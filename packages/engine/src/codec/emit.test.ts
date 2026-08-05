@@ -171,6 +171,42 @@ describe("emit", () => {
     expect(out).toContain("store(myStore)");
   });
 
+  it("emits a user store referenced by rules in more than one group exactly once", () => {
+    // Fragment-free path (ir.raw is empty): the dedup guard on emittedStores
+    // must stop a store referenced from two different groups from being
+    // emitted twice (a duplicate store() declaration is a kmcmplib error).
+    const ir = makeIR();
+    ir.stores.push({
+      nodeId: "store#2",
+      name: "sharedStore",
+      items: [{ kind: "char", value: "a" }],
+      isSystem: false,
+    });
+    const secondGroup: IRGroup = {
+      nodeId: "group#1",
+      name: "second",
+      usingKeys: false,
+      readonly: false,
+      rules: [
+        {
+          nodeId: "rule#5",
+          context: [{ kind: "any", storeRef: "sharedStore" }],
+          output: [{ kind: "char", value: "b" }],
+        },
+      ],
+    };
+    ir.groups[0]?.rules.push({
+      nodeId: "rule#4",
+      context: [{ kind: "any", storeRef: "sharedStore" }],
+      output: [{ kind: "char", value: "c" }],
+    });
+    ir.groups.push(secondGroup);
+
+    const out = emit(ir);
+    const occurrences = out.split("\n").filter((line) => line.includes("store(sharedStore)"));
+    expect(occurrences).toHaveLength(1);
+  });
+
   it("emits RawKmnFragment sourceText verbatim", () => {
     const ir = makeIR();
     ir.raw.push({
@@ -962,5 +998,119 @@ describe("emit — faithful path catch-all dedup prevents double-emission of a n
     // The dedup guard must prevent a second emission.
     const matches = [...out.matchAll(/store\(alreadyEmitted\)/g)];
     expect(matches).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Store-body range re-collapse on emit (spec 042, FR-008)
+// ---------------------------------------------------------------------------
+
+function kmnWithStore(storeLine: string): string {
+  return `store(&VERSION) '10.0'
+store(&NAME) 'Range Test'
+store(&TARGETS) 'any'
+${storeLine}
+begin Unicode > use(main)
+group(main) using keys
++ [K_A] > U+0061
+`;
+}
+
+/** Extract the `store(<name>) …` line from emitted output. */
+function storeLine(out: string, name: string): string {
+  const line = out.split("\n").find((l) => l.includes(`store(${name})`));
+  if (line === undefined) throw new Error(`no store(${name}) line in output`);
+  return line;
+}
+
+describe("range re-collapse on emit (spec 042)", () => {
+  it("C11: a BMP svara run re-collapses to `U+0904 .. U+0914`", () => {
+    const { ir } = parse(kmnWithStore("store(svara) U+0904 .. U+0914"), "svara");
+    const out = emit(ir);
+    expect(storeLine(out, "svara")).toContain("U+0904 .. U+0914");
+  });
+
+  it("C11: an SMP run re-collapses with quoted endpoints `'𑚀' .. '𑚉'`", () => {
+    const { ir } = parse(kmnWithStore("store(ConsU) U+11680 .. U+11689"), "smp");
+    const out = emit(ir);
+    const line = storeLine(out, "ConsU");
+    expect(line).toContain(`${String.fromCodePoint(0x11680)}' .. '${String.fromCodePoint(0x11689)}`);
+  });
+
+  it("C11: an ascending run of length < 3 is NOT collapsed", () => {
+    const { ir } = parse(kmnWithStore("store(x) U+0905 U+0906"), "short");
+    const out = emit(ir);
+    expect(storeLine(out, "x")).not.toContain("..");
+  });
+
+  it("an all-printable-ASCII ascending run stays a legible string (dictionary/&word preserved)", () => {
+    const { ir } = parse(kmnWithStore("store(word) 'abc'"), "ascii");
+    const out = emit(ir);
+    const line = storeLine(out, "word");
+    expect(line).toContain("'abc'");
+    expect(line).not.toContain("..");
+  });
+
+  // A store that contains a `dk()` deadkey item must NOT get range re-collapse:
+  // kmcmplib rejects a store holding both a `X .. Y` range and a `dk()` item in
+  // the same declaration with KM_WARNING_KMCMP_5251093 "Invalid 'deadkey' or 'dk'
+  // statement" (no .kmx produced). This is exactly the shape of the deadkey
+  // lookup store `store(dkf0021)` in sil_cameroon_azerty — a run of consecutive
+  // combining marks followed by a trailing deadkey — and re-collapsing it broke a
+  // Track-1 copy of that keyboard at the preview compile.
+  it("does NOT re-collapse an ascending run in a store that also holds a dk() item", () => {
+    const { ir } = parse(
+      kmnWithStore("store(dkf) U+0300 U+0301 U+0302 U+0303 dk(003d)"),
+      "deadkey-store",
+    );
+    const out = emit(ir);
+    const line = storeLine(out, "dkf");
+    expect(line).not.toContain("..");
+    expect(line).toContain("U+0300");
+    expect(line).toContain("U+0303");
+    expect(line).toContain("dk(003d)");
+  });
+
+  // kmcmplib (19.0.240-alpha) crashes with a wasm memory-access-out-of-bounds
+  // when a single store declaration carries 8+ `X .. Y` ranges and the file
+  // also uses option-store statements — bisected against bj_cree_woods, whose
+  // Eastern-Finals store re-collapses to 12 ranges (7 compile, 8 crash,
+  // per-store). See KMCMPLIB_STORE_RANGE_BUDGET in emit.ts. A store that
+  // would exceed the budget must emit fully explicit instead.
+  it("does NOT re-collapse a store that would exceed the per-store range budget (kmcmplib crash guard)", () => {
+    // 8 separate ascending runs of 3 non-ASCII codepoints, gaps between runs.
+    const runs: string[] = [];
+    for (let r = 0; r < 8; r++) {
+      const base = 0x1401 + r * 8;
+      runs.push(
+        `U+${base.toString(16).toUpperCase().padStart(4, "0")} .. U+${(base + 2)
+          .toString(16)
+          .toUpperCase()
+          .padStart(4, "0")}`,
+      );
+    }
+    const { ir } = parse(kmnWithStore(`store(cef) ${runs.join(" ")}`), "budget");
+    const out = emit(ir);
+    const line = storeLine(out, "cef");
+    expect(line).not.toContain("..");
+    // Endpoints survive as explicit items (codepoints or quoted chars).
+    expect(line).toContain(String.fromCodePoint(0x1401));
+    expect(line).toContain(String.fromCodePoint(0x1401 + 7 * 8 + 2));
+  });
+
+  it("keeps re-collapse for a store at exactly the range budget (7 ranges)", () => {
+    const runs: string[] = [];
+    for (let r = 0; r < 7; r++) {
+      const base = 0x1401 + r * 8;
+      runs.push(
+        `U+${base.toString(16).toUpperCase().padStart(4, "0")} .. U+${(base + 2)
+          .toString(16)
+          .toUpperCase()
+          .padStart(4, "0")}`,
+      );
+    }
+    const { ir } = parse(kmnWithStore(`store(cef) ${runs.join(" ")}`), "budget7");
+    const out = emit(ir);
+    expect(storeLine(out, "cef")).toContain("..");
   });
 });

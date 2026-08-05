@@ -1,0 +1,60 @@
+# source.caps-handling — how the chosen base's .kmn handles uppercase
+# variants of its rules: duplicated per-case, folded via any()/index()
+# case-insensitive matching, absent entirely, or a mix.
+
+id: source.caps-handling
+family: source
+title: Source capitals handling
+description: >
+  Whether the chosen base's .kmn handles uppercase variants of its rules by
+  duplicating each rule per case, folding case via any()/index() matching
+  against a single case-neutral store, has no caps-handling rules at all, or
+  mixes these across rule groups. A pure source-shape fact ahead of the
+  caps-normalize transform offer.
+
+valueType: enum
+values: [per-rule-duplication, any-index-fold, no-caps-rules, mixed]
+
+modality: physical
+
+derivations:
+  - kind: computed
+    source: "planned:caps-handling-of-kmn"
+    sourceStatus: planned
+    notes: >
+      Classifies whether uppercase variants are handled by rules duplicated
+      per case, folded via any()/index() case-insensitive matching against a
+      shared store, or absent entirely (no rule for the shifted key).
+
+consumers:
+  prefills: []
+  proposes:
+    - "transform-offer:caps-normalize"
+
+provenanceLabel: "how your source keyboard already handles capital letters and marks"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: computed
+
+transformImpactClass: behavior-preserving
+houseTargetPolicy:
+  inputs: [pb_capitals_marks]
+  rules:
+    - when: "pb_capitals_marks indicates capitals are typed with marks"
+      target: any-index-fold
+    - when: default
+      target: no-caps-rules
+invertibility: lossless
+implications: >
+  Folding per-case rule duplication into any()/index() matching (or the
+  reverse) changes source structure only; the same casing variants compile
+  to the same output either way.
+exceptionSites: []
+causePredicates: []
+
+notes: >
+  Not applicable when source.casing == caseless (e.g. Arabic, Devanagari) —
+  there is no uppercase variant to handle in the first place.

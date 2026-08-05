@@ -58,138 +58,36 @@ function axes(overrides: Partial<DiscoveryAxisVector>): DiscoveryAxisVector {
 // ---------------------------------------------------------------------------
 
 describe("selectStrategy — primary rules", () => {
-  it("Rule 1: massive + logographic → S-12", () => {
-    const result = selectStrategy(
-      axes({ scale: "massive", scriptClass: "logographic" }),
-    );
-    expect(result.primary).toBe("S-12");
-    expect(result.triggeredRule).toBe(1);
-  });
-
-  it("Rule 2a (abjad): scriptClass=abjad → S-09", () => {
-    const result = selectStrategy(axes({ scriptClass: "abjad" }));
-    expect(result.primary).toBe("S-09");
-    expect(result.triggeredRule).toBe(2);
-    expect(result.secondaries).toEqual([]);
-  });
-
-  it("Rule 2b (abugida+clusters+strong): abugida + clusterSensitivity + strong → S-09 with S-05", () => {
-    const result = selectStrategy(
-      axes({
-        scriptClass: "abugida",
-        clusterSensitivity: true,
-        phoneticIntuition: "strong",
-      }),
-    );
-    expect(result.primary).toBe("S-09");
-    expect(result.triggeredRule).toBe(2);
-    expect(result.secondaries).toContain("S-05");
-  });
-
-  it("Rule 3: diacriticBehavior=replacing-cycling → S-07 with S-04", () => {
-    const result = selectStrategy(
-      axes({ diacriticBehavior: "replacing-cycling" }),
-    );
-    expect(result.primary).toBe("S-07");
-    expect(result.triggeredRule).toBe(3);
-    expect(result.secondaries).toEqual(["S-04"]);
-  });
-
-  it("Rule 3a: alphabetic + strong + postfix → S-03 with S-04", () => {
-    const result = selectStrategy(
-      axes({
-        scriptClass: "alphabetic",
-        phoneticIntuition: "strong",
-        markInputOrder: "postfix",
-      }),
-    );
-    expect(result.primary).toBe("S-03");
-    expect(result.triggeredRule).toBe("3a");
-    expect(result.secondaries).toEqual(["S-04"]);
-  });
-
-  it("Rule 3a dormant for prefix: alphabetic + strong + medium + prefix → falls through to rule 5 (S-05)", () => {
-    const result = selectStrategy(
-      axes({
-        scriptClass: "alphabetic",
-        phoneticIntuition: "strong",
-        scale: "medium",
-        markInputOrder: "prefix",
-      }),
-    );
-    expect(result.primary).toBe("S-05");
-    expect(result.triggeredRule).toBe(5);
-    expect(result.secondaries).toEqual(["S-04"]);
-  });
-
-  it("Rule 4: multiMode=two-orthography → S-11 (primary)", () => {
-    const result = selectStrategy(axes({ multiMode: "two-orthography" }));
-    expect(result.primary).toBe("S-11");
-    expect(result.triggeredRule).toBe(4);
-    expect(result.secondaries).toEqual([]);
-  });
-
-  it("Rule 5: phoneticIntuition=strong + scale=medium → S-05 with S-04", () => {
-    const result = selectStrategy(
-      axes({ phoneticIntuition: "strong", scale: "medium" }),
-    );
-    expect(result.primary).toBe("S-05");
-    expect(result.triggeredRule).toBe(5);
-    expect(result.secondaries).toEqual(["S-04"]);
-  });
-
-  it("Rule 6: diacriticBehavior=multi-family + scale=large → S-06 with S-04", () => {
-    const result = selectStrategy(
-      axes({ diacriticBehavior: "multi-family", scale: "large" }),
-    );
-    expect(result.primary).toBe("S-06");
-    expect(result.triggeredRule).toBe(6);
-    expect(result.secondaries).toEqual(["S-04"]);
-  });
-
-  it("Rule 7: diacriticBehavior=stacking-combining + scale=small → S-02 with S-04", () => {
-    const result = selectStrategy(
-      axes({ diacriticBehavior: "stacking-combining", scale: "small" }),
-    );
-    expect(result.primary).toBe("S-02");
-    expect(result.triggeredRule).toBe(7);
-    expect(result.secondaries).toEqual(["S-04"]);
-  });
-
-  it("Rule 8: scriptClass=alphabetic + remapPosture=full-remap → S-06 with S-04, S-08", () => {
-    const result = selectStrategy(
-      axes({ scriptClass: "alphabetic", remapPosture: "full-remap" }),
-    );
-    expect(result.primary).toBe("S-06");
-    expect(result.triggeredRule).toBe(8);
-    expect(result.secondaries).toEqual(["S-04", "S-08"]);
-  });
-
-  it("Rule 9 (secondary): constraintEnforcement=loud → secondaries includes S-10", () => {
-    const result = selectStrategy(axes({ constraintEnforcement: "loud" }));
-    expect(result.secondaries).toContain("S-10");
-  });
-
-  it("Rule 10 (secondary): spareKeyAvailability=fully booked → secondaries includes S-08", () => {
-    const result = selectStrategy(
-      axes({ spareKeyAvailability: "fully booked" }),
-    );
-    expect(result.secondaries).toContain("S-08");
-  });
-
-  it("Rule 11: scale=tiny + phoneticIntuition=strong → S-01", () => {
-    const result = selectStrategy(
-      axes({ scale: "tiny", phoneticIntuition: "strong" }),
-    );
-    expect(result.primary).toBe("S-01");
-    expect(result.triggeredRule).toBe(11);
-  });
-
-  it("Rule 12 (fallback): all defaults → S-03", () => {
-    const result = selectStrategy(axes({}));
-    expect(result.primary).toBe("S-03");
-    expect(result.triggeredRule).toBe(12);
-  });
+  it.each([
+    { rule: 1, desc: "massive + logographic", axes: { scale: "massive", scriptClass: "logographic" }, expectPrimary: "S-12", expectRule: 1, expectSecondaries: [] },
+    { rule: 2, desc: "abjad", axes: { scriptClass: "abjad" }, expectPrimary: "S-09", expectRule: 2, expectSecondaries: [] },
+    { rule: "2b", desc: "abugida+clusters+strong", axes: { scriptClass: "abugida", clusterSensitivity: true, phoneticIntuition: "strong" }, expectPrimary: "S-09", expectRule: 2, expectSecondaries: ["S-05"] },
+    { rule: 3, desc: "diacriticBehavior=replacing-cycling", axes: { diacriticBehavior: "replacing-cycling" }, expectPrimary: "S-07", expectRule: 3, expectSecondaries: ["S-04"] },
+    { rule: "3a", desc: "alphabetic+strong+postfix", axes: { scriptClass: "alphabetic", phoneticIntuition: "strong", markInputOrder: "postfix" }, expectPrimary: "S-03", expectRule: "3a", expectSecondaries: ["S-04"] },
+    { rule: "3a-dormant", desc: "alphabetic+strong+medium+prefix (rule 3a dormant)", axes: { scriptClass: "alphabetic", phoneticIntuition: "strong", scale: "medium", markInputOrder: "prefix" }, expectPrimary: "S-05", expectRule: 5, expectSecondaries: ["S-04"] },
+    { rule: 4, desc: "multiMode=two-orthography", axes: { multiMode: "two-orthography" }, expectPrimary: "S-11", expectRule: 4, expectSecondaries: [] },
+    { rule: 5, desc: "phoneticIntuition=strong+scale=medium", axes: { phoneticIntuition: "strong", scale: "medium" }, expectPrimary: "S-05", expectRule: 5, expectSecondaries: ["S-04"] },
+    { rule: 6, desc: "diacriticBehavior=multi-family+scale=large", axes: { diacriticBehavior: "multi-family", scale: "large" }, expectPrimary: "S-06", expectRule: 6, expectSecondaries: ["S-04"] },
+    { rule: 7, desc: "diacriticBehavior=stacking-combining+scale=small", axes: { diacriticBehavior: "stacking-combining", scale: "small" }, expectPrimary: "S-02", expectRule: 7, expectSecondaries: ["S-04"] },
+    { rule: 8, desc: "alphabetic+remapPosture=full-remap", axes: { scriptClass: "alphabetic", remapPosture: "full-remap" }, expectPrimary: "S-06", expectRule: 8, expectSecondaries: ["S-04", "S-08"] },
+    { rule: 9, desc: "constraintEnforcement=loud (secondary)", axes: { constraintEnforcement: "loud" }, expectPrimary: undefined, expectRule: undefined, expectSecondaries: ["S-10"] },
+    { rule: 10, desc: "spareKeyAvailability=fully booked (secondary)", axes: { spareKeyAvailability: "fully booked" }, expectPrimary: undefined, expectRule: undefined, expectSecondaries: ["S-08"] },
+    { rule: 11, desc: "scale=tiny+phoneticIntuition=strong", axes: { scale: "tiny", phoneticIntuition: "strong" }, expectPrimary: "S-01", expectRule: 11, expectSecondaries: [] },
+    { rule: 12, desc: "all defaults (fallback)", axes: {}, expectPrimary: "S-03", expectRule: 12, expectSecondaries: [] },
+  ])(
+    "Rule $rule: $desc",
+    ({ expectPrimary, expectRule, expectSecondaries, axes: axesOverrides }) => {
+      const result = selectStrategy(axes(axesOverrides));
+      if (expectPrimary !== undefined) expect(result.primary).toBe(expectPrimary);
+      if (expectRule !== undefined) expect(result.triggeredRule).toBe(expectRule);
+      expectSecondaries.forEach((s) => expect(result.secondaries).toContain(s));
+      if (expectSecondaries.length > 0) {
+        expect(result.secondaries).toHaveLength(expectSecondaries.length);
+      } else if (expectPrimary !== undefined) {
+        expect(result.secondaries).toEqual([]);
+      }
+    }
+  );
 });
 
 // ---------------------------------------------------------------------------
@@ -218,240 +116,32 @@ describe("selectStrategy — S-11 wrapper", () => {
 // ---------------------------------------------------------------------------
 
 describe("§7.5 seed fixtures", () => {
-  it("akan", () => {
-    const result = selectStrategy(
-      axes({
-        scale: "tiny",
-        scriptClass: "alphabetic",
-        phoneticIntuition: "strong",
-        diacriticBehavior: "none",
-        multiMode: "single",
-        constraintEnforcement: "none",
-        spareKeyAvailability: "many",
-        remapPosture: "addition",
-      }),
-    );
-    expect(result.primary).toBe("S-01");
-    expect(result.triggeredRule).toBe(11);
-    expect(result.secondaries).toEqual([]);
-  });
-
-  it("sil_euro_latin", () => {
-    const result = selectStrategy(
-      axes({
-        scale: "large",
-        scriptClass: "alphabetic",
-        phoneticIntuition: "strong",
-        diacriticBehavior: "multi-family",
-        multiMode: "single",
-        constraintEnforcement: "none",
-        spareKeyAvailability: "RAlt only",
-        remapPosture: "addition",
-      }),
-    );
-    expect(result.primary).toBe("S-05");
-    expect(result.triggeredRule).toBe(5);
-    expect(result.secondaries).toContain("S-04");
-  });
-
-  it("sil_ipa", () => {
-    const result = selectStrategy(
-      axes({
-        scale: "medium",
-        scriptClass: "alphabetic",
-        phoneticIntuition: "strong",
-        diacriticBehavior: "none",
-        multiMode: "single",
-        constraintEnforcement: "none",
-        spareKeyAvailability: "many",
-        remapPosture: "addition",
-        markInputOrder: "postfix",
-      }),
-    );
-    expect(result.primary).toBe("S-03");
-    expect(result.triggeredRule).toBe("3a");
-    expect(result.secondaries).toContain("S-04");
-  });
-
-  it("sil_devanagari_phonetic", () => {
-    const result = selectStrategy(
-      axes({
-        scale: "medium",
-        scriptClass: "abugida",
-        clusterSensitivity: true,
-        phoneticIntuition: "strong",
-        diacriticBehavior: "none",
-        multiMode: "single",
-        constraintEnforcement: "none",
-        spareKeyAvailability: "many",
-      }),
-    );
-    expect(result.primary).toBe("S-09");
-    expect(result.triggeredRule).toBe(2);
-    expect(result.secondaries).toContain("S-05");
-  });
-
-  it("vietnamese_telex", () => {
-    const result = selectStrategy(
-      axes({
-        scale: "medium",
-        scriptClass: "alphabetic",
-        phoneticIntuition: "strong",
-        diacriticBehavior: "replacing-cycling",
-        multiMode: "single",
-        constraintEnforcement: "none",
-        spareKeyAvailability: "many",
-        remapPosture: "addition",
-      }),
-    );
-    expect(result.primary).toBe("S-07");
-    expect(result.triggeredRule).toBe(3);
-    expect(result.secondaries).toContain("S-04");
-  });
-
-  it("sil_yoruba8", () => {
-    const result = selectStrategy(
-      axes({
-        scale: "medium",
-        scriptClass: "alphabetic",
-        phoneticIntuition: "strong",
-        diacriticBehavior: "multi-family",
-        multiMode: "two-orthography",
-        constraintEnforcement: "none",
-        spareKeyAvailability: "many",
-        remapPosture: "addition",
-      }),
-    );
-    expect(result.primary).toBe("S-11");
-    expect(result.triggeredRule).toBe(4);
-    expect(result.secondaries).toEqual([]);
-  });
-
-  it("armenian_mnemonic_r", () => {
-    const result = selectStrategy(
-      axes({
-        scale: "medium",
-        scriptClass: "alphabetic",
-        phoneticIntuition: "weak",
-        diacriticBehavior: "none",
-        multiMode: "single",
-        constraintEnforcement: "none",
-        spareKeyAvailability: "RAlt only",
-        remapPosture: "full-remap",
-      }),
-    );
-    expect(result.primary).toBe("S-06");
-    expect(result.triggeredRule).toBe(8);
-    expect(result.secondaries).toContain("S-04");
-    expect(result.secondaries).toContain("S-08");
-  });
-
-  it("el_pasifika", () => {
-    const result = selectStrategy(
-      axes({
-        scale: "small",
-        scriptClass: "alphabetic",
-        phoneticIntuition: "strong",
-        diacriticBehavior: "stacking-combining",
-        multiMode: "single",
-        constraintEnforcement: "loud",
-        spareKeyAvailability: "many",
-        remapPosture: "addition",
-      }),
-    );
-    expect(result.primary).toBe("S-02");
-    expect(result.triggeredRule).toBe(7);
-    expect(result.secondaries).toContain("S-04");
-    expect(result.secondaries).toContain("S-10");
-  });
-
-  it("cs_pinyin", () => {
-    const result = selectStrategy(
-      axes({
-        scale: "massive",
-        scriptClass: "logographic",
-        phoneticIntuition: "weak",
-        diacriticBehavior: "none",
-        multiMode: "single",
-        constraintEnforcement: "none",
-        spareKeyAvailability: "many",
-      }),
-    );
-    expect(result.primary).toBe("S-12");
-    expect(result.triggeredRule).toBe(1);
-    expect(result.secondaries).toEqual([]);
-  });
-
-  it("itrans_devanagari_hindi", () => {
-    const result = selectStrategy(
-      axes({
-        scale: "large",
-        scriptClass: "abugida",
-        clusterSensitivity: true,
-        phoneticIntuition: "strong",
-        diacriticBehavior: "none",
-        multiMode: "two-orthography",
-        constraintEnforcement: "none",
-        spareKeyAvailability: "many",
-      }),
-    );
-    expect(result.primary).toBe("S-09");
-    expect(result.triggeredRule).toBe(2);
-    expect(result.secondaries).toContain("S-05");
-    expect(result.secondaries).toContain("S-11");
-  });
-
-  it("sil_pan_africa_mnemonic", () => {
-    const result = selectStrategy(
-      axes({
-        scale: "large",
-        scriptClass: "alphabetic",
-        phoneticIntuition: "weak",
-        diacriticBehavior: "multi-family",
-        multiMode: "single",
-        constraintEnforcement: "none",
-        spareKeyAvailability: "many",
-        remapPosture: "addition",
-      }),
-    );
-    expect(result.primary).toBe("S-06");
-    expect(result.triggeredRule).toBe(6);
-    expect(result.secondaries).toContain("S-04");
-  });
-
-  it("arabic_izza", () => {
-    const result = selectStrategy(
-      axes({
-        scale: "medium",
-        scriptClass: "abjad",
-        phoneticIntuition: "weak",
-        diacriticBehavior: "none",
-        multiMode: "single",
-        constraintEnforcement: "none",
-        spareKeyAvailability: "many",
-      }),
-    );
-    expect(result.primary).toBe("S-09");
-    expect(result.triggeredRule).toBe(2);
-    expect(result.secondaries).toEqual([]);
-  });
-
-  it("russian_mnemonic_r", () => {
-    const result = selectStrategy(
-      axes({
-        scale: "medium",
-        scriptClass: "alphabetic",
-        phoneticIntuition: "weak",
-        diacriticBehavior: "none",
-        multiMode: "single",
-        constraintEnforcement: "none",
-        spareKeyAvailability: "RAlt only",
-        remapPosture: "full-remap",
-      }),
-    );
-    expect(result.primary).toBe("S-06");
-    expect(result.triggeredRule).toBe(8);
-    expect(result.secondaries).toContain("S-04");
-    expect(result.secondaries).toContain("S-08");
-  });
+  it.each([
+    { name: "akan", axes: { scale: "tiny", scriptClass: "alphabetic", phoneticIntuition: "strong", diacriticBehavior: "none", multiMode: "single", constraintEnforcement: "none", spareKeyAvailability: "many", remapPosture: "addition" }, expectPrimary: "S-01", expectRule: 11, expectSecondaries: [] },
+    { name: "sil_euro_latin", axes: { scale: "large", scriptClass: "alphabetic", phoneticIntuition: "strong", diacriticBehavior: "multi-family", multiMode: "single", constraintEnforcement: "none", spareKeyAvailability: "RAlt only", remapPosture: "addition" }, expectPrimary: "S-05", expectRule: 5, expectSecondaries: ["S-04"] },
+    { name: "sil_ipa", axes: { scale: "medium", scriptClass: "alphabetic", phoneticIntuition: "strong", diacriticBehavior: "none", multiMode: "single", constraintEnforcement: "none", spareKeyAvailability: "many", remapPosture: "addition", markInputOrder: "postfix" }, expectPrimary: "S-03", expectRule: "3a", expectSecondaries: ["S-04"] },
+    { name: "sil_devanagari_phonetic", axes: { scale: "medium", scriptClass: "abugida", clusterSensitivity: true, phoneticIntuition: "strong", diacriticBehavior: "none", multiMode: "single", constraintEnforcement: "none", spareKeyAvailability: "many" }, expectPrimary: "S-09", expectRule: 2, expectSecondaries: ["S-05"] },
+    { name: "vietnamese_telex", axes: { scale: "medium", scriptClass: "alphabetic", phoneticIntuition: "strong", diacriticBehavior: "replacing-cycling", multiMode: "single", constraintEnforcement: "none", spareKeyAvailability: "many", remapPosture: "addition" }, expectPrimary: "S-07", expectRule: 3, expectSecondaries: ["S-04"] },
+    { name: "sil_yoruba8", axes: { scale: "medium", scriptClass: "alphabetic", phoneticIntuition: "strong", diacriticBehavior: "multi-family", multiMode: "two-orthography", constraintEnforcement: "none", spareKeyAvailability: "many", remapPosture: "addition" }, expectPrimary: "S-11", expectRule: 4, expectSecondaries: [] },
+    { name: "armenian_mnemonic_r", axes: { scale: "medium", scriptClass: "alphabetic", phoneticIntuition: "weak", diacriticBehavior: "none", multiMode: "single", constraintEnforcement: "none", spareKeyAvailability: "RAlt only", remapPosture: "full-remap" }, expectPrimary: "S-06", expectRule: 8, expectSecondaries: ["S-04", "S-08"] },
+    { name: "el_pasifika", axes: { scale: "small", scriptClass: "alphabetic", phoneticIntuition: "strong", diacriticBehavior: "stacking-combining", multiMode: "single", constraintEnforcement: "loud", spareKeyAvailability: "many", remapPosture: "addition" }, expectPrimary: "S-02", expectRule: 7, expectSecondaries: ["S-04", "S-10"] },
+    { name: "cs_pinyin", axes: { scale: "massive", scriptClass: "logographic", phoneticIntuition: "weak", diacriticBehavior: "none", multiMode: "single", constraintEnforcement: "none", spareKeyAvailability: "many" }, expectPrimary: "S-12", expectRule: 1, expectSecondaries: [] },
+    { name: "itrans_devanagari_hindi", axes: { scale: "large", scriptClass: "abugida", clusterSensitivity: true, phoneticIntuition: "strong", diacriticBehavior: "none", multiMode: "two-orthography", constraintEnforcement: "none", spareKeyAvailability: "many" }, expectPrimary: "S-09", expectRule: 2, expectSecondaries: ["S-05", "S-11"] },
+    { name: "sil_pan_africa_mnemonic", axes: { scale: "large", scriptClass: "alphabetic", phoneticIntuition: "weak", diacriticBehavior: "multi-family", multiMode: "single", constraintEnforcement: "none", spareKeyAvailability: "many", remapPosture: "addition" }, expectPrimary: "S-06", expectRule: 6, expectSecondaries: ["S-04"] },
+    { name: "arabic_izza", axes: { scale: "medium", scriptClass: "abjad", phoneticIntuition: "weak", diacriticBehavior: "none", multiMode: "single", constraintEnforcement: "none", spareKeyAvailability: "many" }, expectPrimary: "S-09", expectRule: 2, expectSecondaries: [] },
+    { name: "russian_mnemonic_r", axes: { scale: "medium", scriptClass: "alphabetic", phoneticIntuition: "weak", diacriticBehavior: "none", multiMode: "single", constraintEnforcement: "none", spareKeyAvailability: "RAlt only", remapPosture: "full-remap" }, expectPrimary: "S-06", expectRule: 8, expectSecondaries: ["S-04", "S-08"] },
+  ])(
+    "$name",
+    ({ expectPrimary, expectRule, expectSecondaries, axes: axesOverrides }) => {
+      const result = selectStrategy(axes(axesOverrides));
+      expect(result.primary).toBe(expectPrimary);
+      expect(result.triggeredRule).toBe(expectRule);
+      expectSecondaries.forEach((s) => expect(result.secondaries).toContain(s));
+      if (expectSecondaries.length > 0) {
+        expect(result.secondaries).toHaveLength(expectSecondaries.length);
+      } else {
+        expect(result.secondaries).toEqual([]);
+      }
+    }
+  );
 });

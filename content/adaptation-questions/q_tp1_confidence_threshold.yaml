@@ -1,0 +1,22 @@
+# Q-TP1 confidence-threshold (spec 038 US3, trust-policy).
+# The trust dial: how confident the corpus evidence must be before a base is
+# treated as single-script. Lowering it prefills more aggressively (a "mixed"
+# base becomes single-script, named in its chip); raising it routes borderline
+# bases to a US1 confirmation. A policy dial fed by policy, not a facet — its
+# honest default (0.80) IS its no-evidence form (FR-004).
+
+id: q_tp1_confidence_threshold
+family: trust-policy
+elicits: >
+  How confident the corpus evidence must be (the single-script threshold) before
+  the studio prefills a base's script wholesale rather than asking.
+firingCondition: "workflow-defaults-being-configured"
+prefill:
+  facets: []
+provenanceLabel: "the single-script confidence threshold (default 80%)"
+consumers:
+  - "base-suggestion:ranking"
+noEvidenceDegradation: ask-plainly
+scope: workflow
+renders: true
+status: candidate

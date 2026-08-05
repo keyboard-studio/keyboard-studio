@@ -6,6 +6,8 @@ import type { AxisFill } from "./axisFill";
 import type { SurveyPhaseResult } from "./surveyPhaseResult";
 import type { MechanismAssignment } from "./assignmentMap";
 import { mergeAssignments } from "./assignmentMap";
+import type { ConfirmedAlphabet, OutputForm, PlacementWorklist } from "./confirmedAlphabet";
+import { deriveConfirmedInventory, makeConfirmedAlphabet } from "./confirmedAlphabet";
 
 /**
  * Session-level running state across all survey phases.
@@ -95,6 +97,82 @@ export interface SurveySession {
    * `confirmedInventory: []`.
    */
   confirmedInventory: string[];
+  /**
+   * Deduped union of all phases' `attestedDigraphs` — the multi-letter units
+   * the exemplar sources wrote as `{..}` clusters. Held ALONGSIDE
+   * `confirmedInventory`, never inside it: the constituent letters are what
+   * gets typed and they are already in the inventory; this is the record that
+   * they also form a unit. See {@link SurveyPhaseResult.attestedDigraphs}.
+   *
+   * **Additive optional** — absent when no phase attested a cluster, so
+   * existing literal `SurveySession` objects stay valid (unlike
+   * `confirmedInventory`, which is required).
+   */
+  attestedDigraphs?: string[];
+  /**
+   * Store-wise merged three-store alphabet across all phases (spec 046):
+   * deduped union of `bases` (NFC-normalised) and `marks` (compared/deduped
+   * as-authored — combining marks are not independently normalisable the
+   * way base letters are, so `mergeAlphabets` pushes them verbatim), plus a
+   * deduped order-preserving union of `attestedStacks`, last-wins
+   * `declaredRoles`. **Additive optional** —
+   * absent when no phase carried an `alphabet`; when present, the session's
+   * `confirmedInventory` also contains its derived projection.
+   */
+  alphabet?: ConfirmedAlphabet;
+  /**
+   * Marks-series exit state (spec 046): last phase carrying a worklist wins.
+   * **Additive optional** — absent until the marks series completes (or is
+   * skipped, which produces an *empty* worklist, not an absent one).
+   */
+  marksWorklist?: PlacementWorklist;
+  /**
+   * The S4 whole-keyboard output-form decision (spec 046): last phase
+   * carrying one wins, mirroring `marksWorklist`. **Additive optional** —
+   * absent until the marks series' output-form station has been confirmed.
+   */
+  marksOutputForm?: OutputForm;
+  /**
+   * Deduped union of all phases' `retainedConvenienceChars` — base-keyboard
+   * characters kept for loanwords / email addresses / web addresses despite
+   * not being in the orthography. Held ALONGSIDE `confirmedInventory`, never
+   * inside it (see {@link SurveyPhaseResult.retainedConvenienceChars}): the
+   * carve gallery shields them from removal, and nothing else treats them as
+   * orthography.
+   *
+   * **Additive optional** — absent when no phase asked the convenience
+   * question, so existing literal `SurveySession` objects stay valid.
+   */
+  retainedConvenienceChars?: string[];
+}
+
+/**
+ * Order-preserving deduped union of one string-list field across phases:
+ * NFC-normalise, trim, drop empties, first appearance wins.
+ *
+ * Each call owns its own `seen` set, which is the point — `confirmedInventory`
+ * and `attestedDigraphs` must not suppress each other, so a cluster spelled
+ * the same as a character survives in both lists. The returned `push` lets a
+ * caller keep feeding the same list later under the same rule (the flat
+ * inventory also absorbs the three-store alphabet's projection).
+ */
+function nfcDedupUnion(
+  phaseResults: readonly SurveyPhaseResult[],
+  pick: (phase: SurveyPhaseResult) => readonly string[] | undefined
+): { values: string[]; push: (raw: string) => void } {
+  const seen = new Set<string>();
+  const values: string[] = [];
+  const push = (raw: string): void => {
+    const g = raw.normalize("NFC").trim();
+    if (g.length > 0 && !seen.has(g)) {
+      seen.add(g);
+      values.push(g);
+    }
+  };
+  for (const phase of phaseResults) {
+    for (const raw of pick(phase) ?? []) push(raw);
+  }
+  return { values, push };
 }
 
 /**
@@ -122,17 +200,54 @@ export function mergePhaseResults(
   ];
   const assignments = mergeAssignments(phaseResults.map((p) => p.assignments));
   // Deduped union across phases: NFC-normalise, drop empties/whitespace, first-appearance order.
-  const seen = new Set<string>();
-  const confirmedInventory: string[] = [];
-  for (const phase of phaseResults) {
-    for (const raw of phase.confirmedInventory ?? []) {
-      const g = raw.normalize("NFC").trim();
-      if (g.length > 0 && !seen.has(g)) {
-        seen.add(g);
-        confirmedInventory.push(g);
-      }
-    }
+  const { values: confirmedInventory, push: pushInventory } = nfcDedupUnion(
+    phaseResults,
+    (p) => p.confirmedInventory
+  );
+
+  // Attested multi-letter clusters: same dedupe/normalise rule as the
+  // inventory, but a SEPARATE list and a separate `seen` set — a cluster must
+  // never suppress or be suppressed by a single character, and must never leak
+  // into `confirmedInventory` (see SurveyPhaseResult.attestedDigraphs).
+  const { values: attestedDigraphs } = nfcDedupUnion(
+    phaseResults,
+    (p) => p.attestedDigraphs
+  );
+
+  // Three-store alphabet (spec 046): store-wise deduped union across phases;
+  // stacks dedupe on their exact ordered shape; declared roles are last-wins.
+  const alphabet = mergeAlphabets(phaseResults.map((p) => p.alphabet));
+  if (alphabet !== undefined) {
+    // The flat inventory always contains the stores' projection, so pre-046
+    // consumers see alphabet-only contributions too (dedupe absorbs overlap).
+    for (const g of deriveConfirmedInventory(alphabet)) pushInventory(g);
   }
+
+  // Marks-series exit state: the last phase that carried a worklist wins.
+  let marksWorklist: PlacementWorklist | undefined;
+  for (const phase of phaseResults) {
+    if (phase.marksWorklist !== undefined) marksWorklist = phase.marksWorklist;
+  }
+
+  // Output-form decision: same last-wins rule as marksWorklist.
+  let marksOutputForm: OutputForm | undefined;
+  for (const phase of phaseResults) {
+    if (phase.marksOutputForm !== undefined) marksOutputForm = phase.marksOutputForm;
+  }
+
+  // Convenience-retained base characters: same dedupe/normalise rule as the
+  // inventory and a separate `seen` set, but the PRESENCE rule differs from
+  // attestedDigraphs' `length > 0` — an author who was asked and deliberately
+  // kept nothing yields `[]`, which is a different state from "never asked"
+  // (absent). So the field is emitted whenever any phase carried one at all.
+  const { values: retainedConvenienceChars } = nfcDedupUnion(
+    phaseResults,
+    (p) => p.retainedConvenienceChars
+  );
+  const convenienceAsked = phaseResults.some(
+    (p) => p.retainedConvenienceChars !== undefined
+  );
+
   return {
     axes,
     irAxes: { ...irAxes },
@@ -140,7 +255,54 @@ export function mergePhaseResults(
     selectedPatternIds,
     assignments,
     confirmedInventory,
+    ...(attestedDigraphs.length > 0 ? { attestedDigraphs } : {}),
+    ...(alphabet !== undefined ? { alphabet } : {}),
+    ...(marksWorklist !== undefined ? { marksWorklist } : {}),
+    ...(marksOutputForm !== undefined ? { marksOutputForm } : {}),
+    ...(convenienceAsked ? { retainedConvenienceChars } : {}),
   };
+}
+
+/**
+ * Store-wise merge of per-phase alphabets: deduped union of `bases` and
+ * `marks` (first-appearance order), deduped union of `attestedStacks` keyed on
+ * their exact ordered shape (order-preserving — the same marks in a different
+ * order are a distinct stack), last-wins `declaredRoles`. Returns `undefined`
+ * when no phase carried an alphabet, so pre-046 sessions stay shape-identical.
+ */
+function mergeAlphabets(
+  alphabets: (ConfirmedAlphabet | undefined)[]
+): ConfirmedAlphabet | undefined {
+  const present = alphabets.filter((a): a is ConfirmedAlphabet => a !== undefined);
+  if (present.length === 0) return undefined;
+  const merged = makeConfirmedAlphabet();
+  const baseSeen = new Set<string>();
+  const markSeen = new Set<string>();
+  const stackSeen = new Set<string>();
+  for (const a of present) {
+    for (const b of a.bases) {
+      const g = b.normalize("NFC");
+      if (!baseSeen.has(g)) {
+        baseSeen.add(g);
+        merged.bases.push(g);
+      }
+    }
+    for (const m of a.marks) {
+      if (!markSeen.has(m)) {
+        markSeen.add(m);
+        merged.marks.push(m);
+      }
+    }
+    for (const s of a.attestedStacks) {
+      const key = `${s.base} ${s.marks.join(" ")}`;
+      if (!stackSeen.has(key)) {
+        stackSeen.add(key);
+        merged.attestedStacks.push({ base: s.base, marks: [...s.marks] });
+      }
+    }
+    Object.assign(merged.declaredRoles, a.declaredRoles);
+  }
+  return merged;
 }
 
 /**

@@ -75,10 +75,14 @@ const TREE_URL =
 const RAW_BASE =
   "https://raw.githubusercontent.com/keyboard-studio/keyboards/master";
 
+// basic_kbdus and sil_devanagari_phonetic use the Keyman 17+ source/ layout
+// (the live corpus's current default for essentially every package);
+// sil_euro_latin stays on the legacy flat-root layout to prove dual-layout
+// support is preserved.
 const KPS_RESPONSES: Record<string, string> = {
-  "release/b/basic_kbdus/basic_kbdus.kps": KPS_BASIC_KBDUS,
+  "release/b/basic_kbdus/source/basic_kbdus.kps": KPS_BASIC_KBDUS,
   "release/s/sil_euro_latin/sil_euro_latin.kps": KPS_SIL_EURO_LATIN,
-  "release/s/sil_devanagari_phonetic/sil_devanagari_phonetic.kps":
+  "release/s/sil_devanagari_phonetic/source/sil_devanagari_phonetic.kps":
     KPS_SIL_DEVANAGARI,
 };
 
@@ -151,19 +155,21 @@ function createTruncatedFetch(): FetchFn {
       });
     }
     // release/b recursively (paths relative to the subfolder root).
+    // basic_kbdus uses the source/ layout (see the KPS_RESPONSES comment above).
     if (url === `${TREES_BASE}/bsha?recursive=1`) {
       return jsonOk({
         sha: "bsha", url: "", truncated: false,
-        tree: [treeItem("basic_kbdus/basic_kbdus.kps", "blob", "k1")],
+        tree: [treeItem("basic_kbdus/source/basic_kbdus.kps", "blob", "k1")],
       });
     }
-    // release/s recursively.
+    // release/s recursively. sil_euro_latin stays flat-root (legacy);
+    // sil_devanagari_phonetic uses source/ — both layouts exercised here too.
     if (url === `${TREES_BASE}/ssha?recursive=1`) {
       return jsonOk({
         sha: "ssha", url: "", truncated: false,
         tree: [
           treeItem("sil_euro_latin/sil_euro_latin.kps", "blob", "k2"),
-          treeItem("sil_devanagari_phonetic/sil_devanagari_phonetic.kps", "blob", "k3"),
+          treeItem("sil_devanagari_phonetic/source/sil_devanagari_phonetic.kps", "blob", "k3"),
         ],
       });
     }
@@ -225,6 +231,19 @@ describe("createBaseBrowser", () => {
     expect(kb?.sourceUrl).toBe(
       "https://github.com/keyboard-studio/keyboards/tree/master/release/s/sil_euro_latin"
     );
+
+    // Source/ layout (Keyman 17+): path must be the keyboard ROOT with the
+    // trailing "/source" stripped, so the loader's own "/source/" append
+    // resolves to a single source/ segment (not "source/source"). sourceUrl
+    // still points at the source/ folder that holds the files.
+    const kbdus = keyboards.find((k) => k.id === "basic_kbdus");
+    expect(kbdus?.path).toBe("release/b/basic_kbdus");
+    expect(kbdus?.sourceUrl).toBe(
+      "https://github.com/keyboard-studio/keyboards/tree/master/release/b/basic_kbdus/source"
+    );
+
+    const deva = keyboards.find((k) => k.id === "sil_devanagari_phonetic");
+    expect(deva?.path).toBe("release/s/sil_devanagari_phonetic");
   });
 
   it("listAll always includes offline fallback even when already in API results", async () => {
@@ -233,6 +252,89 @@ describe("createBaseBrowser", () => {
 
     const matches = keyboards.filter((k) => k.id === "basic_kbdus");
     expect(matches).toHaveLength(1);
+  });
+
+  // -------------------------------------------------------------------------
+  // Transitional duplicate — same id under BOTH layouts at once
+  // -------------------------------------------------------------------------
+
+  it("listAll collapses a transitional duplicate (id present under both layouts) to a single entry, preferring source/", async () => {
+    const KPS_FLAT = `<?xml version="1.0" encoding="UTF-8"?>
+<Package>
+  <Info>
+    <Name value="SIL Euro Latin (flat, legacy)"/>
+    <Version value="1.0"/>
+  </Info>
+  <Keyboards>
+    <Keyboard>
+      <Name>SIL Euro Latin (flat, legacy)</Name>
+      <ID>sil_euro_latin</ID>
+      <Version>1.0</Version>
+      <Languages>
+        <Language ID="en-Latn-001" Name="English (World)"/>
+      </Languages>
+      <Targets>windows</Targets>
+    </Keyboard>
+  </Keyboards>
+</Package>`;
+
+    const KPS_SOURCE = `<?xml version="1.0" encoding="UTF-8"?>
+<Package>
+  <Info>
+    <Name value="SIL Euro Latin (source, canonical)"/>
+    <Version value="2.0"/>
+  </Info>
+  <Keyboards>
+    <Keyboard>
+      <Name>SIL Euro Latin (source, canonical)</Name>
+      <ID>sil_euro_latin</ID>
+      <Version>2.0</Version>
+      <Languages>
+        <Language ID="en-Latn-001" Name="English (World)"/>
+      </Languages>
+      <Targets>windows macosx linux web</Targets>
+    </Keyboard>
+  </Keyboards>
+</Package>`;
+
+    const dupTree = {
+      sha: "duptreesha",
+      truncated: false,
+      tree: [
+        treeItem("release/s/sil_euro_latin/sil_euro_latin.kps", "blob", "flatsha"),
+        treeItem(
+          "release/s/sil_euro_latin/source/sil_euro_latin.kps",
+          "blob",
+          "sourcesha"
+        ),
+      ],
+    };
+
+    const dupFetch: FetchFn = async (url) => {
+      if (url === TREE_URL) return jsonOk(dupTree);
+      if (url === `${RAW_BASE}/release/s/sil_euro_latin/sil_euro_latin.kps`) {
+        return { ok: true, status: 200, statusText: "OK", json: async () => ({}), text: async () => KPS_FLAT };
+      }
+      if (
+        url === `${RAW_BASE}/release/s/sil_euro_latin/source/sil_euro_latin.kps`
+      ) {
+        return { ok: true, status: 200, statusText: "OK", json: async () => ({}), text: async () => KPS_SOURCE };
+      }
+      return { ok: false, status: 404, statusText: "Not Found", json: async () => ({}), text: async () => "" };
+    };
+
+    const service = createBaseBrowser({ fetch: dupFetch });
+    const keyboards = await service.listAll();
+
+    const matches = keyboards.filter((k) => k.id === "sil_euro_latin");
+    expect(matches).toHaveLength(1);
+    // Dedup preferred the source/ layout (asserted via displayName/version
+    // below), but `path` is the keyboard ROOT with the trailing `/source`
+    // stripped — the loader appends `/source/` itself, so a `.../source` path
+    // would resolve to `.../source/source/<id>.kmn` (404).
+    expect(matches[0]?.path).toBe("release/s/sil_euro_latin");
+    expect(matches[0]?.displayName).toBe("SIL Euro Latin (source, canonical)");
+    expect(matches[0]?.version).toBe("2.0");
   });
 
   it("listAll falls back to offline bundle when API call throws", async () => {

@@ -2,10 +2,17 @@
 //
 // FR-005: renders the same element, role, and resolved styles as the inline
 // control it replaces. The base INPUT_STYLE values are reproduced verbatim;
-// `resize: "vertical"` is always applied (matching the isMultiLine branch).
 // `error` variant swaps the border to ERROR_BORDER.
 // Native style/className pass-through ensures call-site overrides survive
 // exactly (Decision 2).
+//
+// Issue #536: `resize` defaults to `"none"` — most survey multiline fields
+// (short free-text answers) never needed free resize; callers that
+// genuinely want it (long-form notes) pass `resize="vertical"` explicitly.
+// Carries `.ks-focus-ring .ks-hit-target` (index.css) for the shared
+// focus-ring / >=44px touch-target conventions — merged with any caller
+// className, never replacing it. Height is left to `rows` (not `--control-h`,
+// which sizes single-line controls only).
 
 import React from "react";
 import {
@@ -15,10 +22,18 @@ import {
   FONT,
   ERROR_BORDER,
 } from "./theme.ts";
+import { mergeClassNames } from "./classNames.ts";
 
 export type TextareaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement> & {
   /** When true, applies ERROR_BORDER (#7a2a2a) as the border color. */
   error?: boolean;
+  /**
+   * CSS `resize` value. Defaults to `"none"` — free resize is reserved for
+   * fields that are genuinely open-ended (long-form notes), opted into by
+   * passing `"vertical"` explicitly. Never `"horizontal"`/`"both"` in this
+   * codebase's fixed-width layout.
+   */
+  resize?: "none" | "vertical";
 };
 
 const BASE_STYLE: React.CSSProperties = {
@@ -33,12 +48,11 @@ const BASE_STYLE: React.CSSProperties = {
   fontFamily: FONT,
   boxSizing: "border-box",
   outline: "none",
-  resize: "vertical",
 };
 
 /**
  * Multi-line textarea primitive. Matches the `<textarea>` + `INPUT_STYLE`
- * with `resize: "vertical"` rendering in QuestionField.tsx exactly.
+ * rendering in QuestionField.tsx, with `resize:none` by default (#536).
  *
  * Extends all native HTMLTextAreaElement props so call sites using arbitrary
  * HTML attributes (id, aria-*, value, onChange, disabled, rows, …) pass
@@ -46,14 +60,18 @@ const BASE_STYLE: React.CSSProperties = {
  */
 export function Textarea({
   error = false,
+  resize = "none",
   style,
+  className,
   ...rest
 }: TextareaProps): React.ReactElement {
   return (
     <textarea
+      className={mergeClassNames("ks-focus-ring ks-hit-target", className)}
       style={{
         ...BASE_STYLE,
         borderColor: error ? ERROR_BORDER : BORDER,
+        resize,
         ...style,
       }}
       {...rest}

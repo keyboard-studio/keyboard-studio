@@ -39,11 +39,68 @@
   --app-accent-text:   #8fc4f6;
   --app-font:          var(--ui);
   --app-font-mono:     var(--mono);
+  /* Glyph-display font — same 'Lora' serif stack already used ad hoc for
+     character tiles (GlyphCell, RemovalBanner, StatusBar); named here so
+     CarveGalleryV2 can reference one token instead of repeating the stack. */
+  --app-font-glyph:    'Lora', Georgia, serif;
+  --app-danger:        var(--danger);
   --sil-orange:        var(--amber);
   --sil-orange-dark:   var(--amber-text);
   --sil-green:         #509E2F;
   --sil-green-dark:    #38751C;
+
+  /* Shared control conventions (issue #536) */
+  --control-h:         34px;
+  --app-accent-ring:   rgba(90, 167, 240, 0.45);
 }
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--ui); }
+
+/* Shared control conventions (issue #536) ---------------------------------
+ * .ks-control      — single-line inputs/selects are sized to --control-h.
+ * .ks-focus-ring   — consistent keyboard-focus indicator across every
+ *                     interactive control (inputs, selects, buttons,
+ *                     comboboxes); uses --app-accent-ring so a host-page
+ *                     theme change propagates automatically.
+ * .ks-hit-target   — bumps the effective hit area to >=44px on coarse
+ *                     (touch) pointers only, leaving the compact desktop
+ *                     visual (--control-h / native padding) untouched for
+ *                     mouse/trackpad users.
+ * These are additive utility classes — they never replace a component's own
+ * inline styles, only supplement them (focus/touch cannot be expressed via
+ * an inline `style` object). */
+.ks-control {
+  height: var(--control-h);
+}
+
+.ks-focus-ring:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--app-accent-ring);
+  border-color: var(--app-accent);
+}
+
+@media (pointer: coarse) {
+  .ks-hit-target {
+    min-height: 44px;
+  }
+}
+
+/* Deletable-chip hover-red affordance (alphabet-gallery overhaul) ----------
+ * Every neon-green "click to remove" chip across the assignment-loop
+ * galleries (MechanismGallery's "Added"/"Existing methods" rows, TouchGallery's
+ * "Configured" row) turns red on hover to signal "click deletes". This is
+ * deliberately NOT a `.ks-deletable-chip:hover` class rule here: each of
+ * those chips already carries an inline `background`/`border`/`color` (the
+ * row's own palette props), and an inline style always wins over a class
+ * selector of equal or lower specificity — a class rule would need
+ * `!important` fighting the inline styles it's laid over, which is fragile
+ * (any inline-style caller that later adds `!important` of its own wins
+ * back). The reliable, `!important`-free path is a per-chip
+ * onMouseEnter/onMouseLeave state swap, implemented once as
+ * `HoverDangerChip` in editors/assignLoop/parts/RemovableChipRow.tsx and
+ * shared by every deletable-chip site (including the standalone "Applied
+ * methods" pills, which bypass RemovableChipRow's `items` shape but still
+ * import HoverDangerChip directly). No CSS class is needed for this
+ * affordance; kept as a comment here so a future attempt at a `:hover` class
+ * doesn't silently lose to the inline styles again. */

@@ -231,13 +231,27 @@ describe("orphan-input lint — every manifested input has a prior producer", ()
     expect(reports).toHaveLength(0);
   });
 
-  it("all registry modules are referenced by a manifest, except the explicit reserve allowlist", () => {
-    // Every registry entry appears in a manifest EXCEPT the deliberately demoted
-    // reserve modules in RESERVE_ALLOWLIST. A module absent from both is a
-    // genuine fault — an unfinished addition, or an accidental drop from a flow.
+  it("all registry modules are referenced by a manifest, except the two explicit exemptions", () => {
+    // Every registry entry appears in a manifest EXCEPT two documented classes.
+    // A module absent from all of them is a genuine fault — an unfinished
+    // addition, or an accidental drop from a flow.
+    //
+    // spec 046 RELOCATED_EXEMPT: pb_mark_input_order is intentionally
+    // NON-manifested — its content is RELOCATED into the marks series' S3
+    // station (survey/marks/InputOrderStation.tsx reads the module's
+    // definition), so the module stays registered/on disk but off every manifest.
+    //
+    // RESERVE_ALLOWLIST (above): demoted-but-revivable modules. Kept separate
+    // from RELOCATED_EXEMPT because the two exemptions mean different things and
+    // decay differently — a relocated module's content is still reachable by an
+    // author, a demoted one's is not.
+    const RELOCATED_EXEMPT = new Set(["pb_mark_input_order"]);
     const registryIds = Object.keys(questionRegistry);
     const nonManifested = registryIds.filter(
-      (id) => !manifestedIds.has(id) && !RESERVE_ALLOWLIST.has(id),
+      (id) =>
+        !manifestedIds.has(id) &&
+        !RELOCATED_EXEMPT.has(id) &&
+        !RESERVE_ALLOWLIST.has(id),
     );
     expect(
       nonManifested,

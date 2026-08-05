@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { definition, fixtures } from "../../../../src/survey/questions/b/pb_legacy_encoding.ts";
+import {
+  definition,
+  fixtures,
+} from "../../../../src/survey/questions/b/pb_legacy_encoding.ts";
 
 describe("pb_legacy_encoding — definition", () => {
   it("has correct id", () => {
@@ -19,13 +22,8 @@ describe("pb_legacy_encoding — definition", () => {
   });
 });
 
-describe("pb_legacy_encoding — fixtures (no validate)", () => {
+describe("pb_legacy_encoding — fixtures", () => {
   it("has no invalid fixtures", () => {
     expect(fixtures.invalid).toHaveLength(0);
   });
-  for (const { value, note } of fixtures.valid) {
-    it(`valid fixture: ${JSON.stringify(value)}${note ? ` (${note})` : ""}`, () => {
-      expect(true).toBe(true);
-    });
-  }
 });

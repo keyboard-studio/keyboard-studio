@@ -254,3 +254,31 @@ entry is a **hard failure** — promotion must be explicit.
 
 **Demotion** is the exact reverse. Either direction, the spec-022 no-delete guardrail keeps
 every module registered + on-disk + test-covered — demotion is never deletion.
+
+## Leftover section (Flow Map)
+
+Demoted/relocated question modules are physically relocated out of the live phase
+folders into a dedicated `packages/studio/src/survey/questions/reserve/` folder, with
+their own sub-registry (`registry.reserve.ts`, exporting `reserveRegistry`) merged into
+the consolidated `questionRegistry`. The Flow Map's **Leftover questions** section
+(`buildLeftoverSection` in `dashboard/renderedNodeSet.ts`) renders every module in
+`reserveRegistry` directly — it is sourced from the reserve registry, not derived by
+subtracting live-flow ids from `questionRegistry` — so it always reflects physical
+reality: a module is Leftover if and only if it lives in `reserve/`. Nodes are labelled
+*kept for reference / possible reuse, never run by the live survey*. This is where the
+demoted Phase A battery (and `pb_mark_input_order`, relocated by spec 046) live — never
+rendered as reserve clog inside a live drill-down.
+
+Concretely, the live `identity_lite` drill-down keys off `phaseARegistry`, which now
+holds ONLY the `il_*` modules (the demoted battery no longer lives alongside them in
+`questions/a/`), so its drill-down shows only its own questions. The demoted modules
+stay registered (no-delete) in `reserveRegistry` and appear in the Leftover section —
+and, in their authored order, in the Library section as the `phase_a_identity` proposed
+flow (whose `flowSources` registry is `reserveRegistry`).
+
+To **reuse** a leftover question, re-add its id to a live flow's `questions:` list (e.g.
+`identity_lite.modular.yaml`) and move its module file back into the appropriate live
+phase folder with its import updated in that phase's sub-registry — it then renders live
+and drops out of Leftover automatically (the Leftover set is derived from the reserve
+registry, not a hand-maintained list). See the promotion runbook above for turning a
+whole *proposed flow* live.

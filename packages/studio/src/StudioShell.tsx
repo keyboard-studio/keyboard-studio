@@ -3,21 +3,45 @@
 // Routes:
 //   #survey  (default)  — full authoring wizard: identity → base → track →
 //                         [project_name (copy)] → characters (prefill/B) →
-//                         carve → mechanisms → touch → help → done
-//   #preview            — PreviewScreen: "try it" — OSK preview + diagnostics
-//                         (no Download button, no SignUpPanel)
+//                         carve → mechanisms → sequences →
+//                         touch → help → done
+//   #preview            — CompareScreen: look at a keyboard you are NOT
+//                         authoring — run it, read its source. Read-only:
+//                         no path from this tab into the working copy
+//                         (spec 057 US2). The route token stays `preview`
+//                         while the tab is labelled "Compare".
 //   #output             — OutputScreen: "ship it" — Download .zip +
 //                         SignUpPanel (no interactive OSK)
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties } from "react";
 import { useResizablePanes } from "./hooks/useResizablePanes.ts";
 import { ResizeHandle } from "./components/ResizeHandle.tsx";
-import type { BaseKeyboard, Pattern } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, DecisionEntry, Pattern, VirtualFS, KeyboardIR, RemovalCapability } from "@keyboard-studio/contracts";
 import { buildTouchLayoutJson } from "./lib/buildTouchLayoutJson.ts";
+import { shouldEmitTouchLayout, resolveTouchSeedSource } from "./lib/touchEmission.ts";
 import { useWorkingCopyStore, bindManifest } from "./stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
 import { instantiateFromBaseIfConfirmed } from "./lib/confirmRebase.ts";
+import {
+  deriveProjectKeyFromWorkingCopy,
+  discardActiveDraft,
+  installDraftAutosave,
+  clearDraft as clearPersistenceDraft,
+  // Aliased: dev's draftAutosave engine (below) also exports a startCloudSync
+  // AND a PENDING_PROJECT_KEY; both engines coexist post-merge, so every
+  // shared name runs under a distinct alias on this side.
+  startCloudSync as startPersistenceCloudSync,
+  PENDING_PROJECT_KEY as DRAFT_PERSISTENCE_PENDING_KEY,
+  wasDraftRestoredThisBoot,
+  restoredDraftSavedAt,
+} from "./lib/draftPersistence.ts";
+import { useGitHubAuth } from "./hooks/useGitHubAuth.ts";
 import { type RouteId } from "./lib/navigate.ts";
+import { parseLocation } from "./lib/location.ts";
+import { liveResolveContext, setPendingWelcomeLocation } from "./lib/jumpToLocation.ts";
+import { readPaneSplitPct, useViewStateStore } from "./stores/viewStateStore.ts";
+import { useStepWalkStore } from "./stores/stepWalkStore.ts";
 import { useKeyboardArtifact, type OnInstantiateCallback } from "./hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
 import { OSKFrame } from "./components/OSKFrame.tsx";
@@ -31,20 +55,85 @@ import { getPatternLibraryService } from "./lib/services.ts";
 import { physicalAssignmentsOf } from "./lib/physicalAssignments.ts";
 import { FlowMapView } from "./dashboard/DashboardView.tsx";
 import { runCompleteness } from "./dashboard/completeness.ts";
-import { PreviewScreen } from "./components/PreviewScreen.tsx";
+import { CompareScreen } from "./components/CompareScreen.tsx";
+import { StudioFooter } from "./components/StudioFooter.tsx";
 import { OutputScreen } from "./components/OutputScreen.tsx";
+import type { MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
+import { resolveMessage } from "./lib/i18nResolve.ts";
+import "./lib/i18n.ts"; // side-effect: load + activate the default (en) catalog
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
+import { LocaleSwitcher } from "./components/LocaleSwitcher.tsx";
 import { ProfileScreen } from "./components/ProfileScreen.tsx";
 import { AccountControl } from "./components/AccountControl.tsx";
-import { manifest } from "./steps/manifest.ts";
+import { hasVisited } from "./lib/firstVisit.ts";
+import { manifest, validateManifestShape } from "./steps/manifest.ts";
 import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
+import { createStudioDecisionRecorder } from "./decisions/createStudioDecisionRecorder.ts";
+import { createSourceSnapshotter } from "./decisions/snapshotSource.ts";
+import { useDecisionLogStore } from "./decisions/decisionLogStore.ts";
+import { DecisionTrailView } from "./decisions/DecisionTrailView.tsx";
+import { resolveImpact, resolveImpactAsync } from "./decisions/impact.ts";
+import { buildPathOverlay } from "./dashboard/pathOverlay.ts";
+import { projectWorkingCopyForOutput } from "./lib/serializeWorkingCopy.ts";
 import { StepHost } from "./components/StepHost.tsx";
-import { TEXT_MAIN, FONT } from "./survey/surveyStyles.ts";
+import { ResumeDraftBanner } from "./components/ResumeDraftBanner.tsx";
+import { SurveyResetButton } from "./components/SurveyResetButton.tsx";
+import {
+  loadDraftMeta,
+  applyDraft,
+  applyStudioDraft,
+  buildStudioDraft,
+  clearDraft,
+  startDraftAutosave,
+  startCloudSync,
+  migrateLegacyDraft,
+  getActiveProjectKey,
+  setActiveProject,
+  pinActiveProject,
+  PENDING_PROJECT_KEY,
+  type DraftMeta,
+  type StudioDraft,
+} from "./lib/draftAutosave.ts";
+import {
+  loadServerDraftMeta,
+  loadServerDraftContent,
+  clearServerDraft,
+  serverMetaToDraftMeta,
+} from "./lib/serverDraftStore.ts";
+import { TEXT_MAIN, TEXT_DIM, FONT } from "./survey/surveyStyles.ts";
+import { CharacterMapPane } from "./survey/CharacterMapPane.tsx";
+import { useBasePreviewStatusStore, type BasePreviewStatus } from "./stores/basePreviewStatusStore.ts";
+import { useInventoryCoverageGate } from "./hooks/useInventoryCoverageGate.ts";
+import { useSurveyBrowserHistorySync } from "./hooks/useSurveyBrowserHistorySync.ts";
+
+// Offer the resume banner only once per page load — on the first SurveyView
+// mount in this JS context, not on same-session route remounts. A page reload
+// resets this flag by starting a new JS context.
+//
+// Spec 057: this flag is now the ONLY thing a route remount changes. The
+// traversal itself survives (FR-002), so a remount is not a fresh wizard and
+// there is nothing to offer to resume — re-offering the banner mid-session
+// would invite the author to "resume" the session they are already in.
+let resumeOfferConsumed = false;
 
 // Bind the manifest into the store's staleness actions.
 // Called once at module load; avoids a circular static import in the store
 // (stores/ → steps/manifest.ts → steps/registerEditorSteps.ts → editors/ → stores/).
 bindManifest(manifest);
+
+// One-shot, idempotent adoption of the legacy single-slot `ks.studio.draft`
+// into the per-project "My keyboards" scheme (specs/037-my-keyboards/spec.md
+// "Migration"). Called at module load (this file's existing idiom for
+// one-time setup, alongside bindManifest/validateManifestShape above/below) —
+// module evaluation runs strictly before any component mounts, so this always
+// completes before SurveyView's useEffect starts autosave/cloud-sync, exactly
+// as the spec requires ("Run once ... before autosave/cloud-sync start").
+// migrateLegacyDraft() self-guards on ks.studio.projects.index already
+// existing, so re-importing this module (e.g. tests using vi.resetModules())
+// re-runs it safely against whatever localStorage state is present then.
+migrateLegacyDraft();
 
 // The Flow Map is a developer aid. It shows automatically in `vite dev`; in
 // hosted builds (Vercel previews, future production) it is gated by
@@ -53,7 +142,10 @@ const SHOW_FLOWMAP =
   import.meta.env.DEV || import.meta.env.VITE_SHOW_FLOWMAP === "1";
 
 const VALID_ROUTES = new Set<RouteId>(
-  (["welcome", "survey", "preview", "output", "flowmap", "profile"] as const).filter(
+  // "trail" is NOT filtered: the decision trail is a production surface (spec 053
+  // FR-017), unlike the flow map beside it. The filter below is only ever about
+  // `flowmap`.
+  (["welcome", "survey", "preview", "output", "flowmap", "trail", "profile"] as const).filter(
     (r) => r !== "flowmap" || SHOW_FLOWMAP,
   ),
 );
@@ -66,10 +158,59 @@ function isRouteId(v: string): v is RouteId {
 // useRoute — reads window.location.hash and reacts to hashchange events
 // ---------------------------------------------------------------------------
 
+// First-visit landing gate (proposal §9). Decides where an empty or unknown
+// hash lands. A genuine first-time visitor sees the welcome screen; a returning
+// visitor — or one with a resumable draft (the survey route surfaces the resume
+// banner) — goes straight into the survey. A newcomer landing also overrides
+// an explicit deep-link hash (a shared #survey/#preview link, a stale
+// bookmark) — see hashToRoute below; internal navigation always sets a valid
+// hash, so beyond that this only governs the initial landing and stale-hash
+// cases.
+function defaultLandingRoute(): RouteId {
+  if (hasVisited()) return "survey";
+  if (loadDraftMeta() !== null) return "survey";
+  return "welcome";
+}
+
 function useRoute(): RouteId {
   const hashToRoute = (): RouteId => {
+    // Spec 057 FR-010/FR-011: the hash may now carry a step and a question
+    // (`#survey/characters/pb_rtl_direction_confirm`). `parseLocation` is the
+    // ONE grammar — routing reads the parsed location's `route` rather than
+    // treating the whole hash as a token, so a deep-linked hash no longer
+    // falls through to the landing route just because it has segments.
+    //
+    // A malformed hash parses to null and behaves exactly as an unknown token
+    // always has: fall back to `defaultLandingRoute()`. Reachability of the
+    // step/question is NOT decided here — that is `resolveLocation`'s job, and
+    // deciding it here would swallow FR-013's stated reason.
     const raw = window.location.hash.slice(1);
-    return isRouteId(raw) ? raw : "survey";
+    const parsed = parseLocation(raw);
+    const landing = defaultLandingRoute();
+    // A genuine newcomer (never visited, no resumable draft) always lands on
+    // welcome first — even on a deep-linked hash (a shared #survey/#preview
+    // link, a stale bookmark). The gate lifts the moment they leave welcome
+    // (markVisited) or once a resumable draft exists, after which the incoming
+    // hash is honored normally.
+    if (landing === "welcome") {
+      // Keep window.location.hash in sync with the forced route. Without this,
+      // a deep-linked hash (e.g. "#survey") is left in place while the route
+      // renders "welcome"; WelcomeScreen's "I'm new" button then calls
+      // navigateTo("survey"), a same-value hash assignment that fires zero
+      // hashchange events per spec, soft-locking the user on WelcomeScreen.
+      if (raw !== "welcome") {
+        // Spec 057 FR-015 (D-9): hold the requested location before the
+        // rewrite discards it, so `leaveWelcome` can honour it on exit
+        // instead of dropping a shared deep link on the floor. The
+        // replaceState itself stays — it exists to avoid the same-value-hash
+        // soft-lock described below.
+        if (parsed !== null) setPendingWelcomeLocation(parsed);
+        window.history.replaceState(window.history.state, "", "#welcome");
+      }
+      return "welcome";
+    }
+    if (parsed !== null && isRouteId(parsed.route)) return parsed.route;
+    return landing;
   };
 
   const [route, setRoute] = useState<RouteId>(hashToRoute);
@@ -89,24 +230,53 @@ function useRoute(): RouteId {
 
 interface NavItem {
   id: RouteId;
-  label: string;
+  /**
+   * Lazy `msg` descriptor — NAV_ITEMS is built at module scope where no
+   * useLingui() binding exists, so labels are resolved per-render via
+   * resolveMessage(i18n, ...) inside NavBar (the same pattern MechanismGallery
+   * uses for its module-scope option tables).
+   */
+  label: MessageDescriptor;
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { id: "survey", label: "Studio" },
-  { id: "preview", label: "Preview" },
-  { id: "output", label: "Output" },
-  ...(SHOW_FLOWMAP ? [{ id: "flowmap" as const, label: "Flow Map" }] : []),
+  { id: "survey", label: msg({ id: "nav.studio", message: "Studio" }) },
+  // Spec 057 FR-020: a NEW message id, not a re-worded one. The tab's
+  // purpose changed — it is a read-only comparison surface now, not a
+  // preview of the author's own keyboard — so an existing translation of
+  // "Preview" is not a translation of this.
+  { id: "preview", label: msg({ id: "nav.compare", message: "Compare" }) },
+  { id: "output", label: msg({ id: "nav.output", message: "Output" }) },
+  // Spec 053 FR-017: unconditional, alongside Output and Preview rather than
+  // beside the dev-gated Flow Map below.
+  { id: "trail", label: msg({ id: "nav.decisionTrail", message: "Decisions" }) },
+  ...(SHOW_FLOWMAP
+    ? [{ id: "flowmap" as const, label: msg({ id: "nav.flowMap", message: "Flow Map" }) }]
+    : []),
 ];
 
 interface NavBarProps {
   active: RouteId;
+  /**
+   * P0 fix UX signal (not the authoritative enforcement — that lives in
+   * OutputScreen/usePreviewArtifact's canDownload gate, which is reachable
+   * regardless of how #output was navigated to). Dims the Output tab and
+   * marks it aria-disabled with an explanatory title so the block is obvious
+   * BEFORE the click, not just after landing on a disabled download button.
+   */
+  outputBlocked?: boolean;
+  /** Tooltip / aria explanation shown while outputBlocked is true. */
+  outputBlockedTitle?: string;
 }
 
-function NavBar({ active }: NavBarProps) {
+function NavBar({ active, outputBlocked = false, outputBlockedTitle }: NavBarProps) {
+  const { i18n: activeI18n } = useLingui();
   return (
     <nav
-      aria-label="Studio navigation"
+      aria-label={resolveMessage(
+        activeI18n,
+        msg({ id: "nav.ariaLabel", message: "Studio navigation" }),
+      )}
       style={{
         height: 48,
         flexShrink: 0,
@@ -123,31 +293,39 @@ function NavBar({ active }: NavBarProps) {
       <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1 }}>
         {NAV_ITEMS.map(({ id, label }) => {
           const isActive = id === active;
+          const isBlocked = id === "output" && outputBlocked;
           return (
             <a
               key={id}
               href={`#${id}`}
               aria-current={isActive ? "page" : undefined}
+              aria-disabled={isBlocked ? "true" : undefined}
+              title={isBlocked ? outputBlockedTitle : undefined}
               style={{
                 padding: "4px 12px",
                 fontSize: 14,
                 fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
                 textDecoration: "none",
-                color: isActive ? "#6ea8fe" : "#e6edf3",
+                color: isBlocked ? "#6e7681" : isActive ? "#6ea8fe" : "#e6edf3",
+                opacity: isBlocked ? 0.6 : 1,
                 borderBottom: isActive ? "2px solid #6ea8fe" : "2px solid transparent",
                 lineHeight: "40px",
                 whiteSpace: "nowrap",
                 transition: "color 120ms ease, border-bottom-color 120ms ease",
               }}
             >
-              {label}
+              {resolveMessage(activeI18n, label)}
             </a>
           );
         })}
       </div>
 
-      {/* Right group — account control (hidden on the welcome route) */}
-      {active !== "welcome" && <AccountControl />}
+      {/* Right group — locale switcher (all routes) + account control
+          (hidden on the welcome route) */}
+      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        <LocaleSwitcher />
+        {active !== "welcome" && <AccountControl />}
+      </div>
     </nav>
   );
 }
@@ -162,8 +340,9 @@ function NavBar({ active }: NavBarProps) {
 // by the SurveyRunner, legitimately not promoted to manifest steps).
 //
 // Manifest spine order (FR-012, M2):
-//   identity → choose_base → track → characters → carve →
-//   mechanisms[lock:physical] → touch[lock:touch] → help → package[reserved]
+//   identity → choose_base → track → characters → marks → carve →
+//   mechanisms[lock:physical] → sequences →
+//   touch[lock:touch] → help → package[reserved]
 //
 // Off-spine (spine:false) steps in array order:
 //   project_name  — copy-track CYOA fork; joinTarget:"characters"
@@ -179,103 +358,39 @@ function NavBar({ active }: NavBarProps) {
 // Side effects on step completion are all dispatched through applyStepCompletion()
 // (steps/reducer.ts) — editors are pure (FR-011, R4).
 //
-// Double-instantiation guard (P1 fix):
+// Double-instantiation guard (P1 fix) / re-instantiation on genuine base
+// switch (F1 fix):
 //   setScaffoldSpec() causes a second compile run whose onInstantiate callback
-//   would fire applyStepCompletion("choose_base", ...) a second time. An
-//   instantiatedRef flag prevents the R3 side effect from running more than once
-//   per session; it resets on start-over.
+//   re-captures the artifact into pendingArtifactRef; the commit effect's
+//   doCommit (below) would then run the choose_base side effect
+//   (applyStepCompletion("choose_base", ...)) a second time for the SAME base.
+//   An `instantiatedForBaseIdRef` (id-aware, not a plain boolean) prevents
+//   that repeat from running more than once per base id, while still allowing
+//   a confirm for a genuinely DIFFERENT base id later in the same session to
+//   re-run the side effect — see docs/design-notes/switch-base-popup-behavior-log.md
+//   (F1). Resets to null on start-over; set to the restored base's id on
+//   résumé (handleResumeDraft).
 // ---------------------------------------------------------------------------
 
 const SURVEY_DIVIDER_WIDTH = 6;
 const SURVEY_LEFT_MIN_PCT = 25;
 const SURVEY_LEFT_MAX_PCT = 65;
-const SURVEY_LEFT_INIT_PCT = 45;
+// The survey pane's INITIAL split now lives in stores/viewStateStore.ts's
+// INITIAL_SPLIT_PCT (spec 057 US5) — the split is session view state, so its
+// starting value belongs with the slot that holds it rather than as a second
+// constant here that could drift from it. The min/max above stay: they are
+// this screen's layout bounds, and `readPaneSplitPct` clamps against them on
+// every read.
 
 // ---------------------------------------------------------------------------
 // ActiveStepId — imported from surveySessionStore (the traversal vocabulary
 // owner). See stores/surveySessionStore.ts (research D-R1).
 // ---------------------------------------------------------------------------
 
-// ---------------------------------------------------------------------------
-// validateManifestShape — throw-on-mismatch structural guard (M2, M3, M4).
-// Called once at module load; a misshapen manifest is a hard error, not a
-// logged warning — fail fast so CI catches it before any render occurs.
-// ---------------------------------------------------------------------------
-
-function validateManifestShape(): void {
-  const ids = manifest.map((s) => s.id);
-  const spineIds = manifest.filter((s) => s.spine !== false).map((s) => s.id);
-
-  // M2 — spine order.
-  const expectedSpine = [
-    "identity", "choose_base", "track", "characters",
-    "carve", "mechanisms", "touch", "help", "package",
-  ];
-  for (let i = 0; i < expectedSpine.length; i++) {
-    const expected = expectedSpine[i];
-    if (expected === undefined) break;
-    const actual = spineIds[i];
-    if (actual !== expected) {
-      throw new Error(
-        `[SurveyView] manifest spine[${i}] expected "${expected}", got "${actual ?? "(none)"}"`,
-      );
-    }
-  }
-
-  // M3 — exactly one lock:physical and one lock:touch, in that order.
-  const locks = manifest.filter((s) => s.lock !== undefined).map((s) => s.lock);
-  if (locks[0] !== "physical" || locks[1] !== "touch" || locks.length !== 2) {
-    throw new Error(
-      `[SurveyView] manifest locks expected ["physical","touch"], got [${locks.join(",")}]`,
-    );
-  }
-
-  // M4 — touch_seed_source is spine:false with joinTarget "touch".
-  const seedSource = manifest.find((s) => s.id === "touch_seed_source");
-  if (seedSource === undefined || seedSource.spine !== false || seedSource.joinTarget !== "touch") {
-    throw new Error(`[SurveyView] manifest touch_seed_source missing or misconfigured`);
-  }
-
-  // M4b — project_name is spine:false with joinTarget "characters".
-  const projName = manifest.find((s) => s.id === "project_name");
-  if (projName === undefined || projName.spine !== false || projName.joinTarget !== "characters") {
-    throw new Error(`[SurveyView] manifest project_name missing or misconfigured (must be spine:false, joinTarget:"characters")`);
-  }
-
-  // M5 — unique ids.
-  const seen = new Set<string>();
-  for (const id of ids) {
-    if (seen.has(id)) {
-      throw new Error(`[SurveyView] manifest duplicate step id: "${id}"`);
-    }
-    seen.add(id);
-  }
-
-  // Layout guard (spec 028 Stage 5, T016): layout:"full" is now LOAD-BEARING —
-  // StepHost reads step.layout to select full-screen vs two-pane chrome (R4).
-  // EXACTLY {carve, mechanisms, touch} must declare layout:"full"; all others
-  // must be "pane" or omit layout. This assertion is retained (not removed) as
-  // a correctness gate: a mismatched layout would silently change the chrome.
-  const FULL_LAYOUT_IDS = new Set(["carve", "mechanisms", "touch"]);
-  for (const step of manifest) {
-    if (step.layout === "full") {
-      if (!FULL_LAYOUT_IDS.has(step.id)) {
-        throw new Error(
-          `[SurveyView] unexpected layout:"full" on step "${step.id}" — only carve/mechanisms/touch may be full-screen (spec 024 Stage 0)`,
-        );
-      }
-    }
-  }
-  for (const expectedId of FULL_LAYOUT_IDS) {
-    const step = manifest.find((s) => s.id === expectedId);
-    if (step?.layout !== "full") {
-      throw new Error(
-        `[SurveyView] step "${expectedId}" must declare layout:"full" (spec 024 Stage 0)`,
-      );
-    }
-  }
-}
-
+// validateManifestShape (M2/M3/M4/M4b/M5 structural guard) now lives in
+// steps/manifest.ts (exported, unit-tested by spec 034 T003). Still invoked
+// once here at module load so a misshapen manifest is a hard error before any
+// render — fail fast so CI catches it.
 validateManifestShape();
 
 // manifestIndexOf and nextSpineStepAfter have moved to steps/advance.ts
@@ -301,9 +416,30 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const localBase = useSurveySessionStore((s) => s.localBase);
   const surveyContext = useSurveySessionStore((s) => s.surveyContext);
 
+  // Self-contained useGitHubAuth() call (same idiom as MyKeyboardsList /
+  // ManagedPRSubmitPanel) so SurveyView can start/stop the signed-in cloud
+  // draft backup (startCloudSync, below) without threading auth state down
+  // through props. Only the access-token PRIMITIVE is read — see the
+  // cloud-sync effect's dependency array.
+  const { token: githubToken } = useGitHubAuth();
+  const cloudSyncAccessToken = githubToken?.accessToken ?? null;
+
   // Store actions needed by SurveyView (not delegated to StepHost).
   const sessionReset = useSurveySessionStore((s) => s.reset);
   const setLocalBase = useSurveySessionStore((s) => s.setLocalBase);
+  // Injected into reducerDeps (spec 035 R12) so reducer.ts can clear the
+  // touch_seed_source fork choice on a genuine base re-instantiation without
+  // steps/ importing stores/ directly.
+  const setTouchSeedSource = useSurveySessionStore((s) => s.setTouchSeedSource);
+
+  // githubTokenRef lets dev's draftAutosave cloud-sync loop read the current
+  // token lazily (from the single useGitHubAuth() call above), so signing in
+  // mid-session starts syncing without restarting the subscription.
+  const githubTokenRef = useRef(githubToken);
+  useEffect(() => {
+    githubTokenRef.current = githubToken;
+  }, [githubToken]);
+  const currentAccessToken = (): string | null => githubTokenRef.current?.accessToken ?? null;
 
   // Derive whether the active step declares layout:"full" (load-bearing per Stage 5,
   // FR-002, R4). SurveyView uses this to skip the two-pane shell for full-screen steps.
@@ -312,20 +448,191 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     return step?.layout === "full";
   }, [activeStepId]);
 
-  // Reset the session store on mount — the store is a module-level singleton that
-  // persists across React tree unmounts/remounts (e.g. navigating away from the
-  // survey route and back creates a new SurveyView mount = a new wizard session).
-  // Without this reset the singleton would resume from stale prior state rather
-  // than starting at "identity". Component-local useState used to give this
-  // mount-fresh reset for free; this call restores that invariant for the store.
+  // Derived the same way as activeStepIsFullScreen: which right-pane content
+  // the active step declares (default "preview" — the live OSK). Used below
+  // to swap in CharacterMapPane for the Phase B build-list screen only, gated
+  // further on discoveryMethod === "build-list" (the IntroChooser and the
+  // manual step-by-step path keep the OSK preview — see steps/types.ts's
+  // rightPane field and steps/manifest.ts's "characters" step).
+  const activeRightPane = useMemo(() => {
+    const step = manifest.find((s) => s.id === activeStepId);
+    return step?.rightPane ?? "preview";
+  }, [activeStepId]);
+  const discoveryMethod = useSurveySessionStore((s) => s.discoveryMethod);
+  const showCharacterMap = activeRightPane === "character-map" && discoveryMethod === "build-list";
+
+  // NO mount-time reset (spec 057 FR-002/FR-003, defect D-1).
+  //
+  // This component used to call `useSurveySessionStore.getState().reset()` on
+  // mount, on the reading that "navigating away and back is a fresh wizard,
+  // not a resume". That reading was the defect. The survey-session store is a
+  // module-level singleton and the working-copy store beside it is never
+  // reset, so a route change lost the author's POSITION while keeping their
+  // CONTENT — the reported symptom exactly ("returning to Studio puts me back
+  // on question one, even though later questions are still filled"). It also
+  // cascaded: the reset was persisted by the autosave subscription (D-2), it
+  // broke every affordance that sets a target step and then navigates (D-3),
+  // and by returning `charactersSubStage` to "prefill" it made a later
+  // re-confirm silently empty the author's Phase B alphabet (D-4).
+  //
+  // THE CONTRACT NOW: component lifetime is not a session boundary. A
+  // traversal reset happens only where the author asked for one, and there are
+  // exactly two such places — `handleStartOver()` below (the corner reset
+  // control and the terminal panels' "Start over") and WelcomeScreen's "I'm
+  // new". Both already call `reset()` explicitly; nothing was added to replace
+  // this deletion, because a second notion of session identity beside those
+  // two is the framing that produced the bug.
+  //
+  // `wasDraftRestoredThisBoot()` went with it: it existed only to stop this
+  // reset from clobbering a draft main.tsx had already restored pre-mount.
+  // With no reset there is nothing to guard, and a resume no longer depends on
+  // an unrelated durable-storage read having happened first (FR-005).
+
+  // F7 — browser Back/Forward integration for the survey wizard (see
+  // hooks/useSurveyBrowserHistorySync.ts for the full design + sync
+  // invariant). Its DEV ordering guard used to key on the reset/restore effect
+  // above; with that effect gone it keys on draft-restore settlement instead,
+  // which is the antecedent that genuinely remains (FR-017, D-9a). See that
+  // hook's doc comment on the parameter.
+  const draftRestoreSettledRef = useRef(false);
   useEffect(() => {
-    useSurveySessionStore.getState().reset();
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentionally empty: runs exactly once on mount
+    // Reading the flag is the settlement: `loadDraft()` runs once, pre-mount,
+    // in main.tsx, so by the time any effect runs the answer is final. This
+    // effect exists to make the ORDER observable to the hook below, not to
+    // decide anything itself.
+    draftRestoreSettledRef.current = true;
+    // Intentionally empty deps: runs exactly once on mount.
   }, []);
 
-  const [oskMode, setOskMode] = useState<OskMode>("desktop");
-  const { containerRef, leftPct, onPointerDown } =
-    useResizablePanes({ minPct: SURVEY_LEFT_MIN_PCT, maxPct: SURVEY_LEFT_MAX_PCT, initPct: SURVEY_LEFT_INIT_PCT });
+  useSurveyBrowserHistorySync(draftRestoreSettledRef);
+
+  // ---------------------------------------------------------------------------
+  // Resume-draft banner + autosave (localStorage draft; lib/draftAutosave.ts).
+  //
+  // On the first SurveyView mount of a page load, peek at any saved draft and
+  // offer to resume it. Autosave does not start until the author decides, so a
+  // pending decision can't overwrite the very draft being offered. When there is
+  // no draft, autosave starts immediately.
+  // ---------------------------------------------------------------------------
+  // The initializer must be PURE: <StrictMode> (main.tsx) double-invokes lazy
+  // useState initializers in dev, and only the *second* return value is kept.
+  // A flag flipped inside the initializer would make invocation 1 consume the
+  // offer and invocation 2 (the kept value) see it already consumed → the banner
+  // would silently never appear in `pnpm dev` / e2e. So read the flag here and
+  // mark it consumed in the mount effect below instead.
+  //
+  // F5 fix (docs/design-notes/switch-base-popup-behavior-log.md): also
+  // suppressed once `wasDraftRestoredThisBoot()` is true. That flag means
+  // `main.tsx`'s pre-mount `draftPersistence.loadDraft()` has ALREADY
+  // silently restored the freshest working-copy + traversal snapshot into
+  // these SAME stores this boot. `loadDraftMeta()` here reads the OTHER,
+  // independent draft engine (`lib/draftAutosave.ts`, coarser 1000ms debounce,
+  // installed earlier at first mount) — its record can legitimately be
+  // STALER than the one already applied. Offering a second "Resume" for an
+  // already-resumed session invites clicking it and silently regressing the
+  // wizard to that staler step (F5's exact symptom); a session that was NOT
+  // silently restored (a real "resume this later" localStorage-only session
+  // predating draftPersistence's pending-slot support, or one on another
+  // device/browser) is unaffected — `wasDraftRestoredThisBoot()` is false
+  // there, so this banner still offers normally.
+  const [resumeMeta, setResumeMeta] = useState<DraftMeta | null>(() =>
+    resumeOfferConsumed || wasDraftRestoredThisBoot() ? null : loadDraftMeta(),
+  );
+
+  // Cloud-restore offer (signed-in only): a server-backed draft found on load —
+  // e.g. a new tab or a different device. Kept separate from the local
+  // resumeMeta so the local draft always wins when both exist; the cloud offer
+  // is only surfaced when there is no local draft to resume. Set at most once
+  // per mount (cloudRestoreCheckedRef).
+  const [cloudResume, setCloudResume] = useState<DraftMeta | null>(null);
+  const cloudRestoreCheckedRef = useRef(false);
+
+  // Mark the one-per-page-load resume offer as consumed after commit (idempotent
+  // under StrictMode's mount/cleanup/mount). Subsequent same-session SurveyView
+  // remounts (route away + back = a fresh wizard) then read the flag and skip the
+  // banner; a real page reload resets the module flag by starting a new JS context.
+  useEffect(() => {
+    // Runs once on mount; touches only the module-level flag, so no deps.
+    resumeOfferConsumed = true;
+  }, []);
+
+  useEffect(() => {
+    // Wait for the author's Resume/Discard choice on either banner before
+    // autosaving, so a pending decision can't overwrite the draft being offered.
+    if (resumeMeta !== null || cloudResume !== null) return;
+    const stopLocal = startDraftAutosave();
+    // Cloud sync runs alongside localStorage autosave; it self-gates on the
+    // token (guests never push) and on meaningful progress, so starting it here
+    // for everyone is safe — a guest or pristine session pushes nothing.
+    const stopCloud = startCloudSync(currentAccessToken);
+    return () => {
+      stopLocal();
+      stopCloud();
+    };
+  }, [resumeMeta, cloudResume]);
+
+  // Cloud-restore check (signed-in only). On the first render where a GitHub
+  // token is present, look for a server-backed draft. Offer it only when there
+  // is no local draft already being offered (local wins) and the author hasn't
+  // started meaningful work — otherwise a fresh session's cloud backup would
+  // pop an unexpected restore. Runs at most once per mount.
+  useEffect(() => {
+    if (cloudRestoreCheckedRef.current) return;
+    const accessToken = githubToken?.accessToken ?? null;
+    if (accessToken === null) return; // guest, or token not yet verified — wait
+    cloudRestoreCheckedRef.current = true;
+    if (resumeMeta !== null) return; // a local draft is offered — prefer it
+    let cancelled = false;
+    // Multi-project note: this one-shot check only looks at the caller's
+    // currently-pinned active project (or the pending pre-instantiation slot
+    // on a genuinely fresh browser) — discovering OTHER cloud-backed projects
+    // from a browser with no local trace of them is the "My keyboards" list
+    // screen's job (next cycle, specs/037-my-keyboards), not this banner's.
+    const draftId = getActiveProjectKey() ?? PENDING_PROJECT_KEY;
+    void loadServerDraftMeta(accessToken, draftId).then((serverMeta) => {
+      if (cancelled || serverMeta === null) return;
+      // Don't surprise an author who began working while the fetch was in flight.
+      if (buildStudioDraft() !== null) return;
+      // F5 fix (freshness comparison, not blanket suppression):
+      // `wasDraftRestoredThisBoot()` means draftPersistence's boot-time
+      // `loadDraft()` already silently restored a local draft into these
+      // SAME stores this boot. That local restore can be STALER than a
+      // genuinely newer cloud draft (a cross-device save discovered on this
+      // boot) — so this offer is suppressed only when the just-restored
+      // local draft is AT LEAST AS FRESH as the cloud one; a strictly newer
+      // cloud draft is still offered. `restoredDraftSavedAt()` reads the
+      // envelope draftPersistence already parsed (no local restore this
+      // boot → null → the comparison never suppresses, same as before this
+      // fix for a fresh session).
+      const localSavedAt = restoredDraftSavedAt();
+      if (localSavedAt !== null && localSavedAt >= serverMeta.savedAt) return;
+      setCloudResume(serverMetaToDraftMeta(serverMeta));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [githubToken, resumeMeta]);
+
+  // Spec 057 US5 (FR-050): the OSK mode and the pane split are VIEW state, not
+  // authoring state — they had been component `useState`, which the route
+  // unmount destroyed on every tab switch. Backed by the session-scoped
+  // viewStateStore they survive the round trip and die on reload (Q9), and
+  // neither read nor write can reach a compile or a validator run (FR-053).
+  const oskMode = useViewStateStore((s) => s.oskMode.survey);
+  const setSurveyOskMode = useViewStateStore((s) => s.setOskMode);
+  const setOskMode = useCallback(
+    (mode: OskMode) => setSurveyOskMode("survey", mode),
+    [setSurveyOskMode],
+  );
+  const setPaneSplitPct = useViewStateStore((s) => s.setPaneSplitPct);
+  const { containerRef, leftPct, onPointerDown } = useResizablePanes({
+    minPct: SURVEY_LEFT_MIN_PCT,
+    maxPct: SURVEY_LEFT_MAX_PCT,
+    // Clamped on READ, so a split stored under a different layout can never
+    // produce an unusable pane here.
+    initPct: readPaneSplitPct("survey", SURVEY_LEFT_MIN_PCT, SURVEY_LEFT_MAX_PCT),
+    onChange: (pct) => setPaneSplitPct("survey", pct),
+  });
 
   // Sync localBase when the prop changes (e.g. after a start-over that sets a new base).
   // localBase lives in the session store; we update it when the working-copy's baseKeyboard
@@ -345,15 +652,200 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const setValidatorFindings = useWorkingCopyStore((s) => s.setValidatorFindings);
 
   // ---------------------------------------------------------------------------
-  // P1 fix: double-instantiation guard.
+  // P1 fix (double-instantiation guard) + F1 fix (id-aware re-instantiation).
   //
   // For Track 1 (copy), setScaffoldSpec() causes a second compile run whose
-  // onInstantiate fires applyStepCompletion("choose_base")/instantiate a second
-  // time. The rebase-guard in instantiateFromBaseIfConfirmed may no-op the
-  // second call, but edit-state-dependent behavior is non-deterministic.
-  // Gate: the R3 side effect fires exactly once per session; reset on start-over.
+  // onInstantiate re-fires for the SAME base already committed. Originally
+  // gated by a plain boolean ("fire the R3 side effect at most once per
+  // session"), which also — as an unwanted side effect — made it impossible to
+  // ever re-instantiate for a genuinely DIFFERENT base chosen later in the same
+  // session (F1: docs/design-notes/switch-base-popup-behavior-log.md). The gate
+  // is now id-aware: it records WHICH base id doCommit has already committed,
+  // so a second settle for that SAME id (P1) is still a no-op, but a confirm
+  // for a DIFFERENT id (F1, after the synchronous rebase-confirm gate in
+  // BaseResolutionAdapter.onConfirm has already run) proceeds and re-runs
+  // doCommit's body. Null before any commit; reset to null on start-over; set
+  // to the restored base's id on résumé (see handleResumeDraft) so a résumé
+  // over an already-instantiated copy does not re-trigger doCommit either.
   // ---------------------------------------------------------------------------
-  const instantiatedRef = useRef<boolean>(false);
+  const instantiatedForBaseIdRef = useRef<string | null>(null);
+
+  // ---------------------------------------------------------------------------
+  // Preview-before-commit (choose_base step): the compile pipeline may settle
+  // BEFORE the author clicks "Choose this keyboard" (they might preview
+  // several bases first). `onInstantiate` below only CAPTURES the settled
+  // artifact here; the actual instantiation (`doCommit`) is deferred until
+  // `baseConfirmed` flips true, via the effect that follows `onInstantiate`.
+  // Cleared alongside `instantiatedForBaseIdRef` on start-over.
+  // ---------------------------------------------------------------------------
+  const pendingArtifactRef = useRef<{
+    base: BaseKeyboard;
+    vfs: VirtualFS;
+    ir: KeyboardIR | null;
+    removalCapabilities: Map<string, RemovalCapability>;
+  } | null>(null);
+
+  // ---------------------------------------------------------------------------
+  // T023 (spec 034 US3): teardown fn for the durable-draft autosave, installed
+  // once the working copy is instantiated (see onInstantiate below) and torn
+  // down on unmount / start-over / a fresh re-instantiation for a new project.
+  // ---------------------------------------------------------------------------
+  const autosaveTeardownRef = useRef<(() => void) | null>(null);
+
+  useEffect(() => {
+    return () => {
+      autosaveTeardownRef.current?.();
+      autosaveTeardownRef.current = null;
+    };
+    // Teardown-on-unmount only; the ref itself is stable.
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // F6 fix (docs/design-notes/switch-base-popup-behavior-log.md): install the
+  // SAME durable-draft autosave for PRE-instantiation progress — wizard levels
+  // L1 (identity-lite) / L2 (an un-confirmed base preview) — under the
+  // reserved `DRAFT_PERSISTENCE_PENDING_KEY` slot. Before this, the autosave
+  // installer ran only from `doCommit` (i.e. only once a base was CONFIRMED),
+  // so a refresh before that point had nothing for `main.tsx`'s silent
+  // boot-time restore (`draftPersistence.loadDraft`, resolved via THIS
+  // module's own `ks.draft.active` pointer) to find — identity answers and an
+  // in-progress base preview were lost outright.
+  //
+  // Guarded on `autosaveTeardownRef.current === null` so StrictMode's
+  // double-invoked mount effect (no cleanup is returned; the ref itself is the
+  // idempotency guard, mirroring `instantiatedForBaseIdRef`'s pattern in this
+  // same file) never installs two overlapping subscriptions. `doCommit`'s
+  // existing teardown-then-reinstall (`autosaveTeardownRef.current?.()`) is
+  // what PROMOTES this pending subscription to the real one the moment the
+  // author actually confirms a base — see doCommit's cleanup of the abandoned
+  // pending record below.
+  //
+  // RESTORING BOOT (spec 057 FR-004/SC-002). When a real project key is
+  // ALREADY derivable at mount, the working copy was instantiated before this
+  // component ever rendered — `main.tsx`'s pre-mount `loadDraft` on a plain
+  // browser refresh, or a route remount of an in-session wizard. This branch
+  // used to `return` here and leave the real-project subscription to
+  // `doCommit`, on the reading that doCommit always re-fires on such a boot.
+  // It does, and that was the defect, in both directions:
+  //
+  //   - Nothing installed the autosave until the compile pipeline re-settled,
+  //     so every store write between mount and that settle went unpersisted.
+  //   - Worse, the re-commit is NOT a no-op. `doCommit` re-derives the
+  //     instantiation mode from `useSurveySessionStore.selectedTrack`, which
+  //     has ADVANCED since the original commit: the base is confirmed at
+  //     `choose_base`, before the track step exists to answer. So an author on
+  //     the adapt track re-commits as `adapt-existing` over a working copy
+  //     recorded `new-from-base`, and `resolveInstantiationCase` reads
+  //     same-id/different-mode as a genuine base switch and clears
+  //     `phaseResults` (workingCopyStore.ts). A refresh silently discarded the
+  //     survey. The same re-commit also fires `setTouchSeedSource(null)` and
+  //     the rebase draft-key migration, neither of which a restore should do.
+  //
+  // Both follow from re-running a COMMIT to restore a copy that is already
+  // committed. So the restore path now does what the résumé path has always
+  // done (see `handleResumeDraft`): pre-seed `instantiatedForBaseIdRef` with
+  // the restored base id, which makes doCommit's own guard early-return, and
+  // install the real-project autosave here directly. A genuine base switch
+  // later is unaffected — a DIFFERENT id still passes the guard (F1).
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (autosaveTeardownRef.current !== null) return;
+    const restoredProjectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
+    if (restoredProjectKey !== null) {
+      instantiatedForBaseIdRef.current =
+        useWorkingCopyStore.getState().baseKeyboard?.id ?? null;
+      autosaveTeardownRef.current = installDraftAutosave(restoredProjectKey);
+      return;
+    }
+    autosaveTeardownRef.current = installDraftAutosave(DRAFT_PERSISTENCE_PENDING_KEY);
+    // Runs once on mount; deriveProjectKeyFromWorkingCopy/installDraftAutosave
+    // are stable module-level imports, and the refs are stable by construction.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * F6 fix — shared "promote the pending autosave to a real project key"
+   * step. Reads the CURRENT working-copy state via getState() (stable
+   * escape hatch, matching every other imperative read in this component) so
+   * it can be called from both `doCommit` (a genuine base confirm) and
+   * `handleResumeDraft` (a résumé via the OTHER draft engine's banner — see
+   * that handler's own call site below for why it needs this too: résumé
+   * pre-seeds `instantiatedForBaseIdRef` specifically so `doCommit` never
+   * fires for the restored base, so nothing else would ever promote the
+   * pending subscription away from `DRAFT_PERSISTENCE_PENDING_KEY` for that
+   * path without this). No-ops when no real project key is derivable yet
+   * (nothing to promote to).
+   */
+  const promotePendingAutosave = useCallback(() => {
+    const projectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
+    if (projectKey === null) return;
+    autosaveTeardownRef.current?.();
+    autosaveTeardownRef.current = installDraftAutosave(projectKey);
+    if (projectKey !== DRAFT_PERSISTENCE_PENDING_KEY) {
+      clearPersistenceDraft(DRAFT_PERSISTENCE_PENDING_KEY);
+    }
+  }, []);
+
+  // ---------------------------------------------------------------------------
+  // US3a: signed-in cloud-draft backup. Runs ALONGSIDE (never instead of) the
+  // local autosave above — see draftPersistence.ts's startCloudSync docstring
+  // for what it pushes and why this is not a second D3-scoped debounce cycle.
+  // Starts as soon as an access token is present (sign-in can happen before
+  // OR after a working copy is instantiated — startCloudSync's own flush
+  // no-ops while there is no active project yet) and tears down on sign-out
+  // or unmount. `cloudSyncAccessToken` is the effect's ONLY dependency, so
+  // this does not restart the subscription on every render; React calls the
+  // returned cleanup (tearing down the old subscription) before re-running
+  // the effect on a token change, so there is exactly one live subscription
+  // at a time. A project switch (e.g. start-over) does NOT need its own
+  // teardown/restart here — startCloudSync re-resolves the active project on
+  // every flush, so it simply follows whichever project is active next.
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (cloudSyncAccessToken === null) {
+      return undefined;
+    }
+    const teardown = startPersistenceCloudSync(() => cloudSyncAccessToken);
+    return teardown;
+  }, [cloudSyncAccessToken]);
+
+  // ---------------------------------------------------------------------------
+  // Decision audit (spec 053) — the `recordDecision` dep, composed here for the
+  // same reason as every other ReducerDeps member: the recorder needs stores/ and
+  // lib/, and steps/ may import neither.
+  //
+  // `readProjectedFiles` delegates to `projectWorkingCopyForOutput` — the SAME
+  // function the download zip and the pull-request path use. That is not an
+  // implementation convenience, it is FR-009/SC-005: the text the audit diffs must
+  // be the text that ships, and this is the one function that produces it. Do not
+  // "optimise" this into a codec emit from the working IR; that text is not what
+  // ships (see snapshotSource.ts's header).
+  //
+  // Held in a ref rather than a memo because the snapshotter is STATEFUL — it
+  // carries the previous boundary's text. A re-memo mid-session would drop that
+  // baseline and make the next diff span two boundaries.
+  // ---------------------------------------------------------------------------
+  const snapshotterRef = useRef(
+    createSourceSnapshotter({
+      readProjectedFiles: async () => {
+        const projected = await projectWorkingCopyForOutput();
+        return projected === null ? null : { entries: projected.vfs.entries() };
+      },
+    }),
+  );
+
+  // The store-derived dep block itself lives in createStudioDecisionRecorder.ts,
+  // shared verbatim with reducer.decisionRecording.test.ts's `realRecorder()` —
+  // see that module's header for why this used to be inlined here and why that
+  // was a defect (specs/055 post-implement review, P1).
+  const recordDecision = useMemo(
+    () =>
+      createStudioDecisionRecorder({
+        getWorkingCopyState: () => useWorkingCopyStore.getState(),
+        snapshotter: snapshotterRef.current,
+      }),
+    [],
+  );
 
   // ---------------------------------------------------------------------------
   // ReducerDeps — injected into applyStepCompletion (steps/reducer.ts).
@@ -371,11 +863,33 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       setTouchLayoutJson,
       instantiateFromBase,
       instantiateFromExisting,
-      buildTouchLayoutJson: (baseIrArg, assignments, baseTouchJson) =>
-        buildTouchLayoutJson(baseIrArg, assignments, baseTouchJson),
+      setTouchSeedSource,
+      // Spec 035 R11: this wrapper is the ONE call site (of the two — the
+      // other is TouchGallery's preview/lint memos) that applies the
+      // emission matrix for the output path. It resolves the Entity-5
+      // default seed source, decides whether to emit at all, and only then
+      // calls the real buildTouchLayoutJson — so reducer.ts (steps/, which
+      // may not import lib/) stays a thin pass-through.
+      buildTouchLayoutJson: (baseIrArg, assignments, opts) => {
+        const seedSource = resolveTouchSeedSource(opts.seedSource, opts.baseTouchJson !== undefined);
+        const hasRealEdits = assignments.length > 0;
+        if (!shouldEmitTouchLayout(seedSource, opts.mods, hasRealEdits)) {
+          return { json: null, warnings: [] };
+        }
+        return buildTouchLayoutJson(baseIrArg, assignments, {
+          // Reseed discards the shipped layout (R10) — never pass baseTouchJson
+          // through on that path, even though buildTouchLayoutJson's own Case A
+          // branch condition would ignore it anyway.
+          ...(seedSource !== "reseed-from-desktop" && opts.baseTouchJson !== undefined
+            ? { baseTouchJson: opts.baseTouchJson }
+            : {}),
+          mods: opts.mods,
+          seedSource,
+        });
+      },
       resolveBaseTouchJson: (vfs) => resolveBaseTouchJson(vfs),
-      instantiateFromBaseIfConfirmed: (base, opts) =>
-        instantiateFromBaseIfConfirmed(base, opts),
+      instantiateFromBaseIfConfirmed: (base, opts, options) =>
+        instantiateFromBaseIfConfirmed(base, opts, options),
       // spec-014 mutate seam (T014): read/write the working-copy carve IR for
       // the reducer's path-scoped mutate() apply. Read via getState() (stable,
       // no re-render churn); write via the OVERLAY-PRESERVING setWorkingIR action.
@@ -387,10 +901,16 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // spec-014 US2 (T024): the staleness closure drives touch re-propagation
       // on physical-step completion. Read via getState() (no re-render churn).
       getStaleSteps: () => useWorkingCopyStore.getState().staleSteps,
+      // Spec 046 R10: record (never act on) the base-content migration need
+      // when base-plus-mark output is chosen over a ready-made-form base.
+      setMarksMigrationNeeded: (needed) =>
+        useSurveySessionStore.getState().setMarksMigrationNeeded(needed),
+      // Spec 053 FR-001/FR-002: record every step's decisions. Injected like
+      // everything else here; the reducer knows only that it has a callback.
+      recordDecision,
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     // Wrapper lambdas delegate to stable module imports — excluded from deps intentionally.
-    [lockDesktop, clearStale, setTouchLayoutJson, instantiateFromBase, instantiateFromExisting],
+    [lockDesktop, clearStale, setTouchLayoutJson, instantiateFromBase, instantiateFromExisting, setTouchSeedSource, recordDecision],
   );
 
   // Keep reducerDepsRef current so the async onInstantiate callback always
@@ -401,28 +921,143 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   }, [reducerDeps]);
 
   // ---------------------------------------------------------------------------
-  // onInstantiate — compile-pipeline callback (R3: choose_base side effect).
+  // doCommit — the actual choose_base instantiation side effect (R3).
   //
-  // Fires when the compile pipeline produces an IR + VFS for the chosen base.
-  // Dispatches applyStepCompletion("choose_base", ...) which routes Track 2 →
+  // Extracted verbatim from the pre-preview-before-commit `onInstantiate` body
+  // so its internals are unchanged; it is now invoked from the single-
+  // instantiation effect below (gated on `baseConfirmed`) rather than directly
+  // from the compile-pipeline callback. Dispatches
+  // applyStepCompletion("choose_base", ...), which routes Track 2 →
   // instantiateFromExisting, Track 1/default → instantiateFromBaseIfConfirmed.
   //
-  // instantiatedRef gates this to fire exactly once per session — a second
-  // compile triggered by setScaffoldSpec will not re-run the instantiate side
-  // effect (P1 fix).
+  // instantiatedForBaseIdRef gates this to fire at most once PER BASE ID: a
+  // second compile settle for the SAME base (setScaffoldSpec's re-compile, or
+  // a second confirm click on an unchanged base) is a no-op (P1 fix); a
+  // confirm for a DIFFERENT base id proceeds and re-runs the body below (F1
+  // fix). The rebase-confirm question itself is NOT asked here — by the time
+  // this runs, BaseResolutionAdapter.onConfirm has already resolved it
+  // synchronously (confirmRebaseTo); the `skipRebaseConfirm: true` passed to
+  // applyStepCompletion below tells the reducer not to ask a second time.
+  // ---------------------------------------------------------------------------
+  const doCommit = useCallback(
+    (
+      base: BaseKeyboard,
+      { vfs, ir, removalCapabilities }: { vfs: VirtualFS; ir: KeyboardIR | null; removalCapabilities: Map<string, RemovalCapability> },
+    ) => {
+      if (instantiatedForBaseIdRef.current === base.id) return;
+      instantiatedForBaseIdRef.current = base.id;
+
+      // REBASE draft migration (F1's last seam). A non-null key here means the
+      // working copy is STILL INSTANTIATED under another project key at the
+      // moment of a new commit — which only the rebase path produces: start-over
+      // resets the stores before the next pick, a résumé pre-seeds
+      // `instantiatedForBaseIdRef` so doCommit never fires, and a fresh boot has
+      // nothing instantiated. On that path the author has already accepted
+      // "Switching base keyboards will discard your current edits" (or had
+      // none to discard), so the record under the OLD key is precisely the
+      // discarded state — leaving it behind strands a phantom card in "My
+      // keyboards" for a base the author rejected. This is a MIGRATION of the
+      // one project's draft key, not a clear-on-switch: spec 047's SC-001
+      // ("start keyboard B, keyboard A survives") concerns two projects, and
+      // every two-project path leaves this key null. Cleared AFTER the
+      // instantiation + promotion below succeed, so a failed commit never
+      // deletes the only copy of the author's work.
+      const rebasedFromProjectKey = deriveProjectKeyFromWorkingCopy(
+        useWorkingCopyStore.getState(),
+      );
+
+      // Spec 034's VR-5 used to call `replaceActiveDraftIfDifferentProject`
+      // here: picking a new base DELETED the previously active project's
+      // draft, because the studio could hold only one draft at a time and a
+      // project switch was therefore indistinguishable from abandonment.
+      //
+      // "My keyboards" (spec 047 US3a) is precisely the feature that makes
+      // several drafts co-exist, so that implicit delete is now the direct
+      // negation of SC-001 — it would let an author start keyboard B and find
+      // keyboard A silently gone from their list. The clear-on-switch is
+      // removed, not merely relaxed: there is no longer any sense in which a
+      // project switch implies discarding the project being switched away
+      // from. Abandonment stays explicit, via `discardActiveDraft` on the
+      // start-over paths (WelcomeScreen's "start over" and this shell's own
+      // reset below) — the author's own instruction, not an inference from
+      // navigation. See specs/047-my-keyboards/spec.md ("Superseded: spec
+      // 034 VR-5").
+
+      // Pin the active-project pointer to this base's id the moment a working
+      // copy is instantiated (specs/047-my-keyboards spec — projectKey =
+      // identity.keyboardId ?? baseKeyboard.id; the identity keyboardId, when
+      // Track 1 later sets one, isn't chosen yet at this point, so base.id is
+      // the correct starting key for both tracks). This ONLY repoints THIS
+      // session's active-project pointer — it does not touch any other
+      // project's stored record or index row, so starting a new keyboard
+      // never overwrites/wipes an already-in-flight project.
+      pinActiveProject(base.id);
+
+
+      // Reads via getState() escape hatch (not a selector) to avoid a stale closure — the callback is memoised with empty deps.
+      const track = useSurveySessionStore.getState().selectedTrack;
+      applyStepCompletion(
+        "choose_base",
+        { base, vfs, ir, removalCapabilities, track: track ?? null, skipRebaseConfirm: true },
+        reducerDepsRef.current,
+      );
+
+      // T023: install the durable-draft autosave now that the working copy is
+      // instantiated. `deriveProjectKeyFromWorkingCopy` reads the JUST-WRITTEN
+      // store state via getState() (identity.keyboardId falls back to
+      // baseKeyboard.id — see draftPersistence.ts) so this resolves immediately
+      // for both tracks, even before Track 1's Phase A sets a custom keyboardId.
+      // F1 fix: `instantiatedForBaseIdRef` above only guards against a REPEAT
+      // commit for the SAME base id — a genuine base switch (a different id)
+      // reaches this point with a real prior autosave subscription still
+      // live, so `autosaveTeardownRef.current` is NO LONGER always null here;
+      // the `?.()` teardown-then-reinstall below is load-bearing (not
+      // defensive) for that case — it tears down the OLD project's autosave
+      // subscription before installing the NEW project's, so edits after a
+      // switch autosave under the new project key, not the abandoned one.
+      // F6 fix: promote pending -> real (see promotePendingAutosave's doc
+      // comment). Replaces the old inline "teardown + installDraftAutosave"
+      // pair with the shared helper so `handleResumeDraft` (below) can reuse
+      // the exact same promotion logic for its own résumé path.
+      promotePendingAutosave();
+
+      // Complete the rebase migration (see rebasedFromProjectKey above): the
+      // new key's record + index row exist as of promotePendingAutosave's
+      // synchronous install-time save, so removing the old key's record and
+      // row now is a rename, never a gap. Same-key commits (P1 repeat settle
+      // never reaches here; F2 refresh re-commit derives the same key) are
+      // no-ops by the inequality guard.
+      const projectKeyAfterCommit = deriveProjectKeyFromWorkingCopy(
+        useWorkingCopyStore.getState(),
+      );
+      if (rebasedFromProjectKey !== null && rebasedFromProjectKey !== projectKeyAfterCommit) {
+        clearPersistenceDraft(rebasedFromProjectKey);
+      }
+    },
+    // Same escape hatch as the pre-preview-before-commit onInstantiate: all
+    // reads are via getState()/reducerDepsRef.current (stable refs), not
+    // React state, so an empty dep array is intentional here too.
+    // promotePendingAutosave is itself an empty-deps useCallback (stable).
+    [promotePendingAutosave],
+  );
+
+  // ---------------------------------------------------------------------------
+  // onInstantiate — compile-pipeline callback (R3: choose_base side effect).
+  //
+  // Preview-before-commit: fires whenever the compile pipeline produces an
+  // IR + VFS for the CURRENTLY PREVIEWED base (every preview click restarts
+  // the pipeline for its base). This callback ONLY captures the settled
+  // artifact — it does NOT instantiate the working copy or advance the
+  // wizard. `doCommit` (above) does that, invoked by the effect below once
+  // the author clicks "Choose this keyboard" (`baseConfirmed` flips true).
+  // This is what makes previewing several bases side-effect-free.
   // ---------------------------------------------------------------------------
   const onInstantiate = useCallback<OnInstantiateCallback>((base, { vfs, ir, removalCapabilities }) => {
-    if (instantiatedRef.current) return;
-    instantiatedRef.current = true;
-
-    // Reads via getState() escape hatch (not a selector) to avoid a stale closure — the callback is memoised with empty deps.
-    const track = useSurveySessionStore.getState().selectedTrack;
-    applyStepCompletion(
-      "choose_base",
-      { base, vfs, ir, removalCapabilities, track: track ?? null },
-      reducerDepsRef.current,
-    );
+    pendingArtifactRef.current = { base, vfs, ir, removalCapabilities };
   }, []);
+
+  // Subscribed so the effect below re-checks whenever the author confirms.
+  const baseConfirmed = useSurveySessionStore((s) => s.baseConfirmed);
 
   // Pattern map for the working-copy transform — needed from Phase F onwards so
   // mechanism assignments are projected into the OSK preview.
@@ -442,19 +1077,72 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
         setSurveyPatternMap(map);
       })
       .catch((err: unknown) => {
-        console.error("[SurveyView] pattern load for preview failed:", err);
+        devLog.error("[SurveyView] pattern load for preview failed:", err);
       });
   }, [sessionAssignments]);
 
   // Working-copy transform — projects carve + assignments + identity into the OSK.
   // surveyPatternMap is empty until Phase C completes; null patternMap → skip assignments.
+  //
+  // previewedBaseId: localBase.id — bug F4. `localBase` drives the compile
+  // pipeline below (preview-before-commit) and can differ from the store's
+  // already-instantiated `baseKeyboard` when the author previews a candidate
+  // replacement base without having confirmed the switch yet. Passing it lets
+  // useWorkingCopyTransform suppress the carve/identity overlay for a
+  // candidate base it doesn't belong to, instead of projecting the committed
+  // base's carve deletions onto the candidate's freshly-fetched VFS.
   const workingCopyTransform = useWorkingCopyTransform({
     patternMap: surveyPatternMap.size > 0 ? surveyPatternMap : null,
+    previewedBaseId: localBase?.id ?? null,
   });
 
   // Use localBase (immediately updated on selection) to drive the pipeline.
   // Pass scaffoldSpec so Track 1 routes through scaffold() instead of fetchKeyboardSourceToVfs.
   const { stage: artifactStage, retry } = useKeyboardArtifact(localBase, scaffoldSpec, workingCopyTransform, onInstantiate);
+
+  // ---------------------------------------------------------------------------
+  // Single-instantiation effect (preview-before-commit).
+  //
+  // Runs `doCommit` once BOTH are true:
+  //   - the author has confirmed (`baseConfirmed`, set by
+  //     BaseResolutionAdapter's onConfirm — see editors/adapters/panelAdapters.tsx,
+  //     which has already synchronously resolved any rebase-confirm question
+  //     via confirmRebaseTo BEFORE flipping baseConfirmed — F1 fix)
+  //   - the compile pipeline has actually settled for THAT SAME base
+  //     (`pendingArtifactRef`, filled by `onInstantiate` above).
+  //
+  // "At most once" is now per-base-id, not per-mount: `doCommit` itself
+  // early-returns via `instantiatedForBaseIdRef` when the settled artifact's
+  // base id has already been committed (P1's repeat-settle case), but
+  // proceeds — and re-instantiates — for a genuinely different confirmed base
+  // id (F1). This effect's own job is unchanged: hand `doCommit` whatever
+  // settled artifact matches the currently confirmed base, whenever that
+  // becomes true, in either order.
+  //
+  // Confirm is gated on `previewStatus === "ready"` in BaseResolution's commit
+  // button, so in practice `baseConfirmed` only flips true once the pipeline
+  // has already settled — the ref is already populated by the time this
+  // effect sees `baseConfirmed`. The `artifactStage`-triggered re-run (waiting
+  // for the ref to be filled after confirm) is retained purely as a defensive
+  // fallback, not a load-bearing path. The `art.base.id === lb.id` check
+  // guards against a stale ref from a PREVIOUS preview surviving a fast
+  // re-preview.
+  // ---------------------------------------------------------------------------
+  useEffect(() => {
+    if (!baseConfirmed) return;
+    const art = pendingArtifactRef.current;
+    const lb = useSurveySessionStore.getState().localBase;
+    if (art && lb && art.base.id === lb.id) {
+      doCommit(art.base, { vfs: art.vfs, ir: art.ir, removalCapabilities: art.removalCapabilities });
+    }
+    // else: compile still in flight for this base — onInstantiate will fill
+    // pendingArtifactRef and the "ready" artifactStage transition below will
+    // re-run this effect.
+    // doCommit is stable (empty-deps useCallback, see its own definition
+    // above) — omitted from deps to mirror the existing escape-hatch
+    // convention in this file (e.g. the reducerDeps memo above).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseConfirmed, artifactStage]);
 
   // Derive KMN source from the working copy's base VFS for the validator.
   const kmnSource = useMemo(() => {
@@ -473,19 +1161,147 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     setValidatorFindings(findings);
   }, [findings, setValidatorFindings]);
   const globalFindings = useMemo(() => selectUnmappedFindings(findings), [findings]);
+  // Warning-severity global findings render as a bare advisory line above the step content
+  // — no card background/border/code-badge/hint-button/location chrome; see
+  // the survey-pane render below. Non-warning severities keep the existing
+  // boxed LintSummary treatment untouched.
+  const globalWarnings = useMemo(
+    () => globalFindings.filter((f) => f.severity === "warning"),
+    [globalFindings],
+  );
+  const globalNonWarnings = useMemo(
+    () => globalFindings.filter((f) => f.severity !== "warning"),
+    [globalFindings],
+  );
 
   // ---------------------------------------------------------------------------
   // Start over — reset session store first (clears all traversal slots + history),
   // then reset the working-copy store and local component state.
-  // Ordering: session.reset() before instantiatedRef.current = false so the
-  // guard is clear before any re-instantiation can fire (research D-R5).
+  // Ordering: session.reset() before instantiatedForBaseIdRef.current = null so
+  // the guard is clear before any re-instantiation can fire (research D-R5).
   // ---------------------------------------------------------------------------
   function handleStartOver() {
+    // T024 (spec 034 US3, research D5, G-3): clear the durable draft (and the
+    // active-project pointer) BEFORE resetting the in-memory stores, so the
+    // NEXT boot does not immediately re-rehydrate the just-abandoned session.
+    discardActiveDraft();
+    autosaveTeardownRef.current?.();
+    autosaveTeardownRef.current = null;
+
     sessionReset();
     resetSurvey();
-    instantiatedRef.current = false;
+    instantiatedForBaseIdRef.current = null;
+    // Spec 053: start-over is an explicit "throw it away", and that includes the
+    // decision trail — carrying the abandoned keyboard's decisions into the next
+    // one would attribute them to a keyboard that never made them. The source
+    // baseline goes too, so the first boundary of the new session establishes a
+    // fresh one instead of diffing against the abandoned keyboard's text.
+    useDecisionLogStore.getState().reset();
+    // Spec 057 FR-052: view state clears with the session it belongs to. This
+    // is one of exactly TWO places a reset is legitimate (the other is
+    // WelcomeScreen's "I'm new") — the same two the survey-session store's own
+    // reset lives in. Leaving a prior project's collapsed stages, pane splits
+    // and Compare selection behind would make the next keyboard open in a
+    // layout the author never chose for it.
+    useViewStateStore.getState().reset();
+    // Within-step positions belong to the walk being abandoned. Left behind,
+    // the next keyboard's mechanism/touch galleries would open on a character
+    // from the previous project's inventory — a cursor is only meaningful
+    // against the walk that published it (stores/stepWalkStore.ts).
+    useStepWalkStore.getState().reset();
+    snapshotterRef.current.reset();
+    pendingArtifactRef.current = null;
+    // F6 fix: re-arm the pre-instantiation pending autosave for the NEXT
+    // attempt in this SAME mount. The mount-time effect that installs it only
+    // ever runs once (empty deps — see its own comment), so a start-over
+    // without this would leave the second attempt's L1/L2 progress
+    // unpersisted until doCommit's own install fires again at that attempt's
+    // base-confirm. Installed against the freshly-reset stores above, so its
+    // synchronous initial save is a correct no-op (hasPendingProgress() is
+    // false immediately after reset).
+    autosaveTeardownRef.current = installDraftAutosave(DRAFT_PERSISTENCE_PENDING_KEY);
     // sessionReset() calls reset() which already clears charactersSubStage to
     // "prefill" (spec 027 Stage 4 — the store slot is the authoritative owner).
+    // sessionReset() also clears baseConfirmed back to false via INITIAL_STATE.
+    // Discard any saved draft — start-over is an explicit "throw it away".
+    // Read the project key BEFORE clearDraft() (which clears the active
+    // pointer as part of removing the project) so the server call still knows
+    // which project to delete. clearDraft() only removes THIS ONE project's
+    // record + index row — every other in-flight "My keyboards" project is
+    // untouched (spec: start-over must not wipe the whole project index).
+    const projectKey = getActiveProjectKey();
+    clearDraft();
+    if (projectKey !== null) {
+      const accessToken = currentAccessToken();
+      if (accessToken !== null) void clearServerDraft(accessToken, projectKey);
+    }
+    setResumeMeta(null);
+    setCloudResume(null);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Resume banner handlers.
+  //
+  // Resume: restore both stores from the saved draft, then mark the working copy
+  // as already instantiated FOR THE RESTORED BASE so the compile pipeline's
+  // onInstantiate does not re-run instantiateFromBase over the restored copy
+  // (which would pop the rebase-confirm dialog / risk discarding restored
+  // survey answers — F1/F2). Reads the restored base id back from the
+  // just-patched workingCopyStore rather than hardcoding `true`, so a LATER
+  // genuine switch to a DIFFERENT base (in the same session, after resume)
+  // still re-instantiates normally (F1 fix — see instantiatedForBaseIdRef).
+  // Discard: drop the draft and continue fresh.
+  // Either way, clearing resumeMeta hides the banner and starts autosave.
+  // ---------------------------------------------------------------------------
+  function handleResumeDraft() {
+    const active = resumeMeta ?? cloudResume;
+    if (active?.source === "cloud") {
+      // Fetch the full payload from the server, then apply it. applyStudioDraft
+      // validates the record shape/version before hydrating the stores.
+      const accessToken = currentAccessToken();
+      if (accessToken !== null) {
+        // Same draftId resolution as the cloud-restore check above — the
+        // window between that check and this click doesn't run autosave
+        // (gated on resumeMeta/cloudResume being null), so the active-project
+        // pointer can't have moved in between.
+        const draftId = getActiveProjectKey() ?? PENDING_PROJECT_KEY;
+        // Dev's engine stores StudioDraft envelopes; pick that envelope off
+        // the shared transport (see serverDraftStore.ts's ServerDraftPayload).
+        void loadServerDraftContent<StudioDraft>(accessToken, draftId).then((draft) => {
+          if (applyStudioDraft(draft)) {
+            instantiatedForBaseIdRef.current = useWorkingCopyStore.getState().baseKeyboard?.id ?? null;
+            setActiveProject(draftId);
+            // F6 fix: promote the pending durable-draft autosave (draftPersistence
+            // engine) to this now-restored real project — instantiatedForBaseIdRef
+            // above is set specifically so doCommit never fires for this base, so
+            // nothing else would ever perform this promotion for a résumé via
+            // THIS (the other, draftAutosave) engine's banner otherwise.
+            promotePendingAutosave();
+          }
+          setResumeMeta(null);
+          setCloudResume(null);
+        });
+        return;
+      }
+    }
+    if (applyDraft()) {
+      instantiatedForBaseIdRef.current = useWorkingCopyStore.getState().baseKeyboard?.id ?? null;
+      // F6 fix: same promotion as the cloud branch above.
+      promotePendingAutosave();
+    }
+    setResumeMeta(null);
+    setCloudResume(null);
+  }
+
+  function handleDiscardDraft() {
+    const projectKey = getActiveProjectKey();
+    clearDraft();
+    if (projectKey !== null) {
+      const accessToken = currentAccessToken();
+      if (accessToken !== null) void clearServerDraft(accessToken, projectKey);
+    }
+    setResumeMeta(null);
+    setCloudResume(null);
   }
 
   // ---------------------------------------------------------------------------
@@ -507,6 +1323,35 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   };
 
   // ---------------------------------------------------------------------------
+  // basePreviewStatusStore value — a coarse projection of `artifactStage` (see
+  // stores/basePreviewStatusStore.ts for the BasePreviewStatus union).
+  // Published to the store below so BaseResolutionAdapter (reached through
+  // StepHost while activeStepId === "choose_base") can read the live preview
+  // status without importing useKeyboardArtifact directly, and without a
+  // prop-drilling chain through StepHost's generic EditorStepProps.
+  // ---------------------------------------------------------------------------
+  const previewStatus: BasePreviewStatus = useMemo(() => {
+    if (localBase === null) return "idle";
+    switch (artifactStage.kind) {
+      case "fetching":
+      case "vfs-loading":
+      case "compiling":
+        return "loading";
+      case "ready":
+        return "ready";
+      case "error":
+        return "error";
+      default:
+        return "idle";
+    }
+  }, [localBase, artifactStage.kind]);
+
+  const setBasePreviewStatus = useBasePreviewStatusStore((s) => s.setStatus);
+  useEffect(() => {
+    setBasePreviewStatus(previewStatus);
+  }, [previewStatus, setBasePreviewStatus]);
+
+  // ---------------------------------------------------------------------------
   // Render: StepHost drives all survey step rendering (spec 028 Stage 5, T012).
   //
   // StepHost reads activeStepId from surveySessionStore, resolves the manifest
@@ -516,7 +1361,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   //
   // The host handles done/unsupported terminals and the unknown-id error panel.
   // SurveyView retains: resizable panes, OSK right pane, validator, oskMode,
-  // pattern-map effect, instantiatedRef, onInstantiate (FR-009).
+  // pattern-map effect, instantiatedForBaseIdRef, onInstantiate (FR-009).
   // ---------------------------------------------------------------------------
 
   const stepHost = (
@@ -529,12 +1374,26 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
   const rightPct = 100 - leftPct;
 
-  // Full-screen steps (carve/mechanisms/touch) bypass the two-pane layout.
-  // StepHost returns the full-screen container; SurveyView renders it directly.
-  // This reproduces the pre-Stage-5 early-return pattern without per-step branches
-  // in SurveyView — the decision is data-driven via step.layout (R4, FR-002).
+  // Corner reset — visible on every survey step (both layouts). Wired to the
+  // same handleStartOver as the terminal panels' "Start over", so it clears
+  // stores + draft directly and never trips the rebase-confirm dialog.
+  const resetButton = <SurveyResetButton onReset={handleStartOver} />;
+
+  // Full-screen steps (carve/mechanisms/touch/touch_seed_source) bypass the
+  // two-pane layout. StepHost returns the full-screen container; SurveyView
+  // renders it directly. This reproduces the pre-Stage-5 early-return pattern
+  // without per-step branches in SurveyView — the decision is data-driven via
+  // step.layout (R4, FR-002). touch_seed_source needs this too (P0 fix, spec
+  // 035 R4b follow-up): its panel renders its own inline live OSK preview, so
+  // the two-pane shell's persistent right-pane OSKFrame must NOT also mount —
+  // that was the redundant-desktop-preview bug.
   if (activeStepIsFullScreen) {
-    return stepHost;
+    return (
+      <>
+        {stepHost}
+        {resetButton}
+      </>
+    );
   }
 
   return (
@@ -551,8 +1410,44 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     >
       {/* Left pane: survey questions (StepHost renders pane content) */}
       <section aria-label="Survey questions" style={questionsPaneStyle}>
-        {globalFindings.length > 0 && (
-          <LintSummary findings={globalFindings} />
+        {(resumeMeta ?? cloudResume) !== null && (
+          <ResumeDraftBanner
+            meta={(resumeMeta ?? cloudResume)!}
+            onResume={handleResumeDraft}
+            onDiscard={handleDiscardDraft}
+          />
+        )}
+        {globalWarnings.length > 0 && (
+          // Rendered flush on "var(--bg)" — the same token the container above
+          // paints and the one CharacterMapPane's own root implicitly sits on
+          // (it sets no background of its own, so it shows through to the
+          // container's var(--bg) too). Pinned explicitly here rather than left
+          // to accidental non-override, so a future change to questionsPaneStyle's
+          // background doesn't silently drag this along. No border/card fill/
+          // padding-as-box — this is text on the character-map surface, not a
+          // card.
+          <div
+            role="status"
+            aria-live="polite"
+            style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12, background: "var(--bg)" }}
+          >
+            {globalWarnings.map((f, i) => (
+              <div key={`${f.code}-${i}`} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <p style={{ margin: 0, fontSize: 13, lineHeight: 1.5, color: TEXT_MAIN }}>
+                  <span aria-hidden="true">⚠</span>{" "}
+                  <Trans id="common.warningLabel">Warning:</Trans> {f.message}
+                </p>
+                {f.hint !== undefined && (
+                  <p style={{ margin: 0, fontSize: 12, lineHeight: 1.5, color: TEXT_DIM }}>
+                    {f.hint}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+        {globalNonWarnings.length > 0 && (
+          <LintSummary findings={globalNonWarnings} />
         )}
         {stepHost}
       </section>
@@ -560,9 +1455,13 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       {/* Drag handle */}
       <ResizeHandle onPointerDown={onPointerDown} />
 
-      {/* Right pane: live OSK preview */}
+      {/* Right pane: live OSK preview, OR (Phase B build-list only) the
+          interactive character map — see activeRightPane/showCharacterMap
+          above. The mechanism gallery and every other full-screen step render
+          their own preview and are unaffected (they never reach this branch:
+          activeStepIsFullScreen returns early above). */}
       <section
-        aria-label="Keyboard preview"
+        aria-label={showCharacterMap ? "Character map" : "Keyboard preview"}
         style={{
           flexBasis: `calc(${rightPct}% - ${SURVEY_DIVIDER_WIDTH / 2}px)`,
           flexGrow: 1,
@@ -578,7 +1477,9 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           fontFamily: FONT,
         }}
       >
-        {localBase === null ? (
+        {showCharacterMap ? (
+          <CharacterMapPane />
+        ) : localBase === null ? (
           <div
             style={{
               flex: 1,
@@ -592,8 +1493,16 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
               textAlign: "center",
             }}
           >
-            <span style={{ fontSize: 32, opacity: 0.4, fontFamily: "monospace" }}>[kb]</span>
-            <span>Choose a base keyboard in the wizard to see a live preview here.</span>
+            {/* Decorative icon stand-in: aria-hidden (conveys nothing the next
+                line doesn't), and opacity floor 0.6 — #9aa7b8 over #0d1117 at
+                0.6 is 3.5:1, the minimum that clears the 3:1 large-text
+                contrast bar for sighted low-vision users (1.4.3). */}
+            <span aria-hidden="true" style={{ fontSize: 32, opacity: 0.6, fontFamily: "monospace" }}>[kb]</span>
+            <span>
+              <Trans id="preview.empty.hint">
+                Choose a base keyboard in the wizard to see a live preview here.
+              </Trans>
+            </span>
           </div>
         ) : (
           <>
@@ -620,6 +1529,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           </>
         )}
       </section>
+
+      {resetButton}
     </div>
   );
 }
@@ -631,6 +1542,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
 export function StudioShell() {
   const route = useRoute();
+  const { t } = useLingui();
 
   const selectedBaseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
 
@@ -677,6 +1589,115 @@ export function StudioShell() {
     [desktopLocked, touchLayoutJson, staleSteps, validatorFindings],
   );
 
+  // ---------------------------------------------------------------------------
+  // Output nav-link UX signal (P0 fix) — NOT the authoritative enforcement
+  // (that is OutputScreen's canDownload gate via usePreviewArtifact, which
+  // still applies regardless of how #output was reached). This is purely so
+  // the block is visible on the tab itself before the click. Same shared hook
+  // (hooks/useInventoryCoverageGate.ts) as StepHost/PhaseFGate/OutputScreen —
+  // do not re-derive the desktop-always/touch-only-if-authored booleans here.
+  // ---------------------------------------------------------------------------
+  const outputNavBlocked = useInventoryCoverageGate().blocked;
+
+  // ---------------------------------------------------------------------------
+  // Per-tab view state (spec 057 US5, FR-050). Read HERE rather than in the
+  // views themselves: `dashboard/` and `decisions/` have no `stores/` import
+  // (the depcruise layer rules), so these follow the same prop route
+  // `completenessReport`, `axisFills` and `pathOverlay` already take.
+  // ---------------------------------------------------------------------------
+  const flowMapSection = useViewStateStore((s) => s.flowMapSection);
+  const setFlowMapSection = useViewStateStore((s) => s.setFlowMapSection);
+  const trailCollapsedSteps = useViewStateStore((s) => s.trailCollapsedSteps);
+  const toggleTrailStage = useViewStateStore((s) => s.toggleTrailStage);
+  const trailShowSuperseded = useViewStateStore((s) => s.trailShowSuperseded);
+  const setTrailShowSuperseded = useViewStateStore((s) => s.setTrailShowSuperseded);
+
+  // ---------------------------------------------------------------------------
+  // Decision trail (spec 053 US1). Same arrangement as completenessReport above:
+  // read the stores here, pass plain values down, so decisions/ needs no store
+  // import and the trail is renderable against a fixture record.
+  //
+  // `resolveEntryImpact` is passed as a FUNCTION, not as resolved impacts — that
+  // is what makes FR-010 structural: mounting the list resolves nothing, and
+  // expanding one row resolves exactly that row.
+  // ---------------------------------------------------------------------------
+  const decisionRecord = useDecisionLogStore((s) => s.record);
+  const decisionDroppedCount = useDecisionLogStore((s) => s.droppedCount);
+  const impactDeps = useMemo(
+    () => ({
+      getWorkingIR: () => useWorkingCopyStore.getState().ir,
+      isDesktopLocked: () => useWorkingCopyStore.getState().desktopLocked,
+      // The touch lock's observable is a built touch layout — the same signal
+      // runCompleteness reads above, rather than a second notion of "locked".
+      isTouchLocked: () => useWorkingCopyStore.getState().touchLayoutJson !== null,
+    }),
+    [],
+  );
+  const resolveEntryImpact = useCallback(
+    (entry: DecisionEntry) => resolveImpact(entry, impactDeps),
+    [impactDeps],
+  );
+
+  // spec 057 FR-009/FR-010: the async resolver, for a decision recorded before a
+  // working copy existed. It re-derives the effect by projecting the working copy
+  // twice through `projectWorkingCopyForOutput` — the SAME function the download zip
+  // and the pull-request path use, and the same one `readProjectedFiles` above
+  // delegates to. That is FR-010, not a convenience: both sides of the comparison
+  // must come from the function that produces the shipped keyboard, or the trail can
+  // disagree with the artifact (SC-005).
+  //
+  // Passed as a FUNCTION for the same reason `resolveEntryImpact` is: mounting the
+  // trail resolves nothing, and expanding one row resolves exactly that row.
+  const asyncImpactDeps = useMemo(
+    () => ({
+      ...impactDeps,
+      project: projectWorkingCopyForOutput,
+      hasWorkingCopy: () => useWorkingCopyStore.getState().baseVfs !== null,
+      getRecord: () => useDecisionLogStore.getState().record,
+    }),
+    [impactDeps],
+  );
+  const resolveEntryImpactAsync = useCallback(
+    (entry: DecisionEntry) => resolveImpactAsync(entry, asyncImpactDeps),
+    [asyncImpactDeps],
+  );
+
+  // ---------------------------------------------------------------------------
+  // Flow-map walked path (spec 053 US3, FR-023/FR-026). Projected HERE, where the
+  // record is reachable, and passed into FlowMapView as a prop — `dashboard/` has
+  // no `stores/` import (the depcruise `dashboard-layer` rule), exactly as
+  // completenessReport and axisFills above.
+  //
+  // The overlay is passed only while a keyboard identity exists. With no keyboard
+  // selected the prop is `undefined` and the map renders as it always has, which is
+  // FR-024's identity rather than an empty-set decoration that renders the same.
+  // ---------------------------------------------------------------------------
+  const pathOverlay = useMemo(
+    () => (decisionRecord.keyboardId === null ? undefined : buildPathOverlay(decisionRecord)),
+    [decisionRecord],
+  );
+  // FR-026: the alternative at ONE inspected node. `resolveImpact` is reused with an
+  // explicit `requestedValue`, so "what would this other answer have produced?" runs
+  // the same derivation as "what did this decision do?" — a second code path could
+  // disagree with the trail about the same question. Returns `null` when this step
+  // recorded no survey decision to vary, which the map reports as a reason rather
+  // than a failure (FR-028).
+  const resolveStepAlternative = useCallback(
+    (stepId: string, alternativeValue: string) => {
+      const entries = useDecisionLogStore.getState().record.entries;
+      // The LIVE decision for the step: scan backwards, so a revisited step is asked
+      // about the answer that currently stands rather than one it superseded.
+      for (let i = entries.length - 1; i >= 0; i--) {
+        const entry = entries[i]!;
+        if (entry.stepId === stepId && entry.payload.kind === "survey-answer") {
+          return resolveImpact(entry, impactDeps, alternativeValue);
+        }
+      }
+      return null;
+    },
+    [impactDeps],
+  );
+
   let content: ReactNode;
   switch (route) {
     case "welcome":
@@ -686,19 +1707,70 @@ export function StudioShell() {
       content = <SurveyView baseKeyboard={selectedBaseKeyboard} />;
       break;
     case "preview":
-      content = <PreviewScreen />;
+      // The route TOKEN stays `preview` while the tab is labelled "Compare"
+      // (spec 057 contract §1): renaming it would break every existing
+      // bookmark and every e2e hash assertion for no requirement's sake.
+      content = <CompareScreen />;
       break;
     case "output":
       content = <OutputScreen />;
       break;
     case "flowmap":
-      content = <FlowMapView completeness={completenessReport} axisFills={axisFills} />;
+      content = (
+        <FlowMapView
+          completeness={completenessReport}
+          axisFills={axisFills}
+          {...(pathOverlay !== undefined ? { pathOverlay } : {})}
+          resolveAlternative={resolveStepAlternative}
+          // Spec 057 US5 (FR-050): the selected section is view state. It
+          // arrives as a read-once initial value plus a change notification —
+          // the same shape `useResizablePanes` takes — because `dashboard/`
+          // may not import `stores/` (the depcruise dashboard-layer rule), so
+          // the store is read HERE and passed down exactly as
+          // `completeness`/`axisFills`/`pathOverlay` already are.
+          initialSection={flowMapSection}
+          onSectionChange={setFlowMapSection}
+        />
+      );
+      break;
+    case "trail":
+      // Spec 053 US1. The record and the impact resolver are both computed here,
+      // where the stores are reachable, and passed down — DecisionTrailView reads
+      // no store of its own, so it can be rendered against a fixture in tests.
+      content = (
+        <DecisionTrailView
+          record={decisionRecord}
+          droppedCount={decisionDroppedCount}
+          resolveImpact={resolveEntryImpact}
+          resolveImpactAsync={resolveEntryImpactAsync}
+          // Spec 057 US5 (FR-050): per-stage collapse and the replaced-
+          // decisions toggle are view state, read here for the same
+          // layer-boundary reason as the flow map's section above.
+          initialCollapsedSteps={trailCollapsedSteps}
+          onToggleStage={toggleTrailStage}
+          initialShowSuperseded={trailShowSuperseded}
+          onShowSupersededChange={setTrailShowSuperseded}
+          // Spec 057 FR-035: pre-resolve each row's jump target so an entry
+          // whose target is unreachable states the reason INSTEAD of offering
+          // a link that fails on activation. Composed from the exported
+          // `liveResolveContext()` rather than assembled here, so a row can
+          // never disagree with `jumpToLocation` about whether its own jump
+          // is possible. Read at render time — a pure, store-free computation
+          // that resolves no impact (FR-036 is about impact, not location).
+          resolveCtx={liveResolveContext()}
+        />
+      );
       break;
     case "profile":
       content = <ProfileScreen />;
       break;
   }
 
+  // NOTE: the <I18nProvider> lives in AppRoot, ABOVE this component — never
+  // here. StudioShell calls useLingui() itself (below, for the nav tooltip),
+  // and a component cannot consume a context it renders: that combination
+  // returned a null context and blanked the app in production builds, where
+  // Lingui's dev-only invariant is stripped. See AppRoot.tsx.
   return (
     <div
       style={{
@@ -710,10 +1782,22 @@ export function StudioShell() {
         background: "var(--bg)",
       }}
     >
-      <NavBar active={route} />
-      <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>
-        {content}
-      </div>
+      <NavBar
+        active={route}
+        outputBlocked={outputNavBlocked}
+        outputBlockedTitle={t({
+          id: "studio.nav.outputBlocked.title",
+          message: "Finish every inventory character before you can access Output",
+        })}
+      />
+      <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>{content}</div>
+      {/* Spec 057 US4/US6 (T052, FR-040): the narrow journey footer. Mounted
+          unconditionally rather than per-route because `StudioFooter` returns
+          null whenever `deriveProjectLabel` has nothing to name — so it is
+          ABSENT, not an empty shell, on Welcome and wherever there is no
+          project yet (Q6). A route-by-route conditional here would be a second
+          place to keep that rule, and the two would drift. */}
+      <StudioFooter />
     </div>
   );
 }

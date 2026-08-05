@@ -1,11 +1,19 @@
 import type { LintFinding } from "@keyboard-studio/contracts";
-import { forEachMatch } from "./_shared.js";
+import { forEachMatch, stripNonCodeSource } from "./_shared.js";
 
 // Codepoint validation — lint.md check #10 (Compiler.cpp:3746-3770).
 // U+XXXX literals must be in range 0..0x10FFFF and must not be:
 //   - Surrogates:    0xD800–0xDFFF
 //   - Non-chars:     0xFDD0–0xFDEF
 //   - Specials:      0xFFFE, 0xFFFF
+//
+// NOT swapped onto the shared `isNoncharacterCodePoint` (@keyboard-studio/
+// contracts, charUtils.ts) despite the overlapping range test: that helper's
+// `(cp & 0xfffe) === 0xfffe` check flags plane-end noncharacters for EVERY
+// plane (e.g. U+1FFFE, U+2FFFE), whereas this check below only special-cases
+// the BMP pair 0xFFFE/0xFFFF explicitly. Swapping would change this lint's
+// findings for supplementary-plane U+XXXXXX literals — a behavior change,
+// not a pure dedup, so left as-is here.
 
 // Matches U+XXXX or U+XXXXXX (1–6 hex digits). Case-insensitive so u+0041 is caught.
 const UPLUS_RE = /\bU\+([0-9A-Fa-f]{1,6})\b/i;
@@ -13,7 +21,9 @@ const UPLUS_RE = /\bU\+([0-9A-Fa-f]{1,6})\b/i;
 export function checkCodepointFormat(source: string): LintFinding[] {
   const findings: LintFinding[] = [];
 
-  forEachMatch(source, new RegExp(UPLUS_RE.source, "gi"), (match, lineIdx) => {
+  // Strip quoted-string and comment spans first so a `U+hhhh` in prose (a
+  // trailing `c` comment or a quoted doc value) is not read as a codepoint.
+  forEachMatch(stripNonCodeSource(source), new RegExp(UPLUS_RE.source, "gi"), (match, lineIdx) => {
     const hex = match[1] ?? "";
     const cp = parseInt(hex, 16);
 

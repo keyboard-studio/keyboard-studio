@@ -1,9 +1,12 @@
 import { useMemo } from 'react';
+import type { I18n } from '@lingui/core';
+import { msg } from '@lingui/core/macro';
+import { useLingui } from "@lingui/react/macro";
 import type { CarveNode } from '../../../lib/irToCarveNodes.ts';
-import { nodeState, MOD_GROUP_DEFS } from '../../../lib/irToCarveNodes.ts';
+import { nodeState, MOD_GROUP_DEFS, resolveNodeName } from '../../../lib/irToCarveNodes.ts';
 import { KIND_COLOR } from './KindBadge.tsx';
 import { ToggleBox } from './ToggleBox.tsx';
-import { WarnIcon } from './carveShared.tsx';
+import { WarnIcon, resolveMessage } from './carveShared.tsx';
 import type { MouseEvent } from 'react';
 import { useHoverInfoStore } from '../../../stores/hoverInfoStore.ts';
 
@@ -12,12 +15,19 @@ interface RailSection {
   kind: CarveNode['kind'];
 }
 
-const SECTIONS: RailSection[] = [
-  { label: 'Patterns', kind: 'pattern' },
-  { label: 'Groups',   kind: 'group' },
-  { label: 'Stores',   kind: 'store' },
-  { label: 'Advanced', kind: 'raw' },
-];
+// Chrome (section headings); built per-render via the optional-i18n +
+// msg()/resolveMessage() pattern (see Inspector.tsx's storeBlurb) rather than
+// taking `t` as a bare function parameter — Lingui's macro tracks the
+// specific binding introduced by useLingui(), so a re-bound `t` parameter is
+// a distinct binding the extractor does not follow.
+function buildSections(i18n?: I18n): RailSection[] {
+  return [
+    { label: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.section.patterns", message: "Patterns" })), kind: 'pattern' },
+    { label: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.section.groups", message: "Groups" })), kind: 'group' },
+    { label: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.section.stores", message: "Stores" })), kind: 'store' },
+    { label: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.section.advanced", message: "Advanced" })), kind: 'raw' },
+  ];
+}
 
 type StoreSubGroup = 'input' | 'output' | 'both' | 'pattern' | 'unused';
 
@@ -31,13 +41,20 @@ function storeSubGroup(node: CarveNode): StoreSubGroup {
   return 'unused';
 }
 
-const STORE_SUBS: { key: StoreSubGroup; label: string; chip: string; color: string }[] = [
-  { key: 'input',   label: 'Input',          chip: 'in',     color: 'var(--app-accent-text)' },
-  { key: 'output',  label: 'Output',         chip: 'out',    color: '#7dbf8e' },
-  { key: 'both',    label: 'Input + Output', chip: 'in+out', color: '#c8b0e8' },
-  { key: 'pattern', label: 'Pattern',        chip: '',       color: KIND_COLOR.pattern },
-  { key: 'unused',  label: 'Unused',         chip: '',       color: 'var(--app-text-subtle)' },
-];
+// Chrome (sub-section headings + chip abbreviations); built per-render via
+// the same optional-i18n + msg()/resolveMessage() pattern as buildSections
+// above (see its comment for why a bare `t` parameter is unsafe here).
+function buildStoreSubs(
+  i18n?: I18n,
+): { key: StoreSubGroup; label: string; chip: string; color: string }[] {
+  return [
+    { key: 'input', label: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.input", message: "Input" })), chip: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.inputChip", message: "in" })), color: 'var(--app-accent-text)' },
+    { key: 'output', label: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.output", message: "Output" })), chip: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.outputChip", message: "out" })), color: '#7dbf8e' },
+    { key: 'both', label: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.both", message: "Input + Output" })), chip: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.bothChip", message: "in+out" })), color: '#c8b0e8' },
+    { key: 'pattern', label: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.pattern", message: "Pattern" })), chip: '', color: KIND_COLOR.pattern },
+    { key: 'unused', label: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.unused", message: "Unused" })), chip: '', color: 'var(--app-text-subtle)' },
+  ];
+}
 
 interface RailProps {
   nodes: CarveNode[];
@@ -59,6 +76,9 @@ function SectionHeader({ tone, label, count }: { tone: string; label: string; co
 }
 
 export function Rail({ nodes, selectedId, onSelect, isItemDeleted, isDeleted, onSetManyGlyphs, onToggleNode }: RailProps) {
+  const { t, i18n } = useLingui();
+  const SECTIONS = buildSections(i18n);
+  const STORE_SUBS = buildStoreSubs(i18n);
   const setInfo = useHoverInfoStore((s) => s.setInfo);
   const clearInfo = useHoverInfoStore((s) => s.clearInfo);
 
@@ -118,33 +138,46 @@ export function Rail({ nodes, selectedId, onSelect, isItemDeleted, isDeleted, on
           };
 
           return (
+            // Outer wrapper is layout only — no role, no click handler, no
+            // tabIndex. The two interactive affordances (toggle + select) are
+            // real <button>s inside, so they don't nest. Previously the outer
+            // was role="button" with onClick, which put a real ToggleBox
+            // <button> inside a role="button" ancestor — axe's
+            // `nested-interactive` at serious (WCAG 4.1.2).
             <div
               key={node.nodeId}
-              data-testid={`carve-card-${node.nodeId}`}
-              data-kind={node.kind}
-              onClick={() => onSelect(node.nodeId)}
-              onMouseEnter={() => setInfo({ kind: 'node', node })}
-              onFocus={() => setInfo({ kind: 'node', node })}
-              onMouseLeave={clearInfo}
-              onBlur={clearInfo}
-              tabIndex={0}
               style={{
-                display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px', cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 10, padding: '8px 16px',
                 background: active ? 'var(--app-accent-subtle)' : 'transparent',
                 boxShadow: active ? 'inset 3px 0 0 var(--app-accent)' : 'none',
               }}
             >
               <ToggleBox glyph={node.trigger} state={st} size={26} onClick={handleToggle} />
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{
+              <button
+                type="button"
+                data-testid={`carve-card-${node.nodeId}`}
+                data-kind={node.kind}
+                onClick={() => onSelect(node.nodeId)}
+                onMouseEnter={() => setInfo({ kind: 'node', node })}
+                onFocus={() => setInfo({ kind: 'node', node })}
+                onMouseLeave={clearInfo}
+                onBlur={clearInfo}
+                style={{
+                  flex: 1, minWidth: 0, cursor: 'pointer', textAlign: 'left',
+                  background: 'transparent', border: 'none', padding: 0,
+                  font: 'inherit', color: 'inherit',
+                }}
+              >
+                <span style={{
+                  display: 'block',
                   fontSize: 13, fontWeight: active ? 600 : 500,
                   whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
                   color: st === 'off' ? 'var(--app-text-subtle)' : 'var(--app-text)',
                   textDecoration: st === 'off' ? 'line-through' : 'none',
                 }}>
-                  {node.name}
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 2 }}>
+                  {resolveNodeName(node, i18n)}
+                </span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 7, marginTop: 2 }}>
                   {total !== null && !showBreakdown && (
                     <span style={{ fontSize: 11, color: 'var(--app-text-subtle)' }}>{keptN}/{total}</span>
                   )}
@@ -165,12 +198,12 @@ export function Rail({ nodes, selectedId, onSelect, isItemDeleted, isDeleted, on
                     <span style={{ font: '600 9px/1 var(--app-font-mono)', color: chipColor, border: '1px solid currentColor', borderRadius: 3, padding: '1px 4px', opacity: 0.85 }}>{chipLabel}</span>
                   )}
                   {node.loadBearing === true && (
-                    <span aria-label="load-bearing" style={{ color: 'var(--sil-orange)', display: 'inline-flex' }}>
+                    <span aria-label={t({ id: "editor.assignLoop.rail.loadBearingAriaLabel", message: "load-bearing" })} style={{ color: 'var(--sil-orange)', display: 'inline-flex' }}>
                       <WarnIcon size={11} />
                     </span>
                   )}
-                </div>
-              </div>
+                </span>
+              </button>
             </div>
           );
         };

@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
+import { Trans, useLingui } from "@lingui/react/macro";
+import { plural } from "@lingui/core/macro";
 import { KindBadge } from './KindBadge.tsx';
 import { useHoverInfoStore } from '../../../stores/hoverInfoStore.ts';
 import type { CardKind } from './KindBadge.tsx';
 import { KeySeq } from './KeySeq.tsx';
 import { ChevronIcon, UndoIcon, CheckIcon } from './carveShared.tsx';
-import { isCombining } from '../../../lib/irToCarveNodes.ts';
+import { displayChar } from '../../../lib/irToCarveNodes.ts';
 
 export type RemovedItem =
   | { type: 'node'; id: string; kind: CardKind; label: string; count: number; glyphIds?: string[] | undefined }
@@ -32,16 +34,30 @@ const menuScroll: React.CSSProperties = { maxHeight: 340, overflowY: 'auto', pad
 const menuRow: React.CSSProperties = { display: 'flex', alignItems: 'center', gap: 10, padding: '7px 8px' };
 
 function RemovedMenu({ list, onRestore, onRestoreAll, onClose }: RemovedMenuProps) {
+  const { t } = useLingui();
+  // Keyboard dismissal route: Escape closes the menu wherever focus sits
+  // (trigger button or a Restore button inside the panel). The backdrop
+  // below is the pointer counterpart of this same dismiss action.
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [onClose]);
   return (
     <>
-      <div onClick={onClose} style={backdrop} />
+      {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions --
+          pointer counterpart of the Escape route installed above; hidden from
+          the accessibility tree, so it must not present as interactive. */}
+      <div onClick={onClose} aria-hidden="true" style={backdrop} />
       <div style={menuPanel}>
         <div style={menuHeader}>
           <span style={{ font: '600 11px/1 var(--app-font)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--app-text-subtle)' }}>
-            Removed · {list.length}
+            <Trans id="editor.assignLoop.statusBar.removedCount">Removed · {list.length}</Trans>
           </span>
           <button onClick={onRestoreAll} style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '5px 10px', background: 'transparent', border: '1px solid var(--app-border-strong)', borderRadius: 7, color: 'var(--app-accent-text)', font: '600 12.5px var(--app-font)', cursor: 'pointer' }}>
-            <UndoIcon size={13} /> Restore all
+            <UndoIcon size={13} /> <Trans id="editor.assignLoop.statusBar.restoreAll">Restore all</Trans>
           </button>
         </div>
         <div style={menuScroll}>
@@ -52,14 +68,19 @@ function RemovedMenu({ list, onRestore, onRestoreAll, onClose }: RemovedMenuProp
                   <KindBadge kind={it.kind} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={{ fontSize: 13.5, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', color: 'var(--app-text)' }}>{it.label}</div>
-                    <div style={{ fontSize: 12, color: 'var(--app-text-subtle)' }}>{it.count} character{it.count !== 1 ? 's' : ''}</div>
+                    <div style={{ fontSize: 12, color: 'var(--app-text-subtle)' }}>
+                      {t({
+                        id: "editor.assignLoop.statusBar.characterCount",
+                        message: plural(it.count, { one: "# character", other: "# characters" }),
+                      })}
+                    </div>
                   </div>
                 </>
               ) : (
                 <>
                   <span style={{ flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 34, height: 34, padding: '0 7px', background: 'var(--app-surface-2)', border: '1px solid var(--app-border)', borderRadius: 7 }}>
                     <span style={{ font: "400 18px/1 'Lora', serif", color: 'var(--app-text)' }}>
-                      {isCombining(it.ch) ? '◌' + it.ch : it.ch}
+                      {displayChar(it.ch)}
                     </span>
                   </span>
                   <div style={{ flex: 1, minWidth: 0, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -69,7 +90,7 @@ function RemovedMenu({ list, onRestore, onRestoreAll, onClose }: RemovedMenuProp
                 </>
               )}
               <button onClick={() => onRestore(it)} style={{ flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 11px', background: 'var(--sil-green)', border: '1px solid var(--sil-green-dark)', borderRadius: 7, color: '#fff', font: '600 12.5px var(--app-font)', cursor: 'pointer' }}>
-                <CheckIcon size={12} /> Keep
+                <CheckIcon size={12} /> <Trans id="editor.assignLoop.statusBar.keepButton">Keep</Trans>
               </button>
             </div>
           ))}
@@ -88,14 +109,23 @@ interface StatusBarProps {
 }
 
 export function StatusBar({ kept, total, removedList, onRestore, onRestoreAll }: StatusBarProps) {
+  const { t } = useLingui();
   const [open, setOpen] = useState(false);
   useEffect(() => { if (removedList.length === 0) setOpen(false); }, [removedList.length]);
 
   const setInfo = useHoverInfoStore((s) => s.setInfo);
   const clearInfo = useHoverInfoStore((s) => s.clearInfo);
 
-  const keptInfo = { kind: 'text' as const, title: 'Characters kept', body: 'How many characters you are keeping out of the total in this keyboard.' };
-  const removedInfo = { kind: 'text' as const, title: 'Removed items', body: 'Open this to see what you removed and restore anything you change your mind about.' };
+  const keptInfo = {
+    kind: 'text' as const,
+    title: t({ id: "editor.assignLoop.statusBar.keptInfoTitle", message: "Characters kept" }),
+    body: t({ id: "editor.assignLoop.statusBar.keptInfoBody", message: "How many characters you are keeping out of the total in this keyboard." }),
+  };
+  const removedInfo = {
+    kind: 'text' as const,
+    title: t({ id: "editor.assignLoop.statusBar.removedInfoTitle", message: "Removed items" }),
+    body: t({ id: "editor.assignLoop.statusBar.removedInfoBody", message: "Open this to see what you removed and restore anything you change your mind about." }),
+  };
 
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', padding: '12px 22px', borderBottom: '1px solid var(--app-border)', background: 'var(--app-surface)' }}>
@@ -106,16 +136,22 @@ export function StatusBar({ kept, total, removedList, onRestore, onRestoreAll }:
         onBlur={clearInfo}
       >
         <div style={{ fontSize: 13, color: 'var(--app-text-muted)' }}>
-          <b style={{ color: 'var(--app-accent-text)', fontSize: 18 }}>{kept}</b> of {total} characters kept
+          <Trans id="editor.assignLoop.statusBar.keptLine">
+            <b style={{ color: 'var(--app-accent-text)', fontSize: 18 }}>{kept}</b> of {total} characters kept
+          </Trans>
         </div>
         <div style={{ fontSize: 11.5, color: 'var(--app-text-subtle)', marginTop: 2 }}>
-          {total - kept} removed · reversible until you continue
+          <Trans id="editor.assignLoop.statusBar.removedReversibleLine">
+            {total - kept} removed · reversible until you continue
+          </Trans>
         </div>
       </div>
       <div style={{ marginLeft: 'auto', position: 'relative' }}>
         <button
           onClick={() => setOpen((o) => !o)}
           disabled={removedList.length === 0}
+          aria-expanded={open}
+          aria-haspopup="true"
           onMouseEnter={() => setInfo(removedInfo)}
           onFocus={() => setInfo(removedInfo)}
           onMouseLeave={clearInfo}
@@ -132,7 +168,9 @@ export function StatusBar({ kept, total, removedList, onRestore, onRestoreAll }:
           }}
         >
           <UndoIcon size={13} />
-          {removedList.length > 0 ? <span><b>{removedList.length}</b> removed</span> : 'Nothing removed'}
+          {removedList.length > 0
+            ? <Trans id="editor.assignLoop.statusBar.removedCountButton"><b>{removedList.length}</b> removed</Trans>
+            : t({ id: "editor.assignLoop.statusBar.nothingRemoved", message: "Nothing removed" })}
           {removedList.length > 0 && <ChevronIcon open={open} size={14} />}
         </button>
         {open && removedList.length > 0 && (

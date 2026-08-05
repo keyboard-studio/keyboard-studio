@@ -13,6 +13,9 @@
 //     and records instantiationMode = "new-from-base".
 //   - `instantiateFromExisting()` is the Track-2 entry point; it preserves the
 //     loaded keyboard's identity and sets instantiationMode = "adapt-existing".
+//   - Both instantiate entry points also clear the per-working-copy Phase B
+//     proposal decisions (resetPhaseBDraftDecisions, spec 044 FR-016a), which
+//     deliberately survive phaseBDraftStore's own per-visit reset().
 //   - `setIdentity()` overlays a post-instantiation identity patch.
 //   - No host-disk writes. VirtualFS lives as a React-state reference.
 //   - Worker boundary upheld: WASM is not imported here.
@@ -31,7 +34,26 @@ import {
   type TouchAssignment,
 } from "@keyboard-studio/contracts";
 import { computeStalenessFromManifest } from "../dashboard/completeness.ts";
+import { resetPhaseBDraftDecisions } from "./phaseBDraftStore.ts";
 import type { Step } from "../steps/types.ts";
+import { isSequenceAssignmentForChar } from "../editors/assignLoop/patternIds.ts";
+
+/**
+ * One sibling-accent bulk group: the batch of accented siblings the longpress
+ * accelerator placed on a single host key in one confirm. Persisted in
+ * `touchDraft` so the touch gallery can render a single removable summary box
+ * for the batch (and delete it as a unit) that survives unmount/remount.
+ */
+export interface BulkAccentGroup {
+  /** Stable id for this group (`${baseChar}:${hostKey}`). */
+  id: string;
+  /** The Keyman vkey the siblings were placed on (e.g. `K_U`). */
+  hostKey: string;
+  /** The accepted character whose acceptance triggered the batch. */
+  baseChar: string;
+  /** The sibling characters this batch actually placed (both cases). */
+  members: string[];
+}
 
 // ---------------------------------------------------------------------------
 // Manifest binding — avoids a static import of steps/manifest.ts which would
@@ -77,12 +99,18 @@ export function bindManifest(m: readonly Step[]): void {
  *
  * 'n'     — whole node deleted (single).
  * 'i'     — single item removed (single).
+ * 't'     — single pre-existing touch method deleted (single), addressed by
+ *           the `touchKeyAddress.ts` scheme (main key / longpress / multitap
+ *           / flick) — mirrors 'i' but on the separate `deletedTouchKeyIds`
+ *           overlay so a touch-method deletion and a carve item deletion
+ *           can never collide on the same id space.
  * 'batch' — grouped cascade-delete (multiple nodes + items in one undo step).
  *            A single undoDelete() call reverses the entire cascade atomically.
  */
 export type UndoEntry =
   | { k: 'n'; id: string }
   | { k: 'i'; id: string }
+  | { k: 't'; id: string }
   | { k: 'batch'; nodeIds: string[]; itemIds: string[] };
 
 // ---------------------------------------------------------------------------
@@ -115,8 +143,15 @@ export type IdentityPatch = Partial<{
   bcp47: string;
   /** Human-readable display name for the new keyboard. */
   displayName: string;
-  /** Raw target script subtag as entered by the user (e.g. "Latn", "Deva"). */
-  targetScript: string;
+  /**
+   * The language's name in English, as the author confirmed it (spec 057 FR-002).
+   *
+   * Display text for the package descriptor's `<Language>` element and nothing
+   * else — the codec does not serialize a language name, so this never reaches
+   * the `.kmn`. Blank or absent lets the BCP47 tag stand in as its own display
+   * text, which is what the descriptor writer did for every tag before 057.
+   */
+  languageName: string;
   /**
    * New keyboard identifier chosen by the author (Track 1 only).
    *
@@ -199,6 +234,21 @@ export interface WorkingCopyState {
    */
   baseHolderOverride: string | null;
 
+  /**
+   * The base keyboard's `LICENSE.md` VERBATIM, or null when it has none
+   * (spec 059 FR-011).
+   *
+   * Kept on the working copy because the base's license is deliberately never
+   * written into the VFS (fetchKeyboardSourceToVfs FR-011), so it cannot be read
+   * back out of it — and the download path needs it to know which holders the
+   * emitted LICENSE.md must retain. Without it a downloaded zip would name only
+   * the new author, dropping the notice MIT requires a derivative to keep.
+   *
+   * Raw text, not the parsed holders: `resolveInheritedHolders` in the engine is
+   * the one parser, shared by both emission paths.
+   */
+  baseLicenseText: string | null;
+
   // -- Carve working IR (irStore slots) ----------------------------------------
   /**
    * Carve working IR — the in-progress keyboard IR being edited in the carve
@@ -223,8 +273,20 @@ export interface WorkingCopyState {
    * has removed. Format: `"<nodeId>#<index>"` or `"<nodeId>#r<ruleIndex>"`.
    */
   deletedItemIds: Set<string>;
+  /**
+   * Set of individually-deleted pre-existing touch methods (main key /
+   * longpress / multitap / flick provided by the base keyboard's
+   * `.keyman-touch-layout`), addressed by the `touchKeyAddress.ts` scheme
+   * (`"<platform>:<layerId>:<keyId>"`, optionally suffixed
+   * `:sk:<subId>` / `:multitap:<subId>` / `:flick:<direction>`). A separate
+   * overlay from `deletedItemIds` (a different id space — desktop carve item
+   * ids never collide with touch addresses) so the two deletion kinds can be
+   * undone independently. Consumed by `projectWorkingCopyVfs`'s touch-method
+   * deletion step (`applyTouchKeycapRemovalsToVfs`).
+   */
+  deletedTouchKeyIds: Set<string>;
   /** Ordered list of undo entries (latest last). Each entry is either a whole-node
-   * deletion or a single-item removal. */
+   * deletion, a single-item removal, or a single touch-method deletion. */
   undoStack: UndoEntry[];
 
   // -- Survey results (surveyResultsStore slots) --------------------------------
@@ -239,6 +301,16 @@ export interface WorkingCopyState {
   session: SurveySession;
   /** Desktop layout lock — prevents further physical edits until unlocked. */
   desktopLocked: boolean;
+  /**
+   * De-duplicated, insertion-ordered list of characters flagged (via
+   * flagCharForSequence) for later sequence definition. Dates from the
+   * retired standalone Sequence Gallery step; MechanismGallery's inline
+   * sequence builder (SequenceBuilderPanel) records real
+   * multi_char_sequence assignments directly instead of flagging, so no
+   * current UI call site populates this list — see flagCharForSequence's
+   * own doc comment.
+   */
+  sequenceFlaggedChars: string[];
   /**
    * Serialized JSON for the `.keyman-touch-layout` artifact, derived from
    * scaffoldTouchLayout(ir) at Phase E completion. Written into the cloned
@@ -270,6 +342,14 @@ export interface WorkingCopyState {
   touchDraft: {
     charTouchEntries: Array<[string, TouchAssignment]>;
     suggestionResolvedChars: string[];
+    /**
+     * Sibling-accent bulk groups (longpress accelerator): each records a batch
+     * of accented siblings placed together by one "Add them" confirm, so the
+     * touch gallery can summarize the batch in a single removable box rather
+     * than one chip per sibling. Optional for back-compat with drafts persisted
+     * before this field existed (absent reads as `[]`).
+     */
+    bulkAccentGroups?: BulkAccentGroup[];
   } | null;
 
   /**
@@ -347,6 +427,15 @@ export interface WorkingCopyState {
    * consume. Routing them through {@link setIR} silently wipes those deletions.
    */
   setWorkingIR: (ir: KeyboardIR) => void;
+  /**
+   * Commit a facet-transform result (spec 039). Writes the transform's `nextIr`
+   * via the overlay-preserving {@link setWorkingIR} seam, and — when the transform
+   * changed the produced-character set — re-seeds the IR-derived discovery axes so
+   * `session.axes` and downstream `selectStrategy()`/gallery reads re-derive
+   * against the new produced set (FR-013 / research D11). A no-op axis re-seed
+   * when `producedSetChanged` is false.
+   */
+  commitFacetTransform: (nextIr: KeyboardIR, producedSetChanged: boolean) => void;
   /** Clear the carve working IR and reset carve deletion state. */
   clearIR: () => void;
   /** Mark a node as deleted and push to undo stack. */
@@ -363,9 +452,24 @@ export interface WorkingCopyState {
   restoreItem: (itemId: string) => void;
   /** Returns true if the given itemId is in the item deletion set. */
   isItemDeleted: (itemId: string) => boolean;
-  /** Clear all deletions (nodes + items) and the undo stack without touching the IR. */
+  /**
+   * Mark a pre-existing touch method (main key / longpress / multitap /
+   * flick) as deleted, addressed by the `touchKeyAddress.ts` scheme. Pushes a
+   * `'t'` undo entry so a single `undoDelete()` reverses it.
+   */
+  deleteTouchKey: (touchKeyId: string) => void;
+  /** Restore a single deleted touch-method address. */
+  restoreTouchKey: (touchKeyId: string) => void;
+  /** Returns true if the given touch-method address is in the deletion set. */
+  isTouchKeyDeleted: (touchKeyId: string) => boolean;
+  /**
+   * Clear all deletions (nodes + items + touch-method deletions) and the
+   * undo stack, without touching the IR. Also clears `deletedTouchKeyIds` so
+   * no 't' deletion is left applied with its only undo path (the entry this
+   * just wiped from `undoStack`) gone — see the implementation comment.
+   */
   keepAll: () => void;
-  /** Clear all deletions (nodes + items) and the undo stack. Alias for keepAll with clearer name. */
+  /** Clear all deletions (nodes + items + touch-method deletions) and the undo stack. Alias for keepAll with clearer name. */
   restoreAll: () => void;
   /**
    * Atomically delete a set of whole-rule nodes AND a set of output-store slot items
@@ -384,13 +488,36 @@ export interface WorkingCopyState {
 
   // -- Actions (surveyResultsStore) --------------------------------------------
   /**
-   * Record a phase result and re-derive the session. Re-running a phase
-   * replaces its earlier result (keyed by phase) so back-navigation works.
+   * Record a phase result and re-derive the session. The entry for that phase
+   * is updated FIELD-WISE (`{...prior, ...result}`), not replaced wholesale.
+   *
+   * Field-wise, because a phase id is not a step id: more than one spine step
+   * can legitimately report under the same phase (the marks series and the
+   * pre-carve convenience question are both Phase C), and each owns a
+   * different slice of the result. Wholesale replacement made the second step
+   * to complete silently erase the first one's fields — e.g. the convenience
+   * question dropping `marksWorklist`/`marksOutputForm`, the normalization
+   * signal carve's needed-set derivation depends on.
+   *
+   * The consequence for callers: **re-running a step CLEARS only the fields it
+   * re-emits.** A step that must reset a field it previously set has to emit a
+   * value for it rather than omitting it. Required fields (`answers`) always
+   * overwrite, so back-navigation still re-answers a phase rather than
+   * accumulating; so do the optional fields every emitter always sets
+   * (`marksWorklist`, `retainedConvenienceChars`). The one field that can now
+   * outlive its writer is `marksOutputForm`, which the marks series omits on
+   * its S0 skip: an alphabet edited down to zero marks leaves the earlier form
+   * choice in place. Harmless today — carve normalizes BOTH the produced and
+   * needed sides with that one form, so a stale value shifts which grapheme
+   * representation is compared but never desyncs the comparison. Emitting it
+   * unconditionally instead would change the reducer's skip-path default
+   * (`?? "base-plus-mark"`, steps/reducer.ts), which is a separate decision.
    */
   recordPhase: (result: SurveyPhaseResult) => void;
   /**
    * Record a Phase C result carrying the given assignments, replacing any
-   * prior Phase C assignments (last-wins semantics). Call with [] to clear.
+   * prior Phase C assignments (last-wins semantics) and preserving every other
+   * field on the Phase C entry. Call with [] to clear.
    */
   recordAssignments: (assignments: MechanismAssignment[]) => void;
   /** Update the IR-derived axis baseline and re-derive the session. */
@@ -416,10 +543,21 @@ export interface WorkingCopyState {
     draft: {
       charTouchEntries: Array<[string, TouchAssignment]>;
       suggestionResolvedChars: string[];
+      bulkAccentGroups?: BulkAccentGroup[];
     } | null,
   ) => void;
   /** Mark a gallery's one-time intro splash as seen for this working-copy session. */
   markGalleryIntroSeen: (gallery: "mechanism" | "touch") => void;
+  /**
+   * Flag a character for later sequence assignment (idempotent add).
+   * Tracked-for-Sequence-Gallery only — never emitted as a MechanismAssignment.
+   */
+  flagCharForSequence: (char: string) => void;
+  /**
+   * Remove a character from the sequence-flagged list.
+   * Tracked-for-Sequence-Gallery only — never emitted as a MechanismAssignment.
+   */
+  unflagCharForSequence: (char: string) => void;
   /**
    * Reset the entire working copy to initial state. Clears all slots
    * including base keyboard, base VFS, base IR, identity, carve IR,
@@ -483,6 +621,9 @@ export interface WorkingCopyState {
 
   /** Record the author-supplied original holder — spec 059 D5 escape hatch. */
   setBaseHolderOverride: (holder: string | null) => void;
+
+  /** Retain the base's verbatim LICENSE.md so both emission paths can read it. */
+  setBaseLicenseText: (text: string | null) => void;
 
   /**
    * Returns true once instantiateFromBase or instantiateFromExisting has been
@@ -598,13 +739,13 @@ function seedIrAxesFromBaseIr(
  *    phaseResults) exactly as they stood. This guards against setScaffoldSpec()
  *    triggering a second compile whose onInstantiate would otherwise re-apply
  *    this call's (possibly different/default) removalCapabilities and reset
- *    the carve overlay for no reason — see StudioShell's instantiatedRef
+ *    the carve overlay for no reason — see StudioShell's instantiatedForBaseIdRef
  *    comment. The mode conjunct matters because a SAME-id call can also arrive
  *    from a genuine Track switch: e.g. the working copy was instantiated via
  *    the OTHER track for keyboard X, and the user then independently
  *    re-selects keyboard X via a different entry point (e.g. the
  *    Preview/Output screen's own base picker — usePreviewArtifact runs its own
- *    decoupled pipeline, outside the main survey's instantiatedRef gate — see
+ *    decoupled pipeline, outside the main survey's instantiatedForBaseIdRef gate — see
  *    confirmRebase.ts / instantiateFromBaseIfConfirmed), which fires the
  *    action for the same id but the OTHER mode. An id-only guard would wrongly
  *    no-op and strand the working copy in the old track/identity mode instead
@@ -669,15 +810,18 @@ const INITIAL_SURVEY = remerge({}, []);
 export type WorkingCopyData = Omit<
   WorkingCopyState,
   // actions are excluded from the data snapshot
-  | "setIR" | "setWorkingIR" | "clearIR" | "deleteNode" | "undoDelete" | "restoreNode"
-  | "isDeleted" | "deleteItem" | "restoreItem" | "isItemDeleted" | "keepAll" | "restoreAll"
+  | "setIR" | "setWorkingIR" | "commitFacetTransform" | "clearIR" | "deleteNode" | "undoDelete" | "restoreNode"
+  | "isDeleted" | "deleteItem" | "restoreItem" | "isItemDeleted"
+  | "deleteTouchKey" | "restoreTouchKey" | "isTouchKeyDeleted" | "keepAll" | "restoreAll"
   | "cascadeDelete"
   | "cascadeRestore"
   | "recordPhase" | "recordAssignments"
   | "setIrAxes" | "lockDesktop" | "unlockDesktop"
   | "setTouchLayoutJson" | "setTouchDraft" | "markGalleryIntroSeen" | "reset"
+  | "flagCharForSequence" | "unflagCharForSequence"
   | "instantiateFromBase" | "instantiateFromExisting" | "setIdentity" | "isInstantiated"
   | "setAttribution" | "setLicenseUnparseable" | "setBaseHolderOverride"
+  | "setBaseLicenseText"
   | "markStale" | "clearStale"
   | "setValidatorFindings"
   | "setAxisFills"
@@ -694,15 +838,18 @@ const INITIAL_STATE: WorkingCopyData = {
   attribution: null,
   licenseUnparseable: null,
   baseHolderOverride: null,
+  baseLicenseText: null,
   // carve IR slots
   ir: null,
   removalCapabilities: new Map(),
   deletedNodeIds: new Set(),
   deletedItemIds: new Set(),
+  deletedTouchKeyIds: new Set(),
   undoStack: [],
   // survey slots
   ...INITIAL_SURVEY,
   desktopLocked: false,
+  sequenceFlaggedChars: [],
   touchLayoutJson: null,
   touchDraft: null,
   galleryIntrosSeen: { mechanism: false, touch: false },
@@ -732,6 +879,19 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   setWorkingIR: (ir) =>
     set({ ir }),
 
+  // spec 039 — commit a facet-transform result. Overlay-preserving write; when the
+  // produced-character set changed, re-derive the IR-seeded axes (markInputOrder)
+  // from the new IR so strategy/gallery picks do not go stale (FR-013 / D11).
+  commitFacetTransform: (nextIr, producedSetChanged) =>
+    set((s) => {
+      if (!producedSetChanged) return { ir: nextIr };
+      // Drop the cached IR-derived axis so seedIrAxesFromBaseIr re-derives it
+      // from the new IR; survey-derived axes (phaseResults) are re-merged as-is.
+      const { markInputOrder: _drop, ...preserved } = s.irAxes;
+      const reseeded = seedIrAxesFromBaseIr(nextIr, preserved);
+      return { ir: nextIr, ...remerge(reseeded, s.phaseResults) };
+    }),
+
   clearIR: () =>
     set({ ir: null, deletedNodeIds: new Set(), deletedItemIds: new Set(), undoStack: [] }),
 
@@ -753,6 +913,10 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         const next = new Set(s.deletedItemIds);
         next.delete(last.id);
         return { deletedItemIds: next, undoStack: s.undoStack.slice(0, -1) };
+      } else if (last.k === 't') {
+        const next = new Set(s.deletedTouchKeyIds);
+        next.delete(last.id);
+        return { deletedTouchKeyIds: next, undoStack: s.undoStack.slice(0, -1) };
       } else {
         // Batch entry: reverse all node AND item deletions in this cascade atomically.
         const nextNodes = new Set(s.deletedNodeIds);
@@ -797,22 +961,65 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
 
   isItemDeleted: (itemId) => get().deletedItemIds.has(itemId),
 
+  deleteTouchKey: (touchKeyId) =>
+    set((s) => ({
+      deletedTouchKeyIds: new Set([...s.deletedTouchKeyIds, touchKeyId]),
+      undoStack: [...s.undoStack, { k: 't', id: touchKeyId }],
+    })),
+
+  restoreTouchKey: (touchKeyId) =>
+    set((s) => {
+      const next = new Set(s.deletedTouchKeyIds);
+      next.delete(touchKeyId);
+      return {
+        deletedTouchKeyIds: next,
+        undoStack: s.undoStack.filter((e) => !(e.k === 't' && e.id === touchKeyId)),
+      };
+    }),
+
+  isTouchKeyDeleted: (touchKeyId) => get().deletedTouchKeyIds.has(touchKeyId),
+
+  // keepAll/restoreAll semantics: `restoreAll` is literally the same discard-
+  // everything operation as `keepAll` (see the aliasing below and the
+  // interface doc comments) — CarveGallery's "Skip carving" / gate-screen
+  // buttons call `keepAll()` to mean "discard any pending review, keep every
+  // rule as-is", and StatusBar's "Restore all" calls `restoreAll()` to mean
+  // "undo every deletion made so far". Both land on the same post-condition:
+  // NO deletion of any kind remains applied. Per the carve/touch symmetry
+  // this fix restores, `keepAll` must therefore clear `deletedTouchKeyIds`
+  // exactly like it clears `deletedNodeIds`/`deletedItemIds` — leaving any
+  // subset of the three Sets applied while wiping `undoStack` would orphan
+  // whichever 'n'/'i'/'t' undo entries pointed at the still-applied Set,
+  // making that deletion permanently un-undoable while it stays live. The
+  // invariant restored: after keepAll/restoreAll, undoStack is empty AND all
+  // three deletion Sets (deletedNodeIds, deletedItemIds, deletedTouchKeyIds)
+  // are empty too — no applied deletion can outlive the undo history that
+  // was its only path back.
   keepAll: () =>
-    set({ deletedNodeIds: new Set(), deletedItemIds: new Set(), undoStack: [] }),
+    set({
+      deletedNodeIds: new Set(),
+      deletedItemIds: new Set(),
+      deletedTouchKeyIds: new Set(),
+      undoStack: [],
+    }),
 
   restoreAll: () => get().keepAll(),
 
   cascadeDelete: (ruleNodeIds, storeSlotIds) => {
     if (ruleNodeIds.length === 0 && storeSlotIds.length === 0) return;
     set((s) => {
-      // Route BOTH whole-rule deletes and store-slot nul-fills through the ITEM
+      // Route BOTH whole-rule deletes and store-slot drops through the ITEM
       // channel (deletedItemIds). The chip grid and kept-counts reflect deletion
       // via isItemDeleted(gid) — and for a simple-rule chip gid === rule.nodeId —
       // so using the item channel dims every affected chip, matching the single-
       // glyph delete path (deleteItem). projectWorkingCopyVfs folds bare node ids
       // in deletedItemIds into whole-node deletions on emit, so the rules are
       // still dropped from the compiled keyboard.
-      const allItems = [...ruleNodeIds, ...storeSlotIds];
+      // Dedup: a caller-supplied id could appear in both ruleNodeIds and
+      // storeSlotIds (or repeat within one), which would otherwise let the
+      // same id appear twice in this undo entry's itemIds. Latent-safety
+      // only — no caller currently passes overlapping ids.
+      const allItems = [...new Set([...ruleNodeIds, ...storeSlotIds])];
       const nextItems = new Set([...s.deletedItemIds, ...allItems]);
       const batchEntry: UndoEntry = { k: 'batch', nodeIds: [], itemIds: allItems };
       return {
@@ -845,7 +1052,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     const next =
       idx === -1
         ? [...prev, result]
-        : prev.map((p, i) => (i === idx ? result : p));
+        : prev.map((p, i) => (i === idx ? { ...p, ...result } : p));
     set(remerge(get().irAxes, next));
   },
 
@@ -853,11 +1060,9 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     const prev = get().phaseResults;
     const existingC = prev.find((p) => p.phase === "C");
     const next: SurveyPhaseResult = {
+      ...existingC,
       phase: "C",
       answers: existingC?.answers ?? [],
-      ...(existingC?.selectedPatternIds !== undefined
-        ? { selectedPatternIds: existingC.selectedPatternIds }
-        : {}),
       assignments,
     };
     const idx = prev.findIndex((p) => p.phase === "C");
@@ -886,6 +1091,51 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       galleryIntrosSeen: { ...s.galleryIntrosSeen, [gallery]: true },
     })),
 
+  // Idempotent add — tracked for the (now-retired) standalone Sequence
+  // Gallery only, never emitted. MechanismGallery's inline sequence builder
+  // (SequenceBuilderPanel) records real assignments directly and no longer
+  // calls this action — sequenceFlaggedChars/flagCharForSequence are unused
+  // by any current UI call site and are candidates for a later simplify pass.
+  // Left in place (and still store-tested) rather than removed in this
+  // change, per the "don't touch what isn't asked" rule.
+  flagCharForSequence: (char) =>
+    set((s) =>
+      s.sequenceFlaggedChars.includes(char)
+        ? s
+        : { sequenceFlaggedChars: [...s.sequenceFlaggedChars, char] },
+    ),
+
+  // ALSO strips any recorded individual-scope multi_char_sequence
+  // (PATTERN_SEQUENCE) assignment for `char` from Phase C — this stripping
+  // half of the action is still actively used by MechanismGallery's
+  // "Sequence recorded"/"Sequences" remove controls (which now key
+  // reachability off a recorded PATTERN_SEQUENCE assignment via
+  // hasSequenceForChar, not off sequenceFlaggedChars membership — see
+  // SequenceBuilderPanel.tsx). The sequenceFlaggedChars-membership half below
+  // is a no-op in that flow (the char generally isn't in the list at all
+  // since flagCharForSequence is no longer called) but is harmless and kept
+  // for the retired-gallery call shape. Done here, in the one store action,
+  // so every call site (both MechanismGallery chip-remove buttons) is
+  // covered without duplicating the filter at each call site.
+  unflagCharForSequence: (char) => {
+    // Delegate the Phase C merge to recordAssignments — the single place that
+    // already knows how to splice a new assignments array back into
+    // phaseResults (preserving the existing Phase C's answers/
+    // selectedPatternIds) and remerge. Only touch Phase C when it already
+    // exists, matching the prior no-op behavior for an as-yet-unrecorded
+    // working copy.
+    const phaseC = get().phaseResults.find((p) => p.phase === "C");
+    if (phaseC !== undefined) {
+      const strippedAssignments = (phaseC.assignments ?? []).filter(
+        (a) => !isSequenceAssignmentForChar(a, char),
+      );
+      get().recordAssignments(strippedAssignments);
+    }
+    set((s) => ({
+      sequenceFlaggedChars: s.sequenceFlaggedChars.filter((c) => c !== char),
+    }));
+  },
+
   reset: () => {
     // Clear the module-level re-opened roots so clearStale after reset is correct.
     _reopenedRoots = new Set();
@@ -894,6 +1144,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // Re-initialize mutable objects so mutations do not bleed across resets.
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(),
+      deletedTouchKeyIds: new Set(),
       removalCapabilities: new Map(),
       galleryIntrosSeen: { mechanism: false, touch: false },
       staleSteps: new Set<string>(),
@@ -920,6 +1171,14 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
 
     // Track 1: new keyboard from base — identity RESET, edit layers cleared.
     _reopenedRoots = new Set(); // reset staleness roots for the new session
+    // Phase B proposal decisions are per-working-copy (spec 044 FR-016a), not
+    // per-session: they survive phaseBDraftStore.reset() (which runs on every
+    // entry to the build-list screen) and are cleared HERE instead. Without
+    // this, declining the exemplar offer — or removing a proposed character —
+    // on one keyboard would silently carry into the next one started in the
+    // same browser session. Placed after the shouldNoop guard so a redundant
+    // re-fire of the same instantiate never discards a live decision.
+    resetPhaseBDraftDecisions();
     set({
       instantiationMode: "new-from-base",
       baseKeyboard: base,
@@ -932,6 +1191,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       removalCapabilities: removalCapabilities ?? new Map(),
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(),
+      deletedTouchKeyIds: new Set(),
       undoStack: [],
       // Clear survey results only on a genuine base switch; otherwise carry
       // forward any phaseResults/irAxes recorded while this instantiate was
@@ -939,6 +1199,10 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // runs when there is nothing to preserve.
       ...remerge(seedIrAxesFromBaseIr(ir, preservedIrAxes), preservedPhaseResults),
       desktopLocked: false,
+      // Reset unconditionally: a fresh/re-instantiated working copy has no
+      // flags, and flagging only happens in Phase C (well after instantiation
+      // settles), so no in-flight value can be lost here.
+      sequenceFlaggedChars: [],
       touchLayoutJson: null,
       touchDraft: null,
       galleryIntrosSeen: { mechanism: false, touch: false },
@@ -964,6 +1228,10 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     }
 
     _reopenedRoots = new Set(); // reset staleness roots for the new session
+    // Per-working-copy Phase B proposal decisions — see the identical call in
+    // instantiateFromBase above for why this cannot live in
+    // phaseBDraftStore.reset().
+    resetPhaseBDraftDecisions();
     // Track 2: adapt existing keyboard — identity PRESERVED from loaded keyboard.
     set({
       instantiationMode: "adapt-existing",
@@ -985,12 +1253,14 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       removalCapabilities: removalCapabilities ?? new Map(),
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(),
+      deletedTouchKeyIds: new Set(),
       undoStack: [],
       // Edit layers start clean only on a genuine base switch; otherwise carry
       // forward any phaseResults/irAxes recorded while this instantiate was
       // still in flight.
       ...remerge(seedIrAxesFromBaseIr(ir, preservedIrAxes), preservedPhaseResults),
       desktopLocked: false,
+      sequenceFlaggedChars: [],
       touchLayoutJson: null,
       touchDraft: null,
       galleryIntrosSeen: { mechanism: false, touch: false },
@@ -1009,6 +1279,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   setLicenseUnparseable: (v) => set({ licenseUnparseable: v }),
 
   setBaseHolderOverride: (holder) => set({ baseHolderOverride: holder }),
+
+  setBaseLicenseText: (text) => set({ baseLicenseText: text }),
 
   isInstantiated: () => get().baseKeyboard !== null,
 

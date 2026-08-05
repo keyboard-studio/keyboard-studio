@@ -29,8 +29,14 @@
 //
 //   - Action functions from the Zustand factory: excluded automatically (not in
 //     the data fields enumerated here).
+//
+// Reuse (spec 034 US3): `WorkingCopySnapshot`, `serializeEntry`/`deserializeEntry`,
+// and the `snapshotWorkingCopyData`/`applyWorkingCopySnapshot` builder/applier are
+// exported so the durable localStorage draft (../lib/draftPersistence.ts) builds
+// and restores its `workingCopy` envelope field through this exact code — never
+// a second enumeration of the WorkingCopyData field list.
 
-import type { VirtualFSEntry } from "@keyboard-studio/contracts";
+import type { RemovalCapability, VirtualFS, VirtualFSEntry } from "@keyboard-studio/contracts";
 import { createVirtualFS, mergePhaseResults } from "@keyboard-studio/contracts";
 import { classifyRemovalCapabilities } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -48,7 +54,7 @@ const DRAFT_KEY = "ks.working-copy.draft";
 // ---------------------------------------------------------------------------
 
 /** Serializable form of a VirtualFSEntry (binary content as Base64 string). */
-interface SerializedEntry {
+export interface SerializedEntry {
   path: string;
   content: string; // Base64 if isBinary, verbatim string otherwise
   isBinary: boolean;
@@ -64,19 +70,27 @@ interface SerializedEntry {
  *
  * The base type is narrowed by serialization overrides:
  *   - `baseVfs` (a VirtualFS instance) → `baseVfsEntries` (Base64-encoded plain array)
- *   - `deletedNodeIds` / `deletedItemIds` / `staleSteps` (Set<string>) → `string[]`
+ *   - `deletedNodeIds` / `deletedItemIds` / `deletedTouchKeyIds` / `staleSteps`
+ *     (Set<string>) → `string[]`
  * and two derived fields are dropped entirely (`removalCapabilities`, `session`)
  * because they are re-derived on rehydration, never stored.
  *
  * `validatorFindings` (LintFinding[]) and `axisFills` (AxisFill[], #890) flow
  * through unchanged — both are plain, JSON-safe data, so they round-trip
  * directly with no override.
+ *
+ * Exported (spec 034 US3): the durable localStorage draft
+ * (`../lib/draftPersistence.ts`) reuses this exact type — and the
+ * `snapshotWorkingCopyData`/`applyWorkingCopySnapshot` builder/applier below —
+ * for its `workingCopy` envelope field, rather than re-enumerating the field
+ * list a second time.
  */
-type WorkingCopySnapshot = Omit<
+export type WorkingCopySnapshot = Omit<
   WorkingCopyData,
   | "baseVfs"
   | "deletedNodeIds"
   | "deletedItemIds"
+  | "deletedTouchKeyIds"
   | "staleSteps"
   | "removalCapabilities"
   | "session"
@@ -84,10 +98,11 @@ type WorkingCopySnapshot = Omit<
   baseVfsEntries: SerializedEntry[];
   deletedNodeIds: string[];
   deletedItemIds: string[];
+  deletedTouchKeyIds: string[];
   staleSteps: string[];
 };
 
-function serializeEntry(entry: VirtualFSEntry): SerializedEntry {
+export function serializeEntry(entry: VirtualFSEntry): SerializedEntry {
   if (entry.isBinary) {
     // Uint8Array → Base64
     const bytes = entry.content as Uint8Array;
@@ -100,7 +115,7 @@ function serializeEntry(entry: VirtualFSEntry): SerializedEntry {
   return { path: entry.path, content: entry.content as string, isBinary: false };
 }
 
-function deserializeEntry(raw: SerializedEntry): VirtualFSEntry {
+export function deserializeEntry(raw: SerializedEntry): VirtualFSEntry {
   if (raw.isBinary) {
     const binary = atob(raw.content);
     const bytes = new Uint8Array(binary.length);
@@ -110,6 +125,179 @@ function deserializeEntry(raw: SerializedEntry): VirtualFSEntry {
     return { path: raw.path, content: bytes, isBinary: true };
   }
   return { path: raw.path, content: raw.content, isBinary: false };
+}
+
+// ---------------------------------------------------------------------------
+// Shared snapshot builder / applier (spec 034 US3)
+//
+// Extracted so BOTH the OAuth-redirect sessionStorage snapshot below AND the
+// durable localStorage draft (../lib/draftPersistence.ts) build/apply the
+// working-copy portion of their envelope through the exact same code — no
+// second enumeration of the WorkingCopyData field list.
+// ---------------------------------------------------------------------------
+
+// Base-VFS serialization cache (efficiency): the base VFS is set once at
+// instantiation (workingCopyStore.instantiateFromBase/FromExisting) and never
+// mutated in place, so its Base64 serialization is invariant for the life of a
+// working copy. The durable-draft autosave calls snapshotWorkingCopyData on
+// every ~500ms debounced change during authoring, and re-encoding the whole
+// (potentially hundreds of KB) base file tree each time is pure wasted work.
+// Memoize on the baseVfs OBJECT REFERENCE: a cache hit while the same working
+// copy is active, an automatic recompute when a new instantiation replaces the
+// reference (or a reset sets it back to null).
+let _cachedBaseVfsRef: VirtualFS | null = null;
+let _cachedBaseVfsEntries: SerializedEntry[] = [];
+
+function serializeBaseVfsEntries(baseVfs: VirtualFS | null): SerializedEntry[] {
+  if (baseVfs === null) return [];
+  if (baseVfs !== _cachedBaseVfsRef) {
+    _cachedBaseVfsRef = baseVfs;
+    _cachedBaseVfsEntries = baseVfs.entries().map(serializeEntry);
+  }
+  return _cachedBaseVfsEntries;
+}
+
+/**
+ * Build a serializable snapshot of the CURRENT working-copy store state.
+ *
+ * Does NOT guard on instantiationMode/ir — callers that only want to persist
+ * a real working copy (both callers in this module, and
+ * draftPersistence.saveDraft's VR-2 guard) check that themselves before
+ * calling, since each caller's guard condition is otherwise identical and the
+ * check is cheap to repeat at the call site rather than hide in here.
+ *
+ * The base-VFS serialization is memoized on the baseVfs reference (see
+ * `serializeBaseVfsEntries`) so the debounced autosave does not re-Base64 the
+ * immutable base file tree on every write.
+ */
+export function snapshotWorkingCopyData(): WorkingCopySnapshot {
+  const s = useWorkingCopyStore.getState();
+  return {
+    instantiationMode: s.instantiationMode,
+    baseKeyboard: s.baseKeyboard,
+    baseVfsEntries: serializeBaseVfsEntries(s.baseVfs),
+    baseIr: s.baseIr,
+    identity: s.identity,
+    // spec 059: plain JSON, so it round-trips with no custom handling. Present
+    // here because WorkingCopySnapshot is Omit-derived from WorkingCopyData —
+    // the compiler required this line, which is the point of that derivation.
+    attribution: s.attribution,
+    // spec 059 D5: both are plain JSON. The override in particular MUST persist —
+    // an author who supplied the original holder should not have to re-enter it
+    // after a reload, or the download block would reappear on resume.
+    licenseUnparseable: s.licenseUnparseable,
+    baseHolderOverride: s.baseHolderOverride,
+    baseLicenseText: s.baseLicenseText,
+    ir: s.ir,
+    deletedNodeIds: [...s.deletedNodeIds],
+    deletedItemIds: [...s.deletedItemIds],
+    deletedTouchKeyIds: [...s.deletedTouchKeyIds],
+    undoStack: s.undoStack,
+    phaseResults: s.phaseResults,
+    irAxes: s.irAxes,
+    desktopLocked: s.desktopLocked,
+    sequenceFlaggedChars: s.sequenceFlaggedChars,
+    touchLayoutJson: s.touchLayoutJson,
+    touchDraft: s.touchDraft,
+    galleryIntrosSeen: s.galleryIntrosSeen,
+    staleSteps: [...s.staleSteps],
+    validatorFindings: s.validatorFindings,
+    axisFills: s.axisFills,
+  };
+}
+
+/**
+ * Build the working-copy store patch from a snapshot WITHOUT mutating the
+ * store. This is where all the FALLIBLE work lives — `deserializeEntry`'s
+ * `atob()` can throw on a corrupt Base64 VFS entry, and the re-derivation of
+ * the dropped fields runs here too (`removalCapabilities` from `baseIr`,
+ * `session` from `irAxes` + `phaseResults`; see the derived-field policy in the
+ * module header). Separated from the commit so a caller restoring MORE than one
+ * store (draftPersistence.loadDraft restores the working-copy AND survey-session
+ * stores) can do every throwing step BEFORE mutating anything — a throw then
+ * leaves both stores untouched rather than one patched and the other not.
+ */
+export function prepareWorkingCopySnapshot(snapshot: WorkingCopySnapshot): Partial<WorkingCopyData> {
+  const baseVfs = createVirtualFS(snapshot.baseVfsEntries.map(deserializeEntry));
+
+  const removalCapabilities =
+    snapshot.baseIr !== null
+      ? classifyRemovalCapabilities(snapshot.baseIr)
+      : new Map<string, RemovalCapability>();
+
+  const session = mergePhaseResults(snapshot.irAxes, snapshot.phaseResults);
+
+  return {
+    instantiationMode: snapshot.instantiationMode,
+    baseKeyboard: snapshot.baseKeyboard,
+    baseVfs,
+    baseIr: snapshot.baseIr,
+    identity: snapshot.identity,
+    // Tolerate snapshots saved before these fields existed (spec 059 landed
+    // after the durable draft): an absent value must not clobber the store's
+    // null default with undefined. `baseHolderOverride` in particular decides
+    // whether the download block reappears, so it has to restore as a real null.
+    attribution: snapshot.attribution ?? null,
+    licenseUnparseable: snapshot.licenseUnparseable ?? null,
+    baseHolderOverride: snapshot.baseHolderOverride ?? null,
+    baseLicenseText: snapshot.baseLicenseText ?? null,
+    ir: snapshot.ir,
+    removalCapabilities,
+    deletedNodeIds: new Set(snapshot.deletedNodeIds),
+    deletedItemIds: new Set(snapshot.deletedItemIds),
+    // Tolerate snapshots saved before this field existed (dev-branch drafts):
+    // an absent value must not clobber the store default with undefined.
+    deletedTouchKeyIds: new Set(snapshot.deletedTouchKeyIds ?? []),
+    undoStack: snapshot.undoStack,
+    phaseResults: snapshot.phaseResults,
+    irAxes: snapshot.irAxes,
+    session,
+    desktopLocked: snapshot.desktopLocked,
+    // Tolerate snapshots saved before this field existed (dev-branch drafts):
+    // an absent value must not clobber the store default with undefined.
+    sequenceFlaggedChars: snapshot.sequenceFlaggedChars ?? [],
+    touchLayoutJson: snapshot.touchLayoutJson,
+    touchDraft: snapshot.touchDraft,
+    galleryIntrosSeen: snapshot.galleryIntrosSeen,
+    staleSteps: new Set(snapshot.staleSteps),
+    validatorFindings: snapshot.validatorFindings,
+    axisFills: snapshot.axisFills,
+  };
+}
+
+/**
+ * Patch a `WorkingCopySnapshot` directly into the ONE working-copy store
+ * (Article III — restore never constructs a second working copy). Composes
+ * `prepareWorkingCopySnapshot` (fallible) with a single `setState` (pure), so a
+ * throw during preparation never mutates the store.
+ *
+ * Returns true when applied, false when the snapshot is not a real working
+ * copy (instantiationMode null) — the guard the localStorage draft resume
+ * (lib/draftAutosave.ts) relies on.
+ */
+export function applyWorkingCopySnapshot(snapshot: WorkingCopySnapshot): boolean {
+  if (snapshot.instantiationMode === null) {
+    return false;
+  }
+  useWorkingCopyStore.setState(prepareWorkingCopySnapshot(snapshot));
+  return true;
+}
+
+/**
+ * Build a serializable snapshot of the current working copy, or null when there
+ * is no real working copy yet (instantiationMode/ir still null — e.g. a survey
+ * still on the identity step before a base is picked).
+ *
+ * Guarded convenience over `snapshotWorkingCopyData` for callers that want the
+ * null-on-no-working-copy contract (lib/draftAutosave.ts); callers that guard
+ * themselves use `snapshotWorkingCopyData` directly.
+ */
+export function captureWorkingCopySnapshot(): WorkingCopySnapshot | null {
+  const s = useWorkingCopyStore.getState();
+  if (s.instantiationMode === null || s.ir === null) {
+    return null;
+  }
+  return snapshotWorkingCopyData();
 }
 
 // ---------------------------------------------------------------------------
@@ -135,35 +323,7 @@ export function snapshotWorkingCopyToSession(): void {
     return;
   }
 
-  const snapshot: WorkingCopySnapshot = {
-    instantiationMode: s.instantiationMode,
-    baseKeyboard: s.baseKeyboard,
-    baseVfsEntries: s.baseVfs !== null ? s.baseVfs.entries().map(serializeEntry) : [],
-    baseIr: s.baseIr,
-    identity: s.identity,
-    // spec 059: plain JSON, so it round-trips with no custom handling. Present
-    // here because WorkingCopySnapshot is Omit-derived from WorkingCopyData —
-    // the compiler required this line, which is the point of that derivation.
-    attribution: s.attribution,
-    // spec 059 D5: both are plain JSON. The override in particular MUST persist —
-    // an author who supplied the original holder should not have to re-enter it
-    // after a reload, or the block would reappear on resume.
-    licenseUnparseable: s.licenseUnparseable,
-    baseHolderOverride: s.baseHolderOverride,
-    ir: s.ir,
-    deletedNodeIds: [...s.deletedNodeIds],
-    deletedItemIds: [...s.deletedItemIds],
-    undoStack: s.undoStack,
-    phaseResults: s.phaseResults,
-    irAxes: s.irAxes,
-    desktopLocked: s.desktopLocked,
-    touchLayoutJson: s.touchLayoutJson,
-    touchDraft: s.touchDraft,
-    galleryIntrosSeen: s.galleryIntrosSeen,
-    staleSteps: [...s.staleSteps],
-    validatorFindings: s.validatorFindings,
-    axisFills: s.axisFills,
-  };
+  const snapshot = snapshotWorkingCopyData();
 
   try {
     sessionStorage.setItem(DRAFT_KEY, JSON.stringify(snapshot));
@@ -185,6 +345,11 @@ export function snapshotWorkingCopyToSession(): void {
  * that follow an OAuth return. The consume-and-clear nature means a stale
  * snapshot from a prior interrupted session does not persist beyond the first
  * re-entry.
+ *
+ * spec 034 US3 / research D4: `main.tsx` calls `loadDraft()` (the durable
+ * localStorage draft) BEFORE this function, so on an OAuth-return boot this
+ * may legitimately layer the pre-redirect sessionStorage snapshot on top of
+ * whatever the durable draft already restored.
  */
 export function rehydrateWorkingCopyFromSession(): boolean {
   const raw = sessionStorage.getItem(DRAFT_KEY);
@@ -193,67 +358,28 @@ export function rehydrateWorkingCopyFromSession(): boolean {
   // Always clear first so a malformed snapshot doesn't loop.
   sessionStorage.removeItem(DRAFT_KEY);
 
-  let snapshot: WorkingCopySnapshot;
+  // P2 back-port of the draftPersistence.loadDraft P0 fix: the ENTIRE
+  // parse-through-apply body is one try/catch, not just JSON.parse. A
+  // snapshot can be valid JSON but wrong-shaped (missing/null
+  // `instantiationMode`, non-object value), or `applyWorkingCopySnapshot` can
+  // throw deep inside `deserializeEntry`'s `atob()` on a corrupt Base64 VFS
+  // entry. Either failure mode must not crash the OAuth-return boot.
   try {
-    snapshot = JSON.parse(raw) as WorkingCopySnapshot;
+    const snapshot = JSON.parse(raw) as WorkingCopySnapshot;
+
+    // Basic sanity: must have instantiationMode set.
+    if (
+      snapshot === null ||
+      typeof snapshot !== "object" ||
+      snapshot.instantiationMode === null
+    ) {
+      return false;
+    }
+
+    applyWorkingCopySnapshot(snapshot);
+
+    return true;
   } catch {
     return false;
   }
-
-  // Basic sanity: must have instantiationMode set.
-  if (snapshot.instantiationMode === null) {
-    return false;
-  }
-
-  const baseVfs = createVirtualFS(snapshot.baseVfsEntries.map(deserializeEntry));
-
-  // Re-derive computed fields from their restored source fields.
-  // Per the derived-field policy in the module header: these are NOT stored;
-  // they are recomputed here so they can't drift from their inputs.
-  //
-  // removalCapabilities derives from baseIr — NOT the carve working `ir`. The
-  // store documents this map as "computed once at instantiation from the base
-  // IR … never recomputed on carve edits." Deriving it from `ir` here would
-  // diverge from that invariant the moment `ir` is mutated before the redirect.
-  const removalCapabilities =
-    snapshot.baseIr !== null
-      ? classifyRemovalCapabilities(snapshot.baseIr)
-      : new Map<string, import("@keyboard-studio/contracts").RemovalCapability>();
-
-  const session = mergePhaseResults(snapshot.irAxes, snapshot.phaseResults);
-
-  // staleSteps is restored as-is (the visible staleness closure). Its module-level
-  // roots (`_reopenedRoots` in workingCopyStore) are intentionally not persisted —
-  // they live behind a bound manifest that does not survive the redirect. Restoring
-  // the closure preserves what the author saw; a subsequent markStale/clearStale
-  // recomputes from the (now-empty) roots, which is acceptable for this edge.
-  //
-  // Patch directly into the store.
-  useWorkingCopyStore.setState({
-    instantiationMode: snapshot.instantiationMode,
-    baseKeyboard: snapshot.baseKeyboard,
-    baseVfs,
-    baseIr: snapshot.baseIr,
-    identity: snapshot.identity,
-    attribution: snapshot.attribution,
-    licenseUnparseable: snapshot.licenseUnparseable,
-    baseHolderOverride: snapshot.baseHolderOverride,
-    ir: snapshot.ir,
-    removalCapabilities,
-    deletedNodeIds: new Set(snapshot.deletedNodeIds),
-    deletedItemIds: new Set(snapshot.deletedItemIds),
-    undoStack: snapshot.undoStack,
-    phaseResults: snapshot.phaseResults,
-    irAxes: snapshot.irAxes,
-    session,
-    desktopLocked: snapshot.desktopLocked,
-    touchLayoutJson: snapshot.touchLayoutJson,
-    touchDraft: snapshot.touchDraft,
-    galleryIntrosSeen: snapshot.galleryIntrosSeen,
-    staleSteps: new Set(snapshot.staleSteps),
-    validatorFindings: snapshot.validatorFindings,
-    axisFills: snapshot.axisFills,
-  });
-
-  return true;
 }

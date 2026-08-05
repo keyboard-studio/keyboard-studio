@@ -2,7 +2,7 @@
 // from a base). Lets the author set the display name and keyboard id before
 // downloading.
 //
-// Placement: rendered in PreviewShell's left pane when
+// Placement: rendered in OutputScreen's left pane when
 // instantiationMode === "new-from-base", below the scaffold mode toggle and
 // above the KMN editor. Hidden (or made read-only) for Track 2
 // (adapt-existing) because identity is preserved from the loaded keyboard.
@@ -19,8 +19,10 @@
 //     change it before submitting to the community repo).
 
 import { useEffect, useRef, useState } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { validateKeyboardId } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { TextField, Label, ErrorText } from "../../ui/index.ts";
 import { CARD_BORDER, TEXT_DIM, WARNING } from "../../ui/theme.ts";
 
@@ -29,10 +31,16 @@ import { CARD_BORDER, TEXT_DIM, WARNING } from "../../ui/theme.ts";
 // ---------------------------------------------------------------------------
 
 export function TrackOneIdentityPanel() {
+  const { t } = useLingui();
   const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
   const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
   const identity = useWorkingCopyStore((s) => s.identity);
   const setIdentity = useWorkingCopyStore((s) => s.setIdentity);
+  // The identity-lite answers, still in the survey session. `bcp47` is the tag the
+  // series composed; `english` is the language's English name (spec 057 FR-001/FR-002).
+  const identityResult = useSurveySessionStore((s) => s.identityResult);
+  const identityBcp47 = (identity?.bcp47 ?? identityResult?.bcp47 ?? "").trim();
+  const identityLanguageName = (identity?.languageName ?? identityResult?.english ?? "").trim();
 
   // Local controlled state — mirrors the store with a round-trip:
   // store → local (seeded), local → store (on change).
@@ -67,9 +75,27 @@ export function TrackOneIdentityPanel() {
   }
 
   const idValidation = validateKeyboardId(keyboardId.trim());
-  const idError = idValidation.valid ? null : (idValidation.reason ?? "invalid keyboard id");
+  const idError = idValidation.valid ? null : (idValidation.reason ?? t({ id: "editor.trackOneIdentity.invalidKeyboardId", message: "invalid keyboard id" }));
   const isIdValid = idValidation.valid;
   const isIdUntouched = keyboardId.trim() === baseKeyboard.id;
+
+  // The identity-lite answers, carried into every patch this panel writes.
+  //
+  // spec 057 FR-001/FR-002: the package descriptor declares the author's language,
+  // and this panel is the copy track's OTHER identity writer (the first being
+  // project_name's onCommit). Without these two fields a later edit here would
+  // spread `...identity` over a patch that had them and then be re-merged — which
+  // works — but on a walk that reaches this panel before project_name has
+  // committed, the store would carry a display name and no language at all. Both
+  // writers therefore source the same two values from the same place.
+  //
+  // Taken WHOLE from the composed tag (research D-03); a blank answer is omitted
+  // so the descriptor writer applies its `und` placeholder rather than declaring
+  // an empty tag.
+  const languageFields = {
+    ...(identityBcp47 !== "" ? { bcp47: identityBcp47 } : {}),
+    ...(identityLanguageName !== "" ? { languageName: identityLanguageName } : {}),
+  };
 
   // Propagate to the store on display-name change.
   function handleDisplayNameChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -77,6 +103,7 @@ export function TrackOneIdentityPanel() {
     setDisplayName(next);
     setIdentity({
       ...identity,
+      ...languageFields,
       displayName: next,
     });
   }
@@ -91,6 +118,7 @@ export function TrackOneIdentityPanel() {
     if (validationError.valid) {
       setIdentity({
         ...identity,
+        ...languageFields,
         keyboardId: trimmed,
       });
     }
@@ -100,7 +128,7 @@ export function TrackOneIdentityPanel() {
 
   return (
     <section
-      aria-label="Name your keyboard"
+      aria-label={t({ id: "editor.trackOneIdentity.heading", message: "Name your keyboard" })}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -120,7 +148,7 @@ export function TrackOneIdentityPanel() {
           fontWeight: 700,
         }}
       >
-        Name your keyboard
+        <Trans id="editor.trackOneIdentity.heading">Name your keyboard</Trans>
       </div>
 
       {/* Display name */}
@@ -130,14 +158,14 @@ export function TrackOneIdentityPanel() {
           htmlFor="identity-display-name"
           style={{ fontSize: 12, color: TEXT_DIM, fontWeight: 600, marginBottom: 0 }}
         >
-          Display name
+          <Trans id="editor.trackOneIdentity.displayNameLabel">Display name</Trans>
         </Label>
         {/* one-off: input border CARD_BORDER — TextField BORDER is #30363d; override via style passthrough */}
         <TextField
           id="identity-display-name"
           value={displayName}
           onChange={handleDisplayNameChange}
-          placeholder="e.g. Hausa (SIL)"
+          placeholder={t({ id: "editor.trackOneIdentity.displayNamePlaceholder", message: "e.g. Hausa (SIL)" })}
           autoComplete="off"
           aria-describedby="identity-display-name-hint"
           style={{ border: `1px solid ${CARD_BORDER}`, fontSize: 13 }}
@@ -147,7 +175,9 @@ export function TrackOneIdentityPanel() {
           id="identity-display-name-hint"
           style={{ fontSize: 11, color: TEXT_DIM, lineHeight: 1.4 }}
         >
-          Shown on the spacebar in the on-screen keyboard.
+          <Trans id="editor.trackOneIdentity.displayNameHint">
+            Shown on the spacebar in the on-screen keyboard.
+          </Trans>
         </div>
       </div>
 
@@ -158,7 +188,7 @@ export function TrackOneIdentityPanel() {
           htmlFor="identity-keyboard-id"
           style={{ fontSize: 12, color: TEXT_DIM, fontWeight: 600, marginBottom: 0 }}
         >
-          Keyboard ID
+          <Trans id="editor.trackOneIdentity.keyboardIdLabel">Keyboard ID</Trans>
         </Label>
         {/* one-off: input border CARD_BORDER — TextField BORDER is #30363d; override via style passthrough */}
         <TextField
@@ -168,7 +198,7 @@ export function TrackOneIdentityPanel() {
           value={keyboardId}
           onChange={handleKeyboardIdChange}
           onBlur={() => setIdTouched(true)}
-          placeholder="e.g. ha_sil"
+          placeholder={t({ id: "editor.trackOneIdentity.keyboardIdPlaceholder", message: "e.g. ha_sil" })}
           autoComplete="off"
           spellCheck={false}
           aria-describedby={
@@ -198,8 +228,10 @@ export function TrackOneIdentityPanel() {
             aria-live="polite"
             style={{ fontSize: 12, color: WARNING, lineHeight: 1.4 }}
           >
-            [WARN] This is still the base keyboard&rsquo;s id. Set a unique id
-            before submitting to the community repository.
+            <Trans id="editor.trackOneIdentity.baseIdWarning">
+              [WARN] This is still the base keyboard&rsquo;s id. Set a unique id
+              before submitting to the community repository.
+            </Trans>
           </div>
         ) : (
           // one-off: hint TEXT_DIM — ErrorText hint renders var(--app-text-muted), not TEXT_DIM
@@ -207,8 +239,10 @@ export function TrackOneIdentityPanel() {
             id="identity-id-hint"
             style={{ fontSize: 11, color: TEXT_DIM, lineHeight: 1.4 }}
           >
-            1&ndash;255 chars; no spaces, parens, brackets, or commas. Used as
-            the zip filename.
+            <Trans id="editor.trackOneIdentity.keyboardIdHint">
+              1&ndash;255 chars; no spaces, parens, brackets, or commas. Used as
+              the zip filename.
+            </Trans>
           </div>
         )}
       </div>

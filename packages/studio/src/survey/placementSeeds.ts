@@ -41,6 +41,8 @@
 import type { PlacementMap, PlacementCandidate } from "@keyboard-studio/contracts";
 import { topCandidate, strategyForCandidate, parseUPlusNotation, toUPlusNotation } from "@keyboard-studio/contracts";
 import type { StrategyId } from "@keyboard-studio/contracts";
+import { caseCounterpart } from "@keyboard-studio/engine";
+import { isOrthographicallyUnicameral } from "../lib/casePairSuppression.ts";
 
 // ---------------------------------------------------------------------------
 // Confidence threshold
@@ -163,44 +165,200 @@ export function extractSeedEntries(
 // Single-character lookup
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Ranked suggestions — up to 2 distinct-strategy candidates for a codepoint
+// ---------------------------------------------------------------------------
+
 /**
- * Return the {@link PlacementSeedEntry} for a single character if the
- * PlacementMap contains a qualifying entry for it, or `null` otherwise.
- *
- * Use this when a UI component needs to check whether one specific character
- * already has a suggested placement (e.g. to decide whether to render a
- * pre-fill chip next to a character-picker item).
- *
- * @param char          The Unicode character to look up (must be a single
- *                      code point; callers are responsible for grapheme
- *                      segmentation).
- * @param placementMap  The seeder output from kbgen / the survey pipeline.
- * @param threshold     Confidence threshold below which the top candidate is
- *                      treated as absent.  Defaults to
- *                      {@link PLACEMENT_SEED_CONFIDENCE_THRESHOLD} (0.5).
- * @returns A {@link PlacementSeedEntry} if a qualifying entry exists, or
- *          `null` if the character is not in the map or its top candidate
- *          falls below the threshold.
+ * A character is a combining mark (`\p{M}`) — deadkey/store-index (S-02)
+ * suggestions are suppressed for these codepoints (see
+ * {@link getRankedSuggestionsForChar}): a combining mark is itself the
+ * accent a deadkey composes onto a base letter, so proposing "deadkey to
+ * produce this combining mark" is circular, not a placement suggestion.
  */
-export function getSuggestionForChar(
+function isCombiningMark(char: string): boolean {
+  return /^\p{M}$/u.test(char);
+}
+
+/**
+ * Whether `candidate` qualifies to appear in a ranked-suggestions list for
+ * `char`, at the given confidence `threshold`.
+ *
+ * An S-02 (deadkey/store-index) candidate additionally requires:
+ *   - `char` is not itself a combining mark, and
+ *   - the candidate carries a corpus-attested `baseLetter`.
+ *
+ * This is the ONLY gate a deadkey suggestion passes through — there is no
+ * fallback that synthesizes a baseLetter from NFD decomposition or
+ * script-level statistics.  A `"deadkey"`/`"store-index"` candidate with no
+ * `baseLetter` is dropped, full stop.
+ */
+function qualifiesForRanking(
+  char: string,
+  candidate: PlacementCandidate,
+  threshold: number,
+): boolean {
+  if (!(candidate.confidence >= threshold)) return false;
+  const strategyId = strategyForCandidate(candidate);
+  if (strategyId === "S-02") {
+    if (isCombiningMark(char)) return false;
+    if (candidate.baseLetter === undefined || candidate.baseLetter.length === 0) {
+      return false;
+    }
+  }
+  return true;
+}
+
+/**
+ * Walk `candidates` (already best-first per the {@link PlacementEntry}
+ * ordering invariant — see `topCandidate`) and collect up to 2 entries with
+ * DISTINCT `strategyId`s, in candidate order.  This deliberately does NOT
+ * re-sort by confidence — same rationale as `topCandidate`: ordering is the
+ * producer's responsibility.
+ */
+function rankedEntriesFromCandidates(
+  character: string,
+  codepoint: string,
+  candidates: PlacementCandidate[],
+  threshold: number,
+): PlacementSeedEntry[] {
+  const result: PlacementSeedEntry[] = [];
+  const seenStrategies = new Set<StrategyId>();
+
+  for (const candidate of candidates) {
+    if (result.length >= 2) break;
+    if (!qualifiesForRanking(character, candidate, threshold)) continue;
+    const strategyId = strategyForCandidate(candidate);
+    if (seenStrategies.has(strategyId)) continue;
+    seenStrategies.add(strategyId);
+    result.push({ character, codepoint, strategyId, topCandidate: candidate });
+  }
+
+  return result;
+}
+
+/**
+ * Ranked entries for `char`'s OWN placement-map entry (no case-pair
+ * inheritance) — up to 2, distinct strategyIds, best-first.
+ */
+function rankedOwnEntries(
   char: string,
   placementMap: PlacementMap,
-  threshold = PLACEMENT_SEED_CONFIDENCE_THRESHOLD,
-): PlacementSeedEntry | null {
-  if (char.length === 0) return null;
-
+  threshold: number,
+): PlacementSeedEntry[] {
+  if (char.length === 0) return [];
   const codepoint = toUPlusNotation(char);
-
   const entry = placementMap.entries.find((e) => e.codepoint === codepoint);
-  if (entry === undefined) return null;
+  if (entry === undefined) return [];
+  return rankedEntriesFromCandidates(char, codepoint, entry.candidates, threshold);
+}
 
-  const candidate = topCandidate(entry);
-  if (candidate === undefined || candidate.confidence < threshold) return null;
+/**
+ * Shift a LOWERCASE sibling's ranked entry into the UPPERCASE `char`'s own
+ * suggestion, per mechanism:
+ *
+ *   - S-08 (RALT-layer) → add `"SHIFT"` to modifiers (the shifted
+ *     counterpart of the lowercase's RAlt layer).
+ *   - S-01 (key substitution) → add `"SHIFT"`, same vkey (the natural
+ *     Shift-plane assignment of the same physical key).
+ *   - S-02 (deadkey) → same mechanism/vkey/modifiers; `baseLetter` is
+ *     replaced by its own case counterpart. Returns `null` if
+ *     `caseCounterpart` cannot find one (the entry is skipped, not
+ *     substituted with anything else).
+ *
+ * Every other {@link PlacementCandidate} field is carried over unchanged
+ * from the lowercase sibling — there is no `PriorSource` value for "derived
+ * from a sibling's placement", and adding one would be a locked-contract
+ * change (`packages/contracts`), so this reuses the sibling's attribution as
+ * the closest honest fit.
+ */
+function shiftEntryForUppercase(
+  char: string,
+  lowerEntry: PlacementSeedEntry,
+  bcp47: string | undefined,
+): PlacementSeedEntry | null {
+  const lowerCandidate = lowerEntry.topCandidate;
 
-  return {
-    character: char,
-    codepoint,
-    strategyId: strategyForCandidate(candidate),
-    topCandidate: candidate,
-  };
+  if (lowerEntry.strategyId === "S-08" || lowerEntry.strategyId === "S-01") {
+    const modifiers = lowerCandidate.modifiers.includes("SHIFT")
+      ? [...lowerCandidate.modifiers]
+      : ["SHIFT", ...lowerCandidate.modifiers];
+    const synthesized: PlacementCandidate = { ...lowerCandidate, modifiers };
+    return {
+      character: char,
+      codepoint: toUPlusNotation(char),
+      strategyId: strategyForCandidate(synthesized),
+      topCandidate: synthesized,
+    };
+  }
+
+  if (lowerEntry.strategyId === "S-02") {
+    if (lowerCandidate.baseLetter === undefined) return null;
+    const upperBase = caseCounterpart(lowerCandidate.baseLetter, bcp47);
+    if (upperBase === null) return null;
+    const synthesized: PlacementCandidate = {
+      ...lowerCandidate,
+      baseLetter: upperBase.counterpart,
+    };
+    return {
+      character: char,
+      codepoint: toUPlusNotation(char),
+      strategyId: strategyForCandidate(synthesized),
+      topCandidate: synthesized,
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Return up to 2 ranked {@link PlacementSeedEntry} suggestions for `char`,
+ * one per DISTINCT `strategyId`, ordered by the per-codepoint corpus
+ * evidence already encoded in the entry's candidate order (best-first).
+ *
+ * **Case-pair inheritance.** When `char` is the UPPERCASE half of a case pair
+ * (via `caseCounterpart` — the ONLY casing source, spec 051 FR-002) and has
+ * no qualifying entries of its own, this inherits the LOWERCASE sibling's
+ * ranked entries verbatim (never re-deriving an independent uppercase
+ * ranking) — see {@link shiftEntryForUppercase} for the per-mechanism shift.
+ * The Georgian `isOrthographicallyUnicameral` suppression is preserved.
+ *
+ * **S-02 gating.** A deadkey/store-index entry appears only when the exact
+ * codepoint (or, via inheritance, its lowercase sibling) has a
+ * corpus-attested `baseLetter` — see {@link qualifiesForRanking}. Combining
+ * marks (`\p{M}`) never receive an S-02 suggestion.
+ *
+ * @param char          The character to look up.
+ * @param placementMap  The seeder/corpus output.
+ * @param threshold     Confidence threshold below which a candidate is
+ *                       treated as absent. Defaults to
+ *                       {@link PLACEMENT_SEED_CONFIDENCE_THRESHOLD} (0.5).
+ * @param bcp47         Optional BCP47 tag for locale-sensitive case mapping
+ *                       (e.g. Turkic dotted/dotless I), forwarded to
+ *                       `caseCounterpart` unchanged.
+ * @returns 0–2 entries with distinct strategyIds, best-first.
+ */
+export function getRankedSuggestionsForChar(
+  char: string,
+  placementMap: PlacementMap,
+  threshold: number = PLACEMENT_SEED_CONFIDENCE_THRESHOLD,
+  bcp47?: string,
+): PlacementSeedEntry[] {
+  const own = rankedOwnEntries(char, placementMap, threshold);
+  if (own.length > 0) return own;
+
+  if (isOrthographicallyUnicameral(char)) return [];
+
+  const pair = caseCounterpart(char, bcp47);
+  if (pair === null || pair.direction !== "toLower") return [];
+
+  const lowerEntries = rankedOwnEntries(pair.counterpart, placementMap, threshold);
+  if (lowerEntries.length === 0) return [];
+
+  const inherited: PlacementSeedEntry[] = [];
+  for (const lowerEntry of lowerEntries) {
+    const shifted = shiftEntryForUppercase(char, lowerEntry, bcp47);
+    if (shifted !== null) inherited.push(shifted);
+  }
+  return inherited;
 }

@@ -1,0 +1,30 @@
+# directionality — spec 043 US3 (character-content archetype).
+#
+# The writing direction of the base's produced characters: ltr / rtl / bidi-aware
+# (FR-031). Derived from the scripts the produced-character set attests — an RTL
+# script (Arabic, Hebrew, Syriac, Thaana, N'Ko, …) → rtl; a mix of RTL and LTR →
+# bidi-aware; otherwise ltr. Neutral characters (digits/punctuation/combining
+# marks) carry no direction and are ignored. A keyboard.* facet: no session
+# mirror, empty feedsSessionFacets (FR-006).
+id: directionality
+title: Directionality
+description: >
+  The writing direction of the base's produced characters — ltr, rtl, or
+  bidi-aware — from the directions of the scripts its produced set attests.
+  Keyboard-index-only (no session mirror).
+valueType: enum
+limits:
+  values:
+    - ltr
+    - rtl
+    - bidi-aware
+  open: false
+likelihoodSemantics: >
+  a single keyboard-level direction determination (`consistency` 1) from the
+  attested produced scripts; `bidi-aware` when both directions are produced.
+derivation:
+  archetype: character-content
+  classifierId: directionality-classifier
+  fallbackChain: [content-derived, undetermined]
+feedsSessionFacets: []
+schemaVersion: 1

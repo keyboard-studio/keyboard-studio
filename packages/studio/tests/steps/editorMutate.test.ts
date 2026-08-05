@@ -34,8 +34,9 @@ function group(nodeId: string, name: string, rules: IRRule[]): IRGroup {
   return { nodeId, name, usingKeys: true, rules, readonly: false };
 }
 
-// An output store referenced by index() so applyStoreSlotRemovals treats its
-// slots as eligible for nul-fillers.
+// An output store whose index() output resolves (self-paired, via its own
+// any() context element in the SAME rule) so applyStoreSlotRemovals treats
+// its slots as an eligible coordinated drop.
 function outputStore(nodeId: string, name: string, chars: string): IRStore {
   return makeCharStore(nodeId, name, chars);
 }
@@ -45,8 +46,8 @@ function freshIR(): KeyboardIR {
     rule("r0"),
     {
       nodeId: "r1",
-      context: [{ kind: "vkey", name: "K_B", modifiers: [] }],
-      output: [{ kind: "index", storeRef: "dkt", offset: 2 }],
+      context: [{ kind: "any", storeRef: "dkt" }],
+      output: [{ kind: "index", storeRef: "dkt", offset: 1 }],
     },
   ]);
   const stores = [outputStore("dkt", "dkt", "xyz"), makeCharStore("s1", "extra", "de")];
@@ -85,13 +86,16 @@ describe("editorMutate — buildCarvePatch / applyCarveMutate (containment, M3)"
     expect(out.stores.map((s) => s.nodeId)).toEqual(["dkt"]);
   });
 
-  it("rewrites a store slot to a nul filler (deletedItemIds slot path)", () => {
+  it("splices a store slot out entirely (deletedItemIds slot path, #931 — nul-fill mode removed)", () => {
     const ir = freshIR();
     const out = applyCarveMutate(ir, new Set(), new Set(["dkt#1"]));
     const dkt = out.stores.find((s) => s.nodeId === "dkt")!;
-    expect(dkt.items[1]).toEqual({ kind: "raw", text: "nul" });
-    // sibling slots preserved
-    expect(dkt.items[0]).toEqual({ kind: "char", value: "x" });
+    // "y" (was index 1) is spliced out entirely — never nul-filled in place —
+    // so the store shrinks and its surviving chars close the gap.
+    expect(dkt.items).toEqual([
+      { kind: "char", value: "x" },
+      { kind: "char", value: "z" },
+    ]);
   });
 
   it("treats a bare rule item id as a whole-node deletion", () => {

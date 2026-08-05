@@ -15,7 +15,10 @@
 //
 // Rebuilding the studio after editing a flow or a selector rule updates this map.
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
+import { plural } from "@lingui/core/macro";
+import { useScrollRestoration } from "../hooks/useScrollRestoration.ts";
 
 // Identity-lite is read directly here for the Script-routing section (§9). The
 // flow drill-down sources (derived from step flowRefs) and the rendered-node-id composition
@@ -28,15 +31,21 @@ import {
   buildManifestProjection,
   attachDrillDowns,
 } from "./manifestProjection.ts";
-import { buildFlowSources, buildLibrarySection } from "./renderedNodeSet.ts";
+import { buildFlowSources, buildLibrarySection, buildLeftoverSection } from "./renderedNodeSet.ts";
 import { FlowGraphView } from "./FlowGraphView.tsx";
 import { StrategyTreeView } from "./StrategyTreeView.tsx";
 import { ScriptRoutingView } from "./ScriptRoutingView.tsx";
 import { MONO, SANS } from "./tokens.tsx";
 import type { CompletenessReport } from "./completeness.ts";
-import type { AxisFill } from "@keyboard-studio/contracts";
+import type { PathOverlay } from "./pathOverlay.ts";
+import type { AxisFill, DecisionImpact } from "@keyboard-studio/contracts";
 
-type Section = "flow" | "routing" | "strategy" | "completeness";
+// Exported (spec 057 T056) so callers — today, only StudioShell — can type
+// the `initialSection` / `onSectionChange` props below without redeclaring
+// this union. Structurally identical to viewStateStore's `FlowMapSection`;
+// not IMPORTED from it, because dashboard/ may not import stores/ (the
+// dashboard-layer depcruise boundary just below governs this file).
+export type Section = "flow" | "routing" | "strategy" | "completeness";
 
 function LegendItem({ swatch, border, dashed, label }: { swatch: string; border: string; dashed?: boolean; label: string }) {
   return (
@@ -68,6 +77,7 @@ function EdgeLegendItem({ color, dashed, label }: { color: string; dashed?: bool
 }
 
 function FlowLegend() {
+  const { t } = useLingui();
   return (
     <div
       style={{
@@ -81,17 +91,56 @@ function FlowLegend() {
         marginBottom: 16,
       }}
     >
-      <LegendItem swatch="#11203a" border="#6ea8fe" label="entry" />
-      <LegendItem swatch="#241c10" border="#d29922" label="gate (conditional next)" />
-      <LegendItem swatch="#14181f" border="#6e7681" dashed label="engine-resolved (not shown)" />
-      <LegendItem swatch="#0f2417" border="#3fb950" label="terminal" />
-      <LegendItem swatch="#1a1030" border="#6e40c9" label="reserve (not in live flow)" />
-      <LegendItem swatch="#0d2035" border="#58a6ff" label="stub (gallery / wizard step)" />
-      <LegendItem swatch="#0c2a2e" border="#39c5cf" label="proposed (Library — not live)" />
+      <LegendItem
+        swatch="#11203a"
+        border="#6ea8fe"
+        label={t({ id: "dashboard.flowLegend.entry", message: "entry" })}
+      />
+      <LegendItem
+        swatch="#241c10"
+        border="#d29922"
+        label={t({ id: "dashboard.flowLegend.gate", message: "gate (conditional next)" })}
+      />
+      <LegendItem
+        swatch="#14181f"
+        border="#6e7681"
+        dashed
+        label={t({ id: "dashboard.flowLegend.engineResolved", message: "engine-resolved (not shown)" })}
+      />
+      <LegendItem
+        swatch="#0f2417"
+        border="#3fb950"
+        label={t({ id: "dashboard.flowLegend.terminal", message: "terminal" })}
+      />
+      <LegendItem
+        swatch="#1a1030"
+        border="#6e40c9"
+        label={t({ id: "dashboard.flowLegend.reserve", message: "reserve (not in live flow)" })}
+      />
+      <LegendItem
+        swatch="#0d2035"
+        border="#58a6ff"
+        label={t({ id: "dashboard.flowLegend.stub", message: "stub (gallery / wizard step)" })}
+      />
+      <LegendItem
+        swatch="#0c2a2e"
+        border="#39c5cf"
+        label={t({ id: "dashboard.flowLegend.proposed", message: "proposed (Library — not live)" })}
+      />
       <span style={{ width: 1, alignSelf: "stretch", background: "#21262d" }} />
-      <EdgeLegendItem color="#d29922" label="conditional branch" />
-      <EdgeLegendItem color="#6e7681" dashed label="default (else)" />
-      <EdgeLegendItem color="#4d5b7c" label="linear next" />
+      <EdgeLegendItem
+        color="#d29922"
+        label={t({ id: "dashboard.flowLegend.edge.conditional", message: "conditional branch" })}
+      />
+      <EdgeLegendItem
+        color="#6e7681"
+        dashed
+        label={t({ id: "dashboard.flowLegend.edge.default", message: "default (else)" })}
+      />
+      <EdgeLegendItem
+        color="#4d5b7c"
+        label={t({ id: "dashboard.flowLegend.edge.linear", message: "linear next" })}
+      />
     </div>
   );
 }
@@ -100,7 +149,7 @@ function FlowLegend() {
 function ParseErrorBanner({ error }: { error: string }) {
   return (
     <div style={{ color: "#ff9492", fontFamily: MONO, fontSize: 12, padding: 12, border: "1px solid #763a3a", borderRadius: 6 }}>
-      Failed to parse: {error}
+      <Trans id="dashboard.flow.parseError">Failed to parse: {error}</Trans>
     </div>
   );
 }
@@ -120,7 +169,9 @@ function DanglingTargetsWarning({ targets }: { targets: readonly string[] }) {
         background: "#241c10",
       }}
     >
-      Dangling goto target(s): {targets.join(", ")}
+      <Trans id="dashboard.flow.danglingTargets">
+        Dangling goto target(s): {targets.join(", ")}
+      </Trans>
     </div>
   );
 }
@@ -155,7 +206,9 @@ function CompletenessView({ report }: { report: CompletenessReport | undefined }
   if (report === undefined) {
     return (
       <div style={{ color: "#8b949e", fontFamily: MONO, fontSize: 13, padding: "16px 0" }}>
-        No completeness report available. Open a keyboard to begin.
+        <Trans id="dashboard.completeness.emptyState">
+          No completeness report available. Open a keyboard to begin.
+        </Trans>
       </div>
     );
   }
@@ -200,14 +253,28 @@ function CompletenessView({ report }: { report: CompletenessReport | undefined }
           fontSize: 13,
         }}
       >
-        {hasIssues ? "[WARN] Completeness violations detected" : "[OK] All completeness checks passed"}
+        {hasIssues ? (
+          <>
+            {"[WARN] "}
+            <Trans id="dashboard.completeness.summary.issues">Completeness violations detected</Trans>
+          </>
+        ) : (
+          <>
+            {"[OK] "}
+            <Trans id="dashboard.completeness.summary.ok">All completeness checks passed</Trans>
+          </>
+        )}
       </div>
 
       {/* C1: Stale steps */}
       <div style={SECTION_STYLE}>
-        <h3 style={HEADING_STYLE}>C1 — Stale steps (transitive closure)</h3>
+        <h3 style={HEADING_STYLE}>
+          <Trans id="dashboard.completeness.c1.heading">C1 — Stale steps (transitive closure)</Trans>
+        </h3>
         {report.stale.size === 0 ? (
-          <span style={OK_STYLE}>No stale steps (nothing re-opened)</span>
+          <span style={OK_STYLE}>
+            <Trans id="dashboard.completeness.c1.empty">No stale steps (nothing re-opened)</Trans>
+          </span>
         ) : (
           <ul style={{ margin: 0, padding: "0 0 0 16px", color: "#e3b341", fontFamily: MONO, fontSize: 12 }}>
             {[...report.stale].map((id) => (
@@ -219,9 +286,13 @@ function CompletenessView({ report }: { report: CompletenessReport | undefined }
 
       {/* C2: Cycles */}
       <div style={SECTION_STYLE}>
-        <h3 style={HEADING_STYLE}>C2 — Data-edge cycles (hard error if non-empty)</h3>
+        <h3 style={HEADING_STYLE}>
+          <Trans id="dashboard.completeness.c2.heading">C2 — Data-edge cycles (hard error if non-empty)</Trans>
+        </h3>
         {report.cycles.length === 0 ? (
-          <span style={OK_STYLE}>No cycles — acyclic writes→inputs graph</span>
+          <span style={OK_STYLE}>
+            <Trans id="dashboard.completeness.c2.empty">No cycles — acyclic writes→inputs graph</Trans>
+          </span>
         ) : (
           <ul style={{ margin: 0, padding: "0 0 0 16px" }}>
             {report.cycles.map((cycle, i) => (
@@ -235,9 +306,13 @@ function CompletenessView({ report }: { report: CompletenessReport | undefined }
 
       {/* C3: Rejoin violations */}
       <div style={SECTION_STYLE}>
-        <h3 style={HEADING_STYLE}>C3 — Side-trail rejoin</h3>
+        <h3 style={HEADING_STYLE}>
+          <Trans id="dashboard.completeness.c3.heading">C3 — Side-trail rejoin</Trans>
+        </h3>
         {report.rejoinViolations.length === 0 ? (
-          <span style={OK_STYLE}>All off-spine steps rejoin a spine step</span>
+          <span style={OK_STYLE}>
+            <Trans id="dashboard.completeness.c3.empty">All off-spine steps rejoin a spine step</Trans>
+          </span>
         ) : (
           <ul style={{ margin: 0, padding: "0 0 0 16px" }}>
             {report.rejoinViolations.map((v) => (
@@ -251,14 +326,24 @@ function CompletenessView({ report }: { report: CompletenessReport | undefined }
 
       {/* C4: Unshippable prefixes */}
       <div style={SECTION_STYLE}>
-        <h3 style={HEADING_STYLE}>C4 — Spine-prefix shippability (structural proxy)</h3>
+        <h3 style={HEADING_STYLE}>
+          <Trans id="dashboard.completeness.c4.heading">
+            C4 — Spine-prefix shippability (structural proxy)
+          </Trans>
+        </h3>
         {report.unshippablePrefixes.length === 0 ? (
-          <span style={OK_STYLE}>All spine prefixes are lock-consistent</span>
+          <span style={OK_STYLE}>
+            <Trans id="dashboard.completeness.c4.empty">All spine prefixes are lock-consistent</Trans>
+          </span>
         ) : (
           <div style={WARN_STYLE}>
-            Unshippable spine prefix indices: {report.unshippablePrefixes.join(", ")}
+            <Trans id="dashboard.completeness.c4.unshippable">
+              Unshippable spine prefix indices: {report.unshippablePrefixes.join(", ")}
+            </Trans>
             <div style={{ marginTop: 4, fontSize: 11, color: "#8b949e" }}>
-              (A prefix is unshippable when it includes a lock step whose gate has not been applied.)
+              <Trans id="dashboard.completeness.c4.note">
+                (A prefix is unshippable when it includes a lock step whose gate has not been applied.)
+              </Trans>
             </div>
           </div>
         )}
@@ -266,9 +351,13 @@ function CompletenessView({ report }: { report: CompletenessReport | undefined }
 
       {/* C5: Orphan inputs */}
       <div style={SECTION_STYLE}>
-        <h3 style={HEADING_STYLE}>C5 — Orphan inputs (no upstream writes)</h3>
+        <h3 style={HEADING_STYLE}>
+          <Trans id="dashboard.completeness.c5.heading">C5 — Orphan inputs (no upstream writes)</Trans>
+        </h3>
         {report.orphanInputs.length === 0 ? (
-          <span style={OK_STYLE}>All inputs are satisfied by upstream writes</span>
+          <span style={OK_STYLE}>
+            <Trans id="dashboard.completeness.c5.empty">All inputs are satisfied by upstream writes</Trans>
+          </span>
         ) : (
           <ul style={{ margin: 0, padding: "0 0 0 16px" }}>
             {report.orphanInputs.map((o, i) => (
@@ -282,9 +371,13 @@ function CompletenessView({ report }: { report: CompletenessReport | undefined }
 
       {/* C7: Unreachable steps */}
       <div style={SECTION_STYLE}>
-        <h3 style={HEADING_STYLE}>C7 — Unreachable steps</h3>
+        <h3 style={HEADING_STYLE}>
+          <Trans id="dashboard.completeness.c7.heading">C7 — Unreachable steps</Trans>
+        </h3>
         {report.unreachable.length === 0 ? (
-          <span style={OK_STYLE}>All steps are reachable from the spine entry</span>
+          <span style={OK_STYLE}>
+            <Trans id="dashboard.completeness.c7.empty">All steps are reachable from the spine entry</Trans>
+          </span>
         ) : (
           <ul style={{ margin: 0, padding: "0 0 0 16px" }}>
             {report.unreachable.map((id) => (
@@ -317,15 +410,65 @@ export interface FlowMapViewProps {
    * `useWorkingCopyStore((s) => s.axisFills)` and passes it in here.
    */
   axisFills?: AxisFill[];
+  /**
+   * The walked path of the selected keyboard (spec 053, FR-023), forwarded to the
+   * manifest-spine graph — the one graph on this page whose node ids ARE step ids.
+   *
+   * Same boundary rationale as `completeness` again: `StudioShell` projects
+   * `useDecisionLogStore`'s record through `buildPathOverlay` and passes the result
+   * in. Absent means no keyboard is selected, and the map renders exactly as it
+   * always has (FR-024).
+   */
+  pathOverlay?: PathOverlay;
+  /**
+   * Derive the alternative outcome at one inspected step, on request (spec 053,
+   * FR-026). Forwarded to the manifest spine with `pathOverlay`; absent in any host
+   * that does not supply it, which removes the affordance entirely.
+   */
+  resolveAlternative?: (stepId: string, alternativeValue: string) => DecisionImpact | null;
+  /**
+   * Which section tab was open last session (view state — spec 057 US5,
+   * FR-050, data-model.md ViewState.flowMapSection). Read ONCE as the initial
+   * value — the same "read on mount, notify on change" idiom
+   * `useResizablePanes` uses for pane splits (`initPct` + `onChange`), NOT a
+   * fully controlled prop. dashboard/ may not import stores/ (the
+   * dashboard-layer depcruise boundary above), so StudioShell owns
+   * `viewStateStore.flowMapSection` and hands this component only the
+   * restored value and a change notifier — the same arrangement it already
+   * uses for `completeness` / `axisFills` / `pathOverlay`.
+   */
+  initialSection?: Section;
+  /** Called whenever the section tab changes, so the caller can persist it. */
+  onSectionChange?: (section: Section) => void;
 }
 
-export function FlowMapView({ completeness, axisFills }: FlowMapViewProps) {
-  const [section, setSection] = useState<Section>("flow");
+export function FlowMapView({
+  completeness,
+  axisFills,
+  pathOverlay,
+  resolveAlternative,
+  initialSection,
+  onSectionChange,
+}: FlowMapViewProps) {
+  const { t } = useLingui();
+  const [section, setSectionState] = useState<Section>(initialSection ?? "flow");
+  const setSection = (next: Section) => {
+    setSectionState(next);
+    onSectionChange?.(next);
+  };
+  // Scroll position (spec 057 US5, FR-050): this outer scrollable div is the
+  // ONE pane on this screen, so one stable id is enough — no per-section
+  // sub-key needed, since switching sections does not remount this div.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useScrollRestoration(scrollRef, "dashboard-flow-map");
   const flows = useMemo(() => buildFlowSources(), []);
   // spec 025 (D6): the Library section — proposed-flow ordered graphs + flat
   // reserve + "also live" dual-references. Derived from flowSources status:"proposed"
   // entries; excluded from the live rendered<->runtime bijection.
   const library = useMemo(() => buildLibrarySection(), []);
+  // Leftover — registered questions used by NO live flow: kept for reference /
+  // future reuse, shown in their own section so they never clog a live drill-down.
+  const leftover = useMemo(() => buildLeftoverSection(), []);
 
   // Spec 015 (DEC-001 = Variant A): project the manifest spine onto a FlowGraph
   // via the StepGraph → FlowGraph/GraphNode adapter, reusing FlowGraphView /
@@ -366,6 +509,8 @@ export function FlowMapView({ completeness, axisFills }: FlowMapViewProps) {
 
   return (
     <div
+      ref={scrollRef}
+      data-testid="flow-map-root"
       style={{
         height: "100%",
         overflow: "auto",
@@ -377,29 +522,36 @@ export function FlowMapView({ completeness, axisFills }: FlowMapViewProps) {
       }}
     >
       <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap", marginBottom: 4 }}>
-        <h1 style={{ margin: 0, fontSize: 20, color: "#e6edf3" }}>Flow Map</h1>
+        <h1 style={{ margin: 0, fontSize: 20, color: "#e6edf3" }}>
+          <Trans id="dashboard.flowMap.title">Flow Map</Trans>
+        </h1>
         <span style={{ fontSize: 12.5, color: "#6e7681" }}>
-          developer view · auto-generated from <code style={{ fontFamily: MONO }}>content/flows/*.modular.yaml</code> +{" "}
-          <code style={{ fontFamily: MONO }}>strategy-selector</code>
+          <Trans id="dashboard.flowMap.subtitle">
+            developer view · auto-generated from{" "}
+            <code style={{ fontFamily: MONO }}>content/flows/*.modular.yaml</code> +{" "}
+            <code style={{ fontFamily: MONO }}>strategy-selector</code>
+          </Trans>
         </span>
       </div>
       <p style={{ margin: "0 0 16px", fontSize: 13, color: "#8b949e", maxWidth: 920 }}>
-        A live map of the survey questions, where each branch goes, and the strategy decision tree. It rebuilds
-        from source — change a flow's question order or a selector rule, rebuild, and this updates.
+        <Trans id="dashboard.flowMap.description">
+          A live map of the survey questions, where each branch goes, and the strategy decision tree. It rebuilds
+          from source — change a flow&rsquo;s question order or a selector rule, rebuild, and this updates.
+        </Trans>
       </p>
 
       <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
         <SectionTab active={section === "flow"} onClick={() => setSection("flow")}>
-          Survey flow
+          <Trans id="dashboard.tabs.surveyFlow">Survey flow</Trans>
         </SectionTab>
         <SectionTab active={section === "routing"} onClick={() => setSection("routing")}>
-          Script routing (§9)
+          <Trans id="dashboard.tabs.scriptRouting">Script routing (§9)</Trans>
         </SectionTab>
         <SectionTab active={section === "strategy"} onClick={() => setSection("strategy")}>
-          Strategy tree (§7.2)
+          <Trans id="dashboard.tabs.strategyTree">Strategy tree (§7.2)</Trans>
         </SectionTab>
         <SectionTab active={section === "completeness"} onClick={() => setSection("completeness")}>
-          Completeness (US3)
+          <Trans id="dashboard.tabs.completeness">Completeness (US3)</Trans>
         </SectionTab>
       </div>
 
@@ -415,7 +567,19 @@ export function FlowMapView({ completeness, axisFills }: FlowMapViewProps) {
                 {manifestSpine.flowId} · {manifestSpine.nodes.length} steps · {manifestSpine.edges.length} edges
               </span>
             </div>
-            <FlowGraphView graph={manifestSpine} />
+            {/* Spec 053 (FR-023): the walked-path overlay goes ONLY here. The
+                manifest spine is the one graph on this page whose node ids are step
+                ids, which is what a decision record records; the drill-down,
+                Library, and Leftover graphs are question-level and would match
+                nothing. Passing it to them would be harmless but misleading. */}
+            {/* Conditional spread, not `prop={maybeUndefined}` — the repo runs
+                `exactOptionalPropertyTypes`, so an absent prop and an explicitly
+                undefined one are different types (same shape as `axisFills` below). */}
+            <FlowGraphView
+              graph={manifestSpine}
+              {...(pathOverlay !== undefined ? { pathOverlay } : {})}
+              {...(resolveAlternative !== undefined ? { resolveAlternative } : {})}
+            />
           </section>
 
           {/* Spec 015 (FR-004): per-phase modular graphs as registry-keyed drill-downs
@@ -426,11 +590,15 @@ export function FlowMapView({ completeness, axisFills }: FlowMapViewProps) {
             return (
               <div key={stepId}>
                 <h2 style={{ margin: "0 0 4px", fontSize: 15, color: "#6ea8fe" }}>
-                  Drill-downs under <code style={{ fontFamily: MONO }}>{stepId}</code>
+                  <Trans id="dashboard.flowMap.drillDownsUnder">
+                    Drill-downs under <code style={{ fontFamily: MONO }}>{stepId}</code>
+                  </Trans>
                 </h2>
                 <p style={{ margin: "0 0 16px", fontSize: 12, color: "#6e7681", maxWidth: 920 }}>
-                  Question flows hung as registry-keyed drill-downs under the manifest
-                  <code style={{ fontFamily: MONO }}> {stepId}</code> step.
+                  <Trans id="dashboard.flowMap.drillDownsDescription">
+                    Question flows hung as registry-keyed drill-downs under the manifest
+                    <code style={{ fontFamily: MONO }}> {stepId}</code> step.
+                  </Trans>
                 </p>
                 {stepDrillDowns.map(({ graph, error, title, registryKey }) => (
                   <section key={title} style={{ marginBottom: 28 }}>
@@ -458,15 +626,26 @@ export function FlowMapView({ completeness, axisFills }: FlowMapViewProps) {
               bijection. */}
           <section style={{ marginTop: 36, borderTop: "1px solid #21262d", paddingTop: 24 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 4, flexWrap: "wrap" }}>
-              <h2 style={{ margin: 0, fontSize: 15, color: "#39c5cf" }}>Library — proposed flows</h2>
+              <h2 style={{ margin: 0, fontSize: 15, color: "#39c5cf" }}>
+                <Trans id="dashboard.library.heading">Library — proposed flows</Trans>
+              </h2>
               <span style={{ fontSize: 11.5, color: "#6e7681", fontFamily: MONO }}>
-                {library.proposed.length} proposed · not in the live survey
+                {t({
+                  id: "dashboard.library.count",
+                  message: plural(library.proposed.length, {
+                    one: "# proposed · not in the live survey",
+                    other: "# proposed · not in the live survey",
+                  }),
+                })}
               </span>
             </div>
             <p style={{ margin: "0 0 16px", fontSize: 12, color: "#6e7681", maxWidth: 920 }}>
-              Ordered graphs of flows registered as <code style={{ fontFamily: MONO }}>status:"proposed"</code> — browsable
-              and promotable, never run by the live survey. See{" "}
-              <code style={{ fontFamily: MONO }}>content/flows/README.md</code> for the promotion runbook.
+              <Trans id="dashboard.library.description">
+                Ordered graphs of flows registered as{" "}
+                <code style={{ fontFamily: MONO }}>{'status:"proposed"'}</code> — browsable
+                and promotable, never run by the live survey. See{" "}
+                <code style={{ fontFamily: MONO }}>content/flows/README.md</code> for the promotion runbook.
+              </Trans>
             </p>
 
             {/* Dual-reference ("also live") WARN — never a failure. */}
@@ -483,8 +662,11 @@ export function FlowMapView({ completeness, axisFills }: FlowMapViewProps) {
                   background: "#241c10",
                 }}
               >
-                [WARN] also live — question(s) in both a live and a proposed flow:{" "}
-                {library.dualReferenced.join(", ")}
+                {"[WARN] "}
+                <Trans id="dashboard.library.dualReferenced">
+                  also live — question(s) in both a live and a proposed flow:{" "}
+                  {library.dualReferenced.join(", ")}
+                </Trans>
               </div>
             )}
 
@@ -508,11 +690,14 @@ export function FlowMapView({ completeness, axisFills }: FlowMapViewProps) {
             {/* Flat reserve — questions in NO flow at all (neither live nor proposed). */}
             <div style={{ marginTop: 8 }}>
               <h3 style={{ margin: "0 0 6px", fontSize: 13, color: "#adbac7" }}>
-                Reserve — questions in no flow
+                <Trans id="dashboard.library.reserve.heading">Reserve — questions in no flow</Trans>
               </h3>
               {library.reserve.length === 0 ? (
                 <span style={{ color: "#3fb950", fontFamily: MONO, fontSize: 12 }}>
-                  [OK] Every registered question belongs to a live or proposed flow.
+                  {"[OK] "}
+                  <Trans id="dashboard.library.reserve.ok">
+                    Every registered question belongs to a live or proposed flow.
+                  </Trans>
                 </span>
               ) : (
                 <ul style={{ margin: 0, padding: "0 0 0 16px", color: "#8b949e", fontFamily: MONO, fontSize: 12 }}>
@@ -522,6 +707,51 @@ export function FlowMapView({ completeness, axisFills }: FlowMapViewProps) {
                 </ul>
               )}
             </div>
+          </section>
+
+          {/* Leftover questions — registered but used by NO live flow. Kept for
+              reference / future reuse (spec-022 no-delete); never run by the live
+              survey and never rendered as reserve clog inside a live drill-down. */}
+          <section style={{ marginTop: 36, borderTop: "1px solid #21262d", paddingTop: 24 }}>
+            <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 4, flexWrap: "wrap" }}>
+              <h2 style={{ margin: 0, fontSize: 15, color: "#6e40c9" }}>
+                <Trans id="dashboard.leftover.heading">Leftover questions</Trans>
+              </h2>
+              <span style={{ fontSize: 11.5, color: "#6e7681", fontFamily: MONO }}>
+                {t({
+                  id: "dashboard.leftover.count",
+                  message: plural(leftover.length, {
+                    one: "# registered · used by no live flow",
+                    other: "# registered · used by no live flow",
+                  }),
+                })}
+              </span>
+            </div>
+            <p style={{ margin: "0 0 16px", fontSize: 12, color: "#6e7681", maxWidth: 920 }}>
+              <Trans id="dashboard.leftover.description">
+                Registered questions that no live flow currently uses — kept for reference and
+                possible reuse, never run by the live survey. Re-add an id to a live flow YAML to
+                bring it back (see{" "}
+                <code style={{ fontFamily: MONO }}>content/flows/README.md</code>).
+              </Trans>
+            </p>
+            {leftover.length === 0 ? (
+              <span style={{ color: "#3fb950", fontFamily: MONO, fontSize: 12 }}>
+                {"[OK] "}
+                <Trans id="dashboard.leftover.empty">
+                  Every registered question is used by a live flow.
+                </Trans>
+              </span>
+            ) : (
+              <ul style={{ margin: 0, padding: "0 0 0 16px", color: "#8b949e", fontFamily: MONO, fontSize: 12 }}>
+                {leftover.map((n) => (
+                  <li key={n.id}>
+                    {n.id}
+                    {n.label !== n.id && <span style={{ color: "#6e7681" }}> — {n.label}</span>}
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
         </>
       )}

@@ -24,7 +24,8 @@
 // container attribute check on the nearest parent div.
 
 import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
-import { render, screen, cleanup, act } from "@testing-library/react";
+import { screen, cleanup, act } from "@testing-library/react";
+import { render } from "../../src/test/renderWithI18n.tsx";
 import { useSurveySessionStore } from "../../src/stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../../src/stores/workingCopyStore.ts";
 import type { ActiveStepId } from "../../src/stores/surveySessionStore.ts";
@@ -76,6 +77,10 @@ vi.mock("../../src/editors/assignLoop/TouchGallery.tsx", () => ({
   TouchGallery: () => <div data-testid="stub-TouchGallery" />,
 }));
 
+vi.mock("../../src/editors/touchSeedSource/TouchSeedSourcePanel.tsx", () => ({
+  TouchSeedSourcePanel: () => <div data-testid="stub-TouchSeedSourcePanel" />,
+}));
+
 vi.mock("../../src/components/UnsupportedScriptStub.tsx", () => ({
   UnsupportedScriptStub: ({ script }: { script: string }) => (
     <div data-testid="stub-UnsupportedScriptStub" data-script={script} />
@@ -114,6 +119,10 @@ vi.mock("../../src/lib/navigate.ts", () => ({
 
 vi.mock("../../src/lib/confirmRebase.ts", () => ({
   instantiateFromBaseIfConfirmed: vi.fn(),
+  // BaseResolutionAdapter's onConfirm calls confirmRebaseTo synchronously
+  // (F1 fix) before advancing; this suite's working copy starts uninstantiated
+  // in every render, so mocking it to always allow preserves prior behavior.
+  confirmRebaseTo: vi.fn(() => true),
 }));
 
 vi.mock("../../src/lib/buildTouchLayoutJson.ts", () => ({
@@ -255,7 +264,7 @@ const editorSteps = manifest.filter(
 //   charactersStep    → CharactersStep                    → stub-CharactersStep
 //   carveStep         → CarveAdapter                      → CarveGallery stub
 //   mechanismsStep    → AddPhysicalAdapter                → MechanismGallery stub
-//   touchSeedSourceStep → AddTouchAdapter                 → TouchGallery stub
+//   touchSeedSourceStep → TouchSeedSourcePanel            → TouchSeedSourcePanel stub (layout:"full" — P0 fix, spec 035 R4b follow-up)
 //   touchStep         → AddTouchAdapter                   → TouchGallery stub
 //   helpStep          → PhaseFStepFactoryComponent        → FlowStepHost stub (flow_id=phase_f_helpdocs)
 //   packageStep       → PhaseFStepFactoryComponent        → FlowStepHost stub (flow_id=phase_f_helpdocs)
@@ -267,14 +276,18 @@ const STEP_TO_EXPECTED_STUB: Record<string, string> = {
   characters: "stub-CharactersStep",
   carve: "stub-CarveGallery",
   mechanisms: "stub-MechanismGallery",
-  touch_seed_source: "stub-TouchGallery",
+  touch_seed_source: "stub-TouchSeedSourcePanel",
   touch: "stub-TouchGallery",
   help: "stub-FlowStepHost-phase_f_helpdocs",
   package: "stub-FlowStepHost-phase_f_helpdocs",
 };
 
 // Full-layout step ids (declared in manifest as layout:"full").
-const FULL_LAYOUT_IDS = new Set<string>(["carve", "mechanisms", "touch"]);
+// touch_seed_source joined this set in the P0 fix (spec 035 R4b follow-up):
+// TouchSeedSourcePanel now renders its own inline live OSK preview, so the
+// step must be full-screen to suppress SurveyView's persistent right-pane
+// OSKFrame — see manifest.ts's FULL_LAYOUT_IDS guard.
+const FULL_LAYOUT_IDS = new Set<string>(["carve", "mechanisms", "touch", "touch_seed_source"]);
 
 describe("SC-005: declared component matches mounted component for all manifest editor steps", () => {
   for (const step of editorSteps) {

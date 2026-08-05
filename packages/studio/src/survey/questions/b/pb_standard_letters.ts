@@ -8,6 +8,7 @@ import { irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
 export const definition = {
   id: "pb_standard_letters",
   prompt: "Which best describes the letters your language uses?",
+  audit_label: "Alphabet type",
   help_text:
     "Think about the alphabet your language is written in. Pick the option " +
     "that best matches. If you are not sure, pick the closest one and you " +
@@ -35,7 +36,11 @@ export const definition = {
   ],
   next: [
     { condition: "value == 'other-alphabet'", goto: "pb_non_roman_branch" },
-    { default: true, goto: "pb_accent_marks_gate" },
+    // spec 046: the accent-marks chain (gate → picker → stacking → style →
+    // capitals) is superseded by the marks question series. The typing-approach
+    // probe (A3) stays live for accent-likely alphabets; plain a-z skips it.
+    { condition: "value == 'extended-latin'", goto: "pb_typing_approach" },
+    { default: true, goto: "pb_special_letters" },
   ],
 } satisfies import("../../types.ts").FlowQuestion;
 

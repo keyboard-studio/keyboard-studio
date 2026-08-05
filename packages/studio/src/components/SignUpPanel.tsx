@@ -21,6 +21,7 @@
 // so there is no per-provider sign-out here (the same model as ProfileScreen
 // and AccountControl).
 
+import { Trans, useLingui } from "@lingui/react/macro";
 import { useIdentitySession } from "../hooks/useIdentitySession.ts";
 import { GitHubMark, GoogleMark } from "./ProviderMarks.tsx";
 
@@ -103,23 +104,30 @@ const statusLineStyle: React.CSSProperties = {
 
 const alertStyle: React.CSSProperties = { fontSize: 12, color: "#f0a0a0" };
 
-/** "Signed in with Google as <name> (<email>)" — name falls back to email. */
-function googleLabel(name: string | null, email: string | null): string {
-  const display = name !== null && name.length > 0 ? name : (email ?? "");
-  return display.length > 0 ? `Signed in with Google as ${display}` : "Signed in with Google";
-}
-
 export function SignUpPanel() {
+  const { t } = useLingui();
   const { isVerifying, github, google, signOut } = useIdentitySession();
+
+  const accountAriaLabel = t({ id: "output.identity.account.ariaLabel", message: "Account" });
+  const githubSignUpAriaLabel = t({
+    id: "output.identity.github.signUpAriaLabel",
+    message: "Sign up with GitHub",
+  });
+  const googleSignUpAriaLabel = t({
+    id: "output.identity.google.signUpAriaLabel",
+    message: "Sign up with Google",
+  });
 
   // Verifying state: show interim while the GitHub token is being checked, so we
   // don't flash the signed-out sign-up state for a returning user.
   if (isVerifying) {
     return (
-      <section aria-label="Account" style={sectionStyle}>
-        <div style={labelStyle}>Account</div>
+      <section aria-label={accountAriaLabel} style={sectionStyle}>
+        <div style={labelStyle}>
+          <Trans id="output.identity.account.label">Account</Trans>
+        </div>
         <div role="status" aria-live="polite" style={{ fontSize: 13, color: "#9aa7b8" }}>
-          Checking GitHub sign-in...
+          <Trans id="output.identity.checkingGithub">Checking GitHub sign-in...</Trans>
         </div>
       </section>
     );
@@ -130,44 +138,65 @@ export function SignUpPanel() {
   // together. Below: identity lines for whatever is linked, sign-up buttons for
   // whatever is not, and exactly one "Sign out" once any provider is linked.
   if (github.linked || google.linked) {
+    // "Signed in with Google as <name>" — name falls back to email, and to no
+    // suffix at all when neither is available.
+    const googleDisplay =
+      google.name !== null && google.name.length > 0 ? google.name : (google.email ?? "");
+
     return (
-      <section aria-label="Account" style={sectionStyle}>
-        <div style={labelStyle}>Account</div>
+      <section aria-label={accountAriaLabel} style={sectionStyle}>
+        <div style={labelStyle}>
+          <Trans id="output.identity.account.label">Account</Trans>
+        </div>
 
         {github.linked ? (
           <div role="status" style={statusLineStyle}>
-            <GitHubMark /> Signed up with GitHub{github.login !== null ? ` as ${github.login}` : ""}
+            <GitHubMark />{" "}
+            {github.login !== null ? (
+              <Trans id="output.identity.github.signedUpAs">
+                Signed up with GitHub as {github.login}
+              </Trans>
+            ) : (
+              <Trans id="output.identity.github.signedUp">Signed up with GitHub</Trans>
+            )}
           </div>
         ) : (
           <button
             type="button"
             onClick={() => { void github.connect("identity"); }}
-            aria-label="Sign up with GitHub"
+            aria-label={githubSignUpAriaLabel}
             style={githubButtonStyle}
           >
             <GitHubMark />
-            Sign up with GitHub
+            <Trans id="output.identity.github.signUpLabel">Sign up with GitHub</Trans>
           </button>
         )}
 
         {google.linked ? (
           <div role="status" style={statusLineStyle}>
-            <GoogleMark /> {googleLabel(google.name, google.email)}
+            <GoogleMark />{" "}
+            {googleDisplay.length > 0 ? (
+              <Trans id="output.identity.google.signedInAs">
+                Signed in with Google as {googleDisplay}
+              </Trans>
+            ) : (
+              <Trans id="output.identity.google.signedIn">Signed in with Google</Trans>
+            )}
           </div>
         ) : (
           <button
             type="button"
             onClick={() => { void google.connect(); }}
-            aria-label="Sign up with Google"
+            aria-label={googleSignUpAriaLabel}
             style={googleButtonStyle}
           >
             <GoogleMark />
-            Sign up with Google
+            <Trans id="output.identity.google.signUpLabel">Sign up with Google</Trans>
           </button>
         )}
 
         <button type="button" onClick={signOut} style={secondaryButtonStyle}>
-          Sign out
+          <Trans id="output.identity.signOut.label">Sign out</Trans>
         </button>
 
         {github.error !== null && (
@@ -186,31 +215,38 @@ export function SignUpPanel() {
 
   // Neither signed in — show both sign-in buttons.
   return (
-    <section aria-label="Submit your keyboard" style={sectionStyle}>
-      <div style={labelStyle}>Submit your keyboard</div>
+    <section
+      aria-label={t({ id: "output.identity.submit.ariaLabel", message: "Submit your keyboard" })}
+      style={sectionStyle}
+    >
+      <div style={labelStyle}>
+        <Trans id="output.identity.submit.label">Submit your keyboard</Trans>
+      </div>
       <p style={{ margin: 0, fontSize: 12, color: "#9aa7b8", lineHeight: 1.5 }}>
-        Sign up to submit your keyboard to the community repository. We handle
-        the technical side — you just choose how to sign in.
+        <Trans id="output.identity.submit.intro">
+          Sign up to submit your keyboard to the community repository. We handle
+          the technical side — you just choose how to sign in.
+        </Trans>
       </p>
 
       <button
         type="button"
         onClick={() => { void github.connect("identity"); }}
-        aria-label="Sign up with GitHub"
+        aria-label={githubSignUpAriaLabel}
         style={githubButtonStyle}
       >
         <GitHubMark />
-        Sign up with GitHub
+        <Trans id="output.identity.github.signUpLabel">Sign up with GitHub</Trans>
       </button>
 
       <button
         type="button"
         onClick={() => { void google.connect(); }}
-        aria-label="Sign up with Google"
+        aria-label={googleSignUpAriaLabel}
         style={googleButtonStyle}
       >
         <GoogleMark />
-        Sign up with Google
+        <Trans id="output.identity.google.signUpLabel">Sign up with Google</Trans>
       </button>
 
       {github.error !== null && (

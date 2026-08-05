@@ -47,10 +47,10 @@ import { applyStepCompletion, MECHANISMS_STEP_ID } from "../../src/steps/reducer
 import type { ReducerDeps, MutateRequest } from "../../src/steps/reducer.ts";
 
 // The 5 in-scope non-empty-`writes` identity/header modules (reconciled in T000).
-import isoCode from "../../src/survey/questions/a/iso_code.ts";
-import primaryScript from "../../src/survey/questions/a/primary_script.ts";
-import languageNameEnglish from "../../src/survey/questions/a/language_name_english.ts";
-import paCopyrightHolder from "../../src/survey/questions/a/pa_copyright_holder.ts";
+import isoCode from "../../src/survey/questions/reserve/iso_code.ts";
+import primaryScript from "../../src/survey/questions/reserve/primary_script.ts";
+import languageNameEnglish from "../../src/survey/questions/reserve/language_name_english.ts";
+import paCopyrightHolder from "../../src/survey/questions/reserve/pa_copyright_holder.ts";
 import pbStandardLetters from "../../src/survey/questions/b/pb_standard_letters.ts";
 
 // ---------------------------------------------------------------------------

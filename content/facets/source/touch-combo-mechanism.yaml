@@ -1,0 +1,63 @@
+# source.touch-combo-mechanism — the dominant mechanism the chosen base's
+# .keyman-touch-layout uses to expose a base+mark sequence to a touch
+# typist. Derived from a touch-layout scan, NOT the KMN recognizer — touch
+# layouts are declarative JSON with no relationship to the desktop rule
+# engine that source.desktop-combo-mechanism reads.
+
+id: source.touch-combo-mechanism
+family: source
+title: Source touch combo mechanism
+description: >
+  The dominant mechanism the chosen base's .keyman-touch-layout uses to
+  expose a base+mark sequence to a touch typist: a dedicated key, a layer
+  switch, a longpress popup, a flick gesture, or multitap. Read from the
+  touch-layout JSON directly — independent of the desktop .kmn recognizer,
+  which source.desktop-combo-mechanism reads instead.
+
+valueType: enum
+values: [key, layer, longpress, flick, multitap]
+
+modality: touch
+
+derivations:
+  - kind: computed
+    source: "planned:touch-combo-mechanism-of-layout"
+    sourceStatus: planned
+    notes: >
+      Scans the base's .keyman-touch-layout JSON for the mechanism exposing
+      each mark: a dedicated key, a subkey/longpress popup, a layer switch,
+      a flick, or a multitap sequence. Uses the consolidated
+      .keyman-touch-layout parser, not any desktop-side codec path.
+
+consumers:
+  prefills: []
+  proposes:
+    - "mechanism-gallery:touch-method-ordering"
+    - "transform-offer:touch-mechanism-switch"
+
+provenanceLabel: "how your source keyboard already composes marks on touch"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: computed
+
+notes: >
+  Derived from a touch-layout scan, not the KMN recognizer.
+
+transformImpactClass: ux-changing
+houseTargetPolicy:
+  inputs: [source.desktop-combo-mechanism]
+  rules:
+    - when: "source.desktop-combo-mechanism == deadkey"
+      target: longpress
+    - when: default
+      target: layer
+invertibility: one-way
+implications: >
+  Changing the touch mechanism changes the on-screen gesture (tap vs
+  long-press vs layer switch) the typist performs to reach a mark; it has
+  no effect on the desktop side of the same keyboard.
+exceptionSites: []
+causePredicates: []

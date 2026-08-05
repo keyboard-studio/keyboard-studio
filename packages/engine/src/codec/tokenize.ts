@@ -14,10 +14,28 @@
  * Comments: the `c` comment syntax has two forms:
  *   1. A line whose first non-whitespace text is `c` followed by whitespace or
  *      end-of-line (KMN column-0 convention).
- *   2. The tail of any logical line that follows the rule separator `>`, where
- *      a `c` preceded by whitespace starts a trailing comment (rare but valid).
- *      For simplicity we strip those at the rule-parsing stage, not here.
+ *   2. A whitespace-delimited standalone `c` appearing later in the SAME
+ *      logical line. kmcmplib starts an end-of-line comment there on ANY line
+ *      kind — store/group/begin/rule — not only on the tail of a rule after
+ *      the `>` separator. hasCommentToken() (./continuation.ts) recognizes
+ *      this generically across all line kinds so the continuation-join loop
+ *      knows a trailing `\` after such a `c` is inside the comment, not a
+ *      line continuation. This is comment RECOGNITION only (does a `c` token
+ *      start a comment here, for tokenizing purposes); it is distinct from
+ *      the codec's structured trailing-comment EXTRACTION (splitting a
+ *      rule's trailing `c <text>` into `IRRule.trailingComment`), which is
+ *      deliberately rule-only and lives in parse.ts (splitOnArrow /
+ *      stripTrailingComment). A trailing comment on a store/group/begin line
+ *      is recognized here (so it doesn't break continuation joining) but is
+ *      not split into a typed field elsewhere in the codec.
+ *
+ * The continuation join itself (backslash matching, comment guards, the
+ * per-segment physical-line map) lives in ./continuation.ts and is shared
+ * with the Layer-A validator (validator/index.ts) so the join logic exists
+ * in exactly one place.
  */
+
+import { joinContinuations } from "./continuation.js";
 
 export type TokenKind =
   | "comment"        // c <text>
@@ -57,19 +75,8 @@ function stripBom(text: string): string {
 
 // Module-scope regexes (compiled once; file convention after the COMMENT_LINE_RE
 // hoist — all single-use tokenizer patterns live here rather than inside
-// tokenize()).
-
-// A backslash at the end of a physical line — optionally followed by trailing
-// whitespace — joins the next physical line. The trailing whitespace is
-// tolerated because real keyboard sources sometimes ship `\ ` or `\  `
-// (e.g. basic_kbdoldit line 92, store(unused) continuation).
-const CONTINUATION_RE = /\\\s*$/;
-
-// A full-line `c` comment ends at the newline. kmcmplib does NOT honor a
-// trailing backslash inside a comment as a line-continuation, so a line like
-// `c \` must not swallow the following line. Mirrors the comment classifier
-// below (`/^c(?:\s|$)/i`), but tests the untrimmed physical line.
-const COMMENT_LINE_RE = /^\s*c(?:\s|$)/i;
+// tokenize()). The continuation-join regexes/helpers live in ./continuation.ts
+// now (shared with the validator); see the import above.
 
 // Target-selector prefix matchers (case-insensitive; kmcmplib uses u16nicmp).
 // The colon is required; whitespace between the prefix and the rest of the
@@ -92,26 +99,12 @@ const NOMATCH_RE = /^nomatch\s*>/i;
  */
 export function tokenize(source: string): Token[] {
   const clean = stripBom(source);
-  const physicalLines = clean.split(/\r?\n/);
 
-  // Step 1: join continuation lines (CONTINUATION_RE, module scope above).
-  const logicalLines: Array<{ text: string; line: number }> = [];
-  let i = 0;
-  while (i < physicalLines.length) {
-    let text = physicalLines[i] ?? "";
-    const startLine = i + 1; // 1-based
-    while (
-      CONTINUATION_RE.test(text) &&
-      !COMMENT_LINE_RE.test(text) &&
-      i + 1 < physicalLines.length
-    ) {
-      text = text.replace(CONTINUATION_RE, ""); // drop backslash + trailing ws
-      i++;
-      text = text + (physicalLines[i] ?? "").trimStart();
-    }
-    logicalLines.push({ text, line: startLine });
-    i++;
-  }
+  // Step 1: join continuation lines (./continuation.ts, shared with the
+  // validator). tokenize only needs each logical line's joined `text` and
+  // its first physical `line`; the richer per-segment map is for consumers
+  // that need to translate a diagnostic back to a physical position.
+  const logicalLines = joinContinuations(clean);
 
   const tokens: Token[] = [];
 

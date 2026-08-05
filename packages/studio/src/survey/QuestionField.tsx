@@ -2,24 +2,30 @@
 // Each renderer receives the current value (string | string[] | undefined)
 // and calls onChange when the user modifies it.
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useState, useEffect, useRef } from "react";
-import type { FlowQuestion } from "./types.ts";
+import { Trans, useLingui } from "@lingui/react/macro";
+import type { I18n } from "@lingui/core";
+import type { FlowQuestion, SurveyContext } from "./types.ts";
 import type { LintFinding, LanguageSummary } from "@keyboard-studio/contracts";
 import { LintChip } from "../lint/LintChip.tsx";
 import { loadLangtags } from "../lib/langtagsDefaults.ts";
 import {
   TextField,
   Textarea,
-  Dropdown,
+  SelectMenu,
   RadioGroup,
   Notice,
   Label,
   MultiSelect,
 } from "../ui/index.ts";
-import type { DropdownOption } from "../ui/Dropdown.tsx";
+import type { SelectMenuOption } from "../ui/SelectMenu.tsx";
 import type { RadioOption } from "../ui/RadioGroup.tsx";
 import type { MultiSelectOption } from "../ui/MultiSelect.tsx";
 import { helpText, TEXT_DIM } from "./surveyStyles.ts";
+import { normalizeForCompare } from "../lib/normalizeForCompare.ts";
+import { resolveContentString, slugifyIdSegment } from "../lib/contentI18n.ts";
+import { interpolate } from "./interpolate.ts";
 
 
 interface FieldProps {
@@ -42,6 +48,38 @@ interface FieldProps {
    * combobox fields (Q1 name picker, Q2/region options) call it.
    */
   onSelectAdvance?: (value: string) => void;
+  /**
+   * Survey answer context (spec 050 US1 fix) — carries `{{token}}` values
+   * (e.g. `base_name`, `language_name`) so a resolved Tier B content-i18n
+   * string can be interpolated AFTER catalog resolution, not before. Optional
+   * and defaults to `{}` at the QuestionField boundary so existing/test
+   * callers that don't pass it keep today's no-op-interpolation behavior
+   * (an empty context leaves any `{{token}}` in the string as-is).
+   */
+  context?: SurveyContext;
+}
+
+/**
+ * Resolve a flow-question Tier-B content string for the active locale, then
+ * interpolate `{{token}}`s from the survey context. Resolution MUST precede
+ * interpolation (see interpolate.ts) — a translated catalog value carries its
+ * own `{{token}}` placeholders, so the *resolved* string is what gets
+ * interpolated, never the English value that fed resolveContentString.
+ * `field` is the catalog field segment (e.g. "prompt", "help_text", or
+ * `option.<slug>.label`); `englishValue` is the raw record value used as the
+ * fallback and the resolution seed.
+ */
+function resolveFlowText(
+  question: FlowQuestion,
+  field: string,
+  englishValue: string,
+  i18n: I18n,
+  ctx: SurveyContext,
+): string {
+  return interpolate(
+    resolveContentString("flowQuestions", question.id, field, englishValue, i18n),
+    ctx,
+  );
 }
 
 function stringValue(v: string | string[] | undefined): string {
@@ -60,6 +98,10 @@ function TextFieldControl({ question, value, onChange }: FieldProps) {
   const isMultiLine = question.type === "text";
   const strVal = stringValue(value);
   if (isMultiLine) {
+    // `type: "text"` questions are the survey's genuinely open-ended fields
+    // (long-form description prompts, e.g. phase_f_helpdocs) — the exact case
+    // Textarea reserves `resize="vertical"` for (#536). Opt in explicitly so
+    // these keep the resize handle they had before the resize:none default.
     return (
       <Textarea
         id={question.id}
@@ -67,6 +109,7 @@ function TextFieldControl({ question, value, onChange }: FieldProps) {
         value={strVal}
         onChange={(e) => onChange(e.target.value)}
         rows={4}
+        resize="vertical"
       />
     );
   }
@@ -85,6 +128,7 @@ function TextFieldControl({ question, value, onChange }: FieldProps) {
 // ---------------------------------------------------------------------------
 
 function AutocompleteField({ question, value, onChange, onEntryResolved, onSelectAdvance }: FieldProps) {
+  const { t } = useLingui();
   // `@langtags_names` (spec 030 US1): the English-name-first picker. It shows
   // the language NAME in the field and reports the resolved entry via
   // onEntryResolved so homonyms (same name, different code) can be told apart.
@@ -95,7 +139,10 @@ function AutocompleteField({ question, value, onChange, onEntryResolved, onSelec
         value={value}
         onChange={onChange}
         valueMode="name"
-        placeholder="Type your language name in English…"
+        placeholder={t({
+          id: "survey.questionField.autocomplete.namePlaceholder",
+          message: "Type your language name in English…",
+        })}
         {...(onEntryResolved !== undefined ? { onEntryResolved } : {})}
         {...(onSelectAdvance !== undefined ? { onSelectAdvance } : {})}
       />
@@ -126,7 +173,10 @@ function AutocompleteField({ question, value, onChange, onEntryResolved, onSelec
         value={value}
         onChange={onChange}
         valueMode="code"
-        placeholder="Search by name, autonym, or code…"
+        placeholder={t({
+          id: "survey.questionField.autocomplete.codePlaceholder",
+          message: "Search by name, autonym, or code…",
+        })}
         {...(onSelectAdvance !== undefined ? { onSelectAdvance } : {})}
       />
     );
@@ -172,15 +222,14 @@ function StyledOptionsField({ question, value, onChange, onSelectAdvance }: Fiel
   // own-script autonyms in both value and label (IdentityLite.getSeedOptions),
   // matching the dedup key in IdentityLite.getSeedOptions and the comparison in
   // LangtagsComboboxField.resolveTyped.
-  const q = typed.trim().normalize("NFC").toLowerCase();
+  const q = normalizeForCompare(typed);
   const exact = allOptions.some((o) => o.value.normalize("NFC") === typed.normalize("NFC"));
   const shown =
     q === "" || exact
       ? allOptions
       : allOptions.filter(
           (o) =>
-            o.label.normalize("NFC").toLowerCase().includes(q) ||
-            o.value.normalize("NFC").toLowerCase().includes(q),
+            normalizeForCompare(o.label).includes(q) || normalizeForCompare(o.value).includes(q),
         );
 
   return (
@@ -257,6 +306,7 @@ function LangtagsComboboxField({
   valueMode,
   placeholder,
 }: FieldProps & LangtagsComboboxExtras) {
+  const { t } = useLingui();
   const strVal = stringValue(value);
   const [options, setOptions] = useState<LanguageSummary[]>([]);
   const [loaded, setLoaded] = useState(false);
@@ -307,7 +357,7 @@ function LangtagsComboboxField({
       .catch((err: unknown) => {
         // Degrade to a plain free-text field on import failure (FR-009).
         if (!isMountedRef.current) return;
-        console.warn(
+        devLog.warn(
           "[LangtagsComboboxField] langtags load failed; degrading to free-text input",
           err,
         );
@@ -328,17 +378,44 @@ function LangtagsComboboxField({
     // ref.current is the current prop, so this path is unchanged.
     const onResolved = onEntryResolvedRef.current;
     if (onResolved === undefined) return;
-    // NFC-normalize before case-folding so NFC/NFD variants of the same name
+    // Normalize before case-folding so NFC/NFD variants of the same name
     // compare equal — matches the own-name dedup key in IdentityLite.getSeedOptions.
-    const trimmed = text.trim().normalize("NFC").toLowerCase();
+    const trimmed = normalizeForCompare(text);
     if (trimmed === "") {
       onResolved(null);
       return;
     }
-    const exact = results.filter(
-      (r) => (r.englishName ?? "").normalize("NFC").toLowerCase() === trimmed,
-    );
-    onResolved(exact.length === 1 ? exact[0]! : null);
+    // Match the primary English name OR any alternate English name (langtags
+    // aliases, e.g. "Otuo" → Ghotuo) so a resolvable alias seeds downstream
+    // fields, not just the canonical name. Alternate names live on
+    // LanguageDefaults (getLanguageDefaults), not the LanguageSummary row, so
+    // read them through the loaded module.
+    const mod = modRef.current;
+    const primaryMatch = (r: LanguageSummary): boolean =>
+      normalizeForCompare(r.englishName ?? "") === trimmed;
+    const aliasMatch = (r: LanguageSummary): boolean => {
+      const altNames = mod?.getLanguageDefaults(r.code)?.englishNames;
+      return altNames?.some((n) => normalizeForCompare(n) === trimmed) ?? false;
+    };
+
+    // The primary English name takes precedence over aliases: a *unique*
+    // primary-name match resolves even when the same text is also an alias of a
+    // different entry. This keeps alias resolution strictly additive — it never
+    // turns a query that previously auto-resolved (by primary name) into an
+    // ambiguous null. Aliases decide only when no single primary name matches.
+    // This precedence is local to resolveTyped: lookupByName folds aliases into
+    // the same ranking tier as the primary name (it has no primary-over-alias
+    // precedence of its own), so there is nothing there to mirror.
+    const primary = results.filter(primaryMatch);
+    if (primary.length >= 1) {
+      // >1 primary match is genuinely ambiguous by canonical name alone → null.
+      onResolved(primary.length === 1 ? primary[0]! : null);
+      return;
+    }
+    // No primary-name match: fall back to aliases. An alias shared by >1 entry
+    // stays ambiguous (null), same as an ambiguous primary name.
+    const byAlias = results.filter(aliasMatch);
+    onResolved(byAlias.length === 1 ? byAlias[0]! : null);
   }
 
   function handleType(text: string): void {
@@ -381,7 +458,7 @@ function LangtagsComboboxField({
       id={question.id}
       value={strVal}
       options={comboOptions}
-      placeholder={loaded ? placeholder : "Loading languages…"}
+      placeholder={loaded ? placeholder : t({ id: "survey.questionField.langtagsCombobox.loading", message: "Loading languages…" })}
       required={question.required === true}
       onType={handleType}
       onSelect={handleSelect}
@@ -484,9 +561,13 @@ function StyledCombobox({
     }
   }
 
+  // Issue #536: sized to --control-h (34px) instead of a fixed padded box;
+  // `.ks-control .ks-focus-ring .ks-hit-target` (index.css) give this the
+  // same accent-ring focus + >=44px touch target as every other single-line
+  // control (TextField, Dropdown).
   const inputStyle: React.CSSProperties = {
     width: "100%",
-    padding: "8px 10px",
+    padding: "0 10px",
     background: "#0d1117",
     border: "1px solid #30363d",
     borderRadius: 6,
@@ -518,6 +599,7 @@ function StyledCombobox({
         onFocus={openList}
         // Delay close so an option's onMouseDown registers before blur.
         onBlur={() => setTimeout(() => isMountedRef.current && setOpen(false), 120)}
+        className="ks-control ks-focus-ring ks-hit-target"
         style={inputStyle}
       />
       {showList && (
@@ -574,20 +656,37 @@ function StyledCombobox({
 }
 
 // ---------------------------------------------------------------------------
-// Select (native <select>)  →  ui Dropdown
+// Select (native <select> does not open in the VS Code webview — #1307)
+// →  ui SelectMenu
 // ---------------------------------------------------------------------------
 
-function SelectField({ question, value, onChange }: FieldProps) {
+function SelectField({ question, value, onChange, context }: FieldProps) {
+  const { t, i18n } = useLingui();
   const strVal = stringValue(value);
-  const dropdownOptions: DropdownOption[] = (question.options ?? []).map(
-    (opt) => ({ value: opt.value, label: opt.label }),
-  );
+  // Leading placeholder option — matches the hardcoded "— Select one —" entry
+  // of the now-removed ui/Dropdown (always first, selectable to reset to
+  // unanswered), now actually localized (Dropdown's was a plain string, never
+  // wrapped in t()).
+  const selectOptions: SelectMenuOption[] = [
+    { value: "", label: t({ id: "survey.selectField.placeholder", message: "— Select one —" }) },
+    ...(question.options ?? []).map((opt) => ({
+      value: opt.value,
+      label: resolveFlowText(
+        question,
+        `option.${slugifyIdSegment(opt.value)}.label`,
+        opt.label,
+        i18n,
+        context ?? {},
+      ),
+    })),
+  ];
   return (
-    <Dropdown
+    <SelectMenu
       id={question.id}
-      aria-required={question.required === true}
+      ariaLabelledby={`label-${question.id}`}
+      required={question.required === true}
       value={strVal}
-      options={dropdownOptions}
+      options={selectOptions}
       onChange={(v) => onChange(v)}
     />
   );
@@ -597,12 +696,32 @@ function SelectField({ question, value, onChange }: FieldProps) {
 // Radio group  →  ui RadioGroup (mode="list")
 // ---------------------------------------------------------------------------
 
-function RadioField({ question, value, onChange }: FieldProps) {
+function RadioField({ question, value, onChange, context }: FieldProps) {
+  const { i18n } = useLingui();
+  const ctx = context ?? {};
   const strVal = stringValue(value);
   const radioOptions: RadioOption[] = (question.options ?? []).map((opt) => ({
     value: opt.value,
-    label: opt.label,
-    ...(opt.note !== undefined ? { note: opt.note } : {}),
+    label: resolveFlowText(
+      question,
+      `option.${slugifyIdSegment(opt.value)}.label`,
+      opt.label,
+      i18n,
+      ctx,
+    ),
+    // The per-option helper line is rendered prose — resolve it through the
+    // same Tier B catalog path as the label (extracted as option.<slug>.note).
+    ...(opt.note !== undefined
+      ? {
+          note: resolveFlowText(
+            question,
+            `option.${slugifyIdSegment(opt.value)}.note`,
+            opt.note,
+            i18n,
+            ctx,
+          ),
+        }
+      : {}),
   }));
   return (
     <RadioGroup
@@ -638,21 +757,30 @@ function BoolField({ question, value, onChange }: FieldProps) {
 // Multi-select (checkboxes)  →  ui MultiSelect
 // ---------------------------------------------------------------------------
 
-function MultiSelectField({ question, value, onChange }: FieldProps) {
+function MultiSelectField({ question, value, onChange, context }: FieldProps) {
+  const { i18n } = useLingui();
   const arrVal = arrayValue(value);
   const options = question.options ?? [];
 
   if (options.length === 0 && question.options_source !== undefined) {
     return (
       <p style={{ fontSize: 13, color: TEXT_DIM, fontStyle: "italic" }}>
-        Dynamic options ({question.options_source}) not loaded in this build.
+        <Trans id="survey.questionField.multiSelect.dynamicOptionsNotLoaded">
+          Dynamic options ({question.options_source}) not loaded in this build.
+        </Trans>
       </p>
     );
   }
 
   const msOptions: MultiSelectOption[] = options.map((opt) => ({
     value: opt.value,
-    label: opt.label,
+    label: resolveFlowText(
+      question,
+      `option.${slugifyIdSegment(opt.value)}.label`,
+      opt.label,
+      i18n,
+      context ?? {},
+    ),
   }));
 
   return (
@@ -670,10 +798,24 @@ function MultiSelectField({ question, value, onChange }: FieldProps) {
 // Notice (read-only; no input)  →  ui Notice
 // ---------------------------------------------------------------------------
 
-function NoticeField({ question }: Pick<FieldProps, "question">) {
+function NoticeField({ question, context }: Pick<FieldProps, "question" | "context">) {
+  const { i18n } = useLingui();
+  const ctx = context ?? {};
+  const resolvedBody =
+    question.body !== undefined
+      ? resolveFlowText(question, "body", question.body, i18n, ctx)
+      : undefined;
+  const resolvedHelpText =
+    question.help_text !== undefined
+      ? resolveFlowText(question, "help_text", question.help_text, i18n, ctx)
+      : undefined;
+  const resolvedPrompt =
+    question.prompt !== undefined
+      ? resolveFlowText(question, "prompt", question.prompt, i18n, ctx)
+      : undefined;
   return (
     <Notice>
-      {question.body ?? question.help_text ?? question.prompt}
+      {resolvedBody ?? resolvedHelpText ?? resolvedPrompt}
     </Notice>
   );
 }
@@ -691,6 +833,8 @@ export interface QuestionFieldProps {
   onEntryResolved?: (entry: LanguageSummary | null) => void;
   /** Auto-advance callback for dropdown selections — see FieldProps.onSelectAdvance. */
   onSelectAdvance?: (value: string) => void;
+  /** Survey answer context for `{{token}}` interpolation — see FieldProps.context. */
+  context?: SurveyContext;
 }
 
 export function QuestionField({
@@ -700,13 +844,28 @@ export function QuestionField({
   findingsByQuestionId,
   onEntryResolved,
   onSelectAdvance,
+  context,
 }: QuestionFieldProps) {
   // Findings are associated to questions by id via a caller-supplied map.
   // LintFinding has no questionId field by design (see contracts/lintFinding.ts);
   // the survey<->lint bridge owns the mapping.
   const relevant = findingsByQuestionId?.[question.id] ?? [];
 
-  const labelText = question.prompt ?? question.label ?? question.id;
+  const { i18n } = useLingui();
+  const ctx = context ?? {};
+  const resolvedPrompt =
+    question.prompt !== undefined
+      ? resolveFlowText(question, "prompt", question.prompt, i18n, ctx)
+      : undefined;
+  const resolvedLabel =
+    question.label !== undefined
+      ? resolveFlowText(question, "label", question.label, i18n, ctx)
+      : undefined;
+  const labelText = resolvedPrompt ?? resolvedLabel ?? question.id;
+  const resolvedHelpText =
+    question.help_text !== undefined
+      ? resolveFlowText(question, "help_text", question.help_text, i18n, ctx)
+      : undefined;
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
@@ -730,8 +889,8 @@ export function QuestionField({
         );
       })()}
 
-      {question.help_text !== undefined && question.type !== "notice" && (
-        <p style={helpText}>{question.help_text}</p>
+      {resolvedHelpText !== undefined && question.type !== "notice" && (
+        <p style={helpText}>{resolvedHelpText}</p>
       )}
 
       {question.type === "text" || question.type === "short_text" ? (
@@ -745,15 +904,30 @@ export function QuestionField({
           {...(onSelectAdvance !== undefined ? { onSelectAdvance } : {})}
         />
       ) : question.type === "select" ? (
-        <SelectField question={question} value={value} onChange={onChange} />
+        <SelectField
+          question={question}
+          value={value}
+          onChange={onChange}
+          {...(context !== undefined ? { context } : {})}
+        />
       ) : question.type === "radio" ? (
-        <RadioField question={question} value={value} onChange={onChange} />
+        <RadioField
+          question={question}
+          value={value}
+          onChange={onChange}
+          {...(context !== undefined ? { context } : {})}
+        />
       ) : question.type === "bool" ? (
         <BoolField question={question} value={value} onChange={onChange} />
       ) : question.type === "multi_select" ? (
-        <MultiSelectField question={question} value={value} onChange={onChange} />
+        <MultiSelectField
+          question={question}
+          value={value}
+          onChange={onChange}
+          {...(context !== undefined ? { context } : {})}
+        />
       ) : question.type === "notice" ? (
-        <NoticeField question={question} />
+        <NoticeField question={question} {...(context !== undefined ? { context } : {})} />
       ) : null}
 
       {relevant.length > 0 && (

@@ -107,7 +107,7 @@ export interface ScaffoldResult {
    * un-attributed scaffold look like a fetch failure.
    *
    * Callers that publish or download MUST gate on this — an unattributed package
-   * is incomplete, and the pre-037 alternative (naming the keyboard's own display
+   * is incomplete, and the pre-059 alternative (naming the keyboard's own display
    * name as rights holder) was a false attribution.
    */
   attributionMissing: boolean;
@@ -132,6 +132,20 @@ export interface ScaffoldResult {
    * dropping it — a hard block with an escape hatch, not a dead end.
    */
   licenseUnparseable?: { reason: string; line: string };
+  /**
+   * The base keyboard's `LICENSE.md` VERBATIM, or undefined when it has none
+   * (spec 059 FR-011).
+   *
+   * Surfaced so the caller can keep it on the working copy. The download path
+   * completes missing stub files — including `LICENSE.md`, which the loader
+   * deliberately never writes into the VFS — and without this text it would have
+   * no way to know which holders to retain, emitting a notice naming only the new
+   * author. That is the same defect on a second path.
+   *
+   * Raw text rather than the parsed block: parsing is `resolveInheritedHolders`'
+   * job, and one parser shared by both paths is the point of FR-005.
+   */
+  baseLicenseText?: string;
 }
 
 /**

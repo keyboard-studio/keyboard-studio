@@ -7,15 +7,18 @@
  *   3. Accumulation across multiple assignments to the same host key
  *   4. Idempotency / deduplication
  *   5. Purity (no mutation of the original layout)
- *   6. Structural isolation (shift layer and tablet platform untouched)
+ *   6. Structural isolation (shift layer untouched; tablet untouched when phone present)
  *   7. Emit-side round-trip for flick/multitap
+ *   8. Mobile platform resolution (phone-preferred, tablet-fallback — spec-035 R7a)
  */
 
 import { describe, it, expect } from "vitest";
 import { applyTouchAssignments } from "./applyTouchAssignments.js";
 import { emitTouchLayout } from "../codec/index.js";
+import { scaffoldTouchLayoutWithDiagnostics } from "../scaffolder/scaffoldTouchLayout.js";
 import type { TouchLayoutIR, TouchKeyIR } from "@keyboard-studio/contracts";
 import type { TouchAssignment } from "@keyboard-studio/contracts";
+import type { KeyboardIR, IRRule } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -396,16 +399,72 @@ describe("applyTouchAssignments — isolation of other layers and platforms", ()
     expect(outTablet).toBe(inputTablet);
   });
 
-  it("a layout with no phone platform returns unchanged layout + one warning", () => {
-    const noPhoneLayout: TouchLayoutIR = {
-      platforms: [{ id: "tablet", layers: [{ id: "default", rows: [] }] }],
+  it("phone-containing layout is unaffected by tablet's presence — phone still preferred when both exist", () => {
+    // Same layout as the "tablet platform is reference-equal" case above, but
+    // this asserts the OTHER half of the contract: the assignment actually
+    // lands on the phone platform (not silently dropped, not misrouted to
+    // tablet) when both platforms are present.
+    const layout = makeLayout([makeKey("K_A")], { tabletPlatform: true });
+
+    const { layout: out } = applyTouchAssignments(layout, [longpress("K_A", "á")]);
+
+    const key = getKey(out, "K_A")!;
+    expect(key.sk).toHaveLength(1);
+    expect(key.sk![0]!.id).toBe("U_00E1");
+
+    // ...and the tablet platform is still untouched (reference-equal).
+    const inputTablet = layout.platforms.find((p) => p.id === "tablet")!;
+    const outTablet = out.platforms.find((p) => p.id === "tablet")!;
+    expect(outTablet).toBe(inputTablet);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Mobile platform resolution — phone-preferred, tablet-fallback (spec-035
+// amendment R7a: the reseed-from-desktop derivation now emits a TABLET
+// platform, and Phase E must apply touch assignments to it just like it
+// always has for phone — not silently no-op).
+// ---------------------------------------------------------------------------
+
+describe("applyTouchAssignments — mobile platform resolution (phone/tablet, spec-035 R7a)", () => {
+  it("tablet-only layout: assignments are APPLIED to the tablet platform's layer", () => {
+    const tabletOnlyLayout: TouchLayoutIR = {
+      platforms: [
+        {
+          id: "tablet",
+          layers: [{ id: "default", rows: [{ keys: [makeKey("K_A")] }] }],
+        },
+      ],
       nodeIds: [],
     };
 
-    const { layout: out, warnings } = applyTouchAssignments(noPhoneLayout, [longpress("K_A", "á")]);
+    const { layout: out, warnings } = applyTouchAssignments(tabletOnlyLayout, [
+      longpress("K_A", "á"),
+    ]);
+
+    expect(warnings).toHaveLength(0);
+    const tablet = out.platforms.find((p) => p.id === "tablet")!;
+    const def = tablet.layers.find((l) => l.id === "default")!;
+    const key = def.rows.flatMap((r) => r.keys).find((k) => k.id === "K_A")!;
+    expect(key.sk).toHaveLength(1);
+    expect(key.sk![0]!.id).toBe("U_00E1");
+    expect(key.sk![0]!.text).toBe("á");
+  });
+
+  it("a layout with NEITHER phone nor tablet platform returns unchanged layout + one warning", () => {
+    // The genuine no-mobile-platform guard — still a safe no-op, unlike the
+    // tablet-only case above which R7a supersedes.
+    const noMobileLayout: TouchLayoutIR = {
+      platforms: [{ id: "desktop", layers: [{ id: "default", rows: [] }] }],
+      nodeIds: [],
+    };
+
+    const { layout: out, warnings } = applyTouchAssignments(noMobileLayout, [
+      longpress("K_A", "á"),
+    ]);
     expect(warnings).toHaveLength(1);
-    expect(warnings[0]).toContain("no phone platform");
-    expect(out).toBe(noPhoneLayout); // same reference — unchanged
+    expect(warnings[0]).toContain("no phone or tablet platform");
+    expect(out).toBe(noMobileLayout); // same reference — unchanged
   });
 });
 
@@ -700,5 +759,258 @@ describe("applyTouchAssignments — emit-side verification", () => {
     expect(mt[0]!["id"]).toBe("U_00E2");
     expect(mt[0]!["text"]).toBe("â");
     expect(mt[0]!["output"]).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Layer targeting — the optional `layer` slot value
+//
+// Absent `layer` === "default" is the compatibility guarantee the whole change
+// rests on; every case above exercises the absent form, so this block covers
+// the explicit form, a non-default target, and the miss paths.
+// ---------------------------------------------------------------------------
+
+/** Build a touch assignment naming an explicit target layer. */
+function longpressOnLayer(hostKey: string, char: string, layer: string): TouchAssignment {
+  return {
+    scope: "individual",
+    target: char,
+    modality: "touch",
+    mechanisms: [
+      { patternId: "longpress_alternates", slotValues: { hostKey, char, layer } },
+    ],
+    source: "user",
+  };
+}
+
+/** Read the keys of a named phone layer from a result layout. */
+function phoneLayerKeys(layout: TouchLayoutIR, layerId: string): TouchKeyIR[] {
+  const phone = layout.platforms.find((p) => p.id === "phone")!;
+  const layer = phone.layers.find((l) => l.id === layerId)!;
+  return layer.rows.flatMap((r) => r.keys);
+}
+
+describe("applyTouchAssignments — layer targeting", () => {
+  it('layer: "default" produces exactly the same result as an absent layer', () => {
+    const withAbsent = applyTouchAssignments(makeLayout([makeKey("K_A")]), [
+      longpress("K_A", "á"),
+    ]);
+    const withExplicit = applyTouchAssignments(makeLayout([makeKey("K_A")]), [
+      longpressOnLayer("K_A", "á", "default"),
+    ]);
+
+    expect(withExplicit.warnings).toEqual(withAbsent.warnings);
+    expect(withExplicit.layout).toEqual(withAbsent.layout);
+  });
+
+  it('layer: "shift" places on the shift layer and leaves the default layer untouched', () => {
+    const layout = makeLayout([makeKey("K_A")], { shiftLayer: true });
+
+    const { layout: out, warnings } = applyTouchAssignments(layout, [
+      longpressOnLayer("K_A", "Á", "shift"),
+    ]);
+
+    expect(warnings).toHaveLength(0);
+
+    const shiftKeyA = phoneLayerKeys(out, "shift").find((k) => k.id === "K_A")!;
+    expect(shiftKeyA.sk).toHaveLength(1);
+    expect(shiftKeyA.sk![0]!.text).toBe("Á");
+
+    const defaultKeyA = phoneLayerKeys(out, "default").find((k) => k.id === "K_A")!;
+    expect(defaultKeyA.sk).toBeUndefined();
+  });
+
+  it("two mechanisms on one character targeting different layers both apply", () => {
+    const layout = makeLayout([makeKey("K_A")], { shiftLayer: true });
+
+    const { layout: out, warnings } = applyTouchAssignments(layout, [
+      {
+        scope: "individual",
+        target: "á",
+        modality: "touch",
+        mechanisms: [
+          { patternId: "longpress_alternates", slotValues: { hostKey: "K_A", char: "á" } },
+          {
+            patternId: "longpress_alternates",
+            slotValues: { hostKey: "K_A", char: "Á", layer: "shift" },
+          },
+        ],
+        source: "user",
+      },
+    ]);
+
+    expect(warnings).toHaveLength(0);
+    expect(phoneLayerKeys(out, "default").find((k) => k.id === "K_A")!.sk![0]!.text).toBe("á");
+    expect(phoneLayerKeys(out, "shift").find((k) => k.id === "K_A")!.sk![0]!.text).toBe("Á");
+  });
+
+  it("an unknown layer warns and skips the mechanism — no throw, no default fallback", () => {
+    const layout = makeLayout([makeKey("K_A")]);
+
+    const { layout: out, warnings } = applyTouchAssignments(layout, [
+      longpressOnLayer("K_A", "Á", "caps"),
+    ]);
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('target layer "caps" not found in phone platform');
+    // Crucially NOT applied to the default layer.
+    expect(phoneLayerKeys(out, "default").find((k) => k.id === "K_A")!.sk).toBeUndefined();
+    // Nothing was touched, so the layout comes back by reference.
+    expect(out).toBe(layout);
+  });
+
+  it("a host key absent from the target layer warns naming that layer, and does not look elsewhere", () => {
+    // Shift layer carries only K_A; K_S exists on default only.
+    const layout: TouchLayoutIR = {
+      platforms: [
+        {
+          id: "phone",
+          layers: [
+            { id: "default", rows: [{ keys: [makeKey("K_A"), makeKey("K_S")] }] },
+            { id: "shift", rows: [{ keys: [makeKey("K_A")] }] },
+          ],
+        },
+      ],
+      nodeIds: [],
+    };
+
+    const { layout: out, warnings } = applyTouchAssignments(layout, [
+      longpressOnLayer("K_S", "Ś", "shift"),
+    ]);
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('host key "K_S" not found in phone layer "shift"');
+    expect(phoneLayerKeys(out, "default").find((k) => k.id === "K_S")!.sk).toBeUndefined();
+  });
+
+  it("untouched layers and platforms are returned by reference when another layer is targeted", () => {
+    const layout = makeLayout([makeKey("K_A")], { shiftLayer: true, tabletPlatform: true });
+    const phone = layout.platforms.find((p) => p.id === "phone")!;
+    const inputDefaultLayer = phone.layers.find((l) => l.id === "default")!;
+    const inputTablet = layout.platforms.find((p) => p.id === "tablet")!;
+
+    const { layout: out } = applyTouchAssignments(layout, [
+      longpressOnLayer("K_A", "Á", "shift"),
+    ]);
+
+    const outPhone = out.platforms.find((p) => p.id === "phone")!;
+    expect(outPhone.layers.find((l) => l.id === "default")!).toBe(inputDefaultLayer);
+    expect(out.platforms.find((p) => p.id === "tablet")!).toBe(inputTablet);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Reseed-from-desktop tablet "rightalt" regression — a real
+// scaffoldTouchLayoutWithDiagnostics(ir, "tablet") output, not a hand-rolled
+// fixture. This is the actual user flow the bug report describes: the
+// scaffolder used to emit the tablet RALT layer under the non-canonical id
+// "altgr" (and "altgr-shift"), so an assignment naming the canonical
+// "rightalt" layer (what resolveTouchLayerId/TOUCH_ID_FRAGMENT.RALT and the
+// real keyboards corpus both use) never matched, producing a
+// '[touch-apply] target layer "rightalt" not found' warning and silently
+// dropping the character. The fix migrates the scaffolder onto "rightalt" /
+// "rightalt-shift" directly, so no alias is needed here.
+// ---------------------------------------------------------------------------
+
+/** Build a minimal IR with a RALT-only special letter and an RALT+SHIFT
+ *  uppercase special letter, enough to make the tablet scaffolder emit both
+ *  secondary layers. */
+function makeRaltIR(): KeyboardIR {
+  const rule = (vkey: string, modifiers: string[], output: string): IRRule => ({
+    nodeId: `rule_${vkey}_${modifiers.join("") || "none"}_${output}`,
+    context: [{ kind: "vkey", name: vkey, modifiers }],
+    output: [{ kind: "char", value: output }],
+  });
+
+  return {
+    origin: "imported",
+    header: {
+      keyboardId: "test_kb",
+      name: "Test KB",
+      bcp47: [],
+      copyright: "",
+      version: "1.0",
+      targets: [],
+      storeDirectives: [],
+    },
+    stores: [],
+    groups: [
+      {
+        nodeId: "group:main",
+        name: "main",
+        usingKeys: true,
+        readonly: false,
+        rules: [
+          rule("K_A", [], "a"),
+          rule("K_A", ["SHIFT"], "A"),
+          rule("K_E", [], "e"),
+          rule("K_E", ["SHIFT"], "E"),
+          rule("K_E", ["RALT"], "ə"),
+          rule("K_N", [], "n"),
+          rule("K_N", ["RALT", "SHIFT"], "Ŋ"),
+        ],
+      },
+    ],
+    comments: [],
+    raw: [],
+    recognizedPatterns: [],
+  };
+}
+
+describe("applyTouchAssignments — reseed-from-desktop tablet rightalt layer (regression)", () => {
+  it("scaffolds the tablet layer set with canonical 'rightalt'/'rightalt-shift' ids, entry-point reachable", () => {
+    const { layout } = scaffoldTouchLayoutWithDiagnostics(makeRaltIR(), "tablet");
+    const tablet = layout.platforms.find((p) => p.id === "tablet")!;
+    const layerIds = tablet.layers.map((l) => l.id);
+
+    expect(layerIds).toContain("rightalt");
+    expect(layerIds).toContain("rightalt-shift");
+    expect(layerIds).not.toContain("altgr");
+    expect(layerIds).not.toContain("altgr-shift");
+
+    // Reachability: some key on the default layer must target "rightalt" —
+    // the entry-point toggle/specials key the RALT-only layer is reached
+    // through.
+    const defaultLayer = tablet.layers.find((l) => l.id === "default")!;
+    const entryKey = defaultLayer.rows
+      .flatMap((r) => r.keys)
+      .find((k) => k.nextlayer === "rightalt");
+    expect(entryKey).toBeDefined();
+  });
+
+  it("a 'rightalt'-targeted touch assignment applies with no 'not found' warning, and the char lands on the rightalt layer", () => {
+    const { layout: scaffolded } = scaffoldTouchLayoutWithDiagnostics(makeRaltIR(), "tablet");
+
+    const { layout: out, warnings } = applyTouchAssignments(scaffolded, [
+      longpressOnLayer("K_E", "ě", "rightalt"),
+    ]);
+
+    expect(warnings).toHaveLength(0);
+    expect(warnings.some((w) => w.includes('target layer "rightalt" not found'))).toBe(false);
+
+    const rightaltLayer = out.platforms
+      .find((p) => p.id === "tablet")!
+      .layers.find((l) => l.id === "rightalt")!;
+    const eKey = rightaltLayer.rows.flatMap((r) => r.keys).find((k) => k.id === "K_E")!;
+    expect(eKey.sk?.some((s) => s.text === "ě")).toBe(true);
+  });
+
+  it("a 'rightalt-shift'-targeted touch assignment applies with no 'not found' warning, and the char lands on the rightalt-shift layer", () => {
+    const { layout: scaffolded } = scaffoldTouchLayoutWithDiagnostics(makeRaltIR(), "tablet");
+
+    const { layout: out, warnings } = applyTouchAssignments(scaffolded, [
+      longpressOnLayer("K_N", "Ň", "rightalt-shift"),
+    ]);
+
+    expect(warnings).toHaveLength(0);
+    expect(warnings.some((w) => w.includes('target layer "rightalt-shift" not found'))).toBe(
+      false,
+    );
+
+    const rightaltShiftLayer = out.platforms
+      .find((p) => p.id === "tablet")!
+      .layers.find((l) => l.id === "rightalt-shift")!;
+    const nKey = rightaltShiftLayer.rows.flatMap((r) => r.keys).find((k) => k.id === "K_N")!;
+    expect(nKey.sk?.some((s) => s.text === "Ň")).toBe(true);
   });
 });

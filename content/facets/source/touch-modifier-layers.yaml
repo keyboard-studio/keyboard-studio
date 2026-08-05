@@ -1,0 +1,61 @@
+# source.touch-modifier-layers — whether the chosen base's
+# .keyman-touch-layout exposes desktop modifier combinations (ALT, RALT,
+# CTRL) as their own touch layers. Read from the touch-layout JSON directly.
+
+id: source.touch-modifier-layers
+family: source
+title: Source touch modifier layers
+description: >
+  Whether the chosen base's touch layout exposes desktop modifier
+  combinations (ALT, RALT, CTRL) as their own touch layers, has no such
+  layers, or mixes both across the layer set. Read directly from the
+  .keyman-touch-layout JSON's layer ids, independent of the desktop .kmn
+  source.
+valueType: enum
+values: [none, maps-desktop-modifiers, mixed]
+
+modality: touch
+
+derivations:
+  - kind: computed
+    source: "planned:touch-modifier-layers-of-layout"
+    sourceStatus: planned
+    notes: >
+      Scans the base's .keyman-touch-layout JSON's layer ids for names
+      matching desktop modifier combinations (alt, ralt, ctrl, and their
+      shift-combined forms).
+
+consumers:
+  prefills: []
+  proposes:
+    - "mechanism-gallery:touch-modifier-layers"
+
+provenanceLabel: "whether your source keyboard already exposes desktop modifiers on touch"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: computed
+
+notes: >
+  Exposing ALT/RALT/CTRL as touch layers is often a desktop-derivation
+  artifact rather than a deliberate touch design — the cause-taxonomy
+  predicates capacity-forced and gap-omission are relevant here when the
+  base's touch layout was auto-generated from its desktop rules rather than
+  authored for touch directly. The classifier is planned, not available.
+  Detection must also match COMPOUND modifier layer ids (e.g. shift-alt,
+  ctrl-alt), not only the single modifiers alt/ralt/ctrl, or a base that
+  only exposes compound-modifier layers will be misclassified as "none".
+  houseTargetPolicy deferred: measure-only at candidate stage; no default
+  proposed until predictive lift is measured.
+
+transformImpactClass: ux-changing
+houseTargetPolicy: null
+invertibility: one-way
+implications: >
+  Adding, removing, or collapsing desktop-modifier touch layers changes how
+  many layer switches the typist needs to reach modifier-gated characters
+  on touch; it has no effect on the desktop side of the same keyboard.
+exceptionSites: []
+causePredicates: [capacity-forced, gap-omission]

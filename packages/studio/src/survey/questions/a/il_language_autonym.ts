@@ -14,6 +14,7 @@ import type { QuestionModule, ValidationResult } from "../../types.ts";
 export const definition = {
   id: "il_language_autonym",
   prompt: "What is your language called in your own language?",
+  audit_label: "Language name (own language)",
   help_text:
     "The name your community uses for the language, in your own spelling and " +
     "characters. For example: Fà', Kiswahili, हिन्दी. Pick a suggested name or " +
@@ -54,5 +55,11 @@ export const fixtures: QuestionModule["fixtures"] = {
   ],
 };
 
-const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [] };
+// Output reach (spec 057 FR-016): `writes` stays `[]` — this question writes no
+// KeyboardIR — while `outputs` states that the answer nevertheless reaches an
+// emitted artifact. Here it reaches none: the autonym is collected for the
+// display-name seed and for the author's own recognition of their language, not as
+// the descriptor's `<Language>` display text (spec 057 Assumptions). The explicit
+// `[]` says so on the record rather than leaving the field absent.
+const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [], outputs: [] };
 export default mod;

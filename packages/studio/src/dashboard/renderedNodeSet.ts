@@ -26,7 +26,8 @@
 // resolveNext (SurveyRunner.tsx -> stores/debugPinsStore.ts): runtime-reach
 // traversal lives in the depcruise-excluded guardrail test, not here.
 
-import { buildModularFlowGraph, buildProposedFlowGraphFromFlow, buildLibraryReserveNodes } from "./buildStepGraph.ts";
+import { devLog } from "@keyboard-studio/contracts/dev-log";
+import { buildModularFlowGraph, buildProposedFlowGraphFromFlow, buildLibraryReserveNodes, buildLeftoverNodes } from "./buildStepGraph.ts";
 import { buildManifestProjection, attachDrillDowns, CHARACTERS_STEP_ID as _CHARACTERS_STEP_ID } from "./manifestProjection.ts";
 import type { FlowGraph, GraphNode } from "./model.ts";
 import { flowSources } from "../steps/flowSources.ts";
@@ -34,6 +35,7 @@ import { manifest } from "../steps/manifest.ts";
 import { loadModularFlow } from "../survey/loadModularFlow.ts";
 import type { FlowDef } from "../survey/types.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
+import { reserveRegistry } from "../survey/questions/registry.reserve.ts";
 
 // Re-export CHARACTERS_STEP_ID so driftGuardrail and other callers don't need
 // a separate import from manifestProjection.
@@ -108,7 +110,7 @@ export function buildFlowSources(): BuiltFlowSource[] {
         // Unresolved ref — surface as an error entry so the map shows the gap.
         // Also fail loud at dev time so a missing flowSources entry is caught early.
         if (import.meta.env.DEV) {
-          console.error(
+          devLog.error(
             `[renderedNodeSet] unresolved flowRef "${ref}" on step "${step.id}" — add it to steps/flowSources.ts`,
           );
         }
@@ -241,7 +243,7 @@ function parseAllSources(): ParsedSource[] {
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (import.meta.env.DEV) {
-        console.error(`[renderedNodeSet] flowSources["${source.id}"] failed to parse — ${message}`);
+        devLog.error(`[renderedNodeSet] flowSources["${source.id}"] failed to parse — ${message}`);
       }
       return {
         id: source.id,
@@ -296,4 +298,33 @@ export function buildLibrarySection(): LibrarySection {
   const reserve = buildLibraryReserveNodes(questionRegistry, inAnyFlow);
 
   return { proposed, reserve, dualReferenced };
+}
+
+// ---------------------------------------------------------------------------
+// Leftover section — registered questions used by NO live flow.
+//
+// Kept for reference / future reuse (spec-022 no-delete: still registered, on
+// disk, and test-covered), but never run by the live survey and never rendered as
+// reserve clog inside a live drill-down. This is a SEPARATE composition from the
+// live drill-downs (buildFlowSources) and from the Library section
+// (buildLibrarySection) — the Flow Map paints it under its own heading.
+// ---------------------------------------------------------------------------
+
+/**
+ * buildLeftoverSection — every module physically relocated to the reserve
+ * sub-registry (questions/reserve/, registry.reserve.ts).
+ *
+ * Sourced DIRECTLY from reserveRegistry — not derived by subtracting the live
+ * flow ids from questionRegistry. The reserve folder/registry IS the Leftover
+ * set: a module lives there if and only if it is demoted, so this always
+ * matches physical reality and can never silently diverge from a live flow's
+ * id list. Every reserveRegistry module renders as a kind:"library-not-in-flow"
+ * / region:"leftover" node (via buildLeftoverNodes with an empty "in-flow" set,
+ * so nothing is excluded).
+ *
+ * Excluded from the rendered<->runtime bijection by construction: collectRenderedNodeIds
+ * never traverses this composition (like the Library section).
+ */
+export function buildLeftoverSection(): GraphNode[] {
+  return buildLeftoverNodes(reserveRegistry, new Set());
 }

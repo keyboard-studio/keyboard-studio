@@ -7,7 +7,8 @@
 // whose rows render only while the dropdown is open, so each case opens it first.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { render, cleanup, waitFor, fireEvent } from "@testing-library/react";
+import { cleanup, waitFor, fireEvent } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import type { LanguageSummary } from "@keyboard-studio/contracts";
 
 const MANY: LanguageSummary[] = Array.from({ length: 300 }, (_, i) => ({

@@ -1,5 +1,5 @@
 import type { LintFinding } from "@keyboard-studio/contracts";
-import { collectDeclaredStores, forEachMatch } from "./_shared.js";
+import { collectDeclaredStores, forEachMatch, stripNonCodeSource } from "./_shared.js";
 
 // index(store, N) bounds — lint.md check #13 (warn-only).
 // Validates that:
@@ -18,9 +18,14 @@ const ANY_RE = /\bany\s*\([^)]*\)/g;
 export function checkIndexBounds(source: string): LintFinding[] {
   const findings: LintFinding[] = [];
   const declared = collectDeclaredStores(source);
-  const lines = source.split("\n");
+  // collectDeclaredStores runs on the ORIGINAL source (it reads quoted store
+  // bodies for length). The index()/any() scans run on the stripped source so
+  // an `index(...)`/`any(...)` in a trailing `c` comment or a quoted value is
+  // not read as a real call (and does not inflate the any() count).
+  const strippedSource = stripNonCodeSource(source);
+  const lines = strippedSource.split("\n");
 
-  forEachMatch(source, INDEX_RE, (match, lineIdx) => {
+  forEachMatch(strippedSource, INDEX_RE, (match, lineIdx) => {
     const line = lines[lineIdx] ?? "";
     const rawName = (match[1] ?? "").trim();
     const offset = parseInt(match[2] ?? "0", 10);

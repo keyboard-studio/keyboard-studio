@@ -1,0 +1,37 @@
+# diacritic-mechanism — spec 043 US2 (rule-structure archetype).
+#
+# Axis A4: HOW the base applies diacritics, read from its rule IR shape.
+#   stacking-combining  — rules output Unicode combining marks (\p{M}) that stack
+#                         onto the preceding base (NFD-style base+combining input)
+#   replacing-cycling   — a dk(NNNN) compose rule (deadkey in context, base after)
+#                         replaces/cycles the base into a composed form (NFC-style)
+#   multi-family        — both mechanisms attested on the same base
+#   none                — the base has rules but no diacritic-input mechanism
+# The value is the plurality over diacritic-input rules, `multi-family` when both
+# are present, `none` when none are. A base with no rule surface at all lands at
+# the undetermined fallback tier (value omitted), never a forced `none`.
+id: diacritic-mechanism
+title: Diacritic mechanism (axis A4)
+description: >
+  How the base applies diacritics — stacking combining marks, a replacing/cycling
+  deadkey compose, both (multi-family), or none — read from the rule IR. Lets the
+  §7.2 selector match a candidate base's diacritic mechanism (axis A4) to the
+  target orthography's needs.
+valueType: enum
+limits:
+  values:
+    - stacking-combining
+    - replacing-cycling
+    - multi-family
+    - none
+  open: false
+likelihoodSemantics: >
+  the plurality mechanism over the base's diacritic-input rules carries the
+  `consistency`; `multi-family` is emitted when both mechanisms are attested,
+  with the split described by `consistency`/`causeTagCounts`.
+derivation:
+  archetype: rule-structure
+  classifierId: diacritic-mechanism-classifier
+  fallbackChain: [content-derived, undetermined]
+feedsSessionFacets: [source.diacritic-mechanism]
+schemaVersion: 1

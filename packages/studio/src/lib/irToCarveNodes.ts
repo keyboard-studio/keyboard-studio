@@ -11,8 +11,13 @@ import type {
   RemovalCapability,
   StoreItem,
 } from '@keyboard-studio/contracts';
-import { isParallelIndexFanOut, classifyStoreSlotEdit } from '@keyboard-studio/engine';
-import type { StoreSlotBlockReason } from '@keyboard-studio/engine';
+import { buildProducedSet } from '@keyboard-studio/contracts';
+import { isParallelIndexFanOut, classifyStoreSlotEdit, describeStorePairing, analyzeStores, buildProducerIndex, isCharCoveredForLocale, collectCharContributors, isPlusSeparator, parseSlotId, isCombiningMarkChar } from '@keyboard-studio/engine';
+import type { ProducerIndex } from '@keyboard-studio/engine';
+import type { StoreSlotBlockReason, StoreSlotEditMode, StoreAnalysis, CharContributors, CharNormalizationForm } from '@keyboard-studio/engine';
+import type { I18n } from '@lingui/core';
+import { resolveContentString } from './contentI18n.ts';
+import { caseGroupFor, caseTrimSet } from './carveCasePairs.ts';
 export type CardKind = 'pattern' | 'group' | 'store' | 'raw';
 
 // ---------------------------------------------------------------------------
@@ -126,16 +131,51 @@ export function modifierLabel(rule: IRRule): string {
 }
 
 // ---------------------------------------------------------------------------
-// isCombining — true for Unicode non-spacing marks (Mn category, all scripts)
+// isCombining — true for the full Unicode Mark category (Mn/Mc/Me, all
+// scripts). General_Category M is the correct test (km-domain, spec 046
+// follow-up): many Mc marks (e.g. Devanagari vowel signs) have canonical
+// combining class (ccc) 0, so a ccc-based test under-detects — General_Category
+// is required, not ccc. Sk "modifier symbol" characters (U+00B4 ACUTE ACCENT,
+// U+02DC SMALL TILDE, etc.) are DELIBERATELY EXCLUDED: they are free-standing
+// spacing characters, not marks that attach to a base, and must never get a
+// dotted-circle prefix. (U+02CA MODIFIER LETTER ACUTE ACCENT is General_Category
+// Lm, not Sk, but is excluded from \p{M} for the same reason: it's a
+// free-standing letter, not an attaching mark.)
+//
+// Thin alias over the engine's isCombiningMarkChar (characterMap.ts) — both
+// predicates test the same \p{M} class, so there is no reason to keep a
+// separate studio-local regex. Kept as a local name (rather than updating
+// every call site to import isCombiningMarkChar directly) to minimize churn.
 // ---------------------------------------------------------------------------
 
 export const isCombining = (ch: string) => {
-  return /^\p{Mn}$/u.test(ch ?? '');
+  return isCombiningMarkChar(ch ?? '');
 };
+
+// Double-span combining marks (U+0360-0362) visually span TWO base
+// characters (e.g. U+0361 COMBINING DOUBLE INVERTED BREVE ties two letters
+// together) — a single leading dotted circle misrepresents them, since the
+// mark has nothing to "attach to" on its right. Rendered standalone as
+// circle + mark + circle instead (km-domain guidance).
+const DOUBLE_SPAN_MARKS = new Set(['͠', '͡', '͢']);
+
+// Prefix a combining mark with U+25CC DOTTED CIRCLE so it's visible standalone
+// (Unicode's standard convention for showing a combining mark in isolation).
+// Double-span marks (see DOUBLE_SPAN_MARKS) get a circle on BOTH sides.
+// Parameterized on the caller's own combining-ness test rather than computing
+// it internally: displayChar() keys off isCombining() (now a thin alias for
+// the engine's isCombiningMarkChar), and the character-map pane keys off its
+// cell.isCombiningMark (also isCombiningMarkChar, computed engine-side) — both
+// callers agree on the same \p{M} test today; the parameter is kept so a
+// caller could still special-case it without touching this helper.
+export function prefixCombiningMark(ch: string, isCombiningMark: boolean): string {
+  if (!isCombiningMark) return ch;
+  return DOUBLE_SPAN_MARKS.has(ch) ? '◌' + ch + '◌' : '◌' + ch;
+}
 
 // Render-ready character: prefix combining marks with a dotted circle so they're visible standalone.
 export function displayChar(ch: string): string {
-  return isCombining(ch) ? '◌' + ch : ch;
+  return prefixCombiningMark(ch, isCombining(ch));
 }
 
 const INVISIBLE_CHAR_LABELS: Record<string, string> = {
@@ -186,6 +226,21 @@ export interface CarveGlyph {
   modifierLabel: string;
   capability: RemovalCapability;
   owners?: GlyphOwner[];
+  /**
+   * Faithful, ordered "how it's typed" step sequence (#1399) — deliberately
+   * SEPARATE from `keys` (the simplified display string `contextToKeys`
+   * builds, which the old rule/node Rail view — `CarveGallery.tsx` — reads
+   * and must keep reading unchanged). Consumed only by the character-first
+   * view (`irToCharacterView.ts` -> `CarveGalleryV2.tsx`).
+   *
+   * Semantics: a single entry is one fully-composed CHORD (e.g. "Shift + A",
+   * already including any modifier prefix) — simultaneous keys. Multiple
+   * entries are ordered STEPS typed one after another (e.g. a deadkey
+   * trigger then a base letter) — render joined by "then", never "+".
+   * `undefined` means the shape could not be resolved faithfully (never a
+   * fabricated key) — the caller falls back to a "not shown" message.
+   */
+  keySteps?: string[] | undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -197,7 +252,7 @@ export function contextToKeys(context: ContextElement[]): string[] {
   for (const el of context) {
     switch (el.kind) {
       case 'char':
-        keys.push(el.value);
+        keys.push(displayChar(el.value));
         break;
       case 'vkey':
         keys.push(el.name);
@@ -330,6 +385,24 @@ function expandParallelStoreRule(rule: IRRule, ir: KeyboardIR, capabilities: Map
     // Bare shape (Bamum): physical key only, no deadkey marker.
     const keys = hasDeadkey ? ['‹dk›', inputLabel] : [inputLabel];
 
+    // Faithful (#1399) per-slot base label — SEPARATE from `inputLabel` above
+    // (which feeds the untouched `keys` field): a vkey base is run through
+    // vkeyLabel() so it reads as "A" rather than raw "K_A". Deadkey shape
+    // (S-02/S-06): two faithful steps — the deadkey's real trigger key, then
+    // this base label — via keySequenceLabel. Bare shape (no deadkey, e.g.
+    // Bamum bare transliteration): a single direct keypress, no trigger to
+    // reconstruct.
+    const faithfulBaseLabel = inputItem && inputItem.kind === 'char'
+      ? displayChar(inputItem.value)
+      : inputItem && inputItem.kind === 'vkey'
+        ? desktopVkeyLabel(inputItem.name)
+        : undefined;
+    const keySteps: string[] | undefined = faithfulBaseLabel === undefined
+      ? undefined
+      : hasDeadkey
+        ? keySequenceLabel(rule, ir, faithfulBaseLabel)
+        : [faithfulBaseLabel];
+
     const gid = `${outputStore.nodeId}#${i}`;
     if (seen.has(gid)) continue;  // dedup: same store+index appearing in multiple rules
     seen.add(gid);
@@ -337,6 +410,7 @@ function expandParallelStoreRule(rule: IRRule, ir: KeyboardIR, capabilities: Map
     glyphs.push({
       gid, keys, ch, modifierLayer: modLayer, modifierLabel: modLabel, capability: slotCapability,
       ...(slotOwners.length > 0 ? { owners: slotOwners } : {}),
+      ...(keySteps !== undefined ? { keySteps } : {}),
     });
   }
 
@@ -344,37 +418,119 @@ function expandParallelStoreRule(rule: IRRule, ir: KeyboardIR, capabilities: Map
 }
 
 // ---------------------------------------------------------------------------
+// storeRefRole — single source of truth for "does this ONE context/output
+// element count as a store reference, and in what role." context any/notany
+// -> 'source'; context index -> 'output'; output index/outs -> 'output';
+// anything else -> null (not a store reference). storeRefsOf (the per-rule
+// roll-up over every store), ruleReferencesStore (the non-allocating
+// presence check for one named store), and ruleStoreRoles (the
+// non-allocating presence+role check for one named store) all iterate this
+// single classifier so the element-kind knowledge never forks between the
+// three call shapes (#952, following on #923's storeRefsOf consolidation).
+// ---------------------------------------------------------------------------
+
+type StoreRefRole = 'source' | 'output';
+
+function storeRefRole(el: ContextElement | OutputElement, inOutput: boolean): { storeName: string; role: StoreRefRole } | null {
+  if (!inOutput) {
+    if (el.kind === 'any' || el.kind === 'notany') return { storeName: el.storeRef, role: 'source' };
+    if (el.kind === 'index') return { storeName: el.storeRef, role: 'output' };
+    return null;
+  }
+  if (el.kind === 'index' || el.kind === 'outs') return { storeName: el.storeRef, role: 'output' };
+  return null;
+}
+
+// ---------------------------------------------------------------------------
 // storeRefsOf — single source of truth for "what counts as a store
-// reference in a rule, and its role." context any/notany -> asSource;
-// context index -> asOutput; output index/outs -> asOutput. Returns one
-// entry per DISTINCT store name (first-seen order), OR-ing roles across
-// multiple refs to the same store. Shared by ruleStoreOwners and
-// analyzeStoreUsage so the "store tag" render layer and the store "Used by"
-// panel never drift on which elements count as a store reference.
+// reference in a rule, and its role," rolled up across the whole rule.
+// Returns one entry per DISTINCT store name (first-seen order), OR-ing roles
+// across multiple refs to the same store. Used by ruleStoreOwners, which
+// genuinely needs the full per-store role list (it walks every store the
+// rule touches, not one named store), so the "store tag" render layer and
+// the store "Used by" panel derive from the same storeRefRole classifier.
 // (Positional consumers like describeRuleForStore that need the element
-// index keep their own scan — see the comment on that function.)
+// index keep their own scan — see the comment on that function. Callers
+// that only care about a single named store should use ruleReferencesStore
+// (presence-only) or ruleStoreRoles (presence + role) instead — see their
+// comments; both avoid this function's Map+array allocation over every
+// store in the rule.)
 // ---------------------------------------------------------------------------
 
 function storeRefsOf(rule: IRRule): { storeName: string; asSource: boolean; asOutput: boolean }[] {
   const byName = new Map<string, { storeName: string; asSource: boolean; asOutput: boolean }>();
-  const touch = (name: string, role: 'asSource' | 'asOutput') => {
+  const touch = (name: string, role: StoreRefRole) => {
     let entry = byName.get(name);
     if (!entry) {
       entry = { storeName: name, asSource: false, asOutput: false };
       byName.set(name, entry);
     }
-    entry[role] = true;
+    if (role === 'source') entry.asSource = true;
+    else entry.asOutput = true;
   };
 
   for (const el of rule.context) {
-    if (el.kind === 'any' || el.kind === 'notany') touch(el.storeRef, 'asSource');
-    else if (el.kind === 'index') touch(el.storeRef, 'asOutput');
+    const ref = storeRefRole(el, false);
+    if (ref) touch(ref.storeName, ref.role);
   }
   for (const el of rule.output) {
-    if (el.kind === 'index' || el.kind === 'outs') touch(el.storeRef, 'asOutput');
+    const ref = storeRefRole(el, true);
+    if (ref) touch(ref.storeName, ref.role);
   }
 
   return [...byName.values()];
+}
+
+// ---------------------------------------------------------------------------
+// ruleReferencesStore — non-allocating presence-only check: does `rule`
+// reference `storeName` at all (in either role)? Early-exits on the first
+// match instead of building storeRefsOf's full Map + array roll-up. Shares
+// storeRefRole with storeRefsOf so the element-kind knowledge stays in one
+// place (#952). Use this at call sites that only need a boolean — if you
+// need the asSource/asOutput roles or the full per-store list, use
+// storeRefsOf instead.
+// ---------------------------------------------------------------------------
+
+function ruleReferencesStore(rule: IRRule, storeName: string): boolean {
+  for (const el of rule.context) {
+    const ref = storeRefRole(el, false);
+    if (ref && ref.storeName === storeName) return true;
+  }
+  for (const el of rule.output) {
+    const ref = storeRefRole(el, true);
+    if (ref && ref.storeName === storeName) return true;
+  }
+  return false;
+}
+
+// ---------------------------------------------------------------------------
+// ruleStoreRoles — non-allocating role lookup for ONE store: does `rule`
+// reference `storeName` as a source, an output, or both? Unlike
+// ruleReferencesStore this can't early-exit on the first match (both roles
+// must be checked), but still avoids storeRefsOf's Map+array roll-up over
+// EVERY store the rule references — it only ever tracks two booleans for
+// the single store the caller asked about. Shares storeRefRole with
+// storeRefsOf/ruleReferencesStore so the element-kind knowledge stays in
+// one place (#952). Used by analyzeStoreUsage's main per-rule usage loop,
+// which — unlike the patternRefs/groupRefs loops — needs the role, not just
+// presence.
+// ---------------------------------------------------------------------------
+
+function ruleStoreRoles(rule: IRRule, storeName: string): { asSource: boolean; asOutput: boolean } {
+  let asSource = false;
+  let asOutput = false;
+  for (const el of rule.context) {
+    const ref = storeRefRole(el, false);
+    if (ref && ref.storeName === storeName) {
+      if (ref.role === 'source') asSource = true;
+      else asOutput = true;
+    }
+  }
+  for (const el of rule.output) {
+    const ref = storeRefRole(el, true);
+    if (ref && ref.storeName === storeName) asOutput = true;
+  }
+  return { asSource, asOutput };
 }
 
 // ---------------------------------------------------------------------------
@@ -419,6 +575,9 @@ function ruleToGlyphs(rule: IRRule, ir: KeyboardIR, capabilities: Map<string, Re
   const ch = outputToChar(rule.output);
   if (ch === '?' || ch === '‹dk›') return [];
   const owners = ruleStoreOwners(rule, ir);
+  // Faithful (#1399) step sequence for this rule — S-01 (bare vkey chord) or
+  // S-05 (mnemonic char+char); undefined for every other shape (fallback).
+  const keySteps = keySequenceLabel(rule, ir);
   return [{
     gid: rule.nodeId,
     keys,
@@ -427,6 +586,7 @@ function ruleToGlyphs(rule: IRRule, ir: KeyboardIR, capabilities: Map<string, Re
     modifierLabel: modifierLabel(rule),
     capability: capabilities.get(rule.nodeId) ?? 'not-removable:unknown',
     ...(owners.length > 0 ? { owners } : {}),
+    ...(keySteps !== undefined ? { keySteps } : {}),
   }];
 }
 
@@ -534,9 +694,9 @@ export function patternToGlyphs(pattern: Pattern, ir: KeyboardIR, capabilities: 
 //
 // Action is derived once per store via classifyStoreSlotEdit (single
 // authority — never re-derived here):
-//   "nul-fill" — output-store slots; removing the char replaces it with a
-//                silent `nul` filler that preserves index() alignment.
-//   "drop"     — safe to splice out entirely (no positional contract).
+//   "drop"     — safe to splice out entirely (no positional contract), or a
+//                coordinated drop across a resolved pairing set (see
+//                StoreSlotEditMode.coordinatedWith in the engine).
 //   "disabled" — classifyStoreSlotEdit returned "blocked"; disabledReason
 //                carries an author-facing plain-language explanation.
 // ---------------------------------------------------------------------------
@@ -548,7 +708,7 @@ export interface StoreCharChip {
   ch: string;
   /** TRUE 0-based index into IRStore.items (not the char-only display index). */
   itemsIndex: number;
-  action: 'nul-fill' | 'drop' | 'disabled';
+  action: 'drop' | 'disabled';
   /** Author-facing plain-language explanation. Present only when action === 'disabled'. */
   disabledReason?: string;
 }
@@ -562,22 +722,32 @@ export interface StoreCharChip {
  */
 function blockReasonToDisabledReason(reason: StoreSlotBlockReason): string {
   switch (reason) {
-    case 'paired-input':
-      return "This store feeds an any()/index() mechanism — removing characters here would break its pairing; per-character removal for paired stores is planned.";
     case 'notany-widens':
       return "This store is matched negatively (notany) — removing a character would make MORE keys match, not fewer.";
     case 'context-index-aligned':
       return "This store's positions are read directly by a rule's matcher (index() in its context) — removing a character would shift every position after it out of alignment.";
-    case 'dual-use':
-      return "This store is both read from and written to across your rules — removing a character here isn't safe until that dual role is resolved.";
+    case 'unresolved-index-pairing':
+      return "This store (or one it's paired with) feeds a rule's index() output, but the pairing couldn't be resolved to a matching source — removing a character here isn't safe to prove yet.";
+    case 'outs-reference-unanalyzed':
+      return "This store is passed to another group's rules via outs() — removing a character here could break a mechanism hidden behind that hand-off, so it isn't safe to prove yet.";
     case 'system-store':
       return "This is a system store the compiler manages directly — it isn't meant to be edited here.";
   }
 }
 
-/** Extract per-character toggle chips for a store, classified once via classifyStoreSlotEdit. */
-export function storeCharChips(store: IRStore, ir: KeyboardIR): StoreCharChip[] {
-  const editMode = classifyStoreSlotEdit(store, ir);
+/**
+ * Extract per-character toggle chips for a store, classified once via classifyStoreSlotEdit.
+ *
+ * @param analysis Optional precomputed engine `analyzeStores(ir)` result — pass this
+ *                 when classifying many stores against the same `ir` (e.g.
+ *                 `toRailNodes`'s per-store loop, or `recommendedRemovalChars`'s
+ *                 per-candidate-character loop) so each call doesn't re-scan every
+ *                 rule in the IR from scratch.
+ */
+export function storeCharChips(store: IRStore, ir: KeyboardIR, analysis?: StoreAnalysis): StoreCharChip[] {
+  const editMode = analysis !== undefined
+    ? classifyStoreSlotEdit(store, ir, analysis)
+    : classifyStoreSlotEdit(store, ir);
   const chips: StoreCharChip[] = [];
 
   store.items.forEach((item, itemsIndex) => {
@@ -630,7 +800,7 @@ function precedingContextLabel(elements: ContextElement[]): string {
   const parts: string[] = [];
   for (const el of elements) {
     switch (el.kind) {
-      case 'char':       parts.push(`"${el.value}"`); break;
+      case 'char':       parts.push(`"${displayChar(el.value)}"`); break;
       case 'any':        parts.push(`any char from "${el.storeRef}"`); break;
       case 'notany':     parts.push(`any char not in "${el.storeRef}"`); break;
       case 'vkey':       parts.push(`[${el.name}]`); break;
@@ -674,7 +844,7 @@ function describeRuleForStore(rule: IRRule, storeName: string): StoreRuleDetail 
   );
 
   // The raw('+') element marks the keystroke boundary — refs after it are the active keypress
-  const plusIdx = rule.context.findIndex((el) => el.kind === 'raw' && el.text.trim() === '+');
+  const plusIdx = rule.context.findIndex(isPlusSeparator);
   // ctxRefIdx === -1 means store is output-only (not a keystroke trigger)
   const isKeystroke = ctxRefIdx !== -1 && (plusIdx === -1 || ctxRefIdx > plusIdx);
 
@@ -705,10 +875,10 @@ function analyzeStoreUsage(storeName: string, ir: KeyboardIR): StoreUsage {
 
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      const ref = storeRefsOf(rule).find((r) => r.storeName === storeName);
-      if (ref) {
-        if (ref.asSource) asSource = true;
-        if (ref.asOutput) asOutput = true;
+      const { asSource: ruleAsSource, asOutput: ruleAsOutput } = ruleStoreRoles(rule, storeName);
+      if (ruleAsSource || ruleAsOutput) {
+        if (ruleAsSource) asSource = true;
+        if (ruleAsOutput) asOutput = true;
         ruleCount++;
         groupNameSet.add(group.name);
       }
@@ -725,7 +895,7 @@ function analyzeStoreUsage(storeName: string, ir: KeyboardIR): StoreUsage {
     for (const group of ir.groups) {
       for (const rule of group.rules) {
         if (!ownedIds.has(rule.nodeId)) continue;
-        const used = storeRefsOf(rule).some((r) => r.storeName === storeName);
+        const used = ruleReferencesStore(rule, storeName);
         if (used) pRules.push(describeRuleForStore(rule, storeName));
       }
     }
@@ -744,7 +914,7 @@ function analyzeStoreUsage(storeName: string, ir: KeyboardIR): StoreUsage {
     const gRules: StoreRuleDetail[] = [];
     for (const rule of group.rules) {
       if (rule.ownedByPattern !== undefined || ownedNodeIds.has(rule.nodeId)) continue; // skip — already counted in patternRefs
-      const used = storeRefsOf(rule).some((r) => r.storeName === storeName);
+      const used = ruleReferencesStore(rule, storeName);
       if (used) gRules.push(describeRuleForStore(rule, storeName));
     }
     if (gRules.length > 0) groupRefs.push({ groupId: group.nodeId, groupName: group.name, ruleCount: gRules.length, rules: gRules });
@@ -824,6 +994,63 @@ export interface CarveNode {
   pairedStoreRoles?: ('input' | 'output' | 'input+output' | undefined)[] | undefined;
   /** store: short top-of-panel role line ("Output — …" / "Input — …"); undefined when role is undetermined */
   storeRoleLine?: string | undefined;
+  /**
+   * Removal-recommendation confidence, computed by annotateRemovalRecommendations() as a
+   * separate pass over toRailNodes() output (see #525 FOUNDATION slice):
+   *   - 'high'   — safe-to-remove suggestion; every character this node produces is absent
+   *                from the author's confirmed inventory, with no wanted character depending
+   *                on it (see the store dependency guard in annotateRemovalRecommendations).
+   *   - 'medium' — reserved for softer signals (Unicode-block / Phase-C mechanism-not-enabled).
+   *                Not emitted by the slice-1 conservative rule; TODO(#525) once those signals land.
+   *   - 'none'   — no suggestion (default; also the value when Phase B inventory is empty).
+   * Undefined on nodes produced directly by toRailNodes() before annotation runs.
+   */
+  recommendation?: 'high' | 'medium' | 'none' | undefined;
+}
+
+/**
+ * `CarveNode.name` is `pattern.title` verbatim for `kind: 'pattern'` nodes
+ * (see toRailNodes below) — a Tier B content string (spec 046 T028). Render
+ * sites across the Carve editor (Rail, Inspector header, InfoView hover
+ * panel, DepBanner, CarveGallery cascade dialogs) all print `node.name`, so
+ * resolve it here once rather than duplicating the
+ * `node.kind === 'pattern' ? resolveContentString(...) : node.name` branch at
+ * every call site. Group/store/raw names are IR-authoring names, not Pattern
+ * content, and pass through unresolved.
+ */
+export function resolveNodeName(node: CarveNode, i18n?: I18n): string {
+  if (node.kind !== 'pattern') return node.name;
+  return resolveContentString('patterns', node.nodeId, 'title', node.name, i18n);
+}
+
+/**
+ * Same resolution as resolveNodeName, for the `{kind, nodeId, label}` shape
+ * shared by CharLocation (buildCharWeb's cross-reference web popup, below)
+ * and the engine's CharContributors.locations (collectCharContributors) —
+ * both carry pattern.title verbatim in `label` for `kind: 'pattern'` entries.
+ */
+export function resolveLocationLabel(
+  loc: { kind: 'group' | 'pattern' | 'store' | 'raw'; nodeId: string; label: string },
+  i18n?: I18n,
+): string {
+  if (loc.kind !== 'pattern') return loc.label;
+  return resolveContentString('patterns', loc.nodeId, 'title', loc.label, i18n);
+}
+
+/**
+ * `CarveNode.referencedByLabel` mirrors the owning pattern's title verbatim
+ * for a store node (spec 046 T028) — same Tier B content string as
+ * resolveNodeName/resolveLocationLabel above, just carried under a different
+ * field name. Resolves it once rather than duplicating the
+ * `referencedByNodeId !== undefined ? resolveContentString(...) : referencedByLabel`
+ * ternary at each of its two call sites (InfoView.tsx, Inspector.tsx).
+ * Returns undefined when the node has no referencing pattern at all.
+ */
+export function resolveReferencedByLabel(node: CarveNode, i18n?: I18n): string | undefined {
+  if (node.referencedByLabel === undefined) return undefined;
+  return node.referencedByNodeId !== undefined
+    ? resolveContentString('patterns', node.referencedByNodeId, 'title', node.referencedByLabel, i18n)
+    : node.referencedByLabel;
 }
 
 // ---------------------------------------------------------------------------
@@ -944,6 +1171,31 @@ export function vkeyLabel(name: string): string | undefined {
   return stripped || undefined;
 }
 
+/**
+ * True for a Keyman virtual-key name that only exists on the on-screen touch
+ * layout (the `T_xxxx` custom-VK namespace a `.kmn` can bind rules against
+ * directly, e.g. `+ [T_003B] > U+003B`) — it has no physical desktop key
+ * behind it. "How it's typed" is a DESKTOP keystroke reconstruction; a touch
+ * key id is a different input modality and must never be presented as one of
+ * its steps (#1399 follow-on).
+ */
+export function isTouchOnlyVkeyName(name: string): boolean {
+  return /^T_/i.test(name);
+}
+
+/**
+ * Desktop-safe vkey label: same resolution as `vkeyLabel`, but returns
+ * `undefined` (rather than falling back to the raw name) for a touch-only
+ * vkey — the one case where "just show the raw name" would leak a
+ * non-physical key id into a desktop keystroke step. Every call site that
+ * previously did `vkeyLabel(name) ?? name` for a context/store-item vkey
+ * feeding a rendered "how it's typed" step or floor uses this instead.
+ */
+export function desktopVkeyLabel(name: string): string | undefined {
+  if (isTouchOnlyVkeyName(name)) return undefined;
+  return vkeyLabel(name) ?? name;
+}
+
 // ---------------------------------------------------------------------------
 // triggerKeyLabel — extract the human-readable trigger from a rule's context
 // ---------------------------------------------------------------------------
@@ -954,94 +1206,637 @@ export function vkeyLabel(name: string): string | undefined {
  *   any(storeA) + [K_BKSP] > index(storeB, 1)
  * the trigger is the vkey element after raw('+').
  *
+ * `ir` is optional and needed only to resolve a STORE-based trigger
+ * (`any()`/`notany()`) into its floor description (see
+ * `storeTriggerFloorLabel` below) — callers that never see a store trigger
+ * (or that don't have an `ir` handy) can omit it; that arm then returns
+ * undefined exactly as it did before this floor existed.
+ *
  * Returns a human-readable string or undefined when no trigger is present.
  */
-export function triggerKeyLabel(context: ContextElement[]): string | undefined {
-  const plusIdx = context.findIndex((el) => el.kind === 'raw' && el.text.trim() === '+');
+export function triggerKeyLabel(context: ContextElement[], ir?: KeyboardIR): string | undefined {
+  const plusIdx = context.findIndex(isPlusSeparator);
   if (plusIdx === -1) return undefined;
   const triggerEl = context[plusIdx + 1];
   if (!triggerEl) return undefined;
   switch (triggerEl.kind) {
-    case 'vkey':    return vkeyLabel(triggerEl.name) ?? triggerEl.name;
-    case 'char':    return `"${triggerEl.value}"`;
+    case 'vkey':    return desktopVkeyLabel(triggerEl.name);
+    case 'char':    return `"${displayChar(triggerEl.value)}"`;
     case 'deadkey': return `deadkey ${triggerEl.id}`;
+    // TOTAL FLOOR (#1399 follow-on): a store-triggered rule (any()/notany())
+    // must never resolve to undefined — describe the store's own items
+    // instead of naming a single (nonexistent) key.
+    case 'any':
+    case 'notany':
+      return ir !== undefined ? storeTriggerFloorLabel(triggerEl.storeRef, ir) : undefined;
     default:        return undefined;
   }
 }
 
-// ---------------------------------------------------------------------------
-// detectStorePairs — find any(storeA)/index(storeB) peer relationships
-// ---------------------------------------------------------------------------
-
-/** A single entry in the detectStorePairs result: a peer store plus the trigger key that fires the swap. */
-export interface StorePairEntry {
-  pairedName: string;
-  /** Human-readable trigger key label (e.g. "Backspace", "A"); undefined when not determinable. */
-  trigger: string | undefined;
+/**
+ * Floor description for a store-based trigger element — "one of: b c d" when
+ * the store has <=8 items with a nameable label (char OR vkey, via
+ * slotItemLabel), else the loose "one of several keys". Returns undefined
+ * only when the store can't be resolved at all or has zero nameable items.
+ */
+function storeTriggerFloorLabel(storeRef: string, ir: KeyboardIR): string | undefined {
+  const store = ir.stores.find((s) => s.name === storeRef);
+  if (store === undefined) return undefined;
+  const labels = store.items
+    .map((item) => slotItemLabel(item))
+    .filter((label): label is string => label !== undefined);
+  if (labels.length === 0) return undefined;
+  if (labels.length <= 8) return `one of: ${labels.join(' ')}`;
+  return 'one of several keys';
 }
 
 /**
- * For each rule that has both an any(storeA) element in its context AND an
- * index(storeB, …) element in its output, record storeA → storeB and
- * storeB → storeA as paired peers, capturing the trigger key for each pair.
- *
- * Returns a map of storeName → StorePairEntry[] (deduplicated by pairedName,
- * trigger taken from the first matching rule). Sorted by pairedName.
- * Only `any()`/`index()` pairing is in scope (no deadkey elements).
+ * Bare (unquoted) trigger label — same resolution as triggerKeyLabel, but the
+ * char case is returned without surrounding quotes (used for the faithful
+ * "how it's typed" step display, where a literal key is shown as a KeyCap
+ * chip, not inline prose — see keySequenceLabel below).
  */
-export function detectStorePairs(ir: KeyboardIR): Map<string, StorePairEntry[]> {
-  // Inner map: storeName → Map<pairedName, trigger>
-  const pairsMap = new Map<string, Map<string, string | undefined>>();
+function bareTriggerLabel(context: ContextElement[]): string | undefined {
+  const label = triggerKeyLabel(context);
+  if (label === undefined) return undefined;
+  if (label.length >= 2 && label.startsWith('"') && label.endsWith('"')) return label.slice(1, -1);
+  return label;
+}
 
-  const addPair = (a: string, b: string, trigger: string | undefined) => {
-    if (a === b) return;
-    if (!pairsMap.has(a)) pairsMap.set(a, new Map());
-    if (!pairsMap.has(b)) pairsMap.set(b, new Map());
-    // Only record trigger on first observation (first matching rule wins)
-    if (!pairsMap.get(a)!.has(b)) pairsMap.get(a)!.set(b, trigger);
-    if (!pairsMap.get(b)!.has(a)) pairsMap.get(b)!.set(a, trigger);
-  };
+/**
+ * Compose a single fully-resolved CHORD label for one context element that is
+ * itself the "primary" key of a rule (S-01's own vkey element, or a resolved
+ * deadkey-trigger rule's own single context element) — vkeyLabel() + the
+ * OWNING rule's modifierLabel(), or the bare literal for a char element.
+ * Never fabricates a vkey name for a char element.
+ */
+function primaryChordLabel(el: ContextElement, owningRule: IRRule): string | undefined {
+  if (el.kind === 'vkey') {
+    const base = desktopVkeyLabel(el.name);
+    if (base === undefined) return undefined;
+    const mod = modifierLabel(owningRule);
+    return mod ? `${mod} + ${base}` : base;
+  }
+  if (el.kind === 'char') return el.value;
+  return undefined;
+}
 
+/**
+ * Find the rule that enters deadkey `dkId` — mirrors the shape check in the
+ * engine's s02-deadkey-single-tap.ts buildTriggerIndex/isTrigger (a rule
+ * whose OUTPUT is a single deadkey, whose EFFECTIVE context — i.e. with the
+ * codec's synthetic '+' keystroke-boundary separator stripped out, so the
+ * common `+ [K_X] > dk(id)` form matches exactly like the rarer bare
+ * `[K_X] > dk(id)` form — is a single vkey or char element), but — unlike
+ * that recognizer-matching pass — does NOT skip rules already claimed by a
+ * pattern (ownedByPattern set): by the time this runs, the trigger rule for
+ * an already-recognized S-02 pattern is normally owned by that very
+ * pattern, so skipping owned rules would make its own trigger unfindable.
+ * Display-only; never mutates ownership.
+ */
+function findDeadkeyTrigger(ir: KeyboardIR, dkId: number): { el: ContextElement; rule: IRRule } | undefined {
+  const candidates: { el: ContextElement; rule: IRRule }[] = [];
   for (const group of ir.groups) {
+    if (group.name === 'deadkeys') continue;
     for (const rule of group.rules) {
-      // Collect all any() store names from context
-      const anyStores: string[] = [];
-      for (const el of rule.context) {
-        if (el.kind === 'any' && el.storeRef !== undefined) {
-          anyStores.push(el.storeRef);
-        }
-      }
-      if (anyStores.length === 0) continue;
+      const effCtx = rule.context.filter((c) => !isPlusSeparator(c));
+      if (effCtx.length !== 1 || rule.output.length !== 1) continue;
+      const el = effCtx[0];
+      const out = rule.output[0];
+      if (el === undefined || (el.kind !== 'vkey' && el.kind !== 'char')) continue;
+      if (out === undefined || out.kind !== 'deadkey' || out.id !== dkId) continue;
+      candidates.push({ el, rule });
+    }
+  }
+  if (candidates.length === 0) return undefined;
+  // Prefer a genuine desktop trigger over a touch-only one (T_xxxx) — a
+  // deadkey can legitimately have BOTH a desktop and a touch-only trigger
+  // rule, and filtering this out BEFORE the unshifted-preference search below
+  // ensures the touch-only trigger never shadows a resolvable desktop chord.
+  // Falls back to the full candidate list when EVERY trigger is touch-only,
+  // preserving prior behavior for that case.
+  const desktopCandidates = candidates.filter((c) => c.el.kind !== 'vkey' || !isTouchOnlyVkeyName(c.el.name));
+  const pool = desktopCandidates.length > 0 ? desktopCandidates : candidates;
+  // Prefer the unshifted vkey trigger (mirrors s02's pickPrimaryTrigger).
+  const unshifted = pool.find((c) => c.el.kind === 'vkey' && c.el.modifiers.length === 0);
+  return unshifted ?? pool[0];
+}
 
-      // Collect all index() store names from output
-      const indexStores: string[] = [];
-      for (const el of rule.output) {
-        if (el.kind === 'index' && el.storeRef !== undefined) {
-          indexStores.push(el.storeRef);
-        }
-      }
-      if (indexStores.length === 0) continue;
+// ---------------------------------------------------------------------------
+// keySequenceLabel — faithful, ordered "how it's typed" step sequence
+// (#1399), reconstructed from the RULE that actually produces a glyph,
+// never invented. Returns undefined when the shape can't be resolved
+// faithfully — callers fall back to a "not shown" message rather than
+// guessing.
+//
+// Shapes covered:
+//   S-01 (bare vkey rule, char output): single composed chord, e.g. "Shift + A".
+//   S-02/S-06 (deadkey body, parallel fan-out slot): two steps — the resolved
+//     TRIGGER key for the deadkey, then the caller-supplied per-slot base
+//     label (reusing expandParallelStoreRule's own per-slot resolution,
+//     never re-derived here).
+//   S-03 (sequence: any() at a NON-terminal context position, followed by a
+//     fixed literal trigger, output index()'d at the any's own 1-based
+//     context position): two steps — the caller-supplied per-slot base
+//     label, then the literal trigger.
+//   S-05 (mnemonic: char, '+', char — no store, no fan-out): two steps, both
+//     literal characters, quoted-literal only (never mapped through vkeyLabel).
+//
+// `resolvedBaseLabel` — when supplied, this call is for ONE SLOT of a
+// parallel-store fan-out glyph (S-02/S-03); the label for that slot's base
+// store item is the caller's job (expandParallelStoreRule already computes
+// it), not this function's.
+// ---------------------------------------------------------------------------
 
-      const trigger = triggerKeyLabel(rule.context);
+export function keySequenceLabel(
+  rule: IRRule,
+  ir: KeyboardIR,
+  resolvedBaseLabel?: string,
+): string[] | undefined {
+  const ctx = rule.context;
 
-      // Cross-pair: every any() store is paired with every index() store in this rule
-      for (const a of anyStores) {
-        for (const b of indexStores) {
-          addPair(a, b, trigger);
-        }
+  if (resolvedBaseLabel !== undefined) {
+    const dkEl = ctx.find((el) => el.kind === 'deadkey');
+    if (dkEl !== undefined && dkEl.kind === 'deadkey') {
+      // S-02/S-06 deadkey body: trigger THEN base.
+      const trigger = findDeadkeyTrigger(ir, dkEl.id);
+      if (trigger === undefined) return undefined;
+      const triggerLabel = primaryChordLabel(trigger.el, trigger.rule);
+      return triggerLabel !== undefined ? [triggerLabel, resolvedBaseLabel] : undefined;
+    }
+    // S-03 sequence: base (any(), non-terminal) THEN the fixed literal trigger.
+    const triggerLabel = bareTriggerLabel(ctx);
+    return triggerLabel !== undefined ? [resolvedBaseLabel, triggerLabel] : undefined;
+  }
+
+  // S-01: a single bare vkey rule (no '+', no store).
+  if (ctx.length === 1 && ctx[0] !== undefined && ctx[0].kind === 'vkey') {
+    const label = primaryChordLabel(ctx[0], rule);
+    return label !== undefined ? [label] : undefined;
+  }
+
+  // S-05 mnemonic: literal char, '+', literal char — no store, no fan-out.
+  // Emits the FULL ordered preceding literal run (not just ctx[0]) so a
+  // multi-literal-char rule (e.g. "n" "n" + "n" > ŋ) shows a COMPLETE
+  // N-step sequence rather than a 2-step one truncated at the first char.
+  // N=1 (the common single-preceding-char case) degenerates to the same
+  // two-step result as before. A MIXED preceding run (a vkey/deadkey/any
+  // among the literals) never fires this branch — falls through to the
+  // honest `undefined` below rather than fabricating a step.
+  if (ctx[0] !== undefined && ctx[0].kind === 'char') {
+    const plusIdx = ctx.findIndex(isPlusSeparator);
+    if (plusIdx > 0) {
+      const preceding = ctx.slice(0, plusIdx);
+      const allLiteral = preceding.every(
+        (el): el is Extract<ContextElement, { kind: 'char' }> => el.kind === 'char',
+      );
+      if (allLiteral) {
+        const triggerLabel = bareTriggerLabel(ctx);
+        if (triggerLabel !== undefined) return [...preceding.map((el) => el.value), triggerLabel];
       }
     }
   }
 
-  // Convert to StorePairEntry[] sorted by pairedName
-  const result = new Map<string, StorePairEntry[]>();
-  for (const [name, peers] of pairsMap) {
-    const entries: StorePairEntry[] = [...peers.entries()]
-      .sort(([a], [b]) => a.localeCompare(b))
-      .map(([pairedName, trigger]) => ({ pairedName, trigger }));
-    result.set(name, entries);
+  // "Ways to type it" (#1399) additive branch: the preceding context is a
+  // NON-literal marker — a store match (any/notany), a context() back-
+  // reference, a baselayout() guard, or an index() back-reference — none of
+  // which is a single nameable key. The actual DISTINGUISHING keystroke is
+  // just the TRIGGER after '+'; the precondition itself is surfaced
+  // separately by charProducers' condition builder below, never fabricated
+  // here as a key. Deliberately excludes 'deadkey' preceding (a rarer hybrid
+  // shape this pass doesn't resolve faithfully — falls through to the
+  // honest `undefined` below rather than under-reporting a step).
+  if (ctx[0] !== undefined && NON_KEY_PRECEDING_KINDS.has(ctx[0].kind)) {
+    const plusIdx = ctx.findIndex(isPlusSeparator);
+    if (plusIdx > 0) {
+      const triggerLabel = bareTriggerLabel(ctx);
+      if (triggerLabel !== undefined) return [triggerLabel];
+    }
   }
-  return result;
+
+  // Deadkey-combination rule (#1399 follow-on): the effective context — ctx
+  // with the '+' keystroke-boundary separator AND any bare `raw` guard
+  // elements stripped out (e.g. a `platform('hardware')` precondition the
+  // codec preserves verbatim as `{kind:"raw"}` — see parseContextElements'
+  // "unknown -> raw" fallback; it names a build target, never a keystroke,
+  // so it can never itself be a step) — is composed ENTIRELY of deadkey
+  // elements, and the rule composes them into a literal char (e.g.
+  // `dk(1) dk(2) > 'e'`, `platform('hardware') dk(1) dk(1) > 'e'`, or
+  // `dk(1) + dk(2) > 'e'` where the active keystroke is itself a deadkey).
+  // This is the gap the NON_KEY_PRECEDING_KINDS branch above deliberately
+  // excludes rather than resolves. Each deadkey's own trigger rule is
+  // resolved via findDeadkeyTrigger and rendered as one ordered chord step;
+  // if ANY deadkey's trigger can't be found, the whole sequence is
+  // unresolvable — return undefined rather than fabricating a step.
+  const effCtx = ctx.filter((el) => el.kind !== 'raw');
+  if (effCtx.length > 0 && effCtx.every((el) => el.kind === 'deadkey')) {
+    const steps: string[] = [];
+    for (const el of effCtx) {
+      if (el.kind !== 'deadkey') continue; // narrows for TS; guaranteed by the `every` above
+      const trigger = findDeadkeyTrigger(ir, el.id);
+      if (trigger === undefined) return undefined;
+      const label = primaryChordLabel(trigger.el, trigger.rule);
+      if (label === undefined) return undefined;
+      steps.push(label);
+    }
+    return steps;
+  }
+
+  return undefined;
+}
+
+const NON_KEY_PRECEDING_KINDS = new Set(['any', 'notany', 'context', 'baselayout', 'index', 'raw']);
+
+// ---------------------------------------------------------------------------
+// charProducers — "ways to type it" producer enumeration (#1399)
+//
+// Every RULE that produces a given character, as a faithful keystroke
+// sequence plus a plain-language CONDITION describing when that rule
+// applies. Mirrors the rule-matching loop in the engine's
+// collectCharContributors (store-output match, then literal-char-output
+// match) but — unlike that function, which only returns ids for cascade-
+// delete — captures enough of each matching {rule, group} to render a
+// human-readable entry. Most characters have exactly one producer; a
+// character reachable via more than one rule (e.g. a duplicate S-08 RAlt
+// binding, or a base letter reachable both directly and via a deadkey)
+// gets one entry per producing rule.
+//
+// A single producer's `condition` is built from `rule.context.slice(0,
+// plusIdx)` — the preceding, ALREADY-TYPED buffer match, everything before
+// the codec's synthetic '+' keystroke-boundary token (isPlusSeparator). No
+// '+' present means no preceding match to describe — unconditional.
+//
+// Honest-fallback contract: whenever EITHER the keystroke steps OR the
+// condition can't be faithfully derived, the WHOLE entry falls back to
+// `{ steps: [] }` (the same convention CharacterCell.keys already uses),
+// plus — whenever resolvable — a `triggerFloor` (TOTAL FLOOR, #1399
+// follow-on) so the panel can still say "Typed with <floor>" instead of a
+// placeholder phrase — never a fabricated step or a guessed condition.
+// ---------------------------------------------------------------------------
+
+/** One faithful "way to type" a character: an ordered keystroke sequence plus an optional plain-language condition. Empty `steps` is the honest-fallback convention (mirrors CharacterCell.keys). */
+export interface CharProducer {
+  steps: string[];
+  condition?: string;
+  /**
+   * TOTAL FLOOR (#1399 follow-on): a human-readable trigger-key description
+   * for the producing rule — e.g. "Backspace" or "one of: b c d" — computed
+   * whenever `steps` couldn't be resolved faithfully (`steps: []`). Lets the
+   * panel cascade to "Typed with <triggerFloor>" instead of ever rendering a
+   * placeholder phrase. Only undefined when the rule has no '+'-separated
+   * trigger element to describe at all.
+   */
+  triggerFloor?: string;
+}
+
+type ConditionOutcome =
+  | { kind: 'none' }
+  | { kind: 'text'; text: string }
+  | { kind: 'unrenderable' };
+
+/**
+ * Plain-language condition builder over a rule's PRECEDING context elements
+ * (the slice before the '+' keystroke boundary — see charProducers' doc).
+ * Table (km-keyman spec, #1399):
+ *   none                      -> unconditional (kind: 'none')
+ *   one literal char x        -> "when it follows x"
+ *   several literal chars xy  -> "when it follows xy" (NFC-joined)
+ *   any(store), <=8 items     -> "when it follows one of: a e i o u"
+ *   any(store), >8 items      -> "when it follows certain letters"
+ *   notany(store)             -> same two tiers, "doesn't follow"
+ *   deadkey marker present    -> unconditional (kind: 'none') — already
+ *                                 expressed by the rule's own two-step
+ *                                 keySteps; never duplicated here
+ *   context() (offset 1 only  -> "after any typed character"
+ *     — context(N>1) never reaches here; it's parsed as a RawKmnFragment)
+ *   baselayout(value)         -> "only on the '<value>' keyboard layout"
+ *   index() back-ref, or any  -> unrenderable — the whole producer entry
+ *     other/mixed shape          falls back (see charProducers)
+ */
+function buildCondition(preceding: readonly ContextElement[], ir: KeyboardIR): ConditionOutcome {
+  if (preceding.length === 0) return { kind: 'none' };
+  if (preceding.some((el) => el.kind === 'deadkey')) return { kind: 'none' };
+
+  if (preceding.length === 1) {
+    const el = preceding[0]!;
+    switch (el.kind) {
+      case 'char':
+        return { kind: 'text', text: `when it follows ${el.value}` };
+      case 'any':
+        return storeConditionOutcome(el.storeRef, ir, false);
+      case 'notany':
+        return storeConditionOutcome(el.storeRef, ir, true);
+      case 'context':
+        return { kind: 'text', text: 'after any typed character' };
+      case 'baselayout':
+        return { kind: 'text', text: `only on the '${el.value}' keyboard layout` };
+      default:
+        return { kind: 'unrenderable' };
+    }
+  }
+
+  // Several literal chars in a row (e.g. a two-char mnemonic prefix).
+  if (preceding.every((el) => el.kind === 'char')) {
+    const text = preceding.map((el) => (el as { kind: 'char'; value: string }).value).join('').normalize('NFC');
+    return { kind: 'text', text: `when it follows ${text}` };
+  }
+
+  return { kind: 'unrenderable' };
+}
+
+/** Shared `any(store)`/`notany(store)` condition tier (<=8 items lists them; >8 goes loose). */
+function storeConditionOutcome(storeRef: string, ir: KeyboardIR, negate: boolean): ConditionOutcome {
+  const store = ir.stores.find((s) => s.name === storeRef);
+  if (store === undefined) return { kind: 'unrenderable' };
+  const chars = store.items
+    .filter((it): it is Extract<StoreItem, { kind: 'char' }> => it.kind === 'char')
+    .map((it) => displayChar(it.value));
+  if (chars.length === 0) return { kind: 'unrenderable' };
+  const verb = negate ? "doesn't follow" : 'follows';
+  if (chars.length <= 8) return { kind: 'text', text: `when it ${verb} one of: ${chars.join(' ')}` };
+  return { kind: 'text', text: `when it ${verb} certain letters` };
+}
+
+/** Shared per-slot base label (mirrors expandParallelStoreRule's faithfulBaseLabel / irToCharacterView's sequenceShapeCells baseSlotLabel — all three route their vkey case through the exported `desktopVkeyLabel` so the touch-only-vkey check lives in exactly one place). */
+function slotItemLabel(item: StoreItem | undefined): string | undefined {
+  if (item === undefined) return undefined;
+  if (item.kind === 'char') return displayChar(item.value);
+  if (item.kind === 'vkey') return desktopVkeyLabel(item.name);
+  return undefined;
+}
+
+/**
+ * Resolve the faithful keystroke steps for ONE producing store slot of ONE
+ * SPECIFIC output element `el` (parallel index fan-out — S-02/S-06 deadkey
+ * body or bare transliteration — or a general index()-over-a-store shape,
+ * including multi-`index()` cross-store tables where each output element
+ * resolves its base at its OWN context offset). Returns undefined when the
+ * slot's base item can't be labelled or keySequenceLabel can't resolve the
+ * shape.
+ *
+ * Takes the specific `el` the caller (charProducers) matched rather than
+ * assuming `rule.output[0]` — a rule may emit several `index()` elements
+ * over DIFFERENT stores (e.g. `any(A) any(B) + any(K) > index(A,1)
+ * index(B,2) index(mods,3)`), and each must resolve against its own offset,
+ * not the first output element's.
+ */
+function resolveStoreSlotSteps(
+  rule: IRRule,
+  ir: KeyboardIR,
+  el: OutputElement,
+  slotIndex: number,
+  storeMap: ReadonlyMap<string, IRStore>,
+): string[] | undefined {
+  if (isParallelIndexFanOut(rule)) {
+    const inputAnyEl = rule.context.find((c) => c.kind === 'any');
+    const inputStore = inputAnyEl && inputAnyEl.kind === 'any' ? storeMap.get(inputAnyEl.storeRef) : undefined;
+    const baseLabel = slotItemLabel(inputStore?.items[slotIndex]);
+    if (baseLabel === undefined) return undefined;
+    const hasDeadkey = rule.context.some((c) => c.kind === 'deadkey');
+    return hasDeadkey ? keySequenceLabel(rule, ir, baseLabel) : [baseLabel];
+  }
+
+  if (el.kind === 'index') {
+    const effectiveCtx = rule.context.filter((c) => !isPlusSeparator(c));
+    const baseEl = effectiveCtx[el.offset - 1];
+    if (baseEl !== undefined && baseEl.kind === 'any') {
+      const baseStore = storeMap.get(baseEl.storeRef);
+      const baseLabel = slotItemLabel(baseStore?.items[slotIndex]);
+      if (baseLabel !== undefined) return keySequenceLabel(rule, ir, baseLabel);
+    }
+  }
+
+  return undefined;
+}
+
+/** True when a rule's ENTIRE output is exactly one `{kind:"deadkey"}` element (an S-02 trigger rule — never itself a character producer; mirrors the engine's isDeadkeyOnlyOutput, inlined here to avoid depending on an unexported engine module path). */
+function isDeadkeyTriggerRule(rule: IRRule): boolean {
+  return rule.output.length === 1 && rule.output[0]?.kind === 'deadkey';
+}
+
+// Trigger vkeys whose role in the Keyman VK namespace is "erase/undo a level
+// of composition," not "compose new content" — a backspace/forward-delete
+// rule that re-emits a character is editing behavior, not a way to TYPE it.
+// This is a fixed VK-namespace set, NOT derived from any keyboard's stores/id/language.
+const NON_TYPING_TRIGGER_VKEYS = new Set(['K_BKSP', 'K_DEL']);
+
+/**
+ * The rule's own trigger vkey element — the element right of the last `+`, or
+ * the sole context element for an S-01 bare single-vkey shape — or undefined
+ * when the rule's trigger isn't a single nameable vkey. Shared shape-check
+ * used by both `isNotAForwardTypingPath` and `isTouchOnlyTriggerRule` below.
+ */
+function ruleTriggerVkey(rule: IRRule): Extract<ContextElement, { kind: 'vkey' }> | undefined {
+  const ctx = rule.context;
+  const plusIdx = ctx.findIndex(isPlusSeparator);
+  const triggerEl = plusIdx === -1
+    ? (ctx.length === 1 ? ctx[0] : undefined)   // S-01 bare single-vkey shape
+    : ctx[plusIdx + 1];                           // element right of '+'
+  return triggerEl !== undefined && triggerEl.kind === 'vkey' ? triggerEl : undefined;
+}
+
+/**
+ * True when `rule`'s trigger vkey is an erase/undo-composition key rather
+ * than a forward-typing one — i.e. the rule is editing behavior (e.g.
+ * `any(composed) + [K_BKSP] > index(base, 1)`), not a faithful "way to type"
+ * the character it happens to output. General, keyboard-agnostic rule-shape
+ * predicate — no store names, ids, or language.
+ */
+export function isNotAForwardTypingPath(rule: IRRule): boolean {
+  const triggerEl = ruleTriggerVkey(rule);
+  return triggerEl !== undefined && NON_TYPING_TRIGGER_VKEYS.has(triggerEl.name.toUpperCase());
+}
+
+/**
+ * True when `rule`'s trigger vkey is touch-only (`T_xxxx`, see
+ * `isTouchOnlyVkeyName`) — the rule's ONLY resolvable "how it's typed" step
+ * would be a touch key id, which is a different input modality from the
+ * desktop keystrokes this view reconstructs (#1399 follow-on). Such a
+ * producer is dropped entirely by `charProducers` rather than rendered with
+ * a leaked touch id, or floored/banned — the character may still have other,
+ * real desktop producers.
+ */
+function isTouchOnlyTriggerRule(rule: IRRule): boolean {
+  const triggerEl = ruleTriggerVkey(rule);
+  return triggerEl !== undefined && isTouchOnlyVkeyName(triggerEl.name);
+}
+
+/**
+ * Enumerate every faithful "way to type" `ch` across the whole IR — one
+ * `CharProducer` per producing rule (or producing store slot, for a
+ * parallel-fan-out / sequence rule). See the module-doc block above this
+ * section for the full contract.
+ */
+export function charProducers(ir: KeyboardIR, ch: string): CharProducer[] {
+  const target = ch.normalize('NFC');
+  const storeMap = new Map(ir.stores.map((s) => [s.name, s]));
+  const producers: CharProducer[] = [];
+  const seenKeys = new Set<string>();
+
+  // `computeCondition: false` for store-slot producers (parallel fan-out /
+  // S-03 sequence): by construction of those two shapes (isParallelIndexFanOut's
+  // pre-terminal-all-deadkey requirement; the S-03 baseEl-at-offset match), the
+  // ENTIRE preceding context is exactly the one store item already resolved as
+  // the producer's OWN first step — a generic store-wide "when it follows one
+  // of: a e i o u" would be both redundant with that step AND actively
+  // misleading for a multi-item store (it would wrongly imply every store item
+  // produces THIS SAME character). Generalizes the explicit deadkey carve-out
+  // in buildCondition to the other shape where the precondition is already
+  // faithfully expressed via keySteps.
+  // TOTAL FLOOR (#1399 follow-on): whenever a producer's faithful steps
+  // can't be resolved, attach the rule's own trigger-key floor (see
+  // triggerKeyLabel) instead of leaving the entry bare — the panel then
+  // cascades to "Typed with <floor>" rather than ever rendering a
+  // placeholder phrase. `triggerKeyLabel` itself only returns undefined when
+  // the rule has no '+'-separated trigger element to describe at all (e.g.
+  // a mixed/unresolvable preceding shape with no trigger boundary).
+  const unresolvedProducer = (rule: IRRule): CharProducer => {
+    const floor = triggerKeyLabel(rule.context, ir);
+    return floor !== undefined ? { steps: [], triggerFloor: floor } : { steps: [] };
+  };
+
+  const push = (rule: IRRule, resolveSteps: () => string[] | undefined, dedupeKey: string, computeCondition: boolean) => {
+    if (seenKeys.has(dedupeKey)) return;
+    seenKeys.add(dedupeKey);
+
+    let conditionOutcome: ConditionOutcome = { kind: 'none' };
+    if (computeCondition) {
+      const plusIdx = rule.context.findIndex(isPlusSeparator);
+      const preceding = plusIdx === -1 ? [] : rule.context.slice(0, plusIdx);
+      conditionOutcome = buildCondition(preceding, ir);
+      if (conditionOutcome.kind === 'unrenderable') {
+        producers.push(unresolvedProducer(rule));
+        return;
+      }
+    }
+
+    const steps = resolveSteps();
+    if (steps === undefined) {
+      producers.push(unresolvedProducer(rule));
+      return;
+    }
+    producers.push(conditionOutcome.kind === 'text' ? { steps, condition: conditionOutcome.text } : { steps });
+  };
+
+  // (a) Store-produced match: the character is emitted through index()/outs()
+  // over a store — one entry per matching slot in that store. Returns true
+  // when at least one slot matched (and was pushed via `push`, subject to
+  // its own dedup/floor rules).
+  const tryProduceStoreMatch = (rule: IRRule): boolean => {
+    let matchedViaStore = false;
+    const effCtx = rule.context.filter((c) => !isPlusSeparator(c));
+    for (const el of rule.output) {
+      if ((el.kind !== 'index' && el.kind !== 'outs') || el.storeRef === undefined) continue;
+
+      // Self-permutation (reorder) guard: an index() output pointing back
+      // at the SAME store it matched as input is a REORDER, not a way to
+      // type — skip this element entirely. Proven non-overlapping with
+      // genuine production shapes (a translation table's input/output
+      // stores are always distinct); keep the existing Backspace/K_DEL
+      // exclusion (isNotAForwardTypingPath) as well.
+      const targetEl = el.kind === 'index' ? effCtx[el.offset - 1] : undefined;
+      if (el.kind === 'index' && targetEl?.kind === 'any' && targetEl.storeRef === el.storeRef) continue;
+
+      const outStore = storeMap.get(el.storeRef);
+      if (outStore === undefined) continue;
+      outStore.items.forEach((item, i) => {
+        if (item.kind !== 'char' || item.value.normalize('NFC') !== target) return;
+        matchedViaStore = true;
+        push(rule, () => resolveStoreSlotSteps(rule, ir, el, i, storeMap), `${rule.nodeId}#${i}`, false);
+      });
+    }
+    return matchedViaStore;
+  };
+
+  // (b) Literal-output match: the character is written out directly. NEVER
+  // run for an editing-only rule (see below) — a bare `[K_DEL] > 'x'` with no
+  // preceding store match isn't a "repair" of anything, it's just a Delete
+  // key re-emitting a literal char, which stays excluded unconditionally.
+  const tryProduceLiteralMatch = (rule: IRRule): boolean => {
+    const charEls = rule.output.filter((el): el is Extract<OutputElement, { kind: 'char' }> => el.kind === 'char');
+    if (charEls.length === 0) return false;
+    const onlyCharOutput = charEls.length === rule.output.length;
+    const wholeOutput = charEls.map((el) => el.value).join('').normalize('NFC');
+
+    if (onlyCharOutput && wholeOutput === target) {
+      // Condition is computed normally here (S-01 bare vkey chord's
+      // preceding is empty by construction; S-05's own preceding literal
+      // char(s) DO get a condition even though `steps[0]` already names
+      // the first one — a little reinforcement, not misleading, unlike
+      // the store-slot case above where a multi-item store would be
+      // actively wrong for a single specific character).
+      push(rule, () => keySequenceLabel(rule, ir), rule.nodeId, true);
+      return true;
+    }
+    // A rule whose literal output merely CONTAINS `target` as part of a
+    // longer cluster (wholeOutput.includes(target) && wholeOutput !==
+    // target) is not a way to type the single character — it's excluded
+    // entirely rather than pushed as an unrenderable producer (#1399
+    // follow-on). collectCharContributors' separate "blocked" handling
+    // (removal-safety) is untouched — a different concern from "ways to
+    // type it".
+    return false;
+  };
+
+  // Editing-only rules (Backspace/Delete-triggered) are excluded entirely —
+  // they're not how a character is deliberately typed, they're how a
+  // mis-composed one is corrected (isNotAForwardTypingPath's own doc). A
+  // character whose only producer is such a rule simply has no producer here
+  // (empty waysToType) — that is the correct, honest state; it is never
+  // backfilled with a "press Backspace" step.
+  for (const group of ir.groups) {
+    for (const rule of group.rules) {
+      if (isDeadkeyTriggerRule(rule)) continue;
+      if (isTouchOnlyTriggerRule(rule)) continue;
+      if (isNotAForwardTypingPath(rule)) continue;
+      if (tryProduceStoreMatch(rule)) continue;
+      tryProduceLiteralMatch(rule);
+    }
+  }
+
+  return producers;
+}
+
+// ---------------------------------------------------------------------------
+// crossPairTrigger — display-only trigger-key lookup for a CONFIRMED
+// describeStorePairing "cross" partner.
+//
+// describeStorePairing (engine) is the single source of truth for WHICH
+// stores are paired — it resolves the pairing graph precisely (an
+// index(target, offset) whose (offset-1)-th non-'+' context element is
+// any(source), unioned through the same offset-alignment the engine's
+// applyStoreSlotRemovals dispatch uses). detectStorePairs used to
+// cross-product every any() against every index() in a rule instead, which
+// over-pairs a rule with 2+ any() and 2+ index() elements (e.g. Cameroon's
+// `word`/`final`, each independently self-paired at its own offset — see
+// the engine's describeStorePairing regression test).
+//
+// This function reimplements ONLY the same offset-resolution rule, locally,
+// to find a trigger key for a partner name describeStorePairing already
+// confirmed — it never introduces a partner describeStorePairing didn't
+// name. If no rule resolves this exact edge (shouldn't happen for a
+// confirmed partner, but display code stays defensive), returns undefined
+// rather than guessing.
+// ---------------------------------------------------------------------------
+
+export function crossPairTrigger(storeName: string, partnerName: string, ir: KeyboardIR): string | undefined {
+  for (const group of ir.groups) {
+    for (const rule of group.rules) {
+      const effectiveContext = rule.context.filter((el) => !isPlusSeparator(el));
+      for (const el of rule.output) {
+        if (el.kind !== 'index') continue;
+        const target = effectiveContext[el.offset - 1];
+        if (target === undefined || target.kind !== 'any') continue;
+        const a = el.storeRef;
+        const b = target.storeRef;
+        const matchesEdge = (a === storeName && b === partnerName) || (a === partnerName && b === storeName);
+        if (!matchesEdge) continue;
+        const trigger = triggerKeyLabel(rule.context);
+        if (trigger !== undefined) return trigger;
+      }
+    }
+  }
+  return undefined;
 }
 
 // ---------------------------------------------------------------------------
@@ -1119,12 +1914,16 @@ export function toRailNodes(ir: KeyboardIR, capabilities: Map<string, RemovalCap
     });
   }
 
-  const storePairs = detectStorePairs(ir);
-
   // Build a name→nodeId lookup for resolving paired store names to nodeIds
   const storeNameToNodeId = new Map<string, string>(
     ir.stores.filter((s) => !s.isSystem).map((s) => [s.name, s.nodeId]),
   );
+
+  // Precomputed ONCE per IR and reused for every store below — classifyStoreSlotEdit
+  // and describeStorePairing both scan every rule in the IR, so calling analyzeStores
+  // per-store here (rather than letting each call recompute it) keeps this loop
+  // O(stores + rules) instead of O(stores * rules). (#931 perf)
+  const analysis = analyzeStores(ir);
 
   for (const store of ir.stores) {
     if (store.isSystem) continue;
@@ -1133,20 +1932,30 @@ export function toRailNodes(ir: KeyboardIR, capabilities: Map<string, RemovalCap
     );
     const usage = analyzeStoreUsage(store.name, ir);
 
-    const pairedEntries = storePairs.get(store.name);
-    const hasPairs = pairedEntries !== undefined && pairedEntries.length > 0;
-    const pairedStoreNames = hasPairs ? pairedEntries.map((e) => e.pairedName) : undefined;
+    // Single source of truth for "is this store paired, and with whom?" —
+    // the engine's describeStorePairing, resolved via the pairing graph.
+    // Only the "cross" kind names OTHER stores; "none"/"self"/"unresolved"
+    // never populate the Linked-pair panel (accuracy over completeness —
+    // see the #931 review: the old detectStorePairs cross-produced every
+    // any() against every index() in a rule and could over-pair, e.g.
+    // Cameroon's word/final, which are each independently self-paired).
+    const pairing = describeStorePairing(store, ir, analysis);
+    const partners = pairing.kind === 'cross' ? pairing.partners : undefined;
+    const hasPairs = partners !== undefined && partners.length > 0;
+    const pairedStoreNames = hasPairs ? partners : undefined;
     // Keep index-aligned with pairedStoreNames/Triggers/Roles: an unresolved
     // peer (e.g. a system store, absent from storeNameToNodeId) stays as an
     // undefined slot rather than being filtered out, which would shift every
     // later pair's id/trigger/role by one. Inspector guards undefined per-slot.
     const pairedStoreIds = hasPairs
-      ? pairedEntries.map((e) => storeNameToNodeId.get(e.pairedName))
+      ? partners.map((name) => storeNameToNodeId.get(name))
       : undefined;
-    const pairedStoreTriggers = hasPairs ? pairedEntries.map((e) => e.trigger) : undefined;
+    const pairedStoreTriggers = hasPairs
+      ? partners.map((name) => crossPairTrigger(store.name, name, ir))
+      : undefined;
     const pairedStoreRoles: ('input' | 'output' | 'input+output' | undefined)[] | undefined = hasPairs
-      ? pairedEntries.map((e) => {
-          const u = analyzeStoreUsage(e.pairedName, ir);
+      ? partners.map((name) => {
+          const u = analyzeStoreUsage(name, ir);
           if (u.asSource && u.asOutput) return 'input+output';
           if (u.asSource) return 'input';
           if (u.asOutput) return 'output';
@@ -1160,7 +1969,7 @@ export function toRailNodes(ir: KeyboardIR, capabilities: Map<string, RemovalCap
       nodeId: store.nodeId,
       kind: 'store',
       name: store.name,
-      storeChips: storeCharChips(store, ir),
+      storeChips: storeCharChips(store, ir, analysis),
       loadBearing: refPattern !== undefined,
       storeUsage: usage.ruleCount > 0 ? usage : undefined,
       ...(refPattern !== undefined ? { referencedByNodeId: refPattern.id, referencedByLabel: refPattern.title } : {}),
@@ -1183,4 +1992,748 @@ export function toRailNodes(ir: KeyboardIR, capabilities: Map<string, RemovalCap
   }
 
   return nodes;
+}
+
+// ---------------------------------------------------------------------------
+// annotateRemovalRecommendations — #525 FOUNDATION slice
+//
+// Separate, pure pass over an already-built CarveNode[] (from toRailNodes()).
+// Kept out of toRailNodes() itself so the node-building pass stays free of the
+// confirmed-inventory signal — callers that don't have a confirmed inventory
+// yet (or don't want recommendations) can use toRailNodes() output unannotated.
+//
+// Slice-1 scope is deliberately narrow: the ONLY signal is "does this node
+// produce any character the author confirmed they want?" No Unicode-block
+// signal, no Phase-C mechanism-not-enabled signal, no Track-1 default
+// filtering — see the TODO(#525) markers below for each deferred signal's
+// natural hook point.
+// ---------------------------------------------------------------------------
+
+// Non-literal markers outputToChar()/displayChar() can emit — a placeholder
+// means "production unknown", not "produces an unwanted character", so these
+// must never be treated as produced chars (they'd otherwise leak into the
+// removal-recommendation signal as false "unwanted" output — see #525 P1).
+const PLACEHOLDER_CHARS = new Set(['…', '‹dk›', '🔔', '?']);
+
+/**
+ * Categorical never-remove guard (#525): a character is never recommended
+ * for removal if its Unicode General_Category is a Number (`\p{N}`),
+ * Punctuation (`\p{P}`), or Symbol (`\p{S}`) — regardless of target
+ * language. CLDR's punctuation/number exemplar tiers are language-specific
+ * and often sparse (e.g. Greek `el` doesn't list ASCII `.`/`,`/`0-9`), so
+ * these fall outside `needed` and would otherwise look surplus even though
+ * they're wanted on essentially every keyboard. Shared by both
+ * annotateRemovalRecommendations (node-level) and recommendedRemovalChars
+ * (character-level) so the two signals agree.
+ *
+ * A combining/letter grapheme (base letter + mark) normalizes to category
+ * L/M, not N/P/S, so it does NOT match here — surplus letters/marks are
+ * still eligible for removal recommendations. Only bare number/punctuation/
+ * symbol codepoints are shielded.
+ */
+function isAlwaysKeepCategory(ch: string): boolean {
+  return /^[\p{N}\p{P}\p{S}]$/u.test(ch);
+}
+
+/**
+ * Produced output characters for a single node — the `.ch` of every glyph
+ * (group/pattern) or every store chip (store). Raw fragments produce nothing
+ * displayable, so they always resolve to an empty set (→ 'none').
+ *
+ * Two normalizations vs. the raw `.ch`:
+ * - Strips a leading dotted-circle (U+25CC) that displayChar() prefixes onto
+ *   combining-mark glyphs for standalone visibility, so a combining mark the
+ *   author confirmed (e.g. in confirmedInventory as raw `̀`) still
+ *   matches a fan-out glyph whose `.ch` is `◌̀`.
+ * - Drops placeholder chars (PLACEHOLDER_CHARS) entirely rather than adding
+ *   them to the set — an unresolved index()/outs()/deadkey/beep output is
+ *   "don't know what this produces," not "produces an unwanted character."
+ */
+function producedCharsOf(node: CarveNode, form: CharNormalizationForm = 'NFC'): Set<string> {
+  const chars = new Set<string>();
+  const add = (raw: string) => {
+    const stripped = raw.startsWith('◌') ? raw.slice(1) : raw;
+    const normalized = stripped.normalize(form);
+    // Placeholder-detection uses NFC regardless of `form`: PLACEHOLDER_CHARS
+    // are ASCII/invariant tokens ('…', '‹dk›', '🔔', '?'), identical under
+    // every normalization form, so this check is unaffected by `form`.
+    if (PLACEHOLDER_CHARS.has(stripped.normalize('NFC'))) return;
+    chars.add(normalized);
+  };
+  for (const g of node.glyphs ?? []) add(g.ch);
+  for (const c of node.storeChips ?? []) add(c.ch);
+  return chars;
+}
+
+// ---------------------------------------------------------------------------
+// resolveCoordinatedPartnerItems — SHARED coordinated-partner resolution
+// (#525/#931 follow-up review fix — refactor).
+//
+// Both coordinatedDropHitsNeededChar (boolean short-circuit) and
+// coordinatedCollateralForSlots (display-list builder) independently walked
+// classifyStoreSlotEdit's `coordinatedWith` and looked up each partner
+// store's item at the same `itemsIndex` — this is that walk, written once.
+// Pure and read-only: it never re-derives or changes the engine's
+// coordinated-drop algorithm (classifyStoreSlotEdit/applyStoreSlotRemovals
+// remain the single source of truth for WHICH stores pair and how), it only
+// projects what the engine will do.
+//
+// Takes an ALREADY-CLASSIFIED `mode` rather than (store, ir, analysis) so a
+// caller looping over multiple itemsIndex values for the SAME store can
+// hoist the classifyStoreSlotEdit call once outside that loop (mode never
+// changes across itemsIndex — see the #931-perf fix in
+// annotateRemovalRecommendations below).
+// ---------------------------------------------------------------------------
+
+/** A coordinated partner store's item at a given slot, resolved from a StoreSlotEditMode. */
+interface CoordinatedPartnerItem {
+  partnerStore: IRStore;
+  /** The partner's char item at the same itemsIndex (never a non-char item — those are skipped). */
+  item: Extract<StoreItem, { kind: 'char' }>;
+  /** "<partnerStore.nodeId>#<itemsIndex>" — the locked slot-id contract. */
+  slotId: string;
+}
+
+/**
+ * Resolve every coordinated PARTNER store's item at `itemsIndex`, given an
+ * already-classified `mode` for the store being edited. Returns `[]` when
+ * `mode` is 'blocked' (not this helper's concern — the caller already treats
+ * `mode.mode === 'blocked'` as "not simple" separately), has no coordinated
+ * partners (`coordinatedWith: []` — e.g. a self-paired or unpaired store),
+ * or when a named partner can't be resolved (unknown name, or no char item
+ * at that index — a shorter/non-char partner store slot).
+ */
+function resolveCoordinatedPartnerItems(
+  mode: StoreSlotEditMode,
+  itemsIndex: number,
+  storesByName: ReadonlyMap<string, IRStore>,
+): CoordinatedPartnerItem[] {
+  if (mode.mode === 'blocked' || mode.coordinatedWith.length === 0) return [];
+
+  const results: CoordinatedPartnerItem[] = [];
+  for (const partnerName of mode.coordinatedWith) {
+    const partnerStore = storesByName.get(partnerName);
+    if (partnerStore === undefined) continue;
+    const item = partnerStore.items[itemsIndex];
+    if (item === undefined || item.kind !== 'char') continue;
+    results.push({ partnerStore, item, slotId: `${partnerStore.nodeId}#${itemsIndex}` });
+  }
+  return results;
+}
+
+/**
+ * Coordinated-removal collateral guard ("remove everywhere", #525 v2) —
+ * replaces the old store-LEVEL `storeFeedsConfirmedChar` shield, which
+ * conflated "some rule referencing this store produces a needed char
+ * SOMEWHERE" (store-level, and — via the Cameroon `word` idiom, where a
+ * self-referencing index() output resolves back to the WHOLE store's own
+ * items — trivially true for almost every store) with the actual question
+ * that matters for a specific slot: "would dropping THIS item, via
+ * applyStoreSlotRemovals' coordinated pairing graph, also drop a needed
+ * character from a PAIRED store at the same position?"
+ *
+ * `classifyStoreSlotEdit`'s `coordinatedWith` names the store(s) that a drop
+ * on `store` splices at the SAME `itemsIndex` (see applyStoreSlotRemovals).
+ * A self-paired or unpaired store (`coordinatedWith: []` — e.g. Cameroon's
+ * `word`, self-paired with itself in the SAME rule) has no partner, so it can
+ * never trip this guard: removing one of its own surplus chars never touches
+ * another store's item. A blocked store is not this guard's concern — the
+ * caller already treats `mode.mode === 'blocked'` as "not simple" separately.
+ *
+ * Takes an already-classified `mode` (see resolveCoordinatedPartnerItems)
+ * rather than (store, ir, analysis) — callers looping over itemsIndex for
+ * the same store hoist classifyStoreSlotEdit once outside the loop.
+ *
+ * NARROWED to a three-part conjunction (spec 051 FR-003). "Any partner slot
+ * holds a needed character" over-shielded: on Cameroon QWERTY, trimming the
+ * surplus `ɨ` resolves partner slot `dkf0060#1`, which holds the needed `i` —
+ * so the trim was refused, even though `dkf0060` is the any()-CONSUMED INPUT
+ * store and `i` stays typeable through its own `+ [K_I] > 'i'` rule. Splicing
+ * the pair removes the `i → ɨ` mapping, not the letter `i`.
+ *
+ * A partner now shields only when ALL THREE hold:
+ *   (needed)   the partner's character is in the orthography, AND
+ *   (a) the partner store is an index()/outs() OUTPUT target — dropping from
+ *       it removes a character the keyboard EMITS, not one you merely type; AND
+ *   (b) that character has no OTHER producer — dropping this slot would leave
+ *       it genuinely unproducible.
+ *
+ * Both new facts are engine-side (`asIndexOutputTarget` on the store analysis,
+ * and `buildProducerIndex`), because both are facts about the IR rather than
+ * carve policy. The producer index MUST be hoisted once per IR by the caller
+ * (invariant D4) — building it per candidate character would make the proposal
+ * loop O(chars x rules), the shape the #931 perf note warns against.
+ */
+function coordinatedDropHitsNeededChar(
+  mode: StoreSlotEditMode,
+  itemsIndex: number,
+  needed: ReadonlySet<string>,
+  bcp47: string | null | undefined,
+  analysis: StoreAnalysis,
+  producerIndex: ProducerIndex,
+  form: CharNormalizationForm = 'NFC',
+): boolean {
+  const partners = resolveCoordinatedPartnerItems(mode, itemsIndex, analysis.storeByName);
+  return partners.some(({ partnerStore, item }) => {
+    const ch = item.value.normalize(form);
+    if (!isCharCoveredForLocale(ch, needed, bcp47 ?? '', form)) return false;
+    if (!isOutputStore(partnerStore, analysis)) return false;
+    return (producerIndex.get(ch) ?? 0) <= 1;
+  });
+}
+
+/** True when the store is an index()/outs() target somewhere in the IR — a producer. */
+function isOutputStore(store: IRStore, analysis: StoreAnalysis): boolean {
+  return analysis.usageByName.get(store.name)?.asIndexOutputTarget === true;
+}
+
+// ---------------------------------------------------------------------------
+// coordinatedCollateralForSlots — manual-carve safety helper (#525/#931
+// follow-up, MANUAL-carve gap).
+//
+// collectCharContributors names the store slots a manual chip/cascade click
+// targets DIRECTLY. applyStoreSlotRemovals' coordinated-drop pairing graph
+// (classifyStoreSlotEdit's `coordinatedWith`) then ALSO splices every PAIRED
+// partner store at the SAME itemsIndex — e.g. removing an input char from a
+// deadkey INPUT store silently drops the aligned composed character from the
+// OUTPUT store too. That collateral is otherwise invisible to the confirm
+// dialog. This pass resolves it explicitly for display: for every slot that
+// will actually be dropped (mode 'drop'), it names each coordinated
+// partner's character at the same index, flagging whether it's a needed
+// character (isNeeded) — reusing resolveCoordinatedPartnerItems, the exact
+// same walk coordinatedDropHitsNeededChar above uses for the
+// recommendation-signal guard, never a separate heuristic. Does NOT change
+// or re-derive the engine's coordinated-drop algorithm itself — purely a
+// read-only projection of what applyStoreSlotRemovals will do.
+// ---------------------------------------------------------------------------
+
+/** One character collaterally dropped from a PAIRED store by a coordinated removal. */
+export interface CoordinatedCollateralChar {
+  ch: string;
+  storeName: string;
+  isNeeded: boolean;
+  /**
+   * "<partnerStore.nodeId>#<itemsIndex>" — the locked slot-id contract (same
+   * convention as CharContributors.storeSlotIds / StoreCharChip.chipId).
+   * Lets a caller (e.g. CarveGallery's handleCascadePrimary) fold this
+   * partner slot into cascadeDelete's storeSlotIds argument so a confirmed
+   * "remove everywhere" persists the collateral drop in deletedItemIds —
+   * without this, the Gallery kept showing the collateral char as KEPT even
+   * though export-time applyStoreSlotRemovals had already dropped it.
+   */
+  slotId: string;
+  /**
+   * Whether the partner store PRODUCES this character (`output` — an
+   * index()/outs() target) or merely matches on it (`input` — any()-consumed).
+   * Drives the FR-005 severity split: losing a produced character is a warning,
+   * losing an input mapping is informational (the transform stops firing).
+   */
+  role: 'input' | 'output';
+  /**
+   * True when this drop genuinely makes a needed character unproducible —
+   * `isNeeded && role === 'output' && producerCount <= 1`. Exactly the guard's
+   * conjunction (spec 051 FR-003), surfaced for display so the UI splits
+   * severity by real consequence rather than by `isNeeded` alone.
+   */
+  isLost: boolean;
+}
+
+/**
+ * Resolve the coordinated-drop collateral for a set of store-slot ids about
+ * to be removed (typically `CharContributors.storeSlotIds` from
+ * collectCharContributors). A partner slot already present in `storeSlotIds`
+ * itself (i.e. already an explicit removal target, not a hidden surprise) is
+ * excluded — this surfaces only the collateral the author did NOT already
+ * ask to remove. Deduped by partner slot id (a partner can only be hit once
+ * per index, but two different requested slots could in principle name the
+ * same partner+index).
+ *
+ * @param storeSlotIds Slot ids ("<storeNodeId>#<itemsIndex>") targeted for removal.
+ * @param ir           The full IR.
+ * @param needed       Confirmed-inventory ∪ CLDR needed-set — the same union the
+ *                      caller already threads into annotateRemovalRecommendations /
+ *                      recommendedRemovalChars.
+ * @param bcp47        Target language, for the Turkic-aware case fold in isCharCoveredForLocale.
+ * @param analysis     Optional precomputed analyzeStores(ir) result (see StoreAnalysis doc) —
+ *                      pass this when calling for many removals against the same ir.
+ * @param form         Normalization form both `needed` and the resolved collateral
+ *                      character are compared under (default "NFC", preserving
+ *                      pre-existing behavior) — see isCharCoveredForLocale's `form` doc.
+ */
+export function coordinatedCollateralForSlots(
+  storeSlotIds: readonly string[],
+  ir: KeyboardIR,
+  needed: ReadonlySet<string>,
+  bcp47?: string | null,
+  analysis: StoreAnalysis = analyzeStores(ir),
+  form: CharNormalizationForm = 'NFC',
+  producerIndex: ProducerIndex = buildProducerIndex(ir),
+): CoordinatedCollateralChar[] {
+  if (storeSlotIds.length === 0) return [];
+
+  // storesByNodeId resolves the TARGETED slot's own store (keyed by nodeId,
+  // as parseSlotId yields) — not carried by StoreAnalysis, which keys by
+  // name. storesByName (partner-name resolution) IS carried by StoreAnalysis
+  // (analysis.storeByName), so it is reused rather than rebuilt (#931 perf).
+  const storesByNodeId = new Map(ir.stores.map((s) => [s.nodeId, s]));
+  const targetSlotIds = new Set(storeSlotIds);
+  const seenPartnerSlotIds = new Set<string>();
+  const collateral: CoordinatedCollateralChar[] = [];
+
+  for (const slotId of storeSlotIds) {
+    const parsed = parseSlotId(slotId);
+    if (parsed === null) continue;
+    const store = storesByNodeId.get(parsed.storeNodeId);
+    if (store === undefined) continue;
+
+    const mode = classifyStoreSlotEdit(store, ir, analysis);
+    const partners = resolveCoordinatedPartnerItems(mode, parsed.itemsIndex, analysis.storeByName);
+
+    for (const { partnerStore, item, slotId: partnerSlotId } of partners) {
+      if (targetSlotIds.has(partnerSlotId) || seenPartnerSlotIds.has(partnerSlotId)) continue;
+
+      seenPartnerSlotIds.add(partnerSlotId);
+      const ch = item.value.normalize(form);
+      const isNeeded = isCharCoveredForLocale(ch, needed, bcp47 ?? '', form);
+      const role: 'input' | 'output' = isOutputStore(partnerStore, analysis) ? 'output' : 'input';
+      collateral.push({
+        ch,
+        storeName: partnerStore.name,
+        isNeeded,
+        slotId: partnerSlotId,
+        role,
+        // Same conjunction the guard applies — see coordinatedDropHitsNeededChar.
+        isLost: isNeeded && role === 'output' && (producerIndex.get(ch) ?? 0) <= 1,
+      });
+    }
+  }
+
+  return collateral;
+}
+
+/**
+ * Guardrail (#525 items 2/4 — language-driven surplus, confirmed with the
+ * user): recognized patterns, opaque/raw fragments, and deadkey/fan-out
+ * mechanisms are structural, not simple character producers, so neither
+ * signal (inventory-only or language-surplus) may ever recommend removing
+ * them, however "surplus" their output looks in isolation.
+ *
+ * - 'pattern' nodes — owned by a recognized pattern; a rule-level version of
+ *   this exclusion already keeps pattern-owned rules out of 'group' nodes
+ *   (see ownedByPattern / collectOwnedNodeIds in groupToGlyphs), so excluding
+ *   the 'pattern' CardKind here covers "recognized-pattern rules" too.
+ * - 'raw' nodes — opaque RawKmnFragment; never produce glyphs anyway
+ *   (produced.size === 0 already resolves to 'none'), excluded explicitly
+ *   for clarity rather than relying on that side effect.
+ * - 'group' nodes containing a deadkey-context rule, a deadkey-*registration*
+ *   rule (output `dk(...)`, e.g. `+ [K_COLON] > dk(003b)`), or a
+ *   parallel-store fan-out rule (isParallelIndexFanOut — the same predicate
+ *   the S-02 deadkey-body/Bamum-transliteration classifier uses) — a deadkey
+ *   mechanism's characters are locked together structurally; recommending
+ *   removal from the character signal alone could break the composition
+ *   without the author realizing it's part of a deadkey chain. Registration
+ *   rules commonly live in a different group than the deadkey's consuming
+ *   context rules (e.g. `group(main)` registers via output, `group(deadkeys)`
+ *   consumes via context) — checking output as well as context catches that
+ *   split idiom.
+ *
+ * Only plain letter/glyph producers (ordinary 'group' rules with no deadkey
+ * involvement) and store-char producers ('store' nodes) are eligible.
+ *
+ * @param ownedNodeIds Precomputed collectOwnedNodeIds(ir) — hoisted by the
+ *                      caller (annotateRemovalRecommendations) so this
+ *                      O(rules) scan isn't repeated for every group node.
+ */
+function isStructuralExclusion(node: CarveNode, ir: KeyboardIR, ownedNodeIds: Set<string>): boolean {
+  if (node.kind === 'pattern' || node.kind === 'raw') return true;
+  if (node.kind !== 'group') return false;
+
+  const group = ir.groups.find((g) => g.nodeId === node.nodeId);
+  if (!group) return false;
+
+  return group.rules.some((rule) => {
+    if (rule.ownedByPattern !== undefined || ownedNodeIds.has(rule.nodeId)) return false; // owned by a pattern — not this group's concern
+    return (
+      rule.context.some((el) => el.kind === 'deadkey') ||
+      rule.output.some((el) => el.kind === 'deadkey') ||
+      isParallelIndexFanOut(rule)
+    );
+  });
+}
+
+/**
+ * Annotates each node's `recommendation` field. See CarveNode.recommendation
+ * for the meaning of each value; slice-1/2 only ever emit 'high' or 'none'.
+ *
+ * Conservative by design — "when in doubt, return 'none'": a node is 'high'
+ * iff it is not structurally excluded (isStructuralExclusion above), produces
+ * at least one character, and every character it produces is absent from
+ * `needed` AND (for stores) no rule that references it produces a needed
+ * character (the dependency guard above).
+ *
+ * `needed` (#525 items 2/4 — language-driven surplus) is the union of
+ * `neededChars` (a target language's CLDR exemplar set, resolved upstream —
+ * see neededCharsForLanguage) and `confirmedInventory` (the author's Phase B
+ * choices). Passing `neededChars` as null/undefined (CLDR unavailable for
+ * this language, or not yet resolved) falls back to the original
+ * inventory-only behavior — `needed` degrades to `confirmedInventory` alone,
+ * so this is backward-compatible with 3-argument callers. If BOTH sets are
+ * empty, there is no signal at all — every node gets 'none' rather than a
+ * spurious "everything is unwanted" result.
+ *
+ * Membership against `needed` is case-folded via `isCharCoveredForLocale`
+ * (reusing suggestMissing.ts's `isCovered` exception-aware fold, incl. the
+ * Turkic dotted-I exception) rather than exact-match: CLDR exemplars are
+ * lowercase-only, so a keyboard producing an uppercase accented letter (e.g.
+ * French "É") must still count as needed. `bcp47` is required for the Turkic
+ * exception check; when omitted (no target language resolved yet), a plain
+ * non-Turkic fold is used.
+ *
+ * `form` (default "NFC", preserving pre-046-carve behavior) is the
+ * normalization form the marks series' output-form decision resolves to
+ * (see `normalizationFormForOutputForm` — "ready-made" => "NFC",
+ * "base-plus-mark" => "NFD"). BOTH the produced-character set (via
+ * `producedCharsOf`) and `needed` are normalized to this SAME form before
+ * comparison, so the chosen output form actually drives which combo
+ * grapheme (precomposed vs. decomposed) counts as a match — the "apples to
+ * apples" carve-gallery comparison. `needed`'s members are re-normalized
+ * here rather than trusted as already-`form`-normalized, since callers may
+ * pass sets built against the default NFC assumption.
+ */
+export function annotateRemovalRecommendations(
+  nodes: CarveNode[],
+  ir: KeyboardIR,
+  confirmedInventory: ReadonlySet<string>,
+  neededChars?: ReadonlySet<string> | null,
+  bcp47?: string | null,
+  form: CharNormalizationForm = 'NFC',
+): CarveNode[] {
+  const renormalize = (set: ReadonlySet<string>): Set<string> => new Set([...set].map((ch) => ch.normalize(form)));
+  const needed: ReadonlySet<string> = neededChars
+    ? renormalize(new Set([...neededChars, ...confirmedInventory]))
+    : renormalize(confirmedInventory);
+
+  if (needed.size === 0) {
+    return nodes.map((node) => ({ ...node, recommendation: 'none' }));
+  }
+
+  const ownedNodeIds = collectOwnedNodeIds(ir);
+  // '' is a safe "no locale known" default: primarySubtag('') is '' which is
+  // never in TURKIC_LOCALES, so isCharCoveredForLocale falls back to a plain
+  // (non-Turkic) case fold — matching pre-fix exact-match behavior's intent
+  // as closely as possible when the target language hasn't resolved yet.
+  const isNeeded = (ch: string): boolean => isCharCoveredForLocale(ch, needed, bcp47 ?? '', form);
+
+  // Precomputed ONCE per IR (not per store node) — classifyStoreSlotEdit scans
+  // every rule in the IR, mirroring recommendedRemovalChars' perf note below.
+  // storesByName is NOT rebuilt here — analysis.storeByName already carries
+  // an identical name-keyed map (#931 perf).
+  const analysis = analyzeStores(ir);
+  // Also hoisted ONCE per IR (spec 051 invariant D4) — the coordinated guard's
+  // "does this needed char have another producer?" test reads it per slot.
+  const producerIndex = buildProducerIndex(ir);
+  const storesByNodeId = new Map(ir.stores.map((s) => [s.nodeId, s]));
+
+  return nodes.map((node) => {
+    if (isStructuralExclusion(node, ir, ownedNodeIds)) return { ...node, recommendation: 'none' };
+
+    const produced = producedCharsOf(node, form);
+    if (produced.size === 0) return { ...node, recommendation: 'none' };
+
+    for (const ch of produced) {
+      if (isNeeded(ch) || isAlwaysKeepCategory(ch)) return { ...node, recommendation: 'none' };
+    }
+
+    if (node.kind === 'store') {
+      const store = storesByNodeId.get(node.nodeId);
+      if (store !== undefined) {
+        // classifyStoreSlotEdit is index-INDEPENDENT (it classifies the whole
+        // store, not a single slot) — hoisted out of the itemsIndex loop below
+        // so it runs ONCE per store instead of once per item (#931 perf).
+        const mode = classifyStoreSlotEdit(store, ir, analysis);
+        for (let i = 0; i < store.items.length; i++) {
+          if (coordinatedDropHitsNeededChar(mode, i, needed, bcp47, analysis, producerIndex, form)) {
+            return { ...node, recommendation: 'none' };
+          }
+        }
+      }
+    }
+
+    // TODO(#525): fold in the Unicode-block signal here (a node whose produced
+    // chars all fall in a block the author's script routing never touches is a
+    // softer 'medium' signal, not 'high') once §9 routing exposes block ranges.
+    // TODO(#525): fold in the Phase-C mechanism-not-enabled signal here (a node
+    // that exists only to support a mechanism the author didn't select in
+    // Phase C survey answers) once that mechanism-selection data is threaded
+    // through to the carve step.
+    return { ...node, recommendation: 'high' };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// recommendedRemovalChars — #525 BANNER slice
+//
+// Character-level removal-recommendation signal, sibling to
+// annotateRemovalRecommendations's node-level 'high'/'none' pass above. The
+// banner's flat checklist operates at CHARACTER granularity, not node
+// granularity — a node can mix simple and structural producers of the SAME
+// character (e.g. a plain group rule AND a deadkey fan-out both happen to
+// produce the same surplus letter), so the node-level signal alone can't
+// drive a per-character checklist safely. This pass re-derives its own
+// producer-simplicity check per character via collectCharContributors,
+// rather than reusing isStructuralExclusion (which is node-scoped).
+// ---------------------------------------------------------------------------
+
+/**
+ * Allowlist predicate (NOT a blocklist): true iff `rule` is a provably-simple,
+ * single-character producer — safe to fold into the character-level removal
+ * banner without risking a structural mechanism.
+ *
+ * A simple rule has EXACTLY:
+ *   - one context element, of kind 'char' or 'vkey' — a bare key press or a
+ *     literal preceding character. Any deadkey/any/notany/context/index/
+ *     baselayout/raw context element fails this (wrong kind, or the extra
+ *     element pushes context.length past 1 — which is also how an if()/
+ *     set()/platform() guard is rejected, since the codec represents those
+ *     as additional context elements).
+ *   - one output element, of kind 'char'. Any deadkey/index()/outs()/beep/
+ *     useGroup/raw output element fails this. A base+combining-mark pair
+ *     that NFC-composes to one visible glyph is still two IR elements and
+ *     is rejected here too, even though collectCharContributors treats it
+ *     as a whole-rule producer (see the ruleNodeIds loop below).
+ *   - NOT owned by a recognized pattern (ownedByPattern === undefined) — a
+ *     pattern-owned rule is part of a structural mechanism the recognizer
+ *     already identified, mirroring isStructuralExclusion's 'pattern'
+ *     exclusion at the node level.
+ *
+ * Default-safe: any shape this predicate doesn't explicitly recognize as
+ * simple returns false.
+ *
+ * Deliberately NOT the same predicate as `isS01` in
+ * `packages/engine/src/recognizer/rules/s01-simple-swap.ts` (the "Simple
+ * swap" pattern recognizer) or the `'removable:simple'` capability from
+ * `classifyRemovalCapabilities` — this is a narrower, character-signal-only
+ * allowlist, so the two differences are intentional, not drift:
+ *   - this predicate accepts a bare `char`-kind context element (one literal
+ *     preceding character), which isS01 does not (isS01 requires a `vkey`
+ *     context); isS01/removable:simple would reject such a rule.
+ *   - this predicate does NOT exclude group "deadkeys" the way isS01 does —
+ *     structural deadkey exclusion for the banner checklist is handled
+ *     separately, upstream, via the per-producer `blocked`/store-mode checks
+ *     in `recommendedRemovalChars` below.
+ * If either isS01 or classifyRemovalCapabilities's simple-shape check
+ * changes, re-check whether this predicate should follow — they are not
+ * mechanically linked.
+ */
+export function isSimpleRemovableRule(rule: IRRule): boolean {
+  if (rule.ownedByPattern !== undefined) return false;
+  if (rule.context.length !== 1) return false;
+  const ctx = rule.context[0];
+  if (ctx === undefined || (ctx.kind !== 'char' && ctx.kind !== 'vkey')) return false;
+  if (rule.output.length !== 1) return false;
+  const out = rule.output[0];
+  if (out === undefined || out.kind !== 'char') return false;
+  return true;
+}
+
+/** A single recommended-removal character for the CarveGallery banner checklist. */
+export interface RecommendedRemovalChar {
+  ch: string;
+  /** Contributor info for removal — pass straight to cascadeDelete(contributors.ruleNodeIds, contributors.storeSlotIds). */
+  contributors: CharContributors;
+  /**
+   * All members of this row's case group, sorted by code point, present ONLY when this
+   * row is a paired row (length > 1) — FR-014, contracts/case-pairing.md "Proposal-row
+   * granularity". `contributors` above stays the SURVIVING character's own contributors;
+   * this function does not merge the paired member's CharContributors record — the
+   * gallery unions them at apply time.
+   */
+  caseGroup?: string[];
+}
+
+/**
+ * Character-level removal-recommendation signal for the CarveGallery banner
+ * (#525 BANNER slice). A produced character `ch` is recommended iff ALL hold:
+ *
+ *   1. Surplus — `ch` is absent from `needed` (case-folded via
+ *      isCharCoveredForLocale, same fold annotateRemovalRecommendations
+ *      uses). The caller pre-unions neededChars ∪ confirmedInventory into
+ *      `needed` — this function does no signal-merging of its own. `ch` is
+ *      also never surplus if it falls in the categorical never-remove guard
+ *      (isAlwaysKeepCategory — Unicode Number/Punctuation/Symbol), which
+ *      overrides any language-specific CLDR exemplar-tier gap.
+ *   2. Allowlist rule-shielding — EVERY producer of `ch` (resolved via
+ *      collectCharContributors) is provably simple:
+ *        - any collectCharContributors `blocked` entry (opaque fragment, or
+ *          a multi-char/partial literal run) shields immediately.
+ *        - a character with NO producers found at all (an unrecognized
+ *          shape collectCharContributors can't classify) shields —
+ *          default-safe.
+ *        - each ruleNodeIds entry must resolve to a real rule and pass
+ *          isSimpleRemovableRule.
+ *        - each storeSlotIds entry (`<storeNodeId>#<i>`) must resolve to a
+ *          real store whose classifyStoreSlotEdit mode is 'drop' — never
+ *          'blocked' (notany-widens/context-index-aligned/system-store/
+ *          unresolved-index-pairing/outs-reference-unanalyzed).
+ *   3. Coordinated-removal collateral guard ("remove everywhere", #525 v2) —
+ *      for each contributing store slot `store#i`, resolving
+ *      `classifyStoreSlotEdit`'s `coordinatedWith` partners and checking
+ *      whether any partner store's item AT THE SAME INDEX `i` is itself a
+ *      needed character (`coordinatedDropHitsNeededChar`, shared with the
+ *      node-level pass above). A self-paired or unpaired store
+ *      (`coordinatedWith: []`) has no partner and can never shield on this
+ *      account — this is deliberately narrower than the old store-level
+ *      `storeFeedsConfirmedChar` shield it replaces, which treated "some
+ *      rule referencing this store produces ANY needed char anywhere" as
+ *      grounds to shield EVERY character the store contributes to (the
+ *      Cameroon `word`-store over-coarse-guard bug — `word` self-feeds the
+ *      whole Latin alphabet AND a needed Greek letter, so the old guard
+ *      shielded every Latin letter).
+ *
+ * Returns [] when `needed` is empty — no signal at all yet (mirrors
+ * annotateRemovalRecommendations's "no default is a defect until we're
+ * sure" stance), so the banner never shows before Phase B/CLDR resolves.
+ *
+ * `form` (default "NFC", preserving pre-046-carve behavior) — see
+ * annotateRemovalRecommendations's matching doc. `buildProducedSet` (from
+ * contracts) always returns NFC; rather than touching that shared helper
+ * (used well beyond carve), its output is re-normalized to `form` here at
+ * this comparison seam, alongside `needed`, so both sides of the
+ * surplus-detection match under the SAME form.
+ */
+export function recommendedRemovalChars(args: {
+  ir: KeyboardIR;
+  needed: ReadonlySet<string>;
+  bcp47?: string | null | undefined;
+  form?: CharNormalizationForm;
+}): RecommendedRemovalChar[] {
+  const { ir, needed: rawNeeded, bcp47, form = 'NFC' } = args;
+  if (rawNeeded.size === 0) return [];
+  const needed = new Set([...rawNeeded].map((ch) => ch.normalize(form)));
+
+  const produced = new Set([...buildProducedSet(ir)].map((ch) => ch.normalize(form)));
+  const storesById = new Map(ir.stores.map((s) => [s.nodeId, s]));
+  const rulesById = new Map<string, IRRule>();
+  for (const group of ir.groups) {
+    for (const rule of group.rules) rulesById.set(rule.nodeId, rule);
+  }
+  // Precomputed ONCE per IR, not per candidate character — classifyStoreSlotEdit
+  // scans every rule in the IR, and this loop can call it once per contributing
+  // store of EVERY candidate character, so without this it's O(chars * rules)
+  // rather than O(chars + rules). (#931 perf)
+  const analysis = analyzeStores(ir);
+  // Same hoist, same reason (spec 051 invariant D4) — one pass over the IR, not
+  // one per candidate character.
+  const producerIndex = buildProducerIndex(ir);
+
+  const results: RecommendedRemovalChar[] = [];
+
+  for (const ch of produced) {
+    if (isCharCoveredForLocale(ch, needed, bcp47 ?? '', form)) continue; // needed — not a candidate
+    if (isAlwaysKeepCategory(ch)) continue; // digit/punctuation/symbol — never a removal candidate
+
+    const contributors = collectCharContributors(ir, ch);
+
+    // Any blocked producer (opaque fragment, multi-char/partial literal run)
+    // shields immediately; so does finding NO producer at all (unrecognized
+    // shape — default-safe).
+    if (contributors.blocked.length > 0) continue;
+    if (contributors.ruleNodeIds.length === 0 && contributors.storeSlotIds.length === 0) continue;
+
+    let allSimple = true;
+    for (const ruleId of contributors.ruleNodeIds) {
+      const rule = rulesById.get(ruleId);
+      if (rule === undefined || !isSimpleRemovableRule(rule)) { allSimple = false; break; }
+    }
+
+    let dependsOnNeeded = false;
+    if (allSimple) {
+      for (const slotId of contributors.storeSlotIds) {
+        const parsed = parseSlotId(slotId);
+        if (parsed === null) { allSimple = false; break; }
+        const store = storesById.get(parsed.storeNodeId);
+        if (store === undefined) { allSimple = false; break; }
+        const mode = classifyStoreSlotEdit(store, ir, analysis);
+        if (mode.mode === 'blocked') { allSimple = false; break; }
+        // Reuses the `mode` just computed above — coordinatedDropHitsNeededChar
+        // takes an already-classified mode rather than re-deriving it (#931 perf).
+        if (coordinatedDropHitsNeededChar(mode, parsed.itemsIndex, needed, bcp47, analysis, producerIndex, form)) {
+          dependsOnNeeded = true;
+          break;
+        }
+      }
+    }
+
+    if (!allSimple || dependsOnNeeded) continue;
+
+    results.push({ ch, contributors });
+  }
+
+  // FR-014 (contracts/case-pairing.md "Proposal-row granularity"): when both members of
+  // a case group are surplus, fold them into ONE proposal row rather than surfacing two.
+  // Bucket the already-produced `results` by their case group's shared uppercase — this
+  // deliberately buckets `results` itself, not the full `produced` set, so a member that
+  // was shielded above (blocked, structural, or collateral-guarded, and therefore never
+  // pushed into `results`) can never be pulled into a fold here. The fold only ever
+  // REMOVES rows; it never adds a character the guard already refused.
+  // FR-013 is the constraint that makes this more than a display fold: a SHARED
+  // uppercase may only retire once its LAST produced lowercase referent is also
+  // going. Folding on "two rows share an uppercase" alone gets that wrong — with
+  // produced { s, ſ, S } where `ſ` is in the orthography but `s` and `S` are not,
+  // it would propose trimming `s` + `S` together and leave `ſ` without its
+  // uppercase. `caseTrimSet` is the one implementation of the retire rule
+  // (carveCasePairs.ts); this asks it rather than re-deriving the condition here.
+  const resultChs = new Set(results.map((r) => r.ch));
+  const foldedAway = new Set<string>(); // chars absorbed into another row's paired proposal
+  const retainedUppers = new Set<string>(); // uppercase kept alive by a surviving referent
+  const caseGroupBySurvivor = new Map<string, string[]>();
+  const handledUppers = new Set<string>();
+
+  for (const r of results) {
+    const group = caseGroupFor(r.ch, produced, bcp47 ?? undefined);
+    if (group.upper === null) continue; // no counterpart in produced — stays a single row
+    const upper = group.upper;
+    // Drive this from the LOWERCASE side only, once per uppercase. Two distinct
+    // lowercases that merely share an uppercase (s and ſ) are NOT counterparts of
+    // each other and must never be folded into one row together.
+    if (r.ch === upper || handledUppers.has(upper)) continue;
+    handledUppers.add(upper);
+
+    // The uppercase itself must be surplus and unshielded, or there is no pair to
+    // propose — the lowercase stays a single row and the uppercase is left alone.
+    if (!resultChs.has(upper)) continue;
+
+    // Retire oracle. `resultChs` is the set of characters this banner is proposing,
+    // so "every referent is also being trimmed" == "every referent is proposed".
+    if (!caseTrimSet(r.ch, produced, bcp47 ?? undefined, resultChs).has(upper)) {
+      // A referent survives -> the uppercase is retained, and must not be offered
+      // as a row of its own either; trimming it alone would breach FR-013 just as
+      // surely as folding it in would.
+      retainedUppers.add(upper);
+      continue;
+    }
+
+    // Whole case group is surplus -> ONE row (FR-014). The survivor is the
+    // lowest-code-point lowercase, which is deterministic and always present:
+    // `r.ch` is itself a proposed referent, so this list is never empty.
+    const proposedLowers = group.lowers.filter((l) => resultChs.has(l));
+    const survivor = proposedLowers.reduce((min, l) =>
+      (l.codePointAt(0) ?? 0) < (min.codePointAt(0) ?? 0) ? l : min,
+    );
+    const groupChars = [upper, ...proposedLowers]
+      .sort((a, b) => (a.codePointAt(0) ?? 0) - (b.codePointAt(0) ?? 0));
+    caseGroupBySurvivor.set(survivor, groupChars);
+    for (const c of groupChars) {
+      if (c !== survivor) foldedAway.add(c);
+    }
+  }
+
+  // Preserve the existing result order for surviving rows (the banner is a checklist —
+  // reshuffling it on every trim would be disorienting).
+  return results
+    .filter((r) => !foldedAway.has(r.ch) && !retainedUppers.has(r.ch))
+    .map((r) => {
+      const caseGroup = caseGroupBySurvivor.get(r.ch);
+      return caseGroup === undefined ? r : { ...r, caseGroup };
+    });
 }

@@ -1,0 +1,1108 @@
+{
+  "workflow": "speckit",
+  "specName": "046-marks-question-series",
+  "branch": "046-marks-question-series",
+  "selectedAt": "2026-07-21T22:43:12.777Z",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-21T22:52:57.741Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-21T23:09:12.820Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-21T23:09:12.826Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-21T23:28:14.207Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-21T23:30:27.833Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-21T23:31:53.986Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-21T23:38:39.969Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T00:27:25.545Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T00:27:42.362Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-22T00:32:40.080Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T00:41:58.565Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T00:47:46.864Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T00:47:47.098Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T00:53:48.954Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T00:53:49.187Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T00:53:49.416Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:00:06.456Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:06:31.416Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:06:31.649Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:06:31.879Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:21:32.062Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:21:32.295Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:21:32.526Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:28:22.606Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:28:22.865Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:28:23.095Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:28:23.344Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:46:31.503Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:46:31.737Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:46:31.982Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:46:32.226Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:50:22.573Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:50:22.800Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:59:10.143Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:59:10.387Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:59:10.620Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:59:10.852Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T01:59:11.091Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T02:04:42.498Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T02:04:42.742Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T02:20:54.566Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T02:20:54.801Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T02:20:55.040Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T02:47:51.691Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T02:47:51.932Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T02:47:52.174Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-22T03:01:05.396Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-22T03:01:05.710Z"
+    }
+  ],
+  "telemetryInstanceId": "2fbeb931-cc8e-463b-9a7c-bfa4e0b7a804",
+  "approach": "Split the confirmed alphabet into three additive contract stores (bases/marks/attestedStacks, flat confirmedInventory derived), host the S0-S5 marks series as one new spine EditorStep between carve and mechanisms with card-based stations, and hand the mechanism gallery a typed PlacementWorklist via an optional prop. Engine logic lands as pure functions in a new engine/src/marks/ subsystem (nfc-posture-of-inventory shared table, house-target-policy-shaped output-form decision table), with the uniformity invariant enforced by a new IR-level validator check plus one new layer-c-enforce criteria row (148 to 149).",
+  "decisions": [
+    {
+      "decision": "Host the series as one new spine EditorStep (marks) between carve and mechanisms, stations sequenced internally with S0 as an unrendered gate",
+      "why": "S1/S2 interpolate the designer's own glyphs, which the static FlowQuestion shape cannot express; the EditorStep card mechanism already exists (CharactersStep/MechanismGallery precedents)",
+      "rejected": "Extending the Phase B sub-flow with more pb_* FlowQuestions, or one spine step per station"
+    },
+    {
+      "decision": "Three stores + PlacementWorklist as additive optional contract fields; legacy confirmedInventory kept and derived from the stores",
+      "why": "Inventory is contract-owned today and the documented convention is additive fields; deriving the flat list keeps every existing consumer working with no locked-type edit",
+      "rejected": "Studio-local store split (engine needs typed input) or replacing confirmedInventory (major-bump locked-contract removal)"
+    },
+    {
+      "decision": "Build nfc-posture-of-inventory as the single shared pure function and copy the house-target-policy decision-table shape for the S4 output-form proposal",
+      "why": "The facet YAML already names the function as its planned derivation, and one computed table keeps the facet, proposal, unwrap stores, and blocking rules from ever disagreeing",
+      "rejected": "Independent posture computation in the station and the validator (divergence is the failure mode FR-022 exists to prevent)"
+    },
+    {
+      "decision": "Enforce the uniformity invariant as an IR-level check (layer-a-prime convention, tagged layer B) plus one new layer-c-enforce criteria row, bumping enforced counts 148 to 149 and band 66 to 67",
+      "why": "FR-022 requires mechanical checkability against the produced keyboard; normalization form of emitted outputs is an IR property, not a lexical one",
+      "rejected": "Survey-side assertion only (advisory) or a Layer A source-string regex check"
+    },
+    {
+      "decision": "Ship blocked combinations as generated swallow-behavior rules (minimal A6 pull-forward) and generate stepwise backspace-unwrap stores from the attachment matrix",
+      "why": "No blocking generator exists; swallow defers the Phase-C-gated A6 loudness axis without blocking FR-021, and nfd-to-nfc.ts already recognizes the unwrap rule shape",
+      "rejected": "Implementing the full A6 axis now (scope creep) or pairwise NxN exclusion UI"
+    },
+    {
+      "decision": "Record the nfc-to-nfd migration need as a session flag only; do not build the reverse facet-transform in this feature",
+      "why": "The spec assumption and design-note open question 3 hold it as a separate decision; silently implementing would reopen a resolved v1 decline informally",
+      "rejected": "Implementing the reverse transform now"
+    },
+    {
+      "decision": "Keep 046 CharacterMapPane edits localized to handleToggle/handleRawSubmit + additive exports so open PR #1291 (km/charmap-jump-to-script) merges cleanly",
+      "why": "User flagged PR #1291 must land against this branch; its diff rewrites the pane fetch/filter/scripts-checkbox areas and characterMap.ts script tagging but leaves handleToggle/handleRawSubmit bodies and both predicates (isCombiningMarkChar/isPrivateUseCodePoint) intact",
+      "rejected": "Restructuring the pane search path for the decomposition narration (would collide with 1291 matchesQuery/characterSearch.ts)"
+    },
+    {
+      "decision": "Skip the guard hop (guardHopSkipped flag) when an existing match rule already ends in a foreign use()",
+      "why": "kmcmplib allows one trailing use() per rule; chaining a second would corrupt a foreign generator or imported base rule",
+      "rejected": "Chaining a second useGroup or reordering the foreign use()"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Full plan + research + data model + contracts for the marks question series: three-store alphabet, S0-S5 card stations as one spine step, typed worklist handoff, uniformity check",
+      "key_finding": "Every seam the feature needs already has an in-tree precedent - the placementMap optional-prop seam into MechanismGallery, the house-target-policy decision table, the engine_resolved gate pattern, and the planned nfc-posture-of-inventory stub in the posture facet YAML - so no locked contract changes and no new architectural surface are required"
+    },
+    "tasks": {
+      "summary": "37 tasks in 11 phases: Setup + Foundational (contracts/decompose/posture/store split), one phase per P1 story (US5, US1, US2, US3, US7) then P2 (US4, US6, US8), Polish (retirement, e2e, SC validation); waves 2-3 deep per phase"
+    },
+    "implement": {
+      "summary": "All 37 tasks shipped: three-store ConfirmedAlphabet + PlacementWorklist contracts (zod-mirrored), visible picker decomposition + PUA role prompt, the S0-S5 marks series as a new marks spine step between carve and mechanisms, output-form policy + layer-B uniformity check (criteria 148->149), mark guards (blocking swallow + backspace unwrap) wired via the reducer, gallery worklist seam, 5 questions retired + pb_mark_input_order relocated, e2e helper; gates green, only the 16 pre-existing baseline test failures remain"
+    }
+  },
+  "coverage": {
+    "FR-001": {
+      "title": "Three distinct records: bases, marks, ordered attested combinations",
+      "tasks": [
+        "T002",
+        "T005"
+      ],
+      "tests": [
+        "packages/contracts/src/confirmedAlphabet.test.ts",
+        "packages/contracts/src/surveySession.test.ts"
+      ]
+    },
+    "FR-002": {
+      "title": "Whole composed character selectable as a single pick",
+      "tasks": [
+        "T008"
+      ]
+    },
+    "FR-003": {
+      "title": "Composed pick records base+marks+stack, visibly at pick time",
+      "tasks": [
+        "T008",
+        "T009",
+        "T010"
+      ],
+      "tests": [
+        "packages/studio/src/survey/BuildListView.test.tsx::AlphabetBreakdown",
+        "packages/studio/src/stores/phaseBDraftStore.test.ts"
+      ]
+    },
+    "FR-004": {
+      "title": "PUA pick asks letter-or-mark; answer is a permanent declared role",
+      "tasks": [
+        "T030"
+      ],
+      "tests": [
+        "packages/studio/src/survey/CharacterMapPane.test.tsx::PUA role prompt"
+      ]
+    },
+    "FR-006": {
+      "title": "One prefilled attachment row per mark (attested/plausible/blocked)",
+      "tasks": [
+        "T015",
+        "T016"
+      ],
+      "tests": [
+        "packages/engine/src/marks/marks-foundations.test.ts::proposeAttachments"
+      ]
+    },
+    "FR-007": {
+      "title": "Unchecked base means blocked, consequence stated in row help text",
+      "tasks": [
+        "T015",
+        "T016"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::FR-007"
+      ]
+    },
+    "FR-008": {
+      "title": "Single-attested-base mark shows as auto-confirmed summary, still editable",
+      "tasks": [
+        "T015",
+        "T016"
+      ],
+      "tests": [
+        "packages/engine/src/marks/marks-foundations.test.ts::auto-confirms",
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::FR-008"
+      ]
+    },
+    "FR-009": {
+      "title": "Case pairs derived from alphabet case data, no separate question",
+      "tasks": [
+        "T015"
+      ],
+      "tests": [
+        "packages/engine/src/marks/marks-foundations.test.ts::deriveCaseCounterparts"
+      ]
+    },
+    "FR-010": {
+      "title": "Marks grouped into classes; mental model confirmed per class with overrides",
+      "tasks": [
+        "T014",
+        "T024"
+      ],
+      "tests": [
+        "packages/engine/src/marks/marks-foundations.test.ts::groupMarkClasses"
+      ]
+    },
+    "FR-011": {
+      "title": "Mental-model prefill from spread, base mechanism, spare-key affordability",
+      "tasks": [
+        "T022",
+        "T024"
+      ],
+      "tests": [
+        "packages/engine/src/marks/worklist-and-prefill.test.ts::computeMentalModelPrefills"
+      ]
+    },
+    "FR-012": {
+      "title": "Input-order question only when a letter-plus-mark class exists, prefilled from import",
+      "tasks": [
+        "T025"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::S2/S3 walk"
+      ]
+    },
+    "FR-013": {
+      "title": "Output form is one uniform keyboard-wide decision, never mixed",
+      "tasks": [
+        "T018"
+      ],
+      "tests": [
+        "packages/engine/src/marks/output-form-policy.test.ts"
+      ]
+    },
+    "FR-014": {
+      "title": "Any pair lacking a ready-made form: propose base-plus-mark as a notice",
+      "tasks": [
+        "T018",
+        "T020"
+      ],
+      "tests": [
+        "packages/engine/src/marks/output-form-policy.test.ts::FR-014",
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::FR-014"
+      ]
+    },
+    "FR-015": {
+      "title": "All pairs compose + no letter-plus-mark class: propose ready-made as a notice",
+      "tasks": [
+        "T018",
+        "T020"
+      ],
+      "tests": [
+        "packages/engine/src/marks/output-form-policy.test.ts::FR-015"
+      ]
+    },
+    "FR-016": {
+      "title": "Ambiguous case: open choice, recommended first, no Unicode/normalization wording",
+      "tasks": [
+        "T018",
+        "T029"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::US4 open choice"
+      ]
+    },
+    "FR-017": {
+      "title": "Output-form preview demonstrates repeated-backspace behavior",
+      "tasks": [
+        "T020",
+        "T029"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::backspace preview"
+      ]
+    },
+    "FR-018": {
+      "title": "Stacking confirmation only on evidence, else two-mark combos stay blocked",
+      "tasks": [
+        "T026"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::stacking evidence"
+      ]
+    },
+    "FR-019": {
+      "title": "Affirmative stacking shows specific attested stacks for explicit confirmation",
+      "tasks": [
+        "T026"
+      ]
+    },
+    "FR-020": {
+      "title": "Series exit hands the gallery a complete three-group classification",
+      "tasks": [
+        "T023",
+        "T027",
+        "T028"
+      ],
+      "tests": [
+        "packages/engine/src/marks/worklist-and-prefill.test.ts::buildPlacementWorklist",
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::worklist handoff"
+      ]
+    },
+    "FR-021": {
+      "title": "Blocked combinations unreachable by any ordinary key sequence",
+      "tasks": [
+        "T031",
+        "T033"
+      ],
+      "tests": [
+        "packages/engine/src/pattern-apply/mark-guards.test.ts",
+        "packages/studio/src/steps/reducer.test.ts::marks"
+      ]
+    },
+    "FR-022": {
+      "title": "Uniformity invariant mechanically checkable on the produced keyboard",
+      "tasks": [
+        "T019",
+        "T021"
+      ],
+      "tests": [
+        "packages/engine/src/validator/layer-b-uniformity.test.ts"
+      ]
+    },
+    "FR-023": {
+      "title": "Alphabet edits that change decision evidence flag stations for reconfirmation",
+      "tasks": [
+        "T013",
+        "T027"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::gate recompute"
+      ]
+    },
+    "FR-024": {
+      "title": "No up-front marks question; every station derived from the confirmed alphabet",
+      "tasks": [
+        "T011"
+      ]
+    },
+    "FR-025": {
+      "title": "Retire five standalone marks questions; relocate pb_mark_input_order as S3",
+      "tasks": [
+        "T025",
+        "T034"
+      ],
+      "tests": [
+        "packages/studio/tests/survey/inputs-writes-coverage.test.ts",
+        "packages/studio/tests/survey/orphan-input-lint.test.ts"
+      ]
+    },
+    "FR-026": {
+      "title": "Digraphs keep their own question, with parallel wording",
+      "tasks": [
+        "T035"
+      ]
+    },
+    "FR-005": {
+      "title": "Computed, never-displayed gate skips the series when marks list is empty",
+      "tasks": [
+        "T011",
+        "T012"
+      ],
+      "tests": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx::S0 skip path"
+      ]
+    }
+  },
+  "concerns": [
+    {
+      "note": "Baseline not fully green: 19 pre-existing studio test failures (useKeyboardArtifact.test.ts, browserPatternLibrary.test.ts, projectWorkingCopyVfs*.test.ts, articleIVProbe.test.ts) present before any 046 edit; new-failure attribution is by diff against this set",
+      "step": "implement"
+    },
+    {
+      "note": "Merge with PR #1291 will produce small adjacent-hunk conflicts in CharacterMapPane.tsx (filteredGroups memo sits directly above the 046 describeContribution insert) and characterMap.ts (export keyword on isCombiningMarkChar sits in 1291 hunk context); both are trivial semantic no-ops to resolve",
+      "step": "implement"
+    },
+    {
+      "note": "E2E walk specs updated for the marks series but NOT executed here: the global Playwright CLI is unavailable in this shell (only @playwright/mcp nested alpha). Run npx playwright test in the manual/CD e2e lane before release",
+      "step": "implement"
+    },
+    {
+      "note": "Deferred P1/P2 from review: guard hop wired only to the first using-keys group (acceptable while generated keyboards are single-entry-group; revisit for multi-group Track 2 bases); combining-mark predicate duplicated in layer-b-uniformity vs nfd-to-nfc (deliberate wide \\p{M} semantics, consolidation is a km-simplify follow-up); marks-series station transitions lack aria-live/focus management polish",
+      "step": "implement"
+    }
+  ],
+  "currentTask": "T037",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Baseline: install/build/typecheck green; 19 pre-existing studio test failures in 4 files (useKeyboardArtifact, browserPatternLibrary, projectWorkingCopyVfs x2, articleIVProbe) documented as attributable baseline"
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "New contracts module confirmedAlphabet.ts: ConfirmedAlphabet/AttestedStack/DeclaredRole/AttachmentState/MarkUnit/BlockedCombination/PlacementWorklist + factories, deriveConfirmedInventory, validateConfirmedAlphabet, 10 tests",
+      "files": [
+        "packages/contracts/src/confirmedAlphabet.ts",
+        "packages/contracts/src/confirmedAlphabet.test.ts",
+        "packages/contracts/src/index.ts"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "decomposeGrapheme engine helper (NFD, order-preserving, full Mn/Mc range, null for PUA/plain/digraph); exported isCombiningMarkChar/isPrivateUseCodePoint from characterMap; 9 tests",
+      "files": [
+        "packages/engine/src/character-discovery/decompose.ts",
+        "packages/engine/src/character-discovery/decompose.test.ts",
+        "packages/engine/src/character-discovery/characterMap.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Zod mirrors (DeclaredRole/AttestedStack/ConfirmedAlphabet/AttachmentState/MarkInputOrder/MarkUnit/BlockedCombination/PlacementWorklist) + 7 compile-time drift guards",
+      "files": [
+        "packages/contracts/src/schemas.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Additive alphabet?/marksWorklist? on SurveyPhaseResult+SurveySession; store-wise mergeAlphabets (dedupe, order-preserving stacks, last-wins roles), last-wins worklist, derived projection folded into confirmedInventory; 6 merge tests",
+      "files": [
+        "packages/contracts/src/surveyPhaseResult.ts",
+        "packages/contracts/src/surveySession.ts",
+        "packages/contracts/src/surveySession.test.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "nfcPostureOfInventory + aggregateInventoryPosture pure functions (9 tests); facet YAML derivation flipped planned->available (facet-lint green)",
+      "files": [
+        "packages/engine/src/marks/nfc-posture-of-inventory.ts",
+        "packages/engine/src/marks/nfc-posture-of-inventory.test.ts",
+        "content/facets/orth/mark-composition-posture.yaml",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "phaseBDraftStore split: picks canonical, bases/marks/attestedStacks/declaredRoles derived (orphan-free removal), lastPick contribution for US5 highlight, snapshot carries declaredRoles; chars keeps pinned verbatim setAll contract; 29 tests green incl. consumers",
+      "files": [
+        "packages/studio/src/stores/phaseBDraftStore.ts",
+        "packages/studio/src/stores/phaseBDraftStore.test.ts"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Pick-commit decomposition narration in CharacterMapPane: aria-live announcement now states base->Letters, mark->Marks, combination recorded on add (grid toggle + U+XXXX escape hatch)",
+      "files": [
+        "packages/studio/src/survey/CharacterMapPane.tsx"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "AlphabetBreakdown section in BuildListView: Letters/Marks/Accented letters chips (marks on U+25CC carriers), just-added 'new' indicators, renders only when marks/stacks exist; 4 tests",
+      "files": [
+        "packages/studio/src/survey/PhaseB.tsx",
+        "packages/studio/src/survey/BuildListView.test.tsx"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "CharactersStep commits ConfirmedAlphabet (draftConfirmedAlphabet) alongside flat confirmedInventory on completion; absent for manual-flow (empty draft)",
+      "files": [
+        "packages/studio/src/survey/CharactersStep.tsx"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "MarksSeriesStep host: computeMarksGate S0 (never rendered), immediate completion with empty PlacementWorklist on skip, direction-aware transparency via new session lastNavigation flag, series shell + marks-continue for marked alphabets; 6 tests",
+      "files": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.tsx",
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx",
+        "packages/studio/src/stores/surveySessionStore.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Spine step 'marks' registered between carve and mechanisms: manifest entry, expectedSpine, advance policy case, ActiveStepId unions; pinned spine oracles updated (advance.test, manifest.test, StudioShell.test)",
+      "files": [
+        "packages/studio/src/steps/manifest.ts",
+        "packages/studio/src/steps/advance.ts",
+        "packages/studio/src/steps/advance.test.ts",
+        "packages/studio/src/steps/manifest.test.ts",
+        "packages/studio/src/StudioShell.test.tsx"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Gate recomputes from session.alphabet via useMemo (US1 AC2: adding a marked char makes series reachable on next advance); back-pop transparency prevents the skip gate trapping Back from mechanisms",
+      "files": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.tsx"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "groupMarkClasses: function-bucket (above/below/other) + single-link Jaccard clustering over attested base sets, named ATTACHMENT_SIMILARITY_THRESHOLD constant; deterministic ids/labels",
+      "files": [
+        "packages/engine/src/marks/mark-classes.ts",
+        "packages/engine/src/marks/marks-foundations.test.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "proposeAttachments tri-state (attested prechecked / class-sibling plausible / blocked default) + FR-008 autoConfirmed predicate + deriveCaseCounterparts (FR-009, caseCounterpart reuse); 10 engine tests",
+      "files": [
+        "packages/engine/src/marks/attachment-proposals.ts",
+        "packages/engine/src/marks/marks-foundations.test.ts"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "AttachmentStation S1 card: per-mark rows, plausible dashed-suggested chips, unchecked-means-blocked help text, auto-confirmed details summary, derived case-pair note; testid marks-attachment",
+      "files": [
+        "packages/studio/src/survey/marks/AttachmentStation.tsx"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Station sequencing in the host: visibleStations list with per-station render conditions, Continue advances/completes, in-series Back; simple orthography = one screen (4 new tests)",
+      "files": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.tsx",
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "resolveOutputFormProposal ordered decision table (FR-014 notice / FR-016 open-choice flag / FR-015 default notice) + hasDecidablePairs gate; SC-005 asserted mechanically; 7 tests",
+      "files": [
+        "packages/engine/src/marks/output-form-policy.ts",
+        "packages/engine/src/marks/output-form-policy.test.ts"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "checkNormalizationUniformity IR check (layer B, KM_LINT_MARK_NORMALIZATION_UNIFORM, one aggregate finding, non-system stores included) wired into validateWithOracle reference TS task - same single debounce cycle; 7 tests incl. cycle integration",
+      "files": [
+        "packages/engine/src/validator/layer-b-uniformity.ts",
+        "packages/engine/src/validator/layer-b-uniformity.test.ts",
+        "packages/engine/src/validator/oracle.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "OutputFormStation S4: notice presentation, mandatory step-by-step backspace preview (peel-one-mark vs one-step), change control, skipped when zero decidable pairs; SC-005 render test; 5 station tests + SC-002 two-screen test",
+      "files": [
+        "packages/studio/src/survey/marks/OutputFormStation.tsx",
+        "packages/studio/src/survey/marks/MarksSeriesStep.tsx",
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "criteria.json +18.13-mark-normalization-uniform (layer-c-enforce, consistency, lintRuleId KM_LINT_MARK_NORMALIZATION_UNIFORM); counts 148->149, band 66->67, section-18 12->13/7->8 in types.test.ts, schemas.test.ts, criteria-summary.md",
+      "files": [
+        "packages/contracts/data/criteria.json",
+        "packages/contracts/src/types.test.ts",
+        "packages/contracts/src/schemas.test.ts",
+        "packages/contracts/data/criteria-summary.md"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "computeMentalModelPrefills (spread/base-mechanism/spare-key signals, PRODUCTIVITY_SPREAD_THRESHOLD const, unaffordable reason) + detectBaseMarkMechanism sibling detector; 6 tests",
+      "files": [
+        "packages/engine/src/marks/mental-model-prefill.ts",
+        "packages/engine/src/marks/worklist-and-prefill.test.ts"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "buildPlacementWorklist (own-letter units incl composed pairs, mark units with inputOrder, blocked = every unchecked pair) + verifyWorklistCoverage SC-007 invariant + per-mark override support; 3 tests",
+      "files": [
+        "packages/engine/src/marks/worklist.ts",
+        "packages/engine/src/marks/worklist-and-prefill.test.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "MentalModelStation S2: per-class radiogroup with suggested markers, unaffordable own-letter disabled with reason; trivially-single-pair classes take the prefill without a screen (classNeedsMentalModelScreen keeps SC-002)",
+      "files": [
+        "packages/studio/src/survey/marks/MentalModelStation.tsx",
+        "packages/studio/src/survey/marks/MarksSeriesStep.tsx"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "InputOrderStation S3: pb_mark_input_order prompt/help/options relocated verbatim, prefill from session.axes.markInputOrder (detectMarkInputOrderFromImport), rendered only with a letter-plus-mark class",
+      "files": [
+        "packages/studio/src/survey/marks/InputOrderStation.tsx"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "StackingStation S5: evidence-gated (attested multi-mark stack or overlapping reachable sets), yes/no + explicit attested-stack checkbox confirm (never inferred from rows)",
+      "files": [
+        "packages/studio/src/survey/marks/StackingStation.tsx"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "Series completion assembles buildPlacementWorklist from all station answers, commits marksWorklist via phase result; FR-023 staleness = content-keyed re-seed + return to first station on alphabet edit; 2 full-walk tests (17 total in marks suite)",
+      "files": [
+        "packages/studio/src/survey/marks/MarksSeriesStep.tsx",
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "MechanismGallery worklist?: PlacementWorklist optional prop (placementMap seam): composed units covered by productive mark keys leave the walk, empty/absent = identity; AddPhysicalAdapter passes session.marksWorklist",
+      "files": [
+        "packages/studio/src/editors/assignLoop/MechanismGallery.tsx",
+        "packages/studio/src/editors/adapters/addPhysicalAdapter.tsx"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "FR-016 open-choice rendering in OutputFormStation: radio with recommended-first + tag, per-option plain-language consequence, backspace preview for BOTH options; SC-005 asserted on the open rendering; 1 walk test",
+      "files": [
+        "packages/studio/src/survey/marks/OutputFormStation.tsx",
+        "packages/studio/src/survey/marks/MarksSeriesStep.test.tsx"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "PUA role prompt at pick-commit in CharacterMapPane (escape-hatch path): letter/mark asked before any list update, answer recorded as permanent declaredRole via store add(c,{role}); 4 tests updated/added",
+      "files": [
+        "packages/studio/src/survey/CharacterMapPane.tsx",
+        "packages/studio/src/survey/CharacterMapPane.test.tsx"
+      ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "Blocking-rule generation (applyMarkGuards): generated_marks_guard non-using-keys group with per-blocked-pair swallow rules, entered via match>use() hop from the entry group (key-assignment independent); idempotent; codec round-trip test",
+      "files": [
+        "packages/engine/src/pattern-apply/mark-guards.ts",
+        "packages/engine/src/pattern-apply/mark-guards.test.ts"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "Stepwise backspace-unwrap generation: generated_marks_unwrap_from/to store pair (each composed unit paired with its one-mark-shorter predecessor) + any/K_BKSP/index rule, only under ready-made form (native peel under base-plus-mark); 3 tests",
+      "files": [
+        "packages/engine/src/pattern-apply/mark-guards.ts",
+        "packages/engine/src/pattern-apply/mark-guards.test.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "MARKS_STEP_ID reducer case: applyMarkGuards onto working IR via injected getWorkingIR/setWorkingIR, MarksCompleteResult payload carries marksOutputForm, R10 migrationNeeded session flag (setMarksMigrationNeeded dep + surveySessionStore field); 3 reducer tests",
+      "files": [
+        "packages/studio/src/steps/reducer.ts",
+        "packages/studio/src/steps/reducer.test.ts",
+        "packages/studio/src/steps/advance.ts",
+        "packages/studio/src/StudioShell.tsx",
+        "packages/studio/src/stores/surveySessionStore.ts",
+        "packages/studio/src/survey/marks/MarksSeriesStep.tsx"
+      ]
+    },
+    "T034": {
+      "status": "DONE",
+      "did": "Retired 5 marks questions from active use (flow YAML + registry.b.ts unregistered; modules/tests stay on disk per spec-022 demotion precedent); pb_mark_input_order relocated off-flow with orphan-lint exemption; pb_standard_letters/pb_typing_approach routing retargeted; registry floor 102->97; Phase B graph snapshot regenerated; posture facet asked-derivation dropped; 1887 tests green",
+      "files": [
+        "content/flows/phase_b_characters.modular.yaml",
+        "packages/studio/src/survey/questions/registry.b.ts",
+        "packages/studio/src/survey/questions/b/pb_standard_letters.ts",
+        "packages/studio/src/survey/questions/b/pb_typing_approach.ts",
+        "packages/studio/tests/survey/inputs-writes-coverage.test.ts",
+        "packages/studio/tests/survey/orphan-input-lint.test.ts",
+        "content/facets/orth/mark-composition-posture.yaml",
+        "packages/studio/src/survey/marks/InputOrderStation.tsx"
+      ]
+    },
+    "T035": {
+      "status": "DONE",
+      "did": "Digraph wording parity (FR-026): pb_latin_digraphs_gate help text aligned to 'its own letter of the alphabet' phrasing + parity comment pinning the parallel to MentalModelStation; structural change none",
+      "files": [
+        "packages/studio/src/survey/questions/b/pb_latin_digraphs_gate.ts"
+      ]
+    },
+    "T036": {
+      "status": "DONE",
+      "did": "driveMarksSeries e2e helper (gate-skip tolerant, <=6 continues) slotted before confirmMechanismsEmpty + wired into touch-derivation us1/us2 (simple-confirm path via e); carve.spec covers the skip path via defensive pass-through; TS-syntax-verified (e2e lane runs in manual/CD step)",
+      "files": [
+        "packages/studio/e2e/helpers/surveyFlow.ts",
+        "packages/studio/e2e/touch-derivation-us1.spec.ts",
+        "packages/studio/e2e/touch-derivation-us2.spec.ts"
+      ]
+    },
+    "T037": {
+      "status": "DONE",
+      "did": "Gates: typecheck 0 errors, lint GREEN (eslint/depcruise/crew/facet/facet-index/adaptation-catalog), full test run - only the 16 pre-existing baseline failures remain (no new failing file); golden-walk fixtures regenerated for the marks hop; criteria-count prose bumped 148->149 in CLAUDE.md/README/spec.md par.11 (spec-trace acknowledged)",
+      "files": [
+        "CLAUDE.md",
+        "README.md",
+        "spec.md",
+        "docs/spec-trace.json",
+        "packages/studio/tests/steps/__fixtures__/goldenWalk/copy.json",
+        "packages/studio/tests/steps/__fixtures__/goldenWalk/adapt.json"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "typecheck all packages",
+      "command": "pnpm typecheck",
+      "result": "0 errors",
+      "warnings": []
+    },
+    {
+      "what": "full lint gate (eslint + depcruise + crew-lint + facet-lint + facet-index-lint + adaptation-catalog-lint)",
+      "command": "pnpm lint",
+      "result": "all GREEN; pre-existing no-console warnings only",
+      "warnings": [
+        "no-console warnings in files not touched by 046"
+      ]
+    },
+    {
+      "what": "full recursive test run",
+      "command": "pnpm -r test",
+      "result": "contracts 437, engine all green incl. 45+ new 046 tests, studio 4104/4122 - the 16 failures are the PRE-EXISTING baseline set (useKeyboardArtifact, browserPatternLibrary, projectWorkingCopyVfs.flagParity, articleIVProbe) documented at T001; zero new failing files",
+      "warnings": [
+        "baseline failures pre-date this feature - see T001 concern"
+      ]
+    },
+    {
+      "what": "SC-003/SC-004 mechanical checkability",
+      "command": "pnpm --filter @keyboard-studio/engine test src/validator/layer-b-uniformity.test.ts src/pattern-apply/mark-guards.test.ts",
+      "result": "13 tests: uniformity check flags mixed forms in the single debounce cycle; blocked pairs generate swallow rules; unwrap stores round-trip through the codec",
+      "warnings": []
+    },
+    {
+      "what": "SC-005 no Unicode/normalization in S4 designer text",
+      "command": "vitest output-form-policy.test.ts + MarksSeriesStep.test.tsx SC-005 cases",
+      "result": "asserted mechanically on the policy explanations, notice rendering, and open-choice rendering",
+      "warnings": []
+    },
+    {
+      "what": "SC-001/SC-002/SC-006/SC-007 walk behavior",
+      "command": "vitest src/survey/marks (18 tests)",
+      "result": "zero-marks alphabets skip with empty worklist; simple orthography = 2 screens; tonal walk <= 5 screens; worklist coverage invariant verified in engine tests",
+      "warnings": []
+    },
+    {
+      "what": "km-verification review pass (post-implement)",
+      "command": "scoped engine/contracts/studio suites + pnpm typecheck",
+      "result": "APPROVE - 57 engine, 437 contracts, 1614 studio tests green; SC-002/SC-005/SC-007 pinned; criteria 149 (40/67/32/10) confirmed",
+      "warnings": []
+    },
+    {
+      "what": "km-qc code-quality review",
+      "command": "review of 046 diff",
+      "result": "PASS 91/100 - 2 P1 (mark-guards idempotency, in-place rule mutation) sent to fix cycle, 3 P2",
+      "warnings": []
+    },
+    {
+      "what": "km-keyman generated-KMN semantics review",
+      "command": "review of mark-guards.ts + layer-b-uniformity.ts",
+      "result": "REQUEST_CHANGES - P0 missing plus-separator in unwrap rule context (invalid emitted .kmn); fixed in review cycle 2. Layer-B severity/level judged correct",
+      "warnings": []
+    },
+    {
+      "what": "km-synthesis integration review",
+      "command": "seam review vs house patterns",
+      "result": "APPROVE WITH NOTES - worklist prop follows placementMap seam, reducer case follows TouchCompleteResult pattern, store split matches snapshot idiom; P1 predicate duplication documented",
+      "warnings": []
+    },
+    {
+      "what": "km-frontend SPA review",
+      "command": "review of marks series UI + stores",
+      "result": "PASS WITH NOTES - no Article IV or D3 violations; P1 JSON.stringify memo key sent to fix cycle; P2 a11y polish (station-change aria-live, focus management) deferred",
+      "warnings": [
+        "a11y polish deferred to follow-up"
+      ]
+    },
+    {
+      "what": "review cycle 2 - P0/P1 fixes re-verified",
+      "command": "engine mark-guards/marks/uniformity suites (53), contracts (441 incl. confirmedAlphabetKey), studio marks+steps (200), pnpm typecheck",
+      "result": "all green after commit d2986ce2: unwrap plus-separator P0 fixed with emit-string assertion; guard-hop idempotency/purity/ordering hardened (guardHopSkipped flag, insertBeforeTerminalRules, raw-use() recognition); canonical confirmedAlphabetKey replaces JSON.stringify memo key; narrowed store subscriptions",
+      "warnings": []
+    }
+  ],
+  "last_action": "PR https://github.com/keyboard-studio/keyboard-studio/pull/1300 opened after km-lead APPROVED review (one P0 fixed in d2986ce2); gates green modulo the documented pre-existing baseline"
+}

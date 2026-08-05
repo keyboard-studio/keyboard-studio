@@ -1,0 +1,673 @@
+// Tests for OutputScreen — the "ship it" half of the old preview/output split.
+//
+// Spec 057 (T030, FR-072): the PreviewScreen half of this file is GONE, not
+// deleted-and-forgotten. That screen was replaced by CompareScreen, whose
+// contract is an ABSENCE (no write path into the working copy) rather than a
+// presence, so its assertions read nothing like the ones that were here and
+// live in their own file: components/CompareShell.test.tsx.
+//
+// OutputScreen ("ship it"):
+//   - Renders "Download .zip" button and SignUpPanel.
+//   - Does NOT render an interactive OSK (no osk-frame testid).
+//   - projection-warning surface (original PreviewShell.test coverage, re-homed here)
+//   - identity-unset warning banner (AC2 + AC4)
+//   - download filename
+
+import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
+import { screen, fireEvent, act, cleanup } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
+import { useWorkingCopyStore } from "../stores/workingCopyStore";
+import { TOUCH_STEP_ID } from "../steps/reducer";
+import { createVirtualFS } from "@keyboard-studio/contracts";
+import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
+import type { Stage } from "../hooks/useKeyboardArtifact";
+
+// ---------------------------------------------------------------------------
+// vi.hoisted — variables referenced inside vi.mock factories.
+// ---------------------------------------------------------------------------
+
+const { mockSerializeResult, mockStage, mockRetry } = vi.hoisted(() => {
+  return {
+    mockSerializeResult: {
+      current: null as
+        | { bytes: Uint8Array; warnings: string[]; keyboardId: string; version: string }
+        | null,
+    },
+    mockStage: {
+      current: { kind: "idle" } as Stage,
+    },
+    // Hoisted so a test can assert the D5 escape hatch actually RE-SCAFFOLDS.
+    // A fresh vi.fn() per call would be unassertable, and without the re-run the
+    // block would clear while the emitted LICENSE.md still lacked the holder.
+    mockRetry: vi.fn(),
+  };
+});
+
+// ---------------------------------------------------------------------------
+// Mock heavy dependencies.
+// ---------------------------------------------------------------------------
+
+vi.mock("../lib/serializeWorkingCopy.ts", () => ({
+  serializeWorkingCopy: () => Promise.resolve(mockSerializeResult.current),
+  projectWorkingCopyForOutput: () => Promise.resolve(null),
+}));
+
+vi.mock("../hooks/useKeyboardArtifact.ts", () => ({
+  useKeyboardArtifact: () => ({
+    stage: mockStage.current,
+    retry: mockRetry,
+    recompile: vi.fn(),
+  }),
+}));
+
+vi.mock("./BaseKeyboardPicker.tsx", () => ({
+  BaseKeyboardPicker: ({ onChange }: { onChange: (kb: unknown) => void }) => (
+    <button
+      data-testid="base-picker"
+      onClick={() => onChange(basicKbdus)}
+    >
+      pick base
+    </button>
+  ),
+}));
+
+vi.mock("./OSKFrame.tsx", () => ({
+  OSKFrame: () => <div data-testid="osk-frame">osk</div>,
+}));
+
+vi.mock("./KmnEditor.tsx", () => ({
+  KmnEditor: () => <div data-testid="kmn-editor">editor</div>,
+}));
+
+vi.mock("../editors/panels/ScaffoldForm.tsx", () => ({
+  ScaffoldForm: () => <div data-testid="scaffold-form">scaffold</div>,
+}));
+
+vi.mock("../editors/panels/TrackOneIdentityPanel.tsx", () => ({
+  TrackOneIdentityPanel: () => <div data-testid="identity-panel">identity</div>,
+}));
+
+vi.mock("./OskModeToggle.tsx", () => ({
+  OskModeToggle: () => <div data-testid="osk-toggle">toggle</div>,
+}));
+
+vi.mock("../lib/confirmRebase.ts", () => ({
+  confirmRebaseIfEdited: () => true,
+  instantiateFromBaseIfConfirmed: vi.fn(),
+}));
+
+vi.mock("../hooks/useWorkingCopyTransform.ts", () => ({
+  useWorkingCopyTransform: () => null,
+}));
+
+// SignUpPanel pulls heavy deps (useGitHubAuth, useGoogleAuth, services); mock it
+// to a recognisable testid so we can assert its presence/absence without
+// importing the real module.
+vi.mock("./SignUpPanel.tsx", () => ({
+  SignUpPanel: () => (
+    <section data-testid="signup-panel" aria-label="Submit your keyboard">
+      Sign-up panel
+    </section>
+  ),
+}));
+
+// ---------------------------------------------------------------------------
+// Import components under test AFTER mocks are registered.
+// ---------------------------------------------------------------------------
+
+import { OutputScreen } from "./OutputScreen.tsx";
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+// Minimal valid ZIP file signature (empty ZIP, 22 bytes)
+const EMPTY_ZIP_BYTES = new Uint8Array([80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
+
+/** Render helper — OutputScreen uses Lingui Trans/t macros (useLingui()),
+ * which require an I18nProvider ancestor. All OutputScreen render call-sites
+ * in this file go through this helper so there is exactly one place the
+ * provider is wired up. */
+function renderOutputScreen() {
+  return render(<OutputScreen />);
+}
+
+/**
+ * Seed an instantiated working copy — the normal end-of-flow state.
+ *
+ * Note for OutputScreen tests: seeding is by itself enough to give the screen a
+ * base. `usePreviewArtifact` lazy-inits its `baseKeyboard` from this store, and
+ * since spec 058 an instantiated working copy puts the left pane in its
+ * "shipping" variant, which has NO picker to click (re-basing from the ship-it
+ * screen was the defect that change removed). So the seeded OutputScreen tests
+ * below deliberately do not click "base-picker" — the tests that still do are
+ * exercising the cold-arrival path, where the picker is the only route.
+ */
+function seedInstantiatedWorkingCopy() {
+  const vfs = createVirtualFS([
+    { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+  ]);
+  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+    vfs,
+    ir: makeTestIR([]),
+  });
+  // spec 059 D5/D6: download is gated on attribution, because a redistributable
+  // package with no rights holder is incomplete. A fully instantiated working
+  // copy therefore has one — the dedicated no-attribution case is asserted
+  // separately below.
+  useWorkingCopyStore.getState().setAttribution({
+    authorName: "Alice Example",
+    copyrightHolder: "Alice Example",
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Setup / teardown
+// ---------------------------------------------------------------------------
+
+beforeEach(() => {
+  useWorkingCopyStore.getState().reset();
+  mockStage.current = {
+    kind: "ready",
+    compileResult: { success: true, artifacts: [], diagnostics: [], compileMs: 0, isWarmCompile: true },
+    jsBlobUrl: "",
+    vfs: createVirtualFS(),
+    scaffoldWarnings: [],
+    keyboardId: "basic_kbdus",
+  };
+  mockSerializeResult.current = null;
+});
+
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
+
+// ---------------------------------------------------------------------------
+// Route-split assertions (AC)
+// ---------------------------------------------------------------------------
+
+describe("OutputScreen — route-split AC", () => {
+  it("renders the Download .zip button after base is picked", () => {
+    seedInstantiatedWorkingCopy();
+    mockSerializeResult.current = {
+      bytes: EMPTY_ZIP_BYTES,
+      warnings: [],
+      keyboardId: "basic_kbdus",
+      version: "1.0",
+    };
+    renderOutputScreen();
+    expect(screen.getByRole("button", { name: /download/i })).toBeTruthy();
+  });
+
+  it("renders SignUpPanel after base is picked", () => {
+    renderOutputScreen();
+    fireEvent.click(screen.getByTestId("base-picker"));
+    expect(screen.getByTestId("signup-panel")).toBeTruthy();
+  });
+
+  it("does NOT render an interactive OSK (no osk-frame testid)", () => {
+    renderOutputScreen();
+    fireEvent.click(screen.getByTestId("base-picker"));
+    expect(screen.queryByTestId("osk-frame")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests — output-time touch-layout staleness gate.
+//
+// A mechanics edit after the Touch step was completed re-opens touch
+// staleness (staleSteps.has(TOUCH_STEP_ID)); MechanismGallery.handleUnlock
+// only marks "touch" stale when touchLayoutJson !== null, so this predicate
+// already implies the emitted source/<id>.keyman-touch-layout side-car would
+// be stale. Neither output surface may ship it: both the zip download and the
+// managed-PR submit must refuse-with-explanation while this predicate holds.
+// ---------------------------------------------------------------------------
+
+describe("OutputScreen — output-time touch-layout staleness gate", () => {
+  function renderWithReadyOutput() {
+    seedInstantiatedWorkingCopy();
+    mockSerializeResult.current = {
+      bytes: EMPTY_ZIP_BYTES,
+      warnings: [],
+      keyboardId: "basic_kbdus",
+      version: "1.0",
+    };
+    renderOutputScreen();
+  }
+
+  it("disables the download button when staleSteps contains the touch step id", () => {
+    renderWithReadyOutput();
+    act(() => {
+      useWorkingCopyStore.setState({ staleSteps: new Set([TOUCH_STEP_ID]) });
+    });
+
+    const btn = screen.getByTestId("emit-download") as HTMLButtonElement;
+    expect(btn.disabled).toBe(true);
+  });
+
+  it("download button aria-label explains the touch-staleness block", () => {
+    renderWithReadyOutput();
+    act(() => {
+      useWorkingCopyStore.setState({ staleSteps: new Set([TOUCH_STEP_ID]) });
+    });
+
+    expect(
+      screen.getByRole("button", { name: /download unavailable.*touch layout is out of date/i }),
+    ).toBeTruthy();
+  });
+
+  it("renders a role=alert banner explaining the block when touch is stale", () => {
+    renderWithReadyOutput();
+    act(() => {
+      useWorkingCopyStore.setState({ staleSteps: new Set([TOUCH_STEP_ID]) });
+    });
+
+    const alert = screen.getByRole("alert");
+    expect(alert.textContent).toMatch(/touch step/i);
+    expect(alert.textContent).toMatch(/out of date/i);
+  });
+
+  it("disables the managed-PR submit button when staleSteps contains the touch step id", () => {
+    renderWithReadyOutput();
+    act(() => {
+      useWorkingCopyStore.setState({ staleSteps: new Set([TOUCH_STEP_ID]) });
+    });
+
+    const submitBtn = screen.getByRole("button", {
+      name: /submit unavailable.*touch layout is out of date/i,
+    }) as HTMLButtonElement;
+    expect(submitBtn.disabled).toBe(true);
+  });
+
+  it("control: both buttons are enabled when staleSteps does NOT contain the touch step id", () => {
+    renderWithReadyOutput();
+    // Confirm the default (no staleness seeded) leaves both surfaces usable.
+    expect(useWorkingCopyStore.getState().staleSteps.has(TOUCH_STEP_ID)).toBe(false);
+
+    const downloadBtn = screen.getByTestId("emit-download") as HTMLButtonElement;
+    expect(downloadBtn.disabled).toBe(false);
+
+    // The submit button is still gated on its own form validity — fill it in
+    // so this control assertion isolates the staleness gate specifically.
+    const nameInput = screen.getByRole("textbox", { name: /your name/i });
+    fireEvent.change(nameInput, { target: { value: "Jane" } });
+    fireEvent.blur(nameInput);
+    const emailInput = screen.getByRole("textbox", { name: /email address/i });
+    fireEvent.change(emailInput, { target: { value: "jane@example.com" } });
+    fireEvent.blur(emailInput);
+    fireEvent.click(screen.getByRole("checkbox"));
+
+    const submitBtn = screen.getByRole("button", {
+      name: /submit keyboard to community repository/i,
+    }) as HTMLButtonElement;
+    expect(submitBtn.disabled).toBe(false);
+  });
+
+  it("does NOT render the staleness banner when touch is not stale", () => {
+    renderWithReadyOutput();
+    expect(screen.queryByText(/touch step/i)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests — projection warning surface (re-homed from PreviewShell.test)
+// ---------------------------------------------------------------------------
+
+describe("OutputScreen — projection warnings", () => {
+  it("does NOT render a warning region when serializeWorkingCopy returns no warnings", async () => {
+    seedInstantiatedWorkingCopy();
+    mockSerializeResult.current = {
+      bytes: EMPTY_ZIP_BYTES,
+      warnings: [],
+      keyboardId: "basic_kbdus",
+      version: "1.0",
+    };
+
+    renderOutputScreen();
+
+    // Click Download.
+    await act(async () => {
+      const btn = screen.getByRole("button", { name: /download/i });
+      fireEvent.click(btn);
+    });
+
+    // No warning region should exist.
+    expect(screen.queryByRole("status", { name: /Download projection warnings/i })).toBeNull();
+  });
+
+  it("renders the warning region with each warning string when warnings are returned", async () => {
+    seedInstantiatedWorkingCopy();
+    mockSerializeResult.current = {
+      bytes: EMPTY_ZIP_BYTES,
+      warnings: [
+        "[serialize] zip named ha_sil.zip but internal source paths still reference basic_kbdus",
+        "[carve] opaque IR skipped",
+      ],
+      keyboardId: "ha_sil",
+      version: "1.0",
+    };
+
+    renderOutputScreen();
+
+    await act(async () => {
+      const btn = screen.getByRole("button", { name: /download/i });
+      fireEvent.click(btn);
+    });
+
+    const region = screen.getByRole("status", { name: /Download projection warnings/i });
+    expect(region).toBeTruthy();
+    expect(region.textContent).toMatch(/zip named ha_sil\.zip/);
+    expect(region.textContent).toMatch(/opaque IR skipped/);
+  });
+
+  it("warning region has aria-live='polite' (non-blocking)", async () => {
+    seedInstantiatedWorkingCopy();
+    mockSerializeResult.current = {
+      bytes: EMPTY_ZIP_BYTES,
+      warnings: ["[serialize] something"],
+      keyboardId: "basic_kbdus",
+      version: "1.0",
+    };
+
+    renderOutputScreen();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /download/i }));
+    });
+
+    const region = screen.getByRole("status", { name: /Download projection warnings/i });
+    expect(region.getAttribute("aria-live")).toBe("polite");
+  });
+
+  it("warning region is cleared on a subsequent clean download", async () => {
+    seedInstantiatedWorkingCopy();
+
+    // First download — with warnings.
+    mockSerializeResult.current = {
+      bytes: EMPTY_ZIP_BYTES,
+      warnings: ["[serialize] first warning"],
+      keyboardId: "basic_kbdus",
+      version: "1.0",
+    };
+
+    renderOutputScreen();
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /download/i }));
+    });
+
+    expect(screen.getByRole("status", { name: /Download projection warnings/i })).toBeTruthy();
+
+    // Second download — no warnings.
+    mockSerializeResult.current = {
+      bytes: EMPTY_ZIP_BYTES,
+      warnings: [],
+      keyboardId: "basic_kbdus",
+      version: "1.0",
+    };
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /download/i }));
+    });
+
+    // Warning region should be gone.
+    expect(screen.queryByRole("status", { name: /Download projection warnings/i })).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests — identity-unset warning banner (AC2 + AC4)
+// ---------------------------------------------------------------------------
+
+// Helper: render OutputScreen with a base in place, so the identity-warn banner
+// (inside {baseKeyboard !== null}) renders. seedInstantiatedWorkingCopy() both
+// supplies that base (lazy-init from the store — see its docstring) and keeps
+// identity = null via instantiateFromBase's idempotence guard, which is what
+// makes showIdentityWarn true.
+function renderOutputWithBasePicked() {
+  seedInstantiatedWorkingCopy();
+  renderOutputScreen();
+}
+
+function getIdentityStatusRegion() {
+  const regions = screen.getAllByRole("status");
+  const el = regions.find((e) => e.textContent?.includes("base id"));
+  expect(el).toBeTruthy();
+  return el!;
+}
+
+describe("OutputScreen — identity-unset warning banner", () => {
+  it("renders an actionable button with the identity-step aria-label when identity is unset (AC4)", () => {
+    renderOutputWithBasePicked();
+
+    // The banner must contain a button that directs the user to the id step.
+    const btn = screen.getByRole("button", {
+      name: /go to the keyboard name and id step/i,
+    });
+    expect(btn).toBeTruthy();
+    // Clicking must not throw. TrackOneIdentityPanel is mocked in this suite,
+    // so #identity-keyboard-id is absent — the handler's getElementById returns
+    // null and the scroll/focus calls are guarded no-ops.
+    expect(() => fireEvent.click(btn)).not.toThrow();
+  });
+
+  it("actionable button is inside the role=status live region (AC4)", () => {
+    renderOutputWithBasePicked();
+
+    // Find the status region that contains the identity-warn text.
+    const identityStatus = getIdentityStatusRegion();
+    const innerBtn = identityStatus.querySelector(
+      "[aria-label='Go to the keyboard name and id step']",
+    );
+    expect(innerBtn).toBeTruthy();
+  });
+
+  it("banner text references the download/zip path (AC2)", () => {
+    renderOutputWithBasePicked();
+
+    const identityStatus = getIdentityStatusRegion();
+    // Must mention the ZIP download concern.
+    expect(identityStatus.textContent).toMatch(/\.zip|download/i);
+  });
+
+  it("banner text also references the community repository (AC2)", () => {
+    renderOutputWithBasePicked();
+
+    const identityStatus = getIdentityStatusRegion();
+    expect(identityStatus.textContent).toMatch(/community repository/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Tests — download filename
+// ---------------------------------------------------------------------------
+
+describe("OutputScreen — download filename", () => {
+  it("names the download <keyboardId>-<version>.zip", async () => {
+    seedInstantiatedWorkingCopy();
+    mockSerializeResult.current = {
+      bytes: EMPTY_ZIP_BYTES,
+      warnings: [],
+      keyboardId: "basic_kbdus",
+      version: "2.5",
+    };
+
+    // Spy on createElement to capture the download anchor's filename. Override
+    // the anchor's click() to a no-op so we read the download attr without
+    // triggering jsdom's "navigation not implemented" noise.
+    const realCreateElement = document.createElement.bind(document);
+    let anchorDownload: string | null = null;
+    const createElementSpy = vi
+      .spyOn(document, "createElement")
+      .mockImplementation(((tag: string) => {
+        const el = realCreateElement(tag);
+        if (tag === "a") {
+          const a = el as HTMLAnchorElement;
+          a.click = () => {
+            anchorDownload = a.download;
+          };
+        }
+        return el;
+      }) as typeof document.createElement);
+
+    try {
+      renderOutputScreen();
+      await act(async () => {
+        fireEvent.click(screen.getByRole("button", { name: /download/i }));
+      });
+
+      expect(anchorDownload).toBe("basic_kbdus-2.5.zip");
+    } finally {
+      createElementSpy.mockRestore();
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Attribution gate on download (spec 059 D5/D6/FR-015)
+//
+// A redistributable package with no rights holder is incomplete, and the
+// pre-037 alternative — naming the keyboard's own display name — was a false
+// attribution. So download is GATED, not warned, and the disabled reason names
+// the real cause rather than blaming the compile.
+// ---------------------------------------------------------------------------
+
+describe("OutputScreen — attribution gate", () => {
+  function seedWithoutAttribution() {
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+      vfs,
+      ir: makeTestIR([]),
+    });
+    // Deliberately NO setAttribution — this is the case under test.
+  }
+
+  it("disables download when the working copy has no attribution", () => {
+    seedWithoutAttribution();
+    render(<OutputScreen />);
+    expect((screen.getByTestId("emit-download") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("explains WHY rather than blaming the compile", () => {
+    seedWithoutAttribution();
+    render(<OutputScreen />);
+    const label = screen.getByTestId("emit-download").getAttribute("aria-label") ?? "";
+    // Tolerant of the articles ("an author and a copyright holder") — the
+    // assertion is about naming both missing facts, not the exact phrasing,
+    // which is Content's to word (Article VI).
+    expect(label).toMatch(/author and a? ?copyright holder/i);
+    expect(label).not.toMatch(/compile/i);
+  });
+
+  it("shows an actionable message naming where to fix it", () => {
+    seedWithoutAttribution();
+    render(<OutputScreen />);
+    const msg = screen.getByTestId("attribution-required").textContent ?? "";
+    expect(msg).toMatch(/author/i);
+    expect(msg).toMatch(/copyright holder/i);
+    expect(msg).toMatch(/language step/i);
+  });
+
+  it("enables download once attribution is present", () => {
+    seedInstantiatedWorkingCopy(); // seeds attribution
+    render(<OutputScreen />);
+    expect((screen.getByTestId("emit-download") as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryByTestId("attribution-required")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// D5 — unreadable base notice blocks, with an escape hatch (spec 059 T037)
+//
+// The block is only acceptable because the author is never stuck AND the remedy
+// preserves the original notice rather than dropping it.
+// ---------------------------------------------------------------------------
+
+describe("OutputScreen — unreadable base copyright notice (D5)", () => {
+  const UNREADABLE = { reason: "template_placeholder", line: "Copyright (c) YYYY ______" };
+
+  function seedWithUnreadableLicense() {
+    seedInstantiatedWorkingCopy(); // attribution present, so D5 is the ONLY blocker
+    useWorkingCopyStore.getState().setLicenseUnparseable(UNREADABLE);
+  }
+
+  it("blocks download while the base notice is unreadable", () => {
+    seedWithUnreadableLicense();
+    render(<OutputScreen />);
+    expect((screen.getByTestId("emit-download") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("names THIS reason rather than the attribution one", () => {
+    seedWithUnreadableLicense();
+    render(<OutputScreen />);
+    const label = screen.getByTestId("emit-download").getAttribute("aria-label") ?? "";
+    expect(label).toMatch(/original copyright holder/i);
+    expect(label).not.toMatch(/compile/i);
+  });
+
+  it("shows the offending line so the author can see what could not be read", () => {
+    seedWithUnreadableLicense();
+    render(<OutputScreen />);
+    expect(screen.getByTestId("license-unreadable").textContent).toContain(UNREADABLE.line);
+  });
+
+  it("offers an input to supply the original holder — a block, not a dead end", () => {
+    seedWithUnreadableLicense();
+    render(<OutputScreen />);
+    expect(screen.getByLabelText("Original copyright holder")).toBeTruthy();
+    expect(screen.getByTestId("resolve-base-holder")).toBeTruthy();
+  });
+
+  it("confirming a holder records it for the re-scaffold", () => {
+    seedWithUnreadableLicense();
+    render(<OutputScreen />);
+    fireEvent.change(screen.getByLabelText("Original copyright holder"), {
+      target: { value: "  Original Author  " },
+    });
+    fireEvent.click(screen.getByTestId("resolve-base-holder"));
+    // Trimmed, so the emitted notice carries a clean holder name.
+    expect(useWorkingCopyStore.getState().baseHolderOverride).toBe("Original Author");
+  });
+
+  it("ignores a blank submission rather than clearing the block", () => {
+    seedWithUnreadableLicense();
+    render(<OutputScreen />);
+    fireEvent.click(screen.getByTestId("resolve-base-holder"));
+    expect(useWorkingCopyStore.getState().baseHolderOverride).toBeNull();
+    expect((screen.getByTestId("emit-download") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("does not show the block when the base notice was readable", () => {
+    seedInstantiatedWorkingCopy();
+    render(<OutputScreen />);
+    expect(screen.queryByTestId("license-unreadable")).toBeNull();
+    expect((screen.getByTestId("emit-download") as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  // The load-bearing half of the escape hatch. Recording the holder alone would
+  // clear the block while leaving the already-emitted LICENSE.md without it — the
+  // pipeline has to re-run so the scaffolder retains the notice.
+  it("RE-SCAFFOLDS after the holder is confirmed, so the notice is actually retained", () => {
+    seedWithUnreadableLicense();
+    render(<OutputScreen />);
+    mockRetry.mockClear();
+
+    fireEvent.change(screen.getByLabelText("Original copyright holder"), {
+      target: { value: "Original Author" },
+    });
+    fireEvent.click(screen.getByTestId("resolve-base-holder"));
+
+    expect(mockRetry, "the pipeline must re-run or the emitted notice stays wrong").toHaveBeenCalled();
+  });
+
+  it("does NOT re-scaffold on a blank submission", () => {
+    seedWithUnreadableLicense();
+    render(<OutputScreen />);
+    mockRetry.mockClear();
+    fireEvent.click(screen.getByTestId("resolve-base-holder"));
+    expect(mockRetry).not.toHaveBeenCalled();
+  });
+});

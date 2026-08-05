@@ -7,7 +7,8 @@
 // SurveyRunner level, independent of the identity flow.
 
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import type { FlowDef } from "./types.ts";
 

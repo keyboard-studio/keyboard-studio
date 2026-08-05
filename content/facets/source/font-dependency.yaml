@@ -1,0 +1,53 @@
+# source.font-dependency — whether the source/base depends on a bundled font to
+# render (system-font-reliant) or renders with system fonts (self-contained).
+# Corroborates orth.display-difficulty. A measure-only descriptive fact in spec
+# 043; any transform is spec 039's scope. Session consumption is planned.
+
+id: source.font-dependency
+family: source
+title: Source font dependency
+description: >
+  Whether the source keyboard depends on a bundled font to render correctly —
+  system-font-reliant when it bundles a .ttf/.otf and wires it into rendering (a
+  .kmn visual-keyboard store or a .kps <OSKFont>/<DisplayFont>), else
+  self-contained. Corroborates orth.display-difficulty (a poorly-system-supported
+  script bundles its own font).
+valueType: enum
+values: [self-contained, system-font-reliant]
+
+modality: both
+
+derivations:
+  - kind: corpus
+    source: "corpus:font-dependency"
+    sourceStatus: planned
+    notes: >
+      Bundled-font presence AND font-wiring, produced by the keyboard-facet-index
+      font-dependency classifier (spec 043); session consumption of the index is
+      planned.
+
+consumers:
+  prefills: []
+  proposes:
+    - "base-eligibility:font-dependency"
+
+provenanceLabel: "whether your source keyboard needs its own bundled font to display"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: corpus
+
+notes: >
+  Measure-only in spec 043 (FR-042 / NG-002); no transform. Corroborates
+  orth.display-difficulty.
+
+transformImpactClass: gate
+houseTargetPolicy: null
+invertibility: one-way
+implications: >
+  Describes whether the base ships and wires its own font; it is a property of
+  the source package, not a switchable authoring choice in this feature.
+exceptionSites: []
+causePredicates: []

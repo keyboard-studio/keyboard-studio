@@ -4,6 +4,15 @@
   "branch": "035-mobile-touch-derivation",
   "selectedAt": "2026-07-13T16:55:31.497Z",
   "currentStep": "specify",
-  "status": "draft",
-  "history": []
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T02:04:09.616Z"
+    }
+  ],
+  "telemetryInstanceId": "ae3e7d1c-2f85-4d15-aa61-25cc0c816f67"
 }

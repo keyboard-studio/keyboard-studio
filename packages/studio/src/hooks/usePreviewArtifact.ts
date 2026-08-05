@@ -1,4 +1,11 @@
-// Shared artifact pipeline for PreviewScreen and OutputScreen.
+// The artifact pipeline for OutputScreen.
+//
+// Spec 057 (FR-026): NOT renamed and NOT modified. It used to be shared with
+// PreviewScreen; the Compare tab that replaced that screen has its own
+// deliberately weaker hook (useCompareArtifact) which passes no onInstantiate.
+// Output still needs this one's instantiate path and its download gate, so the
+// rename sweep stops at the tab's author-facing surfaces and leaves this name
+// alone.
 //
 // Encapsulates: baseKeyboard / pickerMode / scaffoldSpec local state,
 // useKeyboardArtifact, useWorkingCopyTransform, onInstantiate, diagnostics
@@ -10,7 +17,17 @@
 // across hash navigation, so selecting/instantiating on Output works
 // standalone and handleDownload reads the settled store state regardless of
 // which screen triggered the compile.
+//
+// canDownload ALSO gates on inventory coverage (the Phase F hard-gate truth,
+// spec §7.7 / §10 criterion 18.6) — not just compile-readiness. This is the
+// authoritative enforcement point: OutputScreen is directly reachable via
+// #output (nav link or a typed/bookmarked hash) without ever passing through
+// advance.ts's "help" gate or PhaseFGate, so the artifact must not be
+// emittable here either, independent of how the screen was reached. Computed
+// via the SAME shared selector (lib/unimplementedInventory.ts) StepHost and
+// PhaseFGate use — do not fork the definition a fourth time.
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { BaseKeyboard, CompilerDiagnostic } from "@keyboard-studio/contracts";
 import {
@@ -22,6 +39,8 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { instantiateFromBaseIfConfirmed } from "../lib/confirmRebase.ts";
 import { useWorkingCopyTransform } from "./useWorkingCopyTransform.ts";
 import { serializeWorkingCopy } from "../lib/serializeWorkingCopy.ts";
+import { useInventoryCoverageGate } from "./useInventoryCoverageGate.ts";
+import type { InventoryCoverageGate } from "../lib/unimplementedInventory.ts";
 
 export type PickerMode = "open" | "scaffold";
 
@@ -69,6 +88,13 @@ export interface PreviewArtifact {
   downloadWarnings: string[];
   handleDownload: () => Promise<void>;
 
+  // Inventory coverage gate — the same desktop-always/touch-only-if-authored
+  // truth StepHost and PhaseFGate compute (lib/unimplementedInventory.ts).
+  // canDownload already folds `!coverageGate.blocked` in; this is exposed
+  // separately so OutputScreen can render WHY (which characters, which
+  // modality) rather than a silently-disabled button.
+  coverageGate: InventoryCoverageGate;
+
   // Identity warning
   showIdentityWarn: boolean;
 }
@@ -110,6 +136,32 @@ export function usePreviewArtifact(): PreviewArtifact {
     clearScaffoldIfOpen(mode);
   }, [clearScaffoldIfOpen]);
 
+  // Late-instantiation adoption: the lazy init above reads the store exactly
+  // once, at mount, on the assumption that SurveyView's onInstantiate has
+  // already settled by the time the author navigates to Preview/Output. That
+  // assumption can race — SurveyView's own compile pipeline (StudioShell's
+  // onInstantiate, fired from useKeyboardArtifact's async fetch/compile/parse
+  // run) can still be in flight at the exact moment this screen mounts, so the
+  // lazy init reads null even though the working copy finishes instantiating a
+  // few hundred ms later. Without this, THIS screen's local baseKeyboard stays
+  // permanently null (no picker value, no download affordance) even after the
+  // store settles, because the lazy-init form never re-reads.
+  //
+  // This effect closes that race by adopting the store's baseKeyboard the
+  // moment it FIRST transitions to non-null — but only while this screen's own
+  // local baseKeyboard is still null. Once the author (or the mount-time lazy
+  // init) has set a local baseKeyboard, this guard permanently closes, so a
+  // later, unrelated store change (e.g. a different screen re-instantiating)
+  // can never fight handleBaseKeyboardChange's picker updates on this screen —
+  // preserving the original lazy-init contract for every case except this one
+  // race at mount.
+  const storeBaseKeyboardForLateAdopt = useWorkingCopyStore((s) => s.baseKeyboard);
+  useEffect(() => {
+    if (baseKeyboard === null && storeBaseKeyboardForLateAdopt !== null) {
+      setBaseKeyboard(storeBaseKeyboardForLateAdopt);
+    }
+  }, [baseKeyboard, storeBaseKeyboardForLateAdopt]);
+
   const [downloading, setDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [downloadWarnings, setDownloadWarnings] = useState<string[]>([]);
@@ -144,7 +196,7 @@ export function usePreviewArtifact(): PreviewArtifact {
   // discarding the survey answers and leaving nothing valid to submit. So skip
   // entirely when the store already holds a working copy for this same base;
   // only genuinely NEW bases picked via this screen's own picker fall through to
-  // instantiate. Mirrors StudioShell's instantiatedRef gate, keyed on the store
+  // instantiate. Mirrors StudioShell's instantiatedForBaseIdRef gate, keyed on the store
   // (survives this screen's own mount/unmount) rather than a per-mount ref.
   const onInstantiate = useCallback<OnInstantiateCallback>((base, { vfs, ir, removalCapabilities }) => {
     const current = useWorkingCopyStore.getState().baseKeyboard;
@@ -154,7 +206,16 @@ export function usePreviewArtifact(): PreviewArtifact {
 
   // Working-copy transform — projects carve + identity layers into the pick-base
   // OSK. Returns null when the working copy is not yet instantiated.
-  const workingCopyTransform = useWorkingCopyTransform();
+  //
+  // previewedBaseId: this screen's own local `baseKeyboard` picker state (bug
+  // F4) — it can point at a candidate base the author is previewing that
+  // differs from the store's already-instantiated base (e.g. re-visiting the
+  // picker after a base was committed and carved). Without this, the
+  // candidate base's compile would receive the committed base's carve
+  // overlay (node ids that don't belong to it) and never reach "ready".
+  const workingCopyTransform = useWorkingCopyTransform({
+    previewedBaseId: baseKeyboard?.id ?? null,
+  });
 
   const activeSpec = pickerMode === "scaffold" ? scaffoldSpec : null;
   const { stage, retry, recompile } = useKeyboardArtifact(
@@ -186,10 +247,19 @@ export function usePreviewArtifact(): PreviewArtifact {
     (storeIdentity?.keyboardId === undefined ||
       storeIdentity.keyboardId === storeBaseKeyboard.id);
 
+  // Inventory coverage gate — same shared hook StepHost/PhaseFGate use
+  // (hooks/useInventoryCoverageGate.ts).
+  const coverageGate = useInventoryCoverageGate();
+
   // canDownload: require the compile to be ready AND the working copy to be
-  // instantiated (baseVfs + baseIr available in the store). The serializer
-  // builds the zip from the store's baseVfs, not from stage.vfs, so the
-  // download contains the full projected working copy including assignments.
+  // instantiated (baseVfs + baseIr available in the store) AND every
+  // inventory character implemented in every modality actually engaged this
+  // session (the Phase F hard-gate truth — see the module comment above) AND
+  // the package's attribution is emittable (spec 059).
+  // The serializer builds the zip from the store's baseVfs, not from
+  // stage.vfs, so the download contains the full projected working copy
+  // including assignments.
+
   // spec 059 D5/D6: never emit a package whose only "holder" is invented, and
   // never emit one with no notice at all. Gate rather than warn.
   const attributionMissing = useWorkingCopyStore((s) => s.attribution === null);
@@ -202,6 +272,7 @@ export function usePreviewArtifact(): PreviewArtifact {
   const canDownload =
     stage.kind === "ready" &&
     isInstantiated &&
+    !coverageGate.blocked &&
     !attributionMissing &&
     licenseUnparseable === null;
 
@@ -224,6 +295,29 @@ export function usePreviewArtifact(): PreviewArtifact {
 
   const handleDownload = useCallback(async () => {
     if (stage.kind !== "ready") return;
+    // Defense-in-depth: the emit-download button is already disabled while
+    // coverage.blocked (canDownload), but handleDownload must refuse the
+    // emission itself too — this is the authoritative gate, not just a
+    // disabled affordance. A caller invoking this outside the normal button
+    // click (tests, a future programmatic path) must not bypass it.
+    if (coverageGate.blocked) {
+      setDownloadError("Finish every inventory character before downloading.");
+      return;
+    }
+    // Same defense-in-depth for the spec 059 attribution gates: emitting a
+    // package whose copyright notice is absent or would silently drop the base
+    // author's is the failure this feature exists to prevent, so the refusal
+    // lives on the emission path and not only on the button.
+    if (attributionMissing) {
+      setDownloadError("Add the author and copyright holder before downloading.");
+      return;
+    }
+    if (licenseUnparseable !== null) {
+      setDownloadError(
+        "The base keyboard's copyright notice could not be read — supply the original holder before downloading.",
+      );
+      return;
+    }
     setDownloading(true);
     setDownloadError(null);
     setDownloadWarnings([]);
@@ -241,7 +335,7 @@ export function usePreviewArtifact(): PreviewArtifact {
       // missing patterns, identity-injection failures). Warn-only: the
       // download still proceeds so the user is not silently blocked.
       if (result.warnings.length > 0) {
-        console.warn("[studio] download projection warnings:", result.warnings);
+        devLog.warn("[studio] download projection warnings:", result.warnings);
         setDownloadWarnings(result.warnings);
       }
 
@@ -276,7 +370,7 @@ export function usePreviewArtifact(): PreviewArtifact {
     } finally {
       setDownloading(false);
     }
-  }, [stage, revokeZipUrl]);
+  }, [stage, revokeZipUrl, coverageGate.blocked, attributionMissing, licenseUnparseable]);
 
   return {
     baseKeyboard,
@@ -297,6 +391,7 @@ export function usePreviewArtifact(): PreviewArtifact {
     downloadError,
     downloadWarnings,
     handleDownload,
+    coverageGate,
     showIdentityWarn,
   };
 }

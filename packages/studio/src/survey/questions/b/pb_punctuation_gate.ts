@@ -5,6 +5,7 @@ import type { QuestionModule, ValidationResult } from "../../types.ts";
 
 export const definition = {
   id: "pb_punctuation_gate",
+  audit_label: "Non-standard punctuation",
   prompt:
     "Does your language use any punctuation marks that are not on a standard English keyboard?",
   help_text:

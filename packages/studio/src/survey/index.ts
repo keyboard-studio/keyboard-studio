@@ -6,8 +6,11 @@
 //   → makeFlowStepComponent). The golden-walk mock seam moved to
 //   survey/FlowStepHost.tsx (used directly by makeFlowStepComponent).
 //
-// Track type is declared here (not imported from phaseWrappers.tsx which is gone)
-// so surveySessionStore.ts type-only import continues to resolve.
+// Track type — canonical definition now lives in ./types.ts (a leaf module
+// surveySessionStore.ts can import type-only WITHOUT routing through this
+// barrel, which re-exports PhaseB.tsx at runtime — see types.ts's Track
+// docstring for the runtime-cycle reason). Re-exported here for existing
+// external consumers of survey/index.ts.
 
 export { IdentityLite, extractIdentityLite } from "./IdentityLite.tsx";
 export type { IdentityLiteProps, IdentityLiteResult } from "./IdentityLite.tsx";
@@ -38,5 +41,4 @@ export type { FlowStepHostProps } from "./FlowStepHost.tsx";
 // surveySessionStore.ts imports this type-only; the canonical definition is here.
 // ---------------------------------------------------------------------------
 
-/** The two authoring tracks (spec §8 v1.3.0). */
-export type Track = "copy" | "adapt";
+export type { Track } from "./types.ts";

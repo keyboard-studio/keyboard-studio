@@ -1,3 +1,4 @@
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import type { BaseKeyboard, VirtualFS, KeyboardIR, RemovalCapability, TouchLayoutIR, KpsFontEntry, KpsStylesheetEntry } from "@keyboard-studio/contracts";
@@ -146,6 +147,20 @@ function buildCssBlobUrls(stylesheets: KpsStylesheetEntry[]): string[] {
 // ---------------------------------------------------------------------------
 // Stage discriminated union
 // ---------------------------------------------------------------------------
+//
+// Warning channels on the "ready" stage (refs #467):
+//   - scaffoldWarnings — warnings from the scaffold + pattern-apply pipeline
+//     (the scaffolder's result.warnings and the post-scaffold transform). These
+//     describe what happened while producing/mutating the artifact.
+//   - runtimeWarnings  — warnings from the runtime parse/recognize pipeline that
+//     are non-fatal to the compile (e.g. a codec IR-parse gap that disables IR
+//     features but leaves the preview working). Kept separate so the UI can
+//     render them apart from the pattern-application "Apply warnings" heading.
+//
+// Warning-text convention (both channels): each message is prefixed with a
+// bracket tag naming its source — `[<source>] <human-readable text>`
+// (e.g. `[pattern-apply] ...`, `[ir-parse] ...`). Prefer this over a prose
+// prefix so new warning sources stay greppable and visually grouped.
 
 export type Stage =
   | { kind: "idle" }
@@ -158,7 +173,7 @@ export type Stage =
    */
   | { kind: "vfs-loading" }
   | { kind: "compiling"; isWarmCompile: boolean }
-  | { kind: "ready"; compileResult: CompileResult; jsBlobUrl: string; vfs: VirtualFS; scaffoldWarnings: string[]; keyboardId: string; fontFaceUrl?: string; fontFaceFamily?: string; keyboardCssUrls?: string[] }
+  | { kind: "ready"; compileResult: CompileResult; jsBlobUrl: string; vfs: VirtualFS; scaffoldWarnings: string[]; runtimeWarnings?: string[]; keyboardId: string; fontFaceUrl?: string; fontFaceFamily?: string; keyboardCssUrls?: string[] }
   | {
       kind: "error";
       step: "fetch" | "vfs" | "compile";
@@ -206,7 +221,7 @@ export type VfsTransform = (
 
 /**
  * Called exactly once per successful fetch→compile run, after both the
- * compile result and the parsed IR are available. The caller (PreviewShell,
+ * compile result and the parsed IR are available. The caller (OutputScreen,
  * SurveyView) uses this to call instantiateFromBase or instantiateFromExisting
  * on the workingCopyStore — separating the pipeline from store ownership.
  *
@@ -411,7 +426,7 @@ export function useKeyboardArtifact(
                 try {
                   ir = { ...ir, touchLayout: engine.parseTouchLayout(touchText) };
                 } catch (e) {
-                  console.warn("[useKeyboardArtifact] parseTouchLayout failed, falling back to generated default:", e);
+                  devLog.warn("[useKeyboardArtifact] parseTouchLayout failed, falling back to generated default:", e);
                   // Leave ir.touchLayout undefined; fall back to the generated default.
                 }
               }
@@ -429,8 +444,8 @@ export function useKeyboardArtifact(
             // Record the gap so it surfaces as a warning on the ready stage.
             // Do not re-throw — compile must still succeed independently.
             parseWarning = parseErr instanceof Error
-              ? `IR features unavailable: ${parseErr.message}`
-              : "IR features unavailable: unknown parse error";
+              ? `[ir-parse] IR features unavailable: ${parseErr.message}`
+              : "[ir-parse] IR features unavailable: unknown parse error";
             return null;
           }
         })(),
@@ -449,11 +464,10 @@ export function useKeyboardArtifact(
 
     if (runId.current !== thisRunId) return;
 
-    // Fold any parse-gap note into the scaffold warnings so the ready stage
-    // surfaces "IR features unavailable: <reason>" without blocking the preview.
-    if (parseWarning !== null) {
-      warnings = [...warnings, parseWarning];
-    }
+    // Route any parse-gap note to the runtime-warning channel (refs #467) so it
+    // surfaces on the ready stage without riding the scaffold/apply channel or
+    // blocking the preview.
+    const runtimeWarnings: string[] = parseWarning !== null ? [parseWarning] : [];
 
     const jsArtifact = result.artifacts.find((a) => a.filename.endsWith(".js"));
 
@@ -487,6 +501,7 @@ export function useKeyboardArtifact(
     const readyStage: Extract<Stage, { kind: "ready" }> = {
       kind: "ready", compileResult: result, jsBlobUrl, vfs, scaffoldWarnings: warnings, keyboardId: compileId,
     };
+    if (runtimeWarnings.length > 0) readyStage.runtimeWarnings = runtimeWarnings;
     if (prevFontBlobUrl.current !== null) readyStage.fontFaceUrl = prevFontBlobUrl.current;
     if (fontFaceFamilyRef.current !== null) readyStage.fontFaceFamily = fontFaceFamilyRef.current;
     if (prevKeyboardCssBlobUrls.current.length > 0) {
@@ -574,6 +589,10 @@ export function useKeyboardArtifact(
         });
         // Record (or clear) the unreadable-notice block for the download gate.
         wc.setLicenseUnparseable(result.licenseUnparseable ?? null);
+        // Retain the base's verbatim license so the DOWNLOAD path can inherit the
+        // same holders. It completes a missing LICENSE.md, and the loader never
+        // writes the base's into the VFS, so this is its only source.
+        wc.setBaseLicenseText(result.baseLicenseText ?? null);
         vfsRef.current = result.vfs;
         scaffoldWarnings.push(...result.warnings);
         // Build font + CSS blob URLs from scaffold result — mirrors the open-base path below.

@@ -465,3 +465,133 @@ describe("buildProducedSet — opaque fragment producedOutput", () => {
     expect(buildProducedSet(ir, { includeSpace: true }).has(" ")).toBe(true);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Range-store interior inheritance (spec 042, FR-011 / contract C13)
+// ---------------------------------------------------------------------------
+
+describe("buildProducedSet — range-store interior (spec 042)", () => {
+  it("a store whose items are the full U+0904..U+0914 interior contributes all 17 codepoints via index()", () => {
+    // The engine codec (parseStoreItems) expands `store(rng) U+0904 .. U+0914`
+    // to these 17 char items; this test fixes the consumer contract: given the
+    // expanded items, buildProducedSet inherits the whole interior with NO
+    // change to its own source. (Contracts is the dependency root and cannot
+    // import the engine parser, so the expanded store is constructed directly.)
+    const rangeChars = Array.from({ length: 17 }, (_, k) => String.fromCodePoint(0x0904 + k)).join("");
+    const rng = makeStore("rng", rangeChars);
+    const ir = makeTestIR(
+      [makeGroup([makeRule([{ kind: "index", storeRef: "rng", offset: 1 }])])],
+      [rng],
+    );
+    const result = buildProducedSet(ir);
+    for (let k = 0; k < 17; k++) {
+      expect(result.has(String.fromCodePoint(0x0904 + k))).toBe(true);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Input-only characters (spec 051, invariant D2a — FR-001/FR-002)
+// ---------------------------------------------------------------------------
+
+describe("buildProducedSet — input-only characters (spec 051)", () => {
+  it("character appearing only in an any()-consumed store is absent from buildProducedSet (invariant D2a)", () => {
+    // FR-001/FR-002: produced characters are rule outputs + output-store slots;
+    // input/trigger characters (any-consumed) are NOT produced characters.
+    // This is the characterization test that pins the existing correct behavior
+    // before touching the collateral guard.
+    const inputStore = makeStore("inputOnly", "xyz");
+    const ir = makeTestIR(
+      [
+        makeGroup([
+          {
+            nodeId: "rule#test",
+            context: [
+              { kind: "vkey", name: "K_A", modifiers: [] },
+              { kind: "any", storeRef: "inputOnly" },
+            ],
+            output: [{ kind: "char", value: "result" }],
+          },
+        ]),
+      ],
+      [inputStore],
+    );
+    const result = buildProducedSet(ir);
+    // The rule produces "result", not the input chars
+    expect(result.has("r")).toBe(true);
+    expect(result.has("e")).toBe(true);
+    expect(result.has("s")).toBe(true);
+    expect(result.has("u")).toBe(true);
+    expect(result.has("l")).toBe(true);
+    expect(result.has("t")).toBe(true);
+    // Characters from the any()-consumed store are NOT produced
+    expect(result.has("x")).toBe(false);
+    expect(result.has("y")).toBe(false);
+    expect(result.has("z")).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// excludeBackspaceCorrections (opt-in) — direct-context backspace exclusion
+// ---------------------------------------------------------------------------
+
+describe("buildProducedSet — excludeBackspaceCorrections option (opt-in)", () => {
+  it("a backspace-correction rule's store output is INCLUDED by default (unchanged)", () => {
+    // any(composed) + [K_BKSP] > index(comp-dia,1) — the SIL Cameroon Â shape.
+    const compDia = makeStore("comp-dia", "X");
+    const composed = makeStore("composed", "X");
+    const ir = makeTestIR(
+      [
+        makeGroup([
+          {
+            nodeId: "rule#bksp-correction",
+            context: [
+              { kind: "any", storeRef: "composed" },
+              { kind: "vkey", name: "K_BKSP", modifiers: [] },
+            ],
+            output: [{ kind: "index", storeRef: "comp-dia", offset: 1 }],
+          },
+        ]),
+      ],
+      [compDia, composed],
+    );
+    const defaultResult = buildProducedSet(ir);
+    expect(defaultResult.has("X")).toBe(true);
+  });
+
+  it("with excludeBackspaceCorrections:true, the same rule's store output is EXCLUDED", () => {
+    const compDia = makeStore("comp-dia", "X");
+    const composed = makeStore("composed", "X");
+    const ir = makeTestIR(
+      [
+        makeGroup([
+          {
+            nodeId: "rule#bksp-correction",
+            context: [
+              { kind: "any", storeRef: "composed" },
+              { kind: "vkey", name: "K_BKSP", modifiers: [] },
+            ],
+            output: [{ kind: "index", storeRef: "comp-dia", offset: 1 }],
+          },
+        ]),
+      ],
+      [compDia, composed],
+    );
+    const result = buildProducedSet(ir, { excludeBackspaceCorrections: true });
+    expect(result.has("X")).toBe(false);
+  });
+
+  it("a normal (non-backspace) rule still contributes under both default and excludeBackspaceCorrections:true", () => {
+    const ir = makeTestIR([
+      makeGroup([
+        {
+          nodeId: "rule#normal",
+          context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
+          output: [{ kind: "char", value: "A" }],
+        },
+      ]),
+    ]);
+    expect(buildProducedSet(ir).has("A")).toBe(true);
+    expect(buildProducedSet(ir, { excludeBackspaceCorrections: true }).has("A")).toBe(true);
+  });
+});

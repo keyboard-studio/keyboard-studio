@@ -13,7 +13,10 @@
 // il_language_code / il_language_autonym.
 
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { screen, fireEvent, cleanup } from "@testing-library/react";
+// Swap only `render` (../test/renderWithI18n.tsx): the flow-step chrome calls
+// useLingui(), which throws without an <I18nProvider> ancestor.
+import { render } from "../test/renderWithI18n.tsx";
 import React from "react";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { IdentityLite, type IdentityLiteResult } from "./IdentityLite.tsx";

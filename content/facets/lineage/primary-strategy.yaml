@@ -1,0 +1,41 @@
+# lineage.primary-strategy — the base's OWN dominant spec-§7 input-method
+# strategy (the mode of its per-keyboard owned-rule strategy tally), distinct
+# from lineage.strategy-fingerprint's neighborhood aggregate. The single value
+# the §7.2 selector ranks a candidate base by (primary-strategy match, SC-006).
+# Measurement ships in spec 043's keyboard-facet-index; session consumption is
+# planned.
+
+id: lineage.primary-strategy
+family: lineage
+title: Base primary strategy
+description: >
+  The candidate base's own dominant strategy (S-01..S-13), read as the mode of
+  the recognizer's per-keyboard owned-rule tally — not the neighborhood
+  aggregate. A tie is recorded honestly as `mixed`. Lets the §7.2 selector rank
+  bases by primary-strategy match rather than inferring it from neighbors.
+valueType: enum
+values: [S-01, S-02, S-03, S-04, S-05, S-06, S-07, S-08, S-09, S-10, S-11, S-12, S-13, mixed]
+
+modality: both
+
+derivations:
+  - kind: corpus
+    source: "corpus:primary-strategy"
+    sourceStatus: planned
+    notes: >
+      Arg-max of the per-keyboard recognizer strategy tally, produced by the
+      keyboard-facet-index primary-strategy classifier (spec 043); session
+      consumption of the index is planned.
+
+consumers:
+  prefills: []
+  proposes:
+    - "strategy:primary-match"
+
+provenanceLabel: "the dominant strategy your candidate base itself uses"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: corpus

@@ -252,7 +252,9 @@ describe("token store", () => {
 
   it("setStoredToken writes only to sessionStorage, not localStorage", () => {
     setStoredToken(sample);
-    expect(sessionStorage.getItem("ks.github.token")).not.toBeNull();
+    const sessionToken = sessionStorage.getItem("ks.github.token");
+    expect(sessionToken).not.toBeNull();
+    expect(JSON.parse(sessionToken!)).toEqual(sample);
     expect(localStorage.getItem("ks.github.token")).toBeNull();
   });
 

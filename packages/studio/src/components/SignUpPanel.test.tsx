@@ -9,7 +9,8 @@
 // docs/github-integration.md §1a).
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, screen } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import { SignUpPanel } from "./SignUpPanel.tsx";
 import { useGitHubAuth, type UseGitHubAuthResult } from "../hooks/useGitHubAuth.ts";
 import { useGoogleAuth, type UseGoogleAuthResult } from "../hooks/useGoogleAuth.ts";
@@ -18,6 +19,10 @@ vi.mock("../hooks/useGitHubAuth.ts", () => ({ useGitHubAuth: vi.fn() }));
 vi.mock("../hooks/useGoogleAuth.ts", () => ({ useGoogleAuth: vi.fn() }));
 const mockedUseGitHubAuth = vi.mocked(useGitHubAuth);
 const mockedUseGoogleAuth = vi.mocked(useGoogleAuth);
+
+function renderPanel() {
+  return render(<SignUpPanel />);
+}
 
 const connect = vi.fn(async () => {});
 const disconnect = vi.fn();
@@ -68,13 +73,13 @@ afterEach(() => {
 describe("SignUpPanel", () => {
   it("shows the GitHub sign-up button when signed out (idle)", () => {
     mockAuth({ status: "idle" });
-    render(<SignUpPanel />);
+    renderPanel();
     expect(screen.getByRole("button", { name: "Sign up with GitHub" })).toBeTruthy();
   });
 
   it("calls connect('identity') when the GitHub button is clicked (identity flow, no scope)", () => {
     mockAuth({ status: "idle" });
-    render(<SignUpPanel />);
+    renderPanel();
     screen.getByRole("button", { name: "Sign up with GitHub" }).click();
     expect(connect).toHaveBeenCalledOnce();
     expect(connect).toHaveBeenCalledWith("identity");
@@ -82,21 +87,21 @@ describe("SignUpPanel", () => {
 
   it("shows the Google sign-up button enabled (not a disabled placeholder)", () => {
     mockAuth({ status: "idle" });
-    render(<SignUpPanel />);
+    renderPanel();
     const google = screen.getByRole("button", { name: "Sign up with Google" }) as HTMLButtonElement;
     expect(google.disabled).toBe(false);
   });
 
   it("calls google connect() when the Google button is clicked", () => {
     mockAuth({ status: "idle" });
-    render(<SignUpPanel />);
+    renderPanel();
     screen.getByRole("button", { name: "Sign up with Google" }).click();
     expect(googleConnect).toHaveBeenCalledOnce();
   });
 
   it("shows the signed-in GitHub identity + global sign-out when GitHub connected", () => {
     mockAuth({ status: "connected", login: "octocat" });
-    render(<SignUpPanel />);
+    renderPanel();
     expect(screen.getByText(/Signed up with GitHub as octocat/)).toBeTruthy();
     const signOut = screen.getByRole("button", { name: "Sign out" });
     signOut.click();
@@ -108,13 +113,13 @@ describe("SignUpPanel", () => {
 
   it("treats needs-scope as signed-in (identity established)", () => {
     mockAuth({ status: "needs-scope", login: "octocat" });
-    render(<SignUpPanel />);
+    renderPanel();
     expect(screen.getByText(/Signed up with GitHub/)).toBeTruthy();
   });
 
   it("shows the signed-in Google identity + sign-out when Google connected", () => {
     mockAuth({ status: "idle" }, { status: "connected", identity: testGoogleIdentity });
-    render(<SignUpPanel />);
+    renderPanel();
     expect(screen.getByText(/Signed in with Google as Test User/)).toBeTruthy();
     const signOut = screen.getByRole("button", { name: "Sign out" });
     signOut.click();
@@ -127,7 +132,7 @@ describe("SignUpPanel", () => {
       { status: "connected", login: "octocat" },
       { status: "connected", identity: testGoogleIdentity },
     );
-    render(<SignUpPanel />);
+    renderPanel();
     expect(screen.getByText(/Signed up with GitHub as octocat/)).toBeTruthy();
     expect(screen.getByText(/Signed in with Google as Test User/)).toBeTruthy();
     // One account → one sign-out, never per-provider.
@@ -144,7 +149,7 @@ describe("SignUpPanel", () => {
       { status: "connected", login: "octocat" },
       { status: "connected", identity: testGoogleIdentity },
     );
-    render(<SignUpPanel />);
+    renderPanel();
     screen.getByRole("button", { name: "Sign out" }).click();
     expect(disconnect).toHaveBeenCalledOnce();
     expect(googleDisconnect).toHaveBeenCalledOnce();
@@ -152,7 +157,7 @@ describe("SignUpPanel", () => {
 
   it("renders the GitHub error message on failure", () => {
     mockAuth({ status: "error", error: "GitHub sign-in could not be completed. Please try connecting again." });
-    render(<SignUpPanel />);
+    renderPanel();
     expect(screen.getByRole("alert").textContent).toContain("could not be completed");
   });
 
@@ -161,13 +166,13 @@ describe("SignUpPanel", () => {
       { status: "idle" },
       { status: "error", error: "Google sign-in could not be completed. Please try connecting again." },
     );
-    render(<SignUpPanel />);
+    renderPanel();
     expect(screen.getByRole("alert").textContent).toContain("could not be completed");
   });
 
   it("is an identity control only — no Submit PR / branch / pull request vocabulary", () => {
     mockAuth({ status: "connected", login: "octocat" });
-    const { container } = render(<SignUpPanel />);
+    const { container } = renderPanel();
     const text = container.textContent ?? "";
     expect(text).not.toMatch(/submit pr|pull request|branch/i);
   });

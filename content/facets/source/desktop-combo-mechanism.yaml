@@ -1,0 +1,62 @@
+# source.desktop-combo-mechanism — the dominant mechanism the chosen base's
+# .kmn uses to compose a base+mark sequence on desktop: a dedicated direct
+# key, a modifier chord, a deadkey store, a context()-match rule, or
+# delegation to the OS's own compose sequence.
+
+id: source.desktop-combo-mechanism
+family: source
+title: Source desktop combo mechanism
+description: >
+  The dominant mechanism the chosen base's .kmn rules use to compose a
+  base+mark sequence on desktop, classified from rule shape: a dedicated
+  direct key, a modifier-key chord, a deadkey store, a context()-match rule,
+  or delegation to os-compose. The strategy-selector's decision tree already
+  discriminates similar shapes (S-01..S-13); this facet reads what the base
+  actually does, ahead of any strategy re-selection for the adaptation.
+
+valueType: enum
+values: [direct-key, modifier-key, deadkey, context-match, os-compose]
+
+modality: physical
+
+derivations:
+  - kind: computed
+    source: "planned:desktop-combo-mechanism-of-kmn"
+    sourceStatus: planned
+    notes: >
+      Classifies the base's rule shapes: deadkey stores + rules keyed off
+      them, context() match rules, modifier-chord key matches, or a single
+      direct-key rule per mark; the dominant shape by rule count wins.
+
+consumers:
+  prefills:
+    - pb_typing_approach
+    - pb_mark_input_order
+  proposes:
+    - "mechanism-gallery:desktop-method-ordering"
+
+relatedAxes: [A3]
+provenanceLabel: "how your source keyboard already composes marks on desktop"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: computed
+
+transformImpactClass: ux-changing
+houseTargetPolicy:
+  inputs: [lineage.strategy-fingerprint]
+  rules:
+    - when: "lineage.strategy-fingerprint has a majority mechanism among the near neighbors"
+      target: "that majority mechanism"
+    - when: default
+      target: deadkey
+invertibility: one-way
+implications: >
+  Changing the composition mechanism changes the physical key sequence or
+  chord the typist performs to produce a mark (e.g. deadkey-then-base vs a
+  direct dedicated key); it is a visible typing-method change, not a
+  source-only rewrite.
+exceptionSites: []
+causePredicates: []

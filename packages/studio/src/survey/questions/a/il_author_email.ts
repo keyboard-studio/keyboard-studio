@@ -9,7 +9,7 @@
 // and pre-fills the Phase F contact question (FR-016).
 
 import type { QuestionModule } from "../../types.ts";
-import authorContactEmail from "./author_contact_email.ts";
+import authorContactEmail from "../reserve/author_contact_email.ts";
 
 export const definition = {
   ...authorContactEmail.definition,

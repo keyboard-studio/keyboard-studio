@@ -1,4 +1,5 @@
 import type { LintFinding } from "@keyboard-studio/contracts";
+import { stripCommentSource } from "./_shared.js";
 
 // Context statement ordering — lint.md check #11 (Compiler.cpp:1509-1520).
 // Rules for the context (LHS before +) of a key rule:
@@ -17,6 +18,10 @@ const VIRTUAL_KEY_RE = /\[[^\]]*\bK_[A-Za-z0-9_]+[^\]]*\]/g;
 // Matches nul keyword as a standalone word
 const NUL_RE = /\bnul\b/i;
 
+// Matches a single hex digit — used by extractContext to detect a `U+hhhh`
+// codepoint literal's `+` (which is never the context/key separator).
+const HEX_DIGIT_RE = /[0-9A-Fa-f]/;
+
 // Matches guard keyword calls: if(...), platform(...), baselayout(...) — shared by
 // stripGuardTokens() and the rule-2 scan below. Both manage `.lastIndex` explicitly
 // before each exec, so a single hoisted instance is safe to reuse.
@@ -30,11 +35,14 @@ const CONTENT_TOKEN_RE =
   /(?:\b(?:dk|deadkey|context|any|index)\s*\([^)]*\)|\bU\+[0-9A-Fa-f]{1,6}\b|"[^"]*"|'[^']*')/gi;
 
 /**
- * Scan `str` starting at `start` (which should be positioned just after the
- * opening `(` of a guard call) and return the index just past the matching `)`,
- * honouring nested parens and double/single-quoted strings.
+ * Scan `str` starting at `start` (which should be positioned just after an
+ * opening `(` of ANY parenthesised group — a guard call like `if(...)` or a
+ * content call like `dk(...)`/`index(...)`/`any(...)`) and return the index just
+ * past the matching `)`, honouring nested parens and double/single-quoted
+ * strings. Used by stripGuardTokens (guard groups) and blankParenContents (all
+ * groups); not guard-specific despite the historical name.
  */
-function scanPastGuardArg(str: string, start: number): number {
+function scanPastParenArg(str: string, start: number): number {
   let depth = 1;
   let inDouble = false;
   let inSingle = false;
@@ -71,7 +79,7 @@ function stripGuardTokens(ctx: string): string {
     const tokenStart = kwMatch.index;
     // kwMatch[0] ends with '(', so the arg starts right after it:
     const argStart = tokenStart + kwMatch[0].length;
-    const tokenEnd = scanPastGuardArg(ctx, argStart);
+    const tokenEnd = scanPastParenArg(ctx, argStart);
 
     // Blank out the guard token in `out`.
     for (let i = tokenStart; i < tokenEnd; i++) {
@@ -84,8 +92,38 @@ function stripGuardTokens(ctx: string): string {
 }
 
 /**
+ * Blank the CONTENTS of every parenthesised group (dk(...), index(...),
+ * any(...), if(...), etc.) with spaces, preserving the parens and surrounding
+ * tokens, so a keyword-shaped identifier used as a call ARGUMENT — e.g. a
+ * deadkey literally named `nul` in `dk(nul)` — is not mistaken for a standalone
+ * `nul` context token. Quote-aware (a ')' inside a quoted argument does not
+ * close the group early) and length-preserving (columns stay accurate).
+ *
+ * The wrapping call token is preserved (only the interior is blanked), so a
+ * legitimate content token that precedes a bare `nul` — e.g. `dk(acute) nul` —
+ * still registers as "content before nul" for the rule-1 check.
+ */
+function blankParenContents(ctx: string): string {
+  const out = ctx.split("");
+  let i = 0;
+  while (i < ctx.length) {
+    if (ctx[i] === "(") {
+      const close = scanPastParenArg(ctx, i + 1); // index just past matching ')'
+      for (let j = i + 1; j < close - 1; j++) out[j] = " ";
+      i = close;
+    } else {
+      i++;
+    }
+  }
+  return out.join("");
+}
+
+/**
  * Extract the context (LHS before the rule separator `+`) from a rule line.
- * Returns null if the line does not look like a key rule (no `+` separator).
+ * Returns null unless the line is a key rule — i.e. it has BOTH a context/key
+ * separator `+` and, after it, an unquoted `>` rule separator. Requiring the
+ * `>` confirmation stops a non-rule line with irregular spacing (e.g.
+ * `store(x) "a" +"b"`) from being mis-scanned as a rule.
  * Lines starting with `+` have no context (empty LHS).
  */
 function extractContext(line: string): { ctx: string; ctxStart: number } | null {
@@ -95,35 +133,61 @@ function extractContext(line: string): { ctx: string; ctxStart: number } | null 
     return null;
   }
 
-  // Scan for the first ` + ` separator, skipping quoted regions.
+  // Single quote/paren-aware scan that must find, in order:
+  //   (a) the context/key separator `+`, then
+  //   (b) an unquoted, depth-0 `>` rule separator after it.
   let inDouble = false;
   let inSingle = false;
-  let depth = 0; // paren depth — skip contents of function calls
+  let sepIndex = -1;
   for (let i = 0; i < line.length; i++) {
     const ch = line[i];
-    if (ch === '"' && !inSingle && depth === 0) { inDouble = !inDouble; continue; }
-    if (ch === "'" && !inDouble && depth === 0) { inSingle = !inSingle; continue; }
+    if (ch === '"' && !inSingle) { inDouble = !inDouble; continue; }
+    if (ch === "'" && !inDouble) { inSingle = !inSingle; continue; }
     if (inDouble || inSingle) continue;
-    if (ch === "(") { depth++; continue; }
-    if (ch === ")") { depth = Math.max(0, depth - 1); continue; }
-    if (depth > 0) continue;
-    if (ch === "+" && (i === 0 || line[i - 1] === " ") &&
-        (i + 1 >= line.length || line[i + 1] === " ")) {
-      return { ctx: line.slice(0, i).trim(), ctxStart: 0 };
+    if (ch === "(") { i = scanPastParenArg(line, i + 1) - 1; continue; }
+
+    if (sepIndex < 0 && ch === "+") {
+      // Any depth-0, unquoted `+` is the context/key separator — whether it is
+      // whitespace-, terminator- (`]` `)` `'` `"`), or bareword-preceded (e.g.
+      // `nul+[K_A]`). The one exception is a `U+hhhh` codepoint literal, whose
+      // `+` follows `U`/`u` and precedes a hex digit; that `+` is never the
+      // separator, so a later real `+` (or none) is used instead.
+      const prev = line[i - 1];
+      const next = line[i + 1];
+      const isCodepointPlus =
+        (prev === "U" || prev === "u") && next !== undefined && HEX_DIGIT_RE.test(next);
+      if (!isCodepointPlus) {
+        sepIndex = i;
+      }
+      continue;
+    }
+
+    if (sepIndex >= 0 && ch === ">") {
+      // Confirmed rule: separator found and an unquoted `>` follows it.
+      // ctxStart records the leading-whitespace width dropped by trim() so the
+      // caller can re-offset finding columns back to the original line (an
+      // indented rule's context otherwise reports a column shifted left).
+      const rawCtx = line.slice(0, sepIndex);
+      return { ctx: rawCtx.trim(), ctxStart: rawCtx.length - rawCtx.trimStart().length };
     }
   }
+  // No separator, or no `>` after it — not a key rule.
   return null;
 }
 
 export function checkContextOrdering(source: string): LintFinding[] {
   const findings: LintFinding[] = [];
-  const lines = source.split("\n");
+  // Strip trailing `c` comments before scanning — quote-preserving, unlike
+  // stripNonCodeSource, since Rule 2's CONTENT_TOKEN_RE legitimately matches
+  // quoted-string content tokens. A comment containing `>`, `+`, `nul`, or
+  // `[K_X]` must not contaminate the rule scan (see stripCommentSource docs).
+  const lines = stripCommentSource(source).split("\n");
 
   for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
     const line = lines[lineIdx] ?? "";
     const extracted = extractContext(line);
     if (!extracted) continue;
-    const { ctx } = extracted;
+    const { ctx, ctxStart } = extracted;
     if (!ctx) continue;
 
     // --- Rule 3: no virtual keys [K_X] in context ---
@@ -135,7 +199,7 @@ export function checkContextOrdering(source: string): LintFinding[] {
         severity: "error",
         layer: "A",
         message: `Virtual key "${vkMatch[0]}" is not allowed in the context (LHS) of a rule`,
-        location: { file: "", line: lineIdx + 1, column: vkMatch.index + 1 },
+        location: { file: "", line: lineIdx + 1, column: vkMatch.index + ctxStart + 1 },
       });
     }
 
@@ -146,18 +210,26 @@ export function checkContextOrdering(source: string): LintFinding[] {
     const ctxStripped = stripGuardTokens(ctx);
 
     // --- Rule 1: nul must be the first token if present ---
-    const nulInStripped = NUL_RE.exec(ctxStripped);
-    if (nulInStripped) {
-      const beforeNul = ctxStripped.slice(0, nulInStripped.index).trim();
+    // Strip guard clauses first (stripGuardTokens erases the whole
+    // if()/platform()/baselayout() token so a guard preceding `nul` is not
+    // "content before nul" — guards are allowed before nul), THEN blank the
+    // contents of the remaining parenthesised groups so a keyword-shaped
+    // argument (e.g. a deadkey named `nul` in `dk(nul)`) is not mistaken for a
+    // standalone `nul`. Both passes are length-preserving, so the match index
+    // is the accurate column. A non-guard call wrapper survives blanking, so
+    // `dk(acute) nul` still has content before the bare `nul` and correctly
+    // reports NUL_NOT_FIRST.
+    const ctxForNul = blankParenContents(stripGuardTokens(ctx));
+    const nulMatch = NUL_RE.exec(ctxForNul);
+    if (nulMatch) {
+      const beforeNul = ctxForNul.slice(0, nulMatch.index).trim();
       if (beforeNul.length > 0) {
-        // Find nul position in original ctx for accurate column
-        const nulOrig = NUL_RE.exec(ctx);
         findings.push({
           code: "KM_ERROR_NUL_NOT_FIRST",
           severity: "error",
           layer: "A",
           message: `"nul" must be the first token in the context`,
-          location: { file: "", line: lineIdx + 1, column: (nulOrig?.index ?? 0) + 1 },
+          location: { file: "", line: lineIdx + 1, column: nulMatch.index + ctxStart + 1 },
         });
       }
     }
@@ -171,7 +243,7 @@ export function checkContextOrdering(source: string): LintFinding[] {
     let guardKwMatch: RegExpExecArray | null;
     while ((guardKwMatch = GUARD_KW_RE.exec(ctx)) !== null) {
       const argStart = guardKwMatch.index + guardKwMatch[0].length;
-      const end = scanPastGuardArg(ctx, argStart);
+      const end = scanPastParenArg(ctx, argStart);
       lastGuardEnd = Math.max(lastGuardEnd, end);
     }
 
@@ -188,7 +260,7 @@ export function checkContextOrdering(source: string): LintFinding[] {
             severity: "error",
             layer: "A",
             message: `if()/platform()/baselayout() must appear before other content tokens in the context`,
-            location: { file: "", line: lineIdx + 1, column: contentMatch.index + 1 },
+            location: { file: "", line: lineIdx + 1, column: contentMatch.index + ctxStart + 1 },
           });
           break; // one finding per line is sufficient
         }

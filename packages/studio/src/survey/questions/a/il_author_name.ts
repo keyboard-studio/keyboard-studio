@@ -15,9 +15,14 @@
 // keeps one source of survey copy (Article VI: prompt text is Content-owned;
 // Engine authors none here) and leaves the demoted modules byte-identical for the
 // no-delete guardrail.
+//
+// Those modules live under `questions/reserve/` — relocated there wholesale (#1318)
+// so the Flow Map's live drill-downs stop rendering them as reserve clutter. They
+// remain registered, on disk, and test-covered, which is what makes this import a
+// stable seam rather than a reference into something on its way out.
 
 import type { QuestionModule, ValidationResult } from "../../types.ts";
-import authorDisplayName from "./author_display_name.ts";
+import authorDisplayName from "../reserve/author_display_name.ts";
 
 export const definition = {
   ...authorDisplayName.definition,

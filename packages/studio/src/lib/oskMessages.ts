@@ -33,10 +33,27 @@ export interface SetKeyboardCommand {
 
 export interface SetOskModeCommand {
   type: "SET_OSK_MODE";
-  mode: "desktop" | "touch";
+  mode: "desktop" | "touch" | "tablet";
 }
 
-export type OskCommand = SetKeyboardCommand | SetOskModeCommand;
+/**
+ * Push localized UI strings into the frame. The frame is a static
+ * /osk-frame.html document with no access to the studio's Lingui catalogs,
+ * so its user-facing chrome (the input placeholder and the idle "pick a
+ * keyboard" status prompt) is supplied by the host, which does have `t`.
+ * Sent on frame load and whenever the active locale changes.
+ */
+export interface SetStringsCommand {
+  type: "SET_STRINGS";
+  strings: {
+    /** Placeholder for the type-here textarea. */
+    placeholder?: string;
+    /** Status line shown once the engine is up but no keyboard is active yet. */
+    statusReady?: string;
+  };
+}
+
+export type OskCommand = SetKeyboardCommand | SetOskModeCommand | SetStringsCommand;
 
 // ---------------------------------------------------------------------------
 // Events: frame → host

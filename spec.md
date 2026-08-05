@@ -978,9 +978,9 @@ Changes to the KeyboardIR schema (§5a) — field renames, type changes, removal
 | Document | Location |
 |---|---|
 | Authoring plan and component architecture | `docs/KM-Questionnaire.md` in the keyboard-studio repo, or https://github.com/keyboard-studio/keyboard-studio/blob/main/docs/KM-Questionnaire.md |
-| Validator / lint architecture (14 compiler checks) | `docs/lint.md` in the keyboard-studio repo, or https://github.com/keyboard-studio/keyboard-studio/blob/main/docs/lint.md |
-| PR review criteria (~200 checkpoints, green/yellow/red) | `docs/criteria.md` in the keyboard-studio repo, or https://github.com/keyboard-studio/keyboard-studio/blob/main/docs/criteria.md |
-| Template-cleanup recipe (scaffolder source of truth) | `docs/making-a-template.md` in the keyboard-studio repo, or https://github.com/keyboard-studio/keyboard-studio/blob/main/docs/making-a-template.md |
+| Validator / lint architecture (14 compiler checks) | [docs/lint.md](docs/lint.md) |
+| PR review criteria (~200 checkpoints, green/yellow/red) | [docs/criteria.md](docs/criteria.md) |
+| Template-cleanup recipe (scaffolder source of truth) | [docs/making-a-template.md](docs/making-a-template.md) |
 | `.kmn` strategy framework (discovery axes, decision tree, strategy cards S-01..S-12) | Merged into Sec 7 of this spec. `strategy tree/strategies.md` is retained only as a stub pointer — do not treat it as a separate source. |
 | GitHub repository | https://github.com/keyboard-studio/keyboard-studio |
 | Issue tracker | https://github.com/keyboard-studio/keyboard-studio/issues |

@@ -1,0 +1,32 @@
+# touch-number-row — corpus counterpart of the session facet
+# source.touch-number-row: whether a corpus keyboard's
+# .keyman-touch-layout shows a 5th (number) row, and whether it carries
+# digits or is repurposed for letters.
+#
+# derivation.archetype note: as with touch-combo-mechanism, the natural
+# label is "touch-layout scan"; ARCHETYPES has no touch-layout-specific
+# member yet, so "rule-structure" is used as the closest fit — a
+# .keyman-touch-layout JSON file is itself a declarative rule structure
+# (row/key -> character), not a .kmn rule.
+
+id: touch-number-row
+title: Touch number row presence/content
+description: >
+  Whether a corpus keyboard's .keyman-touch-layout shows the top row (row
+  id "1", above the qwerty letter rows), and whether that row carries digit
+  characters, letter characters, or a mix across layers. Read from the
+  touch-layout JSON directly, independent of the desktop .kmn source. Feeds
+  the source.touch-number-row session facet.
+valueType: enum
+limits:
+  values: [absent, digits, letters, mixed]
+  open: false
+likelihoodSemantics: >
+  the single classified value for the keyboard's touch layout; likelihood
+  is 1 for the classified value.
+derivation:
+  archetype: rule-structure
+  classifierId: touch-number-row-classifier
+  fallbackChain: [content-derived, undetermined]
+feedsSessionFacets: [source.touch-number-row]
+schemaVersion: 1

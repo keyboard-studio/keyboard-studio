@@ -1,21 +1,25 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
+import { Trans, useLingui } from "@lingui/react/macro";
+import { msg, plural } from "@lingui/core/macro";
 import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
-import { toRailNodes, nodeState, buildCharWeb } from '../../lib/irToCarveNodes.ts';
-import type { CarveNode, CharLocation } from '../../lib/irToCarveNodes.ts';
+import { toRailNodes, nodeState, buildCharWeb, annotateRemovalRecommendations, recommendedRemovalChars, coordinatedCollateralForSlots, displayChar, resolveNodeName, resolveLocationLabel } from '../../lib/irToCarveNodes.ts';
+import type { CarveNode, CharLocation, RecommendedRemovalChar, CoordinatedCollateralChar } from '../../lib/irToCarveNodes.ts';
 import { KIND_COLOR } from '../assignLoop/parts/KindBadge.tsx';
 import { StatusBar } from '../assignLoop/parts/StatusBar.tsx';
 import type { RemovedItem } from '../assignLoop/parts/StatusBar.tsx';
 import { DepBanner } from '../assignLoop/parts/DepBanner.tsx';
 import type { DepNode } from '../assignLoop/parts/DepBanner.tsx';
+import { RemovalBanner } from '../assignLoop/parts/RemovalBanner.tsx';
 import { Rail } from '../assignLoop/parts/Rail.tsx';
 import { Inspector } from '../assignLoop/parts/Inspector.tsx';
 import { InfoView, capabilityHint } from '../assignLoop/parts/InfoView.tsx';
-import { InfoIcon } from '../assignLoop/parts/carveShared.tsx';
+import { InfoIcon, resolveMessage } from '../assignLoop/parts/carveShared.tsx';
 import { ConfirmDialog } from '../assignLoop/parts/ConfirmDialog.tsx';
 import { useHoverInfoStore } from '../../stores/hoverInfoStore.ts';
-import { collectCharContributors } from '@keyboard-studio/engine';
-import type { CharContributors } from '@keyboard-studio/engine';
+import { collectCharContributors, analyzeStores } from '@keyboard-studio/engine';
+import type { CharContributors, StoreAnalysis, CharNormalizationForm } from '@keyboard-studio/engine';
 import type { KeyboardIR, RemovalCapability } from '@keyboard-studio/contracts';
+import { useCarveNeededSet } from '../../hooks/useCarveNeededSet.ts';
 
 /** Pending cascade state — set when the user clicks a cross-wired chip. */
 interface PendingCascade {
@@ -29,6 +33,42 @@ interface PendingCascade {
   restoreIds: string[];
   /** contributors.ruleNodeIds is the REMOVABLE set only; blocked carries the warnings (remove mode). */
   contributors: CharContributors;
+  /**
+   * Remove mode only (always `[]` for restore) — coordinated-drop collateral
+   * this removal will ALSO cause in a PAIRED store, via
+   * classifyStoreSlotEdit's `coordinatedWith` (see coordinatedCollateralForSlots).
+   * Never silent: any non-empty collateral routes the click through this
+   * dialog even when the clicked chip is otherwise its char's sole producer.
+   */
+  collateral: CoordinatedCollateralChar[];
+}
+
+/**
+ * Pending BULK-removal cascade state — set when a store-card master toggle
+ * (Rail's whole-store ToggleBox, or StoreDetail's "select all" toggle, both
+ * routed through handleSetManyGlyphs) would ALSO drop a coordinated
+ * collateral character from a paired store. A bulk removal is MORE likely to
+ * hit a coordinated pair than a single chip (it can span every slot in a
+ * store at once), so it gets the same "remove everywhere" awareness a single
+ * chip gets via PendingCascade — one dialog for the whole batch, not one per
+ * gid (see handleSetManyGlyphs below).
+ */
+interface PendingBulkCascade {
+  /** The full batch of ids the caller asked to remove (glyph gids and/or store slot ids). */
+  gids: string[];
+  /** Coordinated-drop collateral aggregated across the WHOLE batch (deduped by partner slot id). */
+  collateral: CoordinatedCollateralChar[];
+  /**
+   * Not-removable producers found while resolving a case-paired proposal row's
+   * OTHER member (spec 051 FR-011/FR-015, contracts/case-pairing.md
+   * "Composition with store pairing") — always `[]` for the plain store-card
+   * bulk-toggle caller (handleSetManyGlyphs never populates this). A blocked
+   * producer must not silently drop out of the union (FR-008), so it rides
+   * along in the SAME dialog this already opens for isLost collateral,
+   * reusing the identical warning box the single-chip dialog renders for
+   * `pendingCascade.contributors.blocked` — no second dialog is introduced.
+   */
+  blocked: CharContributors['blocked'];
 }
 
 interface BuildPendingCascadeArgs {
@@ -42,6 +82,35 @@ interface BuildPendingCascadeArgs {
   isItemDeleted: (id: string) => boolean;
   removalCapabilities: Map<string, RemovalCapability>;
   nodes: CarveNode[];
+  /** Confirmed-inventory ∪ CLDR needed-set — threaded into coordinatedCollateralForSlots
+   *  so a collateral partner char can be flagged "needed" in the confirm dialog. */
+  needed: ReadonlySet<string>;
+  /** Target language, for the Turkic-aware case fold in isCharCoveredForLocale. */
+  bcp47?: string | null | undefined;
+  /**
+   * Precomputed engine analyzeStores(ir) result, hoisted ONCE per `ir` by the
+   * caller (see the `storeAnalysis` memo below) and threaded through to
+   * coordinatedCollateralForSlots — classifyStoreSlotEdit/describeStorePairing
+   * scan every rule in the IR, so recomputing this per chip click would
+   * re-scan the whole IR on every 300ms-cycle-adjacent click (#931 perf).
+   * Undefined only when `ir` itself is null (buildPendingCascade bails before
+   * using it in that case).
+   */
+  analysis: StoreAnalysis | undefined;
+  /** From the caller's useLingui() — passed through to capabilityHint() and
+   * resolveMessage() (the "an advanced rule" fallback label below). Not a bare
+   * `t` parameter: Lingui's macro tracks the specific binding useLingui()
+   * introduces, so a re-bound `t` here would be a distinct binding the
+   * extractor doesn't follow (see Inspector.tsx's storeBlurb for the same fix). */
+  i18n: import('@lingui/core').I18n;
+  /**
+   * Normalization form the marks series' output-form decision resolves to
+   * (see `normalizationFormForOutputForm`) — threaded into
+   * coordinatedCollateralForSlots so a collateral partner char is compared
+   * against `needed` under the SAME form the rest of the carve comparison
+   * uses. Optional; defaults to "NFC" inside coordinatedCollateralForSlots.
+   */
+  form?: CharNormalizationForm | undefined;
 }
 
 /**
@@ -51,9 +120,17 @@ interface BuildPendingCascadeArgs {
  * or open the cascade ConfirmDialog (returns a PendingCascade). Only the
  * caller-resolved clickedCapability/clickedLabel differ between callers —
  * store chips carry no per-rule capability, so they pass undefined / 'this character'.
+ *
+ * Manual-carve safety (#525/#931 follow-up): remove-mode ALWAYS resolves
+ * coordinatedCollateralForSlots over the store slots this removal will
+ * actually drop. Any non-empty collateral forces the ConfirmDialog open —
+ * even for what would otherwise be a "sole producer" plain toggle — because
+ * a coordinated drop can silently take a PAIRED store's aligned character
+ * (e.g. a deadkey's composed output) along with it. Awareness, not
+ * prevention: the user can still confirm and remove.
  */
 function buildPendingCascade({
-  ir, gid, targetChar, clickedCapability, clickedLabel, isItemDeleted, removalCapabilities, nodes,
+  ir, gid, targetChar, clickedCapability, clickedLabel, isItemDeleted, removalCapabilities, nodes, needed, bcp47, analysis, i18n, form,
 }: BuildPendingCascadeArgs): PendingCascade | null {
   // No IR to analyse → plain single-chip toggle.
   if (ir == null) return null;
@@ -70,6 +147,7 @@ function buildPendingCascade({
     return {
       gid, targetChar, mode: 'restore', actionCount: restoreIds.length, restoreIds,
       contributors: { ...found, blocked: [] },
+      collateral: [],
     };
   }
 
@@ -77,30 +155,191 @@ function buildPendingCascade({
   const removableRuleIds = found.ruleNodeIds.filter((id) => !isNotRemovable(id));
   const blockedRuleIds = found.ruleNodeIds.filter(isNotRemovable);
   const ruleLabel = (id: string): string => {
-    for (const node of nodes) if (node.glyphs?.some((g) => g.gid === id)) return node.name;
-    return 'an advanced rule';
+    for (const node of nodes) if (node.glyphs?.some((g) => g.gid === id)) return resolveNodeName(node, i18n);
+    return resolveMessage(i18n, msg({ id: 'editor.carve.advancedRuleFallbackLabel', message: 'an advanced rule' }));
   };
   const blocked = [
     ...found.blocked,
-    ...blockedRuleIds.map((id) => ({ label: ruleLabel(id), reason: capabilityHint(removalCapabilities.get(id) ?? 'not-removable:unknown') })),
+    ...blockedRuleIds.map((id) => ({ label: ruleLabel(id), reason: capabilityHint(removalCapabilities.get(id) ?? 'not-removable:unknown', i18n) })),
   ];
   // The clicked "!" chip is often NOT a plain single-char producer, so it never
   // lands in found.ruleNodeIds/blockedRuleIds — add it explicitly so the warning
   // box always names the not-removable chip the user actually clicked.
   if (clickedIsNotRemovable && !blockedRuleIds.includes(gid)) {
-    blocked.push({ label: clickedLabel, reason: capabilityHint(clickedCapability ?? 'not-removable:unknown') });
+    blocked.push({ label: clickedLabel, reason: capabilityHint(clickedCapability ?? 'not-removable:unknown', i18n) });
   }
 
   const removableCount = removableRuleIds.length + found.storeSlotIds.length;
 
+  // Coordinated collateral — resolved over the store slots that will ACTUALLY
+  // be dropped (classifyStoreSlotEdit inside the helper already filters to
+  // mode 'drop' only, so a slot classifyStoreSlotEdit would block is never
+  // reported as collateral here either). Threads the precomputed `analysis`
+  // through so this doesn't re-scan the whole IR on every chip click (#931 perf).
+  const collateral = coordinatedCollateralForSlots(found.storeSlotIds, ir, needed, bcp47, analysis, form);
+
   // Plain toggle (no dialog) ONLY for a removable chip that is its char's sole
-  // producer with nothing blocked. A not-removable chip ALWAYS opens the dialog.
-  if (!clickedIsNotRemovable && removableCount <= 1 && blocked.length === 0) return null;
+  // producer, nothing blocked, AND no coordinated collateral. A not-removable
+  // chip, or ANY collateral (even for a sole producer), ALWAYS opens the dialog.
+  //
+  // FR-008 (spec 051) — "closes with no visible effect" is unreachable here,
+  // and these three conditions are exactly why. A second producer cannot slip
+  // past them: a removable one is counted in `removableCount`, a not-removable
+  // one lands in `blocked`, and a coordinated partner lands in `collateral` —
+  // each of which opens the dialog and names its reason. So this fast path
+  // fires only when the clicked tile IS the whole trim, which is why flipping
+  // that one gid is a complete and visible outcome. Pinned by the FR-007/FR-008
+  // tests in CarveGallery.test.tsx; see research.md §R5's recorded outcome.
+  if (!clickedIsNotRemovable && removableCount <= 1 && blocked.length === 0 && collateral.length === 0) return null;
 
   return {
     gid, targetChar, mode: 'remove', actionCount: removableCount, restoreIds: [],
     contributors: { ...found, ruleNodeIds: removableRuleIds, blocked },
+    collateral,
   };
+}
+
+/**
+ * "Marked not-removable" warning box — shared by the single-chip cascade
+ * dialog (`pendingCascade.contributors.blocked`) and the bulk cascade dialog
+ * (`pendingBulkCascade.blocked`, populated only by a case-paired proposal
+ * row's OTHER member — spec 051 FR-008/FR-011/FR-015). Extracted so the paired
+ * bulk path reuses the IDENTICAL box rather than a second one (no new dialog,
+ * no divergent copy).
+ */
+function BlockedWarning({ blocked }: { blocked: CharContributors['blocked'] }) {
+  if (blocked.length === 0) return null;
+  return (
+    <div
+      role="alert"
+      style={{
+        marginTop: 8,
+        padding: '8px 12px',
+        borderRadius: 8,
+        background: 'color-mix(in srgb, var(--sil-orange) 10%, var(--app-surface))',
+        border: '1px solid color-mix(in srgb, var(--sil-orange) 40%, transparent)',
+        fontSize: 12,
+        color: 'var(--sil-orange-dark)',
+      }}
+    >
+      <b><Trans id="editor.carve.cascade.markedNotRemovable">⚠ Marked not-removable — these will stay:</Trans></b>{' '}
+      {blocked.map((b, i) => (
+        <span key={i}>
+          {b.label} ({b.reason}){i < blocked.length - 1 ? ', ' : ''}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+/** Comma-joined "<char> from <store>" list, shared by both collateral boxes. */
+function CollateralList({ entries }: { entries: CoordinatedCollateralChar[] }) {
+  return (
+    <>
+      {entries.map((c, i) => (
+        <span key={c.slotId}>
+          &quot;{displayChar(c.ch)}&quot; from {c.storeName}
+          {i < entries.length - 1 ? ', ' : ''}
+        </span>
+      ))}
+    </>
+  );
+}
+
+/**
+ * Coordinated-removal collateral box — shared markup for both the
+ * single-cascade dialog (one clicked chip) and the bulk-cascade dialog (a
+ * whole batch), which previously duplicated this block near-verbatim
+ * (#525/#931 follow-up review fix — dedup).
+ *
+ * Severity is split by CONSEQUENCE, not by `isNeeded` (spec 051 FR-005). The
+ * old copy warned "this will also remove a character you need" for every
+ * needed partner char, including the common and harmless case where the
+ * partner is an any()-consumed INPUT store: trimming `ɨ` off Cameroon's
+ * grave-accent pair drops `i` from the deadkey's input store, but `i` is still
+ * typeable through its own base rule — only the `i → ɨ` combination stops
+ * firing. Telling the author they are about to lose a letter they need was
+ * simply wrong there.
+ *
+ *   isLost          -> warning,       role="alert",  must be confirmed (FR-006)
+ *   role === input  -> informational, role="status", names the lost transform
+ *   otherwise       -> informational, role="status", neutral copy
+ */
+function CollateralWarning({
+  collateral,
+  isBulk,
+  targetChar,
+}: {
+  collateral: CoordinatedCollateralChar[];
+  isBulk: boolean;
+  /** The character being trimmed, when a single one is (drives the input-drop copy). */
+  targetChar?: string | undefined;
+}) {
+  const { t } = useLingui();
+  const lost = collateral.filter((c) => c.isLost);
+  const inputDrops = collateral.filter((c) => !c.isLost && c.role === 'input');
+  const otherDrops = collateral.filter((c) => !c.isLost && c.role !== 'input');
+
+  const boxStyle = (emphatic: boolean) => ({
+    marginTop: 8,
+    padding: '8px 12px',
+    borderRadius: 8,
+    background: 'color-mix(in srgb, var(--sil-orange) 10%, var(--app-surface))',
+    border: emphatic
+      ? '1px solid var(--sil-orange)'
+      : '1px solid color-mix(in srgb, var(--sil-orange) 40%, transparent)',
+    fontSize: 12,
+    color: 'var(--sil-orange-dark)',
+  });
+
+  return (
+    <>
+      {lost.length > 0 && (
+        <div role="alert" style={boxStyle(true)}>
+          <b>
+            {isBulk
+              ? t({ id: "editor.carve.collateralWarning.anyNeededPlural", message: "This will also remove characters you need, from paired stores:" })
+              : t({ id: "editor.carve.collateralWarning.anyNeededSingular", message: "This will also remove a character you need, from a paired store:" })}
+          </b>{' '}
+          {lost.map((c, i) => (
+            <span key={c.slotId}>
+              &quot;{displayChar(c.ch)}&quot; from {c.storeName}
+              <b> — {t({ id: "editor.carve.collateralWarning.neededForLanguage", message: "needed for your language" })}</b>
+              {i < lost.length - 1 ? ', ' : ''}
+            </span>
+          ))}
+        </div>
+      )}
+      {inputDrops.length > 0 && (
+        <div role="status" style={boxStyle(false)}>
+          {inputDrops.map((c, i) => (
+            <span key={c.slotId}>
+              {/* Wording per the km-domain read of OQ-2 (spec 051 T031): "combination"
+                  is the right mechanism-neutral noun for BOTH a deadkey sequence and an
+                  AltGr fan-out, but "fire" is event-system jargon and "stays typeable"
+                  buries the reassurance in the passive. Plain, active phrasing instead. */}
+              {targetChar === undefined
+                ? t({
+                    id: "editor.carve.collateralWarning.inputDropGeneric",
+                    message: `The "${displayChar(c.ch)}" combination will no longer work. You can still type "${displayChar(c.ch)}" on its own.`,
+                  })
+                : t({
+                    id: "editor.carve.collateralWarning.inputDrop",
+                    message: `The "${displayChar(c.ch)}" → "${displayChar(targetChar)}" combination will no longer work. You can still type "${displayChar(c.ch)}" on its own.`,
+                  })}
+              {i < inputDrops.length - 1 ? ' ' : ''}
+            </span>
+          ))}
+        </div>
+      )}
+      {otherDrops.length > 0 && (
+        <div role="status" style={boxStyle(false)}>
+          <b>{t({ id: "editor.carve.collateralWarning.removing", message: "Removing this will also remove from paired stores:" })}</b>{' '}
+          <CollateralList entries={otherDrops} />
+        </div>
+      )}
+    </>
+  );
 }
 
 interface CarveGalleryProps {
@@ -109,9 +348,55 @@ interface CarveGalleryProps {
 }
 
 export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
+  const { t, i18n } = useLingui();
   const ir = useWorkingCopyStore((s) => s.ir);
   const removalCapabilities = useWorkingCopyStore((s) => s.removalCapabilities);
   const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
+  // #525 FOUNDATION slice — the confirmed Phase B inventory drives removal
+  // recommendations.
+  //
+  // #1357 data-derivation prerequisite — carve's needed-set is DERIVED from
+  // the marks series' final answers (spec 046 marksWorklist/marksOutputForm),
+  // not just the flat confirmedInventory (which unconditionally folds in
+  // EVERY attested stack/lone mark regardless of the marks series' own
+  // reachability decisions — see deriveConfirmedInventory). The 3-tier
+  // classification (deriveCarveNeededSet) replaces ONLY the alphabet-derived
+  // slice of confirmedInventory with its refined required/optional split;
+  // any OTHER source of confirmedInventory is preserved verbatim, so nothing
+  // that used to count as needed stops counting except a genuine marks-series
+  // BLOCK-CANDIDATE.
+  //
+  // #525 items 2/4 — the language-driven surplus signal (CLDR/SLDR exemplars)
+  // resolves ASYNCHRONOUSLY inside the hook and arrives as an already-resolved
+  // Set; the pure annotateRemovalRecommendations() pass below never does I/O.
+  //
+  // Shared with the pre-carve convenience question via useCarveNeededSet so
+  // the two surfaces reason about the same needed-set (see that hook's doc).
+  const {
+    neededSet: orthographyNeededSet,
+    tieredNeededSet: orthographyTiered,
+    neededChars,
+    form: carveNormalizationForm,
+    bcp47: identityBcp47,
+    hasSignal,
+  } = useCarveNeededSet();
+
+  // Base characters the author chose to KEEP at the pre-carve convenience
+  // question — letters their orthography does not use but they still need for
+  // borrowed words, email addresses, and web addresses. They are not part of
+  // the orthography (deliberately absent from confirmedInventory, see
+  // SurveyPhaseResult.retainedConvenienceChars), but for carve's purposes they
+  // are needed: shielding them here is the whole point of having asked.
+  const retainedConvenienceChars = useWorkingCopyStore((s) => s.session.retainedConvenienceChars);
+  const retainedSet = useMemo(
+    () => new Set((retainedConvenienceChars ?? []).map((ch) => ch.normalize(carveNormalizationForm))),
+    [retainedConvenienceChars, carveNormalizationForm],
+  );
+  const tieredNeededSet = useMemo(
+    () => (retainedSet.size === 0 ? orthographyTiered : new Set([...orthographyTiered, ...retainedSet])),
+    [orthographyTiered, retainedSet],
+  );
+
   const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
   const isDeleted = useWorkingCopyStore((s) => s.isDeleted);
@@ -134,6 +419,152 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
 
   const nodes = useMemo(() => (ir ? toRailNodes(ir, removalCapabilities) : []), [ir, removalCapabilities]);
 
+  // Precomputed ONCE per `ir` (memoized on its reference) and threaded through
+  // every buildPendingCascade() call and the bulk-toggle collateral check
+  // below — classifyStoreSlotEdit/describeStorePairing scan every rule in the
+  // IR, so recomputing this per chip click would re-scan the whole IR on
+  // every click within the 300ms cycle (#931 perf; see the analysis field doc
+  // on BuildPendingCascadeArgs above).
+  const storeAnalysis = useMemo(() => (ir ? analyzeStores(ir) : undefined), [ir]);
+
+  // #525 FOUNDATION slice + items 2/4 (language-driven surplus) — non-destructive
+  // removal-recommendation annotation, kept as a SEPARATE pass over `nodes`
+  // (toRailNodes stays pure/unchanged). Skipped entirely (nodes pass through
+  // unannotated) when instantiationMode is null (working copy not yet
+  // instantiated) or there is no signal at all — inventory empty AND no CLDR
+  // needed-set resolved — both cases have no signal to recommend from.
+  // TODO(#525): Track-1 default filtering hooks in here too — a Track 1
+  // (new-from-base) author gets different defaults than Track 2 (adapt-existing).
+  const recommendedNodes = useMemo(
+    () => (instantiationMode !== null && hasSignal && ir
+      ? annotateRemovalRecommendations(nodes, ir, tieredNeededSet, neededChars, identityBcp47, carveNormalizationForm)
+      : nodes),
+    [nodes, ir, instantiationMode, hasSignal, tieredNeededSet, neededChars, identityBcp47, carveNormalizationForm],
+  );
+
+  // #525 BANNER slice — character-level companion to recommendedNodes above,
+  // driving the green removal-recommendation banner's flat checklist. `needed`
+  // is the SAME neededChars ∪ tieredNeededSet union annotateRemovalRecommendations
+  // computes internally, pre-unioned here so recommendedRemovalChars (a pure
+  // character-granularity pass) doesn't need to know about the two-signal shape.
+  // Members are normalized to carveNormalizationForm at construction: this set
+  // is the `coveringSet`/`needed` argument to recommendedRemovalChars,
+  // coordinatedCollateralForSlots, and buildPendingCascade — all passed
+  // `form: carveNormalizationForm` — and isCharCoveredForLocale's contract
+  // requires the covering set to already be normalized to that form. Skipping
+  // this silently mismatches the collateral-safety check under NFD
+  // (base-plus-mark output), which can miss warning about deleting a
+  // still-needed decomposed character. Mirrors the renormalize helper in
+  // annotateRemovalRecommendations.
+  //
+  // Both members are already normalized to carveNormalizationForm — the hook
+  // normalizes the orthography slice, retainedSet is normalized above.
+  const neededSet = useMemo(
+    () => (retainedSet.size === 0
+      ? orthographyNeededSet
+      : new Set([...orthographyNeededSet, ...retainedSet])),
+    [orthographyNeededSet, retainedSet],
+  );
+  const recommendedChars = useMemo(
+    () => (instantiationMode !== null && hasSignal && ir
+      ? recommendedRemovalChars({ ir, needed: neededSet, bcp47: identityBcp47, form: carveNormalizationForm })
+      : []),
+    [ir, instantiationMode, hasSignal, neededSet, identityBcp47, carveNormalizationForm],
+  );
+
+  // Bulk removal from the banner checklist deliberately skips the per-removal
+  // ConfirmDialog that handleCascadeDelete/handleStoreChipCascade open below —
+  // the checklist itself (every row pre-checked, individually uncheckable
+  // before the author clicks "Remove all selected") IS the confirmation for
+  // this batch, so a second per-character dialog would be redundant.
+  //
+  // FR-006 (spec 051) qualifies that: the checklist is confirmation enough for
+  // an ordinary trim, but NOT for one that would leave a needed character
+  // unproducible. `recommendedRemovalChars` already shields those (an `isLost`
+  // partner is exactly the guard's conjunction), so this is a backstop rather
+  // than the common path — but "silently applied" must not be reachable for a
+  // lost character by any route. Any isLost collateral routes the batch to the
+  // same bulk confirm dialog the store-card master toggle uses.
+  //
+  // FR-011/FR-015 (spec 051, contracts/case-pairing.md "Composition with store
+  // pairing") — a paired proposal row names its WHOLE case group in
+  // `row.caseGroup` (present only on a paired row; `caseGroupFor` already
+  // resolved which characters must trim together upstream, in
+  // recommendedRemovalChars). `row.contributors` only carries the row's own
+  // surviving character's contributors, so before this accepts a paired row it
+  // resolves collectCharContributors for every OTHER member of the group and
+  // unions rule/slot ids in — one action, one undo entry, same as any other
+  // selected row. Deduped: a case pair can share a rule or store slot (e.g. a
+  // deadkey table that maps both cases through the same producer), and folding
+  // the same id in twice would just be redundant work for cascadeDelete
+  // (harmless, but the dedup keeps the ids list matching the actual affected
+  // set 1:1). A group member's contributors can be `blocked` even though the
+  // row itself is not (its own shielding was checked, not its partner's) —
+  // collected below and, when non-empty, folded into `pendingBulkCascade` so
+  // it surfaces through the SAME warning box `pendingCascade.contributors.blocked`
+  // already renders (FR-008: never silently dropped, never a second dialog).
+  //
+  // Deliberately NOT done for the per-chip cascade (handleCascadeDelete /
+  // buildPendingCascade / handleStoreChipCascade) — that single-character path
+  // is the OQ-5 escape hatch an author uses to keep one case while trimming
+  // the other after declining a paired row. Case-pairing that path too would
+  // remove the only way to decline the pairing.
+  const handleRemoveSelectedRecommended = useCallback((selected: RecommendedRemovalChar[]) => {
+    const ruleNodeIds: string[] = [];
+    const storeSlotIds: string[] = [];
+    const blocked: CharContributors['blocked'] = [];
+    const seenRuleIds = new Set<string>();
+    const seenSlotIds = new Set<string>();
+    const seenBlocked = new Set<string>();
+    const addContributors = (contributors: CharContributors) => {
+      for (const id of contributors.ruleNodeIds) {
+        if (seenRuleIds.has(id)) continue;
+        seenRuleIds.add(id);
+        ruleNodeIds.push(id);
+      }
+      for (const id of contributors.storeSlotIds) {
+        if (seenSlotIds.has(id)) continue;
+        seenSlotIds.add(id);
+        storeSlotIds.push(id);
+      }
+      for (const b of contributors.blocked) {
+        const key = `${b.label}::${b.reason}`;
+        if (seenBlocked.has(key)) continue;
+        seenBlocked.add(key);
+        blocked.push(b);
+      }
+    };
+    for (const row of selected) {
+      addContributors(row.contributors);
+      // Expand a paired row to its OTHER case-group members. Only possible
+      // with an `ir` to resolve them against — with no `ir` there is nothing
+      // to look up, so the row's own (already-resolved) contributors are all
+      // this can act on, same as the ir==null early-return below.
+      if (ir != null && row.caseGroup) {
+        for (const ch of row.caseGroup) {
+          if (ch === row.ch) continue; // already folded in via row.contributors above
+          addContributors(collectCharContributors(ir, ch));
+        }
+      }
+    }
+    if (ruleNodeIds.length === 0 && storeSlotIds.length === 0) return;
+    if (ir == null) {
+      cascadeDelete(ruleNodeIds, storeSlotIds);
+      return;
+    }
+    const collateral = coordinatedCollateralForSlots(storeSlotIds, ir, neededSet, identityBcp47, storeAnalysis, carveNormalizationForm);
+    if (collateral.some((c) => c.isLost) || blocked.length > 0) {
+      // cascadeDelete unions both id params into one item-channel set, so the
+      // rule ids ride in `gids` alongside the slot ids (see handleBulkCascadePrimary).
+      setPendingBulkCascade({ gids: [...ruleNodeIds, ...storeSlotIds], collateral, blocked });
+      return;
+    }
+    // Fold the resolved collateral slots into the SAME call, so the gallery's
+    // kept/removed state matches what export-time applyStoreSlotRemovals does
+    // — the identical P1 fix the single-chip and store-card paths already apply.
+    cascadeDelete(ruleNodeIds, [...storeSlotIds, ...collateral.map((c) => c.slotId)]);
+  }, [cascadeDelete, ir, neededSet, identityBcp47, storeAnalysis, carveNormalizationForm]);
+
   // Cross-reference web: character → all the group/pattern/store cards it lives in.
   // Built ONCE per node set (not per glyph). Powers the summary tags on each card.
   const charWeb = useMemo(() => buildCharWeb(nodes), [nodes]);
@@ -143,6 +574,10 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   //   2. No recognised patterns, user stores, or raw fragments — nothing complex to carve.
   //   3. At most one plain group AND that group has ≤ 20 displayable glyphs — a truly small keyboard.
   //      Arabic / Ethiopic / CJK keyboards with hundreds of rules in "main" must go to the full carver.
+  // TODO(#525): once removal recommendations are trustworthy enough, this gate should
+  // also consider whether any 'high'-recommendation nodes exist ("Your rules look good"
+  // is a poor message when the tool has active suggestions to show) — deferred out of
+  // this FOUNDATION slice; do not change the gate predicate here yet.
   const isSimple = useMemo(() => {
     if (instantiationMode === 'adapt-existing') return false;
     if (nodes.some((n) => n.kind === 'pattern' || n.kind === 'store' || n.kind === 'raw')) return false;
@@ -156,12 +591,15 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
 
   const [selectedId, setSelectedId] = useState<string | null>(() => null);
   const selectedNode = useMemo<CarveNode | undefined>(
-    () => nodes.find((n) => n.nodeId === selectedId) ?? nodes[0],
-    [nodes, selectedId],
+    () => recommendedNodes.find((n) => n.nodeId === selectedId) ?? recommendedNodes[0],
+    [recommendedNodes, selectedId],
   );
 
   // -- Cascade-delete state ----------------------------------------------------
   const [pendingCascade, setPendingCascade] = useState<PendingCascade | null>(null);
+
+  // -- Bulk cascade-delete state (P0 — store-card master toggle) ---------------
+  const [pendingBulkCascade, setPendingBulkCascade] = useState<PendingBulkCascade | null>(null);
 
   // -- Cross-reference "web" popup (a character's other locations) --------------
   const [webPopup, setWebPopup] = useState<{ ch: string; locations: CharLocation[] } | null>(null);
@@ -173,10 +611,58 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
     if (locations.length > 1) { setWebPopup({ ch, locations }); }
   }, []);
 
-  // Handlers for Rail/Inspector callbacks
+  /**
+   * Handler for Rail/Inspector bulk-toggle callbacks (a store card's master
+   * toggle, or StoreDetail's "select all" toggle) — gids may be glyph gids,
+   * store-slot ids, or a mix.
+   *
+   * Restore (off === false) never routes through the collateral guard —
+   * restoring can't silently drop anything, only bring characters back.
+   *
+   * Remove (off === true): resolves coordinatedCollateralForSlots over the
+   * WHOLE batch at once (P0 — a bulk removal is more likely than a single
+   * chip to hit a coordinated pair, since it can touch every slot in a store
+   * in one click — see Rail.tsx's whole-store ToggleBox). Any aggregated
+   * collateral opens ONE confirm dialog for the batch (not one per gid); with
+   * no collateral, the batch applies immediately (existing fast path,
+   * unchanged for the common case).
+   */
   const handleSetManyGlyphs = useCallback((gids: string[], off: boolean) => {
-    gids.forEach((gid) => { if (off) { deleteItem(gid); } else { restoreItem(gid); } });
-  }, [deleteItem, restoreItem]);
+    if (!off) {
+      gids.forEach((gid) => restoreItem(gid));
+      return;
+    }
+    if (ir == null) {
+      gids.forEach((gid) => deleteItem(gid));
+      return;
+    }
+    const collateral = coordinatedCollateralForSlots(gids, ir, neededSet, identityBcp47, storeAnalysis, carveNormalizationForm);
+    if (collateral.length === 0) {
+      gids.forEach((gid) => deleteItem(gid));
+      return;
+    }
+    // Never populates `blocked` — the store-card master toggle's gids are
+    // resolved capability-filtered ids already, not a case-group expansion
+    // (that's handleRemoveSelectedRecommended's concern above).
+    setPendingBulkCascade({ gids, collateral, blocked: [] });
+  }, [ir, deleteItem, restoreItem, neededSet, identityBcp47, storeAnalysis, carveNormalizationForm]);
+
+  const handleBulkCascadePrimary = useCallback(() => {
+    if (!pendingBulkCascade) return;
+    // Reuses cascadeDelete (the SAME persistence path as the single-chip
+    // cascade's handleCascadePrimary below) so the batch AND the aggregated
+    // collateral slot ids land in deletedItemIds together, as one undo entry.
+    const collateralSlotIds = pendingBulkCascade.collateral.map((c) => c.slotId);
+    // gids may mix glyph gids and store-slot ids; passed positionally into
+    // storeSlotIds (not ruleNodeIds) is safe because cascadeDelete unions
+    // both id params into one item-channel set (workingCopyStore.ts).
+    cascadeDelete([], [...pendingBulkCascade.gids, ...collateralSlotIds]);
+    setPendingBulkCascade(null);
+  }, [pendingBulkCascade, cascadeDelete]);
+
+  const handleBulkCascadeCancel = useCallback(() => {
+    setPendingBulkCascade(null);
+  }, []);
 
   const handleToggleNode = useCallback((nodeId: string, off: boolean) => {
     if (off) { deleteNode(nodeId); } else { restoreNode(nodeId); }
@@ -199,11 +685,11 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
     // Resolve the clicked glyph — output char, removal capability, and its card.
     let targetChar: string | undefined;
     let clickedCapability: RemovalCapability | undefined;
-    let clickedLabel = 'this key';
+    let clickedLabel = t({ id: 'editor.carve.thisKeyFallbackLabel', message: 'this key' });
     for (const node of nodes) {
       if (!node.glyphs) continue;
       const glyph = node.glyphs.find((g) => g.gid === gid);
-      if (glyph) { targetChar = glyph.ch; clickedCapability = glyph.capability; clickedLabel = node.name; break; }
+      if (glyph) { targetChar = glyph.ch; clickedCapability = glyph.capability; clickedLabel = resolveNodeName(node, i18n); break; }
     }
 
     // Glyph not found → do nothing rather than toggle an untracked id.
@@ -211,10 +697,11 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
 
     const pending = buildPendingCascade({
       ir, gid, targetChar, clickedCapability, clickedLabel, isItemDeleted, removalCapabilities, nodes,
+      needed: neededSet, bcp47: identityBcp47, analysis: storeAnalysis, i18n, form: carveNormalizationForm,
     });
     if (pending === null) { handleToggleGlyph(gid); return; }
     setPendingCascade(pending);
-  }, [nodes, ir, handleToggleGlyph, isItemDeleted, removalCapabilities]);
+  }, [nodes, ir, handleToggleGlyph, isItemDeleted, removalCapabilities, neededSet, identityBcp47, storeAnalysis, t, i18n, carveNormalizationForm]);
 
   /**
    * Store-chip cascade toggle — same "remove/restore everywhere" contract as
@@ -226,19 +713,32 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
    */
   const handleStoreChipCascade = useCallback((chipId: string, ch: string) => {
     const pending = buildPendingCascade({
-      ir, gid: chipId, targetChar: ch, clickedLabel: 'this character',
+      ir, gid: chipId, targetChar: ch,
+      clickedLabel: t({ id: 'editor.carve.thisCharacterFallbackLabel', message: 'this character' }),
       isItemDeleted, removalCapabilities, nodes,
+      needed: neededSet, bcp47: identityBcp47, analysis: storeAnalysis, i18n, form: carveNormalizationForm,
     });
     if (pending === null) { handleToggleGlyph(chipId); return; }
     setPendingCascade(pending);
-  }, [nodes, ir, handleToggleGlyph, isItemDeleted, removalCapabilities]);
+  }, [nodes, ir, handleToggleGlyph, isItemDeleted, removalCapabilities, neededSet, identityBcp47, storeAnalysis, t, i18n, carveNormalizationForm]);
 
   const handleCascadePrimary = useCallback(() => {
     if (!pendingCascade) return;
     if (pendingCascade.mode === 'restore') {
       cascadeRestore(pendingCascade.restoreIds);
     } else {
-      cascadeDelete(pendingCascade.contributors.ruleNodeIds, pendingCascade.contributors.storeSlotIds);
+      // P1 fix: fold the CONFIRMED collateral partner slot ids into the same
+      // cascadeDelete call so they land in deletedItemIds alongside the
+      // primary removal. Without this, "Yes, remove everywhere" only marked
+      // the directly-targeted slots as deleted — the Gallery kept showing
+      // the collateral char as KEPT even though export-time
+      // applyStoreSlotRemovals coordinately drops it regardless, a silent
+      // divergence between the reviewed state and the exported .kmn.
+      const collateralSlotIds = pendingCascade.collateral.map((c) => c.slotId);
+      cascadeDelete(
+        pendingCascade.contributors.ruleNodeIds,
+        [...pendingCascade.contributors.storeSlotIds, ...collateralSlotIds],
+      );
     }
     setPendingCascade(null);
   }, [pendingCascade, cascadeDelete, cascadeRestore]);
@@ -254,14 +754,14 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
 
   // Kept / total counts
   const { kept, total } = useMemo(() => {
-    let t = 0, k = 0;
+    let totalCount = 0, k = 0;
     nodes.forEach((node) => {
       if (node.glyphs) {
-        t += node.glyphs.length;
+        totalCount += node.glyphs.length;
         k += node.glyphs.filter((g) => !isItemDeleted(g.gid)).length;
       }
     });
-    return { kept: k, total: t };
+    return { kept: k, total: totalCount };
   }, [nodes, deletedItemIds, isItemDeleted]);
 
   // Removed list for StatusBar
@@ -278,7 +778,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
     for (const node of nodes) {
       if ((node.kind === 'pattern' || node.kind === 'group') && nodeState(node, isItemDeleted, isDeleted) === 'off') {
         fullOffIds.add(node.nodeId);
-        list.push({ type: 'node', id: node.nodeId, kind: node.kind, label: node.name, count: node.glyphs?.length ?? 0, glyphIds: node.glyphs?.map((g) => g.gid) });
+        list.push({ type: 'node', id: node.nodeId, kind: node.kind, label: resolveNodeName(node, i18n), count: node.glyphs?.length ?? 0, glyphIds: node.glyphs?.map((g) => g.gid) });
       } else if ((node.kind === 'store' || node.kind === 'raw') && isDeleted(node.nodeId)) {
         list.push({ type: 'node', id: node.nodeId, kind: node.kind, label: node.name, count: 1 });
       }
@@ -290,7 +790,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
       for (const glyph of node.glyphs) {
         if (deletedItemIds.has(glyph.gid)) {
           seenItemIds.add(glyph.gid);
-          list.push({ type: 'item', id: glyph.gid, ch: glyph.ch, keys: glyph.keys, nodeName: node.name });
+          list.push({ type: 'item', id: glyph.gid, ch: glyph.ch, keys: glyph.keys, nodeName: resolveNodeName(node, i18n) });
         }
       }
     }
@@ -306,7 +806,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
       }
     }
     return list;
-  }, [nodes, deletedItemIds, deletedNodeIds, isItemDeleted, isDeleted]);
+  }, [nodes, deletedItemIds, deletedNodeIds, isItemDeleted, isDeleted, i18n]);
 
   const handleRestore = useCallback((item: RemovedItem) => {
     if (item.type === 'item') { restoreItem(item.id); return; }
@@ -324,7 +824,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
 
       // Orphaned pattern/group — all glyphs removed but node itself not deleted
       if ((node.kind === 'pattern' || node.kind === 'group') && !isDeleted(node.nodeId) && state === 'off') {
-        orphaned.push({ nodeId: node.nodeId, name: node.name });
+        orphaned.push({ nodeId: node.nodeId, name: resolveNodeName(node, i18n) });
       }
 
       if (node.kind !== 'store' || isDeleted(node.nodeId)) continue;
@@ -355,12 +855,14 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
       }
     }
     return { orphanedNodes: orphaned, unusedStoreNodes: unusedStores };
-  }, [nodes, deletedItemIds, deletedNodeIds, isItemDeleted, isDeleted]);
+  }, [nodes, deletedItemIds, deletedNodeIds, isItemDeleted, isDeleted, i18n]);
 
   if (!ir) {
     return (
       <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--app-bg)', color: 'var(--app-text)' }}>
-        <p style={{ fontSize: 14, color: 'var(--app-text-muted)' }}>Loading keyboard…</p>
+        <p style={{ fontSize: 14, color: 'var(--app-text-muted)' }}>
+          <Trans id="editor.carve.loadingKeyboard">Loading keyboard…</Trans>
+        </p>
       </div>
     );
   }
@@ -380,10 +882,12 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
         </svg>
         <div>
           <h2 style={{ margin: '0 0 8px', font: "500 22px/1.15 'Playfair Display', serif", color: 'var(--app-text)' }}>
-            Your rules look good
+            <Trans id="editor.carve.rulesLookGood">Your rules look good</Trans>
           </h2>
           <p style={{ margin: 0, fontSize: 14.5, color: 'var(--app-text-muted)', maxWidth: 400, lineHeight: 1.6 }}>
-            This keyboard uses standard rules in a single group — there's nothing complex to review or remove.
+            <Trans id="editor.carve.rulesLookGoodBody">
+              This keyboard uses standard rules in a single group — there's nothing complex to review or remove.
+            </Trans>
           </p>
         </div>
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -396,18 +900,18 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
             }}
             style={{ font: '600 13.5px var(--app-font)', cursor: 'pointer', color: 'var(--app-accent-text)', background: 'var(--app-surface-2)', border: '1px solid var(--app-border-strong)', borderRadius: 9, padding: '10px 20px' }}
           >
-            Open rule carver anyway
+            <Trans id="editor.carve.openCarverAnyway">Open rule carver anyway</Trans>
           </button>
           <button
             onClick={() => { keepAll(); onComplete(); }}
             style={{ font: '600 13.5px var(--app-font)', cursor: 'pointer', color: '#fff', background: 'var(--app-accent)', border: 'none', borderRadius: 9, padding: '10px 22px' }}
           >
-            Skip Rule Carver →
+            <Trans id="editor.carve.skipCarverButton">Skip Rule Carver →</Trans>
           </button>
         </div>
         {onBack !== undefined && (
           <button onClick={onBack} style={{ font: '13px var(--app-font)', cursor: 'pointer', color: 'var(--app-text-subtle)', background: 'transparent', border: 'none', marginTop: 4 }}>
-            ← Back
+            <Trans id="editor.carve.backButton">← Back</Trans>
           </button>
         )}
       </div>
@@ -420,12 +924,18 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
       {hasRawFragments && (
         <div
           role="note"
-          aria-label="Advanced rule blocks preserved"
+          aria-label={t({ id: "editor.carve.rawFragmentsNoteAriaLabel", message: "Advanced rule blocks preserved" })}
           style={{ flexShrink: 0, display: 'flex', alignItems: 'flex-start', gap: 10, padding: '10px 22px', background: 'var(--accent-bg)', borderBottom: '1px solid color-mix(in srgb, var(--app-accent) 35%, transparent)', fontSize: 13, color: 'var(--app-text-muted)', lineHeight: 1.5 }}
         >
           <span style={{ flexShrink: 0, marginTop: 1, color: 'var(--app-accent)', display: 'inline-flex' }}><InfoIcon size={14} /></span>
           <span>
-            This keyboard contains {ir.raw.length} advanced rule block{ir.raw.length !== 1 ? 's' : ''} the editor preserves as-is. Removals you make here are applied normally — the preserved blocks are left unchanged.
+            {t({
+              id: "editor.carve.rawFragmentsNoteBody",
+              message: plural(ir.raw.length, {
+                one: "This keyboard contains # advanced rule block the editor preserves as-is. Removals you make here are applied normally — the preserved blocks are left unchanged.",
+                other: "This keyboard contains # advanced rule blocks the editor preserves as-is. Removals you make here are applied normally — the preserved blocks are left unchanged.",
+              }),
+            })}
           </span>
         </div>
       )}
@@ -434,58 +944,67 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
         {onBack !== undefined && (
           <button
             onClick={onBack}
-            onMouseEnter={() => setInfo({ kind: 'text', title: 'Back', body: 'Return to the previous step.' })}
-            onFocus={() => setInfo({ kind: 'text', title: 'Back', body: 'Return to the previous step.' })}
+            onMouseEnter={() => setInfo({ kind: 'text', title: t({ id: "editor.carve.backHoverTitle", message: "Back" }), body: t({ id: "editor.carve.backHoverBody", message: "Return to the previous step." }) })}
+            onFocus={() => setInfo({ kind: 'text', title: t({ id: "editor.carve.backHoverTitle", message: "Back" }), body: t({ id: "editor.carve.backHoverBody", message: "Return to the previous step." }) })}
             onMouseLeave={clearInfo}
             onBlur={clearInfo}
             style={{ font: '600 13px var(--app-font)', cursor: 'pointer', color: 'var(--app-text-muted)', background: 'transparent', border: 'none', padding: '4px 0', whiteSpace: 'nowrap' }}
           >
-            ← Back
+            <Trans id="editor.carve.backButton">← Back</Trans>
           </button>
         )}
         <div style={{ flex: 1 }}>
           <div style={{ font: '600 10.5px/1 var(--app-font)', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--app-text-subtle)' }}>
-            Phase D · Carve
+            <Trans id="editor.carve.phaseDEyebrow">Phase D · Carve</Trans>
           </div>
           <h1 style={{ margin: '6px 0 0', font: "500 23px/1.1 'Playfair Display', serif", color: 'var(--app-text)' }}>
-            Review your keyboard's rules
+            <Trans id="editor.carve.heading">Review your keyboard's rules</Trans>
           </h1>
         </div>
         <button
           onClick={() => setInfoOpen((v) => { if (v) clearInfo(); return !v; })}
           aria-pressed={infoOpen}
-          aria-label={infoOpen ? 'Hide info panel' : 'Show info panel'}
-          onMouseEnter={() => setInfo({ kind: 'text', title: 'Info panel', body: 'Show or hide this panel. It describes whatever your cursor is over.' })}
-          onFocus={() => setInfo({ kind: 'text', title: 'Info panel', body: 'Show or hide this panel. It describes whatever your cursor is over.' })}
+          aria-label={infoOpen ? t({ id: "editor.carve.hideInfoPanel", message: "Hide info panel" }) : t({ id: "editor.carve.showInfoPanel", message: "Show info panel" })}
+          onMouseEnter={() => setInfo({ kind: 'text', title: t({ id: "editor.carve.infoPanelHoverTitle", message: "Info panel" }), body: t({ id: "editor.carve.infoPanelHoverBody", message: "Show or hide this panel. It describes whatever your cursor is over." }) })}
+          onFocus={() => setInfo({ kind: 'text', title: t({ id: "editor.carve.infoPanelHoverTitle", message: "Info panel" }), body: t({ id: "editor.carve.infoPanelHoverBody", message: "Show or hide this panel. It describes whatever your cursor is over." }) })}
           onMouseLeave={clearInfo}
           onBlur={clearInfo}
           style={{ font: '600 13px var(--app-font)', cursor: 'pointer', borderRadius: 8, padding: '7px 13px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5, marginRight: 4, background: infoOpen ? 'var(--app-accent)' : 'transparent', color: infoOpen ? '#fff' : 'var(--app-text-muted)', border: infoOpen ? '1px solid var(--app-accent)' : '1px solid var(--app-border-strong)', fontWeight: infoOpen ? 700 : 600 }}
         >
           <InfoIcon size={14} />
-          Info
+          <Trans id="editor.carve.infoButton">Info</Trans>
         </button>
         <button
           onClick={() => { keepAll(); onComplete(); }}
-          onMouseEnter={() => setInfo({ kind: 'text', title: 'Skip carving', body: 'Keep every rule and continue without removing anything.' })}
-          onFocus={() => setInfo({ kind: 'text', title: 'Skip carving', body: 'Keep every rule and continue without removing anything.' })}
+          onMouseEnter={() => setInfo({ kind: 'text', title: t({ id: "editor.carve.skipCarvingHoverTitle", message: "Skip carving" }), body: t({ id: "editor.carve.skipCarvingHoverBody", message: "Keep every rule and continue without removing anything." }) })}
+          onFocus={() => setInfo({ kind: 'text', title: t({ id: "editor.carve.skipCarvingHoverTitle", message: "Skip carving" }), body: t({ id: "editor.carve.skipCarvingHoverBody", message: "Keep every rule and continue without removing anything." }) })}
           onMouseLeave={clearInfo}
           onBlur={clearInfo}
           style={{ font: '600 13px var(--app-font)', cursor: 'pointer', color: 'var(--app-text-muted)', background: 'transparent', border: '1px solid var(--app-border-strong)', borderRadius: 8, padding: '7px 13px', whiteSpace: 'nowrap', marginRight: 6 }}
         >
-          Skip
+          <Trans id="editor.carve.skipButton">Skip</Trans>
         </button>
         <button
           data-testid="carve-continue"
           onClick={onComplete}
-          onMouseEnter={() => setInfo({ kind: 'text', title: 'Continue', body: 'Save your changes and move to the next step.' })}
-          onFocus={() => setInfo({ kind: 'text', title: 'Continue', body: 'Save your changes and move to the next step.' })}
+          onMouseEnter={() => setInfo({ kind: 'text', title: t({ id: "editor.carve.continueHoverTitle", message: "Continue" }), body: t({ id: "editor.carve.continueHoverBody", message: "Save your changes and move to the next step." }) })}
+          onFocus={() => setInfo({ kind: 'text', title: t({ id: "editor.carve.continueHoverTitle", message: "Continue" }), body: t({ id: "editor.carve.continueHoverBody", message: "Save your changes and move to the next step." }) })}
           onMouseLeave={clearInfo}
           onBlur={clearInfo}
           style={{ font: '600 13px var(--app-font)', cursor: 'pointer', color: '#fff', background: 'var(--app-accent)', border: 'none', borderRadius: 8, padding: '9px 18px' }}
         >
-          Continue →
+          <Trans id="editor.carve.continueButton">Continue →</Trans>
         </button>
       </div>
+
+      {/* Removal-recommendation banner (#525 BANNER slice) — the single surface
+          for the character-level removal signal; replaces the old per-node
+          "Suggested removal" Rail badge (see Rail.tsx). */}
+      <RemovalBanner
+        recommended={recommendedChars}
+        languageLabel={identityBcp47 ?? t({ id: "editor.carve.yourTargetLanguageFallback", message: "your target language" })}
+        onRemoveSelected={handleRemoveSelectedRecommended}
+      />
 
       {/* Status bar */}
       <StatusBar
@@ -506,7 +1025,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
       {/* Two-panel body */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
         <Rail
-          nodes={nodes}
+          nodes={recommendedNodes}
           selectedId={selectedNode?.nodeId ?? null}
           onSelect={setSelectedId}
           isItemDeleted={isItemDeleted}
@@ -517,7 +1036,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0 }}>
           <Inspector
             node={selectedNode}
-            nodes={nodes}
+            nodes={recommendedNodes}
             isItemDeleted={isItemDeleted}
             onToggleGlyph={handleToggleGlyph}
             onSetManyGlyphs={handleSetManyGlyphs}
@@ -538,15 +1057,15 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
         const isRestore = pendingCascade.mode === 'restore';
         const hasActions = pendingCascade.actionCount > 0;
         const title = isRestore
-          ? `Restore "${pendingCascade.targetChar}" everywhere?`
+          ? t({ id: "editor.carve.cascade.restoreTitle", message: `Restore "${{ char: pendingCascade.targetChar }}" everywhere?` })
           : hasActions
-            ? `Remove "${pendingCascade.targetChar}" everywhere?`
-            : `"${pendingCascade.targetChar}" can't be fully removed`;
+            ? t({ id: "editor.carve.cascade.removeTitle", message: `Remove "${{ char: pendingCascade.targetChar }}" everywhere?` })
+            : t({ id: "editor.carve.cascade.cannotFullyRemoveTitle", message: `"${{ char: pendingCascade.targetChar }}" can't be fully removed` });
         const message = isRestore
-          ? 'This character was removed from several places. Restore it everywhere it was removed?'
+          ? t({ id: "editor.carve.cascade.restoreMessage", message: 'This character was removed from several places. Restore it everywhere it was removed?' })
           : hasActions
-            ? 'This character appears in multiple places. Removing it everywhere keeps the keyboard consistent; removing it from just one place may leave broken references.'
-            : 'This character is produced by advanced rules that can\'t be removed automatically — see below.';
+            ? t({ id: "editor.carve.cascade.removeMessage", message: 'This character appears in multiple places. Removing it everywhere keeps the keyboard consistent; removing it from just one place may leave broken references.' })
+            : t({ id: "editor.carve.cascade.cannotFullyRemoveMessage", message: 'This character is produced by advanced rules that can\'t be removed automatically — see below.' });
         return (
         <ConfirmDialog
           open={true}
@@ -558,20 +1077,25 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
               </p>
               {!isRestore && pendingCascade.contributors.storeSlotIds.length > 0 && (
                 <p style={{ margin: '0 0 10px' }}>
-                  Note: the key or sequence that triggers this character will still
-                  exist, but will now produce nothing.
+                  <Trans id="editor.carve.cascade.storeSlotNote">
+                    Note: the key or sequence that triggers this character will still
+                    exist, but will now produce nothing.
+                  </Trans>
                 </p>
               )}
               <ul
-                aria-label="Locations affected"
+                aria-label={t({ id: "editor.carve.cascade.locationsAffectedAriaLabel", message: "Locations affected" })}
                 style={{ margin: '0 0 10px', paddingLeft: 18, fontSize: 13 }}
               >
                 {(['group', 'pattern', 'store'] as const).map((kind) => {
                   const labels = pendingCascade.contributors.locations
                     .filter((l) => l.kind === kind)
-                    .map((l) => l.label);
+                    .map((l) => resolveLocationLabel(l, i18n));
                   if (labels.length === 0) return null;
                   // Pluralize the kind label only when it has more than one entry.
+                  // kind/kindLabel are the raw enum-ish kind string ("group" /
+                  // "pattern" / "store"), left untranslated — same judgment call
+                  // as GlyphCell's cross-reference tags (see report).
                   const kindLabel = labels.length > 1 ? `${kind}s` : kind;
                   return (
                     <li key={kind} style={{ marginBottom: 4 }}>
@@ -582,43 +1106,88 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
                   );
                 })}
               </ul>
-              {pendingCascade.contributors.blocked.length > 0 && (
-                <div
-                  style={{
-                    marginTop: 8,
-                    padding: '8px 12px',
-                    borderRadius: 8,
-                    background: 'color-mix(in srgb, var(--sil-orange) 10%, var(--app-surface))',
-                    border: '1px solid color-mix(in srgb, var(--sil-orange) 40%, transparent)',
-                    fontSize: 12,
-                    color: 'var(--sil-orange-dark)',
-                  }}
-                >
-                  <b>⚠ Marked not-removable — these will stay:</b>{' '}
-                  {pendingCascade.contributors.blocked.map((b, i) => (
-                    <span key={i}>
-                      {b.label} ({b.reason}){i < pendingCascade.contributors.blocked.length - 1 ? ', ' : ''}
-                    </span>
-                  ))}
-                </div>
+              {/* Coordinated-removal collateral (#525/#931 follow-up) — a manual
+                  removal that hits a PAIRED store also drops that store's
+                  aligned partner character at the same position. Never
+                  silent: shown for every collateral char, with a needed one
+                  flagged prominently so the author can back out via Cancel. */}
+              {!isRestore && pendingCascade.collateral.length > 0 && (
+                <CollateralWarning
+                  collateral={pendingCascade.collateral}
+                  isBulk={false}
+                  targetChar={pendingCascade.contributors.targetChar}
+                />
               )}
+              <BlockedWarning blocked={pendingCascade.contributors.blocked} />
             </div>
           }
-          primaryLabel={isRestore ? 'Yes, restore everywhere' : hasActions ? 'Yes, remove everywhere' : 'OK'}
+          primaryLabel={
+            isRestore
+              ? t({ id: "editor.carve.cascade.restorePrimaryButton", message: "Yes, restore everywhere" })
+              : hasActions
+                ? t({ id: "editor.carve.cascade.removePrimaryButton", message: "Yes, remove everywhere" })
+                : t({ id: "editor.carve.cascade.okButton", message: "OK" })
+          }
           onPrimary={!isRestore && !hasActions ? handleCascadeCancel : handleCascadePrimary}
-          {...(!isRestore && !hasActions ? {} : { secondaryLabel: 'Cancel', onSecondary: handleCascadeCancel })}
+          {...(!isRestore && !hasActions ? {} : { secondaryLabel: t({ id: "editor.carve.cascade.cancelButton", message: "Cancel" }), onSecondary: handleCascadeCancel })}
         />);
+      })()}
+
+      {/* Bulk cascade-delete confirmation dialog (P0 — store-card master
+          toggle). ONE dialog for the whole batch, aggregating the coordinated
+          collateral across every slot the batch will drop — see
+          handleSetManyGlyphs above. */}
+      {pendingBulkCascade !== null && (() => {
+        const n = pendingBulkCascade.gids.length;
+        const collateralCount = pendingBulkCascade.collateral.length;
+        const selectedLabel = t({
+          id: "editor.carve.bulkCascade.selectedCount",
+          message: plural(n, {
+            one: "# selected character",
+            other: "# selected characters",
+          }),
+        });
+        const collateralLabel = t({
+          id: "editor.carve.bulkCascade.collateralCount",
+          message: plural(collateralCount, {
+            one: "# paired character",
+            other: "# paired characters",
+          }),
+        });
+        return (
+          <ConfirmDialog
+            open={true}
+            title={t({ id: "editor.carve.bulkCascade.title", message: "Remove everywhere?" })}
+            body={
+              <div>
+                <p style={{ margin: '0 0 10px' }}>
+                  <Trans id="editor.carve.bulkCascade.body">
+                    Removing {selectedLabel} will also drop the following {collateralLabel} from linked stores.
+                  </Trans>
+                </p>
+                <CollateralWarning collateral={pendingBulkCascade.collateral} isBulk={true} />
+                <BlockedWarning blocked={pendingBulkCascade.blocked} />
+              </div>
+            }
+            primaryLabel={t({ id: "editor.carve.cascade.removePrimaryButton", message: "Yes, remove everywhere" })}
+            onPrimary={handleBulkCascadePrimary}
+            secondaryLabel={t({ id: "editor.carve.cascade.cancelButton", message: "Cancel" })}
+            onSecondary={handleBulkCascadeCancel}
+          />
+        );
       })()}
 
       {/* Cross-reference web popup — the character's OTHER locations, each a link. */}
       {webPopup !== null && (
         <ConfirmDialog
           open={webPopup !== null}
-          title={`Where "${webPopup.ch}" also appears`}
+          title={t({ id: "editor.carve.webPopup.title", message: `Where "${{ char: webPopup.ch }}" also appears` })}
           body={
             <div>
               <p style={{ margin: '0 0 12px' }}>
-                This character also lives in these places — click one to jump to it in the rail.
+                <Trans id="editor.carve.webPopup.body">
+                  This character also lives in these places — click one to jump to it in the rail.
+                </Trans>
               </p>
               <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {webPopup.locations.map((loc) => (
@@ -643,7 +1212,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
                         {loc.kind}
                       </span>
                       <span style={{ fontFamily: 'var(--app-font-mono)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {loc.label}
+                        {resolveLocationLabel(loc, i18n)}
                       </span>
                     </button>
                   </li>
@@ -651,7 +1220,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
               </ul>
             </div>
           }
-          primaryLabel="Close"
+          primaryLabel={t({ id: "editor.carve.webPopup.closeButton", message: "Close" })}
           onPrimary={() => setWebPopup(null)}
         />
       )}

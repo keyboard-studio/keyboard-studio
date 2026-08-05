@@ -11,7 +11,7 @@
 // so an author who is also the rights holder confirms one field instead of two.
 
 import type { QuestionModule } from "../../types.ts";
-import paCopyrightHolder from "./pa_copyright_holder.ts";
+import paCopyrightHolder from "../reserve/pa_copyright_holder.ts";
 
 export const definition = {
   ...paCopyrightHolder.definition,

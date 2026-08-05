@@ -363,7 +363,7 @@ script family that silently gets a degraded strategy. Both need an explicit
 
 ---
 
-## 6. Survey wrapper architecture (spec 029 Stage 6 — FlowStepHost convergence)
+## 7. Survey wrapper architecture (spec 029 Stage 6 — FlowStepHost convergence)
 
 **Ratified 2026-07-03 (spec 029).** The three bespoke survey wrappers
 (`PhaseTrack`, `PhaseProjectName`, `PhaseF`) are now thin wrappers over a single

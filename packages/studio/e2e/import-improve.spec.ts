@@ -1,22 +1,28 @@
 /**
  * E2E: Track 2 (import-improve) lane.
  *
- * BLOCKER: Playwright is not yet installed in this package.
- * All tests in this file are `.skip`-ped until Playwright is wired up.
+ * (STALE, resolved) Former BLOCKER: "Playwright is not yet installed."
+ * Playwright is now wired up in this package — a `playwright` devDependency
+ * of @keyboard-studio/studio; the four sibling walk specs (carve, copy-edit,
+ * touch-derivation-us1/us2) run live/passing against it. No longer a blocker.
  *
- * Additional BLOCKER: Track 2 import (KeyboardIR import path via the SPA) is
- * not yet confirmed to be fully live (as of 2026-06-15). The survey flow for
- * Track 2 and the re-import path after emit are stubbed or partial.
- * See packages/studio/src/stores/irStore.test.ts for the current IR store state.
- * Confirm with km-frontend before removing the inner `.skip` marks.
+ * REMAINING BLOCKER (as of 2026-07-20): the arbitrary-`.kmn` file-import /
+ * source-picker UX that this spec's flow is written against does not exist yet.
+ * Track 2's `instantiateFromExisting` ("Adapt") workflow IS live and E2E-tested
+ * via the gallery-based Adapt card (see touch-derivation-us1/us2.spec.ts), but
+ * that path adapts a base chosen from the gallery — NOT a file uploaded through
+ * a file-picker. The file-picker entry point is still an explicit TODO:
+ * see packages/studio/src/stores/workingCopyStore.ts (TODO(track2-ui)).
+ * There is no `track2-import-button` / filechooser / source-picker testid in
+ * packages/studio/src today. Confirm with km-frontend before un-skipping.
  *
  * To unblock (in order):
- *   1. Playwright install (see copy-edit.spec.ts for steps).
- *   2. Confirm Track 2 import UI is live (file-picker -> KeyboardIR parse
- *      -> survey mutation -> emit).
- *   3. Confirm the re-import path (emitted .kmn -> KeyboardIR) is live in
+ *   1. Land the arbitrary-`.kmn` import / source-picker UX (TODO(track2-ui)
+ *      in workingCopyStore.ts), OR rewrite this spec to exercise Track 2 adapt
+ *      via the gallery path as the touch-derivation specs already do.
+ *   2. Confirm the re-import path (emitted .kmn -> KeyboardIR) is live in
  *      the engine (codec round-trip).
- *   4. Remove `.skip` calls.
+ *   3. Remove `.skip` calls.
  *
  * Flow being tested:
  *   launch SPA
@@ -31,7 +37,8 @@
  * refs #410 AC §3
  */
 
-// TODO(refs #410): import { test, expect, Page } from "@playwright/test";
+import { test } from "playwright/test";
+// TODO(refs #410): import { expect, Page } from "playwright/test";
 // TODO(refs #410): import { assertSemanticEquivalence } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
@@ -87,14 +94,14 @@
 // Specs
 // ---------------------------------------------------------------------------
 
-// TODO(refs #410): Replace `describe.skip` with `test.describe` once
-// both blockers above are resolved.
-describe.skip("Track 2 (import-improve) E2E", () => {
+// TODO(refs #410): Replace `test.describe.skip` with `test.describe` once the
+// remaining blocker above (Track 2 file-import UX) is resolved.
+test.describe.skip("Track 2 (import-improve) E2E", () => {
   // test.beforeEach(async ({ page }) => {
   //   await page.goto("/");
   // });
 
-  it.skip("imports a fixture .kmn via Track 2 without import errors", async () => {
+  test.skip("imports a fixture .kmn via Track 2 without import errors", async () => {
     // TODO: Implement after Playwright install + Track 2 UI is live.
     //
     // await importKmnViaTrack2(page, FIXTURE_KMN_PATH);
@@ -103,7 +110,7 @@ describe.skip("Track 2 (import-improve) E2E", () => {
     // await expect(page.getByTestId("import-status-badge")).not.toHaveText("round-trip-divergence");
   });
 
-  it.skip("applies one mutation and emits without compile errors", async () => {
+  test.skip("applies one mutation and emits without compile errors", async () => {
     // TODO: Implement after Playwright install + Track 2 UI is live.
     //
     // await importKmnViaTrack2(page, FIXTURE_KMN_PATH);
@@ -115,7 +122,7 @@ describe.skip("Track 2 (import-improve) E2E", () => {
     // expect(result.errors).toHaveLength(0);
   });
 
-  it.skip("round-trip via assertSemanticEquivalence preserves everything except the mutation", async () => {
+  test.skip("round-trip via assertSemanticEquivalence preserves everything except the mutation", async () => {
     // TODO: Implement after Playwright install + Track 2 UI + codec round-trip live.
     //
     // BLOCKER: re-importing the emitted .kmn back to KeyboardIR requires the
@@ -151,6 +158,3 @@ describe.skip("Track 2 (import-improve) E2E", () => {
   });
 });
 
-// This export keeps the module non-empty so TypeScript doesn't treat it as a
-// script (no top-level imports once Playwright is wired).
-export {};

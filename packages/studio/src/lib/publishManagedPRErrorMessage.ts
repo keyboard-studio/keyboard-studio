@@ -2,9 +2,20 @@
 // union, docs/github_flow.md "Option B") to a single user-facing string.
 //
 // publishManagedPR THROWS a PublishManagedPRError-shaped plain object on
-// failure; the UI switches on `err.kind` to pick recovery copy. Kept pure +
-// dependency-free so it is testable in isolation and reusable from any surface.
+// failure; the UI switches on `err.kind` to pick recovery copy. Called BOTH
+// from a real component (ManagedPRSubmitPanel, which has an `i18n` instance
+// from `useLingui()`, bound to the active locale) AND directly from unit
+// tests (which call it with no `i18n` argument at all, asserting on the
+// English source text) — the same shape `keyHint`/`capabilityHint`/`infoFor`
+// use in editors/assignLoop/parts/InfoView.tsx. `msg()` only DEFINES a
+// descriptor; resolving it against whichever `i18n` (if any) is available is
+// `resolveMessage`'s job (see its doc comment in lib/i18nResolve.ts) — kept
+// pure otherwise (no dependency on global mutable i18n state) so this stays
+// testable in isolation and reusable from any surface.
 
+import type { I18n } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { resolveMessage } from "./i18nResolve.ts";
 import type { PublishManagedPRError } from "@keyboard-studio/contracts";
 
 /**
@@ -32,26 +43,50 @@ const PUBLISH_MANAGED_PR_ERROR_KINDS = [
  * The mapping is exhaustive over the union's `kind`; adding a new kind to the
  * contract surfaces here as a TypeScript error (the `never` default).
  */
-export function publishManagedPRErrorMessage(err: PublishManagedPRError): string {
+export function publishManagedPRErrorMessage(err: PublishManagedPRError, i18n?: I18n): string {
   switch (err.kind) {
     case "proxy-unavailable":
-      return "The submission service is temporarily unavailable. Please try again later.";
+      return resolveMessage(i18n, msg({
+        id: "output.submit.error.proxyUnavailable",
+        message: "The submission service is temporarily unavailable. Please try again later.",
+      }));
     case "rate-limit":
-      return `Too many submissions — please retry in ${err.retryAfterSeconds} seconds.`;
+      return resolveMessage(i18n, msg({
+        id: "output.submit.error.rateLimit",
+        message: `Too many submissions — please retry in ${{ retryAfterSeconds: err.retryAfterSeconds }} seconds.`,
+      }));
     case "branch-exists":
-      return "It looks like you already submitted this keyboard. Please try again with a new name.";
+      return resolveMessage(i18n, msg({
+        id: "output.submit.error.branchExists",
+        message: "It looks like you already submitted this keyboard. Please try again with a new name.",
+      }));
     case "upstream-failure":
-      return "Submission failed due to an upstream error. Please try again.";
+      return resolveMessage(i18n, msg({
+        id: "output.submit.error.upstreamFailure",
+        message: "Submission failed due to an upstream error. Please try again.",
+      }));
     case "proxy-rejected":
-      return `Submission was rejected (${err.httpStatus}). Please check your details and try again.`;
+      return resolveMessage(i18n, msg({
+        id: "output.submit.error.proxyRejected",
+        message: `Submission was rejected (${{ httpStatus: err.httpStatus }}). Please check your details and try again.`,
+      }));
     case "network":
-      return "Could not reach the submission service. Please check your connection and try again.";
+      return resolveMessage(i18n, msg({
+        id: "output.submit.error.network",
+        message: "Could not reach the submission service. Please check your connection and try again.",
+      }));
     case "unknown":
-      return `Submission failed: ${err.message}`;
+      return resolveMessage(i18n, msg({
+        id: "output.submit.error.unknownKind",
+        message: `Submission failed: ${{ detail: err.message }}`,
+      }));
     default: {
       // Exhaustiveness guard: a new error kind must be handled above.
       const _exhaustive: never = err;
-      return `Unexpected submission error.${String(_exhaustive)}`;
+      return resolveMessage(i18n, msg({
+        id: "output.submit.error.unexpectedKind",
+        message: `Unexpected submission error.${{ detail: String(_exhaustive) }}`,
+      }));
     }
   }
 }

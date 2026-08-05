@@ -9,18 +9,33 @@
 //     -> serves the file at <repoRoot>/<release-tree-path>.
 //
 // The scan parses each keyboard's source/<id>.kmn header for
-// store(&NAME) and store(&VERSION). Script defaults to "Latn"; full
-// detection requires reading .kpj BaseLanguage — tracked as a follow-up.
+// store(&NAME) and store(&VERSION). Script comes from the committed facet
+// index's content-derived `script` facet, falling back to the .kps declared
+// BCP47 tags, then "Latn" (see scripts/facet-script-lookup.mjs).
 
 import type { Plugin } from "vite";
 import * as fs from "node:fs";
 import * as path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import {
+  loadFacetScripts,
+  resolveKeyboardScript,
+} from "../scripts/facet-script-lookup.mjs";
 
 export interface LocalKeyboardsOptions {
   /** Absolute path to the keymanapp/keyboards clone root. */
   keyboardsRepoRoot: string;
+  /**
+   * Absolute path to the committed keyboard facet index. Defaults to this
+   * repo's docs/keyboard-facet-index.json.
+   */
+  facetIndexPath?: string;
 }
+
+const DEFAULT_FACET_INDEX_PATH = fileURLToPath(
+  new URL("../../../docs/keyboard-facet-index.json", import.meta.url),
+);
 
 const STORE_NAME_RE = /^\s*store\s*\(\s*&NAME\s*\)\s*'([^']*)'/im;
 const STORE_VERSION_RE = /^\s*store\s*\(\s*&VERSION\s*\)\s*'([^']*)'/im;
@@ -74,9 +89,20 @@ function parseKmnMetadata(kmnPath: string): { name: string; version: string } {
   }
 }
 
-function scan(keyboardsRepoRoot: string): BaseKeyboard[] {
+function scan(
+  keyboardsRepoRoot: string,
+  facetIndexPath: string,
+): BaseKeyboard[] {
   const releaseDir = path.join(keyboardsRepoRoot, "release");
   if (!fs.existsSync(releaseDir)) return [];
+  const facetScripts = loadFacetScripts(facetIndexPath);
+  if (facetScripts.size === 0) {
+    // eslint-disable-next-line no-console
+    console.warn(
+      `[local-keyboards] no script facets loaded from ${facetIndexPath} — ` +
+        "falling back to .kps declared-tag script derivation",
+    );
+  }
   const out: BaseKeyboard[] = [];
   for (const vendor of fs.readdirSync(releaseDir)) {
     const vendorDir = path.join(releaseDir, vendor);
@@ -108,9 +134,7 @@ function scan(keyboardsRepoRoot: string): BaseKeyboard[] {
       const entry: BaseKeyboard = {
         id,
         path: `release/${vendor}/${id}`,
-        // [SCAFFOLD] script hardcoded to "Latn" — derive from .kpj
-        // BaseLanguage once that parsing lands.
-        script: "Latn",
+        script: resolveKeyboardScript(id, languages, facetScripts),
         targets: ["windows", "macosx", "linux", "web"],
         displayName: meta.name !== "" ? meta.name : id,
         version: meta.version,
@@ -150,7 +174,10 @@ export function localKeyboardsPlugin(opts: LocalKeyboardsOptions): Plugin {
           return;
         }
         if (catalogCache === null) {
-          catalogCache = scan(root);
+          catalogCache = scan(
+            root,
+            opts.facetIndexPath ?? DEFAULT_FACET_INDEX_PATH,
+          );
           // eslint-disable-next-line no-console
           console.info(
             `[local-keyboards] scanned ${catalogCache.length} keyboards from ${root}`,
@@ -206,9 +233,14 @@ export function localKeyboardsPlugin(opts: LocalKeyboardsOptions): Plugin {
         }
         const ext = path.extname(fsPath).toLowerCase();
         const mime =
-          ext === ".kmn" || ext === ".keyman-touch-layout" ||
-          ext === ".kvks" || ext === ".kpj" || ext === ".xml" ||
-          ext === ".txt" || ext === ".js" || ext === ".html" ||
+          ext === ".kmn" ||
+          ext === ".keyman-touch-layout" ||
+          ext === ".kvks" ||
+          ext === ".kpj" ||
+          ext === ".xml" ||
+          ext === ".txt" ||
+          ext === ".js" ||
+          ext === ".html" ||
           ext === ".htm"
             ? "text/plain; charset=utf-8"
             : "application/octet-stream";

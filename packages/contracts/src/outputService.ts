@@ -3,6 +3,23 @@
 import type { VirtualFS } from "./virtualFS";
 
 /**
+ * The `client` discriminator that travels on the GitHub OAuth exchange/refresh
+ * wire (the SPA's `/oauth/exchange` and `/oauth/refresh` POST bodies).
+ * Single source of truth shared by the SPA (`packages/studio/src/lib/githubOAuth.ts`)
+ * and the OAuth backend (`utilities/oauth-backend/src/schemas.ts`) so the two
+ * sides cannot diverge without a compile error.
+ *
+ * - `"github_app"` (default when absent) — GitHub App user-to-server
+ *   credentials. Used for the standard identity sign-in flow (no scope).
+ * - `"oauth_app"` — Classic OAuth App credentials, used for the Option A
+ *   "fork & submit yourself" flow that requires the `public_repo` scope.
+ */
+export const GITHUB_OAUTH_CLIENTS = ["github_app", "oauth_app"] as const;
+
+/** Which GitHub credential pair a token-exchange/refresh request used. */
+export type GitHubOAuthClient = (typeof GITHUB_OAUTH_CLIENTS)[number];
+
+/**
  * The ordered phases of the {@link OutputService.publishPR} fork+PR flow (§12).
  * `fork-create` fires ONLY when the fork does not yet exist — on a pre-existing
  * fork that phase is skipped and no event is emitted for it.

@@ -1,0 +1,240 @@
+# script — the v1 keyboard-level facet (spec 036, worked example that proves
+# the artifact shape). See specs/036-keyboard-facet-index/data-model.md Entity 1
+# (sample) and contracts/facet-definition.schema.md for the authoritative shape.
+#
+# limits.values note: this is the full set of CONCRETE (histogram-eligible)
+# ISO 15924 short codes the pinned UCD 17.0.0 lookup
+# (utilities/facet-index/ucd/generated/scriptLookup.ts) can ever emit as a
+# `scriptOf`/`scriptExtensionsOf` result — every code appearing in that
+# generated file's scriptRanges/scriptExtensionRanges tables, derived from
+# Scripts.txt + ScriptExtensions.txt, EXCLUDING the neutral/special codes
+# "Zyyy" (Common), "Zinh" (Inherited), and "Zzzz" (Unknown, `scriptOf`'s
+# @missing default for an unranged codepoint). Those three are deliberately
+# NOT histogram-eligible: the classifier already treats Zyyy/Zinh as neutral
+# (script-classifier.ts) and never emits them as a distribution key, and an
+# emitted Zzzz would signal a classifier/UCD gap that SHOULD fail the
+# build-time limits check (X1) loud rather than validate silently — that
+# check is not yet wired (build-index validation lands in Phase 4, T025); this
+# list documents the intended enforcement, not a guarantee in force today.
+# "Zxxx" (Unwritten) is likewise excluded and is never emitted by the current
+# lookup tables.
+#
+# The lone exception is one reserved non-ISO sentinel: "undetermined". That
+# sentinel is required because the fallback chain's last tier
+# (utilities/facet-index/fallback.ts) can produce `value: "undetermined"`
+# when neither declared metadata nor a langtags default script resolves a
+# keyboard's language — with `limits.open: false`, omitting it would make
+# that legitimate fallback value fail X1 once that check lands (Phase 4,
+# T025). It is the only non-ISO entry in this list; everything else here is a
+# real ISO 15924 short code.
+#
+# On a UCD pin bump (scripts/langtags-version.json-adjacent UCD pin), this
+# list MUST be re-reconciled against scriptLookup.ts's emitted code set — a
+# lint cross-check for that is deferred to Phase 6 T032.
+id: script
+title: Output script
+description: >
+  The script(s) the keyboard actually produces, as an ISO 15924 distribution
+  over concretely-scripted output characters (Common/Inherited characters are
+  neutral and excluded from the histogram). Falls back to declared .kps
+  language metadata, then to the langtags default script for the declared
+  language, then to "undetermined" when a keyboard has no scripted output and
+  no resolvable language signal at all.
+valueType: histogram
+limits:
+  values:
+    - Adlm
+    - Aghb
+    - Ahom
+    - Arab
+    - Armi
+    - Armn
+    - Avst
+    - Bali
+    - Bamu
+    - Bass
+    - Batk
+    - Beng
+    - Berf
+    - Bhks
+    - Bopo
+    - Brah
+    - Brai
+    - Bugi
+    - Buhd
+    - Cakm
+    - Cans
+    - Cari
+    - Cham
+    - Cher
+    - Chrs
+    - Copt
+    - Cpmn
+    - Cprt
+    - Cyrl
+    - Deva
+    - Diak
+    - Dogr
+    - Dsrt
+    - Dupl
+    - Egyp
+    - Elba
+    - Elym
+    - Ethi
+    - Gara
+    - Geor
+    - Glag
+    - Gong
+    - Gonm
+    - Goth
+    - Gran
+    - Grek
+    - Gujr
+    - Gukh
+    - Guru
+    - Hang
+    - Hani
+    - Hano
+    - Hatr
+    - Hebr
+    - Hira
+    - Hluw
+    - Hmng
+    - Hmnp
+    - Hung
+    - Ital
+    - Java
+    - Kali
+    - Kana
+    - Kawi
+    - Khar
+    - Khmr
+    - Khoj
+    - Kits
+    - Knda
+    - Krai
+    - Kthi
+    - Lana
+    - Laoo
+    - Latn
+    - Lepc
+    - Limb
+    - Lina
+    - Linb
+    - Lisu
+    - Lyci
+    - Lydi
+    - Mahj
+    - Maka
+    - Mand
+    - Mani
+    - Marc
+    - Medf
+    - Mend
+    - Merc
+    - Mero
+    - Mlym
+    - Modi
+    - Mong
+    - Mroo
+    - Mtei
+    - Mult
+    - Mymr
+    - Nagm
+    - Nand
+    - Narb
+    - Nbat
+    - Newa
+    - Nkoo
+    - Nshu
+    - Ogam
+    - Olck
+    - Onao
+    - Orkh
+    - Orya
+    - Osge
+    - Osma
+    - Ougr
+    - Palm
+    - Pauc
+    - Perm
+    - Phag
+    - Phli
+    - Phlp
+    - Phnx
+    - Plrd
+    - Prti
+    - Rjng
+    - Rohg
+    - Runr
+    - Samr
+    - Sarb
+    - Saur
+    - Sgnw
+    - Shaw
+    - Shrd
+    - Sidd
+    - Sidt
+    - Sind
+    - Sinh
+    - Sogd
+    - Sogo
+    - Sora
+    - Soyo
+    - Sund
+    - Sunu
+    - Sylo
+    - Syrc
+    - Tagb
+    - Takr
+    - Tale
+    - Talu
+    - Taml
+    - Tang
+    - Tavt
+    - Tayo
+    - Telu
+    - Tfng
+    - Tglg
+    - Thaa
+    - Thai
+    - Tibt
+    - Tirh
+    - Tnsa
+    - Todr
+    - Tols
+    - Toto
+    - Tutg
+    - Ugar
+    - Vaii
+    - Vith
+    - Wara
+    - Wcho
+    - Xpeo
+    - Xsux
+    - Yezi
+    - Yiii
+    - Zanb
+    - undetermined
+  open: false
+likelihoodSemantics: >
+  each script's share of the distinct non-neutral codepoints produced, after
+  Script_Extensions-shared codepoints are apportioned across every script
+  they independently strengthen; shares sum to 1. For the declared-metadata /
+  default-fallback / undetermined tiers, the distribution is a single value at
+  likelihood 1 — there is no per-character evidence to distribute over.
+derivation:
+  archetype: character-content
+  classifierId: script-classifier
+  fallbackChain: [content-derived, declared-metadata, default-fallback, undetermined]
+feedsSessionFacets: [community.multi-orthography]
+subProfiles:
+  latin: [plain, extended, ipa]
+# schemaVersion 2 (spec 040): the classifier now folds desktop base-layout
+# fall-through into the produced evidence — a base-layer physical key a keyboard
+# does not name falls through to the OS default layout (kbdus), so its un-blocked
+# Latin character surfaces as a minor, distribution-only sliver (never a
+# dominant-value flip). This changes affected desktop keyboards' `script`
+# records, hence the bump. NB: the freshness rescan is driven by the `script@N`
+# token in freshness.ts CLASSIFIER_VERSION, not by this field.
+schemaVersion: 2

@@ -5,8 +5,13 @@
 // accept a suggestion or pick any base.
 // The chosen base then back-fills the prefill confirmations. refs #369.
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useEffect, useMemo, useState } from "react";
+import type { I18n } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import { resolveMessage } from "../../lib/i18nResolve.ts";
 import { getBaseBrowserService } from "../../lib/services.ts";
 import { suggestBases, type SuggestTarget } from "../../lib/suggestBase.ts";
 import {
@@ -20,14 +25,27 @@ import { BaseKeyboardPicker } from "../../components/BaseKeyboardPicker.tsx";
 import { Badge, Button } from "../../ui/index.ts";
 import type { BadgeTone } from "../../ui/Badge.tsx";
 
-const REASON_LABEL: Record<ResolvedReason, string> = {
-  "language-match-monolingual": "Dedicated to your language",
-  "language-match-multilingual": "Already supports your language",
-  genealogical: "Related language, same script",
-  "script-match": "Matches your script",
-  "language-cross-script": "Supports your language, different script",
-  "us-qwerty-fallback": "Start blank (US QWERTY)",
-};
+// Chrome (badge labels); built per-render via the optional-i18n +
+// msg()/resolveMessage() pattern (see Inspector.tsx's storeBlurb) rather than
+// taking `t` as a bare function parameter — Lingui's macro tracks the
+// specific binding introduced by useLingui(), so a re-bound `t` parameter is
+// a distinct binding the extractor does not follow.
+function buildReasonLabel(reason: ResolvedReason, i18n?: I18n): string {
+  switch (reason) {
+    case "language-match-monolingual":
+      return resolveMessage(i18n, msg({ id: "editor.baseResolution.reason.monolingual", message: "Dedicated to your language" }));
+    case "language-match-multilingual":
+      return resolveMessage(i18n, msg({ id: "editor.baseResolution.reason.multilingual", message: "Already supports your language" }));
+    case "genealogical":
+      return resolveMessage(i18n, msg({ id: "editor.baseResolution.reason.genealogical", message: "Related language, same script" }));
+    case "script-match":
+      return resolveMessage(i18n, msg({ id: "editor.baseResolution.reason.scriptMatch", message: "Matches your script" }));
+    case "language-cross-script":
+      return resolveMessage(i18n, msg({ id: "editor.baseResolution.reason.crossScript", message: "Supports your language, different script" }));
+    case "us-qwerty-fallback":
+      return resolveMessage(i18n, msg({ id: "editor.baseResolution.reason.usQwertyFallback", message: "Start blank (US QWERTY)" }));
+  }
+}
 
 // Token-mapped reason tones for Badge, in descending strength:
 //   language-match-monolingual  → Badge "success" (var(--sil-green)) — dedicated
@@ -48,19 +66,37 @@ const REASON_TONE: Record<ResolvedReason, BadgeTone> = {
 export interface BaseResolutionProps {
   /** The chosen (language, script) target from identity-lite. */
   target: SuggestTarget;
-  onResolved: (base: BaseKeyboard) => void;
+  /**
+   * Fired on every search-result / suggestion-card click. Drives the LIVE
+   * preview in the right pane WITHOUT advancing the wizard or instantiating
+   * the working copy (preview-before-commit). `null` when the picker's
+   * clear action (second Escape) fires.
+   */
+  onPreview: (base: BaseKeyboard | null) => void;
+  /**
+   * Fired by the single "Choose this keyboard" button — commits the
+   * currently-previewed base and advances the wizard.
+   */
+  onConfirm: () => void;
+  /** The base currently shown in the right-pane preview, or null before any pick. */
+  previewedBase: BaseKeyboard | null;
+  /** Coarse compile-pipeline status for `previewedBase` (see stores/basePreviewStatusStore.ts). */
+  previewStatus: "idle" | "loading" | "ready" | "error";
   onBack?: () => void;
 }
 
 export function BaseResolution({
   target,
-  onResolved,
+  onPreview,
+  onConfirm,
+  previewedBase,
+  previewStatus,
   onBack,
 }: BaseResolutionProps) {
+  const { t, i18n } = useLingui();
   const [bases, setBases] = useState<BaseKeyboard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [picked, setPicked] = useState<BaseKeyboard | null>(null);
   // What the top search bar looks through: the suggested bases (default) or
   // the full catalog. Widened via the toggle or the picker's zero-match action.
   const [searchScope, setSearchScope] = useState<"suggested" | "all">("suggested");
@@ -82,8 +118,8 @@ export function BaseResolution({
         },
         (err) => {
           if (!live) return;
-          console.error("[BaseResolution] listAll() failed:", err);
-          setError("Could not load base keyboards.");
+          devLog.error("[BaseResolution] listAll() failed:", err);
+          setError(t({ id: "editor.baseResolution.loadError", message: "Could not load base keyboards." }));
           setLoading(false);
         },
       );
@@ -157,12 +193,12 @@ export function BaseResolution({
     fontFamily: "var(--app-font)",
   };
 
-  if (loading) return <div role="status" style={{ color: "var(--app-text-muted)", fontFamily: "var(--app-font)" }}>Loading base keyboards...</div>;
+  if (loading) return <div role="status" style={{ color: "var(--app-text-muted)", fontFamily: "var(--app-font)" }}><Trans id="base.picker.loading">Loading base keyboards...</Trans></div>;
   if (error !== null) return <div style={{ color: "var(--danger)", fontFamily: "var(--app-font)" }}>{error}</div>;
   if (bases.length === 0)
     return (
       <div role="status" style={{ color: "var(--app-text-muted)", fontSize: 13, fontFamily: "var(--app-font)" }}>
-        No base keyboards found. Check your connection and try again.
+        <Trans id="base.picker.emptyCatalog">No base keyboards found. Check your connection and try again.</Trans>
       </div>
     );
 
@@ -178,13 +214,15 @@ export function BaseResolution({
           // margin now that the button sits at the top with the search bar.
           style={{ marginTop: 0, marginBottom: 12 }}
         >
-          &larr; Back
+          <Trans id="editor.baseResolution.backButton">&larr; Back</Trans>
         </Button>
       )}
-      <h2 style={heading}>Choose a starting keyboard</h2>
+      <h2 style={heading}><Trans id="editor.baseResolution.heading">Choose a starting keyboard</Trans></h2>
       <p style={subtle}>
-        Based on your language and chosen script, here are the closest starting
-        points. Search above or pick a suggestion below.
+        <Trans id="editor.baseResolution.intro">
+          Based on your language and chosen script, here are the closest starting
+          points. Search above or pick a suggestion below.
+        </Trans>
       </p>
 
       {/* Search — at the top, scoped to the suggestions by default with a
@@ -192,11 +230,11 @@ export function BaseResolution({
       <div style={{ marginBottom: 20 }}>
         <div
           role="group"
-          aria-label="Search scope"
+          aria-label={t({ id: "editor.baseResolution.searchScopeAriaLabel", message: "Search scope" })}
           style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}
         >
           <span style={{ fontSize: 12, color: "var(--app-text-muted)", fontFamily: "var(--app-font)" }}>
-            Search in:
+            <Trans id="editor.baseResolution.searchInLabel">Search in:</Trans>
           </span>
           {(["suggested", "all"] as const).map((scope) => {
             const active = searchScope === scope;
@@ -218,57 +256,75 @@ export function BaseResolution({
                   fontFamily: "var(--app-font)",
                 }}
               >
-                {scope === "suggested" ? "Suggested" : "All keyboards"}
+                {scope === "suggested"
+                  ? t({ id: "editor.baseResolution.scopeSuggested", message: "Suggested" })
+                  : t({ id: "editor.baseResolution.scopeAll", message: "All keyboards" })}
               </Button>
             );
           })}
         </div>
         <BaseKeyboardPicker
-          value={picked}
-          onChange={setPicked}
+          value={previewedBase}
+          onChange={onPreview}
           target={target}
-          label="Search keyboards"
+          label={t({ id: "editor.baseResolution.searchKeyboardsLabel", message: "Search keyboards" })}
           scopeIds={searchScope === "suggested" ? suggestedIds : undefined}
           onSearchAll={() => setSearchScope("all")}
         />
+        {/*
+          The single commit button for the step. Enabled ONLY once the
+          preview has compiled successfully (previewStatus === "ready") —
+          disabled while idle, loading, AND on error. This means an author can
+          only commit a keyboard they have actually been able to preview/test,
+          which makes the confirm-while-loading -> subsequent-compile-error
+          race structurally unreachable: there is no path from "clicked
+          confirm" to "advanced onto a base whose compile then fails".
+        */}
         <Button
           variant="secondary"
           data-testid="base-confirm"
-          disabled={picked === null}
-          onClick={() => picked !== null && onResolved(picked)}
+          disabled={previewedBase === null || previewStatus !== "ready"}
+          onClick={onConfirm}
           style={{
             marginTop: 10,
             padding: "8px 18px",
-            background: picked === null ? "transparent" : "var(--app-accent)",
+            background: previewedBase === null ? "transparent" : "var(--app-accent)",
             border: "1px solid var(--app-border)",
             borderRadius: 6,
-            color: picked === null ? "var(--app-text-subtle)" : "var(--app-text)",
+            color: previewedBase === null ? "var(--app-text-subtle)" : "var(--app-text)",
             fontSize: 13,
-            cursor: picked === null ? "not-allowed" : "pointer",
+            cursor: previewedBase === null || previewStatus !== "ready" ? "not-allowed" : "pointer",
             fontFamily: "var(--app-font)",
           }}
         >
-          Use this keyboard
+          {previewStatus === "loading"
+            ? t({ id: "editor.baseResolution.preparingPreview", message: "Preparing preview…" })
+            : t({ id: "editor.baseResolution.chooseThisKeyboard", message: "Choose this keyboard" })}
         </Button>
       </div>
 
       <div style={{ borderTop: "1px solid var(--app-border)", paddingTop: 16 }}>
-        <p style={{ ...subtle, marginBottom: 8 }}>Suggested for you:</p>
+        <p style={{ ...subtle, marginBottom: 8 }}><Trans id="editor.baseResolution.suggestedForYou">Suggested for you:</Trans></p>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          {suggestions.map(({ base, reason, relative }) => (
+          {suggestions.map(({ base, reason, relative }) => {
+            const isSelected = base.id === previewedBase?.id;
+            return (
             <Button
               key={base.id}
               variant="secondary"
               data-testid={`base-card-${base.id}`}
-              onClick={() => onResolved(base)}
+              // Preview only — does NOT advance the wizard or instantiate the
+              // working copy. Committing happens exclusively via the single
+              // "Choose this keyboard" button above.
+              onClick={() => onPreview(base)}
               style={{
                 display: "flex",
                 justifyContent: "space-between",
                 alignItems: "center",
                 gap: 12,
                 padding: "10px 14px",
-                background: "var(--app-surface)",
-                border: "1px solid var(--app-border)",
+                background: isSelected ? "var(--app-accent-subtle)" : "var(--app-surface)",
+                border: `1px solid ${isSelected ? "var(--app-accent)" : "var(--app-border)"}`,
                 borderRadius: 8,
                 color: "var(--app-text)",
                 fontSize: 14,
@@ -288,15 +344,19 @@ export function BaseResolution({
               {reason === "genealogical" && relative !== undefined ? (
                 <Badge
                   tone={REASON_TONE[reason]}
-                  title={`Genealogical distance ${relative.distance} — total steps to ${relative.name} across both branches (up to the nearest common ancestor, then down); smaller is closer`}
+                  title={t({
+                    id: "editor.baseResolution.genealogicalDistanceTitle",
+                    message: `Genealogical distance ${{ distance: relative.distance }} — total steps to ${{ name: relative.name }} across both branches (up to the nearest common ancestor, then down); smaller is closer`,
+                  })}
                 >
-                  Related: {relative.name}, same script
+                  <Trans id="editor.baseResolution.relatedBadge">Related: {relative.name}, same script</Trans>
                 </Badge>
               ) : (
-                <Badge tone={REASON_TONE[reason]}>{REASON_LABEL[reason]}</Badge>
+                <Badge tone={REASON_TONE[reason]}>{buildReasonLabel(reason, i18n)}</Badge>
               )}
             </Button>
-          ))}
+            );
+          })}
         </div>
       </div>
     </div>

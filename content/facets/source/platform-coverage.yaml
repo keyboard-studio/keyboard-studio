@@ -1,0 +1,53 @@
+# source.platform-coverage — the device modalities the source/base ships for
+# (desktop / web / touch), inferred from the bundled file types in its .kps
+# <Files> list (never OS-level labels). A measure-only descriptive fact in spec
+# 043; any transform is spec 039's scope. Session consumption is planned.
+
+id: source.platform-coverage
+family: source
+title: Source platform coverage
+description: >
+  Which device modalities the source keyboard already ships for — a subset of
+  {desktop, web, touch} — inferred from bundled file types in the .kps <Files>
+  list (.kmx/.kmn -> desktop, .js -> web, .keyman-touch-layout -> touch) unioned
+  with touch-layout artifact presence. Modality only; OS-level labels are never
+  emitted since file presence cannot distinguish them.
+valueType: set
+values: [desktop, web, touch]
+
+modality: both
+
+derivations:
+  - kind: corpus
+    source: "corpus:platform-coverage"
+    sourceStatus: planned
+    notes: >
+      Modality set from the .kps <Files> bundled file types, produced by the
+      keyboard-facet-index platform-coverage classifier (spec 043); session
+      consumption of the index is planned.
+
+consumers:
+  prefills: []
+  proposes:
+    - "base-eligibility:platform-coverage"
+
+provenanceLabel: "which platforms your source keyboard already runs on"
+
+status: candidate
+metrics:
+  predictiveLift: null
+  discrimination: null
+  elicitationCost: corpus
+
+notes: >
+  Measure-only in spec 043 (FR-042 / NG-002); no transform. Read from bundled
+  file types, never a <Targets> element (absent in this corpus's .kps dialect).
+
+transformImpactClass: gate
+houseTargetPolicy: null
+invertibility: one-way
+implications: >
+  Describes the base's existing platform reach; it is a property of the source
+  package, not a switchable authoring choice in this feature.
+exceptionSites: []
+causePredicates: []

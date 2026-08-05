@@ -224,6 +224,58 @@ describe("mergePhaseResults()", () => {
     expect(session.confirmedInventory).toEqual(["a", "b", "c"]);
   });
 
+  it("attestedDigraphs is absent when no phase attested a cluster", () => {
+    const session = mergePhaseResults({}, [
+      { phase: "B", answers: [], confirmedInventory: ["d", "z"] },
+    ]);
+    expect(session.attestedDigraphs).toBeUndefined();
+  });
+
+  it("attestedDigraphs unions across phases, deduped, first-appearance order", () => {
+    const phaseB: SurveyPhaseResult = {
+      phase: "B",
+      answers: [],
+      attestedDigraphs: ["dz", "kp"],
+    };
+    const phaseC: SurveyPhaseResult = {
+      phase: "C",
+      answers: [],
+      attestedDigraphs: ["kp", "ng"], // kp is a duplicate
+    };
+    const session = mergePhaseResults({}, [phaseB, phaseC]);
+    expect(session.attestedDigraphs).toEqual(["dz", "kp", "ng"]);
+  });
+
+  it("keeps attestedDigraphs out of confirmedInventory entirely", () => {
+    // A digraph is not a character to type: its letters are already in the
+    // inventory, and folding "dz" in would put it on the placement worklist as
+    // if it needed a key of its own.
+    const session = mergePhaseResults({}, [
+      {
+        phase: "B",
+        answers: [],
+        confirmedInventory: ["d", "z"],
+        attestedDigraphs: ["dz"],
+      },
+    ]);
+    expect(session.confirmedInventory).toEqual(["d", "z"]);
+    expect(session.attestedDigraphs).toEqual(["dz"]);
+  });
+
+  it("a digraph and a same-spelled inventory entry do not suppress each other", () => {
+    // The two lists carry independent `seen` sets.
+    const session = mergePhaseResults({}, [
+      {
+        phase: "B",
+        answers: [],
+        confirmedInventory: ["dz"],
+        attestedDigraphs: ["dz"],
+      },
+    ]);
+    expect(session.confirmedInventory).toEqual(["dz"]);
+    expect(session.attestedDigraphs).toEqual(["dz"]);
+  });
+
   it("confirmedInventory drops empty strings and whitespace-only entries", () => {
     const phaseB: SurveyPhaseResult = {
       phase: "B",
@@ -294,5 +346,197 @@ describe("updateIrAxes()", () => {
     const session = mergePhaseResults({ scale: "massive" }, phases);
     const updated = updateIrAxes(session, { scale: "large" });
     expect(updated.axes.scale).toBe("tiny");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Three-store alphabet + marks worklist merge (spec 046)
+// ---------------------------------------------------------------------------
+
+describe("mergePhaseResults() — alphabet + marksWorklist (spec 046)", () => {
+  const ACUTE = "́";
+  const GRAVE = "̀";
+
+  it("omits alphabet, marksWorklist, and marksOutputForm when no phase carries them (pre-046 shape)", () => {
+    const session = mergePhaseResults({}, [{ phase: "B", answers: [] }]);
+    expect("alphabet" in session).toBe(false);
+    expect("marksWorklist" in session).toBe(false);
+    expect("marksOutputForm" in session).toBe(false);
+  });
+
+  it("merges alphabets store-wise across phases, deduped, first-appearance order", () => {
+    const phases: SurveyPhaseResult[] = [
+      {
+        phase: "B",
+        answers: [],
+        alphabet: {
+          bases: ["e", "c"],
+          marks: [ACUTE],
+          attestedStacks: [{ base: "e", marks: [ACUTE] }],
+          declaredRoles: {},
+        },
+      },
+      {
+        phase: "C",
+        answers: [],
+        alphabet: {
+          bases: ["c", "a"],
+          marks: [ACUTE, GRAVE],
+          attestedStacks: [
+            { base: "e", marks: [ACUTE] }, // duplicate — dropped
+            { base: "a", marks: [GRAVE] },
+          ],
+          declaredRoles: {},
+        },
+      },
+    ];
+    const session = mergePhaseResults({}, phases);
+    expect(session.alphabet?.bases).toEqual(["e", "c", "a"]);
+    expect(session.alphabet?.marks).toEqual([ACUTE, GRAVE]);
+    expect(session.alphabet?.attestedStacks).toEqual([
+      { base: "e", marks: [ACUTE] },
+      { base: "a", marks: [GRAVE] },
+    ]);
+  });
+
+  it("keeps stacks with the same marks in a different order as distinct", () => {
+    const phases: SurveyPhaseResult[] = [
+      {
+        phase: "B",
+        answers: [],
+        alphabet: {
+          bases: ["a"],
+          marks: [ACUTE, GRAVE],
+          attestedStacks: [
+            { base: "a", marks: [ACUTE, GRAVE] },
+            { base: "a", marks: [GRAVE, ACUTE] },
+          ],
+          declaredRoles: {},
+        },
+      },
+    ];
+    const session = mergePhaseResults({}, phases);
+    expect(session.alphabet?.attestedStacks).toHaveLength(2);
+  });
+
+  it("declared roles merge last-wins", () => {
+    const pua = String.fromCodePoint(0xe000);
+    const phases: SurveyPhaseResult[] = [
+      {
+        phase: "B",
+        answers: [],
+        alphabet: { bases: [], marks: [pua], attestedStacks: [], declaredRoles: { [pua]: "mark" } },
+      },
+      {
+        phase: "C",
+        answers: [],
+        alphabet: { bases: [pua], marks: [], attestedStacks: [], declaredRoles: { [pua]: "letter" } },
+      },
+    ];
+    const session = mergePhaseResults({}, phases);
+    expect(session.alphabet?.declaredRoles[pua]).toBe("letter");
+  });
+
+  it("folds the merged alphabet's projection into confirmedInventory (deduped)", () => {
+    const phases: SurveyPhaseResult[] = [
+      {
+        phase: "B",
+        answers: [],
+        confirmedInventory: ["e"],
+        alphabet: {
+          bases: ["e"],
+          marks: [ACUTE],
+          attestedStacks: [{ base: "e", marks: [ACUTE] }],
+          declaredRoles: {},
+        },
+      },
+    ];
+    const session = mergePhaseResults({}, phases);
+    expect(session.confirmedInventory).toContain("e");
+    expect(session.confirmedInventory).toContain("é"); // é composed from the stack
+    expect(session.confirmedInventory.filter((g) => g === "e")).toHaveLength(1);
+  });
+
+  it("marksWorklist is last-wins across phases; an empty worklist still counts", () => {
+    const phases: SurveyPhaseResult[] = [
+      {
+        phase: "B",
+        answers: [],
+        marksWorklist: {
+          ownLetterUnits: ["é"],
+          markUnits: [],
+          blockedCombinations: [],
+        },
+      },
+      {
+        phase: "C",
+        answers: [],
+        marksWorklist: { ownLetterUnits: [], markUnits: [], blockedCombinations: [] },
+      },
+    ];
+    const session = mergePhaseResults({}, phases);
+    expect(session.marksWorklist).toEqual({
+      ownLetterUnits: [],
+      markUnits: [],
+      blockedCombinations: [],
+    });
+  });
+
+  it("marksOutputForm is last-wins across phases", () => {
+    const phases: SurveyPhaseResult[] = [
+      { phase: "B", answers: [], marksOutputForm: "ready-made" },
+      { phase: "C", answers: [], marksOutputForm: "base-plus-mark" },
+    ];
+    const session = mergePhaseResults({}, phases);
+    expect(session.marksOutputForm).toBe("base-plus-mark");
+  });
+});
+
+describe("mergePhaseResults — retainedConvenienceChars (pre-carve convenience question)", () => {
+  it("is absent when no phase asked the question", () => {
+    const session = mergePhaseResults({}, [
+      { phase: "B", answers: [], confirmedInventory: ["a", "b"] },
+    ]);
+    expect(session.retainedConvenienceChars).toBeUndefined();
+  });
+
+  it("is [] — not absent — when the question was asked and nothing was kept", () => {
+    // "Asked, kept none" is a real answer and must be distinguishable from
+    // "never asked": the former means carve shields nothing on purpose.
+    const session = mergePhaseResults({}, [
+      { phase: "C", answers: [], retainedConvenienceChars: [] },
+    ]);
+    expect(session.retainedConvenienceChars).toEqual([]);
+  });
+
+  it("unions across phases, deduped, first-appearance order", () => {
+    const session = mergePhaseResults({}, [
+      { phase: "C", answers: [], retainedConvenienceChars: ["q", "Q"] },
+      { phase: "C", answers: [], retainedConvenienceChars: ["Q", "x", "X"] },
+    ]);
+    expect(session.retainedConvenienceChars).toEqual(["q", "Q", "x", "X"]);
+  });
+
+  it("keeps retained characters OUT of confirmedInventory", () => {
+    // They are not the language's characters: folding them into the inventory
+    // would put them on the mechanism gallery's placement worklist and inside
+    // the Phase F "every character implemented" gate.
+    const session = mergePhaseResults({}, [
+      { phase: "B", answers: [], confirmedInventory: ["a", "b"] },
+      { phase: "C", answers: [], retainedConvenienceChars: ["q", "Q"] },
+    ]);
+    expect(session.confirmedInventory).toEqual(["a", "b"]);
+    expect(session.retainedConvenienceChars).toEqual(["q", "Q"]);
+  });
+
+  it("does not suppress or get suppressed by an identical confirmedInventory entry", () => {
+    // Separate `seen` sets: a letter can legitimately be both needed by the
+    // orthography and listed as retained by an earlier answer.
+    const session = mergePhaseResults({}, [
+      { phase: "B", answers: [], confirmedInventory: ["q"] },
+      { phase: "C", answers: [], retainedConvenienceChars: ["q"] },
+    ]);
+    expect(session.confirmedInventory).toContain("q");
+    expect(session.retainedConvenienceChars).toEqual(["q"]);
   });
 });

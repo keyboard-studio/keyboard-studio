@@ -1,17 +1,28 @@
 // MetadataCard — displays selected base keyboard metadata and try-it hints.
 
+import { Trans, useLingui } from "@lingui/react/macro";
+import { msg } from "@lingui/core/macro";
+import type { MessageDescriptor } from "@lingui/core";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { BG_CARD, CARD_BORDER, FONT_MONO, SUCCESS_ACCENT, TEXT_MAIN } from "../ui/theme.ts";
 
 // [TEMP] Per-fixture typing hints. Hardcoded until the Pattern schema's
 // `tests` field (spec §5) is wired into the UI to drive these automatically.
-const TRY_HINTS: Record<string, { intro: string; examples: string[] }> = {
+// `intro` is user-facing prose (lazy msg descriptor, resolved per-render);
+// `examples` are keystroke-notation demos, not translatable copy.
+const TRY_HINTS: Record<string, { intro: MessageDescriptor; examples: string[] }> = {
   basic_kbdus: {
-    intro: "US-English layout — types the same as your physical keyboard.",
+    intro: msg({
+      id: "metadata.tryHint.basicKbdus.intro",
+      message: "US-English layout — types the same as your physical keyboard.",
+    }),
     examples: ["a -> a", "Shift+a -> A", "1 -> 1"],
   },
   sil_euro_latin: {
-    intro: "Diacritics via a leading punctuation deadkey.",
+    intro: msg({
+      id: "metadata.tryHint.silEuroLatin.intro",
+      message: "Diacritics via a leading punctuation deadkey.",
+    }),
     examples: [
       "' then a -> a-acute",
       "` then e -> e-grave",
@@ -21,7 +32,10 @@ const TRY_HINTS: Record<string, { intro: string; examples: string[] }> = {
     ],
   },
   sil_devanagari_phonetic: {
-    intro: "Romanised phonetic input for Devanagari.",
+    intro: msg({
+      id: "metadata.tryHint.silDevanagariPhonetic.intro",
+      message: "Romanised phonetic input for Devanagari.",
+    }),
     examples: ["a -> base vowel", "k -> ka consonant", "i -> i vowel"],
   },
 };
@@ -36,6 +50,7 @@ function Row({ k, v }: { k: string; v: string }) {
 }
 
 export function MetadataCard({ kb }: { kb: BaseKeyboard }) {
+  const { t } = useLingui();
   const hint = TRY_HINTS[kb.id];
   return (
     <>
@@ -61,7 +76,7 @@ export function MetadataCard({ kb }: { kb: BaseKeyboard }) {
             marginBottom: 4,
           }}
         >
-          Selected keyboard
+          <Trans id="metadata.selectedKeyboard.heading">Selected keyboard</Trans>
         </div>
         <Row k="id" v={kb.id} />
         <Row k="name" v={kb.displayName} />
@@ -92,10 +107,10 @@ export function MetadataCard({ kb }: { kb: BaseKeyboard }) {
               marginBottom: 8,
             }}
           >
-            Try typing
+            <Trans id="metadata.tryTyping.heading">Try typing</Trans>
           </div>
           <div style={{ fontSize: 13, color: "#9aa7b8", marginBottom: 8 }}>
-            {hint.intro}
+            {t(hint.intro)}
           </div>
           <ul
             style={{

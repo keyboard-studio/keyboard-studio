@@ -26,10 +26,22 @@
 // the same pinned version already vetted for @keyboard-studio/engine's own
 // zip writer, not a new library introduction).
 
-import { test, expect, type Page } from "playwright/test";
+import { test, expect } from "playwright/test";
+import { expectNoSeriousAxeViolations } from "./helpers/axe";
 import { unzipSync, strFromU8 } from "fflate";
 import { readFile } from "node:fs/promises";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
+import {
+  driveIdentityLite,
+  pickBaseKeyboard,
+  chooseAdaptTrack,
+  confirmPrefill,
+  buildOneCharacterList,
+  confirmMechanismsEmpty,
+  driveTouchGallery,
+  driveHelpPhase,
+  seedReturningVisitor,
+} from "./helpers/surveyFlow";
 
 // ---------------------------------------------------------------------------
 // Fixture constants
@@ -40,6 +52,64 @@ const TARGET_NODE_ID = "rule#93";
 // Present in the emitted .kmn iff rule#93 (the sole index(C_efc,...) user) survives.
 const KEPT_ONLY_TOKEN = "index(C_efc,3)";
 const KMN_ZIP_PATH = `source/${BASE_KEYBOARD_ID}.kmn`;
+
+/**
+ * Pre-existing 1.4.3 (Contrast Minimum) offenders on the carve gallery,
+ * excluded by selector with the criterion and reason named inline — the same
+ * idiom e2e/tab-roundtrip.spec.ts and e2e/decision-deeplink.spec.ts use
+ * (KNOWN_CONTRAST_DEBT). This is spec 056's open tracker debt
+ * (specs/056-ada-accessibility/wcag-2.2-aa-tracker.md, 1.4.3 is an open
+ * `unknown` row), not anything introduced or touched by spec 057 — the
+ * components (CarveGallery.tsx, RemovalBanner.tsx) are byte-identical to
+ * `main` (see specs/057-bulletproof-navigation/evidence/gating-red.md
+ * §"Two corrections made to reach a *valid* red").
+ */
+const KNOWN_CONTRAST_DEBT: readonly string[] = [
+  // 1.4.3 — CarveGallery's info-panel toggle button.
+  'button[aria-label="Hide info panel"]',
+  // 1.4.3 — CarveGallery's footer "Continue" button.
+  'button[data-testid="carve-continue"]',
+  // 1.4.3 — RemovalBanner's dismiss control (assignLoop/parts/RemovalBanner.tsx).
+  'button[aria-label="Dismiss removal recommendation"]',
+  // 1.4.3 — RemovalBanner's own region (its collapsed-strip text sits on the
+  // green-tinted background at a ratio axe flags). Excluded by the banner's
+  // stable aria-label rather than the anonymous div chain axe reports (the
+  // chain has no data-testid/aria hook of its own to key on).
+  'div[aria-label="Removal recommendation"]',
+  // 1.4.3 — Rail's per-node carve-card buttons: the "kept/total" and
+  // per-modifier breakdown spans inside them (Rail.tsx) fall short.
+  // Excluded by the testid PREFIX (carve-card-<nodeId> varies per fixture,
+  // e.g. "carve-card-group#0") rather than the brittle nth-child span chain
+  // axe reports for the same reason.
+  'button[data-testid^="carve-card-"]',
+  // 1.4.3 — GlyphCell's cross-reference tag chips (assignLoop/parts/
+  // GlyphCell.tsx): "<kind> — go to" / "<kind> — N places". Keyed on the
+  // aria-label SUFFIX because the kind prefix varies ("store", "group", ...)
+  // and the chips carry no testid.
+  'button[aria-label$="go to"]',
+  'button[aria-label$="places"]',
+  // 1.4.3 — Rail's sticky SectionHeader (assignLoop/parts/Rail.tsx): the
+  // tone-colored uppercase section label. The header is an anonymous div
+  // with no testid/aria hook, so it is keyed on its one distinguishing
+  // attribute — the inline-style signature only this header uses. Adding a
+  // programmatic landmark to Rail is 056's call, not this spec's.
+  'div[style*="letter-spacing: 0.13em"]',
+];
+
+/**
+ * Pre-existing 1.4.3 offenders on the OUTPUT screen (same rules and evidence
+ * trail as KNOWN_CONTRAST_DEBT above — spec 056's open tracker debt; both
+ * components predate and are untouched by spec 057). Kept as a separate list
+ * because the two screens share no offending component.
+ */
+const KNOWN_CONTRAST_DEBT_OUTPUT: readonly string[] = [
+  // 1.4.3 — OskModeToggle's inactive mode button (components/OskModeToggle.tsx):
+  // the unselected toggle half's text on the group background falls short.
+  'div[role="group"] > button',
+  // 1.4.3 — SignUpPanel's GitHub button; the same exclusion
+  // decision-deeplink.spec.ts already carries for shared chrome.
+  'button[aria-label="Sign up with GitHub"]',
+];
 
 // ---------------------------------------------------------------------------
 // window.__ksE2E__ typing — mirrors packages/studio/src/lib/e2eHook.ts.
@@ -59,197 +129,21 @@ declare global {
 }
 
 // ---------------------------------------------------------------------------
-// Page-object-lite helpers
+// Page-object-lite helpers (carve-specific)
 // ---------------------------------------------------------------------------
-
-/**
- * Every phase in this spec that renders SurveyRunner shares one forward
- * control: data-testid="survey-advance". Its accessible name toggles
- * "Next"/"Finish" depending on question position, but the testid is
- * constant — this is the fix for the bug this spec previously carried,
- * where role+name "Next" matching missed the final question's "Finish"
- * label and hung for the full 90s timeout.
- */
-function surveyAdvance(page: Page) {
-  return page.getByTestId("survey-advance");
-}
-
-/**
- * Drive the identity-lite (Phase A "il_*") mini-flow to completion.
- * il_language_code is left blank (required: false) — the survey advances on
- * a blank optional field. il_target_script is set to "other" so Canadian
- * Aboriginal Syllabics (not in the v1 script enum) does not accidentally
- * route into the §9 unsupported-script stub reserved for Ethi/Hani/Hang.
- */
-async function driveIdentityLite(page: Page): Promise<void> {
-  await page.locator("#il_language_autonym").fill("Nehiyawewin");
-  await surveyAdvance(page).click();
-
-  // il_language_english is seeded from the autonym by IdentityLite's
-  // getSeedValue; required, but already non-empty — just advance.
-  await expect(page.locator("#il_language_english")).not.toHaveValue("");
-  await surveyAdvance(page).click();
-
-  // il_language_code — optional, left blank.
-  await surveyAdvance(page).click();
-
-  // il_target_script — required select. "other" keeps routing generic and
-  // avoids the CJK/Ethiopic/Hangul §9 stub gate. This is the last
-  // identity-lite question, so the button reads "Finish" here — same
-  // testid, so no branching needed.
-  await page.locator("#il_target_script").selectOption("other");
-  await surveyAdvance(page).click();
-
-  // Robustness check for the phase boundary itself: identity-lite hands off
-  // to the base keyboard picker. Wait on that landmark rather than trusting
-  // the fixed 4-click count above to stay in sync with il_*.yaml.
-  await expect(page.getByRole("combobox", { name: "Base keyboard" })).toBeVisible({
-    timeout: 15_000,
-  });
-}
-
-/**
- * Resolve the base keyboard via the BaseKeyboardPicker combobox (the "pick
- * any base by id" path — the ranked-suggestion cards are not guaranteed to
- * surface a Canadian-syllabics keyboard for an "other"-script target).
- */
-async function pickBaseKeyboard(page: Page, keyboardId: string): Promise<void> {
-  const combobox = page.getByRole("combobox", { name: "Base keyboard" });
-  await combobox.click();
-  await combobox.fill(keyboardId);
-
-  const option = page.getByRole("option", { name: new RegExp(keyboardId) }).first();
-  await option.click();
-
-  await page.getByTestId("base-confirm").click();
-}
-
-/**
- * track step — PhaseTrack renders a single-question SurveyRunner flow
- * (track_choice). data-testid="track-adapt" is the live RadioGroup option
- * (RadioGroup.tsx wires the testid only onto the track_choice-adapt input);
- * the old "track-adapt"/"track-next" pair on the retired
- * editors/panels/TrackStep.tsx no longer applies — that component is not
- * rendered by SurveyView.
- */
-async function chooseAdaptTrack(page: Page): Promise<void> {
-  await page.getByTestId("track-adapt").check();
-  await surveyAdvance(page).click();
-}
-
-/** characters step, prefill sub-stage — a static confirmation, no inputs. */
-async function confirmPrefill(page: Page): Promise<void> {
-  // Prefill.tsx is a standalone confirmation screen, not a SurveyRunner
-  // instance — no survey-advance testid reaches it, so role+text matching
-  // stays here (flagged for km-frontend below).
-  await page.getByRole("button", { name: "Confirm and continue" }).click();
-}
-
-/**
- * characters step, Phase B sub-stage — build-list discovery method (the
- * IntroChooser default). Adds exactly one character that the base keyboard
- * ALREADY produces via an unconditional TYPED rule, so that
- * useInventoryDiff() resolves lettersToAdd to empty and the downstream
- * Mechanism/Touch galleries take their empty-diff "nothing to do" exits
- * rather than requiring a full per-character assignment walk.
- *
- * U+166E ("᙮", CANADIAN SYLLABICS FULL STOP) is produced by
- * bj_cree_woods.kmn's `+ "." > U+166E` rule — a plain `{kind:"char"}`
- * output with no if/index/deadkey conditioning, so buildProducedSet (which
- * only walks typed ir.groups[].rules[].output, never ir.raw) captures it
- * directly. This is deliberately NOT a character produced only via the
- * opaque rule#93 (e.g. U+140C, a member of store C_efc emitted solely by
- * rule#93's index(C_efc,3) output) — buildProducedSet cannot see into
- * ir.raw, so such a character would show as still-missing ("0 of 1 added")
- * regardless of the carve decision, defeating the empty-diff pass-through
- * this helper exists to set up.
- */
-async function buildOneCharacterList(page: Page): Promise<void> {
-  // IntroChooser ("Continue") and the build-list add/done controls are a
-  // standalone Phase B sub-view, not a SurveyRunner instance — no testid
-  // reaches them, so role+text matching stays here (flagged for
-  // km-frontend below).
-  await page.getByRole("button", { name: "Continue" }).click();
-
-  await page.getByLabel("Character to add").fill("᙮");
-  await page.getByRole("button", { name: "+ Add" }).click();
-
-  await page.getByRole("button", { name: /^Done \(1 character\)$/ }).click();
-}
-
-/**
- * mechanisms step — expected to resolve immediately to the empty-diff exit
- * ("No new characters to add." + data-testid="mechanisms-continue") given
- * buildOneCharacterList() pre-empted every letter via the produced-set
- * trick. The testid is constant across MechanismGallery's several exit
- * states (empty-diff, all-keys-added, locked-escape), so this helper does
- * not need to branch on which one rendered.
- *
- * MechanismGallery gates its first render behind a one-time intro splash
- * (showIntro, seeded from galleryIntrosSeen.mechanism — MechanismGallery.tsx)
- * with a "Start the mechanism gallery" button; the empty-diff message only
- * appears after it is dismissed. Same GalleryIntroSplash component and same
- * conditional-click pattern as driveTouchGallery's "Start the touch
- * gallery" button below — no data-testid exists on either intro button yet
- * (IntroSplash.tsx sets aria-label={startAriaLabel}, not a testid; flagged
- * for km-frontend), so role+name matching stays here to unblock now.
- */
-async function confirmMechanismsEmpty(page: Page): Promise<void> {
-  const startButton = page.getByRole("button", { name: "Start the mechanism gallery" });
-  if (await startButton.isVisible().catch(() => false)) {
-    await startButton.click();
-  }
-
-  await expect(page.getByText("No new characters to add.")).toBeVisible({ timeout: 15_000 });
-  await page.getByTestId("mechanisms-continue").click();
-}
-
-/**
- * touch step — same one-character inventory as Phase B (TouchGallery reads
- * the raw confirmedInventory, not the base-diffed lettersToAdd). Dismiss the
- * one-time intro splash, then Skip the single character to reach the
- * all-done state, whose forward control is data-testid="touch-continue".
- */
-async function driveTouchGallery(page: Page): Promise<void> {
-  const startButton = page.getByRole("button", { name: "Start the touch gallery" });
-  if (await startButton.isVisible().catch(() => false)) {
-    await startButton.click();
-  }
-
-  const skipButton = page.getByRole("button", { name: /^Skip / });
-  if (await skipButton.isVisible().catch(() => false)) {
-    await skipButton.click();
-  }
-
-  await page.getByTestId("touch-continue").click();
-}
-
-/**
- * help (Phase F) step — fill the two required fields, then click
- * survey-advance in a bounded loop until PhaseF hands off to Output
- * (there is no "package" screen between help and output — see spec §11
- * output path). Detecting the #output URL rather than counting clicks
- * keeps this driver correct if phase_f_helpdocs.yaml gains or loses
- * optional tips/credits/contact questions.
- */
-async function driveHelpPhase(page: Page): Promise<void> {
-  await page.locator("#pf_welcome_paragraph").fill("Welcome to the Western Cree keyboard.");
-  await surveyAdvance(page).click();
-
-  await page.locator("#pf_usage_tip_1").fill("Press a consonant key, then a vowel key.");
-
-  // Advance through the remaining optional tips/credits/contact questions —
-  // survey-advance is the single control for both "Next" and the final
-  // question's "Finish" label, and the last click navigates straight to
-  // #output (no intermediate package/summary screen).
-  for (let guard = 0; guard < 15; guard++) {
-    await surveyAdvance(page).click();
-    if (/#output$/.test(page.url())) {
-      return;
-    }
-  }
-  throw new Error("driveHelpPhase: did not reach #output within the expected question count");
-}
+//
+// The shared survey prelude (identity-lite, base picker, track choice,
+// prefill, character list, mechanism/touch galleries, help phase) now lives
+// in ./helpers/surveyFlow and is imported above. There is no carve-local
+// driver left: the standalone Sequence Gallery step (formerly inserted
+// between mechanisms and the touch fork) has been retired — S-03 sequences
+// now build inline inside the Mechanism Gallery's method chooser (selecting
+// the "sequence" method swaps the right/preview pane for SequenceBuilderPanel;
+// see MechanismGallery.tsx). This fixture's mechanism step never flags a
+// character for anything (confirmMechanismsEmpty's "No new characters to
+// add." empty-diff path), so there is no per-character loop here to drive the
+// sequence builder through — nothing to replace the old pass-through driver
+// with for THIS walk.
 
 // ---------------------------------------------------------------------------
 // Spec
@@ -258,18 +152,26 @@ async function driveHelpPhase(page: Page): Promise<void> {
 test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn", () => {
   test("deleting rule#93 in the carve gallery removes it from the deleted-node IR state and from the emitted .kmn", async ({ page }) => {
     // ?e2e=1 is the runtime override for installE2eHook() (src/lib/e2eHook.ts)
-    // — no VITE_E2E build flag needed.
+    // — no VITE_E2E build flag needed. Seed the returning-visitor flag first
+    // so the fresh browser context skips WelcomeScreen (see seedReturningVisitor).
+    await seedReturningVisitor(page);
     await page.goto("/?e2e=1");
 
-    await driveIdentityLite(page);
+    await driveIdentityLite(page, {
+      english: "Test",
+      autonym: "Nehiyawewin",
+      script: "other",
+    });
     await pickBaseKeyboard(page, BASE_KEYBOARD_ID);
     await chooseAdaptTrack(page);
     await confirmPrefill(page);
-    await buildOneCharacterList(page);
+    await buildOneCharacterList(page, "᙮");
 
-    // Manifest spine order (StudioShell.tsx) is characters -> carve ->
-    // mechanisms -> touch -> help; carve comes immediately after Phase B,
-    // BEFORE mechanisms/touch.
+    // Manifest spine order (StudioShell.tsx) is characters -> marks -> carve ->
+    // mechanisms -> touch -> help (no separate sequences step — S-03 builds
+    // inline in the Mechanism Gallery, see the note above); the marks-free
+    // alphabet ("᙮") auto-skips the marks step, so carve renders right after
+    // Phase B.
 
     // ---------------------------------------------------------------------
     // Carve gallery
@@ -280,6 +182,12 @@ test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn",
     const targetCard = page.getByTestId(`carve-card-${TARGET_NODE_ID}`);
     await expect(targetCard).toBeVisible();
     await expect(targetCard).toHaveAttribute("data-kind", "raw");
+
+    // Accessibility gate (spec 056 FR-003): scan the carve gallery screen.
+    await expectNoSeriousAxeViolations(page, "carve gallery (bj_cree_woods)", {
+      exclude: KNOWN_CONTRAST_DEBT,
+    });
+
     await targetCard.click();
 
     await page.getByTestId("raw-remove-anyway").click();
@@ -306,7 +214,8 @@ test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn",
     await page.getByTestId("carve-continue").click();
 
     // ---------------------------------------------------------------------
-    // Remaining spine steps: mechanisms, touch, help.
+    // Remaining spine steps: mechanisms, touch, help. (No separate sequences
+    // step — see the note above the describe block.)
     // ---------------------------------------------------------------------
     await confirmMechanismsEmpty(page);
     await driveTouchGallery(page);
@@ -314,6 +223,11 @@ test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn",
 
     // handlePhaseFComplete navigates to #output.
     await page.waitForURL(/#output$/);
+
+    // Accessibility gate (spec 056 FR-003): scan the output screen.
+    await expectNoSeriousAxeViolations(page, "output screen (carve walk)", {
+      exclude: KNOWN_CONTRAST_DEBT_OUTPUT,
+    });
 
     // ---------------------------------------------------------------------
     // AC2 checkpoint 2: the emitted .kmn omits the deleted rule.
@@ -346,13 +260,18 @@ test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn",
   // (e.g. a scaffold/base-resolution regression that silently drops raw
   // fragments before the carve step even runs).
   test("control: keeping rule#93 leaves its distinguishing token in the emitted .kmn", async ({ page }) => {
+    await seedReturningVisitor(page);
     await page.goto("/?e2e=1");
 
-    await driveIdentityLite(page);
+    await driveIdentityLite(page, {
+      english: "Test",
+      autonym: "Nehiyawewin",
+      script: "other",
+    });
     await pickBaseKeyboard(page, BASE_KEYBOARD_ID);
     await chooseAdaptTrack(page);
     await confirmPrefill(page);
-    await buildOneCharacterList(page);
+    await buildOneCharacterList(page, "᙮");
 
     const carveGallery = page.getByTestId("carve-gallery");
     await expect(carveGallery).toBeVisible({ timeout: 30_000 });

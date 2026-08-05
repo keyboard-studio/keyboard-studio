@@ -5,8 +5,9 @@
 //   2. DEFAULT_TOUCH_SUGGEST_POLICY has the expected field values (defaults.ts, T019).
 //   3. Policy fields are overridable individually without clobbering other fields.
 //   4. touchSuggest() derives a provenance-stamped TouchLayoutIR from a
-//      KeyboardIR (spec-014 T023): never `hand-set`; `base-derived` for keys
-//      carried from the base layout, `physical-suggested` otherwise.
+//      KeyboardIR (spec-014 T023): `base-derived` for keys carried from the
+//      base layout, `physical-suggested` otherwise, and an incoming
+//      `hand-set` tag is preserved rather than re-stamped (R6 no-clobber).
 //   5. touchSuggest() accepts and merges policyOverrides without throwing.
 
 import { describe, it, expect } from "vitest";
@@ -148,6 +149,23 @@ describe("touchSuggest (spec-014 T023 body)", () => {
     const layout = touchSuggest({ physicalIR: ir });
     const seeded = allKeys(layout).find((k) => k.id === "K_SEED");
     expect(seeded?.provenance).toBe("base-derived");
+  });
+
+  it("Case B: a key carried through already tagged hand-set is preserved, not re-stamped (R6 no-clobber)", () => {
+    const ir = physicalIR();
+    const handSetKey: TouchKeyIR = {
+      nodeId: "nh",
+      id: "K_SEED",
+      text: "z",
+      provenance: "hand-set",
+    };
+    ir.touchLayout = {
+      platforms: [{ id: "phone", layers: [{ id: "default", rows: [{ keys: [handSetKey] }] }] }],
+      nodeIds: [],
+    };
+    const layout = touchSuggest({ physicalIR: ir });
+    const seeded = allKeys(layout).find((k) => k.id === "K_SEED");
+    expect(seeded?.provenance).toBe("hand-set");
   });
 
   it("is pure — does not mutate the input IR", () => {

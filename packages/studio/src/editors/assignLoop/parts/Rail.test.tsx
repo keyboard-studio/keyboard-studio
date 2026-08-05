@@ -16,7 +16,8 @@
 //     onSetManyGlyphs.
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
-import { render, cleanup, fireEvent, screen } from '@testing-library/react';
+import { cleanup, fireEvent, screen } from '@testing-library/react';
+import { render } from '../../../test/renderWithI18n.tsx';
 import { Rail } from './Rail.tsx';
 import { useHoverInfoStore } from '../../../stores/hoverInfoStore.ts';
 import type { CarveNode, StoreCharChip } from '../../../lib/irToCarveNodes.ts';
@@ -235,5 +236,111 @@ describe('Rail — store node fallback whole-node toggle', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Keep' }));
     expect(onToggleNode).toHaveBeenCalledWith('store#s', false);
+  });
+});
+
+// Spec 056 Cycle 1 — the card's "select" affordance is a real <button> now
+// (was a role="button" div, which nested inside the real ToggleBox <button> —
+// axe fires nested-interactive at serious, WCAG 4.1.2). This suite pins the
+// contract: card selection stays keyboard-accessible via native <button>
+// semantics, and the two sibling buttons don't interfere with each other.
+describe('Rail — carve-card select affordance is a real button', () => {
+  function makePatternNode(overrides: Partial<CarveNode> = {}): CarveNode {
+    return {
+      nodeId: 'pattern#p',
+      kind: 'pattern',
+      name: 'Grave accent',
+      ...overrides,
+    };
+  }
+
+  it('renders the card as a native <button> element, not a role="button" div', () => {
+    const node = makePatternNode();
+    render(<Rail {...baseRailProps} nodes={[node]} />);
+
+    const card = screen.getByTestId(`carve-card-${node.nodeId}`);
+    expect(card.tagName).toBe('BUTTON');
+    // Not carrying a stale ARIA role — the native tag is the semantics.
+    expect(card.getAttribute('role')).toBeNull();
+  });
+
+  it('clicking the card calls onSelect with the node id (pointer path)', () => {
+    const onSelect = vi.fn();
+    const node = makePatternNode();
+    render(<Rail {...baseRailProps} nodes={[node]} onSelect={onSelect} />);
+
+    fireEvent.click(screen.getByTestId(`carve-card-${node.nodeId}`));
+
+    expect(onSelect).toHaveBeenCalledWith(node.nodeId);
+  });
+
+  it('clicking the ToggleBox toggles the node without also firing onSelect (sibling buttons, stopPropagation in handleToggle)', () => {
+    const onSelect = vi.fn();
+    const onToggleNode = vi.fn();
+    const node = makePatternNode({ storeChips: [] });
+    render(
+      <Rail
+        {...baseRailProps}
+        nodes={[node]}
+        onSelect={onSelect}
+        onToggleNode={onToggleNode}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove' }));
+
+    expect(onToggleNode).toHaveBeenCalledWith(node.nodeId, true);
+    expect(onSelect).not.toHaveBeenCalled();
+  });
+});
+
+describe('Rail — removal-recommendation badge retired (#525 BANNER slice)', () => {
+  // The per-node "Suggested removal" badge (originally added in the #525
+  // FOUNDATION slice) is retired — the green removal-recommendation banner
+  // (CarveGallery's RemovalBanner) is now the SINGLE surface for this signal.
+  // `recommendation` itself is left intact on CarveNode (annotateRemovalRecommendations
+  // still computes it — see irToCarveNodes.test.ts) so Rail must simply never
+  // render anything for it, regardless of value.
+  function makePatternNode(overrides: Partial<CarveNode> = {}): CarveNode {
+    return {
+      nodeId: 'pattern#p',
+      kind: 'pattern',
+      name: 'Grave accent',
+      ...overrides,
+    };
+  }
+
+  it('never renders a "Suggested removal" badge for a node with recommendation "high"', () => {
+    const node = makePatternNode({ recommendation: 'high' });
+    render(<Rail {...baseRailProps} nodes={[node]} />);
+
+    expect(screen.queryByTestId('carve-suggested-removal-pattern#p')).toBeNull();
+    expect(screen.queryByText('Suggested removal')).toBeNull();
+  });
+
+  it('does not render anything for a node with recommendation "none"', () => {
+    const node = makePatternNode({ recommendation: 'none' });
+    render(<Rail {...baseRailProps} nodes={[node]} />);
+
+    expect(screen.queryByTestId('carve-suggested-removal-pattern#p')).toBeNull();
+    expect(screen.queryByText('Suggested removal')).toBeNull();
+  });
+
+  it('does not render anything for a node with recommendation undefined (unannotated)', () => {
+    const node = makePatternNode();
+    render(<Rail {...baseRailProps} nodes={[node]} />);
+
+    expect(screen.queryByTestId('carve-suggested-removal-pattern#p')).toBeNull();
+    expect(screen.queryByText('Suggested removal')).toBeNull();
+  });
+
+  it('renders no badge for either node when a "high" node is rendered alongside a "none" node', () => {
+    const highNode = makePatternNode({ nodeId: 'pattern#high', recommendation: 'high' });
+    const noneNode = makePatternNode({ nodeId: 'pattern#none', name: 'Cedilla', recommendation: 'none' });
+    render(<Rail {...baseRailProps} nodes={[highNode, noneNode]} />);
+
+    expect(screen.queryByTestId('carve-suggested-removal-pattern#high')).toBeNull();
+    expect(screen.queryByTestId('carve-suggested-removal-pattern#none')).toBeNull();
+    expect(screen.queryAllByText('Suggested removal')).toHaveLength(0);
   });
 });

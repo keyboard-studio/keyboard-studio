@@ -1,0 +1,22 @@
+# Q-IP3 keep-script-conventions (spec 038 US2, inheritance-posture).
+# The base's neutral-residue script conventions (ordering, normalization habits)
+# carry script variants the target may not want. record-no-default: residue is
+# not a confident signal, so the posture is recorded blank rather than guessed.
+
+id: q_ip3_keep_script_conventions
+family: inheritance-posture
+elicits: >
+  Whether to keep the base keyboard's script conventions (ordering and
+  normalization habits) when its neutral residue carries script variants.
+firingCondition: "base-neutral-residue-has-script-variants"
+prefill:
+  facets: [script]
+  sessionFacet: community.input-conventions
+provenanceLabel: "the base keyboard's neutral-residue script conventions"
+consumers:
+  - "axis:A4"
+  - "strategy:selection-bias"
+noEvidenceDegradation: record-no-default
+scope: session
+renders: true
+status: candidate

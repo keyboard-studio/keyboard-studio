@@ -11,12 +11,23 @@
 //     ctx.field != 'x', "or" (space-separated "or" tokens), "and" tokens.
 //     Full boolean DSL is out of scope — these cover the actual YAML content.
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useState, useId, useMemo, useRef, useEffect } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { FlowDef, FlowQuestion, FlowOption, FlowGotoRule, SurveyContext, AnswerStackEntry } from "./types.ts";
 import type { SurveyAnswer, SurveyPhaseResult, LintFinding, LangtagsProvenance, LanguageSummary } from "@keyboard-studio/contracts";
 import { QuestionField } from "./QuestionField.tsx";
 import { debugPinsStore } from "../stores/debugPinsStore.ts";
+import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import {
+  useStepWalkStore,
+  peekStepCursor,
+  peekAnswerDraft,
+  type AnswerDraft,
+} from "../stores/stepWalkStore.ts";
+import type { StepWalkPositions } from "../lib/stepWalk.ts";
 import { secondaryButton, primaryButton } from "./surveyStyles.ts";
+import { handleEnterToAdvance } from "./enterToAdvance.ts";
 
 // ---------------------------------------------------------------------------
 // Condition evaluator
@@ -146,25 +157,13 @@ function toSurveyAnswer(
 // ---------------------------------------------------------------------------
 // Template interpolation
 // ---------------------------------------------------------------------------
-
-function interpolate(text: string, ctx: SurveyContext): string {
-  return text.replace(/\{\{(\w+)\}\}/g, (_, key: string) => ctx[key] ?? `{{${key}}}`);
-}
-
-function interpolateQuestion(q: FlowQuestion, ctx: SurveyContext): FlowQuestion {
-  return {
-    ...q,
-    ...(q.prompt !== undefined ? { prompt: interpolate(q.prompt, ctx) } : {}),
-    ...(q.help_text !== undefined ? { help_text: interpolate(q.help_text, ctx) } : {}),
-    ...(q.body !== undefined ? { body: interpolate(q.body, ctx) } : {}),
-    ...(q.options !== undefined ? {
-      options: q.options.map((opt) => ({
-        ...opt,
-        label: interpolate(opt.label, ctx),
-      })),
-    } : {}),
-  };
-}
+// `{{token}}` interpolation of a question's prompt/label/help_text/body and
+// option labels happens in QuestionField (see its `resolveFlowText`), AFTER
+// Tier-B content-i18n catalog resolution — a translated catalog value carries
+// its own tokens, so only the resolved string may be interpolated. SurveyRunner
+// therefore hands QuestionField the RAW question (plus any dynamic options) and
+// does NOT pre-interpolate it here: doing so would redundantly process the
+// English fallback and cannot see the translated string's tokens at all.
 
 // ---------------------------------------------------------------------------
 // advanceThrough — moved before SurveyRunner so it is in scope for render-time
@@ -202,12 +201,12 @@ export function advanceThrough(
   while (nextId !== null) {
     const next = index.get(nextId);
     if (next === undefined) {
-      console.error("SurveyRunner: unresolved goto target", nextId);
+      devLog.error("SurveyRunner: unresolved goto target", nextId);
       return null;
     }
     if (next.engine_resolved !== true) return nextId;
     if (visited.has(nextId)) {
-      console.error("SurveyRunner: cycle detected in engine_resolved chain", nextId);
+      devLog.error("SurveyRunner: cycle detected in engine_resolved chain", nextId);
       return null;
     }
     visited.add(nextId);
@@ -235,16 +234,23 @@ export interface SurveyRunnerProps {
    */
   onAnswerCommit?: (questionId: string, value: string | string[] | undefined) => void;
   /**
-   * Called when SurveyRunner is about to push a new question onto the stack.
-   * Return a seed value to pre-fill the question's input, or undefined to leave
-   * the input empty. The seed is only applied the first time a question is pushed
-   * (i.e., when arriving forward, not when restoring via Back — Back restores the
-   * previously-saved stack entry value instead).
+   * Called when SurveyRunner needs a value for a question it has no COMMITTED
+   * answer for. Return a seed value to pre-fill the input, or undefined to leave
+   * it empty.
    *
-   * "Default once, then user owns it" contract: the seed populates the input on
-   * first arrival; the user can edit it freely; if the user goes Back and returns,
-   * Back discards the unsaved edit so the seed fires again on re-arrival. This is
-   * the expected behavior — Back is an explicit discard.
+   * "Default once, then user owns it": the seed populates the input on first
+   * arrival and the author may edit it freely. Pressing Next commits the value
+   * onto the walk, and a committed value is never re-seeded over — walking Back
+   * and forward again restores what the author committed, NOT a fresh seed.
+   *
+   * (That last sentence is a deliberate change from the original behaviour, in
+   * which Back truncated the walk and re-arrival always re-seeded. The bug it
+   * caused: a seed sourced from state that does not survive a remount — the
+   * langtags refs behind `il_language_code` and `il_target_script`, held in
+   * IdentityLite refs populated only by the name picker — came back `undefined`
+   * after a tab switch, so Back-then-Next silently BLANKED an answer the author
+   * had already given. Preserving the committed value is what makes the walk
+   * survive a remount; see `answersDiffer` for the one case that still discards.)
    */
   getSeedValue?: (questionId: string) => string | string[] | undefined;
   /**
@@ -327,6 +333,7 @@ export function SurveyRunner({
   contentMinHeight,
   resumeAnswers,
 }: SurveyRunnerProps) {
+  const { t } = useLingui();
   // Single gate for all debug-mode behaviour — evaluated once per render so all
   // branches are driven by the same boolean, not scattered checks.
   const debugEnabled = debugPinsStore.isDebugEnabled();
@@ -371,16 +378,97 @@ export function SurveyRunner({
     if (callerFirst !== undefined) return callerFirst;
     return debugEnabled ? debugPinsStore.getPinned(firstId) : undefined;
   })();
-  const [stack, setStack] = useState<AnswerStackEntry[]>(() => {
-    // Resume: rebuild the walked stack from a prior completed run so the
-    // author lands on the flow's last question, not question 1.
-    if (resumeAnswers !== undefined) {
-      const resumed = buildResumeStack(firstId, resumeAnswers, context, index);
-      if (resumed !== null) return resumed;
-    }
-    return [{ questionId: firstId ?? "", value: firstSeed }];
+  // The step this runner is the walk for. Read from the traversal store rather
+  // than threaded through five call sites (FlowStepHost, IdentityLite, PhaseA,
+  // PhaseB) as a prop: a runner is only ever rendered INSIDE the active step, so
+  // `activeStepId` is that step by construction, and a prop would be a second
+  // way to say the same thing that could disagree.
+  const walkStepId = useSurveySessionStore((s) => s.activeStepId);
+  const publishStepWalk = useStepWalkStore((s) => s.publishStepWalk);
+  const setStepCursor = useStepWalkStore((s) => s.setStepCursor);
+  const setAnswerDraft = useStepWalkStore((s) => s.setAnswerDraft);
+  const externalCursor = useStepWalkStore((s) => s.cursors[walkStepId]);
+
+  // The walk: every question this run has visited, in order, plus WHICH ONE is
+  // showing. One state object rather than two so the index can never point past
+  // the array it indexes.
+  //
+  // `cursor` replaced "the last entry is the current one". Back used to TRUNCATE
+  // (`stack.slice(0, -1)`), which threw away the committed answers of every
+  // question ahead of the landing point — see getSeedValue's docstring for the
+  // blanked-answer bug that caused. Moving an index instead keeps them.
+  const [walk, setWalk] = useState<{ stack: AnswerStackEntry[]; cursor: number }>(() => {
+    // Replay source, in precedence order:
+    //   1. this step's IN-PROGRESS answers (stores/stepWalkStore.ts) — what the
+    //      author has typed on this visit but not yet submitted. Highest
+    //      precedence because it is the most recent thing they did, and because
+    //      recovering it is the whole point: a tab switch destroys this
+    //      component, and without the draft a half-answered step came back as
+    //      question one with an empty form.
+    //   2. `resumeAnswers` — a PRIOR COMPLETED run of this flow.
+    // Merged, not chosen between: the draft may hold a revision of one question
+    // while the rest of a completed run is still valid, and replaying the union
+    // through the SAME `buildResumeStack` keeps one restoration path rather than
+    // two that could disagree about routing.
+    const draft = peekAnswerDraft(walkStepId);
+    const replay =
+      draft === undefined
+        ? resumeAnswers
+        : resumeAnswers === undefined
+          ? draft
+          : { ...resumeAnswers, ...draft };
+    const resumed =
+      replay !== undefined ? buildResumeStack(firstId, replay, context, index) : null;
+    const stack = resumed ?? [{ questionId: firstId ?? "", value: firstSeed }];
+    // Arrival position: honour a cursor a jump parked for this step BEFORE this
+    // component existed (lib/jumpToLocation.ts writes it, see its own comment on
+    // ordering). Read in the initializer, not an effect, so the first render is
+    // already correct and the publishing effect below does not overwrite the
+    // request with the stack's tail. A pure read, so StrictMode's double
+    // invocation is harmless.
+    const requested = peekStepCursor(walkStepId);
+    const requestedIndex =
+      requested === undefined ? -1 : stack.findIndex((e) => e.questionId === requested);
+    return { stack, cursor: requestedIndex === -1 ? stack.length - 1 : requestedIndex };
   });
+  const { stack, cursor } = walk;
   const [currentValue, setCurrentValue] = useState<string | string[] | undefined>(undefined);
+  // Mirrors `currentValue` for the two navigation paths that must bank the
+  // in-flight edit from OUTSIDE a render closure that can see it: `handleBack`
+  // (called from an event handler that runs before the next render) and the
+  // external-cursor effect (whose dependency list deliberately excludes the
+  // value, see its own comment). Same ref-mirroring idiom the callback props
+  // above use.
+  const currentValueRef = useRef(currentValue);
+  currentValueRef.current = currentValue;
+
+  /**
+   * A `setWalk` updater that banks the in-flight field edit onto the entry being
+   * LEFT, then moves the cursor to `nextCursor(prev)`.
+   *
+   * Banking it is the difference between "the walk remembers what you typed" and
+   * "navigating away is a discard". The original implementation discarded it —
+   * and, because Back also truncated the stack, re-arrival fell back to a seed
+   * that could be `undefined`, which is how an already-answered question came
+   * back blank. After this there is no navigation that loses a value the author
+   * entered: only SUBMITTING (Next) has consequences, and only CHANGING an
+   * answer invalidates what follows it.
+   */
+  function bankInFlightEdit(
+    nextCursor: (prev: { stack: AnswerStackEntry[]; cursor: number }) => number,
+  ): (prev: { stack: AnswerStackEntry[]; cursor: number }) => {
+    stack: AnswerStackEntry[];
+    cursor: number;
+  } {
+    return (prev) => {
+      const edit = currentValueRef.current;
+      const stackWithEdit =
+        edit === undefined
+          ? prev.stack
+          : prev.stack.map((e, i) => (i === prev.cursor ? { ...e, value: edit } : e));
+      return { stack: stackWithEdit, cursor: nextCursor(prev) };
+    };
+  }
 
   // Auto-advance on option select (advanceOnSelect flows only): a field reports a
   // discrete selection via onSelectAdvance → requestAdvance stashes the picked
@@ -403,9 +491,92 @@ export function SurveyRunner({
 
   const progressDescId = useId();
 
-  const currentEntry = stack[stack.length - 1];
+  const currentEntry = stack[cursor];
   const currentQId = currentEntry?.questionId ?? "";
   const currentQ = currentQId !== "" ? index.get(currentQId) : undefined;
+
+  // ---------------------------------------------------------------------------
+  // Publish this walk (see lib/stepWalk.ts) so the footer can render one dot per
+  // question instead of one per stage, and so leaving the step and coming back
+  // resumes where the author was rather than at question 1.
+  //
+  // No labels: a question's label has exactly one resolver
+  // (decisions/lookupQuestionLabel.ts) and the consumer applies it — see
+  // StepWalkPosition.label.
+  //
+  // Declared BEFORE the "Survey complete" early return below, so hook order is
+  // identical on every render (rules-of-hooks).
+  // ---------------------------------------------------------------------------
+  // The live value of every entry, current one included — `currentValue` holds
+  // the edit in flight, which has not landed on the stack yet. Shared by the
+  // positions and the answer draft below so a dot and a restored answer can
+  // never disagree about what the author has typed.
+  const liveValues = useMemo(
+    () => stack.map((entry, i) => (i === cursor ? (currentValue ?? entry.value) : entry.value)),
+    [stack, cursor, currentValue],
+  );
+
+  const positions: StepWalkPositions = useMemo(
+    () => stack.map((entry, i) => ({ id: entry.questionId, done: hasValue(liveValues[i]) })),
+    [stack, liveValues],
+  );
+
+  const answerDraft: AnswerDraft = useMemo(() => {
+    const draft: Record<string, string | string[]> = {};
+    stack.forEach((entry, i) => {
+      const value = liveValues[i];
+      // Only answered entries: an undefined value carries no information a
+      // replay could use, and storing it would make `buildResumeStack` treat an
+      // untouched question as deliberately blank.
+      if (value !== undefined) draft[entry.questionId] = value;
+    });
+    return draft;
+  }, [stack, liveValues]);
+
+  useEffect(() => {
+    publishStepWalk(walkStepId, positions);
+    setAnswerDraft(walkStepId, answerDraft);
+    // "" is the completed-flow sentinel (no entry to be at) — never publish it
+    // as a position, or the footer would mark a stop that does not exist.
+    if (currentQId !== "") setStepCursor(walkStepId, currentQId);
+  }, [
+    walkStepId,
+    positions,
+    answerDraft,
+    currentQId,
+    publishStepWalk,
+    setAnswerDraft,
+    setStepCursor,
+  ]);
+
+  // Honour a cursor written while this runner is already mounted — a footer dot
+  // for another question in the step the author is CURRENTLY on. That jump
+  // changes no route and no step, so nothing remounts and the arrival-position
+  // read in the state initializer above never re-runs.
+  useEffect(() => {
+    if (externalCursor === undefined) return;
+    // Already there — the common case, since the publishing effect above keeps
+    // the store cursor equal to this walk's own position.
+    if (stack[cursor]?.questionId === externalCursor) return;
+    const target = stack.findIndex((e) => e.questionId === externalCursor);
+    // Not in this walk: a stop the author has not reached in this run. Ignored
+    // rather than forced — `resolveLocation` refuses such a jump upstream, so
+    // reaching here at all means the walk changed underneath it.
+    if (target === -1) return;
+    // Decided OUTSIDE the updater, not inside it: React may run an updater during
+    // a later render, so a flag set inside one is not readable on the line after
+    // `setWalk`. `stack`/`cursor` come from the render this effect re-ran on,
+    // which is current by construction.
+    setWalk(bankInFlightEdit(() => target));
+    // The banked edit belongs to the question being LEFT; the
+    // `currentValue ?? currentEntry.value` fallback then shows the value of
+    // wherever we landed.
+    setCurrentValue(undefined);
+    // Deliberately keyed on the cursor alone: adding `stack`/`cursor` would
+    // re-run this on every keystroke and fight the walk's own Next/Back in the
+    // window before the publishing effect above has caught up.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalCursor]);
 
   if (currentQ === undefined || currentQId === "") {
     return (
@@ -416,23 +587,24 @@ export function SurveyRunner({
           fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
         }}
       >
-        Survey complete.
+        <Trans id="survey.surveyRunner.complete">Survey complete.</Trans>
       </div>
     );
   }
 
-  const baseDisplayQ = interpolateQuestion(currentQ, context);
   // Dynamic datalist options (spec 030 US2): when the caller supplies non-empty
   // options for this question (e.g. the resolved entry's local names), they
-  // override the static options; the field still accepts free text.
+  // override the static options; the field still accepts free text. The raw
+  // question is handed to QuestionField as-is — it resolves the active-locale
+  // Tier-B catalog string and interpolates `{{token}}`s itself (see above).
   const dynamicOptions = getSeedOptionsRef.current?.(currentQId);
   const displayQ: FlowQuestion =
     dynamicOptions !== undefined && dynamicOptions.length > 0
-      ? { ...baseDisplayQ, options: dynamicOptions }
-      : baseDisplayQ;
-  const stepNum = stack.length;
+      ? { ...currentQ, options: dynamicOptions }
+      : currentQ;
+  const stepNum = cursor + 1;
 
-  const canGoBack = stack.length > 1 || onBack !== undefined;
+  const canGoBack = cursor > 0 || onBack !== undefined;
 
   const value = currentValue ?? currentEntry?.value;
   const isNotice = displayQ.type === "notice";
@@ -455,12 +627,17 @@ export function SurveyRunner({
     const nextId = advanceThrough(currentQ, committedValue, context, index, getNextOverrideRef.current);
 
     if (nextId === null) {
-      // End of flow — build the result. The current (last) entry is excluded
-      // from the loop: its answer is appended from `committedValue` below.
-      // Including it here too would duplicate the final answer whenever the last
-      // entry already carries a value (a seeded or resumed final question).
+      // End of flow — build the result. The CURRENT entry is excluded from the
+      // loop: its answer is appended from `committedValue` below. Including it
+      // here too would duplicate the final answer whenever the entry already
+      // carries a value (a seeded or resumed final question).
+      //
+      // `slice(0, cursor)`, not `slice(0, -1)`: entries AFTER the cursor are the
+      // walk the author has since backed out of. If a revised answer routes the
+      // flow to an earlier ending, those stale entries must not contribute
+      // answers to a result they are no longer part of.
       const answers: SurveyAnswer[] = [];
-      for (const entry of stack.slice(0, -1)) {
+      for (const entry of stack.slice(0, cursor)) {
         if (entry.value === undefined) continue;
         const q = index.get(entry.questionId);
         if (q === undefined) continue;
@@ -483,31 +660,62 @@ export function SurveyRunner({
     // for the very next push below.
     onAnswerCommitRef.current?.(currentQId, committedValue);
 
+    // Can the walk ahead of this question be KEPT?
+    //
+    // Two conditions, both necessary:
+    //   1. the answer just committed is unchanged from what this entry already
+    //      held — a CHANGED answer invalidates everything downstream of it,
+    //      including seeds derived from it (the region pick at
+    //      il_language_region reseeds the autonym and script for the chosen
+    //      variant, spec 030 US3), so those must be re-derived, not preserved;
+    //   2. the existing next entry is for the SAME question the routing now
+    //      leads to — otherwise the author has taken a different branch and the
+    //      old branch's answers are not theirs to inherit.
+    // When both hold, the whole tail is kept, so walking Back several questions
+    // and forward again restores every answer, not just the next one.
+    const previousValue = stack[cursor]?.value;
+    const existingNext = stack[cursor + 1];
+    const keepAhead =
+      !answersDiffer(previousValue, committedValue) &&
+      existingNext !== undefined &&
+      existingNext.questionId === nextId;
+
     // Resolve a seed value for the incoming question. getSeedValue is read via
     // ref so callers can update their seed source synchronously in onAnswerCommit
     // (above) and have the updated value visible here in the same tick.
     // Caller-provided seed takes precedence; debug pin is the fallback so that
-    // the "default once, then user owns it" contract is preserved.
-    const callerSeed = getSeedValueRef.current?.(nextId);
-    const seedValue =
-      callerSeed !== undefined
-        ? callerSeed
-        : debugEnabled
-          ? debugPinsStore.getPinned(nextId)
-          : undefined;
+    // the "default once, then user owns it" contract is preserved. Skipped
+    // entirely when the committed answer ahead is being kept — a seed must never
+    // overwrite an answer the author already gave.
+    const nextValue = keepAhead
+      ? existingNext.value
+      : (() => {
+          const callerSeed = getSeedValueRef.current?.(nextId);
+          return callerSeed !== undefined
+            ? callerSeed
+            : debugEnabled
+              ? debugPinsStore.getPinned(nextId)
+              : undefined;
+        })();
 
-    // Save committed value onto the current stack entry, then push the next.
-    // The new entry starts with the seed value (may be undefined) so the
-    // question's input is pre-filled when the user first arrives.
-    setStack((prev) => {
-      const updated = prev.map((e, i) =>
-        i === prev.length - 1 ? { ...e, value: committedValue } : e,
+    // Save the committed value onto the current entry, then move forward onto
+    // either the preserved tail or a freshly seeded entry.
+    setWalk((prev) => {
+      const updated = prev.stack.map((e, i) =>
+        i === prev.cursor ? { ...e, value: committedValue } : e,
       );
-      return [...updated, { questionId: nextId, value: seedValue }];
+      const ahead = keepAhead
+        ? updated.slice(prev.cursor + 1)
+        : [{ questionId: nextId, value: nextValue }];
+      return {
+        stack: [...updated.slice(0, prev.cursor + 1), ...ahead],
+        cursor: prev.cursor + 1,
+      };
     });
-    // If there is a seed, start currentValue from it so the input is populated
-    // immediately and Next is enabled (satisfies canAdvance for required fields).
-    setCurrentValue(seedValue);
+    // Start currentValue from the incoming entry's value so the input is
+    // populated immediately and Next is enabled (satisfies canAdvance for
+    // required fields).
+    setCurrentValue(nextValue);
   }
 
   function handleNext() {
@@ -524,20 +732,55 @@ export function SurveyRunner({
   }
 
   function handleBack() {
-    if (stack.length <= 1) {
+    if (cursor <= 0) {
       onBack?.();
       return;
     }
-    setStack((prev) => prev.slice(0, -1));
-    // Restore the value of the question we're going back to
-    const prevEntry = stack[stack.length - 2];
-    setCurrentValue(prevEntry?.value);
+    // Move the cursor; do NOT truncate. The questions ahead keep their answers,
+    // so walking forward again restores them (see `advance`'s `keepAhead`).
+    setWalk(bankInFlightEdit((prev) => prev.cursor - 1));
+    // Show the value of the question we're going back to, via the
+    // `currentValue ?? currentEntry.value` fallback rather than a second read of
+    // the same entry.
+    setCurrentValue(undefined);
+  }
+
+  // Enter-to-advance (issue #536): the single keyboard-driven "do the obvious
+  // thing" handler for this runner, attached once at the container so every
+  // question type gets it for free — no per-field wiring, no second timer. The
+  // guard logic is the shared `handleEnterToAdvance` helper, wired here with the
+  // two container-only behaviours turned on:
+  //
+  //   - `multiline`: a genuinely multiline field (<textarea>) treats plain Enter
+  //     as "advance" (native newline suppressed); Shift+Enter still inserts a
+  //     newline.
+  //   - `deferIfDefaultPrevented`: the langtags/options combobox (QuestionField's
+  //     StyledCombobox) owns Enter when a row is highlighted — it calls
+  //     preventDefault() itself (before this handler runs, since it fires on the
+  //     bubble path from the focused input), so we stand down. When nothing is
+  //     highlighted the combobox does NOT preventDefault, so Enter with
+  //     unresolved free text still submits the step.
+  //
+  // Back/Next buttons are covered by the helper's default BUTTON skip.
+  function handleContainerKeyDown(e: React.KeyboardEvent<HTMLDivElement>) {
+    handleEnterToAdvance(e, {
+      advance: () => {
+        if (canAdvance) handleNext();
+      },
+      multiline: true,
+      deferIfDefaultPrevented: true,
+    });
   }
 
   return (
+    /* eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions --
+       the bubbled keydown only ADDS a keyboard capability (Enter-to-advance
+       convenience); every control inside the form remains independently
+       keyboard-operable, and the container is not made pointer-interactive. */
     <div
       role="form"
-      aria-label={`Survey phase ${flow.phase}`}
+      aria-label={t({ id: "survey.surveyRunner.formAriaLabel", message: `Survey phase ${{ phase: flow.phase }}` })}
+      onKeyDown={handleContainerKeyDown}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -549,7 +792,10 @@ export function SurveyRunner({
       {/* Progress indicator */}
       <div
         id={progressDescId}
-        aria-label={`Step ${stepNum} of approximately ${approxTotal}`}
+        aria-label={t({
+          id: "survey.surveyRunner.progressAriaLabel",
+          message: `Step ${{ stepNum }} of approximately ${{ approxTotal }}`,
+        })}
         style={{
           fontSize: 12,
           color: "#8b949e",
@@ -558,7 +804,7 @@ export function SurveyRunner({
           gap: 8,
         }}
       >
-        <span>Step {stepNum} of ~{approxTotal}</span>
+        <span><Trans id="survey.surveyRunner.progressLabel">Step {stepNum} of ~{approxTotal}</Trans></span>
         <div
           aria-hidden="true"
           style={{
@@ -600,8 +846,14 @@ export function SurveyRunner({
               aria-pressed={pinned}
               aria-label={
                 pinned
-                  ? `Unpin default answer for question ${currentQId}`
-                  : `Pin current answer as default for question ${currentQId}`
+                  ? t({
+                      id: "survey.surveyRunner.debugPin.unpinAriaLabel",
+                      message: `Unpin default answer for question ${{ currentQId }}`,
+                    })
+                  : t({
+                      id: "survey.surveyRunner.debugPin.pinAriaLabel",
+                      message: `Pin current answer as default for question ${{ currentQId }}`,
+                    })
               }
               onClick={() => {
                 if (debugPinsStore.isPinned(currentQId)) {
@@ -624,7 +876,11 @@ export function SurveyRunner({
                 userSelect: "none",
               }}
             >
-              {pinned ? "[PIN] Pinned" : "[+] Pin this answer"}
+              {pinned ? (
+                <Trans id="survey.surveyRunner.debugPin.pinnedLabel">[PIN] Pinned</Trans>
+              ) : (
+                <Trans id="survey.surveyRunner.debugPin.pinLabel">[+] Pin this answer</Trans>
+              )}
             </button>
           </div>
         );
@@ -645,6 +901,7 @@ export function SurveyRunner({
         <QuestionField
           question={displayQ}
           value={value}
+          context={context}
           onChange={(v) => setCurrentValue(v)}
           onEntryResolved={(entry) => onEntryResolvedRef.current?.(currentQId, entry)}
           {...(advanceOnSelect === true ? { onSelectAdvance: requestAdvance } : {})}
@@ -682,9 +939,10 @@ export function SurveyRunner({
             type="button"
             data-testid="survey-back"
             onClick={handleBack}
+            className="ks-focus-ring ks-hit-target"
             style={secondaryButton}
           >
-            Back
+            <Trans id="survey.surveyRunner.backButton">Back</Trans>
           </button>
         )}
         <button
@@ -693,9 +951,14 @@ export function SurveyRunner({
           onClick={handleNext}
           disabled={!canAdvance}
           aria-describedby={progressDescId}
+          className="ks-focus-ring ks-hit-target"
           style={{ ...primaryButton(!canAdvance), transition: "background 120ms ease" }}
         >
-          {isLastQuestion ? "Finish" : "Next"}
+          {isLastQuestion ? (
+            <Trans id="survey.surveyRunner.finishButton">Finish</Trans>
+          ) : (
+            <Trans id="survey.surveyRunner.nextButton">Next</Trans>
+          )}
         </button>
       </div>
     </div>
@@ -710,6 +973,31 @@ function hasValue(v: string | string[] | undefined): boolean {
   if (v === undefined) return false;
   if (Array.isArray(v)) return v.length > 0;
   return v.trim() !== "";
+}
+
+/**
+ * Did the author actually CHANGE this answer? The one question `advance` asks to
+ * decide whether the committed answers ahead of it survive (see its `keepAhead`).
+ *
+ * By value, element-wise for a multi-select, because an answer value is either a
+ * string or a string array and a fresh array with identical contents is the same
+ * answer — reference comparison would report every re-confirmation as a change
+ * and discard the downstream walk on a Back/Next that changed nothing, which is
+ * exactly the blanking bug this guard exists to prevent.
+ *
+ * Element ORDER counts: a multi-select's order is author-visible (the character
+ * lists these flows collect are rendered in the order they were built), so a
+ * reorder is a change.
+ */
+function answersDiffer(
+  a: string | string[] | undefined,
+  b: string | string[] | undefined,
+): boolean {
+  if (a === b) return false;
+  if (Array.isArray(a) && Array.isArray(b)) {
+    return a.length !== b.length || a.some((v, i) => v !== b[i]);
+  }
+  return true;
 }
 
 function findFirstRenderable(

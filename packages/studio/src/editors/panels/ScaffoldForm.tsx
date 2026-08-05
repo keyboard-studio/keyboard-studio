@@ -2,6 +2,7 @@
 // Validates keyboardId live via validateKeyboardId from @keyboard-studio/contracts.
 
 import { useState } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import { validateKeyboardId } from "@keyboard-studio/contracts";
 import type { ScaffoldSpec } from "../../hooks/useKeyboardArtifact.ts";
 import { Button, TextField, Label, ErrorText } from "../../ui/index.ts";
@@ -19,11 +20,12 @@ const SCAFFOLD_LABEL_STYLE: React.CSSProperties = { color: TEXT_DIM, fontSize: 1
 const SCAFFOLD_FIELD_BORDER: React.CSSProperties = { border: `1px solid ${CARD_BORDER}` };
 
 export function ScaffoldForm({ onSubmit }: ScaffoldFormProps) {
+  const { t } = useLingui();
   const [keyboardId, setKeyboardId] = useState("");
   const [displayName, setDisplayName] = useState("");
 
   const idValidation = validateKeyboardId(keyboardId.trim());
-  const idError = idValidation.valid ? null : (idValidation.reason ?? "invalid keyboard id");
+  const idError = idValidation.valid ? null : (idValidation.reason ?? t({ id: "editor.scaffold.invalidKeyboardId", message: "invalid keyboard id" }));
   const showIdError = idError !== null && keyboardId.length > 0;
   const isValid = idValidation.valid && displayName.trim().length > 0;
 
@@ -55,14 +57,14 @@ export function ScaffoldForm({ onSubmit }: ScaffoldFormProps) {
           fontWeight: 700,
         }}
       >
-        New keyboard details
+        <Trans id="editor.scaffold.heading">New keyboard details</Trans>
       </div>
 
       {/* Keyboard ID field row */}
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         {/* Label color TEXT_DIM diverges from primitive default #e6edf3 — style passthrough */}
         <Label htmlFor="scaffold-keyboard-id" style={SCAFFOLD_LABEL_STYLE}>
-          Keyboard ID
+          <Trans id="editor.scaffold.keyboardIdLabel">Keyboard ID</Trans>
         </Label>
         {/* TextField: error prop sets ERROR_BORDER #7a2a2a (matches original #7a2a2a exactly).
             Normal border CARD_BORDER diverges from primitive default #30363d — style passthrough. */}
@@ -70,7 +72,7 @@ export function ScaffoldForm({ onSubmit }: ScaffoldFormProps) {
           id="scaffold-keyboard-id"
           value={keyboardId}
           onChange={(e) => { setKeyboardId(e.currentTarget.value); }}
-          placeholder="e.g. my_new_keyboard"
+          placeholder={t({ id: "editor.scaffold.keyboardIdPlaceholder", message: "e.g. my_new_keyboard" })}
           autoComplete="off"
           spellCheck={false}
           aria-describedby={showIdError ? "scaffold-id-error" : undefined}
@@ -96,14 +98,14 @@ export function ScaffoldForm({ onSubmit }: ScaffoldFormProps) {
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
         {/* Label color TEXT_DIM diverges from primitive default #e6edf3 — style passthrough */}
         <Label htmlFor="scaffold-display-name" style={SCAFFOLD_LABEL_STYLE}>
-          Display name
+          <Trans id="editor.scaffold.displayNameLabel">Display name</Trans>
         </Label>
         {/* Border CARD_BORDER diverges from primitive default #30363d — style passthrough */}
         <TextField
           id="scaffold-display-name"
           value={displayName}
           onChange={(e) => { setDisplayName(e.currentTarget.value); }}
-          placeholder="e.g. My New Keyboard"
+          placeholder={t({ id: "editor.scaffold.displayNamePlaceholder", message: "e.g. My New Keyboard" })}
           autoComplete="off"
           style={SCAFFOLD_FIELD_BORDER}
         />
@@ -127,7 +129,7 @@ export function ScaffoldForm({ onSubmit }: ScaffoldFormProps) {
           transition: "background 0.15s",
         }}
       >
-        Create keyboard
+        <Trans id="editor.scaffold.createButton">Create keyboard</Trans>
       </Button>
     </form>
   );

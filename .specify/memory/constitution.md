@@ -93,6 +93,30 @@ duplicates the existing utility.
 Branch policy is unchanged: one feature branch per cycle
 (`km/<short-task-slug>`); direct-to-main only with explicit authorization.
 
+### One conversation per phase (Companion multi-phase features)
+
+To keep each working conversation's context small, a **multi-phase** feature
+(two or more `### User Story N` slices in its `spec.md`) is built **one phase
+per conversation** on the Companion pipeline:
+
+- The `specify` step **halts after specify** on a multi-phase feature — you
+  `/clear` and run `/speckit.companion.resume` in a fresh conversation to plan
+  and build P1.
+- The `implement` step **stops after each user-story phase** (Setup +
+  Foundational ride with P1; Polish rides with the last phase); each remaining
+  phase resumes in its own fresh conversation.
+- This applies to **attended** runs only. An **unattended** run (`unattended:
+  true` in `.spec-context.json` — set by `/speckit.companion.auto`, and required
+  for a hands-off `--dangerously-skip-permissions` run) **records the checkpoint
+  and continues**, since no human is present to open a new conversation. A raw
+  bypass run that never sets `unattended` will simply halt at the first phase
+  boundary and stay resumable — it does not error.
+
+This policy is enforced by `km-phase-break`-sentinel blocks in the shipped
+`speckit.companion.specify.md` / `speckit.companion.implement.md` command
+bodies; if a Companion extension upgrade overwrites them, re-apply from this
+section.
+
 ## Governance
 
 This constitution restates the gates of [spec.md](../../spec.md); it does not
@@ -110,4 +134,4 @@ Amendments to this file follow the change that prompted them: when a spec
 amendment lands (e.g. a new vX.Y.0 recorded in spec-signoff), the relevant
 Article is updated in the same change and the version footer below is bumped.
 
-**Version**: 1.0.0 | **Ratified**: 2026-06-15 | **Last Amended**: 2026-06-15
+**Version**: 1.1.0 | **Ratified**: 2026-06-15 | **Last Amended**: 2026-07-17

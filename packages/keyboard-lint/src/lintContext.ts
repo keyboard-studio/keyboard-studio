@@ -4,7 +4,7 @@
 // package-internal function that accepts optional context so 18.6 can run when
 // the compile gate provides both a KeyboardIR and a LinguistInventory.
 
-import type { VirtualFS, LintFinding, KeyboardIR, LinguistInventory } from "@keyboard-studio/contracts";
+import type { VirtualFS, LintFinding, KeyboardIR, LinguistInventory, TouchLayoutIR } from "@keyboard-studio/contracts";
 import { parseTouchLayout, touchLayoutPath } from "./parsers/parseTouchLayout.js";
 import { checkLongpress } from "./checks/check-18-1-longpress.js";
 import { checkTouchRows } from "./checks/check-18-2-touch-rows.js";
@@ -12,21 +12,37 @@ import { checkKeysPerRow } from "./checks/check-18-3-keys-per-row.js";
 import { checkControlKeyDrift } from "./checks/check-18-4-control-key-drift.js";
 import { checkLayerSwitchReturn } from "./checks/check-18-5-layer-switch-return.js";
 import { checkInventoryCoverage } from "./checks/check-18-6-inventory-coverage.js";
+import { checkTouchCoverage } from "./checks/check-18-6-touch-coverage.js";
 
 /**
  * Optional extra inputs for Layer C checks that need compiled artefacts.
  *
  * Gate -> check mapping:
  *   Phase E exit  -> 18.1, 18.2, 18.3, 18.4, 18.5 (touch-layout checks; no context needed)
- *   Compile gate  -> 18.6 (inventory coverage; needs keyboardIR + inventory)
+ *   Compile gate  -> 18.6 desktop (inventory coverage; needs keyboardIR + inventory)
+ *   Touch gallery -> 18.6 touch (KM_LINT_TOUCH_UNCOVERED; needs touchLayout + touchInventory —
+ *                    spec 035 FR-008, contracts/simplification.md)
  *   Submit        -> all of the above
  *   18.7 (currency) -> DEFERRED; not implemented
  */
 export interface LintContext {
-  /** Keyboard IR from the compile step; required for 18.6. */
+  /** Keyboard IR from the compile step; required for 18.6 desktop. */
   keyboardIR?: KeyboardIR;
-  /** Confirmed linguist inventory; required for 18.6. */
+  /** Confirmed linguist inventory (structured); required for 18.6 desktop. */
   inventory?: LinguistInventory;
+  /**
+   * Derived/edited touch layout (the same one the touch gallery previews and
+   * emits); required for the 18.6 touch check. Distinct from `keyboardIR` —
+   * the touch coverage guard walks a TouchLayoutIR, not desktop rules.
+   */
+  touchLayout?: TouchLayoutIR;
+  /**
+   * Confirmed inventory characters, already flattened (matches the engine's
+   * `touchCoverage(layout, inventory)` signature); required for the 18.6
+   * touch check. Distinct from `inventory` (structured LinguistInventory)
+   * because the touch stage works from an already-flattened char list.
+   */
+  touchInventory?: readonly string[];
 }
 
 /**
@@ -54,9 +70,14 @@ export async function lintWithContext(
     findings.push(...checkLayerSwitchReturn(ir, tlPath));
   }
 
-  // 18.6: inventory coverage — only when both inputs are present
+  // 18.6 desktop: inventory coverage — only when both inputs are present
   if (ctx.keyboardIR && ctx.inventory) {
     findings.push(...checkInventoryCoverage(ctx.keyboardIR, ctx.inventory, kmnPath));
+  }
+
+  // 18.6 touch: coverage guard (spec 035 FR-008) — only when both inputs are present
+  if (ctx.touchLayout && ctx.touchInventory) {
+    findings.push(...checkTouchCoverage(ctx.touchLayout, ctx.touchInventory, tlPath));
   }
 
   return findings;

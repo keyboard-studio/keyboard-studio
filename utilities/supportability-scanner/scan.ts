@@ -55,10 +55,18 @@ import {
   checkHeaderPreservation,
   headerFieldLabel,
 } from "../../packages/engine/src/validator/layer-a-prime.js";
-import { emitPlacementMap, detectBaseLayoutFamily } from "../../packages/engine/src/placement/index.js";
+import {
+  emitPlacementMap,
+  detectBaseLayoutFamily,
+  mineLongpressHosts,
+  aggregateTouchHosts,
+  touchHostsToEntries,
+  type DeadkeySkipCounts,
+  type TouchHostObservation,
+} from "../../packages/engine/src/placement/index.js";
 import { aggregatePlacements, computeFingerprintFromCandidates } from "../../packages/engine/src/placement/aggregate.js";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
-import { ImportStatus } from "@keyboard-studio/contracts";
+import { ImportStatus, parseTouchLayoutString } from "@keyboard-studio/contracts";
 import type { KeyboardPlacementReport } from "../../packages/engine/src/placement/model.js";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -76,6 +84,7 @@ function normalizePath(path: string): string {
 interface Args {
   releaseDir: string;
   outDir: string;
+  placementOutDir: string;
   limit: number | null;
   check: boolean;
   quiet: boolean;
@@ -97,6 +106,10 @@ function parseArgs(argv: string[]): Args {
     // Default: the sibling keymanapp/keyboards checkout (see docs/keyboard-index.md).
     releaseDir: resolve(REPO_ROOT, "..", "keyboards", "release"),
     outDir: resolve(REPO_ROOT, "docs"),
+    // placement-priors.json is runtime data consumed by the studio, so it is
+    // homed in a package data dir (packages/engine/data/), not docs/ — see
+    // docs/spec-amendment-2026-06-11-placement-priors.md.
+    placementOutDir: resolve(REPO_ROOT, "packages", "engine", "data"),
     limit: null,
     check: false,
     quiet: false,
@@ -110,6 +123,9 @@ function parseArgs(argv: string[]): Args {
         break;
       case "--out":
         out.outDir = resolve(requireValue(argv, ++i, a));
+        break;
+      case "--placement-out":
+        out.placementOutDir = resolve(requireValue(argv, ++i, a));
         break;
       case "--limit": {
         const n = Number(requireValue(argv, ++i, a));
@@ -152,11 +168,13 @@ function printHelp(): void {
       "",
       "  --release-dir <path>  release/ tree to scan (default: ../keyboards/release)",
       "  --out <dir>           output directory (default: <repo>/docs)",
+      "  --placement-out <dir> placement-priors.json output directory",
+      "                        (default: <repo>/packages/engine/data)",
       "  --limit <n>           scan only the first n keyboards (dev)",
       "  --check               regenerate to a temp buffer and fail if the",
       "                        committed import-corpus.json is stale (CI mode)",
       "  --quiet               suppress per-keyboard progress",
-      "  --emit-placements     also emit docs/placement-priors.json (§7.6 corpus priors)",
+      "  --emit-placements     also emit placement-priors.json (§7.6 corpus priors)",
       "  -h, --help            show this help",
     ].join("\n"),
   );
@@ -588,22 +606,71 @@ function buildMarkdown(sorted: ScanReport[], opaque: OpaqueEntry[]): string {
 // ---------------------------------------------------------------------------
 
 /**
- * Resolve the git SHA of the keyboards checkout for provenance. Returns
- * "keymanapp/keyboards@<sha>" or "keymanapp/keyboards@unknown" if the SHA
- * cannot be determined (not a git checkout, git unavailable, etc).
+ * Normalize a git remote URL (SSH or HTTPS github.com form) to an
+ * `<org>/<repo>` label. Returns null if the URL doesn't match a recognized
+ * remote shape. Mirrors facet-index's normalizer.
+ *
+ * **Local git-mirror-proxy fallback.** A checkout's `origin` is not always a
+ * literal `github.com` URL: a sandboxed CI harness can rewrite it to a local
+ * relay that preserves the upstream `<org>/<repo>` path under a literal
+ * `git/` segment (e.g.
+ * `http://local_proxy@127.0.0.1:41729/git/keyboard-studio/keyboards`). When
+ * the github.com-specific patterns above don't match, recognize that one
+ * additional shape — deliberately narrow (requires the literal `/git/`
+ * marker) so an unrelated non-github host (e.g. a genuine gitlab.com remote)
+ * still falls through to `null` (→ `"unknown/unknown"`) rather than being
+ * guessed at.
  */
-function resolveKeyboardsProvenance(releaseDir: string): string {
+export function normalizeGithubRemote(remoteUrl: string): string | null {
+  const trimmed = remoteUrl.trim();
+  // https://github.com/<org>/<repo>(.git)
+  let m = /^(?:https?:\/\/)?github\.com\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(trimmed);
+  if (m) return `${m[1]}/${m[2]}`;
+  // git@github.com:<org>/<repo>(.git)
+  m = /^git@github\.com:([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(trimmed);
+  if (m) return `${m[1]}/${m[2]}`;
+  // http(s)://[user@]host[:port]/git/<org>/<repo>(.git) — local mirror-proxy
+  // fallback (see docstring above).
+  m = /^https?:\/\/(?:[^/@]+@)?[^/]+\/git\/([^/]+)\/([^/]+?)(?:\.git)?\/?$/.exec(trimmed);
+  if (m) return `${m[1]}/${m[2]}`;
+  return null;
+}
+
+/**
+ * Resolve the git SHA and org/repo label of the keyboards checkout for
+ * provenance. The label is derived from the checkout's actual `origin`
+ * remote (not hardcoded) so the field reflects whichever corpus fork was
+ * actually scanned. Returns `<org>/<repo>@<sha>`, falling back to
+ * `unknown/unknown@<sha>` when the remote can't be resolved/normalized, and
+ * to `@unknown` when the SHA itself can't be determined.
+ */
+export function resolveKeyboardsProvenance(releaseDir: string): string {
+  const root = dirname(releaseDir);
+
+  let sha = "";
   try {
-    const root = dirname(releaseDir);
-    const sha = execSync("git rev-parse HEAD", {
+    sha = execSync("git rev-parse HEAD", {
       cwd: root,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
-    return sha ? `keymanapp/keyboards@${sha}` : "keymanapp/keyboards@unknown";
   } catch {
-    return "keymanapp/keyboards@unknown";
+    sha = "";
   }
+
+  let label = "unknown/unknown";
+  try {
+    const remoteUrl = execSync("git remote get-url origin", {
+      cwd: root,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    label = normalizeGithubRemote(remoteUrl) ?? "unknown/unknown";
+  } catch {
+    label = "unknown/unknown";
+  }
+
+  return `${label}@${sha || "unknown"}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -627,6 +694,10 @@ async function main(): Promise<void> {
 
   const reports: ScanReport[] = [];
   const placementReports: KeyboardPlacementReport[] = [];
+  // placement-priors v2 — corpus-wide counted deadkey/store-index skip
+  // reasons, and per-keyboard longpress-host observations for touch mining.
+  const deadkeySkipCounts: DeadkeySkipCounts = new Map();
+  const perKeyboardTouchObservations: TouchHostObservation[][] = [];
 
   // A single .kmn can be referenced by more than one .kpj — the aggregate
   // bundle projects under release/packages/ point at .kmn files that also have
@@ -645,7 +716,7 @@ async function main(): Promise<void> {
       // --emit-placements: extract placement candidates from the parsed IR.
       if (args.emitPlacements && ir !== null) {
         try {
-          const candidatesByCodepoint = emitPlacementMap(ir);
+          const candidatesByCodepoint = emitPlacementMap(ir, deadkeySkipCounts);
           if (candidatesByCodepoint.size > 0) {
             const flat = [...candidatesByCodepoint.values()].flat();
             placementReports.push({
@@ -658,6 +729,20 @@ async function main(): Promise<void> {
           }
         } catch {
           // Placement extraction is non-fatal; continue.
+        }
+
+        // Touch (longpress) mining — mine LONGPRESS ONLY from the sibling
+        // .keyman-touch-layout, when present, named after the .kmn (the
+        // corpus convention — see release/g/ghana, release/b/bukawa).
+        const touchLayoutPath = join(dirname(kmn), `${report.keyboardId}.keyman-touch-layout`);
+        if (existsSync(touchLayoutPath)) {
+          try {
+            const touchJson = readFileSync(touchLayoutPath, "utf8");
+            const layout = parseTouchLayoutString(touchJson);
+            perKeyboardTouchObservations.push(mineLongpressHosts(layout));
+          } catch {
+            // Touch mining is non-fatal; continue.
+          }
         }
       }
 
@@ -699,14 +784,26 @@ async function main(): Promise<void> {
 
   // --emit-placements: aggregate and write placement-priors.json.
   if (args.emitPlacements) {
+    const touchEntries = touchHostsToEntries(aggregateTouchHosts(perKeyboardTouchObservations));
     const priorsJSON = aggregatePlacements(placementReports, {
       generatedFrom: resolveKeyboardsProvenance(args.releaseDir),
+      deadkeySkipReasons: Object.fromEntries(deadkeySkipCounts),
+      touch: touchEntries,
     });
-    const priorsPath = join(args.outDir, "placement-priors.json");
+    mkdirSync(args.placementOutDir, { recursive: true });
+    const priorsPath = join(args.placementOutDir, "placement-priors.json");
     await fsp.writeFile(priorsPath, JSON.stringify(priorsJSON, null, 2) + "\n", "utf8");
     console.error(
-      `[OK] placement-priors.json written (${placementReports.length} keyboards with candidates) -> ${normalizePath(relative(REPO_ROOT, priorsPath))}`,
+      `[OK] placement-priors.json written (${placementReports.length} keyboards with candidates, ` +
+        `${touchEntries.length} touch-mined codepoints) -> ${normalizePath(relative(REPO_ROOT, priorsPath))}`,
     );
+    if (deadkeySkipCounts.size > 0) {
+      const summary = [...deadkeySkipCounts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .map(([reason, count]) => `${reason}×${count}`)
+        .join(", ");
+      console.error(`     deadkey/store-index skips: ${summary}`);
+    }
   }
 
   const counts = summarise(reports);
@@ -719,7 +816,20 @@ async function main(): Promise<void> {
   );
 }
 
-main().catch((err: unknown) => {
-  console.error("[ERROR]", err instanceof Error ? err.message : String(err));
-  process.exit(1);
-});
+// Guard direct execution so this module can be imported (e.g. by unit tests
+// exercising resolveKeyboardsProvenance/normalizeGithubRemote) without
+// running the full scan as a side effect of import.
+const isDirectRun = (() => {
+  try {
+    return process.argv[1] !== undefined && fileURLToPath(import.meta.url) === resolve(process.argv[1]);
+  } catch {
+    return false;
+  }
+})();
+
+if (isDirectRun) {
+  main().catch((err: unknown) => {
+    console.error("[ERROR]", err instanceof Error ? err.message : String(err));
+    process.exit(1);
+  });
+}

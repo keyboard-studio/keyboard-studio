@@ -28,6 +28,7 @@ import type { QuestionModule, ValidationResult } from "../../types.ts";
 export const definition = {
   id: "il_language_english",
   prompt: "What is your language called in English?",
+  audit_label: "Language name (English)",
   help_text:
     "Start typing your language's English name and pick it from the list " +
     "(for example: Hausa, Swahili, Hindi). When two languages share a name, " +
@@ -77,5 +78,9 @@ export const fixtures: QuestionModule["fixtures"] = {
   ],
 };
 
-const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [] };
+// Output reach (spec 057 FR-016): `writes` stays `[]` — this question writes no
+// KeyboardIR — while `outputs` states that the answer nevertheless reaches an
+// emitted artifact. Here, the English name is the `<Language>` element's display
+// text.
+const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [], outputs: [{ target: "package-descriptor", field: "languageName" }] };
 export default mod;

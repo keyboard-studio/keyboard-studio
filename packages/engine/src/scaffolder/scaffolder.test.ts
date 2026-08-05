@@ -206,8 +206,8 @@ describe("createScaffolderService", () => {
 
       const { vfs } = await service.scaffold(baseKeyboard, "new_keyboard", "New Keyboard");
 
-      expect(vfs.get("source/new_keyboard.kmn")).toBeDefined();
-      expect(vfs.get("LICENSE.md")).toBeDefined();
+      expect(vfs.get("source/new_keyboard.kmn")?.content).toContain("begin Unicode > use(main)");
+      expect(vfs.get("LICENSE.md")?.content).toContain("MIT License");
     });
 
     it("surfaces a warning when base source is unreachable", async () => {
@@ -218,7 +218,7 @@ describe("createScaffolderService", () => {
 
       expect(warnings).toHaveLength(1);
       expect(warnings[0]).toMatch(/base keyboard source unavailable/);
-      expect(vfs.get("source/new_keyboard.kmn")).toBeDefined();
+      expect(vfs.get("source/new_keyboard.kmn")?.content).toContain("begin Unicode > use(main)");
     });
 
     it("returns no scaffolder-level warnings on successful .kmn fetch (loader optional-file warnings are forwarded)", async () => {
@@ -573,11 +573,18 @@ group(main) using keys
       expect(kps).toContain("..\\build\\my_keyboard.kvk");
     });
 
-    it("threads base.languages into <Languages>, falling back to 'und' when absent", async () => {
+    // spec 057: the descriptor declares exactly ONE language, so the scaffolder's
+    // placeholder threads `base.languages[0]` rather than the whole list. Emitting
+    // every base tag is what let a Bambara keyboard on a French base ship declaring
+    // `fr` — and the base's language is a placeholder here in any case: the output
+    // projection's step 3.6 replaces this block with the AUTHOR's tag before
+    // anything ships (FR-001). The `und` fallback is unchanged.
+    it("threads base.languages[0] into <Languages>, falling back to 'und' when absent", async () => {
       const withLang: BaseKeyboard = { ...baseKeyboard, languages: ["ak", "en"] };
       const kpsLang = await scaffoldKps(BASE_KMN, withLang, "kb_lang");
       expect(kpsLang).toContain('<Language ID="ak">');
-      expect(kpsLang).toContain('<Language ID="en">');
+      expect(kpsLang.match(/<Language\b/g)).toHaveLength(1);
+      expect(kpsLang).not.toContain('<Language ID="en">');
 
       const kpsUnd = await scaffoldKps(BASE_KMN, baseKeyboard, "kb_und");
       expect(kpsUnd).toContain('<Language ID="und">');

@@ -11,6 +11,7 @@ import { loadModularFlow } from "../survey/loadModularFlow.ts";
 import { phaseARegistry } from "../survey/questions/registry.a.ts";
 import { phaseBRegistry } from "../survey/questions/registry.b.ts";
 import { phaseFRegistry } from "../survey/questions/registry.f.ts";
+import { reserveRegistry } from "../survey/questions/registry.reserve.ts";
 import type { FlowDef } from "../survey/types.ts";
 import { manifest } from "../steps/manifest.ts";
 
@@ -43,8 +44,10 @@ function assertLiveNodeSetEqualsManifest(
 // ---------------------------------------------------------------------------
 
 const ALL_FLOWS = [
+  // identity_lite keys off the il_*-only phaseARegistry in production (steps/flowSources.ts).
   { raw: identityLiteModularRaw, title: "Identity-lite", registry: phaseARegistry },
-  { raw: phaseAModularRaw, title: "Phase A", registry: phaseARegistry },
+  // phase_a_identity (the demoted battery) keys off reserveRegistry in production.
+  { raw: phaseAModularRaw, title: "Phase A", registry: reserveRegistry },
   { raw: phaseBModularRaw, title: "Phase B", registry: phaseBRegistry },
   { raw: phaseFModularRaw, title: "Phase F", registry: phaseFRegistry },
 ];
@@ -90,8 +93,11 @@ describe("buildModularFlowGraph — every shipped flow (INV-1)", () => {
   }
 
   const reserveTestCases = [
-    { raw: phaseAModularRaw, title: "Phase A", registry: phaseARegistry, includeProvenance: true },
+    { raw: phaseAModularRaw, title: "Phase A", registry: reserveRegistry, includeProvenance: true },
     { raw: phaseFModularRaw, title: "Phase F", registry: phaseFRegistry, includeProvenance: false },
+    // identity-lite keys off the il_*-only phaseARegistry in production, so its
+    // reserve set is empty (the demoted battery is Leftover, not drill-down clog —
+    // spec 022 / phaseADemoteReserve.test.ts). expectedReserve computes to {} here.
     { raw: identityLiteModularRaw, title: "identity-lite", registry: phaseARegistry, includeProvenance: false },
   ];
 
@@ -393,5 +399,36 @@ describe("buildManifestStepGraph — C8/C9 (T032)", () => {
       );
       expect(joinEdge, `missing join edge from "${node.id}" to "${node.joinTarget}"`).toBeDefined();
     }
+  });
+
+  // T025 (spec 035 polish): the generic tests above cover touch_seed_source only
+  // via aggregate/loop assertions. Pin the fork by name — mirrors the spec-018
+  // "track is branch-defining: fork -> project_name" test in trackRouting.test.ts
+  // — so a regression in the mechanisms/touch_seed_source/touch wiring fails a
+  // test that names the nodes, not just a count.
+  //
+  // "mechanisms" is the branch-defining spine step: sequences (S-03) now build
+  // inline in the Mechanism Gallery's method chooser rather than in a
+  // dedicated spine step, so mechanisms sits directly before the off-spine
+  // touch_seed_source fork in manifest order (mechanisms -> [touch_seed_source]
+  // -> touch), and buildManifestStepGraph's fork edges originate from the
+  // spine step immediately preceding a run of off-spine steps.
+  it("mechanisms is branch-defining: spine -> touch (direct), fork -> touch_seed_source, which joins back to touch (spec 035 FR-013/M4)", () => {
+    const fromMechanisms = graph.edges.filter((e) => e.from === "mechanisms");
+
+    const spineEdge = fromMechanisms.find((e) => e.kind === "spine");
+    expect(spineEdge?.to).toBe("touch");
+
+    const forkEdge = fromMechanisms.find((e) => e.kind === "fork");
+    expect(forkEdge?.to).toBe("touch_seed_source");
+
+    const seedSourceNode = graph.nodes.find((n) => n.id === "touch_seed_source");
+    expect(seedSourceNode?.spine).toBe(false);
+    expect(seedSourceNode?.joinTarget).toBe("touch");
+
+    const joinEdge = graph.edges.find(
+      (e) => e.from === "touch_seed_source" && e.kind === "join",
+    );
+    expect(joinEdge?.to).toBe("touch");
   });
 });

@@ -59,11 +59,13 @@ describe("M5 — all step ids are unique", () => {
 // ---------------------------------------------------------------------------
 // M2 — spine order
 //
-// FR-012: Identity → choose_base → track → Characters → Carve → Mechanisms →
-//         (lock:physical on mechanisms) → touch carve+add → (lock:touch) →
-//         Help → Package
+// FR-012: Identity → choose_base → track → Characters → Marks → Carve →
+//         Mechanisms → (lock:physical on mechanisms) →
+//         touch carve+add → (lock:touch) → Help → Package
 //
 // track is a real spine step (P0 fix). project_name is spine:false (CYOA fork).
+// Sequences (S-03) build inline in the Mechanism Gallery's method chooser —
+// there is no separate "sequences" spine step.
 // ---------------------------------------------------------------------------
 
 const EXPECTED_SPINE_ORDER = [
@@ -71,6 +73,8 @@ const EXPECTED_SPINE_ORDER = [
   "choose_base",
   "track",
   "characters",
+  "marks",
+  "convenience",
   "carve",
   "mechanisms",
   "touch",
@@ -111,6 +115,13 @@ describe("M2 — spine order matches FR-012", () => {
 
   it("'characters' appears before 'carve' on the spine", () => {
     assertStepOrder(spineSteps(manifest), "characters", "carve");
+  });
+
+  it("'marks' sits between 'characters' and 'carve' on the spine (spec 046 reorder — combined-letter answers precede all key work)", () => {
+    const spine = spineSteps(manifest);
+    assertStepOrder(spine, "characters", "marks");
+    assertStepOrder(spine, "marks", "convenience");
+    assertStepOrder(spine, "convenience", "carve");
   });
 
   it("'help' appears before 'package' on the spine", () => {
@@ -175,7 +186,7 @@ describe("M3 — exactly one lock:physical then one lock:touch", () => {
 describe("M4 — touch_seed_source fork", () => {
   it("a step with id 'touch_seed_source' exists in the manifest", () => {
     const found = manifest.find((s) => s.id === "touch_seed_source");
-    expect(found).toBeDefined();
+    expect(found?.id).toBe("touch_seed_source");
   });
 
   it("touch_seed_source has spine:false", () => {
@@ -273,16 +284,20 @@ describe("Off-spine step inventory", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Layout declarations (spec 024 Stage 0)
+// Layout declarations (spec 024 Stage 0; touch_seed_source joined this set in
+// the spec 035 R4b follow-up P0 fix — the panel's inline live OSK preview
+// needs the two-pane shell's persistent right-pane OSKFrame suppressed, or
+// two live OSKs co-mount).
 //
-// Exactly {carve, mechanisms, touch} must declare layout:"full".
-// All other steps must have layout:"pane" or omit the field (implicit "pane").
+// Exactly {carve, mechanisms, touch, touch_seed_source} must declare
+// layout:"full". All other steps must have layout:"pane" or omit the field
+// (implicit "pane").
 // ---------------------------------------------------------------------------
 
-const FULL_LAYOUT_IDS = ["carve", "mechanisms", "touch"] as const;
+const FULL_LAYOUT_IDS = ["carve", "mechanisms", "touch", "touch_seed_source"] as const;
 
 describe("layout declarations (spec 024 Stage 0)", () => {
-  it("exactly three steps declare layout:'full'", () => {
+  it("exactly four steps declare layout:'full'", () => {
     const fullSteps = manifest.filter((s) => s.layout === "full");
     const fullIds = fullSteps.map((s) => s.id).sort();
     expect(fullIds).toEqual([...FULL_LAYOUT_IDS].sort());
@@ -301,6 +316,11 @@ describe("layout declarations (spec 024 Stage 0)", () => {
   it("touch declares layout:'full'", () => {
     const touch = manifest.find((s) => s.id === "touch");
     expect(touch?.layout).toBe("full");
+  });
+
+  it("touch_seed_source declares layout:'full' (P0 fix: suppresses the outer persistent OSK pane so the panel's own inline OSK is the only preview)", () => {
+    const seedSource = manifest.find((s) => s.id === "touch_seed_source");
+    expect(seedSource?.layout).toBe("full");
   });
 
   it("all other steps have layout:'pane' or omit layout (implicit pane)", () => {

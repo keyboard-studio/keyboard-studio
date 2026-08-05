@@ -167,6 +167,81 @@ gating mechanism (kept only as an advisory hint); brittle and contradicts the sp
 (b) *Reorder the manifest to make `touch_seed_source` spine:true* — rejected: it is correctly
 a side-trail; only the advance policy needs the branch.
 
+**Amended 2026-07-28 — see R4a below.** The chooser panel's "no engine calls / preview-only"
+framing is narrowed (not removed) to permit one pure derivation call for a live reseed
+preview.
+
+---
+
+## R4a — Amendment: live reseed preview via `deriveSeedLayout` (2026-07-28)
+
+**Amends**: R4's "no engine calls" framing. This is a recorded amendment, not a silent
+reinterpretation — R4's literal text names `scaffoldTouchLayout` as forbidden in the chooser
+panel, and this decision permits calling it indirectly, through a pure wrapper, for one
+specific purpose. Approved in a km-lead cycle (single-reviewer prose amendment to a
+feature-spec research note).
+
+**Decision**: The seed-source chooser panel
+([TouchSeedSourcePanel.tsx](../../packages/studio/src/editors/touchSeedSource/TouchSeedSourcePanel.tsx))
+MAY call the pure function
+[`deriveSeedLayout`](../../packages/studio/src/lib/buildTouchLayoutJson.ts) to render a live
+preview of what choosing **Reseed from desktop** will actually produce. `deriveSeedLayout`
+internally runs `scaffoldTouchLayout` but performs **no compilation** and touches **no OSK
+iframe** — those two prohibitions from R4 stay in force, unchanged, for this panel. The
+panel's existing raw-JSON preview path for **Import & adapt** (parsing the base's shipped
+`.keyman-touch-layout` directly, bypassing the engine's `parseTouchLayout`) is unaffected by
+this amendment.
+
+**Rationale**: R4's "no engine calls" rule was written to keep the pre-commit fork choice
+lightweight. But the panel as shipped only previews the base's shipped layout — it never
+shows what reseeding would produce — which is precisely why poor reseed output only surfaces
+*after* the author has already committed to that path. `deriveSeedLayout` is the same pure,
+non-compiling function `TouchGallery` already uses downstream for exactly this derivation;
+surfacing it one step earlier, in the chooser, is a deliberate and bounded widening of R4's
+engine-access boundary — not a wholesale lifting of it.
+
+**Alternatives considered**: (a) *Leave R4 as literally written and reinterpret it in code
+without recording an amendment* — rejected: R4 names `scaffoldTouchLayout` as forbidden by
+name, so calling it (even indirectly) without a recorded amendment would be silent drift, the
+exact class of defect this project's spec-amendment discipline exists to catch. (b) *Widen
+R4 to permit compilation or an OSK iframe in the panel too* — rejected: out of scope for this
+change; the team-lead-approved widening is scoped to the pure derivation call only, and the
+compile/OSK prohibitions are unaffected.
+
+**Further amended by R4b below (2026-07-28) — the compile/OSK-iframe prohibition this
+section reaffirmed is superseded.**
+
+---
+
+## R4b — Amendment: live OSK preview replaces the pure-derivation preview (2026-07-28)
+
+**Amends**: R4a's (and R4's) remaining "no compilation, no OSK iframe in this panel"
+restriction. This is a recorded amendment, not a silent reinterpretation — R4a's literal text
+holds those two prohibitions "unchanged, for this panel," and this decision lifts both.
+Directed by the user in a km-lead cycle, after live review of the R4a preview.
+
+**Decision**: The seed-source chooser panel
+([TouchSeedSourcePanel.tsx](../../packages/studio/src/editors/touchSeedSource/TouchSeedSourcePanel.tsx))
+now renders the selected seed option's touch layout via the studio's **live OSK preview** —
+the same `OSKFrame` + `useKeyboardArtifact` compile recipe
+[TouchGallery](../../packages/studio/src/editors/assignLoop/TouchGallery.tsx) already uses —
+locked to **mobile/touch mode**. This supersedes R4/R4a's "no compilation, no OSK iframe in
+this panel" restriction: the panel now compiles the candidate layout and mounts an OSK
+iframe to show it.
+
+**Rationale**: The R4a lightweight, non-OSK preview (a custom keycap renderer driven by the
+pure `deriveSeedLayout`) was reviewed by the user and rejected as not usable. The real OSK
+gives an accurate, familiar rendering the author already trusts from the rest of the studio.
+The OSK compile runs in a scratch VFS scoped to the preview and does not mutate the
+persistent working copy, so driving it from a pre-commit chooser screen carries no working-
+copy-spine risk. This was a direct user decision made in a km-lead cycle.
+
+**Alternatives considered**: (a) *Keep the R4a custom keycap preview* — rejected by the user
+as not usable. (b) *Drive the app's persistent right-hand preview pane instead of an inline
+OSK* — not chosen: the inline OSK reuses `TouchGallery`'s self-contained compile recipe
+without coupling the chooser to the persistent pane's working-copy state, which the
+persistent-pane route would have required.
+
 ---
 
 ## R5 — Coverage guard so simplification never orphans a character (FR-008)
@@ -254,6 +329,9 @@ provenance axis exists precisely for this.
 
 ## R7 — Phone vs tablet platform scope
 
+**Amended by R7a below (2026-07-29) — the phone-only target this decision sets is superseded
+for the reseed path; see R7a.**
+
 **Decision**: The derivation targets the **phone** platform (what `scaffoldTouchLayout` and
 `applyTouchAssignments` operate on today). Tablet is **not** in scope for this feature beyond
 whatever the base layout already ships (Case B preserves shipped tablet verbatim). Record as a
@@ -274,6 +352,58 @@ author is trading the base's tablet coverage for a clean desktop-derived phone l
 
 **Alternatives considered**: Emit phone + tablet in the reseed — deferred: no acceptance
 criterion requires it; can be a follow-up once the phone path is proven.
+
+---
+
+## R7a — Amendment: reseed-from-desktop now emits a TABLET platform, not phone (2026-07-29)
+
+**Amends**: R7's "the derivation targets the phone platform … tablet is not in scope for this
+feature" decision. This is a recorded amendment, not a silent reinterpretation — R7's literal
+text names phone as the reseed target and tablet as out of scope, and this decision reverses
+that for the reseed path specifically. Directed by the user in a km-lead cycle, after review
+of the phone reseed output.
+
+**Decision**: The reseed-from-desktop derivation now emits a **tablet** platform, modeled on
+the base's shipped tablet design, instead of a phone platform. Concretely: a **number row**
+replaces the phone projection's diacritic row; special/extended letters are reached via a
+**combo access key** to the altgr/altgr-shift layers (mirroring how the base's own tablet
+layout exposes those layers); and diacritics are placed as **base-letter long-press**
+affordances rather than their own row or layer. Import-and-adapt (Case B) is unaffected — it
+continues to preserve whatever platform(s) the base ships, verbatim, per R9.
+
+**Rationale**: The user reviewed the phone reseed output and found the compact phone layout
+too sparse; a tablet-style output resembling the base's own touch design — with a full number
+row and the base's established long-press/combo-key conventions — was directed instead. This
+narrows R7's scope rather than reopening its finding that a distinct desktop-shaped grid is
+avoidable clutter: the tablet target here is *modeled on the base's shipped tablet*, not a
+reintroduction of Developer's undifferentiated 5-row desktop grid.
+
+**Known limitation — RESOLVED (was: tracked follow-up)**: the Phase E touch-editing step
+(`applyTouchAssignments`) and the Phase C placement replay (`applyDesktopModifications`) were
+initially phone-platform-hardcoded, so a tablet-seeded reseed layout was not hand-editable in
+the touch gallery. Both are now generalized via a shared `resolveMobilePlatformIndex` helper
+(`touch-mechanism-shared.ts`) — "phone" wins when both platforms are present (unchanged legacy
+behavior), "tablet" is the fallback target when no "phone" platform exists — so a tablet-seeded
+reseed layout is placed onto, and hand-editable on, the tablet platform with no silent drop.
+Diagnostic/warning strings on both paths were also generalized to name whichever platform
+actually resolved (e.g. `${platform.id}` in place of a hardcoded "phone").
+
+**Remaining follow-up (genuinely outstanding)**: two spots are still phone-hardcoded, neither
+of which this amendment's reseed path exercises:
+- `applyDesktopModificationsToRawJson.ts` (the Case B raw-JSON splice used by the
+  import-and-adapt path, not reseed) still reads `layout["phone"]` directly and warns
+  "no phone platform found" — untouched by this change since Case B always preserves the
+  base's own shipped platform verbatim (R9) and reseed never reaches this function.
+- [TouchGallery.tsx](../../packages/studio/src/editors/assignLoop/TouchGallery.tsx) still
+  discards `.warnings` from both `applyTouchAssignments`/`applyDesktopModifications` calls
+  (no UI surface wired to show engine warnings yet) — noted in-line where the discard happens,
+  tracked as its own follow-up rather than silently dropped.
+
+**Alternatives considered**: (a) *Keep phone-only, per R7* — rejected by the user after
+reviewing the phone reseed output as too sparse. (b) *Emit both phone and tablet platforms* —
+rejected: the Phase E touch-editing UI is hardcoded to the phone platform, so a co-emitted
+phone platform would become the one the author actually edits while the tablet sat inert and
+unedited, which is a worse outcome than a single, clearly-tablet-only seed.
 
 ---
 

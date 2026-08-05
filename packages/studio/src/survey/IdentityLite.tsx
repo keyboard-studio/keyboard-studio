@@ -5,22 +5,21 @@
 // confirmations (spec §5, §9). Language and script are decoupled. refs #369.
 
 import { useMemo, useRef, useCallback } from "react";
-import type {
-  Attribution, SurveyPhaseResult, LintFinding, LangtagsProvenance, LanguageDefaults, LanguageSummary } from "@keyboard-studio/contracts";
+import { msg } from "@lingui/core/macro";
+import { Trans, useLingui } from "@lingui/react/macro";
+import type { Attribution, SurveyPhaseResult, LintFinding, LangtagsProvenance, LanguageDefaults, LanguageSummary } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import { loadModularFlow } from "./loadModularFlow.ts";
 import type { SurveyContext, FlowOption } from "./types.ts";
-import {
-  deriveScriptPrefill,
-  normalizeTargetScript,
-  type ScriptPrefill,
-} from "../lib/scriptAxes.ts";
+import { deriveScriptPrefill, normalizeTargetScript } from "../lib/scriptAxes.ts";
+import type { IdentityLiteResult } from "./identityLiteResult.ts";
 import {
   loadLangtags,
   getLoadedLangtags,
   scriptToTargetOption,
 } from "../lib/langtagsDefaults.ts";
 import { answerString } from "./answerString.ts";
+import { normalizeForCompare } from "../lib/normalizeForCompare.ts";
 
 import identityLiteRaw from "../../../../content/flows/identity_lite.modular.yaml?raw";
 
@@ -28,54 +27,19 @@ import identityLiteRaw from "../../../../content/flows/identity_lite.modular.yam
 // ends on the "not supported" notice and the slice should not proceed.
 const UNSUPPORTED_SCRIPTS = new Set(["Ethi", "Hani", "Hang"]);
 
-// Shared caption for every langtags-derived seed (spec 030 FR-010). Frozen: it
-// is stored by reference into provenanceRef at multiple sites, so an in-place
-// mutation would silently corrupt every other seeded field's caption.
-const LANGTAGS_PROVENANCE: LangtagsProvenance = Object.freeze({
-  source: "langtags",
-  caption: "Suggested from langtags — edit if needed",
+// Shared caption descriptor for every langtags-derived seed (spec 030
+// FR-010). Resolved to a plain string (via i18nRef, below) at each seeding
+// site rather than frozen once — the resolved text must track the active locale.
+const LANGTAGS_CAPTION = msg({
+  id: "survey.identityLite.langtagsCaption",
+  message: "Suggested from langtags — edit if needed",
 });
 
-/** Typed result of the identity-lite step. */
-export interface IdentityLiteResult {
-  /** Language name in its own script (autonym). */
-  autonym: string;
-  /** Language name in English. */
-  english: string;
-  /**
-   * ISO 639 language subtag entered by the author (e.g. "ha", "hi", "fr").
-   * Empty string when the author left the field blank.
-   * Region and variant refinement are deferred to the documentation stage (§8).
-   */
-  languageSubtag: string;
-  /**
-   * Region subtag chosen at `il_language_region` (spec 030 US3), e.g. "DJ".
-   * Empty string when the language was unambiguous by region, the step was
-   * skipped, or the entered value was not a shape-valid BCP47 region subtag
-   * (normalized via `normalizeRegionSubtag`). Folded into `bcp47` at the
-   * region position.
-   */
-  region: string;
-  /** Raw `il_target_script` answer (e.g. "Latn", "romanization-Latn", "fonipa"). */
-  targetScriptRaw: string;
-  /**
-   * Full BCP47 target tag combining language subtag + normalized script/variant,
-   * e.g. "ha-Latn", "hi-Deva", "fr-Latn", "und-fonipa".
-   * Empty string when `languageSubtag` was left blank — `suggestBases()` falls
-   * back to script-match ranking in that case.
-   */
-  bcp47: string;
-  /** Whether the chosen target script is supported in v1. */
-  supported: boolean;
-  /**
-   * Who to attribute the keyboard to (spec 059 US1), or null when the flow
-   * terminated before attribution — which is what a gated script does, since an
-   * author who cannot make a keyboard is never asked who holds its copyright.
-   */
-  attribution: Attribution | null;
-  /** Routing/A2 prefill confirmations derived from the target script (spec §5). */
-  prefill: ScriptPrefill;
-}
+// `IdentityLiteResult` lives in its own type-only leaf module so the
+// survey-session store can name it without closing an import cycle through this
+// component — see identityLiteResult.ts's header. Re-exported here because this
+// is where every existing call site imports it from.
+export type { IdentityLiteResult };
 
 /**
  * Build the full BCP47 target tag from an ISO 639 language subtag and a raw
@@ -249,6 +213,17 @@ export function IdentityLite({
   resume,
   authorSeed,
 }: IdentityLiteProps) {
+  const { t, i18n } = useLingui();
+  // Mirrors the latest `i18n` for seedFromEntry/handleAnswerCommit below (deps
+  // `[]`, unchanged — same ref-mirroring idiom this file already uses for
+  // props/state, e.g. q1EnglishRef), so a locale switch is picked up without
+  // changing when those callbacks re-fire. `i18n.t(descriptor)` (a plain method
+  // call on the real i18n instance) is safe to read via ref — unlike the macro
+  // `t` below, it does no compile-time extraction of its own; the extraction
+  // already happened at LANGTAGS_CAPTION's `msg({...})` call site.
+  const i18nRef = useRef(i18n);
+  i18nRef.current = i18n;
+
   const flow = useMemo(() => loadModularFlow(identityLiteRaw as string), []);
   // Held in a ref to match this file's seeding idiom: getSeedValue has an empty
   // dep array by design (see its comment), so it must read through refs.
@@ -336,11 +311,15 @@ export function IdentityLite({
         ? defaults.englishNames
         : undefined;
 
+    const langtagsProvenance: LangtagsProvenance = {
+      source: "langtags",
+      caption: i18nRef.current.t(LANGTAGS_CAPTION),
+    };
     const provenance = new Map<string, LangtagsProvenance>();
-    if (scriptSeedRef.current !== undefined) provenance.set("il_target_script", LANGTAGS_PROVENANCE);
-    if (codeSeedRef.current !== undefined) provenance.set("il_language_code", LANGTAGS_PROVENANCE);
+    if (scriptSeedRef.current !== undefined) provenance.set("il_target_script", langtagsProvenance);
+    if (codeSeedRef.current !== undefined) provenance.set("il_language_code", langtagsProvenance);
     // The autonym default is a langtags value only when an own-script name exists.
-    if (localNamesSeedRef.current !== undefined) provenance.set("il_language_autonym", LANGTAGS_PROVENANCE);
+    if (localNamesSeedRef.current !== undefined) provenance.set("il_language_autonym", langtagsProvenance);
     provenanceRef.current = provenance;
   }, []);
 
@@ -425,14 +404,18 @@ export function IdentityLite({
           // Keep provenance in step with the reseeded fields (FR-010): the autonym
           // default is a langtags value only when the variant has an own-script
           // name; il_language_code is untouched (region variants share the subtag).
+          const langtagsProvenance: LangtagsProvenance = {
+            source: "langtags",
+            caption: i18nRef.current.t(LANGTAGS_CAPTION),
+          };
           const nextProvenance = new Map(provenanceRef.current);
           if (scriptSeedRef.current !== undefined) {
-            nextProvenance.set("il_target_script", LANGTAGS_PROVENANCE);
+            nextProvenance.set("il_target_script", langtagsProvenance);
           } else {
             nextProvenance.delete("il_target_script");
           }
           if (localNamesSeedRef.current !== undefined) {
-            nextProvenance.set("il_language_autonym", LANGTAGS_PROVENANCE);
+            nextProvenance.set("il_language_autonym", langtagsProvenance);
           } else {
             nextProvenance.delete("il_language_autonym");
           }
@@ -521,10 +504,10 @@ export function IdentityLite({
         const opts: FlowOption[] = [];
         for (const n of source) {
           const trimmed = n.trim();
-          // NFC-normalize before case-folding so NFC/NFD variants of the same
+          // Normalize before case-folding so NFC/NFD variants of the same
           // name (Vietnamese, Yorùbá/Akan, Ainu diacritics) don't produce
           // duplicate rows; resolveTyped in QuestionField matches the same way.
-          const key = trimmed.normalize("NFC").toLowerCase();
+          const key = normalizeForCompare(n);
           if (trimmed === "" || seen.has(key)) continue;
           seen.add(key);
           opts.push({ value: trimmed, label: trimmed });
@@ -556,13 +539,28 @@ export function IdentityLite({
           seen.add(c);
           opts.push({ value: c, label });
         };
-        add(d.iso639_3, `${d.iso639_3 ?? ""} — ISO 639-3`);
-        add(d.code, `${d.code} — BCP 47 language subtag`);
+        add(
+          d.iso639_3,
+          t({
+            id: "survey.identityLite.codeOption.iso6393",
+            message: `${{ code: d.iso639_3 ?? "" }} — ISO 639-3`,
+          }),
+        );
+        add(
+          d.code,
+          t({
+            id: "survey.identityLite.codeOption.bcp47",
+            message: `${{ code: d.code }} — BCP 47 language subtag`,
+          }),
+        );
         return opts.length > 0 ? opts : undefined;
       }
       return undefined;
     },
-    [],
+    // `t` closes over the live useLingui() binding directly (required for the
+    // lingui macro extractor to track this call site — see the note above
+    // seedFromEntry's i18nRef usage) so it must be a dependency here.
+    [t],
   );
 
   // Route il_language_english -> il_language_region only when the picked language
@@ -603,7 +601,7 @@ export function IdentityLite({
           fontWeight: 600,
         }}
       >
-        Let's identify your language
+        <Trans id="survey.identityLite.heading">Let's identify your language</Trans>
       </h2>
       <SurveyRunner
         key={flow.flow_id}

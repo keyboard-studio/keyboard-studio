@@ -21,13 +21,26 @@
 // so this file remains boundary-clean. It captures exactly the store actions
 // and lib helpers the reducer needs — nothing more.
 
-import type { IRPath, KeyboardIR, TouchAssignment, VirtualFS, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import { devLog } from "@keyboard-studio/contracts/dev-log";
+import type { IRPath, KeyboardIR, TouchAssignment, VirtualFS, SurveyPhaseResult, PlacementWorklist } from "@keyboard-studio/contracts";
 import type { BaseKeyboard, RemovalCapability } from "@keyboard-studio/contracts";
 import type { MutateContext } from "../survey/types.ts";
+// DesktopModifications is a type from the engine package (a workspace
+// dependency, not an internal studio/src/ layer) — the steps-layer boundary
+// forbids steps/ -> lib/stores/dashboard/components, not other packages.
+import type { DesktopModifications, OutputForm } from "@keyboard-studio/engine";
+import { applyMarkGuards, detectBaseMarkMechanism } from "@keyboard-studio/engine";
 import { applyMutatePatch } from "./mutateApply.ts";
 import { repropagate } from "./repropagate.ts";
 import { isMutateSeamEnabled } from "../flags/mutateFlag.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
+
+/**
+ * The empty/no-op DesktopModifications — used as the TOUCH_STEP_ID case's
+ * default when a caller's payload omits `mods` (defensive; every real caller
+ * — AddTouchAdapter — always supplies it).
+ */
+const EMPTY_DESKTOP_MODIFICATIONS: DesktopModifications = { removals: [], placements: [] };
 
 // ---------------------------------------------------------------------------
 // Step ids that carry side effects (keyed constants — never inline strings)
@@ -38,6 +51,13 @@ export const MECHANISMS_STEP_ID = "mechanisms" as const;
 
 /** Step id for the Touch (Phase E) step — fires buildTouchLayoutJson on complete. */
 export const TOUCH_STEP_ID = "touch" as const;
+
+/**
+ * Step id for the marks series (spec 046) — applies the generated mark guards
+ * (blocking swallow rules + stepwise backspace-unwrap stores) to the working
+ * IR and records the R10 migration-need flag on complete.
+ */
+export const MARKS_STEP_ID = "marks" as const;
 
 /**
  * Step id for the choose-base step — fires the copy/adapt instantiation on complete.
@@ -57,6 +77,18 @@ export interface InstantiateResult {
   removalCapabilities?: Map<string, RemovalCapability>;
   /** Which authoring track the user chose. "adapt" = Track 2; anything else = Track 1. */
   track: string | null;
+  /**
+   * F1 fix: set by StudioShell's doCommit when the caller has ALREADY
+   * resolved the rebase-confirm question synchronously (BaseResolutionAdapter
+   * .onConfirm's confirmRebaseTo call — see editors/adapters/panelAdapters.tsx)
+   * before this step-completion result was even produced. When true, the
+   * Track 1/default branch below passes `{ skipConfirm: true }` through to
+   * `instantiateFromBaseIfConfirmed` so the SAME confirm dialog does not fire
+   * a second time for one user click. Absent/false preserves the original
+   * behavior (the dep runs its own confirmRebaseIfEdited check) for callers
+   * with no upstream synchronous confirm of their own.
+   */
+  skipRebaseConfirm?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -70,6 +102,35 @@ export interface TouchCompleteResult {
   baseIr: KeyboardIR | null;
   /** The base VFS (for resolving the shipped .keyman-touch-layout, if any). */
   baseVfs: VirtualFS | null;
+  /**
+   * Desktop modifications to replay onto the touch seed (spec 035 R3) — carve
+   * removals + Phase C individual letter placements. Computed by the touch
+   * step's adapter (AddTouchAdapter) via deriveDesktopModifications so this
+   * reducer (steps/) never imports lib/ or stores/ directly. Optional so
+   * existing/mocked callers that don't care about the replay can omit it —
+   * the reducer defaults to the empty (no-op) modifications.
+   */
+  mods?: DesktopModifications;
+  /**
+   * The author's raw touch_seed_source fork choice (spec 035 FR-006), or null
+   * if the fork was never recorded (defensive — the R11 Entity-5 default is
+   * applied inside the injected buildTouchLayoutJson dep, not here). Optional
+   * for the same reason as `mods`.
+   */
+  seedSource?: "import-adapt" | "reseed-from-desktop" | null;
+}
+
+// ---------------------------------------------------------------------------
+// Marks-series completion payload (spec 046) — the SurveyPhaseResult the
+// series step reports, extended with the chosen output form (studio-local
+// payload extension, like TouchCompleteResult; the locked contract types are
+// untouched).
+// ---------------------------------------------------------------------------
+
+export interface MarksCompleteResult extends SurveyPhaseResult {
+  marksWorklist?: PlacementWorklist;
+  /** The S4 whole-keyboard decision ("ready-made" | "base-plus-mark"). */
+  marksOutputForm?: OutputForm;
 }
 
 // ---------------------------------------------------------------------------
@@ -101,17 +162,43 @@ export interface ReducerDeps {
     base: BaseKeyboard,
     opts: { vfs: VirtualFS; ir: KeyboardIR; removalCapabilities?: Map<string, RemovalCapability> },
   ) => void;
+  /**
+   * Clear the recorded touch_seed_source fork choice (spec 035 R12: a genuine
+   * base re-instantiation invalidates it). Injected as a surveySessionStore
+   * action so this reducer.ts (steps/) does not import stores/ directly, and
+   * so workingCopyStore does not need to import surveySessionStore (which
+   * would create a circular dependency with surveySessionStore's own
+   * setTouchSeedSource reaching into workingCopyStore to clear touchDraft).
+   * Optional so tests that don't care about the fork can omit it.
+   */
+  setTouchSeedSource?: (v: "import-adapt" | "reseed-from-desktop" | null) => void;
 
   // --- Lib helpers (from lib/buildTouchLayoutJson + lib/resolveBaseTouchJson) ---
   /**
-   * Derive the .keyman-touch-layout JSON string from a base IR + assignments.
-   * Two paths: Case A (generate from scratch) and Case B (faithful edit onto
-   * shipped layout). Returns { json, warnings }; json is null on error.
+   * Derive (and, per the spec 035 R11 emission matrix, decide whether to
+   * emit) the .keyman-touch-layout JSON string from a base IR + assignments.
+   * Two derivation paths: Case A (generate from scratch, replaying `mods`)
+   * and Case B (faithful edit onto the shipped layout, replaying `mods`
+   * first). Returns { json, warnings }; json is null when the R11 matrix says
+   * "don't emit" OR the emit pipeline failed — the reducer treats both
+   * identically (omit the stored layout).
+   *
+   * THIS is the one call site (injected from StudioShell.tsx, which may
+   * import lib/touchEmission.ts) that applies the R11 matrix for the output
+   * path — this reducer (steps/) may not import lib/ directly, so the
+   * gating logic lives inside the injected implementation, not here.
    */
   buildTouchLayoutJson: (
     baseIr: KeyboardIR,
     assignments: ReadonlyArray<TouchAssignment>,
-    baseTouchJson?: string,
+    opts: {
+      /** Present ⇒ the base ships a shipped touch layout to adapt (Case B candidate). */
+      baseTouchJson?: string;
+      /** Desktop modifications to replay onto the seed (spec 035 R3). */
+      mods: DesktopModifications;
+      /** Raw fork choice — may be null; the dep resolves the R11 default. */
+      seedSource: "import-adapt" | "reseed-from-desktop" | null;
+    },
   ) => { json: string | null; warnings: string[] };
 
   /**
@@ -123,11 +210,15 @@ export interface ReducerDeps {
   /**
    * Track 1 instantiation helper that guards against rebase without user
    * confirmation (confirmRebaseIfEdited). Returns true when instantiation
-   * proceeded, false when skipped.
+   * proceeded, false when skipped. The third (optional) `options` param lets
+   * a caller that has ALREADY resolved the confirm question synchronously
+   * (F1 fix — see InstantiateResult.skipRebaseConfirm above) skip the dep's
+   * own internal confirm, so the same dialog cannot fire twice for one click.
    */
   instantiateFromBaseIfConfirmed: (
     base: BaseKeyboard,
     opts: { vfs: VirtualFS | null; ir: KeyboardIR | null; removalCapabilities?: Map<string, RemovalCapability> },
+    options?: { skipConfirm?: boolean },
   ) => boolean;
 
   // --- mutate seam (spec-014 T014) ---
@@ -137,6 +228,14 @@ export interface ReducerDeps {
    * path-scoped `mutate()` patch merge.
    */
   getWorkingIR?: () => KeyboardIR | null;
+  /**
+   * Record the spec-046 R10 consequence: the designer picked the
+   * base-plus-mark output form while adapting a base whose own content uses
+   * ready-made forms — converting that existing content is a follow-on
+   * migration need, recorded here and not acted on. Optional (session-flag
+   * setter injected by the host).
+   */
+  setMarksMigrationNeeded?: (needed: boolean) => void;
   /**
    * Write the merged IR back to the working copy via the OVERLAY-PRESERVING
    * store setter (`setWorkingIR`, NOT `setIR`). These are incremental patches to
@@ -154,6 +253,23 @@ export interface ReducerDeps {
    * re-propagation is attempted (P4b behavior).
    */
   getStaleSteps?: () => ReadonlySet<string>;
+
+  // --- decision audit (spec 053 FR-001/FR-002, research D-02) ---
+  /**
+   * Record the decisions a completed step represents.
+   *
+   * INJECTED, not imported, for the same boundary reason as every dep above:
+   * `steps/` may not import `stores/`, `lib/`, or `components/`, and the
+   * recorder needs all three. The injected implementation (StudioShell) composes
+   * `recordSurveyAnswers` + `recordEditorStep` + the source snapshot over the
+   * decision log.
+   *
+   * Optional, and a no-op when absent. That is load-bearing for FR-006: a session
+   * run with this dep omitted must produce a byte-identical keyboard, so
+   * recording has to be something the pipeline can be missing entirely rather
+   * than something it merely skips internally.
+   */
+  recordDecision?: (event: { stepId: string; result: unknown }) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -224,6 +340,27 @@ export function applyStepCompletion(
   }
 
   switch (stepId) {
+    // Spec 046 — marks-series completion: apply the generated mark guards
+    // (blocking swallow group + stepwise backspace-unwrap stores) to the
+    // working IR, and record the R10 migration-need flag when base-plus-mark
+    // was chosen over a ready-made-form base. All engine-pure; no raw .kmn.
+    case MARKS_STEP_ID: {
+      const payload = result as Partial<MarksCompleteResult>;
+      const worklist = payload.marksWorklist;
+      if (worklist === undefined) break;
+      const ir = deps.getWorkingIR?.() ?? null;
+      if (ir === null) break;
+      const outputForm = payload.marksOutputForm ?? "base-plus-mark";
+      if (outputForm === "base-plus-mark" && detectBaseMarkMechanism(ir) === "precomposed") {
+        deps.setMarksMigrationNeeded?.(true);
+      }
+      const guarded = applyMarkGuards(ir, worklist, outputForm);
+      if (guarded.ir !== ir) {
+        deps.setWorkingIR?.(guarded.ir);
+      }
+      break;
+    }
+
     // R1 — lock gate: fire lockDesktop() after Mechanisms completes.
     case MECHANISMS_STEP_ID: {
       deps.lockDesktop();
@@ -242,37 +379,47 @@ export function applyStepCompletion(
           staleSteps: deps.getStaleSteps(),
           getWorkingIR: deps.getWorkingIR,
           setWorkingIR: deps.setWorkingIR,
-          // Issue #831 — persist the re-serialized side-car so the SHIPPED
-          // `.keyman-touch-layout` reflects re-propagation, not just the preview.
-          // `setTouchLayoutJson` is already a ReducerDep (R2 touch-step build).
-          setTouchLayoutJson: deps.setTouchLayoutJson,
         });
       }
       break;
     }
 
-    // R2 — touch-layout build: mirrors StudioShell.tsx handlePhaseEComplete (lines 380-410).
-    // Same Case-A/B logic and graceful degradation on error.
+    // R2 — touch-layout build: mirrors StudioShell.tsx handlePhaseEComplete.
+    // Spec 035 R11: the reducer no longer gates the build on "assignments is
+    // empty" — that decision (the R11 emission matrix) now lives inside the
+    // injected deps.buildTouchLayoutJson (constructed in StudioShell.tsx,
+    // which may import lib/touchEmission.ts; this reducer may not). The one
+    // gate this reducer still owns is baseIr === null (nothing to build from).
     case TOUCH_STEP_ID: {
       const payload = result as Partial<TouchCompleteResult>;
-      const { assignments = [], baseIr = null, baseVfs = null } = payload;
+      const {
+        assignments = [],
+        baseIr = null,
+        baseVfs = null,
+        mods = EMPTY_DESKTOP_MODIFICATIONS,
+        seedSource = null,
+      } = payload;
 
-      if (assignments.length === 0 || baseIr === null) {
-        // No real assignments — clear the stored touch layout (KMW uses its native default).
+      if (baseIr === null) {
+        // No working IR to derive from — clear the stored touch layout (KMW
+        // uses its native default).
         deps.setTouchLayoutJson(null);
       } else {
         try {
-          // Case B: base ships a touch layout → apply faithfully onto raw JSON copy.
-          // Case A: no shipped touch layout → IR-based generate-from-scratch path.
           const baseTouchJson = deps.resolveBaseTouchJson(baseVfs);
-          const { json, warnings } = deps.buildTouchLayoutJson(baseIr, assignments, baseTouchJson);
+          const { json, warnings } = deps.buildTouchLayoutJson(baseIr, assignments, {
+            ...(baseTouchJson !== undefined ? { baseTouchJson } : {}),
+            mods,
+            seedSource,
+          });
           if (warnings.length > 0) {
-            console.error("[applyStepCompletion:touch] buildTouchLayoutJson warnings:", warnings);
+            devLog.error("[applyStepCompletion:touch] buildTouchLayoutJson warnings:", warnings);
           }
-          // json is null when the emit pipeline threw — omit rather than injecting null/empty.
+          // json is null when the R11 matrix said "don't emit" OR the emit
+          // pipeline threw — omit rather than injecting null/empty either way.
           deps.setTouchLayoutJson(json);
         } catch (err) {
-          console.error("[applyStepCompletion:touch] buildTouchLayoutJson threw unexpectedly:", err);
+          devLog.error("[applyStepCompletion:touch] buildTouchLayoutJson threw unexpectedly:", err);
           // Per spec, the transition proceeds regardless of build failure.
           // Graceful degradation: no touch layout → KMW falls back to shipped file or its default.
           deps.setTouchLayoutJson(null);
@@ -295,7 +442,7 @@ export function applyStepCompletion(
       const base = payload.base;
       if (base === undefined) {
         // Guard: result must carry a base keyboard. Without it, instantiation cannot proceed.
-        console.warn("[applyStepCompletion:choose_base] no base in result — skipping instantiation");
+        devLog.warn("[applyStepCompletion:choose_base] no base in result — skipping instantiation");
         break;
       }
 
@@ -310,14 +457,45 @@ export function applyStepCompletion(
 
       if (track === "adapt") {
         // Track 2: preserve existing keyboard identity.
+        //
+        // spec 034 T005 / TI-2: under the REAL engine a codec-clean base always
+        // yields a parsed IR + VFS, so this null guard is UNREACHABLE in
+        // production — it fires only under the mock engine (which returns null
+        // ir/vfs). Treat a null here as a genuine failure, not a benign skip:
+        // adapt cannot proceed without a parsed IR, and silently doing nothing
+        // would strand the author with no working copy and no signal. Logging at
+        // error level (not warn) makes the no-op non-silent; we still `break`
+        // rather than throw so the mock-engine dev/test path degrades without
+        // crashing the survey.
         if (ir === null || vfs === null) {
-          console.warn("[applyStepCompletion:choose_base] Track 2 skipped: no parsed IR (mock engine?)");
+          devLog.error(
+            "[applyStepCompletion:choose_base] Track 2 (adapt) cannot instantiate: no parsed IR/VFS. " +
+            "This is unreachable under the real engine (codec-clean base always parses); " +
+            "it indicates the mock engine or a base the codec could not parse.",
+          );
           break;
         }
         deps.instantiateFromExisting(base, { ...opts, vfs, ir });
+        // spec 035 R12: a genuine (re-)instantiation invalidates any previously
+        // recorded touch_seed_source choice — the fork must be re-asked.
+        deps.setTouchSeedSource?.(null);
       } else {
         // Track 1 (or null/default): new keyboard from base, with rebase guard.
-        deps.instantiateFromBaseIfConfirmed(base, opts);
+        // instantiateFromBaseIfConfirmed no-ops (returns false) on a redundant
+        // re-fire or a user-cancelled rebase confirm — only clear the fork
+        // choice when instantiation actually proceeded.
+        //
+        // F1 fix: only pass the third `options` argument when the caller has
+        // set skipRebaseConfirm — omitting it entirely (rather than always
+        // passing `{ skipConfirm: false }`) keeps this call's arity identical
+        // to the pre-fix signature for every caller that never sets the flag
+        // (all existing reducer.test.ts fixtures), so this change is additive.
+        const instantiated = payload.skipRebaseConfirm
+          ? deps.instantiateFromBaseIfConfirmed(base, opts, { skipConfirm: true })
+          : deps.instantiateFromBaseIfConfirmed(base, opts);
+        if (instantiated) {
+          deps.setTouchSeedSource?.(null);
+        }
       }
       break;
     }
@@ -342,6 +520,42 @@ export function applyStepCompletion(
 // mutate flag (off ⇒ no-op, byte-identical to P4b), so this is safe to call
 // unconditionally. A module without `mutate`/with empty `writes` is skipped.
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// recordStepCompletion — the decision-audit seam (spec 053, research D-02).
+//
+// Separate from applyStepCompletion on purpose, and this is the one place the
+// implementation departs from the letter of the plan, so it is worth stating why.
+//
+// D-02 puts recording on applyStepCompletion because that is described as "called
+// every time a step completes". It no longer is: StepHost gates it on
+// STEPS_WITH_APPLY_COMPLETION (six steps), and choose_base fires it from an async
+// instantiation callback instead. Hanging the audit there would silently miss
+// every question step — identity, track, project_name, sequences, convenience —
+// which is most of FR-001's subject matter.
+//
+// So recording gets its own entry point, called unconditionally from the host's
+// generic completion path. D-02's actual requirements are preserved intact: the
+// recorder is an INJECTED dep (this file still imports nothing from stores/, lib/,
+// or components/), and no step component or gallery learns that auditing exists —
+// the host passes the same opaque `result` it already has, and `reducerDeps`
+// carries the behaviour.
+// ---------------------------------------------------------------------------
+
+/**
+ * Report a completed step to the decision audit.
+ *
+ * A pure hand-off: no side effect of its own, and a no-op when no recorder is
+ * injected. Called for EVERY completed step, including steps with no reducer
+ * side effects — the effect table gates side effects, not auditing.
+ */
+export function recordStepCompletion(
+  stepId: string,
+  result: unknown,
+  deps: ReducerDeps,
+): void {
+  deps.recordDecision?.({ stepId, result });
+}
 
 export function routeAnswersThroughMutate(
   result: SurveyPhaseResult,

@@ -1,7 +1,9 @@
-// Tests for ruleModifier(), modifierLabel(), glyph-shape integration, StoreUsage.patternRefs, detectStorePairs, and storeRoleLine in irToCarveNodes.ts
+// Tests for ruleModifier(), modifierLabel(), glyph-shape integration, StoreUsage.patternRefs, crossPairTrigger, and storeRoleLine in irToCarveNodes.ts
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, afterEach } from 'vitest';
+import { I18n } from '@lingui/core';
 import type { IRRule, IRGroup, IRStore, KeyboardIR, Pattern, StoreItem } from '@keyboard-studio/contracts';
+import { buildProducedSet } from '@keyboard-studio/contracts';
 import {
   ruleModifier,
   modifierLabel,
@@ -10,14 +12,28 @@ import {
   toRailNodes,
   collectOwnedNodeIds,
   patternToGlyphs,
-  detectStorePairs,
+  crossPairTrigger,
   vkeyLabel,
   triggerKeyLabel,
   storeItemsAreKeys,
   computeStoreRoleLine,
   storeCharChips,
   nodeState,
+  annotateRemovalRecommendations,
+  recommendedRemovalChars,
+  isSimpleRemovableRule,
+  coordinatedCollateralForSlots,
+  isCombining,
+  prefixCombiningMark,
+  displayChar,
+  resolveNodeName,
+  resolveLocationLabel,
+  keySequenceLabel,
+  charProducers,
+  isTouchOnlyVkeyName,
 } from './irToCarveNodes.ts';
+import { _setContentCatalogForTesting, _resetContentI18nForTesting } from './contentI18n.ts';
+import { collectCharContributors, parseSlotId, isPlusSeparator } from '@keyboard-studio/engine';
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -812,44 +828,20 @@ describe('StoreUsage.patternRefs', () => {
 });
 
 // ---------------------------------------------------------------------------
-// detectStorePairs — any()/index() cross-store pairing (StorePairEntry[] shape)
+// crossPairTrigger — display-only trigger lookup for a CONFIRMED
+// describeStorePairing "cross" partner (#931 review: the Linked-pair panel's
+// pairedStore* fields are now sourced from the engine's describeStorePairing,
+// not the retired detectStorePairs cross-product heuristic — see the
+// toRailNodes pairing describe block below for the over-pairing regression).
 // ---------------------------------------------------------------------------
 
-describe('detectStorePairs', () => {
-  it('returns empty map when there are no rules', () => {
+describe('crossPairTrigger', () => {
+  it('returns undefined when no rule resolves the requested edge', () => {
     const ir = makeIR({ groups: [] });
-    expect(detectStorePairs(ir).size).toBe(0);
+    expect(crossPairTrigger('storeA', 'storeB', ir)).toBeUndefined();
   });
 
-  it('returns empty map when rules have any() but no index() output', () => {
-    const ir = makeIR({
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
-        rules: [{
-          nodeId: 'r1',
-          context: [{ kind: 'any', storeRef: 'storeA' }],
-          output: [{ kind: 'char', value: 'x' }],
-        }],
-      }],
-    });
-    expect(detectStorePairs(ir).size).toBe(0);
-  });
-
-  it('returns empty map when rules have index() but no any() in context', () => {
-    const ir = makeIR({
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
-        rules: [{
-          nodeId: 'r1',
-          context: [{ kind: 'char', value: 'a' }],
-          output: [{ kind: 'index', storeRef: 'storeB', offset: 1 }],
-        }],
-      }],
-    });
-    expect(detectStorePairs(ir).size).toBe(0);
-  });
-
-  it('detects a clean any(A)/index(B) pair — both stores get each other as a peer', () => {
+  it('returns undefined when the edge has no trigger (no + separator)', () => {
     const ir = makeIR({
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
@@ -860,9 +852,7 @@ describe('detectStorePairs', () => {
         }],
       }],
     });
-    const pairs = detectStorePairs(ir);
-    expect(pairs.get('storeA')).toEqual([{ pairedName: 'storeB', trigger: undefined }]);
-    expect(pairs.get('storeB')).toEqual([{ pairedName: 'storeA', trigger: undefined }]);
+    expect(crossPairTrigger('storeA', 'storeB', ir)).toBeUndefined();
   });
 
   it('captures the trigger key (K_BKSP -> "Backspace") when present after the + separator', () => {
@@ -880,82 +870,64 @@ describe('detectStorePairs', () => {
         }],
       }],
     });
-    const pairs = detectStorePairs(ir);
-    expect(pairs.get('storeA')?.[0]?.trigger).toBe('Backspace');
-    expect(pairs.get('storeB')?.[0]?.trigger).toBe('Backspace');
+    expect(crossPairTrigger('storeA', 'storeB', ir)).toBe('Backspace');
+    // Symmetric — works from either store's point of view.
+    expect(crossPairTrigger('storeB', 'storeA', ir)).toBe('Backspace');
   });
 
-  it('deduplicates when multiple rules use the same pair (trigger from first rule wins)', () => {
-    const ir = makeIR({
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
-        rules: [
-          {
-            nodeId: 'r1',
-            context: [
-              { kind: 'any', storeRef: 'storeA' },
-              { kind: 'raw', text: '+' },
-              { kind: 'vkey', name: 'K_BKSP', modifiers: [] },
-            ],
-            output: [{ kind: 'index', storeRef: 'storeB', offset: 1 }],
-          },
-          {
-            nodeId: 'r2',
-            context: [
-              { kind: 'any', storeRef: 'storeA' },
-              { kind: 'raw', text: '+' },
-              { kind: 'vkey', name: 'K_BKSP', modifiers: [] },
-            ],
-            output: [{ kind: 'index', storeRef: 'storeB', offset: 1 }],
-          },
-        ],
-      }],
-    });
-    const pairs = detectStorePairs(ir);
-    expect(pairs.get('storeA')).toHaveLength(1);
-    expect(pairs.get('storeA')?.[0]?.pairedName).toBe('storeB');
-    expect(pairs.get('storeA')?.[0]?.trigger).toBe('Backspace');
-  });
-
-  it('records multiple paired stores when one input store pairs with several output stores', () => {
-    const ir = makeIR({
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
-        rules: [
-          {
-            nodeId: 'r1',
-            context: [{ kind: 'any', storeRef: 'storeA' }],
-            output: [{ kind: 'index', storeRef: 'storeB', offset: 1 }],
-          },
-          {
-            nodeId: 'r2',
-            context: [{ kind: 'any', storeRef: 'storeA' }],
-            output: [{ kind: 'index', storeRef: 'storeC', offset: 1 }],
-          },
-        ],
-      }],
-    });
-    const pairs = detectStorePairs(ir);
-    // storeA pairs with both B and C (sorted by pairedName)
-    expect(pairs.get('storeA')).toHaveLength(2);
-    expect(pairs.get('storeA')!.map((e) => e.pairedName)).toEqual(['storeB', 'storeC']);
-    expect(pairs.get('storeB')?.[0]?.pairedName).toBe('storeA');
-    expect(pairs.get('storeC')?.[0]?.pairedName).toBe('storeA');
-  });
-
-  it('does not pair a store with itself', () => {
+  it('does not resolve an edge for a 2-any()/2-index() rule with own-offset resolution (the Cameroon shape)', () => {
+    // platform('touch') any(word) any(final) + [K_SPACE] > index(word,2) index(final,3)
+    // Each index() resolves to its OWN store at its own offset — never a
+    // word<->final cross-pair. crossPairTrigger must not invent one.
     const ir = makeIR({
       groups: [{
         nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
         rules: [{
           nodeId: 'r1',
-          context: [{ kind: 'any', storeRef: 'storeA' }],
-          output: [{ kind: 'index', storeRef: 'storeA', offset: 1 }],
+          context: [
+            { kind: 'raw', text: "platform('touch')" },
+            { kind: 'any', storeRef: 'word' },
+            { kind: 'any', storeRef: 'final' },
+            { kind: 'raw', text: '+' },
+            { kind: 'vkey', name: 'K_SPACE', modifiers: [] },
+          ],
+          output: [
+            { kind: 'index', storeRef: 'word', offset: 2 },
+            { kind: 'index', storeRef: 'final', offset: 3 },
+          ],
         }],
       }],
     });
-    const pairs = detectStorePairs(ir);
-    expect(pairs.size).toBe(0);
+    expect(crossPairTrigger('word', 'final', ir)).toBeUndefined();
+  });
+
+  it('deduplicates across multiple rules — the first resolved rule wins', () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [
+          {
+            nodeId: 'r1',
+            context: [
+              { kind: 'any', storeRef: 'storeA' },
+              { kind: 'raw', text: '+' },
+              { kind: 'vkey', name: 'K_BKSP', modifiers: [] },
+            ],
+            output: [{ kind: 'index', storeRef: 'storeB', offset: 1 }],
+          },
+          {
+            nodeId: 'r2',
+            context: [
+              { kind: 'any', storeRef: 'storeA' },
+              { kind: 'raw', text: '+' },
+              { kind: 'vkey', name: 'K_A', modifiers: [] },
+            ],
+            output: [{ kind: 'index', storeRef: 'storeB', offset: 1 }],
+          },
+        ],
+      }],
+    });
+    expect(crossPairTrigger('storeA', 'storeB', ir)).toBe('Backspace');
   });
 });
 
@@ -1036,6 +1008,71 @@ describe('triggerKeyLabel', () => {
     ];
     expect(triggerKeyLabel(ctx)).toBeUndefined();
   });
+
+  // -------------------------------------------------------------------------
+  // TOTAL FLOOR (#1399 follow-on) — a store-triggered rule (any()/notany())
+  // must never resolve to undefined when `ir` is supplied.
+  // -------------------------------------------------------------------------
+
+  it('without `ir`, an any()/notany() trigger still returns undefined (backward-compatible default)', () => {
+    const ctx = [
+      { kind: 'char' as const, value: 'x' },
+      { kind: 'raw' as const, text: '+' },
+      { kind: 'any' as const, storeRef: 'trig' },
+    ];
+    expect(triggerKeyLabel(ctx)).toBeUndefined();
+  });
+
+  it('with `ir`, an any()-triggered rule resolves to "one of: <items>" for a short store (<=8 char items)', () => {
+    const trig: IRStore = { nodeId: 'store#trig', name: 'trig', items: ['b', 'c', 'd'].map((v) => ({ kind: 'char', value: v })), isSystem: false };
+    const ctx = [
+      { kind: 'char' as const, value: 'x' },
+      { kind: 'raw' as const, text: '+' },
+      { kind: 'any' as const, storeRef: 'trig' },
+    ];
+    const ir = makeIR({ stores: [trig] });
+    expect(triggerKeyLabel(ctx, ir)).toBe('one of: b c d');
+  });
+
+  it('with `ir`, a notany()-triggered rule resolves the same way (vkey items via slotItemLabel too)', () => {
+    const trig: IRStore = {
+      nodeId: 'store#trig', name: 'trig',
+      items: [{ kind: 'vkey', name: 'K_A' }, { kind: 'vkey', name: 'K_B' }],
+      isSystem: false,
+    };
+    const ctx = [
+      { kind: 'char' as const, value: 'x' },
+      { kind: 'raw' as const, text: '+' },
+      { kind: 'notany' as const, storeRef: 'trig' },
+    ];
+    const ir = makeIR({ stores: [trig] });
+    expect(triggerKeyLabel(ctx, ir)).toBe('one of: A B');
+  });
+
+  it('with `ir`, a long store (>8 items) goes loose ("one of several keys")', () => {
+    const trig: IRStore = {
+      nodeId: 'store#trig', name: 'trig',
+      items: ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i'].map((v) => ({ kind: 'char', value: v })),
+      isSystem: false,
+    };
+    const ctx = [
+      { kind: 'char' as const, value: 'x' },
+      { kind: 'raw' as const, text: '+' },
+      { kind: 'any' as const, storeRef: 'trig' },
+    ];
+    const ir = makeIR({ stores: [trig] });
+    expect(triggerKeyLabel(ctx, ir)).toBe('one of several keys');
+  });
+
+  it('with `ir`, an unresolvable storeRef still returns undefined rather than fabricating a floor', () => {
+    const ctx = [
+      { kind: 'char' as const, value: 'x' },
+      { kind: 'raw' as const, text: '+' },
+      { kind: 'any' as const, storeRef: 'missing' },
+    ];
+    const ir = makeIR({ stores: [] });
+    expect(triggerKeyLabel(ctx, ir)).toBeUndefined();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1114,6 +1151,48 @@ describe('toRailNodes store pairedStoreIds / pairedStoreNames / pairedStoreTrigg
     expect(nodeX?.pairedStoreIds).toBeUndefined();
     expect(nodeX?.pairedStoreNames).toBeUndefined();
     expect(nodeX?.pairedStoreTriggers).toBeUndefined();
+  });
+
+  // #931 review — MUST-FIX: the Inspector's "Linked pair" panel must never
+  // show a partnership the engine's pairing graph doesn't actually couple.
+  // The retired detectStorePairs cross-produced every any() against every
+  // index() in a rule, which over-paired this exact shape (word<->final).
+  // describeStorePairing resolves each index() to its own offset instead, so
+  // word and final are each independently SELF-paired — no cross partner —
+  // and the panel must show nothing for either store here.
+  it("does NOT cross-pair a 2-any()/2-index() rule with own-offset resolution (Cameroon shape)", () => {
+    const ir = makeIR({
+      stores: [
+        { nodeId: 'sid-word', name: 'word', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'b' }], isSystem: false },
+        { nodeId: 'sid-final', name: 'final', items: [{ kind: 'char', value: '.' }, { kind: 'char', value: '!' }], isSystem: false },
+      ],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'r1',
+          context: [
+            { kind: 'raw', text: "platform('touch')" },
+            { kind: 'any', storeRef: 'word' },
+            { kind: 'any', storeRef: 'final' },
+            { kind: 'raw', text: '+' },
+            { kind: 'vkey', name: 'K_SPACE', modifiers: [] },
+          ],
+          output: [
+            { kind: 'index', storeRef: 'word', offset: 2 },
+            { kind: 'index', storeRef: 'final', offset: 3 },
+          ],
+        }],
+      }],
+    });
+    const nodes = toRailNodes(ir);
+    const nodeWord = nodes.find((n) => n.name === 'word');
+    const nodeFinal = nodes.find((n) => n.name === 'final');
+    expect(nodeWord?.pairedStoreNames).toBeUndefined();
+    expect(nodeWord?.pairedStoreIds).toBeUndefined();
+    expect(nodeWord?.pairedStoreTriggers).toBeUndefined();
+    expect(nodeFinal?.pairedStoreNames).toBeUndefined();
+    expect(nodeFinal?.pairedStoreIds).toBeUndefined();
+    expect(nodeFinal?.pairedStoreTriggers).toBeUndefined();
   });
 });
 
@@ -1266,24 +1345,39 @@ describe('storeCharChips — chip id stability + TRUE itemsIndex', () => {
 });
 
 describe('storeCharChips — per-class action mapping (classifyStoreSlotEdit dispatch)', () => {
-  it('nul-fill: an output-target store (index() in a rule output) maps every char chip to nul-fill', () => {
+  it('drop: a self-paired output-target store (index() output resolves to its own any() context source) maps every char chip to drop', () => {
     const outputStore = makeChipStore('store#out', 'outX', [
       { kind: 'char', value: 'x' },
       { kind: 'char', value: 'y' },
     ]);
     const rule: IRRule = {
       nodeId: 'rule#1',
-      context: [{ kind: 'vkey', name: 'K_A', modifiers: [] }],
-      output: [{ kind: 'index', storeRef: 'outX', offset: 0 }],
+      context: [{ kind: 'any', storeRef: 'outX' }],
+      output: [{ kind: 'index', storeRef: 'outX', offset: 1 }],
     };
     const ir = makeChipIR([makeChipGroup('g1', [rule])], [outputStore]);
 
     const chips = storeCharChips(outputStore, ir);
     expect(chips).toHaveLength(2);
     chips.forEach((c) => {
-      expect(c.action).toBe('nul-fill');
+      expect(c.action).toBe('drop');
       expect(c.disabledReason).toBeUndefined();
     });
+  });
+
+  it('disabled (unresolved-index-pairing): an index() output whose offset does not resolve to an any() context source maps to disabled with the unresolved-pairing reason', () => {
+    const outputStore = makeChipStore('store#out2', 'out2X', [{ kind: 'char', value: 'x' }]);
+    const rule: IRRule = {
+      nodeId: 'rule#1',
+      context: [{ kind: 'vkey', name: 'K_A', modifiers: [] }],
+      output: [{ kind: 'index', storeRef: 'out2X', offset: 1 }],
+    };
+    const ir = makeChipIR([makeChipGroup('g1', [rule])], [outputStore]);
+
+    const chips = storeCharChips(outputStore, ir);
+    expect(chips).toHaveLength(1);
+    expect(chips[0]!.action).toBe('disabled');
+    expect(chips[0]!.disabledReason).toMatch(/pairing/i);
   });
 
   it('drop: an unpaired any()-source store maps every char chip to drop', () => {
@@ -1355,28 +1449,38 @@ describe('storeCharChips — per-class action mapping (classifyStoreSlotEdit dis
     expect(chips[0]!.disabledReason).toMatch(/position/i);
   });
 
-  it('disabled (paired-input): an any()-source store paired with an output index() maps to disabled with the pairing reason', () => {
+  it('drop (cross-paired): an any()-source store whose SAME rule pairs it to an output index() resolves to a coordinated drop, not a block', () => {
+    // Former "paired-input" block reason — replaced by the pairing graph:
+    // resolving index(pairedOutX, 1) to the rule's own any(pairedInX) context
+    // element ties the two stores into one pair-set, so a slot removal on
+    // either splices both at the same position (coordinated drop) rather than
+    // being refused outright.
     const inputStore = makeChipStore('store#paired-in', 'pairedInX', [{ kind: 'char', value: 'p' }]);
     const outputStore = makeChipStore('store#paired-out', 'pairedOutX', [{ kind: 'char', value: 'o' }]);
     const rule: IRRule = {
       nodeId: 'rule#1',
       context: [{ kind: 'any', storeRef: 'pairedInX' }],
-      output: [{ kind: 'index', storeRef: 'pairedOutX', offset: 0 }],
+      output: [{ kind: 'index', storeRef: 'pairedOutX', offset: 1 }],
     };
     const ir = makeChipIR([makeChipGroup('g1', [rule])], [inputStore, outputStore]);
 
     const chips = storeCharChips(inputStore, ir);
     expect(chips).toHaveLength(1);
-    expect(chips[0]!.action).toBe('disabled');
-    expect(chips[0]!.disabledReason).toMatch(/pairing/i);
+    expect(chips[0]!.action).toBe('drop');
+    expect(chips[0]!.disabledReason).toBeUndefined();
   });
 
-  it('disabled (dual-use): a store that is both an output target and an any() source maps to disabled with the dual-role reason', () => {
+  it('disabled (unresolved-index-pairing): a store that is both an index()-output target (unresolved) and an any() source in a DIFFERENT rule stays blocked', () => {
+    // Former "dual-use" block reason — the pairing graph can only resolve an
+    // index() output against an any() source in the SAME rule, so a store
+    // whose any()-source usage lives in a separate rule from its index()
+    // output still can't be proven safe; it stays blocked, now under the
+    // unresolved-index-pairing reason rather than a coarse dual-use label.
     const store = makeChipStore('store#dual', 'dualX', [{ kind: 'char', value: 'd' }]);
     const outRule: IRRule = {
       nodeId: 'rule#out',
       context: [{ kind: 'vkey', name: 'K_A', modifiers: [] }],
-      output: [{ kind: 'index', storeRef: 'dualX', offset: 0 }],
+      output: [{ kind: 'index', storeRef: 'dualX', offset: 1 }],
     };
     const sourceRule: IRRule = {
       nodeId: 'rule#src',
@@ -1388,7 +1492,7 @@ describe('storeCharChips — per-class action mapping (classifyStoreSlotEdit dis
     const chips = storeCharChips(store, ir);
     expect(chips).toHaveLength(1);
     expect(chips[0]!.action).toBe('disabled');
-    expect(chips[0]!.disabledReason).toMatch(/dual role/i);
+    expect(chips[0]!.disabledReason).toMatch(/pairing/i);
   });
 });
 
@@ -1509,5 +1613,2039 @@ describe('nodeState — store tri-state over toggleable chips', () => {
     const node = makeStoreNode(chips);
 
     expect(nodeState(node, () => false, () => true)).toBe('off');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// annotateRemovalRecommendations (#525 FOUNDATION slice)
+// ---------------------------------------------------------------------------
+
+describe('annotateRemovalRecommendations', () => {
+  it("marks a group node 'high' when none of its produced characters are in the confirmed inventory", () => {
+    const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(['q']));
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('high');
+  });
+
+  it("marks a node 'none' when it produces a character that IS in the confirmed inventory", () => {
+    const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(['y']));
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('none');
+  });
+
+  it("marks a store 'high' when its own chars are all out-of-inventory, even though a rule's any()-consumption of it also happens to produce a confirmed-inventory character via an UNRELATED literal output (#525 v2 — the over-coarse guard fix)", () => {
+    // 'composed' is never touched by index()-output anywhere, so it never
+    // enters the pairing graph: classifyStoreSlotEdit(composed, ...) resolves
+    // to {mode:'drop', coordinatedWith:[]} (no partner store to check at any
+    // shared position). Before the #525 v2 fix, the old store-LEVEL
+    // storeFeedsConfirmedChar('composed', ...) shield treated "rule-1
+    // references 'composed' via any() AND rule-1's output happens to be the
+    // needed char 'y'" as grounds to shield the WHOLE store — even though
+    // 'y' has no positional relationship to 'composed's own items at all.
+    // That is exactly the Cameroon `word`-store shape: a store whose own
+    // surplus items get shielded en masse because SOME rule referencing it
+    // also produces a needed char, regardless of whether removing a slot
+    // could ever touch that needed char. The narrower, correct guard (mirrors
+    // recommendedRemovalChars' coordinatedDropHitsNeededChar) only shields a
+    // slot when a PAIRED store's item at the SAME index is needed — 'composed'
+    // has no pair partner, so it is not shielded.
+    const ir = makeIR({
+      stores: [{ nodeId: 'store-1', name: 'composed', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'b' }], isSystem: false } as IRStore],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'rule-1',
+          context: [{ kind: 'any', storeRef: 'composed' }],
+          output: [{ kind: 'char', value: 'y' }], // the wanted character
+        }],
+      }],
+    });
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(['y']));
+
+    const store = result.find((n) => n.kind === 'store' && n.name === 'composed');
+    expect(store?.recommendation).toBe('high');
+  });
+
+  it("marks a store node 'none' when a CROSS-paired partner store's same-index item IS a needed character (coordinatedDropHitsNeededChar guard fires — positive branch the self-paired `word`-store tests above don't cover), but marks a sibling cross-paired store 'high' when its own partner's same-index item is NOT needed (proves the guard discriminates rather than blanket-shielding every cross-paired store)", () => {
+    // `dk(1) any(dkf) > index(dkt,2)` cross-pairs dkf<->dkt via the pairing
+    // graph (mirrors the Cameroon `dk(003b) any(dkf003b) > index(dkt003b,2)`
+    // idiom) — dkf[0]='a' aligns with dkt[0]='α', a needed char, so a
+    // coordinated drop of dkf's slot 0 would also drop a needed char: the
+    // guard shields the WHOLE dkf store node. dkf2/dkt2 is the identical
+    // shape but dkt2[0]='γ' is NOT needed, so dkf2 is left at the ordinary
+    // 'high' recommendation — proving the guard only fires when the aligned
+    // partner slot is actually needed, not for every cross-paired store.
+    const ir = makeIR({
+      stores: [
+        { nodeId: 'store#dkf', name: 'dkf', items: [{ kind: 'char', value: 'a' }], isSystem: false } as IRStore,
+        { nodeId: 'store#dkt', name: 'dkt', items: [{ kind: 'char', value: 'α' }], isSystem: false } as IRStore,
+        { nodeId: 'store#dkf2', name: 'dkf2', items: [{ kind: 'char', value: 'c' }], isSystem: false } as IRStore,
+        { nodeId: 'store#dkt2', name: 'dkt2', items: [{ kind: 'char', value: 'γ' }], isSystem: false } as IRStore,
+      ],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [
+          { nodeId: 'rule-fanout', context: [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'dkf' }], output: [{ kind: 'index', storeRef: 'dkt', offset: 2 }] },
+          { nodeId: 'rule-fanout2', context: [{ kind: 'deadkey', id: 2 }, { kind: 'any', storeRef: 'dkf2' }], output: [{ kind: 'index', storeRef: 'dkt2', offset: 2 }] },
+        ],
+      }],
+    });
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(['α']));
+
+    const dkf = result.find((n) => n.kind === 'store' && n.name === 'dkf');
+    const dkf2 = result.find((n) => n.kind === 'store' && n.name === 'dkf2');
+    expect(dkf?.recommendation).toBe('none');
+    expect(dkf2?.recommendation).toBe('high');
+  });
+
+  it("marks a group node 'none' (not 'high') when it produces only punctuation/digit characters (#525 categorical never-remove guard)", () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [
+          { nodeId: 'rule-digit', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: '0' }] },
+          { nodeId: 'rule-punct', context: [{ kind: 'char', value: 'w' }], output: [{ kind: 'char', value: '.' }] },
+        ],
+      }],
+    });
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(['q']));
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('none');
+  });
+
+  it("does NOT recommend removing a cross-combining-class grapheme when its attested stack is typed in non-canonical order (Vietnamese ậ, base-plus-mark/NFD seam)", () => {
+    // Regression (km-domain, PR #1358): an AttestedStack preserves the author's
+    // TYPED mark order (deriveCarveNeededSet emits it verbatim under
+    // base-plus-mark). For Vietnamese ậ the typed order is circumflex (ccc 230)
+    // then dot-below (ccc 220) — the REVERSE of Unicode's canonical
+    // (ascending-ccc) order. The keyboard produces the grapheme in canonical
+    // NFD order. If only the produced side were normalized, the needed literal
+    // and produced literal would not string-match and carve would falsely flag
+    // a still-needed grapheme as surplus. annotateRemovalRecommendations
+    // normalizes BOTH sides to `form`, so under NFD the two collapse to the
+    // same string and the node is correctly kept.
+    const CIRCUMFLEX = '̂'; // ccc 230
+    const DOT_BELOW = '̣'; // ccc 220
+    const canonicalOrder = 'a' + DOT_BELOW + CIRCUMFLEX; // what the keyboard produces (NFD)
+    const typedOrder = 'a' + CIRCUMFLEX + DOT_BELOW; // the attested/needed literal
+    expect(typedOrder).not.toBe(canonicalOrder); // orders genuinely differ
+
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{ nodeId: 'rule-1', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: canonicalOrder }] }],
+      }],
+    });
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set([typedOrder]), undefined, undefined, 'NFD');
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('none');
+  });
+
+  it("returns 'none' for every node when the confirmed inventory is empty (Phase B not completed)", () => {
+    const ir = makeIR({
+      groups: [makeGroup([makeCharOnlyRule()])],
+      stores: [{ nodeId: 'store-1', name: 'unused', items: [{ kind: 'char', value: 'z' }], isSystem: false } as IRStore],
+    });
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set());
+
+    expect(result.every((n) => n.recommendation === 'none')).toBe(true);
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  // #525 P1 fixes — the fan-out index()/outs() idiom's real produced chars
+  // must reach the recommendation signal, not the displayChar()/outputToChar()
+  // render-ready placeholders. See the fixture comment on each test for the
+  // exact shape.
+
+  it("does NOT mark the BASE store 'high' when it feeds a confirmed char only through the deadkey-body fan-out's index() output store (dependency-guard index() resolution)", () => {
+    // isParallelIndexFanOut shape: [dk(D), any(BASE)] > index(OUT, 2).
+    // OUT ('comp_dia') carries the confirmed-inventory char; BASE
+    // ('base_vowels')'s own chars ('a') are NOT in the inventory. Before the
+    // fix, storeFeedsConfirmedChar used outputToChar(rule.output), which
+    // returns the '…' placeholder for an index() output — never matching
+    // confirmedInventory — so BASE was wrongly recommended 'high'.
+    const ir = makeIR({
+      stores: [
+        { nodeId: 'store#comp_dia', name: 'comp_dia', items: [{ kind: 'char', value: 'à' }, { kind: 'char', value: 'á' }], isSystem: false } as IRStore,
+        { nodeId: 'store#base_vowels', name: 'base_vowels', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'a' }], isSystem: false } as IRStore,
+      ],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'rule#fanout',
+          context: [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'base_vowels' }],
+          output: [{ kind: 'index', storeRef: 'comp_dia', offset: 2 }],
+        }],
+      }],
+    });
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(['à']));
+
+    const baseStore = result.find((n) => n.kind === 'store' && n.name === 'base_vowels');
+    expect(baseStore?.recommendation).toBe('none');
+  });
+
+  it("marks a fan-out glyph node 'none' when its produced combining mark IS in the confirmed inventory (raw, un-prefixed) — proves the leading dotted-circle (U+25CC) strip", () => {
+    // Same fan-out shape as above, but OUT's items are combining marks —
+    // displayChar() prefixes them with U+25CC for standalone display, so the
+    // glyph's raw `.ch` is `◌̀`, not `̀`. Before the fix, producedCharsOf()
+    // added the ◌-prefixed string unmodified, which never matched the raw
+    // combining mark the author confirmed in Phase B.
+    const ir = makeIR({
+      stores: [
+        { nodeId: 'store#comp_dia', name: 'comp_dia', items: [{ kind: 'char', value: '̀' }, { kind: 'char', value: '́' }], isSystem: false } as IRStore,
+        { nodeId: 'store#base_vowels', name: 'base_vowels', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'a' }], isSystem: false } as IRStore,
+      ],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'rule#fanout',
+          context: [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'base_vowels' }],
+          output: [{ kind: 'index', storeRef: 'comp_dia', offset: 2 }],
+        }],
+      }],
+    });
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(['̀']));
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('none');
+  });
+
+  it("marks a node 'none' (not 'high') when its only glyph is the '…' placeholder from an unresolvable fan-out output store", () => {
+    // isParallelIndexFanOut shape matches structurally, but the output
+    // store ('missing_store') isn't in ir.stores, so expandParallelStoreRule
+    // falls back to a single '…' glyph. Before the fix, producedCharsOf()
+    // treated '…' as a real produced char (never in confirmedInventory) and
+    // recommended removal — a placeholder means "production unknown," which
+    // must never count as "produces an unwanted character."
+    const ir = makeIR({
+      stores: [],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'rule#unresolvable',
+          context: [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'base_vowels' }],
+          output: [{ kind: 'index', storeRef: 'missing_store', offset: 2 }],
+        }],
+      }],
+    });
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(['q']));
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('none');
+  });
+
+  // -------------------------------------------------------------------------
+  // #525 items 2/4 — language-driven surplus (neededChars 4th param)
+  // -------------------------------------------------------------------------
+
+  it("marks a group node 'high' when its produced char is surplus (absent from BOTH the CLDR needed-set and confirmedInventory)", () => {
+    const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+    const nodes = toRailNodes(ir);
+
+    // Neither the language's needed-set nor the confirmed inventory wants 'y'.
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(), new Set(['q']));
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('high');
+  });
+
+  it("marks a node 'none' when its produced char IS in the CLDR needed-set, even though confirmedInventory is empty (the language needs it, author just hasn't typed it)", () => {
+    const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(), new Set(['y']));
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('none');
+  });
+
+  it("needed = CLDR ∪ confirmedInventory — a char present ONLY in confirmedInventory (not CLDR) still saves the node", () => {
+    const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(['y']), new Set(['q']));
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('none');
+  });
+
+  it("falls back to inventory-only behavior when neededChars is null (CLDR unavailable for this language)", () => {
+    const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+    const nodes = toRailNodes(ir);
+
+    // 'y' is not in confirmedInventory, and CLDR is unavailable — must still
+    // recommend removal (identical to the original 3-argument behavior),
+    // NOT flag everything as surplus just because CLDR came back null.
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(['q']), null);
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('high');
+  });
+
+  it("returns 'none' for every node when NEITHER confirmedInventory NOR the CLDR needed-set has any data", () => {
+    const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] });
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(), null);
+
+    expect(result.every((n) => n.recommendation === 'none')).toBe(true);
+    expect(result.length).toBeGreaterThan(0);
+  });
+
+  it("never flags a recognized-pattern node 'high', even when its produced char is surplus under the language signal", () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{ nodeId: 'rule-owned', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: 'z' }], ownedByPattern: 'pattern-1' }],
+      }],
+      recognizedPatterns: [{
+        id: 'pattern-1', title: 'Dead Keys', origin: 'recognized',
+        ownedNodes: [{ kind: 'rule', nodeId: 'rule-owned' }],
+        description: '', category: 'substitute', appliesTo: [],
+      }] as Pattern[],
+    });
+    const nodes = toRailNodes(ir);
+
+    // 'z' is surplus under both signals — would be 'high' for a plain group,
+    // but the pattern node must never be flagged.
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(), new Set(['q']));
+
+    const pattern = result.find((n) => n.kind === 'pattern');
+    expect(pattern?.recommendation).toBe('none');
+  });
+
+  it("never flags a raw (opaque) fragment node 'high'", () => {
+    const ir = makeIR({
+      groups: [makeGroup([makeCharOnlyRule()])], // produces surplus 'y'
+      raw: [{ nodeId: 'raw-1', reason: 'unsupported-syntax', text: '' } as unknown as KeyboardIR['raw'][number]],
+    });
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(), new Set(['q']));
+
+    const raw = result.find((n) => n.kind === 'raw');
+    expect(raw?.recommendation).toBe('none');
+  });
+
+  it("never flags a group 'high' when it contains a deadkey-context rule, even though its produced char is surplus under the language signal", () => {
+    // Plain deadkey rule (not the parallel-fanout shape): [dk(D), char('a')] > char('à').
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'rule-dk',
+          context: [{ kind: 'deadkey', id: 1 }, { kind: 'char', value: 'a' }],
+          output: [{ kind: 'char', value: 'à' }],
+        }],
+      }],
+    });
+    const nodes = toRailNodes(ir);
+
+    // 'à' is surplus under both signals — would be 'high' for a plain rule,
+    // but a deadkey-involved group must never be flagged.
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(), new Set(['q']));
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('none');
+  });
+
+  it("never flags a group 'high' when it contains a parallel-store fan-out rule (isParallelIndexFanOut), even under the language signal", () => {
+    const ir = makeIR({
+      stores: [
+        { nodeId: 'store#comp_dia', name: 'comp_dia', items: [{ kind: 'char', value: 'à' }], isSystem: false } as IRStore,
+        { nodeId: 'store#base_vowels', name: 'base_vowels', items: [{ kind: 'char', value: 'a' }], isSystem: false } as IRStore,
+      ],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'rule#fanout',
+          context: [{ kind: 'any', storeRef: 'base_vowels' }], // bare-any fan-out shape
+          output: [{ kind: 'index', storeRef: 'comp_dia', offset: 1 }],
+        }],
+      }],
+    });
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(), new Set(['q']));
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('none');
+  });
+
+  it("store-char producers remain eligible candidates under the language signal (guardrail excludes group/pattern/raw mechanisms, not stores)", () => {
+    const ir = makeIR({
+      stores: [{ nodeId: 'store-1', name: 'unused', items: [{ kind: 'char', value: 'z' }], isSystem: false } as IRStore],
+    });
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(), new Set(['q']));
+
+    const store = result.find((n) => n.kind === 'store' && n.name === 'unused');
+    expect(store?.recommendation).toBe('high');
+  });
+
+  // -------------------------------------------------------------------------
+  // Review fix 1 — case-fold the needed-vs-produced comparison (over-removal)
+  // -------------------------------------------------------------------------
+
+  it("marks a group 'none' when it produces an uppercase accented letter and the CLDR needed-set only has the lowercase form (French É vs é)", () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'rule-e-acute',
+          context: [{ kind: 'char', value: 'x' }],
+          output: [{ kind: 'char', value: 'É' }],
+        }],
+      }],
+    });
+    const nodes = toRailNodes(ir);
+
+    // CLDR exemplars are lowercase-only — the needed-set has 'é', never 'É'.
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(), new Set(['é']), 'fr');
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('none');
+  });
+
+  it("preserves the Turkic dotted-I exception — does NOT naively case-fold 'İ'/'I' for a tr-tagged keyboard", () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'rule-cap-i',
+          context: [{ kind: 'char', value: 'x' }],
+          output: [{ kind: 'char', value: 'I' }], // dotless capital I
+        }],
+      }],
+    });
+    const nodes = toRailNodes(ir);
+
+    // Needed-set has ONLY dotted lowercase 'i' — a naive toLowerCase() fold
+    // would incorrectly treat 'I' as covered; the Turkic exception must not.
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(), new Set(['i']), 'tr');
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('high');
+  });
+
+  // -------------------------------------------------------------------------
+  // Review fix 3 — guardrail must catch output-side deadkey registration
+  // -------------------------------------------------------------------------
+
+  it("never flags a group 'high' when it contains a deadkey-REGISTRATION rule (output dk(...)), even though its produced char is surplus (real sil_cameroon_qwerty idiom: + [K_COLON] > dk(003b))", () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'rule-dk-register',
+          context: [{ kind: 'char', value: 'x' }],
+          output: [{ kind: 'char', value: 'z' }, { kind: 'deadkey', id: 0x3b }],
+        }],
+      }],
+    });
+    const nodes = toRailNodes(ir);
+
+    // 'z' is surplus under the language signal — would be 'high' for a plain
+    // rule, but a rule that REGISTERS a deadkey via output must never be
+    // flagged, because a separate group's context rules may consume it.
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(), new Set(['q']));
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('none');
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// annotateRemovalRecommendations — form parameter (spec: carve output-form
+// normalization). Uses explicit \u escapes throughout so the precomposed vs.
+// decomposed literal is unambiguous in source (rather than visually-similar
+// characters that differ only by combining-mark composition).
+// ---------------------------------------------------------------------------
+
+describe('annotateRemovalRecommendations — form parameter (spec: base-plus-mark drives NFD comparison)', () => {
+  const PRECOMPOSED = '\u00e9'; // e-acute, single codepoint (NFC)
+  const DECOMPOSED = '\u0065\u0301'; // e + combining acute accent (NFD)
+
+  it('matches a produced PRECOMPOSED char against a needed DECOMPOSED sequence under NFD (base-plus-mark) — recommendation is none', () => {
+    const ir = makeIR({
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [{
+        nodeId: 'rule-precomposed', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: PRECOMPOSED }],
+      }] }],
+    });
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(), new Set([DECOMPOSED]), undefined, 'NFD');
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('none');
+  });
+
+  it('matches a produced DECOMPOSED sequence against a needed PRECOMPOSED char under NFD (base-plus-mark) — recommendation is none', () => {
+    const ir = makeIR({
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [{
+        nodeId: 'rule-decomposed', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: DECOMPOSED }],
+      }] }],
+    });
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(), new Set([PRECOMPOSED]), undefined, 'NFD');
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('none');
+  });
+
+  it('ready-made (NFC, the default) still matches a produced PRECOMPOSED char against a needed DECOMPOSED sequence — existing behavior holds', () => {
+    const ir = makeIR({
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [{
+        nodeId: 'rule-precomposed', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: PRECOMPOSED }],
+      }] }],
+    });
+    const nodes = toRailNodes(ir);
+
+    // form omitted entirely — must default to 'NFC', byte-identical to the
+    // pre-046-carve fallback for an undefined marksOutputForm.
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(), new Set([DECOMPOSED]), undefined);
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('none');
+  });
+
+  it('a genuinely surplus produced character is still recommended high under NFD (form does not disable the surplus signal)', () => {
+    const ir = makeIR({
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [{
+        nodeId: 'rule-surplus', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: 'z' }],
+      }] }],
+    });
+    const nodes = toRailNodes(ir);
+
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(), new Set([DECOMPOSED]), undefined, 'NFD');
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('high');
+  });
+
+  it('Turkic dotted-I exception (G5) still fires ON TOP of NFD normalization for a tr-tagged keyboard', () => {
+    const ir = makeIR({
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [{
+        nodeId: 'rule-cap-i', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: 'I' }],
+      }] }],
+    });
+    const nodes = toRailNodes(ir);
+
+    // Needed-set has ONLY dotted lowercase 'i' — the Turkic exception must
+    // suppress the case fold even under form NFD (normalization and G5 are
+    // additive, not substitutive).
+    const result = annotateRemovalRecommendations(nodes, ir, new Set(), new Set(['i']), 'tr', 'NFD');
+
+    const group = result.find((n) => n.kind === 'group');
+    expect(group?.recommendation).toBe('high');
+  });
+});
+// ---------------------------------------------------------------------------
+// isSimpleRemovableRule — #525 BANNER slice allowlist predicate
+// ---------------------------------------------------------------------------
+
+describe('isSimpleRemovableRule', () => {
+  it('returns true for a bare vkey-context, single-char-output rule', () => {
+    expect(isSimpleRemovableRule({
+      nodeId: 'r1',
+      context: [{ kind: 'vkey', name: 'K_Z', modifiers: [] }],
+      output: [{ kind: 'char', value: 'z' }],
+    })).toBe(true);
+  });
+
+  it('returns true for a bare char-context, single-char-output rule', () => {
+    expect(isSimpleRemovableRule(makeCharOnlyRule())).toBe(true);
+  });
+
+  it('returns false when context has a deadkey element', () => {
+    expect(isSimpleRemovableRule({
+      nodeId: 'r2',
+      context: [{ kind: 'deadkey', id: 1 }, { kind: 'char', value: 'a' }],
+      output: [{ kind: 'char', value: 'à' }],
+    })).toBe(false);
+  });
+
+  it('returns false when context is an any() element', () => {
+    expect(isSimpleRemovableRule({
+      nodeId: 'r3',
+      context: [{ kind: 'any', storeRef: 'S' }],
+      output: [{ kind: 'char', value: 'z' }],
+    })).toBe(false);
+  });
+
+  it('returns false when output is an index() element', () => {
+    expect(isSimpleRemovableRule({
+      nodeId: 'r4',
+      context: [{ kind: 'vkey', name: 'K_Z', modifiers: [] }],
+      output: [{ kind: 'index', storeRef: 'S', offset: 1 }],
+    })).toBe(false);
+  });
+
+  it('returns false for a multi-element context (e.g. a platform() guard represented as an extra raw element)', () => {
+    expect(isSimpleRemovableRule({
+      nodeId: 'r5',
+      context: [{ kind: 'raw', text: "platform('touch')" }, { kind: 'vkey', name: 'K_Z', modifiers: [] }],
+      output: [{ kind: 'char', value: 'z' }],
+    })).toBe(false);
+  });
+
+  it('returns false for a multi-element output (base+combining-mark run that NFC-composes to one glyph)', () => {
+    expect(isSimpleRemovableRule({
+      nodeId: 'r6',
+      context: [{ kind: 'char', value: 'x' }],
+      output: [{ kind: 'char', value: 'e' }, { kind: 'char', value: '́' }],
+    })).toBe(false);
+  });
+
+  it('returns false when the rule is owned by a recognized pattern', () => {
+    expect(isSimpleRemovableRule({
+      nodeId: 'r7',
+      context: [{ kind: 'vkey', name: 'K_Z', modifiers: [] }],
+      output: [{ kind: 'char', value: 'z' }],
+      ownedByPattern: 'pattern-1',
+    })).toBe(false);
+  });
+
+  it("returns true for a single vkey-context rule carrying a modifier (e.g. [SHIFT K_A] > 'A') — modifiers live on the one vkey element and don't expand context.length, so shifted capitals are recommendable, not wrongly shielded", () => {
+    expect(isSimpleRemovableRule({
+      nodeId: 'r8',
+      context: [{ kind: 'vkey', name: 'K_A', modifiers: ['SHIFT'] }],
+      output: [{ kind: 'char', value: 'A' }],
+    })).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// recommendedRemovalChars — #525 BANNER slice character-level signal
+// ---------------------------------------------------------------------------
+
+describe('recommendedRemovalChars', () => {
+  it('recommends a surplus character produced only by a simple, direct rule', () => {
+    const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
+
+    expect(result.map((r) => r.ch)).toEqual(['y']);
+  });
+
+  it('shields a surplus character when ONE of its producing rules is a deadkey-context rule (not every producer is simple)', () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [
+          { nodeId: 'rule-simple', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: 'y' }] },
+          { nodeId: 'rule-dk', context: [{ kind: 'deadkey', id: 1 }, { kind: 'char', value: 'a' }], output: [{ kind: 'char', value: 'y' }] },
+        ],
+      }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
+
+    expect(result.map((r) => r.ch)).not.toContain('y');
+  });
+
+  it('recommends a surplus character produced through a RESOLVED any()-context / index()-output store fan-out rule (#931 NET UNLOCK — was blocked under the old dual-use contract)', () => {
+    // The rule's own any(fan) context element resolves index(fan, 2)'s offset
+    // (deadkey excluded from the '+' count but still occupies context slot 1,
+    // so any(fan) at slot 2 is the pairing target) — a self-paired store, so
+    // classifyStoreSlotEdit now returns 'drop', not 'blocked'. This is the
+    // Cameroon-shaped case: a store that is both an any()-source and an
+    // index()-output target in the SAME rule is exactly what the pairing
+    // graph was built to unblock.
+    const ir = makeIR({
+      stores: [{ nodeId: 'store#fan', name: 'fan', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'y' }], isSystem: false } as IRStore],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'rule-fanout',
+          context: [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'fan' }],
+          output: [{ kind: 'index', storeRef: 'fan', offset: 2 }],
+        }],
+      }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
+
+    expect(result.map((r) => r.ch)).toContain('y');
+  });
+
+  it('shields a surplus character produced through an UNRESOLVED index()-output store fan-out rule (offset does not resolve to an any() context source)', () => {
+    const ir = makeIR({
+      stores: [{ nodeId: 'store#fan2', name: 'fan2', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'y' }], isSystem: false } as IRStore],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'rule-fanout2',
+          context: [{ kind: 'deadkey', id: 1 }],
+          output: [{ kind: 'index', storeRef: 'fan2', offset: 1 }],
+        }],
+      }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
+
+    expect(result.map((r) => r.ch)).not.toContain('y');
+  });
+
+  it('shields a surplus character produced via a store slot with an unresolved index() pairing (blocked)', () => {
+    const ir = makeIR({
+      stores: [{ nodeId: 'store#s', name: 'S', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'y' }], isSystem: false } as IRStore],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [
+          // any()-source reference to S (elsewhere in the rule set)...
+          { nodeId: 'rule-source', context: [{ kind: 'any', storeRef: 'S' }], output: [{ kind: 'char', value: 'z' }] },
+          // ...AND an index()-output reference to S whose OWN rule context has
+          // no matching any(S) at the resolved offset — the pairing graph can't
+          // prove the index() is safe, so it stays blocked (unresolved-index-pairing),
+          // regardless of the unrelated any()-source usage in rule-source.
+          { nodeId: 'rule-output', context: [{ kind: 'char', value: 'w' }], output: [{ kind: 'index', storeRef: 'S', offset: 1 }] },
+        ],
+      }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
+
+    expect(result.map((r) => r.ch)).not.toContain('y');
+  });
+
+  it("recommends a surplus character whose sole producer is a self-paired store slot, even though that SAME store also holds a needed character elsewhere (#525 v2 — the Cameroon `word`-store over-coarse-guard fix)", () => {
+    const ir = makeIR({
+      // S's index()-output resolves to this SAME rule's own any(S) context
+      // element (self-pair) → classifyStoreSlotEdit returns 'drop' with
+      // coordinatedWith: [] (no OTHER store to check at the same index) —
+      // this is exactly the Cameroon `word`-store shape: one store, self-fed,
+      // holding BOTH a surplus char ('y', at index 0) and a needed char ('q',
+      // at index 1). Before the #525 v2 fix, the old store-level
+      // storeFeedsConfirmedChar('S', ...) shield resolved index(S,1)'s output
+      // to ALL of S's own items — including needed 'q' — and shielded EVERY
+      // character S contributes to, including surplus 'y' at an UNRELATED
+      // index. The narrower guard only shields when a PAIRED store's item at
+      // the SAME index is needed; S has no partner, so 'y' is not shielded.
+      stores: [{ nodeId: 'store#s', name: 'S', items: [{ kind: 'char', value: 'y' }, { kind: 'char', value: 'q' }], isSystem: false } as IRStore],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [
+          { nodeId: 'rule-fill', context: [{ kind: 'any', storeRef: 'S' }], output: [{ kind: 'index', storeRef: 'S', offset: 1 }] },
+        ],
+      }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
+
+    expect(result.map((r) => r.ch)).toContain('y');
+  });
+
+  it("shields a surplus character whose CROSS-paired partner store's same-index item IS a needed character (coordinatedDropHitsNeededChar guard fires — the positive branch the self-paired `word`-store test above doesn't cover), but recommends a sibling surplus character whose partner slot is NOT needed (proves the guard discriminates rather than blanket-shielding)", () => {
+    // `dk(1) any(dkf) > index(dkt,2)` cross-pairs dkf<->dkt (mirrors the
+    // Cameroon `dk(003b) any(dkf003b) > index(dkt003b,2)` idiom): dkf[0]='a'
+    // aligns with dkt[0]='α', a needed char, so dropping dkf's slot 0 would
+    // coordinately drop a needed char — 'a' is shielded. dkf[1]='b' aligns
+    // with dkt[1]='β', NOT needed — 'b' is not shielded. A plain literal
+    // rule also emits 'a'/'b' directly so both enter the produced set
+    // (buildProducedSet only walks rule OUTPUT, never any()-context input
+    // stores) — the surplus-ness under test lives on the INPUT store slot,
+    // reached via collectCharContributors' any()-context scan.
+    const ir = makeIR({
+      stores: [
+        { nodeId: 'store#dkf', name: 'dkf', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'b' }], isSystem: false } as IRStore,
+        { nodeId: 'store#dkt', name: 'dkt', items: [{ kind: 'char', value: 'α' }, { kind: 'char', value: 'β' }], isSystem: false } as IRStore,
+      ],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [
+          { nodeId: 'rule-lit-a', context: [{ kind: 'char', value: 'p' }], output: [{ kind: 'char', value: 'a' }] },
+          { nodeId: 'rule-lit-b', context: [{ kind: 'char', value: 'q' }], output: [{ kind: 'char', value: 'b' }] },
+          { nodeId: 'rule-fanout', context: [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'dkf' }], output: [{ kind: 'index', storeRef: 'dkt', offset: 2 }] },
+        ],
+      }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['α']) });
+
+    expect(result.map((r) => r.ch)).not.toContain('a');
+    expect(result.map((r) => r.ch)).toContain('b');
+  });
+
+  it('does not recommend an input-only character appearing only in an any()-consumed store (invariant D2b, spec 051 FR-002)', () => {
+    // Characterization test — pins the existing correct behavior before touching
+    // the collateral guard. The produced set (and thus the recommendation signal)
+    // walks rule OUTPUTS + output-store slots only. An any()-consumed input store
+    // is a trigger, not a producer — its characters are not produced and therefore
+    // never proposed for trimming. This test mirrors T002's contracts-side
+    // characterization of buildProducedSet.
+    const ir = makeIR({
+      stores: [
+        { nodeId: 'store#inputOnly', name: 'inputOnly', items: [{ kind: 'char', value: 'x' }], isSystem: false } as IRStore,
+      ],
+      groups: [
+        makeGroup([
+          makeCharOnlyRule(), // produces 'y' (surplus)
+          // Rule whose context any()-consumes inputOnly (x is an input trigger only)
+          { nodeId: 'rule-with-any', context: [{ kind: 'any', storeRef: 'inputOnly' }], output: [{ kind: 'char', value: 'a' }] },
+        ]),
+      ],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
+
+    // y and a are produced and surplus → should be in result if not shielded
+    // x from the any()-consumed store is NOT produced → NOT recommended
+    expect(result.map((r) => r.ch)).not.toContain('x');
+  });
+
+  it('does not recommend a character that IS in `needed`', () => {
+    const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['y']) });
+
+    expect(result).toEqual([]);
+  });
+
+  it('returns [] when `needed` is empty (no signal yet)', () => {
+    const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set() });
+
+    expect(result).toEqual([]);
+  });
+
+  it('shields a surplus character when an opaque fragment ALSO produces it (a blocked entry shields even alongside a simple rule producer)', () => {
+    // collectCharContributors's opaque-fragment check walks `producedOutput`
+    // structurally (not a sourceText scan — see collectCharContributors.ts's
+    // doc comment), so the fragment needs a producedOutput sketch to be
+    // attributed as a blocked producer of 'y' here.
+    const ir = makeIR({
+      groups: [makeGroup([makeCharOnlyRule()])], // produces surplus 'y' too, via a simple rule
+      raw: [{
+        nodeId: 'raw-1', reason: 'unsupported-syntax', sourceText: "+ [K_X] > 'y'",
+        producedOutput: [{ kind: 'char', value: 'y' }],
+      } as unknown as KeyboardIR['raw'][number]],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
+
+    expect(result.map((r) => r.ch)).not.toContain('y');
+  });
+
+  it('shields a character a RawKmnFragment structurally produces via producedOutput, even though sourceText carries no literal output token', () => {
+    // Fixed gap: collectCharContributors's opaque-fragment check now walks
+    // `producedOutput` structurally (the same run-merge + store-resolution
+    // element-walk `buildProducedSet` uses) rather than scanning `sourceText`
+    // for the target char after a `>` — so a fragment whose codec-extracted
+    // producedOutput sketch names 'y', but whose sourceText has no literal
+    // 'y' token at all (dk(1) is a deadkey reference, not 'y'), is still
+    // correctly found and attributed to `blocked` here — not left as an
+    // "unrecognized shape, zero producers" default-safe shield.
+    const ir = makeIR({
+      raw: [{
+        nodeId: 'raw-1', reason: 'unsupported-syntax', sourceText: "+ [K_X] > dk(1)",
+        producedOutput: [{ kind: 'char', value: 'y' }],
+      } as unknown as KeyboardIR['raw'][number]],
+    });
+
+    const contributors = collectCharContributors(ir, 'y');
+    expect(contributors.blocked.some((b) => b.reason.includes('Opaque fragment'))).toBe(true);
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
+    expect(result.map((r) => r.ch)).not.toContain('y');
+  });
+
+  it('is case-fold aware via isCharCoveredForLocale (French É vs needed é)', () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{ nodeId: 'rule-e-acute', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: 'É' }] }],
+      }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['é']), bcp47: 'fr' });
+
+    expect(result).toEqual([]);
+  });
+
+  // #525 categorical never-remove guard — digits/punctuation/symbols are never
+  // recommended for removal even when CLDR's language-specific exemplar tier
+  // for the target language doesn't list them (e.g. Greek `el` omits ASCII
+  // digits/punct), which would otherwise make them look surplus.
+  describe('categorical never-remove guard (digits/punctuation/symbols)', () => {
+    it.each([
+      ['digit', '0'],
+      ['period', '.'],
+      ['comma', ','],
+      ['dollar sign', '$'],
+      ['plus sign', '+'],
+      ['at sign', '@'],
+    ])('does not recommend a surplus %s (%s) even when absent from `needed` and produced by a simple rule', (_label, ch) => {
+      const ir = makeIR({
+        groups: [{
+          nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+          rules: [{ nodeId: 'rule-1', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: ch }] }],
+        }],
+      });
+
+      const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
+
+      expect(result.map((r) => r.ch)).not.toContain(ch);
+    });
+
+    it('still recommends a surplus LETTER — the categorical shield does not over-exclude letters/marks', () => {
+      const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+
+      const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
+
+      expect(result.map((r) => r.ch)).toEqual(['y']);
+    });
+  });
+});
+
+
+// ---------------------------------------------------------------------------
+// recommendedRemovalChars — form parameter (spec: carve output-form
+// normalization). Sibling seam to annotateRemovalRecommendations above —
+// same PRECOMPOSED/DECOMPOSED pair, explicit \u escapes.
+// ---------------------------------------------------------------------------
+
+describe('recommendedRemovalChars — form parameter (spec: base-plus-mark drives NFD comparison)', () => {
+  const PRECOMPOSED = '\u00e9'; // e-acute, single codepoint (NFC)
+  const DECOMPOSED = '\u0065\u0301'; // e + combining acute accent (NFD)
+
+  it('does NOT recommend a produced PRECOMPOSED char when the needed-set holds the DECOMPOSED sequence, under NFD', () => {
+    const ir = makeIR({
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [{
+        nodeId: 'rule-precomposed', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: PRECOMPOSED }],
+      }] }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set([DECOMPOSED]), form: 'NFD' });
+
+    expect(result.map((r) => r.ch)).toEqual([]);
+  });
+
+  it('does NOT recommend a produced DECOMPOSED sequence when the needed-set holds the PRECOMPOSED char, under NFD', () => {
+    const ir = makeIR({
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [{
+        nodeId: 'rule-decomposed', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: DECOMPOSED }],
+      }] }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set([PRECOMPOSED]), form: 'NFD' });
+
+    expect(result.map((r) => r.ch)).toEqual([]);
+  });
+
+  it('ready-made (NFC, the default) still recognizes a produced PRECOMPOSED char against a needed DECOMPOSED sequence as needed — existing behavior holds', () => {
+    const ir = makeIR({
+      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [{
+        nodeId: 'rule-precomposed', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: PRECOMPOSED }],
+      }] }],
+    });
+
+    // `form` omitted entirely — must default to 'NFC', byte-identical to the
+    // pre-existing 3-argument call shape used everywhere else in this file.
+    const result = recommendedRemovalChars({ ir, needed: new Set([DECOMPOSED]) });
+
+    expect(result.map((r) => r.ch)).toEqual([]);
+  });
+
+  it('still recommends a genuinely surplus letter under NFD (form does not disable the surplus signal)', () => {
+    const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+
+    const result = recommendedRemovalChars({ ir, needed: new Set([DECOMPOSED]), form: 'NFD' });
+
+    expect(result.map((r) => r.ch)).toEqual(['y']);
+  });
+});
+// ---------------------------------------------------------------------------
+// coordinatedCollateralForSlots (#525/#931 follow-up — manual-carve safety)
+// ---------------------------------------------------------------------------
+
+describe('coordinatedCollateralForSlots', () => {
+  // `dk(1) any(dkf) > index(dkt,2)` cross-pairs dkf<->dkt via the pairing
+  // graph (mirrors the Cameroon `dk(003b) any(dkf003b) > index(dkt003b,2)`
+  // idiom) — dkf[0]='a' aligns with dkt[0]='α'. Removing dkf's slot 0
+  // collaterally drops dkt's slot 0 via applyStoreSlotRemovals' coordinated
+  // drop, even though the caller never named dkt#0.
+  // Built via the shared makeIR(overrides) helper (see above) rather than a
+  // hand-written KeyboardIR literal, matching the neighboring tests' idiom.
+  function makeCrossPairedIr(dktChar: string): KeyboardIR {
+    return makeIR({
+      stores: [
+        { nodeId: 'store#dkf', name: 'dkf', items: [{ kind: 'char', value: 'a' }], isSystem: false },
+        { nodeId: 'store#dkt', name: 'dkt', items: [{ kind: 'char', value: dktChar }], isSystem: false },
+      ],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'rule-fanout',
+          context: [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'dkf' }],
+          output: [{ kind: 'index', storeRef: 'dkt', offset: 2 }],
+        }],
+      }],
+    });
+  }
+
+  it("returns the partner store's aligned char as collateral, with isNeeded true when it's in `needed`", () => {
+    const ir = makeCrossPairedIr('α');
+
+    const collateral = coordinatedCollateralForSlots(['store#dkf#0'], ir, new Set(['α']));
+
+    // role/isLost added by spec 051 T013 — `dkt` is the index() OUTPUT store and
+    // α has no other producer, so this drop really would lose it.
+    expect(collateral).toEqual([
+      { ch: 'α', storeName: 'dkt', isNeeded: true, slotId: 'store#dkt#0', role: 'output', isLost: true },
+    ]);
+  });
+
+  it('isNeeded is false when the partner char is not in `needed`', () => {
+    const ir = makeCrossPairedIr('γ');
+
+    const collateral = coordinatedCollateralForSlots(['store#dkf#0'], ir, new Set(['α']));
+
+    expect(collateral).toEqual([
+      { ch: 'γ', storeName: 'dkt', isNeeded: false, slotId: 'store#dkt#0', role: 'output', isLost: false },
+    ]);
+  });
+
+  it('returns [] when the targeted slot has no coordinated partner (unpaired store)', () => {
+    const ir: KeyboardIR = {
+      origin: 'imported',
+      header: { keyboardId: 'test', name: 'Test', bcp47: [], copyright: '', version: '1.0', targets: [], storeDirectives: [] },
+      stores: [{ nodeId: 'store#lone', name: 'lone', items: [{ kind: 'char', value: 'z' }], isSystem: false }],
+      groups: [],
+      comments: [],
+      raw: [],
+      recognizedPatterns: [],
+    };
+
+    const collateral = coordinatedCollateralForSlots(['store#lone#0'], ir, new Set(['z']));
+
+    expect(collateral).toEqual([]);
+  });
+
+  it('excludes a partner slot that is already directly targeted (not a hidden surprise)', () => {
+    const ir = makeCrossPairedIr('α');
+
+    // The caller already named BOTH slots explicitly — dkt#0 is not collateral.
+    const collateral = coordinatedCollateralForSlots(['store#dkf#0', 'store#dkt#0'], ir, new Set(['α']));
+
+    expect(collateral).toEqual([]);
+  });
+
+  it('returns [] when storeSlotIds is empty', () => {
+    const ir = makeCrossPairedIr('α');
+
+    expect(coordinatedCollateralForSlots([], ir, new Set(['α']))).toEqual([]);
+  });
+
+  // seenPartnerSlotIds dedup: two DIFFERENT requested slots (dkf1#0, dkf2#0)
+  // both pair, via the SAME output store's index() pairing, into one shared
+  // partner slot (dkt#0) — a two-deadkey-fan-in-to-one-output-store idiom.
+  // Each requested slot's own pair-set also names the OTHER requested slot as
+  // a coordinated partner, but that's excluded as "already directly
+  // targeted" (see the test above) — leaving dkt#0 as the only collateral,
+  // and it must appear exactly once, not twice.
+  it('dedupes a partner slot shared by two different requested slots', () => {
+    const ir = makeIR({
+      stores: [
+        { nodeId: 'store#dkf1', name: 'dkf1', items: [{ kind: 'char', value: 'a' }], isSystem: false },
+        { nodeId: 'store#dkf2', name: 'dkf2', items: [{ kind: 'char', value: 'b' }], isSystem: false },
+        { nodeId: 'store#dkt', name: 'dkt', items: [{ kind: 'char', value: 'α' }], isSystem: false },
+      ],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [
+          {
+            nodeId: 'rule-fanout-1',
+            context: [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'dkf1' }],
+            output: [{ kind: 'index', storeRef: 'dkt', offset: 2 }],
+          },
+          {
+            nodeId: 'rule-fanout-2',
+            context: [{ kind: 'deadkey', id: 2 }, { kind: 'any', storeRef: 'dkf2' }],
+            output: [{ kind: 'index', storeRef: 'dkt', offset: 2 }],
+          },
+        ],
+      }],
+    });
+
+    const collateral = coordinatedCollateralForSlots(
+      ['store#dkf1#0', 'store#dkf2#0'],
+      ir,
+      new Set(['α']),
+    );
+
+    expect(collateral).toHaveLength(1);
+    expect(collateral[0]?.slotId).toBe('store#dkt#0');
+    expect(collateral).toEqual([
+      { ch: 'α', storeName: 'dkt', isNeeded: true, slotId: 'store#dkt#0', role: 'output', isLost: true },
+    ]);
+  });
+
+  // Blocked-store guard: the TARGETED slot's own store classifies as
+  // 'blocked' (mode.mode !== 'drop') — e.g. a notany()-referenced store.
+  // coordinatedCollateralForSlots must never resolve collateral for a slot
+  // that classifyStoreSlotEdit itself refuses to drop.
+  it("returns [] when the targeted slot's own store classifies as 'blocked'", () => {
+    const ir = makeIR({
+      stores: [
+        { nodeId: 'store#blk', name: 'blk', items: [{ kind: 'char', value: 'a' }], isSystem: false },
+      ],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{
+          nodeId: 'rule-notany',
+          context: [{ kind: 'notany', storeRef: 'blk' }],
+          output: [{ kind: 'char', value: 'x' }],
+        }],
+      }],
+    });
+
+    const collateral = coordinatedCollateralForSlots(['store#blk#0'], ir, new Set(['a']));
+
+    expect(collateral).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isCombining / prefixCombiningMark / displayChar — General_Category M
+// (Mn/Mc/Me) dotted-circle rendering, incl. the Sk exclusion and the
+// double-span (U+0360-0362) two-circle form (spec 046 follow-up, km-domain
+// guidance: General_Category is the correct test, NOT canonical combining
+// class — several Mc marks have ccc=0 and would be missed by a ccc test).
+// ---------------------------------------------------------------------------
+
+describe('isCombining / prefixCombiningMark / displayChar — Mark category (Mn/Mc/Me)', () => {
+  it('flags Mn (non-spacing) marks — e.g. U+0300 COMBINING GRAVE ACCENT', () => {
+    expect(isCombining('̀')).toBe(true);
+  });
+
+  it('flags Mc (spacing combining) marks — e.g. U+093E DEVANAGARI VOWEL SIGN AA (ccc=0, would be missed by a ccc-based test)', () => {
+    expect(isCombining('ा')).toBe(true);
+  });
+
+  it('flags Me (enclosing) marks — e.g. U+20DD COMBINING ENCLOSING CIRCLE', () => {
+    expect(isCombining('⃝')).toBe(true);
+  });
+
+  it('does NOT flag Sk modifier symbols — e.g. U+00B4 ACUTE ACCENT (free-standing, not a mark that attaches to a base)', () => {
+    expect(isCombining('´')).toBe(false);
+  });
+
+  it('prefixCombiningMark: single dotted circle for an ordinary Mn/Mc/Me mark', () => {
+    expect(prefixCombiningMark('̀', true)).toBe('◌̀');
+    expect(prefixCombiningMark('ा', true)).toBe('◌ा');
+  });
+
+  it('prefixCombiningMark: does not prefix when isCombiningMark is false, regardless of the char', () => {
+    expect(prefixCombiningMark('̀', false)).toBe('̀');
+  });
+
+  it('prefixCombiningMark: double-span marks (U+0360-0362) get a dotted circle on BOTH sides', () => {
+    for (const ch of ['͠', '͡', '͢']) {
+      expect(prefixCombiningMark(ch, true)).toBe(`◌${ch}◌`);
+    }
+  });
+
+  it('displayChar: renders Mc/Me marks over a dotted circle (widened from the old Mn-only test)', () => {
+    expect(displayChar('ा')).toBe('◌ा');
+    expect(displayChar('⃝')).toBe('◌⃝');
+  });
+
+  it('displayChar: does not circle a plain letter or an Sk modifier symbol', () => {
+    expect(displayChar('a')).toBe('a');
+    expect(displayChar('´')).toBe('´');
+  });
+
+  it('displayChar: double-span mark renders circle+mark+circle end to end', () => {
+    expect(displayChar('͡')).toBe('◌͡◌');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// resolveNodeName / resolveLocationLabel — Tier B content-i18n for the Carve
+// editor (spec 046 T028). CarveNode.name / CharLocation.label carry
+// pattern.title verbatim for pattern-kind entries; these resolve it against
+// the active locale (English fallback), leaving group/store/raw names
+// (IR-authoring names, not Pattern content) untouched.
+// ---------------------------------------------------------------------------
+
+describe('resolveNodeName / resolveLocationLabel', () => {
+  function i18nFor(locale: string): I18n {
+    return new I18n({ locale, messages: {} });
+  }
+
+  afterEach(() => {
+    _resetContentI18nForTesting();
+  });
+
+  it('resolveNodeName: translates a pattern node title under an active locale with a seeded catalog', () => {
+    _setContentCatalogForTesting('fr', {
+      patterns: { 'content.pattern.p1.title': 'Diacritiques' },
+    });
+    expect(
+      resolveNodeName({ nodeId: 'p1', kind: 'pattern', name: 'Diacritics' }, i18nFor('fr')),
+    ).toBe('Diacritiques');
+  });
+
+  it('resolveNodeName: falls back to the English name when no i18n instance or no translation is seeded', () => {
+    expect(resolveNodeName({ nodeId: 'p1', kind: 'pattern', name: 'Diacritics' })).toBe('Diacritics');
+    expect(resolveNodeName({ nodeId: 'p1', kind: 'pattern', name: 'Diacritics' }, i18nFor('fr'))).toBe(
+      'Diacritics',
+    );
+  });
+
+  it('resolveNodeName: leaves group/store/raw node names unresolved (not Pattern content)', () => {
+    _setContentCatalogForTesting('fr', {
+      patterns: { 'content.pattern.g1.title': 'should never be looked up' },
+    });
+    expect(resolveNodeName({ nodeId: 'g1', kind: 'group', name: 'main' }, i18nFor('fr'))).toBe('main');
+    expect(resolveNodeName({ nodeId: 's1', kind: 'store', name: 'Vowels' }, i18nFor('fr'))).toBe('Vowels');
+  });
+
+  it('resolveLocationLabel: translates a pattern-kind location label the same way as resolveNodeName', () => {
+    _setContentCatalogForTesting('fr', {
+      patterns: { 'content.pattern.p1.title': 'Diacritiques' },
+    });
+    expect(
+      resolveLocationLabel({ kind: 'pattern', nodeId: 'p1', label: 'Diacritics' }, i18nFor('fr')),
+    ).toBe('Diacritiques');
+  });
+
+  it('resolveLocationLabel: leaves group/store location labels unresolved', () => {
+    expect(resolveLocationLabel({ kind: 'group', nodeId: 'g1', label: 'main' }, i18nFor('fr'))).toBe('main');
+    expect(resolveLocationLabel({ kind: 'store', nodeId: 's1', label: 'Vowels' }, i18nFor('fr'))).toBe(
+      'Vowels',
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The collateral guard is a CONJUNCTION, not "any needed partner" (spec 051)
+//
+// contracts/collateral-guard.md G1/G2/G9. Cameroon QWERTY's grave-accent pair:
+// trimming the surplus `ɨ` resolves partner slot `dkf0060#1`, which holds the
+// needed `i`. `dkf0060` is any()-CONSUMED — an input store — so `i` is not
+// produced there and the shield must lift. `i` stays typeable through its own
+// `+ [K_I] > 'i'` rule (FR-004).
+// ---------------------------------------------------------------------------
+
+/**
+ * Cameroon-shaped grave-accent fixture.
+ *
+ * @param outputChars the OUTPUT store's items (what the deadkey emits)
+ * @param inputChars  the INPUT store's items (what you type after the deadkey)
+ * @param baseChars   characters that also get their own `+ [K_x] > 'c'` rule
+ */
+function makeGraveAccentIR(
+  outputChars: string[],
+  inputChars: string[],
+  baseChars: string[],
+): KeyboardIR {
+  const baseRules: IRRule[] = baseChars.map((ch, i) => ({
+    nodeId: `rule#base-${i}`,
+    context: [{ kind: 'vkey', name: `K_${ch.toUpperCase()}`, modifiers: [] }],
+    output: [{ kind: 'char', value: ch }],
+  }));
+  return makeIR({
+    stores: [
+      { nodeId: 'store#dkf', name: 'dkf0060', items: inputChars.map((v) => ({ kind: 'char', value: v })), isSystem: false } as IRStore,
+      { nodeId: 'store#dkt', name: 'dkt0060', items: outputChars.map((v) => ({ kind: 'char', value: v })), isSystem: false } as IRStore,
+    ],
+    groups: [{
+      nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      rules: [
+        ...baseRules,
+        {
+          nodeId: 'rule#fanout',
+          context: [{ kind: 'deadkey', id: 0x0060 }, { kind: 'any', storeRef: 'dkf0060' }],
+          output: [{ kind: 'index', storeRef: 'dkt0060', offset: 2 }],
+        },
+      ],
+    }],
+  });
+}
+
+describe('collateral guard — input partner never shields (spec 051 US1)', () => {
+  it('G1: proposes the surplus ɨ even though its coordinated partner slot holds the needed i', () => {
+    // dkt0060 = [à, ɨ, ù]; dkf0060 = [a, i, u]. Orthography needs a/i/u/à/ù but NOT ɨ.
+    const ir = makeGraveAccentIR(['à', 'ɨ', 'ù'], ['a', 'i', 'u'], ['a', 'i', 'u']);
+    const needed = new Set(['a', 'i', 'u', 'à', 'ù']);
+
+    const result = recommendedRemovalChars({ ir, needed });
+
+    expect(result.map((r) => r.ch)).toContain('ɨ');
+    // The needed characters are never candidates.
+    expect(result.map((r) => r.ch)).not.toContain('i');
+    expect(result.map((r) => r.ch)).not.toContain('à');
+  });
+
+  it('G1: the ɨ proposal resolves to the OUTPUT store slot, tagged with the producing role', () => {
+    const ir = makeGraveAccentIR(['à', 'ɨ', 'ù'], ['a', 'i', 'u'], ['a', 'i', 'u']);
+    const needed = new Set(['a', 'i', 'u', 'à', 'ù']);
+
+    const proposal = recommendedRemovalChars({ ir, needed }).find((r) => r.ch === 'ɨ');
+
+    expect(proposal).toBeDefined();
+    expect(proposal!.contributors.storeSlotIds).toEqual(['store#dkt#1']);
+    expect(proposal!.contributors.storeSlots).toEqual([{ slotId: 'store#dkt#1', role: 'output' }]);
+  });
+
+  it('G2: the coordinated collateral for the ɨ trim names dkf0060#1 (the i slot), as an INPUT partner', () => {
+    const ir = makeGraveAccentIR(['à', 'ɨ', 'ù'], ['a', 'i', 'u'], ['a', 'i', 'u']);
+    const needed = new Set(['a', 'i', 'u', 'à', 'ù']);
+
+    const collateral = coordinatedCollateralForSlots(['store#dkt#1'], ir, needed);
+
+    expect(collateral).toHaveLength(1);
+    expect(collateral[0]!.ch).toBe('i');
+    expect(collateral[0]!.storeName).toBe('dkf0060');
+    expect(collateral[0]!.slotId).toBe('store#dkf#1');
+    // `i` IS needed, but the partner is an INPUT store, so nothing is lost:
+    // the `i → ɨ` mapping stops firing; `i` itself is still typeable.
+    expect(collateral[0]!.isNeeded).toBe(true);
+    expect(collateral[0]!.role).toBe('input');
+    expect(collateral[0]!.isLost).toBe(false);
+  });
+
+  it("G2: the base `+ [K_I] > 'i'` rule is NOT a contributor to the ɨ trim (FR-004)", () => {
+    const ir = makeGraveAccentIR(['à', 'ɨ', 'ù'], ['a', 'i', 'u'], ['a', 'i', 'u']);
+    const needed = new Set(['a', 'i', 'u', 'à', 'ù']);
+
+    const proposal = recommendedRemovalChars({ ir, needed }).find((r) => r.ch === 'ɨ')!;
+
+    // Only the output-store slot is touched — no rule delete, so `+ [K_I] > 'i'`
+    // survives the splice and `i` stays produced.
+    expect(proposal.contributors.ruleNodeIds).toEqual([]);
+  });
+
+  it('G9: the banner and the tile signal agree — both lift together (NFR-001)', () => {
+    // Every char in the OUTPUT store is surplus, so the node-level signal is
+    // decided by the coordinated guard alone; the INPUT store holds needed chars.
+    const ir = makeGraveAccentIR(['ɨ', 'ɔ'], ['i', 'o'], ['i', 'o']);
+    const needed = new Set(['i', 'o']);
+
+    const banner = recommendedRemovalChars({ ir, needed }).map((r) => r.ch);
+    const tiles = annotateRemovalRecommendations(toRailNodes(ir), ir, needed);
+    const outputStoreTile = tiles.find((n) => n.kind === 'store' && n.name === 'dkt0060');
+
+    expect(banner).toEqual(expect.arrayContaining(['ɨ', 'ɔ']));
+    expect(outputStoreTile?.recommendation).toBe('high');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The guard is NARROWED, not removed (spec 051 US2)
+//
+// contracts/collateral-guard.md's truth table, rows 2-5, plus the shields that
+// must be unchanged. The whole point of FR-003 is that a trim which really
+// would leave a needed character unproducible STILL warns.
+// ---------------------------------------------------------------------------
+
+/**
+ * Chained cross-pair: S2 is an index() OUTPUT target in rule 1 and an any()
+ * INPUT source in rule 2, so its pair set reaches an OUTPUT store (S3).
+ * Trimming S2's char therefore has an OUTPUT partner — the only shape in which
+ * a coordinated drop can genuinely lose a produced character.
+ *
+ *   rule#1: dk(1) any(S1) > index(S2, 2)
+ *   rule#2: dk(2) any(S2) > index(S3, 2)
+ */
+function makeChainedPairIR(extraRules: IRRule[] = []): KeyboardIR {
+  return makeIR({
+    stores: [
+      { nodeId: 'store#s1', name: 'S1', items: [{ kind: 'char', value: 'a' }], isSystem: false } as IRStore,
+      { nodeId: 'store#s2', name: 'S2', items: [{ kind: 'char', value: 'X' }], isSystem: false } as IRStore,
+      { nodeId: 'store#s3', name: 'S3', items: [{ kind: 'char', value: 'Y' }], isSystem: false } as IRStore,
+    ],
+    groups: [{
+      nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      rules: [
+        { nodeId: 'rule#1', context: [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'S1' }], output: [{ kind: 'index', storeRef: 'S2', offset: 2 }] },
+        { nodeId: 'rule#2', context: [{ kind: 'deadkey', id: 2 }, { kind: 'any', storeRef: 'S2' }], output: [{ kind: 'index', storeRef: 'S3', offset: 2 }] },
+        ...extraRules,
+      ],
+    }],
+  });
+}
+
+/** `+ [K_Y] > 'Y'` — a second, independent producer of the needed Y. */
+const secondYProducer: IRRule = {
+  nodeId: 'rule#y',
+  context: [{ kind: 'vkey', name: 'K_Y', modifiers: [] }],
+  output: [{ kind: 'char', value: 'Y' }],
+};
+
+describe('collateral guard — truth table (spec 051 US2)', () => {
+  it('G3 (row 5): SHIELDS when the needed partner is an OUTPUT store and has no other producer', () => {
+    const ir = makeChainedPairIR();
+    const result = recommendedRemovalChars({ ir, needed: new Set(['Y']) });
+
+    // Trimming X would splice S3 at the same index and take the needed Y with
+    // it — Y has no other producer, so it would become untypeable.
+    expect(result.map((r) => r.ch)).not.toContain('X');
+  });
+
+  it('G4 (row 4): does NOT shield when the same needed character has a second producer', () => {
+    const ir = makeChainedPairIR([secondYProducer]);
+    const result = recommendedRemovalChars({ ir, needed: new Set(['Y']) });
+
+    expect(result.map((r) => r.ch)).toContain('X');
+  });
+
+  it('G3/G4: the collateral entry reports isLost exactly as the guard decides', () => {
+    const shielded = coordinatedCollateralForSlots(['store#s2#0'], makeChainedPairIR(), new Set(['Y']));
+    const outputPartner = shielded.find((c) => c.storeName === 'S3');
+    expect(outputPartner?.role).toBe('output');
+    expect(outputPartner?.isLost).toBe(true);
+
+    const withSecondProducer = coordinatedCollateralForSlots(
+      ['store#s2#0'],
+      makeChainedPairIR([secondYProducer]),
+      new Set(['Y']),
+    );
+    const stillNeeded = withSecondProducer.find((c) => c.storeName === 'S3');
+    expect(stillNeeded?.isNeeded).toBe(true); // still needed…
+    expect(stillNeeded?.isLost).toBe(false); // …but no longer lost
+  });
+
+  it('row 3: does NOT shield when the needed partner is an any()-consumed INPUT store', () => {
+    const ir = makeGraveAccentIR(['à', 'ɨ', 'ù'], ['a', 'i', 'u'], ['a', 'i', 'u']);
+    const result = recommendedRemovalChars({ ir, needed: new Set(['a', 'i', 'u', 'à', 'ù']) });
+    expect(result.map((r) => r.ch)).toContain('ɨ');
+  });
+
+  it('G5 (row 2): a self-paired store has no partner and is unchanged by the narrowing', () => {
+    // Cameroon's `word` idiom — any(word) and index(word) in the SAME rule, so
+    // coordinatedWith is [] and the guard can never fire (invariant D5).
+    const ir = makeIR({
+      stores: [{ nodeId: 'store#word', name: 'word', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'ɛ' }], isSystem: false } as IRStore],
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{ nodeId: 'rule#self', context: [{ kind: 'any', storeRef: 'word' }], output: [{ kind: 'index', storeRef: 'word', offset: 1 }] }],
+      }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['a']) });
+
+    expect(result.map((r) => r.ch)).toContain('ɛ');
+    expect(coordinatedCollateralForSlots(['store#word#1'], ir, new Set(['a']))).toEqual([]);
+  });
+
+  it('G6 (FR-009): returns [] when the needed set is empty — no signal before the orthography resolves', () => {
+    expect(recommendedRemovalChars({ ir: makeChainedPairIR(), needed: new Set() })).toEqual([]);
+  });
+
+  it('G7: digits, punctuation and symbols stay shielded by isAlwaysKeepCategory', () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [
+          { nodeId: 'rule#digit', context: [{ kind: 'vkey', name: 'K_1', modifiers: [] }], output: [{ kind: 'char', value: '1' }] },
+          { nodeId: 'rule#punct', context: [{ kind: 'vkey', name: 'K_COMMA', modifiers: [] }], output: [{ kind: 'char', value: ',' }] },
+          { nodeId: 'rule#symbol', context: [{ kind: 'vkey', name: 'K_4', modifiers: [] }], output: [{ kind: 'char', value: '$' }] },
+          { nodeId: 'rule#letter', context: [{ kind: 'vkey', name: 'K_Z', modifiers: [] }], output: [{ kind: 'char', value: 'ʒ' }] },
+        ],
+      }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['q']) }).map((r) => r.ch);
+
+    expect(result).toContain('ʒ'); // a surplus letter is still proposed
+    expect(result).not.toContain('1');
+    expect(result).not.toContain(',');
+    expect(result).not.toContain('$');
+  });
+
+  it('G8: an opaque-fragment producer is still shielded by the blocked check, BEFORE the producer test', () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{ nodeId: 'rule#z', context: [{ kind: 'vkey', name: 'K_Z', modifiers: [] }], output: [{ kind: 'char', value: 'ʒ' }] }],
+      }],
+      raw: [{
+        nodeId: 'raw#1',
+        reason: 'if-guard',
+        sourceText: "if(&layer = 'x') + [K_Z] > 'ʒ'",
+        producedOutput: [{ kind: 'char', value: 'ʒ' }],
+      }] as unknown as KeyboardIR['raw'],
+    });
+
+    // 'ʒ' is surplus and has a simple rule producer, but an opaque fragment also
+    // emits it (structurally, via producedOutput) — the codec cannot confirm
+    // what that fragment does, so shield.
+    expect(recommendedRemovalChars({ ir, needed: new Set(['q']) }).map((r) => r.ch)).not.toContain('ʒ');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// recommendedRemovalChars — paired proposal-row granularity (spec 051 T026,
+// FR-014, contracts/case-pairing.md "Proposal-row granularity"). Fixture pair
+// is 'ǝ' U+01DD LATIN SMALL LETTER TURNED E <-> 'Ǝ' U+018E LATIN CAPITAL
+// LETTER REVERSED E — the same grounded fold carveCasePairs.test.ts uses.
+// Deliberately NOT 'ə' U+0259 (which uppercases to 'Ə' U+018F, a DIFFERENT
+// pair) — see carveCasePairs.ts's module doc for why the spec's own
+// Latin-a/Greek-alpha example likewise doesn't hold and isn't reused here.
+// ---------------------------------------------------------------------------
+
+describe('recommendedRemovalChars — paired proposal rows (spec 051 FR-014)', () => {
+  it('folds two independently-surplus case-group members into ONE row, not two', () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [
+          { nodeId: 'rule-lower', context: [{ kind: 'vkey', name: 'K_1', modifiers: [] }], output: [{ kind: 'char', value: 'ǝ' }] },
+          { nodeId: 'rule-upper', context: [{ kind: 'vkey', name: 'K_2', modifiers: [] }], output: [{ kind: 'char', value: 'Ǝ' }] },
+        ],
+      }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.ch).toBe('ǝ'); // lowercase member survives
+    expect(result[0]?.caseGroup).toEqual(['Ǝ', 'ǝ']); // sorted by code point: U+018E before U+01DD
+  });
+
+  it('leaves caseGroup undefined when the character has no counterpart in the produced set', () => {
+    const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y', no case counterpart produced
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
+
+    expect(result.map((r) => r.ch)).toEqual(['y']);
+    expect(result[0]?.caseGroup).toBeUndefined();
+  });
+
+  it('does not fold in a NEEDED case-group partner — only the surplus member surfaces, unpaired', () => {
+    // Turkic fixture (mirrors carveCasePairs.test.ts P7): under bcp47 "tr", plain
+    // lowercase 'i' pairs 1:1 with dotted 'İ', separately from dotless 'ı' <-> 'I'.
+    // isCharCoveredForLocale's own case-fold is Turkic-suppressed too, so 'İ' being
+    // in `needed` does NOT also cover 'i' by fold — 'i' is independently surplus,
+    // while 'İ' is excluded from candidacy outright (it's the literal needed char).
+    // 'İ' therefore never enters `results`, so the fold below must not pull it in.
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [
+          { nodeId: 'rule-lower', context: [{ kind: 'vkey', name: 'K_1', modifiers: [] }], output: [{ kind: 'char', value: 'i' }] },
+          { nodeId: 'rule-upper', context: [{ kind: 'vkey', name: 'K_2', modifiers: [] }], output: [{ kind: 'char', value: 'İ' }] },
+        ],
+      }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['İ']), bcp47: 'tr' });
+
+    expect(result).toHaveLength(1);
+    expect(result[0]?.ch).toBe('i');
+    expect(result[0]?.caseGroup).toBeUndefined();
+  });
+
+  it('leaves an ordinary, non-paired surplus character unchanged (existing behaviour)', () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{ nodeId: 'rule-z', context: [{ kind: 'vkey', name: 'K_Z', modifiers: [] }], output: [{ kind: 'char', value: 'ʒ' }] }],
+      }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
+
+    expect(result.map((r) => r.ch)).toContain('ʒ');
+    expect(result.find((r) => r.ch === 'ʒ')?.caseGroup).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FR-013 at proposal time — a shared uppercase is never offered for trimming
+// while one of its produced lowercase referents survives (spec 051, issue #1357).
+//
+// This is the many-to-one caveat the issue is actually about. The first fold
+// written for FR-014 collapsed any two rows sharing an uppercase, which got
+// { s, ſ, S } wrong: with `ſ` in the orthography, it proposed trimming `s` and
+// `S` together and left `ſ` with no uppercase. The retire rule now runs through
+// `caseTrimSet`, the one implementation of it.
+// ---------------------------------------------------------------------------
+
+/** Rules producing exactly `chars`, one key each — every char is independently trimmable. */
+function makeCharsIR(chars: string[]): KeyboardIR {
+  return makeIR({
+    groups: [{
+      nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      rules: chars.map((c, i) => ({
+        nodeId: `rule#${i}`,
+        context: [{ kind: 'vkey' as const, name: `K_${i}`, modifiers: [] }],
+        output: [{ kind: 'char' as const, value: c }],
+      })),
+    }],
+  });
+}
+
+describe('recommendedRemovalChars — shared uppercase retires last (spec 051 FR-013)', () => {
+  it('does NOT propose the shared uppercase while a produced lowercase referent is needed', () => {
+    // produced { s, ſ, S }; the orthography needs ſ (U+017F) but not s or S.
+    // Trimming S would leave ſ without its uppercase, so S must not be offered
+    // at all — neither folded into s's row nor as a row of its own.
+    const result = recommendedRemovalChars({
+      ir: makeCharsIR(['s', 'ſ', 'S']),
+      needed: new Set(['ſ']),
+    });
+
+    expect(result.map((r) => r.ch)).toEqual(['s']);
+    expect(result[0]!.caseGroup).toBeUndefined(); // single row, not a pair
+    expect(result.map((r) => r.ch)).not.toContain('S');
+  });
+
+  it('DOES retire the shared uppercase once every referent is being trimmed', () => {
+    // Same produced set, but nothing in it is needed — the whole group goes, as
+    // ONE row (FR-014), with the lowest-code-point lowercase surviving as the row.
+    const result = recommendedRemovalChars({
+      ir: makeCharsIR(['s', 'ſ', 'S']),
+      needed: new Set(['q']),
+    });
+
+    expect(result.map((r) => r.ch)).toEqual(['s']);
+    // S U+0053 < s U+0073 < ſ U+017F
+    expect(result[0]!.caseGroup).toEqual(['S', 's', 'ſ']);
+  });
+
+  it('never folds two distinct lowercases that merely share an uppercase', () => {
+    // produced { s, ſ } with no S at all: `s` and `ſ` are not counterparts of
+    // each other, so they stay two independent rows.
+    const result = recommendedRemovalChars({
+      ir: makeCharsIR(['s', 'ſ']),
+      needed: new Set(['q']),
+    });
+
+    expect(result.map((r) => r.ch).sort()).toEqual(['s', 'ſ']);
+    expect(result.every((r) => r.caseGroup === undefined)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// keySequenceLabel — deadkey-combination rule (#1399 follow-on)
+//
+// A rule whose effective context (context with the '+' keystroke-boundary
+// separator stripped out) is composed ENTIRELY of deadkey elements, and
+// whose output is a single literal char — "type deadkey A, then deadkey B
+// -> composed character" (Cameroon's real shape for '=' and ';').
+// ---------------------------------------------------------------------------
+
+describe('keySequenceLabel — deadkey-combination rule (#1399 follow-on)', () => {
+  it('resolves an all-deadkey effective context (no "+") to the ordered trigger chords', () => {
+    const trigger1: IRRule = { nodeId: 'r-t1', context: [{ kind: 'vkey', name: 'K_A', modifiers: [] }], output: [{ kind: 'deadkey', id: 1 }] };
+    const trigger2: IRRule = { nodeId: 'r-t2', context: [{ kind: 'vkey', name: 'K_B', modifiers: [] }], output: [{ kind: 'deadkey', id: 2 }] };
+    const bodyRule: IRRule = {
+      nodeId: 'r-body',
+      context: [{ kind: 'deadkey', id: 1 }, { kind: 'deadkey', id: 2 }],
+      output: [{ kind: 'char', value: 'e' }],
+    };
+    const ir = makeIRWithStores(
+      [makeGroup([trigger1, trigger2]), { nodeId: 'g2', name: 'deadkeys', usingKeys: true, rules: [bodyRule], readonly: false }],
+      [],
+    );
+
+    expect(keySequenceLabel(bodyRule, ir)).toEqual(['A', 'B']);
+  });
+
+  it('resolves an all-deadkey effective context with an embedded "+" the same way', () => {
+    const trigger1: IRRule = { nodeId: 'r-t1', context: [{ kind: 'vkey', name: 'K_A', modifiers: [] }], output: [{ kind: 'deadkey', id: 1 }] };
+    const trigger2: IRRule = { nodeId: 'r-t2', context: [{ kind: 'vkey', name: 'K_B', modifiers: [] }], output: [{ kind: 'deadkey', id: 2 }] };
+    const bodyRule: IRRule = {
+      nodeId: 'r-body-plus',
+      context: [{ kind: 'deadkey', id: 1 }, { kind: 'raw', text: '+' }, { kind: 'deadkey', id: 2 }],
+      output: [{ kind: 'char', value: 'e' }],
+    };
+    const ir = makeIRWithStores(
+      [makeGroup([trigger1, trigger2]), { nodeId: 'g2', name: 'deadkeys', usingKeys: true, rules: [bodyRule], readonly: false }],
+      [],
+    );
+
+    expect(keySequenceLabel(bodyRule, ir)).toEqual(['A', 'B']);
+  });
+
+  it('returns undefined (never fabricates) when one deadkey\'s trigger cannot be found', () => {
+    const trigger1: IRRule = { nodeId: 'r-t1', context: [{ kind: 'vkey', name: 'K_A', modifiers: [] }], output: [{ kind: 'deadkey', id: 1 }] };
+    // No trigger rule produces deadkey id 2.
+    const bodyRule: IRRule = {
+      nodeId: 'r-body-missing',
+      context: [{ kind: 'deadkey', id: 1 }, { kind: 'deadkey', id: 2 }],
+      output: [{ kind: 'char', value: 'e' }],
+    };
+    const ir = makeIRWithStores(
+      [makeGroup([trigger1]), { nodeId: 'g2', name: 'deadkeys', usingKeys: true, rules: [bodyRule], readonly: false }],
+      [],
+    );
+
+    expect(keySequenceLabel(bodyRule, ir)).toBeUndefined();
+  });
+
+  it('resolves a deadkey-entry trigger written in the "+"-form (context [raw(+), vkey]), not only the bare single-vkey form (#1399 follow-on)', () => {
+    // Deadkey 1's own trigger uses the common `+`-form shape a `.kmn` rule
+    // like `+ [K_X] > dk(1)` round-trips to at the IR level (a leading raw
+    // '+' separator followed by the single vkey) — findDeadkeyTrigger must
+    // resolve this exactly like the bare `[vkey] > dk(1)` shape below.
+    const trigger1: IRRule = {
+      nodeId: 'r-t1-plus',
+      context: [{ kind: 'raw', text: '+' }, { kind: 'vkey', name: 'K_X', modifiers: [] }],
+      output: [{ kind: 'deadkey', id: 1 }],
+    };
+    const trigger2: IRRule = { nodeId: 'r-t2', context: [{ kind: 'vkey', name: 'K_Y', modifiers: [] }], output: [{ kind: 'deadkey', id: 2 }] };
+    const bodyRule: IRRule = {
+      nodeId: 'r-body-plusentry',
+      context: [{ kind: 'deadkey', id: 1 }, { kind: 'deadkey', id: 2 }],
+      output: [{ kind: 'char', value: 'e' }],
+    };
+    const ir = makeIRWithStores(
+      [makeGroup([trigger1, trigger2]), { nodeId: 'g2', name: 'deadkeys', usingKeys: true, rules: [bodyRule], readonly: false }],
+      [],
+    );
+
+    expect(keySequenceLabel(bodyRule, ir)).toEqual(['X', 'Y']);
+  });
+
+  it('resolves a deadkey-combination rule guarded by a non-plus raw context element (e.g. platform(...)) by stripping it, not just the "+" separator (#1399 follow-on)', () => {
+    const trigger1: IRRule = { nodeId: 'r-t1', context: [{ kind: 'vkey', name: 'K_A', modifiers: [] }], output: [{ kind: 'deadkey', id: 1 }] };
+    // `platform('hardware') dk(1) dk(1) > 'e'` — a guard the codec preserves
+    // verbatim as an opaque {kind:"raw"} context element (not the plus
+    // separator) ahead of an all-deadkey combination.
+    const bodyRule: IRRule = {
+      nodeId: 'r-body-platform-guard',
+      context: [{ kind: 'raw', text: "platform('hardware')" }, { kind: 'deadkey', id: 1 }, { kind: 'deadkey', id: 1 }],
+      output: [{ kind: 'char', value: 'e' }],
+    };
+    const ir = makeIRWithStores(
+      [makeGroup([trigger1]), { nodeId: 'g2', name: 'deadkeys', usingKeys: true, rules: [bodyRule], readonly: false }],
+      [],
+    );
+
+    expect(keySequenceLabel(bodyRule, ir)).toEqual(['A', 'A']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findDeadkeyTrigger — a touch-only (T_xxxx) trigger must never shadow a
+// resolvable desktop trigger for the SAME deadkey (regression).
+//
+// A deadkey can legitimately be entered by BOTH a real desktop chord and a
+// touch-layout-only virtual key (mirrors the real sil_cameroon_qwerty-style
+// dual-trigger shape already covered for charProducers above, lines
+// 3392-3421, but here for a DEADKEY's own entry trigger rather than a plain
+// literal-output rule). Before the fix, findDeadkeyTrigger's
+// unshifted-preference search ran over the FULL candidate list, so an
+// unshifted touch-only candidate (T_0041) won over a desktop candidate that
+// happened to carry a modifier (Shift + K_A) — and since a touch-only vkey
+// never resolves to a label (desktopVkeyLabel returns undefined for T_
+// names), primaryChordLabel returned undefined and keySequenceLabel gave up
+// on the WHOLE sequence, even though a perfectly good desktop chord existed.
+// ---------------------------------------------------------------------------
+
+describe('keySequenceLabel — a touch-only trigger never shadows a resolvable desktop trigger for the same deadkey (regression)', () => {
+  it('resolves the DESKTOP chord when the deadkey has both a desktop trigger and an unshifted touch-only trigger', () => {
+    // Desktop trigger carries a modifier (Shift + A) — deliberately NOT the
+    // unshifted candidate, so the pre-fix bug (touch-only wins the bare
+    // unshifted-preference search over the full candidate list) is what this
+    // fixture actually exercises, not a case the old code got right by luck.
+    const desktopTrigger: IRRule = {
+      nodeId: 'r-desktop-trigger',
+      context: [{ kind: 'vkey', name: 'K_A', modifiers: ['SHIFT'] }],
+      output: [{ kind: 'deadkey', id: 1 }],
+    };
+    const touchOnlyTrigger: IRRule = {
+      nodeId: 'r-touch-trigger',
+      context: [{ kind: 'vkey', name: 'T_0041', modifiers: [] }],
+      output: [{ kind: 'deadkey', id: 1 }],
+    };
+    const bodyRule: IRRule = {
+      nodeId: 'r-body',
+      context: [{ kind: 'deadkey', id: 1 }],
+      output: [{ kind: 'char', value: 'e' }],
+    };
+    const ir = makeIRWithStores(
+      [
+        makeGroup([desktopTrigger, touchOnlyTrigger]),
+        { nodeId: 'g2', name: 'deadkeys', usingKeys: true, rules: [bodyRule], readonly: false },
+      ],
+      [],
+    );
+
+    expect(keySequenceLabel(bodyRule, ir)).toEqual(['Shift + A']);
+  });
+
+  it('still resolves no fabricated desktop chord when the deadkey has ONLY a touch-only trigger', () => {
+    const touchOnlyTrigger: IRRule = {
+      nodeId: 'r-touch-only-trigger',
+      context: [{ kind: 'vkey', name: 'T_0041', modifiers: [] }],
+      output: [{ kind: 'deadkey', id: 1 }],
+    };
+    const bodyRule: IRRule = {
+      nodeId: 'r-body-touch-only',
+      context: [{ kind: 'deadkey', id: 1 }],
+      output: [{ kind: 'char', value: 'e' }],
+    };
+    const ir = makeIRWithStores(
+      [
+        makeGroup([touchOnlyTrigger]),
+        { nodeId: 'g2', name: 'deadkeys', usingKeys: true, rules: [bodyRule], readonly: false },
+      ],
+      [],
+    );
+
+    // No desktop candidate exists at all — falls back to the touch-only
+    // candidate, which still can't be labelled, so the sequence stays
+    // undefined rather than leaking a "T_0041" step.
+    expect(keySequenceLabel(bodyRule, ir)).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// charProducers — partial-cluster inclusion is not a "way to type it"
+// (#1399 follow-on)
+// ---------------------------------------------------------------------------
+
+describe('charProducers — partial-cluster inclusion is excluded, not a phantom entry', () => {
+  it('does not list a producer whose literal output only PARTIALLY contains the target char', () => {
+    // A key that outputs a longer literal cluster containing 'a' is not a
+    // way to type 'a' alone — no producer, real or unrenderable, for it.
+    const clusterRule: IRRule = {
+      nodeId: 'r-cluster',
+      context: [{ kind: 'vkey', name: 'K_X', modifiers: [] }],
+      output: [{ kind: 'char', value: 'abcd' }],
+    };
+    const realRule: IRRule = {
+      nodeId: 'r-real',
+      context: [{ kind: 'vkey', name: 'K_A', modifiers: ['SHIFT'] }],
+      output: [{ kind: 'char', value: 'a' }],
+    };
+    const ir = makeIRWithStores([makeGroup([clusterRule, realRule])], []);
+
+    expect(charProducers(ir, 'a')).toEqual([{ steps: ['Shift + A'] }]);
+  });
+
+  it('returns an empty list when the only rule mentioning the char is a partial-cluster inclusion', () => {
+    const clusterRule: IRRule = {
+      nodeId: 'r-cluster-only',
+      context: [{ kind: 'vkey', name: 'K_X', modifiers: [] }],
+      output: [{ kind: 'char', value: 'abcd' }],
+    };
+    const ir = makeIRWithStores([makeGroup([clusterRule])], []);
+
+    expect(charProducers(ir, 'b')).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// charProducers — touch-only (T_xxxx) trigger vkeys never surface as a
+// desktop "how it's typed" step (#1399 follow-on)
+// ---------------------------------------------------------------------------
+
+describe('charProducers — a touch-only (T_xxxx) trigger vkey is dropped, never leaked as a step', () => {
+  it('drops a producer whose sole trigger is a touch-only vkey while keeping the real desktop producer', () => {
+    // Mirrors the real sil_cameroon_qwerty shape: `;` is produced both by a
+    // real desktop chord (RAlt + ;) and by a touch-layout-only virtual key
+    // (`+ [T_003B] > ';'`) that has no physical desktop key behind it.
+    const desktopRule: IRRule = {
+      nodeId: 'r-desktop',
+      context: [{ kind: 'vkey', name: 'K_COLON', modifiers: ['RALT'] }],
+      output: [{ kind: 'char', value: ';' }],
+    };
+    const touchRule: IRRule = {
+      nodeId: 'r-touch',
+      context: [{ kind: 'vkey', name: 'T_003B', modifiers: [] }],
+      output: [{ kind: 'char', value: ';' }],
+    };
+    const ir = makeIRWithStores([makeGroup([desktopRule, touchRule])], []);
+
+    expect(charProducers(ir, ';')).toEqual([{ steps: ['AltGr + ;'] }]);
+  });
+
+  it('drops a touch-only-trigger producer entirely (not floored, not banned) when it is the ONLY rule for the char', () => {
+    const touchOnlyRule: IRRule = {
+      nodeId: 'r-touch-only',
+      context: [{ kind: 'vkey', name: 'T_0300', modifiers: [] }],
+      output: [{ kind: 'char', value: '̀' }],
+    };
+    const ir = makeIRWithStores([makeGroup([touchOnlyRule])], []);
+
+    expect(charProducers(ir, '̀')).toEqual([]);
+  });
+
+  it('never resolves a touch-only vkey name to a label via vkeyLabel-based helpers (triggerKeyLabel floor)', () => {
+    // A rule whose trigger is touch-only must not leak "T_0300" as a
+    // TOTAL-FLOOR trigger string either — triggerKeyLabel only resolves a
+    // trigger after a real "+" separator, and even then must not name a
+    // touch-only vkey.
+    const ctx: IRRule['context'] = [
+      { kind: 'any', storeRef: 'diablock' },
+      { kind: 'raw', text: '+' },
+      { kind: 'vkey', name: 'T_0300', modifiers: [] },
+    ];
+    expect(triggerKeyLabel(ctx)).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// charProducers <-> collectCharContributors parity (unguarded duplication
+// risk flagged in review).
+//
+// Both functions walk the SAME rules/stores to answer DIFFERENT questions:
+//   - collectCharContributors (engine) = "which rules/slots, if DELETED,
+//     would stop this character being produced?" — capability-agnostic,
+//     used by cascadeDelete.
+//   - charProducers (this file) = "how would a user TYPE this character on a
+//     DESKTOP keyboard?" — a display-only re-walk that additionally excludes
+//     two shapes collectCharContributors correctly keeps as removable:
+//       (i)  a "self-permutation" reorder — an index() output pointing back
+//            at the SAME store it matched as any() input (tryProduceStoreMatch,
+//            ~line 1731-1738 above) — a reorder, not a way to type, but still
+//            a perfectly valid thing to delete.
+//       (ii) a touch-only-triggered rule (isTouchOnlyTriggerRule, ~line
+//            1659) — no desktop keystroke exists for a T_xxxx trigger, but
+//            deleting that rule is still a valid, capability-agnostic removal.
+//   Deleting either kind of rule is safe; SHOWING it as "how to type it"
+//   would be misleading. That's why the divergence is intentional, not
+//   drift — but it must be EXACTLY these two shapes, or a real bug is
+//   silently hiding behind "well, they're allowed to differ sometimes."
+//
+// CharProducer carries no rule/slot id (it's a rendering-only shape), so the
+// display side of the comparison is expressed as a COUNT against the
+// resolved, exception-adjusted removal-id set rather than a literal id
+// diff — the exception predicates below are structural replicas of the two
+// guards named above (not exported from production code, so replicated
+// here at rule granularity, each with a comment pointing at its source).
+// ---------------------------------------------------------------------------
+
+describe('charProducers <-> collectCharContributors parity (no unguarded drift beyond the two documented display-only exclusions)', () => {
+  // Representative fixture: store-output fan-out + a real deadkey trigger,
+  // TWO independent literal producers of the same character (so the
+  // multi-contributor case is exercised, not just 1-vs-1 coincidence), a
+  // touch-only-triggered literal producer, and a self-permutation reorder
+  // rule over its own store.
+  const dkTrigger: IRRule = {
+    nodeId: 'r-dk-trigger',
+    context: [{ kind: 'vkey', name: 'K_GRAVE', modifiers: [] }],
+    output: [{ kind: 'deadkey', id: 1 }],
+  };
+  const fanout: IRRule = {
+    nodeId: 'r-fanout',
+    context: [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'dkf' }],
+    output: [{ kind: 'index', storeRef: 'dkt', offset: 2 }],
+  };
+  const literal1: IRRule = { nodeId: 'r-literal1', context: [{ kind: 'vkey', name: 'K_L', modifiers: [] }], output: [{ kind: 'char', value: 'l' }] };
+  const literal2: IRRule = { nodeId: 'r-literal2', context: [{ kind: 'vkey', name: 'K_M', modifiers: [] }], output: [{ kind: 'char', value: 'l' }] };
+  const touchOnly: IRRule = { nodeId: 'r-touch', context: [{ kind: 'vkey', name: 'T_0057', modifiers: [] }], output: [{ kind: 'char', value: 'w' }] };
+  const selfPerm: IRRule = { nodeId: 'r-selfperm', context: [{ kind: 'any', storeRef: 'perm' }], output: [{ kind: 'index', storeRef: 'perm', offset: 1 }] };
+
+  const parityIR = makeIRWithStores(
+    [makeGroup([dkTrigger, fanout, literal1, literal2, touchOnly, selfPerm])],
+    [
+      makeStore('dkf', 'store#dkf', { items: ['a', 'i', 'u'].map((v) => ({ kind: 'char' as const, value: v })) }),
+      makeStore('dkt', 'store#dkt', { items: ['á', 'í', 'ú'].map((v) => ({ kind: 'char' as const, value: v })) }),
+      makeStore('perm', 'store#perm', { items: ['x', 'y', 'z'].map((v) => ({ kind: 'char' as const, value: v })) }),
+    ],
+  );
+
+  /**
+   * Structural replica of tryProduceStoreMatch's self-permutation guard
+   * (irToCarveNodes.ts, ~line 1731-1738): true when `rule` has an index()
+   * output element pointing back at the SAME store matched by an any() at
+   * that element's own context offset. Not exported from production code
+   * (the guard is inlined per-output-element); replicated at rule
+   * granularity here since the fixture never overlaps two such rules on one
+   * store.
+   */
+  function isSelfPermutationRule(rule: IRRule): boolean {
+    const effCtx = rule.context.filter((el) => !isPlusSeparator(el));
+    return rule.output.some((el) => {
+      if (el.kind !== 'index' || el.storeRef === undefined) return false;
+      const targetEl = effCtx[el.offset - 1];
+      return targetEl !== undefined && targetEl.kind === 'any' && targetEl.storeRef === el.storeRef;
+    });
+  }
+
+  /**
+   * Structural replica of isTouchOnlyTriggerRule (irToCarveNodes.ts, ~line
+   * 1629-1648: ruleTriggerVkey + isTouchOnlyTriggerRule). Not exported (the
+   * shape-check helper is internal); rebuilt here from the exported
+   * `isTouchOnlyVkeyName` primitive.
+   */
+  function isTouchOnlyRuleLocal(rule: IRRule): boolean {
+    const ctx = rule.context;
+    const plusIdx = ctx.findIndex(isPlusSeparator);
+    const triggerEl = plusIdx === -1 ? (ctx.length === 1 ? ctx[0] : undefined) : ctx[plusIdx + 1];
+    return triggerEl !== undefined && triggerEl.kind === 'vkey' && isTouchOnlyVkeyName(triggerEl.name);
+  }
+
+  /** Resolve the rule that "owns" a collectCharContributors id (a bare rule nodeId, or a store-slot id whose store is targeted by exactly one rule's index()/outs() output in this fixture). */
+  function owningRule(id: string, ir: KeyboardIR): IRRule | undefined {
+    const rulesByNodeId = new Map(ir.groups.flatMap((g) => g.rules).map((r) => [r.nodeId, r]));
+    const direct = rulesByNodeId.get(id);
+    if (direct !== undefined) return direct;
+    const parsed = parseSlotId(id);
+    if (parsed === null) return undefined;
+    const store = ir.stores.find((s) => s.nodeId === parsed.storeNodeId);
+    if (store === undefined) return undefined;
+    return ir.groups.flatMap((g) => g.rules).find((r) => r.output.some((el) => (el.kind === 'index' || el.kind === 'outs') && el.storeRef === store.name));
+  }
+
+  it('for every character the fixture produces: (1) charProducers never claims more producers than collectCharContributors knows about, and (2) every removal contributor collectCharContributors finds but charProducers omits is explained by exactly the self-permutation guard or the touch-only-trigger exclusion', () => {
+    const produced = buildProducedSet(parityIR);
+    expect(produced.size).toBeGreaterThan(0); // sanity: the fixture is not accidentally empty
+
+    for (const ch of produced) {
+      const removalIds = new Set([
+        ...collectCharContributors(parityIR, ch).ruleNodeIds,
+        ...collectCharContributors(parityIR, ch).storeSlotIds,
+      ]);
+      const exceptionIds = new Set(
+        [...removalIds].filter((id) => {
+          const rule = owningRule(id, parityIR);
+          return rule !== undefined && (isSelfPermutationRule(rule) || isTouchOnlyRuleLocal(rule));
+        }),
+      );
+      const nonExceptionCount = removalIds.size - exceptionIds.size;
+      const displayCount = charProducers(parityIR, ch).length;
+
+      // Invariant 1 — no phantom display-only producer: charProducers must
+      // never surface more entries than removal knows about in total.
+      expect(displayCount, `char ${ch}: charProducers must not exceed collectCharContributors' known contributor count`).toBeLessThanOrEqual(removalIds.size);
+      // Invariant 2 — every non-excepted removal contributor IS shown, and
+      // nothing else is: the two documented exclusions fully explain the gap.
+      expect(displayCount, `char ${ch}: unexplained divergence beyond the self-permutation guard / touch-only exclusion`).toBe(nonExceptionCount);
+    }
+
+    // Confirm the fixture actually exercises both exceptions (a vacuous
+    // exceptionIds set would let invariant 2 pass without testing anything).
+    const wRemovalIds = [...collectCharContributors(parityIR, 'w').ruleNodeIds];
+    const permRemovalIds = [...collectCharContributors(parityIR, 'x').storeSlotIds];
+    expect(wRemovalIds.some((id) => isTouchOnlyRuleLocal(owningRule(id, parityIR)!))).toBe(true);
+    expect(permRemovalIds.some((id) => isSelfPermutationRule(owningRule(id, parityIR)!))).toBe(true);
   });
 });

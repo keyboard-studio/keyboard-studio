@@ -9,12 +9,15 @@
 //   - Missing required slot, unknown patternId, touch modality, deduplication
 //   - P2: empty kmnFragment, idempotency at group/rule level
 
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
+import { resolve, dirname } from "node:path";
+import { fileURLToPath } from "node:url";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
 import { latinDeadkeyAcuteSingle } from "@keyboard-studio/contracts/fixtures";
 import type { Pattern } from "@keyboard-studio/contracts";
 import { makePattern } from "@keyboard-studio/contracts";
 import { parse as parseKmn, emit as emitKmn } from "../codec/index.js";
+import { loadPatterns, getById } from "../pattern-library/index.js";
 import {
   applyAssignments,
   resolveRenderableMechanisms,
@@ -633,5 +636,282 @@ describe("applyAssignments — shift-rule injection round-trip", () => {
       .map((r) => (r.context[0]?.kind === "vkey" ? [...r.context[0].modifiers].sort() : []));
     expect(modifierSets).toContainEqual(["NCAPS", "SHIFT"]);
     expect(modifierSets).toContainEqual(["CAPS", "SHIFT"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// multi_char_sequence (S-03) — real production pattern, loaded from
+// content/patterns/desktop-input/multi-char-sequence.yaml (NOT the
+// differently-slotted latin_multi_char_sequence.yaml). The Sequence Gallery
+// (studio) records MechanismAssignments against this exact patternId and
+// relies on applyAssignments to emit the postfix collapse rule
+// `'<content>' + '<indicator>' > '<output>'`. Regression coverage for a gap a
+// verification pass found: previously proven only by a throwaway manual probe.
+// ---------------------------------------------------------------------------
+
+const REAL_CONTENT_DIR = resolve(
+  dirname(fileURLToPath(import.meta.url)),
+  "../../../../content/patterns",
+);
+
+describe("applyAssignments — multi_char_sequence (S-03) real production pattern", () => {
+  beforeAll(async () => {
+    await loadPatterns(REAL_CONTENT_DIR);
+  });
+
+  const BASE_KMN_SEQUENCE =
+    "store(&VERSION) '10.0'\n" +
+    "store(&NAME) 'Test'\n" +
+    "store(&TARGETS) 'any'\n" +
+    "begin Unicode > use(main)\n" +
+    "\n" +
+    "group(main) using keys\n" +
+    "\n" +
+    "+ [K_N] > 'n'\n" +
+    "+ [K_G] > 'g'\n" +
+    "+ [K_Y] > 'y'\n";
+
+  function makeSequenceAssignment(
+    target: string,
+    slotValues: { firstLetterOut: string; secondLetter: string; collapsedChar: string },
+  ): MechanismAssignment {
+    return {
+      scope: "individual",
+      target,
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: "multi_char_sequence",
+          strategyId: "S-03",
+          slotValues,
+        },
+      ],
+      source: "user",
+    };
+  }
+
+  it("resolves the real multi_char_sequence pattern (not the latin_multi_char_sequence variant)", () => {
+    const pattern = getById("multi_char_sequence");
+    expect(pattern).toBeDefined();
+    expect(pattern?.kmnFragment).toContain(
+      "'{{firstLetterOut}}' + '{{secondLetter}}' > '{{collapsedChar}}'",
+    );
+  });
+
+  it("emits the postfix collapse rule 'n' + 'y' > 'ɲ' with no warnings", () => {
+    const pattern = getById("multi_char_sequence")!;
+    const assignment = makeSequenceAssignment("ɲ", {
+      firstLetterOut: "n",
+      secondLetter: "y",
+      collapsedChar: "ɲ",
+    });
+
+    const { kmn, warnings } = applyAssignments(
+      [assignment],
+      (id) => (id === pattern.id ? pattern : undefined),
+      BASE_KMN_SEQUENCE,
+    );
+
+    expect(warnings).toEqual([]);
+    expect(kmn).toContain("'n' + 'y' > 'ɲ'");
+  });
+
+  it("emits a second, distinct postfix collapse rule 'n' + 'g' > 'ŋ' (the ng digraph case)", () => {
+    const pattern = getById("multi_char_sequence")!;
+    const assignment = makeSequenceAssignment("ŋ", {
+      firstLetterOut: "n",
+      secondLetter: "g",
+      collapsedChar: "ŋ",
+    });
+
+    const { kmn, warnings } = applyAssignments(
+      [assignment],
+      (id) => (id === pattern.id ? pattern : undefined),
+      BASE_KMN_SEQUENCE,
+    );
+
+    expect(warnings).toEqual([]);
+    expect(kmn).toContain("'n' + 'g' > 'ŋ'");
+  });
+
+  it("emits both rules into group(main) exactly once each when both assignments are applied together", () => {
+    const pattern = getById("multi_char_sequence")!;
+    const nyAssignment = makeSequenceAssignment("ɲ", {
+      firstLetterOut: "n",
+      secondLetter: "y",
+      collapsedChar: "ɲ",
+    });
+    const ngAssignment = makeSequenceAssignment("ŋ", {
+      firstLetterOut: "n",
+      secondLetter: "g",
+      collapsedChar: "ŋ",
+    });
+
+    const { kmn, warnings } = applyAssignments(
+      [nyAssignment, ngAssignment],
+      (id) => (id === pattern.id ? pattern : undefined),
+      BASE_KMN_SEQUENCE,
+    );
+
+    expect(warnings).toEqual([]);
+    expect(kmn.match(/'n' \+ 'y' > 'ɲ'/g) ?? []).toHaveLength(1);
+    expect(kmn.match(/'n' \+ 'g' > 'ŋ'/g) ?? []).toHaveLength(1);
+
+    // Emitted inside group(main), not appended as a bogus new group. Anchored
+    // to line-start so it doesn't also match the pattern's own explanatory
+    // comment ("c Assumes a `group(main) using keys` host group...") that
+    // gets carried along with the injected fragment body.
+    const matches = kmn.match(/^group\(main\) using keys/gm) ?? [];
+    expect(matches).toHaveLength(1);
+  });
+
+  it("round-trips through parse -> emit with both context-match sides intact", () => {
+    const pattern = getById("multi_char_sequence")!;
+    const assignment = makeSequenceAssignment("ɲ", {
+      firstLetterOut: "n",
+      secondLetter: "y",
+      collapsedChar: "ɲ",
+    });
+
+    const { kmn } = applyAssignments(
+      [assignment],
+      (id) => (id === pattern.id ? pattern : undefined),
+      BASE_KMN_SEQUENCE,
+    );
+
+    const { ir } = parseKmn(kmn, "sequence-roundtrip-test");
+    const mainGroup = ir.groups.find((g) => g.name === "main");
+    expect(mainGroup).toBeDefined();
+
+    // The codec represents the context-side `'n' + 'y'` as three context
+    // items: the two char literals plus an explicit `raw "+"` concatenation
+    // node between them (the `+` operator is not collapsed away).
+    const collapseRule = mainGroup?.rules.find(
+      (r) =>
+        r.context.length === 3 &&
+        r.context[0]?.kind === "char" &&
+        r.context[0].value === "n" &&
+        r.context[2]?.kind === "char" &&
+        r.context[2].value === "y",
+    );
+    expect(collapseRule).toBeDefined();
+    expect(collapseRule?.output).toEqual([{ kind: "char", value: "ɲ" }]);
+
+    // emit.ts normalizes quoted-char literals to U+XXXX codepoint notation
+    // (n=U+006E, y=U+0079, ɲ=U+0272) — mirrors the SHIFT-rule round-trip test
+    // above, which asserts the same U+ form rather than the quoted original.
+    const reemitted = emitKmn(ir);
+    expect(reemitted).toContain("U+006E + U+0079 > U+0272");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// deadkey_single_tap (S-02) merge-by-triggerKey — real production pattern,
+// loaded from content/patterns/desktop-input/deadkey-single-tap.yaml. Spec 051
+// introduces a NEW caller of this old merge path: the S-02 case-pair
+// companion produces a second deadkey_single_tap ref sharing the source's
+// triggerKey (and deadkeyName) but targeting a DIFFERENT character (the
+// uppercase counterpart). If the merge in applyAssignments (grouping
+// deadkeyRefs by triggerKey before store/emit) ever stopped firing, both refs
+// would independently emit their own store(dk_acute_bases)/store(dk_acute_output)
+// pair and their own "+ [K_QUOTE] > dk(acute)" trigger line — duplicate store
+// identifiers and a duplicate context-match line, a Layer-A Check #10 class
+// conflict / compile error. Regression coverage for a gap a review pass found:
+// the merge was previously exercised only via hand-authored double-tap
+// mechanisms sharing one target character, never via two DIFFERENT target
+// characters sharing one triggerKey (the shape S-02's companion introduces).
+// ---------------------------------------------------------------------------
+
+describe("applyAssignments — deadkey_single_tap (S-02) merge by triggerKey across different targets", () => {
+  beforeAll(async () => {
+    await loadPatterns(REAL_CONTENT_DIR);
+  });
+
+  const BASE_KMN_DEADKEY =
+    "store(&VERSION) '10.0'\n" +
+    "store(&NAME) 'Test'\n" +
+    "store(&TARGETS) 'any'\n" +
+    "begin Unicode > use(main)\n" +
+    "\n" +
+    "group(main) using keys\n";
+
+  function makeDeadkeyAssignment(
+    target: string,
+    slotValues: {
+      triggerKey: string;
+      deadkeyName: string;
+      baseLetters: string;
+      accentedForms: string;
+      accentChar: string;
+    },
+  ): MechanismAssignment {
+    return {
+      scope: "individual",
+      target,
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: "deadkey_single_tap",
+          strategyId: "S-02",
+          slotValues,
+        },
+      ],
+      source: "user",
+    };
+  }
+
+  it("resolves the real deadkey_single_tap pattern with the deadkeyName-parameterized store fragment", () => {
+    const pattern = getById("deadkey_single_tap");
+    expect(pattern).toBeDefined();
+    expect(pattern?.kmnFragment).toContain(
+      "store(dk_{{deadkeyName}}_bases)",
+    );
+    expect(pattern?.kmnFragment).toContain(
+      "dk({{deadkeyName}}) + [{{triggerKey}}] > '{{accentChar}}'",
+    );
+  });
+
+  it("collapses a source ref (á) and a same-triggerKey companion ref (Á) into exactly one store pair and one dk trigger line, with both base letters and both accented forms present", () => {
+    const pattern = getById("deadkey_single_tap")!;
+    const sourceRef = makeDeadkeyAssignment("á", {
+      triggerKey: "K_QUOTE",
+      deadkeyName: "acute",
+      baseLetters: "a",
+      accentedForms: "á",
+      accentChar: "́",
+    });
+    const companionRef = makeDeadkeyAssignment("Á", {
+      triggerKey: "K_QUOTE",
+      deadkeyName: "acute",
+      baseLetters: "A",
+      accentedForms: "Á",
+      accentChar: "́",
+    });
+
+    const { kmn, warnings } = applyAssignments(
+      [sourceRef, companionRef],
+      (id) => (id === pattern.id ? pattern : undefined),
+      BASE_KMN_DEADKEY,
+    );
+
+    expect(warnings).toEqual([]);
+
+    // Exactly one store(dk_acute_bases) / store(dk_acute_output) pair —
+    // never one per ref.
+    expect(kmn.match(/store\(dk_acute_bases\)/g) ?? []).toHaveLength(1);
+    expect(kmn.match(/store\(dk_acute_output\)/g) ?? []).toHaveLength(1);
+
+    // Both base letters and both accented forms landed in the single merged
+    // pair, in ref order (source then companion).
+    expect(kmn).toContain("store(dk_acute_bases)  'aA'");
+    expect(kmn).toContain("store(dk_acute_output) 'áÁ'");
+
+    // Exactly one dk(acute) index rule and one dk(acute) trigger line — a
+    // second copy of either is the duplicate-store/duplicate-context-match
+    // regression this test pins.
+    expect(
+      kmn.match(/dk\(acute\) \+ any\(dk_acute_bases\) > index\(dk_acute_output, 2\)/g) ?? [],
+    ).toHaveLength(1);
+    expect(kmn.match(/\+ \[K_QUOTE\] > dk\(acute\)/g) ?? []).toHaveLength(1);
   });
 });

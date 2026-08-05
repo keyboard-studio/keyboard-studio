@@ -40,3 +40,53 @@ export const ALL_PICKABLE_KEYS: ReadonlySet<string> = new Set(
 
 // Use-case-named alias for TouchGallery host-key validation (identical set).
 export const VALID_HOST_KEYS: ReadonlySet<string> = ALL_PICKABLE_KEYS;
+
+// ---------------------------------------------------------------------------
+// "Enter my own character..." custom option — appended to every key-picker
+// dropdown in MechanismGallery and TouchGallery (see KeyPickerField.tsx). The
+// sentinel value is never a real vkey id, so it can never collide with
+// ALL_PICKABLE_KEYS / VALID_HOST_KEYS membership checks.
+// ---------------------------------------------------------------------------
+
+export const CUSTOM_KEY_OPTION_VALUE = "__custom__";
+
+export const CUSTOM_KEY_OPTION: { value: string; label: string } = {
+  value: CUSTOM_KEY_OPTION_VALUE,
+  label: "Enter my own character…",
+};
+
+// ---------------------------------------------------------------------------
+// CHAR_TO_VKEY — derived from KEY_OPTIONS labels, not re-typed by hand.
+//
+// Every non-empty KEY_OPTIONS label carries its character in trailing
+// parens, e.g. "K_A (A)" or "K_BKSLASH (\)". Letters map case-insensitively
+// (both "a" and "A" resolve to K_A); digits and punctuation map their single
+// literal character. Used by the custom-character key pickers to resolve a
+// typed/parsed character to a physical key.
+// ---------------------------------------------------------------------------
+
+const LABEL_CHAR_PATTERN = /\((.+)\)$/;
+
+function buildCharToVkey(): ReadonlyMap<string, string> {
+  const map = new Map<string, string>();
+  for (const option of KEY_OPTIONS) {
+    if (option.value === "") continue;
+    const match = LABEL_CHAR_PATTERN.exec(option.label);
+    if (match === null) continue;
+    const char = match[1]!;
+    if (/^[A-Za-z]$/.test(char)) {
+      map.set(char.toLowerCase(), option.value);
+      map.set(char.toUpperCase(), option.value);
+    } else {
+      map.set(char, option.value);
+    }
+  }
+  return map;
+}
+
+export const CHAR_TO_VKEY: ReadonlyMap<string, string> = buildCharToVkey();
+
+/** Resolve a single character to its physical key id, or null if unmappable. */
+export function charToVkey(char: string): string | null {
+  return CHAR_TO_VKEY.get(char) ?? null;
+}

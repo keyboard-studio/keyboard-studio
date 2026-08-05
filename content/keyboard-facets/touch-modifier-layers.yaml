@@ -1,0 +1,29 @@
+# touch-modifier-layers — corpus counterpart of the session facet
+# source.touch-modifier-layers: whether a corpus keyboard's
+# .keyman-touch-layout exposes desktop modifier combinations (ALT, RALT,
+# CTRL) as their own touch layers.
+#
+# derivation.archetype note: as with touch-combo-mechanism, "rule-structure"
+# is the closest ARCHETYPES fit for a touch-layout scan.
+
+id: touch-modifier-layers
+title: Touch modifier-layer exposure
+description: >
+  Whether a corpus keyboard's .keyman-touch-layout exposes desktop
+  modifier combinations (ALT, RALT, CTRL) as their own touch layers, has
+  none, or mixes both across the layer set. Read from the touch-layout
+  JSON's layer ids directly, independent of the desktop .kmn source. Feeds
+  the source.touch-modifier-layers session facet.
+valueType: enum
+limits:
+  values: [none, maps-desktop-modifiers, mixed]
+  open: false
+likelihoodSemantics: >
+  the single classified value for the keyboard's touch layout; likelihood
+  is 1 for the classified value.
+derivation:
+  archetype: rule-structure
+  classifierId: touch-modifier-layers-classifier
+  fallbackChain: [content-derived, undetermined]
+feedsSessionFacets: [source.touch-modifier-layers]
+schemaVersion: 1

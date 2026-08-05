@@ -23,6 +23,12 @@ import type { FlowStepOptions, FlowStepDeps } from "./makeFlowStepComponent.tsx"
 // Context: { base_name: localBase.displayName }
 // Guard: localBase must be non-null (adapter rendered null if null; factory
 //   will produce a null return to match).
+// Seeds: track_choice from the session's currently-recorded selectedTrack, so
+//   arriving at this step by deep link or by walking Back shows the recorded
+//   answer instead of an empty radio group (spec 057 FR-031). `undefined`
+//   before any choice has ever been recorded — SurveyRunner's "seed once, then
+//   the user owns it" contract leaves the field genuinely unset in that case,
+//   same as project_name below.
 // Extract: track_choice answer → "copy" | "adapt" only; else undefined (stay).
 // onCommit: setSelectedTrack(track); if track!=="copy" also setScaffoldSpec(null).
 // Payload: { track }.
@@ -37,6 +43,13 @@ export const trackOptions: FlowStepOptions<TrackPayload> = {
   buildContext(deps: FlowStepDeps) {
     // Match TrackStepAdapter: base_name from localBase.displayName.
     return { base_name: deps.localBase?.displayName ?? "" };
+  },
+
+  seeds: {
+    getSeedValue(questionId: string, deps: FlowStepDeps): string | string[] | undefined {
+      if (questionId !== "track_choice") return undefined;
+      return deps.selectedTrack ?? undefined;
+    },
   },
 
   extract(result: SurveyPhaseResult): TrackPayload | undefined {
@@ -90,18 +103,35 @@ export const projectNameOptions: FlowStepOptions<ProjectNamePayload> = {
         deps.identityResult !== null
           ? deps.identityResult.autonym || deps.identityResult.english
           : "";
+      // FR-031 (spec 057): `scaffoldSpec` is the durable record this step's OWN
+      // onCommit writes (deps.setScaffoldSpec below) — the same role
+      // `selectedTrack` plays for the track step. Once it is non-null the
+      // author has committed a name/id at least once, so a fresh arrival at
+      // this step (deep link, or Back after an earlier visit unmounted it)
+      // must show THAT, not re-propose the identity-derived default it
+      // started from. `null` (never committed yet) falls through to the
+      // original default-proposal behavior unchanged.
+      const recordedDisplayName = deps.scaffoldSpec?.displayName;
 
       if (questionId === "project_display_name") {
-        // Seed from defaultDisplayName on first arrival; also re-seed on Back→forward.
+        const seed = recordedDisplayName ?? defaultDisplayName;
+        // Seed from `seed` on first arrival; also re-seed on Back→forward.
         // Initialize the per-mount ref on first seed so re-derivation has a starting value.
         // deps.displayNameRef is allocated by useRef() inside the factory component —
         // always "" on a fresh mount, so re-entry never retains a prior session's value.
         if (deps.displayNameRef.current === "") {
-          deps.displayNameRef.current = defaultDisplayName;
+          deps.displayNameRef.current = seed;
         }
-        return defaultDisplayName !== "" ? defaultDisplayName : undefined;
+        return seed !== "" ? seed : undefined;
       }
       if (questionId === "project_keyboard_id") {
+        // A previously-recorded id wins outright — the author may have hand-
+        // edited it away from the auto-slug of the display name, and FR-031
+        // must show what they actually recorded, not re-derive a slug that
+        // happens to look plausible.
+        if (deps.scaffoldSpec?.keyboardId !== undefined && deps.scaffoldSpec.keyboardId !== "") {
+          return deps.scaffoldSpec.keyboardId;
+        }
         // Derive slug from the committed display name (via the per-mount ref).
         const name = deps.displayNameRef.current !== "" ? deps.displayNameRef.current : defaultDisplayName;
         const slug = slugifyKeyboardId(name);
@@ -149,7 +179,26 @@ export const projectNameOptions: FlowStepOptions<ProjectNamePayload> = {
   onCommit(extracted: ProjectNamePayload, deps: FlowStepDeps): void {
     // R7 ordering: setScaffoldSpec BEFORE setIdentity BEFORE onComplete → advance.
     deps.setScaffoldSpec({ keyboardId: extracted.keyboardId, displayName: extracted.displayName });
-    deps.setIdentity({ keyboardId: extracted.keyboardId, displayName: extracted.displayName });
+    // spec 057 FR-001/FR-002: carry the identity-lite answers into the working
+    // copy so the package descriptor can declare the AUTHOR's language. Before
+    // this, Track 1 set only keyboardId and displayName — the composed tag lived
+    // in surveySessionStore.identityResult and never crossed over, so the
+    // descriptor had no author tag to write even in principle.
+    //
+    // `bcp47` is consumed WHOLE (research D-03). The identity-lite series already
+    // composed language + region + script into one tag; re-deriving it here would
+    // be a second composition rule that could disagree with the first. An empty
+    // string (author left the language code blank) is omitted rather than written,
+    // so the descriptor writer applies its own `und` placeholder instead of
+    // declaring a blank tag.
+    const bcp47 = deps.identityResult?.bcp47.trim() ?? "";
+    const languageName = deps.identityResult?.english.trim() ?? "";
+    deps.setIdentity({
+      keyboardId: extracted.keyboardId,
+      displayName: extracted.displayName,
+      ...(bcp47 !== "" ? { bcp47 } : {}),
+      ...(languageName !== "" ? { languageName } : {}),
+    });
   },
 };
 

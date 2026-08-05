@@ -22,10 +22,21 @@ import { parse } from "../codec/parse.js";
 import { emit } from "../codec/emit.js";
 import { detectBaseLayoutFamily } from "../placement/filters.js";
 import { scaffoldIR, sanitizeDisplayName, kmnStringEscape } from "./scaffold-ir.js";
+import { assetFileExtensions } from "../shared/siblingAssetStores.js";
+import { escapeHtml } from "../shared/escapeHtml.js";
+import {
+  buildKpsContent,
+  type PackageDescriptorIdentity,
+} from "../package-descriptor/index.js";
 
 export { scaffoldIR, resetIdentity } from "./scaffold-ir.js";
 export type { ScaffoldIROptions, ScaffoldIRIdentity } from "./scaffold-ir.js";
-export { scaffoldTouchLayout, buildMinimalPhoneTouchLayout } from "./scaffoldTouchLayout.js";
+export {
+  scaffoldTouchLayout,
+  scaffoldTouchLayoutWithDiagnostics,
+  buildMinimalPhoneTouchLayout,
+} from "./scaffoldTouchLayout.js";
+export type { ScaffoldTouchLayoutResult } from "./scaffoldTouchLayout.js";
 
 export interface ScaffolderServiceOptions {
   proxyBase?: string;
@@ -35,15 +46,6 @@ export interface ScaffolderServiceOptions {
 // Defuse PHP block-comment terminator '*/' for stub generation.
 function phpCommentEscape(s: string): string {
   return s.replace(/\*\//g, "* /");
-}
-
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#39;");
 }
 
 /**
@@ -80,6 +82,12 @@ function escapeForRegex(s: string): string {
   return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }
 
+// Build a word-boundary-anchored matcher for a literal id token, so a base id
+// that is a prefix of another token (e.g. `base_id_extra`) is not over-rewritten.
+function buildIdTokenRegex(baseId: string): RegExp {
+  return new RegExp(`(?<![\\w])${escapeForRegex(baseId)}(?![\\w])`, "g");
+}
+
 /**
  * Rewrite file-path references in .kps XML text.
  * Mirrors kmc-copy's copyKpsSourceFile (../keyman/developer/src/kmc-copy/src/KeymanProjectCopier.ts):
@@ -90,7 +98,7 @@ function escapeForRegex(s: string): string {
  */
 function rewriteKpsFilePaths(xml: string, baseId: string, keyboardId: string): string {
   const escaped = escapeForRegex(baseId);
-  const tokenRe = new RegExp(`(?<![\\w])${escaped}(?![\\w])`, "g");
+  const tokenRe = buildIdTokenRegex(baseId);
   let out = xml.replace(
     /(<Name\b[^>]*>)([^<]*)(<\/Name>)/gi,
     (m, open: string, value: string, close: string) => {
@@ -120,6 +128,26 @@ function rewriteKvksKbdname(xml: string, baseId: string, keyboardId: string): st
   );
 }
 
+/**
+ * Rewrite a Keyman project file (.kpj) so its per-file <Filename>/<Filepath>
+ * references to the id-basename source files (e.g. `<baseId>.kmn`,
+ * `source\<baseId>.kps`) point at the new id after a rename. Only the base-id
+ * *token* inside <Filename>/<Filepath> element text is rewritten (word-boundary
+ * anchored), so file GUIDs (<ID>id_…</ID>), display <Name>s, and files that do
+ * not use the id as their basename (HISTORY.md, LICENSE.md, README.md) are left
+ * untouched. The compiler flags the loader/compiler actually read
+ * (parseKpjFlags) are content-independent of this; the rewrite exists so the
+ * emitted project stays coherent when opened in Keyman Developer.
+ */
+function rewriteKpjFilePaths(xml: string, baseId: string, keyboardId: string): string {
+  const tokenRe = buildIdTokenRegex(baseId);
+  return xml.replace(
+    /(<(Filename|Filepath)\b[^>]*>)([^<]*)(<\/\2>)/gi,
+    (_m, open: string, _tag: string, value: string, close: string) =>
+      `${open}${value.replace(tokenRe, keyboardId)}${close}`
+  );
+}
+
 /** @internal Exported for unit testing only. */
 export function renameFilesInVfs(vfs: VirtualFS, baseId: string, keyboardId: string): void {
   // Sibling-file extensions that conventionally use the keyboard id as
@@ -128,17 +156,11 @@ export function renameFilesInVfs(vfs: VirtualFS, baseId: string, keyboardId: str
   // in subdirectories (e.g. source/welcome/welcome.htm) are not touched.
   // `.css`, `.htm`, and `.js` mirror the path-bearing system stores
   // (&KMW_EMBEDCSS, &KMW_HELPFILE, &KMW_EMBEDJS) so the renamed file path
-  // matches the rewritten store reference.
-  const extensions = [
-    ".kmn",
-    ".kps",
-    ".kvks",
-    ".keyman-touch-layout",
-    ".ico",
-    ".css",
-    ".htm",
-    ".js",
-  ];
+  // matches the rewritten store reference. The asset-store extensions
+  // (`.kvks`, `.keyman-touch-layout`, `.ico`, `.css`, `.htm`, `.js`) come from
+  // the canonical siblingAssetStores table; `.kmn`/`.kps` are the keyboard's
+  // own source/project files, not asset-store entries, and stay separate.
+  const extensions = [".kmn", ".kps", ...assetFileExtensions()];
   for (const ext of extensions) {
     const oldPath = `source/${baseId}${ext}`;
     const entry = vfs.get(oldPath);
@@ -162,6 +184,23 @@ export function renameFilesInVfs(vfs: VirtualFS, baseId: string, keyboardId: str
   if (helpEntry !== undefined) {
     vfs.delete(oldHelp);
     vfs.set(`source/help/${keyboardId}.php`, helpEntry.content, helpEntry.isBinary);
+  }
+
+  // The .kpj project file lives at the VFS ROOT (`<baseId>.kpj`), not under
+  // source/, so the extension loop above never sees it. compile() looks it up
+  // as `<keyboardId>.kpj`; without this rename the file keeps the old id,
+  // compile() misses it, and the base keyboard's compiler flags are silently
+  // dropped (falls back to defaults). Rename it and rewrite its internal
+  // <Filename>/<Filepath> references so the emitted project stays coherent.
+  const oldKpj = `${baseId}.kpj`;
+  const kpjEntry = vfs.get(oldKpj);
+  if (kpjEntry !== undefined) {
+    vfs.delete(oldKpj);
+    let content = kpjEntry.content;
+    if (!kpjEntry.isBinary && typeof content === "string") {
+      content = rewriteKpjFilePaths(content, baseId, keyboardId);
+    }
+    vfs.set(`${keyboardId}.kpj`, content, kpjEntry.isBinary);
   }
 
   // Rewrite `.kmw-keyboard-<baseId>` selectors in every *.css entry.
@@ -238,36 +277,28 @@ function applyTouchLayoutCleanup(vfs: VirtualFS, keyboardId: string): void {
   vfs.set(path, JSON.stringify(data, null, 2));
 }
 
-// &TARGETS tokens for which kmcmplib emits a KeymanWeb `.js` artifact. Desktop-only
-// tokens (windows/macosx/linux/desktop) produce no `.js`, so referencing one in the
-// package `<Files>` would make kmc fail with KM04003 (file not found); conversely a
-// web/touch target with no `.js` in the package warns KM0401A (fatal under
-// CompilerWarningsAsErrors). The list must therefore mirror what the build emits.
-// Derived from the emitted `.kmn`'s `&TARGETS` store (what kmc actually reads), not
-// from `BaseKeyboard.targets` — the two can diverge during scaffolding/import.
-const KMW_JS_TARGETS = new Set([
-  "any",
-  "web",
-  "mobile",
-  "tablet",
-  "iphone",
-  "ipad",
-  "androidphone",
-  "androidtablet",
-]);
+// The scaffolder no longer owns a private `.kps` builder. `buildKpsContent`,
+// the `&TARGETS`->`.js` target table it reads, and the `<Languages>` shape all
+// live in `package-descriptor/` now (spec 057 FR-005) so the output projection
+// can re-derive the descriptor from the AUTHOR's identity on both authoring
+// tracks. Behaviour here is unchanged: still generated last, still only when the
+// path is absent.
 
 /**
- * Build a package (`.kps`) that Keyman Developer can compile to a `.kmp`.
+ * Fill in every scaffold stub file that is MISSING from `vfs` — `.kmn`,
+ * `.kvks`, touch layout, icon, welcome/readme, help, LICENSE, HISTORY,
+ * README, tests, and (last, because it reads the final `.kmn`) the `.kps`
+ * package. Existing entries are never overwritten, so calling this on an
+ * already-populated VFS only completes the keyboard directory.
  *
- * The empty `<Package><Info/><Files/></Package>` stub fails `kmc` with KM04021
- * (blank package version) and KM09010 (missing Description). This emits the
- * minimum buildable shape: `<FollowKeyboardVersion/>` (so the package inherits
- * the keyboard version), a non-empty Description, at least one language, and a
- * `<Files>` list derived from what the build actually produces — `.kmx` always,
- * `.js` only for web/touch targets, `.kvk` only when a visual keyboard exists.
- * `languages` are the base keyboard's BCP47 tags; `und` stands in when unknown.
- * `version` propagates from the base keyboard into `<Keyboards><Keyboard><Version>`
- * so Track 2 import does not silently downgrade a 2.0 keyboard to 1.0.
+ * Exported for the output path: the working copy of a Track 1 (new-from-base)
+ * project is instantiated from `fetchKeyboardSourceToVfs`, which deliberately
+ * never writes the base's `.kps` into the VFS (it references compiled
+ * `../build/*` artifacts). Whether the scaffolded VFS (which does carry a
+ * generated `.kps`) ever replaces it in the working-copy store is a race the
+ * commit seam intentionally does not re-run (StudioShell's
+ * `instantiatedForBaseIdRef`), so serialization completes the directory here
+ * instead — a downloaded keyboard must be submittable as-is (spec §12).
  */
 /**
  * Collapse a multi-holder block onto ONE line for `store(&COPYRIGHT)` and the
@@ -315,6 +346,65 @@ function singleLineNotice(
 }
 
 /**
+ * Resolve the copyright holders a derived keyboard INHERITS from its base
+ * (spec 059 US2), plus the D5 refusal when the base's notice cannot be read.
+ *
+ * D4 precedence: `LICENSE.md` is authoritative. It is the notice MIT's own text
+ * refers to ("the above copyright notice"), and it is the better-formed source —
+ * 918 of 920 shipped license lines carry a year, against 366 of 922 `.kmn`
+ * COPYRIGHT values. The two are NEVER merged into separate holders: the 22
+ * observed disagreements are the in-progress SIL International -> SIL Global
+ * rename applied to one file and not the other, and treating that as two rights
+ * holders would fabricate one out of drift.
+ *
+ * EXPORTED because there are two emission paths and they must not each carry
+ * their own copy of this policy. `scaffold()` calls it at instantiation; the
+ * studio's download serializer calls it again when it completes missing stub
+ * files, since the base's `LICENSE.md` is deliberately never written into the
+ * working-copy VFS (fetchKeyboardSourceToVfs FR-011) and so cannot be read back
+ * out of it. Two independently-built notices is exactly the drift FR-005 exists
+ * to prevent.
+ */
+export function resolveInheritedHolders(
+  baseLicenseText: string | undefined,
+  baseHolderOverride?: string,
+): {
+  inherited: readonly import("@keyboard-studio/contracts").CopyrightHolder[];
+  licenseUnparseable: { reason: string; line: string } | null;
+} {
+  const holderOverride = baseHolderOverride?.trim() ?? "";
+  if (holderOverride !== "") {
+    // D5 escape hatch: the author told us who held the copyright, so the notice
+    // is retained rather than dropped. No year — that is precisely what the
+    // unreadable line failed to establish, and inventing one would put a
+    // fabricated fact into a legal notice.
+    return {
+      inherited: [{ name: holderOverride, years: [], marker: DEFAULT_MARKER, inherited: true }],
+      licenseUnparseable: null,
+    };
+  }
+
+  if (baseLicenseText === undefined) {
+    return { inherited: [], licenseUnparseable: null };
+  }
+
+  const parsed = parseCopyright(baseLicenseText);
+  if (parsed.ok) {
+    return { inherited: parsed.block, licenseUnparseable: null };
+  }
+  if (parsed.reason === "no_copyright_line") {
+    // A license file with no notice at all states no holder to retain. Nothing
+    // to inherit, and nothing was destroyed.
+    return { inherited: [], licenseUnparseable: null };
+  }
+  // D5: the file HAS a notice we cannot read (an unfilled template, or a year
+  // with no holder). Refuse rather than silently drop it — emitting a LICENSE.md
+  // whose only holder is the current user would strip a real notice, which is
+  // the defect FR-010 exists to prevent.
+  return { inherited: [], licenseUnparseable: { reason: parsed.reason, line: parsed.line } };
+}
+
+/**
  * The single source of truth for this keyboard's attribution (spec 059 FR-003).
  *
  * LICENSE.md, store(&COPYRIGHT) and .kps <Copyright> all read from HERE, so they
@@ -356,73 +446,33 @@ function attributionText(
   return { line: singleLineNotice(block), license: renderLicense(block), holderCount: block.length };
 }
 
-function buildKpsContent(
-  keyboardId: string,
-  displayName: string,
-  kmnText: string,
-  languages: string[],
-  version = "1.0",
-  attribution?: Attribution,
-  copyrightLine?: string | null,
-): string {
-  const targetsMatch = /store\s*\(\s*&TARGETS\s*\)\s*'([^']*)'/i.exec(kmnText);
-  const targetTokens = (targetsMatch?.[1] ?? "").toLowerCase().split(/[\s,]+/).filter(Boolean);
-  const emitsJs = targetTokens.some((t) => KMW_JS_TARGETS.has(t));
-  const hasVisualKeyboard = /store\s*\(\s*&VISUALKEYBOARD\s*\)/i.test(kmnText);
-
-  const files = [`..\\build\\${keyboardId}.kmx`];
-  if (emitsJs) files.push(`..\\build\\${keyboardId}.js`);
-  if (hasVisualKeyboard) files.push(`..\\build\\${keyboardId}.kvk`);
-  files.push("welcome.htm", "readme.htm");
-
-  const fileEntries = files
-    .map((f) => {
-      const ext = f.slice(f.lastIndexOf("."));
-      return `    <File>\n      <Name>${escapeHtml(f)}</Name>\n      <FileType>${ext}</FileType>\n    </File>`;
-    })
-    .join("\n");
-
-  const langTags = languages.length > 0 ? languages : ["und"];
-  const langEntries = langTags
-    .map((t) => `        <Language ID="${escapeHtml(t)}">${escapeHtml(t)}</Language>`)
-    .join("\n");
-
-  const name = escapeHtml(displayName);
-  const description = escapeHtml(`${displayName} keyboard, generated by Keyboard Studio.`);
-
-  // spec 059 FR-003: both fields come from the shared copyright line / attribution,
-  // never from displayName. Omitted entirely when attribution is absent, so the
-  // .kps never carries a fabricated rights holder. 917/918 shipped keyboards
-  // populate <Copyright> and 442 populate <Author>.
-  const infoExtra =
-    (copyrightLine !== undefined && copyrightLine !== null
-      ? `    <Copyright URL="">${escapeHtml(copyrightLine)}</Copyright>\n`
-      : "") +
-    (attribution !== undefined && attribution.authorName.trim() !== ""
-      ? `    <Author URL="${attribution.authorEmail !== undefined && attribution.authorEmail !== "" ? `mailto:${escapeHtml(attribution.authorEmail)}` : ""}">${escapeHtml(attribution.authorName.trim())}</Author>\n`
-      : "");
-
-  return (
-    `<?xml version="1.0" encoding="utf-8"?>\n` +
-    `<Package>\n` +
-    `  <System>\n    <KeymanDeveloperVersion>17.0.0.0</KeymanDeveloperVersion>\n    <FileVersion>7.0</FileVersion>\n  </System>\n` +
-    `  <Options>\n    <ReadMeFile>readme.htm</ReadMeFile>\n    <WelcomeFile>welcome.htm</WelcomeFile>\n    <FollowKeyboardVersion/>\n  </Options>\n` +
-    `  <Info>\n    <Name URL="">${name}</Name>\n    <Description URL="">${description}</Description>\n${infoExtra}  </Info>\n` +
-    `  <Files>\n${fileEntries}\n  </Files>\n` +
-    `  <Keyboards>\n    <Keyboard>\n      <Name>${name}</Name>\n      <ID>${escapeHtml(keyboardId)}</ID>\n      <Version>${escapeHtml(version)}</Version>\n      <Languages>\n${langEntries}\n      </Languages>\n    </Keyboard>\n  </Keyboards>\n` +
-    `</Package>\n`
-  );
-}
-
-function generateStubs(
+export function generateStubs(
   vfs: VirtualFS,
   keyboardId: string,
   displayName: string,
   languages: string[],
   version: string,
-  attribution: Attribution | undefined,
-  emitYear: number,
-  inherited: readonly import("@keyboard-studio/contracts").CopyrightHolder[],
+  /**
+   * Attribution for the notices this writes (spec 059). Optional so a caller that
+   * genuinely has no attribution to state can omit it — the LICENSE.md is then the
+   * MIT body with NO copyright line, never one naming the keyboard itself.
+   *
+   * Callers with a working copy in hand should always pass it: a stub LICENSE.md
+   * with no holder is the thing FR-003 exists to prevent.
+   */
+  attribution?: Attribution,
+  /**
+   * The year the notice records (D2 — publication year, not "now"). Defaults to the
+   * current year, matching the date stamp this function already derives below.
+   * Tests pass it explicitly so they never read the clock.
+   */
+  emitYear: number = new Date().getFullYear(),
+  /**
+   * Holders inherited from the base, retained VERBATIM (US2 / FR-007). Resolve them
+   * with `resolveInheritedHolders` rather than parsing a license here — see its note
+   * on why both emission paths share one implementation.
+   */
+  inherited: readonly import("@keyboard-studio/contracts").CopyrightHolder[] = [],
 ): void {
   const now = new Date();
   const yyyy = emitYear;
@@ -501,16 +551,36 @@ function generateStubs(
 
   // Generate the package last: it reads the final `.kmn` (base-derived or the
   // stub just written above) to decide which build artifacts to list.
+  //
+  // The base's languages are what this stage knows — the author has not answered
+  // the identity questions yet at scaffold time. The output projection's step 3.6
+  // replaces this block with the author's own tag before anything ships (spec 057
+  // FR-001), so declaring the base's tags here is a placeholder, not the final
+  // word. `languages[0]` because the descriptor declares exactly ONE language;
+  // `undefined` (no base tag) degrades to the writer's `und` placeholder.
   const kpsPath = `source/${keyboardId}.kps`;
   if (vfs.get(kpsPath) === undefined) {
     const kmnEntry = vfs.get(`source/${keyboardId}.kmn`);
     const kmnText =
       kmnEntry !== undefined && typeof kmnEntry.content === "string" ? kmnEntry.content : "";
-    vfs.set(
-      kpsPath,
-      buildKpsContent(keyboardId, displayName, kmnText, languages, version, attribution, copyrightLine),
-      false,
-    );
+    // spec 059 FR-003: the copyright line and author ride the SAME identity the
+    // descriptor already carries, and come from the accumulated block that wrote
+    // LICENSE.md and store(&COPYRIGHT) — one source, so the three cannot drift.
+    // Each is omitted when absent rather than emitted with a fabricated holder.
+    const identity: PackageDescriptorIdentity = {
+      displayName,
+      ...(languages[0] !== undefined ? { languageTag: languages[0] } : {}),
+      ...(copyrightLine !== undefined && copyrightLine !== null
+        ? { copyrightLine }
+        : {}),
+      ...(attribution !== undefined && attribution.authorName.trim() !== ""
+        ? { authorName: attribution.authorName.trim() }
+        : {}),
+      ...(attribution?.authorEmail !== undefined && attribution.authorEmail !== ""
+        ? { authorEmail: attribution.authorEmail }
+        : {}),
+    };
+    vfs.set(kpsPath, buildKpsContent(keyboardId, identity, kmnText, version), false);
   }
 }
 
@@ -592,52 +662,18 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         );
       }
 
-      // ---------------------------------------------------------------------
       // spec 059 US2: resolve the INHERITED copyright holders now that the base
-      // has been fetched, then merge the new author on top.
-      //
-      // D4 precedence: LICENSE.md is authoritative. It is the notice MIT's own
-      // text refers to ("the above copyright notice"), and it is the better-formed
-      // source — 918 of 920 shipped license lines carry a year, against 366 of 922
-      // .kmn COPYRIGHT values. The two are NEVER merged into separate holders:
-      // the 22 observed disagreements are the in-progress SIL International ->
-      // SIL Global rename applied to one file and not the other, and treating
-      // that as two rights holders would fabricate one out of drift.
-      // ---------------------------------------------------------------------
-      let inheritedHolders: readonly import("@keyboard-studio/contracts").CopyrightHolder[] = [];
-      let licenseUnparseable: { reason: string; line: string } | null = null;
-
-      const holderOverride = scaffoldOpts?.baseHolderOverride?.trim() ?? "";
-      if (holderOverride !== "") {
-        // D5 escape hatch: the author told us who held the copyright, so the
-        // notice is retained rather than dropped. No year — that is precisely
-        // what the unreadable line failed to establish, and inventing one would
-        // put a fabricated fact into a legal notice.
-        inheritedHolders = [
-          { name: holderOverride, years: [], marker: DEFAULT_MARKER, inherited: true },
-        ];
-      } else if (baseLicenseText !== undefined) {
-        const parsed = parseCopyright(baseLicenseText);
-        if (parsed.ok) {
-          inheritedHolders = parsed.block;
-        } else if (parsed.reason === "no_copyright_line") {
-          // A license file with no notice at all states no holder to retain.
-          // Nothing to inherit, and nothing was destroyed.
-          inheritedHolders = [];
-        } else {
-          // D5: the file HAS a notice we cannot read (an unfilled template, or a
-          // year with no holder). Refuse rather than silently drop it — emitting
-          // a LICENSE.md whose only holder is the current user would strip a real
-          // notice, which is the defect FR-010 exists to prevent.
-          licenseUnparseable = { reason: parsed.reason, line: parsed.line };
-        }
-      }
-
-      const { line: copyrightLine, holderCount } = attributionText(
-        attribution,
-        emitYear,
-        inheritedHolders,
+      // has been fetched, then merge the new author on top. See
+      // resolveInheritedHolders for the D4/D5 policy.
+      const { inherited: inheritedHolders, licenseUnparseable } = resolveInheritedHolders(
+        baseLicenseText,
+        scaffoldOpts?.baseHolderOverride,
       );
+
+      // Only the line is needed here: `inheritedHolderCount` in the result comes
+      // from inheritedHolders directly, and generateStubs re-derives the notice
+      // itself from the same three inputs.
+      const { line: copyrightLine } = attributionText(attribution, emitYear, inheritedHolders);
 
       // Signalled via ScaffoldResult.attributionMissing rather than a warning:
       // `warnings` means "fell back to stub-only output", and overloading it
@@ -679,6 +715,9 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         attributionMissing,
         inheritedHolderCount: inheritedHolders.length,
         ...(licenseUnparseable !== null ? { licenseUnparseable } : {}),
+        // Handed back so the working copy can keep it — the download path needs it
+        // to retain these same holders when it completes a missing LICENSE.md.
+        ...(baseLicenseText !== undefined ? { baseLicenseText } : {}),
       };
     },
 

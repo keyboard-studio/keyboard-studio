@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Package>
+  <Info>
+    <Name value="Fixture Arabic"/>
+    <Version value="1.0"/>
+  </Info>
+  <Keyboards>
+    <Keyboard>
+      <Name>Fixture Arabic</Name>
+      <ID>fx_arabic</ID>
+      <Version>1.0</Version>
+      <Languages>
+        <Language ID="ar-Arab" Name="Arabic"/>
+      </Languages>
+      <Targets>windows</Targets>
+    </Keyboard>
+  </Keyboards>
+</Package>

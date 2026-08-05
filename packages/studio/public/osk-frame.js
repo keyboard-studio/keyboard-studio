@@ -4,7 +4,8 @@
 //
 // postMessage contract:
 //   host -> frame: { type: "SET_KEYBOARD",  jsUrl, keyboardId, bcp47?, fontFaceUrl?, fontFaceFamily?, keyboardCssUrls? }
-//   host -> frame: { type: "SET_OSK_MODE",  mode: "desktop" | "touch" }
+//   host -> frame: { type: "SET_OSK_MODE",  mode: "desktop" | "touch" | "tablet" }
+//   host -> frame: { type: "SET_STRINGS",   strings: { placeholder?, statusReady? } }
 //   frame -> host: { type: "ENGINE_READY" }
 //   frame -> host: { type: "ENGINE_ERROR", message }
 //   frame -> host: { type: "TEXT_UPDATED", value }
@@ -40,9 +41,23 @@
   var pendingKeyboard = null;
   var currentOsk = null;
   var currentMode = "desktop";
+  // Idle "pick a keyboard" prompt. Localized copy arrives from the host via
+  // SET_STRINGS; this English fallback shows only if that message never lands.
+  var statusReadyText = "Ready — pick a keyboard";
+  // Monotonic token to supersede in-flight keyboard loads. Each loadKeyboard()
+  // call claims the next token; when its async addKeyboards/setActiveKeyboard
+  // chain settles, it bails if a newer load has since started. This prevents a
+  // superseded load (whose blob URL the host may have already revoked on the
+  // next recompile) from surfacing a spurious "Cannot find ... at blob:" error
+  // or stomping the newer keyboard's activation. Mirrors the host-side runId
+  // supersession in useKeyboardArtifact.ts.
+  var loadToken = 0;
 
   // [SCAFFOLD] Device profiles cribbed from Keyman Developer test.js.
-  // Two entries (desktop + phone) cover the toggle; dimensions drive
+  // desktop + touch cover the gallery's Desktop/Mobile toggle; tablet is a
+  // third, dedicated profile (spec 035 touch-seed reseed now derives a
+  // tablet-platform layout, not phone) selected directly by callers that
+  // bypass the toggle (e.g. TouchSeedSourcePanel). Dimensions drive
   // InlinedOSKView.setSize().
   var devices = {
     desktop: {
@@ -60,6 +75,14 @@
       OS: "android",
       touchable: true,
       dimensions: [320, 290],
+    },
+    tablet: {
+      name: "iPad",
+      browser: "chrome",
+      formFactor: "tablet",
+      OS: "ios",
+      touchable: true,
+      dimensions: [980, 420],
     },
   };
 
@@ -278,22 +301,22 @@
     // executes.
     injectFontFace(fontFaceFamily, fontFaceUrl);
     injectKeyboardCss(keyboardCssUrls);
+    var myToken = ++loadToken;
     setStatus("registering keyboard: " + keyboardId);
     var kmwId = "Keyboard_" + keyboardId;
-    // Remove any stale registration before re-adding. KMW caches keyboards
-    // by ID — calling addKeyboards() again with the same ID but a new blob
-    // URL would be silently ignored, so the old compiled rules stay active.
-    // Deregistering first forces KMW to load fresh from the new URL.
+    // Remove any stale registration before re-adding. KMW caches keyboards by
+    // ID — addKeyboards() with the same ID but a new blob URL would be silently
+    // ignored, so the old (now-revoked) blob would stay active. Deregistering
+    // first forces a fresh load from the new URL.
     try {
       if (typeof window.keyman.removeKeyboards === "function") {
         window.keyman.removeKeyboards(kmwId);
       }
     } catch (_) {}
     // Use the keyboard's actual BCP47 (forwarded by the host) so the stub
-    // registers under and setActiveKeyboard activates the same tag the
-    // compiled .js declares. Falling back to "en" causes
-    // "Cannot find the <id> keyboard for English" on any non-English
-    // keyboard.
+    // registers under and setActiveKeyboard activates the same tag the compiled
+    // .js declares. Falling back to "en" causes "Cannot find the <id> keyboard
+    // for English" on any non-English keyboard.
     var languageCode = typeof bcp47 === "string" && bcp47.length > 0 ? bcp47 : "en";
     var stub = {
       id: keyboardId,
@@ -301,25 +324,33 @@
       languages: { id: languageCode, name: languageCode },
       filename: jsUrl,
     };
-    try {
-      window.keyman.addKeyboards(stub);
-    } catch (err) {
-      postError("addKeyboards threw: " + (err && err.message || err));
-      return;
-    }
-    setTimeout(function () {
-      try {
-        window.keyman.setActiveKeyboard(kmwId, languageCode).then(function () {
-          setStatus("active: " + keyboardId);
-          setOsk();
-          try { oskTarget.focus(); } catch (_) {}
-        }).catch(function (err) {
-          postError("setActiveKeyboard('" + kmwId + "') failed: " + (err && err.message || err));
-        });
-      } catch (err) {
-        postError("setActiveKeyboard threw: " + (err && err.message || err));
-      }
-    }, 50);
+    // Await addKeyboards() (it returns a Promise) BEFORE activating — the old
+    // fixed 50ms setTimeout raced the async stub registration. Guard every
+    // stage on myToken so a superseded load neither activates nor reports.
+    // Promise.resolve().then(...) — not redundant: it funnels a SYNCHRONOUS
+    // throw from addKeyboards into the .catch below (the old try/catch did this).
+    Promise.resolve()
+      .then(function () {
+        return window.keyman.addKeyboards(stub);
+      })
+      .then(function () {
+        if (myToken !== loadToken) return null; // superseded before activation
+        return window.keyman.setActiveKeyboard(kmwId, languageCode);
+      })
+      .then(function (result) {
+        if (myToken !== loadToken) return;        // superseded during activation — a newer load owns the frame
+        if (result === false) {                   // KMW resolves false (not throw) on a genuine activation failure
+          postError("setActiveKeyboard('" + kmwId + "') returned false for '" + languageCode + "'");
+          return;
+        }
+        setStatus("active: " + keyboardId);
+        setOsk();
+        try { oskTarget.focus(); } catch (_) {}
+      })
+      .catch(function (err) {
+        if (myToken !== loadToken) return;        // a superseded load's failure (e.g. a blob the host already revoked) — ignore
+        postError("keyboard load failed for '" + kmwId + "': " + (err && err.message || err));
+      });
   }
 
   function initEngine() {
@@ -341,7 +372,7 @@
       .then(function () {
         try { window.keyman.attachToControl(oskTarget); } catch (_) {}
         engineReady = true;
-        setStatus("KMW ready — pick a keyboard");
+        setStatus(statusReadyText);
         post({ type: "ENGINE_READY" });
         if (pendingKeyboard) {
           var k = pendingKeyboard;
@@ -434,8 +465,28 @@
       return;
     }
 
+    if (msg.type === "SET_STRINGS") {
+      var strings = msg.strings && typeof msg.strings === "object" ? msg.strings : {};
+      if (typeof strings.placeholder === "string") {
+        oskTarget.placeholder = strings.placeholder;
+      }
+      if (typeof strings.statusReady === "string") {
+        statusReadyText = strings.statusReady;
+        // If the engine is already up and idle (no keyboard active yet), the
+        // status line is showing the ready prompt — refresh it in place so a
+        // late-arriving or locale-switched translation takes effect.
+        if (engineReady) {
+          var activeIdle = "";
+          try { activeIdle = window.keyman.getActiveKeyboard() || ""; } catch (_) {}
+          if (!activeIdle) setStatus(statusReadyText);
+        }
+      }
+      return;
+    }
+
     if (msg.type === "SET_OSK_MODE") {
-      var nextMode = msg.mode === "touch" ? "touch" : "desktop";
+      var nextMode =
+        msg.mode === "touch" ? "touch" : msg.mode === "tablet" ? "tablet" : "desktop";
       if (nextMode === currentMode) return;
       currentMode = nextMode;
       if (engineReady && window.keyman.getActiveKeyboard()) {

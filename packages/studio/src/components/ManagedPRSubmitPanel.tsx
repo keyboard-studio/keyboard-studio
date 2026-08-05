@@ -22,6 +22,8 @@
 //   3. The copyright attestation checkbox is checked.
 //   4. A keyboard working copy is instantiated and the compile is ready.
 //   5. Submission is not already in flight.
+//   6. The output-time staleness gate (outputBlocked) is not tripped — e.g. a
+//      stale touch-layout side-car after a post-Touch-step mechanics edit.
 //
 // VFS acquisition: at submit time the panel calls projectWorkingCopyForOutput()
 // (the same helper handleDownload uses via serializeWorkingCopy) so the
@@ -29,13 +31,18 @@
 // held in component state between renders — it is projected on demand.
 
 import { useCallback, useEffect, useId, useState } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { PublishManagedPRError } from "@keyboard-studio/contracts";
 import { projectWorkingCopyForOutput } from "../lib/serializeWorkingCopy.ts";
+import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
 import { getManagedPROutputService, getManagedPRProxyEndpoint } from "../lib/services.ts";
 import {
   publishManagedPRErrorMessage,
   isPublishManagedPRError,
 } from "../lib/publishManagedPRErrorMessage.ts";
+import { recordProjectSubmission } from "../lib/draftPersistence.ts";
+import { buildDecisionSummaryBlock } from "@keyboard-studio/engine";
+import { snapshotDecisionRecord } from "../decisions/decisionLogStore.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -145,6 +152,22 @@ export interface ManagedPRSubmitPanelProps {
    */
   canSubmit: boolean;
   /**
+   * Output-time staleness gate (e.g. a stale touch-layout side-car — a
+   * mechanics edit after the Touch step was completed re-opens touch
+   * staleness, and the emitted side-car would ship stale). When true the
+   * Submit button is force-disabled regardless of form validity or
+   * `canSubmit`. OutputScreen renders the explanatory banner above this
+   * panel; this panel only needs to explain itself via aria-label.
+   */
+  outputBlocked?: boolean;
+  /**
+   * Human-readable reason shown in the Submit button's aria-label when
+   * `outputBlocked` is true. Required in practice whenever `outputBlocked`
+   * is true, but kept optional so callers that never block don't need to
+   * pass it.
+   */
+  outputBlockedReason?: string;
+  /**
    * Prefill values from the established identity session.
    * Passed in from OutputScreen which reads the auth hooks; the panel reacts
    * to changes via useEffect so signing in after the panel mounts prefills
@@ -172,11 +195,23 @@ type SubmitState =
 
 export function ManagedPRSubmitPanel({
   canSubmit,
+  outputBlocked = false,
+  outputBlockedReason,
   prefill,
 }: ManagedPRSubmitPanelProps) {
+  const { t, i18n } = useLingui();
   const nameId = useId();
   const emailId = useId();
   const copyrightId = useId();
+
+  // Self-contained useGitHubAuth() call (same idiom as MyKeyboardsList) so
+  // this panel can transition the active "My keyboards" project to
+  // status:"submitted" on a successful publish without threading the token
+  // down as a prop. `accessToken` (the primitive, not the whole `token`
+  // object) is what recordProjectSubmission below actually needs, and is
+  // what the handleSubmit dependency array tracks.
+  const { token } = useGitHubAuth();
+  const accessToken = token?.accessToken ?? null;
 
   const [authorName, setAuthorName] = useState<string>(
     prefill?.displayName ?? "",
@@ -208,7 +243,16 @@ export function ManagedPRSubmitPanel({
   const emailValid = isValidEmail(email);
   const formReady = nameValid && emailValid && copyrightChecked;
   const submitEnabled =
-    formReady && canSubmit && submitState.kind !== "submitting";
+    formReady && canSubmit && !outputBlocked && submitState.kind !== "submitting";
+
+  // Fallback text for outputBlockedReason — normally the caller (OutputScreen)
+  // always passes a localized reason when outputBlocked is true, but the prop
+  // is optional so a caller that never blocks doesn't need to pass one.
+  const blockedFallbackReason = t({
+    id: "output.submit.button.ariaBlockedFallback",
+    message: "output is currently blocked",
+  });
+  const effectiveBlockedReason = outputBlockedReason ?? blockedFallbackReason;
 
   const handleSubmit = useCallback(async () => {
     if (!submitEnabled) return;
@@ -220,8 +264,10 @@ export function ManagedPRSubmitPanel({
       if (projected === null) {
         setSubmitState({
           kind: "error",
-          message:
-            "Nothing to submit — select a keyboard first.",
+          message: t({
+            id: "output.submit.error.nothingToSubmit",
+            message: "Nothing to submit — select a keyboard first.",
+          }),
         });
         return;
       }
@@ -231,6 +277,21 @@ export function ManagedPRSubmitPanel({
       // Build a minimal PR body — the backend prepends provenance and wraps
       // the title. The SPA provides the human description and copyright
       // attestation so the org bot's PR body is meaningful.
+      //
+      // The decision block (specs/053-decision-audit FR-018) is generated from
+      // the record AS IT STANDS at this moment, not maintained incrementally as
+      // the author works: a body assembled from a running buffer could describe
+      // a state the submitted keyboard was never in. It is deliberately English
+      // and unlocalized — the audience is a reviewer reading github.com, and
+      // that is the established precedent for engine-built PR blocks. Omitted
+      // entirely for a session that recorded nothing, rather than shipping an
+      // empty heading.
+      const decisionRecord = snapshotDecisionRecord();
+      const decisionBlock =
+        decisionRecord.entries.length === 0
+          ? []
+          : ["", "---", "", buildDecisionSummaryBlock(decisionRecord)];
+
       const prBody = [
         `## ${displayName}`,
         "",
@@ -239,6 +300,7 @@ export function ManagedPRSubmitPanel({
         "---",
         "",
         "**Copyright attestation:** The submitter has confirmed they are the copyright holder or are authorized to submit this keyboard to the community repository.",
+        ...decisionBlock,
       ].join("\n");
 
       const prTitle =
@@ -256,19 +318,30 @@ export function ManagedPRSubmitPanel({
         proxyEndpoint: getManagedPRProxyEndpoint(),
       });
       setSubmitState({ kind: "success", prUrl: result.prUrl });
+
+      // Transition the active "My keyboards" project to status:"submitted"
+      // (per specs/047-my-keyboards) rather than leaving it as an
+      // in-progress draft — see draftPersistence.ts's recordProjectSubmission
+      // docstring. Fire-and-forget: this is bookkeeping for the "My
+      // keyboards" list, not load-bearing for the success state already
+      // rendered above.
+      void recordProjectSubmission(result.prUrl, accessToken);
     } catch (err: unknown) {
       let message: string;
       if (isPublishManagedPRError(err)) {
-        message = publishManagedPRErrorMessage(err as PublishManagedPRError);
+        message = publishManagedPRErrorMessage(err as PublishManagedPRError, i18n);
       } else {
         message =
           err instanceof Error
             ? err.message
-            : "Submission failed. Please try again.";
+            : t({
+                id: "output.submit.error.unknown",
+                message: "Submission failed. Please try again.",
+              });
       }
       setSubmitState({ kind: "error", message });
     }
-  }, [submitEnabled, authorName, email]);
+  }, [submitEnabled, authorName, email, t, i18n, accessToken]);
 
   // ---------------------------------------------------------------------------
   // Success state — show PR link, no git jargon.
@@ -276,24 +349,34 @@ export function ManagedPRSubmitPanel({
 
   if (submitState.kind === "success") {
     return (
-      <section aria-label="Submission status" style={sectionStyle}>
-        <div style={labelStyle}>Submit to community repository</div>
+      <section
+        aria-label={t({ id: "output.submit.status.ariaLabel", message: "Submission status" })}
+        style={sectionStyle}
+      >
+        <div style={labelStyle}>
+          <Trans id="output.submit.sectionLabel">Submit to community repository</Trans>
+        </div>
         <div style={successPanelStyle} role="status" aria-live="polite">
           <div style={{ fontWeight: 600, marginBottom: 6 }}>
-            Your submission is being reviewed.
+            <Trans id="output.submit.success.heading">Your submission is being reviewed.</Trans>
           </div>
           <div style={{ fontSize: 12, color: "#9aa7b8" }}>
-            The keyboard studio team will review your keyboard and may reach out
-            via the email you provided.{" "}
-            <a
-              href={submitState.prUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              style={{ color: "#6ea8fe" }}
-              aria-label="View your keyboard submission"
-            >
-              View submission
-            </a>
+            <Trans id="output.submit.success.body">
+              The keyboard studio team will review your keyboard and may reach out
+              via the email you provided.{" "}
+              <a
+                href={submitState.prUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ color: "#6ea8fe" }}
+                aria-label={t({
+                  id: "output.submit.success.linkAriaLabel",
+                  message: "View your keyboard submission",
+                })}
+              >
+                View submission
+              </a>
+            </Trans>
           </div>
         </div>
       </section>
@@ -307,17 +390,24 @@ export function ManagedPRSubmitPanel({
   const isSubmitting = submitState.kind === "submitting";
 
   return (
-    <section aria-label="Submit to community repository" style={sectionStyle}>
-      <div style={labelStyle}>Submit to community repository</div>
+    <section
+      aria-label={t({ id: "output.submit.sectionAriaLabel", message: "Submit to community repository" })}
+      style={sectionStyle}
+    >
+      <div style={labelStyle}>
+        <Trans id="output.submit.sectionLabel">Submit to community repository</Trans>
+      </div>
       <p style={{ margin: 0, fontSize: 12, color: "#9aa7b8", lineHeight: 1.5 }}>
-        Provide your name and email for attribution, confirm the copyright
-        statement, and submit. We handle the technical side.
+        <Trans id="output.submit.intro">
+          Provide your name and email for attribution, confirm the copyright
+          statement, and submit. We handle the technical side.
+        </Trans>
       </p>
 
       {/* Author display name */}
       <div>
         <label htmlFor={nameId} style={fieldLabelStyle}>
-          Your name (for attribution)
+          <Trans id="output.submit.name.label">Your name (for attribution)</Trans>
         </label>
         <input
           id={nameId}
@@ -337,11 +427,11 @@ export function ManagedPRSubmitPanel({
           }}
           style={nameBlurred && !nameValid ? inputInvalidStyle : inputStyle}
           disabled={isSubmitting}
-          placeholder="Your name"
+          placeholder={t({ id: "output.submit.name.placeholder", message: "Your name" })}
         />
         {nameBlurred && !nameValid && (
           <div id={`${nameId}-err`} role="alert" style={errorStyle}>
-            Name is required.
+            <Trans id="output.submit.name.error">Name is required.</Trans>
           </div>
         )}
       </div>
@@ -349,7 +439,7 @@ export function ManagedPRSubmitPanel({
       {/* Email */}
       <div>
         <label htmlFor={emailId} style={fieldLabelStyle}>
-          Email address (for attribution)
+          <Trans id="output.submit.email.label">Email address (for attribution)</Trans>
         </label>
         <input
           id={emailId}
@@ -373,7 +463,7 @@ export function ManagedPRSubmitPanel({
         />
         {emailBlurred && !emailValid && (
           <div id={`${emailId}-err`} role="alert" style={errorStyle}>
-            A valid email address is required.
+            <Trans id="output.submit.email.error">A valid email address is required.</Trans>
           </div>
         )}
       </div>
@@ -404,8 +494,10 @@ export function ManagedPRSubmitPanel({
             cursor: isSubmitting ? "not-allowed" : "pointer",
           }}
         >
-          I confirm I am the copyright holder or am authorized to submit this
-          keyboard to the community repository.
+          <Trans id="output.submit.copyright.label">
+            I confirm I am the copyright holder or am authorized to submit this
+            keyboard to the community repository.
+          </Trans>
         </label>
       </div>
 
@@ -417,15 +509,33 @@ export function ManagedPRSubmitPanel({
           void handleSubmit();
         }}
         aria-label={
-          !canSubmit
-            ? "Submit unavailable until the keyboard compile is complete"
-            : !formReady
-              ? "Fill in your name, email, and copyright confirmation to submit"
-              : "Submit keyboard to community repository"
+          outputBlocked
+            ? t({
+                id: "output.submit.button.ariaBlocked",
+                message: `Submit unavailable — ${effectiveBlockedReason}`,
+              })
+            : !canSubmit
+              ? t({
+                  id: "output.submit.button.ariaNotReady",
+                  message: "Submit unavailable until the keyboard compile is complete",
+                })
+              : !formReady
+                ? t({
+                    id: "output.submit.button.ariaFormIncomplete",
+                    message: "Fill in your name, email, and copyright confirmation to submit",
+                  })
+                : t({
+                    id: "output.submit.button.ariaReady",
+                    message: "Submit keyboard to community repository",
+                  })
         }
         style={submitButtonStyle(submitEnabled)}
       >
-        {isSubmitting ? "Submitting..." : "Submit to community repository"}
+        {isSubmitting ? (
+          <Trans id="output.submit.button.submitting">Submitting...</Trans>
+        ) : (
+          <Trans id="output.submit.button.submit">Submit to community repository</Trans>
+        )}
       </button>
 
       {/* Error state */}
@@ -448,7 +558,7 @@ export function ManagedPRSubmitPanel({
               fontSize: 12,
             }}
           >
-            Dismiss
+            <Trans id="output.submit.error.dismiss">Dismiss</Trans>
           </button>
         </div>
       )}

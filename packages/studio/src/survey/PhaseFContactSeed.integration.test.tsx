@@ -17,7 +17,10 @@
 // loadModularFlow + real phase_f_helpdocs.modular.yaml ?raw import. No mocks.
 
 import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, fireEvent, act, cleanup } from "@testing-library/react";
+import { screen, fireEvent, act, cleanup } from "@testing-library/react";
+// Swap only `render` (../test/renderWithI18n.tsx): the flow-step chrome calls
+// useLingui(), which throws without an <I18nProvider> ancestor.
+import { render } from "../test/renderWithI18n.tsx";
 import { PhaseFStepFactoryComponent } from "../editors/adapters/flowStepOptions.tsx";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";

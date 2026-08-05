@@ -8,7 +8,7 @@ import {
   deriveScriptPrefill,
   EXPLICITLY_CLASSIFIED_SCRIPTS,
 } from "./scriptAxes";
-import { VALID_SCRIPT_VALUES } from "../survey/questions/a/primary_script";
+import { VALID_SCRIPT_VALUES } from "../survey/questions/reserve/primary_script";
 
 describe("normalizeTargetScript", () => {
   it("passes plain script subtags through", () => {

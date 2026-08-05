@@ -1,0 +1,502 @@
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterEach, describe, expect, it } from "vitest";
+import { ALL_CRITERIA, CRITERIA_BY_BAND } from "@keyboard-studio/contracts";
+import {
+  extractAdaptationQuestionStrings,
+  extractCriteriaStrings,
+  extractFlowQuestionStrings,
+  extractPatternStrings,
+  slugifyIdSegment,
+} from "./extract.js";
+import { phaseARegistry } from "../../packages/studio/src/survey/questions/registry.a.ts";
+import { phaseBRegistry } from "../../packages/studio/src/survey/questions/registry.b.ts";
+import { phaseFRegistry } from "../../packages/studio/src/survey/questions/registry.f.ts";
+import { phaseGRegistry } from "../../packages/studio/src/survey/questions/registry.g.ts";
+import { reserveRegistry } from "../../packages/studio/src/survey/questions/registry.reserve.ts";
+
+const dirs: string[] = [];
+function tempDir(): string {
+  const dir = mkdtempSync(join(tmpdir(), "i18n-content-extract-test-"));
+  dirs.push(dir);
+  return dir;
+}
+
+afterEach(() => {
+  while (dirs.length > 0) {
+    const dir = dirs.pop();
+    if (dir) rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+describe("slugifyIdSegment", () => {
+  it("replaces literal dots so the catalog key stays undecomposed", () => {
+    expect(slugifyIdSegment("4.3-copyright-holder-is-authorized")).toBe(
+      "4_3-copyright-holder-is-authorized",
+    );
+  });
+
+  it("leaves dot-free ids untouched", () => {
+    expect(slugifyIdSegment("multi_char_sequence")).toBe("multi_char_sequence");
+  });
+});
+
+describe("extractPatternStrings", () => {
+  it("extracts prose and excludes control fields", () => {
+    const dir = tempDir();
+    writeFileSync(
+      join(dir, "sample.yaml"),
+      `
+id: sample_pattern
+title: "Sample title"
+description: "Sample description"
+category: desktop
+appliesTo: [desktop]
+strategyId: S-01
+kmnFragment: |
+  store(x) '{{slotValue}}'
+tests: []
+validatedForFamilies: []
+sourceKeyboards: []
+reviewedBy: "reviewer"
+reviewDate: "2026-01-01"
+questions:
+  - id: q1
+    prompt: "Sample prompt"
+    answerType: char-single
+    default: "n"
+    options:
+      - value: opt1
+        label: "Option one"
+`,
+    );
+
+    const strings = extractPatternStrings(dir);
+
+    expect(strings["content.pattern.sample_pattern.title"]).toBe("Sample title");
+    expect(strings["content.pattern.sample_pattern.description"]).toBe(
+      "Sample description",
+    );
+    expect(strings["content.pattern.sample_pattern.question.q1.prompt"]).toBe(
+      "Sample prompt",
+    );
+    expect(
+      strings["content.pattern.sample_pattern.question.q1.option.opt1.label"],
+    ).toBe("Option one");
+
+    // Control fields never appear as extracted values.
+    const values = Object.values(strings);
+    expect(values).not.toContain("desktop");
+    expect(values).not.toContain("S-01");
+    expect(values).not.toContain("char-single");
+    expect(values.join("\n")).not.toContain("{{slotValue}}");
+    expect(Object.keys(strings)).toHaveLength(4);
+  });
+
+  it("slugifies a dotted pattern id in the generated key", () => {
+    const dir = tempDir();
+    writeFileSync(
+      join(dir, "sample.yaml"),
+      `
+id: "1.2-dotted-id"
+title: "Dotted"
+description: "Dotted description"
+category: desktop
+appliesTo: [desktop]
+kmnFragment: ""
+tests: []
+validatedForFamilies: []
+sourceKeyboards: []
+reviewedBy: "reviewer"
+reviewDate: "2026-01-01"
+questions: []
+`,
+    );
+
+    const strings = extractPatternStrings(dir);
+    expect(strings["content.pattern.1_2-dotted-id.title"]).toBe("Dotted");
+    expect(Object.keys(strings).some((k) => k.includes("1.2-dotted-id"))).toBe(
+      false,
+    );
+  });
+
+  it("recurses into category subdirectories", () => {
+    const dir = tempDir();
+    const sub = join(dir, "desktop-input");
+    mkdirSync(sub);
+    writeFileSync(
+      join(sub, "nested.yaml"),
+      `
+id: nested_pattern
+title: "Nested title"
+description: "Nested description"
+category: desktop
+appliesTo: [desktop]
+kmnFragment: ""
+tests: []
+validatedForFamilies: []
+sourceKeyboards: []
+reviewedBy: "reviewer"
+reviewDate: "2026-01-01"
+questions: []
+`,
+    );
+
+    const strings = extractPatternStrings(dir);
+    expect(strings["content.pattern.nested_pattern.title"]).toBe("Nested title");
+  });
+
+  it("skips a file that fails schema validation rather than throwing", () => {
+    const dir = tempDir();
+    writeFileSync(join(dir, "broken.yaml"), "not: a-valid-pattern\n");
+    expect(() => extractPatternStrings(dir)).not.toThrow();
+    expect(extractPatternStrings(dir)).toEqual({});
+  });
+
+  it("skips a file with invalid YAML syntax (not just schema-invalid) without losing sibling files", () => {
+    const dir = tempDir();
+    // Unterminated quote — a YAML *parse* error, distinct from a
+    // schema-validation failure; must not take down the whole batch.
+    writeFileSync(join(dir, "malformed.yaml"), 'id: bad\ntitle: "unterminated\ndescription: x\n');
+    writeFileSync(
+      join(dir, "valid.yaml"),
+      `
+id: valid_pattern
+title: "Valid title"
+description: "Valid description"
+category: desktop
+appliesTo: [desktop]
+kmnFragment: ""
+tests: []
+validatedForFamilies: []
+sourceKeyboards: []
+reviewedBy: "reviewer"
+reviewDate: "2026-01-01"
+questions: []
+`,
+    );
+
+    let strings: Record<string, string> = {};
+    expect(() => {
+      strings = extractPatternStrings(dir);
+    }).not.toThrow();
+    expect(strings["content.pattern.valid_pattern.title"]).toBe("Valid title");
+  });
+
+  it("keeps the first occurrence and skips a later file with a duplicate pattern id", () => {
+    const dir = tempDir();
+    const body = (title: string) => `
+id: dup_pattern
+title: "${title}"
+description: "Description"
+category: desktop
+appliesTo: [desktop]
+kmnFragment: ""
+tests: []
+validatedForFamilies: []
+sourceKeyboards: []
+reviewedBy: "reviewer"
+reviewDate: "2026-01-01"
+questions: []
+`;
+    writeFileSync(join(dir, "a-first.yaml"), body("First"));
+    writeFileSync(join(dir, "b-second.yaml"), body("Second"));
+
+    const strings = extractPatternStrings(dir);
+    expect(strings["content.pattern.dup_pattern.title"]).toBe("First");
+    expect(Object.keys(strings)).toHaveLength(2);
+  });
+
+  it("preserves multiline/unicode prose exactly", () => {
+    const dir = tempDir();
+    writeFileSync(
+      join(dir, "unicode.yaml"),
+      `
+id: unicode_pattern
+title: "Tap-and-add accent"
+description: >
+  Type the base letter, then a combining mark: aeiouAEIOU -> áéíóúÁÉÍÓÚ.
+  Preserve exactly: U+0301 for combining acute.
+category: desktop
+appliesTo: [desktop]
+kmnFragment: ""
+tests: []
+validatedForFamilies: []
+sourceKeyboards: []
+reviewedBy: "reviewer"
+reviewDate: "2026-01-01"
+questions: []
+`,
+    );
+
+    const strings = extractPatternStrings(dir);
+    const description = strings["content.pattern.unicode_pattern.description"];
+    expect(description).toContain("áéíóúÁÉÍÓÚ");
+    expect(description).toContain("U+0301");
+  });
+});
+
+describe("extractAdaptationQuestionStrings", () => {
+  it("extracts provenanceLabel and excludes elicits + control fields", () => {
+    const dir = tempDir();
+    writeFileSync(
+      join(dir, "q_sample.yaml"),
+      `
+id: q_sample
+family: script-alignment
+elicits: >
+  A dev-facing gloss of what this question teases out.
+firingCondition: "target == Latn"
+provenanceLabel: "the base keyboard's script"
+scope: session
+renders: true
+`,
+    );
+
+    const strings = extractAdaptationQuestionStrings(dir);
+    expect(strings).toEqual({
+      "content.adaptationQuestion.q_sample.provenanceLabel":
+        "the base keyboard's script",
+    });
+  });
+
+  it("skips a record missing provenanceLabel", () => {
+    const dir = tempDir();
+    writeFileSync(join(dir, "q_no_label.yaml"), "id: q_no_label\nfamily: script-alignment\n");
+    expect(extractAdaptationQuestionStrings(dir)).toEqual({});
+  });
+
+  it("skips a record with an empty provenanceLabel", () => {
+    const dir = tempDir();
+    writeFileSync(
+      join(dir, "q_empty_label.yaml"),
+      'id: q_empty_label\nfamily: script-alignment\nprovenanceLabel: "   "\n',
+    );
+    expect(extractAdaptationQuestionStrings(dir)).toEqual({});
+  });
+
+  it("skips a file with invalid YAML syntax without losing sibling files", () => {
+    const dir = tempDir();
+    writeFileSync(join(dir, "malformed.yaml"), 'id: bad\nprovenanceLabel: "unterminated\n');
+    writeFileSync(
+      join(dir, "valid.yaml"),
+      'id: q_valid\nprovenanceLabel: "A valid label"\n',
+    );
+
+    let strings: Record<string, string> = {};
+    expect(() => {
+      strings = extractAdaptationQuestionStrings(dir);
+    }).not.toThrow();
+    expect(strings["content.adaptationQuestion.q_valid.provenanceLabel"]).toBe(
+      "A valid label",
+    );
+  });
+
+  it("keeps the first occurrence and skips a later file with a duplicate id", () => {
+    const dir = tempDir();
+    writeFileSync(join(dir, "a-first.yaml"), 'id: dup_q\nprovenanceLabel: "First"\n');
+    writeFileSync(join(dir, "b-second.yaml"), 'id: dup_q\nprovenanceLabel: "Second"\n');
+
+    const strings = extractAdaptationQuestionStrings(dir);
+    expect(strings["content.adaptationQuestion.dup_q.provenanceLabel"]).toBe(
+      "First",
+    );
+    expect(Object.keys(strings)).toHaveLength(1);
+  });
+});
+
+describe("extractCriteriaStrings", () => {
+  it("extracts description for every band and checklistText only for red-checklist", () => {
+    const strings = extractCriteriaStrings();
+    const keys = Object.keys(strings);
+
+    expect(keys.every((k) => k.startsWith("content.criteria."))).toBe(true);
+
+    const checklistKeys = keys.filter((k) => k.endsWith(".checklistText"));
+    const descriptionKeys = keys.filter((k) => k.endsWith(".description"));
+    // spec 046 D7/T025 (re-scoped): tie the sidecar's counts exactly to the
+    // canonical CriterionSchema-validated catalog, not just non-zero/relative
+    // checks — one description per ALL_CRITERIA row, one checklistText per
+    // red-checklist-band row. Sourced dynamically (not a literal number) so a
+    // legitimate catalog addition doesn't go red for the wrong reason.
+    expect(descriptionKeys.length).toBe(ALL_CRITERIA.length);
+    expect(checklistKeys.length).toBe(CRITERIA_BY_BAND["red-checklist"].length);
+  });
+
+  it("every extracted description is the exact English value from ALL_CRITERIA (no drift, no substitution)", () => {
+    const strings = extractCriteriaStrings();
+    for (const criterion of ALL_CRITERIA) {
+      const key = `content.criteria.${slugifyIdSegment(criterion.id)}.description`;
+      expect(strings[key], key).toBe(criterion.description);
+    }
+  });
+
+  it("only red-checklist criteria contribute checklistText, and its value is the exact preSubmitChecklistText", () => {
+    const strings = extractCriteriaStrings();
+    for (const criterion of ALL_CRITERIA) {
+      const key = `content.criteria.${slugifyIdSegment(criterion.id)}.checklistText`;
+      if (criterion.band === "red-checklist") {
+        expect(strings[key], key).toBe(criterion.preSubmitChecklistText);
+      } else {
+        expect(key in strings, key).toBe(false);
+      }
+    }
+  });
+
+  it("never leaks a control-field value (id/section/band/hook) as an extracted string", () => {
+    // Mirrors extractPatternStrings' control-field guard above — the sidecar
+    // must carry only translatable prose (description/checklistText), never
+    // the identifiers/hooks CriterionSchema also carries on the same record.
+    const values = new Set(Object.values(extractCriteriaStrings()));
+    for (const criterion of ALL_CRITERIA) {
+      expect(values.has(criterion.id), criterion.id).toBe(false);
+      expect(values.has(criterion.section), `${criterion.id}.section`).toBe(false);
+      expect(values.has(criterion.band), `${criterion.id}.band`).toBe(false);
+      if (criterion.principle !== undefined) {
+        expect(values.has(criterion.principle), `${criterion.id}.principle`).toBe(false);
+      }
+      if (criterion.band === "scaffolder-bake") {
+        expect(values.has(criterion.scaffolderRule), `${criterion.id}.scaffolderRule`).toBe(false);
+      }
+      if (criterion.band === "layer-c-enforce") {
+        expect(values.has(criterion.lintRuleId), `${criterion.id}.lintRuleId`).toBe(false);
+      }
+      if (criterion.band === "yellow-survey") {
+        expect(values.has(criterion.surveyQuestionId), `${criterion.id}.surveyQuestionId`).toBe(false);
+      }
+      // red-checklist's own hook, preSubmitChecklistText, is deliberately NOT
+      // checked here — that value IS the legitimately-extracted checklistText
+      // (checking it would trivially fail for every red-checklist row).
+    }
+  });
+
+  it("slugifies dotted criterion ids", () => {
+    const strings = extractCriteriaStrings();
+    const anyDottedKeyLeaked = Object.keys(strings).some((k) => {
+      // A properly-slugified key has no dot inside the id segment itself —
+      // only the fixed `content.criteria.<id>.<field>` separators.
+      const segments = k.split(".");
+      return segments.length !== 4;
+    });
+    expect(anyDottedKeyLeaked).toBe(false);
+  });
+});
+
+describe("extractFlowQuestionStrings", () => {
+  it("extracts the identity-lite prompt/help_text keys from the live Phase A registry", () => {
+    const strings = extractFlowQuestionStrings();
+
+    expect(strings["content.flowQuestion.il_language_english.prompt"]).toBe(
+      "What is your language called in English?",
+    );
+    expect(strings["content.flowQuestion.il_language_english.help_text"]).toContain(
+      "Start typing your language's English name",
+    );
+    expect(strings["content.flowQuestion.il_language_autonym.prompt"]).toBe(
+      "What is your language called in your own language?",
+    );
+    expect(strings["content.flowQuestion.il_language_code.prompt"]).toBe(
+      "Confirm your language's code",
+    );
+  });
+
+  it("excludes control fields — no key names a control field, and no fixture value leaks as a catalog value", () => {
+    const strings = extractFlowQuestionStrings();
+    const keys = Object.keys(strings);
+
+    // A key is `content.flowQuestion.<id>.<field>` (or `...option.<value>.label`).
+    // None of the control field NAMES ever appear as a trailing key segment.
+    for (const controlField of ["type", "required", "next", "id", "options_source", "engine_resolved", "advisory"]) {
+      expect(
+        keys.some((k) => k.endsWith(`.${controlField}`)),
+        `no key should end with .${controlField}`,
+      ).toBe(false);
+    }
+
+    // Fixture values are test vectors, not rendered prose — they must never
+    // surface as a catalog value. il_language_english's fixtures include
+    // "Hausa", "Swahili", "Ainu", etc.; il_language_code's include "hau", "hin".
+    const values = new Set(Object.values(strings));
+    for (const fixtureValue of ["Hausa", "Swahili", "Ainu", "hau", "hin"]) {
+      expect(values.has(fixtureValue), fixtureValue).toBe(false);
+    }
+  });
+
+  it("drops empty/whitespace-only fields (proxy: a field absent from the live definition emits no key)", () => {
+    const strings = extractFlowQuestionStrings();
+    // il_language_code declares no `label` field — the same trim-and-skip
+    // guard that would drop an empty/whitespace-only string also drops an
+    // absent one, so this exercises the same code path.
+    expect("content.flowQuestion.il_language_code.label" in strings).toBe(false);
+  });
+
+  it("excludes registry.reserve.ts's demoted modules (spec 050 D2; US2 forward-guard)", () => {
+    const strings = extractFlowQuestionStrings();
+    const keys = Object.keys(strings);
+    expect(keys.some((k) => k.includes("language_name_english"))).toBe(false);
+  });
+
+  // --- US2: coverage generalizes to every LIVE phase registry (A/B/F/G),
+  // not just the identity-lite Phase A questions. These assertions are derived
+  // from the live registries themselves, so a newly-added live question is
+  // automatically in scope — the gap can't silently reappear in a new flow.
+
+  it("covers questions from every live phase registry (A/B/F/G), not only Phase A", () => {
+    const strings = extractFlowQuestionStrings();
+    const keys = Object.keys(strings);
+    const idsWithKeys = new Set(
+      keys.map((k) => k.slice("content.flowQuestion.".length).split(".")[0]),
+    );
+
+    // Every live registry must contribute at least one question to the catalog.
+    for (const [phase, registry] of [
+      ["A", phaseARegistry],
+      ["B", phaseBRegistry],
+      ["F", phaseFRegistry],
+      ["G", phaseGRegistry],
+    ] as const) {
+      const registryIds = Object.keys(registry).map(slugifyIdSegment);
+      const covered = registryIds.filter((id) => idsWithKeys.has(id));
+      expect(
+        covered.length,
+        `phase ${phase} registry contributes no flow-question keys`,
+      ).toBeGreaterThan(0);
+    }
+
+    // Spot-check one representative id per non-A phase resolves to its prose,
+    // so the generalization is anchored to real render text, not just a count.
+    expect(strings["content.flowQuestion.pb_typing_approach.prompt"]).toBe(
+      "How would you most naturally type an accented letter on this keyboard?",
+    );
+    expect(strings["content.flowQuestion.pf_welcome_paragraph.prompt"]).toBe(
+      "In 1–3 sentences, what is this keyboard for?",
+    );
+    expect(strings["content.flowQuestion.project_display_name.prompt"]).toBe(
+      "What is the display name for your new keyboard?",
+    );
+  });
+
+  it("emits no key for any registry.reserve.ts module id (D2 — full reserve sweep)", () => {
+    const strings = extractFlowQuestionStrings();
+    const idsWithKeys = new Set(
+      Object.keys(strings).map((k) =>
+        k.slice("content.flowQuestion.".length).split(".")[0],
+      ),
+    );
+    // No reserve-only id may appear. Ids that also live in a live registry
+    // (none today, but be robust to future promotion) are excluded from the
+    // ban so this stays a reserve-*exclusion* check, not a duplicate-id check.
+    const liveIds = new Set(
+      [phaseARegistry, phaseBRegistry, phaseFRegistry, phaseGRegistry].flatMap(
+        (r) => Object.keys(r).map(slugifyIdSegment),
+      ),
+    );
+    for (const reserveId of Object.keys(reserveRegistry).map(slugifyIdSegment)) {
+      if (liveIds.has(reserveId)) continue;
+      expect(idsWithKeys.has(reserveId), `reserve id "${reserveId}" leaked`).toBe(
+        false,
+      );
+    }
+  });
+});

@@ -54,4 +54,30 @@ describe("strategyForCandidate()", () => {
     };
     expect(strategyForCandidate(candidate)).toBe("S-08");
   });
+
+  it("mechanism 'deadkey' → 'S-02', regardless of modifiers", () => {
+    const candidate: PlacementCandidate = {
+      ...baseDirect,
+      mechanism: "deadkey",
+      baseLetter: "f",
+    };
+    expect(strategyForCandidate(candidate)).toBe("S-02");
+  });
+
+  it("mechanism 'store-index' → 'S-02'", () => {
+    const candidate: PlacementCandidate = {
+      ...baseDirect,
+      mechanism: "store-index",
+      baseLetter: "f",
+    };
+    expect(strategyForCandidate(candidate)).toBe("S-02");
+  });
+
+  it("mechanism 'opaque' falls back to 'S-01' (advisory only)", () => {
+    const candidate: PlacementCandidate = {
+      ...baseDirect,
+      mechanism: "opaque",
+    };
+    expect(strategyForCandidate(candidate)).toBe("S-01");
+  });
 });

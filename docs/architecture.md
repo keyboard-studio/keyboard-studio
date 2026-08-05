@@ -52,6 +52,41 @@ one persistent working copy.
   by every step, serialized only at output.
   → [docs/workflow-model.md](workflow-model.md) · spec
   [§8](../spec.md#8-data-flow) → [`specs/008-data-flow/`](../specs/008-data-flow/spec.md)
+- **Generic step host (v1.3 studio).** The studio renders every survey/editor
+  step through one generic host — no per-step `switch` in the shell. A typed
+  step **manifest** (`{ id, component, layout, inputs, writes, flowRefs }`)
+  declares each step; `StepHost` resolves `manifest.find(activeStepId)`, renders
+  the declared `component` in the chrome its `layout` selects, and runs a single
+  centralized completion path (`applyStepCompletion → advance → session.advance`).
+  Adding, reordering, or re-laying-out a step is a manifest edit, not a shell
+  edit. The three bespoke survey wrappers converged onto a single `FlowStepHost`
+  + `makeFlowStepComponent` factory (spec 029 Stage 6, landed) — the factory is
+  the extension mechanism for new flows; existing flows keep their
+  `panelAdapters.tsx` adapters to preserve the golden-walk mock seam.
+  → [docs/workflow-model.md §7](workflow-model.md#7-survey-wrapper-architecture-spec-029-stage-6--flowstephost-convergence) ·
+  [`specs/028-qu-generic-step-host/`](../specs/028-qu-generic-step-host/spec.md) ·
+  [`specs/029-qu-flowstephost-convergence/`](../specs/029-qu-flowstephost-convergence/spec.md) ·
+  code [`packages/studio/src/components/StepHost.tsx`](../packages/studio/src/components/StepHost.tsx),
+  [`survey/FlowStepHost.tsx`](../packages/studio/src/survey/FlowStepHost.tsx)
+
+- **Location spine (spec 057).** Where the author *is* — tab, step, question —
+  is held in one addressable model, not in component lifetime. The hash grammar
+  is `#route[/step[/question]]`
+  ([`lib/location.ts`](../packages/studio/src/lib/location.ts)); a pure resolver
+  answers whether a location can be honoured and, if not, which of five closed
+  reasons applies ([`lib/resolveLocation.ts`](../packages/studio/src/lib/resolveLocation.ts));
+  and ONE jump primitive
+  ([`lib/jumpToLocation.ts`](../packages/studio/src/lib/jumpToLocation.ts))
+  either arrives or refuses — never partially arrives. `navigateTo()` remains
+  the only writer of `window.location.hash`; the `Location` overload widened its
+  vocabulary without adding a second router.
+
+  The defect this replaced is worth remembering, because it is the shape the
+  spine exists to prevent: `SurveyView` reset the traversal store on mount, so
+  a route change — which unmounts and remounts it — silently restarted the
+  walk while the working-copy store beside it kept every answer. Position was
+  modelled as component lifetime; content was not.
+  → [`specs/057-bulletproof-navigation/`](../specs/057-bulletproof-navigation/spec.md)
 
 ## The meta-flow (end to end)
 
@@ -79,7 +114,9 @@ pick keyboard ──▶ instantiate working copy (Track 1 copy/adapt | Track 2 i
 Authoritative detail: [`specs/008-data-flow/`](../specs/008-data-flow/spec.md)
 (the 15-step pipeline, survey phases, gallery instantiation) and
 [`specs/007-strategy-selection/`](../specs/007-strategy-selection/spec.md) (the
-A1–A7 axes + decision tree that drive the gallery defaults).
+A1–A7 axes + decision tree that drive the gallery defaults). How the four
+analytic lenses (facets, §7.1 axes, DISCUS, §11 criteria) compose across this
+pipeline as one keep-or-change flow: [docs/lens-model.md](lens-model.md).
 
 ## Validator layering
 
@@ -91,6 +128,47 @@ Three layers gate the working copy (spec [§10](../spec.md#10-validator-and-lint
 - **Layer C** hygiene → [`@keymanapp/keyboard-lint`](../packages/keyboard-lint/)
 - One **300 ms debounce** cycle runs the TS check and the WASM `kmcmplib` oracle
   as concurrent microtasks (decision D3). Do not add a second timer.
+  - **Scope of D3.** D3 governs the *validation/preview* trigger only — the rule
+    exists to prevent visible feedback races between the TS check and the WASM
+    oracle. It does not forbid every debounce in the studio. Non-validation
+    debounced side effects that produce no preview feedback are permitted: the
+    full-corpus import-fidelity round-trip (I2) already runs *outside* the cycle
+    (spec [§10](../spec.md#10-validator-and-lint-engine)), and the ~1 s
+    localStorage survey-draft autosave
+    ([`packages/studio/src/lib/draftAutosave.ts`](../packages/studio/src/lib/draftAutosave.ts))
+    debounces persistence only. Neither touches the validation path, so neither
+    is a "second debounce timer" in the D3 sense.
+
+## Exemplar sourcing — one offline path
+
+Which characters a language actually needs is answered in exactly one place
+([specs/044](../specs/044-cldr-sldr-exemplars/spec.md) FR-015):
+`sourceExemplars(bcp47)` in
+[`packages/engine/src/character-discovery/exemplarSource.ts`](../packages/engine/src/character-discovery/exemplarSource.ts).
+Its three consumers — `buildCharacterMap` (the Phase B picker), `suggestMissing`
+(gap suggestions and the surplus signal), and the studio's Phase B prefill — all
+read it rather than each wiring their own loader.
+
+It reads a **committed, version-pinned index** baked at prebuild from two
+sources: CLDR (`cldr-misc-full`, npm, lockfile-pinned) and SIL's SLDR (one
+SHA-256-pinned tarball). Consequences worth knowing before touching it:
+
+- **No network at authoring time.** The index is a lazily-imported JSON chunk,
+  so a full survey run makes zero requests. The live CLDR fetch loaders still
+  exist and are still exported, but they are the opt-in refresh route and the
+  test-injection seam — not the authoring path.
+- **Precedence is a lookup-time decision, not a bake-time one.** Both sources'
+  raw sets are retained per locale; CLDR wins where it covers a tag. The rule can
+  change without regenerating the artifact.
+- **Deterministic.** Same pins → byte-identical index. No wall clock anywhere in
+  the codegen; the `version.generated` stamp is derived from the pins.
+- **Attribution is per character.** Every returned character carries its source
+  and its confidence (SLDR's LDML draft rank). Confidence is surfaced in the UI,
+  never filtered on — most SLDR coverage is drafted or machine-generated, and
+  dropping it would discard the point of the feature.
+- **`null` means "no confident seed", never an error.** An uncovered tag or a
+  fired confidence gate falls through to whole-script behaviour; nothing blocks
+  the survey.
 
 ## Subsystem composition map
 
@@ -103,12 +181,13 @@ not a number maintained by hand here.)
 | Codec / KeyboardIR spine | spec §5a | `packages/engine/src/codec/` |
 | Working-copy spine | spec §8 / [specs/008](../specs/008-data-flow/spec.md) · [workflow-model.md](workflow-model.md) | engine working-copy + `packages/contracts/src/ir/` |
 | Data flow / survey | [specs/008](../specs/008-data-flow/spec.md) | `packages/engine/src/{character-discovery,inventory,loader}/`, `packages/studio/src/survey/` |
+| Exemplar sourcing | [specs/044](../specs/044-cldr-sldr-exemplars/spec.md) | `packages/engine/src/character-discovery/{exemplarSource,exemplarIndex,exemplarTypes}.ts` + `generated/exemplars.generated.json` |
 | Three-group routing | spec §9 | engine routing + `packages/studio` gallery scoping |
 | Strategy selection | [specs/007](../specs/007-strategy-selection/spec.md) | `packages/engine/src/strategy-selector/`, `recognizer/` |
 | Pattern schema (contract) | [specs/005](../specs/005-pattern-schema/spec.md) | `packages/contracts/src/pattern.ts` (+ zod `schemas.ts`) |
 | Pattern library | spec §5 / [specs/005](../specs/005-pattern-schema/spec.md) | `packages/engine/src/pattern-library/`, `pattern-apply/` |
 | Validator (A/B/A′/C) | spec §10 | `packages/engine/src/validator/`, `packages/keyboard-lint/` |
-| Compiler (kmcmplib) | spec §4 | `packages/engine/src/compiler/`, `packages/compiler/` |
+| Compiler (kmcmplib) | spec §4 | `packages/engine/src/compiler/` (wasm ships in the `@keymanapp/kmc-kmn` npm dependency) |
 | Simulator | spec §4 | `packages/engine/src/simulator/` |
 | Output / scaffolder | spec §11 / §12 | `packages/engine/src/{output,scaffolder}/` |
 | Studio SPA | spec §4 | `packages/studio/` |

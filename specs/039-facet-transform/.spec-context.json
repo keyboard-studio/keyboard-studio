@@ -1,0 +1,861 @@
+{
+  "workflow": "speckit",
+  "specName": "039-facet-transform",
+  "branch": "039-facet-transform",
+  "selectedAt": "2026-07-18T02:16:30.610Z",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "analyze",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-18T02:17:27.231Z"
+    },
+    {
+      "step": "analyze",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T02:21:40.581Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-18T02:26:00.518Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T02:46:04.848Z"
+    },
+    {
+      "step": "analyze",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T02:52:54.804Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-18T02:53:30.736Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T02:54:16.893Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T03:00:43.348Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-18T03:00:43.356Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:22:12.562Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:22:12.651Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:22:12.738Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:22:12.831Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:22:12.921Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:22:13.010Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:22:13.098Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:22:13.185Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:22:13.272Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:22:13.362Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:38:10.432Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:38:10.528Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:38:10.623Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:38:10.718Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:38:10.811Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:38:10.905Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:38:11.005Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:38:11.099Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:38:11.192Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:38:11.282Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:38:11.375Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:38:11.468Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:38:11.562Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:38:11.657Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:38:11.750Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:38:11.842Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:38:11.936Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:38:12.028Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:38:12.120Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T038",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:38:12.211Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T039",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:38:12.302Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:45:23.941Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:45:24.033Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:45:24.123Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:45:24.221Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:45:24.311Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:45:24.409Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:45:24.497Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-18T03:45:42.328Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-18T03:45:42.456Z"
+    }
+  ],
+  "concerns": [
+    {
+      "note": "F1 (MEDIUM): spec.md names one gate facet (source.mnemonic-vs-positional) but transition-matrix.contract.md invariant #4 enumerates two, adding source.casing which the spec never authorizes in Edge Cases/Out of Scope. Reconcile spec<->contract gate-facet set.",
+      "step": "analyze"
+    },
+    {
+      "note": "Codec gap: LSHIFT is absent from KNOWN_VKEY_MODIFIERS (parse.ts) so [LSHIFT K_A] becomes an opaque raw fragment; RSHIFT/LCTRL/RCTRL/LALT/RALT are tokenized. Fixtures use LCTRL/RCTRL for the split-fold demo. Worth filing against the codec.",
+      "step": "implement"
+    },
+    {
+      "note": "Studio wiring (useFacetTransform + FacetTransformPanel + commitFacetTransform) is built, typechecked, and store-tested but not yet mounted into a route — there is no live measurement source until spec 037 lands the cause-tagged source.* schema (D4 guard). Engine is fixture-tested only.",
+      "step": "implement"
+    }
+  ],
+  "telemetryInstanceId": "ed41353a-572a-4d73-a717-9e5e8137afc9",
+  "step_summaries": {
+    "tasks": {
+      "summary": "tasks step re-run: tasks.md complete with 39 tasks (T001-T039) across Setup, Foundational, US1/US2/US3, Polish. Incorporates all analyze remediations (T038 SC-002, T039 SC-003/FR-011, D4 fixture guards, source.casing gate facet, Article IV debounce caution). Tests write-first per spec Testing section. Cleared to /speckit-implement.",
+      "taskCount": 39
+    },
+    "implement": {
+      "summary": "Facet Transform Engine shipped: new packages/engine/src/facet-transform module (types, matrix, propose/refuse, gated apply, 3 migrations) + studio hook/panel/store action; 30 engine + 2 studio tests green across all 3 impact classes, declines, gate, opaque integrity, FR-013 re-seed."
+    }
+  },
+  "coverage": {
+    "FR-001": {
+      "tasks": [
+        "T009",
+        "T015",
+        "T022",
+        "T028"
+      ]
+    },
+    "FR-002": {
+      "tasks": [
+        "T007",
+        "T017",
+        "T019",
+        "T025",
+        "T031"
+      ],
+      "tests": [
+        "gate.test.ts::no-silent-transform structural guard"
+      ]
+    },
+    "FR-003": {
+      "tasks": [
+        "T005",
+        "T016",
+        "T024",
+        "T030",
+        "T032"
+      ],
+      "tests": [
+        "transition-matrix.test.ts::impact-class drift guard"
+      ]
+    },
+    "FR-004": {
+      "tasks": [
+        "T005",
+        "T006",
+        "T032"
+      ],
+      "tests": [
+        "decline.test.ts",
+        "transition-matrix.test.ts"
+      ]
+    },
+    "FR-005": {
+      "tasks": [
+        "T008",
+        "T020"
+      ],
+      "tests": [
+        "longpress-to-flick.test.ts::exception preservation"
+      ]
+    },
+    "FR-006": {
+      "tasks": [
+        "T017",
+        "T025"
+      ]
+    },
+    "FR-007": {
+      "tasks": [
+        "T011",
+        "T016"
+      ],
+      "tests": [
+        "encoding-spelling.test.ts::parity + invertibility"
+      ]
+    },
+    "FR-008": {
+      "tasks": [
+        "T027",
+        "T029",
+        "T030"
+      ],
+      "tests": [
+        "nfd-to-nfc.test.ts::companion backspace rewrite"
+      ]
+    },
+    "FR-009": {
+      "tasks": [
+        "T009",
+        "T033"
+      ],
+      "tests": [
+        "gate.test.ts::opaque-fragment integrity"
+      ]
+    },
+    "FR-010": {
+      "tasks": [
+        "T009",
+        "T033"
+      ],
+      "tests": [
+        "gate.test.ts::compile-regression guard"
+      ]
+    },
+    "FR-011": {
+      "tasks": [
+        "T010"
+      ],
+      "tests": [
+        "preview.test.ts::producedSetDelta"
+      ]
+    },
+    "FR-012": {
+      "tasks": [
+        "T008",
+        "T021"
+      ],
+      "tests": [
+        "longpress-to-flick.test.ts::partial acceptance"
+      ]
+    },
+    "FR-013": {
+      "tasks": [
+        "T010",
+        "T034",
+        "T035"
+      ],
+      "tests": [
+        "workingCopyStore.facetTransform.test.ts"
+      ]
+    }
+  },
+  "decisions": [
+    {
+      "decision": "{\"note\":\"analyze re-run after tasks: 0 CRITICAL/HIGH. Prior F1 gate-facet concern RESOLVED (spec now names both source.mnemonic-vs-positional and source.casing, matching contract invariant #4). Remediated 5 findings in tasks.md/quickstart.md: G2 added SC-002 test T038; G1/G3 added FR-011+SC-003 test T039; U1 added D4 fixture-only guard to T003/T014; N1 added Article-IV debounce caution to T026; I2 added source.casing to quickstart Scenario 4. Cleared to /speckit-implement.\",\"step\":\"analyze\"}"
+    },
+    {
+      "decision": "encoding-spelling migration IR-observable half is the modifier fold (LCTRL/RCTRL->CTRL); pure quoted-literal<->u-notation is a semantic identity at the IR level",
+      "why": "the codec canonicalizes char spelling on emit (BMP chars always render as U+XXXX), so char-spelling normalization is not IR-observable; the source-diff is rendered separately for the preview",
+      "rejected": "mutating char nodes for spelling (no-op, since IR already canonical)"
+    },
+    {
+      "decision": "compile-regression gate checks compile().success in addition to oracle error/fatal severity",
+      "why": "validateWithOracle only emits hint/warning for broken keyboards (undefined group, undeclared store); compile().success is the reliable blocking signal",
+      "rejected": "oracle-severity-only gate (would let compile-breaking transforms commit)"
+    },
+    {
+      "decision": "verify.ts dynamic-imports the simulator",
+      "why": "the Node-only simulator vendor uses bare import specifiers Vite cannot resolve; a static import dragged it into the studio bundle via the engine barrel",
+      "rejected": "static top-level import of simulate (breaks studio build/tests)"
+    }
+  ],
+  "currentTask": "T037",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Created facet-transform module + curated index.ts barrel",
+      "files": [
+        "packages/engine/src/facet-transform/index.ts"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Re-exported facet-transform barrel from engine package root after pattern-apply",
+      "files": [
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "SourceFacetMeasurement fixture builder with D4 fixture-only guard",
+      "files": [
+        "packages/engine/src/facet-transform/__fixtures__/measurements.ts"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Engine types: entities 0-4, refusal, commit-result, D5 disclaimer",
+      "files": [
+        "packages/engine/src/facet-transform/types.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Value-transition matrix: v1 supported + declined rows, sub-profile keyed, gate facets",
+      "files": [
+        "packages/engine/src/facet-transform/transition-matrix.ts"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "proposeFacetTransform + refusal paths (gate/undetermined/declined)",
+      "files": [
+        "packages/engine/src/facet-transform/propose.ts"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "AffectedSite cause-tag disposition builder",
+      "files": [
+        "packages/engine/src/facet-transform/propose.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Shared commit gate + applyFacetTransform: verify dispatch, opaque-diff, one-shot oracle",
+      "files": [
+        "packages/engine/src/facet-transform/verify.ts"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "producedSetDelta + producedSetChanged for FR-011/FR-013",
+      "files": [
+        "packages/engine/src/facet-transform/verify.ts"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "House-target decision-table resolver (first-match-wins, provenance)",
+      "files": [
+        "packages/engine/src/facet-transform/house-target-policy.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Matrix invariant + drift-guard test (invariants 1-5)",
+      "files": [
+        "packages/engine/src/facet-transform/transition-matrix.test.ts"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Parity + invertibility fixture test (SC-001)",
+      "files": [
+        "packages/engine/src/facet-transform/encoding-spelling.test.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "House-target provenance test (chip only when non-default)",
+      "files": [
+        "packages/engine/src/facet-transform/house-target-policy.test.ts"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Modifier-fold precondition test (refuse per-site)",
+      "files": [
+        "packages/engine/src/facet-transform/encoding-spelling.test.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "encoding-spelling migration: modifier fold + char-spelling identity",
+      "files": [
+        "packages/engine/src/facet-transform/migrations/encoding-spelling.ts"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "Behavior-preserving verify branch: produced-set + compile/simulate parity + invertibility",
+      "files": [
+        "packages/engine/src/facet-transform/verify.ts"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "source-diff preview assembly + houseTargetProvenance",
+      "files": [
+        "packages/engine/src/facet-transform/propose.ts"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Exception-preservation + gap + per-site refusal test (SC-004)",
+      "files": [
+        "packages/engine/src/facet-transform/longpress-to-flick.test.ts"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Partial-acceptance test (FR-012)",
+      "files": [
+        "packages/engine/src/facet-transform/longpress-to-flick.test.ts"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "longpress-to-flick migration: sk->flick, provenance, over-budget refusal",
+      "files": [
+        "packages/engine/src/facet-transform/migrations/longpress-to-flick.ts"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Derived flick-direction assignment surfaced as derivedParameterReview",
+      "files": [
+        "packages/engine/src/facet-transform/migrations/longpress-to-flick.ts"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "ux-changing verify branch (output unchanged via compile gate)",
+      "files": [
+        "packages/engine/src/facet-transform/verify.ts"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "ux-description preview assembly (namedLoss, derived table, refusals)",
+      "files": [
+        "packages/engine/src/facet-transform/propose.ts"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "Output-diff + companion backspace-rewrite test (SC-006)",
+      "files": [
+        "packages/engine/src/facet-transform/nfd-to-nfc.test.ts"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "nfd-to-nfc migration: compose base+combining RHS",
+      "files": [
+        "packages/engine/src/facet-transform/migrations/nfd-to-nfc.ts"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "Companion backspace-rule removal (unreachable-rule detection)",
+      "files": [
+        "packages/engine/src/facet-transform/migrations/nfd-to-nfc.ts"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "output-changing verify branch + output-diff preview",
+      "files": [
+        "packages/engine/src/facet-transform/verify.ts",
+        "packages/engine/src/facet-transform/propose.ts"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "Honest-decline + refusal test (gate/permanent/deferred/undetermined)",
+      "files": [
+        "packages/engine/src/facet-transform/decline.test.ts"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "Compile-regression + opaque-integrity test (SC-005/SC-006)",
+      "files": [
+        "packages/engine/src/facet-transform/gate.test.ts"
+      ]
+    },
+    "T038": {
+      "status": "DONE",
+      "did": "No-silent-transform structural test (SC-002)",
+      "files": [
+        "packages/engine/src/facet-transform/gate.test.ts"
+      ]
+    },
+    "T039": {
+      "status": "DONE",
+      "did": "Preview-completeness + fall-through delta test (SC-003/FR-011)",
+      "files": [
+        "packages/engine/src/facet-transform/preview.test.ts"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "Studio facet-transform stage: useFacetTransform hook wires propose/commit to store",
+      "files": [
+        "packages/studio/src/hooks/useFacetTransform.ts"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "Studio proposal UI: source-diff preview + explicit confirm + provenance chip",
+      "files": [
+        "packages/studio/src/components/facet-transform/FacetTransformPanel.tsx"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "Studio ux-description preview + derived-flick review + per-site disposition controls",
+      "files": [
+        "packages/studio/src/components/facet-transform/FacetTransformPanel.tsx"
+      ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "Studio output-diff preview + explicit-confirmation gate",
+      "files": [
+        "packages/studio/src/components/facet-transform/FacetTransformPanel.tsx"
+      ]
+    },
+    "T034": {
+      "status": "DONE",
+      "did": "FR-013 produced-set re-derivation store test",
+      "files": [
+        "packages/studio/src/stores/workingCopyStore.facetTransform.test.ts"
+      ]
+    },
+    "T035": {
+      "status": "DONE",
+      "did": "Studio re-seed wiring: commitFacetTransform action re-seeds axes on producedSetChanged",
+      "files": [
+        "packages/studio/src/stores/workingCopyStore.ts",
+        "packages/studio/src/hooks/useFacetTransform.ts"
+      ]
+    },
+    "T036": {
+      "status": "DONE",
+      "did": "No new corpus keyboards cited (synthetic inline .kmn fixtures used, deterministic) — phonebook needs no rows",
+      "files": [
+        "docs/keyboard-index.md"
+      ]
+    },
+    "T037": {
+      "status": "DONE",
+      "did": "Quickstart validation: 30 engine tests + 2 studio store tests green; typecheck/eslint/depcruise clean",
+      "files": [
+        "specs/039-facet-transform/quickstart.md"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "engine facet-transform suite (Scenarios 1-5 + matrix + preview)",
+      "command": "pnpm --filter @keyboard-studio/engine test src/facet-transform",
+      "result": "8 files, 30 tests passed"
+    },
+    {
+      "what": "studio FR-013 re-seed store test",
+      "command": "pnpm --filter @keyboard-studio/studio test workingCopyStore.facetTransform",
+      "result": "2 tests passed"
+    },
+    {
+      "what": "typecheck",
+      "command": "pnpm --filter engine/studio typecheck",
+      "result": "engine 0 errors; studio clean except pre-existing unbuilt-glottolog codegen (unrelated)"
+    },
+    {
+      "what": "lint + architecture boundaries",
+      "command": "eslint new files; pnpm depcruise",
+      "result": "eslint clean; 0 dependency violations (728 modules)"
+    }
+  ],
+  "last_action": "all 39 tasks done — 30 engine + 2 studio tests pass; typecheck/eslint/depcruise clean"
+}

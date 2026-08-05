@@ -11,6 +11,8 @@
 // behaviour is identical to the original local components — no silent defaults.
 
 import { useState } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
+import { plural } from "@lingui/core/macro";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
 import { OSKFrame } from "../../components/OSKFrame.tsx";
@@ -37,8 +39,10 @@ export function GalleryPreviewPane({
   onKeyTap,
   defaultOskMode,
   heading,
-  warningLabel = "Warnings:",
+  warningLabel,
 }: GalleryPreviewPaneProps) {
+  const { t } = useLingui();
+  const resolvedWarningLabel = warningLabel ?? t({ id: "editor.assignLoop.preview.defaultWarningsLabel", message: "Warnings:" });
   const [oskMode, setOskMode] = useState<OskMode>(defaultOskMode);
 
   const applyWarnings =
@@ -46,9 +50,14 @@ export function GalleryPreviewPane({
       ? stage.scaffoldWarnings
       : [];
 
+  // Runtime/parse-pipeline warnings ride their own channel (refs #467) so they
+  // render apart from the pattern-application "Apply warnings" heading.
+  const runtimeWarnings =
+    stage.kind === "ready" ? (stage.runtimeWarnings ?? []) : [];
+
   return (
     <section
-      aria-label={`${heading} keyboard preview`}
+      aria-label={t({ id: "editor.assignLoop.preview.sectionAriaLabel", message: `${{ heading }} keyboard preview` })}
       style={{
         display: "flex",
         flexDirection: "column",
@@ -98,9 +107,32 @@ export function GalleryPreviewPane({
             fontFamily: FONT,
           }}
         >
-          <strong>{warningLabel}</strong>
+          <strong>{resolvedWarningLabel}</strong>
           <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
             {applyWarnings.map((w, i) => (
+              <li key={i}>{w}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {runtimeWarnings.length > 0 && (
+        <div
+          role="alert"
+          aria-live="polite"
+          style={{
+            background: "#2a1a00",
+            border: "1px solid #f0883e",
+            borderRadius: 6,
+            padding: "8px 12px",
+            fontSize: 12,
+            color: "#f0883e",
+            fontFamily: FONT,
+          }}
+        >
+          <strong><Trans id="editor.assignLoop.preview.pipelineWarnings">Pipeline warnings:</Trans></strong>
+          <ul style={{ margin: "4px 0 0", paddingLeft: 18 }}>
+            {runtimeWarnings.map((w, i) => (
               <li key={i}>{w}</li>
             ))}
           </ul>
@@ -113,7 +145,7 @@ export function GalleryPreviewPane({
         <div
           role="status"
           aria-live="polite"
-          aria-label="Loading keyboard preview"
+          aria-label={t({ id: "editor.assignLoop.preview.loadingAriaLabel", message: "Loading keyboard preview" })}
           style={{
             padding: "24px 0",
             textAlign: "center",
@@ -123,10 +155,12 @@ export function GalleryPreviewPane({
           }}
         >
           {stage.kind === "fetching"
-            ? "Fetching keyboard source..."
+            ? t({ id: "editor.assignLoop.preview.fetching", message: "Fetching keyboard source..." })
             : stage.kind === "compiling"
-              ? `Compiling${stage.isWarmCompile ? "" : " (loading WASM)"}...`
-              : "Loading..."}
+              ? (stage.isWarmCompile
+                  ? t({ id: "editor.assignLoop.preview.compiling", message: "Compiling..." })
+                  : t({ id: "editor.assignLoop.preview.compilingColdStart", message: "Compiling (loading WASM)..." }))
+              : t({ id: "editor.assignLoop.preview.loadingEllipsis", message: "Loading..." })}
         </div>
       )}
 
@@ -144,7 +178,10 @@ export function GalleryPreviewPane({
             fontFamily: FONT,
           }}
         >
-          <strong>[ERROR]</strong> Preview failed ({stage.step}): {stage.message}
+          <strong><Trans id="editor.assignLoop.preview.errorPrefix">[ERROR]</Trans></strong>{" "}
+          <Trans id="editor.assignLoop.preview.previewFailed">
+            Preview failed ({stage.step}): {stage.message}
+          </Trans>
           <div style={{ marginTop: 10 }}>
             <button
               type="button"
@@ -160,7 +197,7 @@ export function GalleryPreviewPane({
                 fontFamily: FONT,
               }}
             >
-              Retry
+              <Trans id="editor.assignLoop.preview.retryButton">Retry</Trans>
             </button>
           </div>
         </div>
@@ -180,7 +217,13 @@ export function GalleryPreviewPane({
         <div
           role="status"
           aria-live="polite"
-          aria-label={`${stage.compileResult.diagnostics.length} compiler diagnostic(s)`}
+          aria-label={t({
+            id: "editor.assignLoop.preview.diagnosticsCountAriaLabel",
+            message: plural(stage.compileResult.diagnostics.length, {
+              one: "# compiler diagnostic",
+              other: "# compiler diagnostics",
+            }),
+          })}
           style={{
             background: BG_CARD,
             border: `1px solid ${BORDER}`,
@@ -192,7 +235,13 @@ export function GalleryPreviewPane({
           }}
         >
           <span style={{ color: "#d29922" }}>
-            {stage.compileResult.diagnostics.length} compiler diagnostic(s).
+            {t({
+              id: "editor.assignLoop.preview.diagnosticsCount",
+              message: plural(stage.compileResult.diagnostics.length, {
+                one: "# compiler diagnostic.",
+                other: "# compiler diagnostics.",
+              }),
+            })}
           </span>
         </div>
       )}

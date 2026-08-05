@@ -4,6 +4,21 @@
 
 import type { IRPath, KeyboardIR } from "@keyboard-studio/contracts";
 
+/**
+ * The two authoring tracks (spec §8 v1.3.0).
+ *
+ * Canonical location: was declared in survey/index.ts (post spec-029 barrel
+ * convergence, after phaseWrappers.tsx/PhaseTrack.tsx were deleted) so that
+ * stores/surveySessionStore.ts's type-only import kept resolving. Moved here
+ * (a leaf types module with no runtime imports of its own) so
+ * surveySessionStore.ts can import it WITHOUT going through survey/index.ts —
+ * that barrel re-exports PhaseB.tsx at runtime, and PhaseB.tsx now imports
+ * surveySessionStore.ts at runtime too (the Phase B character-map pane work),
+ * which would otherwise close a runtime dependency cycle. index.ts re-exports
+ * this type for existing external consumers.
+ */
+export type Track = "copy" | "adapt";
+
 /** Rendering-level question type as declared in the YAML flow. */
 export type FlowQuestionType =
   | "text"
@@ -46,6 +61,12 @@ export interface FlowQuestion {
   label?: string;
   body?: string;
   help_text?: string;
+  /**
+   * Optional short noun-phrase override for this question's decision-trail
+   * headline (spec 055 FR-009, catalog-audit-label.contract.md). Authored
+   * only where `prompt` reads badly as a headline; sparse by design.
+   */
+  audit_label?: string;
   required?: boolean;
   options?: FlowOption[];
   /** Reference to a dynamic options source (e.g. "@langtags_iso639"). Not resolved in v1. */
@@ -100,6 +121,32 @@ export interface AnswerStackEntry {
 export type ValidationResult =
   | { ok: true }
   | { ok: false; code: string; message: string };
+
+// ---------------------------------------------------------------------------
+// Output reach (spec 057 FR-016, contracts/question-output-reach.md)
+// ---------------------------------------------------------------------------
+
+/**
+ * An emitted artifact a question's answer reaches.
+ *
+ * One member today. The point of the type is that the set is CLOSED and named:
+ * a question cannot declare it reaches "the package" in prose that no check can
+ * read.
+ */
+export type OutputTargetId = "package-descriptor";
+
+/**
+ * An identity-overlay field the answer feeds. Names match `IdentityOverlay`'s
+ * own fields (`lib/projectWorkingCopyVfs.ts`) so the counterfactual can vary the
+ * declared field directly rather than translating between two vocabularies.
+ */
+export type IdentityOverlayField = "displayName" | "bcp47" | "languageName";
+
+/** One output artifact + field a question's answer reaches. */
+export interface OutputWrite {
+  target: OutputTargetId;
+  field: IdentityOverlayField;
+}
 
 /**
  * Context passed to a module's `mutate()` (spec-014, mutate-seam.contract.md).
@@ -170,6 +217,23 @@ export interface QuestionModule {
    * Explicit `[]` is required for questions that write nothing (G7 / FR-006).
    */
   writes?: readonly IRPath[];
+
+  /**
+   * Output artifacts this question's answer reaches, if any (spec 057 FR-016).
+   *
+   * DIFFERENT ADDRESS SPACE from `writes`. `writes` is `IRPath[]` over
+   * `KeyboardIR` and governs `mutate()` containment; `outputs` names emitted
+   * ARTIFACTS. A question may legitimately declare `writes: []` and a non-empty
+   * `outputs` — an identity answer writes no IR and still ships in the `.kps`.
+   * That combination was previously inexpressible, which is why a question could
+   * promise the author their answer went on the finished keyboard while nothing
+   * in the repository could check the claim.
+   *
+   * Absent is permitted (most questions reach no output artifact directly); an
+   * explicit `[]` states it deliberately. `questions/outputReach.test.ts`
+   * validates every declared entry against the writer's own consumed-field table.
+   */
+  outputs?: readonly OutputWrite[];
 
   /**
    * Optional IR mutation hook — the question-module IR write seam (spec-014,

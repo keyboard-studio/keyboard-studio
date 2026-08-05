@@ -8,11 +8,22 @@
 // useGoogleAuth at the module boundary; let useIdentitySession run its real
 // composition logic so derived state is honest.
 
-import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, fireEvent } from "@testing-library/react";
+import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { cleanup, screen, fireEvent } from "@testing-library/react";
+import { render, i18n } from "../test/renderWithI18n.tsx";
+import { messages as frMessages } from "../locales/fr/messages.json?lingui";
+import enCatalogRaw from "../locales/en/messages.json";
+import frCatalogRaw from "../locales/fr/messages.json";
 import { ProfileScreen } from "./ProfileScreen.tsx";
 import { useGitHubAuth, type UseGitHubAuthResult } from "../hooks/useGitHubAuth.ts";
 import { useGoogleAuth, type UseGoogleAuthResult } from "../hooks/useGoogleAuth.ts";
+
+const enCatalog = enCatalogRaw as Record<string, string>;
+const frCatalog = frCatalogRaw as Record<string, string>;
+
+function renderProfileScreen() {
+  return render(<ProfileScreen />);
+}
 
 vi.mock("../hooks/useGitHubAuth.ts", () => ({ useGitHubAuth: vi.fn() }));
 vi.mock("../hooks/useGoogleAuth.ts", () => ({ useGoogleAuth: vi.fn() }));
@@ -70,33 +81,33 @@ afterEach(() => {
 describe("ProfileScreen — guest (neither provider linked)", () => {
   it("renders a 'link github' control when GitHub is not connected", () => {
     mockAuth({ status: "idle" });
-    render(<ProfileScreen />);
+    renderProfileScreen();
     expect(screen.getByRole("button", { name: "Link GitHub" })).toBeTruthy();
   });
 
   it("renders a 'link google' control when Google is not connected", () => {
     mockAuth({ status: "idle" });
-    render(<ProfileScreen />);
+    renderProfileScreen();
     expect(screen.getByRole("button", { name: "Link Google" })).toBeTruthy();
   });
 
   it("clicking 'link github' starts the GitHub connect flow", () => {
     mockAuth({ status: "idle" });
-    render(<ProfileScreen />);
+    renderProfileScreen();
     fireEvent.click(screen.getByRole("button", { name: "Link GitHub" }));
     expect(connect).toHaveBeenCalledOnce();
   });
 
   it("clicking 'link google' starts the Google connect flow", () => {
     mockAuth({ status: "idle" });
-    render(<ProfileScreen />);
+    renderProfileScreen();
     fireEvent.click(screen.getByRole("button", { name: "Link Google" }));
     expect(googleConnect).toHaveBeenCalledOnce();
   });
 
   it("does not render a 'Sign out' button when no provider is linked", () => {
     mockAuth({ status: "idle" });
-    render(<ProfileScreen />);
+    renderProfileScreen();
     expect(screen.queryByRole("button", { name: "Sign out" })).toBeNull();
   });
 });
@@ -104,26 +115,26 @@ describe("ProfileScreen — guest (neither provider linked)", () => {
 describe("ProfileScreen — GitHub linked", () => {
   it("shows the GitHub login name when GitHub is connected", () => {
     mockAuth({ status: "connected", login: "octocat" });
-    render(<ProfileScreen />);
+    renderProfileScreen();
     // Login appears as the username heading and in the github: line.
     expect(screen.getAllByText("octocat").length).toBeGreaterThanOrEqual(1);
   });
 
   it("does not render a 'link github' control when GitHub is already linked", () => {
     mockAuth({ status: "connected", login: "octocat" });
-    render(<ProfileScreen />);
+    renderProfileScreen();
     expect(screen.queryByRole("button", { name: "Link GitHub" })).toBeNull();
   });
 
   it("renders the single 'Sign out' button when signed in", () => {
     mockAuth({ status: "connected", login: "octocat" });
-    render(<ProfileScreen />);
+    renderProfileScreen();
     expect(screen.getByRole("button", { name: "Sign out" })).toBeTruthy();
   });
 
   it("still offers 'link google' when only GitHub is linked", () => {
     mockAuth({ status: "connected", login: "octocat" });
-    render(<ProfileScreen />);
+    renderProfileScreen();
     expect(screen.getByRole("button", { name: "Link Google" })).toBeTruthy();
   });
 });
@@ -131,14 +142,14 @@ describe("ProfileScreen — GitHub linked", () => {
 describe("ProfileScreen — Google linked", () => {
   it("shows the Google display name when Google is connected", () => {
     mockAuth({ status: "idle" }, { status: "connected", identity: googleIdentity });
-    render(<ProfileScreen />);
+    renderProfileScreen();
     // Name appears as the username heading and in the google: line.
     expect(screen.getAllByText("Tester User").length).toBeGreaterThanOrEqual(1);
   });
 
   it("does not render a 'link google' control when Google is already linked", () => {
     mockAuth({ status: "idle" }, { status: "connected", identity: googleIdentity });
-    render(<ProfileScreen />);
+    renderProfileScreen();
     expect(screen.queryByRole("button", { name: "Link Google" })).toBeNull();
   });
 });
@@ -149,7 +160,7 @@ describe("ProfileScreen — single global sign-out (one account)", () => {
       { status: "connected", login: "octocat" },
       { status: "connected", identity: googleIdentity },
     );
-    render(<ProfileScreen />);
+    renderProfileScreen();
     expect(screen.getAllByRole("button", { name: "Sign out" })).toHaveLength(1);
   });
 
@@ -158,7 +169,7 @@ describe("ProfileScreen — single global sign-out (one account)", () => {
       { status: "connected", login: "octocat" },
       { status: "connected", identity: googleIdentity },
     );
-    render(<ProfileScreen />);
+    renderProfileScreen();
     expect(screen.queryByRole("button", { name: "Sign out of GitHub" })).toBeNull();
     expect(screen.queryByRole("button", { name: "Sign out of Google" })).toBeNull();
   });
@@ -168,7 +179,7 @@ describe("ProfileScreen — single global sign-out (one account)", () => {
       { status: "connected", login: "octocat" },
       { status: "connected", identity: googleIdentity },
     );
-    render(<ProfileScreen />);
+    renderProfileScreen();
     fireEvent.click(screen.getByRole("button", { name: "Sign out" }));
     expect(disconnect).toHaveBeenCalledOnce();
     expect(googleDisconnect).toHaveBeenCalledOnce();
@@ -178,7 +189,7 @@ describe("ProfileScreen — single global sign-out (one account)", () => {
 describe("ProfileScreen — verifying (token round-trip in flight)", () => {
   it("does not flash the 'Guest' state while the GitHub token is being verified", () => {
     mockAuth({ status: "verifying" });
-    render(<ProfileScreen />);
+    renderProfileScreen();
     // No "Guest" heading, no "?" avatar, and none of the link/sign-out controls
     // should appear before the token round-trip resolves.
     expect(screen.queryByText("Guest")).toBeNull();
@@ -190,7 +201,7 @@ describe("ProfileScreen — verifying (token round-trip in flight)", () => {
 
   it("renders a neutral status placeholder while verifying", () => {
     mockAuth({ status: "verifying" });
-    render(<ProfileScreen />);
+    renderProfileScreen();
     expect(screen.getByRole("status")).toBeTruthy();
   });
 });
@@ -198,7 +209,7 @@ describe("ProfileScreen — verifying (token round-trip in flight)", () => {
 describe("ProfileScreen — error display", () => {
   it("renders github.error text as an alert when a GitHub error is present", () => {
     mockAuth({ status: "idle", error: "GitHub sign-in was rejected." });
-    render(<ProfileScreen />);
+    renderProfileScreen();
     const alerts = screen.getAllByRole("alert");
     const ghAlert = alerts.find((el) => el.textContent === "GitHub sign-in was rejected.");
     expect(ghAlert).toBeTruthy();
@@ -209,7 +220,7 @@ describe("ProfileScreen — error display", () => {
       { status: "idle" },
       { status: "error", error: "Google sign-in could not be completed." },
     );
-    render(<ProfileScreen />);
+    renderProfileScreen();
     const alerts = screen.getAllByRole("alert");
     const googleAlert = alerts.find(
       (el) => el.textContent === "Google sign-in could not be completed.",
@@ -219,7 +230,7 @@ describe("ProfileScreen — error display", () => {
 
   it("does not render an alert when there is no error", () => {
     mockAuth({ status: "idle" });
-    render(<ProfileScreen />);
+    renderProfileScreen();
     expect(screen.queryByRole("alert")).toBeNull();
   });
 });
@@ -227,8 +238,84 @@ describe("ProfileScreen — error display", () => {
 describe("ProfileScreen — back navigation", () => {
   it("navigates to #survey when 'Back to studio' is clicked", () => {
     mockAuth({ status: "idle" });
-    render(<ProfileScreen />);
+    renderProfileScreen();
     fireEvent.click(screen.getByRole("button", { name: /Back to studio/i }));
     expect(window.location.hash).toBe("#survey");
+  });
+});
+
+// T012 (spec 046 US1): acceptance check that a fully-translated area renders
+// zero English chrome once `fr` is active — profile.* is 14/14 translated.
+// `englishOnly` is derived from the live catalogs (not hardcoded strings) so a
+// new profile.* id or a translation that regresses to the English value fails
+// loudly here instead of silently leaking English under fr.
+describe("ProfileScreen — locale acceptance (T012: zero English chrome under fr)", () => {
+  const chromeIds = Object.keys(enCatalog).filter((id) => id.startsWith("profile."));
+  const englishOnly = chromeIds
+    .map((id) => enCatalog[id])
+    .filter((text, idx) => text !== frCatalog[chromeIds[idx] as string]);
+
+  beforeAll(() => {
+    // Precondition: every profile.* id must actually have a distinct fr
+    // translation, or this test would compare English against itself.
+    expect(englishOnly).toHaveLength(chromeIds.length);
+    i18n.load("fr", frMessages);
+  });
+
+  afterEach(() => {
+    cleanup();
+    i18n.activate("en");
+  });
+
+  function renderUnderFrench() {
+    i18n.activate("fr");
+    return renderProfileScreen();
+  }
+
+  it("renders the guest state with zero English profile chrome", () => {
+    mockAuth({ status: "idle" });
+    renderUnderFrench();
+
+    for (const text of englishOnly) {
+      expect(screen.queryByText(text)).toBeNull();
+    }
+    // Positive control — the French strings actually rendered, not just that
+    // English disappeared (e.g. from an empty/broken tree).
+    expect(screen.getByRole("main", { name: frCatalog["profile.page.ariaLabel"]! })).toBeTruthy();
+    expect(screen.getByText(frCatalog["profile.guestName"]!)).toBeTruthy();
+    expect(screen.getByText(frCatalog["profile.accountKind.guest"]!)).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: frCatalog["profile.github.linkLabel"]! }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: frCatalog["profile.google.linkLabel"]! }),
+    ).toBeTruthy();
+  });
+
+  it("renders the signed-in (both providers linked) state with zero English profile chrome", () => {
+    mockAuth(
+      { status: "connected", login: "octocat" },
+      { status: "connected", identity: googleIdentity },
+    );
+    renderUnderFrench();
+
+    for (const text of englishOnly) {
+      expect(screen.queryByText(text)).toBeNull();
+    }
+    expect(screen.getByText(frCatalog["profile.accountKind.signedIn"]!)).toBeTruthy();
+    expect(screen.getByRole("button", { name: frCatalog["profile.signOut"]! })).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: frCatalog["profile.backToStudio"]! }),
+    ).toBeTruthy();
+  });
+
+  it("renders the verifying state with zero English profile chrome", () => {
+    mockAuth({ status: "verifying" });
+    renderUnderFrench();
+
+    for (const text of englishOnly) {
+      expect(screen.queryByText(text)).toBeNull();
+    }
+    expect(screen.getByRole("status").textContent).toBe(frCatalog["profile.checkingSignIn"]);
   });
 });

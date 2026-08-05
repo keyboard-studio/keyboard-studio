@@ -1,0 +1,31 @@
+# Companion project config + git-workflow policy (keyboard-studio).
+#
+# The companion runtime reads `livingSpecs` and `commands.<cmd>.hooks` from this
+# file. The git workflow below is enforced by HOOKS and a command-body block, not
+# by keys parsed from here — this section is the single-page map of WHERE each knob
+# lives, so you tune the behavior at its source instead of hunting for it.
+#
+# Git workflow — "the branch is the failsafe"
+# --------------------------------------------
+# 1. Branch-as-failsafe (run start). Cut `<NNN>-<slug>` off fresh origin/main
+#    BEFORE the spec is written; halt on a dirty tree (require-clean).
+#      -> enforced: .specify/extensions.yml  hooks.before_specify  (km-archivist, prio 5)
+# 2. Per-wave checkpoint commit + push. After every reconciled wave (and before any
+#    Polish/simplify/revision wave). Cheap `wip(<area>):` commits — squashed at PR.
+#      -> enforced: .specify/extensions/companion/commands/speckit.companion.implement.md
+#                   (km-git-checkpoint block, step 4)
+#      -> to switch these to full km-archivist dispatch per wave, edit that block.
+# 3. Open PR (run end). After the km-lead review passes AND `pnpm typecheck` /
+#    `pnpm -r test` / `pnpm lint` are green: push, open a squash-ready PR against
+#    main, reconcile issue AC (closes/refs). Never merges — CI + human review live
+#    on the open PR. A P0 or a failing check leaves the branch pushed, no PR.
+#      -> enforced: .specify/extensions.yml  hooks.after_implement  (km-archivist, prio 30)
+#
+# All three are best-effort: no git / not a repo / missing crew -> skipped, never
+# fails the host command. companion-auto and the Ralph loop inherit them unchanged
+# (the auto flow runs review/PR hooks; only the human review-gate pause is skipped).
+
+livingSpecs:
+  # Opt-in OpenSpec-style living specs. Left off (project default); flip to true to
+  # have specify pre-load and mark-complete fold capability spec deltas.
+  enabled: false

@@ -15,6 +15,7 @@
 // Research decisions: R1 (advance owns the fork), R2 (signature), R3 (mapping),
 // R9 (boundary).
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { manifest } from "./manifest.ts";
 
 // ---------------------------------------------------------------------------
@@ -32,7 +33,10 @@ type ActiveStepId =
   | "project_name"
   | "characters"
   | "carve"
+  | "marks"
+  | "convenience"
   | "mechanisms"
+  | "touch_seed_source"
   | "touch"
   | "help"
   | "done"
@@ -40,6 +44,13 @@ type ActiveStepId =
 
 /** Mirror of survey/index.ts Track (kept local, boundary-clean). */
 type Track = "copy" | "adapt";
+
+/**
+ * Mirror of surveySessionStore.TouchSeedSource (kept local, boundary-clean —
+ * see the module header: advance.ts imports ONLY ./manifest.ts + ./types.ts).
+ * Spec 035 FR-006 / contracts/seed-source-fork.md.
+ */
+type TouchSeedSource = "import-adapt" | "reseed-from-desktop";
 
 // ---------------------------------------------------------------------------
 // AdvanceContext — the session snapshot the advance policy branches on.
@@ -51,6 +62,21 @@ export interface AdvanceContext {
   readonly selectedTrack: Track | null;
   /** Whether the identity step's chosen script is supported in v1. */
   readonly identitySupported: boolean;
+  /**
+   * The recorded touch_seed_source fork choice, or null when none is recorded
+   * yet (spec 035 R12 fork memory). Read by the "mechanisms" case to decide
+   * whether to route into the touch_seed_source chooser or straight to touch.
+   */
+  readonly touchSeedSource: TouchSeedSource | null;
+  /**
+   * The Phase F hard gate: no "come back later" escape, unlike the gallery
+   * leave-warnings. True once every inventory character has an
+   * implementation in every modality actually engaged this session (desktop
+   * always; touch only when a touch layout was authored — see StepHost's
+   * context build and lib/unimplementedInventory.ts). The "help" case below
+   * refuses to advance past Phase F while this is false.
+   */
+  readonly allCharactersImplemented: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -88,6 +114,7 @@ export interface AdvanceOutcome {
 
 export const STEPS_WITH_APPLY_COMPLETION: ReadonlySet<string> = new Set([
   "characters",
+  "marks",
   "carve",
   "mechanisms",
   "touch",
@@ -169,7 +196,7 @@ export function advance(
         // upstream. Log the violation and default to the copy path (project_name) —
         // copy is the safer default because it does NOT skip a step. Do NOT silently
         // route as adapt (which skips project_name and could confuse the user).
-        console.error(
+        devLog.error(
           "[advance] invariant violation: selectedTrack is null at track step. " +
           "trackOptions.onCommit must set selectedTrack before calling onComplete. " +
           "Defaulting to copy path (project_name) to avoid silent wrong-fork routing."
@@ -183,19 +210,51 @@ export function advance(
       return { next: "characters", setCharactersSubStage: "prefill" };
 
     case "characters":
-      return { next: nextSpineStepAfter("characters") }; // carve
+      return { next: nextSpineStepAfter("characters") }; // marks (spec 046)
+
+    case "marks":
+      return { next: nextSpineStepAfter("marks") }; // convenience
+
+    case "convenience":
+      // The pre-carve "keep these letters?" question. No reducer side effects —
+      // its SurveyPhaseResult reaches the session through StepHost's generic
+      // recordPhase path, and the carve gallery reads it off the merged
+      // session. Absent from STEPS_WITH_APPLY_COMPLETION for that reason.
+      return { next: nextSpineStepAfter("convenience") }; // carve
 
     case "carve":
       return { next: nextSpineStepAfter("carve") }; // mechanisms
 
     case "mechanisms":
-      return { next: nextSpineStepAfter("mechanisms") }; // touch (skips touch_seed_source)
+      // Spec 035 R4/R12: route into the off-spine seed-source fork — but only
+      // when no valid choice is recorded yet. A remembered choice goes
+      // straight to "touch" so back-and-forth over mechanisms doesn't re-ask.
+      // nextSpineStepAfter("mechanisms") would skip the off-spine
+      // touch_seed_source step entirely, so the fork check happens here
+      // explicitly rather than delegating to nextSpineStepAfter. (S-03
+      // sequences now build inline in the Mechanism Gallery's method
+      // chooser — there is no separate "sequences" step to route through
+      // first; this fork check used to live on that step's completion.)
+      return ctx.touchSeedSource === null
+        ? { next: "touch_seed_source" }
+        : { next: "touch" };
+
+    case "touch_seed_source":
+      // joinTarget is "touch"; advance there directly (mirrors project_name).
+      return { next: "touch" };
 
     case "touch":
       return { next: nextSpineStepAfter("touch") }; // help
 
     case "help":
-      return { next: "done", navigate: "output" };
+      // Hard gate (the Phase F hard gate): stay on "help" — no navigate signal — until every
+      // inventory character has an implementation. Unlike the gallery leave-
+      // warnings (the gallery leave-warning), there is no "come back later" escape here; the
+      // host surfaces WHY via the helpStep wrapper (PhaseFGate), never a
+      // silently-dead button.
+      return ctx.allCharactersImplemented
+        ? { next: "done", navigate: "output" }
+        : { next: "help" };
 
     // Terminals — if somehow called, stay put (host does not call advance for terminals).
     case "done":

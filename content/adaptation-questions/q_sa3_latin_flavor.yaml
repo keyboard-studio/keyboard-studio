@@ -1,0 +1,22 @@
+# Q-SA3 latin-flavor (spec 038 US1, script-alignment).
+# Latin target only: fires when the base carries a non-plain Latin sub-profile
+# (extended or IPA) that a plain-Latin target start would not assume. Plain-Latin
+# agreement asks nothing.
+
+id: q_sa3_latin_flavor
+family: script-alignment
+elicits: >
+  Which Latin sub-profile this keyboard follows (plain, extended, or IPA), when
+  the base's sub-profile differs from the plain-Latin default.
+firingCondition: "target == Latn AND latin-subprofile-disagreement"
+prefill:
+  facets: [script]
+  sessionFacet: orth.regional-variant
+provenanceLabel: "the base keyboard's Latin sub-profile"
+consumers:
+  - "placement:punctuation-defaults"
+  - "axis:A4"
+noEvidenceDegradation: ask-plainly
+scope: session
+renders: true
+status: candidate

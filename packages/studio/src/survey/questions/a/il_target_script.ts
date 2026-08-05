@@ -16,6 +16,7 @@ const VALID_SCRIPT_VALUES = new Set([
 export const definition = {
   id: "il_target_script",
   prompt: "Which script will THIS keyboard type?",
+  audit_label: "Keyboard script",
   help_text:
     "Choose the writing system this keyboard produces. It can differ from the " +
     "script your language normally uses: pick \"Latin romanization\" or \"IPA\" if " +
@@ -85,5 +86,9 @@ export const fixtures: QuestionModule["fixtures"] = {
   ],
 };
 
-const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [] };
+// Output reach (spec 057 FR-016): `writes` stays `[]` — this question writes no
+// KeyboardIR — while `outputs` states that the answer nevertheless reaches an
+// emitted artifact. Here, the answer contributes the script/variant subtag to the
+// composed tag the descriptor declares.
+const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [], outputs: [{ target: "package-descriptor", field: "bcp47" }] };
 export default mod;

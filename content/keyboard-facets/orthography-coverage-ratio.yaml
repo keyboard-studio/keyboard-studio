@@ -1,0 +1,38 @@
+# orthography-coverage-ratio — spec 043 US2 (character-content archetype).
+#
+# How much of a target orthography's everyday letters the base already produces:
+# the fraction of the CLDR main exemplarCharacters set (for the base's declared
+# BCP47 tag) covered by the base's produced-character set (with the spec-040
+# fall-through fold). A keyboard.* facet: no session mirror, empty
+# feedsSessionFacets (FR-023, FR-006).
+#
+# The exemplar reference is the pinned in-repo snapshot
+# utilities/facet-index/data/cldr-exemplars.json (sha256-pinned in
+# data/SOURCES.json) — no network, no npm CLDR dependency (FR-004). When the
+# declared tag's language has NO entry in the snapshot, the value is the honest
+# `not-derivable` sentinel — DISTINCT from a 0.0 ratio (which means "reference
+# exists, base covers none"); never a guessed coverage (SC-004).
+#
+# valueType is `scalar` (domain 0.0-1.0): the summary ratio is the `value`; the
+# missing-character set is recorded in `notes`. The `not-derivable` string
+# sentinel is a non-numeric value the scalar domain check skips (documented).
+id: orthography-coverage-ratio
+title: Orthography coverage ratio
+description: >
+  Fraction of the target orthography's CLDR exemplar letters the base already
+  produces (0.0-1.0), for the base's declared BCP47 tag, against a pinned CLDR
+  exemplarCharacters snapshot. `not-derivable` when no exemplar set exists for the
+  tag (distinct from 0.0). Keyboard-index-only (no session mirror).
+valueType: scalar
+limits:
+  domain: [0.0, 1.0]
+likelihoodSemantics: >
+  the `value` is the coverage ratio over the declared tag's exemplar set
+  (`consistency` 1); the missing-character set is in `notes`. `not-derivable`
+  marks the absence of a pinned exemplar set — never a fabricated ratio.
+derivation:
+  archetype: character-content
+  classifierId: orthography-coverage-ratio-classifier
+  fallbackChain: [content-derived, undetermined]
+feedsSessionFacets: []
+schemaVersion: 1

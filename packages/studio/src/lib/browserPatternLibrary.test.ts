@@ -36,8 +36,8 @@ describe("browserPatternLibrary", () => {
     expect(all.length).toBeGreaterThan(0);
     // A known desktop-input pattern must be present (proves the glob path + the
     // null-fragment schema handling both work against the real catalog).
-    expect(await svc.getById("deadkey_single_tap")).toBeDefined();
-    expect(await svc.getById("multi_char_sequence")).toBeDefined();
+    expect((await svc.getById("deadkey_single_tap"))?.id).toBe("deadkey_single_tap");
+    expect((await svc.getById("multi_char_sequence"))?.id).toBe("multi_char_sequence");
   });
 
   it("getById() returns undefined for an unknown id", async () => {

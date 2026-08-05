@@ -1,0 +1,355 @@
+{
+  "workflow": "speckit",
+  "specName": "Construction Facet Classifiers",
+  "branch": "041-construction-facet-classifiers",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-19T21:23:57.534Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-19T21:41:40.107Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T21:42:24.346Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-19T21:42:24.357Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T22:18:48.046Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T22:18:48.046Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T22:18:48.046Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T22:18:48.046Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T22:18:48.046Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T22:18:48.046Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T22:18:48.046Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T22:18:48.046Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T22:18:48.046Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T22:18:48.046Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T22:18:48.046Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T22:18:48.046Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T22:18:48.046Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T22:18:48.046Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T22:18:48.046Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T22:18:48.046Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T22:18:48.046Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T22:18:48.046Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T22:18:48.046Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T22:18:48.046Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T22:18:48.046Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:00:21.467Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:00:21.467Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:00:21.467Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:00:21.467Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:00:21.467Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:00:21.467Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:00:21.467Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:00:21.467Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:32:30.122Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:32:30.122Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:32:30.122Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:32:30.122Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:32:30.122Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:32:30.122Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-19T23:32:30.123Z"
+    }
+  ],
+  "telemetryInstanceId": "33c35304-c47c-4b63-a9eb-290098cee7a5",
+  "currentTask": "T035",
+  "verified": [
+    {
+      "what": "US2 touch facets: full facet-index vitest suite 148/148 green (incl. end-to-end fx_touch pipeline assertions + desktop-only notApplicable)"
+    },
+    {
+      "what": "facet-index-lint GREEN (16 facet defs, 920 keyboards); --classified-only rebuild byte-identical (determinism); tool tsc clean"
+    },
+    {
+      "what": "Corpus acceptance: touch keyboards classified (khmer_angkor combo distribution + maps-desktop-modifiers/capacity-forced); desktop-only keyboards notApplicable (769 classified / 151 n/a)"
+    },
+    {
+      "what": "km-lead review cycle APPROVED (no P0): km-verification all 6 claims PASS; km-domain APPROVE; km-qc PASS 94/100. One P1 (YAML<->TS param drift) + three P2 fixed and re-verified in 0ebec7f (9 display-difficulty tests + facet-lint green)."
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Touch classifiers consume the canonical @keyboard-studio/contracts parseTouchLayoutString/TouchLayoutIR (dependency root) rather than a hand-rolled reader — km-qc/km-synthesis P1 duplication finding resolved"
+    },
+    {
+      "decision": "P3 block-age data gap (research R5 wrongly assumed the UCD block-age table already existed): pinned lib/ucd/DerivedAge.txt @ Unicode 17.0.0 and extended codegen-ucd.mjs to emit a per-script first-assigned-version table (firstVersionOfScript) into the generated scriptLookup.ts, rather than a hand-curated table."
+    }
+  ],
+  "concerns": [
+    {
+      "note": "P3 (display-difficulty T030-T032) + Polish (T033-T035) remain; feature not yet complete — resume in a fresh conversation per one-conversation-per-phase",
+      "kind": "P2",
+      "step": "implement"
+    }
+  ]
+}

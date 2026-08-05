@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-07-13",
+  "lastUpdated": "2026-08-03",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -238,7 +238,7 @@
     },
     "§19": {
       "title": "19. Reference",
-      "hash": "sha256:fa3a2e620edb7356",
+      "hash": "sha256:64495957b7332fde",
       "status": "reference",
       "implements": [],
       "decisions": [],
@@ -278,7 +278,7 @@
     },
     "specs/005-pattern-schema": {
       "title": "Feature spec — Pattern schema (spec.md §5)",
-      "hash": "sha256:269db42c81a1c560",
+      "hash": "sha256:f208af38b56ebfb3",
       "status": "implemented",
       "implements": [
         "packages/contracts/src/pattern.ts",
@@ -291,7 +291,7 @@
     },
     "specs/007-strategy-selection": {
       "title": "Feature spec — Strategy selection (spec.md §7)",
-      "hash": "sha256:fb3303c77cd43be5",
+      "hash": "sha256:72d56c2fead04937",
       "status": "partial",
       "implements": [
         "packages/contracts/src/strategy.ts",
@@ -304,7 +304,7 @@
     },
     "specs/008-data-flow": {
       "title": "Feature spec — Data flow (spec.md §8)",
-      "hash": "sha256:622b8a83725b0127",
+      "hash": "sha256:875f2eb1789213b2",
       "status": "partial",
       "implements": [
         "packages/contracts/src/surveySession.ts",
@@ -317,7 +317,7 @@
     },
     "docs/architecture.md": {
       "title": "Keyboard Studio — architecture & meta-flow",
-      "hash": "sha256:d464dcc5f43f4acc",
+      "hash": "sha256:5f3953eacc747126",
       "status": "reference",
       "implements": [],
       "decisions": [],
@@ -517,7 +517,7 @@
     },
     "specs/030-langtags-identity-autocomplete": {
       "title": "Feature Specification: Langtags-driven identity autocomplete",
-      "hash": "sha256:98fe41fb34b82356",
+      "hash": "sha256:1b3f8b884da96a38",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -558,6 +558,222 @@
     "specs/035-mobile-touch-derivation": {
       "title": "Feature Specification: Mobile/touch layout derivation",
       "hash": "sha256:f41ade5918875aec",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/040-desktop-base-layout-fallthrough": {
+      "title": "Feature Specification: Desktop base-layout fall-through in the script facet",
+      "hash": "sha256:0fc200a6c3354ce9",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/042-store-range-notation": {
+      "title": "Feature Specification: KMN store range notation (`X .. Y`)",
+      "hash": "sha256:2aa572f95f2ac91f",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/034-mvp-authoring-walk": {
+      "title": "Feature Specification: MVP end-to-end authoring walk",
+      "hash": "sha256:0e99f3f72e7db885",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/036-glottolog-catalog": {
+      "title": "Feature Specification: Glottolog classification catalog + related-keyboard-base bridge",
+      "hash": "sha256:3511545d8a8ea43a",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/036-keyboard-facet-index": {
+      "title": "Feature Specification: Per-Keyboard Facet Index",
+      "hash": "sha256:8f09b07eb90c6422",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/037-facet-classifiers": {
+      "title": "Feature Specification: Deterministic Facet Classifiers (Script + Two Representative Facets)",
+      "hash": "sha256:a6b4cc496de4e182",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/038-adaptation-questions": {
+      "title": "Feature Specification: En-Masse Adaptation Preference Questions",
+      "hash": "sha256:3538f1ba62f789a4",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/039-facet-transform": {
+      "title": "Feature Specification: Facet Transform Engine",
+      "hash": "sha256:4e1de5eafeddd550",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/041-construction-facet-classifiers": {
+      "title": "Feature Specification: Construction Facet Classifiers",
+      "hash": "sha256:7974b0e191dbbd26",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "docs/lens-model.md": {
+      "title": "How the four analytic lenses compose",
+      "hash": "sha256:71d55e64ebebad72",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/045-lens-vocabulary-source-of-truth": {
+      "title": "Feature Specification: Lens-Vocabulary Single Source of Truth",
+      "hash": "sha256:0a2e80e975208ecc",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/046-marks-question-series": {
+      "title": "Feature Specification: Mark Composition Model and the Marks Question Series",
+      "hash": "sha256:1fd45ce21e849469",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/044-cldr-sldr-exemplars": {
+      "title": "Feature Specification: CLDR/SLDR exemplars",
+      "hash": "sha256:efb413d2330a32fc",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/050-flow-question-i18n": {
+      "title": "Feature Specification: Flow-Question Content i18n (Tier B coverage for the modular flow engine)",
+      "hash": "sha256:a4a726a55cc4a74a",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/046-i18n-localization": {
+      "title": "Feature Specification: Studio UI & Content Localization (i18n)",
+      "hash": "sha256:7d3e922dcbd891e3",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/043-base-selection-facets": {
+      "title": "Feature Specification: Base-Selection & Strategy Facet Classifiers",
+      "hash": "sha256:cdf3150978b2deb8",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/047-alphabet-inventory-categories": {
+      "title": "Feature Specification: Richer character-inventory breakdown on \"Add your whole alphabet\"",
+      "hash": "sha256:2e97691552c74308",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/048-base-facets-in-ir": {
+      "title": "Feature Specification: Bake base-keyboard facets into the working-copy IR (available + overridable)",
+      "hash": "sha256:043eab980690ae15",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/049-lowercase-diacritic-questions": {
+      "title": "Feature Specification: Show only lowercase base letters in the diacritic (marks) survey questions",
+      "hash": "sha256:57a01dcdb5c6b91a",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/047-my-keyboards": {
+      "title": "Feature Specification: My Keyboards — per-user multi-project draft + submission list",
+      "hash": "sha256:ac67a00804861135",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/050-text-sample-prefill": {
+      "title": "Feature Specification: Text-sample prefill (paste or upload)",
+      "hash": "sha256:c1def84ddec203d0",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/051-carve-orthography-trim": {
+      "title": "Feature Specification: Carve gallery trim proposals compare produced characters to the orthography (with cased-letter pairing)",
+      "hash": "sha256:52f42774ce007317",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/051-uppercase-counterpart-suggestion": {
+      "title": "Feature Specification: Suggest the uppercase counterpart when a lowercase cased letter is placed",
+      "hash": "sha256:f09f4bced33a0614",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/052-marks-treatment-question": {
+      "title": "Feature Specification: Marks treatment question",
+      "hash": "sha256:c67294a07baf3ef8",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/056-ada-accessibility": {
+      "title": "Feature Specification: ADA / WCAG 2.2 AA Accessibility Baseline",
+      "hash": "sha256:e5828442ef44c21d",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/053-decision-audit": {
+      "title": "Feature Specification: Per-keyboard decision audit (CYOA Phase 1 — record and review)",
+      "hash": "sha256:beb0740daabeff6c",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/055-legible-decision-trail": {
+      "title": "Feature Specification: Legible decision trail — every stage reports what it did",
+      "hash": "sha256:584aac4859b80265",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

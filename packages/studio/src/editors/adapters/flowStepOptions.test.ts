@@ -61,6 +61,8 @@ function buildDeps(overrides?: Partial<FlowStepDeps>): {
     setIdentity: setIdentitySpy,
     findingsByQuestionId: {},
     displayNameRef: { current: "" },
+    selectedTrack: null,
+    scaffoldSpec: null,
     ...overrides,
   };
 
@@ -86,6 +88,28 @@ describe("trackOptions.buildContext", () => {
   it("falls back to empty string when localBase is null", () => {
     const { deps } = buildDeps({ localBase: null });
     expect(trackOptions.buildContext(deps)).toEqual({ base_name: "" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// trackOptions.seeds — FR-031 (spec 057): arriving at the step (deep link or
+// Back) shows the currently-recorded answer, never an empty radio group.
+// ---------------------------------------------------------------------------
+
+describe("trackOptions.seeds.getSeedValue (FR-031 recorded-answer prefill)", () => {
+  it("seeds track_choice from the session's recorded selectedTrack", () => {
+    const { deps } = buildDeps({ selectedTrack: "adapt" });
+    expect(trackOptions.seeds!.getSeedValue("track_choice", deps)).toBe("adapt");
+  });
+
+  it("returns undefined before any track was ever chosen (field genuinely unset)", () => {
+    const { deps } = buildDeps({ selectedTrack: null });
+    expect(trackOptions.seeds!.getSeedValue("track_choice", deps)).toBeUndefined();
+  });
+
+  it("returns undefined for any other questionId", () => {
+    const { deps } = buildDeps({ selectedTrack: "copy" });
+    expect(trackOptions.seeds!.getSeedValue("some_other_question", deps)).toBeUndefined();
   });
 });
 

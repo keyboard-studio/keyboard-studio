@@ -29,6 +29,7 @@ consumers:
     - pb_digit_set
     - pb_punctuation_gate
     - pb_punctuation_list
+    - q_sa3_latin_flavor
   proposes:
     - "placement:punctuation-defaults"
 

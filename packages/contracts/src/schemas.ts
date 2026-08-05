@@ -17,12 +17,40 @@
 // @see spec.md §11 / §14 Decision 4 (Criterion four-band model)
 
 import { z } from "zod";
-import type { Pattern, PatternQuestion, TestVector, DemoObject } from "./pattern";
+import type { Pattern, PatternCategory, PatternQuestion, TestVector, DemoObject } from "./pattern";
+import { makePattern } from "./pattern";
 import type { Criterion } from "./criteria";
 import type { RemovalCapability } from "./removalCapability";
 import type { TouchKeyProvenance, TouchKeyIR, TouchLayoutIR } from "./keyboard-ir";
 import type { AxisFill, AxisFillSource } from "./axisFill";
+import type {
+  AttachmentState,
+  AttestedStack,
+  BlockedCombination,
+  ConfirmedAlphabet,
+  DeclaredRole,
+  MarkUnit,
+  OutputForm,
+  PlacementWorklist,
+} from "./confirmedAlphabet";
 import type { Scale, ScriptClass } from "./axes";
+import type { StrategyId } from "./strategy";
+import type { KeyBudget, KeyBudgetBand } from "./keyBudget";
+import type {
+  BaseContribution,
+  DecisionAgency,
+  DecisionEntry,
+  DecisionFileChange,
+  DecisionImpact,
+  DecisionPayload,
+  DecisionProposalSource,
+  DecisionProvenance,
+  DecisionRecord,
+  DiffHunk,
+  EditorActionSummary,
+  EditorActionType,
+} from "./decisionRecord";
+import { DECISION_RECORD_FORMAT } from "./decisionRecord";
 
 // ---------------------------------------------------------------------------
 // Leaf enums — mirror the string-literal unions in the contract types.
@@ -139,7 +167,7 @@ export const IRNodeRefSchema = z.object({
 // ---------------------------------------------------------------------------
 
 /** The conservative default provenance for an untagged/legacy touch key (FR-009). */
-const DEFAULT_TOUCH_PROVENANCE: TouchKeyProvenance = "hand-set";
+export const DEFAULT_TOUCH_PROVENANCE: TouchKeyProvenance = "hand-set";
 
 /**
  * Add `| undefined` to every optional (`?:`) property of `T`, recursively.
@@ -186,6 +214,7 @@ export const TouchKeyIRSchema: z.ZodType<LooseOptional<TouchKeyIR>> = z.lazy(() 
     hint: z.string().optional(),
     output: z.string().optional(),
     nextlayer: z.string().optional(),
+    layerAnnotation: z.string().optional(),
     sk: z.array(TouchKeyIRSchema).optional(),
     // Explicit per-direction shape (not Object.fromEntries) so the inferred
     // output keeps the literal direction keys, matching the contract's
@@ -407,6 +436,271 @@ export const RawPatternSchema = z
 
 export type RawPattern = z.infer<typeof RawPatternSchema>;
 
+// Convenience alias for the provenance item type used in PatternInit.
+type ProvenanceItem = { keyboard: string; rule?: string; notes?: string };
+
+/**
+ * Map a validated {@link RawPattern} to the contracts {@link Pattern} shape
+ * by delegating to {@link makePattern}, which handles all optional-field
+ * spreading internally (satisfying `exactOptionalPropertyTypes`).
+ *
+ * Each optional field is hoisted into a typed local before being passed so
+ * that `exactOptionalPropertyTypes` sees a narrowed non-undefined value
+ * rather than `T | undefined`.
+ *
+ * Single source of truth for RawPattern -> Pattern normalisation, imported
+ * by both the engine's node loader (`engine/src/pattern-library/loader.ts`)
+ * and the studio's browser loader (`studio/src/lib/browserPatternLibrary.ts`)
+ * so the two environments cannot silently diverge on how a YAML pattern
+ * becomes a `Pattern`. This function has no `node:fs`/Vite dependency, so
+ * importing it into the browser bundle is safe.
+ */
+export function toPattern(data: RawPattern): Pattern {
+  // Required fields — always present after schema validation.
+  const base = {
+    id: String(data.id),
+    title: String(data.title),
+    description: String(data.description),
+    category: data.category as PatternCategory,
+    appliesTo: data.appliesTo,
+    questions: data.questions as Parameters<typeof makePattern>[0]["questions"],
+    kmnFragment: data.kmnFragment,
+    tests: data.tests as Parameters<typeof makePattern>[0]["tests"],
+    validatedForFamilies: data.validatedForFamilies,
+    sourceKeyboards: data.sourceKeyboards,
+    reviewedBy: String(data.reviewedBy),
+    reviewDate: String(data.reviewDate),
+  };
+
+  // Optional fields — each narrowed to its non-undefined type so the spread
+  // satisfies exactOptionalPropertyTypes on PatternInit.
+  const strategyId = data.strategyId as StrategyId | undefined;
+  const combinesWith = data.combinesWith as StrategyId[] | undefined;
+  const provenance = data.provenance as ProvenanceItem[] | undefined;
+  const demo = data.demo as string | DemoObject | null | undefined;
+
+  return makePattern({
+    ...base,
+    ...(strategyId !== undefined ? { strategyId } : {}),
+    ...(combinesWith !== undefined ? { combinesWith } : {}),
+    // null (authored "no fragment") and undefined both coerce to omitted —
+    // Pattern types these as `?: string`, so only a real string is forwarded.
+    ...(typeof data.touchLayoutFragment === "string"
+      ? { touchLayoutFragment: data.touchLayoutFragment }
+      : {}),
+    ...(typeof data.reorderRules === "string" ? { reorderRules: data.reorderRules } : {}),
+    ...(data.frequencyInCorpus !== undefined
+      ? { frequencyInCorpus: data.frequencyInCorpus }
+      : {}),
+    ...(provenance !== undefined ? { provenance } : {}),
+    ...(demo !== undefined ? { demo } : {}),
+    ...(data.group_visibility !== undefined
+      ? { group_visibility: data.group_visibility }
+      : {}),
+    ...(data.priority !== undefined ? { priority: data.priority } : {}),
+  });
+}
+
+// ---------------------------------------------------------------------------
+// ConfirmedAlphabet + PlacementWorklist (spec 046 marks question series).
+// Mirrors of the additive contract types in confirmedAlphabet.ts — the
+// three-store alphabet model and the mechanism-gallery handoff. Validated at
+// the session/phase-result boundaries where the stores are persisted.
+// ---------------------------------------------------------------------------
+
+export const DeclaredRoleSchema = z.enum(["letter", "mark"]);
+
+export const AttestedStackSchema = z.object({
+  base: z.string().min(1),
+  // Order-preserving: closest-to-base first; at least one mark per stack.
+  marks: z.array(z.string().min(1)).min(1),
+});
+
+export const ConfirmedAlphabetSchema = z.object({
+  bases: z.array(z.string().min(1)),
+  marks: z.array(z.string().min(1)),
+  attestedStacks: z.array(AttestedStackSchema),
+  declaredRoles: z.record(z.string(), DeclaredRoleSchema),
+});
+
+export const AttachmentStateSchema = z.enum(["attested", "plausible-accepted", "blocked"]);
+
+export const MarkInputOrderSchema = z.enum(["prefix", "postfix"]);
+
+export const MarkUnitSchema = z.object({
+  mark: z.string().min(1),
+  inputOrder: MarkInputOrderSchema,
+});
+
+export const BlockedCombinationSchema = z.object({
+  base: z.string().min(1),
+  mark: z.string().min(1),
+});
+
+export const PlacementWorklistSchema = z.object({
+  ownLetterUnits: z.array(z.string()),
+  markUnits: z.array(MarkUnitSchema),
+  blockedCombinations: z.array(BlockedCombinationSchema),
+});
+
+// The S4 whole-keyboard output-form decision (spec 046). Carried on
+// SurveyPhaseResult/SurveySession as `marksOutputForm`.
+export const OutputFormSchema = z.enum(["ready-made", "base-plus-mark"]);
+
+// The single authoritative key-budget determination (spec 052, keyBudget.ts).
+// The band ids are the PROGRAMMATIC form — axis A7's display strings are a
+// projection of these, never the other way round.
+export const KeyBudgetBandSchema = z.enum(["many", "ralt-only", "fully-booked"]);
+
+export const KeyBudgetSchema = z.object({
+  band: KeyBudgetBandSchema,
+  spareKeys: z.number().int().min(0),
+  notes: z.string(),
+  planes: z.object({
+    shiftBound: z.number().int().min(0),
+    altgrBound: z.number().int().min(0),
+    stockKeys: z.number().int().min(0),
+  }),
+});
+
+// ---------------------------------------------------------------------------
+// Decision record (specs/053-decision-audit) — the append-only per-keyboard
+// audit. These mirror decisionRecord.ts; the guards at the bottom of this file
+// pin them to it.
+//
+// The record is read back from two untrusted-ish boundaries — a persisted draft
+// written by an older build, and a `.studio/decision-record.json` inside a
+// downloaded package — so its runtime schema is not decoration: it is what lets
+// `parseDecisionRecord` drop the entries that do not validate and keep the ones
+// that do, instead of failing the whole read (contract §5, SC-009).
+// ---------------------------------------------------------------------------
+
+export const DecisionEventKindSchema = z.enum(["survey-answer", "editor-action"]);
+
+export const DecisionAgencySchema = z.enum(["base-derived", "tool-proposed", "hand-set"]);
+
+export const DecisionProposalSourceSchema = z.enum([
+  "langtags", "cldr", "corpus", "axis-fill", "base", "identity", "region", "derived-from-axis",
+]);
+
+export const DecisionProvenanceSchema = z.object({
+  agency: DecisionAgencySchema,
+  source: DecisionProposalSourceSchema.optional(),
+});
+
+export const EditorActionTypeSchema = z.enum(["gallery_edit", "mechanism_edit", "touch_edit"]);
+
+// `.optional()`, never `.default(0)` — a default would re-introduce, at the
+// record boundary, exactly the "unmeasured reads as zero" coercion FR-005a
+// forbids (specs/055-legible-decision-trail research D-06). Absent = not
+// measured; present `0` = measured, unchanged.
+export const EditorActionSummarySchema = z.object({
+  keysRemoved: z.number().int().min(0).optional(),
+  keysAdded: z.number().int().min(0).optional(),
+  mechanismsAssigned: z.number().int().min(0).optional(),
+  touchKeysAffected: z.number().int().min(0).optional(),
+  sample: z.array(z.string()),
+  sampleTruncated: z.boolean(),
+});
+
+export const DiffHunkSchema = z.object({
+  oldStart: z.number().int().min(0),
+  oldLines: z.number().int().min(0),
+  newStart: z.number().int().min(0),
+  newLines: z.number().int().min(0),
+  lines: z.array(z.string()),
+});
+
+export const DecisionFileChangeSchema = z.object({
+  path: z.string().min(1),
+  hunks: z.array(DiffHunkSchema),
+  magnitude: z.object({
+    added: z.number().int().min(0),
+    removed: z.number().int().min(0),
+  }),
+});
+
+export const DecisionImpactSchema = z.discriminatedUnion("state", [
+  z.object({
+    state: z.literal("captured"),
+    // Non-empty (contract §3): zero changed files is the separate
+    // `{ state: "none" }` variant, never an empty capture.
+    files: z.array(DecisionFileChangeSchema).min(1),
+    magnitude: z.object({
+      added: z.number().int().min(0),
+      removed: z.number().int().min(0),
+    }),
+    sharedWith: z.array(z.string().min(1)).optional(),
+  }),
+  z.object({ state: z.literal("none") }),
+  z.object({
+    state: z.literal("unavailable"),
+    // Mirrors ImpactUnavailableReason. `no-working-copy-yet` is spec 057 FR-012:
+    // a decision recorded before instantiation, whose effect is not yet
+    // resolvable rather than permanently unavailable.
+    reason: z.enum([
+      "lock-gate-dependency",
+      "no-rederivable-write-path",
+      "no-working-copy-yet",
+    ]),
+  }),
+]);
+
+// The survey-answer payload is enumerated per `answerType` rather than typed as
+// one loose `value`, so the value discipline the contract derives from
+// SurveyAnswer is enforced at runtime too: a `boolean` question carrying a
+// string is a validation failure here, not a surprise downstream.
+const SURVEY_ANSWER_BASE = { kind: z.literal("survey-answer"), questionId: z.string().min(1) };
+
+export const BaseContributionSchema = z.object({
+  kind: z.literal("base-contribution"),
+  baseId: z.string().min(1),
+  baseDisplayName: z.string().min(1),
+  // Absent = could not be measured; `0` is reserved for a genuinely empty
+  // starting layout (specs/055-legible-decision-trail data-model.md §3).
+  startingKeyCount: z.number().int().min(0).optional(),
+  derivedAxes: z.array(z.string()),
+  inheritedMetadata: z.array(z.object({ field: z.string(), value: z.string() })),
+  instantiationMode: z.enum(["new-from-base", "adapt-existing"]),
+});
+
+export const DecisionPayloadSchema = z.union([
+  z.object({ ...SURVEY_ANSWER_BASE, answerType: z.literal("char-list"), value: z.array(z.string()) }),
+  z.object({ ...SURVEY_ANSWER_BASE, answerType: z.literal("boolean"), value: z.boolean() }),
+  z.object({ ...SURVEY_ANSWER_BASE, answerType: z.literal("char-single"), value: z.string() }),
+  z.object({ ...SURVEY_ANSWER_BASE, answerType: z.literal("key-name"), value: z.string() }),
+  z.object({ ...SURVEY_ANSWER_BASE, answerType: z.literal("store-content"), value: z.string() }),
+  z.object({ ...SURVEY_ANSWER_BASE, answerType: z.literal("select"), value: z.string() }),
+  z.object({ ...SURVEY_ANSWER_BASE, answerType: z.literal("text"), value: z.string() }),
+  z.object({
+    kind: z.literal("editor-action"),
+    actionType: EditorActionTypeSchema,
+    summary: EditorActionSummarySchema,
+  }),
+  BaseContributionSchema,
+]);
+
+export const DecisionEntrySchema = z.object({
+  entryId: z.string().min(1),
+  stepId: z.string().min(1),
+  payload: DecisionPayloadSchema,
+  provenance: DecisionProvenanceSchema,
+  recordedAt: z.number().int().min(0),
+  supersedes: z.string().min(1).nullable(),
+  // Absent = never captured; null = captured then shed. Both are legal reads,
+  // and the trail says different things about them — so the schema must admit
+  // both rather than collapsing them.
+  impact: DecisionImpactSchema.nullable().optional(),
+});
+
+export const DecisionRecordSchema = z.object({
+  format: z.literal(DECISION_RECORD_FORMAT),
+  version: z.number().int().min(1),
+  keyboardId: z.string().min(1).nullable(),
+  entries: z.array(DecisionEntrySchema),
+  truncated: z.object({ shedCount: z.number().int().min(0) }).nullable(),
+});
+
 // ---------------------------------------------------------------------------
 // Compile-time drift guards.
 //
@@ -467,6 +761,31 @@ type _TouchKeyProvenanceGuard = Expect<
 // (you cannot widen the annotation without also widening `LooseOptional<TouchKeyIR>`,
 // which is pinned to the contract). These aliases pin the inferred OUTPUT back
 // to the contract as belt-and-braces.
+// ConfirmedAlphabet + PlacementWorklist (spec 046) — the three-store alphabet
+// model and the gallery handoff must stay in lockstep with confirmedAlphabet.ts.
+type _DeclaredRoleGuard = Expect<AssignableTo<z.infer<typeof DeclaredRoleSchema>, DeclaredRole>>;
+type _AttestedStackGuard = Expect<AssignableTo<z.infer<typeof AttestedStackSchema>, AttestedStack>>;
+type _ConfirmedAlphabetGuard = Expect<
+  AssignableTo<z.infer<typeof ConfirmedAlphabetSchema>, ConfirmedAlphabet>
+>;
+type _AttachmentStateGuard = Expect<
+  AssignableTo<z.infer<typeof AttachmentStateSchema>, AttachmentState>
+>;
+type _MarkUnitGuard = Expect<AssignableTo<z.infer<typeof MarkUnitSchema>, MarkUnit>>;
+type _BlockedCombinationGuard = Expect<
+  AssignableTo<z.infer<typeof BlockedCombinationSchema>, BlockedCombination>
+>;
+type _PlacementWorklistGuard = Expect<
+  AssignableTo<z.infer<typeof PlacementWorklistSchema>, PlacementWorklist>
+>;
+type _OutputFormGuard = Expect<AssignableTo<z.infer<typeof OutputFormSchema>, OutputForm>>;
+// KeyBudget (spec 052 FR-016) — the single key-budget determination. Its band
+// set is load-bearing: the A7 projection is total and bijective on exactly
+// these three members, so adding or renaming one without updating the schema
+// (and the projection) would silently change which keyboards decision rule 10
+// fires on.
+type _KeyBudgetBandGuard = Expect<AssignableTo<z.infer<typeof KeyBudgetBandSchema>, KeyBudgetBand>>;
+type _KeyBudgetGuard = Expect<AssignableTo<z.infer<typeof KeyBudgetSchema>, KeyBudget>>;
 type _TouchKeyIRGuard = Expect<AssignableTo<z.infer<typeof TouchKeyIRSchema>, TouchKeyIR>>;
 // TouchLayoutIR is guarded on its `platforms` slice (the touch-key + provenance
 // payload — the spec-014 durability target). `nodeIds` is intentionally not run
@@ -488,3 +807,34 @@ type _KeyboardIRTouchGuard = Expect<
     TouchLayoutIR["platforms"]
   >
 >;
+// Decision record (specs/053-decision-audit). The record is BOTH persisted in a
+// draft and shipped inside a downloaded package, so a schema that has drifted
+// from the type would mean a record this build writes is one it cannot read
+// back. The payload guard is the sharpest of these: it pins the enumerated
+// per-`answerType` value shapes to the union `DecisionPayload` derives from
+// `SurveyAnswer`, so a new `AnswerType` member cannot land with the schema
+// silently admitting the wrong value type for it.
+type _DecisionAgencyGuard = Expect<AssignableTo<z.infer<typeof DecisionAgencySchema>, DecisionAgency>>;
+type _DecisionProposalSourceGuard = Expect<
+  AssignableTo<z.infer<typeof DecisionProposalSourceSchema>, DecisionProposalSource>
+>;
+type _DecisionProvenanceGuard = Expect<
+  AssignableTo<z.infer<typeof DecisionProvenanceSchema>, DecisionProvenance>
+>;
+type _EditorActionTypeGuard = Expect<
+  AssignableTo<z.infer<typeof EditorActionTypeSchema>, EditorActionType>
+>;
+type _EditorActionSummaryGuard = Expect<
+  AssignableTo<z.infer<typeof EditorActionSummarySchema>, EditorActionSummary>
+>;
+type _DiffHunkGuard = Expect<AssignableTo<z.infer<typeof DiffHunkSchema>, DiffHunk>>;
+type _DecisionFileChangeGuard = Expect<
+  AssignableTo<z.infer<typeof DecisionFileChangeSchema>, DecisionFileChange>
+>;
+type _DecisionImpactGuard = Expect<AssignableTo<z.infer<typeof DecisionImpactSchema>, DecisionImpact>>;
+type _BaseContributionGuard = Expect<
+  AssignableTo<z.infer<typeof BaseContributionSchema>, BaseContribution>
+>;
+type _DecisionPayloadGuard = Expect<AssignableTo<z.infer<typeof DecisionPayloadSchema>, DecisionPayload>>;
+type _DecisionEntryGuard = Expect<AssignableTo<z.infer<typeof DecisionEntrySchema>, DecisionEntry>>;
+type _DecisionRecordGuard = Expect<AssignableTo<z.infer<typeof DecisionRecordSchema>, DecisionRecord>>;

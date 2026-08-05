@@ -1,0 +1,23 @@
+# Q-IP2 keep-device-targets (spec 038 US2, inheritance-posture).
+# Fires when the base ships a different device mix than the author declared for
+# this keyboard. ask-plainly: the declared device mix is an honest default to
+# confirm. Routes to the existing Phase B / mobile-touch-derivation flow; it does
+# NOT author touch here (Article VII).
+
+id: q_ip2_keep_device_targets
+family: inheritance-posture
+elicits: >
+  Which device targets this keyboard keeps from the base (desktop, touch, web),
+  when the base ships a different mix than you declared.
+firingCondition: "base-target-mix != stated-device-mix"
+prefill:
+  facets: [target-mix]
+  sessionFacet: env.device-mix
+provenanceLabel: "the base keyboard's device targets vs the ones you declared"
+consumers:
+  - "mechanism-gallery:per-modality-ordering"
+  - "scaffolder:touch-layer-inclusion"
+noEvidenceDegradation: ask-plainly
+scope: session
+renders: true
+status: candidate

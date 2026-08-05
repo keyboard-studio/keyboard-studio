@@ -1,0 +1,36 @@
+# script-family — spec 043 US3 (character-content archetype).
+#
+# The writing-system family of the base's dominant script: alphabet / abugida /
+# abjad / syllabary / logographic (FR-032). Derived by mapping the `script`
+# classifier's dominant ISO-15924 code (reused, not re-derived) through the pinned
+# data/iso15924-script-family.json lookup. A code absent from the table yields an
+# undetermined family (never a guess). A keyboard.* facet: no session mirror,
+# empty feedsSessionFacets (FR-006).
+#
+# This is the DURABLE guard for combining-mark-repertoire (spec 043 US2 carried an
+# inline alphabetic-script list as a stand-in; US3 repoints that guard at this
+# facet's `deriveScriptFamily`, so the taxonomy lives in one pinned table).
+id: script-family
+title: Script family
+description: >
+  The writing-system family of the base's dominant script — alphabet, abugida,
+  abjad, syllabary, or logographic — via the pinned ISO-15924 → family lookup.
+  Also the durable guard for combining-mark-repertoire. Keyboard-index-only.
+valueType: enum
+limits:
+  values:
+    - alphabet
+    - abugida
+    - abjad
+    - syllabary
+    - logographic
+  open: false
+likelihoodSemantics: >
+  a single keyboard-level family determination (`consistency` 1) from the
+  dominant ISO-15924 script; undetermined for an unmapped or absent script.
+derivation:
+  archetype: character-content
+  classifierId: script-family-classifier
+  fallbackChain: [content-derived, undetermined]
+feedsSessionFacets: []
+schemaVersion: 1

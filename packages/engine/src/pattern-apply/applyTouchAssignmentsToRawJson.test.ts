@@ -20,7 +20,10 @@
 import { describe, it, expect } from "vitest";
 import * as fs from "node:fs";
 import * as path from "node:path";
-import { applyTouchAssignmentsToRawJson } from "./applyTouchAssignmentsToRawJson.js";
+import {
+  applyTouchAssignmentsToRawJson,
+  isBlankPlaceholder,
+} from "./applyTouchAssignmentsToRawJson.js";
 import { isTouchSubKeyDuplicate } from "./touch-mechanism-shared.js";
 import { charToUnicodeKeyId } from "../shared/touch-ids.js";
 import type { TouchAssignment } from "@keyboard-studio/contracts";
@@ -800,5 +803,625 @@ describe("isTouchSubKeyDuplicate", () => {
 
   it("returns false for an empty existing object", () => {
     expect(isTouchSubKeyDuplicate({}, char)).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Layer targeting — the optional `layer` slot value (faithful-edit path)
+//
+// Absent `layer` === "default"; every case above exercises the absent form, so
+// this block covers the explicit form, a non-default target, and the misses.
+// ---------------------------------------------------------------------------
+
+function longpressOnLayer(hostKey: string, char: string, layer: string): TouchAssignment {
+  return {
+    scope: "individual",
+    target: char,
+    modality: "touch",
+    mechanisms: [
+      { patternId: "longpress_alternates", slotValues: { hostKey, char, layer } },
+    ],
+    source: "user",
+  };
+}
+
+/** Phone-only raw layout whose shift layer carries the same key ids as default
+ *  (what scaffoldTouchLayout emits), plus an extra default-only key. */
+function makePhoneWithShiftJson(): string {
+  return JSON.stringify({
+    phone: {
+      layer: [
+        {
+          id: "default",
+          row: [{ id: 1, key: [{ id: "K_A", text: "a" }, { id: "K_S", text: "s" }] }],
+        },
+        { id: "shift", row: [{ id: 1, key: [{ id: "K_A", text: "A" }] }] },
+      ],
+    },
+  });
+}
+
+/** Pull a key object out of a named phone layer of a result JSON string. */
+function phoneKeyOnLayer(
+  json: string,
+  layerId: string,
+  keyId: string,
+): Record<string, unknown> | undefined {
+  const parsed = JSON.parse(json) as {
+    phone: { layer: Array<{ id: string; row: Array<{ key: Array<Record<string, unknown>> }> }> };
+  };
+  const layer = parsed.phone.layer.find((l) => l.id === layerId);
+  return layer?.row.flatMap((r) => r.key).find((k) => k["id"] === keyId);
+}
+
+/** Pull a key object out of a named layer of an arbitrary named platform
+ *  (generalizes {@link phoneKeyOnLayer} to any platform name, e.g. "tablet"). */
+function phoneOrTabletKeyOnLayer(
+  json: string,
+  platformName: string,
+  layerId: string,
+  keyId: string,
+): Record<string, unknown> | undefined {
+  const parsed = JSON.parse(json) as Record<
+    string,
+    { layer: Array<{ id: string; row: Array<{ key: Array<Record<string, unknown>> }> }> }
+  >;
+  const layer = parsed[platformName]?.layer.find((l) => l.id === layerId);
+  return layer?.row.flatMap((r) => r.key).find((k) => k["id"] === keyId);
+}
+
+// ---------------------------------------------------------------------------
+// Positional fallback into a blank placeholder — layout-agnostic
+//
+// Deliberately uses an invented layer name ("fn", not any real Keyman
+// modifier name like "rightalt") and an invented blank sentinel id, to prove
+// the fallback is driven purely by ARRAY POSITION parity with the "default"
+// layer, never by a hardcoded layer name or sentinel id.
+// ---------------------------------------------------------------------------
+
+/** A generic phone layout: "default" + an arbitrary modifier layer ("fn")
+ *  whose row/key arrays are positionally aligned with "default", per the
+ *  real Keyman `.keyman-touch-layout` invariant (same shape across sibling
+ *  layers). "fn" carries blanks at various positions using DIFFERENT blank
+ *  encodings, to prove the predicate generalizes:
+ *    - index 0: the well-known "T_BLANK" sentinel.
+ *    - index 1: a layout that uses its own sentinel id + spacer sp (no
+ *      "T_BLANK" anywhere) — still recognized as blank.
+ *    - index 2: a real, already-populated key with a DIFFERENT id — must
+ *      never be clobbered. */
+function makeGenericModifierLayerJson(): string {
+  return JSON.stringify({
+    tablet: {
+      layer: [
+        {
+          id: "default",
+          row: [
+            {
+              id: 1,
+              key: [
+                { id: "K_A", text: "a" },
+                { id: "K_S", text: "s" },
+                { id: "K_D", text: "d" },
+              ],
+            },
+          ],
+        },
+        {
+          id: "fn",
+          row: [
+            {
+              id: 1,
+              key: [
+                { id: "T_BLANK", text: "", sp: 10 },
+                // sp:8 (spacer) — a canonical spacer-class value per
+                // isSpacerKeyClass, deliberately NOT "T_BLANK", to prove the
+                // predicate generalizes beyond the well-known sentinel id.
+                { id: "T_OTHER_SENTINEL", text: " ", sp: 8 },
+                { id: "K_ZZZ", text: "z" },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+  });
+}
+
+function longpressOnFnLayer(hostKey: string, char: string): TouchAssignment {
+  return longpressOnLayer(hostKey, char, "fn");
+}
+
+describe("applyTouchAssignmentsToRawJson — positional fallback into blank placeholder (layout-agnostic)", () => {
+  it("promotes a T_BLANK slot by position on an arbitrary non-default layer", () => {
+    const raw = makeGenericModifierLayerJson();
+    const { json, warnings } = applyTouchAssignmentsToRawJson(raw, [
+      longpressOnFnLayer("K_A", "á"),
+    ]);
+    expect(warnings).toHaveLength(0);
+
+    const key = phoneOrTabletKeyOnLayer(json, "tablet", "fn", "K_A")!;
+    expect(key["id"]).toBe("K_A");
+    expect(key["sk"]).toEqual([{ id: "U_00E1", text: "á" }]);
+    // The spacer must be cleared so the slot renders/behaves as a real key.
+    expect(key["sp"]).toBeUndefined();
+
+    // The default layer's K_A is untouched.
+    const defaultKey = phoneOrTabletKeyOnLayer(json, "tablet", "default", "K_A")!;
+    expect(defaultKey["sk"]).toBeUndefined();
+  });
+
+  it("promotes a differently-sentineled blank (no 'T_BLANK' id anywhere, just empty text + sp) by position", () => {
+    const raw = makeGenericModifierLayerJson();
+    const { json, warnings } = applyTouchAssignmentsToRawJson(raw, [
+      longpressOnFnLayer("K_S", "ś"),
+    ]);
+    expect(warnings).toHaveLength(0);
+
+    const key = phoneOrTabletKeyOnLayer(json, "tablet", "fn", "K_S")!;
+    expect(key["id"]).toBe("K_S");
+    expect(key["sk"]).toEqual([{ id: "U_015B", text: "ś" }]);
+    expect(key["sp"]).toBeUndefined();
+  });
+
+  it("does NOT clobber a real, already-populated key at that position with a different id", () => {
+    const raw = makeGenericModifierLayerJson();
+    const { json, warnings } = applyTouchAssignmentsToRawJson(raw, [
+      longpressOnFnLayer("K_D", "đ"),
+    ]);
+    // K_D's position on "fn" holds a real key ("K_ZZZ") — not a blank, so no
+    // platform matches and the assignment is skipped with a warning, exactly
+    // as the pre-existing id-only-miss behavior.
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('host key "K_D" not found in any platform\'s "fn" layer');
+
+    const untouched = phoneOrTabletKeyOnLayer(json, "tablet", "fn", "K_ZZZ")!;
+    expect(untouched["id"]).toBe("K_ZZZ");
+    expect(untouched["text"]).toBe("z");
+    expect(untouched["sk"]).toBeUndefined();
+  });
+
+  it("a genuinely absent position (target layer shorter than default) still warns, not fallback-promoted", () => {
+    const raw = JSON.stringify({
+      tablet: {
+        layer: [
+          {
+            id: "default",
+            row: [{ id: 1, key: [{ id: "K_A", text: "a" }, { id: "K_S", text: "s" }] }],
+          },
+          {
+            id: "fn",
+            row: [{ id: 1, key: [{ id: "T_BLANK", text: "", sp: 10 }] }], // only 1 key, not 2
+          },
+        ],
+      },
+    });
+    const { warnings } = applyTouchAssignmentsToRawJson(raw, [longpressOnFnLayer("K_S", "ś")]);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('host key "K_S" not found in any platform\'s "fn" layer');
+  });
+
+  it("a second assignment targeting the same promoted host key on the same layer applies via the now-set id (no re-promotion needed)", () => {
+    const raw = makeGenericModifierLayerJson();
+    const combined: TouchAssignment = {
+      scope: "individual",
+      target: "a",
+      modality: "touch",
+      mechanisms: [
+        { patternId: "longpress_alternates", slotValues: { hostKey: "K_A", char: "á", layer: "fn" } },
+        { patternId: "multitap", slotValues: { hostKey: "K_A", char: "â", layer: "fn" } },
+      ],
+      source: "user",
+    };
+    const { json, warnings } = applyTouchAssignmentsToRawJson(raw, [combined]);
+    expect(warnings).toHaveLength(0);
+
+    const key = phoneOrTabletKeyOnLayer(json, "tablet", "fn", "K_A")!;
+    expect(key["sk"]).toEqual([{ id: "U_00E1", text: "á" }]);
+    expect(key["multitap"]).toEqual([{ id: "U_00E2", text: "â" }]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Positional fallback into blank placeholder — real fixture regression
+// (sil_cameroon_qwerty "rightalt" layer, the originally reported bug)
+// ---------------------------------------------------------------------------
+
+describe("applyTouchAssignmentsToRawJson — positional fallback: real fixture (sil_cameroon_qwerty)", () => {
+  it.skipIf(!fixtureExists)(
+    "a longpress on K_S targeting the 'rightalt' layer promotes rightalt's T_BLANK slot at K_S's default-layer position",
+    () => {
+      const rawJson = fs.readFileSync(CAMEROON_TOUCH_LAYOUT, "utf-8");
+      const { json, warnings } = applyTouchAssignmentsToRawJson(rawJson, [
+        longpressOnLayer("K_S", "ś", "rightalt"),
+      ]);
+      expect(warnings).toHaveLength(0);
+
+      const parsed = JSON.parse(json) as {
+        tablet: { layer: Array<{ id: string; row: Array<{ key: Array<Record<string, unknown>> }> }> };
+      };
+      const rightaltLayer = parsed.tablet.layer.find((l) => l.id === "rightalt")!;
+      const promoted = rightaltLayer.row.flatMap((r) => r.key).find((k) => k["id"] === "K_S")!;
+      expect(promoted).toBeDefined();
+      expect(promoted["sp"]).toBeUndefined();
+      expect(promoted["sk"]).toEqual([{ id: "U_015B", text: "ś" }]);
+
+      // The default layer's K_S is untouched by this rightalt-targeted edit.
+      const defaultLayer = parsed.tablet.layer.find((l) => l.id === "default")!;
+      const defaultKS = defaultLayer.row.flatMap((r) => r.key).find((k) => k["id"] === "K_S")!;
+      expect(defaultKS["sk"]).toBeUndefined();
+    },
+  );
+});
+
+describe("applyTouchAssignmentsToRawJson — layer targeting", () => {
+  it('layer: "default" produces exactly the same JSON as an absent layer', () => {
+    const raw = makePhoneWithShiftJson();
+
+    const withAbsent = applyTouchAssignmentsToRawJson(raw, [longpress("K_A", "á")]);
+    const withExplicit = applyTouchAssignmentsToRawJson(raw, [
+      longpressOnLayer("K_A", "á", "default"),
+    ]);
+
+    expect(withExplicit.warnings).toEqual(withAbsent.warnings);
+    expect(withExplicit.json).toBe(withAbsent.json);
+  });
+
+  it('layer: "shift" splices onto the shift-layer key and leaves the default key alone', () => {
+    const { json, warnings } = applyTouchAssignmentsToRawJson(makePhoneWithShiftJson(), [
+      longpressOnLayer("K_A", "Á", "shift"),
+    ]);
+
+    expect(warnings).toHaveLength(0);
+
+    const shiftKeyA = phoneKeyOnLayer(json, "shift", "K_A")!;
+    expect(shiftKeyA["sk"]).toEqual([{ id: "U_00C1", text: "Á" }]);
+
+    const defaultKeyA = phoneKeyOnLayer(json, "default", "K_A")!;
+    expect(defaultKeyA["sk"]).toBeUndefined();
+  });
+
+  it("an unknown layer warns naming that layer, skips, and never falls back to default", () => {
+    const { json, warnings } = applyTouchAssignmentsToRawJson(makePhoneWithShiftJson(), [
+      longpressOnLayer("K_A", "Á", "caps"),
+    ]);
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('host key "K_A" not found in any platform\'s "caps" layer');
+    expect(phoneKeyOnLayer(json, "default", "K_A")!["sk"]).toBeUndefined();
+    expect(phoneKeyOnLayer(json, "shift", "K_A")!["sk"]).toBeUndefined();
+  });
+
+  it("a host key present on another layer but absent from the target layer warns and skips", () => {
+    // K_S exists on default only; targeting shift must not silently use default.
+    const { json, warnings } = applyTouchAssignmentsToRawJson(makePhoneWithShiftJson(), [
+      longpressOnLayer("K_S", "Ś", "shift"),
+    ]);
+
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('host key "K_S" not found in any platform\'s "shift" layer');
+    expect(phoneKeyOnLayer(json, "default", "K_S")!["sk"]).toBeUndefined();
+  });
+
+  it("preserves unknown fields and key order when splicing onto a non-default layer", () => {
+    const raw = JSON.stringify({
+      _comment: "hand-authored",
+      phone: {
+        displayUnderlying: false,
+        font: "Andika Afr",
+        layer: [
+          { id: "default", row: [{ id: 1, key: [{ id: "K_A", text: "a" }] }] },
+          {
+            id: "shift",
+            row: [
+              {
+                id: 1,
+                key: [
+                  { id: "K_A", text: "A", width: "150", futureField: 7 },
+                  { id: "K_B", text: "B" },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+
+    const { json, warnings } = applyTouchAssignmentsToRawJson(raw, [
+      longpressOnLayer("K_A", "Á", "shift"),
+    ]);
+
+    expect(warnings).toHaveLength(0);
+
+    const parsed = JSON.parse(json) as Record<string, unknown>;
+    expect(Object.keys(parsed)).toEqual(["_comment", "phone"]);
+    expect(parsed["_comment"]).toBe("hand-authored");
+
+    const shiftKeyA = phoneKeyOnLayer(json, "shift", "K_A")!;
+    // Unknown/verbatim fields survive, and the spliced sk[] is appended last.
+    expect(Object.keys(shiftKeyA)).toEqual(["id", "text", "width", "futureField", "sk"]);
+    expect(shiftKeyA["futureField"]).toBe(7);
+    expect(shiftKeyA["width"]).toBe("150");
+
+    // Key order within the row is unchanged.
+    const shiftLayer = (
+      (parsed["phone"] as { layer: Array<{ id: string; row: Array<{ key: Array<{ id: string }> }> }> })
+        .layer
+    ).find((l) => l.id === "shift")!;
+    expect(shiftLayer.row[0]!.key.map((k) => k.id)).toEqual(["K_A", "K_B"]);
+  });
+
+  it('defaultHint "dot" promotion still fires for a platform that gained an sk[] on a non-default layer', () => {
+    const { json } = applyTouchAssignmentsToRawJson(makePhoneWithShiftJson(), [
+      longpressOnLayer("K_A", "Á", "shift"),
+    ]);
+
+    const parsed = JSON.parse(json) as { phone: { defaultHint?: string } };
+    expect(parsed.phone.defaultHint).toBe("dot");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isBlankPlaceholder — canonical spacer-class predicate (P0 fix)
+// ---------------------------------------------------------------------------
+
+describe("isBlankPlaceholder", () => {
+  it("returns true for the T_BLANK sentinel regardless of sp/text", () => {
+    expect(isBlankPlaceholder({ id: "T_BLANK", text: "" })).toBe(true);
+  });
+
+  it("returns true for sp:10 (canonical padding spacer class) with empty text", () => {
+    expect(isBlankPlaceholder({ id: "T_ANYTHING", text: "", sp: 10 })).toBe(true);
+  });
+
+  it("returns true for sp:8 (canonical spacer class) with whitespace-only text", () => {
+    expect(isBlankPlaceholder({ id: "T_ANYTHING", text: "  ", sp: 8 })).toBe(true);
+  });
+
+  it("returns false for sp:0 (normal key class) even with empty text — the spacebar shape", () => {
+    expect(isBlankPlaceholder({ id: "K_SPACE", text: " ", sp: 0 })).toBe(false);
+  });
+
+  it("returns false for sp:1 (special key class) even with empty text", () => {
+    expect(isBlankPlaceholder({ id: "K_SOMETHING", text: "", sp: 1 })).toBe(false);
+  });
+
+  it("returns false for sp:2 (shift key class) even with empty text", () => {
+    expect(isBlankPlaceholder({ id: "K_SOMETHING", text: "", sp: 2 })).toBe(false);
+  });
+
+  it("returns false for a real key with real text and no sp", () => {
+    expect(isBlankPlaceholder({ id: "K_A", text: "a" })).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Positional fallback never promotes a REAL key — only canonical spacer
+// classes (P0 fix regression: "any defined sp" used to be treated as blank)
+// ---------------------------------------------------------------------------
+
+describe("applyTouchAssignmentsToRawJson — real (non-blank) keys are never promoted", () => {
+  it("a real key with sp:0 and whitespace text (spacebar-shaped) at the aligned position is NOT promoted", () => {
+    const raw = JSON.stringify({
+      tablet: {
+        layer: [
+          { id: "default", row: [{ id: 1, key: [{ id: "K_SPACE", text: " " }] }] },
+          { id: "fn", row: [{ id: 1, key: [{ id: "K_OTHER", text: " ", sp: 0 }] }] },
+        ],
+      },
+    });
+    const { json, warnings } = applyTouchAssignmentsToRawJson(raw, [
+      longpressOnLayer("K_SPACE", "x", "fn"),
+    ]);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('host key "K_SPACE" not found');
+    // The real key at that position must be untouched — not clobbered.
+    const untouched = phoneOrTabletKeyOnLayer(json, "tablet", "fn", "K_OTHER")!;
+    expect(untouched["id"]).toBe("K_OTHER");
+    expect(untouched["sp"]).toBe(0);
+    expect(untouched["sk"]).toBeUndefined();
+  });
+
+  it("a real key with sp:1 (special class) at the aligned position is NOT promoted", () => {
+    const raw = JSON.stringify({
+      tablet: {
+        layer: [
+          { id: "default", row: [{ id: 1, key: [{ id: "K_A", text: "a" }] }] },
+          { id: "fn", row: [{ id: 1, key: [{ id: "K_SYMBOLS", text: "*Symbol*", sp: 1 }] }] },
+        ],
+      },
+    });
+    const { json, warnings } = applyTouchAssignmentsToRawJson(raw, [
+      longpressOnLayer("K_A", "á", "fn"),
+    ]);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain('host key "K_A" not found');
+    const untouched = phoneOrTabletKeyOnLayer(json, "tablet", "fn", "K_SYMBOLS")!;
+    expect(untouched["sp"]).toBe(1);
+    expect(untouched["sk"]).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Out-of-bounds edges — defensive, never crash (Q3 / regression floor)
+// ---------------------------------------------------------------------------
+
+describe("applyTouchAssignmentsToRawJson — positional fallback out-of-bounds edges", () => {
+  it("the target layer has fewer ROWS than default — warns, no crash", () => {
+    const raw = JSON.stringify({
+      tablet: {
+        layer: [
+          {
+            id: "default",
+            row: [
+              { id: 1, key: [{ id: "K_A", text: "a" }] },
+              { id: 2, key: [{ id: "K_B", text: "b" }] },
+            ],
+          },
+          {
+            id: "fn",
+            // Only 1 row — "default" has 2. The position resolved for K_B
+            // (row index 1) does not exist on "fn" at all.
+            row: [{ id: 1, key: [{ id: "T_BLANK", text: "", sp: 10 }] }],
+          },
+        ],
+      },
+    });
+    let result: ReturnType<typeof applyTouchAssignmentsToRawJson> | undefined;
+    expect(() => {
+      result = applyTouchAssignmentsToRawJson(raw, [longpressOnLayer("K_B", "b́", "fn")]);
+    }).not.toThrow();
+    expect(result!.warnings).toHaveLength(1);
+    expect(result!.warnings[0]).toContain('host key "K_B" not found');
+  });
+
+  it("a platform has the target layer but NO 'default' layer at all — warns, no crash", () => {
+    const raw = JSON.stringify({
+      tablet: {
+        layer: [{ id: "fn", row: [{ id: 1, key: [{ id: "T_BLANK", text: "", sp: 10 }] }] }],
+      },
+    });
+    let result: ReturnType<typeof applyTouchAssignmentsToRawJson> | undefined;
+    expect(() => {
+      result = applyTouchAssignmentsToRawJson(raw, [longpressOnLayer("K_A", "á", "fn")]);
+    }).not.toThrow();
+    expect(result!.warnings).toHaveLength(1);
+    expect(result!.warnings[0]).toContain('host key "K_A" not found');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Promotion semantics — nextlayer sample-from-siblings, base-text borrow,
+// width/pad preservation (P1 fixes)
+// ---------------------------------------------------------------------------
+
+describe("applyTouchAssignmentsToRawJson — promoted key nextlayer (sample-from-siblings)", () => {
+  it.skipIf(!fixtureExists)(
+    "promoting K_Q onto rightalt copies nextlayer:'default' from the sibling K_W (real fixture, ~line 1209)",
+    () => {
+      const rawJson = fs.readFileSync(CAMEROON_TOUCH_LAYOUT, "utf-8");
+      const { json, warnings } = applyTouchAssignmentsToRawJson(rawJson, [
+        longpressOnLayer("K_Q", "ʠ", "rightalt"),
+      ]);
+      expect(warnings).toHaveLength(0);
+
+      const promoted = phoneOrTabletKeyOnLayer(json, "tablet", "rightalt", "K_Q")!;
+      expect(promoted["sp"]).toBeUndefined();
+      expect(promoted["nextlayer"]).toBe("default");
+    },
+  );
+
+  it(
+    "promoted key OMITS nextlayer when the first live sibling omits it (persistent-layer case, " +
+      "modeled on sil_cameroon_qwerty's 'caps' layer where K_Q/K_W carry none, ~lines 1820-1834)",
+    () => {
+      const raw = JSON.stringify({
+        tablet: {
+          layer: [
+            { id: "default", row: [{ id: 1, key: [{ id: "K_Q", text: "q" }, { id: "K_W", text: "w" }] }] },
+            {
+              id: "caps",
+              row: [
+                {
+                  id: 1,
+                  key: [
+                    { id: "T_BLANK", text: "", sp: 10 },
+                    { id: "K_W", text: "W" }, // live, no nextlayer — persistent layer
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      });
+      const { json, warnings } = applyTouchAssignmentsToRawJson(raw, [
+        longpressOnLayer("K_Q", "Q́", "caps"),
+      ]);
+      expect(warnings).toHaveLength(0);
+
+      const promoted = phoneOrTabletKeyOnLayer(json, "tablet", "caps", "K_Q")!;
+      expect(promoted["nextlayer"]).toBeUndefined();
+    },
+  );
+
+  it("falls back to nextlayer:'default' when the target layer has zero live keys to sample", () => {
+    const raw = JSON.stringify({
+      tablet: {
+        layer: [
+          { id: "default", row: [{ id: 1, key: [{ id: "K_Q", text: "q" }] }] },
+          { id: "empty", row: [{ id: 1, key: [{ id: "T_BLANK", text: "", sp: 10 }] }] },
+        ],
+      },
+    });
+    const { json, warnings } = applyTouchAssignmentsToRawJson(raw, [
+      longpressOnLayer("K_Q", "q́", "empty"),
+    ]);
+    expect(warnings).toHaveLength(0);
+
+    const promoted = phoneOrTabletKeyOnLayer(json, "tablet", "empty", "K_Q")!;
+    expect(promoted["nextlayer"]).toBe("default");
+  });
+});
+
+describe("applyTouchAssignmentsToRawJson — promoted key base-text borrow", () => {
+  it("a longpress-only promotion borrows the DEFAULT-layer key's base text when still empty after the mechanism", () => {
+    const raw = makeGenericModifierLayerJson();
+    const { json, warnings } = applyTouchAssignmentsToRawJson(raw, [
+      longpressOnFnLayer("K_A", "á"),
+    ]);
+    expect(warnings).toHaveLength(0);
+
+    const promoted = phoneOrTabletKeyOnLayer(json, "tablet", "fn", "K_A")!;
+    // "fn"'s T_BLANK at K_A's position had text:"" — borrowed from default's K_A ("a").
+    expect(promoted["text"]).toBe("a");
+  });
+
+  it("touch_key_replace already sets text — the borrow is a no-op (text is not overwritten)", () => {
+    const raw = JSON.stringify({
+      tablet: {
+        layer: [
+          { id: "default", row: [{ id: 1, key: [{ id: "K_X", text: "x" }] }] },
+          { id: "fn", row: [{ id: 1, key: [{ id: "T_BLANK", text: "", sp: 10 }] }] },
+        ],
+      },
+    });
+    const keyReplaceOnFn: TouchAssignment = {
+      scope: "individual",
+      target: "ñ",
+      modality: "touch",
+      mechanisms: [
+        { patternId: "touch_key_replace", slotValues: { hostKey: "K_X", char: "ñ", layer: "fn" } },
+      ],
+      source: "user",
+    };
+    const { json, warnings } = applyTouchAssignmentsToRawJson(raw, [keyReplaceOnFn]);
+    expect(warnings).toHaveLength(0);
+
+    const promoted = phoneOrTabletKeyOnLayer(json, "tablet", "fn", "U_00F1")!;
+    expect(promoted["text"]).toBe("ñ");
+  });
+});
+
+describe("applyTouchAssignmentsToRawJson — promoted key preserves width/pad", () => {
+  it("width/pad on the blank slot survive promotion; only sp is cleared", () => {
+    const raw = JSON.stringify({
+      tablet: {
+        layer: [
+          { id: "default", row: [{ id: 1, key: [{ id: "K_Q", text: "q" }] }] },
+          {
+            id: "fn",
+            row: [{ id: 1, key: [{ id: "T_BLANK", text: "", sp: 10, width: 120, pad: 40 }] }],
+          },
+        ],
+      },
+    });
+    const { json, warnings } = applyTouchAssignmentsToRawJson(raw, [
+      longpressOnLayer("K_Q", "q́", "fn"),
+    ]);
+    expect(warnings).toHaveLength(0);
+
+    const promoted = phoneOrTabletKeyOnLayer(json, "tablet", "fn", "K_Q")!;
+    expect(promoted["sp"]).toBeUndefined();
+    expect(promoted["width"]).toBe(120);
+    expect(promoted["pad"]).toBe(40);
   });
 });

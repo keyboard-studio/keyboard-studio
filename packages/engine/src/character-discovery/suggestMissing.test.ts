@@ -7,7 +7,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { suggestMissingCharacters } from "./suggestMissing.js";
+import { suggestMissingCharacters, neededCharsForLanguage, isCharCoveredForLocale } from "./suggestMissing.js";
 import type { CldrFullLoader } from "./cldr.js";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import type { IRGroup, IRRule } from "@keyboard-studio/contracts";
@@ -16,12 +16,14 @@ import type { IRGroup, IRRule } from "@keyboard-studio/contracts";
 // Fixture helpers
 // ---------------------------------------------------------------------------
 
-/** Build a loader that returns the supplied main+auxiliary pair for every locale. */
+/** Build a loader that returns the supplied main+auxiliary(+punctuation+numbers) tiers for every locale. */
 function makeLoader(
   main: string,
   auxiliary: string | null = null,
+  punctuation: string | null = null,
+  numbers: string | null = null,
 ): CldrFullLoader {
-  return async (_locale: string) => ({ main, auxiliary });
+  return async (_locale: string) => ({ main, auxiliary, punctuation, numbers });
 }
 
 /** Loader that returns null (locale not found). */
@@ -587,5 +589,286 @@ describe("suggestMissingCharacters — digraph clusters excluded from suggestion
     expect(result!.main).not.toContain("gb");
     // Single missing letter ọ MUST appear
     expect(result!.main).toContain("ọ");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 11. neededCharsForLanguage — full needed-set export (issue #525 items 2/4)
+// ---------------------------------------------------------------------------
+
+describe("neededCharsForLanguage — confidence gate (null)", () => {
+  const wouldFail: CldrFullLoader = async () => {
+    throw new Error("loader should not have been called when gate blocks");
+  };
+
+  it("returns null for 'und'", async () => {
+    const result = await neededCharsForLanguage({ bcp47: "und", loader: wouldFail });
+    expect(result).toBeNull();
+  });
+
+  it("returns null for script-only tag 'Latn'", async () => {
+    const result = await neededCharsForLanguage({ bcp47: "Latn", loader: wouldFail });
+    expect(result).toBeNull();
+  });
+
+  it("returns null for private-use tag 'qaa'", async () => {
+    const result = await neededCharsForLanguage({ bcp47: "qaa", loader: wouldFail });
+    expect(result).toBeNull();
+  });
+
+  it("returns null for bare macrolanguage 'zh' (no region/script)", async () => {
+    const result = await neededCharsForLanguage({ bcp47: "zh", loader: wouldFail });
+    expect(result).toBeNull();
+  });
+
+  it("returns null when the loader has no CLDR locale match", async () => {
+    const result = await neededCharsForLanguage({ bcp47: "yo", loader: nullLoader });
+    expect(result).toBeNull();
+  });
+
+  it("ms-MY (narrowed macrolanguage) passes the gate and returns non-null", async () => {
+    const loader = makeLoader("[a-z é]");
+    const result = await neededCharsForLanguage({ bcp47: "ms-MY", loader });
+    expect(result).not.toBeNull();
+  });
+});
+
+describe("neededCharsForLanguage — returns the full exemplar set (not just missing)", () => {
+  it("includes ASCII exemplar chars, unlike suggestMissingCharacters's letter-filtered fields", async () => {
+    // suggestMissingCharacters would drop the ASCII "a-z" range entirely (it only
+    // suggests non-ASCII gaps); neededCharsForLanguage must keep them — a Latin
+    // keyboard's own a-z ARE needed characters, not "produces-but-unwanted".
+    const loader = makeLoader("[a-z é]");
+    const result = await neededCharsForLanguage({ bcp47: "fr", loader });
+    expect(result).not.toBeNull();
+    expect(result!.has("a")).toBe(true);
+    expect(result!.has("z")).toBe(true);
+    expect(result!.has("é")).toBe(true);
+  });
+
+  it("includes auxiliary (loanword-tier) characters alongside main", async () => {
+    const loader = makeLoader("[ẹ]", "[ü]");
+    const result = await neededCharsForLanguage({ bcp47: "yo", loader });
+    expect(result).not.toBeNull();
+    expect(result!.has("ẹ")).toBe(true);
+    expect(result!.has("ü")).toBe(true);
+  });
+
+  it("returns an empty auxiliary contribution (not null) when CLDR has no auxiliary set", async () => {
+    const loader = makeLoader("[ẹ]", null);
+    const result = await neededCharsForLanguage({ bcp47: "yo", loader });
+    expect(result).not.toBeNull();
+    expect(result!.has("ẹ")).toBe(true);
+    expect(result!.size).toBe(1);
+  });
+
+  it("NFC-normalizes returned characters (decomposed CLDR input composes)", async () => {
+    // e + combining acute (NFD) in the CLDR string should compose to é (NFC)
+    // via parseUnicodeSet's per-character NFC normalization.
+    const loader = makeLoader("[é]"); // already composed source string; parseUnicodeSet NFC-normalizes each output char regardless
+    const result = await neededCharsForLanguage({ bcp47: "fr", loader });
+    expect(result).not.toBeNull();
+    expect(result!.has("é".normalize("NFC"))).toBe(true);
+  });
+
+  // #525 fix — over-removal: punctuation + numbers exemplar tiers must also
+  // count as "needed" (French guillemets, Persian Eastern-Arabic-Indic digits),
+  // not just the letter tiers, or a keyboard producing them gets flagged surplus.
+  it("includes punctuation exemplar characters (e.g. French guillemets)", async () => {
+    const loader = makeLoader("[a-z é]", null, "[« »]");
+    const result = await neededCharsForLanguage({ bcp47: "fr", loader });
+    expect(result).not.toBeNull();
+    expect(result!.has("«")).toBe(true);
+    expect(result!.has("»")).toBe(true);
+  });
+
+  it("includes numbers exemplar characters (e.g. Persian Eastern-Arabic-Indic digits)", async () => {
+    const loader = makeLoader("[ا ب ت]", null, null, "[۰ ۱ ۲]");
+    const result = await neededCharsForLanguage({ bcp47: "fa-IR", loader });
+    expect(result).not.toBeNull();
+    expect(result!.has("۰")).toBe(true);
+    expect(result!.has("۱")).toBe(true);
+    expect(result!.has("۲")).toBe(true);
+  });
+
+  it("returns only main+auxiliary when punctuation/numbers tiers are absent from CLDR", async () => {
+    const loader = makeLoader("[ẹ]", "[ü]");
+    const result = await neededCharsForLanguage({ bcp47: "yo", loader });
+    expect(result).not.toBeNull();
+    expect(result!.size).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 12. isCharCoveredForLocale — case-fold reuse for surplus detection (#525 fix)
+// ---------------------------------------------------------------------------
+
+describe("isCharCoveredForLocale — reuses isCovered's exception-aware fold", () => {
+  it("covers an uppercase accented letter against a lowercase-only CLDR set (French É vs é)", () => {
+    const needed = new Set(["a", "e", "é"]);
+    expect(isCharCoveredForLocale("É", needed, "fr")).toBe(true);
+  });
+
+  it("does not naively lowercase — Turkic dotted-I hazard is preserved (tr)", () => {
+    // Plain toLowerCase() would map "I" -> "i", but Turkish "I".toLowerCase()
+    // should be "ı" (dotless). isCovered suppresses the fold entirely for
+    // Latin-script Turkic locales, so an exact-mismatch stays uncovered.
+    const needed = new Set(["ı"]); // dotless i only
+    expect(isCharCoveredForLocale("I", needed, "tr")).toBe(false);
+    expect(isCharCoveredForLocale("ı", needed, "tr")).toBe(true); // exact match still works
+  });
+
+  it("Cyrillic-script Turkic (bare kk) still uses normal case fold", () => {
+    const needed = new Set(["и"]); // Cyrillic lowercase i
+    expect(isCharCoveredForLocale("И", needed, "kk")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 13. isCharCoveredForLocale — `form` parameter (carve-gallery apples-to-apples
+// comparison, following the ratified marksOutputForm decision). Both sides of
+// a carve comparison must be normalized to the SAME form for a match to be
+// meaningful — these tests hold the produced-vs-needed match under NFD as
+// well as under the pre-existing NFC default, and confirm the Turkic
+// case-fold exception (G5) keeps firing on top of normalization, not instead
+// of it.
+// ---------------------------------------------------------------------------
+
+describe("isCharCoveredForLocale — `form` parameter (spec: normalize both sides identically)", () => {
+  const PRECOMPOSED_LOWER_E_ACUTE = "é"; // single codepoint (NFC)
+  const PRECOMPOSED_UPPER_E_ACUTE = "É"; // single codepoint (NFC)
+  const DECOMPOSED_LOWER_E_ACUTE = "é"; // e + combining acute accent (NFD)
+
+  it("defaults to NFC when `form` is omitted — undefined marksOutputForm fallback stays byte-identical", () => {
+    const needed = new Set([PRECOMPOSED_LOWER_E_ACUTE]);
+    // A decomposed candidate still matches under the NFC default, because
+    // isCovered normalizes `ch` before comparing.
+    expect(isCharCoveredForLocale(DECOMPOSED_LOWER_E_ACUTE, needed, "fr")).toBe(true);
+  });
+
+  it("matches a produced precomposed char against a decomposed needed-set entry under NFD", () => {
+    // Simulates: base rule produces "é" (precomposed), the needed-set entry
+    // was built from a base-plus-mark combo (decomposed) — both get
+    // normalized to NFD before comparison, so they match.
+    const needed = new Set([DECOMPOSED_LOWER_E_ACUTE]);
+    expect(isCharCoveredForLocale(PRECOMPOSED_LOWER_E_ACUTE, needed, "fr", "NFD")).toBe(true);
+  });
+
+  it("matches a produced decomposed sequence against a precomposed needed-set entry under NFC", () => {
+    const needed = new Set([PRECOMPOSED_LOWER_E_ACUTE]);
+    expect(isCharCoveredForLocale(DECOMPOSED_LOWER_E_ACUTE, needed, "fr", "NFC")).toBe(true);
+  });
+
+  it("mismatched forms on the two sides do NOT match — proves the seam actually requires normalizing both sides, not just one", () => {
+    // needed-set built (and left) in NFD, but the caller asks for an NFC
+    // comparison without re-normalizing the covering set — the contract
+    // documented on isCharCoveredForLocale: it's the CALLER's job to build
+    // coveringSet in the same form it's comparing under.
+    const neededStillNFD = new Set([DECOMPOSED_LOWER_E_ACUTE]);
+    // "É" upper-cased precomposed normalized to NFC is "É" (unchanged);
+    // toUpperCase() of the NFD-covering-set entry never happens (that's the
+    // producer side's job), so an exact-form mismatch fails to match.
+    expect(isCharCoveredForLocale(PRECOMPOSED_LOWER_E_ACUTE, neededStillNFD, "fr", "NFC")).toBe(false);
+  });
+
+  it("Turkic dotted-I exception (G5) still fires on top of NFD normalization, not instead of it", () => {
+    const needed = new Set(["ı"]); // dotless i (single codepoint; NFC === NFD here)
+    // Turkic exact-match-only rule still suppresses the case fold under NFD.
+    expect(isCharCoveredForLocale("I", needed, "tr", "NFD")).toBe(false);
+    expect(isCharCoveredForLocale("ı", needed, "tr", "NFD")).toBe(true);
+  });
+
+  it("case-fold still runs IN ADDITION to NFD normalization for non-Turkic locales", () => {
+    // French "É" (precomposed uppercase) against a needed-set built from a
+    // decomposed lowercase entry — normalization brings "É" to NFD first
+    // ("E" + combining acute, uppercase base), then the case-fold lowercases
+    // the base letter, matching the decomposed needed entry.
+    const decomposedLowerEAcute = "é";
+    const needed = new Set([decomposedLowerEAcute]);
+    expect(isCharCoveredForLocale(PRECOMPOSED_UPPER_E_ACUTE, needed, "fr", "NFD")).toBe(true); // "É" precomposed uppercase
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 12. Spec 044 — the offline sourcing path (no loader) and the script
+//     cross-check with all four tiers live.
+//
+// Before spec 044 the punctuation and numbers tiers were read under CLDR key
+// names that have never existed (research R0), so they were always null and
+// three quarters of the "needed" signal never reached surplus detection. Now
+// that they flow, the cross-check must SURFACE out-of-script characters rather
+// than dropping them: a Latin quotation mark in an Arabic locale's punctuation
+// set is genuinely needed, and silently discarding it would re-introduce the
+// over-removal these tiers were added to fix.
+// ---------------------------------------------------------------------------
+
+describe("spec 044 — offline sourcing path (no loader)", () => {
+  it("suggestMissingCharacters resolves without a loader", async () => {
+    const ir = emptyIr;
+    const result = await suggestMissingCharacters({ bcp47: "ewo", baseIr: ir });
+    expect(result).not.toBeNull();
+    expect(result!.bcp47).toBe("ewo");
+  });
+
+  it("suggests from an SLDR-only language's real alphabet", async () => {
+    const result = await suggestMissingCharacters({ bcp47: "ebk", baseIr: emptyIr });
+    expect(result).not.toBeNull();
+    // Eastern Bontok's accented vowels — CLDR has no ebk locale at all.
+    expect(result!.main).toContain("ó");
+  });
+
+  it("still returns null for a tag neither source covers", async () => {
+    expect(await suggestMissingCharacters({ bcp47: "zxx-Qaai", baseIr: emptyIr })).toBeNull();
+  });
+
+  it("still honours the confidence gate without a loader", async () => {
+    for (const tag of ["und", "zh", "ms"]) {
+      expect(await suggestMissingCharacters({ bcp47: tag, baseIr: emptyIr })).toBeNull();
+    }
+  });
+
+  it("neededCharsForLanguage resolves without a loader", async () => {
+    const needed = await neededCharsForLanguage({ bcp47: "ewo" });
+    expect(needed).not.toBeNull();
+    expect(needed!.size).toBeGreaterThan(0);
+  });
+});
+
+describe("spec 044 — all four tiers reach the needed set", () => {
+  it("includes locale punctuation and locale digits, not just letters", async () => {
+    const needed = await neededCharsForLanguage({ bcp47: "ewo" });
+    expect(needed).not.toBeNull();
+    expect(needed!.has("ŋ")).toBe(true); // main
+    expect(needed!.has("x")).toBe(true); // auxiliary
+    expect(needed!.has("?")).toBe(true); // punctuation
+    expect(needed!.has("7")).toBe(true); // numbers
+  });
+
+  it("surfaces Persian's own digits rather than only ASCII ones", async () => {
+    const needed = await neededCharsForLanguage({ bcp47: "fa-IR" });
+    expect(needed!.has("۵")).toBe(true);
+  });
+
+  it("surfaces out-of-script punctuation instead of dropping it", async () => {
+    // Arabic's punctuation tier contains Latin-script marks (parentheses,
+    // quotation marks). Nothing filters on script here, and nothing should:
+    // dropping them would mark real keyboard characters as surplus.
+    const needed = await neededCharsForLanguage({ bcp47: "ar-EG" });
+    expect(needed).not.toBeNull();
+    const latinPunct = [...needed!].filter(
+      (ch) => (ch.codePointAt(0) ?? 0) < 0x80 && /[\p{P}\p{S}]/u.test(ch),
+    );
+    expect(latinPunct.length).toBeGreaterThan(0);
+  });
+
+  it("keeps the LETTER suggestion audience unpolluted by punctuation and digits", async () => {
+    // suggestMissingCharacters is the letter-suggestion audience; the three new
+    // tiers must not start proposing "?" and "7" as keys to add.
+    const result = await suggestMissingCharacters({ bcp47: "ewo", baseIr: emptyIr });
+    expect(result).not.toBeNull();
+    for (const ch of [...result!.main, ...result!.auxiliary]) {
+      expect(/^\p{L}$/u.test(ch)).toBe(true);
+      expect((ch.codePointAt(0) ?? 0) > 0x7f).toBe(true);
+    }
   });
 });

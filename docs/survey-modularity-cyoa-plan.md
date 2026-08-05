@@ -1,6 +1,6 @@
 # Survey Modularity + CYOA Refactor — Plan / RFC
 
-> **Status: PLAN / RFC — P2 implemented (branch `claude/survey-modularity-cyoa-plan-pcpg9a`); P3(a) MERGED (branch `km/modular-loader-cutover`) — E2E lane 1 (copy-edit) unblocked via #906, lane 2 (import-improve) conditional on Track 2 import liveness; P4a and P4b implemented (branch `claude/survey-modularity-cyoa-phase-4-q9ey3o`, P4a merged via #778); P0–P1, P3(b), P5 remain proposals.**
+> **Status: PLAN / RFC — P2 implemented (branch `claude/survey-modularity-cyoa-plan-pcpg9a`); P3(a) MERGED (branch `km/modular-loader-cutover`) — E2E lane 1 (copy-edit) unblocked via #906, lane 2 (import-improve) conditional on Track 2 import liveness; P4a and P4b implemented (branch `claude/survey-modularity-cyoa-phase-4-q9ey3o`, P4a merged via #778, P4b via #780); P0–P1, P3(b), P5 remain proposals.**
 > P2 shipped: `IRPath` typed key-path algebra exported from `@keyboard-studio/contracts`
 > 0.11.0 (breaking bump, §18-ratified); `QuestionModule.inputs`/`writes` declared across
 > all 93 modules (current ground truth: 5 non-empty `writes` — the identity/header writers — with the remaining modules declaring explicit empty `writes`; the original "8 non-empty" was the P2 snapshot, superseded by the P3 loader cutover + #781 legacy retirement); three CI gates (coverage, orphan-input
@@ -17,7 +17,7 @@
 > `EditorStep` adapters; `editors/`/`steps/`/`dashboard/` layer boundary rules added to
 > depcruise; reserved touch-suggest seams (`provenance.ts`, `defaults.ts`). The `SurveyStage`
 > union was not yet replaced (P4a is revertible independently of P4b).
-> P4b shipped (branch `claude/survey-modularity-cyoa-phase-4-q9ey3o`): `steps/manifest.ts` (11
+> P4b shipped (merged to main via #780; branch `claude/survey-modularity-cyoa-phase-4-q9ey3o`): `steps/manifest.ts` (11
 > steps, spine+side-trails); register adapters; manifest-driven `SurveyView` in `StudioShell`
 > (no `SurveyStage` union remains); `applyStepCompletion` reducer routing side effects; flowmap
 > renamed `dashboard/`; `buildManifestStepGraph()` (map == runtime by construction); five
@@ -1032,7 +1032,7 @@ isolated from the ordering change. No union replacement yet.
 
 ### P4b — Replace the `SurveyStage` union with manifest-driven ordering — IMPLEMENTED
 
-> **IMPLEMENTED** on branch `claude/survey-modularity-cyoa-phase-4-q9ey3o` (2026-06-27).
+> **IMPLEMENTED** on branch `claude/survey-modularity-cyoa-phase-4-q9ey3o`, merged to main via #780 (2026-06-27).
 > `steps/manifest.ts` (11 steps: identity, choose_base, track, project_name [spine:false],
 > characters, carve, mechanisms [lock:physical], touch_seed_source [spine:false], touch
 > [lock:touch], help, package); `steps/registerEditorSteps.ts` + `steps/reducer.ts`

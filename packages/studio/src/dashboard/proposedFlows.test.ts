@@ -35,7 +35,8 @@ describe("spec 025 — buildProposedFlowGraph (FR-001)", () => {
   const graph = buildProposedFlowGraph(source.raw, source.title);
 
   it("builds one node per demoted Phase A question (15 + 15 provenance = 30)", () => {
-    expect(graph.nodes.length).toBe(30);
+    // Literal count was fragile; derived from the source collection instead.
+    expect(graph.nodes.length).toBe(DEMOTED_PHASE_A.length);
     const ids = new Set(graph.nodes.map((n) => n.id));
     for (const id of DEMOTED_PHASE_A) {
       expect(ids.has(id), `proposed graph missing "${id}"`).toBe(true);
@@ -100,7 +101,8 @@ describe("spec 025 — buildLibrarySection reserve + dual-reference (FR-004/FR-0
     const pa = lib.proposed.find((p) => p.id === "phase_a_identity");
     expect(pa, "phase_a_identity must be a Library proposed flow").toBeDefined();
     expect(pa!.error).toBeNull();
-    expect(pa!.graph!.nodes.length).toBe(30);
+    // Literal count was fragile; derived from the source collection instead.
+    expect(pa!.graph!.nodes.length).toBe(DEMOTED_PHASE_A.length);
   });
 
   it("demoted Phase A ids are NOT flat reserve (they render inside the proposed graph)", () => {

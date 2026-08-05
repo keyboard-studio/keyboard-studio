@@ -1,0 +1,116 @@
+# crowdin.yml — Crowdin CLI configuration (i18n spike, step 1).
+#
+# Scope of THIS file today:
+#   • Tier A (Studio UI chrome) — ACTIVE. Flat { id: text } JSON catalogs the
+#     Lingui spike already produces. This is Crowdin's ideal case: the id is the
+#     string key, the English is the fingerprinted value (English drift resets
+#     approvals). See docs/i18n-spike.md.
+#   • Tier B (content-owned strings) — ACTIVE (spec 046 T030). Pointing Crowdin
+#     at the raw content records would be WRONG: its generic JSON/YAML parser
+#     translates every string value, so control fields (id, category,
+#     answerType, default, firingCondition, lintRuleId, BCP47 tags, …) would be
+#     sent to translators. The extraction step this needed is
+#     utilities/i18n-content-extract (spec 046 T027) — it flattens the
+#     render-verified prose allowlist (research.md D8) into
+#     content/i18n/en/{patterns,adaptationQuestions,criteria}.json, the SAME
+#     flat { id: text } shape as Tier A, so Crowdin can be pointed at those
+#     sidecars directly below. Freshness (sidecars in sync with the content
+#     records they were extracted from) is enforced by
+#     utilities/content-i18n-lint, wired into `pnpm lint` (spec 046 T031) —
+#     not by this file.
+#
+# Credentials come from the environment (never commit a token). The CLI reads
+# these named env vars; set them in CI secrets / a local shell:
+#   CROWDIN_PROJECT_ID, CROWDIN_PERSONAL_TOKEN
+"project_id_env": "CROWDIN_PROJECT_ID"
+"api_token_env": "CROWDIN_PERSONAL_TOKEN"
+"base_url": "https://api.crowdin.com"
+
+# All source/translation paths below are relative to the repo root.
+"base_path": "."
+"preserve_hierarchy": true
+
+files:
+  # ── Tier A — Studio UI chrome (engine team; spec §12) ──────────────────────
+  - source: "/packages/studio/src/locales/en/messages.json"
+    translation: "/packages/studio/src/locales/%locale%/messages.json"
+    # MUST stay `false`. Keep untranslated keys in downloaded files: every key
+    # must exist in every locale file so the loader is stable, and the runtime
+    # falls back to the English source via the explicit id, so an untranslated
+    # target value is harmless rather than a gap to prune.
+    #
+    # DO NOT "fix" this to `true`. That was tried, and this comment is the
+    # measurement. On 2026-08-05 a real download with `true` against this project
+    # produced:
+    #
+    #   packages/studio/src/locales/fr/messages.json   1201 en keys ->  918
+    #   content/i18n/fr/flowQuestions.json              219 en keys ->  202
+    #   content/i18n/fr/patterns.json                    97 en keys ->    0  ({})
+    #   content/i18n/fr/adaptationQuestions.json          9 en keys ->    0  ({})
+    #
+    # `true` DELETES untranslated keys. It does not emit them as empty values.
+    # The crowdin-cli FAQ says the opposite ("Crowdin exports these keys with
+    # empty values"; removal supposedly needs a support request) -- that FAQ line
+    # does not describe this project's behaviour, and it is what the `true`
+    # attempt was argued from. Trust the numbers above over the docs.
+    #
+    # KNOWN COST of `false`, so nobody rediscovers it as a surprise: an
+    # untranslated string downloads as the ENGLISH SOURCE TEXT. A locale with no
+    # translations therefore arrives 100% English under a byte-identical key set,
+    # passing every key-set-parity check while the translations are gone. That is
+    # the round-trip's original defect and it is real -- utilities/i18n-collapse-
+    # guard exists to catch exactly that shape and is wired into both catalog
+    # lints. The guard is the mitigation; parity is not negotiable, so `false`
+    # plus the guard is the trade we take.
+    #
+    # Corollary: a catalog at 0% translated will trip the collapse guard on every
+    # download (all values equal to English). That is the guard telling the truth
+    # about an untranslated catalog. The answer is to translate it, not to loosen
+    # the guard or flip this setting.
+    skip_untranslated_strings: false
+    # %locale% (not %two_letters_code%) so a region-specific target (pt-BR,
+    # zh-CN) gets its own directory instead of colliding with its base
+    # language — adding ONE OF THOSE is then a SUPPORTED_LOCALES entry +
+    # catalog files, no crowdin.yml change (SC-004), because %locale% already
+    # produces the right region-qualified directory by default.
+    #
+    # Crowdin's default %locale% carries a region for every language, though —
+    # including ones we treat as language-only today (en -> en-US, fr -> fr-FR
+    # per Crowdin's own language list). The languages_mapping below pins THOSE
+    # two to the short directory names the app already reads
+    # (packages/studio/src/lib/i18n.ts SUPPORTED_LOCALES). So: adding a new
+    # LANGUAGE-ONLY locale (e.g. plain `de`) needs its own languages_mapping
+    # entry here, same as en/fr — skipping it would reproduce this exact
+    # fr -> fr-FR directory mismatch. Adding a locale that's genuinely
+    # region-qualified from the start (pt-BR) needs no mapping entry at all.
+    languages_mapping:
+      locale:
+        en: "en"
+        fr: "fr"
+
+  # ── Tier B — Content-owned strings (content team; spec §12) ────────────────
+  # Points at the extracted sidecar catalogs (utilities/i18n-content-extract,
+  # spec 046 T027), not the raw content records — those still interleave
+  # translatable prose with control fields (id, category, answerType, default,
+  # firingCondition, lintRuleId, BCP47 tags, …) that must never reach a
+  # translator. The sidecars are already a flat { id: text } shape, so this
+  # mirrors the Tier A block above: %locale% (not %two_letters_code%) plus the
+  # same en/fr languages_mapping, for the same reason (a region-qualified
+  # target locale needs its own mapping entry; see the Tier A comment above).
+  - source: "/content/i18n/en/*.json"
+    translation: "/content/i18n/%locale%/%original_file_name%"
+    # Same rationale as Tier A, and the same MUST: every key stays present for a
+    # stable resolveContentString lookup, and an untranslated target value falls
+    # back to the English value already in hand (contentI18n.ts), not a gap.
+    #
+    # See the Tier A note above before changing this. `true` deletes untranslated
+    # keys -- measured, not theoretical: it reduced fr/patterns.json from 97 keys
+    # to `{}` and fr/adaptationQuestions.json from 9 to `{}`. The known cost of
+    # `false` (untranslated strings arrive as English source text) is documented
+    # there too, along with why the collapse guard rather than this setting is the
+    # mitigation.
+    skip_untranslated_strings: false
+    languages_mapping:
+      locale:
+        en: "en"
+        fr: "fr"

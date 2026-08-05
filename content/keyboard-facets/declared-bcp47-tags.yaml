@@ -1,0 +1,34 @@
+# declared-bcp47-tags — spec 043 US3 (declared-metadata archetype).
+#
+# The set of BCP47 language tags the base's .kps declares (<Languages>), plus a
+# claim-vs-actual cross-check: when a declared tag carries an explicit script
+# subtag (e.g. hi-Deva) that disagrees with the base's dominant produced script,
+# or the .kps declares tags while the base produces no concrete script, the
+# mismatch is surfaced in the record's `notes` (a corpus smell) — FR-033. Feeds
+# source.declared-bcp47-tags.
+#
+# valueType is `set` with `open: true`: the members are arbitrary BCP47 tags (an
+# open set), so membership is not enumerable in limits.values; the lone `und`
+# (BCP47 undetermined) entry documents the open-set sentinel and satisfies the
+# non-empty-values contract (C3).
+id: declared-bcp47-tags
+title: Declared BCP47 tags
+description: >
+  The BCP47 language tags the base's .kps declares, with a claim-vs-actual
+  cross-check: a declared tag whose explicit script subtag disagrees with the
+  base's dominant produced script (or tags declared with no concrete script
+  produced) is flagged as a mismatch in the record notes.
+valueType: set
+limits:
+  values:
+    - und
+  open: true
+likelihoodSemantics: >
+  membership is the set of declared BCP47 tags (an open set); no per-member
+  likelihood. A claim-vs-actual script mismatch is recorded in `notes`.
+derivation:
+  archetype: declared-metadata
+  classifierId: declared-bcp47-tags-classifier
+  fallbackChain: [declared-metadata, undetermined]
+feedsSessionFacets: [source.declared-bcp47-tags]
+schemaVersion: 1

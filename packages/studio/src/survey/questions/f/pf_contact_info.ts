@@ -15,6 +15,7 @@ import type { QuestionModule } from "../../types.ts";
 export const definition = {
   id: "pf_contact_info",
   prompt: "Is there a public contact for the language community? (optional)",
+  audit_label: "Community contact",
   help_text:
     "An email address, website, or social media handle where people can reach " +
     "the language community. This appears at the end of the help page so users " +

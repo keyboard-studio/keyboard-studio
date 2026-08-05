@@ -20,7 +20,8 @@
 //   - Controlled value (render with a value prop, list closed → input shows displayName)
 
 import { describe, it, expect, vi, afterEach, beforeAll, beforeEach } from "vitest";
-import { render, screen, fireEvent, waitFor, cleanup, within } from "@testing-library/react";
+import { screen, fireEvent, waitFor, cleanup, within } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import React from "react";
 
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
@@ -609,9 +610,7 @@ describe("BaseKeyboardPicker — controlled value prop", () => {
 
   it("controlled value changes when a new value prop is passed", async () => {
     const onChange = vi.fn();
-    const { rerender } = render(
-      <BaseKeyboardPicker value={basicKbdus} onChange={onChange} />,
-    );
+    const { rerender } = render(<BaseKeyboardPicker value={basicKbdus} onChange={onChange} />);
     const input = await waitForCombobox();
     expect((input as HTMLInputElement).value).toBe(basicKbdus.displayName);
 

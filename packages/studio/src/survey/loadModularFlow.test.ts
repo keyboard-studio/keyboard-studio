@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from "vitest";
 import { loadModularFlow } from "./loadModularFlow.ts";
-import { definition as languageNameAutonymDef } from "./questions/a/language_name_autonym.ts";
+import { definition as languageNameAutonymDef } from "./questions/reserve/language_name_autonym.ts";
 
 // ---------------------------------------------------------------------------
 // Pilot thin YAML — single question

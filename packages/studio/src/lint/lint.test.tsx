@@ -1,7 +1,8 @@
 // Vitest unit tests for LintChip and LintSummary. Requires jsdom environment (see vitest.config.ts).
 
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { render, screen, fireEvent, cleanup } from "@testing-library/react";
+import { screen, fireEvent, cleanup } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 import {
   layerAFindings,
   layerBFindings,

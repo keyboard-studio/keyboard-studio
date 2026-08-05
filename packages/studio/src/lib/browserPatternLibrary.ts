@@ -5,20 +5,25 @@
 // Glob path: from the Vite root (packages/studio), the content tree is at
 // ../../content/patterns/**/*.yaml  →  resolves to keyboard-studio/content/patterns.
 //
-// RawPattern -> Pattern mapping and strategy-partition ranking are shared
-// with the engine (packages/engine/src/pattern-library/loader.ts's
-// toPattern, filterFor.ts's rankPatterns), re-exported from the engine's
-// main entry. Both are pure (no node:fs/node:path), so importing them here
-// does not pull Node-only code into the browser bundle — the studio already
-// statically imports this same entry point elsewhere (e.g. workingCopyStore,
-// services.ts) without issue.
+// RawPattern -> Pattern mapping (toPattern) lives in
+// @keyboard-studio/contracts (schemas.ts, next to RawPatternSchema) — the
+// single source of truth shared with the engine's node loader
+// (packages/engine/src/pattern-library/loader.ts). Strategy-partition
+// ranking (rankPatterns) is shared with the engine (filterFor.ts),
+// re-exported from the engine's main entry. Both are pure (no
+// node:fs/node:path), so importing them here does not pull Node-only code
+// into the browser bundle — the studio already statically imports the
+// engine's entry point elsewhere (e.g. workingCopyStore, services.ts)
+// without issue.
 //
 // PatternSchema is imported from "@keyboard-studio/engine/pattern-schema"
 // via the dedicated "./pattern-schema" export added to the engine's package.json.
 // This closes the drift window: the schema is now a single source of truth.
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { parse } from "yaml";
-import { toPattern, rankPatterns } from "@keyboard-studio/engine";
+import { toPattern } from "@keyboard-studio/contracts";
+import { rankPatterns } from "@keyboard-studio/engine";
 import { PatternSchema } from "@keyboard-studio/engine/pattern-schema";
 import type {
   Pattern,
@@ -48,14 +53,14 @@ function loadAll(): Pattern[] {
   const patterns: Pattern[] = [];
   for (const [path, raw] of Object.entries(YAML_MODULES)) {
     if (typeof raw !== "string") {
-      console.warn(`[browserPatternLibrary] skipping ${path}: not a string`);
+      devLog.warn(`[browserPatternLibrary] skipping ${path}: not a string`);
       continue;
     }
     let parsed: unknown;
     try {
       parsed = parse(raw);
     } catch (e) {
-      console.warn(`[browserPatternLibrary] YAML parse error in ${path}: ${String(e)}`);
+      devLog.warn(`[browserPatternLibrary] YAML parse error in ${path}: ${String(e)}`);
       continue;
     }
     const result = PatternSchema.safeParse(parsed);
@@ -63,7 +68,7 @@ function loadAll(): Pattern[] {
       const reason = result.error.issues
         .map((i) => `${i.path.join(".")}: ${i.message}`)
         .join("; ");
-      console.warn(`[browserPatternLibrary] schema error in ${path}: ${reason}`);
+      devLog.warn(`[browserPatternLibrary] schema error in ${path}: ${reason}`);
       continue;
     }
     patterns.push(toPattern(result.data));
@@ -109,4 +114,17 @@ export function getPatternLibraryService(): PatternLibraryService {
     _instance = new BrowserPatternLibraryService();
   }
   return _instance;
+}
+
+/**
+ * Synchronous pattern-by-id lookup over the same eagerly-loaded
+ * `_patternById` index `getById()` wraps in a resolved Promise. Needed by
+ * pure/non-async call sites (e.g. `buildSessionProducedSet` callers in
+ * `useInventoryDiff`/galleries) that must resolve a `MechanismRef.patternId`
+ * to its `Pattern.kmnFragment` inside a `useMemo`, not an effect — see
+ * `services.ts`'s `getPatternByIdSync`, which switches between this and the
+ * mock fixture index the same way `getPatternLibraryService` does.
+ */
+export function getPatternByIdSync(id: string): Pattern | undefined {
+  return _patternById.get(id);
 }

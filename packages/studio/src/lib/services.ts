@@ -8,16 +8,29 @@ import type {
   BaseBrowserService,
   CharacterDiscoveryService,
   OutputService,
+  Pattern,
   PatternLibraryService,
   ScaffolderService,
   VirtualFS,
   KeyboardIR,
 } from "@keyboard-studio/contracts";
-import type { MissingCharSuggestions, CldrFullLoader } from "@keyboard-studio/engine";
-import { mockBaseBrowser, mockOutputService, mockPatternLibrary, mockScaffolder } from "@keyboard-studio/contracts/mocks";
+import type {
+  MissingCharSuggestions,
+  CharacterMapGroup,
+  ExemplarSource,
+  SourcedCharacter,
+  SourcedInventory,
+  ExemplarTier,
+  ToZipOptions,
+} from "@keyboard-studio/engine";
+import { charactersInTier } from "@keyboard-studio/engine";
+import { mockBaseBrowser, mockOutputService, mockPatternLibrary, mockPatternByIdSync, mockScaffolder } from "@keyboard-studio/contracts/mocks";
 import { getBackendUrl } from "./githubOAuth.ts";
 import { localBaseBrowser, LOCAL_PROXY_BASE } from "./localBaseBrowser.ts";
-import { getPatternLibraryService as getBrowserPatternLibraryService } from "./browserPatternLibrary.ts";
+import {
+  getPatternLibraryService as getBrowserPatternLibraryService,
+  getPatternByIdSync as getBrowserPatternByIdSync,
+} from "./browserPatternLibrary.ts";
 
 export const USE_REAL = import.meta.env.VITE_USE_REAL_ENGINE !== "false";
 
@@ -57,6 +70,16 @@ export function getPatternLibraryService(): PatternLibraryService {
   return USE_REAL ? getBrowserPatternLibraryService() : mockPatternLibrary;
 }
 
+// Synchronous counterpart of getPatternLibraryService().getById() — needed by
+// pure/non-async call sites (buildSessionProducedSet callers in
+// useInventoryDiff/the galleries) that resolve a MechanismRef.patternId to
+// its Pattern.kmnFragment inside a useMemo, not an effect. Same USE_REAL
+// switch as every other service getter above so tests forcing mocks never
+// reach the real content-pattern glob.
+export function getPatternByIdSync(id: string): Pattern | undefined {
+  return USE_REAL ? getBrowserPatternByIdSync(id) : mockPatternByIdSync(id);
+}
+
 // CharacterDiscoveryService: when USE_REAL is false returns a minimal stub so
 // CI / test runs never touch the CLDR CDN or the LLM completer. When real,
 // lazily imports from the engine with the browser fetch-backed CLDR loader.
@@ -84,12 +107,17 @@ export async function getCharacterDiscoveryService(): Promise<CharacterDiscovery
 // OutputService (zip path only): when USE_REAL is false returns the mock zip
 // serializer. When real, lazily imports toZip from the engine.
 // The GitHub OAuth publishPR path is separate (createGitHubOutputService).
-let toZipCache: ((vfs: VirtualFS) => Promise<Uint8Array>) | null = null;
-export async function getToZip(): Promise<(vfs: VirtualFS) => Promise<Uint8Array>> {
+// The options argument carries the decision record for the packaged
+// `.studio/` sidecar (specs/053-decision-audit FR-020). It is optional on both
+// sides: the mock ignores it, and a session that recorded nothing produces the
+// archive it produced before the feature existed.
+type ToZipFn = (vfs: VirtualFS, opts?: ToZipOptions) => Promise<Uint8Array>;
+let toZipCache: ToZipFn | null = null;
+export async function getToZip(): Promise<ToZipFn> {
   if (!USE_REAL) return mockOutputService.toZip.bind(mockOutputService);
   if (toZipCache !== null) return toZipCache;
   const { toZip } = await import(/* @vite-ignore */ "@keyboard-studio/engine");
-  toZipCache = toZip as (vfs: VirtualFS) => Promise<Uint8Array>;
+  toZipCache = toZip as ToZipFn;
   return toZipCache;
 }
 
@@ -148,45 +176,129 @@ export function getManagedPRProxyEndpoint(): string {
   return `${base}/submit/managed-pr`;
 }
 
-// suggestMissingChars — Phase B CLDR-grounded missing-character suggestions.
+// suggestMissingChars — Phase B exemplar-grounded missing-character suggestions.
 // When USE_REAL is false returns null (deterministic, no network) so tests
-// render the neutral "no data" note without real CLDR traffic.
-// When real, lazy-imports suggestMissingCharacters + createFetchCldrFullLoader
-// from the engine; caches the loader + engine fn together after first import so
-// subsequent calls skip the dynamic import entirely (mirrors getScaffolderService).
-type SuggestEngineCache = {
-  fn: (opts: { bcp47: string; baseIr: KeyboardIR; loader: CldrFullLoader; languageName?: string }) => Promise<MissingCharSuggestions | null>;
-  loader: CldrFullLoader;
-};
-let suggestEngineCache: SuggestEngineCache | null = null;
+// render the neutral "no data" note without touching real data.
+//
+// Since spec 044 the engine call takes NO loader: it reads the committed,
+// pinned CLDR+SLDR index instead of fetching CLDR at authoring time. The
+// dynamic import is still cached after first use so subsequent calls skip it
+// (mirrors getScaffolderService), and the index chunk is warmed off the startup
+// critical path by warmExemplarSource() below.
+type SuggestEngineFn = (opts: {
+  bcp47: string;
+  baseIr: KeyboardIR;
+  languageName?: string;
+}) => Promise<MissingCharSuggestions | null>;
+let suggestEngineCache: SuggestEngineFn | null = null;
 export async function suggestMissingChars(
   bcp47: string,
   baseIr: KeyboardIR,
   languageName?: string,
 ): Promise<MissingCharSuggestions | null> {
   if (!USE_REAL) return null;
-  if (suggestEngineCache !== null) {
-    return suggestEngineCache.fn({
-      bcp47,
-      baseIr,
-      loader: suggestEngineCache.loader,
-      ...(languageName !== undefined ? { languageName } : {}),
-    });
+  if (suggestEngineCache === null) {
+    const { suggestMissingCharacters } = await import(
+      /* @vite-ignore */ "@keyboard-studio/engine"
+    );
+    suggestEngineCache = suggestMissingCharacters;
   }
-  const { suggestMissingCharacters, createFetchCldrFullLoader } = await import(
-    /* @vite-ignore */ "@keyboard-studio/engine"
-  );
-  suggestEngineCache = {
-    fn: suggestMissingCharacters,
-    loader: createFetchCldrFullLoader(),
-  };
-  return suggestEngineCache.fn({
+  const fn = suggestEngineCache;
+  return fn({
     bcp47,
     baseIr,
-    loader: suggestEngineCache.loader,
     ...(languageName !== undefined ? { languageName } : {}),
   });
 }
 
+// warmExemplarSource — kicks off the lazily-imported exemplar index so the
+// first Characters step does not pay for it inline. Idempotent and safe to
+// fire-and-forget; every consumer awaits the same idempotent warm-up
+// internally, so a call that has not finished yet is never a correctness
+// problem, only a latency one.
+export async function warmExemplarSource(): Promise<void> {
+  if (!USE_REAL) return;
+  const { loadExemplarSource } = await import(/* @vite-ignore */ "@keyboard-studio/engine");
+  await loadExemplarSource();
+}
+
+// sourcedExemplars — the Phase B propose-then-confirm inventory for a target
+// language (spec 044 FR-016/FR-017). Returns null when neither source covers
+// the tag or the confidence gate fires; the discovery-method list then omits
+// the exemplar option entirely rather than offering an empty one.
+export async function sourcedExemplars(bcp47: string): Promise<SourcedInventory | null> {
+  if (!USE_REAL) return null;
+  const { loadExemplarSource, sourceExemplars } = await import(
+    /* @vite-ignore */ "@keyboard-studio/engine"
+  );
+  await loadExemplarSource();
+  return sourceExemplars(bcp47);
+}
+
+export type { SourcedInventory, SourcedCharacter, ExemplarSource, ExemplarTier };
+export { charactersInTier };
+
 // Re-export the type so callers can use it without a direct engine import.
 export type { MissingCharSuggestions };
+
+// characterMapGroups — Phase B right-pane character map data source
+// (CharacterMapPane.tsx). When USE_REAL is false returns [] (deterministic,
+// no network) so tests render the pane's empty state without real CLDR
+// traffic. When real, lazy-imports buildCharacterMap from the engine; caches
+// the function after first import so subsequent calls skip the dynamic
+// import entirely (mirrors suggestMissingChars above).
+//
+// `baseScripts` forwards to buildCharacterMap's opts.baseScripts — additional
+// ISO 15924 scripts (e.g. the base keyboard's own script) to enumerate
+// alongside the resolved target script, so groups from both appear.
+//
+// NOTE: buildCharacterMap is a parallel-track engine deliverable (character
+// discovery, spec §8 Phase B) — the import below is written against its
+// locked signature and resolves once the engine export lands.
+let characterMapEngineCache:
+  | ((
+      baseIr: KeyboardIR | null,
+      bcp47?: string,
+      languageName?: string,
+      opts?: { baseScripts?: readonly string[] },
+    ) => Promise<CharacterMapGroup[]>)
+  | null = null;
+export async function characterMapGroups(
+  baseIr: KeyboardIR | null,
+  bcp47?: string,
+  languageName?: string,
+  baseScripts?: readonly string[],
+): Promise<CharacterMapGroup[]> {
+  if (!USE_REAL) return [];
+  if (characterMapEngineCache === null) {
+    const { buildCharacterMap } = await import(/* @vite-ignore */ "@keyboard-studio/engine");
+    characterMapEngineCache = buildCharacterMap;
+  }
+  return characterMapEngineCache(baseIr, bcp47, languageName, {
+    ...(baseScripts !== undefined ? { baseScripts } : {}),
+  });
+}
+
+// Re-export the type so callers (CharacterMapPane.tsx) can use it without a
+// direct engine import.
+export type { CharacterMapGroup };
+
+// neededCharsForLanguage — the full needed-char set for a target BCP47
+// language (issue #525 items 2/4, language-driven surplus), across all four
+// exemplar tiers. Mirrors suggestMissingChars's lazy-import + cache pattern
+// above. When USE_REAL is false returns null (deterministic, no data access —
+// matches suggestMissingChars's test-mode contract). When real, reads the
+// pinned offline index; no loader, no network.
+type NeededCharsEngineFn = (opts: { bcp47: string }) => Promise<Set<string> | null>;
+let neededCharsEngineCache: NeededCharsEngineFn | null = null;
+export async function neededCharsForLanguage(bcp47: string): Promise<Set<string> | null> {
+  if (!USE_REAL) return null;
+  if (neededCharsEngineCache === null) {
+    const { neededCharsForLanguage: engineNeededCharsForLanguage } = await import(
+      /* @vite-ignore */ "@keyboard-studio/engine"
+    );
+    neededCharsEngineCache = engineNeededCharsForLanguage;
+  }
+  const fn = neededCharsEngineCache;
+  return fn({ bcp47 });
+}

@@ -10,13 +10,16 @@
 //   5. reset(): clears all slots including instantiationMode + identity + base slots.
 //   6. State consistency: mutations via actions are visible in the same store.
 //   7. Cross-slice isolation: IR actions don't bleed into survey state.
+//   8. Per-working-copy Phase B proposal decisions (spec 044 FR-016a): both
+//      instantiate entry points clear the sticky rejected/declined flags.
 //
 // Tests in irStore.test.ts and surveyResultsStore.test.ts own exhaustive
 // coverage of the carve and survey action semantics respectively; this file
 // focuses on the Phase-2 / instantiation surface.
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { useWorkingCopyStore, bindManifest } from "./workingCopyStore.ts";
+import { usePhaseBDraftStore, resetPhaseBDraftDecisions } from "./phaseBDraftStore.ts";
 import { makeTestIR, makeCharStore } from "@keyboard-studio/contracts/fixtures";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { createVirtualFS, irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
@@ -29,6 +32,7 @@ import type {
   RemovalCapability,
   SurveyPhaseResult,
 } from "@keyboard-studio/contracts";
+import type { SourcedInventory } from "@keyboard-studio/engine";
 import type { Step, EditorStep } from "../steps/types.ts";
 import { promoteOnManualEdit } from "../editors/assignLoop/touchBehavior.ts";
 
@@ -63,6 +67,7 @@ describe("workingCopyStore — initial state", () => {
     const s = useWorkingCopyStore.getState();
     expect(s.ir).toBeNull();
     expect(s.deletedNodeIds.size).toBe(0);
+    expect(s.deletedTouchKeyIds.size).toBe(0);
     expect(s.undoStack).toHaveLength(0);
   });
 
@@ -505,11 +510,11 @@ describe("workingCopyStore — setIdentity", () => {
   });
 
   it("partial patches are allowed (exactOptionalPropertyTypes safe)", () => {
-    useWorkingCopyStore.getState().setIdentity({ targetScript: "Latn" });
+    useWorkingCopyStore.getState().setIdentity({ displayName: "Hausa" });
     const s = useWorkingCopyStore.getState();
-    // bcp47 and displayName are absent, not set to undefined
+    // bcp47 is absent, not set to undefined
     expect("bcp47" in (s.identity ?? {})).toBe(false);
-    expect(s.identity?.targetScript).toBe("Latn");
+    expect(s.identity?.displayName).toBe("Hausa");
   });
 
   it("accepts keyboardId in the patch", () => {
@@ -593,6 +598,22 @@ describe("workingCopyStore — reset", () => {
     expect(s.phaseResults).toEqual([]);
     expect(s.session.axes).toEqual({});
     expect(s.desktopLocked).toBe(false);
+  });
+
+  it("reset clears deletedTouchKeyIds", () => {
+    useWorkingCopyStore.getState().deleteTouchKey("phone:default:U_0064");
+    expect(useWorkingCopyStore.getState().deletedTouchKeyIds.size).toBe(1);
+
+    useWorkingCopyStore.getState().reset();
+    expect(useWorkingCopyStore.getState().deletedTouchKeyIds.size).toBe(0);
+  });
+
+  it("reset clears sequenceFlaggedChars", () => {
+    useWorkingCopyStore.getState().flagCharForSequence("á");
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual(["á"]);
+
+    useWorkingCopyStore.getState().reset();
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual([]);
   });
 
   it("isInstantiated returns false after reset (from instantiateFromBase)", () => {
@@ -803,6 +824,134 @@ describe("workingCopyStore — deleteItem/restoreItem round-trip with a chip-for
     useWorkingCopyStore.getState().undoDelete();
     expect(useWorkingCopyStore.getState().isItemDeleted(chipId)).toBe(false);
     expect(useWorkingCopyStore.getState().undoStack).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// deleteTouchKey/restoreTouchKey/isTouchKeyDeleted — the touch-method deletion
+// overlay (separate id space + undo channel from deletedItemIds/deleteItem).
+// ---------------------------------------------------------------------------
+
+describe("workingCopyStore — deleteTouchKey/restoreTouchKey round-trip", () => {
+  it("deleteTouchKey marks the address deleted and pushes a 't' undo entry", () => {
+    const touchId = "phone:default:U_0061:sk:U_00E1";
+
+    useWorkingCopyStore.getState().deleteTouchKey(touchId);
+    expect(useWorkingCopyStore.getState().isTouchKeyDeleted(touchId)).toBe(true);
+    expect(useWorkingCopyStore.getState().undoStack).toEqual([{ k: "t", id: touchId }]);
+  });
+
+  it("restoreTouchKey clears the address and pops its undo entry", () => {
+    const touchId = "phone:default:U_0061";
+
+    useWorkingCopyStore.getState().deleteTouchKey(touchId);
+    useWorkingCopyStore.getState().restoreTouchKey(touchId);
+
+    expect(useWorkingCopyStore.getState().isTouchKeyDeleted(touchId)).toBe(false);
+    expect(useWorkingCopyStore.getState().undoStack).toHaveLength(0);
+  });
+
+  it("undoDelete reverses the most recent touch-key deletion", () => {
+    const touchId = "phone:default:U_0062";
+
+    useWorkingCopyStore.getState().deleteTouchKey(touchId);
+    expect(useWorkingCopyStore.getState().isTouchKeyDeleted(touchId)).toBe(true);
+
+    useWorkingCopyStore.getState().undoDelete();
+    expect(useWorkingCopyStore.getState().isTouchKeyDeleted(touchId)).toBe(false);
+    expect(useWorkingCopyStore.getState().undoStack).toHaveLength(0);
+  });
+
+  it("touch-key deletions and item deletions occupy separate id spaces and undo independently", () => {
+    const touchId = "phone:default:U_0063";
+    const itemId = "phone:default:U_0063"; // same literal string, different channel
+
+    useWorkingCopyStore.getState().deleteTouchKey(touchId);
+    useWorkingCopyStore.getState().deleteItem(itemId);
+
+    expect(useWorkingCopyStore.getState().isTouchKeyDeleted(touchId)).toBe(true);
+    expect(useWorkingCopyStore.getState().isItemDeleted(itemId)).toBe(true);
+
+    // Undo pops the most recent entry (the item deletion) without touching
+    // the touch-key deletion.
+    useWorkingCopyStore.getState().undoDelete();
+    expect(useWorkingCopyStore.getState().isItemDeleted(itemId)).toBe(false);
+    expect(useWorkingCopyStore.getState().isTouchKeyDeleted(touchId)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// keepAll/restoreAll must account for deletedTouchKeyIds — regression for the
+// bug where a pending 't' undo entry was orphaned (undoStack wiped while
+// deletedTouchKeyIds stayed applied) by a carve keepAll/restoreAll. Both
+// actions restore the invariant: after either call, undoStack is empty AND
+// deletedNodeIds/deletedItemIds/deletedTouchKeyIds are all empty — no
+// deletion of any kind can outlive the undo history that was its only path
+// back. See the keepAll implementation comment in workingCopyStore.ts.
+// ---------------------------------------------------------------------------
+
+describe("workingCopyStore — keepAll/restoreAll clear deletedTouchKeyIds", () => {
+  it("deleteTouchKey then restoreAll clears deletedTouchKeyIds and undoStack", () => {
+    const touchId = "phone:default:U_0064";
+
+    useWorkingCopyStore.getState().deleteTouchKey(touchId);
+    expect(useWorkingCopyStore.getState().deletedTouchKeyIds.size).toBe(1);
+
+    useWorkingCopyStore.getState().restoreAll();
+
+    const s = useWorkingCopyStore.getState();
+    expect(s.deletedTouchKeyIds.size).toBe(0);
+    expect(s.isTouchKeyDeleted(touchId)).toBe(false);
+    expect(s.undoStack).toHaveLength(0);
+  });
+
+  it("deleteTouchKey then keepAll leaves no orphaned 't' undo entry and no applied touch deletion", () => {
+    const touchId = "phone:default:U_0065";
+
+    useWorkingCopyStore.getState().deleteTouchKey(touchId);
+    expect(useWorkingCopyStore.getState().undoStack).toEqual([{ k: "t", id: touchId }]);
+
+    useWorkingCopyStore.getState().keepAll();
+
+    const s = useWorkingCopyStore.getState();
+    // The undo stack is wiped by keepAll — so deletedTouchKeyIds must be wiped
+    // in the same call, or this 't' entry's deletion would be permanently
+    // un-undoable while still applied (the orphan this test locks).
+    expect(s.undoStack).toHaveLength(0);
+    expect(s.deletedTouchKeyIds.size).toBe(0);
+    expect(s.isTouchKeyDeleted(touchId)).toBe(false);
+  });
+
+  it("mixed carve (node + item) and touch deletions: keepAll leaves all three deletion Sets and undoStack empty", () => {
+    useWorkingCopyStore.getState().deleteNode("n1");
+    useWorkingCopyStore.getState().deleteItem("n2#0");
+    useWorkingCopyStore.getState().deleteTouchKey("phone:default:U_0066");
+
+    expect(useWorkingCopyStore.getState().undoStack).toHaveLength(3);
+
+    useWorkingCopyStore.getState().keepAll();
+
+    const s = useWorkingCopyStore.getState();
+    expect(s.deletedNodeIds.size).toBe(0);
+    expect(s.deletedItemIds.size).toBe(0);
+    expect(s.deletedTouchKeyIds.size).toBe(0);
+    expect(s.undoStack).toHaveLength(0);
+  });
+
+  it("mixed carve (node + item) and touch deletions: restoreAll leaves all three deletion Sets and undoStack empty", () => {
+    useWorkingCopyStore.getState().deleteNode("n1");
+    useWorkingCopyStore.getState().deleteItem("n2#0");
+    useWorkingCopyStore.getState().deleteTouchKey("phone:default:U_0067");
+
+    expect(useWorkingCopyStore.getState().undoStack).toHaveLength(3);
+
+    useWorkingCopyStore.getState().restoreAll();
+
+    const s = useWorkingCopyStore.getState();
+    expect(s.deletedNodeIds.size).toBe(0);
+    expect(s.deletedItemIds.size).toBe(0);
+    expect(s.deletedTouchKeyIds.size).toBe(0);
+    expect(s.undoStack).toHaveLength(0);
   });
 });
 
@@ -1194,5 +1343,232 @@ describe("workingCopyStore — base-derived A3a seeding (spec §7.2 rule 3a, #92
     const vfs = createVirtualFS([]);
     useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir: postfixBaseIr() });
     expect(useWorkingCopyStore.getState().session.axes.markInputOrder).toBe("prefix");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// sequenceFlaggedChars — S-03 flag tracking (Sequence Gallery deferral)
+// ---------------------------------------------------------------------------
+
+describe("workingCopyStore — sequenceFlaggedChars", () => {
+  it("starts empty", () => {
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual([]);
+  });
+
+  it("flagCharForSequence adds a char, preserving insertion order", () => {
+    useWorkingCopyStore.getState().flagCharForSequence("á");
+    useWorkingCopyStore.getState().flagCharForSequence("é");
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual(["á", "é"]);
+  });
+
+  it("flagCharForSequence is idempotent — flagging the same char twice does not duplicate it", () => {
+    useWorkingCopyStore.getState().flagCharForSequence("á");
+    useWorkingCopyStore.getState().flagCharForSequence("á");
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual(["á"]);
+  });
+
+  it("unflagCharForSequence removes a char", () => {
+    useWorkingCopyStore.getState().flagCharForSequence("á");
+    useWorkingCopyStore.getState().flagCharForSequence("é");
+    useWorkingCopyStore.getState().unflagCharForSequence("á");
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual(["é"]);
+  });
+
+  it("unflagCharForSequence on a char not in the list is a no-op", () => {
+    useWorkingCopyStore.getState().flagCharForSequence("á");
+    useWorkingCopyStore.getState().unflagCharForSequence("z");
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual(["á"]);
+  });
+
+  it("unflagCharForSequence also strips the char's recorded multi_char_sequence assignment (P0)", () => {
+    useWorkingCopyStore.getState().flagCharForSequence("ŋ");
+    useWorkingCopyStore.getState().recordAssignments([
+      {
+        scope: "individual",
+        target: "ŋ",
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: "multi_char_sequence",
+            strategyId: "S-03",
+            slotValues: { firstLetterOut: "n", secondLetter: "g", collapsedChar: "ŋ" },
+          },
+        ],
+        source: "user",
+      },
+    ]);
+    expect(
+      useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C")?.assignments,
+    ).toHaveLength(1);
+
+    useWorkingCopyStore.getState().unflagCharForSequence("ŋ");
+
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual([]);
+    expect(
+      useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C")?.assignments,
+    ).toEqual([]);
+  });
+
+  it("unflagCharForSequence strips ALL recorded sequences when the assignment holds multiple PATTERN_SEQUENCE mechanisms", () => {
+    useWorkingCopyStore.getState().flagCharForSequence("ŋ");
+    useWorkingCopyStore.getState().recordAssignments([
+      {
+        scope: "individual",
+        target: "ŋ",
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: "multi_char_sequence",
+            strategyId: "S-03",
+            slotValues: { firstLetterOut: "n", secondLetter: "g", collapsedChar: "ŋ" },
+          },
+          {
+            patternId: "multi_char_sequence",
+            strategyId: "S-03",
+            slotValues: { firstLetterOut: "n", secondLetter: "y", collapsedChar: "ŋ" },
+          },
+        ],
+        source: "user",
+      },
+    ]);
+    expect(
+      useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C")?.assignments?.[0]
+        ?.mechanisms,
+    ).toHaveLength(2);
+
+    useWorkingCopyStore.getState().unflagCharForSequence("ŋ");
+
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual([]);
+    expect(
+      useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C")?.assignments,
+    ).toEqual([]);
+  });
+
+  it("unflagCharForSequence leaves OTHER characters' assignments (including that char's own non-sequence mechanisms) untouched", () => {
+    useWorkingCopyStore.getState().flagCharForSequence("ŋ");
+    useWorkingCopyStore.getState().recordAssignments([
+      {
+        scope: "individual",
+        target: "ŋ",
+        modality: "physical",
+        mechanisms: [{ patternId: "multi_char_sequence", strategyId: "S-03" }],
+        source: "user",
+      },
+      {
+        scope: "individual",
+        target: "ñ",
+        modality: "physical",
+        mechanisms: [{ patternId: "simple_swap", strategyId: "S-01" }],
+        source: "user",
+      },
+    ]);
+
+    useWorkingCopyStore.getState().unflagCharForSequence("ŋ");
+
+    const remaining = useWorkingCopyStore
+      .getState()
+      .phaseResults.find((p) => p.phase === "C")?.assignments;
+    expect(remaining).toHaveLength(1);
+    expect(remaining?.[0]?.target).toBe("ñ");
+  });
+
+  it("instantiateFromBase clears sequenceFlaggedChars on a genuine base switch", () => {
+    const vfs = createVirtualFS([]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir: makeTestIR([]) });
+    useWorkingCopyStore.getState().flagCharForSequence("á");
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual(["á"]);
+
+    const otherKeyboard = { ...basicKbdus, id: "other_keyboard_id" };
+    useWorkingCopyStore.getState().instantiateFromBase(otherKeyboard, { vfs, ir: makeTestIR([]) });
+    expect(useWorkingCopyStore.getState().sequenceFlaggedChars).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Per-working-copy Phase B proposal decisions (spec 044 FR-016a)
+//
+// `rejected` and `exemplarMethodDeclined` deliberately survive
+// phaseBDraftStore's own reset() — that runs on every entry to the build-list
+// screen, and clearing them there would re-propose characters the author just
+// removed. They are per-WORKING-COPY, so the two instantiate entry points
+// clear them instead. Without that wiring the decisions were effectively
+// per-browser-session: declining on keyboard A silently pre-declined keyboard
+// B, and a character rejected in A was suppressed from B's proposal.
+// ---------------------------------------------------------------------------
+
+describe("workingCopyStore — Phase B proposal decisions are per-working-copy", () => {
+  const BM_INVENTORY: SourcedInventory = {
+    resolvedTag: "bm",
+    source: "cldr",
+    confidence: "approved",
+    characters: [{ char: "ɔ", tier: "main", source: "cldr", confidence: "approved" }],
+    digraphs: [],
+  };
+
+  afterEach(() => {
+    usePhaseBDraftStore.getState().reset();
+    resetPhaseBDraftDecisions();
+  });
+
+  /** Seed a proposal, reject one of its characters, and decline the offer. */
+  function declineAndReject(): void {
+    usePhaseBDraftStore.getState().seedFromProposal(BM_INVENTORY, "bm");
+    usePhaseBDraftStore.getState().remove("ɔ");
+    usePhaseBDraftStore.getState().declineExemplarMethod();
+    expect(usePhaseBDraftStore.getState().rejected).toContain("ɔ");
+    expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(true);
+  }
+
+  it("instantiateFromBase clears them for a new working copy", () => {
+    const vfs = createVirtualFS();
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir: makeTestIR([]) });
+    declineAndReject();
+
+    // Keyboard B, started in the same browser session.
+    const keyboardB = { ...basicKbdus, id: "keyboard_b" };
+    useWorkingCopyStore.getState().instantiateFromBase(keyboardB, { vfs, ir: makeTestIR([]) });
+
+    expect(usePhaseBDraftStore.getState().rejected).toEqual([]);
+    expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(false);
+  });
+
+  it("instantiateFromExisting clears them for a new working copy", () => {
+    const vfs = createVirtualFS();
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir: makeTestIR([]) });
+    declineAndReject();
+
+    const keyboardB = { ...basicKbdus, id: "keyboard_b" };
+    useWorkingCopyStore.getState().instantiateFromExisting(keyboardB, { vfs, ir: makeTestIR([]) });
+
+    expect(usePhaseBDraftStore.getState().rejected).toEqual([]);
+    expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(false);
+  });
+
+  it("a character rejected on keyboard A is proposed normally on keyboard B", () => {
+    const vfs = createVirtualFS();
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir: makeTestIR([]) });
+    declineAndReject();
+
+    const keyboardB = { ...basicKbdus, id: "keyboard_b" };
+    useWorkingCopyStore.getState().instantiateFromBase(keyboardB, { vfs, ir: makeTestIR([]) });
+    // Entering B's build-list screen: the per-visit reset, then a fresh seed.
+    usePhaseBDraftStore.getState().reset();
+    usePhaseBDraftStore.getState().seedFromProposal(BM_INVENTORY, "bm");
+
+    expect(usePhaseBDraftStore.getState().chars).toContain("ɔ");
+    expect(usePhaseBDraftStore.getState().provenance["ɔ"]).toBe("cldr");
+  });
+
+  it("a redundant re-fire of the SAME instantiate does not discard a live decision", () => {
+    const vfs = createVirtualFS();
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    declineAndReject();
+
+    // Case 1 of resolveInstantiationCase: same id AND same mode -> full no-op.
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+
+    expect(usePhaseBDraftStore.getState().rejected).toContain("ɔ");
+    expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(true);
   });
 });

@@ -9,6 +9,7 @@
 // and an IPA keyboard (und-fonipa) matches Latin/IPA bases. refs #369.
 
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import { scriptSubtagOf } from "@keyboard-studio/contracts";
 
 /** The (language, script) target the keyboard is being authored for. */
 export interface SuggestTarget {
@@ -42,7 +43,7 @@ export function primarySubtag(tag: string): string {
  * cross-script suggestions are useful.
  */
 export function hasExplicitScriptSubtag(tag: string): boolean {
-  return tag.split("-").slice(1).some((part) => /^[A-Za-z]{4}$/.test(part));
+  return scriptSubtagOf(tag) !== undefined;
 }
 
 export interface SuggestOptions {

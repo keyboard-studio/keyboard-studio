@@ -21,6 +21,16 @@ export interface RadioOption {
   disabled?: boolean;
   /** Tooltip shown on the input — typically explains why `disabled` is set. */
   title?: string;
+  /**
+   * Rich content rendered inside the option's label, below `label`/`note`.
+   *
+   * For evidence the reader needs AT THE POINT OF CHOOSING rather than one
+   * click away — e.g. spec 044's exemplar offer, which shows the proposed
+   * alphabet's source, size and a character preview on the option itself.
+   * Prefer `note` for plain secondary text; reach for this only when the
+   * content needs markup.
+   */
+  detail?: React.ReactNode;
 }
 
 export interface RadioGroupProps {
@@ -52,6 +62,11 @@ const OPTION_ROW_STYLE: React.CSSProperties = {
   cursor: "pointer",
 };
 
+// Issue #536: the label wraps the radio + its text, so it is the natural hit
+// target — bumping it (not the 16px native radio) to >=44px on coarse
+// pointers keeps the compact desktop layout while satisfying touch a11y.
+const OPTION_ROW_CLASSNAME = "ks-hit-target";
+
 const OPTION_LABEL_STYLE: React.CSSProperties = {
   fontSize: 13,
   color: TEXT_MAIN,
@@ -80,9 +95,9 @@ interface RadioItemProps {
   checked: boolean;
   accentColor: string;
   onChange: (v: string) => void;
-  required?: boolean | undefined;
   disabled?: boolean | undefined;
   title?: string | undefined;
+  detail?: React.ReactNode | undefined;
 }
 
 function RadioItem({
@@ -94,12 +109,12 @@ function RadioItem({
   checked,
   accentColor,
   onChange,
-  required,
   disabled,
   title,
+  detail,
 }: RadioItemProps): React.ReactElement {
   return (
-    <label htmlFor={inputId} style={OPTION_ROW_STYLE}>
+    <label htmlFor={inputId} style={OPTION_ROW_STYLE} className={OPTION_ROW_CLASSNAME}>
       <input
         type="radio"
         id={inputId}
@@ -109,8 +124,8 @@ function RadioItem({
         onChange={() => onChange(optValue)}
         disabled={disabled}
         title={title}
+        className="ks-focus-ring"
         style={{ marginTop: 2, flexShrink: 0, accentColor }}
-        aria-required={required}
         // E2E hook: the live "adapt" option of the track_choice question
         // (packages/studio/src/survey/questions/g/track_choice.ts) is the
         // only wizard-critical radio target Playwright needs a stable,
@@ -122,6 +137,7 @@ function RadioItem({
       <span style={OPTION_LABEL_STYLE}>
         {label}
         {note !== undefined && <span style={NOTE_STYLE}>{note}</span>}
+        {detail}
       </span>
     </label>
   );
@@ -186,6 +202,7 @@ export function RadioGroup({
             onChange={onChange}
             disabled={opt.disabled}
             title={opt.title}
+            detail={opt.detail}
           />
         );
       })}

@@ -8,6 +8,7 @@ import type { QuestionModule, ValidationResult } from "../../types.ts";
 export const definition = {
   id: "pb_discovery_intro",
   prompt: "How would you like to add the alphabet your language uses?",
+  audit_label: "Alphabet entry method",
   help_text:
     "There are several ways to add your whole alphabet. You can answer the " +
     "questions below one by one, paste a paragraph of text in your language " +

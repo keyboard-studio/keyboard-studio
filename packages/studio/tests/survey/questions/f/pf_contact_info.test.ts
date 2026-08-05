@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { definition, fixtures } from "../../../../src/survey/questions/f/pf_contact_info.ts";
+import {
+  definition,
+  fixtures,
+} from "../../../../src/survey/questions/f/pf_contact_info.ts";
 
 describe("pf_contact_info — definition", () => {
   it("has correct id", () => {
@@ -16,13 +19,8 @@ describe("pf_contact_info — definition", () => {
   });
 });
 
-describe("pf_contact_info — fixtures (no validate)", () => {
+describe("pf_contact_info — fixtures", () => {
   it("has no invalid fixtures", () => {
     expect(fixtures.invalid).toHaveLength(0);
   });
-  for (const { value, note } of fixtures.valid) {
-    it(`valid fixture: ${JSON.stringify(value)}${note ? ` (${note})` : ""}`, () => {
-      expect(true).toBe(true);
-    });
-  }
 });

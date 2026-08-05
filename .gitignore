@@ -36,9 +36,6 @@ __pycache__/
 *.pyc
 *.pyo
 
-# kmcmplib fetch output (generated; do not commit)
-packages/compiler/wasm/*.wasm
-
 # kbgen vendored CLDR exemplars (725 files; regenerate via utilities/kbgen/fetch-data.js)
 utilities/kbgen/data/cldr/
 
@@ -79,3 +76,13 @@ utilities/hermes/repo-map*.json
 
 # Local secrets for the Hermes harness (Context7 etc.) - never commit
 utilities/hermes/.env
+
+# Vendored Unicode Character Database (UCD) raw dump — keep on disk, do not commit.
+# Only the files the facet-index classifiers need are tracked (negated below).
+lib/ucd/*
+!lib/ucd/Scripts.txt
+!lib/ucd/ScriptExtensions.txt
+!lib/ucd/PropertyValueAliases.txt
+!lib/ucd/Blocks.txt
+!lib/ucd/DerivedAge.txt
+!lib/ucd/UnicodeData.txt

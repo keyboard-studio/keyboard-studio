@@ -3,10 +3,16 @@
 //
 // kmc-kmn is callback-IO based (no direct Node fs/path use); we bridge
 // its callbacks to our VirtualFS so the compile pipeline runs entirely
-// in the browser. The wasm-host.js + wasm-host.wasm vendored under
-// /wasm/kmcmplib/ are used by kmc-kmn's internal loader (via its own
-// '../import/kmcmplib/wasm-host.js' static import).
+// in the browser. The compiler wasm ships inside the @keymanapp/kmc-kmn
+// npm dependency (version-pinned in packages/engine/package.json) — its
+// Emscripten glue (wasm-host.js) loads wasm-host.wasm as a sibling via
+// `new URL(..., import.meta.url)`. Vite's `optimizeDeps.exclude` for
+// kmc-kmn (packages/studio/vite.config.ts) keeps that resolution intact
+// by skipping pre-bundling. The npm dependency + lockfile are the single
+// source of truth for the compiler version; there is no separate fetch
+// or vendoring step.
 
+import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type {
   CompilerService,
   CompileResult,
@@ -250,7 +256,7 @@ export async function compile(
   // Build the kmc-kmn callback surface bridging to VFS.
   const callbacks = {
     reportMessage(message: Record<string, unknown>): void {
-      console.info("[kmcmplib] reportMessage:", message);
+      devLog.info("[kmcmplib] reportMessage:", message);
       // kmc-kmn message shape (per kmn-compiler-messages.js): the
       // factories return { code, message, ... } where `message` is the
       // human-readable text. Older / lower-level shapes use `text` or
@@ -420,10 +426,10 @@ export async function compile(
     });
   }
 
-  console.info(
+  devLog.info(
     `[kmcmplib] artifacts: ${artifacts.map((a) => `${a.filename}(${a.sizeBytes})`).join(", ")}`,
   );
-  console.info(`[kmcmplib] diagnostics: ${diagnostics.length}`, diagnostics);
+  devLog.info(`[kmcmplib] diagnostics: ${diagnostics.length}`, diagnostics);
 
   const hasFatal = diagnostics.some(
     (d) => d.severity === "fatal" || d.severity === "error",

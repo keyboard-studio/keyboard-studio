@@ -5,6 +5,7 @@ import type { QuestionModule, ValidationResult } from "../../types.ts";
 
 export const definition = {
   id: "pb_special_letters",
+  audit_label: "Special letters",
   prompt:
     "Does your language use any special letters that are not found on a standard keyboard?",
   help_text:

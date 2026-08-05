@@ -1,6 +1,6 @@
 {
   "name": "@keyboard-studio/contracts",
-  "version": "0.15.0",
+  "version": "0.17.0",
   "private": true,
   "type": "module",
   "description": "Shared TypeScript types for keyboard-studio. Day-1 contract per spec.md sections 5, 7, 10, 11.",
@@ -22,6 +22,10 @@
     "./criteria": {
       "types": "./dist/criteriaData.d.ts",
       "import": "./dist/criteriaData.js"
+    },
+    "./dev-log": {
+      "types": "./dist/utils/devLog.d.ts",
+      "import": "./dist/utils/devLog.js"
     }
   },
   "files": [

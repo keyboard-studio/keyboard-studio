@@ -7,7 +7,7 @@
 //   4. Greedy-last-`#` case: storeNodeId itself contains `#` (e.g. "store#dkt#0").
 
 import { describe, it, expect } from "vitest";
-import { parseSlotId } from "./slotId.js";
+import { parseSlotId, makeSlotId } from "./slotId.js";
 
 describe("parseSlotId", () => {
   it("parses a simple slot id", () => {
@@ -41,5 +41,16 @@ describe("parseSlotId", () => {
   it("parses a large index correctly", () => {
     const result = parseSlotId("outputStore#82");
     expect(result).toEqual({ storeNodeId: "outputStore", itemsIndex: 82 });
+  });
+});
+
+describe("makeSlotId", () => {
+  it("builds a slot id from a storeNodeId and itemsIndex", () => {
+    expect(makeSlotId("myStore", 3)).toBe("myStore#3");
+  });
+
+  it("round-trips through parseSlotId even when storeNodeId ends in #<digits>", () => {
+    const id = makeSlotId("store#5", 0);
+    expect(parseSlotId(id)).toEqual({ storeNodeId: "store#5", itemsIndex: 0 });
   });
 });

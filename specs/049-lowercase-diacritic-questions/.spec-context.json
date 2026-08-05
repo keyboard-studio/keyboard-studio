@@ -1,0 +1,175 @@
+{
+  "workflow": "speckit",
+  "specName": "Show only lowercase base letters in the diacritic (marks) survey questions",
+  "branch": "047-alphabet-inventory-categories",
+  "history": [
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-24T03:09:06.616Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-24T03:10:47.030Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-24T03:10:47.321Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-24T03:11:12.238Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-24T03:20:15.830Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-24T03:20:15.832Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-24T03:22:50.384Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-07-24T03:25:54.277Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-24T03:25:54.290Z"
+    },
+    {
+      "step": "implement",
+      "substep": "run-tests",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-24T03:38:42.000Z"
+    }
+  ],
+  "approach": "Fold the marks attachment question's base-letter choices to lowercase-only using the same caseCounterpart primitive the character step uses (shared helper in charNormUtils.ts), and add a pure engine helper expandCaseCounterpartAttachments that reproduces the uppercase attachments from the lowercase answers before buildPlacementWorklist. Derivation-only; no locked-contract change.",
+  "decisions": [
+    {
+      "decision": "Derive casing per-letter via caseCounterpart (shared helper), not a spec-048 IR facet",
+      "why": "Matches the character step exactly (FR-006 single source of truth) and is caseless-safe; the spec-048 casing facet is Draft/unwired and the spec permits this interim path",
+      "rejected": "Read a casing facet baked into the IR (not yet landed) or guess per-question"
+    },
+    {
+      "decision": "Produce US2 uppercase attachments via a new pure engine helper expandCaseCounterpartAttachments reusing caseCounterpart",
+      "why": "buildPlacementWorklist iterates all bases; expanding live answers just before it preserves coverage and keeps casing in the engine; covers plausible-accepted and newly ticked bases",
+      "rejected": "Reuse deriveCaseCounterparts (attested stacks only, cannot carry live answers) or toggle uppercase in the UI onToggle handler"
+    },
+    {
+      "decision": "Compute the capitals-follow-automatically count from the folded lowercase base view",
+      "why": "SC-004 pins the count to lowercase bases with an uppercase counterpart; deriveCaseCounterparts.size counts attested stacks and can diverge",
+      "rejected": "Keep casePairs.size"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Studio-side lowercase fold of marks base choices + engine-side uppercase attachment expansion; derivation-only, no contract change",
+      "key_finding": "The character step has no cased boolean facet; casing is a per-letter caseCounterpart fold, so the shared source of truth is that helper, extracted from PhaseB"
+    },
+    "tasks": {
+      "summary": "12 tasks across 5 phases: shared casing-fold helpers (charNormUtils) + pure engine expansion helper (case-fold.ts) as foundational, then US1 display fold + US2 attachment expansion, each with SC-tied tests",
+      "key_finding": "US1 and US2 must ship together — the display fold without the engine attachment expansion would silently drop accented capitals; Phase 2 helpers block both stories"
+    }
+  },
+  "currentStep": "implement",
+  "status": "implementing",
+  "telemetryInstanceId": "6a782ddf-25e8-439f-83d7-9418434906a8",
+  "coverage": {
+    "FR-001": {
+      "tasks": [
+        "T002",
+        "T006",
+        "T007"
+      ]
+    },
+    "FR-002": {
+      "tasks": [
+        "T003",
+        "T004",
+        "T008",
+        "T009"
+      ]
+    },
+    "FR-003": {
+      "tasks": [
+        "T002",
+        "T003",
+        "T009"
+      ]
+    },
+    "FR-004": {
+      "tasks": [
+        "T002",
+        "T007"
+      ]
+    },
+    "FR-005": {
+      "tasks": [
+        "T006",
+        "T007"
+      ]
+    },
+    "FR-006": {
+      "tasks": [
+        "T002",
+        "T005"
+      ]
+    },
+    "FR-007": {
+      "tasks": [
+        "T003",
+        "T008",
+        "T009",
+        "T012"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "engine unit suite",
+      "command": "pnpm --filter @keyboard-studio/engine test",
+      "result": "1946 passed, 2 skipped (incl. 7 new case-fold tests)"
+    },
+    {
+      "what": "studio unit suite",
+      "command": "pnpm --filter @keyboard-studio/studio test",
+      "result": "4104 passed (incl. 4 new spec-049 MarksSeriesStep tests)"
+    },
+    {
+      "what": "typecheck + lint",
+      "command": "pnpm typecheck && pnpm lint",
+      "result": "both exit 0"
+    }
+  ]
+}

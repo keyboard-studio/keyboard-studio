@@ -26,6 +26,7 @@ import { CARVE_WRITES, ADD_GALLERY_WRITES, TOUCH_WRITES } from "./editorMutate.t
 import { CarveAdapter } from "../editors/adapters/carveAdapter.tsx";
 import { AddPhysicalAdapter } from "../editors/adapters/addPhysicalAdapter.tsx";
 import { AddTouchAdapter } from "../editors/adapters/addTouchAdapter.tsx";
+import { TouchSeedSourcePanel } from "../editors/touchSeedSource/TouchSeedSourcePanel.tsx";
 import {
   BaseResolutionAdapter,
   IdentityLiteAdapter,
@@ -35,6 +36,7 @@ import {
   ProjectNameStepFactoryComponent,
   PhaseFStepFactoryComponent,
 } from "../editors/adapters/flowStepOptions.tsx";
+import { PhaseFGate } from "../editors/adapters/PhaseFGate.tsx";
 
 // ---------------------------------------------------------------------------
 // Helper for common step structure
@@ -135,6 +137,10 @@ export const carveStep: EditorStep = step({
  * Self-read: assigns onto groups[]/stores[] without upstream producer.
  * inputs stays [] to avoid C2 data cycle (FR-002).
  * ADD_GALLERY_WRITES: groups[] / stores[] (editorMutate.ts).
+ * S-03 sequences build inline in MechanismGallery's method chooser (the
+ * right-hand preview pane swaps for a one-character sequence builder while
+ * that method is selected) — there is no separate "sequences" step; this is
+ * the only spine step directly before the off-spine touch_seed_source fork.
  */
 export const mechanismsStep: EditorStep = step({
   id: "mechanisms",
@@ -148,14 +154,28 @@ export const mechanismsStep: EditorStep = step({
 /**
  * Touch seed source step: off-spine fork for choosing touch surface seed.
  * Rejoins the spine at the touch carve+add step (FR-013, M4).
+ * Renders TouchSeedSourcePanel (T014, spec 035 contracts/seed-source-fork.md) —
+ * a bespoke chooser panel, NOT the surface-parameterized carve/add shell, so
+ * `surface` is omitted (that field only describes the AddPhysicalAdapter /
+ * AddTouchAdapter shell pattern the touch step below still uses).
+ *
+ * layout:"full" (P0 fix, spec 035 R4b follow-up): the panel now renders its
+ * own inline live OSK preview (OSKFrame, forced touch mode) beside the seed
+ * choices. Without layout:"full" this was an ordinary "pane" step, so
+ * StudioShell's two-pane shell ALSO mounted the app's persistent right-pane
+ * OSKFrame (showing the working copy's DESKTOP preview) at the same time —
+ * two live KMW iframes on screen, with the outer one showing the wrong
+ * (desktop) preview. Declaring layout:"full" makes StepHost/StudioShell
+ * early-return the panel alone (same mechanism as carve/mechanisms/touch),
+ * so the panel's single inline mobile OSK is the only OSK mounted here.
  */
 export const touchSeedSourceStep: EditorStep = step({
   id: "touch_seed_source",
   title: "Touch Seed Source",
+  layout: "full",
   spine: false,
   joinTarget: "touch",
-  component: AddTouchAdapter,
-  surface: "touch",
+  component: TouchSeedSourcePanel,
 });
 
 /**
@@ -181,11 +201,13 @@ export const touchStep: EditorStep = step({
  * Help step: Phase F question phase (Help & Tips).
  * Spine descriptor; content resolves through PhaseF survey runner (T028).
  * spec 029: PhaseFStepFactoryComponent matches mounted component (SC-005).
+ * Wrapped in PhaseFGate — the hard "every character implemented" gate (the Phase F hard gate)
+ * layered on top of PhaseFStepFactoryComponent; see PhaseFGate.tsx.
  */
 export const helpStep: EditorStep = step({
   id: "help",
   title: "Help & Tips",
-  component: PhaseFStepFactoryComponent,
+  component: PhaseFGate,
   flowRefs: ["phase_f_helpdocs"],
 });
 

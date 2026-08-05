@@ -6,7 +6,8 @@
 // so KMW's init() runs once and stays warm. Hiding & re-creating the iframe
 // would reset KMW context on every selection — expensive.
 
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { isExcludedScript } from "../lib/excludedScriptFamilies.ts";
 import type { Stage } from "../hooks/useKeyboardArtifact.ts";
@@ -19,7 +20,7 @@ import { UnsupportedScriptStub } from "./UnsupportedScriptStub.tsx";
 export interface OSKFrameProps {
   baseKeyboard: BaseKeyboard | null;
   oskMode: OskMode;
-  /** Lifted from useKeyboardArtifact in the parent (PreviewShell). */
+  /** Lifted from useKeyboardArtifact in the parent screen. */
   stage: Stage;
   /** Retry callback from useKeyboardArtifact in the parent. */
   retry: () => void;
@@ -36,6 +37,7 @@ export function OSKFrame({
   onTextChange,
   onKeyTap,
 }: OSKFrameProps) {
+  const { t } = useLingui();
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const channel = useOskChannel(iframeRef, onKeyTap);
   // Working-copy identity drives the bcp47 language tag passed to KMW's
@@ -49,6 +51,32 @@ export function OSKFrame({
   // re-fires these effects every render and spams the iframe with
   // duplicate SET_KEYBOARD messages.
   const { send, engineReady, textValue } = channel;
+
+  // The frame is a static document with no Lingui catalog of its own, so its
+  // user-facing chrome is localized here and pushed in via SET_STRINGS. Keep
+  // the source strings in a ref so `sendStrings` stays stable while still
+  // reading the latest translation.
+  const placeholderText = t({
+    id: "osk.frame.placeholder",
+    message: "Pick a keyboard, then type here...",
+  });
+  const statusReadyText = t({
+    id: "osk.frame.status.ready",
+    message: "Ready — pick a keyboard",
+  });
+  const stringsRef = useRef({ placeholder: placeholderText, statusReady: statusReadyText });
+  stringsRef.current = { placeholder: placeholderText, statusReady: statusReadyText };
+
+  const sendStrings = useCallback(() => {
+    send({ type: "SET_STRINGS", strings: stringsRef.current });
+  }, [send]);
+
+  // Re-push when the locale (and thus the translated strings) changes. The
+  // iframe onLoad handler covers the first paint before this effect can race
+  // the frame's message-listener registration.
+  useEffect(() => {
+    sendStrings();
+  }, [placeholderText, statusReadyText, sendStrings]);
 
   useEffect(() => {
     if (onTextChange) onTextChange(textValue);
@@ -109,7 +137,8 @@ export function OSKFrame({
       <iframe
         ref={iframeRef}
         src="/osk-frame.html"
-        title="On-screen keyboard preview"
+        onLoad={sendStrings}
+        title={t({ id: "osk.frame.title", message: "On-screen keyboard preview" })}
         // allow-same-origin is load-bearing for the frame's postMessage
         // origin check (osk-frame.js compares event.origin against its own
         // window.location.origin) and for KMW's relative .js fetches in dev.
@@ -142,7 +171,7 @@ export function OSKFrame({
             fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
           }}
         >
-          KMW: {channel.engineError}
+          <Trans id="osk.engineError">KMW: {channel.engineError}</Trans>
         </div>
       )}
     </div>
