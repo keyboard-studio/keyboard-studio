@@ -16,7 +16,7 @@
 //   - partial    -> part of the record could not be read; this is what was readable
 // None of them hides the list, because a partial trail is still worth reading.
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   supersededEntryIds,
   type DecisionEntry,
@@ -27,10 +27,12 @@ import {
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import { DecisionEntryRow } from "./DecisionEntryRow.tsx";
+import type { ResolveContext } from "../lib/resolveLocation.ts";
 import { buildStageGroups, type StageGroup } from "./stageGroups.ts";
 import { formatClauseList, stageActionLabel } from "./stageText.ts";
 import type { HeadlineDimension } from "./headline.ts";
 import { ACCENT, BORDER, FONT, TEXT_DIM } from "../ui/theme.ts";
+import { useScrollRestoration } from "../hooks/useScrollRestoration.ts";
 
 export interface DecisionTrailViewProps {
   record: DecisionRecord;
@@ -38,6 +40,41 @@ export interface DecisionTrailViewProps {
   droppedCount?: number;
   /** Resolve one entry's impact. Called only when a row is expanded. */
   resolveImpact: (entry: DecisionEntry) => DecisionImpact | null;
+  /**
+   * Live reachability context for the rows' jump affordances (spec 057
+   * FR-035). Composed by StudioShell for the same layer reason as `record`
+   * and `resolveImpact`: `decisions/` may not import `stores/`, and the
+   * context needs a traversal snapshot and whether a project exists.
+   *
+   * Optional, and load-bearing when absent: without it a row offers the jump
+   * optimistically and `jumpToLocation` still resolves live at click time,
+   * so the jump is never wrong — the author just learns an entry is
+   * unreachable on activation rather than before it. Passing it is what
+   * turns FR-035's "state the reason in place of a link" on.
+   */
+  resolveCtx?: ResolveContext;
+  /**
+   * The per-stage collapse set restored from last session (view state — spec
+   * 057 US5, FR-050, data-model.md ViewState.trailCollapsedSteps). Read ONCE
+   * as the initial value — the `useResizablePanes` idiom (`initPct` +
+   * `onChange`), not a controlled prop. decisions/ may not import stores/
+   * (the decisions-layer depcruise boundary), so StudioShell owns
+   * `viewStateStore.trailCollapsedSteps` and hands this component only the
+   * restored value and a change notifier, the same arrangement it already
+   * uses for `record` / `resolveImpact` above.
+   */
+  initialCollapsedSteps?: ReadonlySet<string>;
+  /**
+   * Called with the stepId whenever a stage is toggled, so the caller can
+   * persist it. Signature matches `viewStateStore.toggleTrailStage` exactly,
+   * so StudioShell can wire this prop directly to that action rather than
+   * re-deriving the toggle.
+   */
+  onToggleStage?: (stepId: string) => void;
+  /** Whether "show replaced decisions" was on last session. Read once. */
+  initialShowSuperseded?: boolean;
+  /** Called whenever the replaced-decisions toggle changes. */
+  onShowSupersededChange?: (show: boolean) => void;
 }
 
 const containerStyle: React.CSSProperties = {
@@ -100,23 +137,44 @@ export function DecisionTrailView({
   record,
   droppedCount = 0,
   resolveImpact,
+  resolveCtx,
+  initialCollapsedSteps,
+  onToggleStage,
+  initialShowSuperseded,
+  onShowSupersededChange,
 }: DecisionTrailViewProps) {
   const { t, i18n } = useLingui();
   // FR-015: superseded entries stay in the DOM as history, collapsed by default so
   // the trail reads as "what I decided" first and "how I got there" on request.
-  const [showSuperseded, setShowSuperseded] = useState(false);
+  // `initialShowSuperseded` (spec 057 US5, FR-050) restores what the author had
+  // left it at last session; absent (e.g. a fixture-driven test) falls back to
+  // the same `false` default this component has always had.
+  const [showSuperseded, setShowSupersededState] = useState(initialShowSuperseded ?? false);
+  const setShowSuperseded = (next: boolean) => {
+    setShowSupersededState(next);
+    onShowSupersededChange?.(next);
+  };
   // Per-stage collapse (FR-022/FR-023). Empty by default: every stage starts
   // expanded so the flat trail's rows stay directly reachable without an extra
   // click, and the one-line account (rendered regardless of this state) is
-  // never the ONLY way to see a stage's entries.
-  const [collapsedSteps, setCollapsedSteps] = useState<ReadonlySet<string>>(new Set());
-  const toggleStage = (stepId: string) =>
+  // never the ONLY way to see a stage's entries. `initialCollapsedSteps`
+  // (spec 057 US5, FR-050) restores last session's set on a fresh mount.
+  const [collapsedSteps, setCollapsedSteps] = useState<ReadonlySet<string>>(
+    initialCollapsedSteps ?? new Set(),
+  );
+  const toggleStage = (stepId: string) => {
     setCollapsedSteps((prev) => {
       const next = new Set(prev);
       if (next.has(stepId)) next.delete(stepId);
       else next.add(stepId);
       return next;
     });
+    onToggleStage?.(stepId);
+  };
+
+  // Scroll position (spec 057 US5, FR-050): one scrollable pane, one stable id.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useScrollRestoration(scrollRef, "decision-trail");
 
   // The same derivation stageGroups.ts and the engine's prSummary read through
   // (contracts' `supersededEntryIds`), so a row dimmed as "replaced" here and a
@@ -338,7 +396,7 @@ export function DecisionTrailView({
   };
 
   return (
-    <div style={containerStyle} data-testid="decision-trail">
+    <div ref={scrollRef} style={containerStyle} data-testid="decision-trail">
       <h2 style={{ margin: "0 0 12px", fontSize: "1.1rem", color: ACCENT }}>
         <Trans id="trail.title">Decision trail</Trans>
       </h2>
@@ -380,7 +438,7 @@ export function DecisionTrailView({
               data-testid="decision-superseded-toggle"
               style={toggleStyle}
               aria-expanded={showSuperseded}
-              onClick={() => setShowSuperseded((prev) => !prev)}
+              onClick={() => setShowSuperseded(!showSuperseded)}
             >
               {showSuperseded
                 ? t({ id: "trail.superseded.hide", message: "Hide replaced decisions" })
@@ -437,6 +495,7 @@ export function DecisionTrailView({
                             superseded={superseded}
                             hidden={superseded && !showSuperseded}
                             resolveImpact={resolveImpact}
+                            {...(resolveCtx !== undefined ? { resolveCtx } : {})}
                           />
                         );
                       })}

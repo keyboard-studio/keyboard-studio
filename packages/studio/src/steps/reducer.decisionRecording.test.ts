@@ -677,9 +677,54 @@ describe("FR-001 — a step completion with survey answers", () => {
   });
 
   it("records nothing for a step that carries no answers and is not an editor", () => {
-    // The track step's real payload (flowStepOptions.ts trackOptions.extract).
-    recordStepCompletion("track", { track: "copy" }, depsWith(realRecorder()));
+    // A step id absent from EDITOR_ACTION_STEPS, given a payload that is not
+    // SurveyPhaseResult-shaped — neither recorder has anything to key on.
+    recordStepCompletion("sequences", ADAPTER_EMITS_NOTHING, depsWith(realRecorder()));
     expect(useDecisionLogStore.getState().record.entries).toEqual([]);
+  });
+
+  // Regression coverage for a bug shape: makeFlowStepComponent.tsx's
+  // wrappedOnComplete used to forward FlowStepOptions.extract()'s RESHAPED
+  // payload (e.g. TrackPayload `{ track: "copy" }`) to `onComplete` instead of
+  // the untouched SurveyPhaseResult the step's runner actually produced. That
+  // silently hid every answer recorded by a step whose `extract()` reshapes
+  // the result — "track" and "project_name" (spec 057 US3 decision-deeplink
+  // E2E, which failed to find a "track" decision entry to jump back to at
+  // all). `phase_f_helpdocs` was unaffected because its `extract()` already
+  // returns the raw result unchanged (flowStepOptions.tsx). Both siblings
+  // are covered below with each step's REAL production payload shape
+  // (per this file's FR-027/SC-010 discipline) — a `SurveyPhaseResult`, not
+  // the extracted payload.
+  it("records the track step's answer, keyed on its real question id (sweep: makeFlowStepComponent reshape)", () => {
+    recordStepCompletion(
+      "track",
+      phaseResult([{ questionId: "track_choice", answerType: "select", value: "adapt" }]),
+      depsWith(realRecorder()),
+    );
+
+    const entries = useDecisionLogStore.getState().record.entries;
+    expect(entries).toHaveLength(1);
+    const payload = entries[0]!.payload;
+    if (payload.kind !== "survey-answer") throw new Error("expected a survey-answer entry");
+    expect(payload.questionId).toBe("track_choice");
+    expect(payload.value).toBe("adapt");
+  });
+
+  it("records the project_name step's answers, keyed on their real question ids (sweep sibling)", () => {
+    recordStepCompletion(
+      "project_name",
+      phaseResult([
+        { questionId: "project_display_name", answerType: "text", value: "Hausa (QWERTY)" },
+        { questionId: "project_keyboard_id", answerType: "text", value: "hausa_qwerty" },
+      ]),
+      depsWith(realRecorder()),
+    );
+
+    const entries = useDecisionLogStore.getState().record.entries;
+    expect(entries).toHaveLength(2);
+    expect(
+      entries.map((e) => (e.payload.kind === "survey-answer" ? e.payload.questionId : null)),
+    ).toEqual(["project_display_name", "project_keyboard_id"]);
   });
 
   it("fires for steps ABSENT from the reducer's effect table", () => {

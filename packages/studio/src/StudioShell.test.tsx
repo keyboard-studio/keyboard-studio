@@ -27,6 +27,7 @@ import { screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { render } from "./test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
 import { useSurveySessionStore, snapshotTraversal } from "./stores/surveySessionStore.ts";
+import { consumePendingWelcomeLocation, jumpToLocation } from "./lib/jumpToLocation.ts";
 import { snapshotWorkingCopyData } from "./lib/persistWorkingCopy.ts";
 import type { OnInstantiateCallback, Stage } from "./hooks/useKeyboardArtifact.ts";
 
@@ -558,10 +559,10 @@ vi.mock("./lib/buildTouchLayoutJson.ts", () => ({
   }),
 }));
 
-// Shallow stubs for PreviewScreen and OutputScreen — routing tests assert on
+// Shallow stubs for CompareScreen and OutputScreen — routing tests assert on
 // the marker divs, not the internal pipeline.
-vi.mock("./components/PreviewScreen.tsx", () => ({
-  PreviewScreen: () => <div data-testid="preview-screen-root">preview-screen</div>,
+vi.mock("./components/CompareScreen.tsx", () => ({
+  CompareScreen: () => <div data-testid="compare-screen-root">compare-screen</div>,
 }));
 
 vi.mock("./components/OutputScreen.tsx", () => ({
@@ -687,11 +688,25 @@ function advanceToF() {
 beforeEach(() => {
   artifactHoisted.onInstantiateRef.current = null;
   artifactHoisted.stageSetters = [];
+  // Spec 057 (FR-072): every test in this file starts from a fresh wizard, and
+  // now has to SAY so.
+  //
+  // It used to be inherited from the defect: `SurveyView`'s mount effect reset
+  // the survey-session store, so every `render()` here silently started at
+  // "identity" no matter where the previous test had left the module-level
+  // singleton. Deleting that reset (D-1) is what makes a tab round trip
+  // preserve the author's position — and it also removes the per-test reset
+  // these suites were leaning on without stating.
+  //
+  // Resetting here is the honest replacement: test isolation is the test
+  // file's job, not a side effect of a component's mount.
+  useSurveySessionStore.getState().reset();
 });
 
 afterEach(() => {
   cleanup();
   useWorkingCopyStore.getState().reset();
+  useSurveySessionStore.getState().reset();
   vi.clearAllMocks();
   // The first-visit gate reads ks.visited / the ks.studio.draft key from
   // localStorage; clear it so gate state can't leak between tests.
@@ -931,12 +946,14 @@ describe("SurveyView — mechanisms → carve back-navigation", () => {
 });
 
 // ---------------------------------------------------------------------------
-// StudioShell routing regression — #preview mounts PreviewScreen and #output
+// StudioShell routing regression — #preview mounts CompareScreen and #output
 // mounts OutputScreen (distinct screens, NOT RoutePlaceholder).
 // ---------------------------------------------------------------------------
 
-describe("StudioShell — route: #preview renders PreviewScreen", () => {
-  it("mounts PreviewScreen (not RoutePlaceholder) when hash is #preview", async () => {
+describe("StudioShell — route: #preview renders CompareScreen", () => {
+  // Spec 057: the route TOKEN stays `preview` while the tab is labelled
+  // "Compare" (contract §1), so this hash assertion is deliberately unchanged.
+  it("mounts CompareScreen (not RoutePlaceholder) when hash is #preview", async () => {
     window.location.hash = "#preview";
     localStorage.setItem("ks.visited", "1"); // returning visitor: deep-link hash is honored
 
@@ -944,11 +961,11 @@ describe("StudioShell — route: #preview renders PreviewScreen", () => {
       render(<StudioShell />);
     });
 
-    // PreviewScreen stub must be present.
-    expect(screen.getByTestId("preview-screen-root")).toBeTruthy();
+    // CompareScreen stub must be present.
+    expect(screen.getByTestId("compare-screen-root")).toBeTruthy();
     // OutputScreen must NOT be present — these are distinct screens.
     expect(screen.queryByTestId("output-screen-root")).toBeNull();
-    // RoutePlaceholder renders "Preview — coming soon"; must NOT be present.
+    // RoutePlaceholder renders a "coming soon" stub; must NOT be present.
     expect(screen.queryByText(/coming soon/i)).toBeNull();
   });
 });
@@ -964,8 +981,8 @@ describe("StudioShell — route: #output renders OutputScreen", () => {
 
     // OutputScreen stub must be present.
     expect(screen.getByTestId("output-screen-root")).toBeTruthy();
-    // PreviewScreen must NOT be present — these are distinct screens.
-    expect(screen.queryByTestId("preview-screen-root")).toBeNull();
+    // CompareScreen must NOT be present — these are distinct screens.
+    expect(screen.queryByTestId("compare-screen-root")).toBeNull();
     expect(screen.queryByText(/coming soon/i)).toBeNull();
   });
 });
@@ -982,7 +999,7 @@ describe("StudioShell — first-visit gate forces newcomers to welcome", () => {
     // The deep-linked #preview is overridden — a genuine newcomer lands on
     // welcome (the shallow WelcomeScreen stub above, per this file's routing-
     // test idiom).
-    expect(screen.queryByTestId("preview-screen-root")).toBeNull();
+    expect(screen.queryByTestId("compare-screen-root")).toBeNull();
     expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
     // The hash is rewritten to #welcome so leaving welcome fires a real hashchange.
     expect(window.location.hash).toBe("#welcome");
@@ -996,7 +1013,7 @@ describe("StudioShell — first-visit gate forces newcomers to welcome", () => {
       render(<StudioShell />);
     });
 
-    expect(screen.getByTestId("preview-screen-root")).toBeTruthy();
+    expect(screen.getByTestId("compare-screen-root")).toBeTruthy();
   });
 });
 
@@ -1114,7 +1131,7 @@ describe("StudioShell — first-visit landing gate", () => {
     });
 
     expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
-    expect(screen.queryByTestId("preview-screen-root")).toBeNull();
+    expect(screen.queryByTestId("compare-screen-root")).toBeNull();
   });
 
   it("lifts the gate on a live hashchange once the newcomer leaves welcome (no remount)", async () => {
@@ -1160,7 +1177,7 @@ describe("StudioShell — first-visit landing gate", () => {
 
     // Gate lifted by the draft ⇒ the deep-linked hash is honored: land on
     // preview, NOT forced onto welcome and NOT defaulted to survey.
-    expect(screen.getByTestId("preview-screen-root")).toBeTruthy();
+    expect(screen.getByTestId("compare-screen-root")).toBeTruthy();
     expect(screen.queryByTestId("welcome-screen-root")).toBeNull();
     expect(screen.queryByTestId("stage-identity")).toBeNull();
   });
@@ -2290,5 +2307,237 @@ describe("rehydrate of a corrupted persisted draft does not runaway-render (free
     expect(notifyCount).toBeLessThan(10);
 
     unsubscribe();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 057 US1 (T020) — traversal survives a route round trip.
+//
+// These tests encode the NEW contract, replacing the old "navigating away and
+// back is a fresh wizard" assumption (FR-002, FR-003, D-1). They are written
+// so that reinstating any mount-time reset makes them fail: each drives the
+// wizard forward, unmounts and remounts SurveyView exactly as a hash-route
+// change does, and asserts the traversal is where the author left it.
+//
+// `cleanup()` + a fresh `render()` is the right model for a route change here:
+// StudioShell's route switch swaps which component the content slot renders,
+// which unmounts SurveyView and mounts it again — the store singleton is what
+// spans the two, and that is precisely the seam under test.
+// ---------------------------------------------------------------------------
+
+describe("SurveyView — traversal survives a route round trip (spec 057 FR-002)", () => {
+  /**
+   * Mount the way `StudioShell` does: `baseKeyboard` is the WORKING-COPY
+   * STORE's base, not a fixed prop. That matters on the remount — `SurveyView`
+   * syncs `localBase` from this prop, so remounting with a hardcoded `null`
+   * would blank a base the author had already chosen and tell us nothing about
+   * traversal.
+   */
+  async function mountSurvey() {
+    const base =
+      useWorkingCopyStore.getState().baseKeyboard ??
+      useSurveySessionStore.getState().localBase;
+    await act(async () => {
+      render(<SurveyView baseKeyboard={base} />);
+    });
+  }
+
+  /** Unmount and remount, as a tab switch away and back does. */
+  async function routeRoundTrip() {
+    cleanup();
+    await mountSurvey();
+  }
+
+  it("keeps activeStepId and history across a remount", async () => {
+    useSurveySessionStore.getState().reset();
+    await mountSurvey();
+    advanceToTrack();
+
+    const before = {
+      activeStepId: useSurveySessionStore.getState().activeStepId,
+      history: [...useSurveySessionStore.getState().history],
+    };
+    expect(before.activeStepId).toBe("track");
+    expect(before.history.length).toBeGreaterThan(0);
+
+    await routeRoundTrip();
+
+    expect(useSurveySessionStore.getState().activeStepId).toBe(before.activeStepId);
+    expect([...useSurveySessionStore.getState().history]).toEqual(before.history);
+  });
+
+  it("renders the step the author left, not the first question", async () => {
+    useSurveySessionStore.getState().reset();
+    await mountSurvey();
+    advanceToPrefill();
+    expect(screen.getByTestId("stage-prefill")).toBeTruthy();
+
+    await routeRoundTrip();
+
+    // The reported symptom, inverted: the prefill screen is still on screen
+    // and the identity stage is not.
+    expect(screen.getByTestId("stage-prefill")).toBeTruthy();
+    expect(screen.queryByTestId("stage-identity")).toBeNull();
+  });
+
+  it("keeps the characters substage across a remount (D-4's antecedent)", async () => {
+    useSurveySessionStore.getState().reset();
+    await mountSurvey();
+    advanceToPrefill();
+    fireEvent.click(screen.getByTestId("prefill-confirm"));
+    expect(useSurveySessionStore.getState().charactersSubStage).toBe("B");
+
+    await routeRoundTrip();
+
+    expect(useSurveySessionStore.getState().charactersSubStage).toBe("B");
+    expect(screen.getByTestId("stage-B")).toBeTruthy();
+  });
+
+  it("keeps the answers the walk recorded — identityResult and selectedTrack", async () => {
+    useSurveySessionStore.getState().reset();
+    await mountSurvey();
+    advanceToTrack();
+    fireEvent.click(screen.getByTestId("track-copy"));
+
+    const identityBefore = useSurveySessionStore.getState().identityResult;
+    const trackBefore = useSurveySessionStore.getState().selectedTrack;
+    expect(identityBefore).not.toBeNull();
+
+    await routeRoundTrip();
+
+    expect(useSurveySessionStore.getState().identityResult).toEqual(identityBefore);
+    expect(useSurveySessionStore.getState().selectedTrack).toBe(trackBefore);
+  });
+
+  it("survives repeated round trips — the loss is not merely deferred by one", async () => {
+    useSurveySessionStore.getState().reset();
+    await mountSurvey();
+    advanceToTrack();
+
+    await routeRoundTrip();
+    await routeRoundTrip();
+    await routeRoundTrip();
+
+    expect(useSurveySessionStore.getState().activeStepId).toBe("track");
+  });
+});
+
+describe("SurveyView — a reset happens only on an explicit start-over (spec 057 FR-003)", () => {
+  it("the corner reset control clears traversal back to identity", async () => {
+    useSurveySessionStore.getState().reset();
+    await act(async () => {
+      render(<SurveyView baseKeyboard={null} />);
+    });
+    advanceToTrack();
+    expect(useSurveySessionStore.getState().activeStepId).toBe("track");
+
+    // The real SurveyResetButton — arm, then confirm.
+    fireEvent.click(screen.getByTestId("survey-reset-arm"));
+    fireEvent.click(screen.getByTestId("survey-reset-yes"));
+
+    expect(useSurveySessionStore.getState().activeStepId).toBe("identity");
+    expect(useSurveySessionStore.getState().history).toEqual([]);
+    expect(useSurveySessionStore.getState().identityResult).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 057 US3 / FR-015 (T046, SC-012) — a shared deep link survives the
+// first-visit gate.
+//
+// Defect D-9: `hashToRoute` forces a genuine newcomer onto `#welcome` and
+// rewrites the address bar to match, DISCARDING whatever location was
+// requested. That rewrite is load-bearing (without it, "I'm new"'s
+// `navigateTo("survey")` would be a same-value hash assignment firing zero
+// hashchange events, soft-locking the visitor on welcome), so the fix is not
+// to remove it but to hold the requested location across it — see
+// `setPendingWelcomeLocation` / `consumePendingWelcomeLocation` in
+// lib/jumpToLocation.ts, consumed by WelcomeScreen's `leaveWelcome`.
+//
+// The location is consumed THROUGH `jumpToLocation`, so the ordinary
+// reachability rules apply: a link naming a step of a project this visitor
+// does not have degrades to the tab rather than landing them somewhere
+// impossible. Both halves are asserted below.
+// ---------------------------------------------------------------------------
+
+describe("StudioShell — a first-time visitor's deep link survives the welcome gate", () => {
+  it("holds a step-scoped location across the gate instead of discarding it", async () => {
+    window.location.hash = "#survey/characters";
+    localStorage.clear(); // pristine browser: a genuine newcomer
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    // Forced onto welcome, and the hash normalized — unchanged behaviour.
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
+    expect(window.location.hash).toBe("#welcome");
+
+    // ...but the requested location was HELD rather than dropped. Consuming it
+    // is what `leaveWelcome` does; asserting it here proves the gate captured
+    // it, which is the half D-9 got wrong.
+    const held = consumePendingWelcomeLocation();
+    expect(held).toEqual({ route: "survey", step: "characters" });
+  });
+
+  it("holds a bare route location too, so an ordinary shared #trail link is not lost", async () => {
+    window.location.hash = "#trail";
+    localStorage.clear();
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
+    expect(consumePendingWelcomeLocation()).toEqual({ route: "trail" });
+  });
+
+  it("holds nothing when the visitor arrived with no deep link at all", async () => {
+    window.location.hash = "";
+    localStorage.clear();
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
+    // Nothing to honour — `leaveWelcome` falls through to the default landing,
+    // exactly as before this feature.
+    expect(consumePendingWelcomeLocation()).toBeNull();
+  });
+
+  it("holds nothing for a malformed hash — a parse failure is not a location", async () => {
+    window.location.hash = "#survey//characters";
+    localStorage.clear();
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
+    expect(consumePendingWelcomeLocation()).toBeNull();
+  });
+
+  it("honours the held location on exit, subject to the ordinary reachability rules", async () => {
+    // A step-scoped link with NO project instantiated degrades to the tab
+    // (`no-project`) rather than landing the visitor inside a wizard that has
+    // nothing to be somewhere in. That is `jumpToLocation` doing its job — the
+    // gate does not get its own reachability rules (FR-015 defers to FR-013).
+    window.location.hash = "#survey/characters";
+    localStorage.clear();
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    const held = consumePendingWelcomeLocation();
+    expect(held).not.toBeNull();
+
+    const outcome = jumpToLocation(held!);
+    expect(outcome).toMatchObject({
+      kind: "degraded",
+      at: { route: "survey" },
+      reason: "no-project",
+    });
   });
 });

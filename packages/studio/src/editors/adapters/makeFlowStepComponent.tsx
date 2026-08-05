@@ -7,7 +7,14 @@
 //     C2.2  Resolves flowSources[options.flowRef] — throws descriptive Error if absent.
 //     C2.3  loadModularFlow(source.raw) once, memoised via useMemo.
 //     C2.4  On completion: extract(result) → if undefined stay on step → onCommit?.(x,deps)
-//           → props.onComplete(x). This is the R7 ordering the golden-walk asserts.
+//           → props.onComplete(result) — the UNTOUCHED SurveyPhaseResult, not the
+//           extracted x. This is the R7 ordering the golden-walk asserts. extract()/x exist
+//           for THIS factory's own onCommit store effects and the no-advance guard only;
+//           StepHost's generic completion path (contract §2) still needs the real,
+//           answers-bearing result — that is what recordStepCompletion's isSurveyPhaseResult
+//           check (createDecisionRecorder.ts) keys on to record a question's decision entry,
+//           and forwarding x there instead of result silently drops the entry (spec 057 US3
+//           regression: the "track" step's decision never made it into the trail).
 //     C2.5  ALL store / hook access confined here (FlowStepHost is pure).
 //     C2.6  New editors → steps/flowSources runtime edge is acyclic (R1 verified).
 //
@@ -72,6 +79,22 @@ export interface FlowStepDeps {
    * each mount starts with an empty string and re-entry resets correctly.
    */
   displayNameRef: { current: string };
+  /**
+   * The session's currently-recorded track choice, or `null` before the
+   * author has ever chosen one. Spec 057 FR-031: a step reached by deep link
+   * (or by walking Back into it) must show the currently-recorded answer, not
+   * an empty field — trackOptions.seeds.getSeedValue reads this to seed
+   * track_choice's radio group on arrival (flowStepOptions.tsx).
+   */
+  selectedTrack: "copy" | "adapt" | null;
+  /**
+   * The session's currently-recorded scaffold spec (display name + keyboard
+   * id), or `null` before the author has ever committed the project_name
+   * step. Spec 057 FR-031: mirrors `selectedTrack` above for project_name's
+   * two questions — projectNameOptions.seeds.getSeedValue prefers this over
+   * the identity-derived default once it is set (flowStepOptions.tsx).
+   */
+  scaffoldSpec: { keyboardId: string; displayName: string } | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -166,6 +189,8 @@ export function makeFlowStepComponent<Extracted>(
     const setSelectedTrack = useSurveySessionStore((s) => s.setSelectedTrack);
     const setScaffoldSpec = useSurveySessionStore((s) => s.setScaffoldSpec);
     const setStoreIdentity = useWorkingCopyStore((s) => s.setIdentity);
+    const selectedTrack = useSurveySessionStore((s) => s.selectedTrack);
+    const scaffoldSpec = useSurveySessionStore((s) => s.scaffoldSpec);
 
     // Unconditional hook call (hooks must not be conditional). When the flow
     // does not use findings, the derived record is computed but ignored below.
@@ -189,6 +214,8 @@ export function makeFlowStepComponent<Extracted>(
       setIdentity: setStoreIdentity,
       findingsByQuestionId,
       displayNameRef,
+      selectedTrack,
+      scaffoldSpec,
     };
 
     // Context derived from current deps.
@@ -220,9 +247,15 @@ export function makeFlowStepComponent<Extracted>(
         if (extracted === undefined) return;
         // R7: store effects fire BEFORE props.onComplete → StepHost advance.
         options.onCommit?.(extracted, depsRef.current);
-        // EditorStepProps.onComplete is unknown-typed; the Extracted generic is
-        // intentionally erased at this boundary (the host receives the raw payload).
-        onComplete(extracted as unknown);
+        // Forward the UNTOUCHED SurveyPhaseResult, not `extracted` — StepHost's
+        // generic completion path (recordPhase / recordStepCompletion / advance)
+        // expects the same opaque result the step actually produced (contract §2
+        // in StepHost.tsx). `extracted` is this factory's own reshaping for its
+        // onCommit store effects and the no-advance guard above; passing it
+        // onward instead of `result` hid every answer this step recorded from
+        // the decision-audit seam (isSurveyPhaseResult in createDecisionRecorder.ts
+        // requires the `answers` array `extracted` does not carry).
+        onComplete(result);
       },
       [onComplete],
     );

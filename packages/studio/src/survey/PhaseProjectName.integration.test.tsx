@@ -100,10 +100,16 @@ describe("ProjectNameStepFactoryComponent — displayName->slug seed chain (real
     let capturedDisplayName: string | undefined;
     let capturedKeyboardId: string | undefined;
 
+    // onComplete now receives the untouched SurveyPhaseResult (see
+    // makeFlowStepComponent.tsx's wrappedOnComplete) — the pair this test
+    // asserts is read out of its `answers`, the same way
+    // projectNameOptions.extract does in production.
     const onComplete = vi.fn((result: unknown) => {
-      const r = result as { displayName?: string; keyboardId?: string };
-      capturedDisplayName = r.displayName;
-      capturedKeyboardId = r.keyboardId;
+      const r = result as { answers: { questionId: string; value: unknown }[] };
+      capturedDisplayName = r.answers.find((a) => a.questionId === "project_display_name")
+        ?.value as string | undefined;
+      capturedKeyboardId = r.answers.find((a) => a.questionId === "project_keyboard_id")
+        ?.value as string | undefined;
     });
 
     render(<ProjectNameStepFactoryComponent onComplete={onComplete} onBack={vi.fn()} />);
@@ -185,9 +191,16 @@ describe("ProjectNameStepFactoryComponent — displayName->slug seed chain (real
     });
 
     expect(onComplete).toHaveBeenCalledOnce();
-    const result = (onComplete as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as { displayName: string; keyboardId: string } | undefined;
-    expect(result?.displayName).toBe(editedName);
-    expect(result?.keyboardId).toBe(editedSlug);
+    // onComplete now receives the untouched SurveyPhaseResult (see
+    // makeFlowStepComponent.tsx's wrappedOnComplete) — read the pair back out
+    // of its `answers`, the same way projectNameOptions.extract does.
+    const result = (onComplete as ReturnType<typeof vi.fn>).mock.calls[0]?.[0] as
+      | { answers: { questionId: string; value: unknown }[] }
+      | undefined;
+    const resultDisplayName = result?.answers.find((a) => a.questionId === "project_display_name")?.value;
+    const resultKeyboardId = result?.answers.find((a) => a.questionId === "project_keyboard_id")?.value;
+    expect(resultDisplayName).toBe(editedName);
+    expect(resultKeyboardId).toBe(editedSlug);
   });
 
   it("onBack fires when Back is clicked", async () => {

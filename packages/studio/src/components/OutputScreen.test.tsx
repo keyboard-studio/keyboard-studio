@@ -1,10 +1,10 @@
-// Tests for PreviewScreen and OutputScreen — the two screens produced by the
-// preview/output split.
+// Tests for OutputScreen — the "ship it" half of the old preview/output split.
 //
-// PreviewScreen ("try it"):
-//   - Renders OSK (testid osk-frame) and DiagnosticsPanel.
-//   - Does NOT render a "Download .zip" button.
-//   - Does NOT render SignUpPanel.
+// Spec 057 (T030, FR-072): the PreviewScreen half of this file is GONE, not
+// deleted-and-forgotten. That screen was replaced by CompareScreen, whose
+// contract is an ABSENCE (no write path into the working copy) rather than a
+// presence, so its assertions read nothing like the ones that were here and
+// live in their own file: components/CompareShell.test.tsx.
 //
 // OutputScreen ("ship it"):
 //   - Renders "Download .zip" button and SignUpPanel.
@@ -111,7 +111,6 @@ vi.mock("./SignUpPanel.tsx", () => ({
 // Import components under test AFTER mocks are registered.
 // ---------------------------------------------------------------------------
 
-import { PreviewScreen } from "./PreviewScreen.tsx";
 import { OutputScreen } from "./OutputScreen.tsx";
 
 // ---------------------------------------------------------------------------
@@ -127,14 +126,6 @@ const EMPTY_ZIP_BYTES = new Uint8Array([80, 75, 5, 6, 0, 0, 0, 0, 0, 0, 0, 0, 0,
  * provider is wired up. */
 function renderOutputScreen() {
   return render(<OutputScreen />);
-}
-
-/** Render helper — PreviewScreen (and its DiagnosticsPanel / OSKFrame /
- * PickerPane children) also uses Lingui Trans/t macros, which require an
- * I18nProvider ancestor. All PreviewScreen render call-sites in this file go
- * through this helper so there is exactly one place the provider is wired up. */
-function renderPreviewScreen() {
-  return render(<PreviewScreen />);
 }
 
 function seedInstantiatedWorkingCopy() {
@@ -172,32 +163,6 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 // Route-split assertions (AC)
 // ---------------------------------------------------------------------------
-
-describe("PreviewScreen — route-split AC", () => {
-  it("renders the OSK frame (osk-frame testid)", () => {
-    renderPreviewScreen();
-    expect(screen.getByTestId("osk-frame")).toBeTruthy();
-  });
-
-  it("renders DiagnosticsPanel (no-diagnostics message) after base is picked", () => {
-    renderPreviewScreen();
-    fireEvent.click(screen.getByTestId("base-picker"));
-    // DiagnosticsPanel renders "No compiler diagnostics." when empty.
-    expect(screen.getByText(/no compiler diagnostics/i)).toBeTruthy();
-  });
-
-  it("does NOT render a Download .zip button", () => {
-    renderPreviewScreen();
-    fireEvent.click(screen.getByTestId("base-picker"));
-    expect(screen.queryByRole("button", { name: /download/i })).toBeNull();
-  });
-
-  it("does NOT render SignUpPanel", () => {
-    renderPreviewScreen();
-    fireEvent.click(screen.getByTestId("base-picker"));
-    expect(screen.queryByTestId("signup-panel")).toBeNull();
-  });
-});
 
 describe("OutputScreen — route-split AC", () => {
   it("renders the Download .zip button after base is picked", () => {

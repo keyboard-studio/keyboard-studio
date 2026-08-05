@@ -7,14 +7,31 @@
 // reason; one whose detail was dropped says it was dropped. Rendering a blank in
 // any of those four situations reads as a failure, and none of them is one.
 
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import type { DecisionEntry, DecisionImpact, DecisionRecord } from "@keyboard-studio/contracts";
+import type { TraversalSnapshot } from "../stores/surveySessionStore.ts";
+import type { ResolveContext } from "../lib/resolveLocation.ts";
+import { manifest } from "../steps/manifest.ts";
 import { DecisionEntryRow } from "./DecisionEntryRow.tsx";
 import { DecisionTrailView } from "./DecisionTrailView.tsx";
 
-afterEach(cleanup);
+// spec 057 T039 — the deep-link jump affordance. `jumpToLocation` is mocked
+// only so the "activates jumpToLocation" test can assert on the call; every
+// other test in this file never clicks the jump control, so the mock has no
+// effect on the 053 coverage above.
+vi.mock("../lib/jumpToLocation.ts", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../lib/jumpToLocation.ts")>();
+  return { ...actual, jumpToLocation: vi.fn(() => ({ kind: "arrived", at: { route: "survey" } })) };
+});
+
+import { jumpToLocation } from "../lib/jumpToLocation.ts";
+
+afterEach(() => {
+  cleanup();
+  vi.mocked(jumpToLocation).mockClear();
+});
 
 function entry(overrides: Partial<DecisionEntry> = {}): DecisionEntry {
   return {
@@ -255,5 +272,185 @@ describe("clause lists are locale-formatted, not comma-joined (km-triage/km-doma
     // plain `join(", ")` cannot produce, so this pins the seam rather than the
     // exact punctuation of one locale.
     expect(text).toMatch(/and keyboard version: 1\.0/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 057 T039 — the deep-link jump affordance (FR-030, FR-031, FR-035,
+// FR-036). `resolveCtx` is a plain, fully-controlled prop here (see
+// DecisionEntryRow.tsx's own doc comment for why it must be a prop rather
+// than something the row reads for itself — the decisions-layer depcruise
+// rule forbids this component importing stores/, even for a type-only
+// reference). A synthetic traversal + a narrow registry, in the same style
+// resolveLocation.test.ts already uses, is enough to construct both a
+// genuinely-reached step and a genuinely un-reached one without needing the
+// real questionRegistry. The real `manifest` IS used, since resolveLocation
+// needs to find "identity"/"touch" in it before it can decide reachability.
+// ---------------------------------------------------------------------------
+
+/** Registry carrying only the one id these fixtures name. */
+const JUMP_REGISTRY = { il_language_english: {} };
+
+/** Same cast idiom resolveLocation.test.ts uses: the real TraversalSnapshot
+ * has many more slots that are not load-bearing for resolveLocation. */
+function jumpTraversal(activeStepId: string): TraversalSnapshot {
+  return { activeStepId, history: [], selectedTrack: null } as unknown as TraversalSnapshot;
+}
+
+function jumpCtxWith(activeStepId: string, hasProject = true): ResolveContext {
+  return {
+    manifest,
+    questionRegistry: JUMP_REGISTRY,
+    traversal: jumpTraversal(activeStepId),
+    hasProject,
+  };
+}
+
+const reachableJumpEntry = (): DecisionEntry =>
+  entry({
+    stepId: "identity",
+    payload: {
+      kind: "survey-answer",
+      questionId: "il_language_english",
+      answerType: "text",
+      value: "Bambara",
+    },
+  });
+
+// "touch" is real but far ahead of "identity" on every track — the author
+// standing at "identity" with empty history has not reached it, so this
+// degrades to `beyond-gate` rather than a bare `unreachable` (resolveLocation
+// never reports `unreachable` for a step-scoped location — see
+// DecisionEntryRow.tsx's own comment on `jumpUnreachableReason`).
+const unreachedJumpEntry = (): DecisionEntry =>
+  entry({
+    stepId: "touch",
+    payload: {
+      kind: "editor-action",
+      actionType: "touch_edit",
+      summary: { sample: [], sampleTruncated: false },
+    },
+  });
+
+describe("the jump control (FR-030, FR-031)", () => {
+  it("a reachable entry renders a real jump control, not a reason", () => {
+    render(
+      <ul>
+        <DecisionEntryRow
+          entry={reachableJumpEntry()}
+          superseded={false}
+          resolveImpact={() => null}
+          resolveCtx={jumpCtxWith("identity")}
+        />
+      </ul>,
+    );
+    expect(screen.getByTestId("decision-entry-jump")).not.toBeNull();
+    expect(screen.queryByTestId("decision-entry-jump-unreachable")).toBeNull();
+  });
+
+  it("without a resolveCtx, optimistically offers the jump control", () => {
+    // Documents the dormant-fallback behaviour DecisionEntryRow.tsx's doc
+    // comment describes: until a caller wires `resolveCtx` through (a
+    // concurrent task's responsibility — DecisionTrailView.tsx is out of
+    // this file's ownership), every entry still offers a working control,
+    // because `jumpToLocation` resolves for real at click time regardless.
+    render(
+      <ul>
+        <DecisionEntryRow entry={reachableJumpEntry()} superseded={false} resolveImpact={() => null} />
+      </ul>,
+    );
+    expect(screen.getByTestId("decision-entry-jump")).not.toBeNull();
+  });
+
+  it("clicking the jump control activates jumpToLocation with the entry's location and a trail returnTo (FR-034)", () => {
+    render(
+      <ul>
+        <DecisionEntryRow
+          entry={reachableJumpEntry()}
+          superseded={false}
+          resolveImpact={() => null}
+          resolveCtx={jumpCtxWith("identity")}
+        />
+      </ul>,
+    );
+    fireEvent.click(screen.getByTestId("decision-entry-jump"));
+    expect(jumpToLocation).toHaveBeenCalledWith(
+      { route: "survey", step: "identity", question: "il_language_english" },
+      { returnTo: { route: "trail" } },
+    );
+  });
+});
+
+describe("the unreachable reason (FR-035)", () => {
+  it("an entry ahead of the author's reached position renders the reason IN PLACE of a link", () => {
+    render(
+      <ul>
+        <DecisionEntryRow
+          entry={unreachedJumpEntry()}
+          superseded={false}
+          resolveImpact={() => null}
+          resolveCtx={jumpCtxWith("identity")}
+        />
+      </ul>,
+    );
+    expect(screen.queryByTestId("decision-entry-jump")).toBeNull();
+    const reason = screen.getByTestId("decision-entry-jump-unreachable");
+    expect(reason).not.toBeNull();
+    // "beyond-gate"'s shared prose (progressDots.ts's unreachableReasonLabel,
+    // reused here rather than a second wording for the same reason code).
+    expect(reason.textContent).toMatch(/not yet reached/i);
+  });
+
+  it("no project instantiated renders the no-project reason", () => {
+    render(
+      <ul>
+        <DecisionEntryRow
+          entry={reachableJumpEntry()}
+          superseded={false}
+          resolveImpact={() => null}
+          resolveCtx={jumpCtxWith("identity", false)}
+        />
+      </ul>,
+    );
+    expect(screen.queryByTestId("decision-entry-jump")).toBeNull();
+    expect(screen.getByTestId("decision-entry-jump-unreachable").textContent).toMatch(/project/i);
+  });
+
+  it("never renders a dead control — the reason always carries legible text", () => {
+    render(
+      <ul>
+        <DecisionEntryRow
+          entry={unreachedJumpEntry()}
+          superseded={false}
+          resolveImpact={() => null}
+          resolveCtx={jumpCtxWith("identity")}
+        />
+      </ul>,
+    );
+    const reason = screen.getByTestId("decision-entry-jump-unreachable");
+    expect(reason.textContent?.trim().length ?? 0).toBeGreaterThan(0);
+  });
+});
+
+describe("mounting resolves no impact (FR-036)", () => {
+  it("resolveImpact is never called merely by rendering the row, jump control included", () => {
+    const resolveImpact = vi.fn(() => null);
+    render(
+      <ul>
+        <DecisionEntryRow
+          entry={reachableJumpEntry()}
+          superseded={false}
+          resolveImpact={resolveImpact}
+          resolveCtx={jumpCtxWith("identity")}
+        />
+        <DecisionEntryRow
+          entry={unreachedJumpEntry()}
+          superseded={false}
+          resolveImpact={resolveImpact}
+          resolveCtx={jumpCtxWith("identity")}
+        />
+      </ul>,
+    );
+    expect(resolveImpact).not.toHaveBeenCalled();
   });
 });

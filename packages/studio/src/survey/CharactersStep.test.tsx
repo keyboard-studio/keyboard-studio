@@ -283,3 +283,70 @@ describe("CharactersStep — findingsByQuestionId prop passed to PhaseB", () => 
     expect(mockPhaseBFindingsRef.current).toEqual(expected);
   });
 });
+
+// ---------------------------------------------------------------------------
+// (f) Spec 057 US1 / FR-007 (T021) — the Phase B draft alphabet is cleared by a
+// genuine prefill → build-list transition, and by nothing else.
+//
+// D-4: composed with the mount reset (D-1), a tab round trip mid-characters
+// returned `charactersSubStage` to "prefill"; re-confirming prefill then fired
+// `resetPhaseBDraft()` and silently emptied the alphabet the author had built.
+// The reset is gone, so the substage survives — and these tests pin the
+// remaining half of the contract, which is that a REMOUNT at substage "B" must
+// not clear the draft either.
+// ---------------------------------------------------------------------------
+
+import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
+
+describe("CharactersStep — Phase B draft alphabet lifecycle (spec 057 FR-007)", () => {
+  /** Seed a built alphabet, as the author would have on the build-list screen. */
+  function seedAlphabet(chars: string[]) {
+    usePhaseBDraftStore.getState().reset();
+    for (const c of chars) usePhaseBDraftStore.getState().add(c);
+  }
+
+  it("remounting at substage 'B' does NOT clear the draft alphabet", () => {
+    seedSessionStore();
+    useSurveySessionStore.setState({ charactersSubStage: "B" });
+    seedAlphabet(["é", "ŋ", "ɔ"]);
+
+    // First mount, then a route-change-shaped unmount/remount.
+    const first = render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
+    expect(screen.getByTestId("mock-phase-b")).toBeTruthy();
+    first.unmount();
+    render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
+
+    expect(screen.getByTestId("mock-phase-b")).toBeTruthy();
+    expect(usePhaseBDraftStore.getState().chars).toEqual(["é", "ŋ", "ɔ"]);
+  });
+
+  it("a genuine prefill -> build-list confirm DOES clear it (the intended reset)", () => {
+    seedSessionStore(); // substage "prefill"
+    seedAlphabet(["é", "ŋ"]);
+
+    render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
+    expect(screen.getByTestId("mock-prefill")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("prefill-confirm"));
+
+    // Entering the build-list screen from prefill starts a fresh alphabet —
+    // this is by design and is NOT what D-4 was about.
+    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+  });
+
+  it("stepping back to prefill and forward again clears it — the transition, not the mount, is the trigger", () => {
+    seedSessionStore();
+    useSurveySessionStore.setState({ charactersSubStage: "B" });
+    seedAlphabet(["é"]);
+
+    render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
+    // Back to prefill: still not a clear — the author has not re-confirmed yet,
+    // so their alphabet is still recoverable by going forward without confirming.
+    fireEvent.click(screen.getByTestId("phaseB-back"));
+    expect(usePhaseBDraftStore.getState().chars).toEqual(["é"]);
+
+    // Re-confirming prefill IS the transition, and clears.
+    fireEvent.click(screen.getByTestId("prefill-confirm"));
+    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+  });
+});
