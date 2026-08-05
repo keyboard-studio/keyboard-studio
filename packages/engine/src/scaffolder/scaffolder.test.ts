@@ -573,7 +573,7 @@ group(main) using keys
       expect(kps).toContain("..\\build\\my_keyboard.kvk");
     });
 
-    // spec 057: the descriptor declares exactly ONE language, so the scaffolder's
+    // spec 059: the descriptor declares exactly ONE language, so the scaffolder's
     // placeholder threads `base.languages[0]` rather than the whole list. Emitting
     // every base tag is what let a Bambara keyboard on a French base ship declaring
     // `fr` — and the base's language is a placeholder here in any case: the output

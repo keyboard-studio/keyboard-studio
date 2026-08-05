@@ -1,6 +1,6 @@
 # Success-criteria evidence: Identity in the package
 
-**Feature**: 057-identity-in-package · **Branch**: `057-identity-in-package` · **Recorded**: 2026-08-03
+**Feature**: 059-identity-in-package · **Branch**: `059-identity-in-package` · **Recorded**: 2026-08-03
 
 Task T044. One row per success criterion from [spec.md](spec.md), with the named
 evidence that satisfies it. A criterion is **met** only where the evidence is a test,

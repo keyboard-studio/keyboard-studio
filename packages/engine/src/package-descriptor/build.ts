@@ -1,6 +1,6 @@
 // build — construct a complete, buildable Keyman package descriptor (`.kps`).
 //
-// Moved here from the scaffolder's private `buildKpsContent` (spec 057 T002,
+// Moved here from the scaffolder's private `buildKpsContent` (spec 059 T002,
 // contracts/package-descriptor.md). The move is what makes FR-005 true: there is
 // exactly ONE writer of the descriptor's identity fields, and both authoring
 // tracks reach it. Before the move the scaffolder owned the only copy, the adapt

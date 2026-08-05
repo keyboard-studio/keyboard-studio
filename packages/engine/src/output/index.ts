@@ -21,6 +21,17 @@ export { addSidecar, isSidecarPath, STUDIO_METADATA_PREFIX } from "./sidecar.js"
 export { buildImportAttributionBlock } from "./import-attribution.js";
 export type { ImportAttributionInput } from "./import-attribution.js";
 export { bumpKeyboardVersion, stageAdaptHistory } from "./adapt-staging.js";
+// Installable package (.kmp) — the primary download. Values are exported as
+// async functions and types via `export type` only, so nothing here forces
+// eager evaluation of kmp.js and its lazy jszip/marked chunk stays out of the
+// studio's entry bundle.
+export { buildKmp, initKmpCompiler, isKmpCompilerReady } from "./kmp.js";
+export type { BuildKmpResult, BuildKmpOptions, KmpBuildArtifacts } from "./kmp.js";
+export { ensurePackageFiles } from "./ensurePackageFiles.js";
+export type {
+  EnsurePackageFilesInput,
+  EnsurePackageFilesResult,
+} from "./ensurePackageFiles.js";
 // Decision audit (specs/053-decision-audit). Re-exported here — rather than only
 // from the engine root — because the record's packaging half (the PR-body block
 // and the `.studio/` sidecar writer) belongs to this module's lifecycle, so the

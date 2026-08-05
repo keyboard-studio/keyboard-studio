@@ -55,11 +55,11 @@ export const fixtures: QuestionModule["fixtures"] = {
   ],
 };
 
-// Output reach (spec 057 FR-016): `writes` stays `[]` — this question writes no
+// Output reach (spec 059 FR-016): `writes` stays `[]` — this question writes no
 // KeyboardIR — while `outputs` states that the answer nevertheless reaches an
 // emitted artifact. Here it reaches none: the autonym is collected for the
 // display-name seed and for the author's own recognition of their language, not as
-// the descriptor's `<Language>` display text (spec 057 Assumptions). The explicit
+// the descriptor's `<Language>` display text (spec 059 Assumptions). The explicit
 // `[]` says so on the record rather than leaving the field absent.
 const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [], outputs: [] };
 export default mod;

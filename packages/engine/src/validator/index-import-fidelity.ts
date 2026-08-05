@@ -6,6 +6,10 @@
  *   runImportFidelityParseChecks  — runs immediately after parse(), before emit()
  *     I1: parse completeness
  *     I4: opaque feature inventory (informational)
+ *     0x05A: touch-layout key-id validity (spec 058 FR-040) — an imported
+ *            keyboard's existing ids. Author-typed ids are handled by edit-time
+ *            rejection instead, with no finding at all. Deliberately NOT a Layer C
+ *            check: see checkTouchLayoutIdentifiers' header.
  *
  *   runImportFidelityEmitChecks   — runs after emit(), with the emitted text in hand
  *     I2: round-trip stub (non-blocking)
@@ -25,6 +29,7 @@ import type { ParseResult } from "../codec/parse.js";
 import {
   checkParseCompleteness,
   checkOpaqueFeatureInventory,
+  checkTouchLayoutIdentifiers,
   checkRoundTrip,
   checkHeaderPreservation,
   checkOwnershipConsistency,
@@ -41,6 +46,7 @@ export function runImportFidelityParseChecks(
   return [
     ...checkParseCompleteness(parseResult, source),
     ...checkOpaqueFeatureInventory(parseResult),
+    ...checkTouchLayoutIdentifiers(parseResult),
   ];
 }
 
@@ -64,3 +70,10 @@ export async function runImportFidelityEmitChecks(
 
 // I5 is standalone — fires at output time.
 export { checkSidecarHash } from "./layer-a-prime.js";
+// Re-exported standalone so the studio can surface 0x05A on an imported layout
+// without running the whole parse-stage suite, and so its code is importable for
+// the routing test.
+export {
+  checkTouchLayoutIdentifiers,
+  TOUCH_LAYOUT_INVALID_IDENTIFIER_CODE,
+} from "./layer-a-prime.js";

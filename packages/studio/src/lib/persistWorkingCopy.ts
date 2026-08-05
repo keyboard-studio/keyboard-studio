@@ -30,6 +30,19 @@
 //   - Action functions from the Zustand factory: excluded automatically (not in
 //     the data fields enumerated here).
 //
+// NOT this module's concern — FR-033b re-derivation resilience: `keyEditOverlay`
+// itself round-trips here verbatim (tolerant-read fallback per T058, below), but
+// naming an orphaned operation's LOST CHARACTER (spec 058 FR-033b; contracts/
+// key-edit-overlay.md §8) needs the PRIOR touch layout the overlay was authored
+// against — a live, in-session value this snapshot does not retain (a snapshot's
+// `ir`/`baseIr`/`touchLayoutJson`/`keyEditOverlay` are always saved and restored
+// TOGETHER, so a restore never by itself produces a seed-A/seed-B mismatch; that
+// mismatch is a live event — the author navigates back, changes physical
+// assignments, and returns — owned by the touch step's own re-derivation memo,
+// not by snapshot/rehydrate). See `keyEditOrphanReport.ts`
+// (`buildKeyEditReDerivationReport` / `discardOrphanedKeyEdits`) for that
+// correlation; it is deliberately decoupled from this module.
+//
 // Reuse (spec 034 US3): `WorkingCopySnapshot`, `serializeEntry`/`deserializeEntry`,
 // and the `snapshotWorkingCopyData`/`applyWorkingCopySnapshot` builder/applier are
 // exported so the durable localStorage draft (../lib/draftPersistence.ts) builds
@@ -39,8 +52,9 @@
 import type { RemovalCapability, VirtualFS, VirtualFSEntry } from "@keyboard-studio/contracts";
 import { createVirtualFS, mergePhaseResults } from "@keyboard-studio/contracts";
 import { classifyRemovalCapabilities } from "@keyboard-studio/engine";
+import type { KeyEditOverlay } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import type { WorkingCopyData } from "../stores/workingCopyStore.ts";
+import type { WorkingCopyData, TouchEditorMode } from "../stores/workingCopyStore.ts";
 
 // ---------------------------------------------------------------------------
 // Key
@@ -94,12 +108,26 @@ export type WorkingCopySnapshot = Omit<
   | "staleSteps"
   | "removalCapabilities"
   | "session"
+  | "keyEditOverlay"
+  | "touchEditorMode"
 > & {
   baseVfsEntries: SerializedEntry[];
   deletedNodeIds: string[];
   deletedItemIds: string[];
   deletedTouchKeyIds: string[];
   staleSteps: string[];
+  /**
+   * Optional (spec 058 T058 / R10.3): a snapshot written before this field
+   * existed has no `keyEditOverlay` key at all. `prepareWorkingCopySnapshot`
+   * falls back to an empty log rather than clobbering the store default with
+   * `undefined` — same tolerant-read idiom as `deletedTouchKeyIds` above.
+   * `DRAFT_VERSION` deliberately does NOT bump for this addition (VR-1
+   * discards a version-mismatched draft rather than migrating it, so a bump
+   * would throw away every author's in-progress keyboard).
+   */
+  keyEditOverlay?: KeyEditOverlay;
+  /** Optional for the same reason as `keyEditOverlay` above — see its comment. */
+  touchEditorMode?: TouchEditorMode;
 };
 
 export function serializeEntry(entry: VirtualFSEntry): SerializedEntry {
@@ -203,6 +231,12 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     staleSteps: [...s.staleSteps],
     validatorFindings: s.validatorFindings,
     axisFills: s.axisFills,
+    // Both fields are plain JSON-safe data (spec 058 T058) — straight
+    // passthrough on write. The read side (prepareWorkingCopySnapshot, below)
+    // is the tolerant half: it falls back when a pre-058 snapshot has neither
+    // key at all (R10.3).
+    keyEditOverlay: s.keyEditOverlay,
+    touchEditorMode: s.touchEditorMode,
   };
 }
 
@@ -262,6 +296,11 @@ export function prepareWorkingCopySnapshot(snapshot: WorkingCopySnapshot): Parti
     staleSteps: new Set(snapshot.staleSteps),
     validatorFindings: snapshot.validatorFindings,
     axisFills: snapshot.axisFills,
+    // Tolerate snapshots saved before these fields existed (spec 058 T058 /
+    // R10.3): an absent value must not clobber the store defaults with
+    // undefined — same idiom as deletedTouchKeyIds/sequenceFlaggedChars above.
+    keyEditOverlay: snapshot.keyEditOverlay ?? { ops: [] },
+    touchEditorMode: snapshot.touchEditorMode ?? "character",
   };
 }
 

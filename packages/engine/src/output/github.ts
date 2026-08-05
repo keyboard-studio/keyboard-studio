@@ -59,8 +59,12 @@ const API_BASE = "https://api.github.com";
 const UPSTREAM_OWNER = "keyboard-studio";
 const UPSTREAM_REPO = "keyboards";
 
-// Compiled artifacts excluded from the PR commit (spec §12, criteria SS1)
-const COMPILED_EXT = new Set([".kmx", ".kvk", ".js"]);
+// Compiled artifacts excluded from the PR commit (spec §12, criteria SS1).
+// `.kmp` is the installable package: a build output, never a source file. The
+// download path builds it on a throwaway clone so it should never reach a VFS
+// the PR path reads, but a filter that depends on that being true elsewhere is
+// one refactor away from committing a binary package to the community repo.
+const COMPILED_EXT = new Set([".kmx", ".kvk", ".js", ".kmp"]);
 
 // ---------------------------------------------------------------------------
 // Helpers

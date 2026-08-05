@@ -23,7 +23,14 @@ import { emit } from "../codec/emit.js";
 import { detectBaseLayoutFamily } from "../placement/filters.js";
 import { scaffoldIR, sanitizeDisplayName, kmnStringEscape } from "./scaffold-ir.js";
 import { assetFileExtensions } from "../shared/siblingAssetStores.js";
-import { escapeHtml } from "../shared/escapeHtml.js";
+// The doc stubs (welcome/readme) own their own escaping now — see
+// ../shared/packageDocs.ts, which imports escapeHtml itself. The scaffolder no
+// longer references escapeHtml directly, so main's `escapeHtml` import is dropped
+// here as dead once the stubs move out.
+// No licenseMd here: Track 1's LICENSE.md comes from the accumulated copyright
+// block (attributionText -> renderLicense), because a derived keyboard must
+// RETAIN the base's holders rather than state a single one (spec 059 US2).
+import { welcomeHtm, readmeHtm } from "../shared/packageDocs.js";
 import {
   buildKpsContent,
   type PackageDescriptorIdentity,
@@ -279,7 +286,7 @@ function applyTouchLayoutCleanup(vfs: VirtualFS, keyboardId: string): void {
 
 // The scaffolder no longer owns a private `.kps` builder. `buildKpsContent`,
 // the `&TARGETS`->`.js` target table it reads, and the `<Languages>` shape all
-// live in `package-descriptor/` now (spec 057 FR-005) so the output projection
+// live in `package-descriptor/` now (spec 059 FR-005) so the output projection
 // can re-derive the descriptor from the AUTHOR's identity on both authoring
 // tracks. Behaviour here is unchanged: still generated last, still only when the
 // path is absent.
@@ -508,11 +515,14 @@ export function generateStubs(
     },
     {
       path: `source/welcome.htm`,
-      content: `<html><body><p>Welcome to ${escapeHtml(displayName)}</p></body></html>`,
+      // Shared with the adapt track's output-time stubs — see
+      // ../shared/packageDocs.ts. The descriptor lists both files, so both
+      // tracks must produce them or the .kmp build fails on a missing member.
+      content: welcomeHtm(displayName),
     },
     {
       path: `source/readme.htm`,
-      content: `<html><body><p>${escapeHtml(displayName)} keyboard</p></body></html>`,
+      content: readmeHtm(displayName),
     },
     {
       path: `source/help/${keyboardId}.php`,
@@ -520,10 +530,10 @@ export function generateStubs(
     },
     {
       path: `LICENSE.md`,
-      // spec 059 FR-004: previously `Copyright © ${yyyy} ${displayName}`, which
-      // named the KEYBOARD as its own rights holder. Now rendered from the shared
-      // copyright line; with no attribution the notice is omitted rather than
-      // invented, and the warning pushed in scaffold() surfaces that.
+      // spec 059 FR-004: previously `licenseMd(displayName, yyyy)`, which named
+      // the KEYBOARD as its own rights holder. Now rendered from the accumulated
+      // copyright block; with no attribution the notice is omitted rather than
+      // invented, and attributionMissing surfaces that.
       content: license,
     },
     {
@@ -554,7 +564,7 @@ export function generateStubs(
   //
   // The base's languages are what this stage knows — the author has not answered
   // the identity questions yet at scaffold time. The output projection's step 3.6
-  // replaces this block with the author's own tag before anything ships (spec 057
+  // replaces this block with the author's own tag before anything ships (spec 059
   // FR-001), so declaring the base's tags here is a placeholder, not the final
   // word. `languages[0]` because the descriptor declares exactly ONE language;
   // `undefined` (no base tag) degrades to the writer's `und` placeholder.

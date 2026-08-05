@@ -41,7 +41,7 @@ export interface DecisionTrailViewProps {
   /** Resolve one entry's impact. Called only when a row is expanded. */
   resolveImpact: (entry: DecisionEntry) => DecisionImpact | null;
   /**
-   * Async resolver, forwarded verbatim to each row (spec 057). Optional: absent, the
+   * Async resolver, forwarded verbatim to each row (spec 059). Optional: absent, the
    * rows use `resolveImpact` alone, which is how the fixture-driven renders and every
    * existing test drive this view.
    *

@@ -27,6 +27,7 @@ import { screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { render } from "./test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
 import { useSurveySessionStore, snapshotTraversal } from "./stores/surveySessionStore.ts";
+import { useStartOverStore } from "./stores/startOverStore.ts";
 import { consumePendingWelcomeLocation, jumpToLocation } from "./lib/jumpToLocation.ts";
 import { snapshotWorkingCopyData } from "./lib/persistWorkingCopy.ts";
 import type { OnInstantiateCallback, Stage } from "./hooks/useKeyboardArtifact.ts";
@@ -655,7 +656,7 @@ function advanceToB() {
  * via the marks step's S0 auto-skip (spec 046; marks-free test alphabet) and the
  * convenience step's own skip.
  *
- * ASYNC since spec 057. The convenience step deliberately holds its gate until
+ * ASYNC since spec 059. The convenience step deliberately holds its gate until
  * the CLDR/SLDR exemplar lookup settles, and `useCarveNeededSet` only settles
  * synchronously when there is NO language to look up. Track 1 now carries the
  * author's composed BCP47 tag into the working copy (FR-001) — which is the point
@@ -759,7 +760,7 @@ describe("SurveyView — B → carve transition", () => {
     fireEvent.click(screen.getByTestId("phaseB-complete"));
 
     // Async landing: the convenience step waits on the exemplar lookup now that
-    // Track 1 carries a language tag (spec 057) — see advanceToCarve.
+    // Track 1 carries a language tag (spec 059) — see advanceToCarve.
     expect(await screen.findByTestId("stage-carve")).toBeTruthy();
     expect(screen.queryByTestId("stage-B")).toBeNull();
   });
@@ -908,7 +909,7 @@ describe("SurveyView — carve → B back-navigation", () => {
 
     // The back-pop crosses the convenience step, which re-runs its exemplar
     // lookup on re-entry and stays transparent in the direction of travel — so
-    // the landing is async in both directions (spec 057; see advanceToCarve).
+    // the landing is async in both directions (spec 059; see advanceToCarve).
     expect(await screen.findByTestId("stage-B")).toBeTruthy();
     expect(screen.queryByTestId("stage-carve")).toBeNull();
     // Confirm it did NOT go to prefill (the old pre-#508 behavior).
@@ -1640,10 +1641,14 @@ describe("F6 wiring: promotePendingAutosave", () => {
     });
     expect(localStorage.getItem(draftKey(PENDING_PROJECT_KEY))).not.toBeNull();
 
-    // Start over: arm + confirm the corner reset control (real component,
-    // not mocked — visible on every survey step).
-    fireEvent.click(screen.getByTestId("survey-reset-arm"));
-    fireEvent.click(screen.getByTestId("survey-reset-yes"));
+    // Start over. The Reset control itself now lives in the NavBar (out of this
+    // SurveyView-only render), so fire the handler SurveyView publishes for it
+    // — which also proves the startOverStore bridge is live on mount.
+    const startOver = useStartOverStore.getState().handler;
+    expect(startOver).not.toBeNull();
+    act(() => {
+      startOver!();
+    });
 
     // handleStartOver's discardActiveDraft() removes the just-abandoned
     // pending record synchronously.

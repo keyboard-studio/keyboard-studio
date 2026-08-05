@@ -1,6 +1,6 @@
 # Feature Specification: Identity in the package — the author's language reaches the `.kps`, and the trail can show it
 
-**Feature Branch**: `057-identity-in-package`
+**Feature Branch**: `059-identity-in-package`
 
 **Created**: 2026-08-03
 

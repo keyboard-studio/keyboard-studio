@@ -275,8 +275,16 @@ export function parseKeySpec(spec: string): { tokens: ModifierToken[]; vkey: str
 // Touch layer id mapping
 // ---------------------------------------------------------------------------
 
-/** Per-token id fragment used to build a combo's touch layer id. */
-const TOUCH_ID_FRAGMENT: Partial<Record<ModifierToken, string>> = {
+/**
+ * Per-token id fragment used to build a combo's touch layer id.
+ *
+ * Exported so the layer-family decomposition can read the fragment vocabulary
+ * out of the one place that defines it rather than re-listing it. Note the map
+ * is deliberately NOT injective — both `ALT` and `LALT` render as `"alt"` — so
+ * no true inverse of {@link comboToTouchLayerId} exists; decomposition returns
+ * a CANONICAL token set, not a round-trip of the original combo.
+ */
+export const TOUCH_ID_FRAGMENT: Partial<Record<ModifierToken, string>> = {
   SHIFT: "shift",
   CTRL: "ctrl",
   RCTRL: "rightctrl",
@@ -322,8 +330,13 @@ const TOUCH_ID_FRAGMENT: Partial<Record<ModifierToken, string>> = {
  * {@link CANONICAL_ORDER}. Unattested in any real corpus fixture (see
  * TOUCH_ID_FRAGMENT's doc) but needed for stable ordering of a standalone
  * NCAPS-bearing combo mixed with other tokens (e.g. `["RALT","NCAPS"]`).
+ *
+ * Exported so the layer-family decomposition orders its canonical token set by
+ * lifting this order rather than re-deriving it. Re-deriving would put a second
+ * copy of the KMW bit-order convention in the tree, and the original bug in
+ * this module was exactly a second copy of an ordering convention going stale.
  */
-const TOUCH_LAYER_PRECEDENCE_ORDER: readonly ModifierToken[] = [
+export const TOUCH_LAYER_PRECEDENCE_ORDER: readonly ModifierToken[] = [
   "LCTRL",
   "RCTRL",
   "LALT",

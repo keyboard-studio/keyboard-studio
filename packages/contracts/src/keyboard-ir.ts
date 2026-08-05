@@ -115,6 +115,33 @@ export interface TouchKeyIR {
   output?: string;
   nextlayer?: string;
   /**
+   * Per-key modifier override from .keyman-touch-layout `layer` (spec 058
+   * FR-030). Names the modifier state this ONE key emits under, superseding the
+   * containing layer's id for that key alone — so a key sitting on the
+   * `default` layer can legitimately send its `shift` output.
+   *
+   * Load-bearing for two things beyond display: it is what disambiguates a real
+   * corpus layout carrying the same key id twice within one layer (the
+   * duplicate-id check's third exemption), and any "Sends:" display that reads
+   * the containing layer instead of this field is wrong for exactly the keys
+   * where the field exists.
+   *
+   * Populated from the same wire `layer` property as {@link layerAnnotation};
+   * they carry the same source string but serve different consumers. This
+   * `layer` is the authoritative, editable view the spec-058 key editor reads
+   * and writes; `layerAnnotation` is the read-only best-effort surface the
+   * engine's `layerClass`/mining consumers read (see its doc). The emitter
+   * round-trips this edited `layer` when present, falling back to
+   * `layerAnnotation` for keys the editor never touched.
+   */
+  layer?: string;
+  /**
+   * Longpress preselect from .keyman-touch-layout `default` (spec 058 FR-030).
+   * Meaningful only on a sub-key: marks which entry of the parent's `sk[]` menu
+   * is preselected when the longpress menu opens.
+   */
+  default?: boolean;
+  /**
    * Raw `.keyman-touch-layout` wire-format `layer` annotation carried on this
    * key/sub-entry (e.g. an `sk[]` longpress sub-key tagged `"layer": "rightalt"`
    * — see `release/g/ghana/source/ghana.keyman-touch-layout`). This is a
@@ -124,6 +151,9 @@ export interface TouchKeyIR {
    * layer-routing data; see `enumerateTouchMethodsForChar`'s `layerClass`
    * bucketing, which reads the OUTER layer id instead and keeps this
    * annotation only as a cheap, best-effort surface.
+   *
+   * Carries the same wire value as {@link layer}; that field is the editable
+   * authoritative view. See {@link layer} for how the two relate on emit.
    */
   layerAnnotation?: string;
   /** Sub-keys (longpress menu). */
@@ -133,7 +163,11 @@ export interface TouchKeyIR {
   /** Rapid successive taps cycling through characters. */
   multitap?: TouchKeyIR[];
   /**
-   * Key class from .keyman-touch-layout `sp` (0 letter, 1 special, 2 active-special, 8 spacer).
+   * Key class from .keyman-touch-layout `sp` (0 letter, 1 special, 2
+   * active-special, 8 deadkey, 9 blank, 10 spacer) — the upstream
+   * `TouchLayoutKeySp` enum, whose tail is `deadkey=8, blank=9, spacer=10`.
+   * (This comment previously said `8 spacer`, which is where the spacer-class
+   * predicate's `{8,10}` came from; the corrected set is `{9,10}`.)
    * The wire format encodes this as a JSON string (e.g. `"sp": "1"`); the IR normalizes it to a number.
    */
   sp?: number;

@@ -24,7 +24,12 @@
  */
 
 import type { TouchLayoutIR, TouchKeyIR, TouchPlacementEntry } from "@keyboard-studio/contracts";
-import { decodeUnicodeKeyId, isSpacerKeyClass, toUPlusNotation } from "@keyboard-studio/contracts";
+import {
+  decodeUnicodeKeyId,
+  isSpacerKeyClass,
+  isDeadkeyStyledKeyClass,
+  toUPlusNotation,
+} from "@keyboard-studio/contracts";
 import { isSingleCodepoint, isStandardKey } from "./filters.js";
 
 export type TouchLayerClass = "default" | "shift" | "other";
@@ -69,7 +74,12 @@ export function mineLongpressHosts(layout: TouchLayoutIR): TouchHostObservation[
       const layerClass = layerClassFor(layer.id);
       for (const row of layer.rows) {
         for (const key of row.keys) {
-          if (isSpacerKeyClass(key.sp)) continue;
+          // Skip non-interactive (sp:9/10) AND deadkey-styled (sp:8) hosts.
+          // spec 058 FR-012 split sp:8 out of `isSpacerKeyClass` (it counts for
+          // coverage because it is interactive), but a deadkey-styled key is
+          // still not a suggestable longpress mining host — so this call site
+          // excludes both classes explicitly.
+          if (isSpacerKeyClass(key.sp) || isDeadkeyStyledKeyClass(key.sp)) continue;
           if (!isStandardKey(key.id)) continue;
           for (const sub of key.sk ?? []) {
             const ch = producedChar(sub);

@@ -31,9 +31,18 @@ export function checkKeysPerRow(
 
     for (const layer of platform.layers) {
       layer.rows.forEach((row, rowIdx) => {
-        // Spacer keys (sp:8 spacer / sp:10 padding) occupy horizontal space but
-        // do not add to the interactive key count that drives crowding on small
-        // screens. Use the canonical predicate so sp:10 is not miscounted.
+        // Blank (sp:9) and spacer (sp:10) keys occupy horizontal space but do
+        // not add to the interactive key count that drives crowding on small
+        // screens. Use the canonical predicate rather than a local literal set.
+        //
+        // RECOUNT (spec 058 FR-012): the predicate's set was corrected from
+        // `{8, 10}` to `{9, 10}`, so this count moved in both directions —
+        // deadkey-styled (sp:8) keys are now COUNTED (they are interactive and
+        // genuinely contribute to crowding), and blank (sp:9) keys are now
+        // EXCLUDED. A row that only exceeded the maximum by way of its sp:9
+        // placeholders stops being reported; a row full of sp:8 deadkey-styled
+        // keys starts being reported. Both are the correct reading of the
+        // upstream enum.
         const keyCount = row.keys.filter((k) => !isSpacerKeyClass(k.sp)).length;
         if (keyCount > maxKeys) {
           findings.push({

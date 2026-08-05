@@ -1,5 +1,5 @@
 // counterfactualProjection — attribute a PRE-INSTANTIATION identity decision by
-// projecting the working copy twice and diffing (spec 057 FR-009…FR-014).
+// projecting the working copy twice and diffing (spec 059 FR-009…FR-014).
 //
 // THE PROBLEM THIS SOLVES
 //
@@ -60,7 +60,7 @@ export interface CounterfactualDeps {
  * The identity-overlay field an entry's question declares it reaches, or
  * `undefined` when it declares none.
  *
- * Read off `QuestionModule.outputs` — the declaration spec 057 added precisely so
+ * Read off `QuestionModule.outputs` — the declaration spec 059 added precisely so
  * that "this answer reaches an output artifact" is something code can ask instead
  * of something a maintainer knows (FR-016). A question declaring more than one
  * field is not something this feature produces; the first is taken, and the

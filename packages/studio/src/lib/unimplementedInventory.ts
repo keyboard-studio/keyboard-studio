@@ -16,7 +16,11 @@
 // implemented" imports one of the two functions below rather than re-deriving
 // coverage locally.
 
-import type { MechanismAssignment, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type {
+  MechanismAssignment,
+  SurveyPhaseResult,
+  TouchKeyRuleIndex,
+} from "@keyboard-studio/contracts";
 import { uncoveredTargets } from "@keyboard-studio/contracts";
 import { parseTouchLayout, touchCoverage } from "@keyboard-studio/engine";
 
@@ -108,6 +112,7 @@ interface TouchState {
 function computeTouchState(
   touchLayoutJson: string | null,
   inventory: readonly string[],
+  ruleIndex?: TouchKeyRuleIndex,
   desktopProducedSet?: ReadonlySet<string>,
 ): TouchState {
   if (touchLayoutJson === null || touchLayoutJson === "") {
@@ -116,7 +121,22 @@ function computeTouchState(
   try {
     const layout = parseTouchLayout(touchLayoutJson);
     return {
-      uncovered: [...touchCoverage(layout, inventory, desktopProducedSet).uncovered],
+      // Spec 058 FR-005/FR-007: with the rule index, a `T_*` key whose output
+      // lives in a `.kmn` rule is credited, so the gate stops blocking on
+      // characters the keyboard genuinely types. Absent the index, behaviour is
+      // unchanged — including still failing closed on a corrupted layout below,
+      // which the index does not and must not soften. `desktopProducedSet`
+      // (session-aware, main's shaped-bug fix) is additionally folded in as the
+      // composability seed so a touch character made typeable only by this
+      // session's desktop deadkey assignment is not misreported as blocking.
+      uncovered: [
+        ...touchCoverage(
+          layout,
+          inventory,
+          ruleIndex !== undefined ? { ruleIndex } : {},
+          desktopProducedSet,
+        ).uncovered,
+      ],
       corrupted: false,
     };
   } catch {
@@ -137,8 +157,9 @@ function computeTouchState(
 export function unimplementedTouchChars(
   touchLayoutJson: string | null,
   inventory: readonly string[],
+  ruleIndex?: TouchKeyRuleIndex,
 ): string[] {
-  return computeTouchState(touchLayoutJson, inventory).uncovered;
+  return computeTouchState(touchLayoutJson, inventory, ruleIndex).uncovered;
 }
 
 /**
@@ -152,6 +173,14 @@ export interface InventoryCoverageInputs {
   readonly lettersToAdd: readonly string[];
   readonly touchLayoutJson: string | null;
   readonly confirmedInventory: readonly string[];
+  /**
+   * From `buildTouchKeyRuleIndex(ir)` (spec 058 FR-007). Optional and additive:
+   * absent, the gate behaves exactly as it did before this feature, including
+   * failing closed on a corrupted layout. Present, a `T_*` key whose output lives
+   * in a `.kmn` rule is credited, so the gate stops blocking on characters the
+   * keyboard genuinely types.
+   */
+  readonly touchRuleIndex?: TouchKeyRuleIndex;
   /**
    * Session-aware desktop produced-glyph set (see `useInventoryDiff`'s
    * `producedSet` / `buildSessionProducedSet`) — folded into BOTH halves of
@@ -239,6 +268,7 @@ export function inventoryCoverageGate(inputs: InventoryCoverageInputs): Inventor
   const touchState = computeTouchState(
     inputs.touchLayoutJson,
     inputs.confirmedInventory,
+    inputs.touchRuleIndex,
     inputs.desktopProducedSet,
   );
   const blockedOnDesktop = unimplementedDesktop.length > 0;

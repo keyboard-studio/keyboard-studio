@@ -20,6 +20,12 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus, silEuroLatin } from "@keyboard-studio/contracts/fixtures";
 import type { Pattern } from "@keyboard-studio/contracts";
+// Type-only import — erased at compile time, so importing it here does not
+// force "@keyboard-studio/engine"'s vi.mock factory below to evaluate before
+// the hoisted spy consts it references are initialized (the same hazard the
+// module docstring's sibling test file, projectWorkingCopyVfs.test.ts, avoids
+// by reimplementing touchKeyAddress locally rather than importing it).
+import type { KeyEditOperation } from "@keyboard-studio/engine";
 
 // ---------------------------------------------------------------------------
 // Spies on the three projection functions
@@ -479,5 +485,186 @@ describe("useWorkingCopyTransform — assignment-warning when patternMap is null
     const { warnings } = result.current!(vfs, "basic_kbdus");
     expect(warnings.some((w) => w.includes("assignment projection skipped"))).toBe(true);
     expect(applyAssignmentsToVfsSpy).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// T053/T055 — liveLayoutOverride (spec 058): preview-identity coverage.
+//
+// R10.2 (contracts/key-edit-overlay.md §6.2) is exactly the class of gap
+// where the emitted artifact and the live preview disagree — one surface
+// carries a change, the other silently does not. Before T053/T054,
+// TouchGallery's own local `vfsTransform` never called projectWorkingCopyVfs
+// at all, so a committed key-edit overlay would have reached the OUTPUT path
+// (serializeWorkingCopy, which does call projectWorkingCopyVfs) but not the
+// PREVIEW path — a silent divergence. The tests below assert BOTH surfaces
+// independently (never collapsed into one `expect`), and separately guard
+// the memo-key mechanics T053 introduces to fix it.
+// ---------------------------------------------------------------------------
+
+/**
+ * Local re-implementation of the "<platform>:<layerId>:<keyId>" wire format
+ * `touchKeyAddress` builds. Not imported from "@keyboard-studio/engine" — a
+ * static value import of that module here would force the mocked engine's
+ * `vi.mock` factory (top of file) to evaluate during THIS file's own ESM
+ * link phase, before the hoisted spy `const`s it references are
+ * initialized. Same precedent as `projectWorkingCopyVfs.test.ts`'s own local
+ * reimplementation of this helper.
+ */
+function touchKeyAddress(platform: string, layerId: string, keyId: string): string {
+  return `${platform}:${layerId}:${keyId}`;
+}
+
+/**
+ * A minimal real `.kmn` with a rule bound to vkey `T_A` — used to prove the
+ * key-edit overlay's rule-half rewrite (`projectWorkingCopyVfs`'s step
+ * 1.7b, `applyKeyRenamesToRuleBindings`) reaches both the direct-call
+ * surface and this hook's own returned transform. No `.keyman-touch-layout`
+ * file is included — the rule-half rewrite operates purely on the `.kmn`
+ * text, and `applyKeyEditsToVfs` (the layout-half sibling, step 1.7) is a
+ * documented no-op when the touch layout file is absent, so omitting it
+ * keeps this fixture minimal without masking the assertion under test.
+ */
+const KEY_EDIT_KMN = `store(&VERSION) '10.0'
+store(&NAME) 'Test'
+store(&TARGETS) 'any'
+
+begin Unicode > use(main)
+
+group(main) using keys
++ [T_A] > 'a'
+`;
+
+function makeKeyEditVfs() {
+  return createVirtualFS([
+    { path: "source/basic_kbdus.kmn", content: KEY_EDIT_KMN, isBinary: false },
+  ]);
+}
+
+function seedBaseWithKeyEditKmn() {
+  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+    vfs: makeKeyEditVfs(),
+    ir: makeTestIR([]),
+  });
+}
+
+/** The one rename op both surfaces below are fed — T_A -> T_ALPHA. */
+const RENAME_OP: KeyEditOperation = {
+  seq: 1,
+  kind: "rename",
+  address: touchKeyAddress("phone", "default", "T_A"),
+  toId: "T_ALPHA",
+};
+
+describe("useWorkingCopyTransform — liveLayoutOverride: preview-identity (R10.2)", () => {
+  it("a rename op's rule rewrite lands in BOTH the emitted .kmn (direct projectWorkingCopyVfs call) and the preview's VFS (this hook's transform)", async () => {
+    const { projectWorkingCopyVfs } = await import("../lib/projectWorkingCopyVfs.ts");
+    const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
+
+    // Surface 1: "the emitted .kmn" — projectWorkingCopyVfs is the SAME pure
+    // helper serializeWorkingCopy (the download/output path) calls, invoked
+    // here directly with the overlay, independent of this hook entirely.
+    const emittedVfs = makeKeyEditVfs();
+    projectWorkingCopyVfs({
+      vfs: emittedVfs,
+      keyboardId: "basic_kbdus",
+      baseIr: makeTestIR([]),
+      deletedNodeIds: new Set(),
+      keyEditOps: [RENAME_OP],
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+    });
+    const emittedKmn = emittedVfs.get("source/basic_kbdus.kmn")?.content as string;
+    expect(emittedKmn).toContain("T_ALPHA");
+
+    // Surface 2: "the preview's VFS" — this hook's own returned transform,
+    // fed the SAME keyEditOps via liveLayoutOverride. Before T053/T054 this
+    // surface would have stayed at the untouched "T_A" (TouchGallery's old
+    // local transform never called projectWorkingCopyVfs at all).
+    seedBaseWithKeyEditKmn();
+    const { result } = renderHook(() =>
+      useWorkingCopyTransform({
+        liveLayoutOverride: { touchLayoutJson: null, keyEditOps: [RENAME_OP] },
+      }),
+    );
+    const previewVfs = makeKeyEditVfs();
+    result.current!(previewVfs, "basic_kbdus");
+    const previewKmn = previewVfs.get("source/basic_kbdus.kmn")?.content as string;
+    expect(previewKmn).toContain("T_ALPHA");
+  });
+});
+
+describe("useWorkingCopyTransform — liveLayoutOverride: memo-key refresh (T053)", () => {
+  it("returns a NEW transform reference when keyEditOps changes between renders, and the new transform actually reflects the new op", async () => {
+    const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
+    seedBaseWithKeyEditKmn();
+    const { result, rerender } = renderHook(
+      ({ ops }: { ops: readonly KeyEditOperation[] }) =>
+        useWorkingCopyTransform({
+          liveLayoutOverride: { touchLayoutJson: null, keyEditOps: ops },
+        }),
+      { initialProps: { ops: [] as readonly KeyEditOperation[] } },
+    );
+    const first = result.current;
+    expect(first).not.toBeNull();
+
+    rerender({ ops: [RENAME_OP] });
+    const second = result.current;
+    // Guards the exact bug T053 exists to prevent: if keyEditOps were folded
+    // into the memo key by REFERENCE (or omitted from the dep array
+    // entirely) rather than via the derived `keyEditOpsKey` string, this
+    // reference would never change and the assertion below would fail.
+    expect(second).not.toBe(first);
+
+    // Not just a reference bump for an unrelated reason — the NEW closure
+    // must actually carry the new op through to projectWorkingCopyVfs.
+    const vfs = makeKeyEditVfs();
+    second!(vfs, "basic_kbdus");
+    expect(vfs.get("source/basic_kbdus.kmn")?.content).toContain("T_ALPHA");
+  });
+
+  it("does NOT return a new transform reference for a semantically-identical (but reference-different) keyEditOps array", async () => {
+    const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
+    seedBaseWithKeyEditKmn();
+    const { result, rerender } = renderHook(
+      ({ ops }: { ops: readonly KeyEditOperation[] }) =>
+        useWorkingCopyTransform({
+          liveLayoutOverride: { touchLayoutJson: null, keyEditOps: ops },
+        }),
+      { initialProps: { ops: [RENAME_OP] as readonly KeyEditOperation[] } },
+    );
+    const first = result.current;
+    // A brand-new array (and a shallow-cloned op object inside it) — same
+    // content, different references throughout. The JSON-serialized
+    // keyEditOpsKey must recognize this as unchanged, exactly mirroring
+    // deletedKey/assignmentsKey's own reference-vs-value precedent.
+    rerender({ ops: [{ ...RENAME_OP }] });
+    expect(result.current).toBe(first);
+  });
+});
+
+describe("useWorkingCopyTransform — liveLayoutOverride does not bypass existing gates (T055)", () => {
+  it("still returns null when baseIr is null, even with a liveLayoutOverride supplied", async () => {
+    const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
+    // No seedBase() — baseIr stays null.
+    const { result } = renderHook(() =>
+      useWorkingCopyTransform({
+        liveLayoutOverride: { touchLayoutJson: null, keyEditOps: [RENAME_OP] },
+      }),
+    );
+    expect(result.current).toBeNull();
+  });
+
+  it("still returns null when previewedBaseId mismatches the store's base, even with a liveLayoutOverride supplied", async () => {
+    const { useWorkingCopyTransform } = await import("./useWorkingCopyTransform.ts");
+    seedBaseWithKeyEditKmn(); // instantiates basic_kbdus (base A)
+    const { result } = renderHook(() =>
+      useWorkingCopyTransform({
+        previewedBaseId: silEuroLatin.id, // a different candidate base
+        liveLayoutOverride: { touchLayoutJson: null, keyEditOps: [RENAME_OP] },
+      }),
+    );
+    expect(result.current).toBeNull();
   });
 });
