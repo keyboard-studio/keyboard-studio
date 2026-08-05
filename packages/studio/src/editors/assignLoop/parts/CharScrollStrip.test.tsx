@@ -236,6 +236,71 @@ describe("CharScrollStrip — producer-count badge", () => {
   });
 });
 
+describe("CharScrollStrip — 'mark for later review' blue flag (mechanism-gallery-progression follow-up)", () => {
+  it("renders no flag marker at all when markedSet is omitted", () => {
+    render(
+      <CharScrollStrip
+        chars={["a"]}
+        currentChar="a"
+        onSelectChar={vi.fn()}
+        assignments={[]}
+        modality="physical"
+      />,
+    );
+
+    expect(screen.queryByTestId("char-scroll-badge-marked-0061")).toBeNull();
+  });
+
+  it("renders no flag marker for a character NOT in markedSet", () => {
+    render(
+      <CharScrollStrip
+        chars={["a", "b"]}
+        currentChar="a"
+        onSelectChar={vi.fn()}
+        assignments={[]}
+        modality="physical"
+        markedSet={new Set(["b"])}
+      />,
+    );
+
+    expect(screen.queryByTestId("char-scroll-badge-marked-0061")).toBeNull();
+    expect(screen.getByTestId("char-scroll-badge-marked-0062")).toBeTruthy();
+  });
+
+  it("renders a decorative, BLUE (#6ea8fe) flag marker on a chip whose character is in markedSet, distinct from the badge's own good/bad palette", () => {
+    render(
+      <CharScrollStrip
+        chars={["a"]}
+        currentChar="a"
+        onSelectChar={vi.fn()}
+        assignments={[]}
+        modality="physical"
+        markedSet={new Set(["a"])}
+      />,
+    );
+
+    const flag = screen.getByTestId("char-scroll-badge-marked-0061");
+    expect(flag.getAttribute("aria-hidden")).toBe("true");
+    expect(flag.textContent).toBe("⚑");
+    expect(flag.style.color).toBe("rgb(110, 168, 254)"); // #6ea8fe — ACCENT, never the badge's amber/green/red palette
+  });
+
+  it("appends a 'marked for later review' clause to the chip's own accessible name — never the ONLY signal (docs/accessibility.md)", () => {
+    render(
+      <CharScrollStrip
+        chars={["a"]}
+        currentChar="a"
+        onSelectChar={vi.fn()}
+        assignments={[]}
+        modality="physical"
+        markedSet={new Set(["a"])}
+      />,
+    );
+
+    expectCurrentChar("a", { marked: true });
+  });
+});
+
 describe("CharScrollStrip — current-chip selection (aria-pressed + accessible name)", () => {
   // This strip is the sole replacement for the removed per-gallery character-
   // heading card (see the file-header comment above); MechanismGallery.test.tsx

@@ -37,7 +37,7 @@ import {
   restoredDraftSavedAt,
 } from "./lib/draftPersistence.ts";
 import { useGitHubAuth } from "./hooks/useGitHubAuth.ts";
-import { type RouteId } from "./lib/navigate.ts";
+import { navigateTo, type RouteId } from "./lib/navigate.ts";
 import { parseLocation } from "./lib/location.ts";
 import { liveResolveContext, setPendingWelcomeLocation } from "./lib/jumpToLocation.ts";
 import { readPaneSplitPct, useViewStateStore } from "./stores/viewStateStore.ts";
@@ -66,6 +66,7 @@ import "./lib/i18n.ts"; // side-effect: load + activate the default (en) catalog
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
 import { LocaleSwitcher } from "./components/LocaleSwitcher.tsx";
 import { ProfileScreen } from "./components/ProfileScreen.tsx";
+import { UnfinishedGalleryIndicator } from "./components/UnfinishedGalleryIndicator.tsx";
 import { AccountControl } from "./components/AccountControl.tsx";
 import { hasVisited } from "./lib/firstVisit.ts";
 import { manifest, validateManifestShape } from "./steps/manifest.ts";
@@ -107,6 +108,7 @@ import { CharacterMapPane } from "./survey/CharacterMapPane.tsx";
 import { useBasePreviewStatusStore, type BasePreviewStatus } from "./stores/basePreviewStatusStore.ts";
 import { useStartOverStore } from "./stores/startOverStore.ts";
 import { useInventoryCoverageGate } from "./hooks/useInventoryCoverageGate.ts";
+import { useAccountedForGate } from "./hooks/useAccountedForGate.ts";
 import { useSurveyBrowserHistorySync } from "./hooks/useSurveyBrowserHistorySync.ts";
 
 // Offer the resume banner only once per page load — on the first SurveyView
@@ -268,9 +270,29 @@ interface NavBarProps {
   outputBlocked?: boolean;
   /** Tooltip / aria explanation shown while outputBlocked is true. */
   outputBlockedTitle?: string;
+  /**
+   * Persistent self-serve "go finish unreviewed defaults" indicator (see
+   * components/UnfinishedGalleryIndicator.tsx) — computed once in
+   * StudioShell from `useAccountedForGate()`, which layers the author's
+   * per-surface "mark for later review" state on top of the same
+   * `useInventoryCoverageGate()` result that feeds `outputBlocked` above, so
+   * the two signals can never disagree about what is actually unimplemented.
+   * 0 hides the corresponding half of the indicator.
+   */
+  unfinishedDesktopCount: number;
+  unfinishedTouchCount: number;
+  /** Routes back to the named gallery and switches to the #survey route. */
+  onNavigateToUnfinishedGallery: (target: "mechanisms" | "touch") => void;
 }
 
-function NavBar({ active, outputBlocked = false, outputBlockedTitle }: NavBarProps) {
+function NavBar({
+  active,
+  outputBlocked = false,
+  outputBlockedTitle,
+  unfinishedDesktopCount,
+  unfinishedTouchCount,
+  onNavigateToUnfinishedGallery,
+}: NavBarProps) {
   const { i18n: activeI18n } = useLingui();
   const startOver = useStartOverStore((s) => s.handler);
   return (
@@ -322,12 +344,22 @@ function NavBar({ active, outputBlocked = false, outputBlockedTitle }: NavBarPro
         })}
       </div>
 
-      {/* Right group — locale switcher (all routes) + account control
-          (hidden on the welcome route) + survey reset in the far corner.
-          The reset is last so it can't crowd the controls beside it; it renders
-          only while a survey is mounted (startOverStore publishes the handler
-          from SurveyView, which exists on the #survey route alone). */}
+      {/* Right group — unfinished-gallery return indicator (hidden on
+          welcome, same as the account control below — nothing to return to
+          before a keyboard exists) + locale switcher (all routes) + account
+          control (hidden on the welcome route) + survey reset in the far
+          corner. The reset is last so it can't crowd the controls beside it;
+          it renders only while a survey is mounted (startOverStore publishes
+          the handler from SurveyView, which exists on the #survey route
+          alone). */}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+        {active !== "welcome" && (
+          <UnfinishedGalleryIndicator
+            desktopCount={unfinishedDesktopCount}
+            touchCount={unfinishedTouchCount}
+            onNavigate={onNavigateToUnfinishedGallery}
+          />
+        )}
         <LocaleSwitcher />
         {active !== "welcome" && <AccountControl />}
         {startOver !== null && <SurveyResetButton onReset={startOver} />}
@@ -1607,9 +1639,43 @@ export function StudioShell() {
   // still applies regardless of how #output was reached). This is purely so
   // the block is visible on the tab itself before the click. Same shared hook
   // (hooks/useInventoryCoverageGate.ts) as StepHost/PhaseFGate/OutputScreen —
-  // do not re-derive the desktop-always/touch-only-if-authored booleans here.
+  // do not re-derive the desktop-always/touch-only-if-applicable booleans
+  // here. IMPORTANT (mechanism-gallery-progression invariant): this is the
+  // IMPLEMENTED-ONLY gate — a mark-for-later-review character is still
+  // "unimplemented" here, on purpose, so a mark can never relax the export
+  // gate. Do not fold marks into `outputNavBlocked`.
   // ---------------------------------------------------------------------------
-  const outputNavBlocked = useInventoryCoverageGate().blocked;
+  const coverageGate = useInventoryCoverageGate();
+  const outputNavBlocked = coverageGate.blocked;
+
+  // The NavBar "still to account for" indicator (components/
+  // UnfinishedGalleryIndicator.tsx) is a SEPARATE, mark-aware view — built on
+  // useAccountedForGate() (hooks/useAccountedForGate.ts), which composes the
+  // SAME coverageGate above with the author's per-surface marks. A marked
+  // character no longer counts here even though it still counts (correctly)
+  // toward `outputNavBlocked`.
+  const accountedForGateResult = useAccountedForGate();
+  const unfinishedDesktopCount = accountedForGateResult.blockedOnDesktop
+    ? accountedForGateResult.unaccountedDesktop.length
+    : 0;
+  const unfinishedTouchCount = accountedForGateResult.blockedOnTouch
+    ? accountedForGateResult.unaccountedTouch.length
+    : 0;
+  const sessionBackToUnfinishedGallery = useSurveySessionStore((s) => s.backToUnfinishedGallery);
+  // A BACK action (backToUnfinishedGallery), not the forward-push `advance` —
+  // mirrors OutputScreen.tsx's handleGoToGallery / PhaseFGate.tsx's
+  // handleGoBack exactly (see backToUnfinishedGallery's own docstring for the
+  // P0 history-corruption regression a forward-push here would reproduce).
+  // Also switches routes to #survey — unlike those two call sites, this
+  // indicator is reachable from ANY route (Preview, Output, Decisions, Flow
+  // Map), not just from inside the survey wizard itself.
+  const handleNavigateToUnfinishedGallery = useCallback(
+    (target: "mechanisms" | "touch") => {
+      sessionBackToUnfinishedGallery(target);
+      navigateTo("survey");
+    },
+    [sessionBackToUnfinishedGallery],
+  );
 
   // ---------------------------------------------------------------------------
   // Per-tab view state (spec 057 US5, FR-050). Read HERE rather than in the
@@ -1801,6 +1867,9 @@ export function StudioShell() {
           id: "studio.nav.outputBlocked.title",
           message: "Finish every inventory character before you can access Output",
         })}
+        unfinishedDesktopCount={unfinishedDesktopCount}
+        unfinishedTouchCount={unfinishedTouchCount}
+        onNavigateToUnfinishedGallery={handleNavigateToUnfinishedGallery}
       />
       <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>{content}</div>
       {/* Spec 057 US4/US6 (T052, FR-040): the narrow journey footer. Mounted
