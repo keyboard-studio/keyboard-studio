@@ -34,6 +34,7 @@ import {
   usePhaseBDraftStore,
 } from "../stores/phaseBDraftStore.ts";
 import { DEFAULT_PHASE_B_FONT, isPhaseBFontValue } from "../survey/surveyStyles.ts";
+import { deriveProjectLabel } from "./projectLabel.ts";
 import {
   applyDecisionRecordSnapshot,
   snapshotDecisionRecord,
@@ -474,11 +475,17 @@ export function saveDraft(projectKey: string): void {
   // displayName: Track-1 scaffoldSpec (project_name step) first, then the
   // identity patch's displayName (Track 2 / post-Phase-A Track 1), then the
   // base keyboard's own display name as a last resort.
-  const displayName =
-    session.scaffoldSpec?.displayName ??
-    wc.identity?.displayName ??
-    wc.baseKeyboard?.displayName ??
-    null;
+  //
+  // Spec 057 FR-041: that order is now stated once, in lib/projectLabel.ts, so
+  // the footer is not a third derivation. This call is a pure substitution —
+  // deriveProjectLabel implements exactly the precedence that was inlined here
+  // (with the addition of a blank-string skip, which the `??` chain could not
+  // express).
+  const displayName = deriveProjectLabel({
+    scaffoldSpec: session.scaffoldSpec,
+    identity: wc.identity,
+    baseKeyboard: wc.baseKeyboard,
+  });
 
   // languageTag: identity-lite's computed BCP47 tag first (may be "" if the
   // step hasn't completed or the language subtag was left blank — normalize
@@ -929,14 +936,20 @@ export function flushActiveDraft(): void {
  * successful apply — pin it as the active project.
  *
  * Reuses `loadDraft` rather than re-implementing the parse/validate/apply
- * sequence: on main, unlike the dev reference implementation, there is no
- * resume-banner component deciding whether to apply a draft — SurveyView's
- * mount effect reads `wasDraftRestoredThisBoot()` to decide whether to reset
- * the session store, and `loadDraft` already sets that flag on success. So
- * a `MyKeyboardsList` "Resume" click that calls this, then navigates to
- * `#survey`, resumes into the SAME already-applied stores rather than racing
- * a fresh reset — see `MyKeyboardsList.tsx`'s handleResume for the other half
- * of this.
+ * sequence.
+ *
+ * Spec 057 (FR-005): this docstring used to explain that a "Resume" click
+ * worked *because* `loadDraft` sets the `wasDraftRestoredThisBoot()` flag that
+ * `SurveyView`'s mount effect read before deciding whether to reset the
+ * session store. That was an apology for a defect, not a design: resume was
+ * the one wizard entry point that happened to work, and it worked only by
+ * tripping the guard on someone else's reset. A navigation primitive that
+ * requires an unrelated durable-storage read to have happened first is not a
+ * primitive.
+ *
+ * The reset is gone (D-1), so nothing here depends on that flag any more.
+ * This function now does exactly what it says: load the project's draft into
+ * the stores, and pin it active if that succeeded.
  *
  * A corrupt/wrong-shaped draft fails the whole resume (returns false,
  * pointer left untouched) rather than silently pinning a project whose

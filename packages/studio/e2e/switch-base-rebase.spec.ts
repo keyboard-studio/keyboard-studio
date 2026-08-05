@@ -235,6 +235,18 @@ test.describe("F1 — switch-base rebase confirm", () => {
     expect(before.phaseResultsCount).toBeGreaterThan(0);
 
     dialogs.setAction("accept"); // should never be consulted
+
+    // Let the durable-draft autosave debounce (AUTOSAVE_DEBOUNCE_MS, ~500 ms in
+    // lib/draftPersistence.ts) flush before reloading — the same wait
+    // copy-edit.spec.ts's T028 makes, for the same reason. Without it this test
+    // reloads while the last store writes are still only in memory, so
+    // `loadDraft` restores the install-time save and the assertion below
+    // compares a live count against a stale one. That is the autosave contract
+    // working as designed, not the behaviour under test: "a refresh preserves
+    // the working copy" is only a meaningful claim about a working copy that
+    // has actually been written.
+    await page.waitForTimeout(2_000);
+
     await page.reload();
     await page.waitForTimeout(3_000);
 

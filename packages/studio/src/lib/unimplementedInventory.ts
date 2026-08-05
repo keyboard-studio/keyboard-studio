@@ -50,12 +50,27 @@ export function selectDesktopAssignments(
  * see useInventoryDiff; NOT the raw confirmedInventory, since a character the
  * base keyboard already produces needs no assignment) that resolve to zero
  * mechanisms in the physical modality.
+ *
+ * `sessionProducedSet` (optional, shaped-bug fix — diacritic-implementability):
+ * `lettersToAdd` itself stays STATIC (base-only — see useInventoryDiff.ts's
+ * module doc for why the WALK'S denominator must not react to session
+ * assignments), so a character that becomes typeable this session ONLY via
+ * composability (e.g. a precomposed "ӝ" once a different character's deadkey
+ * produces the combining-mark byproduct) would otherwise still be reported
+ * uncovered here even though the keyboard being built can already type it.
+ * When supplied (`useInventoryDiff`'s session-aware `producedSet`), a
+ * `lettersToAdd` entry present in it is excluded from the GATE'S result —
+ * this is a completion-GATE relaxation only; it never changes
+ * `lettersToAdd`'s own membership or the interactive walk.
  */
 export function unimplementedDesktopChars(
   assignments: readonly MechanismAssignment[],
   lettersToAdd: readonly string[],
+  sessionProducedSet?: ReadonlySet<string>,
 ): string[] {
-  return uncoveredTargets(assignments, lettersToAdd, "physical");
+  const uncovered = uncoveredTargets(assignments, lettersToAdd, "physical");
+  if (sessionProducedSet === undefined) return uncovered;
+  return uncovered.filter((c) => !sessionProducedSet.has(c.normalize("NFC")));
 }
 
 /**
@@ -98,6 +113,7 @@ function computeTouchState(
   touchLayoutJson: string | null,
   inventory: readonly string[],
   ruleIndex?: TouchKeyRuleIndex,
+  desktopProducedSet?: ReadonlySet<string>,
 ): TouchState {
   if (touchLayoutJson === null || touchLayoutJson === "") {
     return { uncovered: [], corrupted: false };
@@ -109,10 +125,17 @@ function computeTouchState(
       // lives in a `.kmn` rule is credited, so the gate stops blocking on
       // characters the keyboard genuinely types. Absent the index, behaviour is
       // unchanged — including still failing closed on a corrupted layout below,
-      // which the index does not and must not soften.
+      // which the index does not and must not soften. `desktopProducedSet`
+      // (session-aware, main's shaped-bug fix) is additionally folded in as the
+      // composability seed so a touch character made typeable only by this
+      // session's desktop deadkey assignment is not misreported as blocking.
       uncovered: [
-        ...touchCoverage(layout, inventory, ruleIndex !== undefined ? { ruleIndex } : {})
-          .uncovered,
+        ...touchCoverage(
+          layout,
+          inventory,
+          ruleIndex !== undefined ? { ruleIndex } : {},
+          desktopProducedSet,
+        ).uncovered,
       ],
       corrupted: false,
     };
@@ -158,6 +181,22 @@ export interface InventoryCoverageInputs {
    * keyboard genuinely types.
    */
   readonly touchRuleIndex?: TouchKeyRuleIndex;
+  /**
+   * Session-aware desktop produced-glyph set (see `useInventoryDiff`'s
+   * `producedSet` / `buildSessionProducedSet`) — folded into BOTH halves of
+   * the gate (shaped-bug fix, diacritic-implementability): the desktop check
+   * (via `unimplementedDesktopChars`) so a `lettersToAdd` entry composable
+   * only via a DIFFERENT character's session assignment doesn't keep nagging
+   * once it's genuinely typeable, and the touch composability check (via
+   * `computeTouchState`) so a touch character composable only because its
+   * combining-mark component was assigned a desktop deadkey THIS session is
+   * not misreported as blocking the touch gate either. GATE-ONLY: this never
+   * feeds `lettersToAdd`'s own membership or either gallery's interactive
+   * walk — see useInventoryDiff.ts's module doc for why those must stay
+   * static. Optional so existing callers that have not yet threaded it keep
+   * the prior (base-keyboard-only) behavior rather than a type error.
+   */
+  readonly desktopProducedSet?: ReadonlySet<string>;
 }
 
 /**
@@ -224,11 +263,13 @@ export function inventoryCoverageGate(inputs: InventoryCoverageInputs): Inventor
   const unimplementedDesktop = unimplementedDesktopChars(
     inputs.desktopAssignments,
     inputs.lettersToAdd,
+    inputs.desktopProducedSet,
   );
   const touchState = computeTouchState(
     inputs.touchLayoutJson,
     inputs.confirmedInventory,
     inputs.touchRuleIndex,
+    inputs.desktopProducedSet,
   );
   const blockedOnDesktop = unimplementedDesktop.length > 0;
   // Corrupted always blocks (fail closed) once a layout was actually

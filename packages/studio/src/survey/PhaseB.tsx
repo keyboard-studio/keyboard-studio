@@ -42,7 +42,7 @@ import {
   upperCounterpartOf,
 } from "./charNormUtils.ts";
 import { codepointLabel } from "./codepointLabel.ts";
-import { collate, codePointCompare } from "./collation.ts";
+import { collate, codePointCompare, collateInventory } from "./collation.ts";
 import { glyphCategory, isCombiningMarkChar, caseCounterpart } from "@keyboard-studio/engine";
 import { displayChar, prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import { suggestMissingChars, charactersInTier } from "../lib/services.ts";
@@ -287,6 +287,14 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
   // letter+mark combos by default ICU collation (matching the breakdown
   // sections); bare combining marks by raw Unicode code-point order (a diacritic
   // has no meaningful dictionary position), listed after the letters.
+  // NOT migrated to collateInventory: unlike collateInventory's single
+  // concatenated return, this site needs `bareMarks` and `letters` (via
+  // `displayLetters` below) as two SEPARATE arrays — each is rendered by its
+  // own `.map()` with different per-chip logic (letters get the uppercase-
+  // toggle companion chip; bare marks don't), and `unitCount` below sums
+  // their lengths independently. `displayLetters` also runs `letters`
+  // through `lowercaseBaseView` between the partition and the collate,
+  // which collateInventory has no hook for.
   const linguisticChars = chars.filter(isLinguisticChar);
   const bareMarks = linguisticChars.filter(isCombiningMarkChar).sort(codePointCompare);
   const letters = linguisticChars.filter((c) => !isCombiningMarkChar(c));
@@ -852,6 +860,10 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
   // letter; a present uppercase is hidden behind its lowercase (never the
   // reverse) and revealed only under the toggle.
   // Single source of truth with the marks step (spec 049, FR-006).
+  // NOT migrated to collateInventory: `bases` is its own pre-partitioned
+  // store category (marks live separately in `marks` below, rendered in
+  // their own section) — there is no letters/bare-mark mix here to
+  // partition, so a bare `collate()` is already the right call.
   const displayBases = collate(lowercaseBaseView(bases, bcp47));
 
   const uppercaseToggle = (
@@ -882,6 +894,11 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
           }),
           uppercaseToggle,
         )}
+      {/* NOT migrated to collateInventory: `marks` is rendered in its OWN
+          section, entirely separate from Letters — the exact "different
+          reason" the audit calls out (marks-only display, not a combined
+          letters+marks walk), so there is nothing here for collateInventory
+          to partition. */}
       {marks.length > 0 &&
         section(
           "alphabet-marks",
@@ -890,6 +907,9 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
           // Bare diacritics: raw code-point order, not ICU (spec 047 refinement).
           [...marks].sort(codePointCompare).map((m) => chip(m, prefixCombiningMark(m, true), justAddedMarks.has(m))),
         )}
+      {/* NOT migrated: `attestedStacks` is already-composed accented letters
+          (base+mark fused into one grapheme by composeStack) — no bare marks
+          are ever present to partition out, so collate() alone is correct. */}
       {attestedStacks.length > 0 &&
         section(
           "alphabet-accented",
@@ -899,6 +919,12 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
             chip(composed, composed, justAddedStack === composed),
           ),
         )}
+      {/* NOT migrated (numbers/punctuation/symbols below, and separators/
+          controls further down): each is its own pre-partitioned,
+          non-letter, non-mark store category rendered in its own section —
+          none can contain a bare combining mark, so there is no
+          letters-then-marks split to make and a bare collate() is already
+          correct. */}
       {numbers.length > 0 &&
         section(
           "alphabet-numbers",
@@ -1525,10 +1551,12 @@ function ExemplarOfferDetail({ inventory }: { inventory: SourcedInventory }) {
   // ICU collation, matching the "Your alphabet" list and the breakdown
   // sections: letters (and letter+mark combos) by default ICU order; bare
   // combining marks have no meaningful dictionary position, so they sort by
-  // raw code point and trail the letters (spec 047 refinement).
-  const bareMarks = main.filter(isCombiningMarkChar).sort(codePointCompare);
-  const letters = collate(main.filter((c) => !isCombiningMarkChar(c)));
-  const ordered = [...letters, ...bareMarks];
+  // raw code point and trail the letters (spec 047 refinement). `main` is a
+  // single mixed list rendered as ONE ordered sequence (not split across
+  // sections), which is exactly collateInventory's contract — migrated here
+  // (spec 047 refinement / duplication cleanup) instead of hand-rolling the
+  // same partition-then-sort.
+  const ordered = collateInventory(main);
 
   return (
     <div

@@ -43,8 +43,10 @@ interface RawKey {
   nextlayer?: string;
   hint?: string;
   /**
-   * Per-key modifier override (spec 058 FR-030). A standard
-   * `.keyman-touch-layout` property that this parser previously dropped.
+   * The wire `layer` property. A standard `.keyman-touch-layout` field this
+   * parser previously dropped; now read into both `TouchKeyIR.layer` (the
+   * authoritative per-key modifier override, spec 058 FR-030) and
+   * `TouchKeyIR.layerAnnotation` (the engine's free-text best-effort surface).
    */
   layer?: string;
   /**
@@ -183,6 +185,7 @@ function convertKey(raw: RawKey, nextId: () => string): TouchKeyIR {
   if (raw.text !== undefined) key.text = raw.text;
   if (raw.output !== undefined) key.output = raw.output;
   if (raw.nextlayer !== undefined) key.nextlayer = raw.nextlayer;
+  if (typeof raw.layer === "string" && raw.layer.length > 0) key.layerAnnotation = raw.layer;
   // An empty-string hint is treated as absent (not carried onto the IR): it
   // renders nothing at runtime, so `""` and unset are indistinguishable in
   // behaviour. Unifies onto the engine parser's prior form (the old lint parser

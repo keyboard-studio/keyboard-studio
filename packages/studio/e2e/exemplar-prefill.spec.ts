@@ -63,12 +63,14 @@ test.describe("Phase B exemplar prefill", () => {
     const detail = page.getByTestId("exemplar-offer-detail");
     await expect(detail).toBeVisible();
     await expect(detail).toContainText("CLDR");
-    // The preview elides after a couple of dozen characters, so assert on
-    // Ewondo-distinctive letters that fall INSIDE it, plus the elision marker.
+    // The preview shows the whole main-tier set as cards, never truncated
+    // (commit 6ef18ae0, "show full exemplar character list as cards, never
+    // truncated" — an author cannot confirm an alphabet they cannot see).
+    // Assert on Ewondo-distinctive letters; there is no "+N more" elision to
+    // check for.
     const preview = page.getByTestId("exemplar-offer-preview");
     await expect(preview).toContainText("ə");
     await expect(preview).toContainText("ɛ");
-    await expect(preview).toContainText("more");
 
     // Action 1: Continue.
     await page.click('[data-testid="phase-b-intro-next"]');

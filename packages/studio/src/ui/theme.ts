@@ -137,6 +137,16 @@ export const CHIP_GLYPH_ACCENT = "#58a6ff";
 export const ERROR_RED = "#f85149";
 
 /**
+ * Error-state dark background — paired with `ERROR_RED`'s border/text in the
+ * assign-loop galleries' RED (0-count) badge chip and suggestion-row
+ * treatments (CharScrollStrip's bad-badge background, MechanismGallery's and
+ * TouchGallery's suggestion-row background). No canonical counterpart;
+ * preserved exactly — named here so the three call sites share one constant
+ * instead of repeating the literal.
+ */
+export const ERROR_BG = "#2a0a0a";
+
+/**
  * Checked survey-chip background (SuggestionChip, ticked state). No canonical
  * counterpart; preserved exactly.
  */

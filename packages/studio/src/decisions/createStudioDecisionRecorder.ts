@@ -35,6 +35,7 @@ import type {
   SurveyPhaseResult,
 } from "@keyboard-studio/contracts";
 import { selectDesktopAssignments } from "../lib/unimplementedInventory.ts";
+import { deriveProjectKeyFromWorkingCopy } from "../lib/draftPersistence.ts";
 import { createDecisionRecorder } from "./createDecisionRecorder.ts";
 import type { InstantiatedMode } from "./recordBaseContribution.ts";
 import type { SourceSnapshotter } from "./snapshotSource.ts";
@@ -97,13 +98,14 @@ export function createStudioDecisionRecorder(
     getBaseIr: () => getWorkingCopyState().baseIr,
     getDeletedNodeIds: () => getWorkingCopyState().deletedNodeIds,
     getDeletedItemIds: () => getWorkingCopyState().deletedItemIds,
-    // The keyboard's own id once the author has set one, else the base's —
-    // matching how `deriveProjectKeyFromWorkingCopy` keys a project, so the
-    // record and the draft agree on which keyboard this is.
-    getKeyboardId: () => {
-      const wc = getWorkingCopyState();
-      return wc.identity?.keyboardId ?? wc.baseKeyboard?.id ?? null;
-    },
+    // The keyboard's own id once the author has set one, else the base's. This
+    // CALLS the project-key derivation rather than restating it: the comment
+    // here used to claim it was "matching how deriveProjectKeyFromWorkingCopy
+    // keys a project" while independently recomputing the same expression, so
+    // "the record and the draft agree on which keyboard this is" held only by
+    // prose. Nothing would have caught a change to one and not the other — the
+    // shape of the aria-label/filename divergence this spec fixes.
+    getKeyboardId: () => deriveProjectKeyFromWorkingCopy(getWorkingCopyState()),
     // specs/055 FR-030..FR-035 (research D-11): the base baseline, read
     // straight off the instantiated store — never a re-read of the base's
     // source. `null` before instantiation; `recordBaseContribution` (called

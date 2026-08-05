@@ -244,6 +244,41 @@ function isAllPrintableAscii(items: StoreItem[], i: number, len: number): boolea
   return true;
 }
 
+/**
+ * How many `X .. Y` range tokens re-collapse WOULD produce for this store —
+ * the same maximal-ascending-run walk emitStoreItems performs, counted ahead
+ * of time so the whole store can opt out (see KMCMPLIB_STORE_RANGE_BUDGET).
+ */
+function countProspectiveRanges(items: StoreItem[]): number {
+  let count = 0;
+  for (let i = 0; i < items.length; ) {
+    const runLen = ascendingRunLength(items, i);
+    if (runLen >= 3 && !isAllPrintableAscii(items, i, runLen)) {
+      count++;
+      i += runLen;
+    } else {
+      i++;
+    }
+  }
+  return count;
+}
+
+/**
+ * kmcmplib (19.0.240-alpha) crashes with a wasm memory-access-out-of-bounds
+ * (in `u16icmp` under `GetXStringImpl`) compiling a keyboard whose store
+ * declaration carries 8 or more `X .. Y` ranges on one line, when the file
+ * also uses option-store statements (`reset(...)`) — empirically bisected
+ * against bj_cree_woods, whose Eastern-Finals store re-collapses to 12
+ * ranges: 7 ranges compile, 8 crash, per-store not per-file. The crash
+ * poisons the cached wasm instance, so every later compile in the session
+ * fails too. Until the upstream fix lands, cap re-collapse at 7 ranges per
+ * store: a store that would exceed the budget is emitted fully explicit
+ * (codepoints/strings always compile). Same trade as the dk() suppression
+ * below — FR-008's compaction is a legibility nicety, never worth an
+ * uncompilable artifact.
+ */
+const KMCMPLIB_STORE_RANGE_BUDGET = 7;
+
 function emitStoreItems(items: StoreItem[]): string {
   const parts: string[] = [];
   let buf = "";
@@ -257,7 +292,13 @@ function emitStoreItems(items: StoreItem[]): string {
   // sil_cameroon_azerty: `U+0300 U+0301 U+0302 U+0303 ... dk(003d)`), so a Track-1
   // copy of that keyboard failed to compile. Range re-collapse is a pure
   // legibility nicety, so dropping it for these stores costs nothing semantically.
+  //
+  // It is also suppressed when it would produce more than
+  // KMCMPLIB_STORE_RANGE_BUDGET ranges in this one store — see that constant's
+  // comment for the compiler crash this avoids.
   const hasDeadkey = items.some((it) => it.kind === "deadkey");
+  const suppressRanges =
+    hasDeadkey || countProspectiveRanges(items) > KMCMPLIB_STORE_RANGE_BUDGET;
 
   const flushBuf = (): void => {
     if (buf === "") return;
@@ -282,7 +323,7 @@ function emitStoreItems(items: StoreItem[]): string {
     // `first .. last` (spec 042, FR-008). All-printable-ASCII runs are left for
     // the string path (a quoted word reads better than a codepoint range).
     const runLen = ascendingRunLength(items, i);
-    if (runLen >= 3 && !isAllPrintableAscii(items, i, runLen) && !hasDeadkey) {
+    if (runLen >= 3 && !isAllPrintableAscii(items, i, runLen) && !suppressRanges) {
       flushBuf();
       const first = items[i];
       const last = items[i + runLen - 1];

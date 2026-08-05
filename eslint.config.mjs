@@ -142,7 +142,7 @@ export default [
             "\\d", // contains a digit (css sizes, versions) — pragmatic noise cut
             "->", // example key-mappings ("a -> A")
             "system-ui|-apple-system|monospace|sans-serif|Segoe|Roboto|Consolas|Cascadia|Playfair", // font stacks
-            "^(GitHub|Google)$", // brand names — never translated
+            "^(GitHub|Google|Keyboard Studio)$", // brand / product names — never translated
           ],
           ignoreNames: [
             { regex: { pattern: "className", flags: "i" } },

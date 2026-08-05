@@ -7,6 +7,8 @@ export type { SubstituteResult } from "./substitute.js";
 export { applyAssignments, resolveRenderableMechanisms } from "./applyAssignments.js";
 export type { ApplyAssignmentsResult } from "./applyAssignments.js";
 
+export { buildSessionProducedSet } from "./sessionProducedSet.js";
+
 export { applyAssignmentsToVfs } from "./applyAssignmentsToVfs.js";
 
 export { applyCarveToVfs } from "./applyCarveToVfs.js";

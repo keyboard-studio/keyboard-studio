@@ -28,9 +28,16 @@ import { describe, it, expect, afterEach, vi, beforeEach, beforeAll } from "vite
 import { screen, fireEvent, act, cleanup, waitFor, within, renderHook } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { render } from "../../test/renderWithI18n.tsx";
-import { MechanismGallery, PATTERN_SEQUENCE, PATTERN_DEADKEY } from "./MechanismGallery.tsx";
+import {
+  MechanismGallery,
+  PATTERN_SEQUENCE,
+  PATTERN_DEADKEY,
+  PATTERN_SWAP,
+} from "./MechanismGallery.tsx";
 import { usePositionalCharNav } from "./usePositionalCharNav.ts";
 import { useWorkingCopyStore, bindManifest } from "../../stores/workingCopyStore.ts";
+import { useStepWalkStore } from "../../stores/stepWalkStore.ts";
+import { charToPositionToken } from "../../lib/stepWalk.ts";
 import {
   MECHANISMS_STEP_ID,
   TOUCH_STEP_ID,
@@ -38,8 +45,8 @@ import {
   type ReducerDeps,
 } from "../../steps/reducer.ts";
 import type { EditorStep, Step } from "../../steps/types.ts";
-import type { PatternLibraryService, VirtualFS } from "@keyboard-studio/contracts";
-import { createVirtualFS, irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
+import type { Pattern, PatternLibraryService, VirtualFS } from "@keyboard-studio/contracts";
+import { createVirtualFS, irPath, ARRAY_INDEX, makePlacementMap } from "@keyboard-studio/contracts";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { latinDeadkeyAcuteSingle } from "@keyboard-studio/contracts/fixtures";
 import { corpusBackedQwerty } from "@keyboard-studio/contracts/fixtures";
@@ -109,8 +116,24 @@ const mockSvc: PatternLibraryService = {
   },
 };
 
+// Synchronous counterpart of mockSvc.getById (same three well-known ids) —
+// needed by useInventoryDiff's buildSessionProducedSet call, which resolves
+// patterns synchronously inside a useMemo, not via the async service.
+function mockGetPatternByIdSync(id: string): Pattern | undefined {
+  if (id === latinDeadkeyAcuteSingle.id) return latinDeadkeyAcuteSingle;
+  if (id === PATTERN_SEQUENCE || id === PATTERN_DEADKEY) {
+    return {
+      ...latinDeadkeyAcuteSingle,
+      id,
+      title: id === PATTERN_SEQUENCE ? "Multi-char sequence" : "Deadkey single tap",
+    };
+  }
+  return undefined;
+}
+
 vi.mock("../../lib/services.ts", () => ({
   getPatternLibraryService: () => mockSvc,
+  getPatternByIdSync: mockGetPatternByIdSync,
   USE_REAL: false,
 }));
 
@@ -450,6 +473,66 @@ describe("MechanismGallery — sequence method chooser", () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
     expect(screen.getByLabelText(/Physical key for Assign to a key/i)).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Abugida-safe gate on the deadkey auto-default (km-domain ruling) — a
+// consonant+virama sequence (e.g. Devanagari "क" + U+094D) still matches
+// isDecomposableAccented (virama is Mn, General_Category-universal), so the
+// predicate alone can't exclude it; the gallery additionally gates on
+// axes.scriptClass !== "abugida".
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — abugida script-class gate on the deadkey default", () => {
+  // Devanagari "क" (U+0915) + virama (U+094D) — predicate-matching (Mn mark),
+  // but a script-specific abugida mechanism, not a Latin-style accent+base.
+  const CONSONANT_VIRAMA = "क्";
+
+  it("does NOT auto-default to the deadkey method when scriptClass is abugida", async () => {
+    useWorkingCopyStore.getState().setIrAxes({ scriptClass: "abugida" });
+    seedInventory([CONSONANT_VIRAMA]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    expect(screen.queryByLabelText(/Trigger key for deadkey/i)).toBeNull();
+    expect(screen.getByLabelText(/Physical key for Assign to a key/i)).toBeTruthy();
+  });
+
+  it("still auto-defaults to the deadkey method when scriptClass is alphabetic", async () => {
+    useWorkingCopyStore.getState().setIrAxes({ scriptClass: "alphabetic" });
+    seedInventory([CONSONANT_VIRAMA]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    expect(screen.getByLabelText(/Trigger key for deadkey/i)).toBeTruthy();
+  });
+
+  it("still auto-defaults to the deadkey method when scriptClass is undefined (fail-open)", async () => {
+    seedInventory([CONSONANT_VIRAMA]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    expect(screen.getByLabelText(/Trigger key for deadkey/i)).toBeTruthy();
+  });
+
+  // Regression pin (km-domain note): the gate above is abugida-ONLY — an
+  // abjad script (Hebrew/Arabic) must NOT be suppressed, and that "NOT
+  // gated" half of the ruling was previously enforced only by code
+  // omission (no scriptClass === "abjad" branch), with no test proving it.
+  // Hebrew בּ (U+FB31, BET WITH DAGESH) NFD-decomposes to ב (U+05D1, letter)
+  // + U+05BC (dagesh, General_Category Mn) — verified via NFD in this repo's
+  // Node runtime — so isDecomposableAccented(BET_DAGESH) is true, same as
+  // the Latin "á" case, and the deadkey default should fire unmodified.
+  const BET_DAGESH = "\u{FB31}";
+
+  it("still auto-defaults to the deadkey method for a decomposable abjad char (Hebrew, scriptClass 'abjad' is NOT gated)", async () => {
+    useWorkingCopyStore.getState().setIrAxes({ scriptClass: "abjad" });
+    seedInventory([BET_DAGESH]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    expect(screen.getByLabelText(/Trigger key for deadkey/i)).toBeTruthy();
   });
 });
 
@@ -1855,6 +1938,284 @@ describe("MechanismGallery — character-scroll-strip producer badge (integratio
       expect(badgeAfter.style.color).toBe("rgb(86, 211, 100)"); // #56d364 — badge-good color
     });
   });
+
+  // Regression pin for the reported gap: the badge must reflect SESSION-
+  // AWARE composability (useInventoryDiff's `producedSet`, augmented via
+  // augmentWithComposable), not just the static base-only diff. Mirrors the
+  // deadkey-byproduct fixture shape proven in
+  // packages/studio/src/hooks/useInventoryDiff.test.ts's "session-aware
+  // composability (symptom-2 fix)" suite and
+  // packages/engine/src/pattern-apply/sessionProducedSet.test.ts, adapted to
+  // the exact user-reported scenario: ezh U+0292 "ʒ" (this assignment's own
+  // accented-form output) and combining caron U+030C "̌" (this SAME deadkey's
+  // double-tap byproduct — never this assignment's own `target`) are each
+  // produced by ONE session assignment, and the precomposed ezh-with-caron
+  // "ǯ" U+01EF (whose canonical NFD is exactly ʒ + U+030C) has NO assignment
+  // of its own — neither is in the base .kmn.
+  //
+  // A single assignment (rather than sessionProducedSet.test.ts's two-
+  // assignment byproduct fixture) is deliberate here: this file's mocked
+  // `getPatternByIdSync` (see the mock near the top of this file) resolves
+  // PATTERN_DEADKEY to the `latinDeadkeyAcuteSingle` fixture, whose
+  // kmnFragment hardcodes a single fixed deadkey-state name ("accent") with
+  // no `{{deadkeyName}}` placeholder — unlike the real `deadkey_single_tap`
+  // content pattern, two instances of it would collide on the same
+  // `group(deadkeys)`/`deadkey(accent)` name. One assignment's own
+  // baseLetters/accentedForms/accentChar list is enough to exercise the
+  // byproduct path without that collision.
+  it("a precomposed char composable from THIS SESSION's own assignments (ǯ from a session-produced ezh + that SAME deadkey's session-produced bare caron byproduct, neither in the base) shows a GREEN 1 badge — not a stale RED 0 — while staying in the walk", async () => {
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([mainGroup()]) });
+
+    // The base produces none of ʒ/̌/ǯ — every one of these is session-
+    // introduced (or, for ǯ, only reachable by composing two that are).
+    seedInventory(["ʒ", "̌", "ǯ"]);
+
+    // One real deadkey assignment: its own accented-form output is "ʒ"
+    // (base letter "z" + trigger), and its double-tap byproduct — the SAME
+    // deadkey's `accentChar` — is the bare combining caron U+030C, never
+    // this (or any) assignment's own `target`.
+    const producesEzhAndCaronByproduct: MechanismAssignment = {
+      scope: "individual",
+      target: "ʒ",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: PATTERN_DEADKEY,
+          strategyId: "S-02",
+          slotValues: {
+            triggerKey: "K_QUOTE",
+            baseLetters: "z",
+            accentedForms: "ʒ",
+            accentChar: "̌", // U+030C combining caron — this deadkey's double-tap byproduct
+          },
+        },
+      ],
+      source: "user",
+    };
+
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "C",
+      answers: [],
+      assignments: [producesEzhAndCaronByproduct],
+    });
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    const strip = screen.getByTestId("char-scroll-strip");
+
+    // The bug: ǯ has no assignment of its own, so before this fix its badge
+    // read straight from the STATIC base-only diff and stayed red 0 even
+    // though ʒ + ̌ were both produced this session. After the fix it reads
+    // from the session-aware, composable-augmented set and is green 1.
+    const ezhCaronBadge = within(strip).getByTestId("char-scroll-badge-01EF");
+    expect(ezhCaronBadge.textContent).toBe("1");
+    expect(ezhCaronBadge.style.color).toBe("rgb(86, 211, 100)"); // #56d364 — badge-good color
+
+    // Walk MEMBERSHIP is untouched: ǯ carries no MechanismAssignment of its
+    // own, so it must still be a real chip an author can navigate to — the
+    // fix only recolors the badge, it never removes a composable char from
+    // the strip/walk (the hard constraint this fix must not regress).
+    fireEvent.click(within(strip).getByTestId("char-scroll-chip-01EF"));
+    expectCurrentChar("ǯ");
+
+    // Directly-produced ʒ badges green too (ordinary direct-assignment path,
+    // unaffected by this fix) — sanity check the fixture actually wired a
+    // real session assignment, not just inventory noise.
+    const ezhBadge = within(strip).getByTestId("char-scroll-badge-0292");
+    expect(ezhBadge.textContent).toBe("1");
+  });
+
+  // ---------------------------------------------------------------------------
+  // Part 1 (3-signal count model) — case-table pins. Each reuses the same
+  // deadkey-byproduct fixture shape as the test above (one PATTERN_DEADKEY
+  // assignment whose accentedForms output is "ʒ" and whose double-tap
+  // byproduct is the bare combining caron "̌") — the exact shape verified not
+  // to collide inside applyAssignments' merge-by-group-name injection (see
+  // that test's own doc comment for why a SECOND PATTERN_DEADKEY assignment
+  // would collide on `group(deadkeys)`/`deadkey(accent)`; the own-key
+  // assignment below deliberately uses PATTERN_SWAP instead so it can coexist
+  // with the deadkey assignment in the same session).
+  // ---------------------------------------------------------------------------
+
+  it("a char reachable BOTH by its own key AND by composition (ǯ own-key + ʒ/caron session-composable) badges GREEN 2, with the compose marker present", async () => {
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([mainGroup()]) });
+
+    seedInventory(["ʒ", "̌", "ǯ"]);
+
+    const producesEzhAndCaronByproduct: MechanismAssignment = {
+      scope: "individual",
+      target: "ʒ",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: PATTERN_DEADKEY,
+          strategyId: "S-02",
+          slotValues: {
+            triggerKey: "K_QUOTE",
+            baseLetters: "z",
+            accentedForms: "ʒ",
+            accentChar: "̌",
+          },
+        },
+      ],
+      source: "user",
+    };
+    // ǯ's OWN key — deliberately PATTERN_SWAP (not a second PATTERN_DEADKEY,
+    // which would collide with the assignment above inside applyAssignments'
+    // merge-by-group-name injection — see this block's own header comment).
+    // `getById`/`getPatternByIdSync` don't resolve PATTERN_SWAP in this
+    // file's mocks, so it contributes a session-DIRECT mechanism (counted by
+    // `directProducesCount`, which never resolves patterns) without being
+    // baked into the re-parsed preview .kmn buildSessionProducedSet reads —
+    // exactly what this test needs: ǯ's own-key count and its composability
+    // (from the OTHER assignment) come from two independent signals.
+    const ownKeyForZhCaron: MechanismAssignment = {
+      scope: "individual",
+      target: "ǯ",
+      modality: "physical",
+      mechanisms: [{ patternId: PATTERN_SWAP, slotValues: { kmnRules: "+ [K_9] > 'ǯ'" } }],
+      source: "user",
+    };
+
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "C",
+      answers: [],
+      assignments: [producesEzhAndCaronByproduct, ownKeyForZhCaron],
+    });
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    const strip = screen.getByTestId("char-scroll-strip");
+    const ezhCaronBadge = within(strip).getByTestId("char-scroll-badge-01EF");
+    expect(ezhCaronBadge.textContent).toBe("2");
+    expect(ezhCaronBadge.style.color).toBe("rgb(86, 211, 100)"); // #56d364 — badge-good color
+
+    // Compose marker present — ǯ IS composable (in addition to its own key).
+    expect(
+      within(strip).getByTestId("char-scroll-badge-compose-01EF"),
+    ).toBeTruthy();
+  });
+
+  it("a character assigned to TWO independent keys (two individual-scope mechanisms, no composability) badges GREEN 2 with no compose marker", async () => {
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([mainGroup()]) });
+
+    // "ʒ" alone (no caron, no ǯ) — not NFD-decomposable, so composition can
+    // never fire for it; this pins the "own-key-only" side of the case table
+    // (a two-key char must read 2, not double-count into 3 or collapse to 1).
+    seedInventory(["ʒ"]);
+
+    const firstKey: MechanismAssignment = {
+      scope: "individual",
+      target: "ʒ",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: PATTERN_DEADKEY,
+          strategyId: "S-02",
+          slotValues: { triggerKey: "K_QUOTE", baseLetters: "z", accentedForms: "ʒ" },
+        },
+      ],
+      source: "user",
+    };
+    const secondKey: MechanismAssignment = {
+      scope: "individual",
+      target: "ʒ",
+      modality: "physical",
+      mechanisms: [{ patternId: PATTERN_SWAP, slotValues: { kmnRules: "+ [K_9] > 'ʒ'" } }],
+      source: "user",
+    };
+
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "C",
+      answers: [],
+      assignments: [firstKey, secondKey],
+    });
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    const strip = screen.getByTestId("char-scroll-strip");
+    const ezhBadge = within(strip).getByTestId("char-scroll-badge-0292");
+    expect(ezhBadge.textContent).toBe("2");
+    expect(ezhBadge.style.color).toBe("rgb(86, 211, 100)"); // #56d364 — badge-good color
+    expect(
+      screen.queryByTestId("char-scroll-badge-compose-0292"),
+    ).toBeNull();
+  });
+
+  it("the compose marker is present for a composable-only character (ǯ) and ABSENT for a plain own-key character (ʒ) in the SAME strip", async () => {
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([mainGroup()]) });
+
+    seedInventory(["ʒ", "̌", "ǯ"]);
+
+    const producesEzhAndCaronByproduct: MechanismAssignment = {
+      scope: "individual",
+      target: "ʒ",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: PATTERN_DEADKEY,
+          strategyId: "S-02",
+          slotValues: {
+            triggerKey: "K_QUOTE",
+            baseLetters: "z",
+            accentedForms: "ʒ",
+            accentChar: "̌",
+          },
+        },
+      ],
+      source: "user",
+    };
+
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "C",
+      answers: [],
+      assignments: [producesEzhAndCaronByproduct],
+    });
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    const strip = screen.getByTestId("char-scroll-strip");
+
+    // ǯ: composable-only (no own-key assignment) — marker PRESENT.
+    expect(
+      within(strip).getByTestId("char-scroll-badge-compose-01EF"),
+    ).toBeTruthy();
+    expect(within(strip).getByTestId("char-scroll-badge-01EF").textContent).toBe("1");
+
+    // ʒ: own-key only, not NFD-decomposable — marker ABSENT.
+    expect(
+      within(strip).queryByTestId("char-scroll-badge-compose-0292"),
+    ).toBeNull();
+    expect(within(strip).getByTestId("char-scroll-badge-0292").textContent).toBe("1");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -2082,6 +2443,298 @@ describe("MechanismGallery — Back after skipping the only character", () => {
 });
 
 // ---------------------------------------------------------------------------
+// kbgen suggestion row — gated on the current character's producer badge
+// (bug fix: a char already green via composition must not ALSO show a
+// stale "suggested" proposal — there's no single key left for it to propose).
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — kbgen suggestion gated on the current char's producer badge", () => {
+  it("hides the suggestion for a composition-covered character (ǯ, badge count >= 1) and shows it for a plain uncovered character (count === 0) in the same session", async () => {
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([mainGroup()]) });
+
+    // "ǯ" is composable from a session-produced ezh + that SAME deadkey's
+    // session-produced bare caron byproduct (identical fixture shape to the
+    // badge-count pins above) — no assignment of its own, badge count 1.
+    // "à" stays completely uncovered (badge count 0).
+    seedInventory(["ʒ", "̌", "ǯ", "à"]);
+
+    const producesEzhAndCaronByproduct: MechanismAssignment = {
+      scope: "individual",
+      target: "ʒ",
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: PATTERN_DEADKEY,
+          strategyId: "S-02",
+          slotValues: {
+            triggerKey: "K_QUOTE",
+            baseLetters: "z",
+            accentedForms: "ʒ",
+            accentChar: "̌",
+          },
+        },
+      ],
+      source: "user",
+    };
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "C",
+      answers: [],
+      assignments: [producesEzhAndCaronByproduct],
+    });
+
+    // A placement map offering a (would-be) suggestion for BOTH "ǯ" (should
+    // be suppressed by the badge) and "à" (should still show — count 0).
+    const placementMap = makePlacementMap({
+      bcp47Context: "test",
+      baseLayoutFamily: "QWERTY",
+      entries: [
+        {
+          codepoint: "U+01EF", // ǯ
+          candidates: [
+            {
+              vkey: "K_9",
+              modifiers: ["RALT"],
+              mechanism: "direct",
+              priorSource: "corpus",
+              priorCount: 3,
+              confidence: 0.8,
+            },
+          ],
+        },
+        {
+          codepoint: "U+00E0", // à
+          candidates: [
+            {
+              vkey: "K_A",
+              modifiers: ["RALT"],
+              mechanism: "direct",
+              priorSource: "corpus",
+              priorCount: 4,
+              confidence: 0.88,
+            },
+          ],
+        },
+      ],
+    });
+
+    await act(async () => {
+      render(
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} placementMap={placementMap} />,
+      );
+    });
+
+    const strip = screen.getByTestId("char-scroll-strip");
+
+    // "ǯ" — composable (badge green 1, no own assignment): the placement map
+    // has a candidate for it, but the suggestion row must NOT render.
+    fireEvent.click(within(strip).getByTestId("char-scroll-chip-01EF"));
+    await waitFor(() => {
+      expectCurrentChar("ǯ");
+    });
+    expect(screen.queryByText(/Suggested: RAlt \+ 9 for ǯ/i)).toBeNull();
+
+    // "à" — plain uncovered (badge count 0): the SAME placement map's
+    // suggestion for it DOES render.
+    fireEvent.click(within(strip).getByTestId("char-scroll-chip-00E0"));
+    await waitFor(() => {
+      expectCurrentChar("à");
+    });
+    // Wrapped in waitFor (not a bare synchronous getByText) — the suggestion
+    // row's gate (suggestion/currentCharBadge/suggestionDismissed) recomputes
+    // in the same render as the chip's aria-pressed flip, but under
+    // full-suite load a second, effect-driven re-render (the per-char
+    // method-state reset effect a few lines above in the component) can
+    // still be settling when a bare synchronous query runs immediately after
+    // the first waitFor resolves — this only asserts the chip's selection,
+    // not the suggestion row's presence. waitFor retries until both have
+    // caught up, without weakening what's asserted.
+    await waitFor(() => {
+      expect(screen.getByText(/Suggested: RAlt \+ A for à/i)).toBeTruthy();
+    });
+  });
+
+  it("hides the suggestion for a character already produced by the BASE keyboard (ɛ, badge count >= 1 via signal (a) BASE-DIRECT, no session assignment, not composable, no sequence) — the case the old hasSequenceForChar||isComposable gate missed", async () => {
+    // "ɛ" (U+025B) is produced directly by a base-layer rule (K_Q) — no
+    // session MechanismAssignment, no composition, no recorded sequence. The
+    // OLD gate (`!(hasSequenceForChar || isComposable)`) evaluates to
+    // `!(false || false) === true` for this character, so it would WRONGLY
+    // show the suggestion despite the badge already reading count >= 1 —
+    // exactly the reported bug (ɛ already worked via an existing method, yet
+    // "Suggested: Replace Q with ɛ" still appeared).
+    const ruleQ: IRRule = {
+      nodeId: "r-q",
+      context: [{ kind: "vkey", name: "K_Q", modifiers: [] }],
+      output: [{ kind: "char", value: "ɛ" }],
+    };
+    const group: IRGroup = {
+      nodeId: "g-main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [ruleQ],
+    };
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
+
+    // Base-produced characters stay OUT of lettersToAdd (same as the "z" case
+    // in the Done-button tests below) — reach it via the SHOW-ALL strip.
+    seedInventory(["ɛ"]);
+
+    const placementMap = makePlacementMap({
+      bcp47Context: "test",
+      baseLayoutFamily: "QWERTY",
+      entries: [
+        {
+          codepoint: "U+025B", // ɛ
+          candidates: [
+            {
+              vkey: "K_Q",
+              modifiers: [],
+              mechanism: "direct",
+              priorSource: "corpus",
+              priorCount: 5,
+              confidence: 0.9,
+            },
+          ],
+        },
+      ],
+    });
+
+    await act(async () => {
+      render(
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} placementMap={placementMap} />,
+      );
+    });
+
+    fireEvent.click(screen.getByTestId("char-scroll-chip-025B"));
+    await waitFor(() => {
+      expectCurrentChar("ɛ");
+    });
+
+    // Badge already reads count >= 1 (base-direct) — no suggestion may show.
+    expect(screen.queryByText(/Suggested: Replace Q with ɛ/i)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Forward button — forced visible/enabled once the whole inventory is
+// covered, even when currentChar is outside lettersToAdd's walk (bug fix).
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — Done button forced visible when the whole inventory is covered", () => {
+  it("shows an ENABLED Done button when every inventory character has count >= 1, even navigated to an already-produced character outside lettersToAdd (previously hidden)", async () => {
+    const ruleZ: IRRule = {
+      nodeId: "r-z",
+      context: [{ kind: "vkey", name: "K_Z", modifiers: [] }],
+      output: [{ kind: "char", value: "z" }],
+    };
+    const group: IRGroup = {
+      nodeId: "g-main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [ruleZ],
+    };
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
+
+    // "z" is directly produced by the base (badge count via signal (a)) —
+    // stays OUT of lettersToAdd. "y" is in lettersToAdd; give it its own
+    // session assignment so its badge count is also >= 1 — every inventory
+    // character is now covered.
+    seedInventory(["y", "z"]);
+    const yAssignment: MechanismAssignment = {
+      scope: "individual",
+      target: "y",
+      modality: "physical",
+      mechanisms: [{ patternId: PATTERN_SWAP, slotValues: { kmnRules: "+ [K_Y] > 'y'" } }],
+      source: "user",
+    };
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "C",
+      answers: [],
+      assignments: [yAssignment],
+    });
+
+    const onComplete = vi.fn();
+    await act(async () => {
+      render(
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />,
+      );
+    });
+
+    // Navigate to "z" via the SHOW-ALL strip — outside lettersToAdd (["y"]
+    // only), the scenario that previously hid the forward button entirely.
+    fireEvent.click(screen.getByTestId("char-scroll-chip-007A"));
+    await waitFor(() => {
+      expectCurrentChar("z");
+    });
+
+    // The Done button is FORCED visible and enabled — the whole inventory
+    // (both "y" and "z") is covered.
+    const doneBtn = screen.getByTestId("mechanisms-continue");
+    expect(doneBtn.textContent).toMatch(/Done/i);
+    expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
+
+    fireEvent.click(doneBtn);
+    expect(onComplete).toHaveBeenCalledOnce();
+  });
+
+  it("does NOT force-show the Done button when at least one character is still count === 0, even when navigated to an already-produced character outside lettersToAdd", async () => {
+    const ruleZ: IRRule = {
+      nodeId: "r-z",
+      context: [{ kind: "vkey", name: "K_Z", modifiers: [] }],
+      output: [{ kind: "char", value: "z" }],
+    };
+    const group: IRGroup = {
+      nodeId: "g-main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [ruleZ],
+    };
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
+
+    // "z" is directly produced by the base; "y" stays in lettersToAdd with
+    // NO session assignment at all — count 0, so the inventory is NOT fully
+    // covered.
+    seedInventory(["y", "z"]);
+
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />);
+    });
+
+    // Navigate to "z" — outside lettersToAdd (["y"]).
+    fireEvent.click(screen.getByTestId("char-scroll-chip-007A"));
+    await waitFor(() => {
+      expectCurrentChar("z");
+    });
+
+    // Not fully covered ("y" is still count 0) — the forward button stays
+    // hidden entirely, exactly as before this fix.
+    expect(screen.queryByTestId("mechanisms-continue")).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // kbgen suggestion row — persistence across Back navigation
 // ---------------------------------------------------------------------------
 
@@ -2104,8 +2757,12 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
       );
     });
 
-    // Suggestion row shows for "à".
-    expect(screen.getByText(/Suggested: RAlt \+ A for à/i)).toBeTruthy();
+    // Suggestion row shows for "à". Wrapped in waitFor — same fragile
+    // synchronous-getByText-after-render pattern hardened elsewhere in this
+    // describe block (see the kbgen-suggestion-gated describe above).
+    await waitFor(() => {
+      expect(screen.getByText(/Suggested: RAlt \+ A for à/i)).toBeTruthy();
+    });
 
     // Accept it — records the S-08 assignment and dismisses the row (the
     // dismissal is also implied by coveredChars once accepted).
@@ -2157,8 +2814,12 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
       );
     });
 
-    // Suggestion row shows for "à".
-    expect(screen.getByText(/Suggested: RAlt \+ A for à/i)).toBeTruthy();
+    // Suggestion row shows for "à". Wrapped in waitFor — same fragile
+    // synchronous-getByText-after-render pattern hardened elsewhere in this
+    // describe block.
+    await waitFor(() => {
+      expect(screen.getByText(/Suggested: RAlt \+ A for à/i)).toBeTruthy();
+    });
 
     // Skip it — no accept/deny, no assignment recorded.
     fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
@@ -2175,7 +2836,9 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
     // Unlike the accept/deny case above, the suggestion row for "à" MUST
     // reappear — Skip resolved nothing. (If `skippedChars` were reintroduced
     // to suppress the row, this assertion would fail.)
-    expect(screen.getByText(/Suggested: RAlt \+ A for à/i)).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.getByText(/Suggested: RAlt \+ A for à/i)).toBeTruthy();
+    });
   });
 });
 
@@ -2184,9 +2847,10 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
 //
 // The placement map only carries an entry for ƒ (U+0192), the LOWERCASE
 // letter — Ƒ (U+0191) has no map entry of its own. Without the case-pair
-// fallback (getSuggestionForCharWithCasePair), Ƒ would get no suggestion at
-// all. With it, Ƒ gets a synthesized S-08 suggestion on the SAME vkey
-// (K_F) at the RAlt+Shift layer — the shifted counterpart of ƒ's RAlt layer.
+// fallback (getRankedSuggestionsForChar's case-pair inheritance), Ƒ would get
+// no suggestion at all. With it, Ƒ gets a synthesized S-08 suggestion on the
+// SAME vkey (K_F) at the RAlt+Shift layer — the shifted counterpart of ƒ's
+// RAlt layer.
 // ---------------------------------------------------------------------------
 
 const ffHookPlacementMap: PlacementMap = {
@@ -2288,6 +2952,481 @@ describe("MechanismGallery — kbgen suggestion row — uppercase case-pair fall
     expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
       "[RALT K_F]",
     );
+  });
+
+  it("suppresses the suggestion row when the top placement candidate is CAPS-based", async () => {
+    // CAPS is a case/state modifier, not a layer an author reaches for, so a
+    // "Caps + key" recommendation must not be surfaced as a suggestion. The
+    // candidate below would otherwise render an S-08 suggestion row (same
+    // shape as ffHookPlacementMap's RALT candidate); the CAPS token must
+    // suppress it entirely. CAPS remains selectable as a manual layer pick —
+    // that path is covered by the layer-picker tests above and is untouched.
+    const capsPlacementMap: PlacementMap = {
+      entries: [
+        {
+          codepoint: "U+03B5",
+          candidates: [
+            {
+              vkey: "K_E",
+              modifiers: ["RALT", "CAPS"],
+              mechanism: "direct",
+              priorSource: "phonetic",
+              priorCount: 0,
+              confidence: 0.9,
+            },
+          ],
+        },
+      ],
+    };
+    seedInventory(["ε"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={capsPlacementMap}
+        />,
+      );
+    });
+
+    expectCurrentChar("ε");
+    // No suggestion row at all for a CAPS-carrying candidate.
+    expect(screen.queryByText(/Suggested:/i)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Ranked suggestion row — up to 2 distinct-strategy chips for one codepoint
+// (getRankedSuggestionsForChar). ƒ U+0192 attested by BOTH a corpus deadkey
+// (S-02, baseLetter "f") and a corpus RALT candidate (S-08) — the gallery
+// must render both chips, each independently acceptable, with one shared
+// Deny dismissing the whole row.
+// ---------------------------------------------------------------------------
+
+const ffRankedPlacementMap: PlacementMap = {
+  entries: [
+    {
+      codepoint: "U+0192",
+      candidates: [
+        {
+          vkey: "K_QUOTE",
+          modifiers: [],
+          mechanism: "deadkey",
+          priorSource: "corpus",
+          priorCount: 6,
+          confidence: 0.7,
+          baseLetter: "f",
+        },
+        {
+          vkey: "K_F",
+          modifiers: ["RALT"],
+          mechanism: "direct",
+          priorSource: "corpus",
+          priorCount: 4,
+          confidence: 0.6,
+        },
+      ],
+    },
+  ],
+};
+
+describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, same codepoint)", () => {
+  it("renders both chips, each with its own Accept button", async () => {
+    seedInventory(["ƒ"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={ffRankedPlacementMap}
+        />,
+      );
+    });
+
+    expectCurrentChar("ƒ");
+    expect(screen.getByText(/Suggested: Deadkey → f for ƒ/i)).toBeTruthy();
+    expect(screen.getByText(/Suggested: RAlt \+ F for ƒ/i)).toBeTruthy();
+
+    // One shared Deny for the whole row, two independent Accept buttons
+    // (each named by its own aria-label, per mechanism).
+    expect(
+      screen.getByRole("button", {
+        name: /Accept suggestion: deadkey via base letter f for ƒ/i,
+      }),
+    ).toBeTruthy();
+    expect(
+      screen.getByRole("button", { name: /Accept suggestion: RAlt \+ K_F for ƒ/i }),
+    ).toBeTruthy();
+    expect(
+      screen
+        .getAllByRole("button")
+        .filter((b) => b.textContent?.trim() === "Accept"),
+    ).toHaveLength(2);
+    expect(
+      screen.getByRole("button", { name: /Deny suggestion/i }),
+    ).toBeTruthy();
+  });
+
+  it("accepting the S-02 (deadkey) chip records a deadkey_single_tap mechanism using the corpus baseLetter and the studio's default trigger key", async () => {
+    seedInventory(["ƒ"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={ffRankedPlacementMap}
+        />,
+      );
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Accept suggestion: deadkey via base letter f for ƒ/i,
+      }),
+    );
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments).toHaveLength(1);
+    const mech = assignments[0]?.mechanisms[0];
+    expect(mech?.patternId).toBe(PATTERN_DEADKEY);
+    expect(mech?.strategyId).toBe("S-02");
+    expect(mech?.slotValues?.["baseLetters"]).toBe("f");
+    expect(mech?.slotValues?.["accentedForms"]).toBe("ƒ");
+    // Corpus triggers are deliberately not imposed — the studio's own
+    // default trigger key (K_COLON) is used, not the corpus candidate's vkey
+    // (K_QUOTE, which is only ever a display-only host label for THIS
+    // candidate's own placement, not a trigger-key attestation).
+    expect(mech?.slotValues?.["triggerKey"]).toBe("K_COLON");
+  });
+
+  it("accepting the S-08 (RAlt) chip still works independently of the S-02 chip", async () => {
+    seedInventory(["ƒ"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={ffRankedPlacementMap}
+        />,
+      );
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Accept suggestion: RAlt \+ K_F for ƒ/i }),
+    );
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments).toHaveLength(1);
+    expect(assignments[0]?.mechanisms[0]?.patternId).toBe(
+      "modifier_as_layer_switch",
+    );
+    expect(assignments[0]?.mechanisms[0]?.strategyId).toBe("S-08");
+  });
+
+  it("Deny dismisses the whole row — both chips disappear, revisiting the char doesn't reshow it", async () => {
+    seedInventory(["ƒ"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={ffRankedPlacementMap}
+        />,
+      );
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Deny suggestion/i }));
+    expect(screen.queryByText(/Suggested:/i)).toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // Bug fix: accepts are INDEPENDENT — accepting one chip must not hide the
+  // other. Previously, accepting EITHER chip recorded a mechanism, which
+  // flipped the character's producer badge to count >= 1 and hid the WHOLE
+  // row (suggestionDismissed's old coveredChars check + the row's old
+  // `(currentCharBadge?.count ?? 0) === 0` gate) — so accepting the deadkey
+  // chip silently made the RAlt chip vanish before the author ever saw it.
+  // -------------------------------------------------------------------------
+
+  it("accepting the S-02 chip leaves the S-08 chip visible and independently acceptable; accepting both records both assignments and removes the row", async () => {
+    seedInventory(["ƒ"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={ffRankedPlacementMap}
+        />,
+      );
+    });
+
+    // Accept the deadkey (S-02) chip first.
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Accept suggestion: deadkey via base letter f for ƒ/i,
+      }),
+    );
+
+    // The deadkey chip's own text is gone, but the RAlt (S-08) chip's text
+    // AND its Accept button are STILL rendered — the bug this fixes.
+    await waitFor(() => {
+      expect(screen.queryByText(/Suggested: Deadkey → f for ƒ/i)).toBeNull();
+      expect(screen.getByText(/Suggested: RAlt \+ F for ƒ/i)).toBeTruthy();
+    });
+    const raltAccept = screen.getByRole("button", {
+      name: /Accept suggestion: RAlt \+ K_F for ƒ/i,
+    });
+    expect((raltAccept as HTMLButtonElement).disabled).toBe(false);
+
+    // Accept the remaining RAlt chip too.
+    fireEvent.click(raltAccept);
+
+    // Both mechanisms are now recorded — accepting one never overwrote or
+    // dropped the other. Read straight off Phase C's own assignments array
+    // (what recordAssignments writes and the component itself reads via
+    // sessionAssignments/mechanismAssignments), NOT the derived
+    // `session.assignments` view — mergeAssignments there is last-wins per
+    // (modality, scope, target) across PHASES, a cross-phase reconciliation
+    // rule that isn't this row's concern; two independent per-mechanism
+    // entries for the SAME character within the SAME phase C are exactly
+    // what this gallery (and this fix) intentionally allows.
+    await waitFor(() => {
+      const assignments = (
+        useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C")
+          ?.assignments ?? []
+      ).filter((a) => a.modality === "physical");
+      expect(assignments).toHaveLength(2);
+      const strategyIds = assignments
+        .flatMap((a) => a.mechanisms.map((m) => m.strategyId))
+        .sort();
+      expect(strategyIds).toEqual(["S-02", "S-08"]);
+    });
+
+    // With every chip accepted, the row itself disappears entirely.
+    await waitFor(() => {
+      expect(screen.queryByText(/Suggested:/i)).toBeNull();
+    });
+  });
+
+  it("revisit: an accepted chip does not reappear after navigating away and back, while its unaccepted sibling's suggestion persists", async () => {
+    seedInventory(["ƒ", "z"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={ffRankedPlacementMap}
+        />,
+      );
+    });
+
+    const strip = screen.getByTestId("char-scroll-strip");
+    fireEvent.click(within(strip).getByTestId("char-scroll-chip-0192"));
+    await waitFor(() => {
+      expectCurrentChar("ƒ");
+    });
+
+    // Accept only the deadkey (S-02) chip; leave the RAlt (S-08) chip alone.
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Accept suggestion: deadkey via base letter f for ƒ/i,
+      }),
+    );
+    await waitFor(() => {
+      expect(screen.queryByText(/Suggested: Deadkey → f for ƒ/i)).toBeNull();
+    });
+
+    // Navigate away to "z" and back to "ƒ".
+    fireEvent.click(within(strip).getByTestId("char-scroll-chip-007A"));
+    await waitFor(() => {
+      expectCurrentChar("z");
+    });
+    fireEvent.click(within(strip).getByTestId("char-scroll-chip-0192"));
+    await waitFor(() => {
+      expectCurrentChar("ƒ");
+    });
+
+    // The already-accepted deadkey chip must NOT reappear (revisit
+    // semantics — its mechanism is still on record); the never-touched RAlt
+    // chip must still be offered.
+    expect(screen.queryByText(/Suggested: Deadkey → f for ƒ/i)).toBeNull();
+    expect(screen.getByText(/Suggested: RAlt \+ F for ƒ/i)).toBeTruthy();
+  });
+
+  // -------------------------------------------------------------------------
+  // Defect 2 evidence — per-mechanism removal already exists
+  // (handleRemoveMechanism / the "Applied methods" chip row) and works
+  // identically regardless of whether the mechanism was recorded via a
+  // manual Apply or via accepting a suggestion chip: each accepted
+  // suggestion becomes its own MechanismAssignment object, so each gets its
+  // own independent "Remove method" chip.
+  // -------------------------------------------------------------------------
+
+  it("each suggestion-accepted mechanism gets its own independent remove control — removing one leaves the other intact", async () => {
+    seedInventory(["ƒ"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={ffRankedPlacementMap}
+        />,
+      );
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", {
+        name: /Accept suggestion: deadkey via base letter f for ƒ/i,
+      }),
+    );
+    fireEvent.click(
+      screen.getByRole("button", { name: /Accept suggestion: RAlt \+ K_F for ƒ/i }),
+    );
+
+    let deadkeyBadge: HTMLElement | null = null;
+    let raltBadge: HTMLElement | null = null;
+    await waitFor(() => {
+      const badges = screen.queryAllByRole("button", { name: /^Remove method/i });
+      expect(badges.length).toBe(2);
+      deadkeyBadge = badges.find((b) => b.getAttribute("aria-label")?.includes("Deadkey")) ?? null;
+      raltBadge = badges.find((b) => b.getAttribute("aria-label")?.includes("RAlt")) ?? null;
+      expect(deadkeyBadge).not.toBeNull();
+      expect(raltBadge).not.toBeNull();
+    });
+
+    // Remove only the deadkey mechanism.
+    await act(async () => {
+      fireEvent.click(deadkeyBadge!);
+    });
+
+    await waitFor(() => {
+      // See the note in the accept-independence test above re: reading
+      // phaseResults' own Phase C assignments rather than the merged
+      // `session.assignments` view.
+      const assignments = (
+        useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C")
+          ?.assignments ?? []
+      ).filter((a) => a.modality === "physical");
+      expect(assignments).toHaveLength(1);
+      expect(assignments[0]?.mechanisms[0]?.strategyId).toBe("S-08");
+    });
+    const remaining = screen.queryAllByRole("button", { name: /^Remove method/i });
+    expect(remaining.length).toBe(1);
+    expect(remaining[0]!.getAttribute("aria-label") ?? "").toMatch(/RAlt/i);
+  });
+
+  // -------------------------------------------------------------------------
+  // Style — the suggestion row is GREEN, not red (product decision). It's a
+  // proposal/affordance the author can accept or deny, not an error state.
+  // -------------------------------------------------------------------------
+
+  it("renders the suggestion row in the green family, not ERROR_RED/ERROR_BG", async () => {
+    seedInventory(["ƒ"]);
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={ffRankedPlacementMap}
+        />,
+      );
+    });
+
+    const row = screen.getByRole("note", {
+      name: /Placement suggestion from kbgen seeder/i,
+    });
+    // #0d2218 / #238636 — the SAME green pair CharScrollStrip's badgeGood
+    // treatment and the "Applied methods" chips already use elsewhere in
+    // this gallery. Never the old ERROR_RED (#f85149) / ERROR_BG (#2a0a0a).
+    expect(row.style.backgroundColor).toBe("rgb(13, 34, 24)"); // #0d2218
+    expect(row.style.borderColor).toBe("rgb(35, 134, 54)"); // #238636
+    expect(row.style.backgroundColor).not.toBe("rgb(42, 10, 10)"); // #2a0a0a
+    expect(row.style.borderColor).not.toBe("rgb(248, 81, 73)"); // #f85149
+
+    const suggestionText = screen.getByText(/Suggested: Deadkey → f for ƒ/i);
+    expect(suggestionText.style.color).toBe("rgb(86, 211, 100)"); // #56d364
+    expect(suggestionText.style.color).not.toBe("rgb(248, 81, 73)"); // #f85149
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Suggestion row suppression — coverage by means OTHER than one of THIS
+// row's own offered chips. Two signals beyond baseOnlyProducedSet/
+// isComposable: (d) SEQUENCE (hasSequenceForChar) and (e) UNRELATED MANUAL
+// (a recorded non-sequence mechanism whose strategyId isn't among the
+// offered chips). Both must suppress the WHOLE row even though neither one
+// ever populates recordedSuggestionStrategyIds for an OFFERED strategyId —
+// see the render-gate comment in MechanismGallery.tsx.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — suggestion row suppressed by non-chip coverage", () => {
+  it("a char already covered by a recorded PATTERN_SEQUENCE assignment shows no suggestion row", async () => {
+    seedInventory(["ƒ"]);
+    // Mirrors the "coexistence with a separately-recorded sequence
+    // assignment" fixture shape above — a sequence assignment recorded
+    // BEFORE render, for the SAME char the corpus placement map offers
+    // suggestions for.
+    useWorkingCopyStore.getState().recordAssignments([
+      {
+        scope: "individual",
+        target: "ƒ",
+        modality: "physical",
+        mechanisms: [
+          {
+            patternId: PATTERN_SEQUENCE,
+            strategyId: "S-03",
+            slotValues: { firstLetterOut: "f", secondLetter: "f", collapsedChar: "ƒ" },
+          },
+        ],
+        source: "user",
+      },
+    ]);
+
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={ffRankedPlacementMap}
+        />,
+      );
+    });
+
+    expectCurrentChar("ƒ");
+    expect(screen.queryByText(/Suggested:/i)).toBeNull();
+    expect(
+      screen.queryByRole("note", {
+        name: /Placement suggestion from kbgen seeder/i,
+      }),
+    ).toBeNull();
+  });
+
+  it("a char already covered by a manually-applied mechanism whose strategyId is NOT among the offered chips shows no suggestion row", async () => {
+    seedInventory(["ƒ"]);
+    // "S-01" is not one of ffRankedPlacementMap's offered strategyIds
+    // (S-02 deadkey, S-08 RAlt) — an unrelated manual method.
+    useWorkingCopyStore.getState().recordAssignments([
+      {
+        scope: "individual",
+        target: "ƒ",
+        modality: "physical",
+        mechanisms: [
+          { patternId: "simple_swap", strategyId: "S-01", slotValues: { kmnRules: "+ [K_QUOTE] > U+0192" } },
+        ],
+        source: "user",
+      },
+    ]);
+
+    await act(async () => {
+      render(
+        <MechanismGallery
+          selectedBaseKeyboard={basicKbdus}
+          placementMap={ffRankedPlacementMap}
+        />,
+      );
+    });
+
+    expectCurrentChar("ƒ");
+    expect(screen.queryByText(/Suggested:/i)).toBeNull();
+    expect(
+      screen.queryByRole("note", {
+        name: /Placement suggestion from kbgen seeder/i,
+      }),
+    ).toBeNull();
   });
 });
 
@@ -2880,7 +4019,14 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
     await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), "K_E");
     fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
-    await changeSelectMenu(screen.getByLabelText(/Layer 2 for layer-switch combo/i), "SHIFT");
+    // Fallback path: with nothing in use, the second slot starts unselected
+    // ("") — the author must pick before Apply. Locks in the else-branch of
+    // handleAddRaltSlot's in-use default.
+    const secondLayerSelect = screen.getByLabelText(
+      /Layer 2 for layer-switch combo/i,
+    ) as HTMLElement;
+    expect(selectMenuValue(secondLayerSelect)).toBe("");
+    await changeSelectMenu(secondLayerSelect, "SHIFT");
     fireEvent.click(screen.getByRole("button", { name: /Apply method for Ε/i }));
 
     const assignments = useWorkingCopyStore
@@ -2895,6 +4041,65 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrOutputList"]).toBe(
       "Ε",
     );
+  });
+
+  it("defaults the SECOND layer slot to SHIFT when Shift is already in use elsewhere in the working IR", async () => {
+    // Slot 1 still defaults to the alt-family token (raltDefaultToken is
+    // untouched by this change). The SECOND slot is what should now auto-fill
+    // instead of starting unselected: seed SHIFT as already "in use" via an
+    // unrelated K_W rule, then confirm the author never has to touch the
+    // Layer 2 dropdown themselves for it to read SHIFT.
+    instantiateWithModifiersInUse("K_W", ["SHIFT"]);
+    seedInventory(["Ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), "K_E");
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+
+    // Pre-filled with SHIFT — no explicit changeSelectMenu call for slot 2.
+    const secondLayerSelect = screen.getByLabelText(
+      /Layer 2 for layer-switch combo/i,
+    ) as HTMLElement;
+    expect(selectMenuValue(secondLayerSelect)).toBe("SHIFT");
+
+    fireEvent.click(screen.getByRole("button", { name: /Apply method for Ε/i }));
+
+    const assignments = useWorkingCopyStore
+      .getState()
+      .session.assignments.filter((a) => a.modality === "physical");
+    expect(assignments[0]?.mechanisms[0]?.slotValues?.["altgrKeyList"]).toBe(
+      "[SHIFT ALT K_E]",
+    );
+  });
+
+  it("never auto-fills the SECOND slot with CAPS, even when CAPS is the only in-use modifier", async () => {
+    // CAPS is reported as "in use" by any keyboard with routine CAPS/NCAPS
+    // case-handling rules, but it is a case/state modifier rather than a layer
+    // — it must NOT auto-fill the second slot (that would surprise). It stays
+    // selectable in the dropdown; the author picks it explicitly if they want.
+    instantiateWithModifiersInUse("K_W", ["CAPS"]);
+    seedInventory(["Ε"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Assign to a key/i));
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+    await changeSelectMenu(screen.getByLabelText(/Physical key for Assign to a key/i), "K_E");
+    fireEvent.click(screen.getByRole("button", { name: /Add another layer/i }));
+
+    const secondLayerSelect = screen.getByLabelText(
+      /Layer 2 for layer-switch combo/i,
+    ) as HTMLElement;
+    // Not auto-filled with CAPS — stays unselected until the author picks.
+    expect(selectMenuValue(secondLayerSelect)).toBe("");
+    // ...but CAPS is still offered as an explicit choice.
+    const optionValues = await selectMenuOptionValues(secondLayerSelect);
+    expect(optionValues).toContain("CAPS");
   });
 
   it("unifies an author's Ctrl + (chiral) Alt pick to the generic [CTRL ALT K_E] (#defect: AltGr not working)", async () => {
@@ -5146,5 +6351,108 @@ describe("MechanismGallery — 'counterpart already placed' suppression (spec 05
     const assignments = getPhaseCPhysicalAssignments();
     expect(assignments.filter((a) => a.target === "Á")).toHaveLength(1);
     expect(assignments.find((a) => a.target === "á")).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Within-step walk binding (lib/stepWalk.ts, hooks/useCharWalkPosition.ts)
+//
+// Two defects these cover, both reported as "if I jump away from later
+// questions in Mechanisms without completing all of them, I can't get back to
+// the question I was on":
+//
+//   1. `currentChar` was plain component state, and a tab switch unmounts this
+//      gallery — so the walk restarted at the first uncovered character.
+//   2. The whole stage was ONE footer dot, so the row could not say which of a
+//      dozen characters the author was on, and offered no way back into one.
+// ---------------------------------------------------------------------------
+
+describe("MechanismGallery — within-step walk position", () => {
+  it("publishes one stop per walk character, with its code points in the label", async () => {
+    seedInventory(["á", "é"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    const walk = useStepWalkStore.getState().walks[MECHANISMS_STEP_ID];
+    expect(walk?.map((p) => p.id)).toEqual([charToPositionToken("á"), charToPositionToken("é")]);
+    // A character has no question-registry entry, so the walk must carry its own
+    // label — and it names the code points, since a bare glyph is ambiguous
+    // between composed forms and useless to a screen reader.
+    expect(walk?.[0]?.label).toBe("á (U+00E1)");
+  });
+
+  it("publishes the cursor as the author walks, so the footer marker tracks it", async () => {
+    seedInventory(["á", "é"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    expect(useStepWalkStore.getState().cursors[MECHANISMS_STEP_ID]).toBe(
+      charToPositionToken("á"),
+    );
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /skip this character/i }));
+    });
+    expectCurrentChar("é");
+    expect(useStepWalkStore.getState().cursors[MECHANISMS_STEP_ID]).toBe(
+      charToPositionToken("é"),
+    );
+  });
+
+  it("resumes on the character the author was on after the unmount a tab switch causes", async () => {
+    seedInventory(["á", "é", "í"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /skip this character/i }));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /skip this character/i }));
+    });
+    expectCurrentChar("í");
+
+    // The tab switch. NOT a store reset — the working copy survives; only this
+    // component is destroyed and rebuilt.
+    cleanup();
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    // Pre-fix: "á" — the first uncovered character, because nothing outlived the
+    // component to say otherwise.
+    expectCurrentChar("í");
+  });
+
+  it("honours a cursor written while mounted — activating a dot for this same stage", async () => {
+    seedInventory(["á", "é", "í"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    expectCurrentChar("á");
+    // A footer dot inside the step the author is already on: no route change, no
+    // step change, nothing remounts, so only the live cursor can carry it.
+    await act(async () => {
+      useStepWalkStore.getState().setStepCursor(MECHANISMS_STEP_ID, charToPositionToken("í"));
+    });
+    expectCurrentChar("í");
+  });
+
+  it("ignores a cursor naming a character this walk does not hold", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      useStepWalkStore.getState().setStepCursor(MECHANISMS_STEP_ID, charToPositionToken("ω"));
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    expectCurrentChar("á");
+  });
+
+  it("still prefers the first UNCOVERED character on a first-ever entry", async () => {
+    // The arrival heuristic is unchanged where there is no cursor to honour —
+    // only OUTRANKED by one, never replaced.
+    useStepWalkStore.getState().reset();
+    seedInventory(["á", "é"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    expectCurrentChar("á");
   });
 });

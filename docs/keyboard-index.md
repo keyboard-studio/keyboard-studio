@@ -40,6 +40,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | US Basic | `basic_kbdus` | `en`, `bg-Latn`, `id`, `io-Latn`, `ia-Latn`, `zlm-Latn`, `ms`, `bi-Latn`, `gil-Latn`, `ht`, `mwl-Latn`, `blc-Latn`, `roo-Latn`, `so`, `sw` … (+6 more) | © 2008-2020 SIL International | `../keyboards/release/basic/basic_kbdus` |
 | Western Cree (TH-Woods) | `bj_cree_woods` | `cr` | Bill Jancewicz | `../keyboards/release/bj/bj_cree_woods` |
 | BU Phonetic | `bu_phonetic` | `fr`, `de`, `und-Latn`, `es` | J. Albert Bickford | `../keyboards/release/b/bu_phonetic` |
+| Bukawa | `bukawa` | `buk` | William Eckermann | `../keyboards/release/b/bukawa` |
 | Clavier du Burkina | `clavbur9` | `bm`, `bbo`, `beh`, `bfo`, `bib`, `bmq`, `bof`, `box`, `bwj`, `bwq`, `bwy`, `bxl`, `cme`, `dgd`, `dgs` … (+18 more) | © SIL Burkina Faso | `../keyboards/release/c/clavbur9` |
 | Simplified Chinese | `cs_pinyin` | `zh` | SIL International | `../keyboards/release/c/cs_pinyin` |
 | Common Devanagari | `common_devanagari` | `hi` | © 2021 WIn Publishing Trust | `../keyboards/release/c/common_devanagari` |
@@ -58,6 +59,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Georgian Basic | `basic_kbdgeo` | `ka` | (c) 2009-2019 SIL International | `../keyboards/release/basic/basic_kbdgeo` |
 | GFF Amharic | `gff_amharic` | `am` | The Geʾez Frontier Foundation | `../keyboards/release/gff/gff_amharic` |
 | GFF Geʾez Manuscript | `gff_geez_emufi` | `gez` | The Geʾez Frontier Foundation | `../keyboards/experimental/gff/gff_geez_emufi` |
+| Ghana | `ghana` | `ak-Latn`, `ee-Latn`, `ada-Latn`, `dga-Latn`, `hag-Latn`, `nzi-Latn`, `xsm-Latn` | © 2017-2020 SIL International | `../keyboards/release/g/ghana` |
 | Greek Basic | `basic_kbdhe` | `el` | (c) 2009-2019 SIL International | `../keyboards/release/basic/basic_kbdhe` |
 | Hausa Kano | `hausa_kano` | `ha-Latn` | Hamza Sulayman | `../keyboards/release/h/hausa_kano` |
 | Bengali Phonetic (ITRANS) | `itrans_bengali` | `bn`, `as` | Shree Devi Kumar | `../keyboards/release/itrans/itrans_bengali` |

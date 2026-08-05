@@ -1,0 +1,6 @@
+
+Running 1 test using 1 worker
+
+  ✓  1 e2e\tab-roundtrip.spec.ts:100:3 › tab round trip preserves the author's position (spec 057 US1) › mid-walk position, history and Phase B alphabet survive every tab round trip (9.4s)
+
+  1 passed (11.3s)

@@ -13,12 +13,11 @@
 // Expected pb_special_letters_list seed: "ɓ ɗ ə ŋ ɛ"
 
 import { describe, it, expect } from "vitest";
-import type { PlacementMap } from "@keyboard-studio/contracts";
+import type { PlacementMap, PlacementCandidate } from "@keyboard-studio/contracts";
 import {
   buildPlacementSeeds,
   extractSeedEntries,
-  getSuggestionForChar,
-  getSuggestionForCharWithCasePair,
+  getRankedSuggestionsForChar,
   PLACEMENT_SEED_CONFIDENCE_THRESHOLD,
 } from "./placementSeeds.ts";
 import fixtureJson from "./__fixtures__/placement-map.sample.json";
@@ -264,62 +263,309 @@ describe("extractSeedEntries — edge cases", () => {
 });
 
 // ---------------------------------------------------------------------------
-// getSuggestionForCharWithCasePair — uppercase case-pair fallback
+// getRankedSuggestionsForChar — up to 2 distinct-strategy entries
 // ---------------------------------------------------------------------------
 
-describe("getSuggestionForCharWithCasePair", () => {
-  it("synthesizes an S-08 entry for an uppercase whose lowercase sibling has a direct RALT candidate", () => {
-    // Fixture: U+0259 ə -> S-08, vkey K_E, modifiers ["RALT"], confidence 0.6.
-    // Ə (U+018F) is ə's uppercase counterpart and has no map entry of its own.
-    const entry = getSuggestionForCharWithCasePair("Ə", fixture);
-    expect(entry).not.toBeNull();
-    expect(entry!.strategyId).toBe("S-08");
-    expect(entry!.character).toBe("Ə");
-    expect(entry!.topCandidate.vkey).toBe("K_E");
-    expect(entry!.topCandidate.modifiers).toContain("SHIFT");
-    expect(entry!.topCandidate.modifiers).toContain("RALT");
+const raltCandidate: PlacementCandidate = {
+  vkey: "K_F",
+  modifiers: ["RALT"],
+  mechanism: "direct",
+  priorSource: "corpus",
+  priorCount: 5,
+  confidence: 0.7,
+};
+
+const deadkeyCandidateWithBase: PlacementCandidate = {
+  vkey: "K_F",
+  modifiers: [],
+  mechanism: "deadkey",
+  priorSource: "corpus",
+  priorCount: 8,
+  confidence: 0.8,
+  baseLetter: "f",
+};
+
+const deadkeyCandidateNoBase: PlacementCandidate = {
+  vkey: "K_F",
+  modifiers: [],
+  mechanism: "deadkey",
+  priorSource: "corpus",
+  priorCount: 2,
+  confidence: 0.6,
+  // no baseLetter — must never qualify as an S-02 suggestion.
+};
+
+const swapCandidate: PlacementCandidate = {
+  vkey: "K_F",
+  modifiers: [],
+  mechanism: "direct",
+  priorSource: "corpus",
+  priorCount: 3,
+  confidence: 0.55,
+};
+
+describe("getRankedSuggestionsForChar", () => {
+  it("returns both S-02 and S-08 entries, in candidate order, when both are attested for ƒ U+0192", () => {
+    const map: PlacementMap = {
+      entries: [
+        {
+          codepoint: "U+0192",
+          candidates: [deadkeyCandidateWithBase, raltCandidate],
+        },
+      ],
+    };
+    const entries = getRankedSuggestionsForChar("ƒ", map);
+    expect(entries).toHaveLength(2);
+    expect(entries[0]!.strategyId).toBe("S-02");
+    expect(entries[0]!.topCandidate.baseLetter).toBe("f");
+    expect(entries[1]!.strategyId).toBe("S-08");
   });
 
-  it("carries over the lowercase sibling's other PlacementCandidate fields unchanged", () => {
-    const entry = getSuggestionForCharWithCasePair("Ə", fixture);
-    const sibling = getSuggestionForChar("ə", fixture)!.topCandidate;
-    expect(entry!.topCandidate.mechanism).toBe(sibling.mechanism);
-    expect(entry!.topCandidate.priorSource).toBe(sibling.priorSource);
-    expect(entry!.topCandidate.priorCount).toBe(sibling.priorCount);
-    expect(entry!.topCandidate.confidence).toBe(sibling.confidence);
+  it("caps at 2 entries even when 3 distinct strategies are attested", () => {
+    const map: PlacementMap = {
+      entries: [
+        {
+          codepoint: "U+0192",
+          candidates: [deadkeyCandidateWithBase, raltCandidate, swapCandidate],
+        },
+      ],
+    };
+    const entries = getRankedSuggestionsForChar("ƒ", map);
+    expect(entries).toHaveLength(2);
   });
 
-  it("returns null for an uppercase whose lowercase sibling has no map entry at all", () => {
-    // "z" is not in the fixture, so "Z" has no sibling to fall back to.
-    expect(getSuggestionForCharWithCasePair("Z", fixture)).toBeNull();
+  it("drops a deadkey/store-index candidate with no corpus-attested baseLetter (per-codepoint attestation rule)", () => {
+    const map: PlacementMap = {
+      entries: [
+        {
+          codepoint: "U+0192",
+          candidates: [deadkeyCandidateNoBase, raltCandidate],
+        },
+      ],
+    };
+    const entries = getRankedSuggestionsForChar("ƒ", map);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.strategyId).toBe("S-08");
   });
 
-  it("returns null for an uppercase whose lowercase sibling is S-01 (no RALT), not S-08", () => {
-    // Fixture: U+0253 ɓ -> S-01 (modifiers: []). Ɓ (U+0181) must not fall back.
-    expect(getSuggestionForCharWithCasePair("Ɓ", fixture)).toBeNull();
+  it("never derives an S-02 suggestion from decomposability alone (only from an attested candidate)", () => {
+    // "é" decomposes (NFD: e + combining acute) but the map carries no
+    // deadkey/store-index candidate at all for it — only a direct one.
+    const map: PlacementMap = {
+      entries: [
+        {
+          codepoint: "U+00E9",
+          candidates: [
+            {
+              vkey: "K_E",
+              modifiers: [],
+              mechanism: "direct",
+              priorSource: "unicode-decomp",
+              priorCount: 0,
+              confidence: 0.9,
+            },
+          ],
+        },
+      ],
+    };
+    const entries = getRankedSuggestionsForChar("é", map);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.strategyId).toBe("S-01");
   });
 
-  it("leaves a lowercase character's own direct lookup unaffected", () => {
-    // "ə" has its own qualifying entry — must resolve exactly like
-    // getSuggestionForChar, never attempt the case-pair fallback.
-    const direct = getSuggestionForChar("ə", fixture);
-    const withFallback = getSuggestionForCharWithCasePair("ə", fixture);
-    expect(withFallback).toEqual(direct);
+  it("suppresses an S-02 suggestion for a combining-mark codepoint", () => {
+    // U+0301 COMBINING ACUTE ACCENT — even with an attested baseLetter, a
+    // combining mark must never receive a deadkey suggestion.
+    const map: PlacementMap = {
+      entries: [
+        {
+          codepoint: "U+0301",
+          candidates: [
+            {
+              vkey: "K_QUOTE",
+              modifiers: [],
+              mechanism: "deadkey",
+              priorSource: "corpus",
+              priorCount: 5,
+              confidence: 0.8,
+              baseLetter: "a",
+            },
+          ],
+        },
+      ],
+    };
+    const entries = getRankedSuggestionsForChar("́", map);
+    expect(entries).toHaveLength(0);
   });
 
-  it("leaves a character with its own qualifying entry unaffected even when it also has a case pair", () => {
-    // Fixture: U+025B ɛ -> S-01 direct entry of its own. Confirm the fallback
-    // path is never reached (S-01 entry returned as-is, not overridden).
-    const direct = getSuggestionForChar("ɛ", fixture);
-    const withFallback = getSuggestionForCharWithCasePair("ɛ", fixture);
-    expect(withFallback).toEqual(direct);
+  it("returns entries unmodified when char has its own qualifying entry (no inheritance attempted)", () => {
+    const map: PlacementMap = {
+      entries: [
+        { codepoint: "U+0192", candidates: [deadkeyCandidateWithBase] },
+      ],
+    };
+    const entries = getRankedSuggestionsForChar("ƒ", map);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.strategyId).toBe("S-02");
   });
 
-  it("suppresses the fallback for an orthographically-unicameral (Georgian) case pair", () => {
-    // Custom map: lowercase Mkhedruli ა (U+10D0) has a qualifying direct RALT
-    // (S-08) candidate. Its Unicode-formal uppercase Mtavruli counterpart
-    // Ⴀ/Ა (U+1C90) must NOT receive a synthesized suggestion — Georgian
-    // orthography does not case-alternate (see casePairCompanion.ts).
+  it("returns an empty list when the codepoint is entirely absent from the map", () => {
+    expect(getRankedSuggestionsForChar("ƒ", { entries: [] })).toEqual([]);
+  });
+
+  // -- Case-pair inheritance: S-08 shape --------------------------------
+
+  it("case-pair inheritance (S-08): uppercase inherits the lowercase's RALT entry, shifted", () => {
+    const entries = getRankedSuggestionsForChar("Ə", fixture);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.strategyId).toBe("S-08");
+    expect(entries[0]!.topCandidate.modifiers).toContain("SHIFT");
+    expect(entries[0]!.topCandidate.modifiers).toContain("RALT");
+  });
+
+  // -- Case-pair inheritance: S-01 shape --------------------------------
+
+  it("case-pair inheritance (S-01): uppercase inherits the lowercase's swap entry as a same-vkey Shift-plane suggestion", () => {
+    // A synthetic single-letter map: lowercase "f" has a direct (S-01)
+    // candidate; uppercase "F" has none of its own, so it must inherit.
+    const asciiMap: PlacementMap = {
+      entries: [
+        {
+          codepoint: "U+0066", // "f"
+          candidates: [
+            {
+              vkey: "K_F",
+              modifiers: [],
+              mechanism: "direct",
+              priorSource: "corpus",
+              priorCount: 4,
+              confidence: 0.9,
+            },
+          ],
+        },
+      ],
+    };
+    const entries = getRankedSuggestionsForChar("F", asciiMap);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.strategyId).toBe("S-01");
+    expect(entries[0]!.topCandidate.vkey).toBe("K_F");
+    expect(entries[0]!.topCandidate.modifiers).toEqual(["SHIFT"]);
+  });
+
+  // -- Case-pair inheritance: S-02 shape --------------------------------
+
+  it("case-pair inheritance (S-02): uppercase inherits the lowercase's deadkey entry with a case-shifted baseLetter", () => {
+    const asciiDeadkeyMap: PlacementMap = {
+      entries: [
+        {
+          codepoint: "U+0066", // "f"
+          candidates: [
+            {
+              vkey: "K_QUOTE",
+              modifiers: [],
+              mechanism: "deadkey",
+              priorSource: "corpus",
+              priorCount: 6,
+              confidence: 0.8,
+              baseLetter: "f",
+            },
+          ],
+        },
+      ],
+    };
+    const entries = getRankedSuggestionsForChar("F", asciiDeadkeyMap);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.strategyId).toBe("S-02");
+    expect(entries[0]!.topCandidate.baseLetter).toBe("F");
+    // vkey/modifiers untouched — only baseLetter is case-shifted.
+    expect(entries[0]!.topCandidate.vkey).toBe("K_QUOTE");
+    expect(entries[0]!.topCandidate.modifiers).toEqual([]);
+  });
+
+  it("skips the S-02 inheritance entry when the lowercase's baseLetter has no case counterpart", () => {
+    // A lowercase entry ("g") whose corpus-attested baseLetter is "1"
+    // (caseless — caseCounterpart("1") is null) must have its S-02 entry
+    // SKIPPED on inheritance, not substituted with anything else — "G"
+    // ends up with no ranked suggestions at all.
+    const numeralBaseMap: PlacementMap = {
+      entries: [
+        {
+          codepoint: "U+0067", // "g"
+          candidates: [
+            {
+              vkey: "K_QUOTE",
+              modifiers: [],
+              mechanism: "deadkey",
+              priorSource: "corpus",
+              priorCount: 6,
+              confidence: 0.8,
+              baseLetter: "1",
+            },
+          ],
+        },
+      ],
+    };
+    const inherited = getRankedSuggestionsForChar("G", numeralBaseMap);
+    expect(inherited).toHaveLength(0);
+  });
+
+  // -- Turkic i/İ (bcp47="tr") -------------------------------------------
+
+  it("Turkic bcp47 'tr': uppercase İ inherits lowercase i's entries with locale-correct casing", () => {
+    const map: PlacementMap = {
+      entries: [
+        {
+          codepoint: "U+0069", // "i"
+          candidates: [
+            {
+              vkey: "K_I",
+              modifiers: ["RALT"],
+              mechanism: "direct",
+              priorSource: "corpus",
+              priorCount: 4,
+              confidence: 0.8,
+            },
+          ],
+        },
+      ],
+    };
+    // Under "tr", caseCounterpart("İ", "tr") maps back to "i" (toLower), so
+    // İ (U+0130) qualifies as the uppercase half whose lowercase sibling is
+    // looked up.
+    const entries = getRankedSuggestionsForChar("İ", map, PLACEMENT_SEED_CONFIDENCE_THRESHOLD, "tr");
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.strategyId).toBe("S-08");
+    expect(entries[0]!.topCandidate.modifiers).toContain("SHIFT");
+  });
+
+  it("Turkic bcp47 'tr': dotless deadkey baseLetter 'i' case-shifts to dotted 'İ'", () => {
+    const map: PlacementMap = {
+      entries: [
+        {
+          codepoint: "U+0069", // "i"
+          candidates: [
+            {
+              vkey: "K_QUOTE",
+              modifiers: [],
+              mechanism: "deadkey",
+              priorSource: "corpus",
+              priorCount: 6,
+              confidence: 0.8,
+              baseLetter: "i",
+            },
+          ],
+        },
+      ],
+    };
+    const entries = getRankedSuggestionsForChar("İ", map, PLACEMENT_SEED_CONFIDENCE_THRESHOLD, "tr");
+    expect(entries).toHaveLength(1);
+    expect(entries[0]!.strategyId).toBe("S-02");
+    expect(entries[0]!.topCandidate.baseLetter).toBe("İ");
+  });
+
+  // -- Georgian suppression ------------------------------------------------
+
+  it("suppresses case-pair inheritance for an orthographically-unicameral (Georgian) pair", () => {
     const georgianMap: PlacementMap = {
       entries: [
         {
@@ -337,20 +583,15 @@ describe("getSuggestionForCharWithCasePair", () => {
         },
       ],
     };
-    // Sanity: the lowercase entry itself qualifies (so a false "no sibling"
-    // pass would be a false positive for the suppression test).
-    expect(getSuggestionForChar("ა", georgianMap)).not.toBeNull();
-    expect(
-      getSuggestionForCharWithCasePair("Ა", georgianMap),
-    ).toBeNull();
+    expect(getRankedSuggestionsForChar("ა", georgianMap)).toHaveLength(1);
+    expect(getRankedSuggestionsForChar("Ა", georgianMap)).toEqual([]);
   });
 
-  it("returns null when char has no case counterpart at all (caseless script)", () => {
-    // Arabic ب has no Lu/Ll case distinction — caseCounterpart returns null.
-    expect(getSuggestionForCharWithCasePair("ب", fixture)).toBeNull();
+  it("returns an empty list for a caseless script char with no case counterpart at all", () => {
+    expect(getRankedSuggestionsForChar("ب", fixture)).toEqual([]);
   });
 
-  it("returns null for an empty-string char (null-safety)", () => {
-    expect(getSuggestionForCharWithCasePair("", fixture)).toBeNull();
+  it("returns an empty list for an empty-string char (null-safety)", () => {
+    expect(getRankedSuggestionsForChar("", fixture)).toEqual([]);
   });
 });

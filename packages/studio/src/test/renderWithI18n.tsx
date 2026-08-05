@@ -9,7 +9,7 @@
 // the app root) needs its own provider.
 //
 // Rather than duplicate "i18n.load/activate + wrap in <I18nProvider>" at
-// every render() call site (the pattern PreviewShell.test.tsx pioneered
+// every render() call site (the pattern OutputScreen.test.tsx pioneered
 // per-file), this module centralizes it ONCE: `render` here is a drop-in
 // replacement for @testing-library/react's `render` that supplies the
 // provider via RTL's `wrapper` option. `wrapper` is threaded through
