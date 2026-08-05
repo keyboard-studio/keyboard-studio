@@ -62,6 +62,7 @@ import {
   useMemo,
   useRef,
   type CSSProperties,
+  type ReactNode,
 } from "react";
 import type { I18n } from "@lingui/core";
 import { Trans, useLingui } from "@lingui/react/macro";
@@ -124,6 +125,8 @@ import {
   CUSTOM_KEY_OPTION_VALUE,
 } from "../../lib/keyOptions.ts";
 import { formatModifierCombo } from "../../lib/modifierTokenLabel.ts";
+import { keyLabelOrRaw } from "../../lib/keyLabel.ts";
+import { KeyCap } from "../../ui/KeyCap.tsx";
 import {
   resolveCharInput,
   resolveKeyPickerSelection,
@@ -4196,21 +4199,40 @@ export function MechanismGallery({
                 }}
               >
                 {visibleSuggestions.map((entry) => {
-                  const keyName = entry.topCandidate.vkey.replace(/^K_/, "");
-                  const charOrEmpty =
-                    currentChar !== null ? displayChar(currentChar) : "";
+                  // Keycap convention (physical-key-naming ambiguity fix): the
+                  // physical key is named by its unshifted, lowercase glyph and
+                  // boxed as a keycap, with the word "key" in the surrounding
+                  // phrase — a bare uppercase "Q" reads as the capital
+                  // CHARACTER Q, not the physical q key. Produced characters
+                  // are quoted in their real case (never lowercased) via
+                  // displayChar. See lib/keyLabel.ts. Computed per-entry
+                  // (rather than hoisted once, now that this renders a LIST of
+                  // suggestions) and reused for both the visible message and
+                  // this entry's accept button aria-label, so the two can
+                  // never desync for a given entry — mirrors
+                  // CasePairProposalBanner's `keyNameFor`.
+                  const keyName = keyLabelOrRaw(entry.topCandidate.vkey);
+                  // Quoted IN THE VALUE, not the message template — an
+                  // apostrophe inside an ICU/Lingui message is escape syntax
+                  // (it opens a quoted-literal region, swallowing any
+                  // `{placeholder}` inside it instead of interpolating), so the
+                  // quote marks must travel with the interpolated value itself.
+                  const quotedChar =
+                    currentChar !== null ? `'${displayChar(currentChar)}'` : "";
                   const comboTokens = suggestionComboTokensFor(entry);
 
-                  let text: string;
+                  let text: ReactNode;
                   let acceptAriaLabel: string;
                   if (entry.strategyId === "S-01") {
-                    text = t({
-                      id: "editor.assignLoop.suggestion.replaceText",
-                      message: `Suggested: Replace ${keyName} with ${charOrEmpty}`,
-                    });
+                    text = (
+                      <Trans id="editor.assignLoop.suggestion.replaceText">
+                        Suggested: Replace the <KeyCap>{keyName}</KeyCap> key
+                        with {quotedChar}
+                      </Trans>
+                    );
                     acceptAriaLabel = t({
                       id: "editor.assignLoop.suggestion.acceptSwapAriaLabel",
-                      message: `Accept suggestion: assign ${charOrEmpty} to ${entry.topCandidate.vkey}`,
+                      message: `Accept suggestion: replace the ${keyName} key with ${quotedChar}`,
                     });
                   } else if (entry.strategyId === "S-08") {
                     // Derive the label from the candidate's OWN modifiers
@@ -4219,27 +4241,38 @@ export function MechanismGallery({
                     // (modifierTokenLabel.ts) rather than a second copy, so a
                     // case-pair fallback candidate's ["SHIFT","RALT"] renders
                     // "Shift+RAlt" instead of the plain-RAlt lowercase text.
+                    // The shift is conveyed by the modifier word, not by
+                    // casing the key letter itself.
                     const modifierLabel = formatModifierCombo(comboTokens);
-                    text = t({
-                      id: "editor.assignLoop.suggestion.raltText",
-                      message: `Suggested: ${modifierLabel} + ${keyName} for ${charOrEmpty}`,
-                    });
+                    text = (
+                      <Trans id="editor.assignLoop.suggestion.raltText">
+                        Suggested: {modifierLabel} +{" "}
+                        <KeyCap>{keyName}</KeyCap> for {quotedChar}
+                      </Trans>
+                    );
                     acceptAriaLabel = t({
                       id: "editor.assignLoop.suggestion.acceptRaltAriaLabel",
-                      message: `Accept suggestion: ${modifierLabel} + ${entry.topCandidate.vkey} for ${charOrEmpty}`,
+                      message: `Accept suggestion: ${modifierLabel} + ${keyName} key for ${quotedChar}`,
                     });
                   } else {
                     // S-02: corpus-attested deadkey/store-index — named by
                     // its mechanism ("Deadkey"), consistent with S-01's
-                    // "Replace" and S-08's modifier-combo attribution.
-                    const baseLetter = entry.topCandidate.baseLetter ?? "";
+                    // "Replace" and S-08's modifier-combo attribution. Unlike
+                    // keyName above, baseLetter here is a PRODUCED CHARACTER
+                    // (the deadkey's own base-tap output), not a physical
+                    // key — so it is quoted in its real case via displayChar,
+                    // never lowercased and never boxed as a <KeyCap>, the
+                    // same treatment quotedChar gets.
+                    const quotedBase = entry.topCandidate.baseLetter
+                      ? `'${displayChar(entry.topCandidate.baseLetter)}'`
+                      : "";
                     text = t({
                       id: "editor.assignLoop.suggestion.deadkeyText",
-                      message: `Suggested: Deadkey → ${baseLetter} for ${charOrEmpty}`,
+                      message: `Suggested: Deadkey → ${quotedBase} for ${quotedChar}`,
                     });
                     acceptAriaLabel = t({
                       id: "editor.assignLoop.suggestion.acceptDeadkeyAriaLabel",
-                      message: `Accept suggestion: deadkey via base letter ${baseLetter} for ${charOrEmpty}`,
+                      message: `Accept suggestion: deadkey via base letter ${quotedBase} for ${quotedChar}`,
                     });
                   }
 

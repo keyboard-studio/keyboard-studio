@@ -4203,7 +4203,7 @@ describe("TouchGallery — case-pair proposal on a non-default touch layer", () 
     expect(screen.getByText(/Map Θ to the Shift\+RAlt layer as well\?/i)).toBeTruthy();
     await act(async () => {
       fireEvent.click(
-        screen.getByRole("button", { name: /Map Θ to the Shift\+RAlt layer of K_A/i }),
+        screen.getByRole("button", { name: /Map Θ to the Shift\+RAlt layer of the a key/i }),
       );
     });
 
