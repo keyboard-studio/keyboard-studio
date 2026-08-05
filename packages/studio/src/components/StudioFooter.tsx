@@ -20,6 +20,8 @@ import { useLingui } from "@lingui/react/macro";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
+import { useStepWalkStore } from "../stores/stepWalkStore.ts";
+import { stepPositionIds } from "../lib/stepWalk.ts";
 import { manifest } from "../steps/manifest.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import { deriveProjectLabel } from "../lib/projectLabel.ts";
@@ -65,13 +67,24 @@ export function StudioFooter() {
 
   const hasProject = baseKeyboard !== null;
 
+  // ---------------------------------------------------------------------------
+  // Within-step walks — the per-question / per-character stops each stage's own
+  // component publishes (see lib/stepWalk.ts). This is what turns a stage with
+  // a dozen internal stops from one dot into a dozen, and what makes the
+  // current-position marker question-accurate during ordinary forward walking
+  // rather than only right after a deep-link arrival.
+  // ---------------------------------------------------------------------------
+  const walks = useStepWalkStore((s) => s.walks);
+  const cursors = useStepWalkStore((s) => s.cursors);
+
   // `peekPendingJump()` is a plain read of jumpToLocation.ts's module-level
-  // slot, not a subscribable store — there is no reactive primitive for it
-  // (Phase 5/US3's deep-link consumption, T042/T043, had not landed when this
-  // was written). Read fresh on every render; a jump's own `navigateTo` call
-  // changes the hash, which re-renders this component's ancestor anyway, so
-  // the value is live at the render that matters (see progressDots.ts's
-  // module header for the fuller architecture-gap note).
+  // slot, not a subscribable store. It remains the fallback refinement for the
+  // stage dot of a step that has published no walk (a deep-link arrival landing
+  // before the runner mounts); a published walk supersedes it, and the walk's
+  // cursor is what a jump now writes (see jumpToLocation.ts). Read fresh on
+  // every render; a jump's own `navigateTo` call changes the hash, which
+  // re-renders this component's ancestor anyway, so the value is live at the
+  // render that matters.
   const currentQuestion = peekPendingJump()?.question;
 
   const ctx: ResolveContext = useMemo(
@@ -80,8 +93,11 @@ export function StudioFooter() {
       questionRegistry,
       traversal: { activeStepId, history, selectedTrack } as unknown as ResolveContext["traversal"],
       hasProject,
+      // Without this, a dot naming a gallery character would refuse itself as
+      // `question-not-in-build` — a character has no questionRegistry entry.
+      stepPositions: stepPositionIds(walks),
     }),
-    [activeStepId, history, selectedTrack, hasProject],
+    [activeStepId, history, selectedTrack, hasProject, walks],
   );
 
   const dots = useMemo(
@@ -90,9 +106,11 @@ export function StudioFooter() {
         record,
         ctx,
         i18n,
+        stepWalks: walks,
+        stepCursors: cursors,
         ...(currentQuestion !== undefined ? { currentQuestion } : {}),
       }),
-    [record, ctx, i18n, currentQuestion],
+    [record, ctx, i18n, walks, cursors, currentQuestion],
   );
 
   // ---------------------------------------------------------------------------
@@ -197,7 +215,17 @@ export function StudioFooter() {
         }}
       >
         {dots.map((dot) => (
-          <ProgressDot key={`${dot.kind}:${dot.id}`} dot={dot} onActivate={handleActivate} />
+          // Keyed by STEP + stop, not by kind + stop. Two reasons, both now real:
+          // the mechanisms and touch walks address the same characters, so the
+          // same token id appears twice in one row and `kind:id` alone would
+          // collide; and a stop's kind CHANGES as the author answers it
+          // (upcoming -> completed -> current), which under a kind-bearing key
+          // unmounts and remounts the button — throwing away focus mid-Tab.
+          <ProgressDot
+            key={`${dot.location.step ?? "-"}:${dot.id}`}
+            dot={dot}
+            onActivate={handleActivate}
+          />
         ))}
       </div>
 

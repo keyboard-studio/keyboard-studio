@@ -104,6 +104,10 @@ import {
   deriveSeedLayout,
 } from "../../lib/buildTouchLayoutJson.ts";
 import { resolveBaseTouchJson } from "../../lib/resolveBaseTouchJson.ts";
+import { TOUCH_STEP_ID } from "../../steps/reducer.ts";
+import { useCharWalkPosition } from "../../hooks/useCharWalkPosition.ts";
+import { cursorCharIn } from "../../lib/stepWalk.ts";
+import { peekStepCursor } from "../../stores/stepWalkStore.ts";
 import {
   formatModifierCombo,
   MODIFIER_TOKEN_LABELS,
@@ -1876,6 +1880,12 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       // collateInventory's NFC-dedup) doesn't spuriously look like a removal.
       if (prev !== null && indexOfChar(touchLettersToAdd, prev) !== -1) return prev;
       if (prev === null) {
+        // ARRIVAL POSITION — a stored cursor outranks the heuristic below; it is
+        // either where the author was before a tab switch unmounted this gallery
+        // or the character a footer dot asked for. Same rule MechanismGallery
+        // applies to its own walk; see lib/stepWalk.ts.
+        const requested = cursorCharIn(peekStepCursor(TOUCH_STEP_ID), touchLettersToAdd);
+        if (requested !== null) return requested;
         // First-ever pick — prefer the first unconfigured char.
         return (
           touchLettersToAdd.find((c) => !charTouch.has(c)) ??
@@ -1893,6 +1903,18 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     // Only re-run when the walk list itself changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [touchLettersToAddKey]);
+
+  // Bind this walk to the shared within-step position model — one footer dot per
+  // character, and a jump into the middle of the walk lands. Declared AFTER the
+  // sync effect above, which owns the arrival position (see the hook's header).
+  const isCharConfigured = useCallback((char: string) => charTouch.has(char), [charTouch]);
+  useCharWalkPosition({
+    stepId: TOUCH_STEP_ID,
+    list: touchLettersToAdd,
+    currentChar,
+    setCurrentChar,
+    isDone: isCharConfigured,
+  });
 
   // FR-008 completion gate: names of chars with no reachable touch mechanism
   // on the final layout, formatted for display near the completion control.

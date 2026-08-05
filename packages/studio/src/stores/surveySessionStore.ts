@@ -32,13 +32,19 @@
 
 import { create } from "zustand";
 import type { BaseKeyboard, SurveyPhaseResult } from "@keyboard-studio/contracts";
-// Imported directly from the leaf modules (IdentityLite.tsx / types.ts), NOT
-// from the survey/index.ts barrel — that barrel re-exports PhaseB.tsx at
-// runtime, and PhaseB.tsx now imports this store at runtime too (the Phase B
-// character-map pane work), so a type-only import from the barrel here would
-// close a runtime dependency cycle (depcruise no-circular). See survey/types.ts's
-// Track docstring for the full story.
-import type { IdentityLiteResult } from "../survey/IdentityLite.tsx";
+// Imported directly from TYPE-ONLY LEAF modules (identityLiteResult.ts /
+// types.ts), NOT from the survey/index.ts barrel — that barrel re-exports
+// PhaseB.tsx at runtime, and PhaseB.tsx now imports this store at runtime too
+// (the Phase B character-map pane work), so a type-only import from the barrel
+// here would close a runtime dependency cycle (depcruise no-circular). See
+// survey/types.ts's Track docstring for the full story.
+//
+// `identityLiteResult.ts` rather than `IdentityLite.tsx`: SurveyRunner now reads
+// `activeStepId` from this store (to know which step's walk it publishes — see
+// lib/stepWalk.ts), and IdentityLite.tsx renders SurveyRunner, so importing the
+// component module here would close the loop even for a type. That extracted
+// leaf has no runtime dependencies at all.
+import type { IdentityLiteResult } from "../survey/identityLiteResult.ts";
 import type { SurveyContext, Track } from "../survey/types.ts";
 import type { ScaffoldSpec } from "../hooks/useKeyboardArtifact.ts";
 // Runtime import of the sibling store (one-directional: workingCopyStore.ts
