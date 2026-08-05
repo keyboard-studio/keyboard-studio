@@ -11,6 +11,9 @@ import {
   renderLicense,
   renderHolderLine,
   effectiveHolder,
+  parseCopyright,
+  addHolder,
+  orderHolders,
   MIT_BODY,
   DEFAULT_MARKER,
 } from "@keyboard-studio/contracts";
@@ -269,28 +272,47 @@ const KMW_JS_TARGETS = new Set([
 /**
  * The single source of truth for this keyboard's attribution (spec 037 FR-003).
  *
- * LICENSE.md, store(&COPYRIGHT), and .kps <Copyright> all read from HERE, so they
+ * LICENSE.md, store(&COPYRIGHT) and .kps <Copyright> all read from HERE, so they
  * cannot drift — 22 shipped keyboards disagree between their LICENSE.md and .kmn
  * precisely because those strings were built independently.
  *
- * `line` is null when attribution is absent: the scaffolder then omits the notice
- * rather than inventing one. Naming the keyboard's own display name as rights
- * holder (the pre-037 behaviour) is a false attribution, and a missing notice
- * that lint flags is strictly better than a wrong one.
+ * ACCUMULATES rather than replaces (spec 037 US2 / FR-007 / FR-008). MIT requires
+ * the original copyright notice be retained in a derivative, so a keyboard derived
+ * from a base carries the base's holders VERBATIM and appends the new author:
+ *
+ *   Copyright (c) 2016-2021 Original Author     <- inherited, byte-identical
+ *   Copyright (c) 2024 Second Author            <- inherited, byte-identical
+ *   Copyright © 2026 New Author                 <- added by this session
+ *
+ * Ordering is chronological by earliest year with inherited holders first (D3),
+ * so the provenance chain reads top to bottom. A holder who derives again has
+ * their year range extended rather than a duplicate line added (P8).
+ *
+ * `line` is null only when there is NOTHING to state — no attribution AND no
+ * inherited holders. The scaffolder then omits the notice rather than inventing
+ * one; it never names the keyboard's own display name as rights holder.
  */
 function attributionText(
   attribution: Attribution | undefined,
   emitYear: number,
-): { line: string | null; license: string } {
+  inherited: readonly import("@keyboard-studio/contracts").CopyrightHolder[] = [],
+): { line: string | null; license: string; holderCount: number } {
   const holder = attribution !== undefined ? effectiveHolder(attribution) : "";
-  if (holder === "") {
-    // MIT body alone — no copyright line to state.
-    return { line: null, license: `${MIT_BODY}\n` };
+  const block =
+    holder !== ""
+      ? addHolder(inherited, holder, emitYear)
+      : orderHolders(inherited);
+
+  if (block.length === 0) {
+    // MIT body alone — no holder to name.
+    return { line: null, license: `${MIT_BODY}\n`, holderCount: 0 };
   }
-  const block = [
-    { name: holder, years: [emitYear], marker: DEFAULT_MARKER, inherited: false },
-  ];
-  return { line: renderHolderLine(block[0]!), license: renderLicense(block) };
+
+  // The .kmn store and .kps <Copyright> are single-valued, so a multi-holder
+  // chain is joined onto one line. LICENSE.md is the authoritative notice (D4)
+  // and keeps one holder per line; these two are metadata mirrors of it.
+  const line = block.map(renderHolderLine).join("; ");
+  return { line, license: renderLicense(block), holderCount: block.length };
 }
 
 function buildKpsContent(
@@ -359,12 +381,15 @@ function generateStubs(
   version: string,
   attribution: Attribution | undefined,
   emitYear: number,
+  inherited: readonly import("@keyboard-studio/contracts").CopyrightHolder[],
 ): void {
   const now = new Date();
   const yyyy = emitYear;
   const mm = String(now.getMonth() + 1).padStart(2, "0");
   const dd = String(now.getDate()).padStart(2, "0");
-  const { line: copyrightLine, license } = attributionText(attribution, emitYear);
+  // spec 037 US2: the merged block — inherited holders retained verbatim with the
+  // new author appended, NOT replaced.
+  const { line: copyrightLine, license } = attributionText(attribution, emitYear, inherited);
 
   const stubs: Array<{ path: string; content: string | Uint8Array; isBinary?: boolean }> = [
     {
@@ -479,15 +504,11 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
       };
       const vfs = createVirtualFS();
       const warnings: string[] = [];
+      let baseLicenseText: string | undefined;
       const attribution = scaffoldOpts?.attribution;
       // spec 037 D2: the year records when the work was PUBLISHED, and is
       // injectable so tests never read the clock.
       const emitYear = scaffoldOpts?.emitYear ?? new Date().getFullYear();
-      const { line: copyrightLine } = attributionText(attribution, emitYear);
-      // Signalled via ScaffoldResult.attributionMissing rather than a warning:
-      // `warnings` means "fell back to stub-only output", and overloading it
-      // would make every un-attributed scaffold look like a fetch failure.
-      const attributionMissing = copyrightLine === null;
       // Shared IR-apply path for both the base-fetched .kmn and the caller-supplied
       // pre-parsed IR branches below: refine group, scaffold identity/group into
       // the IR, then emit the .kmn text back into the VFS.
@@ -520,6 +541,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         loaderFonts = loaderResult.fonts;
         loaderStylesheets = loaderResult.stylesheets;
         warnings.push(...loaderResult.warnings);
+        baseLicenseText = loaderResult.baseLicenseText;
       } catch (err) {
         // fetchKeyboardSourceToVfs throws when the required .kmn is unreachable
         // (network error, 404, or offline). Fall through to stub-only output and
@@ -528,6 +550,49 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
           `base keyboard source unavailable — stub-only output (${err instanceof Error ? err.message : String(err)})`
         );
       }
+
+      // ---------------------------------------------------------------------
+      // spec 037 US2: resolve the INHERITED copyright holders now that the base
+      // has been fetched, then merge the new author on top.
+      //
+      // D4 precedence: LICENSE.md is authoritative. It is the notice MIT's own
+      // text refers to ("the above copyright notice"), and it is the better-formed
+      // source — 918 of 920 shipped license lines carry a year, against 366 of 922
+      // .kmn COPYRIGHT values. The two are NEVER merged into separate holders:
+      // the 22 observed disagreements are the in-progress SIL International ->
+      // SIL Global rename applied to one file and not the other, and treating
+      // that as two rights holders would fabricate one out of drift.
+      // ---------------------------------------------------------------------
+      let inheritedHolders: readonly import("@keyboard-studio/contracts").CopyrightHolder[] = [];
+      let licenseUnparseable: { reason: string; line: string } | null = null;
+
+      if (baseLicenseText !== undefined) {
+        const parsed = parseCopyright(baseLicenseText);
+        if (parsed.ok) {
+          inheritedHolders = parsed.block;
+        } else if (parsed.reason === "no_copyright_line") {
+          // A license file with no notice at all states no holder to retain.
+          // Nothing to inherit, and nothing was destroyed.
+          inheritedHolders = [];
+        } else {
+          // D5: the file HAS a notice we cannot read (an unfilled template, or a
+          // year with no holder). Refuse rather than silently drop it — emitting
+          // a LICENSE.md whose only holder is the current user would strip a real
+          // notice, which is the defect FR-010 exists to prevent.
+          licenseUnparseable = { reason: parsed.reason, line: parsed.line };
+        }
+      }
+
+      const { line: copyrightLine, holderCount } = attributionText(
+        attribution,
+        emitYear,
+        inheritedHolders,
+      );
+
+      // Signalled via ScaffoldResult.attributionMissing rather than a warning:
+      // `warnings` means "fell back to stub-only output", and overloading it
+      // would make every un-attributed scaffold look like a fetch failure.
+      const attributionMissing = copyrightLine === null;
 
       const kmnVfsPath = vfs.list("source/").find((p) => p.endsWith(".kmn"));
       const actualBaseId = kmnVfsPath != null
@@ -553,9 +618,18 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         base.version ?? "1.0",
         attribution,
         emitYear,
+        inheritedHolders,
       );
 
-      return { vfs, warnings, fonts: loaderFonts, stylesheets: loaderStylesheets, attributionMissing };
+      return {
+        vfs,
+        warnings,
+        fonts: loaderFonts,
+        stylesheets: loaderStylesheets,
+        attributionMissing,
+        inheritedHolderCount: inheritedHolders.length,
+        ...(licenseUnparseable !== null ? { licenseUnparseable } : {}),
+      };
     },
 
     async listTemplates(): Promise<string[]> {

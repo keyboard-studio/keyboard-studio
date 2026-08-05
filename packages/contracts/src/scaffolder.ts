@@ -95,6 +95,27 @@ export interface ScaffoldResult {
    * name as rights holder) was a false attribution.
    */
   attributionMissing: boolean;
+  /**
+   * How many copyright holders were INHERITED from the base's `LICENSE.md`
+   * (spec 037 US2). Zero for a keyboard with no base license to retain.
+   *
+   * MIT requires the original notice be retained in a derivative, so a non-zero
+   * count means the emitted `LICENSE.md` carries those holders verbatim with the
+   * new author appended — never replacing them.
+   */
+  inheritedHolderCount: number;
+  /**
+   * Set when the base HAS a copyright notice that could not be read (spec 037
+   * D5) — an unfilled `Copyright (c) YYYY ____` template, or a year with no
+   * holder. Both are real shipped files.
+   *
+   * Callers MUST block publish/download on this rather than proceed: emitting a
+   * `LICENSE.md` whose only holder is the current user would strip a real notice,
+   * which is the defect FR-010 exists to prevent. The remedy is to let the author
+   * enter the original holder manually, which preserves the notice instead of
+   * dropping it — a hard block with an escape hatch, not a dead end.
+   */
+  licenseUnparseable?: { reason: string; line: string };
 }
 
 /**

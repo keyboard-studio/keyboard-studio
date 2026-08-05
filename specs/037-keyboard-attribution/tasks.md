@@ -2,10 +2,14 @@
 
 **Feature**: `037-keyboard-attribution` | **Spec**: [spec.md](spec.md) | **Plan**: [plan.md](plan.md)
 
-**Scope of this file**: **Slice A (US1) only** — attribution capture and emission. Slice B (US2,
-the base-`LICENSE.md` fetch, parse, and provenance chain) is deliberately **not broken down
-here** because it is gated on rulings for **D4** (`LICENSE.md` vs `.kmn` precedence) and **D5**
-(unparseable-license failure mode). Slice A does not depend on either.
+**Scope of this file**: Slice A (US1) in full, plus the **Slice B core** (US2) — see Phase 5.
+
+Slice B was originally held back pending rulings on D4 and D5. The user has since ruled directly
+on the substance: *"a derived keyboard needs to have the base author's notice with the new author
+added to it not replacing it."* The accumulation is therefore built, with D4 (LICENSE.md
+authoritative, never merged with the `.kmn`) and D5 (unparseable notice blocks rather than being
+dropped) implemented **as proposed in [research.md](research.md)** — both remain overturnable,
+and neither changes the accumulation behaviour itself.
 
 US3 (persistence) has **no tasks of its own**: `Attribution` rides the existing localStorage
 draft ([034](../034-mvp-authoring-walk/spec.md) US3) by virtue of living on the working copy.
@@ -213,3 +217,40 @@ T015 lands **membership only**. The three revived questions were written for a f
 battery, not for a prefilled confirm-this step, so their **prompt and help text almost certainly
 need rewording** — and that text is Content-owned. Raise it as a separate Content-owned change
 rather than having Engine rewrite survey copy inside this feature.
+
+---
+
+## Phase 5: User Story 2 — a derived keyboard retains the base author (Priority: P1)
+
+**Goal**: MIT requires the original copyright notice be retained in a derivative. A keyboard
+derived from a base carries the base's holders **verbatim** with the new author **appended** —
+never substituted.
+
+**Independent test**: Derive from a base whose `LICENSE.md` reads
+`Copyright (c) 2016-2021 Original Author`; confirm the emitted `LICENSE.md` contains that line
+byte-identically plus a new line for the deriving author, ordered oldest first.
+
+- [x] T031 [US2] Fetch the base's `LICENSE.md` into `FetchKeyboardSourceResult.baseLicenseText` in `packages/engine/src/loader/fetchKeyboardSourceToVfs.ts` (FR-011) — it lives at the keyboard ROOT, not under `source/`, so it is a separate fetch from the sibling-asset walk. Absence is non-fatal and not a warning: ~545 of 554 legacy keyboards have none
+- [x] T032 [US2] Parse it with `parseCopyright` and resolve inherited holders in `packages/engine/src/scaffolder/index.ts`, applying **D4** — `LICENSE.md` authoritative, the two sources NEVER merged into separate holders
+- [x] T033 [US2] Make `attributionText()` ACCUMULATE via `addHolder`/`orderHolders` instead of emitting a single holder (FR-007/FR-008/D3)
+- [x] T034 [US2] Surface **D5** as `ScaffoldResult.licenseUnparseable` — an unreadable notice must block, never be silently dropped (FR-010)
+- [x] T035 [US2] Report `ScaffoldResult.inheritedHolderCount` so callers can tell a retained chain from a fresh keyboard
+- [x] T036 [US2] Assert the accumulation in `packages/engine/src/scaffolder/scaffolder.test.ts` — retention, byte-identical inherited lines, chronological order, third-generation chains, the SIL rename left alone, year-range extension on re-derivation, and all four D5 cases
+
+**PHASE 5 DONE 2026-08-04.** contracts 454, engine 1549, studio 3740 — all green.
+
+Verified by mutation: replacing instead of accumulating (7 failures), not fetching the base
+license (10), swallowing the D5 case (2), and putting only the new author in the `.kmn` store (1)
+each turn the suite red.
+
+**One documented limitation.** `store(&COPYRIGHT)` and `.kps <Copyright>` are single-valued, so a
+multi-holder chain is joined onto one line with `"; "`. `LICENSE.md` keeps one holder per line and
+is the authoritative notice (D4); the other two are metadata mirrors. Consequence:
+`parseCopyright` splits on newlines, so re-reading a `.kmn` store would see one compound holder
+rather than several. That is acceptable because D4 makes `LICENSE.md` the source a fork reads —
+but it means the `.kmn` is not a lossless fallback for a multi-generation chain.
+
+### Still open in US2
+
+- [ ] T037 [US2] Surface `licenseUnparseable` in the UI as a hard block with the manual-entry escape hatch D5 requires — the engine reports it, but no caller gates on it yet, so today an unreadable base notice is *flagged and ignored*
+- [ ] T038 [US2] Decide whether `.kps <Copyright>` should carry the joined chain or only the primary holder (see the limitation above)

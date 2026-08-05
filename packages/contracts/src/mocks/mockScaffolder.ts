@@ -44,6 +44,8 @@ export const mockScaffolder: ScaffolderService = {
       // copyright notice was emitted. Derived rather than hard-coded so a caller
       // testing the un-attributed gate gets the same answer from the mock.
       attributionMissing: opts?.attribution === undefined,
+      // The mock fetches nothing, so it inherits nothing.
+      inheritedHolderCount: 0,
     });
   },
 

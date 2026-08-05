@@ -755,3 +755,138 @@ describe("attribution emission (spec 037)", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// US2 — a DERIVED keyboard accumulates the base author's notice (spec 037)
+//
+// MIT requires the original copyright notice be retained in a derivative. So the
+// base's holders are carried VERBATIM and the new author is APPENDED, never
+// substituted. Before this, resetIdentity overwrote the base's copyright with a
+// fabricated `Copyright © <year> <displayName>`.
+// ---------------------------------------------------------------------------
+
+describe("derived keyboard accumulates the base's copyright (spec 037 US2)", () => {
+  const NEW_AUTHOR = {
+    authorName: "Second Author",
+    copyrightHolder: "Second Author",
+  };
+
+  /** Base .kmn plus a LICENSE.md served from the keyboard root. */
+  function serviceWithLicense(licenseText: string | null) {
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(BASE_KMN));
+      if (url.endsWith("/LICENSE.md")) {
+        return licenseText === null
+          ? Promise.resolve(makeNotFoundResponse())
+          : Promise.resolve(makeTextResponse(licenseText));
+      }
+      return Promise.resolve(makeNotFoundResponse());
+    });
+    return createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
+  }
+
+  function license(...lines: string[]): string {
+    return `The MIT License (MIT)\n\n${lines.join("\n")}\n\nPermission is hereby granted, free of charge, to any person obtaining a copy\n`;
+  }
+
+  async function derive(licenseText: string | null) {
+    return serviceWithLicense(licenseText).scaffold(
+      baseKeyboard,
+      "my_keyboard",
+      "My Keyboard",
+      { attribution: NEW_AUTHOR, emitYear: 2026 },
+    );
+  }
+
+  it("RETAINS the base author's line and APPENDS the new author", async () => {
+    const { vfs } = await derive(license("Copyright (c) 2016-2021 Original Author"));
+    const out = vfs.get("LICENSE.md")!.content as string;
+    expect(out).toContain("Copyright (c) 2016-2021 Original Author");
+    expect(out).toContain("Copyright © 2026 Second Author");
+  });
+
+  it("keeps the inherited line BYTE-IDENTICAL (FR-007)", async () => {
+    const original = "Copyright (c) 2016-2021 Original Author";
+    const { vfs } = await derive(license(original));
+    const lines = (vfs.get("LICENSE.md")!.content as string).split("\n");
+    expect(lines[0]).toBe(original);
+  });
+
+  it("orders the chain chronologically, oldest first (D3)", async () => {
+    const { vfs } = await derive(
+      license("Copyright (c) 2016-2021 Original Author", "Copyright (c) 2024 Middle Author"),
+    );
+    const out = vfs.get("LICENSE.md")!.content as string;
+    const idx = (s: string) => out.indexOf(s);
+    expect(idx("Original Author")).toBeLessThan(idx("Middle Author"));
+    expect(idx("Middle Author")).toBeLessThan(idx("Second Author"));
+  });
+
+  it("accumulates a THIRD generation (fork of a fork)", async () => {
+    const { vfs } = await derive(
+      license("Copyright (c) 2016-2021 Original Author", "Copyright © 2024 Second Gen"),
+    );
+    const out = vfs.get("LICENSE.md")!.content as string;
+    const holders = out.split("\n").filter((l) => l.startsWith("Copyright"));
+    expect(holders).toHaveLength(3);
+  });
+
+  it("does NOT rewrite SIL International to SIL Global (D4)", async () => {
+    const { vfs } = await derive(license("Copyright © 2019 SIL International"));
+    const out = vfs.get("LICENSE.md")!.content as string;
+    expect(out).toContain("Copyright © 2019 SIL International");
+    expect(out).not.toContain("SIL Global");
+  });
+
+  it("EXTENDS the year range when the same holder derives again, without duplicating", async () => {
+    const { vfs } = await serviceWithLicense(license("Copyright © 2016 Second Author")).scaffold(
+      baseKeyboard,
+      "my_keyboard",
+      "My Keyboard",
+      { attribution: NEW_AUTHOR, emitYear: 2026 },
+    );
+    const out = vfs.get("LICENSE.md")!.content as string;
+    expect(out.split("\n").filter((l) => l.includes("Second Author"))).toHaveLength(1);
+    expect(out).toContain("2016-2026 Second Author");
+  });
+
+  it("reports how many holders were inherited", async () => {
+    const two = await derive(
+      license("Copyright (c) 2016 A Author", "Copyright (c) 2020 B Author"),
+    );
+    expect(two.inheritedHolderCount).toBe(2);
+    const none = await derive(null);
+    expect(none.inheritedHolderCount).toBe(0);
+  });
+
+  it("the .kmn store carries the whole chain, not just the new author", async () => {
+    const { vfs } = await derive(license("Copyright (c) 2016-2021 Original Author"));
+    const kmn = vfs.get("source/my_keyboard.kmn")!.content as string;
+    expect(kmn).toContain("Original Author");
+    expect(kmn).toContain("Second Author");
+  });
+
+  // D5: a notice we cannot read must BLOCK, never be silently dropped.
+  describe("unparseable base notice (D5)", () => {
+    it("flags an unfilled template rather than dropping the notice", async () => {
+      const r = await derive(license("Copyright (c) YYYY _____________________"));
+      expect(r.licenseUnparseable?.reason).toBe("template_placeholder");
+    });
+
+    it("flags a year with no holder", async () => {
+      const r = await derive(license("Copyright © 2015"));
+      expect(r.licenseUnparseable?.reason).toBe("no_holder");
+    });
+
+    it("does not flag a base with no license file at all", async () => {
+      const r = await derive(null);
+      expect(r.licenseUnparseable).toBeUndefined();
+    });
+
+    it("does not flag a license with no copyright line — nothing was retained", async () => {
+      const r = await derive("The MIT License (MIT)\n\nPermission is hereby granted\n");
+      expect(r.licenseUnparseable).toBeUndefined();
+      expect(r.inheritedHolderCount).toBe(0);
+    });
+  });
+});
