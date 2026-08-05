@@ -74,6 +74,7 @@ const EXPECTED_SPINE_ORDER = [
   "track",
   "characters",
   "marks",
+  "punctuation",
   "convenience",
   "carve",
   "mechanisms",
@@ -120,7 +121,8 @@ describe("M2 — spine order matches FR-012", () => {
   it("'marks' sits between 'characters' and 'carve' on the spine (spec 046 reorder — combined-letter answers precede all key work)", () => {
     const spine = spineSteps(manifest);
     assertStepOrder(spine, "characters", "marks");
-    assertStepOrder(spine, "marks", "convenience");
+    assertStepOrder(spine, "marks", "punctuation");
+    assertStepOrder(spine, "punctuation", "convenience");
     assertStepOrder(spine, "convenience", "carve");
   });
 

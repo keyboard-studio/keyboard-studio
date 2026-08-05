@@ -21,7 +21,7 @@ import { manifest, validateManifestShape } from "./manifest.ts";
 
 type WalkStep =
   | "identity" | "choose_base" | "track" | "project_name" | "characters"
-  | "carve" | "marks" | "mechanisms" | "touch_seed_source" | "touch" | "help" | "done" | "unsupported";
+  | "carve" | "marks" | "punctuation" | "convenience" | "mechanisms" | "touch_seed_source" | "touch" | "help" | "done" | "unsupported";
 
 function walkSpine(
   ctx: { selectedTrack: "copy" | "adapt" | null; identitySupported: boolean },
@@ -91,8 +91,12 @@ describe("nextSpineStepAfter", () => {
     expect(nextSpineStepAfter("characters")).toBe("marks");
   });
 
-  it("marks → convenience", () => {
-    expect(nextSpineStepAfter("marks")).toBe("convenience");
+  it("marks → punctuation", () => {
+    expect(nextSpineStepAfter("marks")).toBe("punctuation");
+  });
+
+  it("punctuation → convenience", () => {
+    expect(nextSpineStepAfter("punctuation")).toBe("convenience");
   });
 
   it("convenience → carve", () => {
@@ -132,7 +136,7 @@ describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
     // mechanisms routes through the off-spine touch_seed_source fork before touch.
     expect(sequence).toEqual([
       "identity", "choose_base", "track", "project_name", "characters",
-      "marks", "convenience", "carve", "mechanisms", "touch_seed_source", "touch", "help", "done",
+      "marks", "punctuation", "convenience", "carve", "mechanisms", "touch_seed_source", "touch", "help", "done",
     ]);
     // "... -> done -> output": help -> done carries navigate:"output".
     expect(navigateAtEnd).toBe("output");
@@ -142,7 +146,7 @@ describe("spec 034 SR-1/SR-2 — full spine walk via advance()", () => {
     const { sequence, navigateAtEnd } = walkSpine(adaptCtx);
     expect(sequence).toEqual([
       "identity", "choose_base", "track", "characters",
-      "marks", "convenience", "carve", "mechanisms", "touch_seed_source", "touch", "help", "done",
+      "marks", "punctuation", "convenience", "carve", "mechanisms", "touch_seed_source", "touch", "help", "done",
     ]);
     expect(sequence).not.toContain("project_name");
     expect(navigateAtEnd).toBe("output");
@@ -200,7 +204,7 @@ describe("spec 034 SR-5 — validateManifestShape structural guard", () => {
     const spineIds = manifest.filter((s) => s.spine !== false).map((s) => s.id);
     expect(spineIds).toEqual([
       "identity", "choose_base", "track", "characters",
-      "marks", "convenience", "carve", "mechanisms", "touch", "help", "package",
+      "marks", "punctuation", "convenience", "carve", "mechanisms", "touch", "help", "package",
     ]);
   });
 });
@@ -296,8 +300,12 @@ describe("advance: spine hops", () => {
     expect(advance("characters", undefined, copyCtx).next).toBe("marks");
   });
 
-  it("marks → convenience", () => {
-    expect(advance("marks", undefined, copyCtx).next).toBe("convenience");
+  it("marks → punctuation", () => {
+    expect(advance("marks", undefined, copyCtx).next).toBe("punctuation");
+  });
+
+  it("punctuation → convenience", () => {
+    expect(advance("punctuation", undefined, copyCtx).next).toBe("convenience");
   });
 
   it("convenience → carve", () => {

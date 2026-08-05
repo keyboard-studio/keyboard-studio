@@ -34,6 +34,7 @@ type ActiveStepId =
   | "characters"
   | "carve"
   | "marks"
+  | "punctuation"
   | "convenience"
   | "mechanisms"
   | "touch_seed_source"
@@ -213,7 +214,15 @@ export function advance(
       return { next: nextSpineStepAfter("characters") }; // marks (spec 046)
 
     case "marks":
-      return { next: nextSpineStepAfter("marks") }; // convenience
+      return { next: nextSpineStepAfter("marks") }; // punctuation
+
+    case "punctuation":
+      // The punctuation-selection page (clone of the Phase B build-list,
+      // scoped to punctuation). Like convenience below, no reducer side
+      // effects — its SurveyPhaseResult reaches the session through StepHost's
+      // generic recordPhase path (confirmedInventory union). Absent from
+      // STEPS_WITH_APPLY_COMPLETION for that reason.
+      return { next: nextSpineStepAfter("punctuation") }; // convenience
 
     case "convenience":
       // The pre-carve "keep these letters?" question. No reducer side effects —
