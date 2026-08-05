@@ -89,6 +89,16 @@ export interface UseGitHubAuthResult {
   /** GitHub login from verifyToken (the fork owner), or null. */
   login: string | null;
   /**
+   * The account's display name from verifyToken, or null (spec 037 D7).
+   *
+   * Pre-fills keyboard attribution so the author confirms rather than types.
+   * Null when the GitHub profile has no name set — ASK in that case; never fall
+   * back to `login`, because a handle is not a copyright holder.
+   */
+  authorName: string | null;
+  /** The account's public email from verifyToken, or null when private (spec 037 D7). */
+  authorEmail: string | null;
+  /**
    * True when a valid `oauth_app` token with `public_repo` is present (gates
    * Option A self-fork Submit PR). The Option B managed-PR panel is gated on
    * `canDownload` in OutputScreen — that is separate and unaffected.
@@ -213,6 +223,8 @@ export function useGitHubAuth(): UseGitHubAuthResult {
     token,
     verify,
     login: verify?.login ?? null,
+    authorName: verify?.name ?? null,
+    authorEmail: verify?.email ?? null,
     canSubmit,
     missingScopes: verify?.missingScopes ?? [],
     error,

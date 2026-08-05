@@ -22,7 +22,7 @@ import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 const flow = loadModularFlow(identityLiteRaw as string);
 
 describe("spec 030 US1 — identity flow order (English name first)", () => {
-  it("orders the questions: english -> region -> autonym -> code -> script -> not-supported", () => {
+  it("orders the questions: english -> region -> autonym -> code -> script -> not-supported -> attribution", () => {
     // il_language_region (US3) sits after the English-name step in the
     // membership; it is a conditional step reached only when the picked language
     // is region-ambiguous.
@@ -33,6 +33,10 @@ describe("spec 030 US1 — identity flow order (English name first)", () => {
       "il_language_code",
       "il_target_script",
       "il_script_not_supported",
+      // spec 037 US1 — attribution capture, appended to the identity flow.
+      "il_author_name",
+      "il_author_email",
+      "il_copyright_holder",
     ]);
   });
 

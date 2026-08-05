@@ -287,8 +287,10 @@ describe("flow-parity: phase_f_helpdocs — questions[]", () => {
 describe("flow-parity: identity_lite — questions[]", () => {
   const modular = loadModularFlow(identityLiteModularRaw);
 
-  it("has exactly 6 questions", () => {
-    expect(modular.questions.length).toBe(6);
+  // 6 -> 9: spec 037 US1 appends attribution capture (author name, email,
+  // copyright holder) to the identity flow.
+  it("has exactly 9 questions", () => {
+    expect(modular.questions.length).toBe(9);
   });
 
   it("flow_id is identity_lite", () => {
@@ -308,6 +310,12 @@ describe("flow-parity: identity_lite — questions[]", () => {
       "il_language_code",
       "il_target_script",
       "il_script_not_supported",
+      // spec 037 US1 — attribution, reached from il_target_script's DEFAULT
+      // branch. A gated script goes to il_script_not_supported instead and
+      // terminates, so it never reaches these.
+      "il_author_name",
+      "il_author_email",
+      "il_copyright_holder",
     ]);
   });
 
@@ -319,6 +327,29 @@ describe("flow-parity: identity_lite — questions[]", () => {
     const q = modular.questions.find((q) => q.id === "il_target_script");
     expect(q).toBeDefined();
     expect(Array.isArray(q?.next)).toBe(true);
+  });
+
+  // spec 037 US1: the supported path must reach attribution, and the gated path
+  // must NOT — an author who cannot make a keyboard is never asked who owns it.
+  it("il_target_script's default branch continues into attribution", () => {
+    const q = modular.questions.find((q) => q.id === "il_target_script");
+    const rules = q?.next as Array<{ condition?: string; goto?: string | null; default?: unknown }>;
+    const fallthrough = rules.find((r) => r.default === true);
+    expect(fallthrough?.goto).toBe("il_author_name");
+  });
+
+  it("attribution chains to a terminal copyright-holder question", () => {
+    const byId = new Map(modular.questions.map((q) => [q.id, q]));
+    expect(byId.get("il_author_name")?.next).toBe("il_author_email");
+    expect(byId.get("il_author_email")?.next).toBe("il_copyright_holder");
+    expect(byId.get("il_copyright_holder")?.next).toBeNull();
+  });
+
+  it("only the author NAME is required — holder defaults to it, email may be private", () => {
+    const byId = new Map(modular.questions.map((q) => [q.id, q]));
+    expect(byId.get("il_author_name")?.required).toBe(true);
+    expect(byId.get("il_author_email")?.required).toBe(false);
+    expect(byId.get("il_copyright_holder")?.required).toBe(false);
   });
 
   it("il_script_not_supported is a terminal notice question", () => {

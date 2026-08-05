@@ -18,7 +18,8 @@
 //   - Worker boundary upheld: WASM is not imported here.
 
 import { create } from "zustand";
-import type { AxisFill, BaseKeyboard, KeyboardIR, LintFinding, RemovalCapability, VirtualFS } from "@keyboard-studio/contracts";
+import type {
+  Attribution, AxisFill, BaseKeyboard, KeyboardIR, LintFinding, RemovalCapability, VirtualFS } from "@keyboard-studio/contracts";
 import { detectMarkInputOrderFromImport } from "@keyboard-studio/engine";
 import {
   mergePhaseResults,
@@ -161,6 +162,24 @@ export interface WorkingCopyState {
    * instantiateFromExisting sets it from the loaded keyboard's identity (Track 2).
    */
   identity: IdentityPatch | null;
+
+  // -- Attribution (spec 037) --------------------------------------------------
+  /**
+   * Who made this keyboard and who holds its copyright.
+   *
+   * The SINGLE source the scaffolder reads for LICENSE.md, store(&COPYRIGHT) and
+   * the .kps <Copyright>/<Author> fields (FR-003) — 22 shipped keyboards disagree
+   * between their LICENSE.md and .kmn because those were written independently.
+   *
+   * Lives here rather than in its own store so it rides the existing localStorage
+   * draft (spec 034 US3) with no new persistence: WorkingCopySnapshot is derived
+   * from this type with Omit, so the compiler requires the persist path to carry
+   * any field added here.
+   *
+   * Null until the identity step captures it. While null the scaffolder emits NO
+   * copyright notice and reports attributionMissing, rather than inventing one.
+   */
+  attribution: Attribution | null;
 
   // -- Carve working IR (irStore slots) ----------------------------------------
   /**
@@ -437,6 +456,11 @@ export interface WorkingCopyState {
   setIdentity: (patch: IdentityPatch) => void;
 
   /**
+   * Record who to attribute the keyboard to (spec 037 US1). Pass null to clear.
+   */
+  setAttribution: (attribution: Attribution | null) => void;
+
+  /**
    * Returns true once instantiateFromBase or instantiateFromExisting has been
    * called (i.e. baseKeyboard is non-null). Callers that need the full triple
    * (base + VFS + IR) should check all three slots directly.
@@ -629,6 +653,7 @@ export type WorkingCopyData = Omit<
   | "setIrAxes" | "lockDesktop" | "unlockDesktop"
   | "setTouchLayoutJson" | "setTouchDraft" | "markGalleryIntroSeen" | "reset"
   | "instantiateFromBase" | "instantiateFromExisting" | "setIdentity" | "isInstantiated"
+  | "setAttribution"
   | "markStale" | "clearStale"
   | "setValidatorFindings"
   | "setAxisFills"
@@ -642,6 +667,7 @@ const INITIAL_STATE: WorkingCopyData = {
   baseVfs: null,
   baseIr: null,
   identity: null,
+  attribution: null,
   // carve IR slots
   ir: null,
   removalCapabilities: new Map(),
@@ -951,6 +977,8 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
 
   setIdentity: (patch) =>
     set({ identity: patch }),
+
+  setAttribution: (attribution) => set({ attribution }),
 
   isInstantiated: () => get().baseKeyboard !== null,
 

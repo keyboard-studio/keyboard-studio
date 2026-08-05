@@ -141,6 +141,10 @@ export function snapshotWorkingCopyToSession(): void {
     baseVfsEntries: s.baseVfs !== null ? s.baseVfs.entries().map(serializeEntry) : [],
     baseIr: s.baseIr,
     identity: s.identity,
+    // spec 037: plain JSON, so it round-trips with no custom handling. Present
+    // here because WorkingCopySnapshot is Omit-derived from WorkingCopyData —
+    // the compiler required this line, which is the point of that derivation.
+    attribution: s.attribution,
     ir: s.ir,
     deletedNodeIds: [...s.deletedNodeIds],
     deletedItemIds: [...s.deletedItemIds],
@@ -226,6 +230,7 @@ export function rehydrateWorkingCopyFromSession(): boolean {
     baseVfs,
     baseIr: snapshot.baseIr,
     identity: snapshot.identity,
+    attribution: snapshot.attribution,
     ir: snapshot.ir,
     removalCapabilities,
     deletedNodeIds: new Set(snapshot.deletedNodeIds),

@@ -81,17 +81,40 @@ plausible year, and that none of them contains the keyboard's display name as th
 ### Identity source
 
 - [x] T011 [P] [US1] Widen the `/user` response type in `packages/engine/src/output/github.ts` (`verifyToken`) to retain `name` and `email` per D7/FR-002 — no additional request
-- [ ] T012 [P] [US1] Extend `packages/studio/src/hooks/useGitHubAuth.ts` to surface the retained `name`/`email` alongside `login`
+- [x] T012 [P] [US1] Extend `packages/studio/src/hooks/useGitHubAuth.ts` to surface the retained `name`/`email` alongside `login`
 - [x] T013 [US1] Test the null cases in `packages/engine/src/output/github.test.ts` — profile `name` absent and `email` private must both resolve without error and must never fall back to the bare `login` handle as a copyright holder
 
 ### Capture
 
-- [ ] T014 [US1] Hold `Attribution` on `packages/studio/src/stores/workingCopyStore.ts` with a setter, so it persists via the existing 034 draft with no new storage
-- [ ] T015 [US1] Add `author_display_name`, `author_contact_email`, `pa_copyright_holder` to the live flow membership in `content/flows/identity_lite.modular.yaml` — **membership only; do not edit the question prompts** (Article VI: prompt text is Content-owned — see the Content hand-off below)
-- [ ] T016 [US1] Seed the three revived questions from the GitHub profile in `packages/studio/src/editors/adapters/` so attribution is propose-then-confirm, never a blank form (FR-001)
-- [ ] T017 [US1] Publish the captured contact into `SurveyContext` as `author_contact` in `packages/studio/src/editors/adapters/panelAdapters.tsx` (`contextFromIdentity`) — satisfies FR-016 and activates the Phase F pre-fill seam already in place
-- [ ] T018 [US1] Update the identity_lite golden assertions in `packages/studio/tests/survey/flow-parity.test.ts` (currently asserts exactly 6 questions) and refresh the snapshot
-- [ ] T019 [US1] Update the registry count floor in `packages/studio/tests/survey/inputs-writes-coverage.test.ts` if the live membership change moves it
+- [x] T014 [US1] Hold `Attribution` on `packages/studio/src/stores/workingCopyStore.ts` with a setter, so it persists via the existing 034 draft with no new storage
+- [x] T015 [US1] Add attribution to the live flow membership in `content/flows/identity_lite.modular.yaml` — **could NOT be membership-only; see the note below.** Reviving the demoted ids directly is structurally impossible, so three thin ids (`il_author_name`, `il_author_email`, `il_copyright_holder`) import the Content-authored prompt/help text and override only `id` and `next`. Engine still authored no prompt text (Article VI honoured)
+- [x] T016 [US1] Seed the three revived questions from the GitHub profile in `packages/studio/src/editors/adapters/` so attribution is propose-then-confirm, never a blank form (FR-001)
+- [x] T017 [US1] Publish the captured contact into `SurveyContext` as `author_contact` in `packages/studio/src/editors/adapters/panelAdapters.tsx` (`contextFromIdentity`) — satisfies FR-016 and activates the Phase F pre-fill seam already in place
+- [x] T018 [US1] Update the identity_lite golden assertions in `packages/studio/tests/survey/flow-parity.test.ts` (currently asserts exactly 6 questions) and refresh the snapshot
+- [x] T019 [US1] Update the registry count floor in `packages/studio/tests/survey/inputs-writes-coverage.test.ts` if the live membership change moves it
+
+**CAPTURE DONE 2026-08-04.** studio 3736 tests green. One architectural finding changed the
+approach:
+
+**T015 could not be "membership only".** Routing lives in each module's `definition.next`
+(loadModularFlow ROUTING DECISION B), so a module belongs to exactly ONE flow chain.
+`pa_copyright_holder` continues to `provenance_opt_in`, which `identity_lite` does not contain —
+adding the demoted ids would have dead-ended at an unresolved goto, and repointing their `next`
+would have broken the proposed `phase_a_identity` graph they still belong to.
+
+Resolution: three thin new ids that **import the Content-authored prompt and help text** from the
+demoted modules and override only `id` and `next`. One source of survey copy (Article VI honoured
+— Engine authored no prompt text), the demoted modules stay byte-identical for the no-delete
+guardrail, and `il_target_script`'s DEFAULT branch now continues into attribution while its gated
+branch still terminates — so an author who cannot make a keyboard is never asked who owns one.
+
+Only the author NAME is required: the holder defaults to it (D1) and the email may be private (D7).
+
+Verified by mutation — dropping the D1 holder default, returning attribution with no author name,
+ceasing to publish `author_contact`, and ceasing to persist attribution each turn the suites red.
+**One mutation initially survived and exposed a pre-existing test weakness**: assertions inside
+`panelAdapters.test.tsx`'s `onComplete` callback surface as uncaught React errors and do NOT fail
+the test. The store is now snapshotted inside the callback and asserted outside it.
 
 ### Emission
 

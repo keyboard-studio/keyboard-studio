@@ -41,7 +41,10 @@ export const definition = {
   ],
   next: [
     { condition: "value == 'Ethi' or value == 'Hani' or value == 'Hang'", goto: "il_script_not_supported" },
-    { default: true as const, goto: null },
+    // spec 037 US1: a supported script continues into attribution capture.
+    // Gated scripts take the branch above and terminate — an author who cannot
+    // make a keyboard is never asked who holds its copyright.
+    { default: true as const, goto: "il_author_name" },
   ],
 } satisfies import("../../types.ts").FlowQuestion;
 

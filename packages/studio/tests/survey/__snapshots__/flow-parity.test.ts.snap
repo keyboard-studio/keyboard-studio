@@ -61,7 +61,7 @@ exports[`flow-parity: identity_lite — questions[] > projected fields are stabl
       },
       {
         "default": true,
-        "goto": null,
+        "goto": "il_author_name",
       },
     ],
     "options": [
@@ -136,6 +136,36 @@ exports[`flow-parity: identity_lite — questions[] > projected fields are stabl
     "prompt": "This writing system is not supported yet",
     "required": false,
     "type": "notice",
+  },
+  {
+    "help_text": "This name will appear in the keyboard package and in the public keyboard repository. You can use a person's name, an organization name, or a committee name, for example: Bafut Language Committee.",
+    "id": "il_author_name",
+    "next": "il_author_email",
+    "options": undefined,
+    "options_source": undefined,
+    "prompt": "Who should be listed as the author of this keyboard?",
+    "required": true,
+    "type": "text",
+  },
+  {
+    "help_text": "This address goes into the keyboard package so that users or maintainers can reach the right person if they have questions. Use an address that will remain active.",
+    "id": "il_author_email",
+    "next": "il_copyright_holder",
+    "options": undefined,
+    "options_source": undefined,
+    "prompt": "What email address can people use to contact the keyboard author?",
+    "required": false,
+    "type": "text",
+  },
+  {
+    "help_text": "Name of the person or organization that holds the copyright for this keyboard. This may be you, your employer, or a language organization. Example: 'Bafut Language Committee'",
+    "id": "il_copyright_holder",
+    "next": null,
+    "options": undefined,
+    "options_source": undefined,
+    "prompt": "Who holds the copyright for this keyboard?",
+    "required": false,
+    "type": "short_text",
   },
 ]
 `;
