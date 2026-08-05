@@ -41,6 +41,8 @@ interface RawKey {
   output?: string;
   nextlayer?: string;
   hint?: string;
+  /** Free-text `layer` annotation (see `TouchKeyIR.layerAnnotation`). */
+  layer?: string;
   sk?: RawKey[];
   multitap?: RawKey[];
   flick?: Record<string, RawKey>;
@@ -150,6 +152,7 @@ function convertKey(raw: RawKey, nextId: () => string): TouchKeyIR {
   if (raw.text !== undefined) key.text = raw.text;
   if (raw.output !== undefined) key.output = raw.output;
   if (raw.nextlayer !== undefined) key.nextlayer = raw.nextlayer;
+  if (typeof raw.layer === "string" && raw.layer.length > 0) key.layerAnnotation = raw.layer;
   // An empty-string hint is treated as absent (not carried onto the IR): it
   // renders nothing at runtime, so `""` and unset are indistinguishable in
   // behaviour. Unifies onto the engine parser's prior form (the old lint parser

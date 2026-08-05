@@ -74,6 +74,7 @@ import type {
   MechanismRef,
   TouchLayoutIR,
   DiscoveryAxisVector,
+  PlacementMap,
 } from "@keyboard-studio/contracts";
 import {
   toUPlusNotation,
@@ -342,6 +343,31 @@ export type TouchMethod =
 function seedLayerTokensForChar(char: string | null): (ModifierToken | "")[] {
   if (char === null) return [];
   return touchLayerForChar(char) === "shift" ? ["SHIFT"] : [];
+}
+
+/**
+ * Corpus longpress-host TIE-BREAKER (placement-priors v2's `PlacementMap.touch`
+ * field — see `packages/engine/src/placement/touch-mining.ts`). Consulted by
+ * the suggestion memo ONLY when the NFD-decomposition path finds nothing —
+ * NFD stays authoritative; the corpus host is convenience/fallback data, not
+ * a competing signal. Returns the best-attested (highest `priorCount`) host's
+ * vkey, or `null` when `placementMap` is absent, carries no `touch` data, or
+ * has no entry for `char`'s codepoint.
+ *
+ * Deliberately does not filter on `layerClass` — the caller only needs a host
+ * vkey to hang a longpress off of; which of the corpus keyboards' layers that
+ * host lived on is not meaningful to a longpress-alternates suggestion on
+ * THIS keyboard's layout.
+ */
+function touchCorpusFallbackHostKey(
+  char: string,
+  placementMap: PlacementMap | undefined,
+): string | null {
+  if (placementMap?.touch === undefined) return null;
+  const codepoint = toUPlusNotation(char);
+  const entry = placementMap.touch.find((e) => e.codepoint === codepoint);
+  const best = entry?.hosts[0];
+  return best !== undefined ? best.vkey : null;
 }
 
 /**
@@ -1363,9 +1389,20 @@ export interface TouchGalleryProps {
    * (locked/read-only; no unlock is performed).
    */
   onBack: () => void;
+  /**
+   * Optional corpus placement map (same object MechanismGallery consumes via
+   * `usePlacementPriors` — see `addPhysicalAdapter.tsx`). TouchGallery only
+   * reads its `touch` field (placement-priors v2's corpus-mined longpress
+   * hosts) — the physical-key `entries` are irrelevant here. When supplied,
+   * the suggestion memo below falls back to a corpus-attested longpress host
+   * ONLY when the NFD-decomposition path finds nothing (see
+   * `touchCorpusFallbackHostKey`); NFD stays authoritative. Absent (or
+   * carrying no `touch` data) => the existing NFD-only behavior, unchanged.
+   */
+  placementMap?: PlacementMap;
 }
 
-export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
+export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryProps) {
   const { t, i18n } = useLingui();
   const baseVfs = useWorkingCopyStore((s) => s.baseVfs);
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
@@ -2478,6 +2515,9 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
 
     // Abugida-safe gate — shared predicate; see siblingAccents.ts for the
     // reasoning (also used by MechanismGallery's deadkey auto-default).
+    // NFD stays AUTHORITATIVE: a decomposable char with a resolvable Latin
+    // base always wins here; the corpus tie-breaker below is only consulted
+    // when this branch either doesn't apply or resolves to nothing.
     if (isGatedAccentCompositionCandidate(currentChar, axes.scriptClass)) {
       const nfd = currentChar.normalize("NFD");
       const baseLetter = [...nfd][0] ?? "";
@@ -2487,13 +2527,23 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
       }
       // Empty-hostkey guard (km-triage finding #3): a non-Latin base letter
       // (e.g. the base of a Cyrillic/Hebrew/Arabic accented char whose base
-      // isn't a-z) leaves `hk` as "" — rendering a vacuous "long-press
-      // [nothing]" card. Skip the suggestion entirely rather than surface an
-      // empty target key.
-      if (hk === "") {
-        return { kind: "none" };
+      // isn't a-z) leaves `hk` as "" — fall through to the corpus tie-breaker
+      // below rather than surfacing an empty target key.
+      if (hk !== "") {
+        return { kind: "longpress", hostKey: hk };
       }
-      return { kind: "longpress", hostKey: hk };
+    }
+
+    // Corpus longpress-host tie-breaker (placement-priors v2's
+    // `PlacementMap.touch` — see touchCorpusFallbackHostKey). Fires ONLY when
+    // NFD gave nothing above (either the char isn't a gated accent-
+    // composition candidate at all, or its base letter didn't resolve to a
+    // Latin key) — this is a NEW path that can now surface a suggestion even
+    // when the old desktop-assignment (`da`) branch above found nothing, as
+    // long as the corpus attests a longpress host for this exact codepoint.
+    const corpusHostKey = touchCorpusFallbackHostKey(currentChar, placementMap);
+    if (corpusHostKey !== null) {
+      return { kind: "longpress", hostKey: corpusHostKey };
     }
 
     return { kind: "none" };
@@ -2503,6 +2553,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     detectedChars,
     currentCharTouchMethods,
     axes.scriptClass,
+    placementMap,
   ]);
 
   // ---------------------------------------------------------------------------

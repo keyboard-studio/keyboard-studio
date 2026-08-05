@@ -42,6 +42,7 @@ function emitKey(key: TouchKeyIR): EmittedKey {
   if (key.width !== undefined) out["width"] = String(key.width);
   if (key.pad !== undefined) out["pad"] = String(key.pad);
   if (key.nextlayer !== undefined) out["nextlayer"] = key.nextlayer;
+  if (key.layerAnnotation !== undefined) out["layer"] = key.layerAnnotation;
   if (key.sk !== undefined && key.sk.length > 0) {
     out["sk"] = key.sk.map(emitKey);
   }
