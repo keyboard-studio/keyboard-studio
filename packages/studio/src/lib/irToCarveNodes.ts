@@ -18,6 +18,7 @@ import type { StoreSlotBlockReason, StoreSlotEditMode, StoreAnalysis, CharContri
 import type { I18n } from '@lingui/core';
 import { resolveContentString } from './contentI18n.ts';
 import { caseGroupFor, caseTrimSet } from './carveCasePairs.ts';
+import { lowerBareLetter } from './keyCasing.ts';
 export type CardKind = 'pattern' | 'group' | 'store' | 'raw';
 
 // ---------------------------------------------------------------------------
@@ -1190,10 +1191,19 @@ export function isTouchOnlyVkeyName(name: string): boolean {
  * non-physical key id into a desktop keystroke step. Every call site that
  * previously did `vkeyLabel(name) ?? name` for a context/store-item vkey
  * feeding a rendered "how it's typed" step or floor uses this instead.
+ *
+ * Applies the lowercase-letter keycap convention (`lowerBareLetter`, the
+ * shared `keyCasing.ts` leaf) on top of `vkeyLabel`'s resolution — this is
+ * the ONE choke point every
+ * "how it's typed" desktop label (`triggerKeyLabel`, `primaryChordLabel`,
+ * `slotItemLabel`/`storeTriggerFloorLabel`, `sequenceShapeCells`'s
+ * `baseSlotLabel`, `crossPairTrigger`) resolves a vkey through, so fixing it
+ * here is sufficient — `vkeyLabel` itself is untouched and stays the shared,
+ * unlowered resolver other (non-desktop-label) call sites still rely on.
  */
 export function desktopVkeyLabel(name: string): string | undefined {
   if (isTouchOnlyVkeyName(name)) return undefined;
-  return vkeyLabel(name) ?? name;
+  return lowerBareLetter(vkeyLabel(name) ?? name);
 }
 
 // ---------------------------------------------------------------------------

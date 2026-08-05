@@ -528,7 +528,7 @@ test.describe("spec 034 proven-script walks + publish paths", () => {
 //   - FR-010: Back stays history-consistent after restore — Back leaves the
 //     Carve gallery, and Forward from there returns to it (a round-trip that
 //     would fail if the restored `history` stack were stale/inconsistent).
-//   - G-3/AS-3: the WelcomeScreen "I'm new" affordance (StudioShell's other
+//   - G-3/AS-3: the WelcomeScreen "Continue as guest" affordance (StudioShell's other
 //     start-over entry point, see draftPersistence.ts clearDraft callers)
 //     clears the persisted draft, and a SUBSEQUENT reload starts fresh at
 //     identity rather than re-resuming the abandoned draft.
@@ -537,16 +537,16 @@ test.describe("spec 034 proven-script walks + publish paths", () => {
 test.describe("spec 034 US3 (T028): durable draft survives reload, Back stays consistent, start-over clears it", () => {
   test.beforeEach(async ({ page }) => {
     // Seeded so the walk below starts at identity (not WelcomeScreen) — this
-    // is draft-safe (unlike WelcomeScreen's "I'm new") and does not prevent
+    // is draft-safe (unlike WelcomeScreen's "Continue as guest") and does not prevent
     // reaching WelcomeScreen later: StudioShell's router still honors an
-    // explicit `#welcome` hash (see the "I'm new" assertion below) once the
+    // explicit `#welcome` hash (see the "Continue as guest" assertion below) once the
     // first-visit gate is satisfied — the gate only forces the redirect for
     // a genuine first-timer.
     await seedReturningVisitor(page);
     await page.goto("/");
   });
 
-  test("T028: hard reload resumes the working copy + step position; Back round-trips; 'I'm new' clears the draft", async ({
+  test("T028: hard reload resumes the working copy + step position; Back round-trips; 'Continue as guest' clears the draft", async ({
     page,
   }) => {
     // Advance several stages (identity -> base -> track -> project_name ->
@@ -647,11 +647,11 @@ test.describe("spec 034 US3 (T028): durable draft survives reload, Back stays co
     await driveConvenienceStep(page);
     await page.waitForSelector('[data-testid="carve-gallery"]', { timeout: 20_000 });
 
-    // G-3/AS-3: "I'm new" (WelcomeScreen's start-over entry point) clears the
-    // durable draft and resets both stores in-place (hash-only navigation —
-    // no reload yet).
+    // G-3/AS-3: "Continue as guest" (WelcomeScreen's start-over entry point)
+    // clears the durable draft and resets both stores in-place (hash-only
+    // navigation — no reload yet).
     await page.goto("/#welcome");
-    await page.getByRole("button", { name: "I’m new" }).click();
+    await page.getByRole("button", { name: "Continue as guest" }).click();
     await page.waitForSelector('[data-testid="identity-panel"]', { timeout: 15_000 });
 
     // A SUBSEQUENT reload must start fresh — the cleared draft must not

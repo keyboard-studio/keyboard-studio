@@ -15,6 +15,7 @@ import {
   useSurveySessionStore,
   snapshotTraversal,
   applyTraversalSnapshot,
+  type TraversalSnapshot,
 } from "./surveySessionStore.ts";
 
 function getStore() {
@@ -502,5 +503,80 @@ describe("surveySessionStore", () => {
       getStore().popHistory();
       expect(getStore().activeStepId).toBe("carve");
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// markedForLaterDesktop / markedForLaterTouch — "mark for later review"
+// (mechanism-gallery-progression). Authoring metadata only, never the
+// working copy — see the state fields' own docstrings for why they live
+// here rather than in workingCopyStore.
+// ---------------------------------------------------------------------------
+
+describe("surveySessionStore — mark for later review", () => {
+  beforeEach(resetStore);
+
+  it("starts empty and toggleMarkedForLaterDesktop adds then removes a character", () => {
+    expect(getStore().markedForLaterDesktop).toEqual([]);
+
+    getStore().toggleMarkedForLaterDesktop("á");
+    expect(getStore().markedForLaterDesktop).toEqual(["á"]);
+
+    getStore().toggleMarkedForLaterDesktop("é");
+    expect(getStore().markedForLaterDesktop).toEqual(["á", "é"]);
+
+    // Toggling an already-marked character removes it (mark/unmark).
+    getStore().toggleMarkedForLaterDesktop("á");
+    expect(getStore().markedForLaterDesktop).toEqual(["é"]);
+  });
+
+  it("tracks touch marks independently of desktop marks", () => {
+    getStore().toggleMarkedForLaterDesktop("á");
+    getStore().toggleMarkedForLaterTouch("中");
+
+    expect(getStore().markedForLaterDesktop).toEqual(["á"]);
+    expect(getStore().markedForLaterTouch).toEqual(["中"]);
+
+    // Unmarking one surface leaves the other untouched.
+    getStore().toggleMarkedForLaterTouch("中");
+    expect(getStore().markedForLaterDesktop).toEqual(["á"]);
+    expect(getStore().markedForLaterTouch).toEqual([]);
+  });
+
+  it("reset() clears both marked sets", () => {
+    getStore().toggleMarkedForLaterDesktop("á");
+    getStore().toggleMarkedForLaterTouch("中");
+    getStore().reset();
+    expect(getStore().markedForLaterDesktop).toEqual([]);
+    expect(getStore().markedForLaterTouch).toEqual([]);
+  });
+
+  it("survives a snapshotTraversal -> applyTraversalSnapshot round trip", () => {
+    getStore().toggleMarkedForLaterDesktop("á");
+    getStore().toggleMarkedForLaterTouch("中");
+
+    const snapshot = snapshotTraversal();
+    expect(snapshot.markedForLaterDesktop).toEqual(["á"]);
+    expect(snapshot.markedForLaterTouch).toEqual(["中"]);
+
+    getStore().reset();
+    expect(getStore().markedForLaterDesktop).toEqual([]);
+
+    applyTraversalSnapshot(snapshot);
+    expect(getStore().markedForLaterDesktop).toEqual(["á"]);
+    expect(getStore().markedForLaterTouch).toEqual(["中"]);
+  });
+
+  it("hydrate() tolerates a pre-existing snapshot that predates these fields (additive backward-compat)", () => {
+    // Simulates a durable draft persisted before this feature shipped — the
+    // snapshot object literally has no markedForLaterDesktop/Touch keys, even
+    // though the current TraversalSnapshot type declares them required.
+    const { markedForLaterDesktop: _d, markedForLaterTouch: _t, ...legacyFields } =
+      snapshotTraversal();
+    const legacySnapshot = legacyFields as TraversalSnapshot;
+
+    expect(() => getStore().hydrate(legacySnapshot)).not.toThrow();
+    expect(getStore().markedForLaterDesktop).toEqual([]);
+    expect(getStore().markedForLaterTouch).toEqual([]);
   });
 });

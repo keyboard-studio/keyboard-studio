@@ -46,7 +46,9 @@ describe('irToCharacterView', () => {
     expect(cells).toHaveLength(1);
     expect(cells[0]).toMatchObject({
       ch: 'a',
-      keys: ['A'], // faithful (#1399): vkeyLabel('K_A') -> 'A', not the raw vkey name
+      keys: ['a'], // faithful (#1399) + keycap convention: vkeyLabel('K_A') -> 'A',
+      // desktopVkeyLabel's lowercase-letter pass -> 'a' (the physical key's
+      // own unshifted glyph, not the raw vkey name and not the shifted char)
       category: 'basic-letter',
       source: 'direct-key',
       inAlpha: false,
@@ -90,7 +92,7 @@ describe('irToCharacterView', () => {
     const cells = irToCharacterView(ir, new Map(), new Set(), new Set());
 
     expect(cells).toHaveLength(1);
-    expect(cells[0]).toMatchObject({ ch: 'a', keys: ['A'], source: 'direct-key' });
+    expect(cells[0]).toMatchObject({ ch: 'a', keys: ['a'], source: 'direct-key' });
   });
 
   it('marks inAlpha true when the NFC character is in confirmedInventory', () => {
@@ -167,7 +169,7 @@ describe('irToCharacterView — advanced-rule-only characters (#1399)', () => {
     const cells = irToCharacterView(ir, new Map(), new Set(), new Set());
 
     const cell = cells.find((c) => c.ch === 'a');
-    expect(cell).toMatchObject({ ch: 'a', keys: ['A'], source: 'direct-key' });
+    expect(cell).toMatchObject({ ch: 'a', keys: ['a'], source: 'direct-key' });
   });
 
   it('a raw fragment WITHOUT producedOutput still contributes nothing (no false surfacing)', () => {
@@ -195,7 +197,7 @@ describe('irToCharacterView — faithful key sequence (#1399)', () => {
 
     const cells = irToCharacterView(ir, new Map(), new Set(), new Set());
 
-    expect(cells.find((c) => c.ch === 'A')).toMatchObject({ keys: ['Shift + A'] });
+    expect(cells.find((c) => c.ch === 'A')).toMatchObject({ keys: ['Shift + a'] });
   });
 
   it('S-02 deadkey two-step: trigger key THEN the base letter (never the "‹dk›" placeholder)', () => {
@@ -360,7 +362,7 @@ describe('irToCharacterView — waysToType (#1399)', () => {
 
     const cells = irToCharacterView(ir, new Map(), new Set(), new Set());
 
-    expect(cells.find((c) => c.ch === 'a')?.waysToType).toEqual([{ steps: ['A'] }]);
+    expect(cells.find((c) => c.ch === 'a')?.waysToType).toEqual([{ steps: ['a'] }]);
   });
 
   it('follows-one-char: a single literal preceding char yields "when it follows x"', () => {
@@ -449,8 +451,8 @@ describe('irToCharacterView — waysToType (#1399)', () => {
     const cells = irToCharacterView(ir, new Map(), new Set(), new Set());
 
     expect(cells.find((c) => c.ch === 'q')?.waysToType).toEqual([
-      { steps: ['A'] },
-      { steps: ['B'] },
+      { steps: ['a'] },
+      { steps: ['b'] },
     ]);
   });
 
@@ -469,7 +471,7 @@ describe('irToCharacterView — waysToType (#1399)', () => {
 
     const cells = irToCharacterView(ir, new Map(), new Set(), new Set());
 
-    expect(cells.find((c) => c.ch === 'a')?.waysToType).toEqual([{ steps: ['A'] }]);
+    expect(cells.find((c) => c.ch === 'a')?.waysToType).toEqual([{ steps: ['a'] }]);
   });
 
   it('excludes a K_DEL-triggered output rule the same way as K_BKSP', () => {
@@ -518,7 +520,7 @@ describe('irToCharacterView — waysToType (#1399)', () => {
 
     const cells = irToCharacterView(ir, new Map(), new Set(), new Set());
 
-    expect(cells.find((c) => c.ch === 'W')?.waysToType).toEqual([{ steps: [], triggerFloor: 'A' }]);
+    expect(cells.find((c) => c.ch === 'W')?.waysToType).toEqual([{ steps: [], triggerFloor: 'a' }]);
   });
 });
 
@@ -546,7 +548,7 @@ describe('irToCharacterView — TOTAL FLOOR (#1399 follow-on)', () => {
 
     const cells = irToCharacterView(ir, new Map(), new Set(), new Set());
 
-    expect(cells.find((c) => c.ch === 'a')?.waysToType).toEqual([{ steps: ['A'] }]);
+    expect(cells.find((c) => c.ch === 'a')?.waysToType).toEqual([{ steps: ['a'] }]);
   });
 
   it('multi-index() cross-store table: each output element resolves its OWN base at its own offset — real steps, not empty', () => {

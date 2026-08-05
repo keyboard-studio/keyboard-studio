@@ -102,6 +102,17 @@ export interface CharScrollStripProps {
    * see `baseDirectSet` above.
    */
   preAugmentSessionAwareSet?: ReadonlySet<string>;
+  /**
+   * Per-surface "mark for later review" set (surveySessionStore's
+   * `markedForLaterDesktop` for MechanismGallery, `markedForLaterTouch` for
+   * TouchGallery — see accountedForGate.ts's module doc for why the two stay
+   * separate sets). Purely a rendering signal here: a marked chip gets a
+   * small BLUE flag on its badge (visual) plus an appended accessible-name
+   * clause (docs/accessibility.md — the flag is never the only signal).
+   * Optional (defaults to empty) — a caller with no mark notion (e.g. a test
+   * exercising something other than marks) simply omits it.
+   */
+  markedSet?: ReadonlySet<string>;
 }
 
 /** Stable empty-set fallback for the two optional pre-augment set props above — avoids allocating a new Set every render when a caller omits them. */
@@ -123,6 +134,7 @@ export function CharScrollStrip({
   modality,
   baseDirectSet = EMPTY_CHAR_SET,
   preAugmentSessionAwareSet = EMPTY_CHAR_SET,
+  markedSet = EMPTY_CHAR_SET,
 }: CharScrollStripProps) {
   const { t } = useLingui();
   const chipRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
@@ -419,6 +431,24 @@ export function CharScrollStrip({
                 message: `reachable by composing ${{ components: composeComponentNames }}`,
               })}`
             : countAriaLabel;
+          // Blue flag indicator (mechanism-gallery-progression follow-up) —
+          // `markedSet` is per-surface (markedForLaterDesktop/Touch), so a
+          // char marked on the OTHER surface never flags here. The flag is
+          // NEVER the only signal (docs/accessibility.md): the chip's own
+          // aria-label below gets an appended clause, not a replaced one, so
+          // a screen-reader user hears "marked for later review" alongside
+          // the existing codepoint-derived name rather than instead of it.
+          const isMarked = markedSet.has(c);
+          const chipBaseAriaLabel = t({
+            id: "editor.assignLoop.charScroll.chipAriaLabel",
+            message: `Go to ${{ notation: toUPlusNotation(c) }} ${{ char: c }}`,
+          });
+          const chipAriaLabel = isMarked
+            ? `${chipBaseAriaLabel} ${t({
+                id: "editor.assignLoop.charScroll.chipMarkedClause",
+                message: "marked for later review",
+              })}`
+            : chipBaseAriaLabel;
           return (
             <button
               key={c}
@@ -430,10 +460,7 @@ export function CharScrollStrip({
               data-testid={`char-scroll-chip-${hex}`}
               tabIndex={isTabbable ? 0 : -1}
               aria-pressed={isSelected}
-              aria-label={t({
-                id: "editor.assignLoop.charScroll.chipAriaLabel",
-                message: `Go to ${{ notation: toUPlusNotation(c) }} ${{ char: c }}`,
-              })}
+              aria-label={chipAriaLabel}
               onClick={() => onSelectChar(c)}
               style={{
                 flexShrink: 0,
@@ -522,6 +549,29 @@ export function CharScrollStrip({
                     style={{ fontSize: 9, lineHeight: 1, color: TEXT_DIM }}
                   >
                     ⊕
+                  </span>
+                )}
+                {isMarked && (
+                  // Decorative — the outer button's aria-label above already
+                  // carries the appended "marked for later review" clause,
+                  // so this glyph is aria-hidden to avoid a double
+                  // announcement (same pattern as the compose marker above).
+                  // BLUE (ACCENT, #6ea8fe — the same hue the mark-for-later
+                  // button uses for its own UNMARKED state), never amber:
+                  // amber here would collide with the badge's own
+                  // uncovered/RED-vs-covered/GREEN palette read as a THIRD
+                  // status color, where the flag is a distinct axis
+                  // ("deferred by the author"), not a coverage state. ~7.8:1
+                  // contrast against the galleries' dark page background
+                  // (#0d1117) and the chip backgrounds (BG_CARD/#161b22,
+                  // selected #0d2840) — comfortably AA (in fact AAA-normal-
+                  // text) for this decorative-but-visible glyph.
+                  <span
+                    data-testid={`char-scroll-badge-marked-${hex}`}
+                    aria-hidden="true"
+                    style={{ fontSize: 10, lineHeight: 1, color: ACCENT }}
+                  >
+                    ⚑
                   </span>
                 )}
               </span>

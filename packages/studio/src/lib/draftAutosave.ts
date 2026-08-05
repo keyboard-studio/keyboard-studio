@@ -986,5 +986,7 @@ function surveySnapshot(): SurveySessionSnapshot {
     baseConfirmed: s.baseConfirmed,
     touchSeedSource: s.touchSeedSource,
     discoveryMethod: s.discoveryMethod,
+    markedForLaterDesktop: s.markedForLaterDesktop,
+    markedForLaterTouch: s.markedForLaterTouch,
   };
 }

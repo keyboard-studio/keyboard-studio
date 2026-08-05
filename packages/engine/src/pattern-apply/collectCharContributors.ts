@@ -303,9 +303,17 @@ const VKEY_DISPLAY_NAMES: Record<string, string> = {
 };
 
 /**
- * "K_A" -> "A", "K_BKSP" -> "Backspace", "K_SEMICOLON" -> "SEMICOLON"
- * (unrecognized name, stripped-prefix fallback). Returns undefined only for
- * a blank name.
+ * "K_A" -> "a", "K_0" -> "0", "K_BKSP" -> "Backspace", "K_SEMICOLON" ->
+ * "SEMICOLON" (unrecognized name, stripped-prefix fallback). Returns
+ * undefined only for a blank name.
+ *
+ * Letter keys are lowercased (physical-key-naming ambiguity fix): a bare
+ * uppercase "A" in a keystroke diagnostic like "Shift+A" reads as the
+ * capital CHARACTER A, not the physical a key that, held with Shift,
+ * PRODUCES that capital. Digits/symbols/named keys are unchanged; any
+ * casing is conveyed by the modifier word ("Shift+") in the surrounding
+ * diagnostic, never by casing the key letter itself. See the studio's
+ * matching UI-side convention in lib/keyLabel.ts.
  */
 function vkeyDisplayName(name: string): string | undefined {
   if (!name) return undefined;
@@ -313,7 +321,7 @@ function vkeyDisplayName(name: string): string | undefined {
   const named = VKEY_DISPLAY_NAMES[upper];
   if (named !== undefined) return named;
   const simple = /^K_([A-Z0-9])$/.exec(upper);
-  if (simple?.[1] !== undefined) return simple[1];
+  if (simple?.[1] !== undefined) return simple[1].toLowerCase();
   const stripped = upper.startsWith('K_') ? upper.slice(2) : upper;
   return stripped || undefined;
 }
