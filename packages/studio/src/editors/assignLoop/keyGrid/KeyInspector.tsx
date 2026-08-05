@@ -49,16 +49,23 @@
 // caller that hasn't wired the effective layout through yet gets a slightly
 // less precise inspector, not a crash.
 //
-// ## Findings — still Phase 9's shape, not this component's
+// ## Findings — the real diagnostics, as of T115/T116
 //
-// `cell.findings` is `keyGridViewModel.ts`'s own `TouchKeyFinding` PLACEHOLDER
-// (T113-T121 have not landed the real diagnostic codes/copy yet — see that
-// module's doc comment, "findings — the Phase 9 seam"). This component
-// renders the STRUCTURED shape it already has (severity + the opaque `code`
-// string + `fields` as a plain key/value list) rather than inventing English
-// prose for codes that do not exist yet. When T113 lands the real
-// `TouchKeyFinding` type and a code -> localized-copy mapping, that mapping
-// is this component's next increment, not a re-architecture of it.
+// `cell.findings` is now the contracts-owned `TouchKeyFinding` (T113), and this
+// component renders each one as localized prose plus a button per fix
+// descriptor. All copy comes from `findingCopy.ts` (T116) — this file composes
+// none of its own, so the inspector and the grid's `aria-live` announcements
+// cannot drift onto different wording for the same finding.
+//
+// Severity is carried by the chip's LETTER *and* by the severity word rendered
+// beside it — never by colour alone (FR-050, US5 AS4). The word is real text
+// rather than an `aria-label` on the chip, so it survives a monochrome or
+// high-contrast display for a sighted author too, not only a screen reader.
+//
+// Acting on a fix is still NOT this component's job: `onApplyFix` reports the
+// author's choice and this file commits nothing, exactly as `onSpChange` does
+// below. See that prop's own doc for why an unwired mount disables the buttons
+// rather than hiding them.
 //
 // ## Editing is NOT this component's job — except the `sp` control (T096)
 //
@@ -93,6 +100,13 @@ import { BG_CARD, BORDER, TEXT_DIM, TEXT_MAIN, FONT } from "../../../lib/gallery
 import { ERROR_RED, FONT_MONO, WARNING } from "../../../ui/theme.ts";
 import { Badge, RadioGroup } from "../../../ui/index.ts";
 import type { KeyGridCellViewModel, TouchKeyFinding } from "./keyGridViewModel.ts";
+import type { TouchKeyFix } from "@keyboard-studio/contracts";
+import {
+  findingDetail,
+  findingTitle,
+  fixLabel,
+  severityLabel,
+} from "./findingCopy.ts";
 
 // Layer C's info-severity blue has no existing named token in ui/theme.ts —
 // KeyGridCell.tsx already made this same observation (its own `INFO_BLUE`
@@ -338,6 +352,20 @@ export interface KeyInspectorProps {
    * control (T096)" section for what this does and does not commit.
    */
   onSpChange?: (sp: TouchKeySpValue) => void;
+  /**
+   * Fired when the author presses a finding's fix button (T115, FR-041). Like
+   * `onSpChange`, this component COMMITS NOTHING: it hands back the fix
+   * descriptor the engine produced plus the finding it came from, and the caller
+   * decides what that means (a `KeyEditOperation`, opening AssignPanel to pick a
+   * character, or scrolling the offending key into view).
+   *
+   * Omitting it renders every fix button DISABLED rather than hiding the fixes.
+   * That is deliberate: a diagnostic with its remedies visible but not yet wired
+   * is honest, whereas hiding them would make the same finding look
+   * unfixable — and FR-041's promise is that a fix exists, which is true
+   * regardless of whether this particular mount has wired it.
+   */
+  onApplyFix?: (fix: TouchKeyFix, finding: TouchKeyFinding) => void;
   /** Localized panel accessible name override. */
   label?: string;
 }
@@ -365,9 +393,13 @@ export function KeyInspector({
   panelRef,
   onEscape,
   onSpChange,
+  onApplyFix,
   label,
 }: KeyInspectorProps) {
-  const { t } = useLingui();
+  // `i18n` alongside `t` because findingCopy.ts's composers take an `I18n`
+  // rather than being JSX macros — the same split existingMethodLabels.ts's
+  // callers already use.
+  const { t, i18n } = useLingui();
   const spGroupLabelId = useId();
 
   const sendsInfo = useMemo(
@@ -646,7 +678,10 @@ export function KeyInspector({
             </div>
           )}
 
-          {/* Findings — structured placeholder pending T113's real diagnostic codes/copy */}
+          {/* Findings — T115/T116/T117: localized copy plus a concrete fix
+              action per diagnostic. Severity is carried by the chip's LETTER
+              and by the visible severity word beside it, never by colour alone
+              (FR-050, US5 AS4). */}
           <div style={ROW_STYLE} data-testid="key-inspector-findings">
             <span style={FIELD_LABEL_STYLE}>
               {selectedCell.findings.length === 0
@@ -663,38 +698,91 @@ export function KeyInspector({
                   })}
             </span>
             {selectedCell.findings.length > 0 && (
-              <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 4 }}>
+              <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 10 }}>
                 {selectedCell.findings.map((finding, i) => {
                   const sev = severityStyle(finding.severity);
+                  const detail = findingDetail(finding, i18n);
                   return (
                     <li
-                      // findings carry no stable id of their own yet (T113 placeholder
-                      // shape); code+index is the best available key until then
+                      // A finding carries no stable id of its own — it is derived
+                      // fresh from the layout every cycle — so code+index is the
+                      // correct key: it is stable for as long as the finding list
+                      // itself is, which is exactly one render pass.
                       key={`${finding.code}-${i}`}
                       data-testid={`key-inspector-finding-${i}`}
-                      style={{ display: "flex", alignItems: "baseline", gap: 6, fontSize: 12 }}
+                      style={{ display: "flex", flexDirection: "column", gap: 3, fontSize: 12 }}
                     >
-                      <span
-                        aria-hidden="true"
-                        style={{
-                          display: "inline-block",
-                          width: 14,
-                          height: 14,
-                          lineHeight: "14px",
-                          textAlign: "center",
-                          borderRadius: 3,
-                          fontWeight: 700,
-                          fontSize: 9,
-                          color: "#0d1117",
-                          background: sev.color,
-                          flexShrink: 0,
-                        }}
-                      >
-                        {sev.letter}
+                      <span style={{ display: "flex", alignItems: "baseline", gap: 6 }}>
+                        <span
+                          aria-hidden="true"
+                          style={{
+                            display: "inline-block",
+                            width: 14,
+                            height: 14,
+                            lineHeight: "14px",
+                            textAlign: "center",
+                            borderRadius: 3,
+                            fontWeight: 700,
+                            fontSize: 9,
+                            color: "#0d1117",
+                            background: sev.color,
+                            flexShrink: 0,
+                          }}
+                        >
+                          {sev.letter}
+                        </span>
+                        {/* The severity WORD, not just the coloured chip — this is
+                            the "and text" half of "icon and text, never colour
+                            alone". It is real text, not `aria-label` on the chip,
+                            so it also survives a high-contrast or monochrome
+                            display for a sighted author. */}
+                        <span
+                          data-testid={`key-inspector-finding-${i}-severity`}
+                          style={{ color: sev.color, fontWeight: 600, flexShrink: 0 }}
+                        >
+                          {severityLabel(finding.severity, i18n)}
+                        </span>
+                        <span
+                          data-testid={`key-inspector-finding-${i}-title`}
+                          style={{ ...FIELD_VALUE_STYLE, fontSize: 12 }}
+                        >
+                          {findingTitle(finding, i18n)}
+                        </span>
                       </span>
-                      <span style={{ ...FIELD_VALUE_STYLE, fontFamily: FONT_MONO, fontSize: 12 }}>
-                        {finding.code}
-                      </span>
+                      {detail !== undefined && (
+                        <span
+                          data-testid={`key-inspector-finding-${i}-detail`}
+                          style={{ ...FIELD_VALUE_STYLE, color: TEXT_DIM, fontSize: 11, paddingLeft: 20 }}
+                        >
+                          {detail}
+                        </span>
+                      )}
+                      {finding.fixes.length > 0 && (
+                        <span style={{ display: "flex", flexWrap: "wrap", gap: 6, paddingLeft: 20 }}>
+                          {finding.fixes.map((fix, fixIndex) => (
+                            <button
+                              key={`${fix.kind}-${fixIndex}`}
+                              type="button"
+                              data-testid={`key-inspector-finding-${i}-fix-${fixIndex}`}
+                              data-fix-kind={fix.kind}
+                              disabled={onApplyFix === undefined}
+                              onClick={() => onApplyFix?.(fix, finding)}
+                              style={{
+                                fontFamily: FONT,
+                                fontSize: 11,
+                                padding: "3px 8px",
+                                borderRadius: 4,
+                                border: `1px solid ${BORDER}`,
+                                background: "transparent",
+                                color: TEXT_MAIN,
+                                cursor: onApplyFix === undefined ? "default" : "pointer",
+                              }}
+                            >
+                              {fixLabel(fix, i18n)}
+                            </button>
+                          ))}
+                        </span>
+                      )}
                     </li>
                   );
                 })}

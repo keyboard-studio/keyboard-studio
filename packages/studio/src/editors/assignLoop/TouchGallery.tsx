@@ -156,7 +156,11 @@ import {
 import { useGridNav } from "./keyGrid/useGridNav.ts";
 import { KeyInspector } from "./keyGrid/KeyInspector.tsx";
 import { AssignPanel, type AssignPanelCommitResult } from "./keyGrid/AssignPanel.tsx";
-import { useKeyEditGuards, type KeyEditInvalidationWarning } from "./keyGrid/useKeyEditGuards.ts";
+import {
+  useKeyEditGuards,
+  type KeyEditInvalidationWarning,
+  type KeyEditRejectionNotice,
+} from "./keyGrid/useKeyEditGuards.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { collateInventory } from "../../survey/collation.ts";
 import { nfcDedup } from "../../survey/charNormUtils.ts";
@@ -191,6 +195,7 @@ import { isMutateSeamEnabled } from "../../flags/mutateFlag.ts";
 import { useKeyboardArtifact } from "../../hooks/useKeyboardArtifact.ts";
 import type { ScaffoldSpec } from "../../hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "../../hooks/useWorkingCopyTransform.ts";
+import { useTouchKeyDiagnostics } from "../../hooks/useValidatorFindings.ts";
 import { GalleryPreviewPane } from "./PreviewPane.tsx";
 import { KeyPickerField } from "./KeyPickerField.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
@@ -227,6 +232,9 @@ import {
   galleryConfigStyle as configStyle,
   galleryCardStyle as cardStyle,
 } from "../../lib/galleryTheme.ts";
+// T118 — the rejection banner's border. `galleryTheme.ts` has no error token of
+// its own; `ui/theme.ts` is where the E/W/I severity palette lives, and this is
+// the same token KeyGridCell/KeyInspector already use for an error severity.
 import { ERROR_RED, ERROR_BG } from "../../ui/theme.ts";
 
 const selectStyle: CSSProperties = gallerySelectMenuStyle(160);
@@ -1722,6 +1730,34 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     [ir],
   );
 
+  // Coverage options for everything on the KEY-MODE side of this step: the
+  // shared progress figures, the FR-008 completion gate, and (via
+  // `useKeyEditGuards`) T119's `blocksContinue` prediction of that gate.
+  //
+  // These three MUST use one index, and it has to be the mutable-`ir` one.
+  // `coverageOptions` above is `baseIr`-scoped, which is right for seed-time
+  // detection but wrong here, for two compounding reasons:
+  //
+  //   1. It UNDER-CREDITS. Once AssignPanel mints a touch-key rule
+  //      (`ensureTouchKeyRule`/`applyGuardSynthesis`), the character that rule
+  //      produces exists only in `ir` — so a `baseIr`-scoped gate refuses
+  //      Continue for a character the author has just placed, by the very path
+  //      US2 exists to provide.
+  //   2. It made `blocksContinue` a LIE. That flag is documented as a
+  //      prediction of this gate's own verdict derived from the same coverage
+  //      truth (see useKeyEditGuards.ts's T119 section), and the guard hook is
+  //      passed `keyModeRuleIndex`. With the gate on a different index the two
+  //      could disagree about a character — the inline warning silent, then
+  //      Continue refused at the gate. That is exactly the deferral US5 AS3
+  //      removes, reintroduced through the back door.
+  //
+  // Falls back to `coverageOptions` only when there is no working `ir` yet, in
+  // which case the two indexes are identical anyway.
+  const keyModeCoverageOptions = useMemo(
+    () => (keyModeRuleIndex !== undefined ? { ruleIndex: keyModeRuleIndex } : coverageOptions),
+    [keyModeRuleIndex, coverageOptions],
+  );
+
   // Draft persistence — read on mount; write on every charTouch change.
   const touchDraft = useWorkingCopyStore((s) => s.touchDraft);
   const setTouchDraft = useWorkingCopyStore((s) => s.setTouchDraft);
@@ -1993,19 +2029,35 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // independently-folded copy. This is what lets the key-mode grid, the
   // shared progress figures below, and the completion gate all agree on one
   // truth about the layout's current state.
-  const effectiveKeyModeLayout = useMemo<TouchLayoutIR | null>(() => {
-    if (layoutForLintAndGate === null) return null;
-    if (keyEditOverlay.ops.length === 0) return layoutForLintAndGate;
+  //
+  // T120 (FR-036e): the replay's `orphaned` outcome is kept, not thrown away.
+  // Replay reports an unresolvable address as a FIRST-CLASS OUTCOME rather
+  // than an exception (FR-033a), and an orphaned op is an author edit that
+  // will not be applied — so Continue has to be able to say so instead of
+  // completing the step over the top of it ("neither silently discarded").
+  const keyModeOverlayReplay = useMemo<{
+    layout: TouchLayoutIR | null;
+    orphaned: readonly KeyEditOperation[];
+  }>(() => {
+    if (layoutForLintAndGate === null) return { layout: null, orphaned: [] };
+    if (keyEditOverlay.ops.length === 0) {
+      return { layout: layoutForLintAndGate, orphaned: [] };
+    }
     try {
-      return replayKeyEditOverlay(layoutForLintAndGate, keyEditOverlay).layout;
+      const { layout, orphaned } = replayKeyEditOverlay(
+        layoutForLintAndGate,
+        keyEditOverlay,
+      );
+      return { layout, orphaned };
     } catch (err) {
       devLog.error(
         "[TouchGallery] effectiveKeyModeLayout overlay replay failed:",
         err,
       );
-      return layoutForLintAndGate;
+      return { layout: layoutForLintAndGate, orphaned: [] };
     }
   }, [layoutForLintAndGate, keyEditOverlay]);
+  const effectiveKeyModeLayout = keyModeOverlayReplay.layout;
 
   // ONE derived source (FR-036d): "characters still unplaced" and "keys with
   // no letter" are two projections of the SAME effectiveKeyModeLayout +
@@ -2013,24 +2065,29 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // no-output scan reuses buildKeyGridViewModel (the exact function the grid
   // itself renders cells from), so this count can never disagree with what
   // the grid displays.
+  //
+  // Both halves read `keyModeRuleIndex` (via `keyModeCoverageOptions`), the
+  // same index the completion gate and the edit-time guard use — see that
+  // memo's own doc comment. A synthesized touch-key rule must move these
+  // figures, the gate, and the inline warning together or not at all.
   const keyGridProgress = useMemo<{
     unplacedChars: readonly string[];
     keysWithNoOutput: readonly string[];
   }>(() => {
-    if (effectiveKeyModeLayout === null || touchRuleIndex === undefined) {
+    if (effectiveKeyModeLayout === null || keyModeRuleIndex === undefined) {
       return { unplacedChars: inventory, keysWithNoOutput: [] };
     }
     const { uncovered } = touchCoverage(
       effectiveKeyModeLayout,
       inventory,
-      coverageOptions,
+      keyModeCoverageOptions,
     );
     const keysWithNoOutput: string[] = [];
     for (const platform of effectiveKeyModeLayout.platforms) {
       for (const layer of platform.layers) {
         const vm = buildKeyGridViewModel({
           layout: effectiveKeyModeLayout,
-          ruleIndex: touchRuleIndex,
+          ruleIndex: keyModeRuleIndex,
           platform: platform.id,
           layerId: layer.id,
         });
@@ -2043,7 +2100,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       }
     }
     return { unplacedChars: uncovered, keysWithNoOutput };
-  }, [effectiveKeyModeLayout, touchRuleIndex, inventory, coverageOptions]);
+  }, [effectiveKeyModeLayout, keyModeRuleIndex, inventory, keyModeCoverageOptions]);
 
   // T073 (FR-036): propose the by-key mode ONLY when BOTH hold — the
   // effective layout has keys with no reachable output AND the inventory
@@ -2117,6 +2174,23 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     );
   }, [activeKeyPlatformEntry]);
 
+  // The edit-time diagnostics (spec 058 T114; FR-040/FR-042). Derived from the
+  // SAME `ir` / `effectiveKeyModeLayout` / `keyModeRuleIndex` / `keyEditOverlay`
+  // this component already has — no new store field, and no new timer: the hook
+  // is a `useMemo` over a pure join, so the findings resolve inside whichever
+  // render the existing 300 ms validation cycle already schedules (Decision D3).
+  //
+  // `keyModeRuleIndex` (built from the MUTABLE `ir`), not `touchRuleIndex`
+  // (built from `baseIr`): a rule the author just minted through AssignPanel
+  // must stop the dead-key finding for that key immediately, not on the next
+  // instantiation.
+  const keyModeDiagnostics = useTouchKeyDiagnostics({
+    ir,
+    layout: effectiveKeyModeLayout,
+    ruleIndex: keyModeRuleIndex,
+    overlay: keyEditOverlay,
+  });
+
   const keyModeViewModel = useMemo<KeyGridViewModel | undefined>(() => {
     if (
       effectiveKeyModeLayout === null ||
@@ -2130,12 +2204,14 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       ruleIndex: keyModeRuleIndex,
       platform: activeKeyPlatformId,
       layerId: activeKeyLayerId,
+      findingsByAddress: keyModeDiagnostics.byAddress,
     });
   }, [
     effectiveKeyModeLayout,
     keyModeRuleIndex,
     activeKeyPlatformId,
     activeKeyLayerId,
+    keyModeDiagnostics,
   ]);
 
   // Stable empty view model so useGridNav (a hook — cannot be called
@@ -2185,17 +2261,46 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // the raw `touchLayoutJson` store field. `keyModeProvenance` above is
   // already the single source for which case applies — reused here rather
   // than a second Case A/B branch.
+  //
+  // T119 (US5 AS3): `inventoryChars` is the SAME collated confirmed inventory
+  // `handleContinue`'s FR-008 gate audits, and `keyModeRuleIndex` is the SAME
+  // index that gate resolves coverage through (`keyModeCoverageOptions`). Both
+  // halves have to match for `blocksContinue` to predict the gate rather than
+  // guess at it — the index half was wrong at first and is what let the inline
+  // warning stay silent about a character the gate then refused (FR-036d).
   const keyEditGuardsOptions = useMemo(
     () => ({
       layout: effectiveKeyModeLayout ?? EMPTY_TOUCH_LAYOUT,
       ...(keyModeRuleIndex !== undefined ? { ruleIndex: keyModeRuleIndex } : {}),
+      inventoryChars: inventory,
       i18n,
     }),
-    [effectiveKeyModeLayout, keyModeRuleIndex, i18n],
+    [effectiveKeyModeLayout, keyModeRuleIndex, inventory, i18n],
   );
-  const { checkOperation: checkKeyEditOperation } = useKeyEditGuards(
-    keyEditGuardsOptions,
-  );
+  const {
+    checkOperation: checkKeyEditOperation,
+    checkRejections: checkKeyEditRejectionNotices,
+  } = useKeyEditGuards(keyEditGuardsOptions);
+
+  // T118 (FR-045): the REFUSAL surface, deliberately separate state from the
+  // invalidation warnings below. The two are different verdicts with opposite
+  // consequences — an invalidation warning describes an edit that DID happen
+  // and is allowed to (FR-036f: "an editor must permit invalid intermediate
+  // states"), while a rejection describes one that did NOT. Sharing one banner
+  // would make "we saved this, look out" and "we did not save this" read alike.
+  const [keyEditRejections, setKeyEditRejections] = useState<
+    readonly KeyEditRejectionNotice[]
+  >([]);
+  // A confirmable rejection the author has acknowledged (`address:reason`), so
+  // the second attempt at the SAME edit goes through. Keyed per edit rather than
+  // as a single boolean so acknowledging one soft block never silently waives an
+  // unrelated one on the next key.
+  const [acknowledgedRejections, setAcknowledgedRejections] = useState<
+    ReadonlySet<string>
+  >(() => new Set());
+  useEffect(() => {
+    setKeyEditRejections([]);
+  }, [selectedKeyAddress]);
 
   // FR-036f: the invalidation warning surfaces AT THE MOMENT of the edit
   // (checked synchronously in handleAssignPanelCommit below, before the
@@ -2240,6 +2345,31 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // directory".
   const handleAssignPanelCommit = useCallback(
     (result: AssignPanelCommitResult) => {
+      // T118 (FR-045) FIRST: there is no point warning about a lost character
+      // for an edit that is about to be refused. A hard rejection returns
+      // without touching the store at all — that is what "the invalid state
+      // never exists" means, and why no finding is emitted for it.
+      const rejections = checkKeyEditRejectionNotices(result.op);
+      const unwaived = rejections.filter(
+        (r) => r.blocking || !acknowledgedRejections.has(`${result.op.address}:${r.reason}`),
+      );
+      if (unwaived.length > 0) {
+        setKeyEditRejections(unwaived);
+        // A confirmable rejection is recorded as acknowledged NOW, so repeating
+        // the same edit proceeds. Propose-then-confirm (spec v1.3.1 §3c): the
+        // first attempt states the risk, the second carries it out.
+        const waivable = unwaived.filter((r) => !r.blocking);
+        if (waivable.length > 0) {
+          setAcknowledgedRejections((prev) => {
+            const next = new Set(prev);
+            for (const r of waivable) next.add(`${result.op.address}:${r.reason}`);
+            return next;
+          });
+        }
+        return;
+      }
+      setKeyEditRejections([]);
+
       const warnings = checkKeyEditOperation(result.op);
       setKeyEditInvalidationWarnings(warnings);
 
@@ -2312,7 +2442,12 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         }
       }
     },
-    [checkKeyEditOperation, keyModeProvenance],
+    [
+      checkKeyEditOperation,
+      checkKeyEditRejectionNotices,
+      acknowledgedRejections,
+      keyModeProvenance,
+    ],
   );
 
   // Grid Enter -> AssignPanel's character field (SC-004's keyboard-only
@@ -2629,6 +2764,16 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // hatch layered on top of it.
   const [showUnimplementedWarning, setShowUnimplementedWarning] =
     useState(false);
+  // T120 (FR-036e): the key-edit overlay's half of "committed or explicitly
+  // resolved". `true` once the author has been shown the orphaned-edit notice
+  // at Continue, so the second Continue completes. Component-local, and NOT a
+  // store field: it records that a message has been READ, not anything about
+  // the working copy — the overlay itself is untouched either way, which is
+  // what "neither silently discarded" requires. Reset whenever the overlay
+  // changes (below), so a NEW orphan is never waived by an earlier
+  // acknowledgement.
+  const [orphanedEditsAcknowledged, setOrphanedEditsAcknowledged] =
+    useState(false);
 
   // Clear a stale gate message as soon as the author makes another edit —
   // "cleared when coverage passes or edits change" (T016b): re-running
@@ -2642,6 +2787,15 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     setUncoveredChars([]);
     setShowUnimplementedWarning(false);
   }, [touchKey]);
+
+  // T120: a NEW orphan is never waived by an earlier acknowledgement. Keyed on
+  // the overlay itself rather than on `touchKey` above, because the overlay is
+  // the thing whose orphan set can change (a fresh commit, an undo, or a live
+  // re-derivation of the Case A seed) — and it changes independently of the
+  // by-character draft that `touchKey` tracks.
+  useEffect(() => {
+    setOrphanedEditsAcknowledged(false);
+  }, [keyEditOverlay]);
 
   // Emit only chars where a real (non-inherited) or inherited assignment was
   // explicitly accepted — everything in charTouch was put there by the user.
@@ -2662,12 +2816,41 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // last character's forward button IS the phase completion, not a further
   // navigation step).
   //
-  // FR-008 gate: before completing, re-run touchCoverage on the same layout
-  // lint audits (layoutForLintAndGate — includes current Phase E edits).
-  // While any inventory char is uncovered, refuse the default Done/Skip
-  // action and surface an inline message + the leave-warning modal (the gallery leave-warning)
-  // naming the uncovered chars — "Come back later" (onSecondary below) is the
-  // only path that still completes with characters unimplemented.
+  // FR-008 gate: before completing, re-run touchCoverage on the effective
+  // layout — `effectiveKeyModeLayout`, which is `layoutForLintAndGate` (the
+  // layout lint audits, including current Phase E edits) with the committed
+  // key-edit overlay folded on top, and IS `layoutForLintAndGate` itself when
+  // the overlay is empty. While any inventory char is uncovered, refuse the
+  // default Done/Skip action and surface an inline message + the leave-warning
+  // modal (the gallery leave-warning) naming the uncovered chars — "Come back
+  // later" (onSecondary below) is the only path that still completes with
+  // characters unimplemented.
+  //
+  // T120 (FR-036e) — "either mode MUST be able to complete the step":
+  //
+  //   * The gate is ONE function, shared by both modes' Continue controls
+  //     (`touch-key-mode-continue` in the key pane, the Done/Skip control in
+  //     the character pane), and it tests coverage ONLY. It reads no mode
+  //     state whatsoever — deliberately, because an author "MUST never have to
+  //     switch modes in order to move on".
+  //   * It audits the OVERLAY-FOLDED layout, not the unfolded one. That is
+  //     what makes by-key work actually count toward completion: several key
+  //     commands (`useKeyCommands`' add/remove/suppress) write only the
+  //     overlay, so a gate reading `layoutForLintAndGate` would refuse to
+  //     credit a coverage gap the author had just fixed in the key view — the
+  //     precise "you must go do it in the other mode" failure FR-036e forbids.
+  //     It is also the SAME layout `keyGridProgress` derives its shared
+  //     figures from, so the gate's verdict and the progress figures cannot
+  //     disagree (FR-036d), and the same one T119's `blocksContinue` predicts.
+  //   * Both in-progress surfaces are accounted for, neither silently
+  //     discarded: the by-character draft is emitted by `finalizeCompletion`
+  //     below, and the key-edit overlay is durable store state that has
+  //     already been folded into the audited layout. The one case where an
+  //     overlay op does NOT reach the layout is an ORPHANED op (its address no
+  //     longer resolves — FR-033a's first-class outcome), and that is reported
+  //     here rather than stepped over: completion pauses once to say which
+  //     edits could not be applied, and only a second, explicit Continue
+  //     proceeds. The ops themselves are never dropped by this gate.
   //
   // desktopProducedSet (session-aware, see its own declaration above) is
   // folded in here via touchCoverage's `additionalProduced` parameter — a
@@ -2677,11 +2860,15 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // session does not block completion, without touching the interactive
   // walk's own (deliberately static) `detectedChars`/`touchLettersToAdd`.
   const handleContinue = useCallback(() => {
-    if (layoutForLintAndGate !== null) {
+    if (effectiveKeyModeLayout !== null) {
+      // `keyModeCoverageOptions`, NOT `coverageOptions` — see that memo's own
+      // doc comment for why the gate must read the mutable-`ir` rule index
+      // (it under-credited a synthesized rule, and it made T119's
+      // `blocksContinue` prediction able to disagree with this very gate).
       const { uncovered } = touchCoverage(
-        layoutForLintAndGate,
+        effectiveKeyModeLayout,
         inventory,
-        coverageOptions,
+        keyModeCoverageOptions,
         desktopProducedSet,
       );
       if (uncovered.length > 0) {
@@ -2693,12 +2880,22 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         return;
       }
     }
+    // Coverage passes. Before completing, resolve the other in-progress
+    // surface explicitly (see the T120 note above): an orphaned overlay op is
+    // author work that will not be applied, so it is stated once and
+    // acknowledged rather than silently carried past the end of the step.
+    if (keyModeOverlayReplay.orphaned.length > 0 && !orphanedEditsAcknowledged) {
+      setOrphanedEditsAcknowledged(true);
+      return;
+    }
     finalizeCompletion();
   }, [
-    layoutForLintAndGate,
+    effectiveKeyModeLayout,
     inventory,
-    coverageOptions,
+    keyModeCoverageOptions,
     desktopProducedSet,
+    keyModeOverlayReplay,
+    orphanedEditsAcknowledged,
     finalizeCompletion,
   ]);
 
@@ -4345,6 +4542,50 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   const currentCharDisplay =
     currentChar !== null ? displayChar(currentChar) : null;
 
+  // T120 (FR-036e): the completion gate's own feedback, rendered by BOTH mode
+  // panes from this one element. The gate is shared (see `handleContinue`), so
+  // its refusal must be legible wherever the author pressed Continue — a gate
+  // that explains itself in only one view is, in practice, a gate that tells
+  // the author to switch modes. The two panes are mutually exclusive
+  // (`leftContent` picks one), so rendering the same element in each shows it
+  // exactly once.
+  //
+  // The uncovered banner keeps `ErrorText tone="warning"` (role="alert" + the
+  // canonical WARNING colour), matching the other gate-message sites. The
+  // orphaned-edit notice is a separate paragraph because it reports a
+  // different thing: not "a character has no key" but "an edit of yours could
+  // not be applied".
+  const completionGateNotice = (
+    <>
+      {uncoveredMessage !== null && (
+        <ErrorText tone="warning">
+          <Trans id="editor.assignLoop.touch.cannotFinishYet">
+            Cannot finish yet — {uncoveredMessage}.
+          </Trans>
+        </ErrorText>
+      )}
+      {orphanedEditsAcknowledged && keyModeOverlayReplay.orphaned.length > 0 && (
+        <div role="alert" data-testid="touch-orphaned-key-edits-notice">
+          <ErrorText tone="warning">
+            {t({
+              id: "editor.assignLoop.touch.orphanedKeyEdits",
+              message: plural(keyModeOverlayReplay.orphaned.length, {
+                one: "# key edit no longer matches any key on this layout, so it will not be applied. Your other edits are unaffected. Press Continue again to move on.",
+                other:
+                  "# key edits no longer match any key on this layout, so they will not be applied. Your other edits are unaffected. Press Continue again to move on.",
+              }),
+            })}
+          </ErrorText>
+          <ul style={{ margin: "4px 0 0", paddingLeft: 18, fontSize: 11, color: TEXT_DIM }}>
+            {keyModeOverlayReplay.orphaned.map((op) => (
+              <li key={op.seq}>{op.address}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </>
+  );
+
   // onKeyDown lives on this OUTER pane div (not on CharScrollStrip below) so
   // ArrowLeft/ArrowRight cycles the character no matter which control inside
   // the pane currently has focus — a plain native keydown bubbles up to here
@@ -4691,16 +4932,10 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
 
           {/* FR-008 completion gate message — set by handleContinue when
               touchCoverage finds an inventory char with no reachable touch
-              mechanism on the final layout; cleared on the next edit.
-              ErrorText tone="warning" renders role="alert" + the canonical
-              WARNING color (#d29922), matching other gate-message sites. */}
-          {uncoveredMessage !== null && (
-            <ErrorText tone="warning">
-              <Trans id="editor.assignLoop.touch.cannotFinishYet">
-                Cannot finish yet — {uncoveredMessage}.
-              </Trans>
-            </ErrorText>
-          )}
+              mechanism on the final layout; cleared on the next edit. Shared
+              with the key-mode pane (T120) via `completionGateNotice`, which
+              also carries the orphaned-key-edit notice. */}
+          {completionGateNotice}
 
           {/* Sibling-accent bulk summary boxes — one green box per accelerator
               batch, at the TOP alongside the single-character suggestion card.
@@ -5327,6 +5562,12 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         </button>
       </div>
 
+      {/* T120 (FR-036e): the SAME gate feedback the character pane shows —
+          coverage refusal and the orphaned-key-edit notice. Either mode
+          completes the step, so either mode has to be able to say why it
+          didn't. */}
+      {completionGateNotice}
+
       {/* The "for editing" verb (FR-020h) — an editable SCHEMATIC layout, not
           a rendered keyboard you type on. */}
       <p
@@ -5440,6 +5681,109 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
             <ul style={{ margin: 0, paddingLeft: 18 }}>
               {keyEditInvalidationWarnings.map((w) => (
                 <li key={w.char}>{w.message}</li>
+              ))}
+            </ul>
+            {/* T119 (US5 AS3): the warning is inline and the edit STANDS — an
+                editor must permit invalid intermediate states — so the two
+                remedies are offered right here rather than left implicit.
+                "Undo this edit" pops the committed operation off the shared
+                chronological stack (`undoKeyEdit`, Phase 5c); "restore" is the
+                FR-062 path, and needs no button because a character that lost
+                its last mechanism has already been returned to the walk by the
+                commit handler above (`returnedToWorklistChars`) — the note says
+                so instead of offering an action that already happened. Whatever
+                the author does here, the FR-008 coverage gate still BLOCKS at
+                Continue; this changes nothing about that. */}
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6 }}>
+              <button
+                type="button"
+                data-testid="key-edit-invalidation-undo"
+                onClick={() => {
+                  useWorkingCopyStore.getState().undoKeyEdit();
+                  setKeyEditInvalidationWarnings([]);
+                }}
+                style={{
+                  fontFamily: FONT,
+                  fontSize: 11,
+                  padding: "3px 8px",
+                  borderRadius: 4,
+                  border: `1px solid ${BORDER}`,
+                  background: "transparent",
+                  color: TEXT_MAIN,
+                  cursor: "pointer",
+                }}
+              >
+                {t({
+                  id: "editor.assignLoop.touch.keyMode.invalidationUndo",
+                  message: "Undo this edit",
+                })}
+              </button>
+              {keyEditInvalidationWarnings.some((w) => w.returnsToWorklist) && (
+                <span data-testid="key-edit-invalidation-restore-note" style={{ fontFamily: FONT }}>
+                  {t({
+                    id: "editor.assignLoop.touch.keyMode.invalidationRestoreNote",
+                    message:
+                      "Or keep the edit — the affected characters are back in the by-character list, ready to place somewhere else.",
+                  })}
+                </span>
+              )}
+            </div>
+            {/* T119 (US5 AS3): when one of the affected characters is in the
+                confirmed inventory, say so HERE — the FR-008 gate will refuse
+                Continue until it types again, and telling the author at the
+                gate instead of at the edit is exactly the deferral US5 exists
+                to remove. Stated, never enforced: the edit above already
+                stands. */}
+            {keyEditInvalidationWarnings.some((w) => w.blocksContinue) && (
+              <div
+                data-testid="key-edit-invalidation-blocks-continue"
+                style={{ marginTop: 6, fontFamily: FONT, color: TEXT_MAIN }}
+              >
+                {t({
+                  id: "editor.assignLoop.touch.keyMode.invalidationBlocksContinue",
+                  message:
+                    "This step cannot be finished while a character from your list has no key. Place it somewhere else, or undo the edit.",
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* T118 (FR-045): the REFUSAL surface. `role="alert"`, not
+            `role="status"`: unlike the invalidation warning above — which
+            reports something that already happened and can be read at leisure —
+            a rejection means the author's edit did NOT land, and they will
+            otherwise carry on believing it did. A non-blocking (confirmable)
+            rejection is recorded as acknowledged on this first showing, so
+            repeating the same edit proceeds (propose-then-confirm, §3c). */}
+        {keyEditRejections.length > 0 && (
+          <div
+            role="alert"
+            data-testid="key-edit-rejections"
+            style={{
+              background: BG_CARD,
+              border: `1px solid ${ERROR_RED}`,
+              borderRadius: 6,
+              padding: "8px 12px",
+              fontSize: 11,
+              color: TEXT_MAIN,
+              fontFamily: FONT,
+            }}
+          >
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {keyEditRejections.map((r) => (
+                <li key={`${r.reason}-${r.keyId}`} data-rejection-reason={r.reason}>
+                  {r.message}
+                  {!r.blocking && (
+                    <span style={{ color: TEXT_DIM }}>
+                      {" "}
+                      {t({
+                        id: "editor.assignLoop.touch.keyMode.rejectionConfirmHint",
+                        message: "Make the same change again to go ahead anyway.",
+                      })}
+                    </span>
+                  )}
+                </li>
               ))}
             </ul>
           </div>

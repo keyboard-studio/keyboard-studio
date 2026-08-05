@@ -110,6 +110,61 @@
 // walk, is out of scope for this warning — FR-036f's own wording is "invalidates
 // a BY-CHARACTER ASSIGNMENT," not "changes any character anywhere."
 //
+// ## T119 — the second watched set: the CONFIRMED INVENTORY (US5 AS3)
+//
+// FR-036f's by-character-assignment scope above is necessary but not
+// sufficient. US5 AS3 is stated over a different set: "an author edit that
+// removes the last mechanism for an INVENTORY character ... warns inline ...
+// and the existing FR-008 gate still blocks at Continue." Those two sets
+// genuinely differ, and the gap is not hypothetical: the by-character walk
+// deliberately never stops on a character the seed layout already covers (see
+// TouchGallery's `touchLettersToAdd` entry-parity rule), so a confirmed
+// inventory character the SHIPPED layout happened to type has no
+// `charTouchEntries` row at all. Stranding exactly that character is the
+// canonical import-fix-up mistake — and with the assignment-only scope it
+// warned about nothing at edit time and only surfaced minutes later as a
+// refused Continue, which is precisely what US5 exists to rule out.
+//
+// So the watched set is the UNION of the two, and each warning carries which
+// consequence applies:
+//   - `returnsToWorklist` (FR-062, T106) — this character lost its last
+//     mechanism ANYWHERE, so it goes back on the worklist to be re-placed.
+//   - `blocksContinue` (T119) — that same character is in the CONFIRMED
+//     INVENTORY, so the FR-008 completion gate will refuse Continue until it
+//     types again. The edit still lands (FR-036f: "an editor must permit
+//     invalid intermediate states"); the author is simply told now rather
+//     than at the gate. This hook does not, and must not, enforce anything:
+//     the gate itself stays where it is (`handleContinue`, TouchGallery), and
+//     `blocksContinue` is a PREDICTION of that one gate's verdict.
+//
+//     That prediction agrees with the gate only so long as BOTH are given the
+//     same `ruleIndex`. That is a caller obligation this hook cannot enforce,
+//     and it was got wrong once already: the gate ran `touchCoverage` with a
+//     `baseIr`-scoped index while this hook was handed the mutable-`ir` one, so
+//     a character produced by a freshly synthesized touch rule was credited
+//     here and refused there — the gate-time surprise US5 AS3 exists to remove,
+//     reintroduced through the back door. TouchGallery now threads one
+//     `keyModeCoverageOptions` through the shared figures, the gate, and this
+//     hook; see that memo's own doc comment. A future caller that passes this
+//     hook a different index than its gate uses breaks the same way.
+// A character that is in neither set is still not warned about at all.
+//
+// ## T118 — the second, different guard on this hook: REJECTION
+//
+// `checkRejections` is the counterpart to everything above, and the two must not
+// be conflated. Everything above reports a real, PERMITTED consequence of a
+// legitimate edit — FR-036f explicitly wants the edit to proceed, because "an
+// editor must permit invalid intermediate states". `checkRejections` reports an
+// edit that must not happen at all (FR-045): an id the compiler cannot lex
+// (0x05A, author-typed — emitting NO finding, since the invalid state never comes
+// to exist), an in-layer id collision, or a `T_` key with nothing to type.
+//
+// Detection lives in `checkKeyEditRejections` (engine's `keyEditOps.ts`), beside
+// the operation union it screens, and shares its predicates with
+// `findDeadTouchKeys` so a state the DETECTOR would report cannot be reachable by
+// an edit the GUARD allows. This file owns only the localized wording, exactly as
+// `findingCopy.ts` does for findings.
+//
 // ## Timing (the actual requirement)
 //
 // `checkOperation` is a plain, synchronous, pure computation over React state
@@ -135,11 +190,13 @@ import {
 } from "@keyboard-studio/contracts";
 import {
   applyKeyEditsToLayout,
+  checkKeyEditRejections,
   parseTouchKeyAddress,
   resolveKeyAddress,
   resolveSubKeyEntry,
   touchCoverage,
   type KeyEditOperation,
+  type KeyEditRejection,
   type ResolvedKeyLocation,
 } from "@keyboard-studio/engine";
 import { resolveMessage } from "../../../lib/i18nResolve.ts";
@@ -215,6 +272,12 @@ function readKeyAtPosition(
  * already folded) — the same "already effective" contract `keyGridViewModel.ts`
  * and `useModeContextCarry.ts` take. Never mutates `layout`; `op` is not
  * actually committed anywhere by this function.
+ *
+ * `assignedChars` is a WATCHED SET, not necessarily the by-character
+ * assignments alone: the hook passes the union of those and the confirmed
+ * inventory (T119 — see the module doc's "The second watched set"). Callers
+ * that only care about the FR-036f half pass just the assignments, and get
+ * exactly the FR-036f answer.
  *
  * `add` never invalidates anything (a brand-new key touches no existing
  * content) and short-circuits to `[]` immediately.
@@ -339,6 +402,26 @@ function composeInvalidationMessage(char: string, i18n?: I18n): string {
   );
 }
 
+/**
+ * T119 (US5 AS3): the wording for an INVENTORY character that just lost its
+ * last mechanism. A separate id rather than a suffix appended to the sentence
+ * above, because the two say different things to the author: one reports a
+ * placement that went away, this one additionally tells them the step will not
+ * complete until they act. Naming the gate here is the whole point — "warns
+ * inline ... and the existing FR-008 gate still blocks at Continue" is one
+ * statement, and splitting it across two surfaces is how an author gets
+ * surprised at the gate.
+ */
+function composeBlockingInvalidationMessage(char: string, i18n?: I18n): string {
+  return resolveMessage(
+    i18n,
+    msg({
+      id: "editor.assignLoop.keyGrid.keyEditGuards.invalidatesInventoryCharacter",
+      message: `Nothing types ${{ character: char }} (${{ notation: codepointLabel(char).title }}) anymore. The edit is kept, but this step cannot be finished until that character has a key again.`,
+    }),
+  );
+}
+
 // ---------------------------------------------------------------------------
 // The hook
 // ---------------------------------------------------------------------------
@@ -364,6 +447,20 @@ export interface KeyEditInvalidationWarning {
    * {@link findCharactersLostForGood}.
    */
   readonly returnsToWorklist: boolean;
+  /**
+   * T119 (US5 AS3): `true` when `char` is in the CONFIRMED INVENTORY and has
+   * lost its last mechanism — i.e. the FR-008 completion gate will refuse
+   * Continue until it types again. A prediction of that one gate's verdict
+   * (derived from the same `touchCoverage` pass, so the two cannot disagree),
+   * never an enforcement: the edit itself still commits, because "an editor
+   * must permit invalid intermediate states" (FR-036f).
+   *
+   * `false` — with `returnsToWorklist` possibly still `true` — for a character
+   * the by-character walk had assigned that is NOT in the confirmed inventory,
+   * or one that survives elsewhere (FR-061). Callers MUST NOT treat this as a
+   * reason to block the edit.
+   */
+  readonly blocksContinue: boolean;
 }
 
 export interface UseKeyEditGuardsOptions {
@@ -371,18 +468,67 @@ export interface UseKeyEditGuardsOptions {
   readonly layout: TouchLayoutIR;
   /** From `buildTouchKeyRuleIndex(ir)`, built once by the caller. Optional — omitting it under-reports a rule-bound production, never over-reports (mirrors `keyEditOrphanReport.ts`'s own convention). */
   readonly ruleIndex?: TouchKeyRuleIndex;
+  /**
+   * T119 (US5 AS3): the confirmed inventory (`session.confirmedInventory`, as
+   * the gallery collates it) — the SAME list the FR-008 completion gate audits
+   * coverage against. Watched in addition to the by-character assignments, and
+   * the source of `blocksContinue`. Omitting it narrows this hook back to
+   * FR-036f's assignment-only scope; it never widens what is reported beyond
+   * these two sets.
+   */
+  readonly inventoryChars?: readonly string[];
   /** `useLingui()`'s `i18n`, for a real component. Omit in a unit test to assert on the English source text. */
   readonly i18n?: I18n;
+}
+
+/**
+ * One refused mutation, with the localized sentence to show for it (T118).
+ *
+ * `blocking` is `true` for a hard refusal and `false` for warn-and-confirm — the
+ * caller MUST NOT commit a `blocking` rejection under any circumstance, and MAY
+ * commit a non-blocking one once the author has acknowledged it. See
+ * `KeyEditRejection.confirmable` (engine) for which reasons can downgrade and
+ * why the other two never do.
+ */
+export interface KeyEditRejectionNotice {
+  readonly reason: KeyEditRejection["reason"];
+  readonly blocking: boolean;
+  readonly keyId: string;
+  /** Ready-to-render, localized sentence naming the key and what is wrong. */
+  readonly message: string;
 }
 
 export interface UseKeyEditGuardsResult {
   /**
    * Check a PENDING key edit — before it is committed — for any by-character
-   * assignment it would invalidate. Call this at the moment of the edit
-   * (e.g. immediately before `commitKeyEdit(op)`), never deferred to the
-   * Continue gate (FR-036f). Returns `[]` when nothing is invalidated.
+   * assignment (FR-036f) or confirmed-inventory character (T119, US5 AS3) it
+   * would invalidate. Call this at the moment of the edit (e.g. immediately
+   * before `commitKeyEdit(op)`), never deferred to the Continue gate. Returns
+   * `[]` when nothing is invalidated.
+   *
+   * The returned warnings are informational in BOTH cases: no verdict here
+   * ever refuses an edit. That is `checkRejections`' job, and only for the
+   * three states of FR-045.
    */
   readonly checkOperation: (op: PendingKeyEditOperation) => readonly KeyEditInvalidationWarning[];
+  /**
+   * Check a PENDING key edit for mutations that must be REFUSED rather than
+   * committed-and-reported (T118, FR-045). Returns `[]` when the edit is
+   * admissible.
+   *
+   * Distinct from {@link checkOperation}, and deliberately not folded into it:
+   * the two answer different questions with different consequences.
+   * `checkOperation` reports a real, permitted consequence of a legitimate edit
+   * (a character loses a mechanism — FR-036f explicitly wants the edit to
+   * proceed, since "an editor must permit invalid intermediate states"). This
+   * one reports an edit that must not happen at all. Merging them would force
+   * every caller to re-separate "warn" from "refuse" at the call site, which is
+   * exactly where the distinction gets lost.
+   *
+   * Call it FIRST: there is no point warning about a lost character for an edit
+   * that is about to be refused.
+   */
+  readonly checkRejections: (op: PendingKeyEditOperation) => readonly KeyEditRejectionNotice[];
 }
 
 const EMPTY_ASSIGNED_CHARS: ReadonlySet<string> = new Set();
@@ -397,6 +543,7 @@ const EMPTY_ASSIGNED_CHARS: ReadonlySet<string> = new Set();
 export function useKeyEditGuards({
   layout,
   ruleIndex,
+  inventoryChars,
   i18n,
 }: UseKeyEditGuardsOptions): UseKeyEditGuardsResult {
   const touchDraft = useWorkingCopyStore((s) => s.touchDraft);
@@ -410,22 +557,123 @@ export function useKeyEditGuards({
     return set;
   }, [touchDraft]);
 
+  // T119: the inventory half of the watched set. `inventoryKey` is the stable
+  // primitive proxy for the array — the same idiom TouchGallery uses for its
+  // own `inventory`/`unplacedChars` memos, so a caller that rebuilds the array
+  // each render (the normal case: it is a `collate()` result) does not
+  // invalidate every downstream callback on every render.
+  const inventoryKey = (inventoryChars ?? []).join("\0");
+  const inventoryCharSet = useMemo(() => {
+    if (inventoryChars === undefined || inventoryChars.length === 0) {
+      return EMPTY_ASSIGNED_CHARS;
+    }
+    return new Set(inventoryChars.map((c) => c.normalize("NFC")));
+    // inventoryKey is the stable primitive proxy for inventoryChars.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [inventoryKey]);
+
+  // The union (see the module doc's "The second watched set"). Kept as ONE set
+  // so the diff below runs once, rather than running it twice and merging two
+  // result lists — which would double the `applyKeyEditsToLayout` work and
+  // invite the two halves to disagree about ordering.
+  const watchedChars = useMemo(() => {
+    if (inventoryCharSet.size === 0) return assignedChars;
+    if (assignedChars.size === 0) return inventoryCharSet;
+    return new Set([...assignedChars, ...inventoryCharSet]);
+  }, [assignedChars, inventoryCharSet]);
+
   const checkOperation = useCallback(
     (op: PendingKeyEditOperation): readonly KeyEditInvalidationWarning[] => {
-      const invalidated = findInvalidatedAssignedCharacters(layout, op, ruleIndex, assignedChars);
+      const invalidated = findInvalidatedAssignedCharacters(layout, op, ruleIndex, watchedChars);
       if (invalidated.length === 0) return [];
       // Only classify (the extra applyKeyEditsToLayout + touchCoverage pass)
       // when there is something to classify — see findCharactersLostForGood's
       // own doc comment on this short-circuit.
-      const lostForGood = new Set(findCharactersLostForGood(layout, op, ruleIndex, assignedChars));
-      return invalidated.map((char) => ({
-        char,
-        message: composeInvalidationMessage(char, i18n),
-        returnsToWorklist: lostForGood.has(char),
-      }));
+      const lostForGood = new Set(findCharactersLostForGood(layout, op, ruleIndex, watchedChars));
+      return invalidated.map((char) => {
+        const returnsToWorklist = lostForGood.has(char);
+        // T119: only an INVENTORY character can block the FR-008 gate — a
+        // by-character assignment for a character outside the confirmed
+        // inventory is not in that gate's denominator at all, so claiming it
+        // blocks Continue would be a lie the author would then chase.
+        const blocksContinue = returnsToWorklist && inventoryCharSet.has(char);
+        return {
+          char,
+          message: blocksContinue
+            ? composeBlockingInvalidationMessage(char, i18n)
+            : composeInvalidationMessage(char, i18n),
+          returnsToWorklist,
+          blocksContinue,
+        };
+      });
     },
-    [layout, ruleIndex, assignedChars, i18n],
+    [layout, ruleIndex, watchedChars, inventoryCharSet, i18n],
   );
 
-  return { checkOperation };
+  const checkRejections = useCallback(
+    (op: PendingKeyEditOperation): readonly KeyEditRejectionNotice[] => {
+      const verdict = checkKeyEditRejections(layout, op, ruleIndex);
+      if (verdict.ok) return [];
+      return verdict.rejections.map((rejection) => ({
+        reason: rejection.reason,
+        blocking: !rejection.confirmable,
+        keyId: rejection.keyId,
+        message: composeRejectionMessage(rejection, i18n),
+      }));
+    },
+    [layout, ruleIndex, i18n],
+  );
+
+  return { checkOperation, checkRejections };
+}
+
+/**
+ * The author-facing sentence for one rejection. Composed here rather than in the
+ * engine for the same reason `findingCopy.ts` exists: the engine returns a
+ * structured reason and this side owns the localized wording (FR-044).
+ *
+ * A confirmable dead-key rejection gets DIFFERENT copy from a hard one, not the
+ * same sentence with a different button: "we cannot tell" and "this is wrong"
+ * are different claims, and presenting the first as the second is how an author
+ * learns to distrust the guard.
+ */
+function composeRejectionMessage(rejection: KeyEditRejection, i18n?: I18n): string {
+  switch (rejection.reason) {
+    case "invalid-identifier":
+      return resolveMessage(
+        i18n,
+        msg({
+          id: "editor.assignLoop.keyGrid.reject.invalidIdentifier",
+          message: `"${{ keyId: rejection.keyId }}" is not a usable key id. Use a letter or underscore first, then letters, digits, or underscores — for example T_MYKEY or U_00E9.`,
+        }),
+      );
+    case "in-layer-id-collision":
+      return resolveMessage(
+        i18n,
+        msg({
+          id: "editor.assignLoop.keyGrid.reject.inLayerIdCollision",
+          message: `Another key on this layer already uses the id "${{ keyId: rejection.keyId }}". Two keys with one id cannot be told apart, so this change cannot be saved.`,
+        }),
+      );
+    case "would-create-dead-key":
+      return rejection.confirmable
+        ? resolveMessage(
+            i18n,
+            msg({
+              id: "editor.assignLoop.keyGrid.reject.wouldCreateDeadKey.confirmable",
+              message: `Nothing appears to type "${{ keyId: rejection.keyId }}". This keyboard contains parts we could not read, which may already define it — save anyway?`,
+            }),
+          )
+        : resolveMessage(
+            i18n,
+            msg({
+              id: "editor.assignLoop.keyGrid.reject.wouldCreateDeadKey",
+              message: `Nothing types "${{ keyId: rejection.keyId }}", so the key would do nothing when pressed. Choose what it types first, or give it a U_ id that types its character directly.`,
+            }),
+          );
+    default: {
+      const exhaustive: never = rejection.reason;
+      return String(exhaustive);
+    }
+  }
 }

@@ -1,12 +1,7 @@
 // Shared helpers for check-18-* (touch-layout / DISCUS) checks — internal to
 // the checks directory.
 
-import type {
-  KeyboardIR,
-  LintFinding,
-  TouchKeyIR,
-  TouchLayoutIR,
-} from "@keyboard-studio/contracts";
+import type { KeyboardIR, LintFinding, TouchLayoutIR } from "@keyboard-studio/contracts";
 import { buildTouchKeyRuleIndex } from "@keyboard-studio/contracts";
 import type { TouchKeyRuleIndex } from "@keyboard-studio/contracts";
 
@@ -22,76 +17,23 @@ export function makeLocation(touchLayoutPath: string): NonNullable<LintFinding["
   return { file: touchLayoutPath, line: 1 };
 }
 
-type TouchPlatform = TouchLayoutIR["platforms"][number];
-type TouchLayer = TouchPlatform["layers"][number];
-type TouchRow = TouchLayer["rows"][number];
-
-/** Per-key context yielded by {@link walkTouchKeys}. */
-export interface TouchKeyContext {
-  platform: TouchPlatform;
-  layer: TouchLayer;
-  row: TouchRow;
-  rowIndex: number;
-  key: TouchKeyIR;
-  keyIndex: number;
-}
-
-/**
- * Walk every leaf key in a touch layout, in `platform → layer → row → key`
- * order (matching the checks' original nested-loop order exactly), invoking
- * `cb` once per key with its full positional context.
- *
- * Does not descend into a key's own `sk`/`multitap`/`flick` sub-keys — those
- * are a different traversal shape (recursive, not row/column positioned) and
- * are out of scope for this iterator.
- *
- * @param ir - Parsed touch layout.
- * @param cb - Invoked once per key with platform/layer/row/key context.
- */
-export function walkTouchKeys(ir: TouchLayoutIR, cb: (ctx: TouchKeyContext) => void): void {
-  for (const platform of ir.platforms) {
-    for (const layer of platform.layers) {
-      layer.rows.forEach((row, rowIndex) => {
-        row.keys.forEach((key, keyIndex) => {
-          cb({ platform, layer, row, rowIndex, key, keyIndex });
-        });
-      });
-    }
-  }
-}
-
-/**
- * Walk every key INCLUDING its `sk` / `multitap` / `flick` sub-keys.
- *
- * Separate from {@link walkTouchKeys} rather than an option on it, because the
- * positional context a sub-key sits in is genuinely different: a sub-key has no
- * row/column position of its own, so `rowIndex`/`keyIndex` describe its PARENT.
- * Checks that report a position must keep using the flat walk; checks that must
- * see every id in the file (the dead-key check, which Keyman Developer's own
- * 0x092 descends for) use this one.
- *
- * `path` is the chain of ancestor keys, outermost first, empty for a main key —
- * so a message can say which longpress menu an entry came from.
- */
-export function walkTouchKeysDeep(
-  ir: TouchLayoutIR,
-  cb: (ctx: TouchKeyContext & { path: readonly TouchKeyIR[] }) => void,
-): void {
-  walkTouchKeys(ir, (ctx) => {
-    const visit = (key: TouchKeyIR, path: readonly TouchKeyIR[]): void => {
-      cb({ ...ctx, key, path });
-      const nextPath = [...path, key];
-      for (const sub of key.sk ?? []) visit(sub, nextPath);
-      for (const sub of key.multitap ?? []) visit(sub, nextPath);
-      if (key.flick) {
-        for (const sub of Object.values(key.flick)) {
-          if (sub) visit(sub, nextPath);
-        }
-      }
-    };
-    visit(ctx.key, []);
-  });
-}
+// The two layout walks and the exemption vocabulary below moved to
+// `@keyboard-studio/contracts`'s `touch-key-diagnostics.ts` at spec 058 T114,
+// where the shared detectors that use them live (FR-040's one-implementation
+// rule). Re-exported from here so every check module's import line is
+// unchanged — and, for `TOUCH_SENTINEL_IDS`, so the copy this file used to keep
+// "because Layer C cannot import engine" is gone: contracts can be imported by
+// both, so there is one list again.
+export {
+  walkTouchKeys,
+  walkTouchKeysDeep,
+  isRulelessByConvention,
+  isFrameKeyLabel,
+  isProducingKeyClass,
+  TOUCH_RULELESS_ID_PREFIXES,
+  TOUCH_SENTINEL_KEY_IDS as TOUCH_SENTINEL_IDS,
+} from "@keyboard-studio/contracts";
+export type { TouchKeyContext } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
 // The joined-check input resolver (spec 058 T033 / contract §5.4)
@@ -141,47 +83,7 @@ export function resolveJoinedCheckInputs(
   return { ir: keyboardIR, layout, ruleIndex: buildTouchKeyRuleIndex(keyboardIR) };
 }
 
-// ---------------------------------------------------------------------------
-// Exemption vocabulary shared by the joined checks
-// ---------------------------------------------------------------------------
-
-/**
- * Ruleless sentinel ids the studio and the corpus both use for a deliberately
- * inert key. A sentinel is not a dead key — it is a key whose whole purpose is
- * to produce nothing (contract §5.1).
- */
-export const TOUCH_SENTINEL_IDS: readonly string[] = ["T_BLANK", "T_SPACER", "T_NUL"];
-
-/**
- * Id prefixes that are auto-minted or reserved for neutralization, and therefore
- * never expected to carry a rule.
- *
- * `T_new_` is Keyman Developer's own auto-mint. The other three are OUR reserved
- * neutralization prefixes, written by the carve cascade, the touch-deletion
- * overlay, and key removal — a key we deliberately emptied must not then be
- * reported as a defect we introduced.
- */
-export const TOUCH_RULELESS_ID_PREFIXES: readonly string[] = [
-  "T_NEW_",
-  "T_REMOVED_",
-  "T_CARVED_",
-  "T_TOUCHDEL_",
-];
-
-/** True for a sentinel or auto-minted/reserved id (case-insensitive). */
-export function isRulelessByConvention(keyId: string): boolean {
-  const upper = keyId.toUpperCase();
-  if (TOUCH_SENTINEL_IDS.includes(upper)) return true;
-  return TOUCH_RULELESS_ID_PREFIXES.some((p) => upper.startsWith(p));
-}
-
-/**
- * True for a `*`-prefixed frame-key label (`*Shift*`, `*abc*`, …).
- *
- * These are Keyman's own convention for a key whose caption is drawn from a
- * built-in string table rather than being literal output, so the label is never
- * a producer and the key is never expected to carry a rule.
- */
-export function isFrameKeyLabel(text: string | undefined): boolean {
-  return text !== undefined && text.startsWith("*");
-}
+// The exemption vocabulary (`TOUCH_SENTINEL_IDS`, `TOUCH_RULELESS_ID_PREFIXES`,
+// `isRulelessByConvention`, `isFrameKeyLabel`) is re-exported at the top of this
+// file from `@keyboard-studio/contracts`. It moved there at T114 together with
+// the detectors that apply it.

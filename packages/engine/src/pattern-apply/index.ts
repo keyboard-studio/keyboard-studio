@@ -149,6 +149,16 @@ export type {
   SuppressSemanticsResult,
 } from "./keyEditOps.js";
 
+// spec 058 T118 — edit-time REJECTION (FR-045), the counterpart to the
+// reporting path in touchKeyDiagnostics.
+export { checkKeyEditRejections } from "./keyEditOps.js";
+export type {
+  KeyEditRejection,
+  KeyEditRejectionReason,
+  KeyEditRejectionVerdict,
+  UnsequencedKeyEditOperation,
+} from "./keyEditOps.js";
+
 export { applyKeyEditsToRawJson } from "./applyKeyEditsToRawJson.js";
 export type { ApplyKeyEditsToRawJsonResult } from "./applyKeyEditsToRawJson.js";
 
@@ -258,18 +268,44 @@ export type {
   KeyIdMintingRequest,
 } from "./keyIdMinting.js";
 
+// The finding/fix shape and every layout/rule detector live in contracts as of
+// spec 058 T113/T114 (FR-040's one-implementation rule — Layer C cannot import
+// engine); `touchKeyDiagnostics.ts` re-exports them, so this barrel and its
+// consumers are unchanged. See that module's doc for the move's rationale.
 export {
+  computeAllTouchKeyDiagnostics,
+  computeTouchKeyDiagnostics,
+  groupTouchKeyFindingsByAddress,
+  touchKeyFindingScope,
+  findDeadTouchKeys,
+  findDuplicateTouchKeyIds,
   findHalfDoneSuppressions,
   findLayerSwitchActiveMismatches,
+  findMissingRequiredTouchKeys,
+  findMissingTouchLayers,
   findMixedSuppressRemove,
+  findSpecialLabelOnNormalKeys,
+  findTouchKeyIdCaseMismatches,
+  findTouchRuleOrphans,
+  findUnidentifiedTouchKeys,
 } from "./touchKeyDiagnostics.js";
 export type {
+  TouchKeyDiagnosticInputs,
   TouchKeyFindingSeverity,
   TouchKeyFindingCode,
+  TouchKeyFindingScope,
   TouchKeyFinding,
   TouchKeyFix,
+  AddRequiredKeysFix,
+  AddRuleFix,
+  ClearSpecialLabelFix,
   CompleteSuppressionFix,
-  SetLayerSwitchSpFix,
+  ConvertToUnicodeIdFix,
+  MarkAsFrameKeyFix,
+  RemoveNextlayerFix,
+  RenameKeyFix,
+  RepointNextlayerFix,
   ReviewKeyFix,
+  SetLayerSwitchSpFix,
 } from "./touchKeyDiagnostics.js";
 

@@ -106,6 +106,37 @@ export function isCustomTouchKeyId(id: string): boolean {
   return upper.startsWith("T_") || upper.startsWith("U_");
 }
 
+/**
+ * The identifier grammar `kmcmplib` accepts for a touch-layout key id — a
+ * leading letter or underscore followed by word characters, the same shape
+ * `KMN_IDENT` enforces elsewhere in the codec. Anything else (a leading digit,
+ * whitespace, punctuation, an empty string) is what `0x05A`
+ * (`ERROR_TouchLayoutInvalidIdentifier`) rejects.
+ */
+const VALID_TOUCH_KEY_ID_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+
+/**
+ * True when `id` is an identifier the compiler will accept (spec 058 FR-040's
+ * `0x05A`).
+ *
+ * ONE grammar, two very different consumers, which is why it lives here rather
+ * than beside either of them:
+ *
+ * - **imported content** — `checkTouchLayoutIdentifiers` (engine's
+ *   `layer-a-prime.ts`, T043) reports every existing id the compiler would
+ *   reject, as a Layer A′ import-fidelity *finding*;
+ * - **author input** — `checkKeyEditRejections` (engine's `keyEditOps.ts`, T118)
+ *   *refuses the mutation* and emits no finding at all, because the invalid
+ *   state never comes into existence (FR-045).
+ *
+ * FR-040 requires both paths to agree on what "invalid" means. Before T118 the
+ * regex was private to `layer-a-prime.ts`; a second copy in the edit path is
+ * exactly the drift this predicate exists to prevent.
+ */
+export function isValidTouchKeyIdentifier(id: string): boolean {
+  return id.length > 0 && VALID_TOUCH_KEY_ID_RE.test(id);
+}
+
 // ---------------------------------------------------------------------------
 // Roles
 // ---------------------------------------------------------------------------

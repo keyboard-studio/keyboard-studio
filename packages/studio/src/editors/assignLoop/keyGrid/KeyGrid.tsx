@@ -202,6 +202,7 @@ import {
 } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { KeyGridCell } from "./KeyGridCell.tsx";
+import { findingAnnouncement } from "./findingCopy.ts";
 import type { KeyGridCommandMenuAnchor } from "./useKeyCommands.ts";
 import type {
   KeyGridCellViewModel,
@@ -354,7 +355,9 @@ export function KeyGrid({
   onOpenCommandMenu,
   onFollowNextLayer,
 }: KeyGridProps) {
-  const { t } = useLingui();
+  // `i18n` beside `t` because findingCopy.ts composes with an `I18n` rather
+  // than a JSX macro — the same split KeyInspector.tsx uses.
+  const { t, i18n } = useLingui();
   const cellRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
   const gridRef = useRef<HTMLDivElement | null>(null);
   const platformTabRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
@@ -587,6 +590,20 @@ export function KeyGrid({
     message: "Unused space in this row",
   });
 
+  // T117 — what the grid's own live region says. The SELECTED cell's findings
+  // only: an announcement fires on selection change, and reading out a whole
+  // layer's diagnostics on every arrow key would make the grid unusable with a
+  // screen reader. Composed by findingCopy.ts (T116), never here, so the
+  // announcement and the inspector cannot word the same finding differently.
+  const selectedFindingAnnouncement = useMemo(() => {
+    if (selectedAddress === null) return undefined;
+    for (const row of viewModel.rows) {
+      const cell = row.keys.find((k) => k.address === selectedAddress);
+      if (cell !== undefined) return findingAnnouncement(cell.findings, i18n);
+    }
+    return undefined;
+  }, [selectedAddress, viewModel, i18n]);
+
   return (
     <>
       {showPlatformTabs && (
@@ -781,17 +798,45 @@ export function KeyGrid({
                   />
                 )}
               </div>
-              {/* Fill row / Even out row (T100, FR-022, FR-039) — ORDINARY
-              buttons, siblings of the role="row" div above rather than
-              children of it (see the module doc's "Row slack, and the Fill
-              row / Even out row seam" for why: they are not gridcells and
-              do not participate in useGridNav's cursor model). Rendered only
-              when at least one action actually applies to this row — a row
-              with no slack and only one key gets neither button, the same
-              "affordance only when applicable" convention the pad spacer
-              above already follows. */}
+              {/* Fill row / Even out row (T100, FR-022, FR-039) — ordinary
+              buttons that are NOT gridcells in useGridNav's cursor model (see
+              the module doc's "Row slack, and the Fill row / Even out row
+              seam"). Rendered only when at least one action actually applies
+              to this row — a row with no slack and only one key gets neither
+              button, the same "affordance only when applicable" convention the
+              pad spacer above already follows.
+
+              ## Why this strip carries `role="row"` + an inner `role="gridcell"`
+              (T123 / SC-009)
+
+              It began as a plain `<div>` sibling of the `role="row"` above,
+              which is invalid: `role="grid"` permits only `row`/`rowgroup`
+              children, so a bare div here made axe's `aria-required-children`
+              fail at CRITICAL impact on the grid container itself — caught by
+              `e2e/touch-key-grid-a11y.spec.ts`, exactly the net-new-widget
+              defect SC-009 exists to find. The alternatives were worse: moving
+              the strip outside the grid loses its per-row placement (the whole
+              point of a per-row affordance), `role="none"` re-parents the
+              buttons into the grid and fails the same rule, and `aria-hidden`
+              on focusable buttons trades one violation for another
+              (`aria-hidden-focus`). Presenting the strip as a row with one cell
+              is both valid and honest: it IS a row-scoped control, and this
+              costs no visual change (roles only).
+
+              No `aria-rowindex` here, deliberately. The indices belong to the
+              LAYOUT's rows, and `aria-rowcount` above counts those (it already
+              differs from the DOM row count by design — the grid windows rows).
+              Numbering a control strip as if it were a layout row would make
+              both figures lie. */}
               {(canFillRow || canEvenOutRow) && (
                 <div
+                  role="row"
+                  // Same tabIndex={-1} convention as the layout rows above:
+                  // programmatically focusable, never a Tab stop of its own.
+                  // The BUTTONS inside remain ordinary Tab stops — they are how
+                  // the actions are reached, and unlike a gridcell they are not
+                  // part of useGridNav's arrow-key cursor.
+                  tabIndex={-1}
                   data-testid={`key-grid-row-actions-${rowIndex}`}
                   style={{
                     display: "flex",
@@ -801,6 +846,7 @@ export function KeyGrid({
                     paddingLeft: 2,
                   }}
                 >
+                <div role="gridcell" style={{ display: "flex", gap: 6 }}>
                   {canFillRow && (
                     <button
                       type="button"
@@ -846,6 +892,7 @@ export function KeyGrid({
                     </button>
                   )}
                 </div>
+                </div>
               )}
             </Fragment>
           );
@@ -866,6 +913,34 @@ export function KeyGrid({
           </Trans>
         </div>
       )}
+      {/* T117 (US5 AS4, FR-050) — THE grid's one `aria-live` region, for the
+          grid's own announcements. Exactly one, and only for this component:
+          the app already has several (TouchGallery x2, DiagnosticsPanel), and
+          US5 AS4's requirement is that the grid adds one of its own, NOT that
+          the app consolidates to a single region.
+
+          `polite`, not `assertive`: a diagnostic on the key you just moved to
+          is context, not an interruption, and `assertive` would talk over the
+          cell's own accessible name as focus lands.
+
+          Driven purely by `selectedAddress` changing — no timer of any kind
+          (Decision D3). The findings it reads are already on the cell's view
+          model, computed in the same cycle that rendered the cell. */}
+      <div
+        role="status"
+        aria-live="polite"
+        data-testid="key-grid-live-region"
+        style={{
+          position: "absolute",
+          width: 1,
+          height: 1,
+          overflow: "hidden",
+          clip: "rect(0,0,0,0)",
+          whiteSpace: "nowrap",
+        }}
+      >
+        {selectedFindingAnnouncement ?? ""}
+      </div>
     </>
   );
 }

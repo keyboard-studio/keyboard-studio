@@ -22,6 +22,7 @@
 import type { TouchLayoutIR, TouchKeyIR, IRNodeRef, TouchKeyProvenance } from "./keyboard-ir";
 import type { VirtualFS } from "./virtualFS";
 import { TouchKeyProvenanceSchema, DEFAULT_TOUCH_PROVENANCE } from "./schemas";
+import { touchKeyAddress, touchSubKeyAddress } from "./touch-key-address";
 
 // TextDecoder is a runtime global in both Node and the browser, but contracts'
 // tsconfig lib (ES2022) does not declare it. Minimal ambient declaration so the
@@ -260,10 +261,17 @@ export function parseTouchLayoutString(json: string): TouchLayoutIR {
         for (const rawKey of rawRow.key ?? []) {
           const key = convertKey(rawKey, nextId);
           keys.push(key);
-          nodeIds.push([`${platform}:${id}:${key.id}`, { kind: "touchKey", nodeId: key.nodeId }]);
+          // Built by the shared builders (touch-key-address.ts), not
+          // re-interpolated here: `nodeIds` and every `touchKeyAddress` caller
+          // must agree on the format byte-for-byte or an overlay operation
+          // resolves against a node the index cannot find.
+          nodeIds.push([touchKeyAddress(platform, id, key.id), { kind: "touchKey", nodeId: key.nodeId }]);
           if (key.sk) {
             for (const sk of key.sk) {
-              nodeIds.push([`${platform}:${id}:${key.id}:sk:${sk.id}`, { kind: "touchKey", nodeId: sk.nodeId }]);
+              nodeIds.push([
+                touchSubKeyAddress(platform, id, key.id, "sk", sk.id),
+                { kind: "touchKey", nodeId: sk.nodeId },
+              ]);
             }
           }
         }

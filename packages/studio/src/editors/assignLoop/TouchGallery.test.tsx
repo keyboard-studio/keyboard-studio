@@ -5475,6 +5475,138 @@ describe("TouchGallery — one shared, derived set of progress figures (T075, FR
   });
 });
 
+// ---------------------------------------------------------------------------
+// T120 (FR-036e) — "either mode MUST be able to complete the step". Three
+// distinct claims, each asserted rather than argued:
+//
+//   1. Completing from the KEY pane works at all — the Continue control there
+//      routes into the same gate and calls onComplete.
+//   2. That gate is coverage-only and mode-blind: it audits the OVERLAY-FOLDED
+//      layout, so a coverage gap the author fixed with a key edit counts. This
+//      is the regression that matters: gating on the unfolded layout would
+//      refuse a keyboard the key view already shows as complete, i.e. force a
+//      mode switch to move on.
+//   3. When it refuses, it says so IN THE PANE THE AUTHOR PRESSED — a gate that
+//      only explains itself in the other view is a mode switch by another name.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — either mode completes the step (T120, FR-036e)", () => {
+  it("Continue in the KEY pane completes the step when coverage passes", async () => {
+    seedKeyModeFixture({ inventory: ["a"], includeBrokenKey: false, coveringCharKey: "a" });
+    const onComplete = vi.fn();
+    await act(async () => {
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />);
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("touch-mode-tab-key"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("touch-key-mode-continue"));
+    });
+
+    // No mode switch was required, and nothing about which view was active
+    // entered the decision.
+    expect(onComplete).toHaveBeenCalledOnce();
+  });
+
+  it("credits a coverage gap fixed through the key-edit OVERLAY — the gate audits the folded layout, not the unfolded one", async () => {
+    // "ñ" is unreachable on the shipped layout: T_broken types nothing.
+    seedKeyModeFixture({ inventory: ["ñ"], includeBrokenKey: true });
+    const onComplete = vi.fn();
+    await act(async () => {
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />);
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("touch-mode-tab-key"));
+    });
+
+    // Before the fix, the gate refuses — from the key pane.
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("touch-key-mode-continue"));
+    });
+    expect(onComplete).not.toHaveBeenCalled();
+
+    // The author fixes it the by-key way: one overlay commit gives the broken
+    // key real output. The overlay is the ONLY place several key commands write
+    // (useKeyCommands' add/remove/suppress), so this is exactly the work a gate
+    // reading the unfolded layout would fail to see.
+    await act(async () => {
+      useWorkingCopyStore.getState().commitKeyEdit({
+        address: "phone:default:T_broken",
+        kind: "set",
+        fields: { output: "ñ" },
+      });
+    });
+    await waitFor(() => {
+      expect(screen.getByTestId("touch-progress-unplaced").textContent).toBe(
+        "0 characters still unplaced",
+      );
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("touch-key-mode-continue"));
+    });
+
+    // Completed from the key pane, on by-key work alone — never sent back to
+    // the character walk to re-do it there.
+    expect(onComplete).toHaveBeenCalledOnce();
+  });
+
+  it("states its refusal inside the key pane, naming the uncovered character", async () => {
+    seedKeyModeFixture({ inventory: ["ñ"], includeBrokenKey: true });
+    const onComplete = vi.fn();
+    await act(async () => {
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />);
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("touch-mode-tab-key"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("touch-key-mode-continue"));
+    });
+
+    expect(onComplete).not.toHaveBeenCalled();
+    // The character-mode pane is not rendered at all in key mode (see the
+    // T072 view-swap test), so an alert found here is the key pane's own.
+    const alerts = screen.getAllByRole("alert");
+    const text = alerts.map((a) => a.textContent ?? "").join(" ");
+    expect(text).toContain("has no touch mechanism");
+    expect(text).toContain("ñ");
+  });
+
+  it("does not clear either in-progress surface on completion — the by-character draft is emitted and the key-edit overlay survives", async () => {
+    seedKeyModeFixture({ inventory: ["a"], includeBrokenKey: true, coveringCharKey: "a" });
+    const onComplete = vi.fn();
+    await act(async () => {
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />);
+    });
+
+    await act(async () => {
+      useWorkingCopyStore.getState().commitKeyEdit({
+        address: "phone:default:T_broken",
+        kind: "set",
+        fields: { text: "x" },
+      });
+    });
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("touch-mode-tab-key"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("touch-key-mode-continue"));
+    });
+
+    expect(onComplete).toHaveBeenCalledOnce();
+    // "neither is silently discarded": the overlay is still there after the
+    // step completes. Dropping it here is precisely the tidy-up someone adds
+    // later, and it would throw away the author's by-key work.
+    expect(useWorkingCopyStore.getState().keyEditOverlay.ops).toHaveLength(1);
+  });
+});
+
 describe("TouchGallery — undo affordance states what it will undo (T076, FR-036g)", () => {
   it("reads 'Nothing to undo' and is disabled when the shared stack is empty", async () => {
     seedStore({ withInventory: ["ä"] });

@@ -15,6 +15,7 @@
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type { LintFinding, KeyboardIR, IRRule } from "@keyboard-studio/contracts";
+import { isValidTouchKeyIdentifier } from "@keyboard-studio/contracts";
 import type { ParseResult } from "../codec/parse.js";
 import { tokenize } from "../codec/tokenize.js";
 import { computeSha256Hex } from "../codec/hash.js";
@@ -414,16 +415,12 @@ export function checkOwnershipConsistency(ir: KeyboardIR): LintFinding[] {
 /** Shared code for the 0x05A import-fidelity finding (the A′ `KM_ERROR_*` namespace). */
 export const TOUCH_LAYOUT_INVALID_IDENTIFIER_CODE = "KM_ERROR_TOUCH_LAYOUT_INVALID_IDENTIFIER";
 
-/**
- * The identifier grammar kmcmplib accepts for a touch-layout key id.
- *
- * A key id is either a recognized key-name token or a `U_<HEX>` unicode name. In
- * both cases the lexical shape is a leading letter or underscore followed by
- * word characters — the same shape `KMN_IDENT` enforces elsewhere in the codec.
- * Anything else (a leading digit, whitespace, punctuation, an empty string) is
- * what 0x05A rejects.
- */
-const VALID_TOUCH_KEY_ID_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
+// The identifier grammar itself is `isValidTouchKeyIdentifier`
+// (`@keyboard-studio/contracts`, `touch-key-rule-join.ts`). It moved there at
+// spec 058 T118 so this import-fidelity check and the edit-time REJECTION path
+// (`checkKeyEditRejections`, `keyEditOps.ts`) cannot disagree about what 0x05A
+// rejects — FR-040 requires the two paths to share one definition, and a private
+// regex here was the second copy waiting to happen.
 
 /**
  * 0x05A: report every touch-layout key id the compiler would reject.
@@ -450,7 +447,7 @@ export function checkTouchLayoutIdentifiers(parseResult: ParseResult): LintFindi
     const id = key.id;
     // An empty id is invalid, and reported with its own wording: "" tells the
     // author nothing, whereas naming the layer locates it.
-    const invalid = id.length === 0 || !VALID_TOUCH_KEY_ID_RE.test(id);
+    const invalid = !isValidTouchKeyIdentifier(id);
     if (invalid && !reported.has(id)) {
       reported.add(id);
       findings.push({

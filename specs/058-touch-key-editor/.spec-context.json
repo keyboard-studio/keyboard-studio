@@ -4,7 +4,7 @@
   "branch": "058-touch-key-editor",
   "selectedAt": "2026-08-04T01:11:58.804Z",
   "currentStep": "implement",
-  "status": "implementing",
+  "status": "implemented",
   "history": [
     {
       "step": "specify",
@@ -978,6 +978,157 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-05T06:42:17.646Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T113",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-05T15:31:28.556Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T114",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-05T15:31:28.556Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T115",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-05T15:31:28.556Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T116",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-05T15:31:28.556Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T117",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-05T15:31:28.556Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T118",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-05T15:31:28.556Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T119",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-05T15:31:28.556Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T120",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-05T15:31:28.556Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T121",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-05T15:31:28.556Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T122",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-05T15:31:28.556Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T123",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-05T15:31:28.556Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T124",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-05T15:31:28.556Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T125",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-05T15:31:28.556Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T126",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-05T15:31:28.556Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T127",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-05T15:31:28.556Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T128",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-05T15:31:28.556Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T129",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-05T15:31:28.556Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T130",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-05T15:31:28.556Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-05T15:31:28.557Z"
     }
   ],
   "decisions": [
@@ -1032,6 +1183,24 @@
       "decision": "Extended the flag-gated __ksE2E__ hook with snapshotBaseFiles/snapshotOutputFiles",
       "why": "SC-006 must compare shipped source against the EMITTED artifact; snapshotOutputFiles runs the same projectWorkingCopyForOutput the download path uses, so the test cannot pass against a projection the real output does not perform. Binary entries encode byte-exactly so equality needs no async hashing inside page.evaluate.",
       "rejected": "downloading and unzipping the artifact in Playwright (needs a zip reader in the test and asserts the zip layer, not the projection)"
+    },
+    {
+      "decision": "Accept the KeyGrid role=row + inner role=gridcell wrapper for the row-action strip as the SC-009 fix, with the missing aria-rowindex/aria-colindex logged as a P2 follow-up rather than a blocker",
+      "why": "It removes a genuine CRITICAL aria-required-children violation at zero visual cost, and the three alternatives the KeyGrid comment rejects (move outside the grid, role=none, aria-hidden on focusable buttons) are each worse or equally invalid. The residual — an arrow-unreachable gridcell and an un-indexed row inside a grid whose other rows are indexed — is an APG completeness gap, not a new violation.",
+      "rejected": "Blocking the cycle to restructure the strip as a trailing gridcell of the layout row plus a useGridNav extension; correct, but a Phase 5e-scale change no task allocated"
+    },
+    {
+      "decision": "Post-implement review verdict: CONDITIONAL — two P1s to fix before merge (the blocksContinue rule-index disagreement, and the NUL bytes in packages/contracts/src/touch-key-diagnostics.ts), five P2/P3 as follow-ups",
+      "why": "No P0: nothing shipped is functionally broken, T130 gate reproduces on spot-check, and both P1s are localized. The rule-index P1 is a correctness claim stated in two doc comments that measurement contradicts, which is exactly the class of defect a review must not wave through; the NUL P1 makes a dependency-root module unreviewable in every future diff."
+    },
+    {
+      "decision": "P1a fixed: the FR-008 Continue gate, the FR-036d shared progress figures, and T119 blocksContinue now all read one keyModeCoverageOptions (mutable-ir rule index)",
+      "why": "The gate ran on the baseIr-scoped index while the guard hook got the mutable-ir one, so a character produced by a freshly synthesized touch rule was credited by the inline warning and then refused at the gate - the exact gate-time surprise US5 AS3 removes. It also under-credited synthesized rules outright.",
+      "rejected": "Weakening the two comments to merely document the divergence - that converts a bug into documented wrongness."
+    },
+    {
+      "decision": "P1b fixed: the six raw U+0000 bytes in packages/contracts/src/touch-key-diagnostics.ts are now \u0000 escapes",
+      "why": "A raw NUL makes git classify a dependency-root source file as binary, so its diffs render as Bin and cannot be reviewed. The in-code justification (the escape does not survive the formatter) was measurably false - prettier leaves it intact."
     }
   ],
   "approach": "Land a touch key<->rule join in packages/contracts first (Layer C cannot import engine), which fixes the coverage arithmetic with zero UI change and is the prerequisite primitive for everything else. Then build key-level editing as a second MODE of the existing touch step (no manifest churn): an ordered key-edit operation log applied through the existing single-writer projection chain as a raw-JSON layout pass plus a new .kmn rule pass, with a net-new ARIA grid, and eight edit-time diagnostics computed as synchronous pure joins on the existing findings surface.",
@@ -1742,9 +1911,37 @@
       "what": "i18n extraction for the 6 new message ids",
       "command": "pnpm --filter @keyboard-studio/studio messages:extract",
       "result": "en+fr catalogs updated (+15 lines each); i18n-catalog-lint green under Node 24.11"
+    },
+    {
+      "what": "T120 gate cannot double-count an overlay op: layoutForLintAndGate reads the LOCAL touchLayoutResult.json memo (TouchGallery.tsx:1782, derived from baseIr/touchKey/mods/deletedTouchKeyIds), never store.touchLayoutJson, so handleAssignPanelCommit s setTouchLayoutJson(promotedLayout) write never re-enters the gate input. promotedLayout is also provenance-only (AssignPanel.tsx:515 promoteKeyAtAddressToHandSet) and carries no op field changes. Overlay replay is the single path by which key edits reach effectiveKeyModeLayout.",
+      "result": "pass",
+      "command": "read TouchGallery.tsx:1737-1911,2190-2295 + AssignPanel.tsx:190-215,511-556"
+    },
+    {
+      "what": "research.md R9 correction is factually right: collectLeafPaths (packages/studio/src/steps/mutateApply.ts:105-120) recurses only on isPlainObject, so an array value is pushed as a leaf. touchLayout.platforms is therefore the deepest leaf ever collected and nothing beneath it (including a new layers[j].id) can be refused by M3.",
+      "result": "pass",
+      "command": "read mutateApply.ts:105-174"
+    },
+    {
+      "what": "orphanedEditsAcknowledged cannot strand an author: press 1 sets the flag and returns, press 2 reaches finalizeCompletion; the reset effect is keyed on the store object keyEditOverlay whose identity changes only on commitKeyEdit/undoKeyEdit, so no render-loop reset exists.",
+      "result": "pass",
+      "command": "read TouchGallery.tsx:2569-2690"
+    },
+    {
+      "what": "T130 spot-check: the six touched studio spec files pass (217 tests, 6 files) — KeyInspector, KeyGrid, useKeyEditGuards, useGridNav, useValidatorFindings, projectWorkingCopyVfs.",
+      "result": "pass",
+      "command": "pnpm --filter @keyboard-studio/studio test <6 files>"
+    },
+    {
+      "what": "T129 phonebook row for sil_senegal_bda_azerty verified against ../keyboards/release/sil/sil_senegal_bda_azerty/source/sil_senegal_bda_azerty.kps: Author=SIL Senegal, Language ID=bda (Bayot), path correct.",
+      "result": "pass"
+    },
+    {
+      "what": "T125/T126 tests carry real non-vacuity controls (an unguarded add op DOES put a dead T_ key in the projected artifact; the M3 guard DOES reject an undeclared sibling), and T122 is behavioural (findings exist with fake timers installed, vi.getTimerCount()===0, same-reference after advancing 2s).",
+      "result": "pass"
     }
   ],
-  "currentTask": "T112",
+  "currentTask": "T130",
   "task_summaries": {
     "T094": {
       "status": "DONE",
@@ -1891,6 +2088,40 @@
     {
       "note": "BLOCKER for SC-006 evidence: Phase 8 built the add/remove surfaces (useKeyCommands, RemoveKeyDialog, FamilyApplyDialog, KeyGridCommandMenu) but TouchGallery.tsx mounts NONE of them - only the US2 assign path is wired. tasks.md allocates no wiring task in Phase 8, and useKeyCommands.ts calls it out as a later TouchGallery wiring task. Until it lands, add/remove are unreachable in the running app and T112 stays skipped. Phase 9 T120 already touches TouchGallery and may be the natural home.",
       "step": "implement"
+    },
+    {
+      "note": "P1 (T119) — the FR-036d one-derived-source claim on blocksContinue is FALSE for the rule index. handleContinue calls touchCoverage with coverageOptions = {ruleIndex: touchRuleIndex} built from baseIr (TouchGallery.tsx:1592-1595), while useKeyEditGuards receives keyModeRuleIndex built from the MUTABLE ir (TouchGallery.tsx:2118, 1607-1610). Those two indexes are documented (1597-1606) to diverge the moment AssignPanel mints a touch-key rule. So a character produced only by a freshly minted rule is credited by blocksContinue/keyGridProgress-adjacent reads but NOT by the gate, and the gate refuses Continue for a character the inline warning said nothing about — exactly the gate-time surprise US5 AS3 exists to remove. The comments at useKeyEditGuards.ts:139-141 and TouchGallery.tsx:2111-2114 assert the opposite.",
+      "kind": "defect",
+      "step": "implement"
+    },
+    {
+      "note": "{\"note\":\"P1 (hygiene, review integrity) — six literal NUL (U+0000) bytes in the new packages/contracts/src/touch-key-diagnostics.ts (lines 886-887, 1038, 1114) make git classify a dependency-root source file as BINARY: its future diffs render as Bin and are unreviewable. Two keyboard-lint files in this same diff already show as Bin 11157 -> 9452 for the same reason. The in-code justification at line 886 (\\\"\\x00 escape does not survive this repo formatter\\\") is measurably wrong — prettier preserves \\u0000 in a template literal (probed), and packages/contracts/src/keyboardIRRoundTrip.ts:126 already uses the escape form and stays textual. Fix: write the separator as an escape (or a named const).\",\"kind\":\"defect\",\"step\":\"implement\"}"
+    },
+    {
+      "note": "P2 (SC-009 residual) — the new role=row + role=gridcell control strip (KeyGrid.tsx:833,849) carries neither aria-rowindex nor aria-colindex while every layout row/cell does, and the grid container aria-rowcount counts layout rows only. Mixed aria-rowindex usage inside one grid leaves AT to fall back to DOM position for the un-indexed rows, which are interleaved between the indexed ones, so announced row positions can collide or exceed aria-rowcount. The new gridcell is also unreachable by useGridNav arrow keys — an APG grid deviation axe does not detect. The structurally correct alternative the KeyGrid comment does not consider: render the two buttons as an extra role=gridcell at the END of the same layout row (aria-colindex = keys.length+1) and let ArrowRight past the last key land on it.",
+      "kind": "a11y",
+      "step": "implement"
+    },
+    {
+      "note": "P2 (test honesty) — KeyInspector.test.tsx SC-007 guard does not do what its name and doc claim. SC007_CODES = Object.keys(SC007_CASES), so the loop expect(SC007_CASES[code]).toBeDefined() is a tautology over the table own keys, and expect(SC007_CODES).toHaveLength(SC007_EXPECTED_CODE_COUNT=11) counts TABLE entries, not TouchKeyFindingCode union members. Since packages/studio/tsconfig.json excludes *.test.tsx from pnpm typecheck, a twelfth union member with no fixture ships unreachable and nothing fails — the exact scenario the pin is documented to catch. Fix: export a runtime TOUCH_KEY_FINDING_CODES array from packages/contracts/src/touch-key-diagnostics.ts (satisfies-checked against the union, drift-guarded like schemas.ts) and assert set-equality against it.",
+      "kind": "test-quality",
+      "step": "implement"
+    },
+    {
+      "note": "P2 (test coverage gap) — T120 orphaned-overlay-op acknowledgement is the one new branch with no test. TouchGallery.test.tsx s four new T120 cases cover coverage-pass, overlay-credit, in-pane refusal wording and no-discard, but none produces an orphaned op, so neither the two-press Continue nor the touch-orphaned-key-edits-notice rendering nor the reset-on-overlay-change effect is exercised anywhere.",
+      "kind": "test-coverage",
+      "step": "implement"
+    },
+    {
+      "note": "P2 (SC-008 structural) — the dead-T_-key guard lives in the CALLER (TouchGallery.handleAssignPanelCommit), not in commitKeyEdit or the projection. Today that is airtight because handleAssignPanelCommit is the only commitKeyEdit call site in packages/studio, but RenameDialog / RemoveKeyDialog / useKeyCommands / FamilyApplyDialog all already build ops and are documented as store-free — the next task that wires any of them reopens SC-008 silently. Consider moving checkKeyEditRejections inside commitKeyEdit, or add a test asserting commitKeyEdit has exactly one call site.",
+      "kind": "robustness",
+      "step": "implement"
+    },
+    {
+      "note": "P3 — docs/accessibility.md now claims the touch key grid implements role=grid/row/gridcell with aria-rowindex/aria-colindex; true of the layout rows and key cells, overstated for the new row-actions strip which carries neither. A half-sentence caveat would keep the corrected row from acquiring a smaller version of the false-conformance problem T128 just fixed.",
+      "kind": "docs",
+      "step": "implement"
     }
-  ]
+  ],
+  "last_action": "Phase 8 (US4) complete - 112/130 tasks checked; T111 shipped, T112 written and skipped on the TouchGallery add/remove wiring gap. Phases 9-10 (18 tasks) go to another agent."
 }

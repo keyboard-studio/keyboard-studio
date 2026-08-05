@@ -67,13 +67,14 @@
 import { useState, type MouseEvent as ReactMouseEvent } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
-import { isSpacerKeyClass } from "@keyboard-studio/contracts";
+import { isSpacerKeyClass, type TouchKeyFinding } from "@keyboard-studio/contracts";
 import { codepointLabel } from "../../../survey/codepointLabel.ts";
 import { displayChar } from "../../../lib/irToCarveNodes.ts";
 import { BG_CARD, BORDER, ACCENT, TEXT_DIM, FONT } from "../../../lib/galleryTheme.ts";
 import { ERROR_RED, FONT_MONO, WARNING } from "../../../ui/theme.ts";
 import type { KeyGridCellViewModel } from "./keyGridViewModel.ts";
 import type { KeyGridCommandMenuAnchor } from "./useKeyCommands.ts";
+import { severityLabel } from "./findingCopy.ts";
 
 // Layer C's info-severity blue has no existing named token in ui/theme.ts
 // (WARNING/ERROR_RED cover Layer B/A already) — matches the editor gutter's
@@ -148,9 +149,25 @@ const WEDGE_MENU = "menu";
 function worstSeverity(
   findings: KeyGridCellViewModel["findings"],
 ): { color: string; letter: string } | undefined {
-  if (findings.some((f) => f.severity === "error")) return { color: ERROR_RED, letter: "E" };
-  if (findings.some((f) => f.severity === "warning")) return { color: WARNING, letter: "W" };
-  if (findings.length > 0) return { color: INFO_BLUE, letter: "I" };
+  const worst = worstSeverityValue(findings);
+  if (worst === "error") return { color: ERROR_RED, letter: "E" };
+  if (worst === "warning") return { color: WARNING, letter: "W" };
+  if (worst === "hint") return { color: INFO_BLUE, letter: "I" };
+  return undefined;
+}
+
+/**
+ * The worst severity present, as the VALUE rather than as presentation — the one
+ * ordering (`error` > `warning` > `hint`) both {@link worstSeverity}'s badge and
+ * `describeFindings`'s accessible text read from, so the coloured badge and the
+ * spoken word can never name different severities for the same cell.
+ */
+function worstSeverityValue(
+  findings: KeyGridCellViewModel["findings"],
+): TouchKeyFinding["severity"] | undefined {
+  if (findings.some((f) => f.severity === "error")) return "error";
+  if (findings.some((f) => f.severity === "warning")) return "warning";
+  if (findings.length > 0) return "hint";
   return undefined;
 }
 
@@ -167,7 +184,8 @@ export function KeyGridCell({
   onOpenCommandMenu,
   onFollowNextLayer,
 }: KeyGridCellProps) {
-  const { t } = useLingui();
+  // `i18n` beside `t` for findingCopy.ts's severity word — see `describeFindings`.
+  const { t, i18n } = useLingui();
   // T111: hover reveals the wedges. Local to the cell rather than lifted to
   // KeyGrid — only one cell is hovered at a time, and keeping it here means a
   // hover never re-renders the other 299 mounted cells.
@@ -226,16 +244,26 @@ export function KeyGridCell({
     return ", " + label;
   }
 
-  /** ", N diagnostics" or "" when there are none. */
+  /**
+   * ", Warning, 2 diagnostics" or "" when there are none.
+   *
+   * T117 (FR-050, US5 AS4): the worst severity is named in WORDS here, not left
+   * to the badge's colour. The badge already carries its single LETTER, which
+   * covers a sighted author on a monochrome display; this covers a screen-reader
+   * user, who otherwise heard a count with no indication of how bad it was.
+   * `findingCopy.ts` owns the severity word so the cell, the inspector, and the
+   * grid's live region cannot disagree.
+   */
   function describeFindings(): string {
     if (cell.findings.length === 0) return "";
-    return (
-      ", " +
-      t({
-        id: "editor.assignLoop.keyGrid.cell.findingsCount",
-        message: plural(cell.findings.length, { one: "# diagnostic", other: "# diagnostics" }),
-      })
-    );
+    const worst = worstSeverityValue(cell.findings);
+    const count = t({
+      id: "editor.assignLoop.keyGrid.cell.findingsCount",
+      message: plural(cell.findings.length, { one: "# diagnostic", other: "# diagnostics" }),
+    });
+    return worst === undefined
+      ? ", " + count
+      : `, ${severityLabel(worst, i18n)}, ${count}`;
   }
 
   /**

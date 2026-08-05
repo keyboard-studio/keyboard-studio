@@ -61,22 +61,26 @@
  * onto the returned view model. T066 supplies the real per-layer value; no
  * shape change is needed when it does.
  *
- * ## `findings` — the Phase 9 seam
+ * ## `findings` — the Phase 9 seam, now closed
  *
- * The eight FR-040 diagnostics (`TouchKeyFinding`, contract-shaped per
- * data-model.md §10) are T113-T121, which do not exist yet. Rather than
- * hardcode `findings: []` on every cell — which T113+ would then have to come
- * back and thread through this module's internals — this module accepts an
- * optional `findingsByAddress: ReadonlyMap<address, TouchKeyFinding[]>` and
- * looks each cell's findings up by its own `address`. A cell whose address has
- * no entry gets `[]`. When T113 lands its real `TouchKeyFinding` type
- * (`packages/engine/src/pattern-apply/touchKeyDiagnostics.ts`, per tasks.md),
- * this module's LOCAL placeholder type below is deleted and this file's one
- * import line is repointed at the real one — the map-lookup wiring in
- * `buildCell` does not change. `useValidatorFindings` (T114) is expected to be
- * the map's producer, aggregated from the same working IR/layout this module
- * already receives — "no second store field, no second timer" (data-model.md
- * §10) holds because this module adds neither.
+ * This module takes an optional
+ * `findingsByAddress: ReadonlyMap<address, TouchKeyFinding[]>` and looks each
+ * cell's findings up by its own `address`; a cell whose address has no entry
+ * gets `[]`. As of T113 the `TouchKeyFinding` type is the real,
+ * contracts-owned one (re-exported below for this directory's existing
+ * importers) rather than the local placeholder it was written against — a
+ * type-only swap; the map-lookup wiring in `buildCell` did not change.
+ *
+ * The map's producer is `useTouchKeyDiagnostics` (T114,
+ * `packages/studio/src/hooks/useValidatorFindings.ts`), aggregated from the
+ * same working IR/layout this module already receives. "No second store field,
+ * no second timer" (data-model.md §10 / Decision D3) holds because this module
+ * adds neither and that hook is a `useMemo`.
+ *
+ * A finding whose `scope` is `"layer"` or `"rule"` is deliberately still IN the
+ * map: its address matches no cell, so no cell ever looks it up, and the grid's
+ * layer-level strip reads those from the flat list instead. Filtering them here
+ * would just move the same decision to two call sites.
  *
  * ## `producedChars` semantics — narrower than `computeTouchCoverage`
  *
@@ -111,6 +115,7 @@ import {
   decodeUnicodeKeyId,
   isSpacerKeyClass,
   producedByKeyId,
+  type TouchKeyFinding,
   type TouchKeyIR,
   type TouchKeyProvenance,
   type TouchKeyRuleIndex,
@@ -144,29 +149,16 @@ export interface KeyGridAnnotationCounts {
 }
 
 // ---------------------------------------------------------------------------
-// Findings — Phase 9 seam (T113-T121). See the module doc's "findings"
-// section. This is a LOCAL PLACEHOLDER, shaped to match data-model.md §10
-// exactly, so the eventual swap to the real engine-owned type is type-only.
+// Findings — the real, contracts-owned shape as of T113. The local placeholder
+// this module used to declare is gone; these two lines are the type-only swap
+// the module doc's "findings" section predicted. `buildCell`'s map-lookup wiring
+// did not change.
 // ---------------------------------------------------------------------------
 
-export type TouchKeyFindingSeverity = "error" | "warning" | "hint";
-
-/**
- * Placeholder for the real `TouchKeyFinding` (T113,
- * `packages/engine/src/pattern-apply/touchKeyDiagnostics.ts`). Structured
- * only — `fields` carries data for studio-composed, localized copy; no
- * English prose crosses this boundary (data-model.md §10).
- */
-export interface TouchKeyFinding {
-  /** One of the eight FR-040 diagnostic codes (opaque here — T113 owns the enum). */
-  readonly code: string;
-  readonly severity: TouchKeyFindingSeverity;
-  /** The key or rule this finding anchors to, in `touchKeyAddress` form. */
-  readonly address: string;
-  readonly fields: Readonly<Record<string, unknown>>;
-  /** At least one fix descriptor, per FR-041 — opaque here, T113 owns the shape. */
-  readonly fixes: readonly unknown[];
-}
+export type {
+  TouchKeyFinding,
+  TouchKeyFindingSeverity,
+} from "@keyboard-studio/contracts";
 
 const EMPTY_FINDINGS: readonly TouchKeyFinding[] = [];
 const EMPTY_FINDINGS_MAP: ReadonlyMap<string, readonly TouchKeyFinding[]> = new Map();
