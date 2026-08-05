@@ -1716,7 +1716,7 @@ export function StudioShell() {
     [impactDeps],
   );
 
-  // spec 057 FR-009/FR-010: the async resolver, for a decision recorded before a
+  // spec 059 FR-009/FR-010: the async resolver, for a decision recorded before a
   // working copy existed. It re-derives the effect by projecting the working copy
   // twice through `projectWorkingCopyForOutput` — the SAME function the download zip
   // and the pull-request path use, and the same one `readProjectedFiles` above

@@ -46,7 +46,7 @@ export const fixtures: QuestionModule["fixtures"] = {
   invalid: [],
 };
 
-// Output reach (spec 057 FR-016): `writes` stays `[]` — this question writes no
+// Output reach (spec 059 FR-016): `writes` stays `[]` — this question writes no
 // KeyboardIR — while `outputs` states that the answer nevertheless reaches an
 // emitted artifact. Here, the answer contributes the language subtag to the
 // composed tag the descriptor declares.

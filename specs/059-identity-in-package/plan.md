@@ -1,6 +1,6 @@
 # Implementation Plan: Identity in the package
 
-**Feature**: 057-identity-in-package · **Branch**: `057-identity-in-package` · **Created**: 2026-08-03
+**Feature**: 059-identity-in-package · **Branch**: `059-identity-in-package` · **Created**: 2026-08-03
 
 **Spec**: [spec.md](spec.md) · **Research**: [research.md](research.md) · **Data model**: [data-model.md](data-model.md) · **Contracts**: [contracts/](contracts/)
 

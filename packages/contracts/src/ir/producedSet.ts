@@ -43,6 +43,30 @@
  * filtering all apply identically. Fragments without the field (non-rule
  * fragments, older parses) are skipped, preserving the prior behavior.
  *
+ * THIS VIEW IS FROZEN (spec 058 FR-008/FR-010)
+ * -------------------------------------------
+ * `buildProducedSet` answers "what do this keyboard's rules emit?" — including a
+ * rule keyed on a touch key id that no key anywhere carries. That is not a bug
+ * here; it is the correct answer to the question this function asks, and several
+ * consumers depend on it. Its semantics MUST NOT change. The reachability-aware
+ * question lives in the sibling `buildReachableProducedSet`
+ * ([reachableProducedSet.ts](./reachableProducedSet.ts)), deliberately a separate
+ * function rather than an option, so nobody can flip a default and silently move
+ * the committed `docs/keyboard-facet-index.json` or the §18.6 denominator.
+ *
+ * A regression test pins that this function STILL COUNTS an orphan `T_` rule. That
+ * single test is the anti-regression pin for the committed facet index.
+ *
+ * Adopter list — NORMATIVE (contract §4.4). Mirrored in reachableProducedSet.ts.
+ *
+ * | Consumer | View | Why |
+ * |---|---|---|
+ * | Facet-transform propose / verify | **plain (this one)** | "Did my transform change what the rules emit" is a rules-only question. Making it reachability-dependent would make a no-regression assertion flaky whenever the layout is edited in the same session. |
+ * | All `utilities/facet-index` classifiers | **plain** | Committed `docs/keyboard-facet-index.json` + corpus-calibrated tests. |
+ * | `producedGlyphs`, char-contributor attribution, character-discovery, mechanism gallery, character-map tinting, convenience-chars gate, carve nodes, desktop-modification derivation | **plain** | None asks a reachability question; several run before any touch layout exists. |
+ * | Layer C inventory-coverage check, the orphan-rule check | reachability-aware | See the sibling module. |
+ * | Studio inventory diff | neither — it gains a third `producedButUnreachable` array | Switching would silently increase author workload. |
+ *
  * Pure, browser-safe, no I/O.
  */
 

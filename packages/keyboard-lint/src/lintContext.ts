@@ -9,10 +9,23 @@ import { parseTouchLayout, touchLayoutPath } from "./parsers/parseTouchLayout.js
 import { checkLongpress } from "./checks/check-18-1-longpress.js";
 import { checkTouchRows } from "./checks/check-18-2-touch-rows.js";
 import { checkKeysPerRow } from "./checks/check-18-3-keys-per-row.js";
-import { checkControlKeyDrift } from "./checks/check-18-4-control-key-drift.js";
-import { checkLayerSwitchReturn } from "./checks/check-18-5-layer-switch-return.js";
+import {
+  checkControlKeyDrift,
+  checkTouchDuplicateKeyId,
+  checkTouchMissingRequiredKey,
+} from "./checks/check-18-4-control-key-drift.js";
+import {
+  checkLayerSwitchReturn,
+  checkTouchMissingLayer,
+} from "./checks/check-18-5-layer-switch-return.js";
 import { checkInventoryCoverage } from "./checks/check-18-6-inventory-coverage.js";
-import { checkTouchCoverage } from "./checks/check-18-6-touch-coverage.js";
+import {
+  checkTouchCoverage,
+  checkTouchKeyIdCase,
+  checkTouchKeyNoRule,
+  checkTouchRuleOrphan,
+} from "./checks/check-18-6-touch-coverage.js";
+import { resolveJoinedCheckInputs } from "./checks/_shared.js";
 
 /**
  * Optional extra inputs for Layer C checks that need compiled artefacts.
@@ -68,6 +81,11 @@ export async function lintWithContext(
     findings.push(...checkKeysPerRow(ir, tlPath));
     findings.push(...checkControlKeyDrift(ir, tlPath));
     findings.push(...checkLayerSwitchReturn(ir, tlPath));
+    // Spec 058: layout-only structural checks — no join needed, so they run
+    // wherever 18.1-18.5 run.
+    findings.push(...checkTouchDuplicateKeyId(ir, tlPath));
+    findings.push(...checkTouchMissingRequiredKey(ir, tlPath));
+    findings.push(...checkTouchMissingLayer(ir, tlPath));
   }
 
   // 18.6 desktop: inventory coverage — only when both inputs are present
@@ -75,9 +93,25 @@ export async function lintWithContext(
     findings.push(...checkInventoryCoverage(ctx.keyboardIR, ctx.inventory, kmnPath));
   }
 
-  // 18.6 touch: coverage guard (spec 035 FR-008) — only when both inputs are present
+  // Spec 058: the JOINED checks need rules AND layout together. One resolver
+  // states the layout precedence once (IR first, then context, then a VFS parse)
+  // and gates on a keyboard IR being present, exactly as the desktop inventory
+  // check above is gated. No new LintContext field is required.
+  const joined = resolveJoinedCheckInputs(ctx.keyboardIR, ctx.touchLayout, ir ?? undefined);
+
+  // 18.6 touch: coverage guard (spec 035 FR-008) — only when both inputs are
+  // present. The rule index is threaded when available (spec 058 FR-007), so a
+  // `T_*` key whose output lives in a rule is credited here too.
   if (ctx.touchLayout && ctx.touchInventory) {
-    findings.push(...checkTouchCoverage(ctx.touchLayout, ctx.touchInventory, tlPath));
+    findings.push(
+      ...checkTouchCoverage(ctx.touchLayout, ctx.touchInventory, tlPath, joined?.ruleIndex),
+    );
+  }
+
+  if (joined) {
+    findings.push(...checkTouchKeyNoRule(joined, tlPath));
+    findings.push(...checkTouchRuleOrphan(joined, tlPath));
+    findings.push(...checkTouchKeyIdCase(joined, tlPath));
   }
 
   return findings;

@@ -15,9 +15,18 @@ import { expect } from "playwright/test";
 import type { Page } from "playwright/test";
 
 export interface AxeScanOptions {
-  /** CSS selectors to exclude from the scan. Each call-site exclusion needs
-   * an inline comment naming the criterion and reason (FR-003). */
-  exclude?: readonly string[];
+  /**
+   * Selectors to exclude from the scan. Each call-site exclusion needs an
+   * inline comment naming the criterion and reason (FR-003).
+   *
+   * An entry may be a plain selector (same-document) or a FRAME CHAIN — an
+   * array like `["iframe", ".vendor-class"]`, which is how axe addresses a node
+   * inside an iframe and the form axe's own violation targets come back in. The
+   * chain form exists so a finding in third-party framed content can be
+   * excluded precisely, instead of excluding the whole frame and losing
+   * coverage of the content the studio itself puts there.
+   */
+  exclude?: readonly (string | readonly string[])[];
 }
 
 /** Runs an axe scan of the current page state and fails the test on any
@@ -31,7 +40,7 @@ export async function expectNoSeriousAxeViolations(
 ): Promise<void> {
   let builder = new AxeBuilder({ page });
   for (const selector of options.exclude ?? []) {
-    builder = builder.exclude(selector);
+    builder = builder.exclude(typeof selector === "string" ? selector : [...selector]);
   }
   const results = await builder.analyze();
   const gated = results.violations

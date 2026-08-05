@@ -78,7 +78,7 @@ export const fixtures: QuestionModule["fixtures"] = {
   ],
 };
 
-// Output reach (spec 057 FR-016): `writes` stays `[]` — this question writes no
+// Output reach (spec 059 FR-016): `writes` stays `[]` — this question writes no
 // KeyboardIR — while `outputs` states that the answer nevertheless reaches an
 // emitted artifact. Here, the English name is the `<Language>` element's display
 // text.

@@ -29,6 +29,11 @@ import type {
   PlacementWorklist,
 } from "@keyboard-studio/contracts";
 
+// The entry-group choice and the terminal-rule constraint are shared with
+// touch-rule synthesis (spec 058) — see ir-insert.ts's module doc for why they
+// are not private to this module any more.
+import { entryGroupOf, insertBeforeTerminalRules } from "./ir-insert.js";
+
 export const MARKS_GUARD_GROUP = "generated_marks_guard";
 export const MARKS_UNWRAP_FROM_STORE = "generated_marks_unwrap_from";
 export const MARKS_UNWRAP_TO_STORE = "generated_marks_unwrap_to";
@@ -45,23 +50,6 @@ export interface MarkGuardsResult {
    * untouched) rather than silently reordering someone else's use() chain.
    */
   guardHopSkipped?: boolean;
-}
-
-/** The entry group: the first using-keys group (KMN's begin target). */
-function entryGroupOf(groups: IRGroup[]): IRGroup | undefined {
-  return groups.find((g) => g.usingKeys && !g.readonly);
-}
-
-/**
- * Insert a rule immediately before the first match/nomatch rule in the
- * group, or append if there is none. kmcmplib requires match/nomatch rules
- * to be last in a group, so any newly generated ordinary rule must land
- * before them, not after.
- */
-function insertBeforeTerminalRules(rules: IRRule[], rule: IRRule): IRRule[] {
-  const idx = rules.findIndex((r) => r.matchKind === "match" || r.matchKind === "nomatch");
-  if (idx === -1) return [...rules, rule];
-  return [...rules.slice(0, idx), rule, ...rules.slice(idx)];
 }
 
 /**
