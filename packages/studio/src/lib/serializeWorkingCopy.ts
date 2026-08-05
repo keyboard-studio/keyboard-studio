@@ -25,6 +25,7 @@ import { getToZip, getPatternLibraryService } from "./services.ts";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
 import type { IdentityOverlay } from "./projectWorkingCopyVfs.ts";
 import { physicalAssignmentsOf } from "./physicalAssignments.ts";
+import { resolveOutputKeyboardId } from "./outputKeyboardId.ts";
 import { bumpKeyboardVersion, generateStubs, stageAdaptHistory } from "@keyboard-studio/engine";
 import { readVfsText } from "./vfsText.ts";
 import { snapshotDecisionRecord } from "../decisions/decisionLogStore.ts";
@@ -156,7 +157,7 @@ export async function projectWorkingCopyForOutput(
   // `.kmw-keyboard-<baseId>` selectors in *.css plus <ID> / <kbdname>
   // references in *.kps and *.kvks.
   const keyboardId = baseKeyboard.id;
-  const outputKeyboardId = identity?.keyboardId ?? keyboardId;
+  const outputKeyboardId = resolveOutputKeyboardId(identity, baseKeyboard);
 
   // Keyboard release version for the `<id>-<version>.zip` filename. baseIr.header.version
   // carries &KEYBOARDVERSION on import (codec/parse prefers it over &VERSION) and the
