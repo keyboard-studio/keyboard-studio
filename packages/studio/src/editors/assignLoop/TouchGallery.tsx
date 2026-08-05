@@ -3458,30 +3458,50 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   const touchForwardButton: TouchForwardButtonSpec | null =
     // TOP PRIORITY (bug fix): once every inventory character has count >= 1
     // (allCovered, the SAME badge computation CharScrollStrip/currentCharBadge
-    // use), the Done button is ALWAYS rendered — regardless of currentChar or
-    // its walk (touchLettersToAdd) membership. Previously this button was
-    // hidden entirely for a currentChar outside touchLettersToAdd (e.g. an
-    // already-detected character reached via the SHOW-ALL CharScrollStrip),
-    // which could strand an author who had, in fact, finished every
-    // character — there was no visible way to advance. Falls through to the
-    // existing branch unchanged whenever any character is still count 0.
-    // `onComplete` is a required TouchGalleryProps field (always defined),
-    // unlike MechanismGallery's optional one, so there is no separate
-    // undefined check here.
+    // use) OR every character is implemented-or-marked (unaccountedTouchChars
+    // — mark-aware, see below), the Done button is ALWAYS rendered —
+    // regardless of currentChar or its walk (touchLettersToAdd) membership.
+    // Previously this button was hidden entirely for a currentChar outside
+    // touchLettersToAdd (e.g. an already-detected character reached via the
+    // SHOW-ALL CharScrollStrip), which could strand an author who had, in
+    // fact, finished every character — there was no visible way to advance.
+    // Falls through to the existing branch unchanged whenever any character
+    // is still count 0 AND unaccounted-for. `onComplete` is a required
+    // TouchGalleryProps field (always defined), unlike MechanismGallery's
+    // optional one, so there is no separate undefined check here.
     //
-    // Unlike MechanismGallery's matching `allCovered` branch, this one does
-    // NOT additionally require `unaccountedTouchChars.length === 0`:
-    // `allCovered` (getProducerBadge over the full `inventory`) and
-    // `unaccountedTouchChars` (`touchCoverage` over `layoutForLintAndGate`)
-    // are DELIBERATELY allowed to diverge here — see the "Done button forced
-    // visible" test suite's own doc comments for a documented, pre-existing
-    // case where the mocked touch-layout builder does not reflect
-    // shipped/mirrored content that the badge-based `allCovered` already
-    // knows about. The per-char branch below still gets its own
-    // `unaccountedTouchChars` guard, which covers the SHOW-ALL
-    // CharScrollStrip jump-to-last-position case (`canGoNext` alone, current
-    // character only, is not sufficient there).
-    allCovered
+    // RECONCILIATION (mechanism-gallery-progression follow-up): a marked
+    // character is NEVER excluded from touchLettersToAdd (marking never
+    // changes detection/suggestion status, only the mark set), so it can
+    // never itself be "the out-of-walk char currentChar jumped to" — but a
+    // DIFFERENT, already-covered character elsewhere in the inventory CAN be
+    // reached via the SHOW-ALL strip while the marked character sits
+    // untouched further down the walk. In that shape, `allCovered` reads
+    // false forever (the marked character's producer-badge count is, and
+    // stays, 0 — marks are authoring metadata, never a `MechanismAssignment`,
+    // so they never move the badge), and the per-char branch below is
+    // unreachable (currentChar is outside touchLettersToAdd) — so, before
+    // this fix, NO Done button rendered at all, even though every character
+    // was genuinely implemented-or-marked. Hence the `||
+    // unaccountedTouchChars.length === 0` added below: `unaccountedTouchChars`
+    // is mark-aware AND is the exact signal `handleContinue` itself checks
+    // before calling `finalizeCompletion` (see that callback above) — so
+    // "Done becomes visible" and "Done, if clicked, actually completes" are
+    // the SAME condition on this path; OR-ing it in adds no case where a
+    // visible enabled Done could still no-op.
+    //
+    // `allCovered` is kept as an alternate (not replaced) rather than the
+    // sole source of truth: it is derived from LIVE, non-mocked signals in
+    // production (touchBaseDirectSet ultimately reads the real seed
+    // layout/session edits), whereas `unaccountedTouchChars` reads
+    // `layoutForLintAndGate`, which in THIS TEST SUITE's harness is rebuilt
+    // by a simplified mocked `buildTouchLayoutJson` that does not replay
+    // `baseTouchJson`/`mods` the way the real engine does (see the "Done
+    // button forced visible" test suite's own doc comments) — a harness gap,
+    // not a production one, but keeping `allCovered` alongside means neither
+    // the pre-existing shipped/mirrored-content test scenario nor this fix's
+    // new marked-character scenario needs the other's signal to be correct.
+    (allCovered || unaccountedTouchChars.length === 0)
       ? {
           label: touchDoneLabel,
           ariaLabel: touchDoneLabel,
@@ -3686,6 +3706,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
           modality="touch"
           baseDirectSet={touchBaseDirectSet}
           preAugmentSessionAwareSet={directTouchProducedSet}
+          markedSet={markedTouchSet}
         />
       )}
 

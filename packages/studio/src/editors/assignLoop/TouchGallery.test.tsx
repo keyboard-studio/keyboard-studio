@@ -1038,7 +1038,7 @@ describe("TouchGallery — character-scroll-strip navigation", () => {
 
     // Landed back on "中" (idx 0) — the phase was NOT exited.
     await waitFor(() => {
-      expectCurrentChar("中");
+      expectCurrentChar("中", { marked: true });
     });
     expect(onBack).not.toHaveBeenCalled();
   });
@@ -1490,6 +1490,17 @@ describe("TouchGallery — touch base-direct signal (a) is LIVE, not frozen (P1 
   });
 });
 
+// This suite pins TWO independent, OR-ed reasons the Done button can be
+// force-shown for a currentChar outside touchLettersToAdd's walk:
+//   (a) `allCovered` — the producer-badge signal, exercised by the two tests
+//       below (a harness-only divergence from `unaccountedTouchChars` here —
+//       see the middle test's own comment);
+//   (b) `unaccountedTouchChars.length === 0` — the mark-aware signal, added
+//       by the mechanism-gallery-progression follow-up and exercised by the
+//       third test below (a marked, still-unimplemented character elsewhere
+//       in the walk, reached from an unrelated already-covered out-of-walk
+//       character). See TouchGallery.tsx's `touchForwardButton` top-priority
+//       branch doc comment for the full reconciliation between the two.
 describe("TouchGallery — Done button forced visible when the whole inventory is covered", () => {
   it("shows an ENABLED Done button when every inventory character has count >= 1, even navigated to an already-detected character outside touchLettersToAdd (previously hidden)", async () => {
     // "x" carries a desktop swap assignment (mirrored onto the touch seed —
@@ -1544,9 +1555,62 @@ describe("TouchGallery — Done button forced visible when the whole inventory i
       expectCurrentChar("€");
     });
 
-    // Not fully covered ("w" is still count 0) — the forward button stays
-    // hidden entirely, exactly as before this fix.
+    // Not fully covered ("w" is still count 0, and not marked either) — the
+    // forward button stays hidden entirely, exactly as before this fix.
     expect(screen.queryByTestId("touch-continue")).toBeNull();
+  });
+
+  it("force-shows an ENABLED Done button via the mark-aware unaccountedTouchChars signal when a DIFFERENT, unimplemented-but-MARKED character remains elsewhere in the walk (mechanism-gallery-progression follow-up)", async () => {
+    // "a" is base-covered by the default scaffold fall-through with no
+    // unresolved suggestion, so it is excluded from touchLettersToAdd
+    // entirely (entry-parity fix) — the SHOW-ALL-only character this test
+    // navigates to. "中" has no base coverage and no desktop assignment
+    // (suggestion kind "none"), so it is the walk's sole entry. Neither
+    // triggers a Phase C desktop-mods replay or a Phase E touch edit, so
+    // `layoutForLintAndGate` resolves to the REAL (non-mocked)
+    // `detectionSeedLayout` here — this test deliberately avoids the
+    // shipped/mirrored-content shape the two tests above use, so it isolates
+    // the NEW `unaccountedTouchChars`-driven branch from the pre-existing,
+    // harness-limited `allCovered` branch.
+    seedStore({ withInventory: ["a", "中"] });
+
+    const onComplete = vi.fn();
+    await act(async () => {
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />);
+    });
+
+    expectCurrentChar("中");
+    // Mark "中" instead of implementing it — its producer badge stays 0
+    // forever (marks are authoring metadata, never a MechanismAssignment),
+    // so `allCovered` over the whole inventory is FALSE for the rest of this
+    // test — the property under test is that Done still force-shows via
+    // `unaccountedTouchChars` alone.
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+4E2D 中 for later review/i }),
+    );
+
+    // Navigate to "a" via the SHOW-ALL strip — outside touchLettersToAdd,
+    // and NOT the marked character itself (a marked-but-unimplemented
+    // character is never excluded from the walk, so it can never be "the
+    // out-of-walk char" on its own — see this suite's header comment).
+    fireEvent.click(screen.getByTestId("char-scroll-chip-0061"));
+    await waitFor(() => {
+      expectCurrentChar("a");
+    });
+
+    // Every character is implemented ("a") or marked ("中") —
+    // `unaccountedTouchChars` is empty even though `allCovered` (badge) is
+    // false — Done force-shows, ENABLED, from this out-of-walk character.
+    const doneBtn = screen.getByTestId("touch-continue");
+    expect(doneBtn.textContent).toMatch(/Done/i);
+    expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
+
+    // Unlike the badge-only tests above, clicking here is expected to
+    // actually complete: `unaccountedTouchChars.length === 0` is the exact
+    // condition `handleContinue` itself checks, so "visible" and "clicking
+    // works" agree on this path — no harness caveat needed.
+    fireEvent.click(doneBtn);
+    expect(onComplete).toHaveBeenCalledOnce();
   });
 });
 
@@ -1686,7 +1750,7 @@ describe("TouchGallery — mark for later review", () => {
     // accounted for), even though it is still not counted as configured.
     fireEvent.click(screen.getByRole("button", { name: /back to previous character/i }));
     await waitFor(() => {
-      expectCurrentChar("中");
+      expectCurrentChar("中", { marked: true });
     });
     expect((nextBtn() as HTMLButtonElement).disabled).toBe(false);
   });
@@ -1884,7 +1948,7 @@ describe("TouchGallery — no modal, ever", () => {
     // from the forward Done path, and must never render a dialog either.
     fireEvent.click(screen.getByRole("button", { name: /back to previous character/i }));
     await waitFor(() => {
-      expectCurrentChar("中");
+      expectCurrentChar("中", { marked: true });
     });
     expect(container.querySelector("dialog")).toBeNull();
   });
@@ -2378,7 +2442,7 @@ describe("TouchGallery — suggestion card variants", () => {
     // Navigate back to "á" without ever resolving its suggestion.
     fireEvent.click(screen.getByRole("button", { name: /back to previous character/i }));
     await waitFor(() => {
-      expectCurrentChar("á");
+      expectCurrentChar("á", { marked: true });
     });
 
     // Unlike the accept/deny case above, the suggestion card for "á" MUST

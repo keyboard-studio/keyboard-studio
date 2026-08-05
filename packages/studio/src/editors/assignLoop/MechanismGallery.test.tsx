@@ -1037,7 +1037,7 @@ describe("MechanismGallery — mark for later review", () => {
     // accounted for), even though it is still not counted toward coverage.
     fireEvent.click(screen.getByRole("button", { name: /← back/i }));
     await waitFor(() => {
-      expectCurrentChar("á");
+      expectCurrentChar("á", { marked: true });
     });
     expect(
       (screen.getByRole("button", { name: /Next character/i }) as HTMLButtonElement)
@@ -1192,7 +1192,7 @@ describe("MechanismGallery — Done-blocked inline hint (no modal)", () => {
 
     fireEvent.click(screen.getByRole("button", { name: /← back/i }));
     await waitFor(() => {
-      expectCurrentChar("á");
+      expectCurrentChar("á", { marked: true });
     });
     expect(container.querySelector("dialog")).toBeNull();
 
@@ -2467,7 +2467,7 @@ describe("MechanismGallery — Back after marking the only character", () => {
 
     // "á" is still the selected chip — positional nav never nulled
     // currentChar out from under the completed character.
-    expectCurrentChar("á");
+    expectCurrentChar("á", { marked: true });
 
     // Back is still positional: idx 0 has no prior position, so it calls
     // onBack — not gated by the character having just been marked.
@@ -2664,6 +2664,17 @@ describe("MechanismGallery — kbgen suggestion gated on the current char's prod
 // ---------------------------------------------------------------------------
 // Forward button — forced visible/enabled once the whole inventory is
 // covered, even when currentChar is outside lettersToAdd's walk (bug fix).
+//
+// This suite pins TWO independent, OR-ed reasons the Done button can be
+// force-shown for a currentChar outside lettersToAdd's walk:
+//   (a) `allCovered` — the producer-badge signal, exercised by the first two
+//       tests below;
+//   (b) `unaccountedChars.length === 0` — the mark-aware signal, added by
+//       the mechanism-gallery-progression follow-up and exercised by the
+//       third test below (a marked, still-unimplemented character elsewhere
+//       in the walk, reached from an unrelated already-produced out-of-walk
+//       character). See MechanismGallery.tsx's `forwardButton` top-priority
+//       branch doc comment for the full reconciliation between the two.
 // ---------------------------------------------------------------------------
 
 describe("MechanismGallery — Done button forced visible when the whole inventory is covered", () => {
@@ -2768,6 +2779,73 @@ describe("MechanismGallery — Done button forced visible when the whole invento
     // hidden entirely, exactly as before this fix.
     expect(screen.queryByTestId("mechanisms-continue")).toBeNull();
   });
+
+  it("force-shows an ENABLED Done button via the mark-aware unaccountedChars signal when a DIFFERENT, unimplemented-but-MARKED character remains elsewhere in the walk (mechanism-gallery-progression follow-up)", async () => {
+    // "z" is directly produced by the base (badge count via signal (a)) —
+    // stays OUT of lettersToAdd, the SHOW-ALL-only character this test
+    // navigates to. "á" has no base coverage, so it is the walk's sole
+    // entry (lettersToAdd === ["á"]).
+    const ruleZ: IRRule = {
+      nodeId: "r-z",
+      context: [{ kind: "vkey", name: "K_Z", modifiers: [] }],
+      output: [{ kind: "char", value: "z" }],
+    };
+    const group: IRGroup = {
+      nodeId: "g-main",
+      name: "main",
+      usingKeys: true,
+      readonly: false,
+      rules: [ruleZ],
+    };
+    const seedVfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: seedVfs, ir: makeTestIR([group]) });
+
+    seedInventory(["á", "z"]);
+
+    const onComplete = vi.fn();
+    await act(async () => {
+      render(
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />,
+      );
+    });
+
+    expectCurrentChar("á");
+    // Mark "á" instead of implementing it — its producer badge stays 0
+    // forever (marks are authoring metadata, never a MechanismAssignment),
+    // so `allCovered` over the whole inventory is FALSE for the rest of
+    // this test — the property under test is that Done still force-shows
+    // via `unaccountedChars` alone.
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+00E1 á for later review/i }),
+    );
+
+    // Navigate to "z" via the SHOW-ALL strip — outside lettersToAdd, and NOT
+    // the marked character itself (a marked-but-unimplemented character is
+    // never excluded from the walk, so it can never be "the out-of-walk
+    // char" on its own).
+    fireEvent.click(screen.getByTestId("char-scroll-chip-007A"));
+    await waitFor(() => {
+      expectCurrentChar("z");
+    });
+
+    // Every character is implemented ("z") or marked ("á") —
+    // `unaccountedChars` is empty even though `allCovered` (badge) is
+    // false — Done force-shows, ENABLED, from this out-of-walk character.
+    const doneBtn = screen.getByTestId("mechanisms-continue");
+    expect(doneBtn.textContent).toMatch(/Done/i);
+    expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
+
+    // Unlike the badge-only test above, clicking here is expected to
+    // actually complete: `unaccountedChars.length === 0` is the exact
+    // condition `handleForwardComplete` itself checks, so "visible" and
+    // "clicking works" agree on this path — no harness caveat needed.
+    fireEvent.click(doneBtn);
+    expect(onComplete).toHaveBeenCalledOnce();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -2870,7 +2948,7 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
     // Navigate back to "à" without ever resolving its suggestion.
     fireEvent.click(screen.getByRole("button", { name: /← back/i }));
     await waitFor(() => {
-      expectCurrentChar("à");
+      expectCurrentChar("à", { marked: true });
     });
 
     // Unlike the accept/deny case above, the suggestion row for "à" MUST

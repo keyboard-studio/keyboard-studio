@@ -630,6 +630,7 @@
   "editor.assignLoop.markForLaterButton": "Mark for later review",
   "trail.entry.headline.axis.markInputOrder": "mark input order",
   "survey.marks.treatment.orderRadiogroupAriaLabel": "Mark input order",
+  "editor.assignLoop.charScroll.chipMarkedClause": "marked for later review",
   "editor.assignLoop.markedForLaterButton": "Marked for later review",
   "editor.baseResolution.reason.scriptMatch": "Matches your script",
   "editor.assignLoop.mechanismGalleryHeading": "Mechanism Gallery",

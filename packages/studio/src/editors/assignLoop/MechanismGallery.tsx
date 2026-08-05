@@ -3429,19 +3429,45 @@ export function MechanismGallery({
   const forwardButton: ForwardButtonSpec | null =
     // TOP PRIORITY (bug fix): once every inventory character has count >= 1
     // (allCovered, the SAME badge computation CharScrollStrip/currentCharBadge
-    // use), the Done button is ALWAYS rendered — regardless of currentChar or
-    // its walk (lettersToAdd) membership. Previously this button was hidden
-    // entirely for a currentChar outside lettersToAdd (e.g. an
-    // already-produced character reached via the SHOW-ALL CharScrollStrip),
-    // which could strand an author who had, in fact, finished every
-    // character — there was no visible way to advance. Falls through to the
-    // existing branches unchanged whenever any character is still count 0.
-    // `unaccountedChars.length === 0` is a defense-in-depth mirror of
-    // `allCovered` here (mechanism-gallery-progression) — the two are
-    // computed over slightly different scopes/signals (full `inventory` via
-    // getProducerBadge vs. `lettersToAdd` via unimplementedDesktopChars), so
-    // this guards against them ever disagreeing about "safe to complete".
-    allCovered && unaccountedChars.length === 0 && onComplete !== undefined
+    // use) OR every character is implemented-or-marked (unaccountedChars —
+    // mark-aware, see below), the Done button is ALWAYS rendered —
+    // regardless of currentChar or its walk (lettersToAdd) membership.
+    // Previously this button was hidden entirely for a currentChar outside
+    // lettersToAdd (e.g. an already-produced character reached via the
+    // SHOW-ALL CharScrollStrip), which could strand an author who had, in
+    // fact, finished every character — there was no visible way to advance.
+    // Falls through to the existing branches unchanged whenever any
+    // character is still count 0 AND unaccounted-for.
+    //
+    // RECONCILIATION (mechanism-gallery-progression follow-up): a marked
+    // character is NEVER excluded from lettersToAdd (marking never changes
+    // detection/suggestion status, only the mark set), so it can never
+    // itself be "the out-of-walk char currentChar jumped to" — but a
+    // DIFFERENT, already-covered character elsewhere in the inventory CAN be
+    // reached via the SHOW-ALL strip while the marked character sits
+    // untouched further down the walk. In that shape, `allCovered` reads
+    // false forever (the marked character's producer-badge count is, and
+    // stays, 0 — marks are authoring metadata, never a `MechanismAssignment`,
+    // so they never move the badge), and the per-char branch below is
+    // unreachable (currentChar is outside lettersToAdd) — so, before this
+    // fix, NO Done button rendered at all, even though every character was
+    // genuinely implemented-or-marked. Hence the `|| unaccountedChars.length
+    // === 0` added below: `unaccountedChars` is mark-aware AND is the exact
+    // signal `handleForwardComplete` itself checks before calling
+    // `onComplete` (see that callback above) — so "Done becomes visible" and
+    // "Done, if clicked, actually completes" are the SAME condition on this
+    // path; OR-ing it in adds no case where a visible enabled Done could
+    // still no-op.
+    //
+    // `allCovered` is kept as an alternate (not replaced) rather than the
+    // sole source of truth for the same reason TouchGallery's mirrored
+    // `touchForwardButton` keeps it: it is derived from LIVE, non-mocked
+    // signals in production, whereas `unaccountedChars` is
+    // lettersToAdd-scoped and reads `sessionAssignments`/`sessionProducedSet`
+    // — keeping both alongside means neither the pre-existing
+    // shipped/mirrored-content test scenario nor this fix's new
+    // marked-character scenario needs the other's signal to be correct.
+    (allCovered || unaccountedChars.length === 0) && onComplete !== undefined
       ? {
           label: doneLabel,
           onClick: handleForwardComplete,
@@ -3480,7 +3506,15 @@ export function MechanismGallery({
           // entirely rather than render it disabled in that case: it isn't
           // a "global Next" separate from this one, so a disabled render
           // would look like the walk is stuck rather than simply "you're
-          // inspecting a character outside this step's coverage".
+          // inspecting a character outside this step's coverage". This
+          // branch is only reached once the TOP-PRIORITY `allCovered ||
+          // unaccountedChars.length === 0` case above has already failed to
+          // fire — i.e. currentChar being outside lettersToAdd here can no
+          // longer, by itself, strand an author who has genuinely finished
+          // every character (implemented or marked): that shape is caught
+          // above (mechanism-gallery-progression reconciliation). This
+          // `null` is reachable only when a real character remains neither
+          // implemented nor marked.
           currentChar !== null && lettersToAdd.includes(currentChar)
           ? // `!hasAnotherCharAfterCurrent` means this IS the completion
             // click (label reads "Done") — gate it on `unaccountedChars` too
@@ -3767,6 +3801,7 @@ export function MechanismGallery({
             modality="physical"
             baseDirectSet={baseOnlyProducedSet}
             preAugmentSessionAwareSet={baseProducedSet}
+            markedSet={markedDesktopSet}
           />
         )}
 
