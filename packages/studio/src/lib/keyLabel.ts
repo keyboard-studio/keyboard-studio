@@ -13,12 +13,10 @@
 // the additional lowercase pass this convention adds on top.
 //
 // `irToCarveNodes.ts`'s OWN desktop-label choke point, `desktopVkeyLabel`,
-// applies the identical lowercase-letter pass via its own private
-// `lowerBareKeyLetter` helper rather than importing `physicalKeyLabel` from
-// here — this module already imports `vkeyLabel` FROM `irToCarveNodes.ts`,
-// so the reverse import would be circular. The two lowering rules are
-// duplicated, not shared, and must be kept in sync if this rule ever
-// changes.
+// applies the identical lowercase-letter pass. Both sites share the ONE rule
+// via the import-free `lowerBareLetter` leaf in `keyCasing.ts` — this module
+// already imports `vkeyLabel` FROM `irToCarveNodes.ts`, so a direct import
+// between the two would be circular; the shared rule sits below both instead.
 //
 // TouchGallery's `hostKeyShortLabel` is a DIFFERENT, already-correct casing
 // convention (spec 051): a touch key's displayed case reflects the touch
@@ -30,6 +28,7 @@
 // rule on top of it.
 
 import { vkeyLabel } from "./irToCarveNodes.ts";
+import { lowerBareLetter } from "./keyCasing.ts";
 
 /**
  * Strip the "K_" vkey-namespace prefix, or return the name unchanged if it
@@ -52,9 +51,7 @@ export function stripVkeyPrefix(vkeyName: string): string {
 export function physicalKeyLabel(vkeyName: string): string | undefined {
   const label = vkeyLabel(vkeyName);
   if (label === undefined) return undefined;
-  return label.length === 1 && /[A-Z]/.test(label)
-    ? label.toLowerCase()
-    : label;
+  return lowerBareLetter(label);
 }
 
 /**
