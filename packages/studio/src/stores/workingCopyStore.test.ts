@@ -22,6 +22,7 @@ import { useWorkingCopyStore, bindManifest } from "./workingCopyStore.ts";
 import { usePhaseBDraftStore, resetPhaseBDraftDecisions } from "./phaseBDraftStore.ts";
 import { makeTestIR, makeCharStore } from "@keyboard-studio/contracts/fixtures";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
+import { makeTouchKeyRuleJoinFixture, TOUCH_JOIN_IDS } from "@keyboard-studio/contracts/fixtures";
 import { createVirtualFS, irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
 import { defaultFillAxes, selectStrategy } from "@keyboard-studio/engine";
 import type {
@@ -2049,5 +2050,123 @@ describe("workingCopyStore — Phase B proposal decisions are per-working-copy",
 
     expect(usePhaseBDraftStore.getState().rejected).toContain("ɔ");
     expect(usePhaseBDraftStore.getState().exemplarMethodDeclined).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// commitTouchKeyRename — the T091 complete reference fix-up (spec 058;
+// key-id-policy.md §4; touch-key-rule-join.md §6.1's final bullet). Reuses
+// the shared touch-key<->rule-join fixture (contract §8, "no second
+// fixture") rather than a bespoke one, mirroring AssignPanel.test.tsx's own
+// precedent for the same fixture in this package.
+// ---------------------------------------------------------------------------
+
+describe("workingCopyStore — commitTouchKeyRename (spec 058 T091)", () => {
+  it("returns changed:false and touches nothing when there is no working IR yet", () => {
+    const result = useWorkingCopyStore
+      .getState()
+      .commitTouchKeyRename(TOUCH_JOIN_IDS.mark, "T_0300RENAMED");
+
+    expect(result).toEqual({ changed: false, renamedRuleNodeIds: [], renamedAddresses: [] });
+  });
+
+  it("writes the renamed ir via the overlay-preserving setWorkingIR seam, preserving the carve-deletion overlay", () => {
+    useWorkingCopyStore.getState().setIR(makeTouchKeyRuleJoinFixture({ withoutOpaqueFragments: true }));
+    useWorkingCopyStore.getState().deleteNode("unrelated-carve-node");
+    expect(useWorkingCopyStore.getState().deletedNodeIds.has("unrelated-carve-node")).toBe(true);
+
+    const result = useWorkingCopyStore
+      .getState()
+      .commitTouchKeyRename(TOUCH_JOIN_IDS.mark, "T_0300RENAMED");
+
+    expect(result.changed).toBe(true);
+    expect([...result.renamedRuleNodeIds].sort()).toEqual(["rule#mark", "rule#mark-guard"].sort());
+
+    const after = useWorkingCopyStore.getState();
+    // A carve-side deletion made through a DIFFERENT overlay survives —
+    // setWorkingIR, not setIR, is the seam this action must use.
+    expect(after.deletedNodeIds.has("unrelated-carve-node")).toBe(true);
+
+    const phoneKey = after.ir!.touchLayout!.platforms.find((p) => p.id === "phone")!.layers[0]!.rows[0]!.keys[0]!;
+    const tabletKey = after.ir!.touchLayout!.platforms.find((p) => p.id === "tablet")!.layers[0]!.rows[0]!.keys[0]!;
+    expect(phoneKey.id).toBe("T_0300RENAMED");
+    expect(tabletKey.id).toBe("T_0300RENAMED");
+  });
+
+  it("remaps a deleted-touch-key address through the EXISTING restore/delete actions, keeping undo entries consistent (FR-028, FR-033)", () => {
+    useWorkingCopyStore.getState().setIR(makeTouchKeyRuleJoinFixture({ withoutOpaqueFragments: true }));
+    const oldAddress = "phone:default:T_0300";
+    const newAddress = "phone:default:T_0300RENAMED";
+    useWorkingCopyStore.getState().deleteTouchKey(oldAddress);
+    expect(useWorkingCopyStore.getState().deletedTouchKeyIds.has(oldAddress)).toBe(true);
+    expect(
+      useWorkingCopyStore.getState().undoStack.some((e) => e.k === "t" && e.id === oldAddress),
+    ).toBe(true);
+
+    const result = useWorkingCopyStore
+      .getState()
+      .commitTouchKeyRename(TOUCH_JOIN_IDS.mark, "T_0300RENAMED");
+
+    expect(result.renamedAddresses).toEqual(
+      expect.arrayContaining([{ oldAddress, newAddress }]),
+    );
+
+    const after = useWorkingCopyStore.getState();
+    // The stale (pre-rename) address no longer resolves to a deletion...
+    expect(after.deletedTouchKeyIds.has(oldAddress)).toBe(false);
+    // ...it moved to the renamed key's new address instead of silently
+    // vanishing (touchKeyAddress.ts: a stale address here would be data
+    // loss, not the carve cascade's desirable idempotence).
+    expect(after.deletedTouchKeyIds.has(newAddress)).toBe(true);
+    // The tablet platform's occurrence of T_0300 was never deleted, so it is
+    // not spuriously added to the overlay by the remap.
+    expect(after.deletedTouchKeyIds.size).toBe(1);
+    // Undo stack: no stale 't' entry for the old address, exactly one for the new.
+    expect(after.undoStack.some((e) => e.k === "t" && e.id === oldAddress)).toBe(false);
+    expect(after.undoStack.filter((e) => e.k === "t" && e.id === newAddress)).toHaveLength(1);
+  });
+
+  it("leaves a deletion overlay untouched when nothing in it matches the renamed key", () => {
+    useWorkingCopyStore.getState().setIR(makeTouchKeyRuleJoinFixture({ withoutOpaqueFragments: true }));
+    useWorkingCopyStore.getState().deleteTouchKey("phone:default:T_FCFA");
+
+    useWorkingCopyStore.getState().commitTouchKeyRename(TOUCH_JOIN_IDS.mark, "T_0300RENAMED");
+
+    const after = useWorkingCopyStore.getState();
+    expect(after.deletedTouchKeyIds.has("phone:default:T_FCFA")).toBe(true);
+    expect(after.deletedTouchKeyIds.size).toBe(1);
+  });
+
+  it("promotes every renamed occurrence to hand-set provenance at its NEW address (T059, address-matched — never id-matched)", () => {
+    useWorkingCopyStore.getState().setIR(makeTouchKeyRuleJoinFixture({ withoutOpaqueFragments: true }));
+
+    const result = useWorkingCopyStore
+      .getState()
+      .commitTouchKeyRename(TOUCH_JOIN_IDS.mark, "T_0300RENAMED");
+    expect(result.changed).toBe(true);
+
+    const after = useWorkingCopyStore.getState();
+    const phoneKey = after.ir!.touchLayout!.platforms.find((p) => p.id === "phone")!.layers[0]!.rows[0]!.keys[0]!;
+    const tabletKey = after.ir!.touchLayout!.platforms.find((p) => p.id === "tablet")!.layers[0]!.rows[0]!.keys[0]!;
+    expect(phoneKey.id).toBe("T_0300RENAMED");
+    expect(phoneKey.provenance).toBe("hand-set");
+    expect(tabletKey.id).toBe("T_0300RENAMED");
+    expect(tabletKey.provenance).toBe("hand-set");
+  });
+
+  it("is a no-op end to end (no ir write, no overlay remap) when fromKeyId matches nothing", () => {
+    useWorkingCopyStore.getState().setIR(makeTouchKeyRuleJoinFixture({ withoutOpaqueFragments: true }));
+    useWorkingCopyStore.getState().deleteTouchKey("phone:default:T_0300");
+    const before = useWorkingCopyStore.getState();
+
+    const result = useWorkingCopyStore
+      .getState()
+      .commitTouchKeyRename("T_DOES_NOT_EXIST", "T_WHATEVER");
+
+    expect(result).toEqual({ changed: false, renamedRuleNodeIds: [], renamedAddresses: [] });
+    const after = useWorkingCopyStore.getState();
+    expect(after.ir).toBe(before.ir);
+    expect(after.deletedTouchKeyIds).toEqual(before.deletedTouchKeyIds);
+    expect(after.undoStack).toEqual(before.undoStack);
   });
 });

@@ -77,6 +77,8 @@ import type {
   TouchLayoutIR,
   DiscoveryAxisVector,
   PlacementMap,
+  KeyboardIR,
+  TouchKeyRuleIndex,
 } from "@keyboard-studio/contracts";
 import {
   toUPlusNotation,
@@ -108,6 +110,8 @@ import {
   caseCounterpart,
   replayKeyEditOverlay,
   parseTouchKeyAddress,
+  touchKeyAddress,
+  emitTouchLayout,
 } from "@keyboard-studio/engine";
 import type { TouchMethodDescriptor } from "@keyboard-studio/engine";
 import {
@@ -150,6 +154,9 @@ import {
   type KeyGridProvenance,
 } from "./keyGrid/KeyGrid.tsx";
 import { useGridNav } from "./keyGrid/useGridNav.ts";
+import { KeyInspector } from "./keyGrid/KeyInspector.tsx";
+import { AssignPanel, type AssignPanelCommitResult } from "./keyGrid/AssignPanel.tsx";
+import { useKeyEditGuards, type KeyEditInvalidationWarning } from "./keyGrid/useKeyEditGuards.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { collateInventory } from "../../survey/collation.ts";
 import { nfcDedup } from "../../survey/charNormUtils.ts";
@@ -230,6 +237,15 @@ const selectStyle: CSSProperties = gallerySelectMenuStyle(160);
 
 /** The empty/no-op DesktopModifications — the mods memo's fallback when baseIr is null. */
 const EMPTY_MODS: DesktopModifications = { removals: [], placements: [] };
+
+/**
+ * Stable empty `TouchLayoutIR` — `useKeyEditGuards` (T088) takes a required
+ * `layout`, but `effectiveKeyModeLayout` is `null` before the base keyboard
+ * has loaded. Hooks cannot be called conditionally, so this is the same
+ * "stable fallback so a hook always has a valid argument" idiom
+ * `emptyKeyGridViewModel` already uses for `useGridNav` below.
+ */
+const EMPTY_TOUCH_LAYOUT: TouchLayoutIR = { platforms: [], nodeIds: [] };
 
 /**
  * Whether a touch layer id carries a casing component (FR-013) — `"shift"`
@@ -1548,6 +1564,13 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     useShallow((s) => s.session.axes as Partial<DiscoveryAxisVector>),
   );
 
+  // The MUTABLE working IR (spec 058 T085-T089 composition) — AssignPanel's
+  // rule synthesis (ensureTouchKeyRule/applyGuardSynthesis) reads/returns this
+  // one, via the overlay-preserving setWorkingIR seam (see
+  // handleAssignPanelCommit below), never `baseIr` (locked, and the scope
+  // `touchRuleIndex` below deliberately stays pinned to for character-mode
+  // coverage detection — see that memo's own doc comment).
+  const ir = useWorkingCopyStore((s): KeyboardIR | null => s.ir);
   // The committed key-level touch layout edit overlay (spec 058) — read here
   // so it can be threaded into useWorkingCopyTransform's liveLayoutOverride
   // below (T054), folded into the key-mode grid's effective layout (T072),
@@ -1682,6 +1705,21 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   const coverageOptions = useMemo(
     () => (touchRuleIndex !== undefined ? { ruleIndex: touchRuleIndex } : {}),
     [touchRuleIndex],
+  );
+
+  // Key-mode's OWN rule index (spec 058 T085-T089 composition), built from the
+  // MUTABLE `ir` rather than `baseIr` above — deliberately a second index, not
+  // a redundant recompute of the same one. `ir` and `baseIr` agree on every
+  // desktop rule (locked identically at instantiation), so this diverges from
+  // `touchRuleIndex` ONLY once AssignPanel mints a touch-key rule
+  // (ensureTouchKeyRule/applyGuardSynthesis) — exactly the case that needs to
+  // be visible to the very next proposal's shared-candidate scan and
+  // opaque-fragment gate, and to the grid/inspector's own "Produces" read.
+  // `touchRuleIndex` stays baseIr-scoped for character-mode coverage
+  // detection, per that memo's own doc comment — not touched here.
+  const keyModeRuleIndex = useMemo<TouchKeyRuleIndex | undefined>(
+    () => (ir !== null ? buildTouchKeyRuleIndex(ir) : undefined),
+    [ir],
   );
 
   // Draft persistence — read on mount; write on every charTouch change.
@@ -2082,20 +2120,20 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   const keyModeViewModel = useMemo<KeyGridViewModel | undefined>(() => {
     if (
       effectiveKeyModeLayout === null ||
-      touchRuleIndex === undefined ||
+      keyModeRuleIndex === undefined ||
       activeKeyPlatformId === null
     ) {
       return undefined;
     }
     return buildKeyGridViewModel({
       layout: effectiveKeyModeLayout,
-      ruleIndex: touchRuleIndex,
+      ruleIndex: keyModeRuleIndex,
       platform: activeKeyPlatformId,
       layerId: activeKeyLayerId,
     });
   }, [
     effectiveKeyModeLayout,
-    touchRuleIndex,
+    keyModeRuleIndex,
     activeKeyPlatformId,
     activeKeyLayerId,
   ]);
@@ -2116,6 +2154,22 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     onSelectCell: handleSelectKeyCell,
   });
 
+  // The selected cell's OWN view model (spec 058 T085-T089 composition) —
+  // KeyInspector/AssignPanel both take `selectedCell: KeyGridCellViewModel |
+  // null`, matching KeyGrid's own `selectedAddress` contract. Re-derived from
+  // `keyModeViewModel` rather than tracked as separate state, so it can never
+  // disagree with what the grid itself is currently showing for that address.
+  const selectedKeyCell = useMemo<KeyGridCellViewModel | null>(() => {
+    if (keyModeViewModel === undefined || selectedKeyAddress === null) {
+      return null;
+    }
+    for (const row of keyModeViewModel.rows) {
+      const found = row.keys.find((k) => k.address === selectedKeyAddress);
+      if (found !== undefined) return found;
+    }
+    return null;
+  }, [keyModeViewModel, selectedKeyAddress]);
+
   // FR-034's honest provenance statement — the same resolvedSeedSource this
   // gallery already threads through buildTouchLayoutJson/deriveSeedLayout
   // above, not a second detection.
@@ -2123,6 +2177,122 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     resolvedSeedSource === "reseed-from-desktop"
       ? "derived-from-base"
       : "imported-existing";
+
+  // AssignPanel's T059 provenance-promotion fold (spec 058 T085-T089
+  // composition) — see AssignPanel.tsx's own module doc, "Two write paths
+  // bundled into one commit": Case A (reseed/derived-from-base) backs the
+  // layout with `ir.touchLayout`; Case B (imported-existing) backs it with
+  // the raw `touchLayoutJson` store field. `keyModeProvenance` above is
+  // already the single source for which case applies — reused here rather
+  // than a second Case A/B branch.
+  const keyEditGuardsOptions = useMemo(
+    () => ({
+      layout: effectiveKeyModeLayout ?? EMPTY_TOUCH_LAYOUT,
+      ...(keyModeRuleIndex !== undefined ? { ruleIndex: keyModeRuleIndex } : {}),
+      i18n,
+    }),
+    [effectiveKeyModeLayout, keyModeRuleIndex, i18n],
+  );
+  const { checkOperation: checkKeyEditOperation } = useKeyEditGuards(
+    keyEditGuardsOptions,
+  );
+
+  // FR-036f: the invalidation warning surfaces AT THE MOMENT of the edit
+  // (checked synchronously in handleAssignPanelCommit below, before the
+  // commit lands) — never deferred to the Continue gate. Cleared on a new
+  // selection so a stale warning from a previous key never lingers.
+  const [keyEditInvalidationWarnings, setKeyEditInvalidationWarnings] =
+    useState<readonly KeyEditInvalidationWarning[]>([]);
+  useEffect(() => {
+    setKeyEditInvalidationWarnings([]);
+  }, [selectedKeyAddress]);
+
+  // ONE commit call site for AssignPanel's `onCommit` (spec 058 T085-T089
+  // composition) — reuses the EXISTING key-edit overlay / undo-stack action
+  // (`commitKeyEdit`, landed in Phase 5b) and the EXISTING overlay-preserving
+  // IR setter (`setWorkingIR`, spec-014's mutate seam) rather than adding a
+  // second write path. AssignPanel itself never calls either — see that
+  // file's own module doc, "Store-free, like every other file in this
+  // directory".
+  const handleAssignPanelCommit = useCallback(
+    (result: AssignPanelCommitResult) => {
+      setKeyEditInvalidationWarnings(checkKeyEditOperation(result.op));
+
+      const store = useWorkingCopyStore.getState();
+      store.commitKeyEdit(result.op);
+
+      if (result.nextIr !== undefined) {
+        store.setWorkingIR(result.nextIr);
+      }
+
+      if (keyModeProvenance === "derived-from-base") {
+        const base = result.nextIr ?? store.ir;
+        if (base !== null) {
+          store.setWorkingIR({ ...base, touchLayout: result.promotedLayout });
+        }
+      } else {
+        store.setTouchLayoutJson(emitTouchLayout(result.promotedLayout));
+      }
+
+      // touchKeyAddress.ts builds the address from the key's OWN id, so a
+      // "set" op that renames the key (the U_/T_ minting path — virtually
+      // always) changes the address that SAME key now resolves under. Follow
+      // it — a successful commit must not silently strand the selection (and
+      // with it, the inspector/panel, which both read `selectedKeyCell`
+      // derived from this address) on an address nothing answers to anymore.
+      if (result.op.kind === "set" && result.op.fields.id !== undefined) {
+        const parts = parseTouchKeyAddress(result.op.address);
+        if (parts !== undefined) {
+          setSelectedKeyAddress(touchKeyAddress(parts.platform, parts.layerId, result.op.fields.id));
+        }
+      }
+    },
+    [checkKeyEditOperation, keyModeProvenance],
+  );
+
+  // Grid Enter -> AssignPanel's character field (SC-004's keyboard-only
+  // path): a native gridcell <button> already answers Enter/Space with its
+  // own click (== onSelectCell, already redundant with arrow-key selection),
+  // so this ADDS the "move focus into the editing surface" half. Queries by
+  // the SAME stable `data-testid` AssignPanel already renders (rather than a
+  // new ref prop) — the same by-attribute convention
+  // `useKeyInspectorFocusBridge.handleEscape` (KeyInspector.tsx) uses for its
+  // own cell lookup. Composed ALONGSIDE `useGridNav`'s own handler (which
+  // never touches Enter — RECOGNIZED_KEYS there is arrows/Home/End only), not
+  // instead of it.
+  const keyModeDetailContainerRef = useRef<HTMLDivElement | null>(null);
+  const handleKeyModeGridKeyDown = useCallback(
+    (e: ReactKeyboardEvent<HTMLDivElement>) => {
+      keyModeGridNav.handleKeyDown(e);
+      if (e.defaultPrevented) return;
+      if (e.key !== "Enter") return;
+      const target = e.target;
+      if (!(target instanceof Element) || target.closest('[role="gridcell"]') === null) {
+        return;
+      }
+      e.preventDefault();
+      keyModeDetailContainerRef.current
+        ?.querySelector<HTMLInputElement>('[data-testid="assign-panel"] input')
+        ?.focus();
+    },
+    [keyModeGridNav],
+  );
+
+  // Escape anywhere in the grid/inspector/panel detail region returns focus
+  // to the selected cell — one handler at the container level (rather than
+  // one per child) so it covers AssignPanel too, which (being store-free, see
+  // its own module doc) exposes no `onEscape` prop of its own.
+  const handleKeyModeDetailEscape = useCallback(
+    (e: ReactKeyboardEvent<HTMLDivElement>) => {
+      if (e.key !== "Escape" || selectedKeyAddress === null) return;
+      const container = keyModeDetailContainerRef.current;
+      const cellEl = container?.querySelector<HTMLElement>(
+        '[role="gridcell"][aria-selected="true"]',
+      );
+      cellEl?.focus();
+    },
+    [selectedKeyAddress],
+  );
 
   // T076 (FR-036g): the undo affordance's description, derived from the top
   // of the SAME shared undoStack `undoDelete` pops from.
@@ -3044,6 +3214,16 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // comboJoinKey, not exported).
   const validLayerComboKeys = useMemo(
     () => new Set(validLayerCombos.map((c) => c.join("+"))),
+    [validLayerCombos],
+  );
+
+  // Whether this keyboard uses CAPS lock (key-id-policy.md §2) — gates
+  // AssignPanel's case-triple checkbox (spec 058 T085-T089 composition).
+  // Derived from the SAME `validLayerCombos` catalog the touch-layer builder
+  // above is hard-constrained by, rather than a second "does this keyboard
+  // have a caps layer" scan.
+  const capsHandled = useMemo(
+    () => validLayerCombos.some((combo) => combo.includes("CAPS")),
     [validLayerCombos],
   );
 
@@ -5071,30 +5251,106 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         </Trans>
       </p>
 
-      {keyModeViewModel !== undefined ? (
-        <KeyGrid
-          viewModel={keyModeViewModel}
-          selectedAddress={selectedKeyAddress}
-          onSelectCell={handleSelectKeyCell}
-          onKeyDown={keyModeGridNav.handleKeyDown}
-          label={t({
-            id: "editor.assignLoop.touch.keyMode.gridAriaLabel",
-            message: `Editable touch key layout — ${{ layer: activeKeyLayerId }} layer`,
-          })}
-          platforms={keyModePlatforms}
-          {...(activeKeyPlatformId !== null
-            ? { activePlatformId: activeKeyPlatformId }
-            : {})}
-          onPlatformChange={(platformId) => setActiveKeyPlatformId(platformId)}
-          provenance={keyModeProvenance}
-        />
-      ) : (
-        <p style={{ margin: 0, fontSize: 13, color: TEXT_DIM, fontFamily: FONT }}>
-          <Trans id="editor.assignLoop.touch.keyMode.notReady">
-            The key layout isn&rsquo;t ready yet.
-          </Trans>
-        </p>
-      )}
+      {/* Grid + inspector + AssignPanel share ONE detail region (spec 058
+          T085-T089 composition): Escape anywhere inside it returns focus to
+          the selected cell (handleKeyModeDetailEscape), and Enter on a
+          gridcell (handleKeyModeGridKeyDown) jumps straight into
+          AssignPanel's character field — the keyboard-only path SC-004
+          measures. */}
+      {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions --
+          bubbled Escape-handling only, mirroring this pane's own outer div
+          above; not made pointer-interactive. */}
+      <div
+        ref={keyModeDetailContainerRef}
+        onKeyDown={handleKeyModeDetailEscape}
+        style={{ display: "flex", flexDirection: "column", gap: 12 }}
+      >
+        {keyModeViewModel !== undefined ? (
+          <KeyGrid
+            viewModel={keyModeViewModel}
+            selectedAddress={selectedKeyAddress}
+            onSelectCell={handleSelectKeyCell}
+            onKeyDown={handleKeyModeGridKeyDown}
+            label={t({
+              id: "editor.assignLoop.touch.keyMode.gridAriaLabel",
+              message: `Editable touch key layout — ${{ layer: activeKeyLayerId }} layer`,
+            })}
+            platforms={keyModePlatforms}
+            {...(activeKeyPlatformId !== null
+              ? { activePlatformId: activeKeyPlatformId }
+              : {})}
+            onPlatformChange={(platformId) => setActiveKeyPlatformId(platformId)}
+            provenance={keyModeProvenance}
+          />
+        ) : (
+          <p style={{ margin: 0, fontSize: 13, color: TEXT_DIM, fontFamily: FONT }}>
+            <Trans id="editor.assignLoop.touch.keyMode.notReady">
+              The key layout isn&rsquo;t ready yet.
+            </Trans>
+          </p>
+        )}
+
+        {/* T070/T085 detail surfaces — display (KeyInspector) beside editing
+            (AssignPanel). Both take the SAME selectedKeyCell/effective layout
+            the grid itself renders, so they can never disagree with it. */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <KeyInspector
+            selectedCell={selectedKeyCell}
+            {...(effectiveKeyModeLayout !== null
+              ? { layout: effectiveKeyModeLayout }
+              : {})}
+          />
+
+          {ir !== null && keyModeRuleIndex !== undefined && (
+            <AssignPanel
+              selectedCell={selectedKeyCell}
+              layout={effectiveKeyModeLayout ?? EMPTY_TOUCH_LAYOUT}
+              ir={ir}
+              ruleIndex={keyModeRuleIndex}
+              inventoryChars={inventory}
+              capsHandled={capsHandled}
+              {...(identityBcp47 !== undefined ? { bcp47: identityBcp47 } : {})}
+              repertoire={inventory}
+              onCommit={handleAssignPanelCommit}
+            />
+          )}
+        </div>
+
+        {/* FR-036f: warn AT THE MOMENT of the edit when a key-level edit
+            invalidates a by-character assignment — never deferred to the
+            Continue gate. Same visual + aria-live convention as
+            touchApplyWarnings above (role="status", aria-live="polite",
+            calm BG_CARD/BORDER treatment). */}
+        {keyEditInvalidationWarnings.length > 0 && (
+          <div
+            role="status"
+            aria-live="polite"
+            data-testid="key-edit-invalidation-warnings"
+            aria-label={t({
+              id: "editor.assignLoop.touch.keyMode.invalidationWarningsAriaLabel",
+              message: plural(keyEditInvalidationWarnings.length, {
+                one: "# assignment invalidated by this edit",
+                other: "# assignments invalidated by this edit",
+              }),
+            })}
+            style={{
+              background: BG_CARD,
+              border: `1px solid ${BORDER}`,
+              borderRadius: 6,
+              padding: "8px 12px",
+              fontSize: 11,
+              color: TEXT_DIM,
+              fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
+            }}
+          >
+            <ul style={{ margin: 0, paddingLeft: 18 }}>
+              {keyEditInvalidationWarnings.map((w) => (
+                <li key={w.char}>{w.message}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
     </div>
   );
 
