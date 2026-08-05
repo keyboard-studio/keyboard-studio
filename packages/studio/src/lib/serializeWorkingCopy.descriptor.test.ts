@@ -293,3 +293,76 @@ describe("delivered artifact — a single descriptor writer (FR-004, FR-005)", (
     expect(prDescriptor).toBe(descriptorText("basic_kbdus"));
   });
 });
+
+// ---------------------------------------------------------------------------
+// A descriptor is not optional — the .kmp cannot be built without one.
+//
+// Step 3.6 (the single writer) is gated on `identity !== null`, and Track 1 sets
+// `identity: null` at instantiation ("no overlay until Phase A completes"). So a
+// Track 1 author who has not named the keyboard yet used to get NO descriptor at
+// all. Harmless for a zip that Keyman Developer would regenerate; fatal for the
+// installable package, which is now the PRIMARY download — the build failed with
+// KM_ERROR_KMP_NO_DESCRIPTOR on a real bj_cree_woods walk.
+// ---------------------------------------------------------------------------
+
+describe("delivered artifact — a descriptor always ships, even with no identity overlay", () => {
+  /** Track 1 with NO scaffolded descriptor and NO identity — the real walk state. */
+  function seedCopyTrackWithoutDescriptorOrIdentity() {
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: BASE_KMN, isBinary: false },
+    ]);
+    const ir = makeTestIR([]);
+    ir.header.version = "1.0";
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    // Deliberately NO setIdentity() — instantiateFromBase leaves identity null.
+    expect(useWorkingCopyStore.getState().identity).toBeNull();
+    return { vfs, ir };
+  }
+
+  it("generates a descriptor when the author has not set an identity yet", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedCopyTrackWithoutDescriptorOrIdentity();
+
+    await serializeWorkingCopy();
+
+    // descriptorText() asserts the file exists in the delivered tree.
+    const kps = descriptorText("basic_kbdus");
+    expect(kps).toContain("<Package>");
+    expect(kps).toContain("<ID>basic_kbdus</ID>");
+  });
+
+  it("declares `und`, NEVER the base keyboard's language (spec 057 FR-007, SC-002)", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedCopyTrackWithoutDescriptorOrIdentity();
+
+    await serializeWorkingCopy();
+
+    const langs = languageElements(descriptorText("basic_kbdus"));
+    expect(langs.length).toBe(1);
+    expect(langs[0]).toContain("und");
+    // basicKbdus declares en-US; borrowing it here is the exact defect spec 057
+    // fixed, and an absent identity must not reintroduce it.
+    expect(langs[0]).not.toMatch(/\ben(-US)?\b/);
+  });
+
+  it("reports the generation rather than doing it silently", async () => {
+    const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
+    seedCopyTrackWithoutDescriptorOrIdentity();
+
+    const projected = await projectWorkingCopyForOutput();
+
+    expect(projected!.warnings.join(" ")).toMatch(/generated a package descriptor/);
+  });
+
+  it("still prefers the author's identity once set", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedCopyTrackWithoutDescriptorOrIdentity();
+    useWorkingCopyStore.getState().setIdentity(AUTHOR_IDENTITY);
+
+    await serializeWorkingCopy();
+
+    const kps = descriptorText("basic_kbdus");
+    expect(languageElements(kps)[0]).toContain("bm-Latn");
+    expect(kps).not.toContain("und");
+  });
+});

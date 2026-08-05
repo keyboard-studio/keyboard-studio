@@ -15,7 +15,11 @@ import { emit } from "../codec/emit.js";
 import { detectBaseLayoutFamily } from "../placement/filters.js";
 import { scaffoldIR, sanitizeDisplayName, kmnStringEscape } from "./scaffold-ir.js";
 import { assetFileExtensions } from "../shared/siblingAssetStores.js";
-import { escapeHtml } from "../shared/escapeHtml.js";
+// The doc stubs (welcome/readme) own their own escaping now — see
+// ../shared/packageDocs.ts, which imports escapeHtml itself. The scaffolder no
+// longer references escapeHtml directly, so main's `escapeHtml` import is dropped
+// here as dead once the stubs move out.
+import { welcomeHtm, readmeHtm, licenseMd } from "../shared/packageDocs.js";
 import {
   buildKpsContent,
   type PackageDescriptorIdentity,
@@ -324,11 +328,14 @@ export function generateStubs(
     },
     {
       path: `source/welcome.htm`,
-      content: `<html><body><p>Welcome to ${escapeHtml(displayName)}</p></body></html>`,
+      // Shared with the adapt track's output-time stubs — see
+      // ../shared/packageDocs.ts. The descriptor lists both files, so both
+      // tracks must produce them or the .kmp build fails on a missing member.
+      content: welcomeHtm(displayName),
     },
     {
       path: `source/readme.htm`,
-      content: `<html><body><p>${escapeHtml(displayName)} keyboard</p></body></html>`,
+      content: readmeHtm(displayName),
     },
     {
       path: `source/help/${keyboardId}.php`,
@@ -336,7 +343,7 @@ export function generateStubs(
     },
     {
       path: `LICENSE.md`,
-      content: `Copyright © ${yyyy} ${displayName}\n\nMIT License\n`,
+      content: licenseMd(displayName, yyyy),
     },
     {
       // Track-1 HISTORY.md entry (new-from-base). For the parallel Track-2 entry

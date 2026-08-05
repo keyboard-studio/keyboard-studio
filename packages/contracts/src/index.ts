@@ -62,8 +62,29 @@ export * from "./validator";
 export * from "./ir/backspaceContext";
 export * from "./ir/composable";
 export * from "./ir/producedSet";
+// The reachability-aware sibling view (spec 058). Deliberately a separate
+// function, not an option on buildProducedSet - see both module headers.
+export * from "./ir/reachableProducedSet";
 export * from "./keyboardIRRoundTrip";
+// Structurally-typed rule-element predicates. The engine's shared/rule-shape.ts
+// re-exports from here so engine/studio call sites are unchanged; the join below
+// and keyboard-lint (which cannot import engine) consume them directly.
+export * from "./rule-shape";
 export * from "./touch-coverage";
+// The canonical touch key <-> rule join (spec 058). Lives here because
+// keyboard-lint must consume it and cannot import engine — the same forced
+// placement as buildProducedSet and computeTouchCoverage.
+export * from "./touch-key-rule-join";
+// The touch-node address scheme (spec 058 T114). Defined in engine originally;
+// moved here because the diagnostics detectors below build addresses and are
+// pinned to contracts. `engine/src/pattern-apply/touchKeyAddress.ts` is now a
+// re-export shim over this module, so no call site moved.
+export * from "./touch-key-address";
+// The edit-time touch-key diagnostics (spec 058 Phase 9). Same forced placement
+// as the join above, for the same reason: FR-040 requires the edit-time surface
+// and its Layer C siblings to share ONE implementation, and contracts is the
+// only package both can import.
+export * from "./touch-key-diagnostics";
 export * from "./parseTouchLayout";
 
 // ---------------------------------------------------------------------------

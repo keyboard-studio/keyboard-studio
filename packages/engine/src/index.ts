@@ -64,6 +64,17 @@ export type { ImportAttributionInput } from "./output/index.js";
 
 // Track 2 adapt-staging helpers (output-only; not used in the OSK preview path).
 export { bumpKeyboardVersion, stageAdaptHistory } from "./output/index.js";
+// Installable package (.kmp) — the primary download (spec §12). `buildKmp`
+// lazily imports @keymanapp/kmc-package on first call, so naming it here does
+// not pull jszip/marked into a consumer's entry chunk.
+export { buildKmp, initKmpCompiler, isKmpCompilerReady, ensurePackageFiles } from "./output/index.js";
+export type {
+  BuildKmpResult,
+  BuildKmpOptions,
+  KmpBuildArtifacts,
+  EnsurePackageFilesInput,
+  EnsurePackageFilesResult,
+} from "./output/index.js";
 
 // Per-keyboard decision audit (specs/053-decision-audit) — the pure differ,
 // serializer, tolerant reader, save-budget shed pass, and the two evidence
@@ -255,9 +266,224 @@ export type { CarveNeededSet, DeriveCarveNeededSetArgs } from "./marks/carve-nee
 export { applyMarkGuards, MARKS_GUARD_GROUP, MARKS_UNWRAP_FROM_STORE, MARKS_UNWRAP_TO_STORE } from "./pattern-apply/mark-guards.js";
 export type { MarkGuardsResult } from "./pattern-apply/mark-guards.js";
 
+// spec 058 — key-level touch layout edit overlay: step 1.7 of
+// projectWorkingCopyVfs (the layout half, Case B) plus the shared address
+// parser its rule-half sibling pass reuses (contracts/key-edit-overlay.md).
+export { applyKeyEditsToVfs, parseTouchKeyAddress } from "./pattern-apply/index.js";
+export type {
+  ApplyKeyEditsToVfsResult,
+  TouchKeyAddressParts,
+  KeyEditOperation,
+  RenameKeyOp,
+} from "./pattern-apply/index.js";
+
+// spec 058 T059 — the studio-side address-matched provenance promotion path
+// (touchBehavior.ts's promoteKeyAtAddressToHandSet) reuses this SAME resolver
+// rather than re-deriving platform/layer/row traversal a third time
+// (contracts/key-edit-overlay.md §5).
+export { resolveKeyAddress } from "./pattern-apply/index.js";
+export type { AddressableLayoutLike, ResolvedKeyLocation } from "./pattern-apply/index.js";
+
+// spec 058 T060 — re-derivation resilience (FR-033b): `resolveSubKeyEntry`
+// lets a studio-side correlation pass (keyEditOrphanReport.ts) resolve an
+// orphaned setSubKey/removeSubKey's sub-entry against the layout the
+// overlay was originally authored against, the same way `resolveKeyAddress`
+// resolves the main key; `declaredOperationOutput` answers the cheap,
+// layout-free half of "what character did this operation carry" for the
+// three op kinds that author `output` directly.
+export { resolveSubKeyEntry, declaredOperationOutput } from "./pattern-apply/index.js";
+
+// spec 058 T095/T097 — the `suppress` compound derivation (FR-029b). The
+// studio must never hand-build a `{ sp, id }` suppression: `sp` governs
+// rendering and interactivity while the id governs output, and only the two
+// halves committed together are impossible to desynchronize. The removal
+// dialog (RemoveKeyDialog.tsx) builds its "suppress in place" outcome from
+// `proposeSuppressFields`, which is also the single statement of the
+// `9`+`T_BLANK` vs `10`+`T_SPACER` pairing (key-id-policy.md §2) — hardcoding
+// either literal in the studio is exactly the drift this export prevents.
+// `applySuppressSemantics` is exported beside it so a studio-side preview can
+// derive the same result the appliers will, including its rejection of any
+// id outside RESERVED_SENTINEL_KEY_IDS.
+export { proposeSuppressFields, applySuppressSemantics } from "./pattern-apply/index.js";
+export type {
+  SuppressShapeChoice,
+  SuppressKeyOp,
+  RemoveKeyOp,
+  SuppressSemanticsResult,
+} from "./pattern-apply/index.js";
+
+// spec 058 T048/T063 — overlay replay is how a studio-side surface folds the
+// overlay into an *effective* layout to project from (the key grid's view
+// model, the preview's live-layout override). Case A's applier is exported
+// beside it because replay is a thin wrapper over that loop.
+export { applyKeyEditsToLayout, replayKeyEditOverlay } from "./pattern-apply/index.js";
+export type {
+  ApplyKeyEditsToLayoutResult,
+  ReplayKeyEditOverlayResult,
+} from "./pattern-apply/index.js";
+
+// spec 058 T113/T114 — the edit-time touch-key diagnostics (FR-040…FR-045).
+// Studio-facing because `useValidatorFindings` computes them inside the existing
+// 300 ms cycle (FR-042 / Decision D3) and the key grid renders them per cell.
+// Only the aggregators are exported: an individual detector is an internal of
+// the aggregate, and a studio surface that reached for one directly would be
+// building a second, partial findings surface — exactly what FR-042's "single
+// aggregated findings surface" forbids. The contracts-owned finding/fix TYPES
+// come through `@keyboard-studio/contracts` directly (the studio already
+// imports from it), so they are not re-exported here.
+export {
+  computeAllTouchKeyDiagnostics,
+  groupTouchKeyFindingsByAddress,
+  findMixedSuppressRemove,
+} from "./pattern-apply/index.js";
+
+// spec 058 T118 — edit-time rejection (FR-045). Studio-facing because the guard
+// runs at the moment of the edit, in `useKeyEditGuards`, before `commitKeyEdit`.
+export { checkKeyEditRejections } from "./pattern-apply/index.js";
+export type {
+  KeyEditRejection,
+  KeyEditRejectionReason,
+  KeyEditRejectionVerdict,
+} from "./pattern-apply/index.js";
+
+// spec 058 T061 — layer-family decomposition and grouping (FR-063/FR-067).
+// Studio-facing because "family order" is what orders layers in the key grid's
+// context-carry (T074) and in the parallelism complaints (T107-T110). Without
+// this export those surfaces duplicate the decomposition grammar, which is
+// exactly the drift layer-families.md exists to prevent.
+export {
+  decomposeLayerId,
+  groupLayerFamilies,
+  // The total order over ModifierToken that family-internal sorting needs.
+  // `comboToTouchLayerId` cannot substitute: its id fragments are lossy for
+  // the chiral pairs (both LALT and ALT render as "alt"), so per-chirality
+  // precedence is unrecoverable from the id-building surface alone.
+  TOUCH_LAYER_PRECEDENCE_ORDER,
+} from "./pattern-apply/index.js";
+export type {
+  ParsedLayerId,
+  FreeformLayerId,
+  LayerIdDecomposition,
+  LayerFamily,
+  LayerFamilyGrouping,
+} from "./pattern-apply/index.js";
+
+// spec 058 T107-T110 — the family-parallelism check itself (FR-064/FR-066/
+// FR-068). Studio-facing because the complaint and its family-wide-apply
+// resolution (FamilyApplyDialog.tsx, T108) are UI surfaces: the studio needs
+// the findings to render, and `severityForPlane`/`classifyPlane` so its copy
+// layer words a symbol-plane hint differently from an alphabetic-family
+// warning WITHOUT restating which planes count as independent layouts. The
+// check runs engine-side; only its results and its classification cross the
+// boundary.
+export {
+  findFamilyParallelismBreaks,
+  classifyPlane,
+  severityForPlane,
+} from "./pattern-apply/index.js";
+export type {
+  FamilyParallelismSeverity,
+  FamilyParallelismBreakKind,
+  FamilyParallelismFinding,
+  ReviewFamilyMemberFix,
+  PlaneClass,
+} from "./pattern-apply/index.js";
+
+// spec 058 T104/T105 — the pre-commit collateral report (FR-060/FR-061). The
+// removal dialog must name every linked output a suppress/remove would
+// discard — the key's own plus every `sk`/flick/multitap sub-key it hosts —
+// and separate the genuinely unreachable from the still-available-elsewhere,
+// BEFORE the edit commits. `useKeyEditGuards.ts` documented the absence of
+// this export as the reason it reached for `touchCoverage` instead; that
+// choice stands on its own merits (it is the FR-036d shared truth), but
+// RemoveKeyDialog's own collateral section has no such alternative — the
+// per-mechanism enumeration exists nowhere else.
+export {
+  enumerateKeyLinkedOutputs,
+  analyzeKeyEditCollateral,
+} from "./pattern-apply/index.js";
+export type {
+  LinkedOutputMechanismKind,
+  LinkedOutput,
+  LinkedOutputReachability,
+  ClassifiedLinkedOutput,
+  KeyEditCollateralReport,
+} from "./pattern-apply/index.js";
+
+// spec 058 T079/T080/T081 — key id minting proposal (FR-024/FR-025) and touch
+// rule/guard synthesis (FR-026/FR-027/FR-027a). Studio-facing because
+// AssignPanel.tsx (T085-T087) computes and confirms a minting proposal, and
+// previews the literal guard-then-producing rule pair, before anything is
+// written — the same "reach past the boundary" gap keyGridViewModel.ts's own
+// module doc flagged and T053 later fixed for applyKeyEditsToLayout;
+// unblocking here rather than leaving a second unresolved DEFECT note.
+export {
+  proposeKeyId,
+  validateCandidateKeyId,
+  checkKeyIdSyntax,
+  checkReservedKeyId,
+  RESERVED_KEY_ID_PREFIXES,
+  RESERVED_SENTINEL_KEY_IDS,
+  RESERVED_PRIVATE_USE_KEY_IDS,
+} from "./pattern-apply/index.js";
+export type {
+  KeyIdMintingPath,
+  KeyIdMintingRequest,
+  KeyIdMintingProposal,
+  KeyIdMintingAlternative,
+  KeyIdMintingAlternativeReason,
+  CaseTripleRuleLines,
+  NoCaseTripleReason,
+  KeyIdSyntaxRejectionReason,
+  KeyIdSyntaxCheckResult,
+  ReservedKeyIdRejectionReason,
+  ExistingKeyIdInScope,
+  KeyIdCandidateContext,
+  KeyIdRejectionReason,
+  ValidateKeyIdResult,
+} from "./pattern-apply/index.js";
+export {
+  ensureTouchKeyRule,
+  planGuardSynthesis,
+  applyGuardSynthesis,
+  checkOpaqueGate,
+  isSingleCombiningMark,
+  isGuardShapedStore,
+  findReusableGuardStore,
+  removeTouchKeyRule,
+  planKeyDeletionRuleRemoval,
+  applyKeyDeletionRuleRemoval,
+  renameTouchKeyRule,
+  renameTouchKey,
+  TOUCH_SYNTH_NODE_ID_PREFIX,
+  TOUCH_SYNTH_STORE_NAME_PREFIX,
+  TOUCH_SYNTH_GUARD_STORE_NAME,
+  planCaseTripleSynthesis,
+  applyCaseTripleSynthesis,
+} from "./pattern-apply/index.js";
+export type {
+  OpaqueGateResult,
+  TouchRuleSynthesisBlocked,
+  EnsureTouchKeyRuleRequest,
+  EnsureTouchKeyRuleResult,
+  EnsureTouchKeyRuleOutcome,
+  GuardRuleDescription,
+  GuardSynthesisPlan,
+  GuardSynthesisPlanResult,
+  ApplyGuardSynthesisResult,
+  RemoveTouchKeyRuleResult,
+  KeyDeletionRuleRemovalPlan,
+  RenameTouchKeyRuleResult,
+  RenameTouchKeyResult,
+  CaseTripleRuleDescription,
+  CaseTriplePlan,
+  CaseTriplePlanResult,
+  ApplyCaseTripleSynthesisResult,
+} from "./pattern-apply/index.js";
+
 // Pattern-apply: slot substitution + MechanismAssignment[] to .kmn injection.
 export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, carveFilterIr, applyKeycapLabelsToVfs, applyCarveKeycapRemovalsToVfs, collectCarvedKeycapTexts, resolveRenderableMechanisms, applyTouchAssignments, applyTouchAssignmentsToRawJson, applyDesktopModifications, applyDesktopModificationsToRawJson, propagateDesktopLayersToTouch, applyStoreSlotRemovals, classifyStoreSlotEdit, describeStorePairing, analyzeStores, storeRoleOf, buildProducerIndex, parseSlotId, makeSlotId, collectCharContributors, collectCompositionMethod, isMnemonicLayout, keyHasCapsHandling, buildShiftRuleLines, buildBaseRuleLines, buildCasePairRuleLines, planShiftAssignment, MODIFIER_EXCLUSIONS, canonicalizeCombo, comboToKeySpec, parseKeySpec, comboToTouchLayerId, comboToKvksShiftToken, collectModifierTokensInUse, collectLayerCombosInUse, buildComboKeyMap, addableTouchLayerTokens, optionsForTouchLayerSlot, isPlusSeparator, touchKeyAddress, touchSubKeyAddress, touchFlickAddress, enumerateTouchMethodsForChar, applyTouchKeycapRemovalsToLayout, applyTouchKeycapRemovalsToRawJson, applyTouchKeycapRemovalsToVfs, buildSessionProducedSet } from "./pattern-apply/index.js";
-export type { SubstituteResult, ApplyAssignmentsResult, ApplyTouchAssignmentsResult, ApplyTouchAssignmentsToRawJsonResult, DesktopModifications, ApplyDesktopModificationsResult, ApplyDesktopModificationsToRawJsonResult, PropagateDesktopLayersToTouchResult, ApplyCarveToVfsOpts, CarveKeycapRemovalInput, StoreSlotRemovalResult, StoreSlotEditMode, StoreSlotBlockReason, StorePairingDescription, StoreAnalysis, StoreRole, ProducerIndex, CharContributors, ContributorDescriptor, ShiftAssignmentPlan, ModifierToken, TouchMethodDescriptor, ApplyTouchKeycapRemovalsResult, ApplyTouchKeycapRemovalsToRawJsonResult } from "./pattern-apply/index.js";
+export type { SubstituteResult, ApplyAssignmentsResult, ApplyTouchAssignmentsResult, ApplyTouchAssignmentsToRawJsonResult, DesktopModifications, ApplyDesktopModificationsResult, ApplyDesktopModificationsToRawJsonResult, PropagateDesktopLayersToTouchResult, ApplyCarveToVfsOpts, CarveKeycapRemovalInput, StoreSlotRemovalResult, StoreSlotEditMode, StoreSlotBlockReason, StorePairingDescription, StoreAnalysis, StoreRole, ProducerIndex, CharContributors, ContributorDescriptor, ShiftAssignmentPlan, ModifierToken, TouchMethodDescriptor, ApplyTouchKeycapRemovalsResult, ApplyTouchKeycapRemovalsToRawJsonResult, KeyEditOverlay } from "./pattern-apply/index.js";
 
 // Facet-transform (spec 039): switch a base's source-construction facet value on
 // the working copy — propose-then-confirm, KeyboardIR copy-return, gated commit.

@@ -22,12 +22,20 @@ function makeIR(platform: "phone" | "tablet" | "desktop", keyCount: number): Tou
   };
 }
 
-/** Build an IR with a mix of normal keys and spacer keys (sp:8 or sp:10). */
+/**
+ * Build an IR with a mix of normal keys and NON-INTERACTIVE keys (sp:9 blank or
+ * sp:10 spacer).
+ *
+ * RECOUNT (spec 058 FR-012): the default was `8`, which the corrected
+ * `isSpacerKeyClass` set `{9, 10}` no longer treats as non-interactive — sp:8 is
+ * deadkey-STYLED and interactive. The default is now `9` (blank), and the sp:8
+ * case has its own test below asserting it is COUNTED.
+ */
 function makeIRWithSpacers(
   platform: "phone" | "tablet" | "desktop",
   normalCount: number,
   spacerCount: number,
-  spacerSp: 8 | 10 = 8
+  spacerSp: 9 | 10 = 9
 ): TouchLayoutIR {
   const normalKeys = Array.from({ length: normalCount }, (_, i) => ({
     nodeId: `k-${i}`,
@@ -83,34 +91,59 @@ describe("checkKeysPerRow (18.3 KM_WARN_TOUCH_KEYS_PER_ROW)", () => {
     expect(findings[0]?.message).toContain("row 1");
   });
 
-  it("passes for phone with 10 normal keys + 2 spacer keys in a row (spacers excluded from count)", () => {
-    // 10 normal keys + 2 spacers = 12 total in array, but spacers (sp===8) are not counted.
-    // Effective interactive key count is 10, which is at the phone limit.
+  it("passes for phone with 10 normal keys + 2 blank keys in a row (sp:9 excluded from count)", () => {
+    // 10 normal keys + 2 blanks = 12 total in array, but blank keys (sp:9) are
+    // not counted. Effective interactive key count is 10, at the phone limit.
     expect(checkKeysPerRow(makeIRWithSpacers("phone", 10, 2), PATH)).toEqual([]);
   });
 
-  it("warns for phone with 11 normal keys + 2 spacer keys (spacers excluded; 11 > 10 limit)", () => {
-    // 11 normal + 2 spacers; effective count is 11 which exceeds the phone limit of 10.
+  it("warns for phone with 11 normal keys + 2 blank keys (blanks excluded; 11 > 10 limit)", () => {
+    // 11 normal + 2 blanks; effective count is 11 which exceeds the phone limit of 10.
     const findings = checkKeysPerRow(makeIRWithSpacers("phone", 11, 2), PATH);
     expect(findings).toHaveLength(1);
     expect(findings[0]?.code).toBe("KM_WARN_TOUCH_KEYS_PER_ROW");
-    // The reported count reflects non-spacer keys only.
+    // The reported count reflects interactive keys only.
     expect(findings[0]?.message).toContain("11 key(s)");
   });
 
   it("passes for phone with 10 normal keys + 1 sp:10 padding key (sp:10 spacers excluded)", () => {
-    // A padding key (sp:10) is a spacer too; it must not push the row over the
-    // limit. Effective interactive count is 10, at the phone limit.
+    // A padding key (sp:10) is non-interactive too; it must not push the row
+    // over the limit. Effective interactive count is 10, at the phone limit.
     expect(checkKeysPerRow(makeIRWithSpacers("phone", 10, 1, 10), PATH)).toEqual([]);
   });
 
-  it("does not miscount a mix of sp:8 and sp:10 spacers", () => {
-    // 10 normal keys + one sp:8 + one sp:10 = 12 in the array, 10 interactive.
+  it("does not miscount a mix of sp:9 blank and sp:10 spacer keys", () => {
+    // 10 normal keys + one sp:9 + one sp:10 = 12 in the array, 10 interactive.
     const ir = makeIRWithSpacers("phone", 10, 0);
     ir.platforms[0]!.layers[0]!.rows[0]!.keys.push(
-      { nodeId: "sp8", id: "K_SP8", sp: 8 },
+      { nodeId: "sp9", id: "K_SP9", sp: 9 },
       { nodeId: "sp10", id: "K_SP10", sp: 10 },
     );
+    expect(checkKeysPerRow(ir, PATH)).toEqual([]);
+  });
+
+  // -------------------------------------------------------------------------
+  // The RECOUNT itself (spec 058 FR-012). These two tests are the deliberate
+  // record of which rows changed verdict when `isSpacerKeyClass` was corrected
+  // from `{8, 10}` to `{9, 10}`.
+  // -------------------------------------------------------------------------
+
+  it("COUNTS a deadkey-styled sp:8 key — it is interactive, not a spacer", () => {
+    // Previously sp:8 was excluded, so this row passed at 10. A deadkey-styled
+    // key is a real key the user can press and it genuinely contributes to
+    // crowding, so 10 normal + 1 sp:8 = 11 interactive and the row now warns.
+    const ir = makeIRWithSpacers("phone", 10, 0);
+    ir.platforms[0]!.layers[0]!.rows[0]!.keys.push({ nodeId: "sp8", id: "T_DK", sp: 8 });
+    const findings = checkKeysPerRow(ir, PATH);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.message).toContain("11 key(s)");
+  });
+
+  it("EXCLUDES a blank sp:9 key that previously pushed a row over the limit", () => {
+    // Previously sp:9 was counted, so 10 normal + 1 sp:9 warned at 11. Blank is
+    // non-interactive, so the row now passes at 10.
+    const ir = makeIRWithSpacers("phone", 10, 0);
+    ir.platforms[0]!.layers[0]!.rows[0]!.keys.push({ nodeId: "sp9", id: "T_BLANK", sp: 9 });
     expect(checkKeysPerRow(ir, PATH)).toEqual([]);
   });
 });
