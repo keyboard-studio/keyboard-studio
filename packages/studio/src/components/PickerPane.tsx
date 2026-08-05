@@ -12,7 +12,7 @@
 // elements without PickerPane importing every child component.
 //
 // ---------------------------------------------------------------------------
-// Variants (spec 057)
+// Variants (spec 058)
 // ---------------------------------------------------------------------------
 // "full" (default) — the historical pane. PreviewScreen always uses it, and
 //   OutputScreen falls back to it on COLD ARRIVAL (a nav click, typed hash, or
@@ -43,12 +43,13 @@
 // rather than unmounting a half-typed identity form. Do not split this into
 // two top-level returns.
 
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import type { PreviewArtifact } from "../hooks/usePreviewArtifact.ts";
 import { MetadataCard } from "./MetadataCard.tsx";
-import { BG_CARD, CARD_BORDER, FONT_MONO, TEXT_MAIN } from "../ui/theme.ts";
+import { BG_CARD, BLUE_ACTION, CARD_BORDER, FONT_MONO, TEXT_MAIN } from "../ui/theme.ts";
+import { PANE_SECONDARY_BUTTON } from "./previewOutputLayout.ts";
 
 export type PickerPaneVariant = "full" | "shipping";
 
@@ -70,22 +71,39 @@ interface PickerPaneProps {
   changeBaseSlot?: ReactNode;
 }
 
+/** The mode toggle's two buttons — the shared treatment plus pressed-state fill. */
+function modeToggleStyle(pressed: boolean): CSSProperties {
+  return {
+    ...PANE_SECONDARY_BUTTON,
+    flex: 1,
+    background: pressed ? BLUE_ACTION : BG_CARD,
+    color: pressed ? TEXT_MAIN : PANE_SECONDARY_BUTTON.color,
+    transition: "background 0.15s",
+  };
+}
+
 /**
  * Read-only base provenance for the "shipping" variant — a definition list so
  * each value is programmatically associated with its own term rather than
  * relying on visual adjacency (docs/accessibility.md).
  */
 function BaseProvenance({ kb }: { kb: BaseKeyboard }) {
-  const rows: { label: ReactNode; value: string }[] = [
+  // Keyed by the FIELD, not by the value: two of these coincide readily in real
+  // data (a base whose displayName is its id, or a single-script base named for
+  // its script), and a duplicate React key silently drops a row from the list.
+  const rows: { field: string; label: ReactNode; value: string }[] = [
     {
+      field: "name",
       label: <Trans id="picker.shipping.provenance.name">Name</Trans>,
       value: kb.displayName,
     },
     {
+      field: "id",
       label: <Trans id="picker.shipping.provenance.id">Base ID</Trans>,
       value: kb.id,
     },
     {
+      field: "script",
       label: <Trans id="picker.shipping.provenance.script">Script</Trans>,
       value: kb.script,
     },
@@ -114,7 +132,7 @@ function BaseProvenance({ kb }: { kb: BaseKeyboard }) {
       </h2>
       <dl style={{ margin: 0, display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 8px" }}>
         {rows.map((row) => (
-          <div key={row.value} style={{ display: "contents" }}>
+          <div key={row.field} style={{ display: "contents" }}>
             <dt style={{ color: "#9aa7b8", fontSize: 13 }}>{row.label}</dt>
             <dd style={{ margin: 0, color: TEXT_MAIN, fontSize: 13, fontFamily: FONT_MONO }}>
               {row.value}
@@ -191,18 +209,7 @@ export function PickerPane({
             type="button"
             onClick={() => handlePickerModeChange("open")}
             aria-pressed={pickerMode === "open"}
-            style={{
-              flex: 1,
-              padding: "6px 12px",
-              fontSize: 12,
-              fontFamily: "inherit",
-              cursor: "pointer",
-              borderRadius: 6,
-              border: "1px solid #283040",
-              background: pickerMode === "open" ? "#1f6feb" : "#161b22",
-              color: pickerMode === "open" ? "#e6edf3" : "#9aa7b8",
-              transition: "background 0.15s",
-            }}
+            style={modeToggleStyle(pickerMode === "open")}
           >
             <Trans id="picker.modeToggle.open">Open base</Trans>
           </button>
@@ -210,18 +217,7 @@ export function PickerPane({
             type="button"
             onClick={() => handlePickerModeChange("scaffold")}
             aria-pressed={pickerMode === "scaffold"}
-            style={{
-              flex: 1,
-              padding: "6px 12px",
-              fontSize: 12,
-              fontFamily: "inherit",
-              cursor: "pointer",
-              borderRadius: 6,
-              border: "1px solid #283040",
-              background: pickerMode === "scaffold" ? "#1f6feb" : "#161b22",
-              color: pickerMode === "scaffold" ? "#e6edf3" : "#9aa7b8",
-              transition: "background 0.15s",
-            }}
+            style={modeToggleStyle(pickerMode === "scaffold")}
           >
             <Trans id="picker.modeToggle.scaffold">New from base</Trans>
           </button>

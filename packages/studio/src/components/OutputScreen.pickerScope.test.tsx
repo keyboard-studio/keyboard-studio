@@ -1,4 +1,4 @@
-// OutputScreen — left-pane scope on the ship-it screen (spec 057).
+// OutputScreen — left-pane scope on the ship-it screen (spec 058).
 //
 // What these lock down:
 //   (a) With a working copy (the normal end-of-flow arrival) the pane drops the

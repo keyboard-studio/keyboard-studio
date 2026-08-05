@@ -6,6 +6,16 @@
 
 **Status**: Implemented (US1–US3, FR-001…FR-010)
 
+**Numbering note**: authored as `057-output-screen-picker-scope`, renumbered to
+**058** when this branch was rebased. Spec 057 was taken by
+[057-bulletproof-navigation](../057-bulletproof-navigation/) (landed on `main`
+first), and the two specs touch the *same* files — `OutputScreen.tsx`,
+`PickerPane.tsx`, `surveySessionStore.ts` — so a shared number left comments
+like "spec 057 FR-045" (navigation) and "spec 057 FR-008" (this) mutually
+ambiguous in one file. Code comments belonging to this feature now say
+"spec 058"; the `km/057-…` branch name is left alone, since renaming it would
+orphan the open PR.
+
 **Governing spec**: [spec.md](../../spec.md) §12 (output), §3c (defaults-first — "propose-then-confirm everywhere"), v1.3.0 working-copy spine ([docs/workflow-model.md](../../docs/workflow-model.md)). Accessibility house rules: [docs/accessibility.md](../../docs/accessibility.md).
 
 **Input**: Author observation — at the end of the keyboard-creation flow, the Output screen's left pane is headed "Keyboard Studio", offers an `Open base` / `New from base` mode toggle and a base-keyboard picker, and reads "Pick a base keyboard to start". It is unclear why an author would switch base at the point of shipping.
@@ -14,7 +24,18 @@
 
 ## Problem statement
 
-The Output screen mounts [PickerPane](../../packages/studio/src/components/PickerPane.tsx) wholesale — the same left pane [PreviewScreen](../../packages/studio/src/components/PreviewScreen.tsx) uses ([PickerPane.tsx:1-8](../../packages/studio/src/components/PickerPane.tsx#L1-L8), [OutputScreen.tsx:3-4](../../packages/studio/src/components/OutputScreen.tsx#L3-L4)). The reuse is deliberate for the *pipeline*: `#output` is directly reachable by nav click, typed hash, or bookmark without passing through the survey, so the screen must be able to select and compile a base standalone or `stage` never reaches `ready` and `canDownload` stays false ([usePreviewArtifact.ts:8-12](../../packages/studio/src/hooks/usePreviewArtifact.ts#L8-L12), [OutputScreen.tsx:10-14](../../packages/studio/src/components/OutputScreen.tsx#L10-L14)).
+The Output screen mounts [PickerPane](../../packages/studio/src/components/PickerPane.tsx) wholesale — a pane shaped for the screen that used to share it, `PreviewScreen` ([PickerPane.tsx:1-8](../../packages/studio/src/components/PickerPane.tsx#L1-L8), [OutputScreen.tsx:3-4](../../packages/studio/src/components/OutputScreen.tsx#L3-L4)). The reuse is deliberate for the *pipeline*: `#output` is directly reachable by nav click, typed hash, or bookmark without passing through the survey, so the screen must be able to select and compile a base standalone or `stage` never reaches `ready` and `canDownload` stays false ([usePreviewArtifact.ts:8-12](../../packages/studio/src/hooks/usePreviewArtifact.ts#L8-L12), [OutputScreen.tsx:10-14](../../packages/studio/src/components/OutputScreen.tsx#L10-L14)).
+
+> **Rebase amendment (2026-08-05).** This spec was authored while `PreviewScreen`
+> still existed. [Spec 057](../057-bulletproof-navigation/) has since removed it
+> — the Compare tab that replaced it renders its own, deliberately smaller pane
+> with no mode toggle, scaffold form, or identity panel — so `PickerPane` now has
+> exactly **one** consumer: `OutputScreen`. This does not weaken the change; it
+> removes the only constraint that argued against it. The `"full"` variant
+> survives *solely* to serve cold arrival at `#output`, which is why FR-001 still
+> requires it to remain the default rather than being deleted outright. Every
+> statement below about "PreviewScreen unchanged" now reads as "the full variant
+> is preserved for cold arrival", and is marked where it appears.
 
 That rationale covers *cold arrival*. It does not cover the common case — an author who has just finished the survey and has a fully-edited working copy. For them the pane presents four defects:
 
@@ -87,7 +108,7 @@ An author opens a bookmarked `#output` in a fresh session with no working copy. 
 - **Late instantiation race.** `usePreviewArtifact` already handles the case where SurveyView's `onInstantiate` has not settled by the time Output mounts ([usePreviewArtifact.ts:110-118](../../packages/studio/src/hooks/usePreviewArtifact.ts#L110-L118)). The pane variant must be derived from *live* store state, not a mount-once read, or a late-settling instantiation leaves the full picker on screen for an author who has one. This is the mirror of the D1 bug and must not be reintroduced as the variant switch.
 - **Cold-arrival transition mid-visit.** US3 scenario 3: the variant must flip when `isInstantiated()` becomes true during the visit, without unmounting `TrackOneIdentityPanel` mid-edit or discarding a partially-typed keyboard id.
 - **Coverage-blocked / touch-stale arrival.** The existing blocked banners and their "go to gallery" control ([OutputScreen.tsx:119-133](../../packages/studio/src/components/OutputScreen.tsx#L119-L133), [:135-142](../../packages/studio/src/components/OutputScreen.tsx#L135-L142)) are unaffected; the reduced pane must not suppress or duplicate them.
-- **PreviewScreen unchanged.** Preview keeps the full pane. "Pick a base and watch it compile" is exactly that screen's job, and the toggle reports state correctly there because the author is choosing in the moment.
+- **The full variant is preserved, not orphaned.** *(Superseded premise — see the rebase amendment: `PreviewScreen` is gone.)* As authored, this read "PreviewScreen keeps the full pane; 'pick a base and watch it compile' is exactly that screen's job, and the toggle reports state correctly there because the author is choosing in the moment." That reasoning now applies to **cold arrival at `#output`** instead, which is the same situation — an author choosing a base in the moment, with no working copy to misreport.
 - **Mock-engine path.** `instantiateFromBaseIfConfirmed` returns false with no IR/VFS ([confirmRebase.ts:131-134](../../packages/studio/src/lib/confirmRebase.ts#L131-L134)); under the mock engine the store never instantiates, so the pane stays in cold form. Acceptable, but tests that assert the reduced form must seed the store rather than rely on a mock compile.
 
 ---
@@ -96,7 +117,7 @@ An author opens a bookmarked `#output` in a fresh session with no working copy. 
 
 ### Functional Requirements
 
-- **FR-001**: `PickerPane` MUST accept a variant that suppresses the mode toggle and the picker slot, and MUST accept screen-appropriate heading and description text. The existing full behaviour MUST remain the default so `PreviewScreen` is untouched.
+- **FR-001**: `PickerPane` MUST accept a variant that suppresses the mode toggle and the picker slot, and MUST accept screen-appropriate heading and description text. The existing full behaviour MUST remain the default — as authored, so `PreviewScreen` was untouched; post-rebase, so **cold arrival at `#output`** is untouched (see the rebase amendment). The requirement is unchanged either way.
 - **FR-002**: `OutputScreen` MUST select the reduced variant when the working-copy store reports an instantiated copy, and the full variant otherwise.
 - **FR-003**: The variant selection MUST be derived from a live store subscription, not a mount-once read, so a late-settling instantiation flips the pane within the same visit (see Edge Cases).
 - **FR-004**: In the reduced variant the base keyboard MUST be presented as read-only provenance with a programmatically-associated label, not as a `select`/combobox.
@@ -131,7 +152,7 @@ An author opens a bookmarked `#output` in a fresh session with no working copy. 
 
 - Naming the keyboard (`TrackOneIdentityPanel`) and a final source edit (`KmnEditor`) are legitimate at ship time and stay. Only base *selection* is out of place. If the author disagrees, US1 scenario 4 is the line to move.
 - The Output screen's right pane (download, submit-to-community, sign-up) is out of scope; this spec touches the left pane and one aria-label.
-- `PreviewScreen` is out of scope and must be provably unchanged.
+- ~~`PreviewScreen` is out of scope and must be provably unchanged.~~ **Void** — spec 057 removed that screen before this landed (see the rebase amendment). The surviving obligation is that the `"full"` variant's cold-arrival behaviour is provably unchanged, which US2 tests directly.
 - The `#output` cold-entry path is a real supported entry point, per the existing docstrings, and is not being reconsidered here.
 - Scaffold mode (`New from base`) remains reachable from Preview and the survey; this spec removes it only from the *instantiated* Output pane, not from the product.
 
@@ -143,3 +164,75 @@ An author opens a bookmarked `#output` in a fresh session with no working copy. 
 - Any change to the coverage gate, touch-staleness gate, or their banners.
 - Restyling the Output right pane or the submit flows.
 - Replacing the native `window.confirm` rebase dialog with an in-app modal. It remains the guard on the survey path; a nicer dialog is a separate concern and this spec deliberately reduces reliance on it rather than reworking it.
+
+---
+
+## Pattern audit
+
+Two of the four defects have a *shape* rather than being one-off slips, so both
+were swept horizontally across `packages/studio/src` before the fix was called
+done. This is the QC pattern-audit gate's required section.
+
+### D1 — local component state shadowing authoritative store state
+
+**Shape:** a `useState` mode/selection that a control reports via
+`aria-pressed`/`aria-selected` while the *authoritative* value lives in a store,
+so the control displays a default instead of the truth.
+
+Swept: every `aria-pressed` / `aria-selected` / `aria-current` site (31), and
+every `useState` initializer that reads a store (`useState…getState()`).
+
+| Site | Verdict |
+|---|---|
+| `hooks/usePreviewArtifact.ts:94` (`pickerMode`) | **The bug.** Never consults the store; always `"open"`. Fixed by removing the control from the screen where the store is authoritative. |
+| `hooks/usePreviewArtifact.ts:91` (`baseKeyboard`) | Clean. Lazy-inits *from* the store, with a documented late-instantiation adoption effect for the settle-after-mount case. |
+| `editors/touchSeedSource/TouchSeedSourcePanel.tsx:274` (`selected`) | Clean — and the near-miss worth naming. Same local-draft shape, but it seeds from `storedSeedSource ?? <derived default>`, precisely the store read `pickerMode` lacks. |
+| `editors/panels/BaseResolution.tsx:102` (`searchScope`) | Not applicable. A view-local search filter with no store counterpart, so there is no truth to drift from. |
+| Remaining 28 `aria-pressed` sites | Not applicable. All derive from a prop or a store selector, not from screen-local default state. |
+
+**Conclusion: no siblings.** `pickerMode` is the only instance where a control
+reports state it does not own. No additional fix needed.
+
+### D4 — a derived id computed independently at more than one call site
+
+**Shape:** "which keyboard id identifies this project" re-derived inline per call
+site, kept in agreement by prose rather than by code.
+
+Swept: `identity?.keyboardId ?? …` and `?? base…id` across all of
+`packages/studio/src`.
+
+| Site | Fallback | Verdict |
+|---|---|---|
+| `lib/serializeWorkingCopy.ts` (filename) + `components/OutputScreen.tsx` (aria-label) | `""` | **The bug.** Two derivations, one of them via `pickerMode`/`scaffoldSpec`. Both now call `lib/outputKeyboardId.ts`. |
+| `decisions/createStudioDecisionRecorder.ts:105` | `null` | **Sibling — fixed here.** Its comment claimed it was "matching how `deriveProjectKeyFromWorkingCopy` keys a project" while independently restating the expression. It now *calls* that function. |
+| `lib/draftPersistence.ts:152` (`deriveProjectKeyFromWorkingCopy`) | `null` | Canonical for the project key. Left as the single source the above now depends on. |
+| `lib/draftAutosave.ts:229` (`deriveProjectKey`) | `PENDING_PROJECT_KEY` | **Sibling — deliberately NOT fixed here.** Same expression, different input type (`WorkingCopySnapshot`, not live store state) and a different fallback that is load-bearing for the pending-project slot. Consolidating it means reconciling two draft-layer signatures, which is a persistence change, not a UI one. Filed as follow-up, not smuggled into this diff. |
+| `editors/panels/TrackOneIdentityPanel.tsx:57` (`seedId`) | n/a | Not applicable. Seeds a *form field* with a suggestion the author then edits; it is an initial value, not an identity claim. |
+| `hooks/useKeyboardArtifact.ts:364,632,710` | `kb.id` | Different family: `scaffoldSpec?.keyboardId ?? kb.id` is the **compile** id, correct for locating `source/<id>.kmn` pre-rename. Notably this is the family D4's aria-label wrongly borrowed from — a compile-time id answering an output-time question. Left alone; conflating the two families is the defect, not the fix. |
+
+**Conclusion: two siblings, one fixed here, one filed.** The audit's real finding
+is that the codebase has *two distinct id families* (output/project identity vs.
+compile identity) that look identical at a glance, and D4 was a cross-family
+borrow. `lib/outputKeyboardId.ts`'s docstring names the boundary so the next
+reader does not repeat it.
+
+---
+
+## Review-cycle amendments (2026-08-05)
+
+Applied from the km-triage crew's findings on the PR, alongside the rebase:
+
+- **Single-sourced the output id** (km-synthesis). New `lib/outputKeyboardId.ts`
+  holds `resolveOutputKeyboardId`, called by both `serializeWorkingCopy` and
+  `OutputScreen`. It is a standalone module rather than an export of
+  `serializeWorkingCopy.ts` because two test files `vi.mock` that module
+  wholesale, which would have made the helper `undefined` in exactly the tests
+  covering the aria-label it fixes.
+- **Keyed `BaseProvenance` rows by field, not value** (km-qc). Name/id/script
+  coincide readily in real data, and a duplicate React key silently drops a row.
+- **Extracted `PANE_SECONDARY_BUTTON`** (km-qc) into
+  `components/previewOutputLayout.ts`, replacing three hand-copied style objects
+  (the two mode-toggle buttons and "Change base keyboard"). It lives beside the
+  shared layout constants — not in `PickerPane.tsx` — for the same mocking reason
+  as above: `OutputScreen.coverageBanner.test.tsx` mocks `PickerPane`.
+- **Pattern audit** (km-qc gate) — the section above.

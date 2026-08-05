@@ -252,7 +252,7 @@ describe("surveySessionStore", () => {
   });
 
   // backToChooseBase — OutputScreen's "Change base keyboard" escape hatch
-  // (spec 057). Re-basing was removed from the ship-it screen; this routes the
+  // (spec 058). Re-basing was removed from the ship-it screen; this routes the
   // author back to the picker where the preview-before-commit gate lives.
   describe("backToChooseBase", () => {
     it("rewinds to the prefix walked BEFORE the picker, so Back from it lands where it did the first time", () => {

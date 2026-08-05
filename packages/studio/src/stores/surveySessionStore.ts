@@ -396,7 +396,7 @@ export interface SurveySessionState {
   backToUnfinishedGallery: (target: "mechanisms" | "touch") => void;
 
   /**
-   * "Change the base keyboard" action (spec 057) — OutputScreen's escape hatch
+   * "Change the base keyboard" action (spec 058) — OutputScreen's escape hatch
    * once a working copy exists. Routes the author back to the `choose_base`
    * step instead of re-basing in place from the ship-it screen.
    *

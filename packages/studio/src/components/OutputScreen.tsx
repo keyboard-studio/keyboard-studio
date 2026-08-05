@@ -1,7 +1,7 @@
 // OutputScreen — "ship it" tab.
 //
 // Left pane: shared PickerPane. Which variant depends on whether a working
-// copy exists (spec 057):
+// copy exists (spec 058):
 //   - instantiated (the normal end-of-flow arrival) -> "shipping": read-only
 //     base provenance + a "Change base keyboard" control that routes back to
 //     the survey's choose_base step, plus TrackOneIdentityPanel and KmnEditor.
@@ -45,6 +45,7 @@ import { useGoogleAuth } from "../hooks/useGoogleAuth.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { navigateTo } from "../lib/navigate.ts";
+import { resolveOutputKeyboardId } from "../lib/outputKeyboardId.ts";
 import { TOUCH_STEP_ID } from "../steps/reducer.ts";
 import { BaseKeyboardPicker } from "./BaseKeyboardPicker.tsx";
 import { ScaffoldForm } from "../editors/panels/ScaffoldForm.tsx";
@@ -54,7 +55,13 @@ import { PickerPane } from "./PickerPane.tsx";
 import { SignUpPanel } from "./SignUpPanel.tsx";
 import { ManagedPRSubmitPanel } from "./ManagedPRSubmitPanel.tsx";
 import { ResizeHandle } from "./ResizeHandle.tsx";
-import { DIVIDER_WIDTH, LEFT_MIN_PCT, LEFT_MAX_PCT, LEFT_INIT_PCT } from "./previewOutputLayout.ts";
+import {
+  DIVIDER_WIDTH,
+  LEFT_MIN_PCT,
+  LEFT_MAX_PCT,
+  LEFT_INIT_PCT,
+  PANE_SECONDARY_BUTTON,
+} from "./previewOutputLayout.ts";
 
 // Shared amber "[WARN]" banner shell used by both the touch-staleness banner
 // and the download-projection-warnings banner below. Only the genuinely
@@ -163,7 +170,7 @@ export function OutputScreen() {
   const staleSteps = useWorkingCopyStore((s) => s.staleSteps);
   const touchStale = staleSteps.has(TOUCH_STEP_ID);
 
-  // Pane variant (spec 057). Live subscription through the store's OWN
+  // Pane variant (spec 058). Live subscription through the store's OWN
   // predicate — do not fork a second notion of "has a working copy".
   const instantiated = useWorkingCopyStore((s) => s.isInstantiated());
 
@@ -193,16 +200,15 @@ export function OutputScreen() {
   // Download button aria-label — computed unconditionally (cheap) so the JSX
   // below stays a single conditional, not a nested t()-per-branch call site.
   //
-  // The id MUST come from the same place the emitted filename does —
-  // serializeWorkingCopy resolves `identity.keyboardId ?? baseKeyboard.id`
-  // (see serializeWorkingCopy.ts). The previous derivation went through
-  // pickerMode/scaffoldSpec instead, and since pickerMode is per-screen local
-  // state that always initializes to "open" here, it announced the BASE id
-  // ("Download keyboard us as zip") while the file that landed was
-  // "dagbanli-<version>.zip" — WCAG 2.2 AA 2.5.3 / 4.1.2. Do not reintroduce a
-  // second derivation of this id.
-  const downloadKeyboardId =
-    identity?.keyboardId ?? (baseKeyboard !== null ? baseKeyboard.id : "");
+  // The id MUST come from the same place the emitted filename does, and the way
+  // it does so is by calling the same function — `resolveOutputKeyboardId`, which
+  // `projectWorkingCopyForOutput` also calls for the `<id>-<version>.zip` name.
+  // The previous derivation went through pickerMode/scaffoldSpec instead, and
+  // since pickerMode is per-screen local state that always initializes to "open"
+  // here, it announced the BASE id ("Download keyboard us as zip") while the file
+  // that landed was "dagbanli-<version>.zip" — WCAG 2.2 AA 2.5.3 / 4.1.2. Do not
+  // reintroduce a second derivation of this id; extend the shared helper.
+  const downloadKeyboardId = resolveOutputKeyboardId(identity, baseKeyboard);
   const downloadAriaLabel = touchStale
     ? t({
         id: "output.download.aria.touchStale",
@@ -250,17 +256,9 @@ export function OutputScreen() {
             type="button"
             data-testid="output-change-base"
             onClick={handleChangeBase}
-            style={{
-              alignSelf: "flex-start",
-              padding: "6px 12px",
-              fontSize: 12,
-              fontFamily: "inherit",
-              cursor: "pointer",
-              borderRadius: 6,
-              border: "1px solid #283040",
-              background: "#161b22",
-              color: "#9aa7b8",
-            }}
+            // The left pane owns this treatment even though the slot content is
+            // authored here — see PANE_SECONDARY_BUTTON in previewOutputLayout.
+            style={{ ...PANE_SECONDARY_BUTTON, alignSelf: "flex-start" }}
           >
             <Trans id="output.changeBase.label">Change base keyboard</Trans>
           </button>

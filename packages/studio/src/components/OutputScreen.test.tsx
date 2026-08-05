@@ -133,7 +133,7 @@ function renderOutputScreen() {
  *
  * Note for OutputScreen tests: seeding is by itself enough to give the screen a
  * base. `usePreviewArtifact` lazy-inits its `baseKeyboard` from this store, and
- * since spec 057 an instantiated working copy puts the left pane in its
+ * since spec 058 an instantiated working copy puts the left pane in its
  * "shipping" variant, which has NO picker to click (re-basing from the ship-it
  * screen was the defect that change removed). So the seeded OutputScreen tests
  * below deliberately do not click "base-picker" — the tests that still do are
