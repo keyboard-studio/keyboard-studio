@@ -95,20 +95,38 @@ plausible year, and that none of them contains the keyboard's display name as th
 
 ### Emission
 
-- [ ] T020 [US1] Replace the fabricated `Copyright © ${yyyy} ${displayName}` line in `packages/engine/src/scaffolder/index.ts` with `renderLicense()`, taking the emit year as a parameter per D2/P9 (FR-004)
-- [ ] T021 [US1] Pass the real copyright through `identity.copyright` so `resetIdentity` stops fabricating `Copyright © <year> <displayName>` (`packages/engine/src/scaffolder/index.ts` → `scaffold-ir.ts`) — per the verified T010 finding this is the SECOND fabrication site and must share T020's single source of truth. Codec unchanged; no raw `.kmn` manipulation (Article II)
-- [ ] T022 [US1] Add `<Copyright>` and `<Author>` to the `<Info>` block in `buildKpsContent()` in `packages/engine/src/scaffolder/index.ts`, with `<Author URL="mailto:…">` when an email is present
-- [ ] T023 [US1] Require an author name before emission for guests with no GitHub session per D6/FR-015 — no placeholder holder may be emitted
+- [x] T020 [US1] Replace the fabricated `Copyright © ${yyyy} ${displayName}` line in `packages/engine/src/scaffolder/index.ts` with `renderLicense()`, taking the emit year as a parameter per D2/P9 (FR-004)
+- [x] T021 [US1] Pass the real copyright through `identity.copyright` so `resetIdentity` stops fabricating `Copyright © <year> <displayName>` (`packages/engine/src/scaffolder/index.ts` → `scaffold-ir.ts`) — per the verified T010 finding this is the SECOND fabrication site and must share T020's single source of truth. Codec unchanged; no raw `.kmn` manipulation (Article II)
+- [x] T022 [US1] Add `<Copyright>` and `<Author>` to the `<Info>` block in `buildKpsContent()` in `packages/engine/src/scaffolder/index.ts`, with `<Author URL="mailto:…">` when an email is present
+- [~] T023 [US1] Require an author name before emission for guests with no GitHub session per D6/FR-015 — **engine half DONE**: with no attribution the scaffolder emits no invented holder and reports `ScaffoldResult.attributionMissing` for callers to gate on. The **UI gate is still open** and belongs with T014–T017 capture
 
 ### Verification
 
-- [ ] T024 [US1] Assert SC-003 in `packages/engine/src/scaffolder/scaffolder.test.ts` — `LICENSE.md`, `store(&COPYRIGHT)`, and `.kps <Copyright>` all agree on the holder
-- [ ] T025 [US1] Assert SC-001 in `packages/engine/src/scaffolder/scaffolder.test.ts` — the keyboard's display name is never emitted as the copyright holder
-- [ ] T026 [US1] Assert SC-006 in `packages/engine/src/scaffolder/scaffolder.test.ts` — the MIT body is byte-identical across two differently-named keyboards
+- [x] T024 [US1] Assert SC-003 in `packages/engine/src/scaffolder/scaffolder.test.ts` — `LICENSE.md`, `store(&COPYRIGHT)`, and `.kps <Copyright>` all agree on the holder
+- [x] T025 [US1] Assert SC-001 in `packages/engine/src/scaffolder/scaffolder.test.ts` — the keyboard's display name is never emitted as the copyright holder
+- [x] T026 [US1] Assert SC-006 in `packages/engine/src/scaffolder/scaffolder.test.ts` — the MIT body is byte-identical across two differently-named keyboards
 - [ ] T027 [US1] End-to-end: complete a walk and assert the emitted ZIP's `LICENSE.md` carries the confirmed holder, in `packages/studio/e2e/`
 
 **Checkpoint**: US1 is independently shippable. Slice B has not started, and nothing here
 depends on D4 or D5.
+
+**EMISSION DONE 2026-08-04.** Engine 1531 tests green. Two things came out differently than
+planned:
+
+1. **`resetIdentity`'s fallback now PRESERVES the base's copyright** instead of fabricating
+   `Copyright © <year> <displayName>`. Three existing tests asserted the fabricated string, i.e.
+   they pinned the defect SC-001 exists to remove; they now assert the base's notice survives.
+   With no attribution and a base present, the `.kmn` therefore keeps the original author's
+   notice — which is what MIT requires of a derivative, and strictly better than either
+   fabricating or omitting.
+2. **The missing-attribution signal is `ScaffoldResult.attributionMissing`, not a warning.**
+   A first pass pushed onto `warnings`, which broke four tests for the right reason: that field
+   is documented as "fell back to stub-only output", so overloading it made every un-attributed
+   scaffold look like a fetch failure.
+
+Verified by mutation testing: reverting the LICENSE.md fabrication, restoring `resetIdentity`'s
+fabrication, dropping the `identity.copyright` pass-through, and removing the `.kps` fields each
+turn the scaffolder suite red (6, 4, 2 and 3 failures respectively).
 
 ---
 

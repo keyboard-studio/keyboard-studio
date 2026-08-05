@@ -4,6 +4,7 @@ import type { VirtualFS } from "./virtualFS";
 import type { BaseKeyboard } from "./baseKeyboard";
 import type { KeyboardIR } from "./keyboard-ir";
 import type { KpsFontEntry, KpsStylesheetEntry } from "./fontEntry";
+import type { Attribution } from "./attribution";
 
 /**
  * Three-group routing identifier per spec §9. The scaffolder picks a
@@ -39,6 +40,31 @@ export interface ScaffoldOptions {
    * @see spec.md §8 step 3
    */
   ir?: KeyboardIR;
+
+  /**
+   * Who to attribute the keyboard to (spec 037 US1).
+   *
+   * When supplied this is the SINGLE source for the copyright holder across
+   * `LICENSE.md`, `IRHeader.copyright` / `store(&COPYRIGHT)`, and the `.kps`
+   * `<Copyright>`/`<Author>` fields, so the three cannot drift — 22 shipped
+   * keyboards disagree between their `LICENSE.md` and `.kmn` precisely because
+   * those were written independently.
+   *
+   * When OMITTED the scaffolder emits **no** copyright line and sets
+   * {@link ScaffoldResult.attributionMissing} rather than inventing one. Naming the keyboard's own display name as the
+   * rights holder — the behaviour before spec 037 — is a false attribution, and
+   * a missing notice that lint flags is strictly better than a wrong one.
+   */
+  attribution?: Attribution;
+
+  /**
+   * Year to stamp on the new copyright line. Defaults to the current year.
+   *
+   * Injectable because a copyright notice records when the work was PUBLISHED
+   * (spec 037 D2), and because tests must not read the clock — a time-dependent
+   * suite breaks at a year boundary.
+   */
+  emitYear?: number;
 }
 
 /**
@@ -56,6 +82,19 @@ export interface ScaffoldResult {
   fonts: KpsFontEntry[];
   /** Per-keyboard CSS forwarded from fetchKeyboardSourceToVfs — same shape, see PR #405. */
   stylesheets: KpsStylesheetEntry[];
+  /**
+   * True when no attribution was supplied, so the emitted package carries NO
+   * copyright notice (spec 037 US1).
+   *
+   * A dedicated signal rather than a `warnings` entry: `warnings` means "fell
+   * back to stub-only output", and overloading it would make every
+   * un-attributed scaffold look like a fetch failure.
+   *
+   * Callers that publish or download MUST gate on this — an unattributed package
+   * is incomplete, and the pre-037 alternative (naming the keyboard's own display
+   * name as rights holder) was a false attribution.
+   */
+  attributionMissing: boolean;
 }
 
 /**

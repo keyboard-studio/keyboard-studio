@@ -136,7 +136,13 @@ describe("createScaffolderService", () => {
       const content = kmnEntry!.content as string;
 
       expect(content).toContain("store(&NAME) 'My Keyboard'");
-      expect(content).toMatch(/store\(&COPYRIGHT\) 'Copyright © \d{4} My Keyboard'/);
+      // spec 037 SC-001: was `Copyright © <year> My Keyboard`, which named the
+      // keyboard as rights holder and discarded the base's real notice.
+      expect(content).toContain("store(&COPYRIGHT) 'Copyright © 2020 Base Author'");
+      // Scope the negative to the COPYRIGHT store — store(&NAME) legitimately
+      // contains the display name.
+      const copyrightStore = /store\(&COPYRIGHT\) '([^']*)'/.exec(content)?.[1] ?? "";
+      expect(copyrightStore).not.toContain("My Keyboard");
       // &VERSION is the KMN file-format version — always 14.0 (minimum for &CasedKeys).
       expect(content).toContain("store(&VERSION) '14.0'");
       // &KEYBOARDVERSION is the human-visible release version — defaults to "1.0".
@@ -337,7 +343,10 @@ describe("scaffold — displayName sanitization", () => {
     const service = createScaffolderService({ fetchImpl: makeFetch(BASE_KMN) as typeof fetch });
     const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "O'Brien's Keyboard");
     const content = vfs.get("source/my_keyboard.kmn")!.content as string;
-    expect(content).toMatch(/store\(&COPYRIGHT\) 'Copyright © \d{4} O’Brien’s Keyboard'/);
+    // spec 037 SC-001: the display name is no longer used as the holder, so the
+    // base's notice survives. Display-name ESCAPING is still covered by the
+    // &NAME assertion in this same test.
+    expect(content).toContain("store(&COPYRIGHT) 'Copyright © 2020 Base Author'");
   });
 
   it("escapes single quote in stub .kmn store(&NAME)", async () => {
@@ -580,6 +589,169 @@ group(main) using keys
       // Version must appear inside <Keyboards><Keyboard>, not as the hardcoded "1.0".
       expect(kps).toContain("<Version>2.0</Version>");
       expect(kps).not.toContain("<Version>1.0</Version>");
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Attribution emission (spec 037 US1)
+//
+// Before this feature LICENSE.md read `Copyright © <year> <displayName>` — naming
+// the KEYBOARD as its own rights holder — and resetIdentity independently
+// fabricated the same string into store(&COPYRIGHT), overwriting whatever the
+// base declared. These assertions pin the success criteria.
+// ---------------------------------------------------------------------------
+
+describe("attribution emission (spec 037)", () => {
+  const ATTRIBUTION = {
+    authorName: "Alice Example",
+    authorEmail: "alice@example.org",
+    copyrightHolder: "Bafut Language Committee",
+  };
+  const YEAR = 2026;
+
+  function serviceWithBase() {
+    const mockFetch = vi.fn().mockImplementation((url: string) => {
+      if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(BASE_KMN));
+      return Promise.resolve(makeNotFoundResponse());
+    });
+    return createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
+  }
+
+  async function scaffoldWith(opts: Record<string, unknown>) {
+    return serviceWithBase().scaffold(baseKeyboard, "my_keyboard", "My Keyboard", opts);
+  }
+
+  function texts(vfs: import("@keyboard-studio/contracts").VirtualFS) {
+    return {
+      license: vfs.get("LICENSE.md")!.content as string,
+      kmn: vfs.get("source/my_keyboard.kmn")!.content as string,
+      kps: vfs.get("source/my_keyboard.kps")!.content as string,
+    };
+  }
+
+  // SC-003: one source of truth. 22 shipped keyboards disagree between their
+  // LICENSE.md and .kmn because those strings were built independently.
+  it("SC-003: LICENSE.md, store(&COPYRIGHT) and .kps <Copyright> all agree on the holder", async () => {
+    const { vfs } = await scaffoldWith({ attribution: ATTRIBUTION, emitYear: YEAR });
+    const { license, kmn, kps } = texts(vfs);
+    const expected = `Copyright © ${YEAR} Bafut Language Committee`;
+    expect(license).toContain(expected);
+    expect(kmn).toContain(`store(&COPYRIGHT) '${expected}'`);
+    expect(kps).toContain(`<Copyright URL="">${expected}</Copyright>`);
+  });
+
+  // SC-001: the bug this feature exists to fix.
+  it("SC-001: the keyboard's display name is NEVER emitted as the copyright holder", async () => {
+    const { vfs } = await scaffoldWith({ attribution: ATTRIBUTION, emitYear: YEAR });
+    const { license, kmn, kps } = texts(vfs);
+    for (const [name, text] of Object.entries({ license, kmn, kps })) {
+      expect(text, `${name} names the keyboard as rights holder`).not.toContain(
+        `Copyright © ${YEAR} My Keyboard`,
+      );
+    }
+    expect(license).not.toContain("My Keyboard");
+  });
+
+  // SC-006: the license body is a constant (all 920 shipped files are MIT with
+  // one canonical body).
+  it("SC-006: the MIT body is byte-identical across differently-named keyboards", async () => {
+    const a = await serviceWithBase().scaffold(baseKeyboard, "kb_one", "Keyboard One", {
+      attribution: ATTRIBUTION,
+      emitYear: YEAR,
+    });
+    const b = await serviceWithBase().scaffold(baseKeyboard, "kb_two", "Keyboard Two", {
+      attribution: { ...ATTRIBUTION, copyrightHolder: "Someone Else" },
+      emitYear: 2019,
+    });
+    const body = (s: string) => s.split("\n\n").slice(1).join("\n\n");
+    const la = a.vfs.get("LICENSE.md")!.content as string;
+    const lb = b.vfs.get("LICENSE.md")!.content as string;
+    expect(body(la)).toBe(body(lb));
+    expect(la).not.toBe(lb); // the holder lines DO differ
+  });
+
+  // T010's finding: resetIdentity used to overwrite the base's copyright with a
+  // fabricated string, stripping the original author from the emitted .kmn.
+  it("stops resetIdentity fabricating a holder — the base's line is replaced by the CONFIRMED one", async () => {
+    const { vfs } = await scaffoldWith({ attribution: ATTRIBUTION, emitYear: YEAR });
+    const { kmn } = texts(vfs);
+    expect(kmn).toContain("store(&COPYRIGHT) 'Copyright © 2026 Bafut Language Committee'");
+    expect(kmn).not.toContain("Copyright © 2026 My Keyboard");
+  });
+
+  it("holder defaults to the author when no explicit copyright holder is given", async () => {
+    const { vfs } = await scaffoldWith({
+      attribution: { authorName: "Alice Example", copyrightHolder: "" },
+      emitYear: YEAR,
+    });
+    expect(texts(vfs).license).toContain(`Copyright © ${YEAR} Alice Example`);
+  });
+
+  it("writes the author into .kps <Author> with a mailto URL when an email is known", async () => {
+    const { vfs } = await scaffoldWith({ attribution: ATTRIBUTION, emitYear: YEAR });
+    expect(texts(vfs).kps).toContain(
+      '<Author URL="mailto:alice@example.org">Alice Example</Author>',
+    );
+  });
+
+  it("omits the mailto URL when the email is private, without dropping the author", async () => {
+    const { vfs } = await scaffoldWith({
+      attribution: { authorName: "Alice Example", copyrightHolder: "Alice Example" },
+      emitYear: YEAR,
+    });
+    const { kps } = texts(vfs);
+    expect(kps).toContain('<Author URL="">Alice Example</Author>');
+    expect(kps).not.toContain("mailto:");
+  });
+
+  it("uses the injected emitYear rather than the clock (D2)", async () => {
+    const { vfs } = await scaffoldWith({ attribution: ATTRIBUTION, emitYear: 1999 });
+    expect(texts(vfs).license).toContain("Copyright © 1999 Bafut Language Committee");
+    expect(vfs.get("LICENSE.md")!.content as string).not.toContain(
+      String(new Date().getFullYear()),
+    );
+  });
+
+  // Fail loud rather than fabricate: no attribution means NO notice, flagged via
+  // a dedicated result field so callers can gate publish/download on it.
+  describe("with no attribution supplied", () => {
+    it("invents no holder — LICENSE.md and .kps carry no notice", async () => {
+      const { vfs } = await scaffoldWith({ emitYear: YEAR });
+      const { license, kps } = texts(vfs);
+      expect(license).not.toMatch(/^Copyright/m);
+      expect(kps).not.toContain("<Copyright");
+    });
+
+    // The .kmn is the one artifact that CAN know a holder without attribution:
+    // parse() read one from the base. Preserving it is what MIT requires of a
+    // derivative, and is strictly better than the pre-037 behaviour of
+    // overwriting it with the keyboard's own display name.
+    it("PRESERVES the base's copyright in the .kmn rather than overwriting it", async () => {
+      const { vfs } = await scaffoldWith({ emitYear: YEAR });
+      const { kmn } = texts(vfs);
+      expect(kmn).toContain("store(&COPYRIGHT) 'Copyright © 2020 Base Author'");
+      const held = /store\(&COPYRIGHT\) '([^']*)'/.exec(kmn)?.[1] ?? "";
+      expect(held).not.toContain("My Keyboard");
+    });
+
+    it("still emits a complete MIT body", async () => {
+      const { vfs } = await scaffoldWith({ emitYear: YEAR });
+      expect(texts(vfs).license).toContain("Permission is hereby granted, free of charge");
+    });
+
+    it("reports attributionMissing so callers can gate", async () => {
+      const missing = await scaffoldWith({ emitYear: YEAR });
+      expect(missing.attributionMissing).toBe(true);
+      const present = await scaffoldWith({ attribution: ATTRIBUTION, emitYear: YEAR });
+      expect(present.attributionMissing).toBe(false);
+    });
+
+    // `warnings` means "fell back to stub-only output"; a missing attribution is
+    // a different condition and must not masquerade as a fetch failure.
+    it("does NOT add a warning — that channel means stub-only fallback", async () => {
+      const { warnings } = await scaffoldWith({ emitYear: YEAR });
+      expect(warnings.filter((w) => /attribut/i.test(w))).toHaveLength(0);
     });
   });
 });
