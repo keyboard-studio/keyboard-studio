@@ -4326,21 +4326,36 @@ export function MechanismGallery({
                       })
                 }
                 style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  // MARKED: filled amber chip (background + solid border), same
+                  // amber hue used for the "marked" badge treatment elsewhere in
+                  // this file. UNMARKED: an outlined chip in ACCENT — visible as
+                  // an available action against the dark page background
+                  // (previously transparent/no-border underlined dim text, which
+                  // read as inert). The two states differ by more than hue: the
+                  // fill/outline treatment flips, the flag glyph below flips
+                  // outline->filled, and the label text itself changes.
                   background: markedDesktopSet.has(currentChar)
                     ? "rgba(227,179,65,0.16)"
                     : "transparent",
                   border: markedDesktopSet.has(currentChar)
                     ? "1px solid #9e6a03"
-                    : "none",
-                  color: markedDesktopSet.has(currentChar) ? "#e3b341" : TEXT_DIM,
+                    : `1px solid ${ACCENT}`,
+                  color: markedDesktopSet.has(currentChar) ? "#e3b341" : ACCENT,
                   fontSize: 12,
-                  cursor: "pointer",
+                  fontWeight: markedDesktopSet.has(currentChar) ? 600 : 500,
+                  cursor: locked ? "not-allowed" : "pointer",
                   fontFamily: FONT,
-                  padding: "4px 8px",
+                  padding: "6px 12px",
                   borderRadius: 6,
-                  textDecoration: markedDesktopSet.has(currentChar) ? "none" : "underline",
+                  textDecoration: "none",
                 }}
               >
+                <span aria-hidden="true" style={{ fontSize: 12 }}>
+                  {markedDesktopSet.has(currentChar) ? "⚑" : "⚐"}
+                </span>
                 {markedDesktopSet.has(currentChar) ? (
                   <Trans id="editor.assignLoop.markedForLaterButton">
                     Marked for later review
