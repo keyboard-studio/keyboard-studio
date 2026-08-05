@@ -11,12 +11,18 @@
  *
  * Normative source: specs/058-touch-key-editor/contracts/key-edit-overlay.md
  * §3 (operations) and §5 (resolver). This module holds ONLY the operation
- * union, the editable-field shape, and the two pieces of machinery the
- * contract's §5 table marks "shared, exactly once" — the address resolver
- * and the field-semantics function. Traversal and write mechanics (node-id
- * minting + structural sharing vs. in-place JSON mutation + placeholder
- * promotion) are each applier's own, per that same table's "duplicated"
- * column, and do not belong here. No VFS, no React, no I/O.
+ * union, the editable-field shape, and the pieces of machinery the
+ * contract's §5 table marks "shared, exactly once" — the address resolver,
+ * the field-semantics function, and (FR-029b) the `suppress` compound
+ * derivation (`applySuppressSemantics`/`proposeSuppressFields`), which routes
+ * through the field-semantics function rather than re-deriving it. Traversal
+ * and write mechanics (node-id minting + structural sharing vs. in-place JSON
+ * mutation + placeholder promotion) are each applier's own, per that same
+ * table's "duplicated" column, and do not belong here. No VFS, no React, no
+ * I/O. The one cross-module import — `RESERVED_SENTINEL_KEY_IDS` from
+ * `keyIdMinting.ts` — is a read of that module's canonical sentinel-id
+ * constant, not a dependency the other direction: `keyIdMinting.ts` does not
+ * import this module, so this is not a cycle.
  *
  * ## What the union deliberately does NOT admit, and why
  *
@@ -43,6 +49,7 @@
  */
 
 import type { TouchKeyAddressParts } from "./touchKeyAddress.js";
+import { RESERVED_SENTINEL_KEY_IDS } from "./keyIdMinting.js";
 
 // ---------------------------------------------------------------------------
 // Editable fields
@@ -138,7 +145,11 @@ export interface RemoveKeyOp extends KeyEditOperationBase {
  * rendering (`sp`) and output (`id`) can never desynchronize into a live
  * key that looks dead (FR-029c). `spClass` is deliberately `9 | 10` — the
  * non-interactive classes — never `8`, which is deadkey-STYLED but
- * interactive (see `isSpacerKeyClass` in touch-coverage.ts).
+ * interactive (see `isSpacerKeyClass` in touch-coverage.ts). The compound
+ * effect (both fields, together, and rejecting a non-sentinel id) is
+ * computed by {@link applySuppressSemantics} below — the paired proposal
+ * (which shape implies which `spClass`/id) by {@link proposeSuppressFields}
+ * — so neither applier re-derives either half on its own.
  */
 export interface SuppressKeyOp extends KeyEditOperationBase {
   readonly kind: "suppress";
@@ -352,6 +363,83 @@ export function applyFieldSemantics(
     sp: patch.sp ?? current.sp,
     ...(output !== undefined ? { output } : {}),
     ...(nextlayer !== undefined ? { nextlayer } : {}),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// The shared suppress derivation (contract §3/§5, FR-029b)
+// ---------------------------------------------------------------------------
+
+/**
+ * The two shapes an author can choose when suppressing a key
+ * (key-id-policy.md section 2's "Gap or blank" row): `"keycap-hole"` keeps a
+ * keycap-shaped hole in the layout (rendered, but non-interactive);
+ * `"spacer"` renders no keycap at all. This is the ONLY vocabulary a caller
+ * uses to state intent — the `9`-vs-`10` `sp` value and the `T_BLANK`-vs-
+ * `T_SPACER` sentinel are both derived from it below, never chosen
+ * separately.
+ */
+export type SuppressShapeChoice = "keycap-hole" | "spacer";
+
+/**
+ * The corpus-matching `(spClass, sentinelId)` pair for a suppress shape
+ * choice. `9` (blank) pairs with `T_BLANK` when a keycap-shaped hole is
+ * wanted; `10` (spacer) pairs with `T_SPACER` otherwise. A PROPOSAL, not a
+ * mutation (spec.md §3c "propose-then-confirm"): the studio calls this to
+ * decide what a `SuppressKeyOp` should carry BEFORE the author confirms it,
+ * so the 9-vs-10 choice is stated once, here, rather than the engine
+ * deciding it silently deep inside an applier.
+ */
+export function proposeSuppressFields(
+  shape: SuppressShapeChoice,
+): { readonly spClass: 9 | 10; readonly sentinelId: "T_BLANK" | "T_SPACER" } {
+  return shape === "keycap-hole"
+    ? { spClass: 9, sentinelId: "T_BLANK" }
+    : { spClass: 10, sentinelId: "T_SPACER" };
+}
+
+/** Why {@link applySuppressSemantics} rejected a `suppress` op. */
+export type SuppressRejectionReason = "sentinel-not-reserved";
+
+export type SuppressSemanticsResult =
+  | { readonly ok: true; readonly fields: EditableKeyFields }
+  | { readonly ok: false; readonly reason: SuppressRejectionReason };
+
+/**
+ * The ONE place a `suppress` op's compound effect (contract §3) is computed:
+ * sets `sp` to `op.spClass` (`9` blank | `10` spacer, the non-interactive
+ * classes) AND neutralizes `id` to `op.sentinelId` in the SAME
+ * {@link applyFieldSemantics} call, so rendering (`sp`) and output (`id`)
+ * cannot be committed as two separate merges that drift apart — a half-done
+ * suppression is a live key that looks dead (FR-029c). Both
+ * `applyKeyEditsToLayout.ts` (Case A) and `applyKeyEditsToRawJson.ts`
+ * (Case B) call THIS function rather than each hand-building
+ * `{ id: op.sentinelId, sp: op.spClass }` and independently risking exactly
+ * the desynchronization FR-029b names (contract §5's "shared, exactly once"
+ * field-semantics row).
+ *
+ * `op.sentinelId` is checked against {@link RESERVED_SENTINEL_KEY_IDS}
+ * before merging: a `suppress` op is meaningless (FR-029c's "ruleless
+ * sentinel") unless its id is actually one of the corpus's ruleless
+ * sentinels, so an arbitrary string is rejected rather than silently
+ * accepted as "suppressed enough". Never throws — a rejection is an
+ * ordinary, reportable outcome (this module's existing never-throw
+ * convention, matching {@link resolveKeyAddress}/{@link resolveSubKeyEntry}),
+ * not an exception. `SuppressKeyOp.sentinelId` is typed `string` rather than
+ * the reserved-sentinel union because the overlay is data the studio
+ * proposes but a caller could still hand-construct or load from a stale
+ * persisted draft; this function is where that gap is actually closed.
+ */
+export function applySuppressSemantics(
+  current: EditableKeyFields,
+  op: SuppressKeyOp,
+): SuppressSemanticsResult {
+  if (!(RESERVED_SENTINEL_KEY_IDS as readonly string[]).includes(op.sentinelId)) {
+    return { ok: false, reason: "sentinel-not-reserved" };
+  }
+  return {
+    ok: true,
+    fields: applyFieldSemantics(current, { id: op.sentinelId, sp: op.spClass }),
   };
 }
 

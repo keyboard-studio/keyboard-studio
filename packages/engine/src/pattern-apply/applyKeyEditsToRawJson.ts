@@ -23,11 +23,15 @@
  *
  * Per contracts/key-edit-overlay.md §5: the address **parser**
  * (`parseTouchKeyAddress`), the **resolver** (`resolveKeyAddress` /
- * `resolveSubKeyEntry`), and the **field-semantics** function
- * (`applyFieldSemantics`) all come from `keyEditOps.ts` UNCHANGED — this
- * module must not re-derive any of them. Traversal (platform→layer→key
- * index build) and write mechanics (in-place JSON mutation vs. Case A's
- * structural sharing + node-id minting) are each applier's own.
+ * `resolveSubKeyEntry`), the **field-semantics** function
+ * (`applyFieldSemantics`), and the **`suppress` compound derivation**
+ * (`applySuppressSemantics`, FR-029b) all come from `keyEditOps.ts`
+ * UNCHANGED — this module must not re-derive any of them, including
+ * hand-building `{ id: op.sentinelId, sp: op.spClass }` for `suppress`
+ * itself, which is exactly the drift FR-029b exists to prevent. Traversal
+ * (platform→layer→key index build) and write mechanics (in-place JSON
+ * mutation vs. Case A's structural sharing + node-id minting) are each
+ * applier's own.
  *
  * **A real gap in the shared resolver's generic bound, reported not
  * patched:** `resolveKeyAddress`/`resolveSubKeyEntry` are generic over
@@ -107,7 +111,12 @@ import type {
   AddressableLayoutLike,
   EditableKeyFields,
 } from "./keyEditOps.js";
-import { applyFieldSemantics, resolveKeyAddress, resolveSubKeyEntry } from "./keyEditOps.js";
+import {
+  applyFieldSemantics,
+  applySuppressSemantics,
+  resolveKeyAddress,
+  resolveSubKeyEntry,
+} from "./keyEditOps.js";
 import { parseTouchKeyAddress } from "./touchKeyAddress.js";
 import {
   isRawLayer,
@@ -355,11 +364,19 @@ export function applyKeyEditsToRawJson(
         break;
       }
       case "suppress": {
+        // Shared, exactly once, in keyEditOps.ts (FR-029b) — see the module
+        // docstring's "What is shared with Case A" section.
         const current = readEditableFields(resolved.key);
-        writeEditableFields(
-          resolved.key,
-          applyFieldSemantics(current, { id: op.sentinelId, sp: op.spClass }),
-        );
+        const semantics = applySuppressSemantics(current, op);
+        if (!semantics.ok) {
+          warnUnresolved(
+            warnings,
+            op,
+            `sentinelId "${op.sentinelId}" is not a reserved ruleless sentinel`,
+          );
+          break;
+        }
+        writeEditableFields(resolved.key, semantics.fields);
         break;
       }
       case "add": {

@@ -48,15 +48,57 @@
 // after suppression — the whole loss this hook exists to catch.
 //
 // ## Scope: THIS operation's own effect, not full-layout reachability
+// (`findInvalidatedAssignedCharacters`) — plus the FR-062 sweep layered on
+// top (`findCharactersLostForGood`)
 //
-// This hook reports a character as invalidated when the specific operation
-// being checked removes the ONLY mechanism it touches for that character —
-// it does not additionally ask "is the character still reachable some other
-// way, via a completely different key." That broader "lost its LAST
-// mechanism anywhere in the layout" reachability sweep is FR-062, reserved
-// for a later worklist over this SAME file (tasks.md T106, [US4]) — see
-// `keyEditOrphanReport.ts`'s own doc comment, which draws the identical
-// line for its `lostCharacters` field. Not implemented here.
+// `findInvalidatedAssignedCharacters` reports a character as invalidated
+// when the specific operation being checked removes the ONLY mechanism IT
+// TOUCHES for that character — it does not additionally ask "is the
+// character still reachable some other way, via a completely different
+// key." That question — "did this character lose its LAST mechanism
+// ANYWHERE in the layout, or is it still reachable elsewhere" — is FR-061/
+// FR-062 (tasks.md T104-T106, [US4]), and is answered by
+// {@link findCharactersLostForGood} below: it takes
+// `findInvalidatedAssignedCharacters`'s own output, actually applies the
+// pending op (`applyKeyEditsToLayout`, same as the diff above), and asks the
+// CANONICAL FR-036d truth source — `touchCoverage`, the SAME function
+// `keyGridProgress` (TouchGallery.tsx) already audits the confirmed
+// inventory against — whether each invalidated character is still produced
+// anywhere in the resulting layout. A character `touchCoverage` still finds
+// is FR-061's "still available elsewhere" case and MUST NOT be treated as
+// lost; one it no longer finds anywhere has lost its last mechanism and MUST
+// return to the unplaced worklist / shared progress figures and be offered
+// for re-placement (FR-062) — never merely reported. Deliberately NOT a
+// second, independently-derived reachability walk (e.g. a recursive
+// collector mirroring `collectAllReachableChars` below but scoped to the
+// WHOLE layout): reusing `touchCoverage` is what lets this classification
+// and `keyGridProgress`'s own count agree by construction rather than by
+// discipline (FR-036d: "MUST NOT be independently maintained counters that
+// can disagree"). `keyEditOrphanReport.ts`'s own doc comment draws the
+// identical "not implemented here" line for its `lostCharacters` field —
+// still accurate for THAT module; this one now closes the gap for the
+// by-character-assignment guard.
+//
+// `@keyboard-studio/engine`'s `touchKeyCollateral.ts` (T104/T105) computes a
+// closely related classification for a DIFFERENT caller (`RemoveKeyDialog`'s
+// pre-commit collateral warning) via its OWN full-layout traversal
+// (`findSurvivingLocation`), independent of `touchCoverage`. This module
+// deliberately does not call it: as of this writing
+// `@keyboard-studio/engine`'s package barrel (`src/index.ts`) does not
+// re-export `analyzeKeyEditCollateral`/`enumerateKeyLinkedOutputs` (only
+// `./pattern-apply/index.ts` does, one level down — not itself a published
+// subpath), so studio code cannot import it without an engine-side export
+// change this task is scoped not to make. Independent of that gap,
+// `touchCoverage` is the better-aligned choice FOR THIS FILE'S PURPOSE
+// regardless: `analyzeKeyEditCollateral`'s traversal walks every layer
+// unconditionally, while `touchCoverage`'s (via `computeTouchCoverage`)
+// restricts to layers actually reachable from `"default"` — the same
+// restriction `keyGridProgress` relies on — so borrowing the OTHER module's
+// traversal here could disagree with the shared progress figures at exactly
+// the margin FR-036d exists to rule out. If a future change re-exports the
+// engine module and this margin turns out to matter for some other caller,
+// that is a reason to reconcile the two traversals, not to swap which one
+// this file uses.
 //
 // ## What counts as "a by-character assignment" here
 //
@@ -96,6 +138,7 @@ import {
   parseTouchKeyAddress,
   resolveKeyAddress,
   resolveSubKeyEntry,
+  touchCoverage,
   type KeyEditOperation,
   type ResolvedKeyLocation,
 } from "@keyboard-studio/engine";
@@ -228,6 +271,55 @@ export function findInvalidatedAssignedCharacters(
   return lost.filter((ch) => assignedChars.has(ch));
 }
 
+/**
+ * FR-062: of `findInvalidatedAssignedCharacters`'s own result, which
+ * characters lose their LAST mechanism ANYWHERE in `layout` once `op`
+ * commits — as opposed to remaining reachable via a completely different
+ * key/sub-entry (FR-061's "still available elsewhere", which this function
+ * excludes). See the module doc's "Scope" section for why this is computed
+ * through `touchCoverage` (the SAME truth `keyGridProgress`, TouchGallery.tsx,
+ * already audits `inventory` against) rather than a second, independently-
+ * derived full-layout reachability walk.
+ *
+ * `op` is actually applied (never mutating `layout`) so the check runs
+ * against the layout as it would exist AFTER the commit — the same
+ * `asIfCommitted` synthesis idiom `findInvalidatedAssignedCharacters` uses
+ * above.
+ *
+ * Short-circuits to `[]` without resolving anything when nothing is
+ * invalidated in the first place (the common case — most edits invalidate
+ * no by-character assignment at all), so a caller checking every commit
+ * pays the extra `applyKeyEditsToLayout` + `touchCoverage` pass only when
+ * there is something worth classifying.
+ */
+export function findCharactersLostForGood(
+  layout: TouchLayoutIR,
+  op: PendingKeyEditOperation,
+  ruleIndex: TouchKeyRuleIndex | undefined,
+  assignedChars: ReadonlySet<string>,
+): readonly string[] {
+  const invalidated = findInvalidatedAssignedCharacters(layout, op, ruleIndex, assignedChars);
+  if (invalidated.length === 0) return invalidated;
+
+  // `seq` is assignment order only; see `findInvalidatedAssignedCharacters`'s
+  // own comment on the same synthesis.
+  const asIfCommitted = { ...op, seq: 0 } as KeyEditOperation;
+  const { layout: afterLayout } = applyKeyEditsToLayout(layout, [asIfCommitted]);
+
+  // `invalidated` (not the gallery's full confirmed inventory) is passed as
+  // touchCoverage's own `inventory` argument — this call only needs to know
+  // whether THESE specific characters remain reachable anywhere in the
+  // post-edit layout, so there is no need to thread the full inventory list
+  // into this hook as a new dependency.
+  const { uncovered } = touchCoverage(
+    afterLayout,
+    invalidated,
+    ruleIndex !== undefined ? { ruleIndex } : {},
+  );
+  const uncoveredSet = new Set(uncovered.map((ch) => ch.normalize("NFC")));
+  return invalidated.filter((ch) => uncoveredSet.has(ch));
+}
+
 // ---------------------------------------------------------------------------
 // Localized message composition (docs/accessibility.md rule 10 —
 // codepoint-derived accessible name via the sanctioned `codepointLabel`
@@ -256,6 +348,22 @@ export interface KeyEditInvalidationWarning {
   readonly char: string;
   /** Ready-to-render, localized sentence naming `char` by its codepoint(s) — never the bare glyph alone. */
   readonly message: string;
+  /**
+   * FR-062: `true` when `char` loses its LAST mechanism anywhere in the
+   * layout once this op commits — the caller MUST return it to the unplaced
+   * worklist / shared progress figures (FR-036d) and offer it for
+   * re-placement, not merely report it as lost (e.g. by removing any stale
+   * `TouchAssignment` entry so the character-mode gallery re-offers the
+   * method chooser instead of showing a now-broken "existing methods" list).
+   * `false` when `char` remains reachable via some other key/sub-entry
+   * elsewhere in the layout (FR-061's "still available elsewhere") — such a
+   * character MUST NOT be treated as lost by any caller consuming this
+   * warning, even though this hook still warns about it (FR-036f's own
+   * narrower "did THIS op's own address stop producing it" question is
+   * independent of whether the character survives elsewhere). See
+   * {@link findCharactersLostForGood}.
+   */
+  readonly returnsToWorklist: boolean;
 }
 
 export interface UseKeyEditGuardsOptions {
@@ -280,11 +388,11 @@ export interface UseKeyEditGuardsResult {
 const EMPTY_ASSIGNED_CHARS: ReadonlySet<string> = new Set();
 
 /**
- * FR-036f's "at the moment of the edit" guard for the touch key grid. See
- * this module's doc comment for the full contract, what it deliberately does
- * NOT do (the FR-062 full-reachability sweep, reserved for T106 over this
- * same file), and why it cannot reuse `keyEditOrphanReport.ts`'s character
- * extraction as-is.
+ * FR-036f's "at the moment of the edit" guard for the touch key grid, now
+ * additionally classified per FR-062/FR-061 via
+ * `returnsToWorklist` (`findCharactersLostForGood`). See this module's doc
+ * comment for the full contract and why it cannot reuse
+ * `keyEditOrphanReport.ts`'s character extraction as-is.
  */
 export function useKeyEditGuards({
   layout,
@@ -305,7 +413,16 @@ export function useKeyEditGuards({
   const checkOperation = useCallback(
     (op: PendingKeyEditOperation): readonly KeyEditInvalidationWarning[] => {
       const invalidated = findInvalidatedAssignedCharacters(layout, op, ruleIndex, assignedChars);
-      return invalidated.map((char) => ({ char, message: composeInvalidationMessage(char, i18n) }));
+      if (invalidated.length === 0) return [];
+      // Only classify (the extra applyKeyEditsToLayout + touchCoverage pass)
+      // when there is something to classify — see findCharactersLostForGood's
+      // own doc comment on this short-circuit.
+      const lostForGood = new Set(findCharactersLostForGood(layout, op, ruleIndex, assignedChars));
+      return invalidated.map((char) => ({
+        char,
+        message: composeInvalidationMessage(char, i18n),
+        returnsToWorklist: lostForGood.has(char),
+      }));
     },
     [layout, ruleIndex, assignedChars, i18n],
   );

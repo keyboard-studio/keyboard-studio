@@ -26,6 +26,8 @@ import {
 } from "@keyboard-studio/contracts/fixtures";
 import {
   applyFieldSemantics,
+  applySuppressSemantics,
+  proposeSuppressFields,
   resolveKeyAddress,
   resolveSubKeyEntry,
   type AddressableKeyLike,
@@ -34,6 +36,7 @@ import {
   type KeyEditOverlay,
   type RenameKeyOp,
   type SetKeyOp,
+  type SuppressKeyOp,
 } from "./keyEditOps.js";
 import { replayKeyEditOverlay } from "./applyKeyEditsToLayout.js";
 import { touchKeyAddress } from "./touchKeyAddress.js";
@@ -246,6 +249,79 @@ describe("applyFieldSemantics", () => {
     const merged = applyFieldSemantics(bare, { text: "C" });
     expect("output" in merged).toBe(false);
     expect("nextlayer" in merged).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// proposeSuppressFields — the paired (spClass, sentinelId) proposal
+// ---------------------------------------------------------------------------
+
+describe("proposeSuppressFields", () => {
+  it("proposes sp:9 + T_BLANK for a keycap-shaped hole", () => {
+    expect(proposeSuppressFields("keycap-hole")).toEqual({ spClass: 9, sentinelId: "T_BLANK" });
+  });
+
+  it("proposes sp:10 + T_SPACER for a spacer", () => {
+    expect(proposeSuppressFields("spacer")).toEqual({ spClass: 10, sentinelId: "T_SPACER" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// applySuppressSemantics — the shared compound derivation (FR-029b)
+// ---------------------------------------------------------------------------
+
+describe("applySuppressSemantics", () => {
+  const current: EditableKeyFields = {
+    id: "T_LIVE",
+    text: "a",
+    output: "a",
+    sp: 0,
+  };
+
+  function suppressOp(overrides: Partial<SuppressKeyOp> = {}): SuppressKeyOp {
+    return {
+      seq: 0,
+      kind: "suppress",
+      address: "phone:default:T_LIVE",
+      spClass: 9,
+      sentinelId: "T_BLANK",
+      ...overrides,
+    };
+  }
+
+  it("sets sp AND neutralizes id in the same result, for each reserved sentinel", () => {
+    for (const { spClass, sentinelId } of [
+      { spClass: 9 as const, sentinelId: "T_BLANK" },
+      { spClass: 10 as const, sentinelId: "T_SPACER" },
+      { spClass: 9 as const, sentinelId: "T_NUL" },
+    ]) {
+      const result = applySuppressSemantics(current, suppressOp({ spClass, sentinelId }));
+      expect(result).toEqual({
+        ok: true,
+        fields: { id: sentinelId, text: "a", sp: spClass },
+      });
+    }
+  });
+
+  it("clears the stale output through applyFieldSemantics — a suppressed key never keeps a live output", () => {
+    const result = applySuppressSemantics(current, suppressOp());
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect("output" in result.fields).toBe(false);
+    }
+  });
+
+  it("rejects a sentinelId that is not one of the reserved ruleless sentinels", () => {
+    const result = applySuppressSemantics(current, suppressOp({ sentinelId: "T_NOT_A_SENTINEL" }));
+    expect(result).toEqual({ ok: false, reason: "sentinel-not-reserved" });
+  });
+
+  it("rejects an author-typed live id masquerading as a suppression", () => {
+    // The exact desync FR-029c names: an sp change with an id that was never
+    // meant to be a ruleless sentinel must not be silently accepted as "the
+    // key is suppressed now".
+    const result = applySuppressSemantics(current, suppressOp({ sentinelId: "T_MY_REAL_KEY" }));
+    expect(result.ok).toBe(false);
   });
 });
 

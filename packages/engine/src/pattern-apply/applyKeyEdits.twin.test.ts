@@ -91,13 +91,15 @@ function buildOps(): KeyEditOperation[] {
       address: touchKeyAddress("phone", "default", TOUCH_JOIN_IDS.dead),
       outcome: "redistribute",
     },
-    // 5. suppress — one operation, sets spClass + neutralizes the id.
+    // 5. suppress — one operation, sets spClass + neutralizes the id to a
+    //    RESERVED ruleless sentinel (T095/FR-029b: applySuppressSemantics
+    //    rejects anything else, so this fixture must use a real one).
     {
       seq: 5,
       kind: "suppress",
       address: touchKeyAddress("phone", "default", TOUCH_JOIN_IDS.opaque),
       spClass: 9,
-      sentinelId: "T_SUPPRESSED_SENTINEL",
+      sentinelId: "T_BLANK",
     },
     // 6. setSubKey — edit one of the longpress host's two `sk[]` entries,
     //    leaving the other untouched (does NOT empty the collection).
@@ -256,5 +258,38 @@ describe("applyKeyEdits twin equivalence (T047)", () => {
     expect(afterCountA).toBe(beforeCount + 1);
     expect(afterCountB).toBe(beforeCount + 1);
     expect(afterCountA).toBe(afterCountB);
+  });
+
+  it("rejects a suppress op with a non-sentinel id identically on both sides (FR-029b)", () => {
+    // A suppress op whose sentinelId is NOT one of the reserved ruleless
+    // sentinels (RESERVED_SENTINEL_KEY_IDS) must be rejected — not silently
+    // applied with an arbitrary id masquerading as "suppressed" — and both
+    // appliers must agree: the addressed key is untouched on both sides.
+    const rawJson = emitTouchLayout(makeTouchKeyRuleJoinLayout());
+    const layoutForCaseA = parseTouchLayout(rawJson);
+    const badSuppressOp: KeyEditOperation = {
+      seq: 1,
+      kind: "suppress",
+      address: touchKeyAddress("phone", "default", TOUCH_JOIN_IDS.opaque),
+      spClass: 9,
+      sentinelId: "T_NOT_A_RESERVED_SENTINEL",
+    };
+
+    const caseA = applyKeyEditsToLayout(layoutForCaseA, [badSuppressOp]);
+    const caseB = applyKeyEditsToRawJson(rawJson, [badSuppressOp]);
+    const caseBAsIR = parseTouchLayout(caseB.json);
+
+    // Neither side applies the rejected op — the layout is unchanged.
+    expect(normalizeForComparison(caseA.layout)).toEqual(normalizeForComparison(layoutForCaseA));
+    expect(normalizeForComparison(caseBAsIR)).toEqual(normalizeForComparison(layoutForCaseA));
+
+    // Both sides report exactly one warning for the rejected op, and it is
+    // NOT reported as an address-resolution orphan — it resolved; it was
+    // the sentinel that was rejected.
+    expect(caseA.orphaned).toEqual([]);
+    expect(caseA.warnings).toHaveLength(1);
+    expect(caseB.warnings).toHaveLength(1);
+    expect(caseA.warnings[0]).toContain("T_NOT_A_RESERVED_SENTINEL");
+    expect(caseB.warnings[0]).toContain("T_NOT_A_RESERVED_SENTINEL");
   });
 });

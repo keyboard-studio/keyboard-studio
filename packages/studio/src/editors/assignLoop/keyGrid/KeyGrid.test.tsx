@@ -370,6 +370,182 @@ describe("KeyGrid — proportional geometry from padPct/widthPct (FR-022)", () =
   });
 });
 
+describe("KeyGrid — Fill row / Even out row (T100, FR-022, FR-039)", () => {
+  it("never prints the slack as a number — the slack spacer carries no text content, only a hatch fill", () => {
+    const rowA = makeRow([makeCell({ id: "A1", padPct: 15, widthPct: 100 })], 0);
+    const rowB = makeRow([makeCell({ id: "B1", padPct: 15, widthPct: 35 })], 65);
+    const vm = makeViewModel([rowA, rowB]);
+
+    render(
+      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+    );
+
+    const slackB = screen.getByTestId("key-grid-row-slack-1");
+    expect(slackB.textContent).toBe("");
+    expect(slackB.style.backgroundImage).toContain("repeating-linear-gradient");
+  });
+
+  it("renders 'Fill row' only for a row that has slack, and 'Even out row' only for a row with two or more keys", () => {
+    const noSlackSingleKey = makeRow(
+      [makeCell({ id: "R0K1", padPct: 15, widthPct: 100 })],
+      0,
+    );
+    const slackSingleKey = makeRow(
+      [makeCell({ id: "R1K1", padPct: 15, widthPct: 35 })],
+      65,
+    );
+    const noSlackTwoKeys = makeRow(
+      [
+        makeCell({ id: "R2K1", padPct: 15, widthPct: 50 }),
+        makeCell({ id: "R2K2", padPct: 15, widthPct: 50 }),
+      ],
+      0,
+    );
+    const slackTwoKeys = makeRow(
+      [
+        makeCell({ id: "R3K1", padPct: 15, widthPct: 30 }),
+        makeCell({ id: "R3K2", padPct: 15, widthPct: 30 }),
+      ],
+      40,
+    );
+    const vm = makeViewModel([
+      noSlackSingleKey,
+      slackSingleKey,
+      noSlackTwoKeys,
+      slackTwoKeys,
+    ]);
+
+    render(
+      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+    );
+
+    // Row 1 (index 0): no slack, one key — neither action applies.
+    expect(screen.queryByTestId("key-grid-row-actions-0")).toBeNull();
+
+    // Row 2 (index 1): slack, one key — only "Fill row".
+    expect(screen.getByTestId("key-grid-fill-row-1")).toBeTruthy();
+    expect(screen.queryByTestId("key-grid-even-out-row-1")).toBeNull();
+
+    // Row 3 (index 2): no slack, two keys — only "Even out row".
+    expect(screen.queryByTestId("key-grid-fill-row-2")).toBeNull();
+    expect(screen.getByTestId("key-grid-even-out-row-2")).toBeTruthy();
+
+    // Row 4 (index 3): slack AND two keys — both actions.
+    expect(screen.getByTestId("key-grid-fill-row-3")).toBeTruthy();
+    expect(screen.getByTestId("key-grid-even-out-row-3")).toBeTruthy();
+  });
+
+  it("names each button with its own 1-based row number, so identical-looking actions on different rows are never confused by an assistive-technology user tabbing between them", () => {
+    const rowA = makeRow([makeCell({ id: "A1", padPct: 15, widthPct: 35 })], 65);
+    const rowB = makeRow([makeCell({ id: "B1", padPct: 15, widthPct: 35 })], 65);
+    const vm = makeViewModel([rowA, rowB]);
+
+    render(
+      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+    );
+
+    expect(screen.getByTestId("key-grid-fill-row-0").textContent).toContain("1");
+    expect(screen.getByTestId("key-grid-fill-row-1").textContent).toContain("2");
+    expect(screen.getByTestId("key-grid-fill-row-0").textContent).not.toBe(
+      screen.getByTestId("key-grid-fill-row-1").textContent,
+    );
+  });
+
+  it("clicking 'Fill row' calls onFillRow with the row's TRUE index into viewModel.rows", () => {
+    const onFillRow = vi.fn();
+    const row = makeRow([makeCell({ id: "K1", padPct: 15, widthPct: 35 })], 65);
+    const vm = makeViewModel([row]);
+
+    render(
+      <KeyGrid
+        viewModel={vm}
+        selectedAddress={null}
+        onSelectCell={vi.fn()}
+        onFillRow={onFillRow}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("key-grid-fill-row-0"));
+
+    expect(onFillRow).toHaveBeenCalledTimes(1);
+    expect(onFillRow).toHaveBeenCalledWith(0);
+  });
+
+  it("clicking 'Even out row' calls onEvenOutRow with the row's TRUE index into viewModel.rows", () => {
+    const onEvenOutRow = vi.fn();
+    const row = makeRow([
+      makeCell({ id: "K1", padPct: 15, widthPct: 50 }),
+      makeCell({ id: "K2", padPct: 15, widthPct: 50 }),
+    ]);
+    const vm = makeViewModel([row]);
+
+    render(
+      <KeyGrid
+        viewModel={vm}
+        selectedAddress={null}
+        onSelectCell={vi.fn()}
+        onEvenOutRow={onEvenOutRow}
+      />,
+    );
+
+    fireEvent.click(screen.getByTestId("key-grid-even-out-row-0"));
+
+    expect(onEvenOutRow).toHaveBeenCalledTimes(1);
+    expect(onEvenOutRow).toHaveBeenCalledWith(0);
+  });
+
+  it("does not throw, and changes nothing, when onFillRow/onEvenOutRow are omitted — widths are never silently redistributed (FR-022, FR-039): the actions render, but clicking one without a caller-supplied handler is a no-op", () => {
+    const row = makeRow(
+      [
+        makeCell({ id: "K1", padPct: 15, widthPct: 30 }),
+        makeCell({ id: "K2", padPct: 15, widthPct: 30 }),
+      ],
+      40,
+    );
+    const vm = makeViewModel([row]);
+
+    render(
+      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+    );
+
+    const fillButton = screen.getByTestId("key-grid-fill-row-0");
+    const evenOutButton = screen.getByTestId("key-grid-even-out-row-0");
+    expect(() => fireEvent.click(fillButton)).not.toThrow();
+    expect(() => fireEvent.click(evenOutButton)).not.toThrow();
+
+    // The view model this component was rendered with is never mutated by
+    // either click — KeyGrid computes no new widths itself (see the module
+    // doc's "Row slack, and the Fill row / Even out row seam").
+    expect(vm.rows[0]?.keys[0]?.widthPct).toBe(30);
+    expect(vm.rows[0]?.keys[1]?.widthPct).toBe(30);
+    expect(vm.rows[0]?.slackPct).toBe(40);
+  });
+
+  it("renders the Fill row / Even out row buttons as siblings of role=row, never inside it — the ARIA grid's owned elements stay gridcells-only", () => {
+    const row = makeRow(
+      [
+        makeCell({ id: "K1", padPct: 15, widthPct: 30 }),
+        makeCell({ id: "K2", padPct: 15, widthPct: 30 }),
+      ],
+      40,
+    );
+    const vm = makeViewModel([row]);
+
+    render(
+      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+    );
+
+    const rowEl = screen.getAllByRole("row")[0];
+    expect(
+      rowEl?.querySelector('[data-testid="key-grid-fill-row-0"]'),
+    ).toBeNull();
+    expect(
+      rowEl?.querySelector('[data-testid="key-grid-even-out-row-0"]'),
+    ).toBeNull();
+    expect(screen.getByTestId("key-grid-fill-row-0")).toBeTruthy();
+  });
+});
+
 describe("KeyGrid — codepoint-derived accessible names (docs/accessibility.md rule 10)", () => {
   it("names a glyph keycap by its U+ notation, not the bare glyph alone", () => {
     const vm = makeViewModel([

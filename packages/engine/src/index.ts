@@ -282,6 +282,25 @@ export type { AddressableLayoutLike, ResolvedKeyLocation } from "./pattern-apply
 // three op kinds that author `output` directly.
 export { resolveSubKeyEntry, declaredOperationOutput } from "./pattern-apply/index.js";
 
+// spec 058 T095/T097 — the `suppress` compound derivation (FR-029b). The
+// studio must never hand-build a `{ sp, id }` suppression: `sp` governs
+// rendering and interactivity while the id governs output, and only the two
+// halves committed together are impossible to desynchronize. The removal
+// dialog (RemoveKeyDialog.tsx) builds its "suppress in place" outcome from
+// `proposeSuppressFields`, which is also the single statement of the
+// `9`+`T_BLANK` vs `10`+`T_SPACER` pairing (key-id-policy.md §2) — hardcoding
+// either literal in the studio is exactly the drift this export prevents.
+// `applySuppressSemantics` is exported beside it so a studio-side preview can
+// derive the same result the appliers will, including its rejection of any
+// id outside RESERVED_SENTINEL_KEY_IDS.
+export { proposeSuppressFields, applySuppressSemantics } from "./pattern-apply/index.js";
+export type {
+  SuppressShapeChoice,
+  SuppressKeyOp,
+  RemoveKeyOp,
+  SuppressSemanticsResult,
+} from "./pattern-apply/index.js";
+
 // spec 058 T048/T063 — overlay replay is how a studio-side surface folds the
 // overlay into an *effective* layout to project from (the key grid's view
 // model, the preview's live-layout override). Case A's applier is exported
@@ -312,6 +331,48 @@ export type {
   LayerIdDecomposition,
   LayerFamily,
   LayerFamilyGrouping,
+} from "./pattern-apply/index.js";
+
+// spec 058 T107-T110 — the family-parallelism check itself (FR-064/FR-066/
+// FR-068). Studio-facing because the complaint and its family-wide-apply
+// resolution (FamilyApplyDialog.tsx, T108) are UI surfaces: the studio needs
+// the findings to render, and `severityForPlane`/`classifyPlane` so its copy
+// layer words a symbol-plane hint differently from an alphabetic-family
+// warning WITHOUT restating which planes count as independent layouts. The
+// check runs engine-side; only its results and its classification cross the
+// boundary.
+export {
+  findFamilyParallelismBreaks,
+  classifyPlane,
+  severityForPlane,
+} from "./pattern-apply/index.js";
+export type {
+  FamilyParallelismSeverity,
+  FamilyParallelismBreakKind,
+  FamilyParallelismFinding,
+  ReviewFamilyMemberFix,
+  PlaneClass,
+} from "./pattern-apply/index.js";
+
+// spec 058 T104/T105 — the pre-commit collateral report (FR-060/FR-061). The
+// removal dialog must name every linked output a suppress/remove would
+// discard — the key's own plus every `sk`/flick/multitap sub-key it hosts —
+// and separate the genuinely unreachable from the still-available-elsewhere,
+// BEFORE the edit commits. `useKeyEditGuards.ts` documented the absence of
+// this export as the reason it reached for `touchCoverage` instead; that
+// choice stands on its own merits (it is the FR-036d shared truth), but
+// RemoveKeyDialog's own collateral section has no such alternative — the
+// per-mechanism enumeration exists nowhere else.
+export {
+  enumerateKeyLinkedOutputs,
+  analyzeKeyEditCollateral,
+} from "./pattern-apply/index.js";
+export type {
+  LinkedOutputMechanismKind,
+  LinkedOutput,
+  LinkedOutputReachability,
+  ClassifiedLinkedOutput,
+  KeyEditCollateralReport,
 } from "./pattern-apply/index.js";
 
 // spec 058 T079/T080/T081 — key id minting proposal (FR-024/FR-025) and touch
