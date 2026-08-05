@@ -251,6 +251,83 @@ describe("surveySessionStore", () => {
     });
   });
 
+  // backToChooseBase — OutputScreen's "Change base keyboard" escape hatch
+  // (spec 058). Re-basing was removed from the ship-it screen; this routes the
+  // author back to the picker where the preview-before-commit gate lives.
+  describe("backToChooseBase", () => {
+    it("rewinds to the prefix walked BEFORE the picker, so Back from it lands where it did the first time", () => {
+      const store = getStore();
+      store.advance("choose_base");
+      store.advance("track");
+      store.advance("project_name");
+      store.advance("characters");
+
+      getStore().backToChooseBase();
+
+      expect(getStore().activeStepId).toBe("choose_base");
+      expect(getStore().history).toEqual(["identity"]);
+      expect(getStore().lastNavigation).toBe("pop");
+
+      // The pre-picker Back target is unchanged from a first walk-through.
+      getStore().popHistory();
+      expect(getStore().activeStepId).toBe("identity");
+    });
+
+    it("leaves nothing at-or-after the picker on the stack for a later Back to walk forward into", () => {
+      const store = getStore();
+      store.advance("choose_base");
+      store.advance("track");
+      store.advance("mechanisms");
+      store.advance("touch");
+
+      getStore().backToChooseBase();
+
+      // The regression an advance("choose_base") would have caused: every step
+      // the author just left still sitting on the stack, so Back walks FORWARD.
+      for (const stale of ["choose_base", "track", "mechanisms", "touch"] as const) {
+        expect(getStore().history).not.toContain(stale);
+      }
+    });
+
+    it("clears baseConfirmed so a stale confirmation cannot instantiate on the next compile settle", () => {
+      const store = getStore();
+      store.advance("choose_base");
+      store.advance("track");
+      store.setBaseConfirmed(true);
+
+      getStore().backToChooseBase();
+
+      expect(getStore().baseConfirmed).toBe(false);
+    });
+
+    it("drops a stale forward-only-gate entry rather than carrying it into the rewound stack", () => {
+      const store = getStore();
+      store.advance("choose_base");
+      store.advance("mechanisms");
+      // A persisted-stale "help" entry (the class sanitizeHistory exists for).
+      useSurveySessionStore.setState({ history: ["identity", "help", "choose_base", "mechanisms"] });
+
+      getStore().backToChooseBase();
+
+      expect(getStore().activeStepId).toBe("choose_base");
+      expect(getStore().history).toEqual(["identity"]);
+      expect(getStore().history).not.toContain("help");
+    });
+
+    it("falls back to an empty (Back-safe) history when the picker was never walked", () => {
+      // Fresh store: activeStepId = "identity", history = [].
+      getStore().backToChooseBase();
+
+      expect(getStore().activeStepId).toBe("choose_base");
+      expect(getStore().history).toEqual([]);
+
+      // Empty is Back-safe: popHistory guards it, so the author is not stranded
+      // on a step that silently no-ops into a stale entry.
+      getStore().popHistory();
+      expect(getStore().activeStepId).toBe("choose_base");
+    });
+  });
+
   // baseConfirmed — the choose_base preview-before-commit gate
   describe("baseConfirmed", () => {
     it("defaults to false on a fresh store", () => {

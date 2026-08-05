@@ -13,8 +13,16 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { computeTouchCoverage, decodeUnicodeKeyId } from "./touch-coverage.js";
+import {
+  computeTouchCoverage,
+  decodeUnicodeKeyId,
+  isDeadkeyStyledKeyClass,
+  isSpacerKeyClass,
+  stripDottedCircle,
+} from "./touch-coverage.js";
 import type { TouchLayoutIR, TouchKeyIR } from "./keyboard-ir.js";
+import { buildTouchKeyRuleIndex } from "./touch-key-rule-join.js";
+import { makeTestIR } from "./fixtures/keyboard-ir.js";
 
 /** Build a single TouchKeyIR for use in test layouts. */
 function makeKey(id: string, overrides: Partial<TouchKeyIR> = {}): TouchKeyIR {
@@ -243,5 +251,252 @@ describe("decodeUnicodeKeyId", () => {
   it("returns undefined when any group in a multi-codepoint id is malformed", () => {
     expect(decodeUnicodeKeyId("U_0061_ZZZZ")).toBeUndefined();
     expect(decodeUnicodeKeyId("U_0061_")).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 058 T025 — the coverage regression locks.
+//
+// Every existing test above calls the TWO-ARGUMENT form, and they all still
+// pass. That is the point: the options argument is additive, so the whole suite
+// above doubles as the byte-identical-behaviour lock. The tests below add the
+// explicit statement of that plus the new behaviours.
+// ---------------------------------------------------------------------------
+
+/** Build a minimal IR carrying one rule keyed on `keyId` that outputs `text`. */
+function irWithRule(keyId: string, text: string) {
+  return makeTestIR([
+    {
+      nodeId: "group#main",
+      name: "Main",
+      usingKeys: true,
+      readonly: false,
+      rules: [
+        {
+          nodeId: `rule#${keyId}`,
+          context: [{ kind: "vkey", name: keyId, modifiers: [] }],
+          output: [...text].map((value) => ({ kind: "char" as const, value })),
+        },
+      ],
+    },
+  ]);
+}
+
+describe("computeTouchCoverage — the options argument is additive (FR-005)", () => {
+  const layout = () =>
+    makeLayout([
+      { id: "default", rows: [{ keys: [makeKey("T_0300", { text: "◌̀" })] }] },
+    ]);
+
+  it("a two-argument call is identical to passing an empty options object", () => {
+    const inventory = ["a", "̀", "◌"];
+    expect(computeTouchCoverage(layout(), inventory)).toEqual(
+      computeTouchCoverage(layout(), inventory, {}),
+    );
+  });
+
+  it("credits U+0300 for a T_0300 key ONLY when the rule index is passed", () => {
+    // The whole US1 defect in one assertion. Without the index the key's output
+    // lives in a rule the coverage walk cannot see; with it, the key is credited.
+    const withoutIndex = computeTouchCoverage(layout(), ["̀"], { stripDottedCircle: false });
+    expect(withoutIndex.uncovered).toEqual(["̀"]);
+
+    const ruleIndex = buildTouchKeyRuleIndex(irWithRule("T_0300", "̀"));
+    const withIndex = computeTouchCoverage(layout(), ["̀"], {
+      ruleIndex,
+      stripDottedCircle: false,
+    });
+    expect(withIndex.uncovered).toEqual([]);
+  });
+
+  it("credits a K_ key's rule output too — the same defect on a physical key", () => {
+    const physical = makeLayout([
+      { id: "default", rows: [{ keys: [makeKey("K_QUOTE", { text: "◌̀" })] }] },
+    ]);
+    const ruleIndex = buildTouchKeyRuleIndex(irWithRule("K_QUOTE", "̀"));
+    expect(
+      computeTouchCoverage(physical, ["̀"], { ruleIndex, stripDottedCircle: false }).uncovered,
+    ).toEqual([]);
+  });
+
+  it("credits a sub-key's rule output — the index is passed down into sk", () => {
+    const nested = makeLayout([
+      {
+        id: "default",
+        rows: [
+          {
+            keys: [
+              makeKey("T_HOST", { text: "h", sk: [makeKey("T_SUB", { text: "s" })] }),
+            ],
+          },
+        ],
+      },
+    ]);
+    const ruleIndex = buildTouchKeyRuleIndex(irWithRule("T_SUB", "ŝ"));
+    expect(computeTouchCoverage(nested, ["ŝ"], { ruleIndex }).uncovered).toEqual([]);
+    // …and without the index it stays uncovered, so the assertion above is not
+    // passing for some unrelated reason.
+    expect(computeTouchCoverage(nested, ["ŝ"]).uncovered).toEqual(["ŝ"]);
+  });
+
+  it("does NOT credit a guard rule's re-emitted context as production", () => {
+    // A `> context` guard produces nothing. Crediting it would make Cameroon's
+    // guard-first idiom over-credit every mark key twice over.
+    const ir = makeTestIR([
+      {
+        nodeId: "group#main",
+        name: "Main",
+        usingKeys: true,
+        readonly: false,
+        rules: [
+          {
+            nodeId: "rule#guard",
+            context: [
+              { kind: "any", storeRef: "diablock" },
+              { kind: "raw", text: "+" },
+              { kind: "vkey", name: "T_0300", modifiers: [] },
+            ],
+            output: [{ kind: "raw", text: "context" }],
+          },
+        ],
+      },
+    ]);
+    const ruleIndex = buildTouchKeyRuleIndex(ir);
+    expect(
+      computeTouchCoverage(layout(), ["̀"], { ruleIndex, stripDottedCircle: false }).uncovered,
+    ).toEqual(["̀"]);
+  });
+});
+
+describe("stripDottedCircle — additive and narrow (FR-006)", () => {
+  it("strips a mark keycap to its bare mark", () => {
+    expect(stripDottedCircle("◌̀")).toBe("̀");
+  });
+
+  it("does NOT strip a bare dotted circle to empty", () => {
+    // Load-bearing: sil_cameroon_qwerty's store(letter) ends in a literal ◌, so
+    // U+25CC is a real inventory character on that keyboard. Stripping it to
+    // nothing would make a genuinely covered character read as uncovered.
+    expect(stripDottedCircle("◌")).toBeUndefined();
+    expect(stripDottedCircle("◌◌")).toBeUndefined();
+  });
+
+  it("leaves a mixed letter/placeholder keycap untouched", () => {
+    expect(stripDottedCircle("a◌b")).toBeUndefined();
+  });
+
+  it("returns undefined when there is no dotted circle at all", () => {
+    expect(stripDottedCircle("a")).toBeUndefined();
+    expect(stripDottedCircle("̀")).toBeUndefined();
+  });
+
+  it("handles a multi-mark keycap", () => {
+    expect(stripDottedCircle("◌̀̈")).toBe("̀̈");
+  });
+});
+
+describe("computeTouchCoverage — the U+25CC strip in situ", () => {
+  it("credits BOTH the unstripped and stripped forms, never one instead of the other", () => {
+    const layout = makeLayout([
+      { id: "default", rows: [{ keys: [makeKey("T_0300", { text: "◌̀" })] }] },
+    ]);
+    // The bare mark is credited by the strip …
+    expect(computeTouchCoverage(layout, ["̀"]).uncovered).toEqual([]);
+    // … and the full keycap string is still credited as before.
+    expect(computeTouchCoverage(layout, ["◌̀".normalize("NFC")]).uncovered).toEqual([]);
+  });
+
+  it("a bare ◌ keycap still covers U+25CC and is not stripped away", () => {
+    const layout = makeLayout([
+      { id: "default", rows: [{ keys: [makeKey("T_DOTTED", { text: "◌" })] }] },
+    ]);
+    expect(computeTouchCoverage(layout, ["◌"]).uncovered).toEqual([]);
+  });
+
+  it("can be turned off, and then the mark is uncovered again", () => {
+    const layout = makeLayout([
+      { id: "default", rows: [{ keys: [makeKey("T_0300", { text: "◌̀" })] }] },
+    ]);
+    expect(
+      computeTouchCoverage(layout, ["̀"], { stripDottedCircle: false }).uncovered,
+    ).toEqual(["̀"]);
+  });
+
+  it("does not strip a `*`-prefixed frame label", () => {
+    // Frame labels are never producers; the strip must not sneak one in.
+    const layout = makeLayout([
+      { id: "default", rows: [{ keys: [makeKey("T_FRAME", { text: "*◌̀*" })] }] },
+    ]);
+    expect(computeTouchCoverage(layout, ["̀"]).uncovered).toEqual(["̀"]);
+  });
+});
+
+describe("computeTouchCoverage — the corrected sp enum (FR-012)", () => {
+  it("credits a deadkey-styled sp:8 key — it is interactive, not a spacer", () => {
+    const layout = makeLayout([
+      { id: "default", rows: [{ keys: [makeKey("T_DK", { text: "ə", sp: 8 })] }] },
+    ]);
+    expect(computeTouchCoverage(layout, ["ə"]).uncovered).toEqual([]);
+  });
+
+  it("does NOT credit a blank sp:9 key's keycap text", () => {
+    // Cameroon's T_BLANK sites carry " ", so the old {8,10} reading spuriously
+    // credited a space as covered while treating sp:8 keys as inert.
+    const layout = makeLayout([
+      { id: "default", rows: [{ keys: [makeKey("T_BLANK", { text: " ", sp: 9 })] }] },
+    ]);
+    expect(computeTouchCoverage(layout, [" "]).uncovered).toEqual([" "]);
+  });
+
+  it("does NOT credit a spacer sp:10 key", () => {
+    const layout = makeLayout([
+      { id: "default", rows: [{ keys: [makeKey("T_SPACER", { text: "x", sp: 10 })] }] },
+    ]);
+    expect(computeTouchCoverage(layout, ["x"]).uncovered).toEqual(["x"]);
+  });
+
+  it("does not credit an sp:9 key's RULE output either — the class short-circuits first", () => {
+    const layout = makeLayout([
+      { id: "default", rows: [{ keys: [makeKey("T_BLANK", { text: " ", sp: 9 })] }] },
+    ]);
+    const ruleIndex = buildTouchKeyRuleIndex(irWithRule("T_BLANK", "z"));
+    expect(computeTouchCoverage(layout, ["z"], { ruleIndex }).uncovered).toEqual(["z"]);
+  });
+
+  it("the two class predicates partition the enum tail as documented", () => {
+    expect(isSpacerKeyClass(9)).toBe(true);
+    expect(isSpacerKeyClass(10)).toBe(true);
+    expect(isSpacerKeyClass(8)).toBe(false);
+    expect(isDeadkeyStyledKeyClass(8)).toBe(true);
+    expect(isDeadkeyStyledKeyClass(9)).toBe(false);
+    for (const sp of [0, 1, 2]) {
+      expect(isSpacerKeyClass(sp)).toBe(false);
+      expect(isDeadkeyStyledKeyClass(sp)).toBe(false);
+    }
+    expect(isSpacerKeyClass(undefined)).toBe(false);
+    expect(isDeadkeyStyledKeyClass(undefined)).toBe(false);
+  });
+});
+
+describe("computeTouchCoverage — multi-char behaviour", () => {
+  it("credits a multi-char keycap as its whole string, not per codepoint", () => {
+    // Pre-existing behaviour, pinned here because the rule-index path adds a
+    // per-codepoint credit alongside it and the two must not be confused.
+    const layout = makeLayout([
+      { id: "default", rows: [{ keys: [makeKey("T_FCFA", { text: "FCFA" })] }] },
+    ]);
+    expect(computeTouchCoverage(layout, ["FCFA"]).uncovered).toEqual([]);
+    expect(computeTouchCoverage(layout, ["F"]).uncovered).toEqual(["F"]);
+  });
+
+  it("a multi-char RULE output credits each codepoint individually", () => {
+    const layout = makeLayout([
+      { id: "default", rows: [{ keys: [makeKey("T_FCFA", { text: "*FCFA*" })] }] },
+    ]);
+    const ruleIndex = buildTouchKeyRuleIndex(irWithRule("T_FCFA", "FCFA"));
+    // The join's `produced` is the per-codepoint set, so each letter is covered…
+    expect(computeTouchCoverage(layout, ["F", "C", "A"], { ruleIndex }).uncovered).toEqual([]);
+    // …but the whole string is not, since nothing credits it as a unit here.
+    expect(computeTouchCoverage(layout, ["FCFA"], { ruleIndex }).uncovered).toEqual(["FCFA"]);
   });
 });

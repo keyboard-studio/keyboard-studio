@@ -91,8 +91,20 @@ describe("output projection completes the scaffold stubs (Track 1)", () => {
 
     const projected = await projectWorkingCopyForOutput();
     expect(projected).not.toBeNull();
-    // Track 2's package fidelity is its own concern — a freshly generated
-    // stub .kps would silently mask the imported package's metadata.
-    expect(readVfsText(projected!.vfs, `source/${keyboardId}.kps`)).toBeUndefined();
+    // welcome.htm is the stub-only artifact: step 5b writes it, nothing else
+    // does, so its absence is what "generateStubs did not run" looks like from
+    // the delivered tree.
+    expect(readVfsText(projected!.vfs, "source/welcome.htm")).toBeUndefined();
+    // The .kps is NOT a counter-example. Step 5b still skips this track; the
+    // descriptor here comes from step 3.6, which runs on BOTH tracks
+    // (spec 059 FR-006). It cannot mask imported package metadata — the
+    // fear the earlier assertion here encoded — because
+    // fetchKeyboardSourceToVfs never fetches the base's .kps in the first
+    // place (it references compiled ../build/* artifacts), so before 3.6 the
+    // adapt track shipped no descriptor at all. serializeWorkingCopy.descriptor.test.ts
+    // owns what it declares; this only pins which step produced it.
+    const kps = readVfsText(projected!.vfs, `source/${keyboardId}.kps`);
+    expect(kps).toBeDefined();
+    expect(kps).toContain(`<ID>${keyboardId}</ID>`);
   });
 });

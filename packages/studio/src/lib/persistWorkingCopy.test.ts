@@ -15,6 +15,7 @@ import {
   prepareWorkingCopySnapshot,
   type WorkingCopySnapshot,
 } from "./persistWorkingCopy.ts";
+import { DRAFT_VERSION } from "./draftPersistence.ts";
 
 // ---------------------------------------------------------------------------
 // sessionStorage stub (jsdom provides it but let's ensure clean isolation)
@@ -535,6 +536,139 @@ describe("persistWorkingCopy", () => {
       const patch = prepareWorkingCopySnapshot(legacySnapshot);
       expect(patch.deletedTouchKeyIds).toBeInstanceOf(Set);
       expect(patch.deletedTouchKeyIds?.size).toBe(0);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // keyEditOverlay / touchEditorMode — spec 058 T058.
+  //
+  // Both fields join WorkingCopySnapshot as OPTIONAL with a tolerant fallback
+  // read in prepareWorkingCopySnapshot, per data-model.md §9 / R10.3: DRAFT_VERSION
+  // stays 1 (VR-1 discards a version-mismatched draft rather than migrating it,
+  // so a bump would throw away every author's in-progress keyboard).
+  // -------------------------------------------------------------------------
+
+  describe("keyEditOverlay / touchEditorMode persistence (T058)", () => {
+    it("DRAFT_VERSION stays 1 — these fields are additive, not a version bump", () => {
+      expect(DRAFT_VERSION).toBe(1);
+    });
+
+    it("round-trip through sessionStorage snapshot/rehydrate", () => {
+      const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+      const vfs = createVirtualFS([]);
+
+      useWorkingCopyStore.getState().instantiateFromBase(
+        { id: "kbd", displayName: "Kbd", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
+        { vfs, ir },
+      );
+      useWorkingCopyStore.getState().commitKeyEdit({
+        address: "phone:default:K_A",
+        kind: "suppress",
+        spClass: 9,
+        sentinelId: "T_none",
+      });
+      useWorkingCopyStore.getState().setTouchEditorMode("key");
+
+      snapshotWorkingCopyToSession();
+      useWorkingCopyStore.getState().reset();
+
+      const result = rehydrateWorkingCopyFromSession();
+      expect(result).toBe(true);
+
+      const s = useWorkingCopyStore.getState();
+      expect(s.keyEditOverlay.ops).toHaveLength(1);
+      expect(s.keyEditOverlay.ops[0]).toMatchObject({ address: "phone:default:K_A", kind: "suppress" });
+      expect(s.touchEditorMode).toBe("key");
+    });
+
+    it("snapshotWorkingCopyData serializes both fields as plain JSON-safe data", () => {
+      useWorkingCopyStore.getState().instantiateFromBase(
+        { id: "kbd", displayName: "Kbd", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
+        { vfs: createVirtualFS(), ir: makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR },
+      );
+      useWorkingCopyStore.getState().commitKeyEdit({
+        address: "phone:default:K_A",
+        kind: "suppress",
+        spClass: 9,
+        sentinelId: "T_none",
+      });
+
+      const snapshot = snapshotWorkingCopyData();
+      expect(snapshot.keyEditOverlay).toEqual({
+        ops: [{ address: "phone:default:K_A", kind: "suppress", spClass: 9, sentinelId: "T_none", seq: 0 }],
+      });
+      expect(snapshot.touchEditorMode).toBe("character");
+    });
+
+    it("prepareWorkingCopySnapshot tolerates a pre-058 snapshot missing both fields, without clobbering store defaults", () => {
+      const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+      const legacySnapshot = {
+        instantiationMode: "new-from-base",
+        baseKeyboard: { id: "kbd", displayName: "Kbd", languages: [] },
+        baseVfsEntries: [],
+        baseIr: ir,
+        identity: null,
+        ir,
+        deletedNodeIds: [],
+        deletedItemIds: [],
+        deletedTouchKeyIds: [],
+        undoStack: [],
+        phaseResults: [],
+        irAxes: {},
+        desktopLocked: false,
+        sequenceFlaggedChars: [],
+        touchLayoutJson: null,
+        touchDraft: null,
+        galleryIntrosSeen: { mechanism: false, touch: false },
+        staleSteps: [],
+        validatorFindings: [],
+        axisFills: [],
+        // keyEditOverlay / touchEditorMode intentionally OMITTED — this is
+        // exactly the shape a snapshot written before spec 058 has.
+      } as unknown as WorkingCopySnapshot;
+
+      const patch = prepareWorkingCopySnapshot(legacySnapshot);
+      expect(patch.keyEditOverlay).toEqual({ ops: [] });
+      expect(patch.touchEditorMode).toBe("character");
+    });
+
+    it("a rehydrated pre-058 snapshot loads without clobbering the store defaults", () => {
+      // Write a raw pre-058-shaped envelope straight into sessionStorage —
+      // simulating a draft saved by an older build, before these fields existed.
+      const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+      const legacySnapshot = {
+        instantiationMode: "new-from-base",
+        baseKeyboard: { id: "kbd", displayName: "Kbd", languages: [] },
+        baseVfsEntries: [],
+        baseIr: ir,
+        identity: null,
+        ir,
+        deletedNodeIds: [],
+        deletedItemIds: [],
+        deletedTouchKeyIds: [],
+        undoStack: [],
+        phaseResults: [],
+        irAxes: {},
+        desktopLocked: false,
+        sequenceFlaggedChars: [],
+        touchLayoutJson: null,
+        touchDraft: null,
+        galleryIntrosSeen: { mechanism: false, touch: false },
+        staleSteps: [],
+        validatorFindings: [],
+        axisFills: [],
+        // No keyEditOverlay / touchEditorMode key at all.
+      };
+      sessionStorage.setItem("ks.working-copy.draft", JSON.stringify(legacySnapshot));
+
+      useWorkingCopyStore.getState().reset();
+      const result = rehydrateWorkingCopyFromSession();
+      expect(result).toBe(true);
+
+      const s = useWorkingCopyStore.getState();
+      // Store defaults, not undefined/clobbered.
+      expect(s.keyEditOverlay).toEqual({ ops: [] });
+      expect(s.touchEditorMode).toBe("character");
     });
   });
 

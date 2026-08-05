@@ -122,6 +122,32 @@ export type ValidationResult =
   | { ok: true }
   | { ok: false; code: string; message: string };
 
+// ---------------------------------------------------------------------------
+// Output reach (spec 059 FR-016, contracts/question-output-reach.md)
+// ---------------------------------------------------------------------------
+
+/**
+ * An emitted artifact a question's answer reaches.
+ *
+ * One member today. The point of the type is that the set is CLOSED and named:
+ * a question cannot declare it reaches "the package" in prose that no check can
+ * read.
+ */
+export type OutputTargetId = "package-descriptor";
+
+/**
+ * An identity-overlay field the answer feeds. Names match `IdentityOverlay`'s
+ * own fields (`lib/projectWorkingCopyVfs.ts`) so the counterfactual can vary the
+ * declared field directly rather than translating between two vocabularies.
+ */
+export type IdentityOverlayField = "displayName" | "bcp47" | "languageName";
+
+/** One output artifact + field a question's answer reaches. */
+export interface OutputWrite {
+  target: OutputTargetId;
+  field: IdentityOverlayField;
+}
+
 /**
  * Context passed to a module's `mutate()` (spec-014, mutate-seam.contract.md).
  *
@@ -191,6 +217,23 @@ export interface QuestionModule {
    * Explicit `[]` is required for questions that write nothing (G7 / FR-006).
    */
   writes?: readonly IRPath[];
+
+  /**
+   * Output artifacts this question's answer reaches, if any (spec 059 FR-016).
+   *
+   * DIFFERENT ADDRESS SPACE from `writes`. `writes` is `IRPath[]` over
+   * `KeyboardIR` and governs `mutate()` containment; `outputs` names emitted
+   * ARTIFACTS. A question may legitimately declare `writes: []` and a non-empty
+   * `outputs` — an identity answer writes no IR and still ships in the `.kps`.
+   * That combination was previously inexpressible, which is why a question could
+   * promise the author their answer went on the finished keyboard while nothing
+   * in the repository could check the claim.
+   *
+   * Absent is permitted (most questions reach no output artifact directly); an
+   * explicit `[]` states it deliberately. `questions/outputReach.test.ts`
+   * validates every declared entry against the writer's own consumed-field table.
+   */
+  outputs?: readonly OutputWrite[];
 
   /**
    * Optional IR mutation hook — the question-module IR write seam (spec-014,

@@ -755,6 +755,18 @@ export function FlowGraphView({ graph, pathOverlay, resolveAlternative }: FlowGr
                     "This step sits behind a lock that has already closed, so an alternative cannot be derived from here.",
                 })}
               </p>
+            ) : outcome.impact.reason === "no-working-copy-yet" ? (
+              // An EXPLICIT arm (spec 059 FR-012). Falling into the trailing
+              // "no re-derivable write path" branch below would tell the author
+              // this step cannot be explored, when in fact it can as soon as a
+              // base keyboard exists to project.
+              <p style={noticeStyle}>
+                {t({
+                  id: "dashboard.flowGraph.alternative.unavailable.noWorkingCopyYet",
+                  message:
+                    "This step comes before a keyboard exists to change, so an alternative cannot be derived yet. Choose a base keyboard and it will appear here.",
+                })}
+              </p>
             ) : (
               <p style={noticeStyle}>
                 {t({

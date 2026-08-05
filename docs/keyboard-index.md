@@ -40,6 +40,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | US Basic | `basic_kbdus` | `en`, `bg-Latn`, `id`, `io-Latn`, `ia-Latn`, `zlm-Latn`, `ms`, `bi-Latn`, `gil-Latn`, `ht`, `mwl-Latn`, `blc-Latn`, `roo-Latn`, `so`, `sw` … (+6 more) | © 2008-2020 SIL International | `../keyboards/release/basic/basic_kbdus` |
 | Western Cree (TH-Woods) | `bj_cree_woods` | `cr` | Bill Jancewicz | `../keyboards/release/bj/bj_cree_woods` |
 | BU Phonetic | `bu_phonetic` | `fr`, `de`, `und-Latn`, `es` | J. Albert Bickford | `../keyboards/release/b/bu_phonetic` |
+| Bukawa | `bukawa` | `buk` | William Eckermann | `../keyboards/release/b/bukawa` |
 | Clavier du Burkina | `clavbur9` | `bm`, `bbo`, `beh`, `bfo`, `bib`, `bmq`, `bof`, `box`, `bwj`, `bwq`, `bwy`, `bxl`, `cme`, `dgd`, `dgs` … (+18 more) | © SIL Burkina Faso | `../keyboards/release/c/clavbur9` |
 | Simplified Chinese | `cs_pinyin` | `zh` | SIL International | `../keyboards/release/c/cs_pinyin` |
 | Common Devanagari | `common_devanagari` | `hi` | © 2021 WIn Publishing Trust | `../keyboards/release/c/common_devanagari` |
@@ -49,6 +50,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | தமிழ்99 \| Tamil99 | `ekwtamil99uni` | `ta` | Mugunth, Umar, K. Sethu | `../keyboards/release/e/ekwtamil99uni` |
 | Enggano | `enggano` | `eno` | Mary Dalrymple | `../keyboards/release/e/enggano` |
 | ᓀᐦᐃᔭᐍᐏᐣ (Plains Cree) | `fv_plains_cree` | `crk` | (c) 2015-2025 FirstVoices, SIL Global, 2015 First Peoples' Cultural Foundation | `../keyboards/release/fv/fv_plains_cree` |
+| ᑐᑊᘁᗕᑋᗸ (Southern Carrier) | `fv_southern_carrier` | `caf-Cans` | (c) 2015-2024 FirstVoices, SIL International, 2015 First Peoples' Cultural Foundation | `../keyboards/release/fv/fv_southern_carrier` |
 | Gautami Bangla/Bengali | `gautami_bangla_bengali` | `bn-IN` | Gautam Sengupta | `../keyboards/release/gautami/gautami_bangla_bengali` |
 | Gautami Devanagari | `gautami_devanagari` | `hi`, `sa` | Gautam Sengupta | `../keyboards/release/gautami/gautami_devanagari` |
 | Gautami IndiTran | `gautami_inditran` | `la` | Gautam Sengupta | `../keyboards/release/gautami/gautami_inditran` |
@@ -57,6 +59,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Georgian Basic | `basic_kbdgeo` | `ka` | (c) 2009-2019 SIL International | `../keyboards/release/basic/basic_kbdgeo` |
 | GFF Amharic | `gff_amharic` | `am` | The Geʾez Frontier Foundation | `../keyboards/release/gff/gff_amharic` |
 | GFF Geʾez Manuscript | `gff_geez_emufi` | `gez` | The Geʾez Frontier Foundation | `../keyboards/experimental/gff/gff_geez_emufi` |
+| Ghana | `ghana` | `ak-Latn`, `ee-Latn`, `ada-Latn`, `dga-Latn`, `hag-Latn`, `nzi-Latn`, `xsm-Latn` | © 2017-2020 SIL International | `../keyboards/release/g/ghana` |
 | Greek Basic | `basic_kbdhe` | `el` | (c) 2009-2019 SIL International | `../keyboards/release/basic/basic_kbdhe` |
 | Hausa Kano | `hausa_kano` | `ha-Latn` | Hamza Sulayman | `../keyboards/release/h/hausa_kano` |
 | Bengali Phonetic (ITRANS) | `itrans_bengali` | `bn`, `as` | Shree Devi Kumar | `../keyboards/release/itrans/itrans_bengali` |
@@ -94,6 +97,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Kannada WinScript (NLCI) | `nlci_kannada_winscript` | `kn`, `kfi-Knda`, `tcy`, `sa-Knda` | Binila Sanki, SG NLCI | `../keyboards/release/nlci/nlci_kannada_winscript` |
 | Telugu Winscript (NLCI) | `nlci_telugu_winscript` | `te` | Binila Sanki, SG NLCI | `../keyboards/release/nlci/nlci_telugu_winscript` |
 | Philippines (SIL) | `sil_philippines` | `tl`, `abc-Latn`, `abp-Latn`, `abx-Latn`, `agn-Latn`, `agt-Latn`, `agy-Latn`, `akl-Latn`, `alj-Latn`, `apf-Latn`, `atd-Latn`, `att-Latn`, `bcl-Latn`, `bgs-Latn`, `bhk-Latn` … (+110 more) | Kåre J. Strømme | `../keyboards/release/sil/sil_philippines` |
+| Senegal Bayot AZERTY | `sil_senegal_bda_azerty` | `bda` | SIL Senegal | `../keyboards/release/sil/sil_senegal_bda_azerty` |
 | Tchad QWERTY | `sil_tchad_qwerty` | `amj`, `sjg`, `bmi`, `bva`, `bjv`, `bxv`, `bes`, `bid`, `btf`, `bvo`, `glc`, `bvf`, `bub`, `bdm`, `bso` … (+116 more) | Jeff Heath & Roger Nadoumngar | `../keyboards/release/sil/sil_tchad_qwerty` |
 | Uganda-Tanzania Bantu (SIL) | `sil_uganda_tanzania` | `sw`, `lg-Latn`, `swh-Latn`, `asa-Latn`, `bdp-Latn`, `bez-Latn`, `bou-Latn`, `cgg-Latn`, `cwa-Latn`, `cwe-Latn`, `dhs-Latn`, `dne-Latn`, `doe-Latn`, `fip-Latn`, `gmx-Latn` … (+96 more) | 2004-2020 SIL International | `../keyboards/release/sil/sil_uganda_tanzania` |
 | SIL Yi | `sil_yi` | `ii` | Andy Eatough, Dennis Walters, David Rowe | `../keyboards/release/sil/sil_yi` |

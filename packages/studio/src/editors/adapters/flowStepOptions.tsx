@@ -179,7 +179,26 @@ export const projectNameOptions: FlowStepOptions<ProjectNamePayload> = {
   onCommit(extracted: ProjectNamePayload, deps: FlowStepDeps): void {
     // R7 ordering: setScaffoldSpec BEFORE setIdentity BEFORE onComplete → advance.
     deps.setScaffoldSpec({ keyboardId: extracted.keyboardId, displayName: extracted.displayName });
-    deps.setIdentity({ keyboardId: extracted.keyboardId, displayName: extracted.displayName });
+    // spec 059 FR-001/FR-002: carry the identity-lite answers into the working
+    // copy so the package descriptor can declare the AUTHOR's language. Before
+    // this, Track 1 set only keyboardId and displayName — the composed tag lived
+    // in surveySessionStore.identityResult and never crossed over, so the
+    // descriptor had no author tag to write even in principle.
+    //
+    // `bcp47` is consumed WHOLE (research D-03). The identity-lite series already
+    // composed language + region + script into one tag; re-deriving it here would
+    // be a second composition rule that could disagree with the first. An empty
+    // string (author left the language code blank) is omitted rather than written,
+    // so the descriptor writer applies its own `und` placeholder instead of
+    // declaring a blank tag.
+    const bcp47 = deps.identityResult?.bcp47.trim() ?? "";
+    const languageName = deps.identityResult?.english.trim() ?? "";
+    deps.setIdentity({
+      keyboardId: extracted.keyboardId,
+      displayName: extracted.displayName,
+      ...(bcp47 !== "" ? { bcp47 } : {}),
+      ...(languageName !== "" ? { languageName } : {}),
+    });
   },
 };
 

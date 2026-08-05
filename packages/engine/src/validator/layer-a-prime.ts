@@ -15,6 +15,7 @@
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type { LintFinding, KeyboardIR, IRRule } from "@keyboard-studio/contracts";
+import { isValidTouchKeyIdentifier } from "@keyboard-studio/contracts";
 import type { ParseResult } from "../codec/parse.js";
 import { tokenize } from "../codec/tokenize.js";
 import { computeSha256Hex } from "../codec/hash.js";
@@ -383,6 +384,99 @@ export function checkOwnershipConsistency(ir: KeyboardIR): LintFinding[] {
           `Rule node "${rule.nodeId}" is owned by Pattern "${rule.ownedByPattern}", ` +
           "but no such Pattern exists (orphaned node — its Pattern was deleted).",
       });
+    }
+  }
+
+  return findings;
+}
+
+// ---------------------------------------------------------------------------
+// 0x05A — ERROR_TouchLayoutInvalidIdentifier, as a VALIDITY concern (spec 058
+// FR-040 / T043).
+//
+// WHY THIS IS NOT A LAYER C CHECK. An id the compiler rejects is a validity
+// problem, not a style or hygiene one, and every check shipped in
+// `@keymanapp/keyboard-lint` today is warning severity — grep confirms zero
+// error severities. Introducing the first error-severity Layer C code would be a
+// layer-boundary breach nobody signed off on.
+//
+// The two paths that DO own 0x05A:
+//   - AUTHOR-TYPED ids: edit-time REJECTION (FR-045). The mutation is blocked
+//     before it can be saved, and no finding is emitted at all — there is nothing
+//     to report, because the invalid state never exists.
+//   - AN IMPORTED KEYBOARD'S EXISTING ids: this check. Layer A′ is exactly the
+//     shape for a validity finding surfaced on import rather than on edit, which
+//     is why it is spread into `runImportFidelityParseChecks` rather than added to
+//     the debounce-cycle `runAllChecks` path.
+//
+// Neither path adds anything to Layer C.
+// ---------------------------------------------------------------------------
+
+/** Shared code for the 0x05A import-fidelity finding (the A′ `KM_ERROR_*` namespace). */
+export const TOUCH_LAYOUT_INVALID_IDENTIFIER_CODE = "KM_ERROR_TOUCH_LAYOUT_INVALID_IDENTIFIER";
+
+// The identifier grammar itself is `isValidTouchKeyIdentifier`
+// (`@keyboard-studio/contracts`, `touch-key-rule-join.ts`). It moved there at
+// spec 058 T118 so this import-fidelity check and the edit-time REJECTION path
+// (`checkKeyEditRejections`, `keyEditOps.ts`) cannot disagree about what 0x05A
+// rejects — FR-040 requires the two paths to share one definition, and a private
+// regex here was the second copy waiting to happen.
+
+/**
+ * 0x05A: report every touch-layout key id the compiler would reject.
+ *
+ * Walks the whole touch layout including `sk` / `multitap` / `flick` sub-keys — an
+ * invalid id on a longpress entry fails the compile exactly as one on a main key
+ * does.
+ *
+ * ONE FINDING PER DISTINCT INVALID ID, not per occurrence: an id repeated across
+ * eight layers is one authoring mistake with one fix, and eight identical errors
+ * would bury the rest of the import report.
+ *
+ * Returns `[]` when the IR has no touch layout — there is nothing to validate,
+ * which is the common case for a desktop-only keyboard.
+ */
+export function checkTouchLayoutIdentifiers(parseResult: ParseResult): LintFinding[] {
+  const layout = parseResult.ir.touchLayout;
+  if (layout === undefined) return [];
+
+  const findings: LintFinding[] = [];
+  const reported = new Set<string>();
+
+  const visit = (key: { id: string; sk?: unknown; multitap?: unknown; flick?: unknown }, platformId: string, layerId: string): void => {
+    const id = key.id;
+    // An empty id is invalid, and reported with its own wording: "" tells the
+    // author nothing, whereas naming the layer locates it.
+    const invalid = !isValidTouchKeyIdentifier(id);
+    if (invalid && !reported.has(id)) {
+      reported.add(id);
+      findings.push({
+        code: TOUCH_LAYOUT_INVALID_IDENTIFIER_CODE,
+        severity: "error",
+        layer: "A",
+        message:
+          id.length === 0
+            ? `Touch layout has a key with no id (${platformId} layer "${layerId}"); the Keyman compiler rejects this (0x05A).`
+            : `Touch layout key id "${id}" (${platformId} layer "${layerId}") is not a valid identifier; the Keyman compiler rejects this (0x05A).`,
+        hint: `Rename the key to a valid identifier — a letter or underscore followed by letters, digits, or underscores (e.g. \`T_MYKEY\` or \`U_00E9\`).`,
+      });
+    }
+
+    const subs = [
+      ...((key.sk as { id: string }[] | undefined) ?? []),
+      ...((key.multitap as { id: string }[] | undefined) ?? []),
+      ...Object.values((key.flick as Record<string, { id: string } | undefined> | undefined) ?? {}).filter(
+        (v): v is { id: string } => v !== undefined,
+      ),
+    ];
+    for (const sub of subs) visit(sub, platformId, layerId);
+  };
+
+  for (const platform of layout.platforms) {
+    for (const layer of platform.layers) {
+      for (const row of layer.rows) {
+        for (const key of row.keys) visit(key, platform.id, layer.id);
+      }
     }
   }
 

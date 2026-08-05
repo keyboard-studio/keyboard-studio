@@ -37,6 +37,7 @@ import { loadModularFlow } from "../../survey/loadModularFlow.ts";
 import { flowSources } from "../../steps/flowSources.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import type { IdentityPatch } from "../../stores/workingCopyStore.ts";
 import { useValidatorFindings } from "../../hooks/useValidatorFindings.ts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import type { SurveyContext } from "../../survey/types.ts";
@@ -66,11 +67,18 @@ const STEP_TITLE_MESSAGES: Record<string, MessageDescriptor> = {
 
 export interface FlowStepDeps {
   localBase: { displayName: string } | null;
-  identityResult: { autonym: string; english: string } | null;
+  /**
+   * The identity-lite answers. `bcp47` is the tag the series COMPOSED (spec 030);
+   * `english` is the language's English name. Both are read verbatim by
+   * projectNameOptions.onCommit so the package descriptor can declare them
+   * (spec 059 FR-001/FR-002) — this step is the only place on the copy track
+   * where the composed tag crosses from the survey session into the working copy.
+   */
+  identityResult: { autonym: string; english: string; bcp47: string } | null;
   surveyContext: SurveyContext;
   setSelectedTrack: (t: "copy" | "adapt" | null) => void;
   setScaffoldSpec: (s: { keyboardId: string; displayName: string } | null) => void;
-  setIdentity: (patch: { keyboardId: string; displayName: string }) => void;
+  setIdentity: (patch: IdentityPatch) => void;
   findingsByQuestionId: Record<string, LintFinding[]>;
   /**
    * Per-mount mutable ref for tracking the committed display name across

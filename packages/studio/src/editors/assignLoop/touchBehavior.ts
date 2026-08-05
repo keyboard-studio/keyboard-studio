@@ -20,7 +20,12 @@
 
 import type { KeyboardIR, TouchKeyIR, TouchLayoutIR } from "@keyboard-studio/contracts";
 import type { ModifierToken } from "@keyboard-studio/engine";
-import { canonicalizeCombo, comboToTouchLayerId } from "@keyboard-studio/engine";
+import {
+  canonicalizeCombo,
+  comboToTouchLayerId,
+  parseTouchKeyAddress,
+  resolveKeyAddress,
+} from "@keyboard-studio/engine";
 
 /**
  * A touch layer id, matching `comboToTouchLayerId`'s vocabulary. The named
@@ -130,6 +135,72 @@ export function promoteKeyToHandSet(
       layers: platform.layers.map((layer) => ({
         ...layer,
         rows: layer.rows.map((row) => ({ keys: row.keys.map(promote) })),
+      })),
+    })),
+    nodeIds: structuredClone(layout.nodeIds),
+  };
+}
+
+/**
+ * Return a structural clone of `layout` with the ONE key named by `address`
+ * promoted to `hand-set`. Address-matched, NOT id-matched (spec 058 FR-031) —
+ * this is the by-key-edit counterpart to {@link promoteKeyToHandSet}, which
+ * stays id-matched/all-platforms/all-layers for the by-character flow and is
+ * never changed by this addition.
+ *
+ * Two failures the id-matched helper has for a by-key edit, which this fixes:
+ *
+ *   1. A rename cannot miss: the caller promotes at the address the edit
+ *      landed on (built fresh from the post-rename key id), not the address
+ *      the overlay op originally named, so renaming a key and then editing it
+ *      still finds and promotes exactly that key.
+ *   2. No incidental fan-out: a `T_*` id can legitimately recur on several
+ *      layers and platforms (touchKeyAddress.ts's module doc — real corpus
+ *      layouts are not required to have unique ids per layer). Promoting by
+ *      id would re-tag every same-id key anywhere in the layout even though
+ *      the author only touched one. Address-matching resolves platform +
+ *      layer + key together, so only the addressed key is ever touched.
+ *
+ * Reuses `resolveKeyAddress` (via `parseTouchKeyAddress`) — the SAME resolver
+ * the key-edit appliers use — rather than a fourth hand-rolled traversal. An
+ * unparsable or unresolvable address (unknown platform/layer/key id) is a
+ * structural no-op clone, matching `resolveKeyAddress`'s and
+ * `parseTouchKeyAddress`'s shared never-throw convention: an address that no
+ * longer resolves is an ordinary, reportable outcome elsewhere, not this
+ * function's job to raise. Pure — `layout` is not mutated.
+ */
+export function promoteKeyAtAddressToHandSet(
+  layout: TouchLayoutIR,
+  address: string,
+): TouchLayoutIR {
+  const parts = parseTouchKeyAddress(address);
+  const resolved = parts ? resolveKeyAddress(layout, parts) : undefined;
+
+  const promote = (
+    key: TouchKeyIR,
+    platformIndex: number,
+    layerIndex: number,
+    rowIndex: number,
+    keyIndex: number,
+  ): TouchKeyIR =>
+    resolved !== undefined &&
+    platformIndex === resolved.platformIndex &&
+    layerIndex === resolved.layerIndex &&
+    rowIndex === resolved.rowIndex &&
+    keyIndex === resolved.keyIndex
+      ? { ...structuredClone(key), provenance: "hand-set" }
+      : structuredClone(key);
+
+  return {
+    platforms: layout.platforms.map((platform, platformIndex) => ({
+      ...platform,
+      layers: platform.layers.map((layer, layerIndex) => ({
+        ...layer,
+        rows: layer.rows.map((row, rowIndex) => ({
+          keys: row.keys.map((key, keyIndex) =>
+            promote(key, platformIndex, layerIndex, rowIndex, keyIndex),
+          ),
+        })),
       })),
     })),
     nodeIds: structuredClone(layout.nodeIds),

@@ -22,6 +22,7 @@
 import type { TouchLayoutIR, TouchKeyIR, IRNodeRef, TouchKeyProvenance } from "./keyboard-ir";
 import type { VirtualFS } from "./virtualFS";
 import { TouchKeyProvenanceSchema, DEFAULT_TOUCH_PROVENANCE } from "./schemas";
+import { touchKeyAddress, touchSubKeyAddress } from "./touch-key-address";
 
 // TextDecoder is a runtime global in both Node and the browser, but contracts'
 // tsconfig lib (ES2022) does not declare it. Minimal ambient declaration so the
@@ -41,6 +42,20 @@ interface RawKey {
   output?: string;
   nextlayer?: string;
   hint?: string;
+  /**
+   * The wire `layer` property. A standard `.keyman-touch-layout` field this
+   * parser previously dropped; now read into both `TouchKeyIR.layer` (the
+   * authoritative per-key modifier override, spec 058 FR-030) and
+   * `TouchKeyIR.layerAnnotation` (the engine's free-text best-effort surface).
+   */
+  layer?: string;
+  /**
+   * Longpress preselect on a sub-key (spec 058 FR-030). The wire format writes a
+   * real JSON boolean here (unlike `sp`/`width`/`pad`, which are strings), but a
+   * `"true"`/`"1"` string is accepted defensively — the parser's job at this
+   * boundary is to read what corpus files actually contain.
+   */
+  default?: boolean | string | number;
   sk?: RawKey[];
   multitap?: RawKey[];
   flick?: Record<string, RawKey>;
@@ -138,6 +153,26 @@ function toNumber(v: string | number | undefined): number | undefined {
   return Number.isFinite(n) ? n : undefined;
 }
 
+/**
+ * Coerce a wire-format boolean field to a boolean, or undefined.
+ *
+ * `default` is written as a real JSON boolean, so the string/number arms are
+ * defensive only. Note what is deliberately NOT here: no `Boolean(v)` fallback.
+ * An unrecognized value returns `undefined` (the field stays absent) rather
+ * than silently becoming `false`, so a preselect a corpus file expressed in a
+ * form we do not read is a visible absence, not a quiet reversal.
+ */
+function toBoolean(v: boolean | string | number | undefined): boolean | undefined {
+  if (typeof v === "boolean") return v;
+  if (typeof v === "number") return v === 1 ? true : v === 0 ? false : undefined;
+  if (typeof v === "string") {
+    const s = v.trim().toLowerCase();
+    if (s === "true" || s === "1") return true;
+    if (s === "false" || s === "0") return false;
+  }
+  return undefined;
+}
+
 function convertKey(raw: RawKey, nextId: () => string): TouchKeyIR {
   const key: TouchKeyIR = {
     nodeId: nextId(),
@@ -150,11 +185,20 @@ function convertKey(raw: RawKey, nextId: () => string): TouchKeyIR {
   if (raw.text !== undefined) key.text = raw.text;
   if (raw.output !== undefined) key.output = raw.output;
   if (raw.nextlayer !== undefined) key.nextlayer = raw.nextlayer;
+  if (typeof raw.layer === "string" && raw.layer.length > 0) key.layerAnnotation = raw.layer;
   // An empty-string hint is treated as absent (not carried onto the IR): it
   // renders nothing at runtime, so `""` and unset are indistinguishable in
   // behaviour. Unifies onto the engine parser's prior form (the old lint parser
   // kept `""`); blast radius is nil today — no Layer C check reads `hint`.
   if (typeof raw.hint === "string" && raw.hint.length > 0) key.hint = raw.hint;
+
+  // Per-key modifier override and longpress preselect (spec 058 FR-030). Both
+  // were dropped unconditionally before this feature; `layer` is load-bearing
+  // beyond display, since it is what makes a duplicate key id within one layer
+  // two distinct keys rather than a collision.
+  if (typeof raw.layer === "string" && raw.layer.length > 0) key.layer = raw.layer;
+  const preselect = toBoolean(raw.default);
+  if (preselect !== undefined) key.default = preselect;
 
   const sp = toNumber(raw.sp);
   if (sp !== undefined) key.sp = sp;
@@ -218,10 +262,17 @@ export function parseTouchLayoutString(json: string): TouchLayoutIR {
         for (const rawKey of rawRow.key ?? []) {
           const key = convertKey(rawKey, nextId);
           keys.push(key);
-          nodeIds.push([`${platform}:${id}:${key.id}`, { kind: "touchKey", nodeId: key.nodeId }]);
+          // Built by the shared builders (touch-key-address.ts), not
+          // re-interpolated here: `nodeIds` and every `touchKeyAddress` caller
+          // must agree on the format byte-for-byte or an overlay operation
+          // resolves against a node the index cannot find.
+          nodeIds.push([touchKeyAddress(platform, id, key.id), { kind: "touchKey", nodeId: key.nodeId }]);
           if (key.sk) {
             for (const sk of key.sk) {
-              nodeIds.push([`${platform}:${id}:${key.id}:sk:${sk.id}`, { kind: "touchKey", nodeId: sk.nodeId }]);
+              nodeIds.push([
+                touchSubKeyAddress(platform, id, key.id, "sk", sk.id),
+                { kind: "touchKey", nodeId: sk.nodeId },
+              ]);
             }
           }
         }

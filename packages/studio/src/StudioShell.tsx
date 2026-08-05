@@ -41,6 +41,7 @@ import { type RouteId } from "./lib/navigate.ts";
 import { parseLocation } from "./lib/location.ts";
 import { liveResolveContext, setPendingWelcomeLocation } from "./lib/jumpToLocation.ts";
 import { readPaneSplitPct, useViewStateStore } from "./stores/viewStateStore.ts";
+import { useStepWalkStore } from "./stores/stepWalkStore.ts";
 import { useKeyboardArtifact, type OnInstantiateCallback } from "./hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
 import { OSKFrame } from "./components/OSKFrame.tsx";
@@ -73,7 +74,7 @@ import { createStudioDecisionRecorder } from "./decisions/createStudioDecisionRe
 import { createSourceSnapshotter } from "./decisions/snapshotSource.ts";
 import { useDecisionLogStore } from "./decisions/decisionLogStore.ts";
 import { DecisionTrailView } from "./decisions/DecisionTrailView.tsx";
-import { resolveImpact } from "./decisions/impact.ts";
+import { resolveImpact, resolveImpactAsync } from "./decisions/impact.ts";
 import { buildPathOverlay } from "./dashboard/pathOverlay.ts";
 import { projectWorkingCopyForOutput } from "./lib/serializeWorkingCopy.ts";
 import { StepHost } from "./components/StepHost.tsx";
@@ -104,6 +105,7 @@ import {
 import { TEXT_MAIN, TEXT_DIM, FONT } from "./survey/surveyStyles.ts";
 import { CharacterMapPane } from "./survey/CharacterMapPane.tsx";
 import { useBasePreviewStatusStore, type BasePreviewStatus } from "./stores/basePreviewStatusStore.ts";
+import { useStartOverStore } from "./stores/startOverStore.ts";
 import { useInventoryCoverageGate } from "./hooks/useInventoryCoverageGate.ts";
 import { useSurveyBrowserHistorySync } from "./hooks/useSurveyBrowserHistorySync.ts";
 
@@ -270,6 +272,7 @@ interface NavBarProps {
 
 function NavBar({ active, outputBlocked = false, outputBlockedTitle }: NavBarProps) {
   const { i18n: activeI18n } = useLingui();
+  const startOver = useStartOverStore((s) => s.handler);
   return (
     <nav
       aria-label={resolveMessage(
@@ -320,10 +323,14 @@ function NavBar({ active, outputBlocked = false, outputBlockedTitle }: NavBarPro
       </div>
 
       {/* Right group — locale switcher (all routes) + account control
-          (hidden on the welcome route) */}
+          (hidden on the welcome route) + survey reset in the far corner.
+          The reset is last so it can't crowd the controls beside it; it renders
+          only while a survey is mounted (startOverStore publishes the handler
+          from SurveyView, which exists on the #survey route alone). */}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         <LocaleSwitcher />
         {active !== "welcome" && <AccountControl />}
+        {startOver !== null && <SurveyResetButton onReset={startOver} />}
       </div>
     </nav>
   );
@@ -1203,6 +1210,11 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     // and Compare selection behind would make the next keyboard open in a
     // layout the author never chose for it.
     useViewStateStore.getState().reset();
+    // Within-step positions belong to the walk being abandoned. Left behind,
+    // the next keyboard's mechanism/touch galleries would open on a character
+    // from the previous project's inventory — a cursor is only meaningful
+    // against the walk that published it (stores/stepWalkStore.ts).
+    useStepWalkStore.getState().reset();
     snapshotterRef.current.reset();
     pendingArtifactRef.current = null;
     // F6 fix: re-arm the pre-instantiation pending autosave for the NEXT
@@ -1232,6 +1244,24 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     setResumeMeta(null);
     setCloudResume(null);
   }
+
+  // ---------------------------------------------------------------------------
+  // Publish start-over to the NavBar's corner Reset (stores/startOverStore.ts).
+  //
+  // handleStartOver is re-created every render, so what gets published is a
+  // stable thunk over a ref instead — registering the handler itself would
+  // re-write the store (and re-render the nav) on every survey keystroke. The
+  // unmount cleanup clearing it to null is what hides the control off-route.
+  // ---------------------------------------------------------------------------
+  const startOverRef = useRef(handleStartOver);
+  startOverRef.current = handleStartOver;
+  const setStartOverHandler = useStartOverStore((s) => s.setHandler);
+  useEffect(() => {
+    setStartOverHandler(() => {
+      startOverRef.current();
+    });
+    return () => setStartOverHandler(null);
+  }, [setStartOverHandler]);
 
   // ---------------------------------------------------------------------------
   // Resume banner handlers.
@@ -1368,11 +1398,6 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
   const rightPct = 100 - leftPct;
 
-  // Corner reset — visible on every survey step (both layouts). Wired to the
-  // same handleStartOver as the terminal panels' "Start over", so it clears
-  // stores + draft directly and never trips the rebase-confirm dialog.
-  const resetButton = <SurveyResetButton onReset={handleStartOver} />;
-
   // Full-screen steps (carve/mechanisms/touch/touch_seed_source) bypass the
   // two-pane layout. StepHost returns the full-screen container; SurveyView
   // renders it directly. This reproduces the pre-Stage-5 early-return pattern
@@ -1382,12 +1407,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // the two-pane shell's persistent right-pane OSKFrame must NOT also mount —
   // that was the redundant-desktop-preview bug.
   if (activeStepIsFullScreen) {
-    return (
-      <>
-        {stepHost}
-        {resetButton}
-      </>
-    );
+    return stepHost;
   }
 
   return (
@@ -1523,8 +1543,6 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           </>
         )}
       </section>
-
-      {resetButton}
     </div>
   );
 }
@@ -1632,6 +1650,30 @@ export function StudioShell() {
     [impactDeps],
   );
 
+  // spec 059 FR-009/FR-010: the async resolver, for a decision recorded before a
+  // working copy existed. It re-derives the effect by projecting the working copy
+  // twice through `projectWorkingCopyForOutput` — the SAME function the download zip
+  // and the pull-request path use, and the same one `readProjectedFiles` above
+  // delegates to. That is FR-010, not a convenience: both sides of the comparison
+  // must come from the function that produces the shipped keyboard, or the trail can
+  // disagree with the artifact (SC-005).
+  //
+  // Passed as a FUNCTION for the same reason `resolveEntryImpact` is: mounting the
+  // trail resolves nothing, and expanding one row resolves exactly that row.
+  const asyncImpactDeps = useMemo(
+    () => ({
+      ...impactDeps,
+      project: projectWorkingCopyForOutput,
+      hasWorkingCopy: () => useWorkingCopyStore.getState().baseVfs !== null,
+      getRecord: () => useDecisionLogStore.getState().record,
+    }),
+    [impactDeps],
+  );
+  const resolveEntryImpactAsync = useCallback(
+    (entry: DecisionEntry) => resolveImpactAsync(entry, asyncImpactDeps),
+    [asyncImpactDeps],
+  );
+
   // ---------------------------------------------------------------------------
   // Flow-map walked path (spec 053 US3, FR-023/FR-026). Projected HERE, where the
   // record is reachable, and passed into FlowMapView as a prop — `dashboard/` has
@@ -1712,6 +1754,7 @@ export function StudioShell() {
           record={decisionRecord}
           droppedCount={decisionDroppedCount}
           resolveImpact={resolveEntryImpact}
+          resolveImpactAsync={resolveEntryImpactAsync}
           // Spec 057 US5 (FR-050): per-stage collapse and the replaced-
           // decisions toggle are view state, read here for the same
           // layer-boundary reason as the flow map's section above.

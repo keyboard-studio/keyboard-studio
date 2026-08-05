@@ -1,7 +1,18 @@
 // OutputScreen — "ship it" tab.
 //
-// Left pane: shared PickerPane (BaseKeyboardPicker, mode toggle, ScaffoldForm,
-// TrackOneIdentityPanel, KmnEditor, MetadataCard).
+// Left pane: shared PickerPane. Which variant depends on whether a working
+// copy exists (spec 058):
+//   - instantiated (the normal end-of-flow arrival) -> "shipping": read-only
+//     base provenance + a "Change base keyboard" control that routes back to
+//     the survey's choose_base step, plus TrackOneIdentityPanel and KmnEditor.
+//     No mode toggle, no picker — nothing on the ship-it screen can re-base
+//     the working copy in place. See PickerPane.tsx's variant notes.
+//   - not instantiated (cold arrival at #output) -> "full": the historical
+//     pane, so a base can still be selected and compiled here standalone.
+// The variant is a LIVE store subscription, not a mount-once read: SurveyView's
+// onInstantiate can settle after this screen mounts (see usePreviewArtifact's
+// late-instantiation adoption), and an author with a working copy must never be
+// left looking at the start-over pane.
 // Right pane: Download .zip button + downloadError + downloadWarnings banner +
 // showIdentityWarn banner + SignUpPanel.
 //
@@ -34,6 +45,7 @@ import { useGoogleAuth } from "../hooks/useGoogleAuth.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { navigateTo } from "../lib/navigate.ts";
+import { resolveOutputKeyboardId } from "../lib/outputKeyboardId.ts";
 import { TOUCH_STEP_ID } from "../steps/reducer.ts";
 import { BaseKeyboardPicker } from "./BaseKeyboardPicker.tsx";
 import { ScaffoldForm } from "../editors/panels/ScaffoldForm.tsx";
@@ -43,7 +55,13 @@ import { PickerPane } from "./PickerPane.tsx";
 import { SignUpPanel } from "./SignUpPanel.tsx";
 import { ManagedPRSubmitPanel } from "./ManagedPRSubmitPanel.tsx";
 import { ResizeHandle } from "./ResizeHandle.tsx";
-import { DIVIDER_WIDTH, LEFT_MIN_PCT, LEFT_MAX_PCT, LEFT_INIT_PCT } from "./previewOutputLayout.ts";
+import {
+  DIVIDER_WIDTH,
+  LEFT_MIN_PCT,
+  LEFT_MAX_PCT,
+  LEFT_INIT_PCT,
+  PANE_SECONDARY_BUTTON,
+} from "./previewOutputLayout.ts";
 
 // Shared amber "[WARN]" banner shell used by both the touch-staleness banner
 // and the download-projection-warnings banner below. Only the genuinely
@@ -59,6 +77,12 @@ const warningBannerStyle: React.CSSProperties = {
   fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
 };
 
+// Cap the package-failure diagnostic list. A dangling asset reference can
+// produce a long run of near-identical messages, and a banner that pushes the
+// still-working .zip button off screen would turn a recoverable failure into a
+// dead end. The full set is in the console via devLog.
+const KMP_DIAGNOSTIC_LIMIT = 5;
+
 export function OutputScreen() {
   const { t } = useLingui();
   // Each screen runs its own independent artifact pipeline — see usePreviewArtifact.ts module comment for why this is deliberate (do not "dedupe" across screens).
@@ -68,13 +92,15 @@ export function OutputScreen() {
 
   const {
     baseKeyboard,
-    pickerMode,
-    scaffoldSpec,
     canDownload,
     downloading,
     downloadError,
     downloadWarnings,
     handleDownload,
+    buildingKmp,
+    kmpError,
+    kmpDiagnostics,
+    handleDownloadKmp,
     coverageGate,
     showIdentityWarn,
   } = artifact;
@@ -85,6 +111,11 @@ export function OutputScreen() {
   // name + email from the stored identity claims.
   const { login: ghLogin } = useGitHubAuth();
   const { identity: googleIdentity } = useGoogleAuth();
+
+  // Author-chosen keyboard identity (TrackOneIdentityPanel writes it). The
+  // single source for the download control's announced id — see
+  // downloadKeyboardId below.
+  const identity = useWorkingCopyStore((s) => s.identity);
 
   // ---------------------------------------------------------------------------
   // Coverage-blocked explanation (P0 fix) — mirrors PhaseFGate's display
@@ -149,6 +180,22 @@ export function OutputScreen() {
   const staleSteps = useWorkingCopyStore((s) => s.staleSteps);
   const touchStale = staleSteps.has(TOUCH_STEP_ID);
 
+  // Pane variant (spec 058). Live subscription through the store's OWN
+  // predicate — do not fork a second notion of "has a working copy".
+  const instantiated = useWorkingCopyStore((s) => s.isInstantiated());
+
+  // "Change base keyboard" — relocates re-basing to the survey's choose_base
+  // step rather than mutating the working copy from the ship-it screen. A BACK
+  // action (see backToChooseBase's docstring for why an advance() would corrupt
+  // the history stack), and it deliberately mutates nothing itself: the rebase
+  // question is answered at the destination by the existing confirmRebaseTo
+  // gate, which also no-ops when the author re-picks the same base.
+  const sessionBackToChooseBase = useSurveySessionStore((s) => s.backToChooseBase);
+  const handleChangeBase = () => {
+    sessionBackToChooseBase();
+    navigateTo("survey");
+  };
+
   // Derive prefill: Google identity takes precedence (has both name + email).
   // GitHub provides only the login handle as a name hint.
   const submitPrefill: { displayName?: string; email?: string } =
@@ -162,12 +209,16 @@ export function OutputScreen() {
 
   // Download button aria-label — computed unconditionally (cheap) so the JSX
   // below stays a single conditional, not a nested t()-per-branch call site.
-  const downloadKeyboardId =
-    baseKeyboard !== null
-      ? pickerMode === "scaffold" && scaffoldSpec !== null
-        ? scaffoldSpec.keyboardId
-        : baseKeyboard.id
-      : "";
+  //
+  // The id MUST come from the same place the emitted filename does, and the way
+  // it does so is by calling the same function — `resolveOutputKeyboardId`, which
+  // `projectWorkingCopyForOutput` also calls for the `<id>-<version>.zip` name.
+  // The previous derivation went through pickerMode/scaffoldSpec instead, and
+  // since pickerMode is per-screen local state that always initializes to "open"
+  // here, it announced the BASE id ("Download keyboard us as zip") while the file
+  // that landed was "dagbanli-<version>.zip" — WCAG 2.2 AA 2.5.3 / 4.1.2. Do not
+  // reintroduce a second derivation of this id; extend the shared helper.
+  const downloadKeyboardId = resolveOutputKeyboardId(identity, baseKeyboard);
   const downloadAriaLabel = touchStale
     ? t({
         id: "output.download.aria.touchStale",
@@ -190,6 +241,20 @@ export function OutputScreen() {
             message: "Download unavailable until compile completes",
           });
 
+  // The .kmp shares every gate with the .zip, so it reuses the same
+  // unavailability reasons and only differs in the ready case.
+  const kmpAriaLabel = canDownload && !touchStale
+    ? t({
+        id: "output.download.aria.kmp",
+        message: `Download keyboard ${downloadKeyboardId} as an installable Keyman package`,
+      })
+    : downloadAriaLabel;
+
+  // Both buttons disable while EITHER download is in flight: they share one
+  // projection + compile, so overlapping clicks would do the same work twice.
+  const kmpActionable = canDownload && !buildingKmp && !downloading && !touchStale;
+  const zipActionable = canDownload && !downloading && !buildingKmp && !touchStale;
+
   return (
     <div
       ref={containerRef}
@@ -205,9 +270,23 @@ export function OutputScreen() {
         overflow: "hidden",
       }}
     >
-      {/* Left pane: picker */}
+      {/* Left pane: shipping details once instantiated, else the cold-arrival
+          picker — see the module comment. */}
       <PickerPane
         artifact={artifact}
+        variant={instantiated ? "shipping" : "full"}
+        changeBaseSlot={
+          <button
+            type="button"
+            data-testid="output-change-base"
+            onClick={handleChangeBase}
+            // The left pane owns this treatment even though the slot content is
+            // authored here — see PANE_SECONDARY_BUTTON in previewOutputLayout.
+            style={{ ...PANE_SECONDARY_BUTTON, alignSelf: "flex-start" }}
+          >
+            <Trans id="output.changeBase.label">Change base keyboard</Trans>
+          </button>
+        }
         leftPct={leftPct}
         dividerWidth={DIVIDER_WIDTH}
         pickerSlot={
@@ -253,22 +332,100 @@ export function OutputScreen() {
         </h2>
         {baseKeyboard !== null && (
           <>
+            {/* PRIMARY download: the installable package. A user double-clicks
+                this and the keyboard installs on Keyman for Windows, macOS,
+                Linux, iOS, or Android — no Keyman Developer, no unzipping, no
+                compile step. The source .zip below is for editing and
+                contributing, which is a different (and rarer) need. */}
+            <button
+              type="button"
+              data-testid="emit-download-kmp"
+              disabled={!canDownload || buildingKmp || downloading || touchStale}
+              onClick={() => { void handleDownloadKmp(); }}
+              aria-label={kmpAriaLabel}
+              style={{
+                alignSelf: "flex-start",
+                marginTop: 4,
+                padding: "9px 18px",
+                background: kmpActionable ? "#1f6feb" : "#161b22",
+                color: kmpActionable ? "#e6edf3" : "#484f58",
+                border: "1px solid #283040",
+                borderRadius: 6,
+                fontSize: 14,
+                fontWeight: 600,
+                cursor: kmpActionable ? "pointer" : "not-allowed",
+                fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+                transition: "background 0.15s",
+              }}
+            >
+              {buildingKmp ? (
+                <Trans id="output.download.button.kmpBuilding">Building package...</Trans>
+              ) : (
+                <Trans id="output.download.button.kmp">Download keyboard (.kmp)</Trans>
+              )}
+            </button>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 12,
+                color: "#8b949e",
+                lineHeight: 1.5,
+                maxWidth: "46ch",
+              }}
+            >
+              <Trans id="output.download.kmp.help">
+                Install it by double-clicking the downloaded file. Works with Keyman
+                on Windows, macOS, Linux, Android, and iOS.
+              </Trans>
+            </p>
+
+            {/* Failed package build: say why, and leave the .zip working. */}
+            {kmpError !== null && (
+              <div
+                role="alert"
+                data-testid="emit-download-kmp-error"
+                style={{
+                  ...warningBannerStyle,
+                  color: "#f85149",
+                  borderColor: "#f85149",
+                  lineHeight: 1.5,
+                }}
+              >
+                {"[ERROR] "}
+                {kmpError}
+                {kmpDiagnostics.length > 0 && (
+                  <ul style={{ margin: "6px 0 0", paddingLeft: 18 }}>
+                    {kmpDiagnostics.slice(0, KMP_DIAGNOSTIC_LIMIT).map((d, i) => (
+                      <li key={`${d.code}-${i}`} style={{ fontFamily: "monospace", fontSize: 11 }}>
+                        {d.code}: {d.message}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <div style={{ marginTop: 6, color: "#9aa7b8" }}>
+                  <Trans id="output.download.kmp.error.zipStillAvailable">
+                    You can still download the source .zip below.
+                  </Trans>
+                </div>
+              </div>
+            )}
+
+            {/* SECONDARY download: source, for editing or contributing. */}
             <button
               type="button"
               data-testid="emit-download"
-              disabled={!canDownload || downloading || touchStale}
+              disabled={!canDownload || downloading || buildingKmp || touchStale}
               onClick={() => { void handleDownload(); }}
               aria-label={downloadAriaLabel}
               style={{
                 alignSelf: "flex-start",
-                marginTop: 4,
-                padding: "7px 16px",
-                background: canDownload && !downloading && !touchStale ? "#1f6feb" : "#161b22",
-                color: canDownload && !downloading && !touchStale ? "#e6edf3" : "#484f58",
+                padding: "6px 14px",
+                background: "transparent",
+                color: zipActionable ? "#9aa7b8" : "#484f58",
                 border: "1px solid #283040",
                 borderRadius: 6,
-                fontSize: 13,
-                cursor: canDownload && !downloading && !touchStale ? "pointer" : "not-allowed",
+                fontSize: 12,
+                cursor: zipActionable ? "pointer" : "not-allowed",
                 fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
                 transition: "background 0.15s",
               }}
@@ -276,9 +433,23 @@ export function OutputScreen() {
               {downloading ? (
                 <Trans id="output.download.button.downloading">Downloading...</Trans>
               ) : (
-                <Trans id="output.download.button.download">Download .zip</Trans>
+                <Trans id="output.download.button.download">Download source .zip</Trans>
               )}
             </button>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 12,
+                color: "#8b949e",
+                lineHeight: 1.5,
+                maxWidth: "46ch",
+              }}
+            >
+              <Trans id="output.download.zip.help">
+                The keyboard&apos;s source files, for editing in Keyman Developer or
+                contributing upstream.
+              </Trans>
+            </p>
             {touchStale && (
               <div
                 role="alert"

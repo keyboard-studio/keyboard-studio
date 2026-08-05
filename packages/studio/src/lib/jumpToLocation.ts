@@ -18,6 +18,8 @@ import { manifest } from "../steps/manifest.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import { snapshotTraversal, useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { useStepWalkStore } from "../stores/stepWalkStore.ts";
+import { stepPositionIds } from "./stepWalk.ts";
 
 export interface JumpOptions {
   /** Remember where we came from so FR-034's "return" affordance has a target. */
@@ -119,6 +121,11 @@ export function liveResolveContext(): ResolveContext {
     questionRegistry,
     traversal: snapshotTraversal(),
     hasProject: useWorkingCopyStore.getState().baseKeyboard !== null,
+    // Within-step stops for the stages whose walks are not flow questions
+    // (a gallery's characters). Without this a footer dot naming a character
+    // would resolve `question-not-in-build` and refuse itself — see
+    // ResolveContext.stepPositions.
+    stepPositions: stepPositionIds(useStepWalkStore.getState().walks),
   };
 }
 
@@ -145,6 +152,15 @@ export function jumpToLocation(loc: Location, opts?: JumpOptions): JumpOutcome {
   // remount reads it — the ordering is load-bearing, not stylistic.
   if (target.step !== undefined) {
     useSurveySessionStore.getState().jumpToStep(target.step);
+    // The WITHIN-STEP half of the same "target before remount" ordering. The
+    // step's own runner/gallery reads this cursor as its arrival position (see
+    // lib/stepWalk.ts), which is what makes a jump into the MIDDLE of a stage
+    // land where it says it will — including when the stage is the one the
+    // author is already on, where no remount happens at all and the pending-jump
+    // hand-off below would never be consumed.
+    if (target.question !== undefined) {
+      useStepWalkStore.getState().setStepCursor(target.step, target.question);
+    }
   }
 
   pendingJump =

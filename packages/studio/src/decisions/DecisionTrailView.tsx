@@ -41,6 +41,15 @@ export interface DecisionTrailViewProps {
   /** Resolve one entry's impact. Called only when a row is expanded. */
   resolveImpact: (entry: DecisionEntry) => DecisionImpact | null;
   /**
+   * Async resolver, forwarded verbatim to each row (spec 059). Optional: absent, the
+   * rows use `resolveImpact` alone, which is how the fixture-driven renders and every
+   * existing test drive this view.
+   *
+   * Passed DOWN as a function, never called here — this view resolves nothing, which
+   * is what keeps FR-011/SC-006 true when a hundred rows mount.
+   */
+  resolveImpactAsync?: (entry: DecisionEntry) => Promise<DecisionImpact | null>;
+  /**
    * Live reachability context for the rows' jump affordances (spec 057
    * FR-035). Composed by StudioShell for the same layer reason as `record`
    * and `resolveImpact`: `decisions/` may not import `stores/`, and the
@@ -137,6 +146,7 @@ export function DecisionTrailView({
   record,
   droppedCount = 0,
   resolveImpact,
+  resolveImpactAsync,
   resolveCtx,
   initialCollapsedSteps,
   onToggleStage,
@@ -495,6 +505,7 @@ export function DecisionTrailView({
                             superseded={superseded}
                             hidden={superseded && !showSuperseded}
                             resolveImpact={resolveImpact}
+                            {...(resolveImpactAsync !== undefined ? { resolveImpactAsync } : {})}
                             {...(resolveCtx !== undefined ? { resolveCtx } : {})}
                           />
                         );

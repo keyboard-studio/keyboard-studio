@@ -2,6 +2,12 @@
 // Criteria: Within a platform, control keys (K_BKSP, K_ENTER) must not move or
 // resize across layers. "Geometry" = sp + width + position (rowIndex + indexInRow).
 //
+// SPEC 058: this module additionally hosts two joined 18.4 codes —
+// KM_WARN_TOUCH_DUPLICATE_KEY_ID and KM_WARN_TOUCH_MISSING_REQUIRED_KEY. Both are
+// per-layer structural checks on the same touch layout this file already walks,
+// and both stay WARNING severity (see check-18-6-touch-coverage.ts's header for
+// why no code here may be an error, and why nothing is added to criteria.json).
+//
 // Design decision: asymmetric sp/width IS drift. If the baseline layer defines sp
 // or width and a subsequent layer omits it (or vice versa), that counts as drift.
 // The undefined side is reported as "unset" in the drift message. Position drift
@@ -10,6 +16,11 @@
 
 import type { LintFinding } from "@keyboard-studio/contracts";
 import type { TouchLayoutIR } from "@keyboard-studio/contracts";
+import {
+  findDuplicateTouchKeyIds,
+  findMissingRequiredTouchKeys,
+  REQUIRED_TOUCH_KEY_IDS,
+} from "@keyboard-studio/contracts";
 import { makeLocation, walkTouchKeys, type TouchKeyContext } from "./_shared.js";
 
 const CONTROL_KEY_IDS = new Set(["K_BKSP", "K_ENTER"]);
@@ -106,4 +117,97 @@ export function checkControlKeyDrift(
   });
 
   return findings;
+}
+
+// ---------------------------------------------------------------------------
+// KM_WARN_TOUCH_DUPLICATE_KEY_ID — two keys with the same id on one layer.
+//
+// A duplicate id means the compiler's key lookup is ambiguous: whichever rule
+// matches fires for both keys, so one of them behaves as the other. Keyman
+// Developer has no such check.
+//
+// THE THIRD EXEMPTION IS WHAT MAKES THIS CHECK SHIPPABLE. A per-key `layer`
+// override disambiguates two same-id keys — they emit under different modifier
+// states and are genuinely two keys. Without that exemption the check produces
+// ~13,900 corpus findings; with it, ~1,170. It is also the exemption that was
+// UNIMPLEMENTABLE before the §18 contract change added `TouchKeyIR.layer`, since
+// the parser dropped the field and the two keys were indistinguishable in the IR.
+// ---------------------------------------------------------------------------
+
+/**
+ * Check for two keys sharing an id within one layer of one platform.
+ *
+ * Scope is per (platform, layer) deliberately: the same id appearing on `default`
+ * and on `shift` is the normal case, not a defect.
+ *
+ * @param ir - Parsed touch layout.
+ * @param touchLayoutPath - Virtual FS path used in `location.file`.
+ */
+export function checkTouchDuplicateKeyId(
+  ir: TouchLayoutIR,
+  touchLayoutPath: string
+): LintFinding[] {
+  // SPEC 058 T114: detection — the three exemptions in order, the NUL-separated
+  // bucket key, and the report-on-the-SECOND-occurrence rule — is
+  // `findDuplicateTouchKeyIds` (contracts, `touch-key-diagnostics.ts`), the ONE
+  // implementation FR-040 requires, shared with the edit-time surface so the two
+  // cannot drift. What remains here is the English prose, composed from the
+  // structured finding's own `fields`. The exemption tests in this module's test
+  // file still exercise every exemption, through this function, as before.
+  return findDuplicateTouchKeyIds(ir).map((finding) => {
+    const keyId = String(finding.fields.keyId);
+    const layerOverride = finding.fields.layerOverride;
+    return {
+      code: "KM_WARN_TOUCH_DUPLICATE_KEY_ID",
+      severity: "warning",
+      layer: "C",
+      message: `Platform "${String(finding.fields.platform)}" layer "${String(finding.fields.layerId)}" has more than one key with id "${keyId}"${typeof layerOverride === "string" ? ` and layer override "${layerOverride}"` : ""}, so a rule keyed on it is ambiguous.`,
+      location: makeLocation(touchLayoutPath),
+      hint: `Give one of them a distinct id, or set a per-key \`layer\` override on one so the two emit under different modifier states.`,
+    };
+  });
+}
+
+// ---------------------------------------------------------------------------
+// KM_WARN_TOUCH_MISSING_REQUIRED_KEY — 0x093 analogue.
+//
+// Upstream citation, because the set is easy to guess wrong: `CRequiredKeys =
+// [K_LOPT, K_BKSP, K_ENTER]` in
+// `keyman/developer/src/kmc-kmn/src/kmw-compiler/constants.ts`, checked by
+// `ValidateLayoutFile` in that directory's `validate-layout-file.ts` against a
+// single `FRequiredKeys` accumulator per layer.
+//
+// THE SET DOES NOT VARY BY PLATFORM OR LAYER. The same three keys are required of
+// every layer of every platform the file declares — there is no phone/tablet
+// -specific required set in that code path. Writing a per-platform variation here
+// would be inventing a rule upstream does not have.
+// ---------------------------------------------------------------------------
+
+/**
+ * Check that every layer of every platform carries the three required keys.
+ *
+ * SPEC 058 T114: detection — the required set itself (upstream's
+ * `CRequiredKeys`, re-exported here as `REQUIRED_TOUCH_KEY_IDS`), the
+ * sub-key descent, and the one-finding-per-layer grouping — is
+ * `findMissingRequiredTouchKeys` (contracts, `touch-key-diagnostics.ts`), the
+ * ONE implementation FR-040 requires. What remains here is the English prose,
+ * composed from the structured finding's own `fields`.
+ */
+export function checkTouchMissingRequiredKey(
+  ir: TouchLayoutIR,
+  touchLayoutPath: string
+): LintFinding[] {
+  return findMissingRequiredTouchKeys(ir).map((finding) => {
+    const platform = String(finding.fields.platform);
+    const layerId = String(finding.fields.layerId);
+    const missing = finding.fields.missingKeyIds as readonly string[];
+    return {
+      code: "KM_WARN_TOUCH_MISSING_REQUIRED_KEY",
+      severity: "warning",
+      layer: "C",
+      message: `Platform "${platform}" layer "${layerId}" is missing the required key(s) ${missing.join(", ")}.`,
+      location: makeLocation(touchLayoutPath),
+      hint: `Add ${missing.join(", ")} to layer "${layerId}" on ${platform}. Keyman Developer requires ${REQUIRED_TOUCH_KEY_IDS.join(", ")} on every layer of every platform.`,
+    };
+  });
 }
