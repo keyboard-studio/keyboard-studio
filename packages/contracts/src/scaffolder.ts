@@ -42,7 +42,7 @@ export interface ScaffoldOptions {
   ir?: KeyboardIR;
 
   /**
-   * Who to attribute the keyboard to (spec 037 US1).
+   * Who to attribute the keyboard to (spec 059 US1).
    *
    * When supplied this is the SINGLE source for the copyright holder across
    * `LICENSE.md`, `IRHeader.copyright` / `store(&COPYRIGHT)`, and the `.kps`
@@ -52,7 +52,7 @@ export interface ScaffoldOptions {
    *
    * When OMITTED the scaffolder emits **no** copyright line and sets
    * {@link ScaffoldResult.attributionMissing} rather than inventing one. Naming the keyboard's own display name as the
-   * rights holder — the behaviour before spec 037 — is a false attribution, and
+   * rights holder — the behaviour before spec 059 — is a false attribution, and
    * a missing notice that lint flags is strictly better than a wrong one.
    */
   attribution?: Attribution;
@@ -61,14 +61,14 @@ export interface ScaffoldOptions {
    * Year to stamp on the new copyright line. Defaults to the current year.
    *
    * Injectable because a copyright notice records when the work was PUBLISHED
-   * (spec 037 D2), and because tests must not read the clock — a time-dependent
+   * (spec 059 D2), and because tests must not read the clock — a time-dependent
    * suite breaks at a year boundary.
    */
   emitYear?: number;
 
   /**
    * The original copyright holder, supplied BY THE AUTHOR when the base's own
-   * `LICENSE.md` carries a notice this tool cannot read (spec 037 D5).
+   * `LICENSE.md` carries a notice this tool cannot read (spec 059 D5).
    *
    * This is the escape hatch that makes the D5 block acceptable rather than a
    * dead end: the author is never stuck, and the remedy PRESERVES the notice
@@ -100,7 +100,7 @@ export interface ScaffoldResult {
   stylesheets: KpsStylesheetEntry[];
   /**
    * True when no attribution was supplied, so the emitted package carries NO
-   * copyright notice (spec 037 US1).
+   * copyright notice (spec 059 US1).
    *
    * A dedicated signal rather than a `warnings` entry: `warnings` means "fell
    * back to stub-only output", and overloading it would make every
@@ -113,7 +113,7 @@ export interface ScaffoldResult {
   attributionMissing: boolean;
   /**
    * How many copyright holders were INHERITED from the base's `LICENSE.md`
-   * (spec 037 US2). Zero for a keyboard with no base license to retain.
+   * (spec 059 US2). Zero for a keyboard with no base license to retain.
    *
    * MIT requires the original notice be retained in a derivative, so a non-zero
    * count means the emitted `LICENSE.md` carries those holders verbatim with the
@@ -121,7 +121,7 @@ export interface ScaffoldResult {
    */
   inheritedHolderCount: number;
   /**
-   * Set when the base HAS a copyright notice that could not be read (spec 037
+   * Set when the base HAS a copyright notice that could not be read (spec 059
    * D5) — an unfilled `Copyright (c) YYYY ____` template, or a year with no
    * holder. Both are real shipped files.
    *

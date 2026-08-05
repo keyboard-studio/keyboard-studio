@@ -58,7 +58,7 @@ export interface FetchKeyboardSourceResult {
   stylesheets: KpsStylesheetEntry[];
   /**
    * The base keyboard's own `LICENSE.md`, verbatim, or undefined when it has
-   * none (spec 037 FR-011).
+   * none (spec 059 FR-011).
    *
    * Fetched because MIT requires the original copyright notice be retained in a
    * derivative: a keyboard derived from this base must ACCUMULATE the base
@@ -371,7 +371,7 @@ export async function fetchKeyboardSourceToVfs(
   // The KMW .js is produced by `CompilerService.compile()` running
   // @keymanapp/kmc-kmn's full pipeline in-browser — no need to fetch a
   // prebuilt stand-in. (Removed once kmw-compiler integration landed.)
-  // spec 037 FR-011: the base's LICENSE.md, for copyright accumulation. Absence
+  // spec 059 FR-011: the base's LICENSE.md, for copyright accumulation. Absence
   // is non-fatal and NOT a warning — ~545 of 554 legacy keyboards have none, and
   // a missing license file is a normal condition the caller decides about.
   let baseLicenseText: string | undefined;

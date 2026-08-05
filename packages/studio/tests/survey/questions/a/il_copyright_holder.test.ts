@@ -1,4 +1,4 @@
-// Mirror spec for il_copyright_holder (spec 037 US1).
+// Mirror spec for il_copyright_holder (spec 059 US1).
 //
 // This id exists separately from the demoted phase_a attribution module it
 // borrows its prompt from, because routing lives in definition.next and the

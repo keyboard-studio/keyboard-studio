@@ -136,7 +136,7 @@ describe("createScaffolderService", () => {
       const content = kmnEntry!.content as string;
 
       expect(content).toContain("store(&NAME) 'My Keyboard'");
-      // spec 037 SC-001: was `Copyright © <year> My Keyboard`, which named the
+      // spec 059 SC-001: was `Copyright © <year> My Keyboard`, which named the
       // keyboard as rights holder and discarded the base's real notice.
       expect(content).toContain("store(&COPYRIGHT) 'Copyright © 2020 Base Author'");
       // Scope the negative to the COPYRIGHT store — store(&NAME) legitimately
@@ -343,7 +343,7 @@ describe("scaffold — displayName sanitization", () => {
     const service = createScaffolderService({ fetchImpl: makeFetch(BASE_KMN) as typeof fetch });
     const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "O'Brien's Keyboard");
     const content = vfs.get("source/my_keyboard.kmn")!.content as string;
-    // spec 037 SC-001: the display name is no longer used as the holder, so the
+    // spec 059 SC-001: the display name is no longer used as the holder, so the
     // base's notice survives. Display-name ESCAPING is still covered by the
     // &NAME assertion in this same test.
     expect(content).toContain("store(&COPYRIGHT) 'Copyright © 2020 Base Author'");
@@ -594,7 +594,7 @@ group(main) using keys
 });
 
 // ---------------------------------------------------------------------------
-// Attribution emission (spec 037 US1)
+// Attribution emission (spec 059 US1)
 //
 // Before this feature LICENSE.md read `Copyright © <year> <displayName>` — naming
 // the KEYBOARD as its own rights holder — and resetIdentity independently
@@ -602,7 +602,7 @@ group(main) using keys
 // base declared. These assertions pin the success criteria.
 // ---------------------------------------------------------------------------
 
-describe("attribution emission (spec 037)", () => {
+describe("attribution emission (spec 059)", () => {
   const ATTRIBUTION = {
     authorName: "Alice Example",
     authorEmail: "alice@example.org",
@@ -725,7 +725,7 @@ describe("attribution emission (spec 037)", () => {
 
     // The .kmn is the one artifact that CAN know a holder without attribution:
     // parse() read one from the base. Preserving it is what MIT requires of a
-    // derivative, and is strictly better than the pre-037 behaviour of
+    // derivative, and is strictly better than the pre-059 behaviour of
     // overwriting it with the keyboard's own display name.
     it("PRESERVES the base's copyright in the .kmn rather than overwriting it", async () => {
       const { vfs } = await scaffoldWith({ emitYear: YEAR });
@@ -757,7 +757,7 @@ describe("attribution emission (spec 037)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// US2 — a DERIVED keyboard accumulates the base author's notice (spec 037)
+// US2 — a DERIVED keyboard accumulates the base author's notice (spec 059)
 //
 // MIT requires the original copyright notice be retained in a derivative. So the
 // base's holders are carried VERBATIM and the new author is APPENDED, never
@@ -765,7 +765,7 @@ describe("attribution emission (spec 037)", () => {
 // fabricated `Copyright © <year> <displayName>`.
 // ---------------------------------------------------------------------------
 
-describe("derived keyboard accumulates the base's copyright (spec 037 US2)", () => {
+describe("derived keyboard accumulates the base's copyright (spec 059 US2)", () => {
   const NEW_AUTHOR = {
     authorName: "Second Author",
     copyrightHolder: "Second Author",
@@ -892,13 +892,13 @@ describe("derived keyboard accumulates the base's copyright (spec 037 US2)", () 
 });
 
 // ---------------------------------------------------------------------------
-// D5 escape hatch (spec 037 T037) — the author supplies the original holder
+// D5 escape hatch (spec 059 T037) — the author supplies the original holder
 //
 // A hard block is only acceptable because the author is never stuck, and because
 // the remedy PRESERVES the notice rather than dropping it.
 // ---------------------------------------------------------------------------
 
-describe("D5 escape hatch — baseHolderOverride (spec 037)", () => {
+describe("D5 escape hatch — baseHolderOverride (spec 059)", () => {
   const NEW_AUTHOR = { authorName: "Second Author", copyrightHolder: "Second Author" };
   const UNREADABLE = "The MIT License (MIT)\n\nCopyright (c) YYYY _____________________\n";
 
@@ -974,7 +974,7 @@ describe("D5 escape hatch — baseHolderOverride (spec 037)", () => {
 // This asserts the studio emits that same shape rather than an invented one.
 // ---------------------------------------------------------------------------
 
-describe("single-line copyright metadata uses the Portions convention (spec 037 T038)", () => {
+describe("single-line copyright metadata uses the Portions convention (spec 059 T038)", () => {
   const NEW_AUTHOR = { authorName: "New Author", copyrightHolder: "New Author" };
 
   function svc(licenseText: string | null) {

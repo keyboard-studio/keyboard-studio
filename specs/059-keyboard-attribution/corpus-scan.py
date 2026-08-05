@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Harvest real-world copyright/license shapes from the keyboards repo.
 
-Evidence base for specs/037-keyboard-attribution/spec.md. Re-run to refresh the
+Evidence base for specs/059-keyboard-attribution/spec.md. Re-run to refresh the
 findings quoted there, and to harvest the parser fixture table required by FR-014
 (fixtures must come from the real corpus, not be hand-invented).
 

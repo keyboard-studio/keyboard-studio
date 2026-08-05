@@ -153,7 +153,7 @@ export async function verifyToken(
     return { ok: false, scopes: [], missingScopes: ["public_repo"] };
   }
 
-  // spec 037 D7: `name` and `email` are already in THIS response, so retaining
+  // spec 059 D7: `name` and `email` are already in THIS response, so retaining
   // them costs no additional request and lets keyboard attribution be
   // propose-then-confirm rather than a blank form. GitHub sends null (not
   // undefined) for an unset profile name or a private email — both are

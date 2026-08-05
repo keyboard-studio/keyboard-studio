@@ -1,6 +1,6 @@
 # Tasks: keyboard attribution and license provenance
 
-**Feature**: `037-keyboard-attribution` | **Spec**: [spec.md](spec.md) | **Plan**: [plan.md](plan.md)
+**Feature**: `059-keyboard-attribution` | **Spec**: [spec.md](spec.md) | **Plan**: [plan.md](plan.md)
 
 **Scope of this file**: Slice A (US1) in full, plus the **Slice B core** (US2) — see Phase 5.
 
@@ -267,7 +267,7 @@ Verified by mutation: reverting to the `"; "` join (4 failures), making the olde
 instead of the deriving author (3), dropping the portions clause entirely (6), and normalising
 inherited markers inside it (3) each turn the suite red.
 
-**US2 is now complete.** Nothing in spec 037 remains open.
+**US2 is now complete.** Nothing in spec 059 remains open.
 
 ### Formerly open in US2 — both now closed
 

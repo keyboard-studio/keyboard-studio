@@ -19,7 +19,7 @@ describe("inputs/writes coverage gate — every registered module declares both 
   // 102 -> 116: the Phase F documentation revision adds 14 modules (doc language,
   // font guidance, the depth gate, and the optional documentation battery). The
   // three demoted usage-tip slots stay registered, so nothing is subtracted.
-  // 116 -> 119: spec 037 US1 adds il_author_name / il_author_email /
+  // 116 -> 119: spec 059 US1 adds il_author_name / il_author_email /
   // il_copyright_holder. These are NEW ids rather than revivals of the demoted
   // author_display_name / author_contact_email / pa_copyright_holder, because
   // routing lives in definition.next and those three belong to the phase_a chain.

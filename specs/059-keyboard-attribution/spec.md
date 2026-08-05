@@ -1,6 +1,6 @@
 # Feature Specification: Keyboard attribution and license provenance
 
-**Feature Branch**: `037-keyboard-attribution`
+**Feature Branch**: `059-keyboard-attribution`
 
 **Created**: 2026-08-04
 

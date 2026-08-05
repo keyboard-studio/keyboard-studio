@@ -40,7 +40,7 @@ export const mockScaffolder: ScaffolderService = {
       warnings: [],
       fonts: [],
       stylesheets: [],
-      // Mirror the real scaffolder (spec 037): attribution present means a
+      // Mirror the real scaffolder (spec 059): attribution present means a
       // copyright notice was emitted. Derived rather than hard-coded so a caller
       // testing the un-attributed gate gets the same answer from the mock.
       attributionMissing: opts?.attribution === undefined,

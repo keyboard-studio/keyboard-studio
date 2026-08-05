@@ -4,7 +4,7 @@
 // path recorded. Nothing here is invented — the whole point is that the parser
 // meets the shapes that actually exist rather than the shapes we imagined.
 //
-// Re-harvest with specs/037-keyboard-attribution/corpus-scan.py.
+// Re-harvest with specs/059-keyboard-attribution/corpus-scan.py.
 //
 // Distribution at the time of harvest (920 release/ LICENSE.md files, all MIT):
 //   marker:  ©  597   (c) 316   (C) 7

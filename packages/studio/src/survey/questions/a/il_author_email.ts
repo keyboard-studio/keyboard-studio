@@ -1,10 +1,10 @@
-// Per-question module: il_author_email (identity-lite, spec 037 US1)
+// Per-question module: il_author_email (identity-lite, spec 059 US1)
 //
 // See il_author_name.ts for why identity-lite uses its own ids rather than
 // reviving the demoted phase_a modules directly.
 //
 // NOT required here, unlike the demoted author_contact_email. A GitHub profile
-// email is often private (D7), and spec 037 states an absent email must never
+// email is often private (D7), and spec 059 states an absent email must never
 // block emission — it is optional metadata that lands in .kps <Author URL="mailto:…">
 // and pre-fills the Phase F contact question (FR-016).
 

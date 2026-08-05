@@ -44,7 +44,7 @@ export interface PreviewArtifact {
   canDownload: boolean;
   /**
    * True when the working copy has no attribution, so the package would ship
-   * with NO copyright notice (spec 037 D5/D6/FR-015).
+   * with NO copyright notice (spec 059 D5/D6/FR-015).
    *
    * Blocks download rather than warning: a redistributable package with no
    * rights holder is incomplete, and the pre-037 alternative — naming the
@@ -55,7 +55,7 @@ export interface PreviewArtifact {
   attributionMissing: boolean;
   /**
    * Set when the chosen base has a copyright notice this tool could not read
-   * (spec 037 D5). Blocks download: emitting a LICENSE.md whose only holder is
+   * (spec 059 D5). Blocks download: emitting a LICENSE.md whose only holder is
    * the current user would strip a real notice.
    */
   licenseUnparseable: { reason: string; line: string } | null;
@@ -190,11 +190,11 @@ export function usePreviewArtifact(): PreviewArtifact {
   // instantiated (baseVfs + baseIr available in the store). The serializer
   // builds the zip from the store's baseVfs, not from stage.vfs, so the
   // download contains the full projected working copy including assignments.
-  // spec 037 D5/D6: never emit a package whose only "holder" is invented, and
+  // spec 059 D5/D6: never emit a package whose only "holder" is invented, and
   // never emit one with no notice at all. Gate rather than warn.
   const attributionMissing = useWorkingCopyStore((s) => s.attribution === null);
 
-  // spec 037 D5: refuse to emit while the base's own notice is unreadable — a
+  // spec 059 D5: refuse to emit while the base's own notice is unreadable — a
   // LICENSE.md naming only the current user would strip it.
   const licenseUnparseable = useWorkingCopyStore((s) => s.licenseUnparseable);
   const setBaseHolderOverride = useWorkingCopyStore((s) => s.setBaseHolderOverride);

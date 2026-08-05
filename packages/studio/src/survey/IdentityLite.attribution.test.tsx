@@ -1,4 +1,4 @@
-// Attribution capture through the REAL identity-lite flow (spec 037 US1).
+// Attribution capture through the REAL identity-lite flow (spec 059 US1).
 //
 // Covers: answers -> IdentityLiteResult.attribution, the D1 blank-holder default,
 // and the two negative paths that matter — a gated script is never asked who
@@ -41,7 +41,7 @@ function type(value: string): void {
   fireEvent.change(screen.getAllByRole("textbox")[0]!, { target: { value } });
 }
 
-describe("identity-lite attribution capture (spec 037 US1)", () => {
+describe("identity-lite attribution capture (spec 059 US1)", () => {
   // Resume lands on the first UNANSWERED question (il_author_name) and does NOT
   // re-seed it: buildResumeStack replays recorded answers directly and never
   // calls getSeedValue. That is the "author override is preserved" guarantee — a

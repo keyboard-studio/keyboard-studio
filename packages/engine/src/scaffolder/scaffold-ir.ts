@@ -170,7 +170,7 @@ export function resetIdentity(ir: KeyboardIR, identity: ScaffoldIRIdentity): voi
   const fileFormatVersion = "14.0";
   // &KEYBOARDVERSION is the human-visible keyboard release version.
   const keyboardVersion = identity.version ?? "1.0";
-  // spec 037 SC-001: when no copyright is supplied, PRESERVE whatever the base
+  // spec 059 SC-001: when no copyright is supplied, PRESERVE whatever the base
   // declared rather than fabricating `Copyright © <year> <displayName>`.
   //
   // The old fallback named the KEYBOARD as its own rights holder AND destroyed a

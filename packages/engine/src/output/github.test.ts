@@ -100,11 +100,11 @@ function makeSourceFS(): VirtualFS {
 // verifyToken tests
 // ---------------------------------------------------------------------------
 
-// spec 037 D7 / FR-002: `name` and `email` come from the SAME /user response the
+// spec 059 D7 / FR-002: `name` and `email` come from the SAME /user response the
 // scope check already makes. The null cases are the ones that matter — GitHub
 // sends null for an unset profile name and for a private email, and a bare login
 // handle must never stand in as a copyright holder.
-describe("verifyToken — attribution fields (spec 037 D7)", () => {
+describe("verifyToken — attribution fields (spec 059 D7)", () => {
   const API_USER = `GET ${API}/user`;
   const SCOPES = { "X-OAuth-Scopes": "public_repo" };
 

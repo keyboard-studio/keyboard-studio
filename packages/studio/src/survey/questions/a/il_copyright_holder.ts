@@ -1,4 +1,4 @@
-// Per-question module: il_copyright_holder (identity-lite, spec 037 US1)
+// Per-question module: il_copyright_holder (identity-lite, spec 059 US1)
 //
 // See il_author_name.ts for why identity-lite uses its own ids rather than
 // reviving the demoted phase_a modules directly.

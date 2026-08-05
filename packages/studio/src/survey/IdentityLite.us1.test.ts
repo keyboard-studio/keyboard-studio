@@ -33,7 +33,7 @@ describe("spec 030 US1 — identity flow order (English name first)", () => {
       "il_language_code",
       "il_target_script",
       "il_script_not_supported",
-      // spec 037 US1 — attribution capture, appended to the identity flow.
+      // spec 059 US1 — attribution capture, appended to the identity flow.
       "il_author_name",
       "il_author_email",
       "il_copyright_holder",

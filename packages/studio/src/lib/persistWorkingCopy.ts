@@ -141,11 +141,11 @@ export function snapshotWorkingCopyToSession(): void {
     baseVfsEntries: s.baseVfs !== null ? s.baseVfs.entries().map(serializeEntry) : [],
     baseIr: s.baseIr,
     identity: s.identity,
-    // spec 037: plain JSON, so it round-trips with no custom handling. Present
+    // spec 059: plain JSON, so it round-trips with no custom handling. Present
     // here because WorkingCopySnapshot is Omit-derived from WorkingCopyData —
     // the compiler required this line, which is the point of that derivation.
     attribution: s.attribution,
-    // spec 037 D5: both are plain JSON. The override in particular MUST persist —
+    // spec 059 D5: both are plain JSON. The override in particular MUST persist —
     // an author who supplied the original holder should not have to re-enter it
     // after a reload, or the block would reappear on resume.
     licenseUnparseable: s.licenseUnparseable,

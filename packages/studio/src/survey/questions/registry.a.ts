@@ -89,7 +89,7 @@ export const phaseARegistry: Readonly<Record<string, QuestionModule>> = {
   il_language_code,
   il_language_region,
   il_target_script,
-  // spec 037 US1 — attribution capture. Separate ids from the demoted
+  // spec 059 US1 — attribution capture. Separate ids from the demoted
   // author_display_name / author_contact_email / pa_copyright_holder, because
   // routing lives in definition.next and those three belong to the phase_a chain.
   il_author_name,

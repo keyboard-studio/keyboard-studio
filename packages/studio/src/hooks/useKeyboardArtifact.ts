@@ -555,7 +555,7 @@ export function useKeyboardArtifact(
         // Scaffold path — new keyboard authoring. Routes through
         // getScaffolderService() so USE_REAL=false uses the mock in CI.
         const svc = await getScaffolderService();
-        // spec 037 US1: pass the captured attribution so LICENSE.md,
+        // spec 059 US1: pass the captured attribution so LICENSE.md,
         // store(&COPYRIGHT) and .kps <Copyright>/<Author> name the real holder.
         // Read from the store at call time rather than through a hook dep, so a
         // re-scaffold picks up an attribution confirmed after the first run.
@@ -563,7 +563,7 @@ export function useKeyboardArtifact(
         // it never invents a holder.
         const wc = useWorkingCopyStore.getState();
         const attribution = wc.attribution;
-        // spec 037 D5: an author-supplied original holder replaces parsing, so
+        // spec 059 D5: an author-supplied original holder replaces parsing, so
         // the remedy preserves the base's notice instead of dropping it.
         const baseHolderOverride = wc.baseHolderOverride;
         const result = await svc.scaffold(kb, scaffoldSpec.keyboardId, scaffoldSpec.displayName, {

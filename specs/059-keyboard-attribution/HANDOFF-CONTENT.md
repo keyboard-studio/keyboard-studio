@@ -1,7 +1,7 @@
 # Content hand-off: attribution question wording (037)
 
 **For**: Content (survey text is Content-owned — Constitution Article VI)
-**From**: Engine, spec [037-keyboard-attribution](spec.md)
+**From**: Engine, spec [059-keyboard-attribution](spec.md)
 **Date**: 2026-08-04
 **Status**: Engine work COMPLETE and shipped. **No prompt text was changed** — that is this
 hand-off.
@@ -64,7 +64,7 @@ is a separate question for that."
 **Now**: "What email address can people use to contact the keyboard author?" *(was `required: true`,
 now `required: false`)*
 
-It became optional because a GitHub profile email is frequently private, and spec 037 states an
+It became optional because a GitHub profile email is frequently private, and spec 059 states an
 absent email must never block emission. The prompt still reads as required.
 
 **Suggested**: add "(optional)" to the prompt, matching the Phase F convention, and note in the

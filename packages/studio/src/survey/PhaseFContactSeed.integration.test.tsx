@@ -1,6 +1,6 @@
 // Integration test: PhaseFStepFactoryComponent with the REAL SurveyRunner.
 //
-// Verifies the pf_contact_info pre-fill END TO END (spec 037 FR-016) rather than
+// Verifies the pf_contact_info pre-fill END TO END (spec 059 FR-016) rather than
 // at the options-record boundary: the seed must travel
 //   surveyContext.author_contact
 //     -> phaseFOptions.seeds.getSeedValue
@@ -81,7 +81,7 @@ describe("Phase F — pf_contact_info pre-fill (end to end)", () => {
     expect(walkToContactField({ author_contact: CONTACT })).toBe(CONTACT);
   });
 
-  // Inert-today guarantee: nothing writes author_contact until spec 037 lands,
+  // Inert-today guarantee: nothing writes author_contact until spec 059 lands,
   // so the field must render empty exactly as it does now.
   it("renders an empty contact field when author_contact is absent", () => {
     expect(walkToContactField({})).toBe("");

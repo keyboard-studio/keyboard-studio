@@ -131,7 +131,7 @@ function seedInstantiatedWorkingCopy() {
     vfs,
     ir: makeTestIR([]),
   });
-  // spec 037 D5/D6: download is gated on attribution, because a redistributable
+  // spec 059 D5/D6: download is gated on attribution, because a redistributable
   // package with no rights holder is incomplete. A fully instantiated working
   // copy therefore has one — the dedicated no-attribution case is asserted
   // separately below.
@@ -442,7 +442,7 @@ describe("OutputScreen — download filename", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Attribution gate on download (spec 037 D5/D6/FR-015)
+// Attribution gate on download (spec 059 D5/D6/FR-015)
 //
 // A redistributable package with no rights holder is incomplete, and the
 // pre-037 alternative — naming the keyboard's own display name — was a false
@@ -498,7 +498,7 @@ describe("OutputScreen — attribution gate", () => {
 });
 
 // ---------------------------------------------------------------------------
-// D5 — unreadable base notice blocks, with an escape hatch (spec 037 T037)
+// D5 — unreadable base notice blocks, with an escape hatch (spec 059 T037)
 //
 // The block is only acceptable because the author is never stuck AND the remedy
 // preserves the original notice rather than dropping it.

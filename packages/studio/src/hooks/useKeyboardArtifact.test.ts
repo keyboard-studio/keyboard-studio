@@ -640,7 +640,7 @@ describe("useKeyboardArtifact — vfsTransform effectiveKeyboardId (reapply effe
 });
 
 // ---------------------------------------------------------------------------
-// KNOWN COVERAGE GAP (spec 037 US1) — attribution pass-through to scaffold()
+// KNOWN COVERAGE GAP (spec 059 US1) — attribution pass-through to scaffold()
 //
 // useKeyboardArtifact reads useWorkingCopyStore.attribution and forwards it as a
 // ScaffoldOptions field. That line is NOT covered by a test: mutation testing

@@ -287,7 +287,7 @@ describe("flow-parity: phase_f_helpdocs — questions[]", () => {
 describe("flow-parity: identity_lite — questions[]", () => {
   const modular = loadModularFlow(identityLiteModularRaw);
 
-  // 6 -> 9: spec 037 US1 appends attribution capture (author name, email,
+  // 6 -> 9: spec 059 US1 appends attribution capture (author name, email,
   // copyright holder) to the identity flow.
   it("has exactly 9 questions", () => {
     expect(modular.questions.length).toBe(9);
@@ -310,7 +310,7 @@ describe("flow-parity: identity_lite — questions[]", () => {
       "il_language_code",
       "il_target_script",
       "il_script_not_supported",
-      // spec 037 US1 — attribution, reached from il_target_script's DEFAULT
+      // spec 059 US1 — attribution, reached from il_target_script's DEFAULT
       // branch. A gated script goes to il_script_not_supported instead and
       // terminates, so it never reaches these.
       "il_author_name",
@@ -329,7 +329,7 @@ describe("flow-parity: identity_lite — questions[]", () => {
     expect(Array.isArray(q?.next)).toBe(true);
   });
 
-  // spec 037 US1: the supported path must reach attribution, and the gated path
+  // spec 059 US1: the supported path must reach attribution, and the gated path
   // must NOT — an author who cannot make a keyboard is never asked who owns it.
   it("il_target_script's default branch continues into attribution", () => {
     const q = modular.questions.find((q) => q.id === "il_target_script");

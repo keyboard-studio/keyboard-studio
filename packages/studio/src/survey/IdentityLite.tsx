@@ -68,7 +68,7 @@ export interface IdentityLiteResult {
   /** Whether the chosen target script is supported in v1. */
   supported: boolean;
   /**
-   * Who to attribute the keyboard to (spec 037 US1), or null when the flow
+   * Who to attribute the keyboard to (spec 059 US1), or null when the flow
    * terminated before attribution — which is what a gated script does, since an
    * author who cannot make a keyboard is never asked who holds its copyright.
    */
@@ -161,7 +161,7 @@ export function extractIdentityLite(result: SurveyPhaseResult): IdentityLiteResu
 }
 
 /**
- * Derive attribution from the completed flow (spec 037 US1).
+ * Derive attribution from the completed flow (spec 059 US1).
  *
  * Returns null when no author name was captured — a gated script terminates at
  * il_script_not_supported before the attribution questions. Callers must treat
@@ -185,7 +185,7 @@ function extractAttribution(result: SurveyPhaseResult): Attribution | null {
 export interface IdentityLiteProps {
   context?: SurveyContext;
   /**
-   * Authenticated profile used to PRE-FILL the attribution questions (spec 037
+   * Authenticated profile used to PRE-FILL the attribution questions (spec 059
    * D7/FR-001), so the author confirms rather than types.
    *
    * Passed in rather than read from the auth hook here, to keep this component a
@@ -475,7 +475,7 @@ export function IdentityLite({
       if (questionId === "il_target_script") {
         return scriptSeedRef.current;
       }
-      // spec 037 FR-001: propose-then-confirm, never a blank form. Undefined
+      // spec 059 FR-001: propose-then-confirm, never a blank form. Undefined
       // when the profile has no name — ASK rather than substitute the login
       // handle, which is not a copyright holder.
       if (questionId === "il_author_name") {

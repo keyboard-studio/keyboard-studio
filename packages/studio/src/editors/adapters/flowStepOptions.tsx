@@ -170,7 +170,7 @@ export type PhaseFPayload = SurveyPhaseResult;
  * SurveyContext key carrying the author's public contact, used to PRE-FILL
  * pf_contact_info rather than asking for the same fact a second time.
  *
- * Producer: keyboard attribution ([specs/037-keyboard-attribution](../../../../../specs/037-keyboard-attribution/spec.md))
+ * Producer: keyboard attribution ([specs/059-keyboard-attribution](../../../../../specs/059-keyboard-attribution/spec.md))
  * captures an author contact once, in the identity phase, itself pre-filled from
  * the authenticated GitHub profile. Until that lands nothing writes this key, so
  * the seed below resolves to undefined and Phase F behaves exactly as it does

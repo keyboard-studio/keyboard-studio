@@ -1,8 +1,8 @@
 # Implementation Plan: keyboard attribution and license provenance
 
-**Branch**: `037-keyboard-attribution` | **Date**: 2026-08-04 | **Spec**: [spec.md](spec.md)
+**Branch**: `059-keyboard-attribution` | **Date**: 2026-08-04 | **Spec**: [spec.md](spec.md)
 
-**Input**: Feature specification from `specs/037-keyboard-attribution/spec.md`, with the six
+**Input**: Feature specification from `specs/059-keyboard-attribution/spec.md`, with the six
 Open Questions resolved in [research.md](research.md) (D1–D6).
 
 ## Summary
@@ -110,7 +110,7 @@ constraint was noticed; it is not this feature's work.
 ### Documentation (this feature)
 
 ```text
-specs/037-keyboard-attribution/
+specs/059-keyboard-attribution/
 ├── spec.md              # Feature spec (OQs now resolved in research.md)
 ├── research.md          # Phase 0 — D1..D9, resolving all six Open Questions
 ├── data-model.md        # Phase 1 — CopyrightHolder / CopyrightBlock / Attribution

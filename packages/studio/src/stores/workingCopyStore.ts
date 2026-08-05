@@ -163,7 +163,7 @@ export interface WorkingCopyState {
    */
   identity: IdentityPatch | null;
 
-  // -- Attribution (spec 037) --------------------------------------------------
+  // -- Attribution (spec 059) --------------------------------------------------
   /**
    * Who made this keyboard and who holds its copyright.
    *
@@ -183,7 +183,7 @@ export interface WorkingCopyState {
 
   /**
    * Set when the chosen base has a copyright notice this tool cannot read
-   * (spec 037 D5) — an unfilled template, or a year with no holder.
+   * (spec 059 D5) — an unfilled template, or a year with no holder.
    *
    * Blocks download: emitting a LICENSE.md whose only holder is the current user
    * would strip a real notice. Cleared by supplying `baseHolderOverride`.
@@ -192,7 +192,7 @@ export interface WorkingCopyState {
 
   /**
    * The original copyright holder as typed by the author, when the base's notice
-   * could not be read (spec 037 D5 escape hatch).
+   * could not be read (spec 059 D5 escape hatch).
    *
    * Passed to the scaffolder on the next run, where it becomes the inherited
    * holder — so the remedy PRESERVES the notice rather than dropping it.
@@ -474,14 +474,14 @@ export interface WorkingCopyState {
   setIdentity: (patch: IdentityPatch) => void;
 
   /**
-   * Record who to attribute the keyboard to (spec 037 US1). Pass null to clear.
+   * Record who to attribute the keyboard to (spec 059 US1). Pass null to clear.
    */
   setAttribution: (attribution: Attribution | null) => void;
 
-  /** Record (or clear) an unreadable base notice — spec 037 D5. */
+  /** Record (or clear) an unreadable base notice — spec 059 D5. */
   setLicenseUnparseable: (v: { reason: string; line: string } | null) => void;
 
-  /** Record the author-supplied original holder — spec 037 D5 escape hatch. */
+  /** Record the author-supplied original holder — spec 059 D5 escape hatch. */
   setBaseHolderOverride: (holder: string | null) => void;
 
   /**

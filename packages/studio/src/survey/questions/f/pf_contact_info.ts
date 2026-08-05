@@ -1,7 +1,7 @@
 // Per-question module: pf_contact_info (Phase F)
 // Ported verbatim from content/flows/phase_f_helpdocs.yaml.
 //
-// PRE-FILLED, STILL OPTIONAL. Once keyboard attribution (spec 037) captures an
+// PRE-FILLED, STILL OPTIONAL. Once keyboard attribution (spec 059) captures an
 // author contact in the identity phase — itself pre-filled from the authenticated
 // GitHub profile — this field is seeded from it rather than asked a second time.
 // See CTX_AUTHOR_CONTACT in editors/adapters/flowStepOptions.tsx.
