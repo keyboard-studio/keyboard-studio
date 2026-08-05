@@ -66,7 +66,7 @@ translations — easy to gate in review).
 
 | File | Change |
 |------|--------|
-| [lingui.config.ts](../packages/studio/lingui.config.ts) | `sourceLocale: en`, `locales: [en, fr]`, minimal-JSON formatter |
+| [lingui.config.ts](../packages/studio/lingui.config.ts) | `sourceLocale: en`, `locales: [en, fr]`, minimal-JSON formatter, `orderBy: "messageId"` |
 | [vite.config.ts](../packages/studio/vite.config.ts) | `@lingui/babel-plugin-lingui-macro` on `react()` + `lingui()` plugin |
 | [vitest.config.ts](../packages/studio/vitest.config.ts) | same Lingui wiring so the macro transforms and `?lingui` resolves in tests |
 | [src/lib/i18n.ts](../packages/studio/src/lib/i18n.ts) | bootstrap: sync-load `en`, region-aware `resolveInitialLocale()`, `activateLocale()` for lazy target locales, `localeReady` awaited pre-first-paint |
@@ -74,7 +74,8 @@ translations — easy to gate in review).
 | [StudioShell.tsx](../packages/studio/src/StudioShell.tsx) | owns the `I18nProvider` (covers the app **and** the ~40 direct-render tests) |
 | [test/renderWithI18n.tsx](../packages/studio/src/test/renderWithI18n.tsx) | shared RTL render helper (drop-in for `render`) that supplies an activated `en` provider — use this instead of a per-file `<I18nProvider>` wrap |
 | `package.json` | `messages:extract`, `messages:compile` scripts |
-| [utilities/i18n-catalog-lint](../utilities/i18n-catalog-lint/index.js) | the drift gate (see below), wired into `pnpm lint` |
+| [utilities/i18n-catalog-lint](../utilities/i18n-catalog-lint/index.js) | the drift gate (see below) **and** the key-order gate, wired into `pnpm lint` |
+| [utilities/i18n-catalog-sort](../utilities/i18n-catalog-sort/index.js) | owns the key-order comparator; `pnpm run i18n-catalog-sort` is the fixer (see Key order below) |
 | [.github/workflows/crowdin-upload-sources.yml](../.github/workflows/crowdin-upload-sources.yml) | uploads Tier A sources to Crowdin on merge to `main` |
 | [.github/workflows/crowdin-download-translations.yml](../.github/workflows/crowdin-download-translations.yml) | scheduled download of translations → opens a PR through the km-triage merge gate |
 
@@ -166,6 +167,35 @@ as `pnpm run i18n-catalog-lint`. It:
 
 Verified: green when in sync; on an English edit under a stable id it reports
 `[en] source catalog out of date — English changed: welcome.title` and exits 1.
+
+## Key order (merge-conflict measure)
+
+The committed catalogs are sorted by **message id**, and `i18n-catalog-lint`
+fails if they aren't. This is not cosmetic. Lingui's default `orderBy` is
+`"message"` — sorted by English *text* — under which a newly added string lands
+wherever its English sorts, i.e. beside whatever unrelated area happens to read
+similarly. Two branches that each add one string therefore land in the same hunk
+and every merge becomes a hand-resolved "keep both sides", on a file where
+nothing was actually contested. Id order groups by area prefix, so `editor.*` and
+`survey.*` additions land in different regions and merge cleanly.
+
+Two halves, and they must agree:
+
+- [packages/studio/lingui.config.ts](../packages/studio/lingui.config.ts) sets
+  `orderBy: "messageId"`, so `messages:extract` *emits* id order — the generator
+  owns the order rather than being fought by a formatter.
+- [utilities/i18n-catalog-sort](../utilities/i18n-catalog-sort/index.js) owns the
+  comparator and enforces it on the committed files, because extract is not the
+  only writer (the Crowdin download and hand edits are too). `pnpm run
+  i18n-catalog-sort` fixes in place; `--check` reports; `i18n-catalog-lint`
+  imports its `checkCatalogDir` so there is one definition of "sorted".
+
+The comparator mirrors Lingui's own `orderByMessageId` exactly — plain
+`localeCompare` — which matters: a codepoint sort orders `L` before `a` and so
+disagrees with extract on our camelCase segments, and the two would then
+overwrite each other forever. Order is checked *separately* from drift (drift
+comparison stays order-independent) because they are different failures with
+different fixes: drift means "re-run extract", order means "run the sorter".
 
 ## Translator context for ambiguous ids (spec 046 T036)
 
