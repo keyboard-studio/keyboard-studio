@@ -25,7 +25,7 @@
 
 import type { TouchLayoutIR, TouchKeyIR, TouchPlacementEntry } from "@keyboard-studio/contracts";
 import { decodeUnicodeKeyId, isSpacerKeyClass, toUPlusNotation } from "@keyboard-studio/contracts";
-import { isStandardKey } from "./filters.js";
+import { isSingleCodepoint, isStandardKey } from "./filters.js";
 
 export type TouchLayerClass = "default" | "shift" | "other";
 
@@ -74,9 +74,9 @@ export function mineLongpressHosts(layout: TouchLayoutIR): TouchHostObservation[
           for (const sub of key.sk ?? []) {
             const ch = producedChar(sub);
             if (ch === undefined) continue;
-            // Single-codepoint only — matches the physical-mechanism
-            // extraction's constraint (deadkey.ts's isSingleCodepoint).
-            if ([...ch].length !== 1) continue;
+            // Single-codepoint only — same constraint as the
+            // physical-mechanism extraction.
+            if (!isSingleCodepoint(ch)) continue;
             out.push({ codepoint: toUPlusNotation(ch), vkey: key.id, layerClass });
           }
         }

@@ -49,7 +49,7 @@ import type {
   OutputElement,
   PlacementCandidate,
 } from "@keyboard-studio/contracts";
-import { US_UNSHIFTED } from "./filters.js";
+import { US_UNSHIFTED, isSingleCodepoint } from "./filters.js";
 
 // ---------------------------------------------------------------------------
 // Base-letter -> vkey lookup (inverse of the engine's pinned US base layout)
@@ -119,11 +119,6 @@ function resolvePureCharStore(ir: KeyboardIR, name: string): string[] | null {
     chars.push(item.value);
   }
   return chars;
-}
-
-/** True iff `s` is exactly one Unicode codepoint (not a multi-codepoint grapheme). */
-function isSingleCodepoint(s: string): boolean {
-  return [...s].length === 1;
 }
 
 interface RawCandidate {
