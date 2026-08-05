@@ -32,6 +32,11 @@
 //     EMPTY — the shape a Crowdin download produces from a locale with no
 //     translations once untranslated strings export as empty rather than
 //     source text. See utilities/i18n-collapse-guard/git-baseline.js.
+//   • target locales, additionally: no individual key may have reverted from a
+//     real translation back to English. The two checks above are both
+//     ratio-based and need a large fraction of the catalog to fire — neither
+//     can see a HANDFUL of keys reverting in an otherwise-translated catalog,
+//     which is exactly what a real Crowdin sync did once (3 keys of 1214).
 //
 // Fix when it fails:  pnpm --filter @keyboard-studio/studio messages:extract
 //
@@ -47,7 +52,11 @@ const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { checkEnglishCollapse, checkBaselineRegression } = require("../i18n-collapse-guard/index.js");
+const {
+  checkEnglishCollapse,
+  checkBaselineRegression,
+  checkKeyReversions,
+} = require("../i18n-collapse-guard/index.js");
 const { resolveBaselineRef, readCatalogAtRef } = require("../i18n-collapse-guard/git-baseline.js");
 const { checkCatalogDir } = require("../i18n-catalog-sort/index.js");
 
@@ -235,6 +244,31 @@ try {
           });
           if (regression.problem) problems.push(regression.problem);
           if (regression.note) notes.push(regression.note);
+
+          // Neither check above can see a HANDFUL of individual keys
+          // reverting to English in an otherwise-translated catalog. This
+          // needs English at the SAME baseline ref too (a key already
+          // legitimately identical to English back then must not be flagged
+          // now), not just the target locale's own baseline.
+          if (committedSource !== null) {
+            const baselineEn = readCatalogAtRef(
+              baselineRef,
+              path.join(COMMITTED_DIR, SOURCE_LOCALE, CATALOG_FILE),
+              REPO_ROOT,
+            );
+            if (baselineEn !== null) {
+              const reversions = checkKeyReversions({
+                baselineTarget: baseline,
+                currentTarget: committed,
+                baselineEn,
+                currentEn: committedSource,
+                locale,
+                catalog: CATALOG_FILE,
+                baselineLabel: baselineRef,
+              });
+              if (reversions.problem) problems.push(reversions.problem);
+            }
+          }
         }
       }
     }

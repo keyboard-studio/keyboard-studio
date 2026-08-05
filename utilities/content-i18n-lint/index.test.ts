@@ -11,6 +11,8 @@ import {
   measureCollapse,
   checkBaselineRegression,
   measureRegression,
+  checkKeyReversions,
+  measureKeyReversions,
 } from "../i18n-collapse-guard/index.js";
 
 const dirs: string[] = [];
@@ -615,6 +617,169 @@ describe("content-i18n-lint baseline regression wiring", () => {
 
     // No getBaselineCatalog supplied at all -- must not throw, must not flag.
     const { problems } = runFlowQuestions(dir);
+    expect(problems).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Per-key English-reversion guard
+//
+// The two guards above are both ratio-based: measureCollapse needs a large
+// FRACTION of the catalog identical to English, measureRegression needs a
+// large fraction to go empty. Neither can see a Crowdin sync reverting a
+// HANDFUL of individual keys while leaving the rest of a large catalog
+// translated -- this happened for real (3 keys out of 1214) and merged clean
+// through both. This guard is a per-key exact check instead of a ratio, so
+// catalog size never matters.
+// ---------------------------------------------------------------------------
+
+describe("i18n-collapse-guard per-key English-reversion guard", () => {
+  it("finds a single key that reverted from a real translation back to English", () => {
+    const baselineEn = { greet: "Hello", bye: "Goodbye" };
+    const currentEn = { greet: "Hello", bye: "Goodbye" };
+    const baselineTarget = { greet: "Bonjour", bye: "Au revoir" };
+    const currentTarget = { greet: "Hello", bye: "Au revoir" }; // greet reverted
+
+    expect(measureKeyReversions(baselineTarget, currentTarget, baselineEn, currentEn)).toEqual([
+      "greet",
+    ]);
+  });
+
+  it("finds multiple reverted keys, matching the real 3-out-of-1214 shape", () => {
+    const en: Record<string, string> = {};
+    const baselineTarget: Record<string, string> = {};
+    const currentTarget: Record<string, string> = {};
+    for (let i = 0; i < 30; i++) {
+      en[`k${i}`] = `English ${i}`;
+      baselineTarget[`k${i}`] = `Francais ${i}`;
+      currentTarget[`k${i}`] = `Francais ${i}`;
+    }
+    // Only these 3 reverted; the other 27 stayed translated.
+    currentTarget.k1 = en.k1;
+    currentTarget.k5 = en.k5;
+    currentTarget.k29 = en.k29;
+
+    expect(measureKeyReversions(baselineTarget, currentTarget, en, en).sort()).toEqual([
+      "k1",
+      "k29",
+      "k5",
+    ]);
+  });
+
+  it("does not flag a key already legitimately identical to English at baseline", () => {
+    // A proper noun / "OK" / symbol -- same on both sides from the start.
+    const en = { brand: "Keyman", greet: "Hello" };
+    const baselineTarget = { brand: "Keyman", greet: "Bonjour" };
+    const currentTarget = { brand: "Keyman", greet: "Bonjour" };
+
+    expect(measureKeyReversions(baselineTarget, currentTarget, en, en)).toEqual([]);
+  });
+
+  it("does not flag a key the target dropped entirely -- key-set parity's concern, not this one's", () => {
+    const en = { greet: "Hello" };
+    const baselineTarget = { greet: "Bonjour" };
+    const currentTarget = {}; // removed, not reverted
+
+    expect(measureKeyReversions(baselineTarget, currentTarget, en, en)).toEqual([]);
+  });
+
+  it("does not flag a brand-new key with no baseline entry", () => {
+    const en = { greet: "Hello", newKey: "New" };
+    const baselineTarget = { greet: "Bonjour" }; // newKey didn't exist yet
+    const currentTarget = { greet: "Bonjour", newKey: "New" }; // untranslated so far, not reverted
+
+    expect(measureKeyReversions(baselineTarget, currentTarget, en, en)).toEqual([]);
+  });
+
+  it("does not flag ordinary editing -- a key translated differently is not a reversion", () => {
+    const en = { greet: "Hello" };
+    const baselineTarget = { greet: "Bonjour" };
+    const currentTarget = { greet: "Salut" }; // re-translated, still not English
+
+    expect(measureKeyReversions(baselineTarget, currentTarget, en, en)).toEqual([]);
+  });
+
+  it("does not flag a key that went empty -- that shape belongs to the regression guard, not this one", () => {
+    const en = { greet: "Hello" };
+    const baselineTarget = { greet: "Bonjour" };
+    const currentTarget = { greet: "" };
+
+    expect(measureKeyReversions(baselineTarget, currentTarget, en, en)).toEqual([]);
+  });
+
+  it("checkKeyReversions names every reverted key and stays silent when there are none", () => {
+    const en = { greet: "Hello", bye: "Goodbye" };
+    const reverted = checkKeyReversions({
+      baselineTarget: { greet: "Bonjour", bye: "Au revoir" },
+      currentTarget: { greet: "Hello", bye: "Au revoir" },
+      baselineEn: en,
+      currentEn: en,
+      locale: "fr",
+      catalog: "messages.json",
+      baselineLabel: "origin/main",
+    });
+    expect(reverted.problem).toContain("[fr] messages.json has 1 key(s)");
+    expect(reverted.problem).toContain("greet");
+    expect(reverted.problem).toContain("origin/main");
+
+    const clean = checkKeyReversions({
+      baselineTarget: { greet: "Bonjour" },
+      currentTarget: { greet: "Bonjour" },
+      baselineEn: en,
+      currentEn: en,
+      locale: "fr",
+      catalog: "messages.json",
+      baselineLabel: "origin/main",
+    });
+    expect(clean.problem).toBeNull();
+  });
+});
+
+describe("content-i18n-lint per-key English-reversion wiring", () => {
+  it("surfaces a problem when a handful of keys revert to English in an otherwise-translated catalog", () => {
+    const dir = tempContentI18nDir();
+    const en = englishCatalog(30);
+    writeFileSync(join(dir, "en", "flowQuestions.json"), JSON.stringify(en));
+    const baselineFr = mapValues(en, (v) => `Invite ${v}`); // fully translated before
+    // Now: translated except for 2 keys that reverted to English. Small
+    // enough that neither the collapse nor the regression guard would fire.
+    const currentFr = { ...baselineFr, "content.flowQuestion.q1.prompt": en["content.flowQuestion.q1.prompt"] };
+    writeFileSync(join(dir, "fr", "flowQuestions.json"), JSON.stringify(currentFr));
+
+    const { problems } = lint({
+      contentI18nDir: dir,
+      freshCatalogs: EMPTY_FRESH,
+      parityOnlyFiles: ["flowQuestions.json"],
+      getBaselineCatalog: (locale, name) => {
+        if (name !== "flowQuestions.json") return null;
+        if (locale === "fr") return baselineFr;
+        if (locale === "en") return en;
+        return null;
+      },
+    });
+
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("reverted from a real");
+    expect(problems[0]).toContain("content.flowQuestion.q1.prompt");
+  });
+
+  it("stays silent when the English baseline is unavailable, even if the target baseline is", () => {
+    const dir = tempContentI18nDir();
+    const en = englishCatalog(30);
+    writeFileSync(join(dir, "en", "flowQuestions.json"), JSON.stringify(en));
+    const baselineFr = mapValues(en, (v) => `Invite ${v}`);
+    const currentFr = { ...baselineFr, "content.flowQuestion.q1.prompt": en["content.flowQuestion.q1.prompt"] };
+    writeFileSync(join(dir, "fr", "flowQuestions.json"), JSON.stringify(currentFr));
+
+    const { problems } = lint({
+      contentI18nDir: dir,
+      freshCatalogs: EMPTY_FRESH,
+      parityOnlyFiles: ["flowQuestions.json"],
+      // Only the target locale's baseline resolves -- English's doesn't
+      // (e.g. a transient git failure specific to that one lookup).
+      getBaselineCatalog: (locale, name) => (locale === "fr" && name === "flowQuestions.json" ? baselineFr : null),
+    });
+
     expect(problems).toEqual([]);
   });
 });

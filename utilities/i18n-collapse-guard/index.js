@@ -310,6 +310,101 @@ function checkBaselineRegression({ baseline, target, locale, catalog, baselineLa
   return { problem: null, note: null };
 }
 
+// ---------------------------------------------------------------------------
+// PER-KEY ENGLISH-REVERSION GUARD
+// ---------------------------------------------------------------------------
+// Both guards above are statistical: measureCollapse needs a large FRACTION
+// of the catalog to equal English, measureRegression needs a large fraction
+// to go empty. Neither can see a Crowdin sync that reverts a HANDFUL of
+// individual keys while leaving the rest of a large catalog translated —
+// this happened for real: a sync reverted 3 keys out of 1214 in a French
+// catalog (a 0.2% ratio, nowhere near either guard's floor) and merged clean.
+//
+// Unlike the two guards above, this one is not a ratio at all — it is a
+// per-key exact check, so catalog size never matters. A key counts as
+// reverted only when ALL of these hold:
+//   - it had a real translation before (non-empty, and not already
+//     legitimately identical to English -- excluding that avoids flagging a
+//     proper noun/"OK"/symbol that was ALREADY the same on both sides)
+//   - it still exists now (a key the target dropped entirely is key-set
+//     parity's concern, not this one's)
+//   - it now equals the CURRENT English value (reverted, not just edited)
+//
+// TRADE-OFF, STATED PLAINLY: a translator who deliberately, on purpose,
+// corrects a mistranslation to intentionally match English will trip this.
+// That is a real but rare cost of catching the shape that matters — a
+// threshold could not both tolerate that case AND catch a 3-of-1214 sync
+// revert, because the two are statistically indistinguishable at that scale.
+// This guard exists because the real incident it is modeled on had zero
+// false positives when checked this way; if that changes, revisit the
+// design, but don't pre-emptively add an escape hatch for a problem that
+// has not actually occurred (a genuine correction is rare enough that a
+// human looking at one failure and confirming it on purpose is proportionate).
+
+/**
+ * Find individual keys that reverted from a genuine prior translation back to
+ * English. Compares the SAME locale/catalog against its own baseline (like
+ * measureRegression) AND against English at both points in time (like
+ * measureCollapse) — the combination neither existing guard makes alone.
+ *
+ * @param {object} baselineTarget  this locale's catalog previously
+ * @param {object} currentTarget   this locale's catalog now
+ * @param {object} baselineEn      the English catalog at the SAME baseline ref
+ * @param {object} currentEn       the English catalog now
+ * @returns {string[]} keys that were a real, distinct translation before and
+ *   now equal the current English value
+ */
+function measureKeyReversions(baselineTarget, currentTarget, baselineEn, currentEn) {
+  const reverted = [];
+  for (const key of Object.keys(baselineTarget)) {
+    const baseValue = baselineTarget[key];
+    if (typeof baseValue !== "string" || baseValue === "") continue;
+    if (baseValue === baselineEn[key]) continue; // already legitimately identical -- not a reversion
+    if (!(key in currentTarget)) continue; // dropped entirely -- key-set parity's concern, not this one's
+    if (currentTarget[key] === currentEn[key]) reverted.push(key);
+  }
+  return reverted;
+}
+
+/**
+ * Check one target catalog for individual keys that reverted to English.
+ *
+ * @param {object}  args
+ * @param {object}  args.baselineTarget  this locale's catalog previously
+ * @param {object}  args.currentTarget   this locale's catalog now
+ * @param {object}  args.baselineEn      English catalog at the same baseline ref
+ * @param {object}  args.currentEn       English catalog now
+ * @param {string}  args.locale          e.g. "fr"
+ * @param {string}  args.catalog         display name, e.g. "messages.json"
+ * @param {string}  args.baselineLabel   what to call the baseline in the message
+ * @returns {{problem: string|null}}
+ */
+function checkKeyReversions({
+  baselineTarget,
+  currentTarget,
+  baselineEn,
+  currentEn,
+  locale,
+  catalog,
+  baselineLabel,
+}) {
+  const reverted = measureKeyReversions(baselineTarget, currentTarget, baselineEn, currentEn);
+  if (reverted.length === 0) return { problem: null };
+
+  return {
+    problem:
+      `[${locale}] ${catalog} has ${reverted.length} key(s) that reverted from a real ` +
+      `translation back to English, compared to ${baselineLabel}: ${reverted.join(", ")}. ` +
+      `This is invisible to both the English-collapse guard (needs a large fraction of the ` +
+      `catalog, not a handful of keys) and the baseline-regression guard (only catches values ` +
+      `going empty, not values matching English) — exactly the shape that slipped through both ` +
+      `once already. If Crowdin genuinely has no '${locale}' translation for these ids, seed ` +
+      `them there rather than committing the English fallback. If this is a deliberate ` +
+      `correction to intentionally match English, that is a legitimate but rare case this ` +
+      `guard cannot distinguish automatically — confirm it's intentional before proceeding.`,
+  };
+}
+
 module.exports = {
   COLLAPSE_THRESHOLD,
   MIN_KEYS,
@@ -321,4 +416,6 @@ module.exports = {
   MIN_KEYS_REGRESSION_EXACT,
   measureRegression,
   checkBaselineRegression,
+  measureKeyReversions,
+  checkKeyReversions,
 };

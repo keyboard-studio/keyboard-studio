@@ -13,7 +13,10 @@
 // (a Crowdin export of an untranslated project); and that its values haven't
 // REGRESSED against their own previously-committed state — a catalog that
 // kept every key but went from translated to empty, which the two checks
-// above cannot see.
+// above cannot see; and that it hasn't reverted a HANDFUL of individual keys
+// back to English — invisible to both other checks, which need a large
+// fraction of the catalog to fire, not a few keys in an otherwise-translated
+// catalog.
 //
 // Read-only: never writes to content/i18n/**.
 //
@@ -40,7 +43,11 @@
 const { readFileSync, readdirSync, existsSync } = require("node:fs");
 const path = require("node:path");
 const { parse: parseYaml } = require("yaml");
-const { checkEnglishCollapse, checkBaselineRegression } = require("../i18n-collapse-guard/index.js");
+const {
+  checkEnglishCollapse,
+  checkBaselineRegression,
+  checkKeyReversions,
+} = require("../i18n-collapse-guard/index.js");
 const { resolveBaselineRef, readCatalogAtRef } = require("../i18n-collapse-guard/git-baseline.js");
 
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
@@ -280,6 +287,27 @@ function checkTargetLocaleParity(
       });
       if (regression.problem) problems.push(regression.problem);
       if (regression.note) notes.push(regression.note);
+
+      // Neither check above can see a HANDFUL of individual keys reverting to
+      // English in an otherwise-translated catalog -- both are ratio-based and
+      // a few keys out of a large catalog never crosses either floor. This
+      // needs English at the SAME baseline ref too, not just the target
+      // locale's baseline -- a key already legitimately identical to English
+      // back then must not be flagged now. null baselineEn (offline, ref
+      // unresolvable) skips silently, same as `baseline` above.
+      const baselineEn = getBaselineCatalog(SOURCE_LOCALE, name);
+      if (baselineEn !== null) {
+        const reversions = checkKeyReversions({
+          baselineTarget: baseline,
+          currentTarget: target,
+          baselineEn,
+          currentEn: freshEnglish,
+          locale,
+          catalog: name,
+          baselineLabel: "its previous committed state",
+        });
+        if (reversions.problem) problems.push(reversions.problem);
+      }
     }
   }
 }
