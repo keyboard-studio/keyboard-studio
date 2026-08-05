@@ -146,6 +146,10 @@ export function useWorkingCopyTransform(
   // against previewedBaseId below (F4 fix) so a candidate-base preview never
   // receives another base's carve overlay.
   const storeBaseKeyboardId = useWorkingCopyStore((s) => s.baseKeyboard?.id ?? null);
+  // The base keyboard's own display name — the anchor for projectWorkingCopyVfs
+  // step 3's "is the display name an EDIT?" test, so the OSK preview and the zip
+  // agree about when `store(&NAME)` is rewritten.
+  const storeBaseDisplayName = useWorkingCopyStore((s) => s.baseKeyboard?.displayName ?? null);
   const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
   const deletedTouchKeyIds = useWorkingCopyStore((s) => s.deletedTouchKeyIds);
@@ -276,6 +280,7 @@ export function useWorkingCopyTransform(
         getPattern: (id) => patternMap?.get(id),
         identity: identityArg,
         ...(touchLayoutJson !== null ? { touchLayoutJson } : {}),
+        ...(storeBaseDisplayName !== null ? { baseDisplayName: storeBaseDisplayName } : {}),
       });
 
       return {
@@ -288,6 +293,7 @@ export function useWorkingCopyTransform(
     baseIr,
     previewedBaseId,
     storeBaseKeyboardId,
+    storeBaseDisplayName,
     deletedKey,
     assignmentsKey,
     identityDisplayName,

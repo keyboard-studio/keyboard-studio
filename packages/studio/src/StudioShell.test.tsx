@@ -27,6 +27,8 @@ import { screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { render } from "./test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
 import { useSurveySessionStore, snapshotTraversal } from "./stores/surveySessionStore.ts";
+import { useStartOverStore } from "./stores/startOverStore.ts";
+import { SurveyResetButton } from "./components/SurveyResetButton.tsx";
 import { consumePendingWelcomeLocation, jumpToLocation } from "./lib/jumpToLocation.ts";
 import { snapshotWorkingCopyData } from "./lib/persistWorkingCopy.ts";
 import type { OnInstantiateCallback, Stage } from "./hooks/useKeyboardArtifact.ts";
@@ -1640,10 +1642,14 @@ describe("F6 wiring: promotePendingAutosave", () => {
     });
     expect(localStorage.getItem(draftKey(PENDING_PROJECT_KEY))).not.toBeNull();
 
-    // Start over: arm + confirm the corner reset control (real component,
-    // not mocked — visible on every survey step).
-    fireEvent.click(screen.getByTestId("survey-reset-arm"));
-    fireEvent.click(screen.getByTestId("survey-reset-yes"));
+    // Start over. The Reset control itself now lives in the NavBar (out of this
+    // SurveyView-only render), so fire the handler SurveyView publishes for it
+    // — which also proves the startOverStore bridge is live on mount.
+    const startOver = useStartOverStore.getState().handler;
+    expect(startOver).not.toBeNull();
+    act(() => {
+      startOver!();
+    });
 
     // handleStartOver's discardActiveDraft() removes the just-abandoned
     // pending record synchronously.
@@ -2440,8 +2446,27 @@ describe("SurveyView — traversal survives a route round trip (spec 057 FR-002)
 describe("SurveyView — a reset happens only on an explicit start-over (spec 057 FR-003)", () => {
   it("the corner reset control clears traversal back to identity", async () => {
     useSurveySessionStore.getState().reset();
+
+    // Spec 057's own move of the Reset control INTO the NavBar (out of
+    // SurveyView's own render — see the sibling "(c) start-over re-arms..."
+    // test above, and the NavBar wiring in StudioShell.tsx) means a bare
+    // `<SurveyView>` render publishes the handler to startOverStore but
+    // renders no button for it. Mount the same wiring NavBar uses — the real
+    // `SurveyResetButton` bound to the store's published handler — so this
+    // test can still exercise the actual arm/confirm UI without pulling in
+    // the whole StudioShell.
+    function ResetHarness() {
+      const startOver = useStartOverStore((s) => s.handler);
+      return (
+        <>
+          <SurveyView baseKeyboard={null} />
+          {startOver !== null && <SurveyResetButton onReset={startOver} />}
+        </>
+      );
+    }
+
     await act(async () => {
-      render(<SurveyView baseKeyboard={null} />);
+      render(<ResetHarness />);
     });
     advanceToTrack();
     expect(useSurveySessionStore.getState().activeStepId).toBe("track");

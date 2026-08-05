@@ -106,6 +106,7 @@ import {
 import { TEXT_MAIN, TEXT_DIM, FONT } from "./survey/surveyStyles.ts";
 import { CharacterMapPane } from "./survey/CharacterMapPane.tsx";
 import { useBasePreviewStatusStore, type BasePreviewStatus } from "./stores/basePreviewStatusStore.ts";
+import { useStartOverStore } from "./stores/startOverStore.ts";
 import { useInventoryCoverageGate } from "./hooks/useInventoryCoverageGate.ts";
 import { useAccountedForGate } from "./hooks/useAccountedForGate.ts";
 import { useSurveyBrowserHistorySync } from "./hooks/useSurveyBrowserHistorySync.ts";
@@ -293,6 +294,7 @@ function NavBar({
   onNavigateToUnfinishedGallery,
 }: NavBarProps) {
   const { i18n: activeI18n } = useLingui();
+  const startOver = useStartOverStore((s) => s.handler);
   return (
     <nav
       aria-label={resolveMessage(
@@ -345,7 +347,11 @@ function NavBar({
       {/* Right group — unfinished-gallery return indicator (hidden on
           welcome, same as the account control below — nothing to return to
           before a keyboard exists) + locale switcher (all routes) + account
-          control (hidden on the welcome route) */}
+          control (hidden on the welcome route) + survey reset in the far
+          corner. The reset is last so it can't crowd the controls beside it;
+          it renders only while a survey is mounted (startOverStore publishes
+          the handler from SurveyView, which exists on the #survey route
+          alone). */}
       <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
         {active !== "welcome" && (
           <UnfinishedGalleryIndicator
@@ -356,6 +362,7 @@ function NavBar({
         )}
         <LocaleSwitcher />
         {active !== "welcome" && <AccountControl />}
+        {startOver !== null && <SurveyResetButton onReset={startOver} />}
       </div>
     </nav>
   );
@@ -1271,6 +1278,24 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   }
 
   // ---------------------------------------------------------------------------
+  // Publish start-over to the NavBar's corner Reset (stores/startOverStore.ts).
+  //
+  // handleStartOver is re-created every render, so what gets published is a
+  // stable thunk over a ref instead — registering the handler itself would
+  // re-write the store (and re-render the nav) on every survey keystroke. The
+  // unmount cleanup clearing it to null is what hides the control off-route.
+  // ---------------------------------------------------------------------------
+  const startOverRef = useRef(handleStartOver);
+  startOverRef.current = handleStartOver;
+  const setStartOverHandler = useStartOverStore((s) => s.setHandler);
+  useEffect(() => {
+    setStartOverHandler(() => {
+      startOverRef.current();
+    });
+    return () => setStartOverHandler(null);
+  }, [setStartOverHandler]);
+
+  // ---------------------------------------------------------------------------
   // Resume banner handlers.
   //
   // Resume: restore both stores from the saved draft, then mark the working copy
@@ -1405,11 +1430,6 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
   const rightPct = 100 - leftPct;
 
-  // Corner reset — visible on every survey step (both layouts). Wired to the
-  // same handleStartOver as the terminal panels' "Start over", so it clears
-  // stores + draft directly and never trips the rebase-confirm dialog.
-  const resetButton = <SurveyResetButton onReset={handleStartOver} />;
-
   // Full-screen steps (carve/mechanisms/touch/touch_seed_source) bypass the
   // two-pane layout. StepHost returns the full-screen container; SurveyView
   // renders it directly. This reproduces the pre-Stage-5 early-return pattern
@@ -1419,12 +1439,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // the two-pane shell's persistent right-pane OSKFrame must NOT also mount —
   // that was the redundant-desktop-preview bug.
   if (activeStepIsFullScreen) {
-    return (
-      <>
-        {stepHost}
-        {resetButton}
-      </>
-    );
+    return stepHost;
   }
 
   return (
@@ -1560,8 +1575,6 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           </>
         )}
       </section>
-
-      {resetButton}
     </div>
   );
 }

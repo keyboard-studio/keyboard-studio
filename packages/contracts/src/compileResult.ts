@@ -29,12 +29,19 @@ export interface CompileArtifact {
 }
 
 /**
- * Diagnostic produced by the WASM compile pass. Narrowed to Layer A only —
+ * Diagnostic produced by a compile pass. Narrowed to Layer A only —
  * the kmcmplib WASM oracle runs the 5 deep checks listed in spec §10
  * (CAPS/NCAPS consistency, unreachable rules, `platform()` parsing,
  * `context(N)` offset, named code constants). Layer B style findings come
  * from `ValidatorService.validate()`; Layer C hygiene findings come from
  * `LintEngineService.lint()` at phase-exit. They MUST NOT appear here.
+ *
+ * **Second Layer-A producer:** the package compiler (`@keymanapp/kmc-package`,
+ * via `engine/src/output/kmp.ts`) also emits these, under `KM_*_KMP_*` codes.
+ * It is a compiler like kmcmplib — it fails a build on a missing member or an
+ * invalid descriptor — so its findings belong in Layer A rather than in the
+ * style or hygiene layers. Not a layering violation; the narrowing above is
+ * about *severity of concern*, not about which binary produced the finding.
  *
  * @see spec.md §10
  * @see #93 (this narrowing decision)
