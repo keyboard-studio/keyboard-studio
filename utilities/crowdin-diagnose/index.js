@@ -31,9 +31,12 @@
 //     and the export is approved-only      -> Crowdin export setting, or approve
 // H3  translations live under a Crowdin
 //     BRANCH the download never reads      -> align branch usage, do NOT seed
-// H4  translations exist, and either they  -> the project is fine; the download
-//     are approved or approval does not       config or file mapping is at fault
-//     gate the export
+// H4  translations exist and are approved  -> the project is fine; the download
+//                                             config or file mapping is at fault
+// H4' translations exist but unapproved,   -> also fine; same downstream fault.
+//     and the export does NOT gate on         Distinct id from H4 because the
+//     approval                                evidence differs (this is the
+//                                             shape a fresh seed produces)
 //
 // H1 is already FALSIFIED for Tier A: upload run 29940588381 (2026-07-22)
 // ran with upload_translations: true and succeeded, logging an accepted
@@ -259,8 +262,8 @@ function verdict({ localeIsTarget, root, branches, exportApprovedOnly }) {
 
   // Only when the setting could not be READ. If the project reported it as
   // false we know approval does not gate the export, so unapproved strings are
-  // not a finding at all and this must fall through to H4 -- see the
-  // exportApprovedOnly note below.
+  // not a finding at all and this must fall through to H4_UNAPPROVED_BUT_EXPORTS
+  // below.
   if (unapproved > 0 && exportApprovedOnly === null) {
     return {
       id: "H2_UNAPPROVED_UNCONFIRMED",
@@ -270,7 +273,8 @@ function verdict({ localeIsTarget, root, branches, exportApprovedOnly }) {
       fix:
         `Do NOT seed. Check "Export only approved translations" in the Crowdin project ` +
         `settings by hand. If it is ON, that explains the all-English download and the fix ` +
-        `is that setting (or approving the strings). If it is OFF, treat this as H4 below.`,
+        `is that setting (or approving the strings). If it is OFF, this is really ` +
+        `H4_UNAPPROVED_BUT_EXPORTS -- the project is fine and the fault is downstream.`,
     };
   }
 
@@ -280,9 +284,17 @@ function verdict({ localeIsTarget, root, branches, exportApprovedOnly }) {
   // "N translated and 0 approved", which reads like a problem when it is not --
   // a freshly seeded project sits in exactly this state, because the seeding
   // path leaves auto_approve_imported off on purpose.
+  //
+  // Distinct id from the terminal H4 below, deliberately, for the same reason
+  // H2 is split into H2_APPROVED_ONLY_EXPORT and H2_UNAPPROVED_UNCONFIRMED: one
+  // id per distinct evidentiary state, not per conclusion. `id` is this tool's
+  // machine contract -- selftest.js asserts on it alone, and --json consumers
+  // have nothing else stable to key on -- so collapsing two distinguishable
+  // states into one id would discard the distinction for every consumer that
+  // does not parse prose.
   if (unapproved > 0) {
     return {
-      id: "H4_PROJECT_LOOKS_HEALTHY",
+      id: "H4_UNAPPROVED_BUT_EXPORTS",
       headline:
         `${root.translated} phrases translated, ${root.approved} approved (${unapproved} ` +
         `unapproved) -- but the project does NOT export approved-only, so the unapproved ` +

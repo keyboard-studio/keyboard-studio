@@ -108,8 +108,8 @@ const SCENARIOS = [
     // correctly and whose setting had in fact been read. Distinguishing null
     // from false is the whole point; a scenario that omits the field cannot
     // catch it, which is why the one above did not.
-    name: "H4 healthy — unapproved, but project does not export approved-only",
-    expect: "H4_PROJECT_LOOKS_HEALTHY",
+    name: "H4' healthy — unapproved, but project does not export approved-only",
+    expect: "H4_UNAPPROVED_BUT_EXPORTS",
     project: {
       name: "kbs",
       sourceLanguageId: "en",
