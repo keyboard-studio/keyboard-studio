@@ -127,6 +127,14 @@ function seedInstantiatedWorkingCopy() {
     vfs,
     ir: makeTestIR([]),
   });
+  // spec 037 D5/D6: download is gated on attribution, because a redistributable
+  // package with no rights holder is incomplete. A fully instantiated working
+  // copy therefore has one — the dedicated no-attribution case is asserted
+  // separately below.
+  useWorkingCopyStore.getState().setAttribution({
+    authorName: "Alice Example",
+    copyrightHolder: "Alice Example",
+  });
 }
 
 // ---------------------------------------------------------------------------
@@ -426,5 +434,61 @@ describe("OutputScreen — download filename", () => {
     } finally {
       createElementSpy.mockRestore();
     }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Attribution gate on download (spec 037 D5/D6/FR-015)
+//
+// A redistributable package with no rights holder is incomplete, and the
+// pre-037 alternative — naming the keyboard's own display name — was a false
+// attribution. So download is GATED, not warned, and the disabled reason names
+// the real cause rather than blaming the compile.
+// ---------------------------------------------------------------------------
+
+describe("OutputScreen — attribution gate", () => {
+  function seedWithoutAttribution() {
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
+      vfs,
+      ir: makeTestIR([]),
+    });
+    // Deliberately NO setAttribution — this is the case under test.
+  }
+
+  it("disables download when the working copy has no attribution", () => {
+    seedWithoutAttribution();
+    render(<OutputScreen />);
+    fireEvent.click(screen.getByTestId("base-picker"));
+    expect((screen.getByTestId("emit-download") as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("explains WHY rather than blaming the compile", () => {
+    seedWithoutAttribution();
+    render(<OutputScreen />);
+    fireEvent.click(screen.getByTestId("base-picker"));
+    const label = screen.getByTestId("emit-download").getAttribute("aria-label") ?? "";
+    expect(label).toMatch(/author and copyright holder/i);
+    expect(label).not.toMatch(/compile/i);
+  });
+
+  it("shows an actionable message naming where to fix it", () => {
+    seedWithoutAttribution();
+    render(<OutputScreen />);
+    fireEvent.click(screen.getByTestId("base-picker"));
+    const msg = screen.getByTestId("attribution-required").textContent ?? "";
+    expect(msg).toMatch(/author/i);
+    expect(msg).toMatch(/copyright holder/i);
+    expect(msg).toMatch(/language step/i);
+  });
+
+  it("enables download once attribution is present", () => {
+    seedInstantiatedWorkingCopy(); // seeds attribution
+    render(<OutputScreen />);
+    fireEvent.click(screen.getByTestId("base-picker"));
+    expect((screen.getByTestId("emit-download") as HTMLButtonElement).disabled).toBe(false);
+    expect(screen.queryByTestId("attribution-required")).toBeNull();
   });
 });

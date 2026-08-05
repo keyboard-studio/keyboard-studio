@@ -43,6 +43,7 @@ export function OutputScreen() {
     downloadWarnings,
     handleDownload,
     showIdentityWarn,
+    attributionMissing,
   } = artifact;
 
   // Identity prefill for the Option B submit form. Read from whichever auth
@@ -134,7 +135,9 @@ export function OutputScreen() {
               aria-label={
                 canDownload
                   ? `Download keyboard ${pickerMode === "scaffold" && scaffoldSpec !== null ? scaffoldSpec.keyboardId : baseKeyboard.id} as zip`
-                  : "Download unavailable until compile completes"
+                  : attributionMissing
+                    ? "Download unavailable until the keyboard has an author and copyright holder"
+                    : "Download unavailable until compile completes"
               }
               style={{
                 alignSelf: "flex-start",
@@ -152,6 +155,26 @@ export function OutputScreen() {
             >
               {downloading ? "Downloading..." : "Download .zip"}
             </button>
+            {attributionMissing && (
+              <div
+                role="status"
+                aria-live="polite"
+                data-testid="attribution-required"
+                style={{
+                  marginTop: 4,
+                  padding: "8px 12px",
+                  background: "#2a1a00",
+                  border: "1px solid #d29922",
+                  borderRadius: 6,
+                  fontSize: 12,
+                  color: "#d29922",
+                  fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+                }}
+              >
+                This keyboard needs an author and a copyright holder before it can be
+                downloaded. Go back to the language step to add them.
+              </div>
+            )}
             {downloadError !== null && (
               <div role="alert" style={{ fontSize: 11, color: "#f0a0a0", marginTop: 4 }}>
                 {downloadError}

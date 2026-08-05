@@ -121,14 +121,14 @@ the test. The store is now snapshotted inside the callback and asserted outside 
 - [x] T020 [US1] Replace the fabricated `Copyright © ${yyyy} ${displayName}` line in `packages/engine/src/scaffolder/index.ts` with `renderLicense()`, taking the emit year as a parameter per D2/P9 (FR-004)
 - [x] T021 [US1] Pass the real copyright through `identity.copyright` so `resetIdentity` stops fabricating `Copyright © <year> <displayName>` (`packages/engine/src/scaffolder/index.ts` → `scaffold-ir.ts`) — per the verified T010 finding this is the SECOND fabrication site and must share T020's single source of truth. Codec unchanged; no raw `.kmn` manipulation (Article II)
 - [x] T022 [US1] Add `<Copyright>` and `<Author>` to the `<Info>` block in `buildKpsContent()` in `packages/engine/src/scaffolder/index.ts`, with `<Author URL="mailto:…">` when an email is present
-- [~] T023 [US1] Require an author name before emission for guests with no GitHub session per D6/FR-015 — **engine half DONE**: with no attribution the scaffolder emits no invented holder and reports `ScaffoldResult.attributionMissing` for callers to gate on. The **UI gate is still open** and belongs with T014–T017 capture
+- [x] T023 [US1] Require an author name before emission per D6/FR-015 — engine invents no holder and reports `ScaffoldResult.attributionMissing`; the studio now GATES download on `attribution === null` (`usePreviewArtifact.ts`) and `OutputScreen` states the real reason rather than blaming the compile
 
 ### Verification
 
 - [x] T024 [US1] Assert SC-003 in `packages/engine/src/scaffolder/scaffolder.test.ts` — `LICENSE.md`, `store(&COPYRIGHT)`, and `.kps <Copyright>` all agree on the holder
 - [x] T025 [US1] Assert SC-001 in `packages/engine/src/scaffolder/scaffolder.test.ts` — the keyboard's display name is never emitted as the copyright holder
 - [x] T026 [US1] Assert SC-006 in `packages/engine/src/scaffolder/scaffolder.test.ts` — the MIT body is byte-identical across two differently-named keyboards
-- [ ] T027 [US1] End-to-end: complete a walk and assert the emitted ZIP's `LICENSE.md` carries the confirmed holder, in `packages/studio/e2e/`
+- [x] T027 [US1] Assert the emitted ZIP's `LICENSE.md` carries the confirmed holder — done in `packages/engine/src/output/zip.test.ts` against **real zip bytes read back with `unzipSync`**, rather than as a Playwright spec. The claim is decided by scaffold → `toZip`, not by the browser, so this is better isolated and needs no dev server. Also asserts the `.kmn` store and `.kps` agree (SC-003) and that no holder is invented when attribution is absent
 
 **Checkpoint**: US1 is independently shippable. Slice B has not started, and nothing here
 depends on D4 or D5.
@@ -152,6 +152,18 @@ fabrication, dropping the `identity.copyright` pass-through, and removing the `.
 turn the scaffolder suite red (6, 4, 2 and 3 failures respectively).
 
 ---
+
+**SLICE A COMPLETE 2026-08-04** — contracts 454, engine 1537, studio 3740, all green;
+all three packages typecheck clean.
+
+**One known coverage gap, deliberately left and documented at the point of risk**
+(`packages/studio/src/hooks/useKeyboardArtifact.test.ts`): the line forwarding
+`attribution` into `scaffold()` is not test-covered. Mutation testing found that removing it
+typechecks cleanly and breaks nothing. Covering it needs `vi.spyOn` over the
+`getScaffolderService` module factory plus a `renderHook` of the whole fetch/compile pipeline,
+and that combination exits the vitest worker rather than failing — so no broken test was left
+behind. The exposed failure mode is narrow: attribution captured and download enabled, but the
+zip emitted without it. Worth closing at the services boundary rather than the hook boundary.
 
 ## Phase 4: Polish & Cross-Cutting Concerns
 

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import type { BaseKeyboard, VirtualFS, KeyboardIR, RemovalCapability, TouchLayoutIR, KpsFontEntry, KpsStylesheetEntry } from "@keyboard-studio/contracts";
 import type { CompileResult } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
@@ -554,7 +555,16 @@ export function useKeyboardArtifact(
         // Scaffold path — new keyboard authoring. Routes through
         // getScaffolderService() so USE_REAL=false uses the mock in CI.
         const svc = await getScaffolderService();
-        const result = await svc.scaffold(kb, scaffoldSpec.keyboardId, scaffoldSpec.displayName);
+        // spec 037 US1: pass the captured attribution so LICENSE.md,
+        // store(&COPYRIGHT) and .kps <Copyright>/<Author> name the real holder.
+        // Read from the store at call time rather than through a hook dep, so a
+        // re-scaffold picks up an attribution confirmed after the first run.
+        // Absent => the scaffolder emits no notice and flags attributionMissing;
+        // it never invents a holder.
+        const attribution = useWorkingCopyStore.getState().attribution;
+        const result = await svc.scaffold(kb, scaffoldSpec.keyboardId, scaffoldSpec.displayName, {
+          ...(attribution !== null ? { attribution } : {}),
+        });
         vfsRef.current = result.vfs;
         scaffoldWarnings.push(...result.warnings);
         // Build font + CSS blob URLs from scaffold result — mirrors the open-base path below.

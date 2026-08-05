@@ -42,6 +42,17 @@ export interface PreviewArtifact {
 
   // Download state
   canDownload: boolean;
+  /**
+   * True when the working copy has no attribution, so the package would ship
+   * with NO copyright notice (spec 037 D5/D6/FR-015).
+   *
+   * Blocks download rather than warning: a redistributable package with no
+   * rights holder is incomplete, and the pre-037 alternative — naming the
+   * keyboard's own display name — was a false attribution. The identity flow
+   * requires an author name, so this normally cannot happen; it catches Track 2
+   * and drafts saved before attribution capture existed.
+   */
+  attributionMissing: boolean;
   downloading: boolean;
   downloadError: string | null;
   downloadWarnings: string[];
@@ -168,7 +179,11 @@ export function usePreviewArtifact(): PreviewArtifact {
   // instantiated (baseVfs + baseIr available in the store). The serializer
   // builds the zip from the store's baseVfs, not from stage.vfs, so the
   // download contains the full projected working copy including assignments.
-  const canDownload = stage.kind === "ready" && isInstantiated;
+  // spec 037 D5/D6: never emit a package whose only "holder" is invented, and
+  // never emit one with no notice at all. Gate rather than warn.
+  const attributionMissing = useWorkingCopyStore((s) => s.attribution === null);
+
+  const canDownload = stage.kind === "ready" && isInstantiated && !attributionMissing;
 
   const handleDownload = useCallback(async () => {
     if (stage.kind !== "ready") return;
@@ -238,6 +253,7 @@ export function usePreviewArtifact(): PreviewArtifact {
     recompile,
     diagnostics,
     canDownload,
+    attributionMissing,
     downloading,
     downloadError,
     downloadWarnings,
