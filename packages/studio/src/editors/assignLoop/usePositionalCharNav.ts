@@ -11,6 +11,80 @@
 
 import { useCallback, useState } from "react";
 
+// ---------------------------------------------------------------------------
+// Identity helpers — shaped-bug fix (walk-order/indexing).
+//
+// `list.indexOf(currentChar)` / `list.includes(currentChar)` compare by RAW
+// string equality. That silently strands the walk when the SAME character
+// changes representation across a reflow — e.g. `collateInventory`'s
+// NFC-dedup (survey/collation.ts) now displays "ӝ" (U+04DD, precomposed)
+// where an earlier render may have held the canonically-equivalent decomposed
+// form ("ж" + combining diaeresis) as `currentChar` — raw equality treats
+// those as two different values even though they are one character. Comparing
+// by NFC canonical form makes membership/position checks robust to that
+// representation drift, matching the NFC-identity convention the rest of the
+// inventory pipeline already uses (useInventoryDiff.ts, buildProducedSet).
+// ---------------------------------------------------------------------------
+
+/**
+ * NFC-canonical-form equality — the identity two menu chips/walk entries
+ * share. Exported for other identity-sensitive comparisons over the same
+ * walk list (CharScrollStrip's `isSelected` chip highlight).
+ */
+export function sameCharIdentity(a: string, b: string): boolean {
+  return a.normalize("NFC") === b.normalize("NFC");
+}
+
+/**
+ * Position of `char` in `list` by NFC identity, or -1 if absent. Exported so
+ * other identity-sensitive consumers of the SAME walk list (CharScrollStrip's
+ * windowing) use the identical comparison rather than a raw `indexOf` that
+ * would strand on a representation change (see the module doc comment).
+ */
+export function indexOfChar(list: readonly string[], char: string): number {
+  return list.findIndex((c) => sameCharIdentity(c, char));
+}
+
+/**
+ * Resolve the character `currentChar` should become after `nextList` reflows
+ * (insertion/removal/reorder), so a removed character never strands the walk
+ * on a stale value nor jumps arbitrarily far away:
+ *   1. Still present (by NFC identity) → keep it (no navigation change).
+ *   2. `currentChar` is null / `prevList` didn't have it → the first entry.
+ *   3. Removed → the NEAREST surviving neighbor: walk outward from its OLD
+ *      position in `prevList`, preferring the entry that slid into that same
+ *      slot, then alternating outward on either side, so the walk resumes as
+ *      close as possible to where the author was rather than jumping to
+ *      "first uncovered"/`list[0]` (which can be arbitrarily far away in a
+ *      long inventory).
+ *
+ * Pure — no store/React reads; both galleries' currentChar-sync effects call
+ * this instead of hand-rolling their own "keep if present, else first" logic,
+ * so they can't drift on the fallback behavior.
+ */
+export function nearestSurvivingChar(
+  prevList: readonly string[],
+  prevChar: string | null,
+  nextList: readonly string[],
+): string | null {
+  if (nextList.length === 0) return null;
+  if (prevChar === null) return nextList[0] ?? null;
+
+  const stillPresentIdx = indexOfChar(nextList, prevChar);
+  if (stillPresentIdx !== -1) return nextList[stillPresentIdx] as string;
+
+  const oldIdx = indexOfChar(prevList, prevChar);
+  if (oldIdx === -1) return nextList[0] ?? null;
+
+  for (let offset = 0; offset < nextList.length; offset++) {
+    const after = nextList[oldIdx + offset];
+    if (after !== undefined) return after;
+    const before = nextList[oldIdx - offset];
+    if (before !== undefined) return before;
+  }
+  return nextList[0] ?? null;
+}
+
 export interface UsePositionalCharNavOptions {
   /** The fixed, ordered character list this gallery walks (lettersToAdd / inventory). */
   list: readonly string[];
@@ -116,10 +190,13 @@ export function usePositionalCharNav({
   }, []);
 
   // Deterministic linear positional navigation — idx = position of
-  // currentChar in `list`. Forward/back always move by one position; they
-  // never search for the next uncovered/unconfigured character, so an
-  // already-handled character is never skipped over.
-  const currentIdx = currentChar !== null ? list.indexOf(currentChar) : -1;
+  // currentChar in `list`, by NFC identity (see `indexOfChar` — a reflow that
+  // changes currentChar's representation, e.g. collateInventory's NFC-dedup,
+  // must not strand the walk on a raw-string mismatch). Forward/back always
+  // move by one position; they never search for the next
+  // uncovered/unconfigured character, so an already-handled character is
+  // never skipped over.
+  const currentIdx = currentChar !== null ? indexOfChar(list, currentChar) : -1;
   const hasAnotherCharAfterCurrent =
     currentIdx >= 0 && currentIdx < list.length - 1;
 
@@ -171,14 +248,15 @@ export function usePositionalCharNav({
   }, [currentChar, currentIdx, list, setCurrentChar]);
 
   // Select-by-value — jumps to ANY position in `list`, forward or backward,
-  // ungated by covered/configured status. `list.includes` (not indexOf-then-
-  // compare) keeps the "not present -> no-op" check self-contained; the
-  // caller (CharScrollStrip) only ever offers chips drawn from this same
-  // `list`, so the not-found branch is defense-in-depth rather than a
-  // reachable UI path.
+  // ungated by covered/configured status. Membership by NFC identity (see
+  // `indexOfChar`), not raw equality — the caller (CharScrollStrip) only ever
+  // offers chips drawn from this same `list`, so the not-found branch is
+  // defense-in-depth rather than a reachable UI path, but a reflow-driven
+  // representation change (e.g. collateInventory's NFC-dedup) must not turn
+  // a legitimate chip click into a silent no-op.
   const handleSelectChar = useCallback(
     (char: string) => {
-      if (!list.includes(char)) return;
+      if (indexOfChar(list, char) === -1) return;
       setCurrentChar(char);
     },
     [list, setCurrentChar],

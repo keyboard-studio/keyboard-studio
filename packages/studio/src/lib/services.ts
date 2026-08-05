@@ -8,6 +8,7 @@ import type {
   BaseBrowserService,
   CharacterDiscoveryService,
   OutputService,
+  Pattern,
   PatternLibraryService,
   ScaffolderService,
   VirtualFS,
@@ -27,10 +28,13 @@ import type {
   KmpBuildArtifacts,
 } from "@keyboard-studio/engine";
 import { charactersInTier } from "@keyboard-studio/engine";
-import { mockBaseBrowser, mockOutputService, mockPatternLibrary, mockScaffolder } from "@keyboard-studio/contracts/mocks";
+import { mockBaseBrowser, mockOutputService, mockPatternLibrary, mockPatternByIdSync, mockScaffolder } from "@keyboard-studio/contracts/mocks";
 import { getBackendUrl } from "./githubOAuth.ts";
 import { localBaseBrowser, LOCAL_PROXY_BASE } from "./localBaseBrowser.ts";
-import { getPatternLibraryService as getBrowserPatternLibraryService } from "./browserPatternLibrary.ts";
+import {
+  getPatternLibraryService as getBrowserPatternLibraryService,
+  getPatternByIdSync as getBrowserPatternByIdSync,
+} from "./browserPatternLibrary.ts";
 
 export const USE_REAL = import.meta.env.VITE_USE_REAL_ENGINE !== "false";
 
@@ -68,6 +72,16 @@ export async function getScaffolderService(): Promise<ScaffolderService> {
 // the mock so CI/test never triggers the glob loader.
 export function getPatternLibraryService(): PatternLibraryService {
   return USE_REAL ? getBrowserPatternLibraryService() : mockPatternLibrary;
+}
+
+// Synchronous counterpart of getPatternLibraryService().getById() — needed by
+// pure/non-async call sites (buildSessionProducedSet callers in
+// useInventoryDiff/the galleries) that resolve a MechanismRef.patternId to
+// its Pattern.kmnFragment inside a useMemo, not an effect. Same USE_REAL
+// switch as every other service getter above so tests forcing mocks never
+// reach the real content-pattern glob.
+export function getPatternByIdSync(id: string): Pattern | undefined {
+  return USE_REAL ? getBrowserPatternByIdSync(id) : mockPatternByIdSync(id);
 }
 
 // CharacterDiscoveryService: when USE_REAL is false returns a minimal stub so

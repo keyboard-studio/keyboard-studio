@@ -1,0 +1,1730 @@
+{
+  "workflow": "companion",
+  "specName": "057-bulletproof-navigation",
+  "branch": "057-bulletproof-navigation",
+  "selectedAt": "2026-08-03T20:09:41.129Z",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-03T20:10:26.507Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-03T20:10:26.509Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T20:19:11.322Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T20:21:07.998Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T20:22:08.500Z"
+    },
+    {
+      "step": "clarify",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T20:53:13.299Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-03T20:59:24.949Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T21:05:31.702Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T21:06:52.299Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-03T21:48:04.387Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T21:51:16.337Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T21:55:08.137Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T21:55:08.370Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T21:55:08.609Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:12:42.095Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:12:42.369Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:12:42.633Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:31:55.590Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:33:21.331Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:33:21.559Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:33:21.786Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:33:22.028Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:33:22.271Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:33:22.521Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:44:29.664Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:44:29.919Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:44:30.160Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:44:30.425Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T041",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T22:44:30.695Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:10:00.747Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:10:01.006Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:10:01.244Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:10:01.520Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:10:01.825Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:10:02.073Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:10:02.314Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:10:02.565Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:10:02.844Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:10:03.119Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:12:27.759Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:24:59.651Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:24:59.894Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:25:00.149Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:25:00.398Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:25:00.675Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:25:00.930Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:25:01.202Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:25:01.489Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T038",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:49:35.884Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T066",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:53:36.724Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T067",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:53:37.294Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T068",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:53:37.862Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T069",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:53:38.442Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T070",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-03T23:53:39.023Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T056",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:17:01.927Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T057",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:17:02.237Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T058",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:17:02.568Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T059",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:17:02.882Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T060",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:17:03.227Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T061",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:17:03.553Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T062",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:17:04.011Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T047",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:27:08.404Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T048",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:27:08.745Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T049",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:27:09.134Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T050",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:27:09.506Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T051",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:27:09.856Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T052",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:27:10.270Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T053",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:27:10.710Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T054",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:27:11.116Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T055",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:27:11.516Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T063",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:27:11.944Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T064",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:27:12.383Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T065",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T00:27:12.835Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T039",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T01:04:55.721Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T01:04:55.974Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T042",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T01:04:56.210Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T043",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T01:04:56.450Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T044",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T01:04:56.708Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T045",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T01:04:56.957Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T046",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T01:04:57.214Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T071",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T01:04:57.467Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T072",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-04T01:04:57.727Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-04T18:40:00.237Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-04T21:39:07.236Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-04T21:39:07.242Z"
+    }
+  ],
+  "telemetryInstanceId": "469b61c6-c778-40d3-b978-3516ec818e69",
+  "approach": "Fix the reported position loss by DELETING SurveyView's mount-time surveySessionStore.reset() — both genuine start-over paths (handleStartOver, WelcomeScreen 'I'm new') already reset explicitly, so the deletion satisfies FR-002/003 and cascades to fix D-2/D-3/D-4 with no new mechanism. Then widen the hash to #route/step/question behind one pure resolver and one jump primitive shared by trail deep links, footer dots and breadcrumb. Make Compare structurally read-only via a new useCompareArtifact that never wires onInstantiate, leaving usePreviewArtifact untouched for Output.",
+  "decisions": [
+    {
+      "decision": "Fix D-1 by deleting SurveyView mount reset, adding no replacement mechanism",
+      "why": "grep finds exactly three surveySessionStore.reset() call sites; the two genuine start-over paths (handleStartOver StudioShell:1073, WelcomeScreen I am new :168) already reset explicitly, so the mount reset is pure defect. Deleting it also fixes D-2 (durable overwrite), D-3 (all four entry points) and D-4 (Phase B alphabet) at once.",
+      "rejected": "A hasNavigatedWithinSession flag or a route-aware reset - both add a second notion of session identity beside the two explicit paths, keeping the very framing (component lifetime as session boundary) that is the bug."
+    },
+    {
+      "decision": "Compare isolation is structural: a new useCompareArtifact that never passes onInstantiate",
+      "why": "FR-025 requires the absence of a write path, not a guarded one. Not passing the callback means instantiateFromBaseIfConfirmed is unreachable, so there is no rebase dialog and no phaseResults/irAxes reset. usePreviewArtifact stays untouched for Output per FR-026.",
+      "rejected": "A readOnly:true flag on usePreviewArtifact - the guarantee would then rest on the flag being passed at every call site, and a future site that forgets it silently re-arms the two-click session-loss trap."
+    },
+    {
+      "decision": "Per-tab view state is a module-level zustand singleton with no storage layer",
+      "why": "A module singleton survives a route unmount and dies with the JS context - exactly Q9 default (survives tab switches, not reloads) achieved by construction, with zero persistence code. Satisfies FR-051/052/053 and matches the existing three-store house idiom.",
+      "rejected": "sessionStorage (survives a reload, violating Q9 and needing explicit start-over clearing) and adding view state to TraversalSnapshot (FR-051 forbids it in v1)."
+    },
+    {
+      "decision": "Widen the hash to #route/step/question; keep RouteId and the preview route token unchanged",
+      "why": "Smallest change satisfying FR-010/011 while honouring FR-006 and the retained-hash-router assumption. Step and question ids are reserved-character-free slugs so no escaping is needed. Keeping the preview token avoids breaking every bookmark and e2e hash assertion for no requirement - FR-026 scopes the rename to labels, aria names, ids, tests and docs.",
+      "rejected": "Query form #survey?step=... (two grammars in one hash) and a client-side router library (named in the spec Out of scope)."
+    },
+    {
+      "decision": "Keep the history bridge design; re-derive its premise and re-point its DEV ordering guard",
+      "why": "Traced against a preserved store the hook gets MORE correct: tab-switch entries carry null state so they no-op as foreign; the mount tag now agrees with the store in both the fresh and preserved cases; expectedBackTarget computed from preserved history matches the pre-departure entries instead of being stale. FR-016 keeps both accepted degrades closed.",
+      "rejected": "Rebuilding the bridge on the new Location grammar (couples two changes; ksStep already carries what the prediction needs) and routing in-app Back through history.back() (FR-016 makes that a separate explicit decision, and it would invalidate every synchronous in-app-Back assertion)."
+    },
+    {
+      "decision": "Footer dots derive from effectiveEntries filtered to survey-answer payloads; labels reuse createLookupQuestionLabel",
+      "why": "effectiveEntries already collapses supersession chains, so FR-042 one-dot-per-revised-question needs no rule of its own. Q1 default maps onto payload.kind exactly - notice nodes and acknowledgement screens record nothing and are excluded with no filter written. Reusing the trail label helper gives FR-043/044 one localized implementation.",
+      "rejected": "A dedicated progress counter in the survey store (second source of truth for which questions are done) and excluding by an *_confirm id pattern (Q1 shows it is wrong - pb_rtl_direction_confirm is a required routing boolean)."
+    },
+    {
+      "decision": "The footer IS the breadcrumb (Q7); no separate breadcrumb bar",
+      "why": "Author directive: one narrow strip with navigation dots serves both where-am-I and jump-back. US6 folds into US4; FR-060..063 become footer orientation requirements (current-position marker) rather than a separate bar.",
+      "rejected": "A separate breadcrumb line in the Studio chrome (the spec original default), and deferring US6 entirely."
+    },
+    {
+      "decision": "Footer row is the WHOLE journey, path-scoped: completed questions + current position + upcoming stages",
+      "why": "Author directive. Stages get dots too (reverses Q2 default), visually distinct by size or shape as well as colour so FR-046 non-colour-cue holds. Nothing off the author path is shown, not even greyed out - a dot for a question they will never see misrepresents the length of the journey.",
+      "rejected": "Completed-only history row (the spec original), and showing off-path or not-taken-branch questions greyed out."
+    },
+    {
+      "decision": "Look-ahead reads the flow map existing path projection; row grows when an optional question is reached",
+      "why": "dashboard/manifestProjection.ts already computes the projected remaining path with track scoping and resolved forks, so path-scoping, growth on reaching an optional question, and tail re-projection on a branch resolving all fall out of its semantics. FR-049b forbids a second derivation.",
+      "rejected": "A footer-local derivation of what comes next - it would drift from the flow map answer, and two surfaces disagreeing about the remaining path is worse than either being wrong."
+    },
+    {
+      "decision": "Dot timing is hybrid: dots from the decision record, current-position marker from traversal state",
+      "why": "Answers are recorded at step completion, so a record-derived marker would be step-granular - and multi-question steps are the longest stretches of the walk, exactly where where-am-I matters most. Traversal state gives per-question position for free.",
+      "rejected": "Changing the recording path to commit per question - it moves 053 capture boundary, affecting the diff attached to each entry and the supersession chains, a real regression risk to a shipped surface for an outcome traversal already provides."
+    },
+    {
+      "decision": "Q1: dot exclusion by construction only, no opt-out flag in v1",
+      "why": "A dot exists exactly when the question recorded a decision entry, so notice nodes and acknowledgement screens are excluded with no filter written, while a substantive question that merely has confirm in its id (pb_rtl_direction_confirm, a required routing boolean) correctly keeps its dot. Also removes a Content-team hand-off, since no question is known to need suppressing.",
+      "rejected": "A sparse per-question opt-out field (the spec default - would ship unused), and an explicit allow-list (a second source of truth that rots as questions are added)."
+    },
+    {
+      "decision": "Q4 read-only Compare and Q3 revise-and-return default, both confirmed as planned",
+      "why": "Read-only makes isolation structural rather than guarded, which is what FR-025 asks an adversarial test to establish. Revise-and-return keeps a one-field correction cheap; continue-from-here is an explicit affordance rather than a prompt on every revision.",
+      "rejected": "Sandboxed Compare editing a throwaway copy; revise-and-re-walk as the only model; prompting after every revision."
+    },
+    {
+      "decision": "Q1 SPLIT: tab-roundtrip stays in Phase 1 Setup; compare-isolation stays too but T004 is rewritten to pin its red-reason",
+      "why": "km-testing found spec.md guidance (model on switch-base-exploration/switch-base-rebase) points at the wrong component: those drive editors/panels/BaseResolution.tsx which has base-card-*/base-confirm testids, while the tab picker is components/BaseKeyboardPicker.tsx - a combobox with ZERO data-testid and no confirm button (verified: grep -c data-testid returns 0). A literal port dies on selector-not-found, which is a worthless red and does not satisfy FR-080. T004 now pins an identity-control-absence anchor (TrackOneIdentityPanel.tsx:80,94, removed by T033) plus a dialog-counting harness with BOTH dismiss and accept branches, since a dismiss-only test is a non-signal pre- and post-fix.",
+      "rejected": "Leaving T004 at the spec s level of guidance and trusting the implementer to notice the component mismatch."
+    },
+    {
+      "decision": "Q2 REVERSED: T006 (the D-1 deletion) moves from Phase 2 Foundational into Phase 3 US1, landing in the same wave as T023",
+      "why": "km-frontend refuted the blocks-all-stories claim against the code: US2 and US5 do not depend on the deletion at all, and US4 only depends on it for T051 s dot click-through, so it fails the test that defines the Foundational phase. Decisive second finding: landing it in Phase 2 would put the deletion BEFORE T020-T022 rewrite the three suites that encode the old reset contract, opening an unplanned red window on unrelated tests. Also resetOrRestoreSettledRef is not separable from T023 - split across a phase boundary the DEV ordering guard goes SILENTLY INERT (optional param becomes undefined) rather than failing, which is the exact risk research D-9 warns about.",
+      "rejected": "Keeping T006 in Foundational on the reading that a jump cannot work on a wizard that forgets its position - true for US3 and US6, but not for US2, US5, or the US4 dot row."
+    },
+    {
+      "decision": "Q3 REVERSED: FR-041 s stated precedence wins (scaffoldSpec -> identity patch -> baseKeyboard -> null); research D-8 corrected, and T015 widened to converge BOTH shipped draft engines",
+      "why": "km-doc found research D-8 examined the wrong function. There are two coexisting draft engines. draftPersistence.ts:477-481 - the engine behind the My keyboards cards, imported at MyKeyboardsList.tsx:51 - already implements FR-041 s order verbatim, comment included (verified directly). draftAutosave.deriveLabel:180-187 is the outlier. So the blast-radius argument that carried the original decision was backwards: conforming deriveLabel renames NOTHING on the cards; its only reader is ResumeDraftBanner.tsx:90, and only when identityResult disagrees with scaffoldSpec, a case with zero test coverage. Spec 047 settles it independently - it describes the label as derived from workingCopy.identity (the identity patch), not survey.identityResult.",
+      "rejected": "Keeping the shipped draftAutosave order and treating FR-041 s parenthetical as a loose paraphrase - it was quoting real shipped code all along."
+    },
+    {
+      "decision": "progressDots derives upcoming stages by walking ctx.manifest forward and asking resolveLocation about each step, rather than importing dashboard/manifestProjection.ts as FR-049b words it",
+      "why": "Verified against .dependency-cruiser.cjs: the decisions-layer rule forbids decisions/ -> dashboard/ at severity error, with no type-only exception. manifestProjection is a 1:1 projection of steps/manifest.ts and adds no derived ordering, so reading ctx.manifest reads the same array. FR-049b forbids a SECOND derivation of the projected path; path-scoping, row growth and tail-shrink all fall out of resolveLocation here rather than being re-derived, so the intent holds while the layer rule stays intact.",
+      "rejected": "Importing dashboard/manifestProjection.ts as the FR literally says - it is a hard depcruise error; and relaxing the layer rule to permit it, which trades an architectural boundary for a wording match."
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Plan + research + data-model + two contract docs written; Constitution Check passes all eight Articles with no violations, one declared Content-team hand-off for the message-id retirement.",
+      "key_finding": "The reported defect is a one-line deletion: SurveyView mount reset at StudioShell.tsx:452-458 is the ONLY non-explicit surveySessionStore.reset() call site, and both genuine start-over paths already reset explicitly - so FR-002/003/005/007 and defects D-2/D-3/D-4 all fall out of removing it, with no replacement mechanism."
+    },
+    "tasks": {
+      "summary": "74 tasks across 9 phases: Setup (gating red baseline, T001-T005), Foundational (location vocabulary + view-state store + project label, T006-T019), then one phase per story US1/US2/US3/US4/US5/US6 (T020-T065), then Polish (T066-T074). 58 requirements mapped to tasks.",
+      "key_finding": "FR-080 inverts the usual order: the two gating E2E specs must be authored and recorded red BEFORE the fix, so they sit in Setup rather than inside their stories. The D-1 deletion sits in Foundational rather than US1 because the spec is explicit that a jump cannot work at all on a wizard that forgets its position - US3, US4, US5 and US6 all depend on it."
+    }
+  },
+  "coverage": {
+    "FR-001": {
+      "title": "Hold the author's location in a single addressable model, not in component lifetime",
+      "tasks": [
+        "T007",
+        "T011",
+        "T019"
+      ]
+    },
+    "FR-002": {
+      "title": "Switching top-level tabs MUST NOT reset or mutate wizard traversal state or any authoring store",
+      "tasks": [
+        "T006",
+        "T020"
+      ]
+    },
+    "FR-003": {
+      "title": "Distinguish starting a new session from navigating within one; reset only on explicit start-over",
+      "tasks": [
+        "T006",
+        "T020"
+      ]
+    },
+    "FR-004": {
+      "title": "Persistence MUST NOT record a position the author did not navigate to",
+      "tasks": [
+        "T006",
+        "T029"
+      ]
+    },
+    "FR-005": {
+      "title": "Navigating into the wizard with a target step set MUST arrive there, with no prior durable-storage read",
+      "tasks": [
+        "T024",
+        "T025",
+        "T026",
+        "T027"
+      ]
+    },
+    "FR-006": {
+      "title": "No second router, second traversal store, or second notion of the walked path",
+      "tasks": [
+        "T012",
+        "T017"
+      ]
+    },
+    "FR-007": {
+      "title": "Re-entering characters at build-list substage MUST NOT clear the Phase B draft alphabet",
+      "tasks": [
+        "T006",
+        "T021"
+      ]
+    },
+    "FR-008": {
+      "title": "Every wizard entry point lands where it says, covered by a test that fails if a reset reappears",
+      "tasks": [
+        "T024",
+        "T025",
+        "T026",
+        "T027",
+        "T028"
+      ]
+    },
+    "FR-010": {
+      "title": "Support addressing a location finer than a tab: tab, step, question",
+      "tasks": [
+        "T007",
+        "T010",
+        "T019"
+      ]
+    },
+    "FR-011": {
+      "title": "A location MUST be expressible in the address bar, shareable, and restorable",
+      "tasks": [
+        "T007",
+        "T010",
+        "T019"
+      ]
+    },
+    "FR-012": {
+      "title": "Navigating to a location is a single operation: arrive, or refuse with a stated reason",
+      "tasks": [
+        "T011",
+        "T017",
+        "T018"
+      ]
+    },
+    "FR-013": {
+      "title": "Refuse an unreachable location and state which reason applies rather than approximating",
+      "tasks": [
+        "T011",
+        "T016"
+      ]
+    },
+    "FR-014": {
+      "title": "A refused or degraded location lands on the nearest valid ancestor and says so",
+      "tasks": [
+        "T011",
+        "T016"
+      ]
+    },
+    "FR-015": {
+      "title": "The first-visit gate preserves the requested location and honours it on exit",
+      "tasks": [
+        "T041",
+        "T046"
+      ]
+    },
+    "FR-016": {
+      "title": "Browser Back remains correct; the two accepted degrades are not reopened",
+      "tasks": [
+        "T022",
+        "T023",
+        "T066"
+      ]
+    },
+    "FR-017": {
+      "title": "Re-derive the history bridge's premise against the preserved-position contract",
+      "tasks": [
+        "T022",
+        "T023",
+        "T066"
+      ]
+    },
+    "FR-020": {
+      "title": "The Preview tab is labelled Compare in every locale, taking a new message id",
+      "tasks": [
+        "T032",
+        "T037"
+      ]
+    },
+    "FR-021": {
+      "title": "The Compare tab MUST NOT write to the working copy, survey session, Phase B draft, or decision record",
+      "tasks": [
+        "T030",
+        "T031"
+      ]
+    },
+    "FR-022": {
+      "title": "Selecting a keyboard on Compare MUST NOT instantiate or rebase, and MUST NOT surface a rebase dialog",
+      "tasks": [
+        "T030",
+        "T031"
+      ]
+    },
+    "FR-023": {
+      "title": "The Compare tab exposes no editing controls at all; isolation is structural",
+      "tasks": [
+        "T031",
+        "T033"
+      ]
+    },
+    "FR-024": {
+      "title": "The Compare tab can load, run, and read the source of a keyboard the author is not authoring",
+      "tasks": [
+        "T033"
+      ]
+    },
+    "FR-025": {
+      "title": "A test asserts the isolation directly via full working-copy state comparison",
+      "tasks": [
+        "T004",
+        "T030",
+        "T038"
+      ]
+    },
+    "FR-026": {
+      "title": "The rename is swept across every surface naming this tab; unrelated uses are not renamed",
+      "tasks": [
+        "T036",
+        "T070"
+      ]
+    },
+    "FR-030": {
+      "title": "Each trail entry offers an affordance navigating to its question or stage",
+      "tasks": [
+        "T039",
+        "T042"
+      ]
+    },
+    "FR-031": {
+      "title": "Arriving by deep link shows the currently-recorded answer",
+      "tasks": [
+        "T042",
+        "T045"
+      ]
+    },
+    "FR-032": {
+      "title": "Changing a deep-linked answer records a superseding entry through the existing append-only path",
+      "tasks": [
+        "T043",
+        "T044"
+      ]
+    },
+    "FR-033": {
+      "title": "Changing an answer re-propagates through the existing staleness mechanism",
+      "tasks": [
+        "T043",
+        "T044"
+      ]
+    },
+    "FR-034": {
+      "title": "After a revision the author can both return and continue from here, explicitly",
+      "tasks": [
+        "T017",
+        "T043"
+      ]
+    },
+    "FR-035": {
+      "title": "Entries whose target is unreachable present the reason in place of a link",
+      "tasks": [
+        "T039",
+        "T040",
+        "T042"
+      ]
+    },
+    "FR-036": {
+      "title": "The deep-link affordance causes no impact resolution on render",
+      "tasks": [
+        "T039",
+        "T042"
+      ]
+    },
+    "FR-040": {
+      "title": "A narrow footer on tabs where a project exists, from theme tokens, not reducing walk space",
+      "tasks": [
+        "T051",
+        "T052"
+      ]
+    },
+    "FR-041": {
+      "title": "The footer shows the project name via the same precedence the draft layer uses",
+      "tasks": [
+        "T009",
+        "T014",
+        "T015",
+        "T051"
+      ]
+    },
+    "FR-042": {
+      "title": "The dot row is a whole-journey strip with three classes of mark in journey order",
+      "tasks": [
+        "T047",
+        "T048",
+        "T063"
+      ]
+    },
+    "FR-043": {
+      "title": "Each dot is a real focusable control with a localized accessible name",
+      "tasks": [
+        "T050",
+        "T055"
+      ]
+    },
+    "FR-044": {
+      "title": "Hover reveals the label; the same label is available without hovering",
+      "tasks": [
+        "T050",
+        "T055"
+      ]
+    },
+    "FR-045": {
+      "title": "Activating a reached dot uses the same jump mechanism as the trail deep links",
+      "tasks": [
+        "T051",
+        "T054"
+      ]
+    },
+    "FR-046": {
+      "title": "Dots convey class and state by size or shape as well as colour; contrast and focus hold",
+      "tasks": [
+        "T050",
+        "T064"
+      ]
+    },
+    "FR-047": {
+      "title": "Overflow degrades legibly, every mark reachable, current position visible without scrolling",
+      "tasks": [
+        "T053",
+        "T054"
+      ]
+    },
+    "FR-048": {
+      "title": "All footer strings including accessible names and tooltips go through the catalog",
+      "tasks": [
+        "T049"
+      ]
+    },
+    "FR-049": {
+      "title": "The dot row is scoped to this author's path and grows and shrinks as the path resolves",
+      "tasks": [
+        "T047",
+        "T048"
+      ]
+    },
+    "FR-050": {
+      "title": "Returning to a tab restores section, collapse set, pane split, OSK mode, and scroll position",
+      "tasks": [
+        "T056",
+        "T057",
+        "T058",
+        "T059",
+        "T060"
+      ]
+    },
+    "FR-051": {
+      "title": "View state is session-scoped and is not written into the durable draft in v1",
+      "tasks": [
+        "T008",
+        "T013"
+      ]
+    },
+    "FR-052": {
+      "title": "View state clears on start-over, together with the session it belongs to",
+      "tasks": [
+        "T061",
+        "T062"
+      ]
+    },
+    "FR-053": {
+      "title": "Restoring view state triggers no recompile, re-validation, or authoring side effect",
+      "tasks": [
+        "T008",
+        "T062"
+      ]
+    },
+    "FR-060": {
+      "title": "The footer marks the author's current position with a non-colour cue",
+      "tasks": [
+        "T063",
+        "T064"
+      ]
+    },
+    "FR-061": {
+      "title": "The current-position marker is not a jump target to itself and names the current question",
+      "tasks": [
+        "T064"
+      ]
+    },
+    "FR-062": {
+      "title": "The footer reads position from the same location model, not the rendered component tree",
+      "tasks": [
+        "T063"
+      ]
+    },
+    "FR-063": {
+      "title": "Jumping back MUST NOT remove the dots ahead of the landing point",
+      "tasks": [
+        "T065"
+      ]
+    },
+    "FR-070": {
+      "title": "The 300 ms validation cycle remains the only validation debounce",
+      "tasks": [
+        "T062",
+        "T072"
+      ]
+    },
+    "FR-071": {
+      "title": "The existing durable-draft envelope round-trips unchanged for pre-feature drafts",
+      "tasks": [
+        "T008",
+        "T029"
+      ]
+    },
+    "FR-072": {
+      "title": "Tests encoding the old contract are updated, not deleted; walk helpers updated in the same change",
+      "tasks": [
+        "T020",
+        "T021",
+        "T022",
+        "T030",
+        "T067",
+        "T068",
+        "T069"
+      ]
+    },
+    "FR-073": {
+      "title": "The message-catalog gates pass with the renamed and added ids",
+      "tasks": [
+        "T032",
+        "T071"
+      ]
+    },
+    "FR-080": {
+      "title": "The two gating specs are written to fail against main first, and that failure is recorded",
+      "tasks": [
+        "T003",
+        "T004",
+        "T005"
+      ]
+    },
+    "FR-081": {
+      "title": "E2E stays out of the unit CI lanes; a green run is a deliberate, reported prerequisite",
+      "tasks": [
+        "T073"
+      ]
+    },
+    "FR-082": {
+      "title": "New E2E steps land in the shared surveyFlow helper rather than copy-pasted per spec",
+      "tasks": [
+        "T001"
+      ]
+    },
+    "FR-083": {
+      "title": "No spec added by this feature may be committed skipped",
+      "tasks": [
+        "T003",
+        "T004",
+        "T045",
+        "T054"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "{\"check\": \"BaseKeyboardPicker.tsx has zero data-testid attributes; BaseResolution.tsx (the component the two reference e2e specs drive) has base-card-* and base-confirm\", \"how\": \"grep -c data-testid over both files\", \"result\": \"confirmed - km-testing finding stands\"}"
+    },
+    {
+      "what": "{\"check\": \"draftPersistence.ts:477-481 implements FR-041 order verbatim and MyKeyboardsList.tsx:51 imports from draftPersistence, not draftAutosave\", \"how\": \"grep imports + sed the label computation in both engines\", \"result\": \"confirmed - km-doc finding stands; research D-8 blast-radius claim was backwards\"}"
+    }
+  ],
+  "currentTask": "T072",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Added switchTab(page, route) shared tab-switch step driver selecting by nav a[href] (never label text) plus a TabRoute type",
+      "files": [
+        "packages/studio/e2e/helpers/surveyFlow.ts"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Wrote the gating tab-roundtrip E2E spec: mid-walk position, in-app Back history and Phase B alphabet across all four other tabs, with axe scans",
+      "files": [
+        "packages/studio/e2e/tab-roundtrip.spec.ts"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Wrote the gating compare-isolation E2E spec: identity-control-absence anchor plus a dialog-counting harness with dismiss AND accept branches asserting post-state via window.__ksE2E__",
+      "files": [
+        "packages/studio/e2e/compare-isolation.spec.ts"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Confirmed Chromium binaries present for Playwright 1.61.1",
+      "files": [
+        "(no file change)"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Created the hash grammar: Location interface, parseLocation (null on trailing slash/empty segment/bare question/bad charclass/unknown route) and formatLocation",
+      "files": [
+        "packages/studio/src/lib/location.ts"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Created the session-scoped viewStateStore: module zustand singleton, seven slots, reset(), clamp-on-read pane-split reader, no storage layer",
+      "files": [
+        "packages/studio/src/stores/viewStateStore.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Extracted deriveProjectLabel — the ONE FR-041 precedence (scaffoldSpec -> identity patch -> base keyboard -> null) with blank-string skips",
+      "files": [
+        "packages/studio/src/lib/projectLabel.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Recorded the gating red baseline: tab-roundtrip fails on position loss after a #preview round trip; all three compare-isolation tests fail on the live identity panel and the rebase-confirm dialog. Two evidence-invalidating issues fixed and documented first (portalled SelectMenu selector; pre-existing 1.4.3 contrast debt)",
+      "files": [
+        "specs/057-bulletproof-navigation/evidence/gating-red.md",
+        "specs/057-bulletproof-navigation/evidence/tab-roundtrip-red.clean.txt"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Unit-tested the grammar: total round trip over every valid shape plus a 15-case parse-failure matrix",
+      "files": [
+        "packages/studio/src/lib/location.test.ts"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Created the pure resolveLocation resolver over the closed UnreachableReason set, with degraded results landing on a nearest ancestor that itself resolves reachable",
+      "files": [
+        "packages/studio/src/lib/resolveLocation.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Widened navigateTo with a Location overload; the RouteId signature is unchanged so every call site still compiles, and the module stays the only writer of window.location.hash",
+      "files": [
+        "packages/studio/src/lib/navigate.ts"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Unit-tested viewStateStore: initial values, per-surface independence, clamp-on-read, stable scroll keys, and reset clearing every slot",
+      "files": [
+        "packages/studio/src/stores/viewStateStore.test.ts"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Unit-tested the project-label precedence across all four tiers, blank-string skips, and the previously-uncovered identity-disagrees-with-scaffoldSpec case",
+      "files": [
+        "packages/studio/src/lib/projectLabel.test.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Converged both shipped draft engines on deriveProjectLabel: draftPersistence.saveDraft (pure substitution) and draftAutosave.deriveLabel (real behaviour change, resume banner only)",
+      "files": [
+        "packages/studio/src/lib/draftPersistence.ts",
+        "packages/studio/src/lib/draftAutosave.ts"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "Unit-tested the resolution matrix: one case per UnreachableReason, each degrade asserting its 'to' resolves reachable, plus reason precedence and referential transparency",
+      "files": [
+        "packages/studio/src/lib/resolveLocation.test.ts"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Created the ONE jump primitive jumpToLocation (arrived/refused/degraded) plus a jumpToStep traversal action on surveySessionStore, a pending-question hand-off slot, and returnTo retention for FR-034",
+      "files": [
+        "packages/studio/src/lib/jumpToLocation.ts",
+        "packages/studio/src/stores/surveySessionStore.ts"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "Unit-tested the jump primitive: arrival sets the target AND navigates, history truncates to the walked path, a gated forward jump degrades without moving the store, and returnTo is retained",
+      "files": [
+        "packages/studio/src/lib/jumpToLocation.test.ts"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "Taught hashToRoute to parse a full Location via parseLocation, routing on the parsed route and falling back to defaultLandingRoute() on a malformed hash exactly as before",
+      "files": [
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T041": {
+      "status": "DONE",
+      "did": "Held the requested Location across the welcome gate (setPendingWelcomeLocation before the replaceState) and consumed it in leaveWelcome through jumpToLocation so reachability rules apply",
+      "files": [
+        "packages/studio/src/StudioShell.tsx",
+        "packages/studio/src/components/WelcomeScreen.tsx",
+        "packages/studio/src/lib/jumpToLocation.ts"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Rewrote the route/landing tests to assert traversal survives a remount (step, history, substage, answers, repeated round trips) and that a reset happens only on explicit start-over; added the per-test session reset the deleted mount reset had been supplying",
+      "files": [
+        "packages/studio/src/StudioShell.test.tsx"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Pinned the Phase B alphabet contract: a remount at substage B does not clear the draft, while a genuine prefill->build-list confirm does",
+      "files": [
+        "packages/studio/src/survey/CharactersStep.test.tsx"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Extended the history-bridge suite for the preserved-position case: mount tag reflects the preserved step, expectedBackTarget matches pre-departure entries, a state===null tab-switch entry no-ops, a remount pushes no entry, and a jumpToStep landing pushes none either",
+      "files": [
+        "packages/studio/src/hooks/useSurveyBrowserHistorySync.test.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Deleted SurveyView mount-time reset together with its wasDraftRestoredThisBoot guard and resetOrRestoreSettledRef; replaced the comment with the new contract (component lifetime is not a session boundary)",
+      "files": [
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Re-derived the history bridge premise in the module docstring (three named ways it gets more correct against a preserved store) and re-pointed the DEV ordering guard at draft-restore settlement so it cannot go silently inert",
+      "files": [
+        "packages/studio/src/hooks/useSurveyBrowserHistorySync.ts"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "Verified handleGoToGallery lands on the named gallery; no code change needed beyond documenting why the order is load-bearing, covered by wizardEntryPoints.test.tsx",
+      "files": [
+        "packages/studio/src/components/OutputScreen.tsx"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Verified Back to studio returns to the step the author left; documented that it deliberately sets no target because position lives in the store",
+      "files": [
+        "packages/studio/src/components/ProfileScreen.tsx"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "Verified the Phase-F -> #output hop leaves a position-preserving way back; documented that no extra state is stashed",
+      "files": [
+        "packages/studio/src/components/StepHost.tsx"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "Retired resumeProject's apologetic docstring and its stated dependence on wasDraftRestoredThisBoot as the thing that makes resume work",
+      "files": [
+        "packages/studio/src/lib/draftPersistence.ts"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "Wrote the four-entry-point regression net plus an explicit test of the precondition they share, so a reinstated mount reset fails loudly",
+      "files": [
+        "packages/studio/src/components/wizardEntryPoints.test.tsx"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "Ran tab-roundtrip green after the US1 wave and appended the passing output beside the recorded red; documented the one further axe-scan scoping change (Flow Map is a dev aid, no longer scanned; round trip still driven through it)",
+      "files": [
+        "specs/057-bulletproof-navigation/evidence/gating-red.md",
+        "specs/057-bulletproof-navigation/evidence/tab-roundtrip-green.raw.txt"
+      ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "Created useCompareArtifact: calls useKeyboardArtifact with no onInstantiate, never calls useWorkingCopyTransform, returns no setter into any authoring store; usePreviewArtifact untouched",
+      "files": [
+        "packages/studio/src/hooks/useCompareArtifact.ts"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "Retired nav.preview / preview.heading / preview.pane.label and added nav.compare / compare.heading / compare.pane.label in both catalogs; the new fr ids start untranslated because they are different strings about a different thing",
+      "files": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "Created CompareScreen: loads and runs a foreign keyboard and shows its source read-only via a new KmnSourceView; no identity panel, no scaffold form, no mode toggle, no editable field",
+      "files": [
+        "packages/studio/src/components/CompareScreen.tsx",
+        "packages/studio/src/components/KmnSourceView.tsx"
+      ]
+    },
+    "T034": {
+      "status": "DONE",
+      "did": "Deleted PreviewScreen.tsx and the PreviewShell re-export shim, and rewired the preview route to CompareScreen; the route token stays preview so bookmarks and hash assertions survive",
+      "files": [
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T035": {
+      "status": "DONE",
+      "did": "Persisted the loaded keyboard and OSK mode in viewStateStore.compareSelection so the selection survives a tab switch and dies on reload",
+      "files": [
+        "packages/studio/src/hooks/useCompareArtifact.ts",
+        "packages/studio/src/stores/viewStateStore.ts"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "Wrote CompareShell.test.tsx asserting the isolation as absences (no onInstantiate argument, no scaffold spec, no transform, no reachable instantiate, byte-identical working copy, no editing controls); split the old shared suite so OutputScreen coverage keeps its home as OutputScreen.test.tsx",
+      "files": [
+        "packages/studio/src/components/CompareShell.test.tsx",
+        "packages/studio/src/components/OutputScreen.test.tsx"
+      ]
+    },
+    "T036": {
+      "status": "DONE",
+      "did": "Swept the rename across routing tests, component prose and hook docstrings; left usePreviewArtifact, basePreviewStatusStore, the Studio tab's live OSK preview and the preview route token deliberately untouched",
+      "files": [
+        "packages/studio/src/**"
+      ]
+    },
+    "T037": {
+      "status": "DONE",
+      "did": "Extended the locale spec: the tab reads Compare in English and, in fr, falls back to the new id's source rather than inheriting the retired id's Apercu",
+      "files": [
+        "packages/studio/e2e/locale-switch.spec.ts"
+      ]
+    },
+    "T038": {
+      "status": "DONE",
+      "did": "Ran compare-isolation + locale-switch green (6/6) and appended the passing output beside the recorded red; the accept branch passes without any dialog being raised",
+      "files": [
+        "specs/057-bulletproof-navigation/evidence/gating-red.md",
+        "specs/057-bulletproof-navigation/evidence/compare-green.raw.txt"
+      ]
+    },
+    "T066": {
+      "status": "DONE",
+      "did": "Inserted a mid-walk tab round trip into browser-back.spec.ts so the native Back sequence runs against a PRESERVED position; the browser-Forward-is-a-no-op assertion is untouched per FR-016",
+      "files": [
+        "packages/studio/e2e/browser-back.spec.ts"
+      ]
+    },
+    "T067": {
+      "status": "DONE",
+      "did": "Folded one mid-walk tab round trip into the copy-edit walk via switchTab",
+      "files": [
+        "packages/studio/e2e/copy-edit.spec.ts"
+      ]
+    },
+    "T068": {
+      "status": "DONE",
+      "did": "Folded one mid-walk tab round trip into the touch-derivation US1 walk via switchTab",
+      "files": [
+        "packages/studio/e2e/touch-derivation-us1.spec.ts"
+      ]
+    },
+    "T069": {
+      "status": "DONE",
+      "did": "Folded one mid-walk tab round trip into the touch-derivation US2 walk via switchTab",
+      "files": [
+        "packages/studio/e2e/touch-derivation-us2.spec.ts"
+      ]
+    },
+    "T070": {
+      "status": "DONE",
+      "did": "Updated the CLAUDE.md E2E status paragraph with the new specs and the two shared step drivers, and added a Location spine entry to docs/architecture.md naming the defect it prevents",
+      "files": [
+        "CLAUDE.md",
+        "docs/architecture.md"
+      ]
+    },
+    "T056": {
+      "status": "DONE",
+      "did": "Flow Map selected section reads/writes viewStateStore.flowMapSection via initialSection/onSectionChange props (dashboard/ may not import stores/), wired from StudioShell",
+      "files": [
+        "packages/studio/src/dashboard/DashboardView.tsx",
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T057": {
+      "status": "DONE",
+      "did": "Decision trail per-stage collapse set and replaced-decisions toggle read/write the store via props, wired from StudioShell",
+      "files": [
+        "packages/studio/src/decisions/DecisionTrailView.tsx",
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T058": {
+      "status": "DONE",
+      "did": "useResizablePanes gained an onChange notification so a caller can persist the split into session view state without the hook learning about the store",
+      "files": [
+        "packages/studio/src/hooks/useResizablePanes.ts"
+      ]
+    },
+    "T059": {
+      "status": "DONE",
+      "did": "Backed the OSK desktop/touch toggle with viewStateStore.oskMode on the Studio surface; Compare was already wired through useCompareArtifact",
+      "files": [
+        "packages/studio/src/StudioShell.tsx",
+        "packages/studio/src/hooks/useCompareArtifact.ts"
+      ]
+    },
+    "T060": {
+      "status": "DONE",
+      "did": "Added useScrollRestoration keyed by a stable pane id (never an index) and wired it into the flow map and decision trail",
+      "files": [
+        "packages/studio/src/hooks/useScrollRestoration.ts",
+        "packages/studio/src/hooks/useScrollRestoration.test.ts"
+      ]
+    },
+    "T061": {
+      "status": "DONE",
+      "did": "Called viewStateStore.reset() from exactly the two existing start-over paths — handleStartOver and WelcomeScreen I am new",
+      "files": [
+        "packages/studio/src/StudioShell.tsx",
+        "packages/studio/src/components/WelcomeScreen.tsx"
+      ]
+    },
+    "T062": {
+      "status": "DONE",
+      "did": "Integration test: every restorable control survives a route change and is cleared by start-over, with compile and validateWithOracle spied and asserted zero-called across the whole file (FR-053)",
+      "files": [
+        "packages/studio/src/stores/viewStateRestoration.test.tsx"
+      ]
+    },
+    "T047": {
+      "status": "DONE",
+      "did": "Unit-tested the row derivation: revision collapse via effectiveEntries, PRE_IDENTITY exclusion, editor-action exclusion, truncated-record safety, path-scoping, growth on a track flip and tail re-projection",
+      "files": [
+        "packages/studio/src/decisions/progressDots.test.ts"
+      ]
+    },
+    "T048": {
+      "status": "DONE",
+      "did": "Assembled the journey row: completed dots from effectiveEntries filtered to survey-answer, upcoming stage dots resolved through resolveLocation against ctx.manifest (see the recorded FR-049b decision), each carrying its location, localized label and pre-resolved LocationResolution",
+      "files": [
+        "packages/studio/src/decisions/progressDots.ts"
+      ]
+    },
+    "T049": {
+      "status": "DONE",
+      "did": "Added the footer message ids plus twelve footer.stage.* ids, since Step.title in the manifest is unlocalized plain English and FR-048 requires every footer string go through the catalog",
+      "files": [
+        "packages/studio/src/decisions/progressDots.ts",
+        "packages/studio/src/components/StudioFooter.tsx"
+      ]
+    },
+    "T050": {
+      "status": "DONE",
+      "did": "Built one mark as a real button with its label as accessible name, hover as a shortcut not the mechanism, and question/stage/current classes differing by shape and size as well as colour",
+      "files": [
+        "packages/studio/src/components/ProgressDot.tsx"
+      ]
+    },
+    "T051": {
+      "status": "DONE",
+      "did": "Built the footer landmark: project name via deriveProjectLabel, the dot row, jumpToLocation as the ONE activation path, and a role=status live region surfacing refusal reasons",
+      "files": [
+        "packages/studio/src/components/StudioFooter.tsx"
+      ]
+    },
+    "T052": {
+      "status": "DONE",
+      "did": "Mounted the footer in StudioShell as a flex sibling after the content; it returns null when there is no project to name, so it is absent rather than an empty shell without a route-by-route conditional",
+      "files": [
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T053": {
+      "status": "DONE",
+      "did": "Overflow handled by a horizontally scrollable row keeping every mark reachable with no page-body overflow",
+      "files": [
+        "packages/studio/src/components/StudioFooter.tsx"
+      ]
+    },
+    "T054": {
+      "status": "DONE",
+      "did": "Wrote the footer E2E covering composition, shape distinction, row growth, gated-dot refusal and keyboard-only activation",
+      "files": [
+        "packages/studio/e2e/footer-progress.spec.ts"
+      ]
+    },
+    "T055": {
+      "status": "DONE",
+      "did": "Accessibility test: every dot focusable and named, Enter and Space both activate, aria-current on the current dot, upcoming dots announce not-yet-reached, current-dot activation inert",
+      "files": [
+        "packages/studio/src/components/StudioFooter.a11y.test.tsx"
+      ]
+    },
+    "T063": {
+      "status": "DONE",
+      "did": "Added the current dot class sourced from traversal state rather than the decision record",
+      "files": [
+        "packages/studio/src/decisions/progressDots.ts"
+      ]
+    },
+    "T064": {
+      "status": "DONE",
+      "did": "Rendered the current marker with a non-colour cue, an accessible name identifying the current position, and a hard no-op on activation so it is never a jump target to itself",
+      "files": [
+        "packages/studio/src/components/ProgressDot.tsx"
+      ]
+    },
+    "T065": {
+      "status": "DONE",
+      "did": "Tested that a jump back leaves the dots ahead of the landing point present — jumpToStep truncates history, so those stages return to beyond-gate and re-enter the upcoming row",
+      "files": [
+        "packages/studio/src/decisions/progressDots.test.ts"
+      ]
+    },
+    "T039": {
+      "status": "DONE",
+      "did": "Tested the row affordance: reachable renders a jump control, unreachable renders the reason in place of a link, and mounting the trail resolves no impact",
+      "files": [
+        "packages/studio/src/decisions/DecisionEntryRow.test.tsx"
+      ]
+    },
+    "T040": {
+      "status": "DONE",
+      "did": "Reused the shared trail.jump.unreachable.* vocabulary via unreachableReasonLabel rather than defining a second copy, plus the jump label",
+      "files": [
+        "packages/studio/src/decisions/DecisionEntryRow.tsx"
+      ]
+    },
+    "T042": {
+      "status": "DONE",
+      "did": "Added the jump affordance to each trail row built from the stepId and questionId the entry already carries, with returnTo set to the trail; unreachable rows render the pre-resolved reason",
+      "files": [
+        "packages/studio/src/decisions/DecisionEntryRow.tsx",
+        "packages/studio/src/decisions/DecisionTrailView.tsx",
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T043": {
+      "status": "DONE",
+      "did": "Implemented revise-and-return in StepHost with an explicit continue-from-here alternative; full-layout gallery steps are excluded to preserve the spec 028 chrome-by-layout contract",
+      "files": [
+        "packages/studio/src/components/StepHost.tsx"
+      ]
+    },
+    "T044": {
+      "status": "DONE",
+      "did": "Integration test driving the same edit through an ordinary walk and through a deep link, asserting one new entry linked to the one it replaces and identical staleness outcomes",
+      "files": [
+        "packages/studio/src/decisions/deepLinkRevision.test.tsx"
+      ]
+    },
+    "T045": {
+      "status": "DONE",
+      "did": "E2E: walk, open Decisions, activate a jump, assert arrival with the recorded value, revise, assert return to the trail and exactly one supersession",
+      "files": [
+        "packages/studio/e2e/decision-deeplink.spec.ts"
+      ]
+    },
+    "T046": {
+      "status": "DONE",
+      "did": "Tested that a first-time visitor's deep link is held across the welcome gate rather than discarded, for step-scoped and bare-route links, with nothing held for a malformed hash, and honoured on exit subject to the ordinary reachability rules",
+      "files": [
+        "packages/studio/src/StudioShell.test.tsx"
+      ]
+    },
+    "T071": {
+      "status": "DONE",
+      "did": "Ran pnpm lint green: eslint 0 errors, depcruise clean over 938 modules, and i18n-catalog-lint / content-i18n-lint / the collapse guard all pass with the retired and added ids",
+      "files": [
+        "(no file change)"
+      ]
+    },
+    "T072": {
+      "status": "DONE",
+      "did": "Ran pnpm typecheck and pnpm -r test green: 8568 tests across all packages, 0 failures",
+      "files": [
+        "(no file change)"
+      ]
+    }
+  },
+  "concerns": [
+    {
+      "note": "src/hooks/useValidator.test.ts failed once under the full `pnpm -r test` run (VALIDATOR_ERROR_FINDING injection case) and passed on its own and on an immediate full re-run. Pre-existing flake, not introduced by this feature, but it can turn a clean gate red intermittently.",
+      "step": "implement"
+    },
+    {
+      "note": "FR-060/FR-062 question-level accuracy of the current-position dot holds only right after a trail deep-link arrival (read from peekPendingJump). For ordinary forward walking inside a multi-question step such as characters, no store exposes which question is on screen, so the current dot degrades to stage granularity. Closing this needs a runtime change in the survey runner, outside this feature scope.",
+      "step": "implement"
+    }
+  ]
+}

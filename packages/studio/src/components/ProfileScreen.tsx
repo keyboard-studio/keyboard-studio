@@ -302,6 +302,14 @@ export function ProfileScreen() {
 
       {/* Bottom — back link, then the single global Sign out button */}
       <div style={{ display: "flex", flexDirection: "column", gap: 16, marginTop: "auto" }}>
+        {/* Spec 057 FR-005/FR-008 (D-3): this is a plain route change and
+            always was — it sets no target step, because the author's position
+            is already in the traversal store. It was broken only because
+            `SurveyView`'s mount reset discarded that position on arrival. With
+            the reset gone (D-1) this lands on the step the author left, so
+            there is nothing to add here; the entry point is covered by
+            `wizardEntryPoints.test.tsx` so a future reset would fail loudly
+            rather than silently regress it. */}
         <button
           type="button"
           style={backLinkStyle}

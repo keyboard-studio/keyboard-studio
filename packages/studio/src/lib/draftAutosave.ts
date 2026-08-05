@@ -145,6 +145,7 @@ const MAX_CLOUD_DRAFT_BYTES = 4 * 1024 * 1024;
 // ResumeDraftBanner) are unaffected.
 export type { StudioDraft, DraftMeta, ProjectIndexEntry } from "./draftTypes.ts";
 import type { StudioDraft, DraftMeta, ProjectIndexEntry } from "./draftTypes.ts";
+import { deriveProjectLabel } from "./projectLabel.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -176,14 +177,31 @@ function hasMeaningfulProgress(
   );
 }
 
-/** Derive a human label for the draft from whatever identity/base info exists. */
+/**
+ * Derive a human label for the draft from whatever identity/base info exists.
+ *
+ * Spec 057 FR-041: delegates to the ONE precedence in lib/projectLabel.ts
+ * (scaffold spec -> working-copy identity patch -> base keyboard -> null).
+ *
+ * This IS a behaviour change here, deliberately. This engine used to read
+ * `survey.identityResult.english` / `.autonym` first, which made it disagree
+ * with `draftPersistence.saveDraft` — the engine behind the "My keyboards"
+ * cards, which has always implemented FR-041's order verbatim. The
+ * identity-lite result answers "what language is this?", not "what is this
+ * project called", so leading with it named a Track-1 project after its
+ * language rather than after the name the author typed at project_name.
+ *
+ * Blast radius: `deriveLabel` feeds `DraftMeta.label`, whose only reader is
+ * the resume banner (components/ResumeDraftBanner.tsx), and only the quoted
+ * name changes — the "My keyboards" card labels are unaffected because they
+ * already run through `draftPersistence`.
+ */
 function deriveLabel(draft: StudioDraft): string | null {
-  const id = draft.survey.identityResult;
-  if (id != null && id.english.trim() !== "") return id.english;
-  if (id != null && id.autonym.trim() !== "") return id.autonym;
-  if (draft.survey.scaffoldSpec !== null) return draft.survey.scaffoldSpec.displayName;
-  if (draft.workingCopy?.baseKeyboard != null) return draft.workingCopy.baseKeyboard.displayName;
-  return null;
+  return deriveProjectLabel({
+    scaffoldSpec: draft.survey.scaffoldSpec,
+    identity: draft.workingCopy?.identity ?? null,
+    baseKeyboard: draft.workingCopy?.baseKeyboard ?? null,
+  });
 }
 
 /**

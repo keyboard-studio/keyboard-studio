@@ -136,6 +136,23 @@ export interface PlacementCandidate {
    * @see spec.md §8 §1096
    */
   confidence: number;
+  /**
+   * Corpus-attested base character for a `"deadkey"` / `"store-index"`
+   * candidate (e.g. `"f"` for ƒ U+0192) — the single grapheme the deadkey
+   * sequence composes with to produce the target codepoint.
+   *
+   * Present **iff** `mechanism` is `"deadkey"` or `"store-index"` AND the
+   * corpus aggregation actually attested a base letter for this exact
+   * codepoint; a `"deadkey"`/`"store-index"` candidate with no corpus
+   * attestation omits this field rather than guessing one from NFD
+   * decomposition or script-level statistics (see
+   * `getRankedSuggestionsForChar` in the studio's `placementSeeds.ts`, the
+   * consumer this field exists for). Always absent for `"direct"` and
+   * `"opaque"` candidates.
+   *
+   * @see spec.md §7.3 (S-02 deadkey strategy card)
+   */
+  baseLetter?: string;
 }
 
 /**
@@ -203,6 +220,60 @@ export interface PlacementMap {
    * before versioning was introduced.
    */
   pinnedPriorsVersion?: string;
+  /**
+   * Corpus-mined touch (longpress) placement priors, passed through verbatim
+   * from `placement-priors.json`'s `touch` field (placement-priors v2).
+   * Optional — absent when the priors snapshot predates touch mining or when
+   * corpus-loader had no touch data to attach.
+   *
+   * This is a SEPARATE vocabulary from `PlacementCandidate`/`PlacementMechanism`
+   * — touch (longpress) placement is not a `PlacementMechanism` value and must
+   * never be merged into it (see {@link TouchPlacementEntry}).
+   */
+  touch?: TouchPlacementEntry[];
+}
+
+// ---------------------------------------------------------------------------
+// Touch (longpress) placement priors — placement-priors v2
+//
+// A DELIBERATELY SEPARATE sibling vocabulary from PlacementCandidate /
+// PlacementMechanism (§7.6 physical-key mechanisms). Touch (longpress)
+// mining answers a different question — "which sub-key host(s) does the
+// corpus use for this character's longpress?" — and must never be folded
+// into PlacementMechanism, which only ever describes physical-key output
+// mechanisms (direct / deadkey / store-index / opaque).
+// ---------------------------------------------------------------------------
+
+/**
+ * One corpus-mined longpress host for a `TouchPlacementEntry`'s codepoint.
+ *
+ * `layerClass` buckets the HOST key's own top-level (outer) `.keyman-touch-
+ * layout` layer id into one of three coarse classes — `"default"` / `"shift"`
+ * / any other top-level layer id folds to `"other"` — since raw layer ids are
+ * keyboard-idiosyncratic (see spec.md §7.6). Deliberately NOT derived from an
+ * `sk[]` sub-entry's own free-text `layer` annotation (e.g. `"rightalt"`),
+ * which is inconsistently applied across the corpus and names layers that do
+ * not always exist top-level.
+ */
+export interface TouchPlacementHost {
+  /** Virtual key name of the MAIN key the longpress hangs off of (e.g. `"K_E"`). */
+  vkey: string;
+  /** Coarse bucket of the host key's own outer layer id. */
+  layerClass: "default" | "shift" | "other";
+  /** Number of independent corpus keyboards attesting this host. */
+  priorCount: number;
+}
+
+/**
+ * All corpus-mined longpress hosts for one target codepoint.
+ *
+ * @see spec.md §7.6 (corpus-derived placement priors, placement-priors v2)
+ */
+export interface TouchPlacementEntry {
+  /** Target codepoint in `"U+XXXX"` notation — same convention as {@link PlacementEntry.codepoint}. */
+  codepoint: string;
+  /** Corpus-attested longpress hosts, in descending `priorCount` order. */
+  hosts: TouchPlacementHost[];
 }
 
 // ---------------------------------------------------------------------------
@@ -236,9 +307,10 @@ export type PlacementMapInit = PlacementMap;
  *   base-key preservation → ergonomics tiebreak) — see {@link topCandidate}.
  *
  * The strip is TOP-LEVEL ONLY — nested `entries` and their `candidates` arrays
- * are carried by reference.  This is safe because {@link PlacementCandidate}
- * has no optional fields, so there is no `exactOptionalPropertyTypes` hazard
- * deeper in the tree.
+ * are carried by reference.  This is safe under `exactOptionalPropertyTypes`
+ * as long as producers OMIT `baseLetter` entirely when absent rather than
+ * setting it to `undefined` — {@link PlacementCandidate}'s one optional field
+ * — since this factory does not strip nested objects.
  *
  * @see spec.md §7.6
  */

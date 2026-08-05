@@ -1,0 +1,105 @@
+# Full Playwright E2E suite — post-us2-fix run (2026-08-04)
+# cd packages/studio && npx playwright test --workers=1 --reporter=list <chunk>
+# Run in four foreground chunks; two whole-suite background attempts were
+# killed by the host mid-run. Same config, same worker count, same dev server.
+
+===== chunk 1 =====
+
+Running 10 tests using 1 worker
+
+  ✓   1 e2e\boot-smoke.spec.ts:27:3 › app boots without an uncaught error (4.6s)
+  ✓   2 e2e\boot-smoke.spec.ts:27:3 › github oauth callback boots without an uncaught error (5.3s)
+  ✓   3 e2e\boot-smoke.spec.ts:27:3 › google oauth callback boots without an uncaught error (3.1s)
+  ✓   4 e2e\boot-smoke.spec.ts:27:3 › lint demo boots without an uncaught error (1.6s)
+  ✓   5 e2e\browser-back.spec.ts:51:3 › browser Back mid-survey (F7) › physical Back button steps back one manifest step at a time (6.2s)
+  ✓   6 e2e\carve.spec.ts:153:3 › Rule Carver — carve one opaque rule, verify IR + emitted .kmn › deleting rule#93 in the carve gallery removes it from the deleted-node IR state and from the emitted .kmn (19.6s)
+  ✓   7 e2e\carve.spec.ts:262:3 › Rule Carver — carve one opaque rule, verify IR + emitted .kmn › control: keeping rule#93 leaves its distinguishing token in the emitted .kmn (15.6s)
+  ✓   8 e2e\compare-isolation.spec.ts:137:3 › Compare cannot write to the author's project (spec 057 US2) › the tab exposes no identity-editing control over the project (5.7s)
+  ✓   9 e2e\compare-isolation.spec.ts:160:3 › Compare cannot write to the author's project (spec 057 US2) › loading another keyboard raises no dialog and leaves the project untouched (dismiss) (13.4s)
+  ✓  10 e2e\compare-isolation.spec.ts:180:3 › Compare cannot write to the author's project (spec 057 US2) › loading another keyboard and ACCEPTING anything offered still leaves the project untouched (13.7s)
+
+  10 passed (1.5m)
+
+===== chunk 2 =====
+
+Running 15 tests using 1 worker
+
+  ✓   1 e2e\copy-edit.spec.ts:252:3 › Track 1 (copy-edit) E2E › walks identity-lite -> base picker -> project-name -> Phase B -> emit (21.9s)
+  ✓   2 e2e\copy-edit.spec.ts:300:3 › Track 1 (copy-edit) E2E › base keyboard compiles cleanly via kmcmplib WASM oracle (open-base mode) (18.5s)
+  ✓   3 e2e\copy-edit.spec.ts:334:3 › Track 1 (copy-edit) E2E › emitted .kps, .kvks, and welcome.htm have non-empty bodies (15.8s)
+  ✓   4 e2e\copy-edit.spec.ts:416:3 › spec 034 proven-script walks + publish paths › T010 [US1]: Cyrillic (russian_mnemonic_r) walks identity → downloadable, compilable ZIP (8.1s)
+  ✓   5 e2e\copy-edit.spec.ts:437:5 › spec 034 proven-script walks + publish paths › T011 [US1]: Latn (basic_kbdfr) reaches a downloadable ZIP (16.2s)
+  ✓   6 e2e\copy-edit.spec.ts:437:5 › spec 034 proven-script walks + publish paths › T011 [US1]: Cyrl (russian_mnemonic_r) reaches a downloadable ZIP (7.0s)
+  ✓   7 e2e\copy-edit.spec.ts:437:5 › spec 034 proven-script walks + publish paths › T011 [US1]: Grek (basic_kbdhe) reaches a downloadable ZIP (6.3s)
+  ✓   8 e2e\copy-edit.spec.ts:437:5 › spec 034 proven-script walks + publish paths › T011 [US1]: Geor (basic_kbdgeo) reaches a downloadable ZIP (15.6s)
+  ✓   9 e2e\copy-edit.spec.ts:437:5 › spec 034 proven-script walks + publish paths › T011 [US1]: Armn (armenian_mnemonic_r) reaches a downloadable ZIP (6.8s)
+  ✓  10 e2e\copy-edit.spec.ts:453:3 › spec 034 proven-script walks + publish paths › T016 [US2]: output screen exposes both publish paths; PR degrades honestly, ZIP still works (15.4s)
+  ✓  11 e2e\copy-edit.spec.ts:520:3 › spec 034 US3 (T028): durable draft survives reload, Back stays consistent, start-over clears it › T028: hard reload resumes the working copy + step position; Back round-trips; 'I'm new' clears the draft (10.4s)
+  ✓  12 e2e\decision-deeplink.spec.ts:87:3 › decision-trail deep link -> revise -> supersede (spec 057 US3) › activating a trail entry's link lands on its question, revising it supersedes and returns to Decisions (7.2s)
+  ✓  13 e2e\exemplar-prefill.spec.ts:55:3 › Phase B exemplar prefill › accept: two actions, alphabet recorded, zero characters typed (SC-008/SC-010) (5.8s)
+  ✓  14 e2e\exemplar-prefill.spec.ts:97:3 › Phase B exemplar prefill › decline: records only what the author typed, and does not re-assert (SC-009) (6.6s)
+  ✓  15 e2e\footer-progress.spec.ts:64:3 › footer progress row (spec 057 US4/US6) › shows the project, grows as questions are answered, distinguishes dot classes by shape, and refuses a gated jump with a reason (27.1s)
+
+  15 passed (3.2m)
+
+===== chunk 3 =====
+
+Running 37 tests using 1 worker
+
+  -   1 e2e\import-improve.spec.ts:104:8 › Track 2 (import-improve) E2E › imports a fixture .kmn via Track 2 without import errors
+  -   2 e2e\import-improve.spec.ts:113:8 › Track 2 (import-improve) E2E › applies one mutation and emits without compile errors
+  -   3 e2e\import-improve.spec.ts:125:8 › Track 2 (import-improve) E2E › round-trip via assertSemanticEquivalence preserves everything except the mutation
+  ✓   4 e2e\locale-switch.spec.ts:46:3 › Locale switcher — persistence + no first-paint English flash › switching to fr translates chrome and persists across reload (5.9s)
+  ✓   5 e2e\locale-switch.spec.ts:92:3 › Compare tab label (spec 057 FR-020) › reads 'Compare' in English and never 'Preview' (2.2s)
+  ✓   6 e2e\locale-switch.spec.ts:100:3 › Compare tab label (spec 057 FR-020) › in fr, falls back to the new id's source string — never the retired id's translation (1.9s)
+  ✓   7 e2e\switch-base-exploration.spec.ts:399:5 › switch-base exploration matrix › L1-identity-done × refresh (10.8s)
+  ✓   8 e2e\switch-base-exploration.spec.ts:413:5 › switch-base exploration matrix › L1-identity-done × browser-back (7.4s)
+  ✓   9 e2e\switch-base-exploration.spec.ts:399:5 › switch-base exploration matrix › L2-base-previewed × refresh (13.0s)
+  ✓  10 e2e\switch-base-exploration.spec.ts:413:5 › switch-base exploration matrix › L2-base-previewed × browser-back (8.4s)
+  ✓  11 e2e\switch-base-exploration.spec.ts:399:5 › switch-base exploration matrix › L3-base-confirmed × refresh (11.9s)
+  ✓  12 e2e\switch-base-exploration.spec.ts:413:5 › switch-base exploration matrix › L3-base-confirmed × browser-back (8.7s)
+  ✓  13 e2e\switch-base-exploration.spec.ts:399:5 › switch-base exploration matrix › L4-track-chosen × refresh (13.3s)
+  ✓  14 e2e\switch-base-exploration.spec.ts:413:5 › switch-base exploration matrix › L4-track-chosen × browser-back (8.5s)
+  ✓  15 e2e\switch-base-exploration.spec.ts:399:5 › switch-base exploration matrix › L5-prefill-confirmed × refresh (12.3s)
+  ✓  16 e2e\switch-base-exploration.spec.ts:413:5 › switch-base exploration matrix › L5-prefill-confirmed × browser-back (8.8s)
+  ✓  17 e2e\switch-base-exploration.spec.ts:399:5 › switch-base exploration matrix › L6-phaseB-done × refresh (13.2s)
+  ✓  18 e2e\switch-base-exploration.spec.ts:413:5 › switch-base exploration matrix › L6-phaseB-done × browser-back (9.2s)
+  ✓  19 e2e\switch-base-exploration.spec.ts:399:5 › switch-base exploration matrix › L7-carve-deleted × refresh (13.4s)
+  ✓  20 e2e\switch-base-exploration.spec.ts:413:5 › switch-base exploration matrix › L7-carve-deleted × browser-back (10.0s)
+  ✓  21 e2e\switch-base-exploration.spec.ts:431:5 › switch-base exploration matrix › L3-base-confirmed × refresh (OK on dialog) (11.7s)
+  ✓  22 e2e\switch-base-exploration.spec.ts:431:5 › switch-base exploration matrix › L4-track-chosen × refresh (OK on dialog) (12.3s)
+  ✓  23 e2e\switch-base-exploration.spec.ts:431:5 › switch-base exploration matrix › L5-prefill-confirmed × refresh (OK on dialog) (12.8s)
+  ✓  24 e2e\switch-base-exploration.spec.ts:431:5 › switch-base exploration matrix › L6-phaseB-done × refresh (OK on dialog) (12.9s)
+  ✓  25 e2e\switch-base-exploration.spec.ts:431:5 › switch-base exploration matrix › L7-carve-deleted × refresh (OK on dialog) (13.3s)
+  ✓  26 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L2-base-previewed × switch-base (Cancel) (10.9s)
+  ✓  27 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L2-base-previewed × switch-base (OK) (10.7s)
+  ✓  28 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L3-base-confirmed × switch-base (Cancel) (11.0s)
+  ✓  29 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L3-base-confirmed × switch-base (OK) (11.4s)
+  ✓  30 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L4-track-chosen × switch-base (Cancel) (12.4s)
+  ✓  31 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L4-track-chosen × switch-base (OK) (12.2s)
+  ✓  32 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L5-prefill-confirmed × switch-base (Cancel) (12.7s)
+  ✓  33 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L5-prefill-confirmed × switch-base (OK) (13.3s)
+  ✓  34 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L6-phaseB-done × switch-base (Cancel) (14.5s)
+  ✓  35 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L6-phaseB-done × switch-base (OK) (14.8s)
+  ✓  36 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L7-carve-deleted × switch-base (Cancel) (15.2s)
+  ✓  37 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L7-carve-deleted × switch-base (OK) (15.0s)
+
+  Slow test file: e2e\switch-base-exploration.spec.ts (6.1m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  3 skipped
+  34 passed (6.3m)
+
+===== chunk 4 =====
+
+Running 7 tests using 1 worker
+
+  ✓  1 e2e\switch-base-rebase.spec.ts:143:3 › F1 — switch-base rebase confirm › switching to a DIFFERENT base with edits: Cancel keeps the OLD base everywhere, no advance (9.3s)
+  ✓  2 e2e\switch-base-rebase.spec.ts:197:3 › F1 — switch-base rebase confirm › re-confirming the SAME base: no popup, phaseResults preserved, wizard advances (7.4s)
+  ✓  3 e2e\switch-base-rebase.spec.ts:227:3 › F1 — switch-base rebase confirm › F2: refresh at the track step — no popup, phaseResults preserved (11.9s)
+  ✓  4 e2e\tab-roundtrip.spec.ts:100:3 › tab round trip preserves the author's position (spec 057 US1) › mid-walk position, history and Phase B alphabet survive every tab round trip (9.3s)
+  ✓  5 e2e\touch-derivation-us1.spec.ts:254:3 › Touch derivation US1 — import & adapt (spec 035 Scenario A) › carved characters vanish, placed letter lands, base layout survives, and the keyboard compiles (32.7s)
+  ✓  6 e2e\touch-derivation-us2.spec.ts:480:3 › Touch derivation US2 — reseed from desktop (spec 035 Scenario B) › carved characters vanish, placed letter lands, layout is the generated tablet projection, and the keyboard compiles (30.9s)
+  ✓  7 e2e\touch-derivation-us2.spec.ts:617:3 › Touch derivation US2-AS4 — explicit reseed discards a shipped touch layout (spec 035) › choosing Reseed on a base that ships a touch layout still produces the desktop projection, not the shipped layout (30.8s)
+
+  7 passed (2.2m)
+

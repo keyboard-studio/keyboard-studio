@@ -72,3 +72,14 @@ export const mockPatternLibrary: PatternLibraryService = {
     return Promise.resolve(ranked);
   },
 };
+
+/**
+ * Synchronous counterpart to `mockPatternLibrary.getById()`, over the same
+ * `samplePatterns` fixture index. Needed by pure/non-async call sites (see
+ * `browserPatternLibrary.ts`'s `getPatternByIdSync` for the real-content
+ * counterpart, and `services.ts`'s `getPatternByIdSync` which switches
+ * between the two on `USE_REAL`, same as `getPatternLibraryService`).
+ */
+export function mockPatternByIdSync(id: string): Pattern | undefined {
+  return byId.get(id);
+}

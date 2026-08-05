@@ -1,4 +1,11 @@
-// Shared artifact pipeline for PreviewScreen and OutputScreen.
+// The artifact pipeline for OutputScreen.
+//
+// Spec 057 (FR-026): NOT renamed and NOT modified. It used to be shared with
+// PreviewScreen; the Compare tab that replaced that screen has its own
+// deliberately weaker hook (useCompareArtifact) which passes no onInstantiate.
+// Output still needs this one's instantiate path and its download gate, so the
+// rename sweep stops at the tab's author-facing surfaces and leaves this name
+// alone.
 //
 // Encapsulates: baseKeyboard / pickerMode / scaffoldSpec local state,
 // useKeyboardArtifact, useWorkingCopyTransform, onInstantiate, diagnostics

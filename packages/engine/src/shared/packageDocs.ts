@@ -24,3 +24,16 @@ export function welcomeHtm(displayName: string): string {
 export function readmeHtm(displayName: string): string {
   return `<html><body><p>${escapeHtml(displayName)} keyboard</p></body></html>`;
 }
+
+/**
+ * `LICENSE.md` — the MIT stub every package must ship so it is redistributable.
+ *
+ * One home for both callers: the scaffolder's `generateStubs` (Track 1, holder
+ * = displayName) and `output/ensurePackageFiles` (Track 2, holder = the
+ * author's copyright falling back to displayName). Two copies of this literal
+ * is exactly the kind of drift `welcomeHtm`/`readmeHtm` were consolidated to
+ * prevent. Not HTML-escaped: LICENSE.md is Markdown/plain text, not markup.
+ */
+export function licenseMd(holder: string, year: number): string {
+  return `Copyright © ${year} ${holder}\n\nMIT License\n`;
+}

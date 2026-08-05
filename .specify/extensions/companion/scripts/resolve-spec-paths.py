@@ -284,6 +284,7 @@ def render_human(result: dict) -> str:
 
 
 def main(argv=None) -> int:
+    cc.configure_stdio()
     ap = argparse.ArgumentParser(description="Resolve Companion living-spec paths.")
     ap.add_argument("--root", default=".", help="repo root (default: cwd)")
     ap.add_argument("--changed", nargs="*", help="changed files -> capabilities in scope")

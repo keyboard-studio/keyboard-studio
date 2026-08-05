@@ -5,8 +5,11 @@
 //                         [project_name (copy)] → characters (prefill/B) →
 //                         carve → mechanisms → sequences →
 //                         touch → help → done
-//   #preview            — PreviewScreen: "try it" — OSK preview + diagnostics
-//                         (no Download button, no SignUpPanel)
+//   #preview            — CompareScreen: look at a keyboard you are NOT
+//                         authoring — run it, read its source. Read-only:
+//                         no path from this tab into the working copy
+//                         (spec 057 US2). The route token stays `preview`
+//                         while the tab is labelled "Compare".
 //   #output             — OutputScreen: "ship it" — Download .zip +
 //                         SignUpPanel (no interactive OSK)
 
@@ -35,6 +38,10 @@ import {
 } from "./lib/draftPersistence.ts";
 import { useGitHubAuth } from "./hooks/useGitHubAuth.ts";
 import { type RouteId } from "./lib/navigate.ts";
+import { parseLocation } from "./lib/location.ts";
+import { liveResolveContext, setPendingWelcomeLocation } from "./lib/jumpToLocation.ts";
+import { readPaneSplitPct, useViewStateStore } from "./stores/viewStateStore.ts";
+import { useStepWalkStore } from "./stores/stepWalkStore.ts";
 import { useKeyboardArtifact, type OnInstantiateCallback } from "./hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
 import { OSKFrame } from "./components/OSKFrame.tsx";
@@ -48,7 +55,8 @@ import { getPatternLibraryService } from "./lib/services.ts";
 import { physicalAssignmentsOf } from "./lib/physicalAssignments.ts";
 import { FlowMapView } from "./dashboard/DashboardView.tsx";
 import { runCompleteness } from "./dashboard/completeness.ts";
-import { PreviewScreen } from "./components/PreviewScreen.tsx";
+import { CompareScreen } from "./components/CompareScreen.tsx";
+import { StudioFooter } from "./components/StudioFooter.tsx";
 import { OutputScreen } from "./components/OutputScreen.tsx";
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
@@ -101,9 +109,13 @@ import { useInventoryCoverageGate } from "./hooks/useInventoryCoverageGate.ts";
 import { useSurveyBrowserHistorySync } from "./hooks/useSurveyBrowserHistorySync.ts";
 
 // Offer the resume banner only once per page load — on the first SurveyView
-// mount in this JS context, not on same-session route remounts (navigating away
-// and back is a fresh wizard, not a resume). A page reload resets this flag by
-// starting a new JS context.
+// mount in this JS context, not on same-session route remounts. A page reload
+// resets this flag by starting a new JS context.
+//
+// Spec 057: this flag is now the ONLY thing a route remount changes. The
+// traversal itself survives (FR-002), so a remount is not a fresh wizard and
+// there is nothing to offer to resume — re-offering the banner mid-session
+// would invite the author to "resume" the session they are already in.
 let resumeOfferConsumed = false;
 
 // Bind the manifest into the store's staleness actions.
@@ -162,7 +174,18 @@ function defaultLandingRoute(): RouteId {
 
 function useRoute(): RouteId {
   const hashToRoute = (): RouteId => {
+    // Spec 057 FR-010/FR-011: the hash may now carry a step and a question
+    // (`#survey/characters/pb_rtl_direction_confirm`). `parseLocation` is the
+    // ONE grammar — routing reads the parsed location's `route` rather than
+    // treating the whole hash as a token, so a deep-linked hash no longer
+    // falls through to the landing route just because it has segments.
+    //
+    // A malformed hash parses to null and behaves exactly as an unknown token
+    // always has: fall back to `defaultLandingRoute()`. Reachability of the
+    // step/question is NOT decided here — that is `resolveLocation`'s job, and
+    // deciding it here would swallow FR-013's stated reason.
     const raw = window.location.hash.slice(1);
+    const parsed = parseLocation(raw);
     const landing = defaultLandingRoute();
     // A genuine newcomer (never visited, no resumable draft) always lands on
     // welcome first — even on a deep-linked hash (a shared #survey/#preview
@@ -176,11 +199,18 @@ function useRoute(): RouteId {
       // navigateTo("survey"), a same-value hash assignment that fires zero
       // hashchange events per spec, soft-locking the user on WelcomeScreen.
       if (raw !== "welcome") {
+        // Spec 057 FR-015 (D-9): hold the requested location before the
+        // rewrite discards it, so `leaveWelcome` can honour it on exit
+        // instead of dropping a shared deep link on the floor. The
+        // replaceState itself stays — it exists to avoid the same-value-hash
+        // soft-lock described below.
+        if (parsed !== null) setPendingWelcomeLocation(parsed);
         window.history.replaceState(window.history.state, "", "#welcome");
       }
       return "welcome";
     }
-    return isRouteId(raw) ? raw : landing;
+    if (parsed !== null && isRouteId(parsed.route)) return parsed.route;
+    return landing;
   };
 
   const [route, setRoute] = useState<RouteId>(hashToRoute);
@@ -211,7 +241,11 @@ interface NavItem {
 
 const NAV_ITEMS: NavItem[] = [
   { id: "survey", label: msg({ id: "nav.studio", message: "Studio" }) },
-  { id: "preview", label: msg({ id: "nav.preview", message: "Preview" }) },
+  // Spec 057 FR-020: a NEW message id, not a re-worded one. The tab's
+  // purpose changed — it is a read-only comparison surface now, not a
+  // preview of the author's own keyboard — so an existing translation of
+  // "Preview" is not a translation of this.
+  { id: "preview", label: msg({ id: "nav.compare", message: "Compare" }) },
   { id: "output", label: msg({ id: "nav.output", message: "Output" }) },
   // Spec 053 FR-017: unconditional, alongside Output and Preview rather than
   // beside the dev-gated Flow Map below.
@@ -341,7 +375,12 @@ function NavBar({ active, outputBlocked = false, outputBlockedTitle }: NavBarPro
 const SURVEY_DIVIDER_WIDTH = 6;
 const SURVEY_LEFT_MIN_PCT = 25;
 const SURVEY_LEFT_MAX_PCT = 65;
-const SURVEY_LEFT_INIT_PCT = 45;
+// The survey pane's INITIAL split now lives in stores/viewStateStore.ts's
+// INITIAL_SPLIT_PCT (spec 057 US5) — the split is session view state, so its
+// starting value belongs with the slot that holds it rather than as a second
+// constant here that could drift from it. The min/max above stay: they are
+// this screen's layout bounds, and `readPaneSplitPct` clamps against them on
+// every read.
 
 // ---------------------------------------------------------------------------
 // ActiveStepId — imported from surveySessionStore (the traversal vocabulary
@@ -422,49 +461,50 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   const discoveryMethod = useSurveySessionStore((s) => s.discoveryMethod);
   const showCharacterMap = activeRightPane === "character-map" && discoveryMethod === "build-list";
 
-  // Reset the session store on mount — the store is a module-level singleton that
-  // persists across React tree unmounts/remounts (e.g. navigating away from the
-  // survey route and back creates a new SurveyView mount = a new wizard session).
-  // Without this reset the singleton would resume from stale prior state rather
-  // than starting at "identity". Component-local useState used to give this
-  // mount-fresh reset for free; this call restores that invariant for the store.
+  // NO mount-time reset (spec 057 FR-002/FR-003, defect D-1).
   //
-  // DEVIATION 2 (spec 034 US3, research D4): a durable draft may have just been
-  // restored in main.tsx (BEFORE this component — or any component — mounted),
-  // patching both the working-copy AND survey-session stores so the author
-  // resumes at their last `activeStepId`. An unconditional reset() here would
-  // immediately clobber that restore. `wasDraftRestoredThisBoot()` reads the
-  // module-level flag draftPersistence.loadDraft() sets on success; it is
-  // stable across StrictMode's double-invoked mount effects because
-  // loadDraft() itself only ever runs once, pre-mount, in main.tsx.
+  // This component used to call `useSurveySessionStore.getState().reset()` on
+  // mount, on the reading that "navigating away and back is a fresh wizard,
+  // not a resume". That reading was the defect. The survey-session store is a
+  // module-level singleton and the working-copy store beside it is never
+  // reset, so a route change lost the author's POSITION while keeping their
+  // CONTENT — the reported symptom exactly ("returning to Studio puts me back
+  // on question one, even though later questions are still filled"). It also
+  // cascaded: the reset was persisted by the autosave subscription (D-2), it
+  // broke every affordance that sets a target step and then navigates (D-3),
+  // and by returning `charactersSubStage` to "prefill" it made a later
+  // re-confirm silently empty the author's Phase B alphabet (D-4).
   //
-  // The localStorage draft (lib/draftAutosave.ts) is unaffected either way: it
-  // lives in localStorage, not the store — the resume banner below reads it and
-  // only applyDraft() (on Resume) hydrates the store.
-  // Flipped to true at the end of the reset/restore effect below — passed to
-  // useSurveyBrowserHistorySync as a live ordering guard (DEV-only): if a
-  // future edit reorders the two calls (or hoists the sync hook above this
-  // effect), that hook's own mount effect finds this still `false` and fails
-  // loud instead of silently tagging the browser entry with a stale
-  // activeStepId. See useSurveyBrowserHistorySync.ts's doc comment on the
-  // param.
-  const resetOrRestoreSettledRef = useRef(false);
+  // THE CONTRACT NOW: component lifetime is not a session boundary. A
+  // traversal reset happens only where the author asked for one, and there are
+  // exactly two such places — `handleStartOver()` below (the corner reset
+  // control and the terminal panels' "Start over") and WelcomeScreen's "I'm
+  // new". Both already call `reset()` explicitly; nothing was added to replace
+  // this deletion, because a second notion of session identity beside those
+  // two is the framing that produced the bug.
+  //
+  // `wasDraftRestoredThisBoot()` went with it: it existed only to stop this
+  // reset from clobbering a draft main.tsx had already restored pre-mount.
+  // With no reset there is nothing to guard, and a resume no longer depends on
+  // an unrelated durable-storage read having happened first (FR-005).
+
+  // F7 — browser Back/Forward integration for the survey wizard (see
+  // hooks/useSurveyBrowserHistorySync.ts for the full design + sync
+  // invariant). Its DEV ordering guard used to key on the reset/restore effect
+  // above; with that effect gone it keys on draft-restore settlement instead,
+  // which is the antecedent that genuinely remains (FR-017, D-9a). See that
+  // hook's doc comment on the parameter.
+  const draftRestoreSettledRef = useRef(false);
   useEffect(() => {
-    if (!wasDraftRestoredThisBoot()) {
-      useSurveySessionStore.getState().reset();
-    }
-    resetOrRestoreSettledRef.current = true;
+    // Reading the flag is the settlement: `loadDraft()` runs once, pre-mount,
+    // in main.tsx, so by the time any effect runs the answer is final. This
+    // effect exists to make the ORDER observable to the hook below, not to
+    // decide anything itself.
+    draftRestoreSettledRef.current = true;
     // Intentionally empty deps: runs exactly once on mount.
   }, []);
 
-  // F7 fix — browser Back/Forward integration for the survey wizard (see
-  // hooks/useSurveyBrowserHistorySync.ts for the full design + sync
-  // invariant). MUST be called after the reset/restore effect immediately
-  // above: its own mount effect reads the store's activeStepId to tag the
-  // current browser entry, and needs that effect's decision (reset vs.
-  // restored) already settled. resetOrRestoreSettledRef makes that ordering
-  // requirement a live DEV-mode check rather than declaration-order-only.
-  useSurveyBrowserHistorySync(resetOrRestoreSettledRef);
+  useSurveyBrowserHistorySync(draftRestoreSettledRef);
 
   // ---------------------------------------------------------------------------
   // Resume-draft banner + autosave (localStorage draft; lib/draftAutosave.ts).
@@ -573,9 +613,26 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     };
   }, [githubToken, resumeMeta]);
 
-  const [oskMode, setOskMode] = useState<OskMode>("desktop");
-  const { containerRef, leftPct, onPointerDown } =
-    useResizablePanes({ minPct: SURVEY_LEFT_MIN_PCT, maxPct: SURVEY_LEFT_MAX_PCT, initPct: SURVEY_LEFT_INIT_PCT });
+  // Spec 057 US5 (FR-050): the OSK mode and the pane split are VIEW state, not
+  // authoring state — they had been component `useState`, which the route
+  // unmount destroyed on every tab switch. Backed by the session-scoped
+  // viewStateStore they survive the round trip and die on reload (Q9), and
+  // neither read nor write can reach a compile or a validator run (FR-053).
+  const oskMode = useViewStateStore((s) => s.oskMode.survey);
+  const setSurveyOskMode = useViewStateStore((s) => s.setOskMode);
+  const setOskMode = useCallback(
+    (mode: OskMode) => setSurveyOskMode("survey", mode),
+    [setSurveyOskMode],
+  );
+  const setPaneSplitPct = useViewStateStore((s) => s.setPaneSplitPct);
+  const { containerRef, leftPct, onPointerDown } = useResizablePanes({
+    minPct: SURVEY_LEFT_MIN_PCT,
+    maxPct: SURVEY_LEFT_MAX_PCT,
+    // Clamped on READ, so a split stored under a different layout can never
+    // produce an unusable pane here.
+    initPct: readPaneSplitPct("survey", SURVEY_LEFT_MIN_PCT, SURVEY_LEFT_MAX_PCT),
+    onChange: (pct) => setPaneSplitPct("survey", pct),
+  });
 
   // Sync localBase when the prop changes (e.g. after a start-over that sets a new base).
   // localBase lives in the session store; we update it when the working-copy's baseKeyboard
@@ -654,22 +711,52 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // module's own `ks.draft.active` pointer) to find — identity answers and an
   // in-progress base preview were lost outright.
   //
-  // Skipped when a real project key is ALREADY derivable at mount — a résumé
-  // (or an L3+ durable draft main.tsx already restored pre-mount) means the
-  // working copy is instantiated before this component ever renders, and
-  // `doCommit`'s own install (below) owns the real-project subscription for
-  // that case. Guarded on `autosaveTeardownRef.current === null` so
-  // StrictMode's double-invoked mount effect (no cleanup is returned; the ref
-  // itself is the idempotency guard, mirroring `instantiatedForBaseIdRef`'s
-  // pattern in this same file) never installs two overlapping subscriptions.
-  // `doCommit`'s existing teardown-then-reinstall
-  // (`autosaveTeardownRef.current?.()`) is what PROMOTES this pending
-  // subscription to the real one the moment the author actually confirms a
-  // base — see doCommit's cleanup of the abandoned pending record below.
+  // Guarded on `autosaveTeardownRef.current === null` so StrictMode's
+  // double-invoked mount effect (no cleanup is returned; the ref itself is the
+  // idempotency guard, mirroring `instantiatedForBaseIdRef`'s pattern in this
+  // same file) never installs two overlapping subscriptions. `doCommit`'s
+  // existing teardown-then-reinstall (`autosaveTeardownRef.current?.()`) is
+  // what PROMOTES this pending subscription to the real one the moment the
+  // author actually confirms a base — see doCommit's cleanup of the abandoned
+  // pending record below.
+  //
+  // RESTORING BOOT (spec 057 FR-004/SC-002). When a real project key is
+  // ALREADY derivable at mount, the working copy was instantiated before this
+  // component ever rendered — `main.tsx`'s pre-mount `loadDraft` on a plain
+  // browser refresh, or a route remount of an in-session wizard. This branch
+  // used to `return` here and leave the real-project subscription to
+  // `doCommit`, on the reading that doCommit always re-fires on such a boot.
+  // It does, and that was the defect, in both directions:
+  //
+  //   - Nothing installed the autosave until the compile pipeline re-settled,
+  //     so every store write between mount and that settle went unpersisted.
+  //   - Worse, the re-commit is NOT a no-op. `doCommit` re-derives the
+  //     instantiation mode from `useSurveySessionStore.selectedTrack`, which
+  //     has ADVANCED since the original commit: the base is confirmed at
+  //     `choose_base`, before the track step exists to answer. So an author on
+  //     the adapt track re-commits as `adapt-existing` over a working copy
+  //     recorded `new-from-base`, and `resolveInstantiationCase` reads
+  //     same-id/different-mode as a genuine base switch and clears
+  //     `phaseResults` (workingCopyStore.ts). A refresh silently discarded the
+  //     survey. The same re-commit also fires `setTouchSeedSource(null)` and
+  //     the rebase draft-key migration, neither of which a restore should do.
+  //
+  // Both follow from re-running a COMMIT to restore a copy that is already
+  // committed. So the restore path now does what the résumé path has always
+  // done (see `handleResumeDraft`): pre-seed `instantiatedForBaseIdRef` with
+  // the restored base id, which makes doCommit's own guard early-return, and
+  // install the real-project autosave here directly. A genuine base switch
+  // later is unaffected — a DIFFERENT id still passes the guard (F1).
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (autosaveTeardownRef.current !== null) return;
-    if (deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState()) !== null) return;
+    const restoredProjectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
+    if (restoredProjectKey !== null) {
+      instantiatedForBaseIdRef.current =
+        useWorkingCopyStore.getState().baseKeyboard?.id ?? null;
+      autosaveTeardownRef.current = installDraftAutosave(restoredProjectKey);
+      return;
+    }
     autosaveTeardownRef.current = installDraftAutosave(DRAFT_PERSISTENCE_PENDING_KEY);
     // Runs once on mount; deriveProjectKeyFromWorkingCopy/installDraftAutosave
     // are stable module-level imports, and the refs are stable by construction.
@@ -860,6 +947,25 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       if (instantiatedForBaseIdRef.current === base.id) return;
       instantiatedForBaseIdRef.current = base.id;
 
+      // REBASE draft migration (F1's last seam). A non-null key here means the
+      // working copy is STILL INSTANTIATED under another project key at the
+      // moment of a new commit — which only the rebase path produces: start-over
+      // resets the stores before the next pick, a résumé pre-seeds
+      // `instantiatedForBaseIdRef` so doCommit never fires, and a fresh boot has
+      // nothing instantiated. On that path the author has already accepted
+      // "Switching base keyboards will discard your current edits" (or had
+      // none to discard), so the record under the OLD key is precisely the
+      // discarded state — leaving it behind strands a phantom card in "My
+      // keyboards" for a base the author rejected. This is a MIGRATION of the
+      // one project's draft key, not a clear-on-switch: spec 047's SC-001
+      // ("start keyboard B, keyboard A survives") concerns two projects, and
+      // every two-project path leaves this key null. Cleared AFTER the
+      // instantiation + promotion below succeed, so a failed commit never
+      // deletes the only copy of the author's work.
+      const rebasedFromProjectKey = deriveProjectKeyFromWorkingCopy(
+        useWorkingCopyStore.getState(),
+      );
+
       // Spec 034's VR-5 used to call `replaceActiveDraftIfDifferentProject`
       // here: picking a new base DELETED the previously active project's
       // draft, because the studio could hold only one draft at a time and a
@@ -914,6 +1020,19 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // pair with the shared helper so `handleResumeDraft` (below) can reuse
       // the exact same promotion logic for its own résumé path.
       promotePendingAutosave();
+
+      // Complete the rebase migration (see rebasedFromProjectKey above): the
+      // new key's record + index row exist as of promotePendingAutosave's
+      // synchronous install-time save, so removing the old key's record and
+      // row now is a rename, never a gap. Same-key commits (P1 repeat settle
+      // never reaches here; F2 refresh re-commit derives the same key) are
+      // no-ops by the inequality guard.
+      const projectKeyAfterCommit = deriveProjectKeyFromWorkingCopy(
+        useWorkingCopyStore.getState(),
+      );
+      if (rebasedFromProjectKey !== null && rebasedFromProjectKey !== projectKeyAfterCommit) {
+        clearPersistenceDraft(rebasedFromProjectKey);
+      }
     },
     // Same escape hatch as the pre-preview-before-commit onInstantiate: all
     // reads are via getState()/reducerDepsRef.current (stable refs), not
@@ -1078,6 +1197,18 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     // baseline goes too, so the first boundary of the new session establishes a
     // fresh one instead of diffing against the abandoned keyboard's text.
     useDecisionLogStore.getState().reset();
+    // Spec 057 FR-052: view state clears with the session it belongs to. This
+    // is one of exactly TWO places a reset is legitimate (the other is
+    // WelcomeScreen's "I'm new") — the same two the survey-session store's own
+    // reset lives in. Leaving a prior project's collapsed stages, pane splits
+    // and Compare selection behind would make the next keyboard open in a
+    // layout the author never chose for it.
+    useViewStateStore.getState().reset();
+    // Within-step positions belong to the walk being abandoned. Left behind,
+    // the next keyboard's mechanism/touch galleries would open on a character
+    // from the previous project's inventory — a cursor is only meaningful
+    // against the walk that published it (stores/stepWalkStore.ts).
+    useStepWalkStore.getState().reset();
     snapshotterRef.current.reset();
     pendingArtifactRef.current = null;
     // F6 fix: re-arm the pre-instantiation pending autosave for the NEXT
@@ -1469,6 +1600,19 @@ export function StudioShell() {
   const outputNavBlocked = useInventoryCoverageGate().blocked;
 
   // ---------------------------------------------------------------------------
+  // Per-tab view state (spec 057 US5, FR-050). Read HERE rather than in the
+  // views themselves: `dashboard/` and `decisions/` have no `stores/` import
+  // (the depcruise layer rules), so these follow the same prop route
+  // `completenessReport`, `axisFills` and `pathOverlay` already take.
+  // ---------------------------------------------------------------------------
+  const flowMapSection = useViewStateStore((s) => s.flowMapSection);
+  const setFlowMapSection = useViewStateStore((s) => s.setFlowMapSection);
+  const trailCollapsedSteps = useViewStateStore((s) => s.trailCollapsedSteps);
+  const toggleTrailStage = useViewStateStore((s) => s.toggleTrailStage);
+  const trailShowSuperseded = useViewStateStore((s) => s.trailShowSuperseded);
+  const setTrailShowSuperseded = useViewStateStore((s) => s.setTrailShowSuperseded);
+
+  // ---------------------------------------------------------------------------
   // Decision trail (spec 053 US1). Same arrangement as completenessReport above:
   // read the stores here, pass plain values down, so decisions/ needs no store
   // import and the trail is renderable against a fixture record.
@@ -1563,7 +1707,10 @@ export function StudioShell() {
       content = <SurveyView baseKeyboard={selectedBaseKeyboard} />;
       break;
     case "preview":
-      content = <PreviewScreen />;
+      // The route TOKEN stays `preview` while the tab is labelled "Compare"
+      // (spec 057 contract §1): renaming it would break every existing
+      // bookmark and every e2e hash assertion for no requirement's sake.
+      content = <CompareScreen />;
       break;
     case "output":
       content = <OutputScreen />;
@@ -1575,6 +1722,14 @@ export function StudioShell() {
           axisFills={axisFills}
           {...(pathOverlay !== undefined ? { pathOverlay } : {})}
           resolveAlternative={resolveStepAlternative}
+          // Spec 057 US5 (FR-050): the selected section is view state. It
+          // arrives as a read-once initial value plus a change notification —
+          // the same shape `useResizablePanes` takes — because `dashboard/`
+          // may not import `stores/` (the depcruise dashboard-layer rule), so
+          // the store is read HERE and passed down exactly as
+          // `completeness`/`axisFills`/`pathOverlay` already are.
+          initialSection={flowMapSection}
+          onSectionChange={setFlowMapSection}
         />
       );
       break;
@@ -1588,6 +1743,21 @@ export function StudioShell() {
           droppedCount={decisionDroppedCount}
           resolveImpact={resolveEntryImpact}
           resolveImpactAsync={resolveEntryImpactAsync}
+          // Spec 057 US5 (FR-050): per-stage collapse and the replaced-
+          // decisions toggle are view state, read here for the same
+          // layer-boundary reason as the flow map's section above.
+          initialCollapsedSteps={trailCollapsedSteps}
+          onToggleStage={toggleTrailStage}
+          initialShowSuperseded={trailShowSuperseded}
+          onShowSupersededChange={setTrailShowSuperseded}
+          // Spec 057 FR-035: pre-resolve each row's jump target so an entry
+          // whose target is unreachable states the reason INSTEAD of offering
+          // a link that fails on activation. Composed from the exported
+          // `liveResolveContext()` rather than assembled here, so a row can
+          // never disagree with `jumpToLocation` about whether its own jump
+          // is possible. Read at render time — a pure, store-free computation
+          // that resolves no impact (FR-036 is about impact, not location).
+          resolveCtx={liveResolveContext()}
         />
       );
       break;
@@ -1621,6 +1791,13 @@ export function StudioShell() {
         })}
       />
       <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>{content}</div>
+      {/* Spec 057 US4/US6 (T052, FR-040): the narrow journey footer. Mounted
+          unconditionally rather than per-route because `StudioFooter` returns
+          null whenever `deriveProjectLabel` has nothing to name — so it is
+          ABSENT, not an empty shell, on Welcome and wherever there is no
+          project yet (Q6). A route-by-route conditional here would be a second
+          place to keep that rule, and the two would drift. */}
+      <StudioFooter />
     </div>
   );
 }

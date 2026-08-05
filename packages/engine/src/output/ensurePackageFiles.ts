@@ -19,7 +19,7 @@
 // never overwritten, so on Track 1 this is a no-op.
 
 import type { VirtualFS } from "@keyboard-studio/contracts";
-import { welcomeHtm, readmeHtm } from "../shared/packageDocs.js";
+import { welcomeHtm, readmeHtm, licenseMd } from "../shared/packageDocs.js";
 
 export interface EnsurePackageFilesInput {
   /** The projected working copy. Mutated in place. */
@@ -66,7 +66,7 @@ export function ensurePackageFiles({
   // emits the same MIT stub on Track 1; this closes the adapt track's gap.
   const holder = copyright !== undefined && copyright !== "" ? copyright : displayName;
   const yyyy = year ?? new Date().getFullYear();
-  write("LICENSE.md", `Copyright © ${yyyy} ${holder}\n\nMIT License\n`);
+  write("LICENSE.md", licenseMd(holder, yyyy));
 
   return { created };
 }

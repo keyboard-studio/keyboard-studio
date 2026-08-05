@@ -15,9 +15,10 @@
 //
 // Rebuilding the studio after editing a flow or a selector rule updates this map.
 
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useRef, useState, type ReactNode } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
+import { useScrollRestoration } from "../hooks/useScrollRestoration.ts";
 
 // Identity-lite is read directly here for the Script-routing section (§9). The
 // flow drill-down sources (derived from step flowRefs) and the rendered-node-id composition
@@ -39,7 +40,12 @@ import type { CompletenessReport } from "./completeness.ts";
 import type { PathOverlay } from "./pathOverlay.ts";
 import type { AxisFill, DecisionImpact } from "@keyboard-studio/contracts";
 
-type Section = "flow" | "routing" | "strategy" | "completeness";
+// Exported (spec 057 T056) so callers — today, only StudioShell — can type
+// the `initialSection` / `onSectionChange` props below without redeclaring
+// this union. Structurally identical to viewStateStore's `FlowMapSection`;
+// not IMPORTED from it, because dashboard/ may not import stores/ (the
+// dashboard-layer depcruise boundary just below governs this file).
+export type Section = "flow" | "routing" | "strategy" | "completeness";
 
 function LegendItem({ swatch, border, dashed, label }: { swatch: string; border: string; dashed?: boolean; label: string }) {
   return (
@@ -420,6 +426,20 @@ export interface FlowMapViewProps {
    * that does not supply it, which removes the affordance entirely.
    */
   resolveAlternative?: (stepId: string, alternativeValue: string) => DecisionImpact | null;
+  /**
+   * Which section tab was open last session (view state — spec 057 US5,
+   * FR-050, data-model.md ViewState.flowMapSection). Read ONCE as the initial
+   * value — the same "read on mount, notify on change" idiom
+   * `useResizablePanes` uses for pane splits (`initPct` + `onChange`), NOT a
+   * fully controlled prop. dashboard/ may not import stores/ (the
+   * dashboard-layer depcruise boundary above), so StudioShell owns
+   * `viewStateStore.flowMapSection` and hands this component only the
+   * restored value and a change notifier — the same arrangement it already
+   * uses for `completeness` / `axisFills` / `pathOverlay`.
+   */
+  initialSection?: Section;
+  /** Called whenever the section tab changes, so the caller can persist it. */
+  onSectionChange?: (section: Section) => void;
 }
 
 export function FlowMapView({
@@ -427,9 +447,20 @@ export function FlowMapView({
   axisFills,
   pathOverlay,
   resolveAlternative,
+  initialSection,
+  onSectionChange,
 }: FlowMapViewProps) {
   const { t } = useLingui();
-  const [section, setSection] = useState<Section>("flow");
+  const [section, setSectionState] = useState<Section>(initialSection ?? "flow");
+  const setSection = (next: Section) => {
+    setSectionState(next);
+    onSectionChange?.(next);
+  };
+  // Scroll position (spec 057 US5, FR-050): this outer scrollable div is the
+  // ONE pane on this screen, so one stable id is enough — no per-section
+  // sub-key needed, since switching sections does not remount this div.
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useScrollRestoration(scrollRef, "dashboard-flow-map");
   const flows = useMemo(() => buildFlowSources(), []);
   // spec 025 (D6): the Library section — proposed-flow ordered graphs + flat
   // reserve + "also live" dual-references. Derived from flowSources status:"proposed"
@@ -478,6 +509,8 @@ export function FlowMapView({
 
   return (
     <div
+      ref={scrollRef}
+      data-testid="flow-map-root"
       style={{
         height: "100%",
         overflow: "auto",

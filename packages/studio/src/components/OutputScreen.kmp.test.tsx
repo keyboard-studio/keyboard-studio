@@ -94,9 +94,14 @@ function seed() {
 }
 
 function renderReady() {
+  // Seeding an instantiated working copy is enough: since spec 058 the left pane
+  // switches to its "shipping" variant, which has NO base picker to click
+  // (re-basing from the ship-it screen was the defect that change removed). The
+  // download buttons render directly off the seeded working copy — mirrors
+  // OutputScreen.test.tsx's seedInstantiatedWorkingCopy() pattern after the
+  // route-split merge.
   seed();
   render(<OutputScreen />);
-  fireEvent.click(screen.getByTestId("base-picker"));
 }
 
 let originalCreateObjectURL: typeof URL.createObjectURL;

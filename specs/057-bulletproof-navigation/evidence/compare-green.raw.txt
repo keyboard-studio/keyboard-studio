@@ -1,0 +1,11 @@
+
+Running 6 tests using 1 worker
+
+  ✓  1 e2e\compare-isolation.spec.ts:137:3 › Compare cannot write to the author's project (spec 057 US2) › the tab exposes no identity-editing control over the project (6.5s)
+  ✓  2 e2e\compare-isolation.spec.ts:160:3 › Compare cannot write to the author's project (spec 057 US2) › loading another keyboard raises no dialog and leaves the project untouched (dismiss) (15.2s)
+  ✓  3 e2e\compare-isolation.spec.ts:180:3 › Compare cannot write to the author's project (spec 057 US2) › loading another keyboard and ACCEPTING anything offered still leaves the project untouched (13.3s)
+  ✓  4 e2e\locale-switch.spec.ts:46:3 › Locale switcher — persistence + no first-paint English flash › switching to fr translates chrome and persists across reload (3.0s)
+  ✓  5 e2e\locale-switch.spec.ts:92:3 › Compare tab label (spec 057 FR-020) › reads 'Compare' in English and never 'Preview' (1.7s)
+  ✓  6 e2e\locale-switch.spec.ts:100:3 › Compare tab label (spec 057 FR-020) › in fr, falls back to the new id's source string — never the retired id's translation (2.3s)
+
+  6 passed (43.6s)

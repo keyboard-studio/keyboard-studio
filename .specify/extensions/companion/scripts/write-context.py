@@ -27,6 +27,13 @@ import subprocess
 import sys
 from pathlib import Path
 
+# This module's own directory is sys.path[0] when it runs as a script, and the
+# importers that load it under its hyphenated name (status-context.py,
+# derive-from-files.py) insert that directory first — so a plain import reaches
+# companion_config either way.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import companion_config as cc  # noqa: E402
+
 # Canonical vocab (mirrors src/core/types/specContext.ts). Kept here only to
 # reject the legacy terminal step and to avoid regressing an advanced spec.
 CANONICAL_STEPS = {"specify", "clarify", "plan", "tasks", "analyze", "implement"}
@@ -1545,6 +1552,7 @@ def sync_tasks(feature_dir: Path, tasks_md: Path, final_status: str, by: str) ->
 
 
 def main() -> int:
+    cc.configure_stdio()
     parser = argparse.ArgumentParser(description="Write/update a feature's .spec-context.json")
     parser.add_argument("--step", default="specify")
     parser.add_argument("--status", default="specified")

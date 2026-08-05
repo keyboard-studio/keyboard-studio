@@ -37,7 +37,9 @@
 //   by contrast, cannot un-advance a wizard step that already committed).
 //
 // instantiateFromBaseIfConfirmed:
-//   Shared body for onInstantiate callbacks in PreviewShell and SurveyView.
+//   Shared body for onInstantiate callbacks in OutputScreen and SurveyView.
+//   NOT reachable from the Compare tab, which passes no onInstantiate at all
+//   (spec 057 FR-022).
 //   Guards on ir/vfs availability, calls confirmRebaseIfEdited (unless the
 //   caller passes `skipConfirm: true` — see the `options` param doc below),
 //   then dispatches instantiateFromBase.
@@ -105,7 +107,7 @@ export function confirmRebaseTo(newBaseId: string): boolean {
 }
 
 /**
- * Shared onInstantiate body for PreviewShell and SurveyView.
+ * Shared onInstantiate body for OutputScreen and SurveyView.
  *
  * Guards that `ir` and `vfs` are non-null (mock-engine path), runs
  * {@link confirmRebaseIfEdited} (reads live store state to avoid stale-closure

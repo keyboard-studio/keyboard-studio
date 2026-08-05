@@ -1,4 +1,4 @@
-// ResizeHandle — shared drag-handle divider used by PreviewScreen and OutputScreen.
+// ResizeHandle — shared drag-handle divider used by CompareScreen and OutputScreen.
 // Renders the vertical separator div with hover highlighting and pointer-capture
 // for resizing the two-pane layout. Hover state is local (purely visual).
 

@@ -24,6 +24,8 @@ from pathlib import Path
 
 # The sibling modules' filenames have hyphens, so import them dynamically.
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+import companion_config as cc  # noqa: E402
+
 wc = importlib.import_module("write-context")
 dff = importlib.import_module("derive-from-files")
 
@@ -217,35 +219,60 @@ def resolve(feature_dir: Path) -> dict:
     return resolution
 
 
-def _print_summary(res: dict) -> None:
+def _summary_lines(res: dict) -> list[str]:
+    """The human summary as lines, built without printing (see _print_summary)."""
     if res.get("empty"):
-        print("Nothing to summarize (no spec files or recorded state found).")
-        print(f"RESOLUTION: {json.dumps(res, ensure_ascii=False)}")
-        return
+        return ["Nothing to summarize (no spec files or recorded state found)."]
 
-    print(f"Spec: {res['specName']}   (source: {res['source']})")
-    print(f"Step: {res['currentStep']}   Status: {res['status']}")
+    lines = [
+        f"Spec: {res['specName']}   (source: {res['source']})",
+        f"Step: {res['currentStep']}   Status: {res['status']}",
+    ]
 
     decisions = res.get("decisions") or []
     if decisions:
-        print("Decisions:")
-        for d in decisions:
-            print(f"  - {d}")
+        lines.append("Decisions:")
+        lines.extend(f"  - {d}" for d in decisions)
     else:
-        print("Decisions: (none recorded)")
+        lines.append("Decisions: (none recorded)")
 
     if res.get("complete"):
-        print("Next: Pipeline complete  →  —")
+        lines.append("Next: Pipeline complete  →  —")
     elif res.get("nextTask"):
-        print(f"Next: {res['nextActionLabel']}  →  dispatching {res['nextCommand']}")
+        lines.append(f"Next: {res['nextActionLabel']}  →  dispatching {res['nextCommand']}")
     else:
         nxt = res.get("nextCommand") or "—"
-        print(f"Next: {res['nextActionLabel']}  →  {nxt}")
+        lines.append(f"Next: {res['nextActionLabel']}  →  {nxt}")
 
-    print(f"RESOLUTION: {json.dumps(res, ensure_ascii=False)}")
+    return lines
+
+
+def _print_summary(res: dict) -> None:
+    """Emit the human summary, then the machine line, as two independent writes.
+
+    Building the block up front means a rendering failure can't leave a
+    half-written summary, and keeping RESOLUTION out of that try means `resume`
+    still gets its input even when the human half fails.
+    """
+    try:
+        print("\n".join(_summary_lines(res)))
+    except Exception as exc:  # noqa: BLE001 - the machine line matters more
+        print(f"[companion] Warning: could not render the summary: {exc}", file=sys.stderr)
+
+    try:
+        print(f"RESOLUTION: {json.dumps(res, ensure_ascii=False)}")
+    except UnicodeEncodeError:
+        # Last resort on a stream that rejected UTF-8: \uXXXX-escaped ASCII is
+        # still JSON and parses back to the identical object.
+        print(f"RESOLUTION: {json.dumps(res, ensure_ascii=True)}")
 
 
 def main() -> int:
+    # First statement, as in every script here: argparse writes --help and its
+    # error messages (which can quote a user-supplied path) before anything else
+    # runs, so the stream has to be safe before parsing, not after.
+    cc.configure_stdio()
+
     parser = argparse.ArgumentParser(
         description="Resolve a feature's pipeline position and next action."
     )
