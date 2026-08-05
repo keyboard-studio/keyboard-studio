@@ -16,14 +16,18 @@
 //     chooser. When there is no suggestion, the method chooser is shown
 //     directly (no intermediate card).
 //   - Method chooser offers 4 expandable cards (longpress, flick, multitap,
-//     replace). "Apply method" + "Next character →" + "Skip this character"
-//     follow MechanismGallery's pattern. There is no manual "already in
-//     layout" card: the auto-detected "already" suggestion records inherited
-//     characters. "Skip this character" is pure forward navigation — it
-//     records nothing; only Apply (or accepting a suggestion) marks a
-//     character configured.
+//     replace). "Apply method" + "Next character →" + "Mark for later review"
+//     follow MechanismGallery's pattern (mechanism-gallery-progression;
+//     "Mark for later review" replaces the old "Skip this character" link —
+//     see canGoNext's own doc comment for why). There is no manual "already
+//     in layout" card: the auto-detected "already" suggestion records
+//     inherited characters. "Mark for later review" is a per-character
+//     TOGGLE (surveySessionStore.markedForLaterTouch, authoring metadata
+//     only — never the working copy); a marked character stays uncovered for
+//     Phase F / export purposes but is no longer "unaccounted for" here.
 //   - Positional Back/Next/last-character navigation walks inventory by
-//     index; a skipped-over character is never treated as resolved.
+//     index; an unaddressed character stays gated (see canGoNext) until it is
+//     either configured or marked.
 //   - Desktop work (carve removals + Phase C letter placements) IS replayed
 //     onto the touch seed (spec 035 R3/R11): the touch layout is derived from
 //     scaffoldTouchLayout(baseIr) (reseed) or the shipped .keyman-touch-layout
@@ -47,10 +51,11 @@
 //
 // The inline touch-lint panel that surfaced Layer C findings below the
 // character cards has been removed; only the FR-008 completion gate remains.
-// FR-008 completion gate: handleContinue re-runs touchCoverage on the same
-// layout lint audits and refuses to complete (surfacing an inline message)
-// while any inventory char is unreachable — see `layoutForLintAndGate` and
-// `uncoveredMessage` below.
+// FR-008 completion gate: `uncoveredTouchChars`/`unaccountedTouchChars` (see
+// `layoutForLintAndGate` below) re-run touchCoverage LIVE on every render
+// (mechanism-gallery-progression) and disable the Done/Continue control —
+// proactively, not just on a click attempt — while any inventory char is
+// both uncovered and unmarked.
 //
 // Single 300 ms debounce contract upheld — no second timer introduced.
 
@@ -68,7 +73,6 @@ import { msg, plural } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useShallow } from "zustand/react/shallow";
 import { resolveMessage } from "../../lib/i18nResolve.ts";
-import { ConfirmDialog } from "./parts/ConfirmDialog.tsx";
 import type {
   TouchAssignment,
   MechanismRef,
@@ -111,11 +115,11 @@ import {
 import { deriveDesktopModifications } from "../../lib/deriveDesktopModifications.ts";
 import { extractMechanismHostKey } from "../../lib/extractMechanismHostKey.ts";
 import { lowercaseFirst } from "../../lib/caseOrder.ts";
+import { subtractMarked } from "../../lib/accountedForGate.ts";
 import {
   shouldEmitTouchLayout,
   resolveTouchSeedSource,
 } from "../../lib/touchEmission.ts";
-import { formatUncoveredCharsList } from "../../lib/unimplementedInventory.ts";
 import { useInventoryDiff } from "../../hooks/useInventoryDiff.ts";
 import { ErrorText } from "../../ui/index.ts";
 import {
@@ -1386,6 +1390,16 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
   const touchSeedSourceStored = useSurveySessionStore((s) => s.touchSeedSource);
 
+  // "Mark for later review" — authoring metadata only (surveySessionStore),
+  // never the working copy. Touch-gallery counterpart of MechanismGallery's
+  // markedForLaterDesktop — see that store field's docstring for why
+  // desktop/touch are tracked separately.
+  const markedForLaterTouch = useSurveySessionStore((s) => s.markedForLaterTouch);
+  const toggleMarkedForLaterTouch = useSurveySessionStore(
+    (s) => s.toggleMarkedForLaterTouch,
+  );
+  const markedTouchSet = useMemo(() => new Set(markedForLaterTouch), [markedForLaterTouch]);
+
   // "Existing methods" section — pre-existing touch methods (from the base
   // keyboard's own touch layout) that already produce currentChar, mirroring
   // MechanismGallery's desktop "Existing methods" section. deletedTouchKeyIds
@@ -1635,7 +1649,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // Diagnostic messages for touch assignments the engine could not apply
   // (e.g. an unmatched host key/layer) — already name the char + host key +
   // layer (see applyTouchAssignmentsToRawJson's warning strings). Rendered
-  // below, next to Apply/Skip, using the same visual + aria-live convention
+  // below, next to Apply/Mark, using the same visual + aria-live convention
   // as the existing "Apply warnings:" banner (GalleryPreviewPane) rather than
   // a new toast system. Recomputes on the same touchKey-driven memo as
   // touchLayoutJson — no second debounce timer (D3).
@@ -1894,44 +1908,43 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [touchLettersToAddKey]);
 
-  // FR-008 completion gate: names of chars with no reachable touch mechanism
-  // on the final layout, formatted for display near the completion control.
-  // Set by handleContinue when it refuses to complete; cleared on the next
-  // edit (see the touchKey-keyed effect below) rather than left stale once
-  // the author starts fixing the gap.
-  const [uncoveredMessage, setUncoveredMessage] = useState<string | null>(null);
-  // Raw uncovered chars backing the leave-warning modal below (count + list) —
-  // tracked alongside uncoveredMessage (the formatted inline banner text)
-  // rather than re-parsed from it.
-  const [uncoveredChars, setUncoveredChars] = useState<string[]>([]);
-  // Soft-warning modal (the gallery leave-warning): "Go back and finish" (stay) vs. "Come back
-  // later" (defer — proceeds with completion anyway). Distinct from the
-  // FR-008 inline gate message above, which still refuses the *default*
-  // Done/Skip-from-last action outright; this modal is the explicit escape
-  // hatch layered on top of it.
-  const [showUnimplementedWarning, setShowUnimplementedWarning] =
-    useState(false);
+  // FR-008 completion gate (mechanism-gallery-progression): names of chars
+  // with no reachable touch mechanism on the final layout — computed LIVE
+  // (not only on a click attempt) so the completion control can be disabled
+  // PROACTIVELY, matching MechanismGallery's Done gating. Mirrors
+  // handleContinue's own `touchCoverage` call exactly (same inputs), so the
+  // two can never disagree about what counts as uncovered.
+  const uncoveredTouchChars = useMemo<string[]>(() => {
+    if (layoutForLintAndGate === null) return [];
+    return [...touchCoverage(layoutForLintAndGate, inventory, desktopProducedSet).uncovered];
+  }, [layoutForLintAndGate, inventory, desktopProducedSet]);
 
-  // Clear a stale gate message as soon as the author makes another edit —
-  // "cleared when coverage passes or edits change" (T016b): re-running
-  // handleContinue will re-surface the message if the edit didn't fix it.
-  // Deliberately keyed on touchKey only (not currentChar): the message lists
-  // ALL uncovered inventory chars at once, not per-character state, so simply
-  // navigating to a different character must NOT clear it — only an actual
-  // edit (or a fresh handleContinue re-check) should.
-  useEffect(() => {
-    setUncoveredMessage(null);
-    setUncoveredChars([]);
-    setShowUnimplementedWarning(false);
-  }, [touchKey]);
+  // Mark-aware "still needs an assignment or a mark before Done is offered"
+  // list — a SEPARATE derivation layered on top of `uncoveredTouchChars`
+  // (implemented-only, UNCHANGED above), never threaded back into it. See
+  // lib/accountedForGate.ts's module doc: the Phase F hard gate / export gate
+  // read a DIFFERENT hook (hooks/useInventoryCoverageGate.ts) and never this
+  // local list, so marks recorded here cannot relax those.
+  const unaccountedTouchChars = useMemo(
+    () => subtractMarked(uncoveredTouchChars, markedTouchSet),
+    [uncoveredTouchChars, markedTouchSet],
+  );
+
+  // Named string local for the FR-008 inline hint rendered near the
+  // completion control below — null hides the hint entirely.
+  const unaccountedTouchMessage = useMemo(
+    () =>
+      unaccountedTouchChars.length > 0
+        ? unaccountedTouchChars.map((c) => formatUncoveredTouchMessage(c)).join("; ")
+        : null,
+    [unaccountedTouchChars],
+  );
 
   // Emit only chars where a real (non-inherited) or inherited assignment was
   // explicitly accepted — everything in charTouch was put there by the user.
   // `.some()` rather than `mechanisms[0]` (regression 3, multi-method): a
   // character can carry several mechanisms, so any real (non-inherited) one
   // qualifies it, not just whichever happens to be first in the array.
-  // Shared by the "already covered" completion path and the leave-warning
-  // modal's "Come back later" (deferred completion) below.
   const finalizeCompletion = useCallback(() => {
     const assignments: TouchAssignment[] = [...charTouch.values()].filter((a) =>
       a.mechanisms.some((m) => m.patternId !== "touch_inherited"),
@@ -1944,34 +1957,16 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // last character's forward button IS the phase completion, not a further
   // navigation step).
   //
-  // FR-008 gate: before completing, re-run touchCoverage on the same layout
-  // lint audits (layoutForLintAndGate — includes current Phase E edits).
-  // While any inventory char is uncovered, refuse the default Done/Skip
-  // action and surface an inline message + the leave-warning modal (the gallery leave-warning)
-  // naming the uncovered chars — "Come back later" (onSecondary below) is the
-  // only path that still completes with characters unimplemented.
-  //
-  // desktopProducedSet (session-aware, see its own declaration above) is
-  // folded in here via touchCoverage's `additionalProduced` parameter — a
-  // completion-GATE-only use (this callback only runs on Continue/Done, never
-  // during interactive editing), so a touch character composable only
-  // because its combining-mark component was assigned a DESKTOP deadkey THIS
-  // session does not block completion, without touching the interactive
-  // walk's own (deliberately static) `detectedChars`/`touchLettersToAdd`.
+  // Defense-in-depth no-op guard (mechanism-gallery-progression): the
+  // per-character `canGoNext` gate below and the forward-button spec's own
+  // `disabled` computation already prevent the walk from reaching a "Done"
+  // click while `unaccountedTouchChars` is non-empty — this should be
+  // unreachable in the ordinary walk. Kept as a guard rather than removed, in
+  // case a future forward-button branch omits the same check.
   const handleContinue = useCallback(() => {
-    if (layoutForLintAndGate !== null) {
-      const { uncovered } = touchCoverage(layoutForLintAndGate, inventory, desktopProducedSet);
-      if (uncovered.length > 0) {
-        setUncoveredMessage(
-          uncovered.map((c) => formatUncoveredTouchMessage(c)).join("; "),
-        );
-        setUncoveredChars([...uncovered]);
-        setShowUnimplementedWarning(true);
-        return;
-      }
-    }
+    if (unaccountedTouchChars.length > 0) return;
     finalizeCompletion();
-  }, [layoutForLintAndGate, inventory, desktopProducedSet, finalizeCompletion]);
+  }, [unaccountedTouchChars, finalizeCompletion]);
 
   // Positional Back/Next/Skip/Previous navigation + suggestion-dismissal
   // tracking — shared with MechanismGallery via usePositionalCharNav so the
@@ -2040,10 +2035,10 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
 
   // Write charTouch + suggestionResolved back to the store draft whenever
   // they change so that back-navigation (unmount) preserves in-progress
-  // work, including which suggestion cards are already decided. Skip
-  // records nothing, so there is no skipped-chars set to persist, and
-  // navigation is purely positional so there is no history stack to persist
-  // either.
+  // work, including which suggestion cards are already decided. Marks
+  // (markedForLaterTouch) persist separately, in surveySessionStore — see
+  // that field's own docstring — not here; navigation is purely positional
+  // so there is no history stack to persist either.
   useEffect(() => {
     setTouchDraft({
       charTouchEntries: [...charTouch.entries()],
@@ -2651,39 +2646,45 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   // Whether the suggestion card must stay hidden for the current character —
   // true once explicitly resolved (Accept/Deny — persisted in
   // suggestionResolved, see above), or once the character is already
-  // configured (a configured char never re-prompts). Skipping does not
-  // resolve a suggestion — Skip records nothing, so a skipped-over character
-  // still shows its suggestion card if revisited. Derived rather than
-  // reset-on-navigate, so returning to an already-decided character never
-  // re-shows its suggestion card.
+  // configured (a configured char never re-prompts). Marking a character for
+  // later review does not resolve its suggestion — the mark is a SEPARATE
+  // toggle (markedTouchSet) unrelated to suggestionResolved/charTouch, so a
+  // marked-but-not-yet-decided character still shows its suggestion card if
+  // revisited. Derived rather than reset-on-navigate, so returning to an
+  // already-decided character never re-shows its suggestion card.
   const suggestionDismissed =
     currentChar !== null &&
     (suggestionResolved.has(currentChar) || charTouch.has(currentChar));
 
   // Forward gate (enables "Next character ->"/"Done"): an untouched
-  // character needs an explicit Apply first — but revisiting an
-  // already-configured character always re-enables it, so Back-then-Next
-  // over a finished character never traps the author. "Skip this character"
-  // is pure navigation (see handleNext, which the Skip button also calls)
-  // and records nothing, so a skipped-over character stays gated here until
-  // it is actually configured. Named to match MechanismGallery's canGoNext
-  // (cross-gallery naming parity — this gallery has no separate
+  // character needs EITHER an explicit Apply OR an explicit "Mark for later
+  // review" first — but revisiting an already-configured/marked character
+  // always re-enables it, so Back-then-Next over a finished (or deferred)
+  // character never traps the author. Named to match MechanismGallery's
+  // canGoNext (cross-gallery naming parity — this gallery has no separate
   // applied-method count, so the gate itself carries the name).
   //
   // A character already reachable on the seed layout (`detectedChars`, the
   // set the "Existing methods" section reads) is also a valid reason to
   // advance — the author needn't do anything to keep an already-present
   // implementation. Without this, every already-implemented character
-  // disabled the primary Next/Done button and forced the author onto the
-  // secondary "Skip this character" link. Detected chars are never
+  // disabled the primary Next/Done button. Detected chars are never
   // double-counted with `charTouch` — the two sets come from independent
   // sources (the seed layout vs. the author's own edits) — so this only ever
   // widens, never narrows, the gate.
+  //
+  // markedTouchSet (mechanism-gallery-progression) replaces the old
+  // "Skip this character" escape: marking is the honest version of the same
+  // "move on without implementing" action — it is a pure TOGGLE (see the
+  // "Mark for later review" button below), and a marked character satisfies
+  // this gate exactly like an applied one.
   const canGoNext = useMemo(
     () =>
       currentChar !== null &&
-      (charTouch.has(currentChar) || detectedChars.has(currentChar)),
-    [currentChar, charTouch, detectedChars],
+      (charTouch.has(currentChar) ||
+        detectedChars.has(currentChar) ||
+        markedTouchSet.has(currentChar)),
+    [currentChar, charTouch, detectedChars, markedTouchSet],
   );
 
   // Reset method inputs (not suggestionResolved — that persists per char)
@@ -3171,7 +3172,7 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
   }, [currentChar, markSuggestionResolved]);
 
   // ---------------------------------------------------------------------------
-  // Apply / Next / Skip handlers
+  // Apply / Next handlers
   // ---------------------------------------------------------------------------
 
   const handleApply = useCallback(() => {
@@ -3262,12 +3263,6 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     proposeCompanion,
     i18n,
   ]);
-
-  // "Skip this character" is pure forward navigation — it records nothing,
-  // so it is identical to handleNext (advance one position, or complete from
-  // the last character, both from usePositionalCharNav above). The Skip
-  // button calls handleNext directly (see below) rather than duplicating
-  // this logic.
 
   // Strip every bulk-added longpress mechanism for `members` on `hostKey` from
   // a charTouch map (dropping any member left with no mechanisms). Touches ONLY
@@ -3473,6 +3468,19 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     // `onComplete` is a required TouchGalleryProps field (always defined),
     // unlike MechanismGallery's optional one, so there is no separate
     // undefined check here.
+    //
+    // Unlike MechanismGallery's matching `allCovered` branch, this one does
+    // NOT additionally require `unaccountedTouchChars.length === 0`:
+    // `allCovered` (getProducerBadge over the full `inventory`) and
+    // `unaccountedTouchChars` (`touchCoverage` over `layoutForLintAndGate`)
+    // are DELIBERATELY allowed to diverge here — see the "Done button forced
+    // visible" test suite's own doc comments for a documented, pre-existing
+    // case where the mocked touch-layout builder does not reflect
+    // shipped/mirrored content that the badge-based `allCovered` already
+    // knows about. The per-char branch below still gets its own
+    // `unaccountedTouchChars` guard, which covers the SHOW-ALL
+    // CharScrollStrip jump-to-last-position case (`canGoNext` alone, current
+    // character only, is not sufficient there).
     allCovered
       ? {
           label: touchDoneLabel,
@@ -3495,7 +3503,9 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
                 })
               : touchDoneLabel,
             onClick: handleNext,
-            disabled: !canGoNext,
+            disabled:
+              !canGoNext ||
+              (!hasAnotherCharAfterCurrent && unaccountedTouchChars.length > 0),
           }
         : null;
 
@@ -3549,9 +3559,13 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             You&rsquo;ll go character by character, just like the desktop
             gallery.
           </Trans>,
-          <Trans id="editor.assignLoop.touch.intro.bullet2" key="bullet2">
+          <Trans
+            id="editor.assignLoop.touch.intro.markForLaterBullet"
+            key="bullet2"
+          >
             Pick a touch method &mdash; long-press, flick, multitap, or replace
-            &mdash; or Skip characters that already work.
+            &mdash; or mark a character for later review if you&rsquo;d rather
+            come back to it.
           </Trans>,
           <Trans id="editor.assignLoop.touch.intro.bullet3" key="bullet3">
             These choices apply to touch only and never change your desktop
@@ -3865,15 +3879,22 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             </div>
           </div>
 
-          {/* FR-008 completion gate message — set by handleContinue when
-              touchCoverage finds an inventory char with no reachable touch
-              mechanism on the final layout; cleared on the next edit.
+          {/* FR-008 completion gate message (mechanism-gallery-progression):
+              derived LIVE from `unaccountedTouchChars` (mark-aware) rather
+              than set imperatively on a click attempt — so the reason Done
+              is disabled is visible proactively, matching MechanismGallery's
+              inline hint. Recomputes automatically on every edit or mark
+              toggle; no separate "clear on edit" effect needed anymore.
               ErrorText tone="warning" renders role="alert" + the canonical
-              WARNING color (#d29922), matching other gate-message sites. */}
-          {uncoveredMessage !== null && (
+              WARNING color (#d29922), matching other gate-message sites.
+              `unaccountedTouchMessage` is a named string local, not an
+              inline `.join()` inside the <Trans> children — see this file's
+              own established convention (currentCharDisplay et al.) for why
+              embedding one directly broke the fr catalog before. */}
+          {unaccountedTouchMessage !== null && (
             <ErrorText tone="warning">
               <Trans id="editor.assignLoop.touch.cannotFinishYet">
-                Cannot finish yet — {uncoveredMessage}.
+                Cannot finish yet — {unaccountedTouchMessage}.
               </Trans>
             </ErrorText>
           )}
@@ -4083,9 +4104,12 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             modality="touch"
           />
 
-          {/* Apply + Skip. Back and Next/Done live in the shared top toolbar
-              row above so the forward-advance control is spatially
-              separated from these editing actions. */}
+          {/* Apply + Mark for later review. Back and Next/Done live in the
+              shared top toolbar row above so the forward-advance control is
+              spatially separated from these editing actions.
+              "Mark for later review" replaces the old "Skip this character"
+              control (mechanism-gallery-progression) — see canGoNext's own
+              doc comment above for why. */}
           <div
             style={{
               display: "flex",
@@ -4122,25 +4146,42 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             )}
             <button
               type="button"
-              onClick={handleNext}
-              aria-label={t({
-                id: "editor.assignLoop.skipCharacterAriaLabel",
-                message: `Skip this character (${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }})`,
-              })}
+              onClick={() => toggleMarkedForLaterTouch(currentChar)}
+              aria-pressed={markedTouchSet.has(currentChar)}
+              aria-label={
+                markedTouchSet.has(currentChar)
+                  ? t({
+                      id: "editor.assignLoop.unmarkForLaterAriaLabel",
+                      message: `Unmark ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }} — currently marked for later review`,
+                    })
+                  : t({
+                      id: "editor.assignLoop.markForLaterAriaLabel",
+                      message: `Mark ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }} for later review`,
+                    })
+              }
               style={{
-                background: "transparent",
-                border: "none",
-                color: TEXT_DIM,
+                background: markedTouchSet.has(currentChar)
+                  ? "rgba(227,179,65,0.16)"
+                  : "transparent",
+                border: markedTouchSet.has(currentChar) ? "1px solid #9e6a03" : "none",
+                color: markedTouchSet.has(currentChar) ? "#e3b341" : TEXT_DIM,
                 fontSize: 12,
                 cursor: "pointer",
                 fontFamily: FONT,
                 padding: "4px 8px",
-                textDecoration: "underline",
+                borderRadius: 6,
+                textDecoration: markedTouchSet.has(currentChar) ? "none" : "underline",
               }}
             >
-              <Trans id="editor.assignLoop.skipCharacterButton">
-                Skip this character
-              </Trans>
+              {markedTouchSet.has(currentChar) ? (
+                <Trans id="editor.assignLoop.markedForLaterButton">
+                  Marked for later review
+                </Trans>
+              ) : (
+                <Trans id="editor.assignLoop.markForLaterButton">
+                  Mark for later review
+                </Trans>
+              )}
             </button>
           </div>
 
@@ -4485,22 +4526,6 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
     </>
   );
 
-  const unimplementedTouchCountLabel = t({
-    id: "editor.touch.unimplemented.count",
-    message: plural(uncoveredChars.length, {
-      one: "# character",
-      other: "# characters",
-    }),
-  });
-  // Named string locals computed BEFORE the JSX below — no inline ternary /
-  // .join() embedded as direct <Trans> children (see MechanismGallery's
-  // matching leave-warning for the same convention).
-  const uncoveredTouchVerb = t({
-    id: "editor.touch.unimplemented.verb",
-    message: plural(uncoveredChars.length, { one: "has", other: "have" }),
-  });
-  const uncoveredCharsList = formatUncoveredCharsList(uncoveredChars);
-
   return (
     <>
       <AssignLoopShell
@@ -4532,40 +4557,6 @@ export function TouchGallery({ onComplete, onBack }: TouchGalleryProps) {
             })}
           />
         }
-      />
-      <ConfirmDialog
-        open={showUnimplementedWarning}
-        title={t({
-          id: "editor.touch.unimplemented.title",
-          message: "Finish these characters before leaving?",
-        })}
-        body={
-          <div>
-            <p style={{ margin: "0 0 10px" }}>
-              <Trans id="editor.touch.unimplemented.message">
-                {unimplementedTouchCountLabel} still {uncoveredTouchVerb} no
-                touch mechanism: {uncoveredCharsList}. You can finish them now,
-                or come back to this gallery later.
-              </Trans>
-            </p>
-          </div>
-        }
-        primaryLabel={t({
-          id: "editor.touch.unimplemented.stay",
-          message: "Go back and finish",
-        })}
-        secondaryLabel={t({
-          id: "editor.touch.unimplemented.defer",
-          message: "Come back later",
-        })}
-        // Escape/backdrop must map to the STAY action, not the proceed-forward
-        // "Come back later" — dismissing a modal is a cancel, not a confirm.
-        dismissAction="primary"
-        onPrimary={() => setShowUnimplementedWarning(false)}
-        onSecondary={() => {
-          setShowUnimplementedWarning(false);
-          finalizeCompletion();
-        }}
       />
     </>
   );

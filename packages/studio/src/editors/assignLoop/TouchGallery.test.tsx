@@ -1022,11 +1022,12 @@ describe("TouchGallery — character-scroll-strip navigation", () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={onBack} />);
     });
 
-    // Advance to "日" (idx 1) via Skip — "月" stays untouched.
+    // Advance to "日" (idx 1) via Mark-then-Next — "月" stays untouched.
     expectCurrentChar("中");
     fireEvent.click(
-      screen.getByRole("button", { name: /Skip this character/i }),
+      screen.getByRole("button", { name: /Mark U\+4E2D 中 for later review/i }),
     );
+    fireEvent.click(screen.getByRole("button", { name: /Next character/i }));
     await waitFor(() => {
       expectCurrentChar("日");
     });
@@ -1625,27 +1626,33 @@ describe("TouchGallery — UsesSequencesCard (integration)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Skip — pure forward navigation; records nothing.
+// Mark for later review — replaces the old "Skip this character" escape
+// (mechanism-gallery-progression). A pure per-character TOGGLE: it records
+// nothing in the working copy, but satisfies canGoNext so the existing
+// Next/Done control (not a second navigation control) can advance.
 // ---------------------------------------------------------------------------
 
-describe("TouchGallery — skip character", () => {
-  it("skipping advances to the next char without recording an assignment", async () => {
+describe("TouchGallery — mark for later review", () => {
+  it("marking the current character records no touch assignment, then Next advances", async () => {
     // "中"/"日" have suggestion kind = "none" (see back-navigation suite above).
     seedStore({ withInventory: ["中", "日"] });
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+4E2D 中 for later review/i }),
+    );
 
     // No assignment recorded.
     expect(useWorkingCopyStore.getState().touchDraft?.charTouchEntries ?? []).toHaveLength(0);
 
+    fireEvent.click(screen.getByRole("button", { name: /Next character/i }));
     await waitFor(() => {
       expectCurrentChar("日");
     });
   });
 
-  it("skipping does not change the coverage count and does not mark the character configured", async () => {
+  it("marking does not change the coverage count, and enables Next without treating the character as configured", async () => {
     seedStore({ withInventory: ["中", "日"] });
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
@@ -1655,27 +1662,36 @@ describe("TouchGallery — skip character", () => {
       "0 of 2 characters configured",
     );
 
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    const nextBtn = () => screen.getByRole("button", { name: /Next character/i });
+    expect((nextBtn() as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+4E2D 中 for later review/i }),
+    );
+    await waitFor(() => {
+      expect((nextBtn() as HTMLButtonElement).disabled).toBe(false);
+    });
+
+    fireEvent.click(nextBtn());
     await waitFor(() => {
       expectCurrentChar("日");
     });
 
-    // Skipping recorded nothing, so coverage is unchanged.
+    // Marking recorded nothing, so coverage is unchanged.
     expect(screen.getByRole("status").getAttribute("aria-label")).toBe(
       "0 of 2 characters configured",
     );
 
-    // Navigating back to the skipped-over "中": it is NOT treated as
-    // configured — Next stays disabled until it is actually applied.
+    // Navigating back to the marked "中": Next stays enabled (it is
+    // accounted for), even though it is still not counted as configured.
     fireEvent.click(screen.getByRole("button", { name: /back to previous character/i }));
     await waitFor(() => {
       expectCurrentChar("中");
     });
-    const nextBtn = screen.getByRole("button", { name: /Next character/i });
-    expect((nextBtn as HTMLButtonElement).disabled).toBe(true);
+    expect((nextBtn() as HTMLButtonElement).disabled).toBe(false);
   });
 
-  it("completes via Done with no Skip needed when the only inventory char is already covered (entry-parity fix)", async () => {
+  it("completes via Done with no marking needed when the only inventory char is already covered (entry-parity fix)", async () => {
     // "a" is present in the default QWERTY scaffold, so it is excluded from
     // the walk entirely (entry-parity fix) — touchLettersToAdd is empty and
     // the gallery lands directly on the all-caught-up panel with its own
@@ -1702,7 +1718,7 @@ describe("TouchGallery — skip character", () => {
 // ---------------------------------------------------------------------------
 
 describe("TouchGallery — FR-008 completion gate refusal (uncovered char)", () => {
-  it("refuses to complete and surfaces an alert naming the uncovered char, without calling onComplete", async () => {
+  it("shows the alert naming the uncovered char PROACTIVELY on mount, with Done disabled, and never calls onComplete", async () => {
     seedStore({ withInventory: ["中"] });
     const onComplete = vi.fn();
 
@@ -1710,39 +1726,42 @@ describe("TouchGallery — FR-008 completion gate refusal (uncovered char)", () 
       render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />);
     });
 
-    // "中" is the only (and therefore last) character — Skip is pure forward
-    // navigation, so from the last position it routes into handleContinue via
-    // usePositionalCharNav's onComplete, exercising the completion gate
-    // without requiring any prior configuration.
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
-
-    // The gate refuses: "中" is not reachable on the derived seed layout.
-    expect(onComplete).not.toHaveBeenCalled();
-    const alert = screen.getByRole("alert");
-    expect(alert.textContent).toContain("has no touch mechanism");
+    // "中" is the only (and therefore last) character. Mark-aware
+    // `unaccountedTouchChars` (mechanism-gallery-progression) is computed
+    // LIVE off `layoutForLintAndGate`, which itself settles asynchronously —
+    // so the alert and the disabled Done control are both present WITHOUT a
+    // click, but may take a tick to appear; wrapped in waitFor rather than
+    // asserted synchronously right after the initial render.
+    const alert = await waitFor(() => {
+      const found = screen.getByRole("alert");
+      expect(found.textContent).toContain("has no touch mechanism");
+      return found;
+    });
     expect(alert.textContent).toContain("中");
+    expect(
+      (screen.getByRole("button", { name: "Done" }) as HTMLButtonElement).disabled,
+    ).toBe(true);
+
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(onComplete).not.toHaveBeenCalled();
   });
 
-  it("clears the alert and completes once a method covering the character is applied", async () => {
+  it("clears the alert and enables Done once a method covering the character is applied", async () => {
     seedStore({ withInventory: ["中"] });
     const onComplete = vi.fn();
 
     await act(async () => {
       render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />);
     });
-
-    // Trigger the refusal first (mirrors the previous test).
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
     expect(screen.getByRole("alert")).toBeTruthy();
-    expect(onComplete).not.toHaveBeenCalled();
 
     // Cover "中": the method chooser is already showing (suggestion kind
     // "none"), defaulted to "Long-press on a key" — pick a host key and apply.
     await changeSelectMenu(screen.getByLabelText(/Host key for long-press/i), "K_A");
     fireEvent.click(screen.getByRole("button", { name: /Apply touch method for/i }));
 
-    // Applying the edit clears the stale alert immediately (touchKey-keyed
-    // effect), before Done is even clicked.
+    // Applying the edit clears the stale alert immediately (live
+    // `unaccountedTouchChars` recompute), before Done is even clicked.
     expect(screen.queryByRole("alert")).toBeNull();
 
     await waitFor(() => {
@@ -1755,6 +1774,28 @@ describe("TouchGallery — FR-008 completion gate refusal (uncovered char)", () 
       expect(onComplete).toHaveBeenCalledOnce();
     });
     expect(screen.queryByRole("alert")).toBeNull();
+  });
+
+  it("marking the uncovered char also clears the alert and enables Done, without recording a touch assignment", async () => {
+    seedStore({ withInventory: ["中"] });
+    const onComplete = vi.fn();
+
+    await act(async () => {
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />);
+    });
+    expect(screen.getByRole("alert")).toBeTruthy();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+4E2D 中 for later review/i }),
+    );
+
+    await waitFor(() => {
+      expect(screen.queryByRole("alert")).toBeNull();
+    });
+    expect(useWorkingCopyStore.getState().touchDraft?.charTouchEntries ?? []).toHaveLength(0);
+
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(onComplete).toHaveBeenCalledOnce();
   });
 });
 
@@ -1787,95 +1828,65 @@ describe("TouchGallery — physical-key type-to-select in an open key picker", (
 });
 
 // ---------------------------------------------------------------------------
-// Leave-warning modal (the same ConfirmDialog contract MechanismGallery uses,
-// see MechanismGallery.test.tsx's own "leave-warning modal open/closed state"
-// suite) — TouchGallery's version fires from the SAME handleContinue gate as
-// the FR-008 inline-alert refusal above, so the modal and the alert always
-// open together on a refused completion attempt. Queried via the native
-// <dialog open> attribute rather than button presence: ConfirmDialog always
-// renders both buttons regardless of `open`, so a bare button-exists query
-// cannot distinguish "modal is showing" from "modal is mounted but closed".
+// No modal — replaces the old ConfirmDialog leave-warning contract
+// (mechanism-gallery-progression; see MechanismGallery.test.tsx's matching
+// "Done-blocked inline hint (no modal)" suite). TouchGallery renders no
+// <dialog> element at all now; Done is simply disabled while
+// `unaccountedTouchChars` is non-empty, with the FR-008 alert explaining why.
 // ---------------------------------------------------------------------------
 
-describe("TouchGallery — leave-warning modal open/closed state", () => {
-  it("does NOT open the dialog when completion succeeds with every character covered", async () => {
+describe("TouchGallery — no modal, ever", () => {
+  it("does NOT render a dialog when completion succeeds with every character covered", async () => {
     const onComplete = vi.fn();
     // "a" is already covered by the default scaffold, so it is excluded from
     // the walk (entry-parity fix) and the gallery lands on the all-caught-up
-    // panel's own Done control directly — no Skip needed.
+    // panel's own Done control directly.
     seedStore({ withInventory: ["a"] });
     const { container } = await act(async () =>
       render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />),
     );
     fireEvent.click(screen.getByTestId("touch-continue"));
     expect(onComplete).toHaveBeenCalledOnce();
-    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
+    expect(container.querySelector("dialog")).toBeNull();
   });
 
-  it("opens the dialog (native <dialog open> attribute) alongside the inline alert when the completion gate refuses", async () => {
+  it("does NOT render a dialog even while the completion gate refuses (Done is disabled instead)", async () => {
     seedStore({ withInventory: ["中"] });
     const { container } = await act(async () =>
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />),
     );
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
     expect(screen.getByRole("alert")).toBeTruthy();
-    expect(container.querySelector("dialog")?.hasAttribute("open")).toBe(true);
-  });
+    expect(container.querySelector("dialog")).toBeNull();
 
-  it('"Go back and finish" (primary) closes the dialog and does NOT complete — the author stays in the gallery able to finish "中"', async () => {
-    const onComplete = vi.fn();
-    seedStore({ withInventory: ["中"] });
-    const { container } = await act(async () =>
-      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />),
-    );
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
-    expect(container.querySelector("dialog")?.hasAttribute("open")).toBe(true);
-
-    fireEvent.click(screen.getByRole("button", { name: /Go back and finish/i }));
-
-    expect(onComplete).not.toHaveBeenCalled();
-    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    expect(container.querySelector("dialog")).toBeNull();
     // Still on "中" — the method chooser is still available to actually cover it.
     expectCurrentChar("中");
     expect(screen.getByLabelText(/Host key for long-press/i)).toBeTruthy();
   });
 
-  it("Escape (the native <dialog> cancel event) does NOT proceed — it stays in the gallery, same as \"Go back and finish\" (P1(a))", async () => {
-    const onComplete = vi.fn();
-    seedStore({ withInventory: ["中"] });
-    const { container } = await act(async () =>
-      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />),
-    );
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
-    const dialog = container.querySelector("dialog")!;
-    expect(dialog.hasAttribute("open")).toBe(true);
-
-    fireEvent(dialog, new Event("cancel", { cancelable: true }));
-
-    expect(onComplete).not.toHaveBeenCalled();
-    expect(dialog.hasAttribute("open")).not.toBe(true);
-    expectCurrentChar("中");
-  });
-
-  it("the ← back to previous character control never opens the leave-warning modal, even while the current character remains uncovered", async () => {
+  it("the ← back to previous character control never renders a dialog, even while the current character remains uncovered", async () => {
     seedStore({ withInventory: ["中", "日"] });
     const { container } = await act(async () =>
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />),
     );
-    // Advance to "日" without covering "中" — Skip is pure forward nav.
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    // Mark "中" (so Next is enabled) and advance without covering it.
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+4E2D 中 for later review/i }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Next character/i }));
     await waitFor(() => {
       expectCurrentChar("日");
     });
-    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
+    expect(container.querySelector("dialog")).toBeNull();
 
-    // Back to the still-uncovered "中" — a DIFFERENT control from the forward
-    // Done/Skip-on-last path that triggers the modal, and must never open it.
+    // Back to the still-uncovered (but marked) "中" — a DIFFERENT control
+    // from the forward Done path, and must never render a dialog either.
     fireEvent.click(screen.getByRole("button", { name: /back to previous character/i }));
     await waitFor(() => {
       expectCurrentChar("中");
     });
-    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
+    expect(container.querySelector("dialog")).toBeNull();
   });
 });
 
@@ -2316,16 +2327,16 @@ describe("TouchGallery — suggestion card variants", () => {
     expect(screen.queryByText(/Suggested: long-press a key to reach/i)).toBeNull();
   });
 
-  it("a suggestion card REAPPEARS after Skip (unlike Accept/Deny) — Skip resolves nothing", async () => {
+  it("a suggestion card REAPPEARS after marking for later review (unlike Accept/Deny) — marking resolves nothing", async () => {
     // Same longpress-suggestion fixture as above, plus a second inventory
     // character ("中", no desktop assignment, not in the default scaffold, not
     // decomposable-accented → suggestion kind "none" AND not detected — same
     // fixture precedent used throughout this file for a genuinely unresolved
-    // character) so there is somewhere to Skip forward to and Back from
+    // character) so there is somewhere to advance forward to and Back from
     // WITHOUT that second character being excluded from the walk itself
     // (entry-parity fix — a plain Latin letter like "x" would be detected via
-    // the OS-default physical fall-through and excluded). Skip is pure
-    // positional navigation and must not add "á" to suggestionResolved, so
+    // the OS-default physical fall-through and excluded). Marking is a
+    // separate toggle from suggestionResolved and must not add "á" to it, so
     // returning to it must show the suggestion card again.
     const deadkeyAssignment: MechanismAssignment = {
       scope: "individual",
@@ -2355,8 +2366,11 @@ describe("TouchGallery — suggestion card variants", () => {
     // Suggestion card shows for "á".
     expect(screen.queryByText(/Suggested: long-press/i)).not.toBeNull();
 
-    // Skip it — no accept/deny, no assignment recorded.
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    // Mark it, then advance — no accept/deny, no assignment recorded.
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+00E1 á for later review/i }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Next character/i }));
     await waitFor(() => {
       expectCurrentChar("中");
     });
@@ -2368,8 +2382,7 @@ describe("TouchGallery — suggestion card variants", () => {
     });
 
     // Unlike the accept/deny case above, the suggestion card for "á" MUST
-    // reappear — Skip resolved nothing. (If `skippedChars` were reintroduced
-    // to suppress the card, this assertion would fail.)
+    // reappear — marking resolved nothing about the suggestion itself.
     expect(screen.queryByText(/Suggested: long-press/i)).not.toBeNull();
   });
 });
@@ -2639,13 +2652,11 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
 
   it("dedupes a mechanism whose existing slotValues has a different key order (mechanismRefEquals must be order-independent)", async () => {
     // Two-character inventory. The gallery's walk is collated (spec 047's
-    // collateCompare): the Latin letter "y" sorts before the CJK "中" under
-    // the default ICU collation, so "y" is idx 0 and "中" is idx 1
-    // regardless of the seed array's own order. "y" is left unconfigured so
-    // the sync effect lands the initial currentChar there too. Next is
-    // purely positional (idx 0 -> idx 1), so no history needs seeding to
-    // land on "中" — mirroring how a real session would have visited "y"
-    // first, then moved on.
+    // collateCompare): the Latin letter "y" is detected via the OS-default
+    // physical fall-through (same precedent as the "x" fixture elsewhere in
+    // this file) and so is excluded from touchLettersToAdd's walk entirely
+    // (entry-parity fix) — "中" is the walk's only entry, and the initial
+    // sync effect lands currentChar there directly.
     seedStore({ withInventory: ["中", "y"] });
 
     // Seed an existing mechanism for "中" whose slotValues key order is
@@ -2675,11 +2686,9 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
     });
 
-    // Mount lands on "y" (first unconfigured char, idx 0). Skip moves one
-    // position forward (idx 0 -> idx 1), landing on the preconfigured
-    // character — "中" has no suggestion, so the chooser (not a suggestion
-    // card) shows directly.
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    // Mount lands directly on "中" (the walk's only entry) — it has no
+    // suggestion, so the chooser (not a suggestion card) shows directly.
+    expectCurrentChar("中");
 
     // Apply the same method+hostKey via the chooser (default method is
     // already "longpress_alternates" — matches buildMechanismRef's key order).

@@ -99,6 +99,7 @@ import { TEXT_MAIN, TEXT_DIM, FONT } from "./survey/surveyStyles.ts";
 import { CharacterMapPane } from "./survey/CharacterMapPane.tsx";
 import { useBasePreviewStatusStore, type BasePreviewStatus } from "./stores/basePreviewStatusStore.ts";
 import { useInventoryCoverageGate } from "./hooks/useInventoryCoverageGate.ts";
+import { useAccountedForGate } from "./hooks/useAccountedForGate.ts";
 import { useSurveyBrowserHistorySync } from "./hooks/useSurveyBrowserHistorySync.ts";
 
 // Offer the resume banner only once per page load — on the first SurveyView
@@ -237,8 +238,10 @@ interface NavBarProps {
   /**
    * Persistent self-serve "go finish unreviewed defaults" indicator (see
    * components/UnfinishedGalleryIndicator.tsx) — computed once in
-   * StudioShell from the same `useInventoryCoverageGate()` hook that already
-   * feeds `outputBlocked` above, so the two signals can never disagree.
+   * StudioShell from `useAccountedForGate()`, which layers the author's
+   * per-surface "mark for later review" state on top of the same
+   * `useInventoryCoverageGate()` result that feeds `outputBlocked` above, so
+   * the two signals can never disagree about what is actually unimplemented.
    * 0 hides the corresponding half of the indicator.
    */
   unfinishedDesktopCount: number;
@@ -1493,18 +1496,26 @@ export function StudioShell() {
   // the block is visible on the tab itself before the click. Same shared hook
   // (hooks/useInventoryCoverageGate.ts) as StepHost/PhaseFGate/OutputScreen —
   // do not re-derive the desktop-always/touch-only-if-applicable booleans
-  // here. Also feeds the persistent "unreviewed defaults" nav indicator
-  // below (components/UnfinishedGalleryIndicator.tsx) — one hook call, two
-  // consumers of the same result, so the tab dimming and the indicator's
-  // counts can never disagree.
+  // here. IMPORTANT (mechanism-gallery-progression invariant): this is the
+  // IMPLEMENTED-ONLY gate — a mark-for-later-review character is still
+  // "unimplemented" here, on purpose, so a mark can never relax the export
+  // gate. Do not fold marks into `outputNavBlocked`.
   // ---------------------------------------------------------------------------
   const coverageGate = useInventoryCoverageGate();
   const outputNavBlocked = coverageGate.blocked;
-  const unfinishedDesktopCount = coverageGate.blockedOnDesktop
-    ? coverageGate.unimplementedDesktop.length
+
+  // The NavBar "still to account for" indicator (components/
+  // UnfinishedGalleryIndicator.tsx) is a SEPARATE, mark-aware view — built on
+  // useAccountedForGate() (hooks/useAccountedForGate.ts), which composes the
+  // SAME coverageGate above with the author's per-surface marks. A marked
+  // character no longer counts here even though it still counts (correctly)
+  // toward `outputNavBlocked`.
+  const accountedForGateResult = useAccountedForGate();
+  const unfinishedDesktopCount = accountedForGateResult.blockedOnDesktop
+    ? accountedForGateResult.unaccountedDesktop.length
     : 0;
-  const unfinishedTouchCount = coverageGate.blockedOnTouch
-    ? coverageGate.unimplementedTouch.length
+  const unfinishedTouchCount = accountedForGateResult.blockedOnTouch
+    ? accountedForGateResult.unaccountedTouch.length
     : 0;
   const sessionBackToUnfinishedGallery = useSurveySessionStore((s) => s.backToUnfinishedGallery);
   // A BACK action (backToUnfinishedGallery), not the forward-push `advance` —

@@ -219,6 +219,12 @@ export interface SurveySessionState {
    * ready-made forms — the base's existing content needs a follow-on
    * conversion. This flag only RECORDS that the need exists; building the
    * conversion is out of scope for spec 046.
+   *
+   * Unrelated to the `markedForLaterDesktop` / `markedForLaterTouch` fields
+   * below despite the shared "mark" vocabulary — those are the
+   * mechanism-gallery-progression "mark a character for later review" state,
+   * a per-character author choice, not a Unicode normalization-form
+   * migration flag.
    */
   marksMigrationNeeded: boolean;
 
@@ -419,6 +425,48 @@ export interface SurveySessionState {
 
   /** Plain setter — the Phase B IntroChooser discovery-method choice. */
   setDiscoveryMethod: (m: DiscoveryMethod | null) => void;
+
+  /**
+   * Characters the author has explicitly "marked for later review" in the
+   * desktop/physical Mechanism Gallery (spec: mechanism-gallery-progression).
+   * AUTHORING METADATA ONLY — this is never read by the codec/scaffolder/
+   * output paths and never reaches the working copy's KeyboardIR or the
+   * emitted `.kmn`; it exists purely so the gallery's Done affordance and the
+   * NavBar "still to account for" indicator can distinguish "consciously
+   * deferred" from "never looked at". Lives HERE (not workingCopyStore, not a
+   * new module-scoped Set) because:
+   *   (a) it is per-authoring-session traversal state, not keyboard content —
+   *       the same category as activeStepId/history/touchSeedSource above,
+   *       never the working copy's own data;
+   *   (b) this store already has a serialize/restore seam
+   *       (snapshotTraversal/applyTraversalSnapshot, driven by
+   *       ../lib/draftPersistence.ts on its EXISTING autosave timer) — adding
+   *       a field here rides that timer rather than inventing a new one (D3
+   *       does not apply: this produces no diagnostics, see draftPersistence's
+   *       AUTOSAVE_DEBOUNCE_MS docstring);
+   *   (c) a plain JSON-safe `readonly string[]` (not a Set — this store's
+   *       fields must all be plain-JSON per TraversalSnapshot's own docstring)
+   *       so it round-trips through `JSON.stringify`/`JSON.parse` exactly like
+   *       every other slot here.
+   * Kept SEPARATE from `markedForLaterTouch` below (not one combined set):
+   * a character can be implemented on one surface and only deferred on the
+   * other (e.g. a desktop deadkey exists but the touch longpress placement is
+   * still undecided) — collapsing the two would falsely "unmark" one surface
+   * whenever the other surface's mark changed.
+   */
+  markedForLaterDesktop: readonly string[];
+
+  /** Touch-gallery counterpart of {@link markedForLaterDesktop}. Same rules. */
+  markedForLaterTouch: readonly string[];
+
+  /**
+   * Toggle `char` in `markedForLaterDesktop` (add if absent, remove if
+   * present). Pure UI state — never touches the working copy.
+   */
+  toggleMarkedForLaterDesktop: (char: string) => void;
+
+  /** Touch-gallery counterpart of {@link toggleMarkedForLaterDesktop}. */
+  toggleMarkedForLaterTouch: (char: string) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -444,7 +492,7 @@ type SurveySessionData = Omit<
   | "setIdentityResult" | "setIdentityPhaseResult" | "setSurveyContext"
   | "setSelectedTrack" | "setScaffoldSpec" | "setLocalBase" | "setCharactersSubStage"
   | "setTouchSeedSource" | "setBaseConfirmed" | "setDiscoveryMethod"
-  | "setMarksMigrationNeeded"
+  | "setMarksMigrationNeeded" | "toggleMarkedForLaterDesktop" | "toggleMarkedForLaterTouch"
 >;
 
 /**
@@ -483,6 +531,8 @@ const INITIAL_STATE = {
   charactersSubStage: "prefill" as CharactersSubStage,
   touchSeedSource: null as TouchSeedSource | null,
   discoveryMethod: null as DiscoveryMethod | null,
+  markedForLaterDesktop: [] as readonly string[],
+  markedForLaterTouch: [] as readonly string[],
 } as const satisfies SurveySessionData;
 
 // ---------------------------------------------------------------------------
@@ -569,9 +619,15 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
   hydrate: (snapshot) =>
     set({
       ...snapshot,
-      // Copy the array so a mutation of the restored draft can't bleed back
-      // into the caller's snapshot object.
+      // Copy the arrays so a mutation of the restored draft can't bleed back
+      // into the caller's snapshot object. `?? []` tolerates a pre-this-change
+      // persisted draft that predates these two fields (same additive
+      // tolerance as phaseBDraft/selectedFont elsewhere in the durable-draft
+      // layer) — a genuinely missing field resumes with "nothing marked",
+      // never a runtime crash on a stale localStorage record.
       history: [...snapshot.history],
+      markedForLaterDesktop: [...(snapshot.markedForLaterDesktop ?? [])],
+      markedForLaterTouch: [...(snapshot.markedForLaterTouch ?? [])],
     }),
 
   setMarksMigrationNeeded: (needed) => set({ marksMigrationNeeded: needed }),
@@ -598,6 +654,20 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
     }),
 
   setDiscoveryMethod: (m) => set({ discoveryMethod: m }),
+
+  toggleMarkedForLaterDesktop: (char) =>
+    set((s) => ({
+      markedForLaterDesktop: s.markedForLaterDesktop.includes(char)
+        ? s.markedForLaterDesktop.filter((c) => c !== char)
+        : [...s.markedForLaterDesktop, char],
+    })),
+
+  toggleMarkedForLaterTouch: (char) =>
+    set((s) => ({
+      markedForLaterTouch: s.markedForLaterTouch.includes(char)
+        ? s.markedForLaterTouch.filter((c) => c !== char)
+        : [...s.markedForLaterTouch, char],
+    })),
 }));
 
 // Ensure the store's getState() escape hatch is available for imperative reads
@@ -632,6 +702,8 @@ export function snapshotTraversal(): TraversalSnapshot {
     charactersSubStage: s.charactersSubStage,
     touchSeedSource: s.touchSeedSource,
     discoveryMethod: s.discoveryMethod,
+    markedForLaterDesktop: s.markedForLaterDesktop,
+    markedForLaterTouch: s.markedForLaterTouch,
   };
 }
 

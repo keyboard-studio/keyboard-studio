@@ -21,9 +21,20 @@
 //         branch, which picks the write path from raltTokens' filled count.
 //   - "Add key" records a MechanismAssignment(scope:"individual"); the user
 //     advances explicitly via "Next character"/"Done".
-//   - "Skip this character" is pure forward navigation — it records nothing.
-//     Only Apply marks a character handled; a skipped character stays
-//     unimplemented and is never counted toward coverage.
+//   - "Mark for later review" (mechanism-gallery-progression) is a per-
+//     character TOGGLE, not navigation — it records the character in
+//     surveySessionStore.markedForLaterDesktop (authoring metadata only,
+//     never the working copy) and unblocks Next/Done for that character
+//     exactly like an Apply would, WITHOUT changing coverage: a marked
+//     character stays unimplemented (Phase F / export still see it as such,
+//     via the untouched useInventoryCoverageGate() gate) but is no longer
+//     "unaccounted for" (lib/accountedForGate.ts). Replaces the old
+//     "Skip this character" link, which advanced without recording anything,
+//     silently leaving a character neither implemented nor accounted for.
+//   - The gallery's Done affordance is disabled while any lettersToAdd
+//     character is neither implemented nor marked (see canGoNext /
+//     unaccountedChars below) — there is no more "come back later" confirm
+//     dialog; the inline hint explains why Done is unavailable instead.
 //   - Forward from the LAST character is the phase completion ("Done" calls
 //     onComplete) rather than landing on a null currentChar.
 //   - Selecting the S-03 sequence method swaps the RIGHT pane's live preview
@@ -68,6 +79,7 @@ import type {
 } from "@keyboard-studio/contracts";
 import { toUPlusNotation, buildProducedSet } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { collateInventory } from "../../survey/collation.ts";
 import { nfcDedup } from "../../survey/charNormUtils.ts";
 import { TOUCH_STEP_ID } from "../../steps/reducer.ts";
@@ -144,12 +156,12 @@ import {
   HoverDangerChip,
   NonDeletableMethodChip,
 } from "./parts/RemovableChipRow.tsx";
-import { ConfirmDialog } from "./parts/ConfirmDialog.tsx";
 import {
   unimplementedDesktopChars,
   selectDesktopAssignments,
   formatUncoveredCharsList,
 } from "../../lib/unimplementedInventory.ts";
+import { subtractMarked } from "../../lib/accountedForGate.ts";
 import {
   SequenceBuilderPanel,
   hasSequenceForChar,
@@ -1319,6 +1331,20 @@ export function MechanismGallery({
   );
   const setAxisFills = useWorkingCopyStore((s) => s.setAxisFills);
 
+  // "Mark for later review" — authoring metadata only (surveySessionStore),
+  // never the working copy. See surveySessionStore.markedForLaterDesktop's
+  // docstring for why it lives there and why desktop/touch are tracked
+  // separately. `markedDesktopSet` is the render-friendly Set view of the
+  // persisted array.
+  const markedForLaterDesktop = useSurveySessionStore((s) => s.markedForLaterDesktop);
+  const toggleMarkedForLaterDesktop = useSurveySessionStore(
+    (s) => s.toggleMarkedForLaterDesktop,
+  );
+  const markedDesktopSet = useMemo(
+    () => new Set(markedForLaterDesktop),
+    [markedForLaterDesktop],
+  );
+
   // -- "Existing methods" (base keyboard producers for currentChar) --------
   // baseIr is the source of truth projectWorkingCopyVfs itself projects
   // from (never mutated by carve/output projection) — the same source
@@ -1896,20 +1922,55 @@ export function MechanismGallery({
     () => unimplementedDesktopChars(sessionAssignments, lettersToAdd, sessionProducedSet),
     [sessionAssignments, lettersToAdd, sessionProducedSet],
   );
-  const [showUnimplementedWarning, setShowUnimplementedWarning] =
-    useState(false);
+
+  // Mark-aware "still needs an assignment or a mark before Done is offered"
+  // list (mechanism-gallery-progression) — a SEPARATE derivation layered on
+  // top of `unimplementedChars` (implemented-only, UNCHANGED above), never
+  // threaded back into it. This is deliberately scoped to `unimplementedChars`
+  // (lettersToAdd-scoped, session-produced-set-aware) rather than re-deriving
+  // coverage — see lib/accountedForGate.ts's module doc for why marks must
+  // stay a strict relaxation applied on top of the implemented-only gate, and
+  // why that gate itself (and therefore the Phase F hard gate / export gate,
+  // which read a DIFFERENT hook — hooks/useInventoryCoverageGate.ts — never
+  // this local list) must never see marks.
+  const unaccountedChars = useMemo(
+    () => subtractMarked(unimplementedChars, markedDesktopSet),
+    [unimplementedChars, markedDesktopSet],
+  );
+
+  // Named string locals for the inline "Done is blocked" hint rendered in
+  // leftContent below — computed here (ahead of leftContent's own
+  // definition) rather than inline, matching this file's established
+  // convention of never embedding a plural/ternary directly as a <Trans>
+  // child (see currentCharDisplay elsewhere in this file). Framed as "needs
+  // an assignment or a mark", never "missing"/"skip forever" (spec v1.3.1
+  // §3c) — replaces the old ConfirmDialog leave-warning modal text.
+  const unaccountedCountLabel = t({
+    id: "editor.mechanisms.unaccounted.count",
+    message: plural(unaccountedChars.length, {
+      one: "# character",
+      other: "# characters",
+    }),
+  });
+  const unaccountedVerb = t({
+    id: "editor.mechanisms.unaccounted.verb",
+    message: plural(unaccountedChars.length, { one: "needs", other: "need" }),
+  });
+  const unaccountedCharsList = formatUncoveredCharsList(unaccountedChars);
 
   // Intercepts the forward-completion action (Done/Continue) ONLY — never
-  // Back, never per-character Next. If uncovered characters remain, holds
-  // navigation and opens the warning modal instead of calling onComplete;
-  // "Come back later" (onSecondary below) proceeds with the real onComplete.
+  // Back, never per-character Next. Defense-in-depth no-op guard: the
+  // per-character `canGoNext` gate above already prevents the walk from
+  // reaching a "Done" click with any character neither implemented nor
+  // marked, and the forward-button spec below disables Done/Continue
+  // whenever `unaccountedChars` is non-empty — so this should be
+  // unreachable in the ordinary walk. Kept as a guard (rather than removed)
+  // in case a future forward-button branch is added without threading the
+  // same check.
   const handleForwardComplete = useCallback(() => {
-    if (unimplementedChars.length > 0) {
-      setShowUnimplementedWarning(true);
-      return;
-    }
+    if (unaccountedChars.length > 0) return;
     onComplete?.();
-  }, [unimplementedChars, onComplete]);
+  }, [unaccountedChars, onComplete]);
 
   // Positional Back/Next/Skip/Previous navigation + suggestion-dismissal
   // tracking — shared with TouchGallery via usePositionalCharNav so the two
@@ -2841,23 +2902,24 @@ export function MechanismGallery({
       ).length,
     [mechanismAssignments, currentChar],
   );
-  // Forward gate: an untouched character needs an explicit Apply before
-  // Next/Done is enabled — revisiting an already-covered character always
-  // re-enables it, so Back-then-Next over a finished character never traps
-  // the author. Skip (see handleNext, which the Skip button also calls) is
-  // pure navigation and records nothing, so a skipped-over character stays
-  // gated here until it is actually applied.
+  // Forward gate: an untouched character needs EITHER an explicit Apply OR an
+  // explicit "Mark for later review" before Next/Done is enabled — revisiting
+  // an already-covered/marked character always re-enables it, so
+  // Back-then-Next over a finished (or deferred) character never traps the
+  // author. This is what "gate the Done button on implemented-OR-marked"
+  // means in practice: because the walk cannot advance forward past an
+  // unaccounted character, by the time the LAST character's button reads
+  // "Done", every character in `lettersToAdd` has already been forced through
+  // this same check — there is no separate whole-inventory re-check needed at
+  // completion (mechanism-gallery-progression; replaces the old
+  // "Skip this character" escape, which recorded nothing and let an author
+  // leave a character neither implemented nor accounted for).
   const canGoNext =
     currentChar !== null &&
     (appliedForCurrentChar > 0 ||
       coveredChars.has(currentChar) ||
-      hasSequenceForChar(sessionAssignments, currentChar));
-
-  // Skip is pure forward navigation — it records nothing, so it is identical
-  // to handleNext (advance one position, or complete from the last
-  // character, both from usePositionalCharNav above). The Skip button calls
-  // handleNext directly (see below) rather than duplicating this logic; kept
-  // as a single source of truth so the two controls can never drift.
+      hasSequenceForChar(sessionAssignments, currentChar) ||
+      markedDesktopSet.has(currentChar));
 
   const handleRemoveCovered = useCallback(
     (char: string) => {
@@ -3306,9 +3368,10 @@ export function MechanismGallery({
             You&rsquo;ll go character by character through the list from your
             survey.
           </Trans>,
-          <Trans id="editor.assignLoop.intro.bullet2" key="bullet2">
+          <Trans id="editor.assignLoop.intro.markForLaterBullet" key="bullet2">
             Pick a method &mdash; use a dead key, swap a key, or use AltGr
-            &mdash; or Skip characters you don&rsquo;t need.
+            &mdash; or mark a character for later review if you&rsquo;d
+            rather come back to it.
           </Trans>,
           <Trans id="editor.assignLoop.intro.bullet3" key="bullet3">
             Need several keystrokes for one character? Pick &ldquo;Type a
@@ -3360,7 +3423,7 @@ export function MechanismGallery({
   }
 
   // Invariant: callers always pass onComplete when locked can be true — so
-  // the "no actionable control" state (locked with Apply/Skip/Next all
+  // the "no actionable control" state (locked with Apply/Mark/Next all
   // disabled and no completion button rendered) is unreachable.
   const doneLabel = t({ id: "editor.assignLoop.doneButton", message: "Done" });
   const forwardButton: ForwardButtonSpec | null =
@@ -3373,7 +3436,12 @@ export function MechanismGallery({
     // which could strand an author who had, in fact, finished every
     // character — there was no visible way to advance. Falls through to the
     // existing branches unchanged whenever any character is still count 0.
-    allCovered && onComplete !== undefined
+    // `unaccountedChars.length === 0` is a defense-in-depth mirror of
+    // `allCovered` here (mechanism-gallery-progression) — the two are
+    // computed over slightly different scopes/signals (full `inventory` via
+    // getProducerBadge vs. `lettersToAdd` via unimplementedDesktopChars), so
+    // this guards against them ever disagreeing about "safe to complete".
+    allCovered && unaccountedChars.length === 0 && onComplete !== undefined
       ? {
           label: doneLabel,
           onClick: handleForwardComplete,
@@ -3405,7 +3473,7 @@ export function MechanismGallery({
             style: forwardBtnStyle,
           }
         : // The per-char Next/Done control is scoped to lettersToAdd's walk
-          // order (Back/Next/Skip/canGoNext all key off it — see the
+          // order (Back/Next/canGoNext all key off it — see the
           // lettersToAdd-gating comment above). currentChar can now also be
           // an already-produced character selected via the SHOW-ALL
           // CharScrollStrip (handleSelectDisplayChar) — HIDE this button
@@ -3414,33 +3482,48 @@ export function MechanismGallery({
           // would look like the walk is stuck rather than simply "you're
           // inspecting a character outside this step's coverage".
           currentChar !== null && lettersToAdd.includes(currentChar)
-          ? {
-              label: hasAnotherCharAfterCurrent
-                ? t({
-                    id: "editor.assignLoop.nextCharacterButton",
-                    message: "Next character →",
-                  })
-                : doneLabel,
-              ariaLabel: hasAnotherCharAfterCurrent
-                ? t({
-                    id: "editor.assignLoop.nextCharacterAriaLabel",
-                    message: "Next character",
-                  })
-                : doneLabel,
-              onClick: handleNext,
-              disabled: !canGoNext || locked,
-              style: {
-                padding: "9px 20px",
-                background: canGoNext ? "#238636" : "#21262d",
-                border: "none",
-                borderRadius: 6,
-                color: canGoNext ? "#e6edf3" : TEXT_DIM,
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: canGoNext ? "pointer" : "not-allowed",
-                fontFamily: FONT,
-              },
-            }
+          ? // `!hasAnotherCharAfterCurrent` means this IS the completion
+            // click (label reads "Done") — gate it on `unaccountedChars` too
+            // (mechanism-gallery-progression), not just `canGoNext` for the
+            // CURRENT character: the SHOW-ALL CharScrollStrip
+            // (handleSelectDisplayChar) can jump `currentChar` straight to
+            // the last walk position without ever visiting the earlier ones,
+            // so canGoNext alone (which only checks the current character)
+            // is not sufficient to guarantee every character in
+            // lettersToAdd has been implemented or marked.
+            (() => {
+              const nextDisabled =
+                !canGoNext ||
+                locked ||
+                (!hasAnotherCharAfterCurrent && unaccountedChars.length > 0);
+              return {
+                label: hasAnotherCharAfterCurrent
+                  ? t({
+                      id: "editor.assignLoop.nextCharacterButton",
+                      message: "Next character →",
+                    })
+                  : doneLabel,
+                ariaLabel: hasAnotherCharAfterCurrent
+                  ? t({
+                      id: "editor.assignLoop.nextCharacterAriaLabel",
+                      message: "Next character",
+                    })
+                  : doneLabel,
+                onClick: handleNext,
+                disabled: nextDisabled,
+                style: {
+                  padding: "9px 20px",
+                  background: !nextDisabled ? "#238636" : "#21262d",
+                  border: "none",
+                  borderRadius: 6,
+                  color: !nextDisabled ? "#e6edf3" : TEXT_DIM,
+                  fontSize: 13,
+                  fontWeight: 600,
+                  cursor: !nextDisabled ? "pointer" : "not-allowed",
+                  fontFamily: FONT,
+                },
+              };
+            })()
           : null;
 
   // ---------------------------------------------------------------------------
@@ -3636,6 +3719,29 @@ export function MechanismGallery({
           </div>
         )}
 
+        {/* Proactive "Done is blocked" hint (mechanism-gallery-progression) —
+              replaces the old ConfirmDialog leave-warning modal. Rendered
+              whenever any lettersToAdd character is neither implemented nor
+              marked, so the reason Done is disabled is visible BEFORE a
+              click, not surfaced reactively after one. role="status" +
+              aria-live="polite" rides the same convention as the coverage
+              status line above (D3 note: this is not a validation cycle, no
+              debounce involved either way) — no new timer, updates on the
+              same re-render that recomputes unaccountedChars. */}
+        {unaccountedChars.length > 0 && (
+          <p
+            role="status"
+            aria-live="polite"
+            style={{ margin: 0, fontSize: 12, color: TEXT_DIM }}
+          >
+            <Trans id="editor.mechanisms.unaccounted.message">
+              {unaccountedCountLabel} still {unaccountedVerb} an assignment or
+              a mark for later review before you can finish:{" "}
+              {unaccountedCharsList}.
+            </Trans>
+          </p>
+        )}
+
         {/* Character scroll strip — horizontal, SHOW-ALL of the confirmed
               inventory (criterion 18.6), not just lettersToAdd: an author
               should be able to see and inspect every character, including
@@ -3667,10 +3773,10 @@ export function MechanismGallery({
         {/* Empty-diff state — status text only; the forward/completion
               control (Continue / Done) now lives in the top toolbar row
               above, paired with Back. This is the only reachable null-
-              currentChar state left — handleNext (which Skip also calls) on
-              the last character calls onComplete directly rather than
-              setting currentChar to null, so there is no separate "all done,
-              char is null" panel to reconcile. */}
+              currentChar state left — handleNext on the last character calls
+              onComplete directly rather than setting currentChar to null, so
+              there is no separate "all done, char is null" panel to
+              reconcile. */}
         {lettersToAdd.length === 0 && (
           <div
             style={{
@@ -3883,7 +3989,7 @@ export function MechanismGallery({
               />
             )}
 
-            {/* Apply + Next + Skip actions */}
+            {/* Applied-methods summary */}
             {appliedForCurrentChar > 0 && (
               <p
                 style={{
@@ -4151,12 +4257,24 @@ export function MechanismGallery({
               modality="physical"
             />
 
-            {/* Apply + Skip. Back and Next/Done live in the shared top
-                  toolbar row above (see leftContent's top of pane) so the
-                  forward-advance control is spatially separated from these
-                  editing actions. The generic "Apply method" button is
-                  hidden for method === "sequence" — the sequence builder
-                  (right pane, see rightContent below) owns its own Apply. */}
+            {/* Apply + Mark for later review. Back and Next/Done live in the
+                  shared top toolbar row above (see leftContent's top of
+                  pane) so the forward-advance control is spatially separated
+                  from these editing actions. The generic "Apply method"
+                  button is hidden for method === "sequence" — the sequence
+                  builder (right pane, see rightContent below) owns its own
+                  Apply.
+                  "Mark for later review" replaces the old "Skip this
+                  character" control (mechanism-gallery-progression):
+                  Skip previously advanced the walk while recording nothing,
+                  so a skipped character was silently unaccounted for at
+                  completion. Marking is the honest version of the same
+                  escape — it is a pure TOGGLE on the current character (does
+                  not itself navigate), and a marked character satisfies
+                  `canGoNext` exactly like an applied one, so the existing
+                  Next/Done control in the toolbar above becomes the single
+                  way to actually move on. Toggle-able so an author who
+                  changes their mind can unmark and implement instead. */}
             <div
               style={{
                 display: "flex",
@@ -4193,26 +4311,45 @@ export function MechanismGallery({
               )}
               <button
                 type="button"
-                onClick={handleNext}
+                onClick={() => toggleMarkedForLaterDesktop(currentChar)}
                 disabled={locked}
-                aria-label={t({
-                  id: "editor.assignLoop.skipCharacterAriaLabel",
-                  message: `Skip this character (${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }})`,
-                })}
+                aria-pressed={markedDesktopSet.has(currentChar)}
+                aria-label={
+                  markedDesktopSet.has(currentChar)
+                    ? t({
+                        id: "editor.assignLoop.unmarkForLaterAriaLabel",
+                        message: `Unmark ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }} — currently marked for later review`,
+                      })
+                    : t({
+                        id: "editor.assignLoop.markForLaterAriaLabel",
+                        message: `Mark ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }} for later review`,
+                      })
+                }
                 style={{
-                  background: "transparent",
-                  border: "none",
-                  color: TEXT_DIM,
+                  background: markedDesktopSet.has(currentChar)
+                    ? "rgba(227,179,65,0.16)"
+                    : "transparent",
+                  border: markedDesktopSet.has(currentChar)
+                    ? "1px solid #9e6a03"
+                    : "none",
+                  color: markedDesktopSet.has(currentChar) ? "#e3b341" : TEXT_DIM,
                   fontSize: 12,
                   cursor: "pointer",
                   fontFamily: FONT,
                   padding: "4px 8px",
-                  textDecoration: "underline",
+                  borderRadius: 6,
+                  textDecoration: markedDesktopSet.has(currentChar) ? "none" : "underline",
                 }}
               >
-                <Trans id="editor.assignLoop.skipCharacterButton">
-                  Skip this character
-                </Trans>
+                {markedDesktopSet.has(currentChar) ? (
+                  <Trans id="editor.assignLoop.markedForLaterButton">
+                    Marked for later review
+                  </Trans>
+                ) : (
+                  <Trans id="editor.assignLoop.markForLaterButton">
+                    Mark for later review
+                  </Trans>
+                )}
               </button>
             </div>
           </>
@@ -4308,23 +4445,6 @@ export function MechanismGallery({
   // Two-pane layout
   // ---------------------------------------------------------------------------
 
-  const unimplementedCountLabel = t({
-    id: "editor.mechanisms.unimplemented.count",
-    message: plural(unimplementedChars.length, {
-      one: "# character",
-      other: "# characters",
-    }),
-  });
-  // Named string locals computed BEFORE the JSX below — no inline ternary /
-  // .join() embedded as direct <Trans> children (this is the exact pattern
-  // that broke the fr catalog before; see currentCharDisplay elsewhere in
-  // this file for the established convention).
-  const unimplementedVerb = t({
-    id: "editor.mechanisms.unimplemented.verb",
-    message: plural(unimplementedChars.length, { one: "has", other: "have" }),
-  });
-  const unimplementedCharsList = formatUncoveredCharsList(unimplementedChars);
-
   return (
     <>
       <AssignLoopShell
@@ -4393,40 +4513,6 @@ export function MechanismGallery({
             )}
           </>
         }
-      />
-      <ConfirmDialog
-        open={showUnimplementedWarning}
-        title={t({
-          id: "editor.mechanisms.unimplemented.title",
-          message: "Finish these characters before leaving?",
-        })}
-        body={
-          <div>
-            <p style={{ margin: "0 0 10px" }}>
-              <Trans id="editor.mechanisms.unimplemented.message">
-                {unimplementedCountLabel} still {unimplementedVerb} no physical
-                (desktop) mechanism: {unimplementedCharsList}. You can finish
-                them now, or come back to this gallery later.
-              </Trans>
-            </p>
-          </div>
-        }
-        primaryLabel={t({
-          id: "editor.mechanisms.unimplemented.stay",
-          message: "Go back and finish",
-        })}
-        secondaryLabel={t({
-          id: "editor.mechanisms.unimplemented.defer",
-          message: "Come back later",
-        })}
-        // Escape/backdrop must map to the STAY action, not the proceed-forward
-        // "Come back later" — dismissing a modal is a cancel, not a confirm.
-        dismissAction="primary"
-        onPrimary={() => setShowUnimplementedWarning(false)}
-        onSecondary={() => {
-          setShowUnimplementedWarning(false);
-          onComplete?.();
-        }}
       />
     </>
   );

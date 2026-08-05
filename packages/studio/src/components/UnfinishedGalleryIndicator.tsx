@@ -11,32 +11,40 @@
 //
 // Coverage counts are DERIVED, never stored, by design (see
 // lib/unimplementedInventory.ts). This component takes plain number props —
-// the caller (StudioShell) computes them from the single shared
-// `useInventoryCoverageGate()` hook (the same one StepHost / PhaseFGate /
-// OutputScreen / StudioShell's own output-nav-blocked signal already use) so
-// this indicator can never disagree with those about what counts as
-// unreviewed. No new store slice, no new debounce timer (D3) — the counts
-// only change when the working copy itself changes, which already re-renders
-// every other consumer of that hook.
+// the caller (StudioShell) computes them from the shared, MARK-AWARE
+// `useAccountedForGate()` hook (../hooks/useAccountedForGate.ts), which
+// itself composes `useInventoryCoverageGate()` (the same base gate
+// StepHost / PhaseFGate / OutputScreen / StudioShell's own output-nav-blocked
+// signal use) with the author's per-surface "mark for later review" sets
+// (mechanism-gallery-progression). A character the author has consciously
+// marked for later review no longer counts here, even though it still counts
+// (correctly, and unaffected by this component) toward the Phase F hard gate
+// and the export/download gate — see useAccountedForGate.ts's own docstring
+// for why those two must stay on the unmarked, implemented-only gate. No new
+// store slice beyond the existing survey-session traversal state, no new
+// debounce timer (D3) — the counts only change when the working copy or the
+// marked sets change, which already re-renders every other consumer.
 //
 // Copy framing is load-bearing (defaults-first, spec v1.3.1 §3c "Defaults are
 // the product"): every character already has a proposed default, so this is a
-// count of UNREVIEWED/UNCONFIRMED defaults, never "missing" letters. Do not
-// reintroduce "missing" wording here.
+// count of characters still needing review OR a mark, never "missing"
+// letters. Do not reintroduce "missing" wording here.
 
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 
 export interface UnfinishedGalleryIndicatorProps {
   /**
-   * Characters on the desktop/physical layer still using an unreviewed
-   * default (`InventoryCoverageGate.blockedOnDesktop ? unimplementedDesktop.length : 0`).
-   * 0 (or negative, defensively) hides the desktop control entirely.
+   * Characters on the desktop/physical layer still needing review — neither
+   * implemented NOR marked for later review
+   * (`AccountedForGate.blockedOnDesktop ? unaccountedDesktop.length : 0`, from
+   * `useAccountedForGate()`). 0 (or negative, defensively) hides the desktop
+   * control entirely — including once every remaining gap has been marked.
    */
   readonly desktopCount: number;
   /**
-   * Characters on the touch layer still using an unreviewed default
-   * (`InventoryCoverageGate.blockedOnTouch ? unimplementedTouch.length : 0`).
+   * Characters on the touch layer still needing review — neither implemented
+   * nor marked (`AccountedForGate.blockedOnTouch ? unaccountedTouch.length : 0`).
    * 0 hides the touch control — including the case where touch has not been
    * authored this session at all (`blockedOnTouch` is false then too).
    */

@@ -6,10 +6,13 @@
 // Component contract under test:
 //   - One character at a time from lettersToAdd (inventory when baseIr is null).
 //   - "Apply method for <char>" button records a MechanismAssignment(scope:"individual").
-//   - "Skip this character" is pure forward navigation — it records nothing;
-//     a skipped-over character is never treated as covered/resolved.
+//   - "Mark for later review" (mechanism-gallery-progression) is a per-
+//     character toggle — it records nothing in the working copy, but
+//     satisfies canGoNext exactly like an Apply, so Next/Done can advance
+//     past it. A marked character is never treated as covered for coverage
+//     purposes, only as "accounted for" (see lib/accountedForGate.ts).
 //   - The last character's forward button always reads "Done", disabled
-//     until that character is actually covered.
+//     until every character in lettersToAdd is implemented or marked.
 //   - Coverage status line: "<N> of <M> added".
 //   - Method chooser: "Type a sequence" always present; "Tap a trigger key, then a letter"
 //     always present (S-02 deadkey is always offered, regardless of char type).
@@ -36,6 +39,7 @@ import {
 } from "./MechanismGallery.tsx";
 import { usePositionalCharNav } from "./usePositionalCharNav.ts";
 import { useWorkingCopyStore, bindManifest } from "../../stores/workingCopyStore.ts";
+import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import {
   MECHANISMS_STEP_ID,
   TOUCH_STEP_ID,
@@ -286,6 +290,7 @@ beforeAll(installDialogShim);
 afterEach(() => {
   cleanup();
   useWorkingCopyStore.getState().reset();
+  useSurveySessionStore.getState().reset();
   vi.clearAllMocks();
   _mockStage = { kind: "idle" };
   _lastVfsTransform = undefined;
@@ -293,6 +298,7 @@ afterEach(() => {
 
 beforeEach(() => {
   useWorkingCopyStore.getState().reset();
+  useSurveySessionStore.getState().reset();
 });
 
 // ---------------------------------------------------------------------------
@@ -650,7 +656,10 @@ describe("MechanismGallery — apply (sequence)", () => {
     fireEvent.click(screen.getByTestId("sequences-apply"));
 
     await waitFor(() => {
-      const status = screen.getByRole("status");
+      // Scoped by name — the Done-blocked inline hint (mechanism-gallery-
+      // progression) also carries role="status" once any character is
+      // unaccounted for; a bare getByRole("status") would now be ambiguous.
+      const status = screen.getByRole("status", { name: "0 of 2 added" });
       expect(status.getAttribute("aria-label")).toBe("0 of 2 added");
     });
   });
@@ -798,9 +807,11 @@ describe("MechanismGallery — coexistence with a separately-recorded sequence a
       screen.queryByRole("group", { name: /Added characters — click to remove/i }),
     ).toBeNull();
 
-    // The coverage line excludes it: 0 of 2, not 1 of 2.
+    // The coverage line excludes it: 0 of 2, not 1 of 2. Scoped by name — see
+    // the note in "renders the coverage status line with initial 0-of-N
+    // count" above.
     await waitFor(() => {
-      const status = screen.getByRole("status");
+      const status = screen.getByRole("status", { name: "0 of 2 added" });
       expect(status.getAttribute("aria-label")).toBe("0 of 2 added");
     });
 
@@ -923,40 +934,68 @@ describe("MechanismGallery — advance after apply", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
 
-    // Coverage updates immediately after Apply (á is now covered).
+    // Coverage updates immediately after Apply (á is now covered). Scoped by
+    // name — see the note in "renders the coverage status line with initial
+    // 0-of-N count" above.
     await waitFor(() => {
-      const status = screen.getByRole("status");
+      const status = screen.getByRole("status", { name: "1 of 2 added" });
       expect(status.getAttribute("aria-label")).toBe("1 of 2 added");
     });
   });
 });
 
 // ---------------------------------------------------------------------------
-// Skip — pure forward navigation; records nothing.
+// Mark for later review — replaces the old "Skip this character" escape
+// (mechanism-gallery-progression). A pure per-character TOGGLE: it does not
+// itself navigate, records nothing in the working copy (authoring metadata
+// only, in surveySessionStore), and satisfies canGoNext so the EXISTING
+// Next/Done control (not a second navigation control) advances.
 // ---------------------------------------------------------------------------
 
-describe("MechanismGallery — skip character", () => {
-  it("skipping advances to the next char without recording an assignment", async () => {
+describe("MechanismGallery — mark for later review", () => {
+  it("marking the current character records no MechanismAssignment", async () => {
     seedInventory(["á", "é"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+00E1 á for later review/i }),
+    );
 
-    // No assignment recorded.
     expect(
       useWorkingCopyStore
         .getState()
         .session.assignments.filter((a) => a.modality === "physical"),
     ).toHaveLength(0);
+  });
 
-    // Current char is now é.
+  it("toggles the marked state and reflects it via aria-pressed and the button label", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    const markBtn = screen.getByRole("button", {
+      name: /Mark U\+00E1 á for later review/i,
+    });
+    expect(markBtn.getAttribute("aria-pressed")).toBe("false");
+
+    fireEvent.click(markBtn);
+    const unmarkBtn = await screen.findByRole("button", {
+      name: /Unmark U\+00E1 á/i,
+    });
+    expect(unmarkBtn.getAttribute("aria-pressed")).toBe("true");
+    expect(unmarkBtn.textContent).toContain("Marked for later review");
+
+    fireEvent.click(unmarkBtn);
     await waitFor(() => {
-      expectCurrentChar("é");
+      const remarkBtn = screen.getByRole("button", {
+        name: /Mark U\+00E1 á for later review/i,
+      });
+      expect(remarkBtn.getAttribute("aria-pressed")).toBe("false");
     });
   });
 
-  it("skipping does not change the coverage count and does not mark the character resolved", async () => {
+  it("marking the current character enables Next/Done without changing the coverage count", async () => {
     seedInventory(["á", "é"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
@@ -968,24 +1007,42 @@ describe("MechanismGallery — skip character", () => {
       screen.getByRole("status", { name: "0 of 2 added" }).getAttribute("aria-label"),
     ).toBe("0 of 2 added");
 
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    // Untouched character — Next is disabled (canGoNext requires Apply OR mark).
+    expect(
+      (screen.getByRole("button", { name: /Next character/i }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(true);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+00E1 á for later review/i }),
+    );
+    await waitFor(() => {
+      expect(
+        (screen.getByRole("button", { name: /Next character/i }) as HTMLButtonElement)
+          .disabled,
+      ).toBe(false);
+    });
+
+    fireEvent.click(screen.getByRole("button", { name: /Next character/i }));
     await waitFor(() => {
       expectCurrentChar("é");
     });
 
-    // Skipping recorded nothing, so coverage is unchanged.
+    // Marking recorded no assignment, so coverage is unchanged.
     expect(
       screen.getByRole("status", { name: "0 of 2 added" }).getAttribute("aria-label"),
     ).toBe("0 of 2 added");
 
-    // Navigating back to the skipped-over "á": it is NOT treated as resolved —
-    // Next stays disabled until it is actually applied.
+    // Navigating back to the marked "á": Next stays enabled (it is
+    // accounted for), even though it is still not counted toward coverage.
     fireEvent.click(screen.getByRole("button", { name: /← back/i }));
     await waitFor(() => {
       expectCurrentChar("á");
     });
-    const nextBtn = screen.getByRole("button", { name: /Next character/i });
-    expect((nextBtn as HTMLButtonElement).disabled).toBe(true);
+    expect(
+      (screen.getByRole("button", { name: /Next character/i }) as HTMLButtonElement)
+        .disabled,
+    ).toBe(false);
   });
 });
 
@@ -994,7 +1051,7 @@ describe("MechanismGallery — skip character", () => {
 // ---------------------------------------------------------------------------
 
 describe("MechanismGallery — Done state (positional: last char's forward button)", () => {
-  it("the only (and therefore last) character's forward button already reads Done, disabled until Apply/Skip", async () => {
+  it("the only (and therefore last) character's forward button already reads Done, disabled until a method is applied", async () => {
     seedInventory(["á"]);
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
@@ -1035,13 +1092,12 @@ describe("MechanismGallery — Done state (positional: last char's forward butto
     expect(onComplete).toHaveBeenCalledOnce();
   });
 
-  it("skipping the only (last) character opens the leave-warning modal, then completes via \"Come back later\"", async () => {
-    // Skip on the last position is itself the phase completion attempt —
-    // positional Skip advances by one position, or finishes if there is no
-    // next position, exactly like Next/Done. "á" was skipped (never applied),
-    // so it is unimplemented — the whole-inventory leave-warning modal opens
-    // instead of completing immediately; "Come back later" defers and
-    // completes anyway.
+  it('marking the only (last) character enables Done, which completes directly — no modal', async () => {
+    // Marking the last position is itself the phase-completion enabler: once
+    // "á" is marked (not applied), Done becomes clickable and completes
+    // directly. There is no more "leave-warning" confirm dialog
+    // (mechanism-gallery-progression) — the affordance is disabled, not
+    // click-intercepted.
     const onComplete = vi.fn();
     seedInventory(["á"]);
     await act(async () => {
@@ -1052,93 +1108,71 @@ describe("MechanismGallery — Done state (positional: last char's forward butto
         />,
       );
     });
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
-    expect(onComplete).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: /Come back later/i }));
+    const doneBtn = screen.getByRole("button", { name: "Done" });
+    expect((doneBtn as HTMLButtonElement).disabled).toBe(true);
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+00E1 á for later review/i }),
+    );
+    await waitFor(() => {
+      expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
+    });
+    fireEvent.click(doneBtn);
     expect(onComplete).toHaveBeenCalledOnce();
   });
 });
 
 // ---------------------------------------------------------------------------
-// Leave-warning modal — open/closed state + the "Go back and finish" (stay)
-// path, and the Back-button-does-not-trigger-it guard. The "Come back later"
-// (defer) path is covered above; this suite closes the gap on the modal's
-// OTHER outcomes and on the dialog's actual open/closed state (queried via
-// the native <dialog> element's `open` attribute, not just button presence —
-// ConfirmDialog always renders both buttons regardless of `open`, so a bare
-// button-exists query cannot distinguish "modal is showing" from "modal is
-// mounted but closed").
+// Done-blocked inline hint — replaces the old leave-warning ConfirmDialog
+// (mechanism-gallery-progression). No <dialog> element is rendered by this
+// gallery at all anymore; the Done/Continue control is simply disabled while
+// any lettersToAdd character is neither implemented nor marked, and an inline
+// role="status" hint explains why.
 // ---------------------------------------------------------------------------
 
-describe("MechanismGallery — leave-warning modal open/closed state", () => {
-  it("does NOT open the dialog when Done completes with every character implemented", async () => {
-    const onComplete = vi.fn();
-    seedInventory(["á"]);
-    const { container } = await act(async () =>
-      render(
-        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />,
-      ),
-    );
-    fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
-    fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
-    await waitFor(() => {
-      const doneBtn = screen.getByRole("button", { name: "Done" });
-      expect((doneBtn as HTMLButtonElement).disabled).toBe(false);
-      fireEvent.click(doneBtn);
-    });
-    // Completed directly — the dialog never opened.
-    expect(onComplete).toHaveBeenCalledOnce();
-    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
-  });
-
-  it("opens the dialog (native <dialog open> attribute) when forward-completing with an unimplemented character", async () => {
-    seedInventory(["á"]);
+describe("MechanismGallery — Done-blocked inline hint (no modal)", () => {
+  it("never renders a <dialog> element, even while characters remain unimplemented", async () => {
+    seedInventory(["á", "é"]);
     const { container } = await act(async () =>
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />),
     );
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
-    expect(container.querySelector("dialog")?.hasAttribute("open")).toBe(true);
+    expect(container.querySelector("dialog")).toBeNull();
+
+    // Clicking the (disabled) Next control is a no-op — still no dialog.
+    fireEvent.click(screen.getByRole("button", { name: /Next character/i }));
+    expect(container.querySelector("dialog")).toBeNull();
   });
 
-  it('"Go back and finish" (primary) closes the dialog and does NOT complete — the author stays in the gallery able to finish "á"', async () => {
-    const onComplete = vi.fn();
-    seedInventory(["á"]);
-    const { container } = await act(async () =>
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />),
+  it("shows an inline hint naming the unaccounted characters, and hides it once every character is marked", async () => {
+    seedInventory(["á", "é"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />);
+    });
+
+    const hint = screen.getByRole("status", {
+      name: (_accessibleName, element) =>
+        element.textContent?.includes("still need an assignment or a mark") ?? false,
+    });
+    expect(hint.textContent).toContain("á");
+    expect(hint.textContent).toContain("é");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+00E1 á for later review/i }),
     );
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
-    expect(container.querySelector("dialog")?.hasAttribute("open")).toBe(true);
-
-    fireEvent.click(screen.getByRole("button", { name: /Go back and finish/i }));
-
-    // No advance — onComplete never fires, and the dialog is closed again.
-    expect(onComplete).not.toHaveBeenCalled();
-    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
-    // Still on "á", with the Apply control still available to actually finish it.
-    expectCurrentChar("á");
-    expect(screen.getByRole("button", { name: /Apply method for á/i })).toBeTruthy();
-  });
-
-  it("Escape (the native <dialog> cancel event) does NOT proceed — it stays in the gallery, same as \"Go back and finish\" (P1(a))", async () => {
-    const onComplete = vi.fn();
-    seedInventory(["á"]);
-    const { container } = await act(async () =>
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />),
+    fireEvent.click(screen.getByRole("button", { name: /Next character/i }));
+    await waitFor(() => expectCurrentChar("é"));
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+00E9 é for later review/i }),
     );
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
-    const dialog = container.querySelector("dialog")!;
-    expect(dialog.hasAttribute("open")).toBe(true);
 
-    fireEvent(dialog, new Event("cancel", { cancelable: true }));
-
-    // Escape must map to the STAY action, not the "Come back later" defer —
-    // onComplete must never fire from a dismissal.
-    expect(onComplete).not.toHaveBeenCalled();
-    expect(dialog.hasAttribute("open")).not.toBe(true);
-    expectCurrentChar("á");
+    await waitFor(() => {
+      expect(
+        screen.queryByText(/still need an assignment or a mark/i),
+      ).toBeNull();
+    });
   });
 
-  it("the ← back button never opens the leave-warning modal, even while characters remain unimplemented", async () => {
+  it("the ← back button navigates freely while characters remain unimplemented (no modal, no block)", async () => {
     const onBack = vi.fn();
     seedInventory(["á", "é"]);
     const { container } = await act(async () =>
@@ -1146,25 +1180,25 @@ describe("MechanismGallery — leave-warning modal open/closed state", () => {
         <MechanismGallery selectedBaseKeyboard={basicKbdus} onBack={onBack} onComplete={vi.fn()} />,
       ),
     );
-    // Advance to "é" (idx 1) without implementing "á" — Skip is pure forward nav.
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    // Mark "á" so Next is enabled, then advance to "é" without implementing it.
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+00E1 á for later review/i }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Next character/i }));
     await waitFor(() => {
       expectCurrentChar("é");
     });
-    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
+    expect(container.querySelector("dialog")).toBeNull();
 
-    // Navigate backward through both (still-unimplemented) characters via
-    // the Back control — this is a DIFFERENT control from the forward
-    // Done/Skip-on-last path that triggers the modal, and must never open it.
     fireEvent.click(screen.getByRole("button", { name: /← back/i }));
     await waitFor(() => {
       expectCurrentChar("á");
     });
-    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
+    expect(container.querySelector("dialog")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: /← back/i }));
     expect(onBack).toHaveBeenCalledOnce();
-    expect(container.querySelector("dialog")?.hasAttribute("open")).not.toBe(true);
+    expect(container.querySelector("dialog")).toBeNull();
   });
 });
 
@@ -2339,10 +2373,12 @@ describe("MechanismGallery — edit after Done (unlock affordance)", () => {
     fireEvent.click(unlockBtn);
 
     expect(useWorkingCopyStore.getState().desktopLocked).toBe(false);
-    // The gallery becomes editable again — Apply/Skip controls return.
+    // The gallery becomes editable again — Apply/Mark controls return.
     await waitFor(() => {
       expect(screen.getByRole("button", { name: /Apply method for á/i })).toBeTruthy();
-      expect(screen.getByRole("button", { name: /Skip this character/i })).toBeTruthy();
+      expect(
+        screen.getByRole("button", { name: /Mark U\+00E1 á for later review/i }),
+      ).toBeTruthy();
     });
   });
 
@@ -2403,8 +2439,8 @@ describe("MechanismGallery — edit after Done (unlock affordance)", () => {
   });
 });
 
-describe("MechanismGallery — Back after skipping the only character", () => {
-  it("Back still calls onBack after skipping the only (first=last) character — position never changed", async () => {
+describe("MechanismGallery — Back after marking the only character", () => {
+  it("Back still calls onBack after marking-then-completing the only (first=last) character — position never changed", async () => {
     const onBack = vi.fn();
     const onComplete = vi.fn();
     seedInventory(["á"]);
@@ -2418,13 +2454,15 @@ describe("MechanismGallery — Back after skipping the only character", () => {
       );
     });
 
-    // Skipping the only character is itself the phase completion attempt
-    // (idx 0 is also the last position) — it does not move currentChar
-    // anywhere. "á" was skipped (never applied), so the leave-warning modal
-    // opens instead of completing immediately; defer via "Come back later".
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
-    expect(onComplete).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: /Come back later/i }));
+    // Marking the only character enables Done at that same position (idx 0
+    // is also the last position) — it does not move currentChar anywhere.
+    // "á" was marked (never applied), so Done completes directly — no modal.
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+00E1 á for later review/i }),
+    );
+    const doneBtn = await screen.findByRole("button", { name: "Done" });
+    await waitFor(() => expect((doneBtn as HTMLButtonElement).disabled).toBe(false));
+    fireEvent.click(doneBtn);
     expect(onComplete).toHaveBeenCalledOnce();
 
     // "á" is still the selected chip — positional nav never nulled
@@ -2432,7 +2470,7 @@ describe("MechanismGallery — Back after skipping the only character", () => {
     expectCurrentChar("á");
 
     // Back is still positional: idx 0 has no prior position, so it calls
-    // onBack — not gated by the character having just been skipped.
+    // onBack — not gated by the character having just been marked.
     const backBtn = screen.getByRole("button", { name: /← back/i });
     expect(backBtn).toBeTruthy();
     fireEvent.click(backBtn);
@@ -2796,11 +2834,12 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
     expect(screen.queryByText(/Suggested: RAlt \+ A for à/i)).toBeNull();
   });
 
-  it("a suggestion row REAPPEARS after Skip (unlike Accept/Deny) — Skip resolves nothing", async () => {
+  it("a suggestion row REAPPEARS after marking for later review (unlike Accept/Deny) — marking resolves nothing", async () => {
     // Same fixture as the accepted-suggestion test above, but this time the
-    // character is SKIPPED rather than accepted/denied. Skip is pure
-    // positional navigation and must not add the character to
-    // suggestionResolved, so returning to it must show the suggestion again.
+    // character is MARKED FOR LATER REVIEW rather than accepted/denied.
+    // Marking is a separate toggle from suggestionResolved (see canGoNext's
+    // own doc comment) and must not add the character to suggestionResolved,
+    // so returning to it must show the suggestion again.
     // "à" is the first character in the collated walk (a < e).
     seedInventory(["é", "à"]);
     await act(async () => {
@@ -2819,8 +2858,11 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
       expect(screen.getByText(/Suggested: RAlt \+ A for à/i)).toBeTruthy();
     });
 
-    // Skip it — no accept/deny, no assignment recorded.
-    fireEvent.click(screen.getByRole("button", { name: /Skip this character/i }));
+    // Mark it, then advance — no accept/deny, no assignment recorded.
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+00E0 à for later review/i }),
+    );
+    fireEvent.click(screen.getByRole("button", { name: /Next character/i }));
     await waitFor(() => {
       expectCurrentChar("é");
     });
@@ -2832,8 +2874,7 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
     });
 
     // Unlike the accept/deny case above, the suggestion row for "à" MUST
-    // reappear — Skip resolved nothing. (If `skippedChars` were reintroduced
-    // to suppress the row, this assertion would fail.)
+    // reappear — marking resolved nothing about the suggestion itself.
     await waitFor(() => {
       expect(screen.getByText(/Suggested: RAlt \+ A for à/i)).toBeTruthy();
     });
