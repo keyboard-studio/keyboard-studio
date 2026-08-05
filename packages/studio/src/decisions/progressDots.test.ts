@@ -484,7 +484,10 @@ describe("within-step walk dots", () => {
     expect(currentDot(dots)?.id).toBe("characters");
   });
 
-  it("labels a character stop from the walk, and a question stop from the resolver", () => {
+  it("collapses a character walk to ONE dot for the gallery, and keeps question stops individual", () => {
+    // Author's call, 2026-08-05: a gallery is one stop in the journey, not one
+    // per letter — each gallery has its own in-page navigation to the character
+    // the author wants, which is what the per-letter dots were duplicating.
     const dots = buildProgressDots({
       record: recordOf([]),
       ctx: ctxWith({
@@ -495,20 +498,87 @@ describe("within-step walk dots", () => {
         }),
         // A character has no questionRegistry entry; the walk is what makes it
         // addressable (see ResolveContext.stepPositions).
-        stepPositions: { mechanisms: ["u00e1"], identity: ["il_language_english"] },
+        stepPositions: {
+          mechanisms: ["u00e1", "u00e9", "u00ed"],
+          identity: ["il_language_english"],
+        },
       }),
       lookupQuestionLabel: stubLabel,
       stepWalks: {
-        mechanisms: [{ id: "u00e1", label: "á (U+00E1)", done: false }],
+        mechanisms: [
+          { id: "u00e1", label: "á (U+00E1)", done: true },
+          { id: "u00e9", label: "é (U+00E9)", done: false },
+          { id: "u00ed", label: "í (U+00ED)", done: false },
+        ],
         identity: [{ id: "il_language_english", done: true }],
       },
-      stepCursors: { mechanisms: "u00e1" },
+      stepCursors: { mechanisms: "u00e9" },
     });
-    expect(currentDot(dots)?.label).toBe("á (U+00E1)");
+
+    // Exactly one dot for the whole gallery, labelled as the STAGE.
+    const mechanismsDots = dots.filter((d) => d.location.step === "mechanisms");
+    expect(mechanismsDots).toHaveLength(1);
+    expect(mechanismsDots[0]?.id).toBe("mechanisms");
+    expect(mechanismsDots[0]?.label).toBe("Mechanisms");
+    // It addresses the step, not a character inside it — landing there hands
+    // over to the gallery's own navigation.
+    expect(mechanismsDots[0]?.location.question).toBeUndefined();
+    // It is the current position, and it is jumpable.
+    expect(currentDot(dots)?.id).toBe("mechanisms");
     expect(currentDot(dots)?.resolution.kind).toBe("reachable");
+    // No character token survives anywhere in the row.
+    expect(dots.some((d) => /^u[0-9a-f]{4}/.test(d.id))).toBe(false);
+
+    // A QUESTION walk is untouched — still one dot per question, still labelled
+    // by the resolver.
     expect(dots.find((d) => d.id === "il_language_english")?.label).toBe(
       "label:il_language_english",
     );
+  });
+
+  it("collapses a character walk whose characters are all done to a single completed dot", () => {
+    const dots = buildProgressDots({
+      record: recordOf([]),
+      ctx: ctxWith({
+        traversal: traversal({
+          activeStepId: "help",
+          history: [
+            "identity", "choose_base", "track", "characters",
+            "marks", "convenience", "carve", "mechanisms", "touch",
+          ],
+          selectedTrack: "adapt",
+        }),
+        stepPositions: { mechanisms: ["u00e1", "u00e9"] },
+      }),
+      lookupQuestionLabel: stubLabel,
+      stepWalks: { mechanisms: [{ id: "u00e1", done: true }, { id: "u00e9", done: true }] },
+    });
+    const mechanismsDots = dots.filter((d) => d.location.step === "mechanisms");
+    expect(mechanismsDots).toHaveLength(1);
+    expect(mechanismsDots[0]?.kind).toBe("completed");
+  });
+
+  it("does not collapse a walk that mixes question ids with character tokens", () => {
+    // Not a shape any publisher emits — pinned so a future one that did could
+    // not silently lose its questions to the gallery rule.
+    const dots = buildProgressDots({
+      record: recordOf([]),
+      ctx: ctxWith({
+        traversal: traversal({ activeStepId: "characters", history: ["identity", "choose_base", "track"] }),
+        stepPositions: { characters: ["u00e1", "il_language_english"] },
+      }),
+      lookupQuestionLabel: stubLabel,
+      stepWalks: {
+        characters: [
+          { id: "u00e1", label: "á (U+00E1)", done: true },
+          { id: "il_language_english", done: false },
+        ],
+      },
+      // Cursor on one of the two stops, so the walk marks its own current dot
+      // rather than the step also contributing a stage-granular one.
+      stepCursors: { characters: "il_language_english" },
+    });
+    expect(dots.filter((d) => d.location.step === "characters")).toHaveLength(2);
   });
 
   it("orders the row by manifest position, not by which source produced each dot", () => {
@@ -536,8 +606,11 @@ describe("within-step walk dots", () => {
       stepCursors: { mechanisms: "u00e1" },
     });
     const order = dots.map((d) => d.id);
-    expect(order.indexOf("il_language_english")).toBeLessThan(order.indexOf("u00e1"));
-    expect(order.indexOf("u00e1")).toBeLessThan(order.indexOf("some_optional_question"));
+    // The gallery's walk is one dot now (id === the step), but the ordering
+    // invariant is the same one: identity's recorded answer sits ahead of the
+    // mechanisms stage, which sits ahead of help's.
+    expect(order.indexOf("il_language_english")).toBeLessThan(order.indexOf("mechanisms"));
+    expect(order.indexOf("mechanisms")).toBeLessThan(order.indexOf("some_optional_question"));
   });
 
   it("keeps a record dot whose step is not in this build, so its reason still surfaces", () => {

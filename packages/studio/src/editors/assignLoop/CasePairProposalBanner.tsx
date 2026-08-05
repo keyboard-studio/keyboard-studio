@@ -28,8 +28,22 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { canonicalizeCombo } from "@keyboard-studio/engine";
 import { formatModifierCombo } from "../../lib/modifierTokenLabel.ts";
+import { keyLabelOrRaw } from "../../lib/keyLabel.ts";
+import { KeyCap } from "../../ui/KeyCap.tsx";
 import { ProposalBanner } from "./parts/ProposalBanner.tsx";
 import type { CasePairProposal } from "./casePairCompanion.ts";
+
+/**
+ * Keycap-convention display label for a proposal's physical key (vkey or
+ * touch host key) — lowercase unshifted glyph, boxed by the caller as a
+ * `<KeyCap>` where the surface is JSX, or embedded plain in an aria-label.
+ * A proposal's `vkey`/`hostKey` is always a real key here (never an
+ * already-resolved glyph), so the shared `keyLabelOrRaw` applies directly
+ * with no `K_`-prefix guard. See lib/keyLabel.ts for the convention this
+ * disambiguates (a bare uppercase "Q" reads as the capital character, not
+ * the physical q key).
+ */
+const keyNameFor = keyLabelOrRaw;
 
 export interface CasePairProposalBannerProps {
   proposal: CasePairProposal;
@@ -67,7 +81,8 @@ export function CasePairProposalBanner({
           <Trans id="editor.assignLoop.companion.prompt.raltLayer">
             {proposal.originalChar} has an uppercase form,{" "}
             {proposal.counterpart}. Map {proposal.counterpart} to the{" "}
-            {raltLayerModifierLabel(proposal)} layer of {proposal.vkey}?
+            {raltLayerModifierLabel(proposal)} layer of the{" "}
+            <KeyCap>{keyNameFor(proposal.vkey)}</KeyCap> key?
           </Trans>
         ) : (
           <Trans id="editor.assignLoop.companion.prompt">
@@ -86,15 +101,18 @@ export function CasePairProposalBanner({
         // physical and combo paths (their parallel slot IS the shift plane),
         // and a new id orphans no translation, where editing the shared
         // message would restate it for two mechanisms that didn't change.
+        // Human-readable, never the raw K_*/T_* key id — same keycap-naming
+        // convention as the prompt text above (lowercase key name, "the …
+        // key" phrasing).
         proposal.mechanism === "touch"
           ? t({
               id: "editor.assignLoop.companion.confirmAriaLabel.touch",
-              message: `Map ${proposal.counterpart} to the ${proposal.targetLayerLabel} layer of ${proposal.hostKey}`,
+              message: `Map ${proposal.counterpart} to the ${proposal.targetLayerLabel} layer of the ${keyNameFor(proposal.hostKey)} key`,
             })
           : proposal.mechanism === "ralt-layer"
             ? t({
                 id: "editor.assignLoop.companion.confirmAriaLabel.raltLayer",
-                message: `Map ${proposal.counterpart} to the ${raltLayerModifierLabel(proposal)} layer of ${proposal.vkey}`,
+                message: `Map ${proposal.counterpart} to the ${raltLayerModifierLabel(proposal)} layer of the ${keyNameFor(proposal.vkey)} key`,
               })
             : t({
                 id: "editor.assignLoop.companion.confirmAriaLabel",
@@ -129,23 +147,33 @@ export function CasePairProposalBanner({
 }
 
 /**
- * What the confirm button's accessible name names as the pairing target. The
- * physical mechanism names its vkey — the exact string the shipping banner
- * used, so its existing tests and translations are unaffected. The other two
- * mechanisms name their own parallel slot.
+ * What the confirm button's accessible name names as the pairing target,
+ * under the same keycap convention as everywhere else (lowercase glyph,
+ * "the … key" phrasing). The physical, touch, and ralt-layer mechanisms name
+ * their physical key directly through `keyNameFor`; the combo mechanism names
+ * its own parallel slot — the dead-key trigger key or the sequence indicator
+ * key. The dead-key trigger is a `K_` vkey, so it routes through `keyNameFor`
+ * to avoid leaking a raw `K_QUOTE` into the accessible name; the sequence
+ * indicator is already a resolved display glyph (its case is meaningful and
+ * must survive), so it passes through untouched — the same `K_`-prefix guard
+ * `GlyphCell` uses, since `keyNameFor`/`vkeyLabel` upper-normalizes its input.
  */
 function confirmTargetLabel(proposal: CasePairProposal): string {
   switch (proposal.mechanism) {
     case "physical":
-      return proposal.vkey;
+      return `the ${keyNameFor(proposal.vkey)} key`;
     case "touch":
-      return proposal.hostKey;
-    case "combo":
-      return proposal.combo.kind === "deadkey"
-        ? proposal.combo.triggerKey
-        : proposal.combo.indicator;
+      return `the ${keyNameFor(proposal.hostKey)} key`;
+    case "combo": {
+      const comboKey =
+        proposal.combo.kind === "deadkey"
+          ? proposal.combo.triggerKey
+          : proposal.combo.indicator;
+      const named = comboKey.startsWith("K_") ? keyNameFor(comboKey) : comboKey;
+      return `the ${named} key`;
+    }
     case "ralt-layer":
-      return proposal.vkey;
+      return `the ${keyNameFor(proposal.vkey)} key`;
   }
 }
 

@@ -1047,7 +1047,7 @@ describe('triggerKeyLabel', () => {
       { kind: 'notany' as const, storeRef: 'trig' },
     ];
     const ir = makeIR({ stores: [trig] });
-    expect(triggerKeyLabel(ctx, ir)).toBe('one of: A B');
+    expect(triggerKeyLabel(ctx, ir)).toBe('one of: a b');
   });
 
   it('with `ir`, a long store (>8 items) goes loose ("one of several keys")', () => {
@@ -3581,7 +3581,7 @@ describe('keySequenceLabel — deadkey-combination rule (#1399 follow-on)', () =
       [],
     );
 
-    expect(keySequenceLabel(bodyRule, ir)).toEqual(['A', 'B']);
+    expect(keySequenceLabel(bodyRule, ir)).toEqual(['a', 'b']);
   });
 
   it('resolves an all-deadkey effective context with an embedded "+" the same way', () => {
@@ -3597,7 +3597,7 @@ describe('keySequenceLabel — deadkey-combination rule (#1399 follow-on)', () =
       [],
     );
 
-    expect(keySequenceLabel(bodyRule, ir)).toEqual(['A', 'B']);
+    expect(keySequenceLabel(bodyRule, ir)).toEqual(['a', 'b']);
   });
 
   it('returns undefined (never fabricates) when one deadkey\'s trigger cannot be found', () => {
@@ -3637,7 +3637,7 @@ describe('keySequenceLabel — deadkey-combination rule (#1399 follow-on)', () =
       [],
     );
 
-    expect(keySequenceLabel(bodyRule, ir)).toEqual(['X', 'Y']);
+    expect(keySequenceLabel(bodyRule, ir)).toEqual(['x', 'y']);
   });
 
   it('resolves a deadkey-combination rule guarded by a non-plus raw context element (e.g. platform(...)) by stripping it, not just the "+" separator (#1399 follow-on)', () => {
@@ -3655,7 +3655,7 @@ describe('keySequenceLabel — deadkey-combination rule (#1399 follow-on)', () =
       [],
     );
 
-    expect(keySequenceLabel(bodyRule, ir)).toEqual(['A', 'A']);
+    expect(keySequenceLabel(bodyRule, ir)).toEqual(['a', 'a']);
   });
 });
 
@@ -3705,7 +3705,7 @@ describe('keySequenceLabel — a touch-only trigger never shadows a resolvable d
       [],
     );
 
-    expect(keySequenceLabel(bodyRule, ir)).toEqual(['Shift + A']);
+    expect(keySequenceLabel(bodyRule, ir)).toEqual(['Shift + a']);
   });
 
   it('still resolves no fabricated desktop chord when the deadkey has ONLY a touch-only trigger', () => {
@@ -3755,7 +3755,7 @@ describe('charProducers — partial-cluster inclusion is excluded, not a phantom
     };
     const ir = makeIRWithStores([makeGroup([clusterRule, realRule])], []);
 
-    expect(charProducers(ir, 'a')).toEqual([{ steps: ['Shift + A'] }]);
+    expect(charProducers(ir, 'a')).toEqual([{ steps: ['Shift + a'] }]);
   });
 
   it('returns an empty list when the only rule mentioning the char is a partial-cluster inclusion', () => {

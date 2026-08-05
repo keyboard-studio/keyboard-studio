@@ -63,7 +63,7 @@ export function surveyAdvance(page: Page) {
  * inside driveIdentityLite, which runs post-goto.
  *
  * This is draft-safe: it only sets the visited flag, unlike clicking
- * WelcomeScreen's "I'm new" button, which additionally clears any resumable
+ * WelcomeScreen's "Continue as guest" button, which additionally clears any resumable
  * draft (see WelcomeScreen.tsx). Explicit navigation to `#welcome` still
  * reaches the WelcomeScreen afterward — StudioShell's router honors an
  * explicit `#welcome` hash for returning visitors; the gate only forces the

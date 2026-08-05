@@ -13,7 +13,7 @@
 // (a Crowdin export of an untranslated project); and that its values haven't
 // REGRESSED against their own previously-committed state — a catalog that
 // kept every key but went from translated to empty, which the two checks
-// above cannot see (#1489).
+// above cannot see.
 //
 // Read-only: never writes to content/i18n/**.
 //
@@ -216,7 +216,7 @@ function checkFreshness(problems, warnings, englishDir, name, fresh) {
 
 // `getBaselineCatalog` defaults to a no-op so every existing test (which
 // never supplies one) is unaffected — it is only ever a real, git-backed
-// lookup when threaded down from main()'s real repo paths. See #1489.
+// lookup when threaded down from main()'s real repo paths.
 function checkTargetLocaleParity(
   problems,
   notes,
@@ -264,9 +264,9 @@ function checkTargetLocaleParity(
     if (collapse.note) notes.push(collapse.note);
 
     // Neither key-set parity nor the English-collapse check above can see a
-    // catalog that kept its keys and went from translated to EMPTY (#1489) —
-    // that needs a comparison against this same locale's own prior state,
-    // which English can never provide. null means "no baseline available for
+    // catalog that kept its keys and went from translated to EMPTY — that
+    // needs a comparison against this same locale's own prior state, which
+    // English can never provide. null means "no baseline available for
     // this file" (offline, brand-new catalog, ref unresolvable) — silently
     // skipped, same as the collapse guard treats an all-empty target.
     const baseline = getBaselineCatalog(locale, name);

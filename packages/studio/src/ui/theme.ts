@@ -32,6 +32,12 @@ export const CSS_SURFACE = "var(--app-surface)" as const;
 /** Default border: `var(--app-border)` — resolves to #33436a */
 export const CSS_BORDER = "var(--app-border)" as const;
 
+/** Secondary / nested surface (e.g. a keycap's own background against a card): `var(--app-surface-2)` — resolves to #27365a */
+export const CSS_SURFACE_2 = "var(--app-surface-2)" as const;
+
+/** Emphasized border (e.g. a keycap's own outline against a card border): `var(--app-border-strong)` — resolves to #44588a */
+export const CSS_BORDER_STRONG = "var(--app-border-strong)" as const;
+
 /** Primary text: `var(--app-text)` — resolves to #eaf1fb */
 export const CSS_TEXT = "var(--app-text)" as const;
 
