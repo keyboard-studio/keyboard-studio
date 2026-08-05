@@ -1,4 +1,4 @@
-// The FR-016 repository check (spec 057 T038, contracts/question-output-reach.md).
+// The FR-016 repository check (spec 059 T038, contracts/question-output-reach.md).
 //
 // WHAT DEFECT CLASS THIS CLOSES
 //
@@ -213,7 +213,7 @@ describe("FR-016 (b) — a question that promises the author it ships, does", ()
     expect(
       offenders,
       "A question promises the author their answer reaches the finished keyboard " +
-        "while nothing carries it there (spec 057 FR-018 / E-4).",
+        "while nothing carries it there (spec 059 FR-018 / E-4).",
     ).toEqual([]);
   });
 

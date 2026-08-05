@@ -695,7 +695,7 @@ describe("FR-021 — the injected resolver is the trail's only route to impact",
 });
 
 // ---------------------------------------------------------------------------
-// resolveImpactAsync — the precedence table (spec 057 T029)
+// resolveImpactAsync — the precedence table (spec 059 T029)
 // ---------------------------------------------------------------------------
 //
 // One row per line of contracts/impact-resolution.md §3. The rows are not
@@ -703,7 +703,7 @@ describe("FR-021 — the injected resolver is the trail's only route to impact",
 // resolver exists at all is that the identity questions used to fall to the LAST row
 // and be told their answers had no write path.
 
-describe("resolveImpactAsync — precedence (spec 057 FR-009…FR-012)", () => {
+describe("resolveImpactAsync — precedence (spec 059 FR-009…FR-012)", () => {
   /** An entry for a question that DECLARES output reach (`outputs: [...]`). */
   function identityEntry(overrides: Partial<DecisionEntry> = {}): DecisionEntry {
     return entry({

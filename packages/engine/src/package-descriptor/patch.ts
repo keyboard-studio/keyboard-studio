@@ -1,5 +1,5 @@
 // patch — write the author's identity into the package descriptor, GENERATING the
-// descriptor when there is none (spec 057 T004, contracts/package-descriptor.md).
+// descriptor when there is none (spec 059 T004, contracts/package-descriptor.md).
 //
 // WHY PATCH-OR-GENERATE, AND NOT TWO FUNCTIONS
 //

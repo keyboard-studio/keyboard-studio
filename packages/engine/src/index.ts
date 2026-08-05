@@ -114,7 +114,7 @@ export { recognizePatterns, classifyRemovalCapabilities } from "./recognizer/ind
 export type { RecognizerRule, MatchResult, RecognizeResult } from "./recognizer/index.js";
 export { isParallelIndexFanOut } from "./recognizer/rules/parallel-index-fanout.js";
 
-// spec 057 — the single package-descriptor writer. Both authoring tracks reach
+// spec 059 — the single package-descriptor writer. Both authoring tracks reach
 // `source/<id>.kps` through this module and nowhere else (FR-005).
 export {
   buildKpsContent,

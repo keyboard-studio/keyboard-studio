@@ -656,7 +656,7 @@ function advanceToB() {
  * via the marks step's S0 auto-skip (spec 046; marks-free test alphabet) and the
  * convenience step's own skip.
  *
- * ASYNC since spec 057. The convenience step deliberately holds its gate until
+ * ASYNC since spec 059. The convenience step deliberately holds its gate until
  * the CLDR/SLDR exemplar lookup settles, and `useCarveNeededSet` only settles
  * synchronously when there is NO language to look up. Track 1 now carries the
  * author's composed BCP47 tag into the working copy (FR-001) — which is the point
@@ -760,7 +760,7 @@ describe("SurveyView — B → carve transition", () => {
     fireEvent.click(screen.getByTestId("phaseB-complete"));
 
     // Async landing: the convenience step waits on the exemplar lookup now that
-    // Track 1 carries a language tag (spec 057) — see advanceToCarve.
+    // Track 1 carries a language tag (spec 059) — see advanceToCarve.
     expect(await screen.findByTestId("stage-carve")).toBeTruthy();
     expect(screen.queryByTestId("stage-B")).toBeNull();
   });
@@ -909,7 +909,7 @@ describe("SurveyView — carve → B back-navigation", () => {
 
     // The back-pop crosses the convenience step, which re-runs its exemplar
     // lookup on re-entry and stays transparent in the direction of travel — so
-    // the landing is async in both directions (spec 057; see advanceToCarve).
+    // the landing is async in both directions (spec 059; see advanceToCarve).
     expect(await screen.findByTestId("stage-B")).toBeTruthy();
     expect(screen.queryByTestId("stage-carve")).toBeNull();
     // Confirm it did NOT go to prefill (the old pre-#508 behavior).

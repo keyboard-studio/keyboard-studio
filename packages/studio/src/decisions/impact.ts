@@ -181,13 +181,13 @@ export function resolveImpact(
 }
 
 // ---------------------------------------------------------------------------
-// The async resolver (spec 057 FR-009…FR-012)
+// The async resolver (spec 059 FR-009…FR-012)
 // ---------------------------------------------------------------------------
 //
 // `resolveImpact` above is unchanged and still the whole answer for a stored
 // capture. What it could not do is attribute a decision recorded BEFORE a working
 // copy existed: the identity questions have no `mutate()`, so they fell to
-// `"no-rederivable-write-path"` — which was true until spec 057 gave their answers
+// `"no-rederivable-write-path"` — which was true until spec 059 gave their answers
 // a write path into the package descriptor, and false afterwards.
 //
 // So this resolver adds exactly one capability: for an entry whose question

@@ -141,11 +141,11 @@ export interface DiffHunk {
  *   this question, or the mutate seam is disabled in this build (research D-05).
  * - `"no-working-copy-yet"` — the decision DOES have a write path, but it was
  *   made before a keyboard existed to change, so there is nothing to project and
- *   diff against yet (spec 057 FR-012). Distinct from `"none"` ("changed
+ *   diff against yet (spec 059 FR-012). Distinct from `"none"` ("changed
  *   nothing") and from both reasons above: the effect is not unavailable in
  *   principle, only *not yet* resolvable, and choosing a base makes it appear.
  *   Reusing `"no-rederivable-write-path"` here would state something false — the
- *   write path exists, and after spec 057 it reaches the package descriptor.
+ *   write path exists, and after spec 059 it reaches the package descriptor.
  */
 export type ImpactUnavailableReason =
   | "lock-gate-dependency"

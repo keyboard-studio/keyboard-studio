@@ -1,5 +1,5 @@
 // useEntryImpact — resolve ONE entry's impact when the author expands it, and not
-// before (spec 057 FR-011, contracts/impact-resolution.md §4).
+// before (spec 059 FR-011, contracts/impact-resolution.md §4).
 //
 // The trail mounts having computed no impact for any entry. That is a property of
 // this hook's shape, not a claim about how fast the resolution is: `expanded` gates

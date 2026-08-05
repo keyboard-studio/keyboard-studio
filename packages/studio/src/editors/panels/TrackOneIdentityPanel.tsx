@@ -37,7 +37,7 @@ export function TrackOneIdentityPanel() {
   const identity = useWorkingCopyStore((s) => s.identity);
   const setIdentity = useWorkingCopyStore((s) => s.setIdentity);
   // The identity-lite answers, still in the survey session. `bcp47` is the tag the
-  // series composed; `english` is the language's English name (spec 057 FR-001/FR-002).
+  // series composed; `english` is the language's English name (spec 059 FR-001/FR-002).
   const identityResult = useSurveySessionStore((s) => s.identityResult);
   const identityBcp47 = (identity?.bcp47 ?? identityResult?.bcp47 ?? "").trim();
   const identityLanguageName = (identity?.languageName ?? identityResult?.english ?? "").trim();
@@ -81,7 +81,7 @@ export function TrackOneIdentityPanel() {
 
   // The identity-lite answers, carried into every patch this panel writes.
   //
-  // spec 057 FR-001/FR-002: the package descriptor declares the author's language,
+  // spec 059 FR-001/FR-002: the package descriptor declares the author's language,
   // and this panel is the copy track's OTHER identity writer (the first being
   // project_name's onCommit). Without these two fields a later edit here would
   // spread `...identity` over a patch that had them and then be re-merged — which

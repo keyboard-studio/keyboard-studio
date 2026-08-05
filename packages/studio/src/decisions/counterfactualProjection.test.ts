@@ -1,4 +1,4 @@
-// Tests for the identity counterfactual (spec 057 T027).
+// Tests for the identity counterfactual (spec 059 T027).
 //
 // The `project` dependency is injected, so these tests drive it with hand-built
 // projections — that is the point of the seam. What they pin is the DIFFING

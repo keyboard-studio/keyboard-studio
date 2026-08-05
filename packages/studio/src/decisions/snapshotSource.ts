@@ -40,7 +40,7 @@
 
 import { diffLines, diffMagnitude } from "@keyboard-studio/engine";
 // The volatile-content exclusion and the "what is diffable text" rule live in ONE
-// module (spec 057 research D-10): FR-013 applies to every comparison the trail
+// module (spec 059 research D-10): FR-013 applies to every comparison the trail
 // makes, and the counterfactual is now a second comparer.
 import { textBaseline, normalizeHistoryDateStamp } from "./projectedText.ts";
 import type { DecisionFileChange, DecisionImpact, VirtualFSEntry } from "@keyboard-studio/contracts";

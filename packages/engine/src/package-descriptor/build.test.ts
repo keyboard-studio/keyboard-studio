@@ -1,4 +1,4 @@
-// Tests for the package-descriptor builder (spec 057 T009).
+// Tests for the package-descriptor builder (spec 059 T009).
 //
 // What these assert is the identity contract, not the whole file shape: the four
 // elements the writer owns (contracts/package-descriptor.md §2), and the two

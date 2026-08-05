@@ -123,7 +123,7 @@ export type ValidationResult =
   | { ok: false; code: string; message: string };
 
 // ---------------------------------------------------------------------------
-// Output reach (spec 057 FR-016, contracts/question-output-reach.md)
+// Output reach (spec 059 FR-016, contracts/question-output-reach.md)
 // ---------------------------------------------------------------------------
 
 /**
@@ -219,7 +219,7 @@ export interface QuestionModule {
   writes?: readonly IRPath[];
 
   /**
-   * Output artifacts this question's answer reaches, if any (spec 057 FR-016).
+   * Output artifacts this question's answer reaches, if any (spec 059 FR-016).
    *
    * DIFFERENT ADDRESS SPACE from `writes`. `writes` is `IRPath[]` over
    * `KeyboardIR` and governs `mutate()` containment; `outputs` names emitted

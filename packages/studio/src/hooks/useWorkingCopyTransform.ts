@@ -308,7 +308,7 @@ export function useWorkingCopyTransform(
   const identityDisplayName = identity?.displayName ?? null;
   const identityKeyboardId = identity?.keyboardId ?? null;
   const identityBcp47 = identity?.bcp47 ?? null;
-  // spec 057: the descriptor's <Language> display text. Forwarded so the OSK
+  // spec 059: the descriptor's <Language> display text. Forwarded so the OSK
   // preview sees the same package descriptor the zip does (FR-004/SC-005).
   const identityLanguageName = identity?.languageName ?? null;
 
