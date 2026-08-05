@@ -103,8 +103,22 @@ export { recognizePatterns, classifyRemovalCapabilities } from "./recognizer/ind
 export type { RecognizerRule, MatchResult, RecognizeResult } from "./recognizer/index.js";
 export { isParallelIndexFanOut } from "./recognizer/rules/parallel-index-fanout.js";
 
+// spec 057 — the single package-descriptor writer. Both authoring tracks reach
+// `source/<id>.kps` through this module and nowhere else (FR-005).
+export {
+  buildKpsContent,
+  buildLanguageElement,
+  buildLanguagesBlock,
+  applyIdentityToKps,
+  DESCRIPTOR_CONSUMED_FIELDS,
+} from "./package-descriptor/index.js";
+export type {
+  PackageDescriptorIdentity,
+  ApplyIdentityToKpsResult,
+} from "./package-descriptor/index.js";
+
 // Issue #19 — scaffolder (template-cleanup pipeline).
-export { createScaffolderService, renameFilesInVfs } from "./scaffolder/index.js";
+export { createScaffolderService, renameFilesInVfs, generateStubs } from "./scaffolder/index.js";
 export { scaffoldIR, resetIdentity } from "./scaffolder/scaffold-ir.js";
 export {
   scaffoldTouchLayout,
@@ -242,7 +256,7 @@ export { applyMarkGuards, MARKS_GUARD_GROUP, MARKS_UNWRAP_FROM_STORE, MARKS_UNWR
 export type { MarkGuardsResult } from "./pattern-apply/mark-guards.js";
 
 // Pattern-apply: slot substitution + MechanismAssignment[] to .kmn injection.
-export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, carveFilterIr, applyKeycapLabelsToVfs, applyCarveKeycapRemovalsToVfs, collectCarvedKeycapTexts, resolveRenderableMechanisms, applyTouchAssignments, applyTouchAssignmentsToRawJson, applyDesktopModifications, applyDesktopModificationsToRawJson, propagateDesktopLayersToTouch, applyStoreSlotRemovals, classifyStoreSlotEdit, describeStorePairing, analyzeStores, storeRoleOf, buildProducerIndex, parseSlotId, makeSlotId, collectCharContributors, collectCompositionMethod, isMnemonicLayout, keyHasCapsHandling, buildShiftRuleLines, buildBaseRuleLines, buildCasePairRuleLines, planShiftAssignment, MODIFIER_EXCLUSIONS, canonicalizeCombo, comboToKeySpec, parseKeySpec, comboToTouchLayerId, comboToKvksShiftToken, collectModifierTokensInUse, collectLayerCombosInUse, buildComboKeyMap, addableTouchLayerTokens, optionsForTouchLayerSlot, isPlusSeparator, touchKeyAddress, touchSubKeyAddress, touchFlickAddress, enumerateTouchMethodsForChar, applyTouchKeycapRemovalsToLayout, applyTouchKeycapRemovalsToRawJson, applyTouchKeycapRemovalsToVfs } from "./pattern-apply/index.js";
+export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, carveFilterIr, applyKeycapLabelsToVfs, applyCarveKeycapRemovalsToVfs, collectCarvedKeycapTexts, resolveRenderableMechanisms, applyTouchAssignments, applyTouchAssignmentsToRawJson, applyDesktopModifications, applyDesktopModificationsToRawJson, propagateDesktopLayersToTouch, applyStoreSlotRemovals, classifyStoreSlotEdit, describeStorePairing, analyzeStores, storeRoleOf, buildProducerIndex, parseSlotId, makeSlotId, collectCharContributors, collectCompositionMethod, isMnemonicLayout, keyHasCapsHandling, buildShiftRuleLines, buildBaseRuleLines, buildCasePairRuleLines, planShiftAssignment, MODIFIER_EXCLUSIONS, canonicalizeCombo, comboToKeySpec, parseKeySpec, comboToTouchLayerId, comboToKvksShiftToken, collectModifierTokensInUse, collectLayerCombosInUse, buildComboKeyMap, addableTouchLayerTokens, optionsForTouchLayerSlot, isPlusSeparator, touchKeyAddress, touchSubKeyAddress, touchFlickAddress, enumerateTouchMethodsForChar, applyTouchKeycapRemovalsToLayout, applyTouchKeycapRemovalsToRawJson, applyTouchKeycapRemovalsToVfs, buildSessionProducedSet } from "./pattern-apply/index.js";
 export type { SubstituteResult, ApplyAssignmentsResult, ApplyTouchAssignmentsResult, ApplyTouchAssignmentsToRawJsonResult, DesktopModifications, ApplyDesktopModificationsResult, ApplyDesktopModificationsToRawJsonResult, PropagateDesktopLayersToTouchResult, ApplyCarveToVfsOpts, CarveKeycapRemovalInput, StoreSlotRemovalResult, StoreSlotEditMode, StoreSlotBlockReason, StorePairingDescription, StoreAnalysis, StoreRole, ProducerIndex, CharContributors, ContributorDescriptor, ShiftAssignmentPlan, ModifierToken, TouchMethodDescriptor, ApplyTouchKeycapRemovalsResult, ApplyTouchKeycapRemovalsToRawJsonResult } from "./pattern-apply/index.js";
 
 // Facet-transform (spec 039): switch a base's source-construction facet value on

@@ -30,6 +30,13 @@
 //                         .keyman-touch-layout written by step 0; no-op when
 //                         the VFS has no touch layout file)
 //   3. Identity         — applyIdentityStubMutation (writes &NAME)
+//   3.5 Keycap labels   — applyKeycapLabelsToVfs (see step 3.5 below)
+//   3.6 Package descriptor — applyIdentityToKps writes the AUTHOR's language +
+//                         display name into source/<keyboardId>.kps, generating
+//                         the descriptor when the track has none (spec 057).
+//                         Runs after the .kmn is final (the <Files> list derives
+//                         from it) and before the step-4 rename (which owns <ID>
+//                         and the <Files> paths).
 //
 // Touch layout is injected FIRST (step 0) so:
 //   - Step 2.5 layer propagation patches the injected layout (or the base
@@ -61,7 +68,9 @@ import {
   parseSlotId,
   propagateDesktopLayersToTouch,
   collectLayerCombosInUse,
+  applyIdentityToKps,
 } from "@keyboard-studio/engine";
+import type { PackageDescriptorIdentity } from "@keyboard-studio/engine";
 import { applyCarveMutate, applyAddGalleryMutate } from "../steps/editorMutate.ts";
 import { isMutateSeamEnabled } from "../flags/mutateFlag.ts";
 import { findTouchLayoutPath } from "./findTouchLayoutPath.ts";
@@ -152,7 +161,22 @@ export type IdentityOverlay = {
   displayName?: string;
   copyright?: string;
   version?: string;
+  /**
+   * The author's composed BCP47 tag.
+   *
+   * Consumed by `resetIdentity` during the step-4 id rename AND, since spec 057,
+   * by step 3.6 as the package descriptor's declared language tag. Taken whole
+   * from the identity-lite result — never re-composed here (FR-001).
+   */
   bcp47?: string;
+  /**
+   * The language's name in English, display text for the descriptor's
+   * `<Language>` element (spec 057 FR-002).
+   *
+   * Descriptor-only: the codec does not serialize a language name, and teaching
+   * it to is out of scope, so this never reaches the `.kmn`.
+   */
+  languageName?: string;
 };
 
 export interface ProjectWorkingCopyVfsResult {
@@ -468,6 +492,56 @@ export function projectWorkingCopyVfs(
       const msg = err instanceof Error ? err.message : String(err);
       warnings.push(`[project-working-copy] keycap label projection skipped: ${msg}`);
     }
+  }
+
+  // Step 3.6: Package-descriptor identity — write the AUTHOR's language and
+  // display name into `source/<keyboardId>.kps`, generating the descriptor when
+  // the track never had one (spec 057 FR-001…FR-006).
+  //
+  // ORDER IS LOAD-BEARING, in both directions:
+  //
+  //   After step 3/3.5, because the descriptor's `<Files>` list is derived from the
+  //   final `.kmn` — a list that named artifacts this build does not emit fails
+  //   `kmc`.
+  //
+  //   Before step 4, because `rewriteKpsFilePaths` owns `<ID>` and the `<Files>`
+  //   paths. This step deliberately writes neither, under the PRE-rename keyboard
+  //   id, so the rename pass composes with no new code. That pass's skip of
+  //   non-path-shaped `<Name>` values is exactly what preserves the display names
+  //   set here (research D-02). Inverting the two would either strand the
+  //   descriptor under the old filename or have the rename mangle the author's
+  //   name into a path.
+  //
+  // Runs for BOTH tracks and on BOTH the preview and output paths, which is what
+  // makes FR-004/SC-005 true: the OSK preview, the zip, and the pull request all
+  // see one descriptor because they all come through here.
+  if (identity !== null) {
+    const kmnTextForKps = readVfsText(vfs, `source/${keyboardId}.kmn`) ?? "";
+    const kpsIdentity: PackageDescriptorIdentity = {
+      // Passed through as-is, INCLUDING a blank: the writer owns the fallback
+      // (`effectiveDisplayName`) so both its paths apply the same one. Note `??`
+      // would not be enough here — an author who clears the display-name field
+      // commits `""`, not `undefined`, and `""` is exactly the case that must not
+      // leave the base keyboard's name standing in the descriptor.
+      displayName: identity.displayName ?? "",
+      ...(identity.bcp47 !== undefined && identity.bcp47 !== ""
+        ? { languageTag: identity.bcp47 }
+        : {}),
+      ...(identity.languageName !== undefined && identity.languageName !== ""
+        ? { languageName: identity.languageName }
+        : {}),
+    };
+    // `applyIdentityToKps` never throws — an absent or unreadable descriptor
+    // reports through its warnings, which merge into the projection's own. A
+    // silent no-op here is the defect this step exists to remove (FR-006).
+    const kpsResult = applyIdentityToKps(
+      vfs,
+      keyboardId,
+      kpsIdentity,
+      kmnTextForKps,
+      identity.version,
+    );
+    warnings.push(...kpsResult.warnings);
   }
 
   // Step 4: Id rename — only when the author chose a different keyboard id.

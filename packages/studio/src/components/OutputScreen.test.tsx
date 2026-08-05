@@ -1,10 +1,10 @@
-// Tests for PreviewScreen and OutputScreen — the two screens produced by the
-// preview/output split.
+// Tests for OutputScreen — the "ship it" half of the old preview/output split.
 //
-// PreviewScreen ("try it"):
-//   - Renders OSK (testid osk-frame) and DiagnosticsPanel.
-//   - Does NOT render a "Download .zip" button.
-//   - Does NOT render SignUpPanel.
+// Spec 057 (T030, FR-072): the PreviewScreen half of this file is GONE, not
+// deleted-and-forgotten. That screen was replaced by CompareScreen, whose
+// contract is an ABSENCE (no write path into the working copy) rather than a
+// presence, so its assertions read nothing like the ones that were here and
+// live in their own file: components/CompareShell.test.tsx.
 //
 // OutputScreen ("ship it"):
 //   - Renders "Download .zip" button and SignUpPanel.
@@ -111,7 +111,6 @@ vi.mock("./SignUpPanel.tsx", () => ({
 // Import components under test AFTER mocks are registered.
 // ---------------------------------------------------------------------------
 
-import { PreviewScreen } from "./PreviewScreen.tsx";
 import { OutputScreen } from "./OutputScreen.tsx";
 
 // ---------------------------------------------------------------------------
@@ -129,14 +128,17 @@ function renderOutputScreen() {
   return render(<OutputScreen />);
 }
 
-/** Render helper — PreviewScreen (and its DiagnosticsPanel / OSKFrame /
- * PickerPane children) also uses Lingui Trans/t macros, which require an
- * I18nProvider ancestor. All PreviewScreen render call-sites in this file go
- * through this helper so there is exactly one place the provider is wired up. */
-function renderPreviewScreen() {
-  return render(<PreviewScreen />);
-}
-
+/**
+ * Seed an instantiated working copy — the normal end-of-flow state.
+ *
+ * Note for OutputScreen tests: seeding is by itself enough to give the screen a
+ * base. `usePreviewArtifact` lazy-inits its `baseKeyboard` from this store, and
+ * since spec 058 an instantiated working copy puts the left pane in its
+ * "shipping" variant, which has NO picker to click (re-basing from the ship-it
+ * screen was the defect that change removed). So the seeded OutputScreen tests
+ * below deliberately do not click "base-picker" — the tests that still do are
+ * exercising the cold-arrival path, where the picker is the only route.
+ */
 function seedInstantiatedWorkingCopy() {
   const vfs = createVirtualFS([
     { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
@@ -173,32 +175,6 @@ afterEach(() => {
 // Route-split assertions (AC)
 // ---------------------------------------------------------------------------
 
-describe("PreviewScreen — route-split AC", () => {
-  it("renders the OSK frame (osk-frame testid)", () => {
-    renderPreviewScreen();
-    expect(screen.getByTestId("osk-frame")).toBeTruthy();
-  });
-
-  it("renders DiagnosticsPanel (no-diagnostics message) after base is picked", () => {
-    renderPreviewScreen();
-    fireEvent.click(screen.getByTestId("base-picker"));
-    // DiagnosticsPanel renders "No compiler diagnostics." when empty.
-    expect(screen.getByText(/no compiler diagnostics/i)).toBeTruthy();
-  });
-
-  it("does NOT render a Download .zip button", () => {
-    renderPreviewScreen();
-    fireEvent.click(screen.getByTestId("base-picker"));
-    expect(screen.queryByRole("button", { name: /download/i })).toBeNull();
-  });
-
-  it("does NOT render SignUpPanel", () => {
-    renderPreviewScreen();
-    fireEvent.click(screen.getByTestId("base-picker"));
-    expect(screen.queryByTestId("signup-panel")).toBeNull();
-  });
-});
-
 describe("OutputScreen — route-split AC", () => {
   it("renders the Download .zip button after base is picked", () => {
     seedInstantiatedWorkingCopy();
@@ -209,7 +185,6 @@ describe("OutputScreen — route-split AC", () => {
       version: "1.0",
     };
     renderOutputScreen();
-    fireEvent.click(screen.getByTestId("base-picker"));
     expect(screen.getByRole("button", { name: /download/i })).toBeTruthy();
   });
 
@@ -247,7 +222,6 @@ describe("OutputScreen — output-time touch-layout staleness gate", () => {
       version: "1.0",
     };
     renderOutputScreen();
-    fireEvent.click(screen.getByTestId("base-picker"));
   }
 
   it("disables the download button when staleSteps contains the touch step id", () => {
@@ -340,9 +314,6 @@ describe("OutputScreen — projection warnings", () => {
 
     renderOutputScreen();
 
-    // Click the base picker to set the base keyboard (renders the Download button).
-    fireEvent.click(screen.getByTestId("base-picker"));
-
     // Click Download.
     await act(async () => {
       const btn = screen.getByRole("button", { name: /download/i });
@@ -366,7 +337,6 @@ describe("OutputScreen — projection warnings", () => {
     };
 
     renderOutputScreen();
-    fireEvent.click(screen.getByTestId("base-picker"));
 
     await act(async () => {
       const btn = screen.getByRole("button", { name: /download/i });
@@ -389,7 +359,6 @@ describe("OutputScreen — projection warnings", () => {
     };
 
     renderOutputScreen();
-    fireEvent.click(screen.getByTestId("base-picker"));
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /download/i }));
@@ -411,7 +380,6 @@ describe("OutputScreen — projection warnings", () => {
     };
 
     renderOutputScreen();
-    fireEvent.click(screen.getByTestId("base-picker"));
 
     await act(async () => {
       fireEvent.click(screen.getByRole("button", { name: /download/i }));
@@ -440,14 +408,14 @@ describe("OutputScreen — projection warnings", () => {
 // Tests — identity-unset warning banner (AC2 + AC4)
 // ---------------------------------------------------------------------------
 
-// Helper: render OutputScreen with the base-picker clicked so local
-// baseKeyboard is set (the identity-warn banner is inside {baseKeyboard !== null}).
-// seedInstantiatedWorkingCopy() seeds the store first so the idempotence guard
-// in instantiateFromBase keeps identity = null → showIdentityWarn = true.
+// Helper: render OutputScreen with a base in place, so the identity-warn banner
+// (inside {baseKeyboard !== null}) renders. seedInstantiatedWorkingCopy() both
+// supplies that base (lazy-init from the store — see its docstring) and keeps
+// identity = null via instantiateFromBase's idempotence guard, which is what
+// makes showIdentityWarn true.
 function renderOutputWithBasePicked() {
   seedInstantiatedWorkingCopy();
   renderOutputScreen();
-  fireEvent.click(screen.getByTestId("base-picker"));
 }
 
 function getIdentityStatusRegion() {
@@ -533,7 +501,6 @@ describe("OutputScreen — download filename", () => {
 
     try {
       renderOutputScreen();
-      fireEvent.click(screen.getByTestId("base-picker"));
       await act(async () => {
         fireEvent.click(screen.getByRole("button", { name: /download/i }));
       });

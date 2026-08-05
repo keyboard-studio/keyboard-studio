@@ -28,6 +28,7 @@ import { render } from "./test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
 import { useSurveySessionStore, snapshotTraversal } from "./stores/surveySessionStore.ts";
 import { useStartOverStore } from "./stores/startOverStore.ts";
+import { consumePendingWelcomeLocation, jumpToLocation } from "./lib/jumpToLocation.ts";
 import { snapshotWorkingCopyData } from "./lib/persistWorkingCopy.ts";
 import type { OnInstantiateCallback, Stage } from "./hooks/useKeyboardArtifact.ts";
 
@@ -559,10 +560,10 @@ vi.mock("./lib/buildTouchLayoutJson.ts", () => ({
   }),
 }));
 
-// Shallow stubs for PreviewScreen and OutputScreen — routing tests assert on
+// Shallow stubs for CompareScreen and OutputScreen — routing tests assert on
 // the marker divs, not the internal pipeline.
-vi.mock("./components/PreviewScreen.tsx", () => ({
-  PreviewScreen: () => <div data-testid="preview-screen-root">preview-screen</div>,
+vi.mock("./components/CompareScreen.tsx", () => ({
+  CompareScreen: () => <div data-testid="compare-screen-root">compare-screen</div>,
 }));
 
 vi.mock("./components/OutputScreen.tsx", () => ({
@@ -652,28 +653,38 @@ function advanceToB() {
 /**
  * Drive from "identity" to "carve".
  * New order (issue #508): prefill → B → carve — phaseB-complete lands on carve
- * via the marks step's S0 auto-skip (spec 046; marks-free test alphabet).
+ * via the marks step's S0 auto-skip (spec 046; marks-free test alphabet) and the
+ * convenience step's own skip.
+ *
+ * ASYNC since spec 057. The convenience step deliberately holds its gate until
+ * the CLDR/SLDR exemplar lookup settles, and `useCarveNeededSet` only settles
+ * synchronously when there is NO language to look up. Track 1 now carries the
+ * author's composed BCP47 tag into the working copy (FR-001) — which is the point
+ * of that feature — so the lookup genuinely runs and the walk past B is genuinely
+ * asynchronous. Awaiting the landing stage is what that costs; asserting
+ * synchronously here would only pass while Track 1 had no language at all.
  */
-function advanceToCarve() {
+async function advanceToCarve() {
   advanceToB();
   fireEvent.click(screen.getByTestId("phaseB-complete"));
+  await screen.findByTestId("stage-carve");
 }
 
 /** Drive from "identity" to "mechanisms". */
-function advanceToMechanisms() {
-  advanceToCarve();
+async function advanceToMechanisms() {
+  await advanceToCarve();
   fireEvent.click(screen.getByTestId("carve-complete"));
 }
 
 /** Drive from "identity" to "touch_seed_source" (the seed-source fork chooser). */
-function advanceToTouchSeedSource() {
-  advanceToMechanisms();
+async function advanceToTouchSeedSource() {
+  await advanceToMechanisms();
   fireEvent.click(screen.getByTestId("mechanisms-complete"));
 }
 
 /** Drive from "identity" to "F". */
-function advanceToF() {
-  advanceToTouchSeedSource();
+async function advanceToF() {
+  await advanceToTouchSeedSource();
   // touch_seed_source fork (spec 035 R4/R12, no choice recorded yet on a fresh
   // walk) renders the mocked TouchSeedSourcePanel chooser; confirming it lands
   // on the real "touch" step (mocked TouchGallery stub, "e-complete").
@@ -688,11 +699,25 @@ function advanceToF() {
 beforeEach(() => {
   artifactHoisted.onInstantiateRef.current = null;
   artifactHoisted.stageSetters = [];
+  // Spec 057 (FR-072): every test in this file starts from a fresh wizard, and
+  // now has to SAY so.
+  //
+  // It used to be inherited from the defect: `SurveyView`'s mount effect reset
+  // the survey-session store, so every `render()` here silently started at
+  // "identity" no matter where the previous test had left the module-level
+  // singleton. Deleting that reset (D-1) is what makes a tab round trip
+  // preserve the author's position — and it also removes the per-test reset
+  // these suites were leaning on without stating.
+  //
+  // Resetting here is the honest replacement: test isolation is the test
+  // file's job, not a side effect of a component's mount.
+  useSurveySessionStore.getState().reset();
 });
 
 afterEach(() => {
   cleanup();
   useWorkingCopyStore.getState().reset();
+  useSurveySessionStore.getState().reset();
   vi.clearAllMocks();
   // The first-visit gate reads ks.visited / the ks.studio.draft key from
   // localStorage; clear it so gate state can't leak between tests.
@@ -734,7 +759,9 @@ describe("SurveyView — B → carve transition", () => {
 
     fireEvent.click(screen.getByTestId("phaseB-complete"));
 
-    expect(screen.getByTestId("stage-carve")).toBeTruthy();
+    // Async landing: the convenience step waits on the exemplar lookup now that
+    // Track 1 carries a language tag (spec 057) — see advanceToCarve.
+    expect(await screen.findByTestId("stage-carve")).toBeTruthy();
     expect(screen.queryByTestId("stage-B")).toBeNull();
   });
 });
@@ -749,7 +776,7 @@ describe("SurveyView — carve → mechanisms transition", () => {
       render(<SurveyView baseKeyboard={null} />);
     });
 
-    advanceToCarve();
+    await advanceToCarve();
     expect(screen.getByTestId("stage-carve")).toBeTruthy();
 
     fireEvent.click(screen.getByTestId("carve-complete"));
@@ -774,7 +801,7 @@ describe("SurveyView — mechanisms → F transition", () => {
       render(<SurveyView baseKeyboard={null} />);
     });
 
-    advanceToMechanisms();
+    await advanceToMechanisms();
     expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
 
     // mechanisms → touch_seed_source fork (spec 035 R4/R12)
@@ -825,7 +852,7 @@ describe("SurveyView — touch_seed_source suppresses the outer OSK pane (P0 fix
       render(<SurveyView baseKeyboard={null} />);
     });
 
-    advanceToTouchSeedSource();
+    await advanceToTouchSeedSource();
     expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
 
     // The outer, persistent right-pane OSKFrame is mocked to unconditionally
@@ -875,12 +902,15 @@ describe("SurveyView — carve → B back-navigation", () => {
       render(<SurveyView baseKeyboard={null} />);
     });
 
-    advanceToCarve();
+    await advanceToCarve();
     expect(screen.getByTestId("stage-carve")).toBeTruthy();
 
     fireEvent.click(screen.getByTestId("carve-back"));
 
-    expect(screen.getByTestId("stage-B")).toBeTruthy();
+    // The back-pop crosses the convenience step, which re-runs its exemplar
+    // lookup on re-entry and stays transparent in the direction of travel — so
+    // the landing is async in both directions (spec 057; see advanceToCarve).
+    expect(await screen.findByTestId("stage-B")).toBeTruthy();
     expect(screen.queryByTestId("stage-carve")).toBeNull();
     // Confirm it did NOT go to prefill (the old pre-#508 behavior).
     expect(screen.queryByTestId("stage-prefill")).toBeNull();
@@ -897,7 +927,7 @@ describe("SurveyView — F → E back-navigation", () => {
       render(<SurveyView baseKeyboard={null} />);
     });
 
-    advanceToF();
+    await advanceToF();
     expect(screen.getByTestId("stage-F")).toBeTruthy();
 
     fireEvent.click(screen.getByTestId("phaseF-back"));
@@ -919,7 +949,7 @@ describe("SurveyView — mechanisms → carve back-navigation", () => {
       render(<SurveyView baseKeyboard={null} />);
     });
 
-    advanceToMechanisms();
+    await advanceToMechanisms();
     expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
 
     fireEvent.click(screen.getByTestId("mechanisms-back"));
@@ -932,12 +962,14 @@ describe("SurveyView — mechanisms → carve back-navigation", () => {
 });
 
 // ---------------------------------------------------------------------------
-// StudioShell routing regression — #preview mounts PreviewScreen and #output
+// StudioShell routing regression — #preview mounts CompareScreen and #output
 // mounts OutputScreen (distinct screens, NOT RoutePlaceholder).
 // ---------------------------------------------------------------------------
 
-describe("StudioShell — route: #preview renders PreviewScreen", () => {
-  it("mounts PreviewScreen (not RoutePlaceholder) when hash is #preview", async () => {
+describe("StudioShell — route: #preview renders CompareScreen", () => {
+  // Spec 057: the route TOKEN stays `preview` while the tab is labelled
+  // "Compare" (contract §1), so this hash assertion is deliberately unchanged.
+  it("mounts CompareScreen (not RoutePlaceholder) when hash is #preview", async () => {
     window.location.hash = "#preview";
     localStorage.setItem("ks.visited", "1"); // returning visitor: deep-link hash is honored
 
@@ -945,11 +977,11 @@ describe("StudioShell — route: #preview renders PreviewScreen", () => {
       render(<StudioShell />);
     });
 
-    // PreviewScreen stub must be present.
-    expect(screen.getByTestId("preview-screen-root")).toBeTruthy();
+    // CompareScreen stub must be present.
+    expect(screen.getByTestId("compare-screen-root")).toBeTruthy();
     // OutputScreen must NOT be present — these are distinct screens.
     expect(screen.queryByTestId("output-screen-root")).toBeNull();
-    // RoutePlaceholder renders "Preview — coming soon"; must NOT be present.
+    // RoutePlaceholder renders a "coming soon" stub; must NOT be present.
     expect(screen.queryByText(/coming soon/i)).toBeNull();
   });
 });
@@ -965,8 +997,8 @@ describe("StudioShell — route: #output renders OutputScreen", () => {
 
     // OutputScreen stub must be present.
     expect(screen.getByTestId("output-screen-root")).toBeTruthy();
-    // PreviewScreen must NOT be present — these are distinct screens.
-    expect(screen.queryByTestId("preview-screen-root")).toBeNull();
+    // CompareScreen must NOT be present — these are distinct screens.
+    expect(screen.queryByTestId("compare-screen-root")).toBeNull();
     expect(screen.queryByText(/coming soon/i)).toBeNull();
   });
 });
@@ -983,7 +1015,7 @@ describe("StudioShell — first-visit gate forces newcomers to welcome", () => {
     // The deep-linked #preview is overridden — a genuine newcomer lands on
     // welcome (the shallow WelcomeScreen stub above, per this file's routing-
     // test idiom).
-    expect(screen.queryByTestId("preview-screen-root")).toBeNull();
+    expect(screen.queryByTestId("compare-screen-root")).toBeNull();
     expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
     // The hash is rewritten to #welcome so leaving welcome fires a real hashchange.
     expect(window.location.hash).toBe("#welcome");
@@ -997,7 +1029,7 @@ describe("StudioShell — first-visit gate forces newcomers to welcome", () => {
       render(<StudioShell />);
     });
 
-    expect(screen.getByTestId("preview-screen-root")).toBeTruthy();
+    expect(screen.getByTestId("compare-screen-root")).toBeTruthy();
   });
 });
 
@@ -1115,7 +1147,7 @@ describe("StudioShell — first-visit landing gate", () => {
     });
 
     expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
-    expect(screen.queryByTestId("preview-screen-root")).toBeNull();
+    expect(screen.queryByTestId("compare-screen-root")).toBeNull();
   });
 
   it("lifts the gate on a live hashchange once the newcomer leaves welcome (no remount)", async () => {
@@ -1161,7 +1193,7 @@ describe("StudioShell — first-visit landing gate", () => {
 
     // Gate lifted by the draft ⇒ the deep-linked hash is honored: land on
     // preview, NOT forced onto welcome and NOT defaulted to survey.
-    expect(screen.getByTestId("preview-screen-root")).toBeTruthy();
+    expect(screen.getByTestId("compare-screen-root")).toBeTruthy();
     expect(screen.queryByTestId("welcome-screen-root")).toBeNull();
     expect(screen.queryByTestId("stage-identity")).toBeNull();
   });
@@ -1652,7 +1684,7 @@ describe("SurveyView — PhaseF done navigates to #output", () => {
       render(<SurveyView baseKeyboard={null} />);
     });
 
-    advanceToF();
+    await advanceToF();
     expect(screen.getByTestId("stage-F")).toBeTruthy();
 
     // Fire PhaseF completion.
@@ -1677,7 +1709,7 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
     });
 
     // Advance to the fork, confirm it, then reach Phase E (touch).
-    advanceToTouchSeedSource();
+    await advanceToTouchSeedSource();
     expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
     fireEvent.click(screen.getByTestId("seed-source-complete"));
     expect(screen.getByTestId("stage-E")).toBeTruthy();
@@ -1696,7 +1728,7 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
       render(<SurveyView baseKeyboard={null} />);
     });
 
-    advanceToTouchSeedSource();
+    await advanceToTouchSeedSource();
     expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
     fireEvent.click(screen.getByTestId("seed-source-complete"));
     fireEvent.click(screen.getByTestId("e-back"));
@@ -1717,7 +1749,7 @@ describe("SurveyView — Phase E back-navigation returns to touch_seed_source (R
     });
 
     // Advance to Phase E.
-    advanceToTouchSeedSource();
+    await advanceToTouchSeedSource();
     fireEvent.click(screen.getByTestId("seed-source-complete"));
     expect(screen.getByTestId("stage-E")).toBeTruthy();
 
@@ -1816,9 +1848,9 @@ describe("SurveyView — adapt-track carve → B back-navigation (SC-002 parity)
     fireEvent.click(screen.getByTestId("prefill-confirm"));
     expect(screen.getByTestId("stage-B")).toBeTruthy();
 
-    // Advance through PhaseB to carve.
+    // Advance through PhaseB to carve (async landing — see advanceToCarve).
     fireEvent.click(screen.getByTestId("phaseB-complete"));
-    expect(screen.getByTestId("stage-carve")).toBeTruthy();
+    expect(await screen.findByTestId("stage-carve")).toBeTruthy();
 
     // carve-back must re-enter PhaseB (not prefill).
     fireEvent.click(screen.getByTestId("carve-back"));
@@ -1873,7 +1905,7 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
     _mockTouchEAssignmentsRef.current = [longpressAssignment];
 
     // Navigate through the fork, then fire the TouchGallery complete button.
-    advanceToMechanisms();
+    await advanceToMechanisms();
     fireEvent.click(screen.getByTestId("mechanisms-complete"));
     // The touch_seed_source chooser is shown next (spec 035 R4/R12, no choice
     // recorded on a fresh walk) — NOT the real "touch" step, so
@@ -1906,7 +1938,7 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
     // setTouchLayoutJson(null) rather than attempting to build a layout.
     _mockTouchEAssignmentsRef.current = [];
 
-    advanceToMechanisms();
+    await advanceToMechanisms();
     fireEvent.click(screen.getByTestId("mechanisms-complete"));
 
     // Confirming touch_seed_source (spec 035 R4/R12 fork; no choice recorded
@@ -1941,7 +1973,7 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
     // Empty assignments — no real touch edits were made.
     _mockTouchEAssignmentsRef.current = [];
 
-    advanceToMechanisms();
+    await advanceToMechanisms();
     fireEvent.click(screen.getByTestId("mechanisms-complete"));
 
     // Confirming touch_seed_source (spec 035 R4/R12 fork; no choice recorded
@@ -1975,7 +2007,7 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
     // Zero Phase E edits — the row that would emit nothing under import-adapt.
     _mockTouchEAssignmentsRef.current = [];
 
-    advanceToMechanisms();
+    await advanceToMechanisms();
     fireEvent.click(screen.getByTestId("mechanisms-complete"));
     expect(screen.getByTestId("stage-seed-source")).toBeTruthy();
 
@@ -2103,7 +2135,7 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     // test alphabet has no marks, so the S0 gate auto-completes the marks
     // step without rendering and the walk lands directly on carve.
     fireEvent.click(screen.getByTestId("phaseB-complete"));
-    expect(screen.getByTestId("stage-carve")).toBeTruthy();
+    expect(await screen.findByTestId("stage-carve")).toBeTruthy();
 
     // → mechanisms
     fireEvent.click(screen.getByTestId("carve-complete"));
@@ -2149,7 +2181,7 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     // phaseB-complete must land on carve (via the marks step's S0 auto-skip
     // — the marks-free test alphabet completes marks without rendering).
     fireEvent.click(screen.getByTestId("phaseB-complete"));
-    expect(screen.getByTestId("stage-carve")).toBeTruthy();
+    expect(await screen.findByTestId("stage-carve")).toBeTruthy();
     expect(screen.queryByTestId("stage-mechanisms")).toBeNull();
   });
 
@@ -2158,7 +2190,7 @@ describe("T029 — runtime step order matches manifest spine order", () => {
       render(<SurveyView baseKeyboard={null} />);
     });
 
-    advanceToMechanisms();
+    await advanceToMechanisms();
 
     // lockDesktop should not have been called yet.
     expect(useWorkingCopyStore.getState().desktopLocked).toBe(false);
@@ -2295,5 +2327,237 @@ describe("rehydrate of a corrupted persisted draft does not runaway-render (free
     expect(notifyCount).toBeLessThan(10);
 
     unsubscribe();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 057 US1 (T020) — traversal survives a route round trip.
+//
+// These tests encode the NEW contract, replacing the old "navigating away and
+// back is a fresh wizard" assumption (FR-002, FR-003, D-1). They are written
+// so that reinstating any mount-time reset makes them fail: each drives the
+// wizard forward, unmounts and remounts SurveyView exactly as a hash-route
+// change does, and asserts the traversal is where the author left it.
+//
+// `cleanup()` + a fresh `render()` is the right model for a route change here:
+// StudioShell's route switch swaps which component the content slot renders,
+// which unmounts SurveyView and mounts it again — the store singleton is what
+// spans the two, and that is precisely the seam under test.
+// ---------------------------------------------------------------------------
+
+describe("SurveyView — traversal survives a route round trip (spec 057 FR-002)", () => {
+  /**
+   * Mount the way `StudioShell` does: `baseKeyboard` is the WORKING-COPY
+   * STORE's base, not a fixed prop. That matters on the remount — `SurveyView`
+   * syncs `localBase` from this prop, so remounting with a hardcoded `null`
+   * would blank a base the author had already chosen and tell us nothing about
+   * traversal.
+   */
+  async function mountSurvey() {
+    const base =
+      useWorkingCopyStore.getState().baseKeyboard ??
+      useSurveySessionStore.getState().localBase;
+    await act(async () => {
+      render(<SurveyView baseKeyboard={base} />);
+    });
+  }
+
+  /** Unmount and remount, as a tab switch away and back does. */
+  async function routeRoundTrip() {
+    cleanup();
+    await mountSurvey();
+  }
+
+  it("keeps activeStepId and history across a remount", async () => {
+    useSurveySessionStore.getState().reset();
+    await mountSurvey();
+    advanceToTrack();
+
+    const before = {
+      activeStepId: useSurveySessionStore.getState().activeStepId,
+      history: [...useSurveySessionStore.getState().history],
+    };
+    expect(before.activeStepId).toBe("track");
+    expect(before.history.length).toBeGreaterThan(0);
+
+    await routeRoundTrip();
+
+    expect(useSurveySessionStore.getState().activeStepId).toBe(before.activeStepId);
+    expect([...useSurveySessionStore.getState().history]).toEqual(before.history);
+  });
+
+  it("renders the step the author left, not the first question", async () => {
+    useSurveySessionStore.getState().reset();
+    await mountSurvey();
+    advanceToPrefill();
+    expect(screen.getByTestId("stage-prefill")).toBeTruthy();
+
+    await routeRoundTrip();
+
+    // The reported symptom, inverted: the prefill screen is still on screen
+    // and the identity stage is not.
+    expect(screen.getByTestId("stage-prefill")).toBeTruthy();
+    expect(screen.queryByTestId("stage-identity")).toBeNull();
+  });
+
+  it("keeps the characters substage across a remount (D-4's antecedent)", async () => {
+    useSurveySessionStore.getState().reset();
+    await mountSurvey();
+    advanceToPrefill();
+    fireEvent.click(screen.getByTestId("prefill-confirm"));
+    expect(useSurveySessionStore.getState().charactersSubStage).toBe("B");
+
+    await routeRoundTrip();
+
+    expect(useSurveySessionStore.getState().charactersSubStage).toBe("B");
+    expect(screen.getByTestId("stage-B")).toBeTruthy();
+  });
+
+  it("keeps the answers the walk recorded — identityResult and selectedTrack", async () => {
+    useSurveySessionStore.getState().reset();
+    await mountSurvey();
+    advanceToTrack();
+    fireEvent.click(screen.getByTestId("track-copy"));
+
+    const identityBefore = useSurveySessionStore.getState().identityResult;
+    const trackBefore = useSurveySessionStore.getState().selectedTrack;
+    expect(identityBefore).not.toBeNull();
+
+    await routeRoundTrip();
+
+    expect(useSurveySessionStore.getState().identityResult).toEqual(identityBefore);
+    expect(useSurveySessionStore.getState().selectedTrack).toBe(trackBefore);
+  });
+
+  it("survives repeated round trips — the loss is not merely deferred by one", async () => {
+    useSurveySessionStore.getState().reset();
+    await mountSurvey();
+    advanceToTrack();
+
+    await routeRoundTrip();
+    await routeRoundTrip();
+    await routeRoundTrip();
+
+    expect(useSurveySessionStore.getState().activeStepId).toBe("track");
+  });
+});
+
+describe("SurveyView — a reset happens only on an explicit start-over (spec 057 FR-003)", () => {
+  it("the corner reset control clears traversal back to identity", async () => {
+    useSurveySessionStore.getState().reset();
+    await act(async () => {
+      render(<SurveyView baseKeyboard={null} />);
+    });
+    advanceToTrack();
+    expect(useSurveySessionStore.getState().activeStepId).toBe("track");
+
+    // The real SurveyResetButton — arm, then confirm.
+    fireEvent.click(screen.getByTestId("survey-reset-arm"));
+    fireEvent.click(screen.getByTestId("survey-reset-yes"));
+
+    expect(useSurveySessionStore.getState().activeStepId).toBe("identity");
+    expect(useSurveySessionStore.getState().history).toEqual([]);
+    expect(useSurveySessionStore.getState().identityResult).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 057 US3 / FR-015 (T046, SC-012) — a shared deep link survives the
+// first-visit gate.
+//
+// Defect D-9: `hashToRoute` forces a genuine newcomer onto `#welcome` and
+// rewrites the address bar to match, DISCARDING whatever location was
+// requested. That rewrite is load-bearing (without it, "I'm new"'s
+// `navigateTo("survey")` would be a same-value hash assignment firing zero
+// hashchange events, soft-locking the visitor on welcome), so the fix is not
+// to remove it but to hold the requested location across it — see
+// `setPendingWelcomeLocation` / `consumePendingWelcomeLocation` in
+// lib/jumpToLocation.ts, consumed by WelcomeScreen's `leaveWelcome`.
+//
+// The location is consumed THROUGH `jumpToLocation`, so the ordinary
+// reachability rules apply: a link naming a step of a project this visitor
+// does not have degrades to the tab rather than landing them somewhere
+// impossible. Both halves are asserted below.
+// ---------------------------------------------------------------------------
+
+describe("StudioShell — a first-time visitor's deep link survives the welcome gate", () => {
+  it("holds a step-scoped location across the gate instead of discarding it", async () => {
+    window.location.hash = "#survey/characters";
+    localStorage.clear(); // pristine browser: a genuine newcomer
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    // Forced onto welcome, and the hash normalized — unchanged behaviour.
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
+    expect(window.location.hash).toBe("#welcome");
+
+    // ...but the requested location was HELD rather than dropped. Consuming it
+    // is what `leaveWelcome` does; asserting it here proves the gate captured
+    // it, which is the half D-9 got wrong.
+    const held = consumePendingWelcomeLocation();
+    expect(held).toEqual({ route: "survey", step: "characters" });
+  });
+
+  it("holds a bare route location too, so an ordinary shared #trail link is not lost", async () => {
+    window.location.hash = "#trail";
+    localStorage.clear();
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
+    expect(consumePendingWelcomeLocation()).toEqual({ route: "trail" });
+  });
+
+  it("holds nothing when the visitor arrived with no deep link at all", async () => {
+    window.location.hash = "";
+    localStorage.clear();
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
+    // Nothing to honour — `leaveWelcome` falls through to the default landing,
+    // exactly as before this feature.
+    expect(consumePendingWelcomeLocation()).toBeNull();
+  });
+
+  it("holds nothing for a malformed hash — a parse failure is not a location", async () => {
+    window.location.hash = "#survey//characters";
+    localStorage.clear();
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    expect(screen.getByTestId("welcome-screen-root")).toBeTruthy();
+    expect(consumePendingWelcomeLocation()).toBeNull();
+  });
+
+  it("honours the held location on exit, subject to the ordinary reachability rules", async () => {
+    // A step-scoped link with NO project instantiated degrades to the tab
+    // (`no-project`) rather than landing the visitor inside a wizard that has
+    // nothing to be somewhere in. That is `jumpToLocation` doing its job — the
+    // gate does not get its own reachability rules (FR-015 defers to FR-013).
+    window.location.hash = "#survey/characters";
+    localStorage.clear();
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    const held = consumePendingWelcomeLocation();
+    expect(held).not.toBeNull();
+
+    const outcome = jumpToLocation(held!);
+    expect(outcome).toMatchObject({
+      kind: "degraded",
+      at: { route: "survey" },
+      reason: "no-project",
+    });
   });
 });

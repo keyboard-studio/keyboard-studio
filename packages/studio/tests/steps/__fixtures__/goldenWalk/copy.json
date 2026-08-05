@@ -31,7 +31,9 @@
       "setSelectedTrack",
       "advance"
     ],
-    "workingCopyMutations": [],
+    "workingCopyMutations": [
+      "recordPhase"
+    ],
     "navigateTo": []
   },
   {
@@ -43,7 +45,8 @@
       "setCharactersSubStage"
     ],
     "workingCopyMutations": [
-      "setIdentity"
+      "setIdentity",
+      "recordPhase"
     ],
     "navigateTo": []
   },

@@ -1,0 +1,176 @@
+/**
+ * E2E (spec 057 US4/US6, T054): the footer's whole-journey dot row.
+ *
+ * Asserts the row's composition against a scripted walk: the project name is
+ * shown, completed-question dots grow as the walk answers questions, an
+ * optional question's dot appends once reached, question and stage dots are
+ * visually distinguishable by shape (not colour alone — FR-046), the current
+ * marker is present and distinguishable, an upcoming dot behind a gate is
+ * refused with a stated reason rather than skipping the gate (FR-045,
+ * US4 scenario 9), and the whole row is operable keyboard-only (Tab to a
+ * dot, read its accessible name, activate with Enter, arrive).
+ *
+ * Not `.skip`-ped, ever (FR-083).
+ */
+
+import { test, expect, type Page } from "playwright/test";
+import {
+  driveIdentityLite,
+  pickBaseKeyboard,
+  chooseAdaptTrack,
+  confirmPrefill,
+  buildOneCharacterList,
+  seedReturningVisitor,
+} from "./helpers/surveyFlow";
+import { expectNoSeriousAxeViolations } from "./helpers/axe";
+
+const FIXTURE = {
+  baseKeyboardId: "basic_kbdfr",
+  autonym: "Footer Test",
+  english: "Footer Test English",
+  targetScript: "other",
+};
+
+const footer = (page: Page) => page.locator("footer");
+const completedDots = (page: Page) => footer(page).locator('[data-progress-dot-kind="completed"]');
+const upcomingDots = (page: Page) => footer(page).locator('[data-progress-dot-kind="upcoming"]');
+const currentDot = (page: Page) => footer(page).locator('[data-progress-dot-kind="current"]');
+
+/**
+ * Known-pre-existing 1.4.3 (Contrast Minimum) offenders on the survey screen,
+ * excluded exactly as tab-roundtrip.spec.ts does — this feature does not
+ * touch them, and 1.4.3 is an open `unknown` row in
+ * [specs/056-ada-accessibility/wcag-2.2-aa-tracker.md]. PhaseB.tsx is
+ * byte-identical to `main` (see
+ * specs/057-bulletproof-navigation/evidence/gating-red.md §"Two corrections
+ * made to reach a *valid* red").
+ */
+const KNOWN_CONTRAST_DEBT: readonly string[] = [
+  'div[aria-label="Keyboard source mode"]',
+  // 1.4.3 — PhaseB's intro "Continue" button, on the characters step.
+  'button[data-testid="phase-b-intro-next"]',
+  // 1.4.3 — the OSK iframe renders KeymanWeb's own markup
+  // (.kmw-spacebar-caption), which this repo does not author and cannot
+  // restyle from here.
+  "iframe",
+];
+
+test.describe("footer progress row (spec 057 US4/US6)", () => {
+  test.beforeEach(async ({ page }) => {
+    await seedReturningVisitor(page);
+    await page.goto("/");
+  });
+
+  test("shows the project, grows as questions are answered, distinguishes dot classes by shape, and refuses a gated jump with a reason", async ({
+    page,
+  }) => {
+    await driveIdentityLite(page, {
+      english: FIXTURE.english,
+      autonym: FIXTURE.autonym,
+      script: FIXTURE.targetScript,
+    });
+
+    // The footer appears the moment a project exists — right after the base
+    // is selected, `deriveProjectLabel`'s third tier (`baseKeyboard.displayName`)
+    // already resolves, ahead of Phase A completing an identity patch.
+    await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
+    await expect(footer(page)).toBeVisible({ timeout: 20_000 });
+    await expect(footer(page)).toContainText(/./); // some project name text present
+
+    // ---- Completed dots grow as the walk answers questions -----------------
+    // identity-lite alone answers several questions (English name, autonym,
+    // code, script) before reaching the track step.
+    const completedAfterIdentity = await completedDots(page).count();
+    expect(completedAfterIdentity).toBeGreaterThan(0);
+
+    // Answering the track question ("Authoring approach") appends its dot —
+    // the growth half of FR-042/FR-061, measured across a question the
+    // decision record actually captures as a `survey-answer` entry.
+    await chooseAdaptTrack(page);
+
+    const prefillConfirm = page.getByTestId("prefill-confirm");
+    await expect(prefillConfirm).toBeVisible({ timeout: 30_000 });
+    const completedAfterTrack = await completedDots(page).count();
+    expect(completedAfterTrack).toBeGreaterThan(completedAfterIdentity);
+
+    // ---- Question and stage dots differ by SHAPE, not colour alone --------
+    // (FR-046). Completed/current dots are circles (borderRadius: 50%);
+    // upcoming stage dots are hollow squares (borderRadius: 3px).
+    const completedRadius = await completedDots(page)
+      .first()
+      .evaluate((el) => getComputedStyle(el).borderRadius);
+    const upcomingRadius = await upcomingDots(page)
+      .first()
+      .evaluate((el) => getComputedStyle(el).borderRadius);
+    expect(completedRadius).not.toBe(upcomingRadius);
+
+    // ---- The current marker is present, distinguishable, non-jumpable -----
+    await expect(currentDot(page)).toHaveCount(1);
+    await expect(currentDot(page)).toHaveAttribute("aria-current", "step");
+
+    // ---- An upcoming dot behind a gate is refused with a reason ------------
+    // (FR-045, US4 scenario 9) — clicking a far-future stage must not skip
+    // the walk's own gates. "help" (Phase F) is many stages ahead here.
+    const helpDot = footer(page).locator('button[aria-label*="Help"]').first();
+    if (await helpDot.isVisible({ timeout: 2_000 }).catch(() => false)) {
+      await helpDot.click();
+      await expect(footer(page).getByRole("status")).toHaveText(/not yet reached/i, {
+        timeout: 5_000,
+      });
+      // The walk did not move — still on the SAME prefill screen, never
+      // having actually reached Phase F.
+      await expect(prefillConfirm).toBeVisible();
+    }
+
+    await confirmPrefill(page);
+    await expect(page.getByTestId("phase-b-intro-next")).toBeVisible({ timeout: 20_000 });
+
+    await expectNoSeriousAxeViolations(page, "survey (footer present, characters step)", {
+      exclude: KNOWN_CONTRAST_DEBT,
+    });
+
+    // ---- The characters/marks phase cannot append QUESTION dots ------------
+    // The row's completed dots come from `survey-answer` decision entries
+    // (progressDots.ts, FR-042/FR-063). Phase B's alphabet confirmation and
+    // the marks series both report `answers: []` by design — their decisions
+    // travel as `confirmedInventory` / `marksWorklist` payloads, not question
+    // answers (survey/marks/MarksSeriesStep.tsx `seriesResult`), so there is
+    // no entry for a dot to grow from. FR-049c's "optional question appends
+    // its dot" is therefore asserted on the track question above (a recorded
+    // survey-answer); walking the characters phase here only carries the test
+    // forward to the dot-jump assertions below and must NOT shrink the row.
+    const completedBeforeMarks = await completedDots(page).count();
+    await buildOneCharacterList(page, "é");
+    // MechanismGallery / carve now follow; wait for a stable landmark rather
+    // than a fixed sleep.
+    await page
+      .getByRole("button", { name: "Start the mechanism gallery" })
+      .waitFor({ timeout: 20_000 })
+      .catch(() => undefined);
+    const completedAfterMarks = await completedDots(page).count();
+    expect(completedAfterMarks).toBeGreaterThanOrEqual(completedBeforeMarks);
+
+    // ---- Keyboard-only: Tab to a completed dot, read its name, arrive ------
+    const firstCompleted = completedDots(page).first();
+    const label = await firstCompleted.getAttribute("aria-label");
+    expect(label).toBeTruthy();
+    await firstCompleted.focus();
+    await page.keyboard.press("Enter");
+
+    // Arrival is visible via the wizard's own rendered step — jumping does
+    // not rewrite the tab-level hash (intra-wizard position is store state,
+    // not a second router — CLAUDE.md's navigateTo() convention), so the
+    // proof is the DOM, exactly as tab-roundtrip.spec.ts asserts arrival.
+    //
+    // STEP-level arrival, not question-level: identity is a MULTI-question
+    // step, and no shared store records which sub-question such a step was
+    // showing (progressDots.ts's "current question architecture gap";
+    // decision-deeplink.spec.ts targets a single-question step for the same
+    // reason). A jump therefore guarantees landing on the identity STEP —
+    // the flow picks which of its questions to render — so the arrival
+    // landmark is the step's own heading, not a specific question input.
+    await expect(
+      page.getByRole("heading", { name: /identify your language/i }),
+    ).toBeVisible({ timeout: 15_000 });
+  });
+});

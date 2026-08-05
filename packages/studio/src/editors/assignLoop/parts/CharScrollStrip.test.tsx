@@ -171,7 +171,7 @@ describe("CharScrollStrip — producer-count badge", () => {
     expect(badge.style.color).toBe("rgb(86, 211, 100)"); // #56d364 — the badge-good color
   });
 
-  it("computes each chip's badge from the shared getCharMechanisms selector, not a re-derived count — a modality mismatch still reads 0", () => {
+  it("computes each chip's badge from the shared getProducerBadge selector, not a re-derived count — a modality mismatch still reads 0", () => {
     const assignments: MechanismAssignment[] = [
       {
         scope: "individual",
@@ -194,7 +194,7 @@ describe("CharScrollStrip — producer-count badge", () => {
     expect(screen.getByTestId("char-scroll-badge-0061").textContent).toBe("0");
   });
 
-  it("badges a seed-reachable character (inheritedChars) GREEN at 1 with no assignment — 'already in the layout' must never read red 0", () => {
+  it("badges a seed-reachable character (baseDirectSet) GREEN at 1 with no assignment — 'already in the layout' must never read red 0", () => {
     render(
       <CharScrollStrip
         chars={["a"]}
@@ -202,7 +202,7 @@ describe("CharScrollStrip — producer-count badge", () => {
         onSelectChar={vi.fn()}
         assignments={[]}
         modality="touch"
-        inheritedChars={new Set(["a"])}
+        baseDirectSet={new Set(["a"])}
       />,
     );
 
@@ -228,7 +228,7 @@ describe("CharScrollStrip — producer-count badge", () => {
         onSelectChar={vi.fn()}
         assignments={assignments}
         modality="touch"
-        inheritedChars={new Set(["a"])}
+        baseDirectSet={new Set(["a"])}
       />,
     );
 

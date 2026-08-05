@@ -34,19 +34,39 @@ files:
   # ── Tier A — Studio UI chrome (engine team; spec §12) ──────────────────────
   - source: "/packages/studio/src/locales/en/messages.json"
     translation: "/packages/studio/src/locales/%locale%/messages.json"
-    # Keep untranslated keys in downloaded files. Every key must exist in every
-    # locale file so the loader is stable; the runtime falls back to the English
-    # source via the explicit id, so an untranslated target value is harmless,
-    # not a gap to prune.
+    # MUST stay `false`. Keep untranslated keys in downloaded files: every key
+    # must exist in every locale file so the loader is stable, and the runtime
+    # falls back to the English source via the explicit id, so an untranslated
+    # target value is harmless rather than a gap to prune.
     #
-    # CAUTION -- this does NOT mean untranslated keys arrive as empty strings.
-    # Crowdin returns the SOURCE TEXT for a string it has no translation for.
-    # So if the project holds no translations for a locale, the downloaded
-    # catalog is 100% English under a byte-identical key set, and every
-    # key-set-parity check passes while the translations are gone. An empty
-    # value is what the REPO uses to mean "not translated yet"; it is not what
-    # a download produces. utilities/i18n-collapse-guard exists to catch this
-    # and is wired into both catalog lints.
+    # DO NOT "fix" this to `true`. That was tried, and this comment is the
+    # measurement. On 2026-08-05 a real download with `true` against this project
+    # produced:
+    #
+    #   packages/studio/src/locales/fr/messages.json   1201 en keys ->  918
+    #   content/i18n/fr/flowQuestions.json              219 en keys ->  202
+    #   content/i18n/fr/patterns.json                    97 en keys ->    0  ({})
+    #   content/i18n/fr/adaptationQuestions.json          9 en keys ->    0  ({})
+    #
+    # `true` DELETES untranslated keys. It does not emit them as empty values.
+    # The crowdin-cli FAQ says the opposite ("Crowdin exports these keys with
+    # empty values"; removal supposedly needs a support request) -- that FAQ line
+    # does not describe this project's behaviour, and it is what the `true`
+    # attempt was argued from. Trust the numbers above over the docs.
+    #
+    # KNOWN COST of `false`, so nobody rediscovers it as a surprise: an
+    # untranslated string downloads as the ENGLISH SOURCE TEXT. A locale with no
+    # translations therefore arrives 100% English under a byte-identical key set,
+    # passing every key-set-parity check while the translations are gone. That is
+    # the round-trip's original defect and it is real -- utilities/i18n-collapse-
+    # guard exists to catch exactly that shape and is wired into both catalog
+    # lints. The guard is the mitigation; parity is not negotiable, so `false`
+    # plus the guard is the trade we take.
+    #
+    # Corollary: a catalog at 0% translated will trip the collapse guard on every
+    # download (all values equal to English). That is the guard telling the truth
+    # about an untranslated catalog. The answer is to translate it, not to loosen
+    # the guard or flip this setting.
     skip_untranslated_strings: false
     # %locale% (not %two_letters_code%) so a region-specific target (pt-BR,
     # zh-CN) gets its own directory instead of colliding with its base
@@ -79,11 +99,16 @@ files:
   # target locale needs its own mapping entry; see the Tier A comment above).
   - source: "/content/i18n/en/*.json"
     translation: "/content/i18n/%locale%/%original_file_name%"
-    # Same rationale as Tier A, and the same caution: every key must exist in
-    # every locale file for a stable resolveContentString lookup, and an empty
-    # target value falls back to the English value already in hand
-    # (contentI18n.ts), not a gap. But an untranslated string DOWNLOADS as the
-    # English source text, not as an empty value -- see the Tier A note above.
+    # Same rationale as Tier A, and the same MUST: every key stays present for a
+    # stable resolveContentString lookup, and an untranslated target value falls
+    # back to the English value already in hand (contentI18n.ts), not a gap.
+    #
+    # See the Tier A note above before changing this. `true` deletes untranslated
+    # keys -- measured, not theoretical: it reduced fr/patterns.json from 97 keys
+    # to `{}` and fr/adaptationQuestions.json from 9 to `{}`. The known cost of
+    # `false` (untranslated strings arrive as English source text) is documented
+    # there too, along with why the collapse guard rather than this setting is the
+    # mitigation.
     skip_untranslated_strings: false
     languages_mapping:
       locale:

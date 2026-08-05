@@ -1,0 +1,236 @@
+
+Running 69 tests using 1 worker
+
+[WebServer] [BABEL] Note: The code generator has deoptimised the styling of D:\Github\_Projects\_KM\keyboard-studio\packages\engine\dist\langtags\generated\index.js as it exceeds the max of 500KB.
+[WebServer] [BABEL] Note: The code generator has deoptimised the styling of D:\Github\_Projects\_KM\keyboard-studio\packages\glottolog\dist\generated\index.js as it exceeds the max of 500KB.
+  ✓   1 e2e\boot-smoke.spec.ts:27:3 › app boots without an uncaught error (16.0s)
+  ✓   2 e2e\boot-smoke.spec.ts:27:3 › github oauth callback boots without an uncaught error (4.6s)
+  ✓   3 e2e\boot-smoke.spec.ts:27:3 › google oauth callback boots without an uncaught error (3.0s)
+  ✓   4 e2e\boot-smoke.spec.ts:27:3 › lint demo boots without an uncaught error (1.7s)
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+kmc-kmn@19.0.240-alpha/node_modules/@keymanapp/kmc-kmn/build/src/main.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+kmc-kmn@19.0.240-alpha/node_modules/@keymanapp/kmc-kmn/build/src/kmw-compiler/kmw-compiler-messages.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+kmc-kmn@19.0.240-alpha/node_modules/@keymanapp/kmc-kmn/build/src/compiler/kmn-compiler-messages.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+kmc-kmn@19.0.240-alpha/node_modules/@keymanapp/kmc-kmn/build/src/compiler/compiler.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+kmc-kmn@19.0.240-alpha/node_modules/@keymanapp/kmc-kmn/build/src/compiler/osk.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/main.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+kmc-kmn@19.0.240-alpha/node_modules/@keymanapp/kmc-kmn/build/src/kmw-compiler/compiler-globals.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/index.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+kmc-kmn@19.0.240-alpha/node_modules/@keymanapp/kmc-kmn/build/src/import/kmcmplib/wasm-host.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+kmc-kmn@19.0.240-alpha/node_modules/@keymanapp/kmc-kmn/build/src/kmw-compiler/kmw-compiler.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/kmx/keyman-targets.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/kvk/kvk-file-writer.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/kvk/visual-keyboard.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/kvk/kvk-file-reader.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/kmx/kmx-file-reader.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/consts/virtual-key-constants.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/kmx/kmx.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/consts/modifier-key-constants.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/kvk/kvk-file.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/keyman-touch-layout/keyman-touch-layout-file.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/util/util.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/lexical-model-types.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/schemas.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/schema-validators.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/kmx/kmx-plus/kmx-plus.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/util/file-types.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/utils/validate-mit-license.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/kpj/kpj-file-writer.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/main-ldml-keyboard.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/kpj/kpj-file-reader.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/utils/keyman-urls.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/kpj/keyman-developer-project.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/kpj/kpj-file.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/is-valid-email.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/kps/kps-file-reader.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/kvks/kvks-file-reader.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/kps/kps-file-writer.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/kvks/kvks-file-writer.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/utils/markdown.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/kvks/kvks-file.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/keyman-touch-layout/keyman-touch-layout-file-reader.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/kmx/kmx-builder.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/ldml-keyboard/ldml-keyboard-xml.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/keyman-touch-layout/keyman-touch-layout-file-writer.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/kps/kps-file.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/kmx/kmx-plus-builder/kmx-plus-builder.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/compiler-interfaces.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/compiler-callbacks.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/utils/UrlSubpathCompilerCallback.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/developer-utils-messages.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/ldml-keyboard/ldml-keyboard-xml-reader.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/source-filename-patterns.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/symbol-utils.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/xml-utils.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/line-utils.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/github-urls.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/cloud-urls.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/valid-ids.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/font-family.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/project-loader.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+kmc-kmn@19.0.240-alpha/node_modules/@keymanapp/kmc-kmn/build/src/kmw-compiler/javascript-strings.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+kmc-kmn@19.0.240-alpha/node_modules/@keymanapp/kmc-kmn/build/src/kmw-compiler/validate-layout-file.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+kmc-kmn@19.0.240-alpha/node_modules/@keymanapp/kmc-kmn/build/src/kmw-compiler/util.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+kmc-kmn@19.0.240-alpha/node_modules/@keymanapp/kmc-kmn/build/src/kmw-compiler/visual-keyboard-compiler.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/util/errors.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/schemas/kpj.schema.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/schemas/kpj-9.0.schema.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/schemas/kvks.schema.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/util/consts.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/schemas/ldml-keyboard3.schema.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/schemas/ldml-keyboardtest3.schema.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/schemas/keyboard_info.schema.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/schemas/keyman-touch-layout.clean.spec.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/schemas/displaymap.schema.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/schemas/keyman-touch-layout.spec.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/schemas/kmp.schema.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/schemas/kpj.schema.validator.mjs" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/schemas/kpj-9.0.schema.validator.mjs" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/schemas/displaymap.schema.validator.mjs" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/schemas/ldml-keyboard3.schema.validator.mjs" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/schemas/kvks.schema.validator.mjs" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/schemas/keyman-touch-layout.spec.validator.mjs" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/schemas/ldml-keyboardtest3.schema.validator.mjs" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/schemas/keyman-touch-layout.clean.spec.validator.mjs" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/schemas/keyboard_info.schema.validator.mjs" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/schemas/kmp.schema.validator.mjs" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/ldml-keyboard/pattern-parser.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/kmx/kmx-plus/element-string.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/ldml-keyboard/string-list.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+common-types@19.0.240-alpha/node_modules/@keymanapp/common-types/build/src/ldml-keyboard/unicodeset-parser-api.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+ldml-keyboard-constants@19.0.240-alpha/node_modules/@keymanapp/ldml-keyboard-constants/build/keyman_core_ldml.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/kmx/kmx-plus-builder/build-disp.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/kmx/kmx-plus-builder/build-keys.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/kmx/kmx-plus-builder/build-sect.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/kmx/kmx-plus-builder/build-elem.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/kmx/kmx-plus-builder/build-list.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/kmx/kmx-plus-builder/build-loca.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/kmx/kmx-plus-builder/build-meta.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/kmx/kmx-plus-builder/build-layr.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/kmx/kmx-plus-builder/build-uset.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/kmx/kmx-plus-builder/build-strs.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/kmx/kmx-plus-builder/build-tran.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/types/kmx/kmx-plus-builder/build-vars.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/ttfmeta/lib/index.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+kmc-kmn@19.0.240-alpha/node_modules/@keymanapp/kmc-kmn/build/src/kmw-compiler/constants.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+kmc-kmn@19.0.240-alpha/node_modules/@keymanapp/kmc-kmn/build/src/kmw-compiler/keymanweb-key-codes.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/ttfmeta/lib/main.js" points to missing source files
+[WebServer] Sourcemap for "D:/Github/_Projects/_KM/keyboard-studio/node_modules/.pnpm/@keymanapp+developer-utils@19.0.240-alpha/node_modules/@keymanapp/developer-utils/build/src/ttfmeta/lib/meta.js" points to missing source files
+  ✓   5 e2e\browser-back.spec.ts:51:3 › browser Back mid-survey (F7) › physical Back button steps back one manifest step at a time (7.7s)
+  ✓   6 e2e\carve.spec.ts:153:3 › Rule Carver — carve one opaque rule, verify IR + emitted .kmn › deleting rule#93 in the carve gallery removes it from the deleted-node IR state and from the emitted .kmn (18.7s)
+  ✓   7 e2e\carve.spec.ts:262:3 › Rule Carver — carve one opaque rule, verify IR + emitted .kmn › control: keeping rule#93 leaves its distinguishing token in the emitted .kmn (16.2s)
+  ✓   8 e2e\compare-isolation.spec.ts:137:3 › Compare cannot write to the author's project (spec 057 US2) › the tab exposes no identity-editing control over the project (5.3s)
+  ✓   9 e2e\compare-isolation.spec.ts:160:3 › Compare cannot write to the author's project (spec 057 US2) › loading another keyboard raises no dialog and leaves the project untouched (dismiss) (13.5s)
+  ✓  10 e2e\compare-isolation.spec.ts:180:3 › Compare cannot write to the author's project (spec 057 US2) › loading another keyboard and ACCEPTING anything offered still leaves the project untouched (13.9s)
+  ✓  11 e2e\copy-edit.spec.ts:252:3 › Track 1 (copy-edit) E2E › walks identity-lite -> base picker -> project-name -> Phase B -> emit (17.1s)
+  ✓  12 e2e\copy-edit.spec.ts:300:3 › Track 1 (copy-edit) E2E › base keyboard compiles cleanly via kmcmplib WASM oracle (open-base mode) (15.9s)
+  ✓  13 e2e\copy-edit.spec.ts:334:3 › Track 1 (copy-edit) E2E › emitted .kps, .kvks, and welcome.htm have non-empty bodies (15.8s)
+  ✓  14 e2e\copy-edit.spec.ts:416:3 › spec 034 proven-script walks + publish paths › T010 [US1]: Cyrillic (russian_mnemonic_r) walks identity → downloadable, compilable ZIP (7.2s)
+  ✓  15 e2e\copy-edit.spec.ts:437:5 › spec 034 proven-script walks + publish paths › T011 [US1]: Latn (basic_kbdfr) reaches a downloadable ZIP (16.1s)
+  ✓  16 e2e\copy-edit.spec.ts:437:5 › spec 034 proven-script walks + publish paths › T011 [US1]: Cyrl (russian_mnemonic_r) reaches a downloadable ZIP (6.7s)
+  ✓  17 e2e\copy-edit.spec.ts:437:5 › spec 034 proven-script walks + publish paths › T011 [US1]: Grek (basic_kbdhe) reaches a downloadable ZIP (6.4s)
+  ✓  18 e2e\copy-edit.spec.ts:437:5 › spec 034 proven-script walks + publish paths › T011 [US1]: Geor (basic_kbdgeo) reaches a downloadable ZIP (15.7s)
+  ✓  19 e2e\copy-edit.spec.ts:437:5 › spec 034 proven-script walks + publish paths › T011 [US1]: Armn (armenian_mnemonic_r) reaches a downloadable ZIP (8.1s)
+  ✓  20 e2e\copy-edit.spec.ts:453:3 › spec 034 proven-script walks + publish paths › T016 [US2]: output screen exposes both publish paths; PR degrades honestly, ZIP still works (16.3s)
+  ✓  21 e2e\copy-edit.spec.ts:520:3 › spec 034 US3 (T028): durable draft survives reload, Back stays consistent, start-over clears it › T028: hard reload resumes the working copy + step position; Back round-trips; 'I'm new' clears the draft (11.6s)
+  ✓  22 e2e\decision-deeplink.spec.ts:87:3 › decision-trail deep link -> revise -> supersede (spec 057 US3) › activating a trail entry's link lands on its question, revising it supersedes and returns to Decisions (8.5s)
+  ✓  23 e2e\exemplar-prefill.spec.ts:55:3 › Phase B exemplar prefill › accept: two actions, alphabet recorded, zero characters typed (SC-008/SC-010) (6.2s)
+  ✓  24 e2e\exemplar-prefill.spec.ts:97:3 › Phase B exemplar prefill › decline: records only what the author typed, and does not re-assert (SC-009) (6.1s)
+  ✓  25 e2e\footer-progress.spec.ts:64:3 › footer progress row (spec 057 US4/US6) › shows the project, grows as questions are answered, distinguishes dot classes by shape, and refuses a gated jump with a reason (26.7s)
+  -  26 e2e\import-improve.spec.ts:104:8 › Track 2 (import-improve) E2E › imports a fixture .kmn via Track 2 without import errors
+  -  27 e2e\import-improve.spec.ts:113:8 › Track 2 (import-improve) E2E › applies one mutation and emits without compile errors
+  -  28 e2e\import-improve.spec.ts:125:8 › Track 2 (import-improve) E2E › round-trip via assertSemanticEquivalence preserves everything except the mutation
+  ✓  29 e2e\locale-switch.spec.ts:46:3 › Locale switcher — persistence + no first-paint English flash › switching to fr translates chrome and persists across reload (3.6s)
+  ✓  30 e2e\locale-switch.spec.ts:92:3 › Compare tab label (spec 057 FR-020) › reads 'Compare' in English and never 'Preview' (1.8s)
+  ✓  31 e2e\locale-switch.spec.ts:100:3 › Compare tab label (spec 057 FR-020) › in fr, falls back to the new id's source string — never the retired id's translation (1.9s)
+  ✓  32 e2e\switch-base-exploration.spec.ts:399:5 › switch-base exploration matrix › L1-identity-done × refresh (10.8s)
+  ✓  33 e2e\switch-base-exploration.spec.ts:413:5 › switch-base exploration matrix › L1-identity-done × browser-back (7.9s)
+  ✓  34 e2e\switch-base-exploration.spec.ts:399:5 › switch-base exploration matrix › L2-base-previewed × refresh (12.2s)
+  ✓  35 e2e\switch-base-exploration.spec.ts:413:5 › switch-base exploration matrix › L2-base-previewed × browser-back (8.8s)
+  ✓  36 e2e\switch-base-exploration.spec.ts:399:5 › switch-base exploration matrix › L3-base-confirmed × refresh (12.3s)
+  ✓  37 e2e\switch-base-exploration.spec.ts:413:5 › switch-base exploration matrix › L3-base-confirmed × browser-back (8.6s)
+  ✓  38 e2e\switch-base-exploration.spec.ts:399:5 › switch-base exploration matrix › L4-track-chosen × refresh (13.3s)
+  ✓  39 e2e\switch-base-exploration.spec.ts:413:5 › switch-base exploration matrix › L4-track-chosen × browser-back (8.9s)
+  ✓  40 e2e\switch-base-exploration.spec.ts:399:5 › switch-base exploration matrix › L5-prefill-confirmed × refresh (12.7s)
+  ✓  41 e2e\switch-base-exploration.spec.ts:413:5 › switch-base exploration matrix › L5-prefill-confirmed × browser-back (8.7s)
+  ✓  42 e2e\switch-base-exploration.spec.ts:399:5 › switch-base exploration matrix › L6-phaseB-done × refresh (13.7s)
+  ✓  43 e2e\switch-base-exploration.spec.ts:413:5 › switch-base exploration matrix › L6-phaseB-done × browser-back (8.9s)
+  ✓  44 e2e\switch-base-exploration.spec.ts:399:5 › switch-base exploration matrix › L7-carve-deleted × refresh (13.4s)
+  ✓  45 e2e\switch-base-exploration.spec.ts:413:5 › switch-base exploration matrix › L7-carve-deleted × browser-back (9.6s)
+  ✓  46 e2e\switch-base-exploration.spec.ts:431:5 › switch-base exploration matrix › L3-base-confirmed × refresh (OK on dialog) (13.6s)
+  ✓  47 e2e\switch-base-exploration.spec.ts:431:5 › switch-base exploration matrix › L4-track-chosen × refresh (OK on dialog) (12.0s)
+  ✓  48 e2e\switch-base-exploration.spec.ts:431:5 › switch-base exploration matrix › L5-prefill-confirmed × refresh (OK on dialog) (12.6s)
+  ✓  49 e2e\switch-base-exploration.spec.ts:431:5 › switch-base exploration matrix › L6-phaseB-done × refresh (OK on dialog) (13.5s)
+  ✓  50 e2e\switch-base-exploration.spec.ts:431:5 › switch-base exploration matrix › L7-carve-deleted × refresh (OK on dialog) (12.6s)
+  ✓  51 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L2-base-previewed × switch-base (Cancel) (10.1s)
+  ✓  52 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L2-base-previewed × switch-base (OK) (10.9s)
+  ✓  53 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L3-base-confirmed × switch-base (Cancel) (12.2s)
+  ✓  54 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L3-base-confirmed × switch-base (OK) (11.6s)
+  ✓  55 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L4-track-chosen × switch-base (Cancel) (12.3s)
+  ✓  56 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L4-track-chosen × switch-base (OK) (13.0s)
+  ✓  57 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L5-prefill-confirmed × switch-base (Cancel) (12.8s)
+  ✓  58 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L5-prefill-confirmed × switch-base (OK) (13.3s)
+  ✓  59 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L6-phaseB-done × switch-base (Cancel) (17.6s)
+  ✓  60 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L6-phaseB-done × switch-base (OK) (17.4s)
+  ✓  61 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L7-carve-deleted × switch-base (Cancel) (16.1s)
+  ✓  62 e2e\switch-base-exploration.spec.ts:448:7 › switch-base exploration matrix › L7-carve-deleted × switch-base (OK) (16.7s)
+  ✓  63 e2e\switch-base-rebase.spec.ts:143:3 › F1 — switch-base rebase confirm › switching to a DIFFERENT base with edits: Cancel keeps the OLD base everywhere, no advance (8.4s)
+  ✓  64 e2e\switch-base-rebase.spec.ts:197:3 › F1 — switch-base rebase confirm › re-confirming the SAME base: no popup, phaseResults preserved, wizard advances (6.9s)
+  ✘  65 e2e\switch-base-rebase.spec.ts:227:3 › F1 — switch-base rebase confirm › F2: refresh at the track step — no popup, phaseResults preserved (10.5s)
+  ✓  66 e2e\tab-roundtrip.spec.ts:100:3 › tab round trip preserves the author's position (spec 057 US1) › mid-walk position, history and Phase B alphabet survive every tab round trip (11.8s)
+  ✓  67 e2e\touch-derivation-us1.spec.ts:238:3 › Touch derivation US1 — import & adapt (spec 035 Scenario A) › carved characters vanish, placed letter lands, base layout survives, and the keyboard compiles (35.3s)
+  ✘  68 e2e\touch-derivation-us2.spec.ts:412:3 › Touch derivation US2 — reseed from desktop (spec 035 Scenario B) › carved characters vanish, placed letter lands, layout is a compact phone projection, and the keyboard compiles (32.4s)
+  ✓  69 e2e\touch-derivation-us2.spec.ts:529:3 › Touch derivation US2-AS4 — explicit reseed discards a shipped touch layout (spec 035) › choosing Reseed on a base that ships a touch layout still produces the desktop projection, not the shipped layout (33.9s)
+
+
+  1) e2e\switch-base-rebase.spec.ts:227:3 › F1 — switch-base rebase confirm › F2: refresh at the track step — no popup, phaseResults preserved 
+
+    Error: expect(received).toBe(expected) // Object.is equality
+
+    Expected: 2
+    Received: 1
+
+      242 |     const after = await hookState(page);
+      243 |     expect(after.baseId).toBe(BASE_A);
+    > 244 |     expect(after.phaseResultsCount).toBe(before.phaseResultsCount);
+          |                                     ^
+      245 |   });
+      246 | });
+      247 |
+        at D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\switch-base-rebase.spec.ts:244:37
+
+    Error Context: test-results\switch-base-rebase-F1-—-sw-e7d1d-opup-phaseResults-preserved\error-context.md
+
+  2) e2e\touch-derivation-us2.spec.ts:412:3 › Touch derivation US2 — reseed from desktop (spec 035 Scenario B) › carved characters vanish, placed letter lands, layout is a compact phone projection, and the keyboard compiles 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByTestId('seed-source-preview')
+    Expected: visible
+    Timeout: 15000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 15000ms
+      - waiting for getByTestId('seed-source-preview')
+
+
+      337 |  */
+      338 | async function confirmReseedDefault(page: Page): Promise<void> {
+    > 339 |   await expect(page.getByTestId("seed-source-preview")).toBeVisible({ timeout: 15_000 });
+          |                                                         ^
+      340 |   await expect(page.getByTestId("seed-source-absent-note")).toBeVisible();
+      341 |
+      342 |   const reseed = page.getByTestId("seed-source-reseed");
+        at confirmReseedDefault (D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\touch-derivation-us2.spec.ts:339:57)
+        at D:\Github\_Projects\_KM\keyboard-studio\packages\studio\e2e\touch-derivation-us2.spec.ts:448:11
+
+    Error Context: test-results\touch-derivation-us2-Touch-70870-n-and-the-keyboard-compiles\error-context.md
+
+  Slow test file: e2e\switch-base-exploration.spec.ts (6.3m)
+  Consider running tests from slow files in parallel. See: https://playwright.dev/docs/test-parallel
+  2 failed
+    e2e\switch-base-rebase.spec.ts:227:3 › F1 — switch-base rebase confirm › F2: refresh at the track step — no popup, phaseResults preserved 
+    e2e\touch-derivation-us2.spec.ts:412:3 › Touch derivation US2 — reseed from desktop (spec 035 Scenario B) › carved characters vanish, placed letter lands, layout is a compact phone projection, and the keyboard compiles 
+  3 skipped
+  64 passed (13.7m)
+EXIT=1

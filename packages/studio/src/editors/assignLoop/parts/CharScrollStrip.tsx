@@ -8,12 +8,17 @@
 // Each chip shows:
 //   - the character's glyph (via displayChar — combining marks get a dotted
 //     circle prefix so they're visible standalone), rendered in WHITE;
-//   - a small count badge below it — the number of ways that character is
-//     produced in the caller's modality (see charMechanisms.ts's
-//     getCharMechanisms — PRODUCES, not USES): the mechanisms whose OUTPUT is
-//     that character, plus one for a character the caller's SEED layout
-//     already reaches (`inheritedChars`, TouchGallery's "already in touch
-//     layout" set). Green when >=1, red when 0.
+//   - a small count badge below it — the number of INDEPENDENT ways that
+//     character can be produced in the caller's modality: a deletion-safety
+//     signal (per product decision, a char reachable BOTH by its own key AND
+//     by composition shows 2, not 1). Computed by charMechanisms.ts's
+//     getProducerBadge — the 3-signal model (base-direct + session-direct
+//     count + one-level composition; see that function's own doc comment for
+//     the full rationale and the disjointness guarantee). Green when the
+//     total is >=1, red when 0. A composable char (signal (c) fired) also
+//     gets a small non-color compose marker (`⊕`, see the badge render
+//     below) so "reachable by composition" is visible in grayscale too, not
+//     just from the count.
 //
 // The CURRENTLY SELECTED chip additionally grows (a larger glyph) and shows
 // its `U+XXXX` notation between the glyph and the badge — this strip is now
@@ -47,7 +52,8 @@ import { plural } from "@lingui/core/macro";
 import type { MechanismAssignment, Modality } from "@keyboard-studio/contracts";
 import { toUPlusNotation, toHex4 } from "@keyboard-studio/contracts";
 import { displayChar } from "../../../lib/irToCarveNodes.ts";
-import { getCharMechanisms } from "./charMechanisms.ts";
+import { getProducerBadge } from "./charMechanisms.ts";
+import { indexOfChar, sameCharIdentity } from "../usePositionalCharNav.ts";
 import {
   BG_CARD,
   BORDER,
@@ -55,7 +61,7 @@ import {
   TEXT_DIM,
   FONT,
 } from "../../../lib/galleryTheme.ts";
-import { ERROR_RED } from "../../../ui/theme.ts";
+import { ERROR_RED, ERROR_BG } from "../../../ui/theme.ts";
 
 const WHEEL_SCROLL_FACTOR = 0.6; // dampen wheel delta so the strip pans a bit slower than the raw device delta
 
@@ -77,14 +83,29 @@ export interface CharScrollStripProps {
   /** Which modality's producer count to badge — "physical" for MechanismGallery, "touch" for TouchGallery. */
   modality: Modality;
   /**
-   * Characters the caller's SEED layout already produces with no author edit —
-   * TouchGallery's `detectedChars` ("already in touch layout"). Each counts as
-   * one producing way in the badge, so a character the gallery reports as
-   * already on the keyboard never badges red 0. MechanismGallery has no seed
-   * notion and omits this.
+   * Signal (a) of the 3-signal badge model (charMechanisms.ts's
+   * getProducerBadge) — the caller's PRE-AUGMENT base/seed-only produced set
+   * (NEVER a set that has been through `augmentWithComposable`). For
+   * MechanismGallery: `buildProducedSet(baseIr, { excludeBackspaceCorrections:
+   * true })`. For TouchGallery: `baseTouchCoveredSet`. Optional (defaults to
+   * empty) — a caller with no base/seed notion (or a test exercising
+   * something other than the badge) simply omits it.
    */
-  inheritedChars?: ReadonlySet<string>;
+  baseDirectSet?: ReadonlySet<string>;
+  /**
+   * Signal (c)'s input — the caller's PRE-AUGMENT, SESSION-AWARE direct
+   * produced set (this session's assignments folded into the base/seed, but
+   * never itself run through `augmentWithComposable`). Used to test whether
+   * `char`'s own NFD components are all directly reachable. For
+   * MechanismGallery: `baseProducedSet` (`buildSessionProducedSet`). For
+   * TouchGallery: `directTouchProducedSet`. Optional (defaults to empty) —
+   * see `baseDirectSet` above.
+   */
+  preAugmentSessionAwareSet?: ReadonlySet<string>;
 }
+
+/** Stable empty-set fallback for the two optional pre-augment set props above — avoids allocating a new Set every render when a caller omits them. */
+const EMPTY_CHAR_SET: ReadonlySet<string> = new Set();
 
 /** Hyphen-joined 4+-digit uppercase hex of EVERY codepoint in `char` — the chip/badge testid key (see file header).
  *  Shares the per-codepoint `toHex4` primitive with `toUPlusNotation`. */
@@ -100,7 +121,8 @@ export function CharScrollStrip({
   onSelectChar,
   assignments,
   modality,
-  inheritedChars,
+  baseDirectSet = EMPTY_CHAR_SET,
+  preAugmentSessionAwareSet = EMPTY_CHAR_SET,
 }: CharScrollStripProps) {
   const { t } = useLingui();
   const chipRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
@@ -236,9 +258,15 @@ export function CharScrollStrip({
   // horizontal scroll inside the current window is never reset by an
   // unrelated re-render elsewhere in the gallery — it only re-centers when
   // navigation actually moves `currentChar` outside the previous window.
+  // `indexOfChar` (NFC identity), not raw `chars.indexOf` — a reflow that
+  // changes `currentChar`'s representation (e.g. collateInventory's NFC-dedup
+  // in survey/collation.ts) must not strand the window on a stale raw-string
+  // mismatch; see usePositionalCharNav.ts's module doc comment for the full
+  // rationale (the same shaped bug this strip's windowing shares with the
+  // Back/Next walk itself).
   const visibleChars = useMemo(() => {
     if (chars.length <= MAX_VISIBLE_CHIPS) return chars;
-    const idx = currentChar !== null ? chars.indexOf(currentChar) : -1;
+    const idx = currentChar !== null ? indexOfChar(chars, currentChar) : -1;
     const half = Math.floor(MAX_VISIBLE_CHIPS / 2);
     const start =
       idx === -1
@@ -250,27 +278,27 @@ export function CharScrollStrip({
   // Whether the selected character is inside the currently-rendered window —
   // see the roving-tabindex comment at the chip map below for why this
   // matters (the tab-reachability fallback when nothing in view is selected).
+  // NFC identity (indexOfChar), not raw `===` — same rationale as above.
   const hasSelectedVisible = useMemo(
-    () => visibleChars.some((c) => c === currentChar),
+    () => currentChar !== null && indexOfChar(visibleChars, currentChar) !== -1,
     [visibleChars, currentChar],
   );
 
-  // Per-character produces count (Part 2 badge) — the shared selector, not a
-  // re-derived count, so this can never disagree with each gallery's own
-  // bottom "uses" list about what counts as a producer. Scoped to
+  // Per-character producer badge (Part 2) — the shared 3-signal selector, not
+  // a re-derived count, so this can never disagree with the gallery's own
+  // pre-augment sets about what counts as a producer. Scoped to
   // `visibleChars` (not `chars`) — no point badging chips this render never
   // mounts.
-  const producesCountByChar = useMemo(() => {
-    const map = new Map<string, number>();
+  const producerBadgeByChar = useMemo(() => {
+    const map = new Map<string, ReturnType<typeof getProducerBadge>>();
     for (const c of visibleChars) {
       map.set(
         c,
-        getCharMechanisms(c, assignments, modality, inheritedChars)
-          .producesCount,
+        getProducerBadge(c, assignments, modality, baseDirectSet, preAugmentSessionAwareSet),
       );
     }
     return map;
-  }, [visibleChars, assignments, modality, inheritedChars]);
+  }, [visibleChars, assignments, modality, baseDirectSet, preAugmentSessionAwareSet]);
 
   if (chars.length === 0) return null;
 
@@ -352,10 +380,45 @@ export function CharScrollStrip({
             is selected. */}
         {visibleChars.map((c, index) => {
           const hex = charHex(c);
-          const isSelected = c === currentChar;
+          // NFC identity (not raw `===`) — same rationale as
+          // visibleChars/hasSelectedVisible above.
+          const isSelected = currentChar !== null && sameCharIdentity(c, currentChar);
           const isTabbable = isSelected || (!hasSelectedVisible && index === 0);
-          const count = producesCountByChar.get(c) ?? 0;
+          const badge = producerBadgeByChar.get(c) ?? {
+            count: 0,
+            hasDirect: false,
+            isComposable: false,
+            components: [],
+          };
+          const count = badge.count;
           const badgeGood = count >= 1;
+          // Accessible name for the compose clause — codepoint-derived (per
+          // docs/accessibility.md #10), never the raw NFD component glyphs on
+          // their own: reuses the same toUPlusNotation helper this file
+          // already uses for every other codepoint-facing aria-label. Reuses
+          // `badge.components` (the exact decomposition `composableComponentsFor`
+          // already computed inside getProducerBadge) rather than re-running
+          // `c.normalize("NFD")` a second time here.
+          const composeComponentNames = badge.isComposable
+            ? badge.components.map((component) => toUPlusNotation(component)).join(", ")
+            : "";
+          // The badge's accessible name — the existing count clause, with a
+          // composition clause appended (never a second aria-live region;
+          // this rides the badge's own existing aria-label, D3-neutral — see
+          // this file's header comment).
+          const countAriaLabel = t({
+            id: "editor.assignLoop.charScroll.badgeAriaLabel",
+            message: plural(count, {
+              one: "# way produces this character",
+              other: "# ways produce this character",
+            }),
+          });
+          const badgeAriaLabel = badge.isComposable
+            ? `${countAriaLabel} ${t({
+                id: "editor.assignLoop.charScroll.badgeComposeClause",
+                message: `reachable by composing ${{ components: composeComponentNames }}`,
+              })}`
+            : countAriaLabel;
           return (
             <button
               key={c}
@@ -418,31 +481,49 @@ export function CharScrollStrip({
                   {toUPlusNotation(c)}
                 </span>
               )}
-              <span
-                data-testid={`char-scroll-badge-${hex}`}
-                aria-label={t({
-                  id: "editor.assignLoop.charScroll.badgeAriaLabel",
-                  message: plural(count, {
-                    one: "# way produces this character",
-                    other: "# ways produce this character",
-                  }),
-                })}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  minWidth: 16,
-                  padding: "0 5px",
-                  borderRadius: 8,
-                  fontSize: 10,
-                  fontWeight: 600,
-                  lineHeight: "16px",
-                  background: badgeGood ? "#0d2218" : "#2a0a0a",
-                  border: `1px solid ${badgeGood ? "#238636" : ERROR_RED}`,
-                  color: badgeGood ? "#56d364" : ERROR_RED,
-                }}
-              >
-                {count}
+              <span style={{ display: "inline-flex", alignItems: "center", gap: 2 }}>
+                <span
+                  data-testid={`char-scroll-badge-${hex}`}
+                  aria-label={badgeAriaLabel}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    minWidth: 16,
+                    padding: "0 5px",
+                    borderRadius: 8,
+                    fontSize: 10,
+                    fontWeight: 600,
+                    lineHeight: "16px",
+                    background: badgeGood ? "#0d2218" : ERROR_BG,
+                    // Composable chars get a DASHED border (never color
+                    // alone) in addition to the `⊕` marker below — a shape
+                    // distinction visible in grayscale. This span's own
+                    // textContent stays the bare count digit(s) — the
+                    // compose marker is a SIBLING span, not nested here, so
+                    // a caller reading this badge's textContent for the
+                    // count keeps getting exactly the number.
+                    border: `1px ${badge.isComposable ? "dashed" : "solid"} ${
+                      badgeGood ? "#238636" : ERROR_RED
+                    }`,
+                    color: badgeGood ? "#56d364" : ERROR_RED,
+                  }}
+                >
+                  {count}
+                </span>
+                {badge.isComposable && (
+                  // Decorative — the badge span's own aria-label above
+                  // already states the composition clause, so this is
+                  // aria-hidden to avoid a double announcement (same pattern
+                  // as the selected-chip U+ notation span above).
+                  <span
+                    data-testid={`char-scroll-badge-compose-${hex}`}
+                    aria-hidden="true"
+                    style={{ fontSize: 9, lineHeight: 1, color: TEXT_DIM }}
+                  >
+                    ⊕
+                  </span>
+                )}
               </span>
             </button>
           );

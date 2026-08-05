@@ -21,6 +21,7 @@ import { TouchGallery } from "../assignLoop/TouchGallery.tsx";
 import type { TouchAssignment } from "@keyboard-studio/contracts";
 import type { DesktopModifications } from "@keyboard-studio/engine";
 import { deriveDesktopModifications } from "../../lib/deriveDesktopModifications.ts";
+import { usePlacementPriors } from "../../hooks/usePlacementPriors.ts";
 
 const EMPTY_MODS: DesktopModifications = { removals: [], placements: [] };
 
@@ -45,6 +46,12 @@ export function AddTouchAdapter({ onComplete, onBack }: EditorStepProps) {
   // edge case); the reducer's injected buildTouchLayoutJson dep resolves the
   // Entity-5 default, not this adapter.
   const seedSource = useSurveySessionStore((s) => s.touchSeedSource);
+  // Self-sources the same corpus placement map addPhysicalAdapter passes to
+  // MechanismGallery (spec §7.6) — TouchGallery only reads its `touch` field
+  // (placement-priors v2's corpus-mined longpress hosts) as a tie-breaker
+  // fallback below the NFD-decomposition path. Null while loading/unavailable
+  // ⇒ TouchGallery's existing NFD-only suggestion behavior, unchanged.
+  const placementMap = usePlacementPriors();
 
   // Stable primitive key so the mods memo only recomputes when the carve
   // overlay or Phase C assignments actually change — the sets/array are
@@ -75,5 +82,11 @@ export function AddTouchAdapter({ onComplete, onBack }: EditorStepProps) {
   // reachable silent-no-op path — kept rather than removed only because
   // TypeScript can't otherwise satisfy TouchGallery's required prop from
   // EditorStepProps's optional one.
-  return <TouchGallery onComplete={handleComplete} onBack={onBack ?? (() => undefined)} />;
+  return (
+    <TouchGallery
+      onComplete={handleComplete}
+      onBack={onBack ?? (() => undefined)}
+      {...(placementMap ? { placementMap } : {})}
+    />
+  );
 }

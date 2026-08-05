@@ -9,10 +9,21 @@
 #
 # seed_translations (manual-trigger only): also uploads the repo's existing
 # target-locale catalogs (fr/messages.json etc.) to Crowdin as translations.
-# One-off seeding tool, not part of the normal round-trip -- without it,
-# Crowdin has no record of the illustrative translations already committed
-# to the repo, so the first `download` overwrites them with English fallback
-# (skip_untranslated_strings: false fills every untranslated key from source).
+# One-off seeding tool, not part of the normal round-trip -- but a LOAD-BEARING
+# prerequisite for ever enabling the download half. Without it Crowdin has no
+# record of the translations already committed to the repo, and the download
+# then overwrites them with whatever Crowdin does hold: nothing.
+#
+# Read that failure mode carefully, because it changed shape in 2026-08 when
+# crowdin.yml moved to skip_untranslated_strings: true. Under `false` an
+# unseeded download came back 100% ENGLISH, which utilities/i18n-collapse-guard
+# is built to catch and did. Under `true` it comes back 100% EMPTY -- and the
+# guard deliberately treats all-empty as a legitimately-bootstrapped locale, so
+# it PASSES. The corruption is quieter now, not less total.
+#
+# Practical consequence: verify the seed actually landed (utilities/crowdin-
+# diagnose reports translated counts per locale) BEFORE enabling scheduled
+# downloads. The guard is no longer the backstop for this particular mistake.
 
 name: Crowdin upload sources
 
