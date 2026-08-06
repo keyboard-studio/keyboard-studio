@@ -215,8 +215,8 @@ phase adds the behavioural proof.
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T044** [P] [US4] Simulate a compile/scaffold/output engine-surface load failure that has already consumed the stale-chunk reload, and assert the crash path still computes a fingerprint, builds a redacted payload, and POSTs — using none of the failed chunk's exports, and with `crypto.subtle.digest` called directly rather than `computeSha256Hex` (FR-014, SC-004) · `packages/studio/src/crash/send.test.ts`
-- [ ] **T045** [P] [US4] Raise the chunk-graph confidence the spec flags as inferred-from-minified-output: a browser-level test that blocks the network request for the lazy engine chunk and asserts the app shell — and the reporter inside it — still renders and can file (Test Surface, "Chunk-graph confidence") · `packages/studio/e2e/crash-engine-chunk-blocked.spec.ts`
+- [x] **T044** [P] [US4] Simulate a compile/scaffold/output engine-surface load failure that has already consumed the stale-chunk reload, and assert the crash path still computes a fingerprint, builds a redacted payload, and POSTs — using none of the failed chunk's exports, and with `crypto.subtle.digest` called directly rather than `computeSha256Hex` (FR-014, SC-004) · `packages/studio/src/crash/send.test.ts`
+- [x] **T045** [P] [US4] Raise the chunk-graph confidence the spec flags as inferred-from-minified-output: a browser-level test that blocks the network request for the lazy engine chunk and asserts the app shell — and the reporter inside it — still renders and can file (Test Surface, "Chunk-graph confidence") · `packages/studio/e2e/crash-engine-chunk-blocked.spec.ts`
 
 **Checkpoint**: the P0 is proven both statically and behaviourally.
 

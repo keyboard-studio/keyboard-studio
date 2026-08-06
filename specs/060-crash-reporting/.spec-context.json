@@ -398,6 +398,22 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-06T02:54:37.692Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T044",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:56:48.147Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T045",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:56:48.396Z"
     }
   ],
   "telemetryInstanceId": "4d8149dc-5ee9-43f5-9dac-81307541deb6",
@@ -558,6 +574,10 @@
       "title": "The crash module stays functional after loadEngine() has already failed for the session",
       "tasks": [
         "T044"
+      ],
+      "tests": [
+        "packages/studio/src/crash/send.test.ts",
+        "packages/studio/e2e/crash-engine-chunk-blocked.spec.ts"
       ]
     },
     "FR-020": {
@@ -1049,6 +1069,9 @@
       "title": "The client caches already-reported fingerprints in sessionStorage",
       "tasks": [
         "T014"
+      ],
+      "tests": [
+        "packages/studio/src/crash/send.test.ts::session dedupe cache"
       ]
     },
     "FR-102": {
@@ -1216,7 +1239,7 @@
       ]
     }
   },
-  "currentTask": "T043",
+  "currentTask": "T045",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1525,6 +1548,20 @@
       "files": [
         "packages/studio/src/components/CrashNotice.tsx",
         "packages/studio/src/crash/send.ts"
+      ]
+    },
+    "T044": {
+      "status": "DONE",
+      "did": "Behavioural proof the reporter survives a spent engine chunk: fingerprints via crypto.subtle directly, builds, and POSTs with no engine helper; plus dedupe-cache and fire-and-forget coverage",
+      "files": [
+        "packages/studio/src/crash/send.test.ts"
+      ]
+    },
+    "T045": {
+      "status": "DONE",
+      "did": "Browser-level chunk-blocked spec that aborts the real engine chunk request and asserts the shell and reporter still file, with a non-vacuity check that the route pattern actually matched",
+      "files": [
+        "packages/studio/e2e/crash-engine-chunk-blocked.spec.ts"
       ]
     }
   },
