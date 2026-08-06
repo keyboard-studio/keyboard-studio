@@ -335,8 +335,8 @@ vi.mock("./editors/panels/BaseResolution.tsx", () => ({
   },
 }));
 
-vi.mock("./editors/carve/CarveGalleryV2.tsx", () => ({
-  CarveGalleryV2: ({ onComplete, onBack }: { onComplete: () => void; onBack?: () => void }) => {
+vi.mock("./editors/carve/CarveGallery.tsx", () => ({
+  CarveGallery: ({ onComplete, onBack }: { onComplete: () => void; onBack?: () => void }) => {
     _mockCarveDoneRef.current = onComplete;
     _mockCarveBackRef.current = onBack ?? null;
     return (
