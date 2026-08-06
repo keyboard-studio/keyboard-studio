@@ -246,6 +246,38 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-06T02:31:08.678Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:39:22.713Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:39:22.983Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:39:23.236Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:39:23.548Z"
     }
   ],
   "telemetryInstanceId": "4d8149dc-5ee9-43f5-9dac-81307541deb6",
@@ -290,6 +322,11 @@
       "decision": "Extended CrashReportBodySchema.context to the full FR-040 structural set (keyboardId, bcp47Tags, stepId, keyCount, exemplarCount, decisionTail, breadcrumbs) alongside browserUA/os",
       "why": "contracts/crash-report-api.md declares only browserUA and os under context; zod strips unknown keys, so the FR-040 structural context the filed issue is required to carry would have been silently dropped, making FR-040/FR-046 unsatisfiable",
       "rejected": "Following the contract table literally and passing structural context through a second top-level field"
+    },
+    {
+      "decision": "CrashRecoveryScreen carries no reload button",
+      "why": "FR-122 pins exactly six crash.* message ids and FR-126 forbids repurposing an existing one; a reload control has no id, and FR-072 requires only that controls which exist are real keyboard-operable elements",
+      "rejected": "Reusing crash.report.retry.notice as the reload label"
     }
   ],
   "step_summaries": {
@@ -901,6 +938,9 @@
       "title": "A stateless global creation cap gates issue creation, surfacing a skip as 429",
       "tasks": [
         "T025"
+      ],
+      "tests": [
+        "api/report/crash.test.ts::global creation cap"
       ]
     },
     "FR-110": {
@@ -1035,7 +1075,7 @@
       ]
     }
   },
-  "currentTask": "T023",
+  "currentTask": "T028",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1205,6 +1245,35 @@
       "did": "Pinned the FR-081d canonical string exactly, plus rebuild/build-id stability and genuine-difference cases, title shape, and the scrub",
       "files": [
         "utilities/oauth-backend/src/crash-report-pipeline.test.ts"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Stateless global creation cap probing recent issues, counting only genuine creations in the window, skipping to 429 rate_limited with Retry-After derived from the window, failing OPEN on probe error",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-pipeline.ts",
+        "api/report/crash.test.ts"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "Recovery screen with role=alert, focus moved to a tabIndex=-1 heading on mount, and the issue link as a real anchor",
+      "files": [
+        "packages/studio/src/components/CrashRecoveryScreen.tsx"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "Notice with aria-live=polite that never moves focus, consuming send.ts's subscribable via useSyncExternalStore",
+      "files": [
+        "packages/studio/src/components/CrashNotice.tsx"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "Caller-side structural context collector reading the working copy, survey session, phase-B draft, and decision-log tail; placed in src/lib/ because the gate forbids these imports inside src/crash/",
+      "files": [
+        "packages/studio/src/lib/crashCallerContext.ts"
       ]
     }
   },

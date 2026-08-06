@@ -662,6 +662,70 @@ export function labelNames(issue: GitHubIssue): string[] {
   return (issue.labels ?? []).map((l) => (typeof l === "string" ? l : l.name));
 }
 
+// ---------------------------------------------------------------------------
+// Global creation cap (FR-106) — stateless, derived from the repo itself
+// ---------------------------------------------------------------------------
+
+/**
+ * Probe recent issue-creation volume and decide whether creation may proceed.
+ *
+ * STATELESS BY DESIGN (FR-105). There is no KV, Redis, or Postgres behind this:
+ * the state is the target repository's own recent issue list, which every
+ * instance of the function can read and none of them has to keep in sync. That
+ * is the difference between a cap that works across a fleet of cold-started
+ * serverless invocations and one that works only when there happens to be one.
+ *
+ * This is the LAST line of defence, not the first. The client session cache
+ * (FR-101), the fingerprint dedupe (FR-090), and the Vercel Firewall per-IP
+ * rule all sit in front of it. What it stops is the case none of those can: a
+ * distributed flood of GENUINELY DISTINCT fingerprints, where every report is
+ * legitimately new and every one would otherwise create an issue.
+ *
+ * Returns `null` when creation may proceed, or a `rate_limited` result when it
+ * may not. A failed probe returns `null` — fails OPEN, matching the dedupe
+ * lookup (FR-096): the cap exists to stop a flood, not to become one more way a
+ * genuine report is silently dropped.
+ */
+export async function checkGlobalCreateCap(
+  gh: GitHubCalls,
+  now: number,
+): Promise<CrashReportHandlerResult | null> {
+  const since = new Date(now - CRASH_REPORT_GLOBAL_CREATE_WINDOW_MS).toISOString();
+
+  let res: CrashReportFetchResponse;
+  try {
+    res = await gh.listCreatedSince(since);
+  } catch {
+    return null;
+  }
+  if (!res.ok) return null;
+
+  let issues: GitHubIssue[];
+  try {
+    issues = (await res.json()) as GitHubIssue[];
+  } catch {
+    return null;
+  }
+  if (!Array.isArray(issues)) return null;
+
+  // `since` filters on UPDATED time, so the response includes issues merely
+  // commented on in the window. Only genuine creations count against a
+  // CREATION cap — otherwise a busy tracker caps itself on comment traffic.
+  const createdInWindow = issues.filter((i) => {
+    const created = Date.parse((i as unknown as { created_at?: string }).created_at ?? "");
+    return Number.isFinite(created) && created >= now - CRASH_REPORT_GLOBAL_CREATE_WINDOW_MS;
+  }).length;
+
+  if (createdInWindow < CRASH_REPORT_GLOBAL_CREATE_CAP) return null;
+
+  return {
+    ok: false,
+    status: 429,
+    error: "rate_limited",
+    retryAfterSeconds: Math.ceil(CRASH_REPORT_GLOBAL_CREATE_WINDOW_MS / 1000),
+  };
+}
+
 /**
  * Run the crash-report pipeline for a validated body.
  *
@@ -679,6 +743,8 @@ export function labelNames(issue: GitHubIssue): string[] {
 export async function submitCrashReport(
   rawBody: CrashReportBody,
   config: CrashReportPipelineConfig,
+  /** Injectable clock, so cooldown and cap windows are testable without waiting. */
+  now: number = Date.now(),
 ): Promise<CrashReportHandlerResult> {
   // Scrub BEFORE anything is written. The client's allowlist should mean there
   // is nothing to find; this route accepts a POST from anywhere and everything
@@ -694,6 +760,9 @@ export async function submitCrashReport(
   const gh = createGitHubCalls(token, config.fetch);
 
   try {
+    const capped = await checkGlobalCreateCap(gh, now);
+    if (capped !== null) return capped;
+
     const created = await gh.createIssue({
       title: buildIssueTitle(normalizeMessage(body.message)),
       body: buildIssueBody(body, fingerprint, kind),

@@ -56,15 +56,19 @@ interface StubCall {
 }
 
 /**
- * Build a stub config whose fetch returns the given responses in order and
- * records every call, so a test can assert not just the outcome but which
- * GitHub calls were and were not made.
+ * Build a stub config that ROUTES by request rather than replaying a fixed
+ * sequence, and records every call so a test can assert not just the outcome
+ * but which GitHub calls were and were not made.
+ *
+ * Routing rather than sequencing matters here: the pipeline's call order grows
+ * as branches land (the global-cap probe, then the dedupe lookup), and an
+ * index-keyed stub silently re-points every assertion at the wrong call each
+ * time one is added.
  */
 function stubConfig(
-  responses: StubResponse[],
+  overrides: { create?: StubResponse; capProbe?: StubResponse } = {},
 ): CrashReportPipelineConfig & { calls: StubCall[] } {
   const calls: StubCall[] = [];
-  let index = 0;
   return {
     getInstallationToken: () => Promise.resolve("tok_crash_test"),
     fetch: (url, init): Promise<CrashReportFetchResponse> => {
@@ -73,7 +77,17 @@ function stubConfig(
         method: init.method,
         body: init.body === undefined ? undefined : JSON.parse(init.body),
       });
-      const r = responses[index++] ?? { ok: true, status: 200, body: {} };
+
+      let r: StubResponse;
+      if (init.method === "GET" && url.includes("since=")) {
+        // Global-creation-cap probe — an empty repo by default.
+        r = overrides.capProbe ?? { ok: true, status: 200, body: [] };
+      } else if (init.method === "POST" && /\/issues$/.test(url.split("?")[0] ?? "")) {
+        r = overrides.create ?? createdIssue;
+      } else {
+        r = { ok: true, status: 200, body: {} };
+      }
+
       const body = r.body ?? {};
       return Promise.resolve({
         ok: r.ok ?? true,
@@ -89,7 +103,7 @@ function stubConfig(
 }
 
 /** A successful `POST /issues` response. */
-const createdIssue = {
+const createdIssue: StubResponse = {
   ok: true,
   status: 201,
   body: {
@@ -98,6 +112,13 @@ const createdIssue = {
   },
 };
 
+/** The recorded `POST …/issues` call, or undefined if creation never happened. */
+function createCall(calls: StubCall[]): StubCall | undefined {
+  return calls.find(
+    (c) => c.method === "POST" && /\/issues$/.test(c.url.split("?")[0] ?? ""),
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Method guard
 // ---------------------------------------------------------------------------
@@ -105,7 +126,7 @@ const createdIssue = {
 describe("runCrashReportHandler — method guard", () => {
   it("returns 405 with Allow: POST for a GET", async () => {
     const req = new Request("https://app.example/report/crash", { method: "GET" });
-    const res = await runCrashReportHandler(req, stubConfig([]));
+    const res = await runCrashReportHandler(req, stubConfig());
     expect(res.status).toBe(405);
     expect(res.headers.get("Allow")).toBe("POST");
     expect(await res.json()).toEqual({ error: "method_not_allowed" });
@@ -126,7 +147,7 @@ describe("runCrashReportHandler — not configured", () => {
   });
 
   it("makes no GitHub call at all when not configured", async () => {
-    const config = stubConfig([createdIssue]);
+    const config = stubConfig();
     await runCrashReportHandler(postReq(validBody()), null);
     expect(config.calls).toEqual([]);
   });
@@ -138,7 +159,7 @@ describe("runCrashReportHandler — not configured", () => {
 
 describe("runCrashReportHandler — body validation", () => {
   it("returns 400 for unparseable JSON", async () => {
-    const res = await runCrashReportHandler(postReq("{not json"), stubConfig([]));
+    const res = await runCrashReportHandler(postReq("{not json"), stubConfig());
     expect(res.status).toBe(400);
     expect(await res.json()).toEqual({ error: "invalid_request" });
   });
@@ -146,7 +167,7 @@ describe("runCrashReportHandler — body validation", () => {
   it("returns 400 when `message` is missing", async () => {
     const res = await runCrashReportHandler(
       postReq({ kind: "render", stackFrames: [] }),
-      stubConfig([]),
+      stubConfig(),
     );
     expect(res.status).toBe(400);
   });
@@ -154,14 +175,14 @@ describe("runCrashReportHandler — body validation", () => {
   it("ignores a client-supplied `fingerprint` rather than honouring it (P0-1)", async () => {
     // The field does not exist in the schema, so it is stripped — the request
     // still succeeds, and the label is derived from the content.
-    const config = stubConfig([createdIssue]);
+    const config = stubConfig();
     const res = await runCrashReportHandler(
       postReq({ ...validBody(), fingerprint: "deadbeefcafe", title: "own title" }),
       config,
     );
     expect(res.status).toBe(200);
 
-    const created = config.calls[0]?.body as { labels: string[]; title: string };
+    const created = createCall(config.calls)?.body as { labels: string[]; title: string };
     expect(created.labels).not.toContain("crash/fp-deadbeefcafe");
     expect(created.title).not.toBe("own title");
     expect(created.title.startsWith("bug(studio): ")).toBe(true);
@@ -174,7 +195,7 @@ describe("runCrashReportHandler — body validation", () => {
 
 describe("runCrashReportHandler — create path", () => {
   it("files an issue and returns issueUrl / issueNumber / action", async () => {
-    const config = stubConfig([createdIssue]);
+    const config = stubConfig();
     const res = await runCrashReportHandler(postReq(validBody()), config);
 
     expect(res.status).toBe(200);
@@ -186,32 +207,32 @@ describe("runCrashReportHandler — create path", () => {
   });
 
   it("targets keyboard-studio/crash-reports, a source constant (FR-089)", async () => {
-    const config = stubConfig([createdIssue]);
+    const config = stubConfig();
     await runCrashReportHandler(postReq(validBody()), config);
-    expect(config.calls[0]?.url).toContain(
+    expect(createCall(config.calls)?.url).toContain(
       "/repos/keyboard-studio/crash-reports/issues",
     );
-    expect(config.calls[0]?.method).toBe("POST");
+    expect(createCall(config.calls)?.method).toBe("POST");
   });
 
   it("labels the issue crash/fp-<hash12> and nothing else", async () => {
-    const config = stubConfig([createdIssue]);
+    const config = stubConfig();
     await runCrashReportHandler(postReq(validBody()), config);
-    const created = config.calls[0]?.body as { labels: string[] };
+    const created = createCall(config.calls)?.body as { labels: string[] };
     expect(created.labels).toHaveLength(1);
     expect(created.labels[0]).toMatch(/^crash\/fp-[0-9a-f]{12}$/);
   });
 
   it("carries the fingerprint body trailer for auditability (FR-092)", async () => {
-    const config = stubConfig([createdIssue]);
+    const config = stubConfig();
     await runCrashReportHandler(postReq(validBody()), config);
-    const created = config.calls[0]?.body as { body: string; labels: string[] };
+    const created = createCall(config.calls)?.body as { body: string; labels: string[] };
     const hash = (created.labels[0] as string).replace("crash/fp-", "");
     expect(created.body).toContain(`<!-- crash-fingerprint: ${hash} -->`);
   });
 
   it("accepts a pre-mount body with no `kind` and no stackFrames (SC-018)", async () => {
-    const config = stubConfig([createdIssue]);
+    const config = stubConfig();
     const res = await runCrashReportHandler(
       postReq({
         message: "Studio bootstrap: #root element missing from index.html",
@@ -221,8 +242,70 @@ describe("runCrashReportHandler — create path", () => {
       config,
     );
     expect(res.status).toBe(200);
-    const created = config.calls[0]?.body as { body: string };
+    const created = createCall(config.calls)?.body as { body: string };
     expect(created.body).toContain("`pre-mount`");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Global creation cap (FR-106, SC-016)
+// ---------------------------------------------------------------------------
+
+describe("runCrashReportHandler — global creation cap", () => {
+  /** `n` issues all created inside the window. */
+  function recentIssues(n: number) {
+    const createdAt = new Date().toISOString();
+    return Array.from({ length: n }, (_, i) => ({
+      number: i + 1,
+      html_url: `https://github.com/keyboard-studio/crash-reports/issues/${i + 1}`,
+      state: "open",
+      comments: 0,
+      updated_at: createdAt,
+      created_at: createdAt,
+    }));
+  }
+
+  it("skips creation and returns 429 rate_limited once the cap is reached", async () => {
+    const config = stubConfig({ capProbe: { ok: true, status: 200, body: recentIssues(200) } });
+    const res = await runCrashReportHandler(postReq(validBody()), config);
+
+    expect(res.status).toBe(429);
+    expect(await res.json()).toEqual({ error: "rate_limited" });
+    expect(createCall(config.calls)).toBeUndefined();
+  });
+
+  it("sets Retry-After from the window, not a hard-coded literal", async () => {
+    const config = stubConfig({ capProbe: { ok: true, status: 200, body: recentIssues(200) } });
+    const res = await runCrashReportHandler(postReq(validBody()), config);
+    // CRASH_REPORT_GLOBAL_CREATE_WINDOW_MS is 600_000.
+    expect(res.headers.get("Retry-After")).toBe("600");
+  });
+
+  it("creates normally when the window is below the cap", async () => {
+    const config = stubConfig({ capProbe: { ok: true, status: 200, body: recentIssues(199) } });
+    const res = await runCrashReportHandler(postReq(validBody()), config);
+    expect(res.status).toBe(200);
+    expect(createCall(config.calls)).toBeDefined();
+  });
+
+  it("does not count issues merely UPDATED in the window against a creation cap", async () => {
+    // `since=` filters on updated time, so a busy tracker returns issues that
+    // were only commented on. Counting those would cap the route on comment
+    // traffic rather than creation volume.
+    const old = new Date(Date.now() - 86_400_000).toISOString();
+    const touched = recentIssues(200).map((i) => ({ ...i, created_at: old }));
+    const config = stubConfig({ capProbe: { ok: true, status: 200, body: touched } });
+    const res = await runCrashReportHandler(postReq(validBody()), config);
+    expect(res.status).toBe(200);
+  });
+
+  it("fails OPEN to creation when the cap probe itself errors", async () => {
+    // A dropped report is worse than a duplicate — same posture as the dedupe
+    // lookup (FR-096).
+    const config = stubConfig({ capProbe: { ok: false, status: 500, body: {} } });
+    const res = await runCrashReportHandler(postReq(validBody()), config);
+    expect(res.status).toBe(200);
+    expect(createCall(config.calls)).toBeDefined();
   });
 });
 
@@ -232,7 +315,7 @@ describe("runCrashReportHandler — create path", () => {
 
 describe("runCrashReportHandler — error mapping", () => {
   it("maps GitHub 403 to 502 submission_unavailable, naming no credential", async () => {
-    const config = stubConfig([{ ok: false, status: 403, body: {} }]);
+    const config = stubConfig({ create: { ok: false, status: 403, body: {} } });
     const res = await runCrashReportHandler(postReq(validBody()), config);
     expect(res.status).toBe(502);
     // Deliberately generic: a caller that could distinguish "wrong App" from
@@ -241,14 +324,14 @@ describe("runCrashReportHandler — error mapping", () => {
   });
 
   it("maps GitHub 401 to 502 submission_unavailable", async () => {
-    const config = stubConfig([{ ok: false, status: 401, body: {} }]);
+    const config = stubConfig({ create: { ok: false, status: 401, body: {} } });
     const res = await runCrashReportHandler(postReq(validBody()), config);
     expect(res.status).toBe(502);
     expect(await res.json()).toEqual({ error: "submission_unavailable" });
   });
 
   it("maps any other non-ok to 502 upstream_error", async () => {
-    const config = stubConfig([{ ok: false, status: 500, body: {} }]);
+    const config = stubConfig({ create: { ok: false, status: 500, body: {} } });
     const res = await runCrashReportHandler(postReq(validBody()), config);
     expect(res.status).toBe(502);
     expect(await res.json()).toEqual({ error: "upstream_error" });
