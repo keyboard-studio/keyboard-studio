@@ -130,6 +130,12 @@ if (!baselineRef) {
   );
 }
 
+// English's baseline content is the same for every target locale, so this is
+// fetched once here rather than once per locale inside the loop below.
+const baselineEn = baselineRef
+  ? readCatalogAtRef(baselineRef, path.join(COMMITTED_DIR, SOURCE_LOCALE, CATALOG_FILE), REPO_ROOT)
+  : null;
+
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "i18n-catalog-check-"));
 let freshLocales = [];
 let extractionProducedNothing = false;
@@ -207,6 +213,7 @@ try {
       const committedSource = readCatalog(
         path.join(COMMITTED_DIR, SOURCE_LOCALE, CATALOG_FILE),
       );
+      let collapseFired = false;
       if (committedSource !== null) {
         const collapse = checkEnglishCollapse({
           en: committedSource,
@@ -214,7 +221,10 @@ try {
           locale,
           catalog: CATALOG_FILE,
         });
-        if (collapse.problem) problems.push(collapse.problem);
+        if (collapse.problem) {
+          problems.push(collapse.problem);
+          collapseFired = true;
+        }
         // A catalog too small to check is reported rather than passing silently
         // — see i18n-collapse-guard's "a skip is reported" note. It goes to
         // `notes`, not `warnings`: nothing is stale, so the extract remediation
@@ -249,25 +259,22 @@ try {
           // reverting to English in an otherwise-translated catalog. This
           // needs English at the SAME baseline ref too (a key already
           // legitimately identical to English back then must not be flagged
-          // now), not just the target locale's own baseline.
-          if (committedSource !== null) {
-            const baselineEn = readCatalogAtRef(
-              baselineRef,
-              path.join(COMMITTED_DIR, SOURCE_LOCALE, CATALOG_FILE),
-              REPO_ROOT,
-            );
-            if (baselineEn !== null) {
-              const reversions = checkKeyReversions({
-                baselineTarget: baseline,
-                currentTarget: committed,
-                baselineEn,
-                currentEn: committedSource,
-                locale,
-                catalog: CATALOG_FILE,
-                baselineLabel: baselineRef,
-              });
-              if (reversions.problem) problems.push(reversions.problem);
-            }
+          // now), not just the target locale's own baseline. Skipped when the
+          // collapse guard above already fired for this locale/catalog: a
+          // full collapse satisfies this per-key check for nearly every key,
+          // and this guard's own message claims to catch what the collapse
+          // guard "misses" — true for an isolated few keys, misleading here.
+          if (committedSource !== null && baselineEn !== null && !collapseFired) {
+            const reversions = checkKeyReversions({
+              baselineTarget: baseline,
+              currentTarget: committed,
+              baselineEn,
+              currentEn: committedSource,
+              locale,
+              catalog: CATALOG_FILE,
+              baselineLabel: baselineRef,
+            });
+            if (reversions.problem) problems.push(reversions.problem);
           }
         }
       }

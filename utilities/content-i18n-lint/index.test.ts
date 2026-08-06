@@ -733,6 +733,71 @@ describe("i18n-collapse-guard per-key English-reversion guard", () => {
     });
     expect(clean.problem).toBeNull();
   });
+
+  // ---------------------------------------------------------------------
+  // English source text moving between baseline and current is a DIFFERENT,
+  // already-tracked event (the "English changed, translations may now be
+  // stale" warning both lint scripts emit elsewhere) -- not a reversion.
+  // Without this exclusion, a translation that legitimately hasn't caught up
+  // to an edited English string yet could spuriously equal the NEW English
+  // text and get flagged as if it had reverted.
+  // ---------------------------------------------------------------------
+
+  it("does not flag a key whose English source text itself changed between baseline and current", () => {
+    const baselineEn = { greet: "Hi there" };
+    const currentEn = { greet: "Hi there, friend" }; // English wording edited
+    const baselineTarget = { greet: "Salut" }; // a real prior translation
+    // Current target happens to equal the NEW English text -- e.g. the
+    // translator hasn't caught up yet and some step filled the gap with the
+    // (now-current) source text. This must not read as "reverted."
+    const currentTarget = { greet: "Hi there, friend" };
+
+    expect(measureKeyReversions(baselineTarget, currentTarget, baselineEn, currentEn)).toEqual([]);
+  });
+
+  it("still flags a reversion when English is unchanged, distinguishing it from the moved-source case", () => {
+    const en = { greet: "Hi there" }; // same at both points in time
+    const baselineTarget = { greet: "Salut" };
+    const currentTarget = { greet: "Hi there" }; // reverted, English didn't move
+
+    expect(measureKeyReversions(baselineTarget, currentTarget, en, en)).toEqual(["greet"]);
+  });
+
+  // ---------------------------------------------------------------------
+  // A huge reverted-key list is the signature of a full collapse (the OTHER
+  // guard's shape), not this one's target case of a handful of keys. The
+  // message caps the list rather than dumping hundreds of ids inline.
+  // ---------------------------------------------------------------------
+
+  it("caps the key list in the message and says how many more, rather than dumping all of them", () => {
+    const en: Record<string, string> = {};
+    const baselineTarget: Record<string, string> = {};
+    const currentTarget: Record<string, string> = {};
+    for (let i = 0; i < 25; i++) {
+      en[`k${i}`] = `English ${i}`;
+      baselineTarget[`k${i}`] = `Francais ${i}`;
+      currentTarget[`k${i}`] = en[`k${i}`]; // all 25 reverted
+    }
+
+    const result = checkKeyReversions({
+      baselineTarget,
+      currentTarget,
+      baselineEn: en,
+      currentEn: en,
+      locale: "fr",
+      catalog: "messages.json",
+      baselineLabel: "origin/main",
+    });
+
+    expect(result.problem).toContain("25 key(s)");
+    expect(result.problem).toContain("and 5 more");
+    // Keys are inserted k0..k24 in order, so the cap (20) shows k0..k19 and
+    // omits k20..k24. Checked by exact key name, not substring -- "k1" is a
+    // substring of "k10"-"k19", so a naive .includes() count would overcount.
+    expect(result.problem).toContain("k19"); // last shown
+    expect(result.problem).not.toContain("k20"); // first omitted
+    expect(result.problem).not.toContain("k24"); // last overall, omitted
+  });
 });
 
 describe("content-i18n-lint per-key English-reversion wiring", () => {
@@ -778,6 +843,61 @@ describe("content-i18n-lint per-key English-reversion wiring", () => {
       // Only the target locale's baseline resolves -- English's doesn't
       // (e.g. a transient git failure specific to that one lookup).
       getBaselineCatalog: (locale, name) => (locale === "fr" && name === "flowQuestions.json" ? baselineFr : null),
+    });
+
+    expect(problems).toEqual([]);
+  });
+
+  it("reports only the collapse guard's problem, not a duplicate/misleading per-key one, when the whole catalog collapsed", () => {
+    const dir = tempContentI18nDir();
+    const en = englishCatalog(30);
+    writeFileSync(join(dir, "en", "flowQuestions.json"), JSON.stringify(en));
+    const baselineFr = mapValues(en, (v) => `Invite ${v}`); // fully translated before
+    // Now: EVERY key collapsed to English, not just a handful -- the OTHER
+    // guard's shape. The per-key guard would also technically match every
+    // key here; it must stay silent so the report doesn't look like two
+    // guards independently caught the same incident (one of which claims to
+    // catch what the other "misses," which would be misleading in this case).
+    writeFileSync(join(dir, "fr", "flowQuestions.json"), JSON.stringify(en));
+
+    const { problems } = lint({
+      contentI18nDir: dir,
+      freshCatalogs: EMPTY_FRESH,
+      parityOnlyFiles: ["flowQuestions.json"],
+      getBaselineCatalog: (locale, name) => {
+        if (name !== "flowQuestions.json") return null;
+        if (locale === "fr") return baselineFr;
+        if (locale === "en") return en;
+        return null;
+      },
+    });
+
+    expect(problems).toHaveLength(1);
+    expect(problems[0]).toContain("collapsed into the English source");
+  });
+
+  it("does not flag a key whose English source text itself changed, even with a real baseline available", () => {
+    const dir = tempContentI18nDir();
+    const baselineEn = englishCatalog(30);
+    // English wording for one key changes between baseline and current.
+    const currentEn = { ...baselineEn, "content.flowQuestion.q1.prompt": "Prompt 0, revised" };
+    writeFileSync(join(dir, "en", "flowQuestions.json"), JSON.stringify(currentEn));
+    const baselineFr = mapValues(baselineEn, (v) => `Invite ${v}`);
+    // The translation hasn't caught up to the revised English yet, and
+    // happens to read identically to the NEW English text -- not a reversion.
+    const currentFr = { ...baselineFr, "content.flowQuestion.q1.prompt": currentEn["content.flowQuestion.q1.prompt"] };
+    writeFileSync(join(dir, "fr", "flowQuestions.json"), JSON.stringify(currentFr));
+
+    const { problems } = lint({
+      contentI18nDir: dir,
+      freshCatalogs: EMPTY_FRESH,
+      parityOnlyFiles: ["flowQuestions.json"],
+      getBaselineCatalog: (locale, name) => {
+        if (name !== "flowQuestions.json") return null;
+        if (locale === "fr") return baselineFr;
+        if (locale === "en") return baselineEn;
+        return null;
+      },
     });
 
     expect(problems).toEqual([]);

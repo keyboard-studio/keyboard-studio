@@ -237,6 +237,9 @@ function checkTargetLocaleParity(
     .filter((d) => d.isDirectory() && d.name !== SOURCE_LOCALE)
     .map((d) => d.name);
   const optionalKeyPattern = OPTIONAL_KEY_PATTERNS[name];
+  // English's baseline content is the same for every target locale of this
+  // catalog, so this is fetched once here rather than once per locale below.
+  const baselineEn = getBaselineCatalog(SOURCE_LOCALE, name);
 
   for (const locale of locales) {
     const file = path.join(contentI18nDir, locale, name);
@@ -267,7 +270,11 @@ function checkTargetLocaleParity(
       locale,
       catalog: name,
     });
-    if (collapse.problem) problems.push(collapse.problem);
+    let collapseFired = false;
+    if (collapse.problem) {
+      problems.push(collapse.problem);
+      collapseFired = true;
+    }
     if (collapse.note) notes.push(collapse.note);
 
     // Neither key-set parity nor the English-collapse check above can see a
@@ -294,9 +301,12 @@ function checkTargetLocaleParity(
       // needs English at the SAME baseline ref too, not just the target
       // locale's baseline -- a key already legitimately identical to English
       // back then must not be flagged now. null baselineEn (offline, ref
-      // unresolvable) skips silently, same as `baseline` above.
-      const baselineEn = getBaselineCatalog(SOURCE_LOCALE, name);
-      if (baselineEn !== null) {
+      // unresolvable) skips silently, same as `baseline` above. Also skipped
+      // when the collapse guard above already fired for this locale/catalog:
+      // a full collapse satisfies this per-key check for nearly every key,
+      // and this guard's own message claims to catch what the collapse guard
+      // "misses" -- true for an isolated few keys, misleading here.
+      if (baselineEn !== null && !collapseFired) {
         const reversions = checkKeyReversions({
           baselineTarget: baseline,
           currentTarget: target,

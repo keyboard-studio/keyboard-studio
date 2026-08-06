@@ -326,6 +326,12 @@ function checkBaselineRegression({ baseline, target, locale, catalog, baselineLa
 //   - it had a real translation before (non-empty, and not already
 //     legitimately identical to English -- excluding that avoids flagging a
 //     proper noun/"OK"/symbol that was ALREADY the same on both sides)
+//   - the ENGLISH SOURCE TEXT for this key is unchanged between baseline and
+//     now -- if English itself moved, a target that hasn't caught up yet is
+//     the ALREADY-EXPECTED "translations may now be stale" event both lint
+//     scripts already track separately (their non-blocking `warnings`
+//     channel), not a Crowdin-style reversion. Skipping this avoids a false
+//     positive that has nothing to do with what this guard exists to catch.
 //   - it still exists now (a key the target dropped entirely is key-set
 //     parity's concern, not this one's)
 //   - it now equals the CURRENT English value (reverted, not just edited)
@@ -360,14 +366,28 @@ function measureKeyReversions(baselineTarget, currentTarget, baselineEn, current
     const baseValue = baselineTarget[key];
     if (typeof baseValue !== "string" || baseValue === "") continue;
     if (baseValue === baselineEn[key]) continue; // already legitimately identical -- not a reversion
+    if (baselineEn[key] !== currentEn[key]) continue; // English itself moved -- not this guard's shape
     if (!(key in currentTarget)) continue; // dropped entirely -- key-set parity's concern, not this one's
     if (currentTarget[key] === currentEn[key]) reverted.push(key);
   }
   return reverted;
 }
 
+/** Cap on how many reverted key names the message spells out. A handful of
+ *  keys is exactly this guard's target shape; a huge list means the catalog
+ *  also collapsed wholesale (checkEnglishCollapse's shape, reported
+ *  separately by the caller) and repeating hundreds of ids here would just
+ *  be noise the other two guards already show as a count/percentage. */
+const KEY_REVERSION_LIST_CAP = 20;
+
 /**
  * Check one target catalog for individual keys that reverted to English.
+ *
+ * Returns `{problem}` only, unlike checkEnglishCollapse/checkBaselineRegression
+ * which also return a `note` for "too small to check" — that concept is
+ * ratio-specific (a floor below which a fraction is meaningless). This is a
+ * per-key exact check with no floor, so there is nothing to skip and nothing
+ * to note; a caller should never read `.note` off this return value.
  *
  * @param {object}  args
  * @param {object}  args.baselineTarget  this locale's catalog previously
@@ -391,10 +411,16 @@ function checkKeyReversions({
   const reverted = measureKeyReversions(baselineTarget, currentTarget, baselineEn, currentEn);
   if (reverted.length === 0) return { problem: null };
 
+  const shown = reverted.slice(0, KEY_REVERSION_LIST_CAP);
+  const keyList =
+    reverted.length > shown.length
+      ? `${shown.join(", ")}, and ${reverted.length - shown.length} more`
+      : shown.join(", ");
+
   return {
     problem:
       `[${locale}] ${catalog} has ${reverted.length} key(s) that reverted from a real ` +
-      `translation back to English, compared to ${baselineLabel}: ${reverted.join(", ")}. ` +
+      `translation back to English, compared to ${baselineLabel}: ${keyList}. ` +
       `This is invisible to both the English-collapse guard (needs a large fraction of the ` +
       `catalog, not a handful of keys) and the baseline-regression guard (only catches values ` +
       `going empty, not values matching English) — exactly the shape that slipped through both ` +
@@ -418,4 +444,5 @@ module.exports = {
   checkBaselineRegression,
   measureKeyReversions,
   checkKeyReversions,
+  KEY_REVERSION_LIST_CAP,
 };
