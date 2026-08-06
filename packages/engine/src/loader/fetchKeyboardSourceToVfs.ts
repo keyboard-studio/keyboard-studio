@@ -198,7 +198,13 @@ export async function fetchKeyboardSourceToVfs(
     if (isText) {
       vfs.set(path, new TextDecoder().decode(r.bytes));
     } else {
-      vfs.set(path, r.bytes);
+      // isBinary MUST be passed explicitly: VirtualFS.set defaults it to false,
+      // and consumers that branch on the flag rather than on the content type
+      // then treat these bytes as a string. That is how the &BITMAP icon used
+      // to be destroyed by a draft snapshot (persistWorkingCopy.serializeEntry)
+      // — and kmcmplib emits ZERO artifacts, reported only as a *warning*, when
+      // it cannot read an icon a header store names.
+      vfs.set(path, r.bytes, true);
     }
     filesLoaded.push(path);
   }
@@ -289,7 +295,9 @@ export async function fetchKeyboardSourceToVfs(
       // keyboard source tree root (mirrors how shared/ assets are addressed
       // relative to the keyboard root).
       const vfsPath = fr.ttfRelPath.slice("release/".length);
-      vfs.set(vfsPath, fr.bytes);
+      // Font files are binary — flag them (see the sibling-asset write above for
+      // what an unflagged byte payload costs downstream).
+      vfs.set(vfsPath, fr.bytes, true);
       filesLoaded.push(vfsPath);
 
       const entry: KpsFontEntry = {

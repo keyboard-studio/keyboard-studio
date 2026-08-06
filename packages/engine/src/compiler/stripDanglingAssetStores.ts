@@ -20,6 +20,8 @@
 //    file was fetched into VFS.
 //
 // The full output/zip path does NOT use this — it serializes the unmodified IR.
+// {@link dropUnbackedBitmapStore} below is the one asset-store removal that DOES
+// apply to the shipped .kmn; see its docstring for why the icon is the exception.
 
 import type { VirtualFS } from "@keyboard-studio/contracts";
 import { parseKmnHeaderStores } from "./parseKmnHeaderStores.js";
@@ -62,13 +64,23 @@ export function stripDanglingAssetStores(
   );
   if (toStrip.length === 0) return { kmn, stripped: [] };
 
-  const toStripNames = new Set(toStrip.map((s) => s.storeName));
+  return removeHeaderStoreLines(kmn, new Set(toStrip.map((s) => s.storeName)));
+}
 
+/**
+ * Remove the named `store(&NAME) 'path'` lines from a .kmn header.
+ *
+ * Only the header (text before `begin`) is touched — a `store(&X)` after `begin`
+ * would be unusual, and this mirrors {@link parseKmnHeaderStores}, which also
+ * scans the header only. Returns `{ kmn, stripped }`, `stripped` listing the
+ * store names actually removed.
+ */
+function removeHeaderStoreLines(
+  kmn: string,
+  names: ReadonlySet<string>,
+): { kmn: string; stripped: string[] } {
   const stripped: string[] = [];
 
-  // Remove the matching store lines. Only touch the header (before `begin`);
-  // a store(&X) after begin would be unusual, and we mirror parseKmnHeaderStores
-  // which only scans the header.
   const beginMatch = /^\s*begin\s/im.exec(kmn);
   const headerEnd = beginMatch !== null ? beginMatch.index : kmn.length;
 
@@ -77,7 +89,7 @@ export function stripDanglingAssetStores(
   const rest = kmn.slice(headerEnd);
 
   const newHeader = header.replace(storeLineRe, (line, name: string) => {
-    if (toStripNames.has((name ?? "").toUpperCase())) {
+    if (names.has((name ?? "").toUpperCase())) {
       stripped.push((name ?? "").toUpperCase());
       return "";
     }
@@ -85,4 +97,37 @@ export function stripDanglingAssetStores(
   });
 
   return { kmn: newHeader + rest, stripped };
+}
+
+/**
+ * Drop `store(&BITMAP) '<file>'` when `<file>` is not in the VFS.
+ *
+ * Unlike {@link stripDanglingAssetStores}, this applies to the SHIPPED .kmn, not
+ * just the preview: an icon reference with no icon behind it is not a degraded
+ * package, it is a package that does not build. kmcmplib reports "Cannot open the
+ * bitmap or icon file for reading" as a mere *warning* and then emits ZERO
+ * artifacts, so the reference has to go rather than be left for the author (or
+ * the keyboards-repo CI) to discover as an empty build.
+ *
+ * The icon is the right store to treat this way because it is the one purely
+ * cosmetic packaging asset: a keyboard with no icon is a complete, working
+ * keyboard. The other dangling-asset stores are load-bearing — VISUALKEYBOARD
+ * and LAYOUTFILE name the keyboard's own layouts — so a missing one is a fetch
+ * bug to surface, not a line to quietly delete from the author's source.
+ *
+ * @param kmn The .kmn source text destined for the output tree.
+ * @param vfs The VFS the .kmn lives in (icon looked up at `source/<path>`).
+ * @returns `{ kmn, dropped }` — `dropped` is the icon path removed, or null when
+ *          there was no &BITMAP or its file was present.
+ */
+export function dropUnbackedBitmapStore(
+  kmn: string,
+  vfs: VirtualFS,
+): { kmn: string; dropped: string | null } {
+  const bitmap = parseKmnHeaderStores(kmn).find((s) => s.storeName === "BITMAP");
+  if (bitmap === undefined) return { kmn, dropped: null };
+  if (vfs.get(`source/${bitmap.path}`) !== undefined) return { kmn, dropped: null };
+
+  const { kmn: out, stripped } = removeHeaderStoreLines(kmn, new Set(["BITMAP"]));
+  return { kmn: out, dropped: stripped.length > 0 ? bitmap.path : null };
 }
