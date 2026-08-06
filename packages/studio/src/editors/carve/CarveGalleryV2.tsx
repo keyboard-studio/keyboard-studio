@@ -1,6 +1,7 @@
-// CarveGalleryV2 — character-first carve gallery (#1399), now the only carve
-// gallery (the VITE_CARVE_V2 / ?carvev2=1 flag was removed). Sibling to
-// CarveGallery.tsx — that file (the rule/node "Rail" view) is untouched.
+// CarveGalleryV2 — character-first carve gallery (#1399), rendered when the
+// VITE_CARVE_V2 / ?carvev2=1 flag is set (default OFF — carveAdapter otherwise
+// renders the rule/node "Rail" view, CarveGallery.tsx, which is untouched).
+// Making V2 the default is deferred to its own change against #1399.
 //
 // Shows every character the keyboard can type in one panel; the author
 // discards CHARACTERS, not rules. Toggling a character resolves its
