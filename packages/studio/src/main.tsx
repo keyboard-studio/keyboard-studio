@@ -17,6 +17,7 @@ import { warmExemplarSource } from "./lib/services.ts";
 import { installConsoleBreadcrumbs } from "./crash/breadcrumbs.ts";
 import { installGlobalCrashHandlers } from "./crash/globalHandlers.ts";
 import { handleStaleChunkFailure } from "./crash/staleChunk.ts";
+import { handlePreMountCrash } from "./crash/preMount.ts";
 import { safeCollectCrashContext } from "./lib/crashCallerContext.ts";
 
 // Crash capture, installed FIRST and synchronously — before the locale await,
@@ -130,9 +131,18 @@ async function mountCallbackScreen(provider: OAuthProvider): Promise<void> {
 // (which runs the code→token exchange and then redirects to the app root)
 // instead of the app — so the exchange is never an invisible blank page. On
 // every normal path we mount the app.
+// The top-level catch is active BEFORE createRoot(...).render(...) runs, which
+// is the whole point: everything from here to first paint — requireRoot(), the
+// `await localeReady`, the draft restore, the OAuth rehydrate — is code an
+// ErrorBoundary structurally cannot cover, because no boundary has mounted
+// (spec 060, FR-060). Without this, any throw in that window is a permanently
+// blank page and zero telemetry.
+//
+// `.catch` rather than try/catch: both mount functions are async, so a
+// synchronous try would only catch a throw before the first await.
 const oauthProvider = detectOAuthCallback();
 if (oauthProvider !== null) {
-  void mountCallbackScreen(oauthProvider);
+  void mountCallbackScreen(oauthProvider).catch(handlePreMountCrash);
 } else {
-  void mountApp();
+  void mountApp().catch(handlePreMountCrash);
 }

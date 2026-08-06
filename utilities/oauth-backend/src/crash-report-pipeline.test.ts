@@ -15,6 +15,7 @@ import {
   computeFingerprint,
   CRASH_REPORT_TITLE_MAX,
   fingerprintLabel,
+  framesFromRawStack,
   normalizeMessage,
   scrubText,
 } from "./crash-report-pipeline.js";
@@ -173,6 +174,105 @@ describe("fingerprint stability", () => {
   it("labels the issue crash/fp-<hash12>", () => {
     const { fingerprint } = computeFingerprint(workedExampleBody());
     expect(fingerprintLabel(fingerprint)).toBe(`crash/fp-${fingerprint}`);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FR-081f — raw-stack extraction and cross-browser convergence (SC-019)
+// ---------------------------------------------------------------------------
+
+describe("raw-stack extraction — FR-081f worked example", () => {
+  /** V8 prepends the error's own message line before the frames. */
+  const V8_STACK = [
+    "TypeError: Cannot read properties of undefined (reading 'exemplarSet')",
+    "    at KeyEditor (assets/main-DLGH1X0S.js:1284:17)",
+    "    at renderWithHooks (assets/vendor-B7QK2M4P.js:11566:26)",
+  ].join("\n");
+
+  /** Firefox and Safari do not — the first line is already a frame. */
+  const FIREFOX_STACK = [
+    "KeyEditor@assets/main-DLGH1X0S.js:1284:17",
+    "renderWithHooks@assets/vendor-B7QK2M4P.js:11566:26",
+  ].join("\n");
+
+  /** The frame portion both shapes must reduce to. */
+  const CONVERGED_FRAMES =
+    "KeyEditor@assets/main.js|renderWithHooks@assets/vendor.js";
+
+  function preMountBody(stack: string): CrashReportBody {
+    return {
+      message:
+        "TypeError: Cannot read properties of undefined (reading 'exemplarSet')",
+      stack,
+      appVersion: "0.1.0+a1b2c3d",
+    };
+  }
+
+  it("extracts two frames from the V8 shape, discarding the message line", () => {
+    const frames = framesFromRawStack(V8_STACK);
+    expect(frames.map((f) => f.function)).toEqual(["KeyEditor", "renderWithHooks"]);
+  });
+
+  it("extracts two frames from the Firefox/Safari shape, keeping the first line", () => {
+    // An unconditional shift() here would eat a real frame and fork one bug
+    // into a per-browser issue — the failure FR-081f exists to close.
+    const frames = framesFromRawStack(FIREFOX_STACK);
+    expect(frames.map((f) => f.function)).toEqual(["KeyEditor", "renderWithHooks"]);
+  });
+
+  it("both shapes canonicalize to the identical frame portion", () => {
+    for (const stack of [V8_STACK, FIREFOX_STACK]) {
+      const canonical = canonicalizeCrashInput({
+        kind: "pre-mount",
+        message: preMountBody(stack).message,
+        frames: framesFromRawStack(stack),
+      });
+      expect(canonical.split("|").slice(2).join("|")).toBe(CONVERGED_FRAMES);
+    }
+  });
+
+  it("both shapes produce the identical fingerprint (SC-019)", () => {
+    expect(computeFingerprint(preMountBody(V8_STACK)).fingerprint).toBe(
+      computeFingerprint(preMountBody(FIREFOX_STACK)).fingerprint,
+    );
+  });
+
+  it("converges on the structured path's frame portion for the same bug", () => {
+    // The whole point: a pre-mount raw stack and a post-mount structured frame
+    // list describing the same code must not fork into two issues.
+    const structured = canonicalizeCrashInput({
+      kind: "pre-mount",
+      message: preMountBody(V8_STACK).message,
+      frames: [
+        { function: "KeyEditor", modulePath: "assets/main-DLGH1X0S.js", line: 1284, column: 17 },
+        { function: "renderWithHooks", modulePath: "assets/vendor-B7QK2M4P.js", line: 11566, column: 26 },
+      ],
+    });
+    expect(structured.split("|").slice(2).join("|")).toBe(CONVERGED_FRAMES);
+  });
+
+  it("produces a DIFFERENT fingerprint for genuinely different frames", () => {
+    const other = [
+      "LayoutGrid@assets/main-DLGH1X0S.js:900:3",
+      "renderWithHooks@assets/vendor-B7QK2M4P.js:11566:26",
+    ].join("\n");
+    expect(computeFingerprint(preMountBody(other)).fingerprint).not.toBe(
+      computeFingerprint(preMountBody(V8_STACK)).fingerprint,
+    );
+  });
+
+  it("names an anonymous frame <anonymous>", () => {
+    const frames = framesFromRawStack("    at assets/main-DLGH1X0S.js:5:1");
+    expect(frames[0]?.function).toBe("<anonymous>");
+  });
+
+  it("falls back to kind + message alone when no frame is parseable", () => {
+    const canonical = canonicalizeCrashInput({
+      kind: "pre-mount",
+      message: "boom",
+      frames: framesFromRawStack("something that is not a stack at all"),
+    });
+    expect(canonical).toBe("pre-mount|boom");
   });
 });
 

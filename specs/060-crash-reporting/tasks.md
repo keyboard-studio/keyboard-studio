@@ -234,8 +234,8 @@ assert the static `index.html` fallback renders and a bare `fetch` POST is attem
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T046** [P] [US5] Assert the exact FR-062 body — `{ message, stack, appVersion }`, no `kind`, no `stackFrames`, no `occurredAt` — validates and files with `kind` defaulted to `"pre-mount"` rather than 400ing; and that a **post-mount** `kind` carrying neither `stackFrames` nor `stack` is rejected `400 invalid_request` by the `.refine()` (SC-018, SC-020) · `utilities/oauth-backend/src/crash-report-schemas.test.ts`
-- [ ] **T047** [P] [US5] Assert the FR-081f worked example: a V8-shaped and a Firefox/Safari-shaped raw `stack` for the same error extract to the identical frame portion `KeyEditor@assets/main.js|renderWithHooks@assets/vendor.js` and produce the identical fingerprint, while genuinely different frames produce a different one (SC-019) · `utilities/oauth-backend/src/crash-report-pipeline.test.ts`
+- [x] **T046** [P] [US5] Assert the exact FR-062 body — `{ message, stack, appVersion }`, no `kind`, no `stackFrames`, no `occurredAt` — validates and files with `kind` defaulted to `"pre-mount"` rather than 400ing; and that a **post-mount** `kind` carrying neither `stackFrames` nor `stack` is rejected `400 invalid_request` by the `.refine()` (SC-018, SC-020) · `utilities/oauth-backend/src/crash-report-schemas.test.ts`
+- [x] **T047** [P] [US5] Assert the FR-081f worked example: a V8-shaped and a Firefox/Safari-shaped raw `stack` for the same error extract to the identical frame portion `KeyEditor@assets/main.js|renderWithHooks@assets/vendor.js` and produce the identical fingerprint, while genuinely different frames produce a different one (SC-019) · `utilities/oauth-backend/src/crash-report-pipeline.test.ts`
 
 ### Implementation for User Story 5
 
@@ -243,8 +243,8 @@ assert the static `index.html` fallback renders and a bare `fetch` POST is attem
 
 **Wave 2 — independent (different files):**
 
-- [ ] **T048** [P] [US5] Add the static, hidden, dependency-free fallback element — plain English text baked into the markup, no React, no catalog lookup, since neither can be assumed to have loaded (FR-061, FR-123) · `packages/studio/index.html`
-- [ ] **T049** [P] [US5] Wrap `mountApp()` and `mountCallbackScreen()` in a top-level try/catch active **before** `createRoot(...).render(...)`; on catch, reveal the T048 element and attempt a best-effort `fetch` POST of `{ message, stack, appVersion }` with a short timeout whose failure is swallowed silently — nothing here may throw a second time. It MUST NOT read `localStorage`/`sessionStorage` identity or working-copy data, and MUST target the same endpoint as the ordinary path (FR-060, FR-062, FR-063, FR-064, FR-036, SC-007) · `packages/studio/src/main.tsx`
+- [x] **T048** [P] [US5] Add the static, hidden, dependency-free fallback element — plain English text baked into the markup, no React, no catalog lookup, since neither can be assumed to have loaded (FR-061, FR-123) · `packages/studio/index.html`
+- [x] **T049** [P] [US5] Wrap `mountApp()` and `mountCallbackScreen()` in a top-level try/catch active **before** `createRoot(...).render(...)`; on catch, reveal the T048 element and attempt a best-effort `fetch` POST of `{ message, stack, appVersion }` with a short timeout whose failure is swallowed silently — nothing here may throw a second time. It MUST NOT read `localStorage`/`sessionStorage` identity or working-copy data, and MUST target the same endpoint as the ordinary path (FR-060, FR-062, FR-063, FR-064, FR-036, SC-007) · `packages/studio/src/main.tsx`
 
 **Checkpoint**: the one crash class an ErrorBoundary structurally cannot reach is now covered.
 

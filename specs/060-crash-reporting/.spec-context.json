@@ -414,6 +414,38 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-06T02:56:48.396Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T046",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:59:40.575Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T047",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:59:40.816Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T048",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:59:41.065Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T049",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:59:41.302Z"
     }
   ],
   "telemetryInstanceId": "4d8149dc-5ee9-43f5-9dac-81307541deb6",
@@ -783,6 +815,9 @@
       "tasks": [
         "T049",
         "T046"
+      ],
+      "tests": [
+        "utilities/oauth-backend/src/crash-report-schemas.test.ts::pre-mount body"
       ]
     },
     "FR-063": {
@@ -915,6 +950,9 @@
       "tasks": [
         "T015",
         "T047"
+      ],
+      "tests": [
+        "utilities/oauth-backend/src/crash-report-pipeline.test.ts::raw-stack extraction"
       ]
     },
     "FR-082": {
@@ -1239,7 +1277,7 @@
       ]
     }
   },
-  "currentTask": "T045",
+  "currentTask": "T049",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1562,6 +1600,35 @@
       "did": "Browser-level chunk-blocked spec that aborts the real engine chunk request and asserts the shell and reporter still file, with a non-vacuity check that the route pattern actually matched",
       "files": [
         "packages/studio/e2e/crash-engine-chunk-blocked.spec.ts"
+      ]
+    },
+    "T046": {
+      "status": "DONE",
+      "did": "Asserted the exact FR-062 pre-mount body validates and defaults kind to pre-mount, and that a post-mount kind carrying neither stackFrames nor stack is rejected by the .refine(); plus cap and stripped-field coverage",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-schemas.test.ts"
+      ]
+    },
+    "T047": {
+      "status": "DONE",
+      "did": "Pinned the FR-081f worked example: V8 and Firefox/Safari raw stacks converge on the identical frame portion and fingerprint, matching the structured path, while genuinely different frames diverge",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-pipeline.test.ts"
+      ]
+    },
+    "T048": {
+      "status": "DONE",
+      "did": "Added the static hidden dependency-free pre-mount fallback with hard-coded English text and inline styles",
+      "files": [
+        "packages/studio/index.html"
+      ]
+    },
+    "T049": {
+      "status": "DONE",
+      "did": "Wrapped mountApp and mountCallbackScreen so a pre-mount throw reveals the fallback and best-effort POSTs { message, stack, appVersion } with a short timeout, reading no identity or working-copy storage",
+      "files": [
+        "packages/studio/src/main.tsx",
+        "packages/studio/src/crash/preMount.ts"
       ]
     }
   },
