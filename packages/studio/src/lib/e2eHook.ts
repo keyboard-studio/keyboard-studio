@@ -17,6 +17,8 @@
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { projectWorkingCopyForOutput } from "./serializeWorkingCopy.ts";
 import { readEnvFlag } from "./envFlag.ts";
+import { _forceCrashForE2E } from "../components/CrashErrorBoundary.tsx";
+import { _setCrashSendStateForTest } from "../crash/send.ts";
 import type { KeyboardIR, VirtualFS } from "@keyboard-studio/contracts";
 
 /**
@@ -75,6 +77,22 @@ export interface KsE2EHook {
    * instantiation. Async because the projection resolves patterns.
    */
   snapshotOutputFiles: () => Promise<KsE2EFileSnapshot | null>;
+  /**
+   * Force the crash boundary into its fallback (spec 060 T033).
+   *
+   * The accessibility scan has to audit the REAL rendered recovery screen —
+   * real page CSS, real focus behaviour, real contrast — and a browser has no
+   * other way to reach it without an actual crash. Rendering a copy of the
+   * component on a scratch page would scan something the author never sees.
+   */
+  forceRenderCrash: () => void;
+  /**
+   * Force the crash notice into its "report sent" state (spec 060 T033).
+   *
+   * Same reason: the notice only appears after a real POST resolves, and the
+   * scan needs the surface, not a stand-in.
+   */
+  forceCrashNoticeSent: (issueUrl: string, issueNumber: number) => void;
 }
 
 declare global {
@@ -106,6 +124,17 @@ export function installE2eHook(): void {
     snapshotOutputFiles: async () => {
       const projected = await projectWorkingCopyForOutput();
       return projected === null ? null : snapshotVfs(projected.vfs);
+    },
+    forceRenderCrash: () => {
+      _forceCrashForE2E();
+    },
+    forceCrashNoticeSent: (issueUrl, issueNumber) => {
+      _setCrashSendStateForTest({
+        status: "sent",
+        issueUrl,
+        issueNumber,
+        action: "created",
+      });
     },
   };
 }

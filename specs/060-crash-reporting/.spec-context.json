@@ -278,6 +278,46 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-06T02:39:23.548Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:46:51.292Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:46:51.845Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:46:52.315Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:46:52.820Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:46:53.301Z"
     }
   ],
   "telemetryInstanceId": "4d8149dc-5ee9-43f5-9dac-81307541deb6",
@@ -666,6 +706,10 @@
       "tasks": [
         "T026",
         "T032"
+      ],
+      "tests": [
+        "packages/studio/src/components/CrashRecoveryScreen.a11y.test.tsx",
+        "packages/studio/e2e/crash-recovery-a11y.spec.ts"
       ]
     },
     "FR-073": {
@@ -673,6 +717,9 @@
       "tasks": [
         "T027",
         "T032"
+      ],
+      "tests": [
+        "packages/studio/src/components/CrashRecoveryScreen.a11y.test.tsx::never moves focus"
       ]
     },
     "FR-074": {
@@ -1075,7 +1122,7 @@
       ]
     }
   },
-  "currentTask": "T028",
+  "currentTask": "T033",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1274,6 +1321,44 @@
       "did": "Caller-side structural context collector reading the working copy, survey session, phase-B draft, and decision-log tail; placed in src/lib/ because the gate forbids these imports inside src/crash/",
       "files": [
         "packages/studio/src/lib/crashCallerContext.ts"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "Added the single CrashErrorBoundary inside AppRoot's I18nProvider, covering StudioShell, LintDemo, and OAuthCallbackScreen with one boundary; mounted CrashNotice as its sibling",
+      "files": [
+        "packages/studio/src/AppRoot.tsx",
+        "packages/studio/src/components/CrashErrorBoundary.tsx"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "Installed window error and unhandledrejection handlers plus the console breadcrumb wrappers at bootstrap, before the locale await; documented why warmExemplarSource's .catch keeps it out of the rejection handler",
+      "files": [
+        "packages/studio/src/main.tsx",
+        "packages/studio/src/crash/globalHandlers.ts"
+      ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "Confirmed useKeyboardArtifact Stage error does not auto-file (no reportCrash import anywhere in the hook) and documented the FR-005 rule on the Stage union",
+      "files": [
+        "packages/studio/src/hooks/useKeyboardArtifact.ts"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "Structural a11y assertions in the jsdom lane covering role=alert, focus-to-heading, aria-live=polite, no focus steal, and real button/anchor elements",
+      "files": [
+        "packages/studio/src/components/CrashRecoveryScreen.a11y.test.tsx"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "Playwright axe scan of both surfaces via a flag-gated E2E hook that drives the real rendered fallback rather than a mounted copy",
+      "files": [
+        "packages/studio/e2e/crash-recovery-a11y.spec.ts",
+        "packages/studio/src/lib/e2eHook.ts"
       ]
     }
   },

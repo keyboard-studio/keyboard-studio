@@ -14,6 +14,17 @@ import { installE2eHook } from "./lib/e2eHook.ts";
 import { loadDraft, resolveActiveProjectKey } from "./lib/draftPersistence.ts";
 import { localeReady } from "./lib/i18n.ts";
 import { warmExemplarSource } from "./lib/services.ts";
+import { installConsoleBreadcrumbs } from "./crash/breadcrumbs.ts";
+import { installGlobalCrashHandlers } from "./crash/globalHandlers.ts";
+import { safeCollectCrashContext } from "./lib/crashCallerContext.ts";
+
+// Crash capture, installed FIRST and synchronously — before the locale await,
+// before any store touch, before React. Anything that throws during the rest of
+// this file is inside the window handlers' reach from here on (spec 060,
+// FR-002, FR-003). The console wrappers call the originals and additionally
+// push to the breadcrumb ring; they never replace console behaviour (FR-044).
+installConsoleBreadcrumbs();
+installGlobalCrashHandlers({ readContext: safeCollectCrashContext });
 
 function requireRoot(): HTMLElement {
   const rootEl = document.getElementById("root");

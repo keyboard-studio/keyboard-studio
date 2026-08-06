@@ -118,16 +118,16 @@ a stub GitHub API with the expected redacted body and label, and that the recove
 
 **Wave 3 — mount the surfaces (each edits a shared bootstrap file):**
 
-- [ ] **T029** [US1] Add the single `ErrorBoundary`, mounted inside `AppRoot`'s `<I18nProvider>` so its fallback can use the catalog and one boundary covers `StudioShell`, `LintDemo`, and `OAuthCallbackScreen` — not three (FR-001) · `packages/studio/src/AppRoot.tsx`, `packages/studio/src/components/CrashErrorBoundary.tsx`
-- [ ] **T030** [US1] Install the `window.onerror` and `unhandledrejection` handlers at bootstrap, routing both to the same payload builder. Verify `warmExemplarSource().catch(() => {})` and other deliberate self-swallowers still never reach the rejection handler (FR-002, FR-003, FR-007, FR-008) · `packages/studio/src/main.tsx`
-- [ ] **T031** [US1] Confirm `useKeyboardArtifact`'s `Stage: "error"` does **not** auto-file on every occurrence — fetch and compile errors there are transient and already have a Retry UX (FR-005) · `packages/studio/src/hooks/useKeyboardArtifact.ts`
+- [x] **T029** [US1] Add the single `ErrorBoundary`, mounted inside `AppRoot`'s `<I18nProvider>` so its fallback can use the catalog and one boundary covers `StudioShell`, `LintDemo`, and `OAuthCallbackScreen` — not three (FR-001) · `packages/studio/src/AppRoot.tsx`, `packages/studio/src/components/CrashErrorBoundary.tsx`
+- [x] **T030** [US1] Install the `window.onerror` and `unhandledrejection` handlers at bootstrap, routing both to the same payload builder. Verify `warmExemplarSource().catch(() => {})` and other deliberate self-swallowers still never reach the rejection handler (FR-002, FR-003, FR-007, FR-008) · `packages/studio/src/main.tsx`
+- [x] **T031** [US1] Confirm `useKeyboardArtifact`'s `Stage: "error"` does **not** auto-file on every occurrence — fetch and compile errors there are transient and already have a Retry UX (FR-005) · `packages/studio/src/hooks/useKeyboardArtifact.ts`
 
 **⟶ Wait for Wave 3, then:**
 
 **Wave 4 — accessibility verification, split across the two lanes (research D3):**
 
-- [ ] **T032** [P] [US1] Structural a11y assertions in the jsdom lane: `role="alert"` present, focus lands on the recovery heading on mount, the notice carries `aria-live="polite"` and does **not** move focus, every control is a real button/link (FR-072, FR-073, SC-008) · `packages/studio/src/components/CrashRecoveryScreen.a11y.test.tsx`
-- [ ] **T033** [P] [US1] Automated axe scan of the recovery screen and notice — **Playwright only**. `expectNoSeriousAxeViolations` does not exist in the vitest lane; `@axe-core/playwright` is the repository's sole axe dependency (FR-124, SC-008, research D3) · `packages/studio/e2e/crash-recovery-a11y.spec.ts`
+- [x] **T032** [P] [US1] Structural a11y assertions in the jsdom lane: `role="alert"` present, focus lands on the recovery heading on mount, the notice carries `aria-live="polite"` and does **not** move focus, every control is a real button/link (FR-072, FR-073, SC-008) · `packages/studio/src/components/CrashRecoveryScreen.a11y.test.tsx`
+- [x] **T033** [P] [US1] Automated axe scan of the recovery screen and notice — **Playwright only**. `expectNoSeriousAxeViolations` does not exist in the vitest lane; `@axe-core/playwright` is the repository's sole axe dependency (FR-124, SC-008, research D3) · `packages/studio/e2e/crash-recovery-a11y.spec.ts`
 
 **Checkpoint**: US1 is independently functional — a render throw files one redacted, build-stamped
 issue and the author gets a linked recovery screen.

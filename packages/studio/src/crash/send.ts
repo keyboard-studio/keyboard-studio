@@ -103,6 +103,19 @@ export function resetCrashSendState(): void {
   setState(IDLE);
 }
 
+/**
+ * Drive the send state directly.
+ *
+ * Test seam only. Component tests need to render the notice in its "sent"
+ * state without standing up a fetch stub, a fingerprint, and a dedupe cache
+ * just to reach it.
+ *
+ * @internal
+ */
+export function _setCrashSendStateForTest(next: CrashSendState): void {
+  setState(next);
+}
+
 /** Publish the "reloading didn't help" state the retry notice renders (FR-053). */
 export function markRetryExhausted(): void {
   setState({ ...state, retryExhausted: true });

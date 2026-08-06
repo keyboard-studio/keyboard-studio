@@ -174,6 +174,20 @@ export type Stage =
   | { kind: "vfs-loading" }
   | { kind: "compiling"; isWarmCompile: boolean }
   | { kind: "ready"; compileResult: CompileResult; jsBlobUrl: string; vfs: VirtualFS; scaffoldWarnings: string[]; runtimeWarnings?: string[]; keyboardId: string; fontFaceUrl?: string; fontFaceFamily?: string; keyboardCssUrls?: string[] }
+  /**
+   * NOT A CRASH-CAPTURE SURFACE (spec 060, FR-005).
+   *
+   * This stage MUST NOT auto-file a crash report on every occurrence. Fetch and
+   * compile errors here are frequently transient — a flaky proxy, an offline
+   * moment, a keyboard whose source has a genuine syntax error the author is
+   * mid-way through fixing — and they already have a modelled Retry UX. Wiring
+   * the reporter in here would file an issue every time someone typed an
+   * unbalanced brace, drowning the tracker in non-defects.
+   *
+   * The one thing this stage DOES owe the reporter is the ORIGINAL rejection
+   * text from `loadEngine()`, so the stale-chunk classifier can see it (FR-005a).
+   * That is forwarding, not filing.
+   */
   | {
       kind: "error";
       step: "fetch" | "vfs" | "compile";
