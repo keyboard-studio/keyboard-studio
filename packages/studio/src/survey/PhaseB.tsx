@@ -24,12 +24,11 @@ import { useCallback, useMemo, useState, useRef, useEffect, type ReactNode } fro
 import { Trans, useLingui } from "@lingui/react/macro";
 import { msg, plural } from "@lingui/core/macro";
 import type { SurveyAnswer, SurveyPhaseResult, LintFinding, PlacementMap } from "@keyboard-studio/contracts";
-import { composeStack, toUPlusNotation } from "@keyboard-studio/contracts";
+import { composeStack } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import { loadModularFlow } from "./loadModularFlow.ts";
 import type { SurveyContext, FlowDef } from "./types.ts";
 import { buildPlacementSeeds } from "./placementSeeds.ts";
-import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore, type DiscoveryMethod } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { useGlyphFontStack } from "./useGlyphFontStack.ts";
@@ -37,7 +36,6 @@ import {
   nfcDedup,
   harvestChars,
   casePairOf,
-  isFoldedUppercase,
   lowercaseBaseView,
   upperCounterpartOf,
 } from "./charNormUtils.ts";
@@ -45,9 +43,8 @@ import { codepointLabel } from "./codepointLabel.ts";
 import { collate, codePointCompare, collateInventory } from "./collation.ts";
 import { glyphCategory, isCombiningMarkChar, caseCounterpart } from "@keyboard-studio/engine";
 import { displayChar, prefixCombiningMark } from "../lib/irToCarveNodes.ts";
-import { suggestMissingChars, charactersInTier } from "../lib/services.ts";
+import { charactersInTier } from "../lib/services.ts";
 import type {
-  MissingCharSuggestions,
   ExemplarSource,
   SourcedInventory,
 } from "../lib/services.ts";
@@ -64,18 +61,14 @@ import {
   phaseContainer,
   phaseHeading,
   phaseHeadingFlush,
-  mutedNote,
   mutedParaFlush,
   sectionHeading,
-  divider,
   secondaryButton,
   primaryButton,
   charChip,
   chipGlyph,
   chipCodepoint,
   chipIndicator,
-  chipIndicatorText,
-  chipIndicatorColor,
   visuallyHidden,
   FONT_OPTIONS,
   phaseBFontStack,
@@ -149,12 +142,6 @@ export function parseSpacedChars(input: string): string[] {
 // ---------------------------------------------------------------------------
 // PhaseB state — intercept non-manual discovery choices
 // ---------------------------------------------------------------------------
-
-type LoadState =
-  | { status: "idle" }
-  | { status: "loading" }
-  | { status: "done"; data: MissingCharSuggestions | null }
-  | { status: "error" };
 
 // Return a modified FlowDef that starts at pb_routing_branch, skipping the
 // discovery-intro question, so the runner goes straight into manual questions.
@@ -514,266 +501,6 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
 }
 
 // ---------------------------------------------------------------------------
-// SuggestionChip — a single CLDR suggestion chip (toggleable)
-// ---------------------------------------------------------------------------
-
-interface SuggestionChipProps {
-  char: string;
-  checked: boolean;
-  onToggle: (c: string) => void;
-}
-
-function SuggestionChip({ char, checked, onToggle }: SuggestionChipProps) {
-  const { t } = useLingui();
-  const glyphFontStack = useGlyphFontStack();
-  const cp = toUPlusNotation(char);
-  const actionLabel = checked
-    ? t({ id: "survey.phaseB.suggestionChip.removeAction", message: "Remove" })
-    : t({ id: "survey.phaseB.suggestionChip.addAction", message: "Add" });
-  return (
-    <button
-      type="button"
-      onClick={() => onToggle(char)}
-      aria-label={`${actionLabel} ${char} (${cp})`}
-      aria-pressed={checked}
-      style={charChip(checked)}
-    >
-      <span style={chipGlyph(checked, glyphFontStack)}>
-        {displayChar(char)}
-      </span>
-      <span style={chipCodepoint()}>{cp}</span>
-      <span style={chipIndicator(chipIndicatorColor(checked))}>
-        {chipIndicatorText(checked)}
-      </span>
-    </button>
-  );
-}
-
-// ---------------------------------------------------------------------------
-// SuggestionPanel — CLDR-grounded suggestions panel
-// ---------------------------------------------------------------------------
-
-interface SuggestionPanelProps {
-  context: SurveyContext;
-  chars: string[];
-  onChange: (next: string[]) => void;
-}
-
-function SuggestionPanel({ context, chars, onChange }: SuggestionPanelProps) {
-  const { t } = useLingui();
-  const baseIr = useWorkingCopyStore((s) => s.baseIr);
-  const bcp47 = context.bcp47_tag;
-  const languageName = context.language_name;
-
-  const [loadState, setLoadState] = useState<LoadState>({ status: "idle" });
-  const [auxExpanded, setAuxExpanded] = useState(false);
-
-  // Fetch suggestions whenever bcp47 or baseIr changes.
-  useEffect(() => {
-    if (!bcp47 || baseIr === null) {
-      return;
-    }
-    let cancelled = false;
-    setLoadState({ status: "loading" });
-    suggestMissingChars(bcp47, baseIr, languageName)
-      .then((result) => {
-        if (!cancelled) setLoadState({ status: "done", data: result });
-      })
-      .catch(() => {
-        if (!cancelled) setLoadState({ status: "error" });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [bcp47, baseIr, languageName]);
-
-  function handleToggle(c: string): void {
-    const nfc = c.normalize("NFC");
-    if (chars.includes(nfc)) {
-      onChange(chars.filter((x) => x !== nfc));
-    } else {
-      onChange(nfcDedup(chars, [nfc]));
-    }
-  }
-
-  const displayName =
-    languageName ?? bcp47 ?? t({ id: "survey.phaseB.suggestionPanel.genericLanguage", message: "this language" });
-
-  // Neutral note when no BCP47 or no baseIr yet
-  if (!bcp47 || baseIr === null) {
-    return (
-      <div style={mutedNote}>
-        <Trans id="survey.phaseB.suggestionPanel.noVerifiedList">
-          No verified character list for {displayName}. Add characters below.
-        </Trans>
-      </div>
-    );
-  }
-
-  if (loadState.status === "idle" || loadState.status === "loading") {
-    return (
-      <div style={mutedNote}>
-        <Trans id="survey.phaseB.suggestionPanel.checking">Checking for a verified character list…</Trans>
-      </div>
-    );
-  }
-
-  if (loadState.status === "error") {
-    return (
-      <div style={mutedNote}>
-        <Trans id="survey.phaseB.suggestionPanel.loadError">
-          Could not load character suggestions. Add characters below.
-        </Trans>
-      </div>
-    );
-  }
-
-  const { data } = loadState;
-
-  // null = no CLDR data
-  if (data === null) {
-    return (
-      <div style={mutedNote}>
-        <Trans id="survey.phaseB.suggestionPanel.noVerifiedList">
-          No verified character list for {displayName}. Add characters below.
-        </Trans>
-      </div>
-    );
-  }
-
-  // Empty main + auxiliary = base already covers the alphabet
-  if (data.main.length === 0 && data.auxiliary.length === 0) {
-    return (
-      <div style={mutedNote}>
-        <Trans id="survey.phaseB.suggestionPanel.baseAlreadyCovers">
-          Your base keyboard already covers this language's alphabet.
-        </Trans>
-      </div>
-    );
-  }
-
-  // What's actually left to OFFER. Two folds, in order — both are about not
-  // asking the author to tick something that is already settled:
-  //
-  //  1. Case fold. `suggestMissingChars` reports each cased letter twice (the
-  //     CLDR consumer path synthesizes uppercase into `specials`), so a
-  //     lowercase-only exemplar list arrives as "à Á á È é …". Offering both
-  //     is noise: the uppercase is never a separate decision, because Done
-  //     folds each cased letter's counterpart into `confirmedInventory` via
-  //     `derivedUppercases` (spec 047 FR-009). Note this differs from the
-  //     character map, which pairs the cases EAGERLY on click — here ticking a
-  //     chip adds the one character, and the uppercase joins at submit.
-  //     `isFoldedUppercase` is the fold rule shared with the map's display-side
-  //     case-collapse.
-  //  2. Already-in-the-alphabet fold. `suggestMissingChars` filters against the
-  //     BASE KEYBOARD's produced set, which knows nothing about the draft — so
-  //     after the exemplar prefill seeds the alphabet (IntroChooser's
-  //     "exemplars" route), every seeded character came back as a suggestion,
-  //     pre-ticked, and the panel became a wall of things already done. A
-  //     character present in either case counts as present.
-  //
-  // Consequence: a ticked chip LEAVES this panel and reappears below in "Your
-  // alphabet", where removal lives (and correctly retracts both cases). The
-  // panel is therefore add-only in practice; `handleToggle`'s remove branch
-  // survives only for the props contract.
-  const offerable = (candidates: string[]): string[] =>
-    candidates
-      .map((c) => c.normalize("NFC"))
-      .filter((c) => !isFoldedUppercase(c, bcp47))
-      .filter((c) => !casePairOf(c, bcp47).some((p) => chars.includes(p)));
-
-  const mainOffered = offerable(data.main);
-  const auxOffered = offerable(data.auxiliary);
-
-  // Everything CLDR/SLDR knows about is already in the draft — distinct from
-  // the "base covers it" note above: the author put these there (or accepted
-  // the prefill), so say that rather than crediting the base keyboard.
-  if (mainOffered.length === 0 && auxOffered.length === 0) {
-    return (
-      <div style={mutedNote}>
-        <Trans id="survey.phaseB.suggestionPanel.allSuggestionsAdded">
-          Every suggested character is already in your alphabet below.
-        </Trans>
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-      <div>
-        <p style={{ margin: "0 0 4px 0", fontSize: 13, fontWeight: 600, color: TEXT_MAIN }}>
-          <Trans id="survey.phaseB.suggestionPanel.suggestedFor">
-            Suggested for {data.languageName ?? displayName}
-          </Trans>
-        </p>
-        <p style={{ margin: "0 0 10px 0", fontSize: 11, color: TEXT_DIM }}>
-          <Trans id="survey.phaseB.suggestionPanel.fromCldr">from CLDR exemplars — tick to add</Trans>
-        </p>
-        {mainOffered.length > 0 ? (
-          <div
-            role="group"
-            aria-label={t({
-              id: "survey.phaseB.suggestionPanel.mainGroupAriaLabel",
-              message: "Suggested main characters — tick to add",
-            })}
-            style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
-          >
-            {mainOffered.map((c) => (
-              <SuggestionChip key={c} char={c} checked={false} onToggle={handleToggle} />
-            ))}
-          </div>
-        ) : (
-          <p style={mutedParaFlush}>
-            <Trans id="survey.phaseB.suggestionPanel.noAdditionalMain">No additional main characters needed.</Trans>
-          </p>
-        )}
-      </div>
-
-      {auxOffered.length > 0 && (
-        <div>
-          <button
-            type="button"
-            onClick={() => setAuxExpanded((v) => !v)}
-            aria-expanded={auxExpanded}
-            style={{
-              background: "transparent",
-              border: "none",
-              color: TEXT_DIM,
-              fontSize: 12,
-              cursor: "pointer",
-              padding: "4px 0",
-              fontFamily: "inherit",
-              display: "flex",
-              alignItems: "center",
-              gap: 4,
-            }}
-          >
-            <span>{auxExpanded ? "▼" : "▶"}</span>
-            <Trans id="survey.phaseB.suggestionPanel.auxiliaryToggle">
-              Also used in loanwords ({auxOffered.length})
-            </Trans>
-          </button>
-          {auxExpanded && (
-            <div
-              role="group"
-              aria-label={t({
-                id: "survey.phaseB.suggestionPanel.auxiliaryGroupAriaLabel",
-                message: "Suggested auxiliary characters for loanwords — tick to add",
-              })}
-              style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: 8 }}
-            >
-              {auxOffered.map((c) => (
-                <SuggestionChip key={c} char={c} checked={false} onToggle={handleToggle} />
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // AlphabetBreakdown — the visible three-store decomposition (spec 046, US5)
 //
 // Renders only once the draft alphabet implies at least one mark or attested
@@ -1075,31 +802,14 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
         <p style={{ margin: 0 }}>
           <Trans id="survey.phaseB.buildList.instructions">
             Add <strong>your whole alphabet</strong> on this page — every
-            character your language uses, not just the special ones. Tick the
-            suggested characters below, then type any that are missing, like
-            this:
+            character your language uses, not just the special ones. Type
+            them in below, like this:
           </Trans>
         </p>
         <p style={{ margin: "8px 0 0 0", fontFamily: "monospace", fontSize: 15 }}>
           a b c d e ɛ ŋ ɔ …
         </p>
       </div>
-
-      {/* Section 1: Suggestions from CLDR */}
-      <section
-        aria-label={t({
-          id: "survey.phaseB.buildList.cldrSectionAriaLabel",
-          message: "Suggested characters from CLDR",
-        })}
-      >
-        <h3 style={sectionHeading}>
-          <Trans id="survey.phaseB.buildList.suggestedCharactersHeading">Suggested characters</Trans>
-        </h3>
-        <SuggestionPanel context={context} chars={chars} onChange={setAll} />
-      </section>
-
-      {/* Divider */}
-      <hr style={divider} />
 
       {/* Section 2: Type-in characters */}
       <section

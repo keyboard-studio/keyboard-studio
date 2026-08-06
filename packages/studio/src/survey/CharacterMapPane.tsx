@@ -7,8 +7,8 @@
 // the IntroChooser and the manual step-by-step path keep the OSK preview).
 //
 // Clicking a cell toggles it into the SAME accumulating alphabet the center
-// pane's BuildListView builds (SuggestionPanel ticks + CharChipEditor type-in),
-// via the shared stores/phaseBDraftStore.ts — both panes read/write one list.
+// pane's BuildListView builds (CharChipEditor type-in), via the shared
+// stores/phaseBDraftStore.ts — both panes read/write one list.
 //
 // Data source: buildCharacterMap (engine, a parallel-track character-discovery
 // deliverable) via lib/services.ts's characterMapGroups wrapper. baseIr comes
