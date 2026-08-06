@@ -227,14 +227,12 @@ export async function driveIdentityLite(
   // used elsewhere and leave the field blank (the value is optional).
   await page.waitForSelector("#il_language_code", { timeout: 15_000 });
   if (languageCode !== undefined) {
-    // Same autocomplete control as il_language_english/il_language_autonym
-    // (fillComboboxFreeText's Escape-to-dismiss doesn't apply here, since
-    // this field is filled directly rather than through that helper): typing
-    // a real code like "fr" opens a suggestion listbox, and a stray option
-    // (e.g. "Arpitan — France (frp)") sitting over the Next button intercepts
-    // the click below. Escape closes it without clearing the typed value.
-    await page.locator("#il_language_code").fill(languageCode);
-    await page.locator("#il_language_code").press("Escape");
+    // Same autocomplete control as il_language_english/il_language_autonym:
+    // typing a real code like "fr" opens a suggestion listbox, and a stray
+    // option (e.g. "Arpitan — France (frp)") sitting over the Next button
+    // would otherwise intercept the click below. fillComboboxFreeText fills
+    // the value and presses Escape to dismiss the listbox without clearing it.
+    await fillComboboxFreeText(page, "#il_language_code", languageCode);
   }
   await surveyAdvance(page).click();
 
@@ -743,8 +741,14 @@ export async function driveHelpPhase(
   await moreDetailNo.check();
   await surveyAdvance(page).click();
 
-  // Advance through remaining optional questions until we reach #output
+  // Advance through remaining optional questions until we reach #output.
+  // Assert Next is enabled before each click: if a future question in this
+  // tail ever becomes required/gated (as il_author_name and pf_more_detail_gate
+  // did above), a disabled Next would make .click() hang on actionability until
+  // the test timeout — the same stale-helper hang this walk was fixed for. The
+  // assertion fails fast instead, naming the question that stalled the walk.
   for (let guard = 0; guard < 15; guard++) {
+    await expect(surveyAdvance(page)).not.toBeDisabled({ timeout: 15_000 });
     await surveyAdvance(page).click();
     if (/#output$/.test(page.url())) {
       return;
