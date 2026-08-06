@@ -86,6 +86,73 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); f
   }
 }
 
+/* Crash surfaces (spec 060 FR-071 – FR-073, spec 056 WCAG 1.4.3) -----------
+ *
+ * `.crash-notice` and `.crash-recovery` are the two crash surfaces. They
+ * carried these class names with NO rule behind them, which is how they failed
+ * an axe scan: with no rule, the notice's Undo button and "View the report"
+ * anchor fall back to UA defaults — default link blue and ButtonFace — over this
+ * app's dark `--bg`, both serious `color-contrast` violations
+ * (`crash-recovery-a11y.spec.ts`, "the sent notice has no serious or critical
+ * axe violations"). The recovery screen passed only because it happens to
+ * contain nothing but a heading and text; add one link there and it fails the
+ * same way.
+ *
+ * A CSS rule rather than inline styles, deliberately: these are the two
+ * components whose whole job is to render when something else has already
+ * broken, and inline styles on the anchor would still leave `:hover`/`:focus`
+ * unstyleable. The class names were already there and already the intent.
+ *
+ * EVERY COLOUR BELOW IS A TOKEN, and every pairing clears WCAG AA (4.5:1 text,
+ * 3:1 non-text) against the surface it sits on — the button reaches 9.7:1 by
+ * using `--app-accent-subtle` as its background instead of an accent fill,
+ * which at `--primary` would have measured 4.25:1 and quietly failed. */
+.crash-notice,
+.crash-recovery {
+  background: var(--card);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-family: var(--ui);
+}
+
+.crash-notice a,
+.crash-recovery a {
+  color: var(--app-accent-text);
+  text-decoration: underline;
+}
+
+.crash-notice a:hover,
+.crash-recovery a:hover {
+  color: var(--app-accent-hover);
+}
+
+.crash-notice button {
+  min-height: var(--control-h);
+  padding: 6px 14px;
+  background: var(--app-accent-subtle);
+  color: var(--text);
+  border: 1px solid var(--app-accent);
+  border-radius: 6px;
+  font: inherit;
+  cursor: pointer;
+}
+
+.crash-notice button:hover {
+  border-color: var(--app-accent-hover);
+}
+
+/* Same indicator the rest of the app uses (.ks-focus-ring), inlined here rather
+ * than by adding the utility class: the Undo affordance must stay keyboard-
+ * visible even if a stylesheet ordering change ever drops that utility. */
+.crash-notice button:focus-visible,
+.crash-notice a:focus-visible,
+.crash-recovery a:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--app-accent-ring);
+}
+
 /* Deletable-chip hover-red affordance (alphabet-gallery overhaul) ----------
  * Every neon-green "click to remove" chip across the assignment-loop
  * galleries (MechanismGallery's "Added"/"Existing methods" rows, TouchGallery's

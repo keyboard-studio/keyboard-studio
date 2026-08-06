@@ -18,6 +18,7 @@ export default defineConfig({
       "oauth/**/*.test.ts",
       "submit/**/*.test.ts",
       "drafts/**/*.test.ts",
+      "report/**/*.test.ts",
     ],
     environment: "node",
   },

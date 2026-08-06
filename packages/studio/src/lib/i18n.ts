@@ -11,6 +11,7 @@ import { i18n } from "@lingui/core";
 import { messages as enMessages } from "../locales/en/messages.json?lingui";
 import { storageAvailable } from "./storageGuard.ts";
 import { activateContentLocale } from "./contentI18n.ts";
+import { pushBreadcrumb } from "../crash/breadcrumbs.ts";
 
 export const SUPPORTED_LOCALES = { en: "English", fr: "Français" } as const;
 export type Locale = keyof typeof SUPPORTED_LOCALES;
@@ -89,6 +90,10 @@ export async function activateLocale(locale: Locale): Promise<void> {
     i18n.load(locale, messages);
   }
   i18n.activate(locale);
+  // Crash breadcrumb (spec 060 FR-045). A locale switch reshapes every string
+  // on screen, so "which locale was active" is frequently the difference
+  // between a reproducible crash report and an unreproducible one.
+  pushBreadcrumb("locale", locale);
 }
 
 // Bootstrap: load + activate English synchronously (always-available

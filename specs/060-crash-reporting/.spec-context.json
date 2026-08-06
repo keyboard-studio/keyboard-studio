@@ -1,0 +1,1865 @@
+{
+  "workflow": "companion",
+  "specName": "060-crash-reporting",
+  "branch": "060-crash-reporting",
+  "selectedAt": "2026-08-06T01:21:13.282Z",
+  "currentStep": "implement",
+  "status": "implemented",
+  "history": [
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-06T01:21:21.909Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-06T01:21:21.946Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T01:33:24.999Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T01:35:50.020Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T01:43:01.727Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T01:43:21.130Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-06T02:04:17.996Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:06:29.983Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:06:30.258Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:06:30.517Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:06:30.803Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:09:20.124Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:15:25.601Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:15:25.872Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:15:26.161Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:15:26.457Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:15:26.752Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:15:27.014Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:15:27.264Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:21:17.066Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:21:17.338Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:21:17.601Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:23:33.164Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:23:33.432Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:26:53.874Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:26:54.126Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:26:54.378Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:26:54.648Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:31:08.141Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:31:08.392Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:31:08.678Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:39:22.713Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:39:22.983Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:39:23.236Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:39:23.548Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:46:51.292Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:46:51.845Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:46:52.315Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:46:52.820Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:46:53.301Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:49:35.200Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:49:35.508Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:49:35.837Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:49:36.113Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T038",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:49:36.376Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T039",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:54:36.748Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:54:36.977Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T041",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:54:37.217Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T042",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:54:37.452Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T043",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:54:37.692Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T044",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:56:48.147Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T045",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:56:48.396Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T046",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:59:40.575Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T047",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:59:40.816Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T048",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:59:41.065Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T049",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:59:41.302Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T050",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T03:06:03.747Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T051",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T03:06:03.998Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T052",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T03:06:04.243Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T053",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T03:41:10.581Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T054",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T03:41:10.851Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T055",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T03:41:11.115Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T056",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T03:41:11.374Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T057",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T03:41:11.611Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T058",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T03:41:11.858Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-06T03:41:12.184Z"
+    }
+  ],
+  "telemetryInstanceId": "4d8149dc-5ee9-43f5-9dac-81307541deb6",
+  "approach": "Client half is greenfield in a new self-contained packages/studio/src/crash/ directory whose import graph must never reach @keyboard-studio/engine, gated by a new import-graph test. Server half copies the managed-PR quartet (schema/pipeline/adapter/Fastify mirror) under utilities/oauth-backend plus a separate CRASH_REPORT_APP_* token minter, computing the dedupe fingerprint server-side from raw client inputs so no caller-supplied value can redirect a report. A new Vite define surfaces VERCEL_GIT_COMMIT_SHA as a compile-time build id readable pre-mount.",
+  "decisions": [
+    {
+      "decision": "Crash code lives in a new top-level packages/studio/src/crash/ directory",
+      "why": "Lets the FR-013 import-graph gate be defined as every file in this directory is an entry point, which stays correct as files are added",
+      "rejected": "Scattering crash*.ts through src/lib/, which would force the gate onto a hand-maintained file list that silently goes stale"
+    },
+    {
+      "decision": "FR-124 accessibility coverage splits across two lanes: axe scan in Playwright, structural ARIA/focus assertions in vitest",
+      "why": "expectNoSeriousAxeViolations does not exist in code -- it appears only in specs/** prose. The sole axe dependency is @axe-core/playwright and the studio jsdom/vitest lane has no axe integration, as StudioFooter.a11y.test.tsx states in its header",
+      "rejected": "Adding jest-axe to the vitest lane, which is a separate change and creates a second competing axe surface"
+    },
+    {
+      "decision": "A new crash-report-installation-token.ts with its own module-scope auth cache, duplicating ~60 lines of installation-token.ts",
+      "why": "installation-token.ts memoizes createAppAuth in a module-level _auth keyed to nothing, so a shared minter would hand whichever App loaded first to both pipelines -- defeating the P0-2 credential separation mechanically, not just conceptually",
+      "rejected": "Parameterizing getInstallationToken(appVars) and calling it from both pipelines"
+    },
+    {
+      "decision": "One pure canonicalizeCrashInput() with a framesFromRawStack() adapter, so structured stackFrames[] and raw stack normalize to the same shape before hashing",
+      "why": "SC-019 requires a V8-shaped and a Firefox/Safari-shaped stack for the same error to produce an identical fingerprint; one code path makes that true by construction rather than by two implementations agreeing",
+      "rejected": "Separate canonicalizeStructured/canonicalizeRaw functions, which is exactly how the two paths drift and fork one bug into two issues"
+    },
+    {
+      "decision": "Client and server implement the FR-081a algorithm independently, both pinned to the FR-081d worked example",
+      "why": "No sharable home exists -- the client cannot value-import a workspace package (FR-010 graph constraint) and the server cannot either (bundle safety), so specification-level agreement plus a shared fixture is the only mechanism. FR-022 already establishes nothing depends on the two agreeing",
+      "rejected": "Publishing a shared @keyboard-studio/crash-fingerprint package"
+    },
+    {
+      "decision": "Send result reaches the UI via a module-scope subscribable consumed with useSyncExternalStore, not a zustand store",
+      "why": "Two of the three capture surfaces fire outside any React tree and the POST resolves after the fallback has already rendered; a zustand store would live under src/stores/ where the engine-importing modules are, crossing the FR-012 boundary",
+      "rejected": "Threading the send promise through the ErrorBoundary state, which the window-level handlers have no boundary to reach"
+    },
+    {
+      "decision": "The /report/crash rewrite is inserted above the terminal /(.*) catch-all in vercel.json",
+      "why": "Vercel evaluates rewrites in order and the catch-all matches everything; a rewrite appended after it is dead config whose failure is silent -- the endpoint would return index.html with a 200 and the fire-and-forget POST would report success while filing nothing",
+      "rejected": "Appending the rewrite, which is the obvious wrong instinct"
+    },
+    {
+      "decision": "Extended CrashReportBodySchema.context to the full FR-040 structural set (keyboardId, bcp47Tags, stepId, keyCount, exemplarCount, decisionTail, breadcrumbs) alongside browserUA/os",
+      "why": "contracts/crash-report-api.md declares only browserUA and os under context; zod strips unknown keys, so the FR-040 structural context the filed issue is required to carry would have been silently dropped, making FR-040/FR-046 unsatisfiable",
+      "rejected": "Following the contract table literally and passing structural context through a second top-level field"
+    },
+    {
+      "decision": "CrashRecoveryScreen carries no reload button",
+      "why": "FR-122 pins exactly six crash.* message ids and FR-126 forbids repurposing an existing one; a reload control has no id, and FR-072 requires only that controls which exist are real keyboard-operable elements",
+      "rejected": "Reusing crash.report.retry.notice as the reload label"
+    },
+    {
+      "decision": "The reopen cooldown is keyed on the presence of the regression label, not on updated_at alone",
+      "why": "FR-095 (first hit after a close always reopens) and FR-095a (a repeat inside the cooldown is suppressed) contradict each other if only updated_at is read, because a maintainer closing an issue sets updated_at to now and would put the very next recurrence inside the cooldown. The regression label is the stateless record of we already reopened this, so it separates the signal from the churn.",
+      "rejected": "Reading updated_at alone, which drops the first regression report after every close"
+    },
+    {
+      "decision": "Added POST /report/crash/retract as a separate route, plus an optional commentId on the report response",
+      "why": "contracts/crash-report-api.md lists the GitHub-side retraction calls but defines no client-facing route for them, so FR-074-FR-077 had no way to reach the server; and a commented report cannot be retracted without the client being told which comment is its own",
+      "rejected": "A mode flag on the report body, which would make required fields depend on the flag and leave message meaningless for a retraction"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "plan.md + research.md (10 decisions) + data-model.md + contracts/ (crash-report-api.md, client-surface.md); Constitution Check PASS on all eight Articles, no violations",
+      "key_finding": "expectNoSeriousAxeViolations, which FR-124 cites as an existing helper, does not exist in code -- axe is Playwright-only here, so the accessibility requirement has to split across two test lanes or it gets silently half-satisfied"
+    },
+    "tasks": {
+      "summary": "58 tasks across 9 phases (Setup, Foundational, US1-US6, Polish) laid out as 24 waves with explicit join points; 112 requirements mapped to tasks",
+      "key_finding": "The FR-013 import-graph gate is placed first in Foundational rather than in its own US4 phase, so every crash-module file is written against a live constraint instead of audited afterwards"
+    },
+    "implement": {
+      "summary": "Crash reporting end to end: self-contained client crash module behind a demonstrated-red import gate, server-authoritative fingerprinting and dedupe on a second GitHub App, stale-deploy carve-out, pre-mount path, and undo."
+    }
+  },
+  "coverage": {
+    "FR-001": {
+      "title": "Exactly one React ErrorBoundary, mounted inside AppRoot's I18nProvider",
+      "tasks": [
+        "T029"
+      ]
+    },
+    "FR-002": {
+      "title": "Install a window.onerror handler for synchronous errors outside the React tree",
+      "tasks": [
+        "T030"
+      ]
+    },
+    "FR-003": {
+      "title": "Install an unhandledrejection handler for un-awaited promise rejections",
+      "tasks": [
+        "T030"
+      ]
+    },
+    "FR-004": {
+      "title": "Install a vite:preloadError handler that preventDefault()s and routes to the stale-chunk carve-out",
+      "tasks": [
+        "T041"
+      ]
+    },
+    "FR-005": {
+      "title": "useKeyboardArtifact Stage:error must not auto-file a report on every occurrence",
+      "tasks": [
+        "T031"
+      ]
+    },
+    "FR-005a": {
+      "title": "loadEngine() must preserve and forward the original import() rejection to the classifier",
+      "tasks": [
+        "T042",
+        "T039"
+      ],
+      "tests": [
+        "packages/studio/src/crash/staleChunk.test.ts::loadEngine rejection forwarding"
+      ]
+    },
+    "FR-006": {
+      "title": "A crash must be classifiable by kind; an absent kind defaults server-side to pre-mount",
+      "tasks": [
+        "T006",
+        "T010"
+      ]
+    },
+    "FR-007": {
+      "title": "Capture must not depend on prior compile, validation, or working-copy state",
+      "tasks": [
+        "T030"
+      ]
+    },
+    "FR-008": {
+      "title": "Deliberate self-swallowing catches must continue never reaching the rejection handler",
+      "tasks": [
+        "T030"
+      ]
+    },
+    "FR-010": {
+      "title": "The crash module must be self-contained: no dynamic import, no engine in its graph",
+      "tasks": [
+        "T005",
+        "T006"
+      ]
+    },
+    "FR-011": {
+      "title": "crypto.subtle.digest is called directly; computeSha256Hex is never imported",
+      "tasks": [
+        "T009",
+        "T044"
+      ]
+    },
+    "FR-012": {
+      "title": "The crash module must not import decisionLogStore, workingCopyStore, or any engine-reaching module",
+      "tasks": [
+        "T005",
+        "T028"
+      ]
+    },
+    "FR-013": {
+      "title": "A repository-level import-graph test, demonstrated failing before it is trusted as a gate",
+      "tasks": [
+        "T005"
+      ],
+      "tests": [
+        "packages/studio/src/crash/engine-reachability.test.ts"
+      ]
+    },
+    "FR-014": {
+      "title": "The crash module stays functional after loadEngine() has already failed for the session",
+      "tasks": [
+        "T044"
+      ],
+      "tests": [
+        "packages/studio/src/crash/send.test.ts",
+        "packages/studio/e2e/crash-engine-chunk-blocked.spec.ts"
+      ]
+    },
+    "FR-020": {
+      "title": "The client computes a local fingerprint by the identical algorithm, for its session cache only",
+      "tasks": [
+        "T009"
+      ]
+    },
+    "FR-021": {
+      "title": "The client must never send any computed fingerprint, hash, or dedupe key",
+      "tasks": [
+        "T006",
+        "T010"
+      ]
+    },
+    "FR-022": {
+      "title": "Nothing depends on the client-local and server-authoritative fingerprints agreeing",
+      "tasks": [
+        "T023"
+      ]
+    },
+    "FR-023": {
+      "title": "Client fingerprint computation is async-safe and engages no debounce cycle",
+      "tasks": [
+        "T009",
+        "T056"
+      ]
+    },
+    "FR-024": {
+      "title": "Two occurrences of the same bug in one session produce the same client-local fingerprint",
+      "tasks": [
+        "T009"
+      ]
+    },
+    "FR-030": {
+      "title": "The payload builder is an allowlist, never a spread of Attribution or IdentitySession",
+      "tasks": [
+        "T013"
+      ]
+    },
+    "FR-031": {
+      "title": "Named identity fields must never appear in a filed report under any payload field",
+      "tasks": [
+        "T013",
+        "T021"
+      ]
+    },
+    "FR-032": {
+      "title": "Redaction runs at capture-time construction, not as a strip-at-send step",
+      "tasks": [
+        "T013"
+      ]
+    },
+    "FR-032a": {
+      "title": "The payload builder module carries a header comment naming the attribution asymmetry",
+      "tasks": [
+        "T013"
+      ]
+    },
+    "FR-033": {
+      "title": "The server scrubs secret-shaped and email-shaped substrings before any GitHub write",
+      "tasks": [
+        "T015"
+      ]
+    },
+    "FR-033a": {
+      "title": "The server neutralizes @mention-shaped substrings before any GitHub write",
+      "tasks": [
+        "T015"
+      ]
+    },
+    "FR-033b": {
+      "title": "Markdown image syntax and raw img tags are neutralized before any GitHub write",
+      "tasks": [
+        "T015"
+      ]
+    },
+    "FR-034": {
+      "title": "A test asserts identity absence against a fixture carrying real populated values",
+      "tasks": [
+        "T021"
+      ],
+      "tests": [
+        "packages/studio/src/crash/redact.test.ts::carries none of the fixture's attribution or identity values"
+      ]
+    },
+    "FR-035": {
+      "title": "Keyboard structural content is explicitly not redacted",
+      "tasks": [
+        "T013"
+      ]
+    },
+    "FR-036": {
+      "title": "The pre-mount path sends only message/stack/appVersion and reads no storage identity",
+      "tasks": [
+        "T049"
+      ]
+    },
+    "FR-040": {
+      "title": "A report may include keyboard id, BCP47 tags, step id, counts, and the decision-log tail",
+      "tasks": [
+        "T028"
+      ]
+    },
+    "FR-041": {
+      "title": "No full VirtualFS snapshot and no raw file content",
+      "tasks": [
+        "T028"
+      ]
+    },
+    "FR-042": {
+      "title": "The decision-log tail is read by the caller and passed in as plain data",
+      "tasks": [
+        "T028"
+      ]
+    },
+    "FR-043": {
+      "title": "A fixed-size ~50-entry module-scope circular breadcrumb buffer",
+      "tasks": [
+        "T008"
+      ]
+    },
+    "FR-044": {
+      "title": "The breadcrumb wrapper calls the original console function and pushes; it never replaces",
+      "tasks": [
+        "T008"
+      ]
+    },
+    "FR-045": {
+      "title": "Breadcrumbs SHOULD record route, step, stage, OAuth, and locale events",
+      "tasks": [
+        "T053"
+      ]
+    },
+    "FR-046": {
+      "title": "Every structural context field is optional and omitted, never fabricated, when unavailable",
+      "tasks": [
+        "T013",
+        "T028"
+      ]
+    },
+    "FR-047": {
+      "title": "No context field may be or contain any FR-031 identity value",
+      "tasks": [
+        "T008",
+        "T028"
+      ]
+    },
+    "FR-050": {
+      "title": "vite:preloadError calls preventDefault() and routes into the carve-out",
+      "tasks": [
+        "T041",
+        "T040"
+      ]
+    },
+    "FR-051": {
+      "title": "A raw import() failure is matched against the stale-chunk pattern on the original rejection text",
+      "tasks": [
+        "T040",
+        "T039"
+      ]
+    },
+    "FR-052": {
+      "title": "First detection reads a sessionStorage timestamp and reloads once, filing nothing",
+      "tasks": [
+        "T040"
+      ]
+    },
+    "FR-053": {
+      "title": "A recurrence inside the window does not reload again; a retry notice shows and filing is allowed",
+      "tasks": [
+        "T040",
+        "T043"
+      ]
+    },
+    "FR-054": {
+      "title": "The carve-out introduces no validation timer and engages no D3 debounce cycle",
+      "tasks": [
+        "T040",
+        "T056"
+      ]
+    },
+    "FR-055": {
+      "title": "The reload-window constant is named and adjustable in one place",
+      "tasks": [
+        "T040"
+      ]
+    },
+    "FR-060": {
+      "title": "mountApp and mountCallbackScreen are wrapped in a top-level try/catch before createRoot",
+      "tasks": [
+        "T049"
+      ]
+    },
+    "FR-061": {
+      "title": "A static, dependency-free fallback element already present in index.html is revealed",
+      "tasks": [
+        "T048"
+      ]
+    },
+    "FR-062": {
+      "title": "A best-effort POST of message/stack/appVersion with a short timeout, failure swallowed",
+      "tasks": [
+        "T049",
+        "T046"
+      ],
+      "tests": [
+        "utilities/oauth-backend/src/crash-report-schemas.test.ts::pre-mount body"
+      ]
+    },
+    "FR-063": {
+      "title": "The pre-mount payload reads no localStorage/sessionStorage identity or working-copy data",
+      "tasks": [
+        "T049"
+      ]
+    },
+    "FR-064": {
+      "title": "The pre-mount POST targets the same crash-report endpoint, not a second route",
+      "tasks": [
+        "T049"
+      ]
+    },
+    "FR-070": {
+      "title": "A captured crash is sent automatically with no confirmation dialog gating the send",
+      "tasks": [
+        "T014"
+      ]
+    },
+    "FR-071": {
+      "title": "A non-blocking notice names that a report was sent, with a link to the filed issue",
+      "tasks": [
+        "T027"
+      ]
+    },
+    "FR-072": {
+      "title": "The recovery screen uses role=alert and moves focus to its heading on mount",
+      "tasks": [
+        "T026",
+        "T032"
+      ],
+      "tests": [
+        "packages/studio/src/components/CrashRecoveryScreen.a11y.test.tsx",
+        "packages/studio/e2e/crash-recovery-a11y.spec.ts"
+      ]
+    },
+    "FR-073": {
+      "title": "A non-render capture presents a lighter aria-live polite notice that never steals focus",
+      "tasks": [
+        "T027",
+        "T032"
+      ],
+      "tests": [
+        "packages/studio/src/components/CrashRecoveryScreen.a11y.test.tsx::never moves focus"
+      ]
+    },
+    "FR-074": {
+      "title": "The notice remains visible for exactly CRASH_REPORT_UNDO_WINDOW_MS with Undo available",
+      "tasks": [
+        "T051",
+        "T050"
+      ],
+      "tests": [
+        "packages/studio/src/components/CrashNotice.test.tsx::Undo window"
+      ]
+    },
+    "FR-075": {
+      "title": "Undo on a created report closes the issue and adds a retraction comment; it never deletes",
+      "tasks": [
+        "T052",
+        "T050"
+      ],
+      "tests": [
+        "utilities/oauth-backend/src/crash-report-dedupe.test.ts::retraction"
+      ]
+    },
+    "FR-076": {
+      "title": "Undo on a commented report removes only the comment this session added",
+      "tasks": [
+        "T052",
+        "T050"
+      ]
+    },
+    "FR-077": {
+      "title": "Once the window elapses or the notice is dismissed, Undo disappears and the report stands",
+      "tasks": [
+        "T051",
+        "T050"
+      ]
+    },
+    "FR-078": {
+      "title": "The send is fire-and-forget: failures are never actionable and never retried in a loop",
+      "tasks": [
+        "T014"
+      ]
+    },
+    "FR-080": {
+      "title": "A new POST /report/crash route, rewritten in vercel.json to /api/report/crash",
+      "tasks": [
+        "T001",
+        "T018"
+      ]
+    },
+    "FR-081": {
+      "title": "CrashReportBodySchema with the specified caps, optional fields, no fingerprint/title, and the refine rule",
+      "tasks": [
+        "T010",
+        "T046"
+      ]
+    },
+    "FR-081a": {
+      "title": "Server canonicalization: kind plus normalized message plus top 3-5 canonicalized frames",
+      "tasks": [
+        "T015",
+        "T023"
+      ]
+    },
+    "FR-081b": {
+      "title": "The build identifier is excluded from the fingerprint hash input",
+      "tasks": [
+        "T015"
+      ]
+    },
+    "FR-081c": {
+      "title": "sha256 of the canonical input, lowercase hex, truncated to 12 for the label",
+      "tasks": [
+        "T015"
+      ]
+    },
+    "FR-081d": {
+      "title": "The worked example exact canonicalized string and hash stability are pinned by test",
+      "tasks": [
+        "T023"
+      ]
+    },
+    "FR-081e": {
+      "title": "Fingerprint computation is a pure function, unit-testable in isolation",
+      "tasks": [
+        "T015",
+        "T023"
+      ]
+    },
+    "FR-081f": {
+      "title": "Raw stack extraction rule, cross-browser convergence, and fingerprint stability",
+      "tasks": [
+        "T015",
+        "T047"
+      ],
+      "tests": [
+        "utilities/oauth-backend/src/crash-report-pipeline.test.ts::raw-stack extraction"
+      ]
+    },
+    "FR-082": {
+      "title": "The schema module value-imports no workspace package; literals copied behind a drift guard",
+      "tasks": [
+        "T010",
+        "T020"
+      ]
+    },
+    "FR-083": {
+      "title": "The four-way structural split plus a new dedicated token minter",
+      "tasks": [
+        "T015",
+        "T018",
+        "T019",
+        "T011"
+      ]
+    },
+    "FR-084": {
+      "title": "A minimal hand-written GitHub REST caller, documented as caller #3 and why not extracted",
+      "tasks": [
+        "T016"
+      ]
+    },
+    "FR-085": {
+      "title": "A dedicated getCrashReportInstallationToken() reading CRASH_REPORT_APP_*, never the managed-PR trio",
+      "tasks": [
+        "T011",
+        "T004"
+      ]
+    },
+    "FR-086": {
+      "title": "api/report/crash.ts added to FUNCTION_ENTRIES in the bundle-safety test",
+      "tasks": [
+        "T020"
+      ]
+    },
+    "FR-087": {
+      "title": "Response and error vocabulary matches the existing mapNonOk convention",
+      "tasks": [
+        "T016",
+        "T018"
+      ]
+    },
+    "FR-088": {
+      "title": "A GitHub 401/403 maps to 502 submission_unavailable, never naming the credential at fault",
+      "tasks": [
+        "T016",
+        "T022"
+      ]
+    },
+    "FR-089": {
+      "title": "The target repository is a source constant, never derived from request input",
+      "tasks": [
+        "T016"
+      ]
+    },
+    "FR-090": {
+      "title": "Dedupe via the crash/fp label through the ordinary REST issues endpoint",
+      "tasks": [
+        "T035"
+      ]
+    },
+    "FR-091": {
+      "title": "Dedupe must not use GET /search/issues; a call-site comment states why",
+      "tasks": [
+        "T035"
+      ]
+    },
+    "FR-092": {
+      "title": "The fingerprint is embedded in the issue body as a trailing HTML comment for auditability",
+      "tasks": [
+        "T024"
+      ]
+    },
+    "FR-093": {
+      "title": "No match found creates a new labelled issue, subject to the global creation cap",
+      "tasks": [
+        "T024",
+        "T025"
+      ]
+    },
+    "FR-093a": {
+      "title": "The generated title is bug(studio): normalized summary, carrying no kind, fingerprint, or build id",
+      "tasks": [
+        "T024"
+      ]
+    },
+    "FR-094": {
+      "title": "An open match is commented on and makes no state-change call at all",
+      "tasks": [
+        "T036",
+        "T034"
+      ],
+      "tests": [
+        "utilities/oauth-backend/src/crash-report-dedupe.test.ts::makes NO state-change call at all on an open issue"
+      ]
+    },
+    "FR-095": {
+      "title": "A closed match reopens with a regression label and a comment, bounded by the cooldown",
+      "tasks": [
+        "T037",
+        "T034"
+      ]
+    },
+    "FR-095a": {
+      "title": "Reopen happens at most once per CRASH_REPORT_REOPEN_COOLDOWN_MS; the first hit always reopens",
+      "tasks": [
+        "T037",
+        "T034"
+      ],
+      "tests": [
+        "utilities/oauth-backend/src/crash-report-dedupe.test.ts::closed match"
+      ]
+    },
+    "FR-096": {
+      "title": "A dedupe-lookup failure fails open to creation, not closed",
+      "tasks": [
+        "T035",
+        "T034"
+      ]
+    },
+    "FR-097": {
+      "title": "Two near-simultaneous first occurrences may both create; an accepted self-healing race",
+      "tasks": [
+        "T034"
+      ]
+    },
+    "FR-098": {
+      "title": "GitHub 429 is surfaced as 429 rate_limited with Retry-After, defaulting to 60",
+      "tasks": [
+        "T038"
+      ]
+    },
+    "FR-099": {
+      "title": "The label vocabulary is project-local and must not propagate upstream",
+      "tasks": [
+        "T024",
+        "T055"
+      ]
+    },
+    "FR-100": {
+      "title": "Flood control composes four independent layers, three code and one platform configuration",
+      "tasks": [
+        "T014",
+        "T025",
+        "T036",
+        "T055"
+      ]
+    },
+    "FR-101": {
+      "title": "The client caches already-reported fingerprints in sessionStorage",
+      "tasks": [
+        "T014"
+      ],
+      "tests": [
+        "packages/studio/src/crash/send.test.ts::session dedupe cache"
+      ]
+    },
+    "FR-102": {
+      "title": "The server caps comment writes using stateless signals from the label-lookup response",
+      "tasks": [
+        "T036"
+      ]
+    },
+    "FR-103": {
+      "title": "Comment cap, comment cooldown, and reopen cooldown are named adjustable constants",
+      "tasks": [
+        "T015"
+      ]
+    },
+    "FR-104": {
+      "title": "A skipped comment still returns the normal 200 commented shape",
+      "tasks": [
+        "T036"
+      ]
+    },
+    "FR-105": {
+      "title": "No distributed rate-limiting infrastructure is introduced for v1",
+      "tasks": [
+        "T055"
+      ]
+    },
+    "FR-106": {
+      "title": "A stateless global creation cap gates issue creation, surfacing a skip as 429",
+      "tasks": [
+        "T025"
+      ],
+      "tests": [
+        "api/report/crash.test.ts::global creation cap"
+      ]
+    },
+    "FR-110": {
+      "title": "A Vite define surfaces the build commit SHA with a dev fallback",
+      "tasks": [
+        "T002"
+      ]
+    },
+    "FR-111": {
+      "title": "The identifier is a compile-time constant, ambiently typed",
+      "tasks": [
+        "T003"
+      ]
+    },
+    "FR-112": {
+      "title": "appVersion combines the package version with the short commit SHA",
+      "tasks": [
+        "T007"
+      ]
+    },
+    "FR-113": {
+      "title": "Build identity is on the critical path; no report ships without it",
+      "tasks": [
+        "T007",
+        "T058"
+      ]
+    },
+    "FR-114": {
+      "title": "The pre-mount fallback can still read the build identifier",
+      "tasks": [
+        "T007",
+        "T049"
+      ]
+    },
+    "FR-120": {
+      "title": "The ErrorBoundary fallback uses role=alert and moves focus to its heading",
+      "tasks": [
+        "T026",
+        "T032"
+      ]
+    },
+    "FR-121": {
+      "title": "The lighter notice uses aria-live polite and does not move focus",
+      "tasks": [
+        "T027",
+        "T032"
+      ]
+    },
+    "FR-122": {
+      "title": "Every author-facing string goes through the catalog under a new area.segment id",
+      "tasks": [
+        "T012"
+      ]
+    },
+    "FR-123": {
+      "title": "The pre-mount fallback is the one deliberate exception: hard-coded English in index.html",
+      "tasks": [
+        "T048"
+      ]
+    },
+    "FR-124": {
+      "title": "The recovery screen and notice pass the automated accessibility scan with zero new violations",
+      "tasks": [
+        "T033",
+        "T032"
+      ]
+    },
+    "FR-125": {
+      "title": "Every interactive element is a real keyboard-operable control",
+      "tasks": [
+        "T026",
+        "T032"
+      ]
+    },
+    "FR-126": {
+      "title": "No id repurposes an existing message id; every one is new",
+      "tasks": [
+        "T012"
+      ]
+    },
+    "FR-127": {
+      "title": "Target-locale catalogs stay honest and the i18n lint gates pass",
+      "tasks": [
+        "T012",
+        "T057"
+      ]
+    },
+    "FR-130": {
+      "title": "No new validation timer; the single 300 ms D3 cycle remains the only validation cadence",
+      "tasks": [
+        "T056"
+      ]
+    },
+    "FR-131": {
+      "title": "The /api bundle-safety invariant holds with the new route added",
+      "tasks": [
+        "T020"
+      ]
+    },
+    "FR-132": {
+      "title": "A new studio-side test asserts the crash module never reaches the engine",
+      "tasks": [
+        "T005"
+      ]
+    },
+    "FR-133": {
+      "title": "Nothing is written into the emitted package, archive, or any submitted pull request",
+      "tasks": [
+        "T056"
+      ]
+    },
+    "FR-134": {
+      "title": "The working-copy spine and the append-only decision record are unchanged",
+      "tasks": [
+        "T028"
+      ]
+    },
+    "FR-135": {
+      "title": "Existing tests asserting the current blank-page-on-crash behaviour are updated",
+      "tasks": [
+        "T054"
+      ]
+    },
+    "FR-136": {
+      "title": "The new route is covered by a handler-level test with an injected fetch stub",
+      "tasks": [
+        "T022",
+        "T034"
+      ],
+      "tests": [
+        "api/report/crash.test.ts"
+      ]
+    }
+  },
+  "currentTask": "T058",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Added /report/crash rewrite above the terminal catch-all",
+      "files": [
+        "vercel.json"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Added Vite define block injecting __KS_COMMIT_SHA__ from VERCEL_GIT_COMMIT_SHA with dev fallback",
+      "files": [
+        "packages/studio/vite.config.ts"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Declared __KS_COMMIT_SHA__ ambiently",
+      "files": [
+        "packages/studio/src/vite-env.d.ts"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Documented the CRASH_REPORT_APP_* trio as distinct from GITHUB_APP_* with no fallback",
+      "files": [
+        "utilities/oauth-backend/src/server.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Import-graph gate written and DEMONSTRATED RED against a decisionLogStore fixture (caught the 2-hop transitive engine edge), fixture deleted",
+      "files": [
+        "packages/studio/src/crash/engine-reachability.test.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Defined client payload types (CrashReport, StackFrame, CrashContext, Breadcrumb) with no fingerprint field and no engine import",
+      "files": [
+        "packages/studio/src/crash/types.ts"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Composed appVersion as <pkg.version>+<sha7> with a guarded __KS_COMMIT_SHA__ read that never yields empty",
+      "files": [
+        "packages/studio/src/crash/buildVersion.ts"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Implemented the 50-entry breadcrumb ring; console.error/warn wrappers call the original AND push",
+      "files": [
+        "packages/studio/src/crash/breadcrumbs.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Implemented the client-local fingerprint with FR-081a canonicalization and a direct crypto.subtle.digest call",
+      "files": [
+        "packages/studio/src/crash/fingerprint.ts"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Defined CrashReportBodySchema with every cap, optional kind/stackFrames/stack, no fingerprint or title, and the post-mount .refine()",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-schemas.ts"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Implemented getCrashReportInstallationToken with its own module-scope cache and _resetCrashAuthCache seam",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-installation-token.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Added the six crash.* ids to the en and fr catalogs",
+      "files": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Allowlist payload builder with the FR-032a header comment; redaction at construction, no spread of any source object",
+      "files": [
+        "packages/studio/src/crash/redact.ts"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Fire-and-forget POST with timeout, sessionStorage per-fingerprint dedupe, and a module-scope subscribable for useSyncExternalStore",
+      "files": [
+        "packages/studio/src/crash/send.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Canonicalization core: exported flood-control constants, pure canonicalizeCrashInput, framesFromRawStack per FR-081f, SHA-256 hash12, and the scrub pass",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-pipeline.ts"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "Added the minimal REST caller (list-by-label, list-created-since, create, comment, patch, delete-comment) with mapNonOk reproducing the github-pipeline vocabulary, plus the caller-#3 vendoring header and the issue-body renderer",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-pipeline.ts"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Wrapped the whole client capture-and-send path in runReport's try/catch: failures are swallowed to a breadcrumb, reportCrash returns void so no rejection can re-enter the unhandledrejection handler",
+      "files": [
+        "packages/studio/src/crash/send.ts"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "Added the Web-fetch adapter with method guard, 503 reporting_not_configured, 400 invalid_request, and the configOverride test seam",
+      "files": [
+        "api/report/crash.ts"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "Registered the Fastify POST /report/crash mirror gated on a crashAppConfigured-equivalent flag independent of appConfigured",
+      "files": [
+        "utilities/oauth-backend/src/server.ts"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Added api/report/crash.ts to FUNCTION_ENTRIES; the workspace-value-import assertion holds for its whole reachable graph",
+      "files": [
+        "api/bundle-safety.test.ts"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "Implemented the create branch: bug(studio) title <=72 chars ellipsized carrying no kind/fingerprint/build id, the crash/fp-<hash12> label, and the crash-fingerprint body trailer",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-pipeline.ts"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Identity-absence test: builds a payload from a fixture carrying real Attribution + GitHub/Google sessions and asserts none of those values appears in the serialized payload",
+      "files": [
+        "packages/studio/src/crash/redact.test.ts"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Handler-level tests with an injected fetch stub covering create, 403->502, 401->502, 500->upstream_error, mint failure, 503 not-configured, 400 paths; added report/ to the api vitest include list",
+      "files": [
+        "api/report/crash.test.ts",
+        "api/vitest.config.ts"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Pinned the FR-081d canonical string exactly, plus rebuild/build-id stability and genuine-difference cases, title shape, and the scrub",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-pipeline.test.ts"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Stateless global creation cap probing recent issues, counting only genuine creations in the window, skipping to 429 rate_limited with Retry-After derived from the window, failing OPEN on probe error",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-pipeline.ts",
+        "api/report/crash.test.ts"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "Recovery screen with role=alert, focus moved to a tabIndex=-1 heading on mount, and the issue link as a real anchor",
+      "files": [
+        "packages/studio/src/components/CrashRecoveryScreen.tsx"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "Notice with aria-live=polite that never moves focus, consuming send.ts's subscribable via useSyncExternalStore",
+      "files": [
+        "packages/studio/src/components/CrashNotice.tsx"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "Caller-side structural context collector reading the working copy, survey session, phase-B draft, and decision-log tail; placed in src/lib/ because the gate forbids these imports inside src/crash/",
+      "files": [
+        "packages/studio/src/lib/crashCallerContext.ts"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "Added the single CrashErrorBoundary inside AppRoot's I18nProvider, covering StudioShell, LintDemo, and OAuthCallbackScreen with one boundary; mounted CrashNotice as its sibling",
+      "files": [
+        "packages/studio/src/AppRoot.tsx",
+        "packages/studio/src/components/CrashErrorBoundary.tsx"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "Installed window error and unhandledrejection handlers plus the console breadcrumb wrappers at bootstrap, before the locale await; documented why warmExemplarSource's .catch keeps it out of the rejection handler",
+      "files": [
+        "packages/studio/src/main.tsx",
+        "packages/studio/src/crash/globalHandlers.ts"
+      ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "Confirmed useKeyboardArtifact Stage error does not auto-file (no reportCrash import anywhere in the hook) and documented the FR-005 rule on the Stage union",
+      "files": [
+        "packages/studio/src/hooks/useKeyboardArtifact.ts"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "Structural a11y assertions in the jsdom lane covering role=alert, focus-to-heading, aria-live=polite, no focus steal, and real button/anchor elements",
+      "files": [
+        "packages/studio/src/components/CrashRecoveryScreen.a11y.test.tsx"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "Playwright axe scan of both surfaces via a flag-gated E2E hook that drives the real rendered fallback rather than a mounted copy",
+      "files": [
+        "packages/studio/e2e/crash-recovery-a11y.spec.ts",
+        "packages/studio/src/lib/e2eHook.ts"
+      ]
+    },
+    "T034": {
+      "status": "DONE",
+      "did": "Fixture-driven dedupe tests asserting the call log: repeat->comment, closed->reopen+regression regardless of comment cap, first-hit-after-close always reopens, repeat reopen suppressed non-fatally, open match makes no PATCH, lookup failure creates anyway, 100 repeats create zero extra issues",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-dedupe.test.ts"
+      ]
+    },
+    "T035": {
+      "status": "DONE",
+      "did": "Implemented dedupe lookup by label with the call-site comment on why GET /search/issues must never be used; fails open to creation",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-pipeline.ts"
+      ]
+    },
+    "T036": {
+      "status": "DONE",
+      "did": "Open-match branch: comment capped statelessly from the issue's own comments count and updated_at, still 200 action=commented when skipped, and no state-change call at all",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-pipeline.ts"
+      ]
+    },
+    "T037": {
+      "status": "DONE",
+      "did": "Closed-match branch: reopen + regression + comment, with the reopen cooldown keyed on the regression label so the first hit after a maintainer close always reopens",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-pipeline.ts"
+      ]
+    },
+    "T038": {
+      "status": "DONE",
+      "did": "GitHub 429 surfaced as 429 rate_limited with Retry-After from the header, defaulting to 60 when absent or non-numeric",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-pipeline.ts"
+      ]
+    },
+    "T039": {
+      "status": "DONE",
+      "did": "Asserted the ORIGINAL loadEngine rejection reaches the FR-051 classifier through the cause chain and fires the carve-out, and that a non-matching rejection still reaches ordinary filing",
+      "files": [
+        "packages/studio/src/crash/staleChunk.test.ts"
+      ]
+    },
+    "T040": {
+      "status": "DONE",
+      "did": "Implemented the carve-out: FR-051 pattern, ks.staleChunkReloadedAt one-shot gate against an exported STALE_CHUNK_RELOAD_WINDOW_MS, one reload with no report, no reload on recurrence",
+      "files": [
+        "packages/studio/src/crash/staleChunk.ts"
+      ]
+    },
+    "T041": {
+      "status": "DONE",
+      "did": "Installed the vite:preloadError handler with event.preventDefault() so the same failure is not double-counted, routing into the carve-out",
+      "files": [
+        "packages/studio/src/crash/globalHandlers.ts",
+        "packages/studio/src/main.tsx"
+      ]
+    },
+    "T042": {
+      "status": "DONE",
+      "did": "Fixed P0-3: loadEngine preserves the original import() rejection and the caller attaches it as cause, so the classifier sees the real text while the UI keeps the friendly synthetic string",
+      "files": [
+        "packages/studio/src/hooks/useKeyboardArtifact.ts"
+      ]
+    },
+    "T043": {
+      "status": "DONE",
+      "did": "Retry notice surfaced via crash.report.retry.notice on a recurrence inside the window, with retryExhausted made sticky so the subsequent ordinary filing does not overwrite the message",
+      "files": [
+        "packages/studio/src/components/CrashNotice.tsx",
+        "packages/studio/src/crash/send.ts"
+      ]
+    },
+    "T044": {
+      "status": "DONE",
+      "did": "Behavioural proof the reporter survives a spent engine chunk: fingerprints via crypto.subtle directly, builds, and POSTs with no engine helper; plus dedupe-cache and fire-and-forget coverage",
+      "files": [
+        "packages/studio/src/crash/send.test.ts"
+      ]
+    },
+    "T045": {
+      "status": "DONE",
+      "did": "Browser-level chunk-blocked spec that aborts the real engine chunk request and asserts the shell and reporter still file, with a non-vacuity check that the route pattern actually matched",
+      "files": [
+        "packages/studio/e2e/crash-engine-chunk-blocked.spec.ts"
+      ]
+    },
+    "T046": {
+      "status": "DONE",
+      "did": "Asserted the exact FR-062 pre-mount body validates and defaults kind to pre-mount, and that a post-mount kind carrying neither stackFrames nor stack is rejected by the .refine(); plus cap and stripped-field coverage",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-schemas.test.ts"
+      ]
+    },
+    "T047": {
+      "status": "DONE",
+      "did": "Pinned the FR-081f worked example: V8 and Firefox/Safari raw stacks converge on the identical frame portion and fingerprint, matching the structured path, while genuinely different frames diverge",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-pipeline.test.ts"
+      ]
+    },
+    "T048": {
+      "status": "DONE",
+      "did": "Added the static hidden dependency-free pre-mount fallback with hard-coded English text and inline styles",
+      "files": [
+        "packages/studio/index.html"
+      ]
+    },
+    "T049": {
+      "status": "DONE",
+      "did": "Wrapped mountApp and mountCallbackScreen so a pre-mount throw reveals the fallback and best-effort POSTs { message, stack, appVersion } with a short timeout, reading no identity or working-copy storage",
+      "files": [
+        "packages/studio/src/main.tsx",
+        "packages/studio/src/crash/preMount.ts"
+      ]
+    },
+    "T050": {
+      "status": "DONE",
+      "did": "Fake-timer assertions on both window edges (Undo present at window-1ms, absent at window), plus retraction confirmation, failure tolerance, and no deletion-implying copy; server-side both-paths assertions added to the dedupe suite",
+      "files": [
+        "packages/studio/src/components/CrashNotice.test.tsx",
+        "utilities/oauth-backend/src/crash-report-dedupe.test.ts"
+      ]
+    },
+    "T051": {
+      "status": "DONE",
+      "did": "Undo affordance visible for exactly CRASH_REPORT_UNDO_WINDOW_MS (exported, 30000), disappearing on expiry or dismissal, with copy that never implies deletion",
+      "files": [
+        "packages/studio/src/components/CrashNotice.tsx"
+      ]
+    },
+    "T052": {
+      "status": "DONE",
+      "did": "Retract branches: created -> retraction comment + close (never a delete of the issue); commented/reopened -> DELETE only this session's comment, leaving state and other comments untouched. Added the POST /report/crash/retract route, adapter, Fastify mirror, rewrite, and bundle-safety entry",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-pipeline.ts",
+        "api/report/crash-retract.ts",
+        "utilities/oauth-backend/src/server.ts",
+        "vercel.json",
+        "api/bundle-safety.test.ts"
+      ]
+    },
+    "T053": {
+      "status": "DONE",
+      "did": "Wired the FR-045 breadcrumb points: hash-route changes and OAuth callback entry in main.tsx, locale activation in i18n.ts, step advance in surveySessionStore, and Stage transitions via a wrapped setStage so a future stage cannot be added without one",
+      "files": [
+        "packages/studio/src/main.tsx",
+        "packages/studio/src/lib/i18n.ts",
+        "packages/studio/src/stores/surveySessionStore.ts",
+        "packages/studio/src/hooks/useKeyboardArtifact.ts"
+      ]
+    },
+    "T054": {
+      "status": "DONE",
+      "did": "Full studio suite (417 files) ran green unchanged, so no existing test contradicted the new behaviour; added affirmative FR-135 assertions to AppRoot.test.tsx that a child throw now renders the recovery screen and that exactly one boundary covers all three trees",
+      "files": [
+        "packages/studio/src/AppRoot.test.tsx"
+      ]
+    },
+    "T055": {
+      "status": "DONE",
+      "did": "Added the prerequisites runbook: repository, second App with issues:write only, scoped install, the three env vars, the Vercel Firewall rule, the instant kill switch, live-verification steps, and the accepted residual risks",
+      "files": [
+        "specs/060-crash-reporting/runbook.md"
+      ]
+    },
+    "T056": {
+      "status": "DONE",
+      "did": "Audited every timer in src/crash/: three single-shot fetch abort budgets and one UI notice lifetime; the stale-chunk check is a sessionStorage comparison with no timer. None validates or emits a diagnostic, so the single 300ms D3 cycle remains the only validation cadence; documented inline in send.ts",
+      "files": [
+        "packages/studio/src/crash/send.ts"
+      ]
+    },
+    "T057": {
+      "status": "DONE",
+      "did": "Ran and greened every gate: pnpm typecheck, pnpm -r test, the /api suite, pnpm lint including both i18n tiers, and pnpm crew-lint",
+      "files": [
+        "(gates)"
+      ]
+    },
+    "T058": {
+      "status": "DONE",
+      "did": "Walked SC-001 to SC-020 and recorded which test discharges each; the walk found three uncovered (SC-007 pre-mount, and the burst forms of SC-016/SC-017) and added tests for all three rather than assuming the passing suite covered them",
+      "files": [
+        "specs/060-crash-reporting/sc-coverage.md",
+        "packages/studio/src/crash/preMount.test.ts",
+        "utilities/oauth-backend/src/crash-report-dedupe.test.ts"
+      ]
+    }
+  },
+  "concerns": [
+    {
+      "note": "contracts/crash-report-api.md request-body table under-specifies context against FR-040 and data-model section 3; the schema now carries the full set and documents the divergence inline, but the contract doc itself should be reconciled",
+      "step": "implement"
+    },
+    {
+      "note": "T024 (create branch) landed in Phase 2 wave 5 rather than US1, because T018 the adapter has no pipeline entry point to call otherwise and would not compile. Its US1 tests (T021-T023) are therefore written after the code rather than before.",
+      "step": "implement"
+    },
+    {
+      "note": "The retraction route and the commentId response field are additions the contract document does not describe; contracts/crash-report-api.md should be reconciled with both.",
+      "step": "implement"
+    },
+    {
+      "note": "The two Playwright specs (crash-recovery-a11y, crash-engine-chunk-blocked) were authored but not executed - this session ran the vitest lanes only. Written but not seen green; run them before merge.",
+      "step": "implement"
+    }
+  ],
+  "verified": [
+    {
+      "what": "api suite including the bundle-safety gate with the new function entry",
+      "command": "npx vitest run (api)",
+      "result": "6 files, 79 tests passed"
+    },
+    {
+      "what": "oauth-backend suite after adding the crash route to server.ts",
+      "command": "npx vitest run (utilities/oauth-backend)",
+      "result": "7 files, 160 tests passed"
+    },
+    {
+      "what": "FR-013 gate re-demonstrated red after the comment-stripping change, using a real dynamic-import fixture",
+      "command": "npx vitest run src/crash/engine-reachability.test.ts with __dyn-fixture.ts present",
+      "result": "failed as expected on the dynamic-import assertion; fixture deleted and suite green"
+    },
+    {
+      "what": "repo typecheck",
+      "command": "pnpm typecheck",
+      "result": "0 errors across all 7 workspace projects"
+    },
+    {
+      "what": "workspace test suites",
+      "command": "pnpm -r test",
+      "result": "all green: studio 6403, engine 2926 (+2 skipped), contracts 753, oauth-backend 233, keyboard-lint 115, glottolog 42, llm 9"
+    },
+    {
+      "what": "co-located Vercel function suite, outside pnpm -r",
+      "command": "npx vitest run (api)",
+      "result": "7 files, 99 tests passed, including bundle-safety with both new crash function entries"
+    },
+    {
+      "what": "lint chain including both i18n tiers",
+      "command": "pnpm lint",
+      "result": "0 errors, 186 warnings (pre-existing class); i18n-catalog-lint and content-i18n-lint both green with the six new crash.* ids",
+      "warnings": [
+        "no-console in breadcrumbs.ts is inherent - the module wraps console.error/warn; matches the existing installation-token.ts pattern"
+      ]
+    },
+    {
+      "what": "crew-lint",
+      "command": "pnpm crew-lint",
+      "result": "all 7 checks GREEN"
+    }
+  ],
+  "last_action": "all 58 tasks done — typecheck clean, pnpm -r test + /api green, lint and crew-lint green; 2 Playwright specs authored but not run"
+}
