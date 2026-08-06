@@ -42,6 +42,7 @@ import { parseLocation } from "./lib/location.ts";
 import { liveResolveContext, setPendingWelcomeLocation } from "./lib/jumpToLocation.ts";
 import { readPaneSplitPct, useViewStateStore } from "./stores/viewStateStore.ts";
 import { useStepWalkStore } from "./stores/stepWalkStore.ts";
+import { useProjectSwitchStore } from "./stores/projectSwitchStore.ts";
 import { useKeyboardArtifact, type OnInstantiateCallback } from "./hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
 import { OSKFrame } from "./components/OSKFrame.tsx";
@@ -64,6 +65,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { resolveMessage } from "./lib/i18nResolve.ts";
 import "./lib/i18n.ts"; // side-effect: load + activate the default (en) catalog
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
+import { CurrentKeyboardIndicator } from "./components/CurrentKeyboardIndicator.tsx";
 import { LocaleSwitcher } from "./components/LocaleSwitcher.tsx";
 import { ProfileScreen } from "./components/ProfileScreen.tsx";
 import { UnfinishedGalleryIndicator } from "./components/UnfinishedGalleryIndicator.tsx";
@@ -313,8 +315,11 @@ function NavBar({
         boxSizing: "border-box",
       }}
     >
-      {/* Left group — tab links */}
+      {/* Left group — current-keyboard indicator (first; same welcome gate
+          as AccountControl/UnfinishedGalleryIndicator — nothing to name
+          before a keyboard exists) + tab links. */}
       <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1 }}>
+        {active !== "welcome" && <CurrentKeyboardIndicator />}
         {NAV_ITEMS.map(({ id, label }) => {
           const isActive = id === active;
           const isBlocked = id === "output" && outputBlocked;
@@ -785,6 +790,19 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // the restored base id, which makes doCommit's own guard early-return, and
   // install the real-project autosave here directly. A genuine base switch
   // later is unaffected — a DIFFERENT id still passes the guard (F1).
+  //
+  // Duplicate-"My keyboards"-row defect (StudioShell.resumeRename.test.tsx /
+  // draftPersistence.resumeRename.test.ts): a résumé or a plain reload can
+  // land here with a working copy whose IDENTITY has already changed since
+  // the record on disk was first filed (an author who renamed the project
+  // mid-session, before the NEXT autosave install) — `restoredProjectKey`
+  // below is then the RENAMED key, not the key the record is still filed
+  // under. This is NOT handled by re-deriving more carefully here: it is
+  // handled once, generically, inside `installDraftAutosave` itself (see its
+  // doc comment) — every install compares the project this module already
+  // considered active against the key it's about to install under, and
+  // migrates the stale filing when they differ. This effect does not need
+  // its own copy of that check.
   // ---------------------------------------------------------------------------
   useEffect(() => {
     if (autosaveTeardownRef.current !== null) return;
@@ -813,6 +831,17 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
    * pending subscription away from `DRAFT_PERSISTENCE_PENDING_KEY` for that
    * path without this). No-ops when no real project key is derivable yet
    * (nothing to promote to).
+   *
+   * The explicit pending-cleanup below is now redundant with (but harmless
+   * alongside) `installDraftAutosave`'s own generic key-change migration —
+   * see that function's doc comment. `installDraftAutosave(projectKey)` on
+   * the line above already deletes whatever this module previously
+   * considered the active project's record (the pending slot, here) the
+   * moment `projectKey` differs from it, for the SAME reason doCommit's old
+   * rebase-only migration was generalized rather than duplicated. Left in
+   * place rather than deleted: it makes this function's OWN contract
+   * ("pending is promoted, not orphaned") legible without requiring a reader
+   * to trace into a different module to see why it holds.
    */
   const promotePendingAutosave = useCallback(() => {
     const projectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
@@ -985,24 +1014,33 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       if (instantiatedForBaseIdRef.current === base.id) return;
       instantiatedForBaseIdRef.current = base.id;
 
-      // REBASE draft migration (F1's last seam). A non-null key here means the
-      // working copy is STILL INSTANTIATED under another project key at the
-      // moment of a new commit — which only the rebase path produces: start-over
-      // resets the stores before the next pick, a résumé pre-seeds
-      // `instantiatedForBaseIdRef` so doCommit never fires, and a fresh boot has
-      // nothing instantiated. On that path the author has already accepted
-      // "Switching base keyboards will discard your current edits" (or had
-      // none to discard), so the record under the OLD key is precisely the
-      // discarded state — leaving it behind strands a phantom card in "My
-      // keyboards" for a base the author rejected. This is a MIGRATION of the
-      // one project's draft key, not a clear-on-switch: spec 047's SC-001
-      // ("start keyboard B, keyboard A survives") concerns two projects, and
-      // every two-project path leaves this key null. Cleared AFTER the
-      // instantiation + promotion below succeed, so a failed commit never
-      // deletes the only copy of the author's work.
-      const rebasedFromProjectKey = deriveProjectKeyFromWorkingCopy(
-        useWorkingCopyStore.getState(),
-      );
+      // REBASE draft migration (F1's last seam): a genuine base switch mid-
+      // session leaves the working copy STILL INSTANTIATED under another
+      // project key at the moment of this new commit (start-over resets the
+      // stores before the next pick, a résumé pre-seeds
+      // `instantiatedForBaseIdRef` so doCommit never fires, and a fresh boot
+      // has nothing instantiated — so this really is rebase-specific). On
+      // that path the author has already accepted "Switching base keyboards
+      // will discard your current edits", so the record under the OLD key is
+      // precisely the discarded state — leaving it behind strands a phantom
+      // card in "My keyboards" for a base the author rejected.
+      //
+      // This USED TO be a bespoke inline capture-then-compare block here
+      // (read the pre-commit key, commit, read the post-commit key, clear the
+      // old one if they differ) — the ONE place such a check existed, which
+      // is exactly the shape of the duplicate-"My keyboards"-row defect this
+      // module's regression tests pin (StudioShell.resumeRename.test.tsx /
+      // draftPersistence.resumeRename.test.ts): a résumé or reload discovers
+      // the SAME "this project's key changed under me" situation, just via a
+      // different route, and had no equivalent cleanup. Rather than add a
+      // second bespoke copy there, `installDraftAutosave` (draftPersistence.ts)
+      // now performs this exact check generically on EVERY install — it
+      // compares the project this module already considered active against
+      // the key about to be installed, and migrates when they differ. The
+      // `promotePendingAutosave()` call below already calls
+      // `installDraftAutosave` with the post-commit key, so the rebase
+      // migration happens as a side effect of that call; nothing further is
+      // needed here.
 
       // Spec 034's VR-5 used to call `replaceActiveDraftIfDifferentProject`
       // here: picking a new base DELETED the previously active project's
@@ -1056,21 +1094,14 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // F6 fix: promote pending -> real (see promotePendingAutosave's doc
       // comment). Replaces the old inline "teardown + installDraftAutosave"
       // pair with the shared helper so `handleResumeDraft` (below) can reuse
-      // the exact same promotion logic for its own résumé path.
+      // the exact same promotion logic for its own résumé path. Also
+      // completes the REBASE draft migration described above: this call
+      // installs autosave under the post-commit key, and
+      // `installDraftAutosave` itself deletes the pre-commit key's record
+      // when the two differ — see its doc comment in draftPersistence.ts.
+      // Same-key commits (P1 repeat settle never reaches here; F2 refresh
+      // re-commit derives the same key) are no-ops by that same-key check.
       promotePendingAutosave();
-
-      // Complete the rebase migration (see rebasedFromProjectKey above): the
-      // new key's record + index row exist as of promotePendingAutosave's
-      // synchronous install-time save, so removing the old key's record and
-      // row now is a rename, never a gap. Same-key commits (P1 repeat settle
-      // never reaches here; F2 refresh re-commit derives the same key) are
-      // no-ops by the inequality guard.
-      const projectKeyAfterCommit = deriveProjectKeyFromWorkingCopy(
-        useWorkingCopyStore.getState(),
-      );
-      if (rebasedFromProjectKey !== null && rebasedFromProjectKey !== projectKeyAfterCommit) {
-        clearPersistenceDraft(rebasedFromProjectKey);
-      }
     },
     // Same escape hatch as the pre-preview-before-commit onInstantiate: all
     // reads are via getState()/reducerDepsRef.current (stable refs), not
@@ -1590,6 +1621,18 @@ export function StudioShell() {
 
   const selectedBaseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
 
+  // P0 fix (silent autosave loss after an in-place keyboard switch): keys
+  // `SurveyView` below so a genuine project switch via the shared
+  // `switchActiveProject()` helper (top-bar `CurrentKeyboardIndicator`,
+  // `MyKeyboardsList`) forces a real remount — teardown-then-reinstall of the
+  // durable-draft autosave subscription — even when the switch happens while
+  // already on `#survey` (no `hashchange`, so the route-driven render alone
+  // would never remount it). See stores/projectSwitchStore.ts's header for
+  // the full mechanism and why this generation counter, specifically, does
+  // NOT bump on a mid-session identity/keyboardId rename (Phase A's custom
+  // keyboard id field) — only on an actual switch to a different project.
+  const projectSwitchGeneration = useProjectSwitchStore((s) => s.generation);
+
   // ---------------------------------------------------------------------------
   // Completeness report — T042/US3.
   // Computed here (where the store is reachable) and passed down to DashboardView
@@ -1782,7 +1825,9 @@ export function StudioShell() {
       content = <WelcomeScreen />;
       break;
     case "survey":
-      content = <SurveyView baseKeyboard={selectedBaseKeyboard} />;
+      content = (
+        <SurveyView key={projectSwitchGeneration} baseKeyboard={selectedBaseKeyboard} />
+      );
       break;
     case "preview":
       // The route TOKEN stays `preview` while the tab is labelled "Compare"

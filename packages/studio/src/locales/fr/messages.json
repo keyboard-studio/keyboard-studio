@@ -999,6 +999,8 @@
   "metadata.tryTyping.heading": "Essayez de taper",
   "nav.ariaLabel": "Studio navigation",
   "nav.compare": "Compare",
+  "nav.currentKeyboard.label": "Clavier",
+  "nav.currentKeyboard.manageAll": "Gérer tous les claviers…",
   "nav.decisionTrail": "Décisions",
   "nav.flowMap": "Flow Map",
   "nav.language": "Langue",
