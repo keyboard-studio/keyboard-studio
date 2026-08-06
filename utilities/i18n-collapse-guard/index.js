@@ -359,6 +359,17 @@ function checkBaselineRegression({ baseline, target, locale, catalog, baselineLa
  * @param {object} currentEn       the English catalog now
  * @returns {string[]} keys that were a real, distinct translation before and
  *   now equal the current English value
+ *
+ * KNOWN BLIND SPOT (accepted, same spirit as the trade-off above): the
+ * English-moved exclusion is all-or-nothing per key. If a key's English text
+ * changes for ANY reason in the same window a genuine reversion also hits
+ * that exact key, this function skips it entirely -- the moved-English check
+ * short-circuits before the target-vs-English comparison ever runs. This
+ * narrows false positives at the cost of a rare false negative, which fits
+ * this module's stated preference throughout; it is not further narrowed
+ * (e.g. by also checking whether currentTarget[key] equals the OLD English)
+ * because that would reintroduce a different false-positive shape for no
+ * proven benefit -- revisit only if this coincidence is ever observed for real.
  */
 function measureKeyReversions(baselineTarget, currentTarget, baselineEn, currentEn) {
   const reverted = [];

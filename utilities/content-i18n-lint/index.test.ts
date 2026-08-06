@@ -13,6 +13,7 @@ import {
   measureRegression,
   checkKeyReversions,
   measureKeyReversions,
+  KEY_REVERSION_LIST_CAP,
 } from "../i18n-collapse-guard/index.js";
 
 const dirs: string[] = [];
@@ -763,6 +764,21 @@ describe("i18n-collapse-guard per-key English-reversion guard", () => {
     expect(measureKeyReversions(baselineTarget, currentTarget, en, en)).toEqual(["greet"]);
   });
 
+  it("documents the accepted blind spot: a coincidental English edit on the SAME key masks a real reversion", () => {
+    // Known, accepted limitation (see the function's own doc comment): the
+    // English-moved exclusion is all-or-nothing per key, so a genuine
+    // reversion is missed if English happens to change on that exact key in
+    // the same window. This test pins that behavior down deliberately, so a
+    // future change to the exclusion logic doesn't silently alter it either
+    // way without a human noticing.
+    const baselineEn = { greet: "Hi there" };
+    const currentEn = { greet: "Hi there, friend" }; // English moved on this key
+    const baselineTarget = { greet: "Salut" }; // a real prior translation
+    const currentTarget = { greet: "Hi there, friend" }; // ALSO reverted, coincidentally
+
+    expect(measureKeyReversions(baselineTarget, currentTarget, baselineEn, currentEn)).toEqual([]);
+  });
+
   // ---------------------------------------------------------------------
   // A huge reverted-key list is the signature of a full collapse (the OTHER
   // guard's shape), not this one's target case of a handful of keys. The
@@ -797,6 +813,33 @@ describe("i18n-collapse-guard per-key English-reversion guard", () => {
     expect(result.problem).toContain("k19"); // last shown
     expect(result.problem).not.toContain("k20"); // first omitted
     expect(result.problem).not.toContain("k24"); // last overall, omitted
+  });
+
+  it("does not say 'and N more' when the reverted count is exactly the cap", () => {
+    // The off-by-one this guards against: reverted.length > shown.length must
+    // be false when they're equal, not just when reverted.length is smaller.
+    const en: Record<string, string> = {};
+    const baselineTarget: Record<string, string> = {};
+    const currentTarget: Record<string, string> = {};
+    for (let i = 0; i < KEY_REVERSION_LIST_CAP; i++) {
+      en[`k${i}`] = `English ${i}`;
+      baselineTarget[`k${i}`] = `Francais ${i}`;
+      currentTarget[`k${i}`] = en[`k${i}`];
+    }
+
+    const result = checkKeyReversions({
+      baselineTarget,
+      currentTarget,
+      baselineEn: en,
+      currentEn: en,
+      locale: "fr",
+      catalog: "messages.json",
+      baselineLabel: "origin/main",
+    });
+
+    expect(result.problem).toContain(`${KEY_REVERSION_LIST_CAP} key(s)`);
+    expect(result.problem).not.toContain("more");
+    expect(result.problem).toContain(`k${KEY_REVERSION_LIST_CAP - 1}`); // the last one is still named
   });
 });
 
