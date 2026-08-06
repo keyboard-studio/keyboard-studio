@@ -318,6 +318,46 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-06T02:46:53.301Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:49:35.200Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:49:35.508Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:49:35.837Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:49:36.113Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T038",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:49:36.376Z"
     }
   ],
   "telemetryInstanceId": "4d8149dc-5ee9-43f5-9dac-81307541deb6",
@@ -367,6 +407,11 @@
       "decision": "CrashRecoveryScreen carries no reload button",
       "why": "FR-122 pins exactly six crash.* message ids and FR-126 forbids repurposing an existing one; a reload control has no id, and FR-072 requires only that controls which exist are real keyboard-operable elements",
       "rejected": "Reusing crash.report.retry.notice as the reload label"
+    },
+    {
+      "decision": "The reopen cooldown is keyed on the presence of the regression label, not on updated_at alone",
+      "why": "FR-095 (first hit after a close always reopens) and FR-095a (a repeat inside the cooldown is suppressed) contradict each other if only updated_at is read, because a maintainer closing an issue sets updated_at to now and would put the very next recurrence inside the cooldown. The regression label is the stateless record of we already reopened this, so it separates the signal from the churn.",
+      "rejected": "Reading updated_at alone, which drops the first regression report after every close"
     }
   ],
   "step_summaries": {
@@ -900,6 +945,9 @@
       "tasks": [
         "T036",
         "T034"
+      ],
+      "tests": [
+        "utilities/oauth-backend/src/crash-report-dedupe.test.ts::makes NO state-change call at all on an open issue"
       ]
     },
     "FR-095": {
@@ -914,6 +962,9 @@
       "tasks": [
         "T037",
         "T034"
+      ],
+      "tests": [
+        "utilities/oauth-backend/src/crash-report-dedupe.test.ts::closed match"
       ]
     },
     "FR-096": {
@@ -1122,7 +1173,7 @@
       ]
     }
   },
-  "currentTask": "T033",
+  "currentTask": "T038",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1359,6 +1410,41 @@
       "files": [
         "packages/studio/e2e/crash-recovery-a11y.spec.ts",
         "packages/studio/src/lib/e2eHook.ts"
+      ]
+    },
+    "T034": {
+      "status": "DONE",
+      "did": "Fixture-driven dedupe tests asserting the call log: repeat->comment, closed->reopen+regression regardless of comment cap, first-hit-after-close always reopens, repeat reopen suppressed non-fatally, open match makes no PATCH, lookup failure creates anyway, 100 repeats create zero extra issues",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-dedupe.test.ts"
+      ]
+    },
+    "T035": {
+      "status": "DONE",
+      "did": "Implemented dedupe lookup by label with the call-site comment on why GET /search/issues must never be used; fails open to creation",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-pipeline.ts"
+      ]
+    },
+    "T036": {
+      "status": "DONE",
+      "did": "Open-match branch: comment capped statelessly from the issue's own comments count and updated_at, still 200 action=commented when skipped, and no state-change call at all",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-pipeline.ts"
+      ]
+    },
+    "T037": {
+      "status": "DONE",
+      "did": "Closed-match branch: reopen + regression + comment, with the reopen cooldown keyed on the regression label so the first hit after a maintainer close always reopens",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-pipeline.ts"
+      ]
+    },
+    "T038": {
+      "status": "DONE",
+      "did": "GitHub 429 surfaced as 429 rate_limited with Retry-After from the header, defaulting to 60 when absent or non-numeric",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-pipeline.ts"
       ]
     }
   },

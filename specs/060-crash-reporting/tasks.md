@@ -144,7 +144,7 @@ comment.
 
 ### Tests for User Story 2
 
-- [ ] **T034** [US2] Fixture-driven handler tests: repeat → comment, closed match outside cooldown → reopen + `regression` regardless of comment-cap state, closed match **inside** `CRASH_REPORT_REOPEN_COOLDOWN_MS` → suppressed with the same non-fatal shape a capped comment returns, an **open** match → never a reopen/label call, dedupe-lookup failure → creates anyway, and 100 repeats → zero extra issues (FR-094, FR-095a, FR-096, SC-002, SC-017) · `utilities/oauth-backend/src/crash-report-pipeline.test.ts`
+- [x] **T034** [US2] Fixture-driven handler tests: repeat → comment, closed match outside cooldown → reopen + `regression` regardless of comment-cap state, closed match **inside** `CRASH_REPORT_REOPEN_COOLDOWN_MS` → suppressed with the same non-fatal shape a capped comment returns, an **open** match → never a reopen/label call, dedupe-lookup failure → creates anyway, and 100 repeats → zero extra issues (FR-094, FR-095a, FR-096, SC-002, SC-017) · `utilities/oauth-backend/src/crash-report-pipeline.test.ts`
 
 ### Implementation for User Story 2
 
@@ -152,18 +152,18 @@ comment.
 
 **Wave 1 — the lookup (everything else branches off it):**
 
-- [ ] **T035** [US2] Implement dedupe lookup via `GET /repos/{owner}/{repo}/issues?labels=crash/fp-<hash12>&state=all&per_page=5`. Add the required call-site comment explaining why `GET /search/issues` MUST NOT be used — indexing lag of seconds to minutes, 30 req/min shared across the whole installation, versus 5,000/hr on ordinary REST. Fail **open** to creation on lookup error (FR-090, FR-091, FR-096) · `utilities/oauth-backend/src/crash-report-pipeline.ts`
+- [x] **T035** [US2] Implement dedupe lookup via `GET /repos/{owner}/{repo}/issues?labels=crash/fp-<hash12>&state=all&per_page=5`. Add the required call-site comment explaining why `GET /search/issues` MUST NOT be used — indexing lag of seconds to minutes, 30 req/min shared across the whole installation, versus 5,000/hr on ordinary REST. Fail **open** to creation on lookup error (FR-090, FR-091, FR-096) · `utilities/oauth-backend/src/crash-report-pipeline.ts`
 
 **⟶ Wait for T035, then:**
 
 **Wave 2 — the two match branches (distinct code paths, buildable in either order):**
 
-- [ ] **T036** [P] [US2] Open-match branch: add a comment, capped by `CRASH_REPORT_COMMENT_CAP` and `CRASH_REPORT_COMMENT_COOLDOWN_MS` derived statelessly from the matched issue's own `comments` count and `updated_at`. A skipped comment still returns `200 { …, action: "commented" }`. Make **no** state-change call at all — an open issue has no state left to change (FR-094, FR-102, FR-104) · `utilities/oauth-backend/src/crash-report-pipeline.ts`
-- [ ] **T037** [P] [US2] Closed-match branch: reopen + add `regression` + comment, bounded by `CRASH_REPORT_REOPEN_COOLDOWN_MS` read off the same `state`/`updated_at` signals. **The first hit after a close always reopens** — the cooldown bounds churn, never the signal (FR-095, FR-095a, SC-017) · `utilities/oauth-backend/src/crash-report-pipeline.ts`
+- [x] **T036** [P] [US2] Open-match branch: add a comment, capped by `CRASH_REPORT_COMMENT_CAP` and `CRASH_REPORT_COMMENT_COOLDOWN_MS` derived statelessly from the matched issue's own `comments` count and `updated_at`. A skipped comment still returns `200 { …, action: "commented" }`. Make **no** state-change call at all — an open issue has no state left to change (FR-094, FR-102, FR-104) · `utilities/oauth-backend/src/crash-report-pipeline.ts`
+- [x] **T037** [P] [US2] Closed-match branch: reopen + add `regression` + comment, bounded by `CRASH_REPORT_REOPEN_COOLDOWN_MS` read off the same `state`/`updated_at` signals. **The first hit after a close always reopens** — the cooldown bounds churn, never the signal (FR-095, FR-095a, SC-017) · `utilities/oauth-backend/src/crash-report-pipeline.ts`
 
 **⟶ Wait for Wave 2, then:**
 
-- [ ] **T038** [US2] Honour GitHub `429` exactly as `github-pipeline.ts` does: surface as `429 rate_limited` with `Retry-After` from the response header, defaulting to 60 when absent or non-numeric (FR-098) · `utilities/oauth-backend/src/crash-report-pipeline.ts`
+- [x] **T038** [US2] Honour GitHub `429` exactly as `github-pipeline.ts` does: surface as `429 rate_limited` with `Retry-After` from the response header, defaulting to 60 when absent or non-numeric (FR-098) · `utilities/oauth-backend/src/crash-report-pipeline.ts`
 
 **Checkpoint**: US1 and US2 both work independently. The tracker holds one issue per bug.
 

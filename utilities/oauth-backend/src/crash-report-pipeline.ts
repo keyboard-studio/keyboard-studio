@@ -726,6 +726,130 @@ export async function checkGlobalCreateCap(
   };
 }
 
+/** Label added on reopen, so a regression is distinguishable at a glance. */
+export const REGRESSION_LABEL = "regression";
+
+/**
+ * Look up an existing issue by the fingerprint label.
+ *
+ * Returns `null` both when there is genuinely no match and when the lookup
+ * itself failed — the caller treats the two identically and creates (FR-096).
+ * Collapsing them is deliberate: the only alternative is surfacing a lookup
+ * failure as an error, which drops the report entirely.
+ */
+export async function findExistingIssue(
+  gh: GitHubCalls,
+  label: string,
+): Promise<GitHubIssue | null> {
+  let res: CrashReportFetchResponse;
+  try {
+    res = await gh.listByLabel(label);
+  } catch {
+    return null;
+  }
+  if (!res.ok) return null;
+
+  try {
+    const issues = (await res.json()) as GitHubIssue[];
+    if (!Array.isArray(issues) || issues.length === 0) return null;
+    return issues[0] ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Has this issue had a comment recently enough, or often enough, to skip? */
+function commentIsCapped(issue: GitHubIssue, now: number): boolean {
+  if (issue.comments >= CRASH_REPORT_COMMENT_CAP) return true;
+  const updated = Date.parse(issue.updated_at);
+  if (!Number.isFinite(updated)) return false;
+  return now - updated < CRASH_REPORT_COMMENT_COOLDOWN_MS;
+}
+
+/**
+ * Handle a fingerprint that already has an issue.
+ *
+ * Every decision here is derived from the matched issue's OWN metadata —
+ * `state`, `comments`, `updated_at`, and its labels. No KV, no Redis, no
+ * Postgres (FR-105): the tracker is the state store, which is what makes this
+ * correct across a fleet of independently cold-started serverless invocations.
+ */
+async function handleExistingIssue(
+  gh: GitHubCalls,
+  issue: GitHubIssue,
+  body: CrashReportBody,
+  kind: CrashKind,
+  now: number,
+): Promise<CrashReportHandlerResult> {
+  const found = {
+    issueUrl: issue.html_url,
+    issueNumber: issue.number,
+  };
+
+  if (issue.state === "open") {
+    // NO STATE-CHANGE CALL IS MADE AT ALL (FR-094). An open issue has no state
+    // left to change, and a PATCH that sets `state: "open"` on an already-open
+    // issue is a write that bumps `updated_at` — corrupting the very signal the
+    // comment cooldown below reads.
+    if (commentIsCapped(issue, now)) {
+      // Still a 200 with action "commented" (FR-104). The report was received
+      // and correctly attributed; the comment was merely redundant. Surfacing
+      // this as an error would make the client treat successful flood control
+      // as a failure.
+      return { ok: true, data: { ...found, action: "commented" } };
+    }
+
+    const commented = await gh.addComment(
+      issue.number,
+      buildRecurrenceComment(body, kind),
+    );
+    if (!commented.ok) return mapNonOk(commented);
+    return { ok: true, data: { ...found, action: "commented" } };
+  }
+
+  // --- Closed match ---------------------------------------------------------
+  //
+  // Two rules that look contradictory until you see which signal each reads:
+  //
+  //   "The first hit after a close ALWAYS reopens"  (FR-095, the signal)
+  //   "A repeat within the cooldown is suppressed"  (FR-095a, the churn bound)
+  //
+  // They are reconciled by the `regression` label, which is itself the
+  // stateless record of "we have already reopened this one". An issue closed by
+  // a maintainer does not carry it, so the first recurrence reopens no matter
+  // how recent the close — the cooldown never eats the signal. An issue that
+  // already carries it was reopened by this pipeline, and a second reopen
+  // inside the window is churn, so it is suppressed.
+  //
+  // Reading `updated_at` alone would break the first rule: a maintainer who
+  // closes an issue sets `updated_at` to now, so a recurrence one minute later
+  // would fall "inside the cooldown" and be dropped — silently discarding the
+  // single most valuable report the tracker can receive.
+  const alreadyReopened = labelNames(issue).includes(REGRESSION_LABEL);
+  const updated = Date.parse(issue.updated_at);
+  const withinCooldown =
+    Number.isFinite(updated) && now - updated < CRASH_REPORT_REOPEN_COOLDOWN_MS;
+
+  if (alreadyReopened && withinCooldown) {
+    // Suppressed — the same non-fatal shape a capped comment returns (P0-A).
+    return { ok: true, data: { ...found, action: "commented" } };
+  }
+
+  const labels = Array.from(new Set([...labelNames(issue), REGRESSION_LABEL]));
+  const reopened = await gh.patchIssue(issue.number, { state: "open", labels });
+  if (!reopened.ok) return mapNonOk(reopened);
+
+  // The reopen comment is NOT comment-capped (FR-095a): a reopen is a distinct,
+  // rare event, and the cap exists to bound chatter on a busy open issue.
+  const commented = await gh.addComment(
+    issue.number,
+    buildRecurrenceComment(body, kind),
+  );
+  if (!commented.ok) return mapNonOk(commented);
+
+  return { ok: true, data: { ...found, action: "reopened" } };
+}
+
 /**
  * Run the crash-report pipeline for a validated body.
  *
@@ -760,6 +884,38 @@ export async function submitCrashReport(
   const gh = createGitHubCalls(token, config.fetch);
 
   try {
+    // -----------------------------------------------------------------------
+    // Dedupe lookup (FR-090, FR-091)
+    //
+    // `GET /search/issues` MUST NOT BE USED HERE, EVER, and the reason is not
+    // stylistic:
+    //
+    //   1. INDEXING LAG. The search index trails writes by seconds to minutes.
+    //      A crash that recurs 20 seconds after the first occurrence — which is
+    //      the normal case, not the edge case, because the author retries what
+    //      just broke — would not find the issue that was created for it, and
+    //      would create a second one. Dedupe that fails exactly when reports
+    //      cluster is worse than no dedupe: it produces bursts of duplicates
+    //      under precisely the load it exists to control.
+    //
+    //   2. RATE LIMIT. Search allows 30 requests per minute, shared across the
+    //      WHOLE installation. Ordinary REST gives 5,000 per hour. At one
+    //      lookup per report, search caps the route at 30 reports/minute
+    //      globally — a limit a single bad deploy would blow through.
+    //
+    // The label endpoint below is read-after-write consistent and draws on the
+    // ordinary budget. That is why the fingerprint is a LABEL and not a body
+    // trailer: the trailer (FR-092) exists for a human auditing an issue, and
+    // finding duplicates by it would mean fetching every issue in the repo.
+    //
+    // FAILS OPEN (FR-096): a lookup error falls through to creation. A
+    // duplicate issue is a nuisance; a dropped crash report is a lost defect.
+    const match = await findExistingIssue(gh, label);
+
+    if (match !== null) {
+      return await handleExistingIssue(gh, match, body, kind, now);
+    }
+
     const capped = await checkGlobalCreateCap(gh, now);
     if (capped !== null) return capped;
 
