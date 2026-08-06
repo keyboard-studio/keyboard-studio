@@ -1,5 +1,6 @@
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { pushBreadcrumb } from "../crash/breadcrumbs.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import type { BaseKeyboard, VirtualFS, KeyboardIR, RemovalCapability, TouchLayoutIR, KpsFontEntry, KpsStylesheetEntry } from "@keyboard-studio/contracts";
 import type { CompileResult } from "@keyboard-studio/contracts";
@@ -42,6 +43,57 @@ interface EngineModule {
   stripDanglingAssetStores?: (kmn: string, fs: VirtualFS) => { kmn: string; stripped: string[] };
 }
 
+/**
+ * The last `import("@keyboard-studio/engine")` rejection, preserved verbatim
+ * (spec 060, FR-005a, P0-3).
+ *
+ * WHY THIS EXISTS. `loadEngine()` collapses every failure to `null`, and the
+ * caller then throws a friendly synthetic string
+ * ("Engine failed to load — check browser console for WASM errors."). That
+ * string is good UX and completely useless to the stale-chunk classifier, which
+ * can only match on the text it is given: a post-deploy chunk 404 says
+ * "Failed to fetch dynamically imported module", the synthetic string does not,
+ * so the carve-out never fires and the failure goes to ordinary filing —
+ * exactly the deploy flood User Story 3 exists to prevent.
+ *
+ * So the original rejection is kept here. The UI keeps showing the friendly
+ * string; the classifier gets the truth.
+ */
+let lastEngineLoadFailure: unknown = null;
+
+/**
+ * Read (and clear) the preserved rejection.
+ *
+ * Cleared on read so a stale failure from an earlier run cannot misclassify a
+ * later, unrelated one.
+ */
+export function takeEngineLoadFailure(): unknown {
+  const failure = lastEngineLoadFailure;
+  lastEngineLoadFailure = null;
+  return failure;
+}
+
+/**
+ * The original rejection's message text, flattened through `cause` chains.
+ *
+ * Bundlers commonly wrap the underlying network error, so the matchable text
+ * can be one or two `cause` levels down from the rejection itself.
+ */
+export function engineLoadFailureMessage(failure: unknown): string {
+  const parts: string[] = [];
+  let current: unknown = failure;
+  for (let depth = 0; depth < 4 && current !== null && current !== undefined; depth += 1) {
+    if (current instanceof Error) {
+      parts.push(current.message);
+      current = current.cause;
+      continue;
+    }
+    if (typeof current === "string") parts.push(current);
+    break;
+  }
+  return parts.join(" | ");
+}
+
 async function loadEngine(): Promise<EngineModule | null> {
   try {
     const mod = await import(
@@ -52,10 +104,14 @@ async function loadEngine(): Promise<EngineModule | null> {
       typeof mod.fetchKeyboardSourceToVfs === "function" &&
       typeof mod.init === "function"
     ) {
+      lastEngineLoadFailure = null;
       return mod as EngineModule;
     }
     return null;
-  } catch {
+  } catch (err: unknown) {
+    // Preserved, not swallowed (FR-005a). The return value stays `null` so
+    // every existing caller behaves exactly as before.
+    lastEngineLoadFailure = err;
     return null;
   }
 }
@@ -174,6 +230,20 @@ export type Stage =
   | { kind: "vfs-loading" }
   | { kind: "compiling"; isWarmCompile: boolean }
   | { kind: "ready"; compileResult: CompileResult; jsBlobUrl: string; vfs: VirtualFS; scaffoldWarnings: string[]; runtimeWarnings?: string[]; keyboardId: string; fontFaceUrl?: string; fontFaceFamily?: string; keyboardCssUrls?: string[] }
+  /**
+   * NOT A CRASH-CAPTURE SURFACE (spec 060, FR-005).
+   *
+   * This stage MUST NOT auto-file a crash report on every occurrence. Fetch and
+   * compile errors here are frequently transient — a flaky proxy, an offline
+   * moment, a keyboard whose source has a genuine syntax error the author is
+   * mid-way through fixing — and they already have a modelled Retry UX. Wiring
+   * the reporter in here would file an issue every time someone typed an
+   * unbalanced brace, drowning the tracker in non-defects.
+   *
+   * The one thing this stage DOES owe the reporter is the ORIGINAL rejection
+   * text from `loadEngine()`, so the stale-chunk classifier can see it (FR-005a).
+   * That is forwarding, not filing.
+   */
   | {
       kind: "error";
       step: "fetch" | "vfs" | "compile";
@@ -274,7 +344,23 @@ export function useKeyboardArtifact(
   vfsTransform?: VfsTransform | null,
   onInstantiate?: OnInstantiateCallback | null,
 ): KeyboardArtifactResult {
-  const [stage, setStage] = useState<Stage>({ kind: "idle" });
+  const [stage, setStageRaw] = useState<Stage>({ kind: "idle" });
+
+  /**
+   * Records a crash breadcrumb on every Stage transition (spec 060 FR-045).
+   *
+   * Wrapping the setter rather than instrumenting each of the ~10 call sites
+   * means a future stage cannot be added without its breadcrumb. Only the
+   * discriminant (and the error `step`) is recorded — structural facts, never
+   * the error message, which could carry author content (FR-047).
+   */
+  const setStage = useCallback((next: Stage) => {
+    pushBreadcrumb(
+      "stage",
+      next.kind === "error" ? `error:${next.step}` : next.kind,
+    );
+    setStageRaw(next);
+  }, []);
   const prevBlobUrl = useRef<string | null>(null);
   const prevFontBlobUrl = useRef<string | null>(null);
   // Current OSK font family, paired with prevFontBlobUrl. Persists across
@@ -532,8 +618,13 @@ export function useKeyboardArtifact(
       engineReadyPromise.current = (async () => {
         const mod = await loadEngine();
         if (mod === null) {
+          // The author sees the friendly string; the classifier must see the
+          // original text (FR-005a). Attaching it as `cause` carries it through
+          // without changing what the Stage: "error" UI renders.
+          const original = takeEngineLoadFailure();
           throw new Error(
             "Engine failed to load — check browser console for WASM errors.",
+            ...(original !== null ? [{ cause: original }] : []),
           );
         }
         engineRef.current = mod;

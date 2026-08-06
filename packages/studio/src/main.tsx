@@ -14,6 +14,25 @@ import { installE2eHook } from "./lib/e2eHook.ts";
 import { loadDraft, resolveActiveProjectKey } from "./lib/draftPersistence.ts";
 import { localeReady } from "./lib/i18n.ts";
 import { warmExemplarSource } from "./lib/services.ts";
+import { installConsoleBreadcrumbs, pushBreadcrumb } from "./crash/breadcrumbs.ts";
+import { installGlobalCrashHandlers } from "./crash/globalHandlers.ts";
+import { handleStaleChunkFailure } from "./crash/staleChunk.ts";
+import { handlePreMountCrash } from "./crash/preMount.ts";
+import { safeCollectCrashContext } from "./lib/crashCallerContext.ts";
+
+// Crash capture, installed FIRST and synchronously — before the locale await,
+// before any store touch, before React. Anything that throws during the rest of
+// this file is inside the window handlers' reach from here on (spec 060,
+// FR-002, FR-003). The console wrappers call the originals and additionally
+// push to the breadcrumb ring; they never replace console behaviour (FR-044).
+installConsoleBreadcrumbs();
+installGlobalCrashHandlers({
+  readContext: safeCollectCrashContext,
+  // A post-deploy chunk 404 reloads once and files nothing (FR-050). Without
+  // this, every tab still running the previous build files an identical,
+  // unactionable report within minutes of every deploy.
+  handleStaleChunk: (message) => handleStaleChunkFailure(message),
+});
 
 function requireRoot(): HTMLElement {
   const rootEl = document.getElementById("root");
@@ -112,9 +131,29 @@ async function mountCallbackScreen(provider: OAuthProvider): Promise<void> {
 // (which runs the code→token exchange and then redirects to the app root)
 // instead of the app — so the exchange is never an invisible blank page. On
 // every normal path we mount the app.
+// The top-level catch is active BEFORE createRoot(...).render(...) runs, which
+// is the whole point: everything from here to first paint — requireRoot(), the
+// `await localeReady`, the draft restore, the OAuth rehydrate — is code an
+// ErrorBoundary structurally cannot cover, because no boundary has mounted
+// (spec 060, FR-060). Without this, any throw in that window is a permanently
+// blank page and zero telemetry.
+//
+// `.catch` rather than try/catch: both mount functions are async, so a
+// synchronous try would only catch a throw before the first await.
+// Crash breadcrumbs for navigation (spec 060 FR-045). The studio is
+// hash-routed, so `hashchange` is the whole of its route history — and "which
+// screen were they on" is usually the first thing a maintainer wants from a
+// report. Registered here rather than in a component so it survives a render
+// crash.
+window.addEventListener("hashchange", () => {
+  pushBreadcrumb("route", window.location.hash || "#");
+});
+pushBreadcrumb("route", window.location.hash || "#");
+
 const oauthProvider = detectOAuthCallback();
 if (oauthProvider !== null) {
-  void mountCallbackScreen(oauthProvider);
+  pushBreadcrumb("oauth", `callback:${oauthProvider}`);
+  void mountCallbackScreen(oauthProvider).catch(handlePreMountCrash);
 } else {
-  void mountApp();
+  void mountApp().catch(handlePreMountCrash);
 }

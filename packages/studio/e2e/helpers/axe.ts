@@ -16,6 +16,22 @@ import type { Page } from "playwright/test";
 
 export interface AxeScanOptions {
   /**
+   * Restrict the scan to these selectors instead of the whole page.
+   *
+   * For surfaces that render as an OVERLAY over an arbitrary screen. A whole-page
+   * scan of one of those also scans whatever happened to be underneath, so a
+   * pre-existing violation on an unrelated screen fails a spec that does not own
+   * it — and the usual fix, an `exclude` per offending node, has to be rewritten
+   * every time that other screen changes.
+   *
+   * `include` is the stronger form where it applies: the scan still runs against
+   * the real document with the real page CSS, real fonts, and real cascade — it
+   * only narrows which nodes are EVALUATED. Prefer it to a list of exclusions
+   * when the spec's subject is a specific surface; prefer `exclude` when the
+   * subject is the whole screen and one node is a named, tracked carve-out.
+   */
+  include?: readonly (string | readonly string[])[];
+  /**
    * Selectors to exclude from the scan. Each call-site exclusion needs an
    * inline comment naming the criterion and reason (FR-003).
    *
@@ -39,6 +55,9 @@ export async function expectNoSeriousAxeViolations(
   options: AxeScanOptions = {},
 ): Promise<void> {
   let builder = new AxeBuilder({ page });
+  for (const selector of options.include ?? []) {
+    builder = builder.include(typeof selector === "string" ? selector : [...selector]);
+  }
   for (const selector of options.exclude ?? []) {
     builder = builder.exclude(typeof selector === "string" ? selector : [...selector]);
   }

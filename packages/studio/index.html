@@ -10,6 +10,44 @@
   </head>
   <body>
     <div id="root"></div>
+
+    <!--
+      Pre-mount crash fallback (spec 060, FR-061, FR-123).
+
+      Hidden until main.tsx's top-level catch reveals it. This is the ONLY
+      surface available when the app throws before createRoot(...).render(...)
+      — no React, no catalog, no component tree exists yet, so anything richer
+      would itself fail to render.
+
+      THE TEXT IS HARD-CODED ENGLISH ON PURPOSE (FR-123), the single documented
+      exception to the message-catalog rule. At this point no locale has
+      necessarily loaded: `localeReady` is exactly one of the awaits that can
+      throw here. Routing this string through the catalog would mean the
+      fallback for "the app failed to start" depends on the app having started.
+
+      Styles are inline for the same reason — the stylesheet is imported by
+      main.tsx, which is the module that just failed.
+    -->
+    <div
+      id="pre-mount-crash"
+      role="alert"
+      hidden
+      style="
+        max-width: 40rem;
+        margin: 4rem auto;
+        padding: 0 1.5rem;
+        font-family: system-ui, sans-serif;
+        line-height: 1.5;
+      "
+    >
+      <h1 style="font-size: 1.5rem">Keyboard Studio could not start</h1>
+      <p>
+        Something went wrong before the page finished loading. A report has been
+        sent so this can be fixed.
+      </p>
+      <p>Reloading the page will often resolve it.</p>
+    </div>
+
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

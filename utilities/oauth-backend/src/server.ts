@@ -6,6 +6,7 @@
  *   POST /oauth/refresh          — GitHub refresh_token → new access_token
  *   POST /oauth/google/exchange  — Google authorization_code → identity claims (only when GOOGLE_OAUTH_ENABLED=true)
  *   POST /submit/managed-pr      — Option B org-mediated fork+PR (no user token; 503 until org creds set)
+ *   POST /report/crash           — crash report → issue in keyboard-studio/crash-reports (503 until the crash App creds are set)
  *   GET  /oauth/health           — liveness probe (no auth)
  *
  * Environment variables (see README.md for full reference):
@@ -15,6 +16,18 @@
  *   GITHUB_APP_PRIVATE_KEY        optional — base64-encoded PEM private key for the GitHub App; never logged
  *   GITHUB_APP_INSTALLATION_ID    optional — installation ID of the GitHub App on the org
  *   GITHUB_ORG_LOGIN              optional — org login that owns the standing fork; must be set together with the three GITHUB_APP_* vars
+ *
+ *   CRASH_REPORT_APP_ID           optional — App ID of the SEPARATE crash-reporting GitHub App; POST /report/crash returns 503 until all three CRASH_REPORT_APP_* vars are set
+ *   CRASH_REPORT_APP_PRIVATE_KEY  optional — base64-encoded PEM private key for the crash-reporting App; never logged
+ *   CRASH_REPORT_APP_INSTALLATION_ID optional — installation ID of the crash-reporting App, scoped to keyboard-studio/crash-reports only
+ *
+ *   The CRASH_REPORT_APP_* trio is a DISTINCT credential set from the GITHUB_APP_*
+ *   trio above and MUST NOT fall back to it (spec 060 FR-085, Prerequisites #4).
+ *   The two Apps hold deliberately different permissions: GITHUB_APP_* carries
+ *   contents:write + pull_requests:write on keyboard-studio/keyboards, while the
+ *   crash App carries issues:write on keyboard-studio/crash-reports and nothing
+ *   else. Sharing a minter between them would hand whichever App loaded first to
+ *   both pipelines, granting the crash path write access to the keyboards repo.
  *   GOOGLE_OAUTH_ENABLED   set to "true" to enable the Google identity flow (default off)
  *   GOOGLE_CLIENT_ID       required only when GOOGLE_OAUTH_ENABLED=true
  *   GOOGLE_CLIENT_SECRET   required only when GOOGLE_OAUTH_ENABLED=true — never logged, never in responses
@@ -47,6 +60,20 @@ import {
   type GitHubPipelineFetchFn,
 } from "./github-pipeline.js";
 import { getInstallationToken } from "./installation-token.js";
+import {
+  CrashReportBodySchema,
+  CrashRetractBodySchema,
+} from "./crash-report-schemas.js";
+import {
+  submitCrashReport,
+  retractCrashReport,
+  type CrashReportPipelineConfig,
+} from "./crash-report-pipeline.js";
+import {
+  getCrashReportInstallationToken,
+  getCrashReportRetractionSecret,
+  isCrashReportAppConfigured,
+} from "./crash-report-installation-token.js";
 import {
   buildDraftConfig,
   getDraftContent,
@@ -227,6 +254,21 @@ export async function buildServer(opts: {
   getInstallationToken?: () => Promise<string>;
   orgLogin?: string;
   /**
+   * Provider callback returning a CRASH-APP installation token per request.
+   * Deliberately a separate option from `getInstallationToken`: passing one
+   * must never configure the other, or the crash route would inherit the
+   * managed-PR App's write access to keyboard-studio/keyboards (FR-085).
+   * When absent, the env-backed crash minter is used if all three
+   * CRASH_REPORT_APP_* vars are set; otherwise POST /report/crash returns 503.
+   */
+  getCrashReportInstallationToken?: () => Promise<string>;
+  /**
+   * Signing key for retraction capability tokens (FR-074a). Defaults to the
+   * `CRASH_REPORT_APP_PRIVATE_KEY`-derived key; injectable so a test can mint a
+   * token and retract with it without any env var set.
+   */
+  crashRetractionSecret?: string;
+  /**
    * Injected fetch implementation — defaults to globalThis.fetch.
    *
    * Must satisfy GitHubPipelineFetchFn (statusText + headers.get + text()) so
@@ -307,6 +349,43 @@ export async function buildServer(opts: {
   const managedPRConfig: ManagedPRPipelineConfig | undefined =
     opts.getInstallationToken && opts.orgLogin
       ? { getInstallationToken: opts.getInstallationToken, orgLogin: opts.orgLogin, fetch: pipelineFetch }
+      : undefined;
+
+  // Crash-report pipeline config, gated on its OWN credential set — the
+  // `crashAppConfigured` flag mirrors the `appConfigured` gate above and shares
+  // nothing with it (FR-085). An injected `getCrashReportInstallationToken`
+  // wins so tests can drive the route without env; otherwise the env-backed
+  // minter is used, and only when all three CRASH_REPORT_APP_* vars are set.
+  const crashTokenProvider =
+    opts.getCrashReportInstallationToken ??
+    (isCrashReportAppConfigured()
+      ? async (): Promise<string> => {
+          const t = await getCrashReportInstallationToken();
+          if (t === undefined) {
+            throw new Error("crash-report installation token unexpectedly undefined");
+          }
+          return t;
+        }
+      : undefined);
+
+  // Retraction-token key material (FR-074a). Env-derived in the ordinary case;
+  // `opts.crashRetractionSecret` lets a test drive the retract route with a
+  // fixed key and no env. A dev server standing up the crash routes with an
+  // injected token provider but no secret gets a deterministic placeholder —
+  // acceptable ONLY because it is local dev against a stub GitHub, and it still
+  // means a token minted by one dev-server run does not verify in the next.
+  const crashRetractionSecret =
+    opts.crashRetractionSecret ??
+    getCrashReportRetractionSecret() ??
+    `dev-only-unconfigured-${process.pid}`;
+
+  const crashReportConfig: CrashReportPipelineConfig | undefined =
+    crashTokenProvider !== undefined
+      ? {
+          getInstallationToken: crashTokenProvider,
+          fetch: pipelineFetch,
+          retractionSecret: crashRetractionSecret,
+        }
       : undefined;
 
   // -------------------------------------------------------------------------
@@ -412,6 +491,81 @@ export async function buildServer(opts: {
         error: result.error,
         ...(result.branchName !== undefined ? { branchName: result.branchName } : {}),
       });
+    }
+    return reply.status(200).send(result.data);
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /report/crash — crash report -> issue in keyboard-studio/crash-reports
+  //
+  // Local-dev parity with the deployed api/report/crash.ts adapter (FR-083):
+  // same route, same schema, same status vocabulary, so a studio running
+  // against `pnpm dev` exercises the real client path rather than a stub.
+  //
+  // No bodyLimit override: CrashReportBodySchema caps the payload at a few KiB,
+  // comfortably inside Fastify's 1 MiB default.
+  // -------------------------------------------------------------------------
+  app.post("/report/crash", async (req, reply) => {
+    if (crashReportConfig === undefined) {
+      // Crash App not provisioned — fail soft. Unsetting one CRASH_REPORT_APP_*
+      // var is also the documented instant kill-switch for this route.
+      return reply.status(503).send({ error: "reporting_not_configured" });
+    }
+
+    const parsed = CrashReportBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.status(400).send({
+        error: "invalid_request",
+        details: parsed.error.issues.map(staticZodDetail),
+      });
+    }
+
+    let result: Awaited<ReturnType<typeof submitCrashReport>>;
+    try {
+      result = await submitCrashReport(parsed.data, crashReportConfig);
+    } catch {
+      // Token-mint failure — 502, never naming which credential is at fault.
+      return reply.status(502).send({ error: "submission_unavailable" });
+    }
+
+    if (!result.ok) {
+      if (result.retryAfterSeconds !== undefined) {
+        reply.header("Retry-After", String(result.retryAfterSeconds));
+      }
+      return reply.status(result.status).send({ error: result.error });
+    }
+    return reply.status(200).send(result.data);
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /report/crash/retract — withdraw a report inside the undo window
+  // (spec 060 FR-074 - FR-077). Local-dev parity with api/report/crash-retract.ts.
+  // -------------------------------------------------------------------------
+  app.post("/report/crash/retract", async (req, reply) => {
+    if (crashReportConfig === undefined) {
+      return reply.status(503).send({ error: "reporting_not_configured" });
+    }
+
+    const parsed = CrashRetractBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.status(400).send({
+        error: "invalid_request",
+        details: parsed.error.issues.map(staticZodDetail),
+      });
+    }
+
+    let result: Awaited<ReturnType<typeof retractCrashReport>>;
+    try {
+      result = await retractCrashReport(parsed.data, crashReportConfig);
+    } catch {
+      return reply.status(502).send({ error: "submission_unavailable" });
+    }
+
+    if (!result.ok) {
+      if (result.retryAfterSeconds !== undefined) {
+        reply.header("Retry-After", String(result.retryAfterSeconds));
+      }
+      return reply.status(result.status).send({ error: result.error });
     }
     return reply.status(200).send(result.data);
   });
