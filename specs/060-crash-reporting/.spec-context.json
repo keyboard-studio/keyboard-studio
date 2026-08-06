@@ -150,6 +150,30 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-06T02:15:27.264Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:21:17.066Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:21:17.338Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:21:17.601Z"
     }
   ],
   "telemetryInstanceId": "4d8149dc-5ee9-43f5-9dac-81307541deb6",
@@ -189,6 +213,11 @@
       "decision": "The /report/crash rewrite is inserted above the terminal /(.*) catch-all in vercel.json",
       "why": "Vercel evaluates rewrites in order and the catch-all matches everything; a rewrite appended after it is dead config whose failure is silent -- the endpoint would return index.html with a 200 and the fire-and-forget POST would report success while filing nothing",
       "rejected": "Appending the rewrite, which is the obvious wrong instinct"
+    },
+    {
+      "decision": "Extended CrashReportBodySchema.context to the full FR-040 structural set (keyboardId, bcp47Tags, stepId, keyCount, exemplarCount, decisionTail, breadcrumbs) alongside browserUA/os",
+      "why": "contracts/crash-report-api.md declares only browserUA and os under context; zod strips unknown keys, so the FR-040 structural context the filed issue is required to carry would have been silently dropped, making FR-040/FR-046 unsatisfiable",
+      "rejected": "Following the contract table literally and passing structural context through a second top-level field"
     }
   ],
   "step_summaries": {
@@ -925,7 +954,7 @@
       ]
     }
   },
-  "currentTask": "T012",
+  "currentTask": "T015",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1011,6 +1040,33 @@
         "packages/studio/src/locales/en/messages.json",
         "packages/studio/src/locales/fr/messages.json"
       ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Allowlist payload builder with the FR-032a header comment; redaction at construction, no spread of any source object",
+      "files": [
+        "packages/studio/src/crash/redact.ts"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Fire-and-forget POST with timeout, sessionStorage per-fingerprint dedupe, and a module-scope subscribable for useSyncExternalStore",
+      "files": [
+        "packages/studio/src/crash/send.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Canonicalization core: exported flood-control constants, pure canonicalizeCrashInput, framesFromRawStack per FR-081f, SHA-256 hash12, and the scrub pass",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-pipeline.ts"
+      ]
     }
-  }
+  },
+  "concerns": [
+    {
+      "note": "contracts/crash-report-api.md request-body table under-specifies context against FR-040 and data-model section 3; the schema now carries the full set and documents the divergence inline, but the contract doc itself should be reconciled",
+      "step": "implement"
+    }
+  ]
 }

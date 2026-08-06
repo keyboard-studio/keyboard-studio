@@ -43,6 +43,54 @@ export const StackFrameSchema = z.object({
   column: z.number().int().nonnegative().optional(),
 });
 
+/** One decision-log entry, reduced to structural handles (data-model §3). */
+export const DecisionTailEntrySchema = z.object({
+  id: z.string().max(120),
+  choice: z.string().max(120).optional(),
+});
+
+/** One breadcrumb-ring entry (data-model §4). */
+export const BreadcrumbSchema = z.object({
+  at: z.string().max(40),
+  channel: z.enum([
+    "console.error",
+    "console.warn",
+    "route",
+    "step",
+    "stage",
+    "oauth",
+    "locale",
+  ]),
+  label: z.string().max(200),
+});
+
+/**
+ * Structural context (FR-040, data-model §3).
+ *
+ * The field list is EXHAUSTIVE, not illustrative (FR-041): no VirtualFS
+ * snapshot and no raw file content, ever. zod strips unknown keys, so this
+ * declaration is also the enforcement — a client that grew a tenth field would
+ * find it dropped here rather than filed.
+ *
+ * CONTRACT NOTE: contracts/crash-report-api.md's request-body table names only
+ * `browserUA` and `os` under `context`. That table under-specifies against
+ * FR-040 and data-model §3, which require the structural set to reach the filed
+ * issue — declaring only two fields would have zod silently strip the rest and
+ * make FR-040 unsatisfiable. The two fields the contract does pin keep their
+ * exact caps (300 / 100); the others follow the same cap discipline.
+ */
+export const CrashContextSchema = z.object({
+  keyboardId: z.string().max(80).optional(),
+  bcp47Tags: z.array(z.string().max(40)).max(10).optional(),
+  stepId: z.string().max(80).optional(),
+  keyCount: z.number().int().nonnegative().optional(),
+  exemplarCount: z.number().int().nonnegative().optional(),
+  decisionTail: z.array(DecisionTailEntrySchema).max(20).optional(),
+  breadcrumbs: z.array(BreadcrumbSchema).max(50).optional(),
+  browserUA: z.string().max(300).optional(),
+  os: z.string().max(100).optional(),
+});
+
 const CrashReportBodyShape = z.object({
   /**
    * OPTIONAL, and that is load-bearing (P0-B). The review-cycle-2 schema made
@@ -63,12 +111,7 @@ const CrashReportBodyShape = z.object({
   stack: z.string().max(8192).optional(),
   appVersion: z.string().max(40).optional(),
   occurredAt: z.string().datetime().optional(),
-  context: z
-    .object({
-      browserUA: z.string().max(300).optional(),
-      os: z.string().max(100).optional(),
-    })
-    .optional(),
+  context: CrashContextSchema.optional(),
 });
 
 /**
@@ -96,6 +139,7 @@ export const CrashReportBodySchema = CrashReportBodyShape.refine(
 export type CrashReportBody = z.infer<typeof CrashReportBodySchema>;
 export type CrashStackFrame = z.infer<typeof StackFrameSchema>;
 export type CrashKind = z.infer<typeof CrashKindSchema>;
+export type CrashContext = z.infer<typeof CrashContextSchema>;
 
 // ---------------------------------------------------------------------------
 // POST /report/crash — 200 response
