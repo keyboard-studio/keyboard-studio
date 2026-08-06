@@ -257,3 +257,63 @@ describe("deriveCarveNeededSet", () => {
     expect(basePlusMark.requiredPrimary.has("á")).toBe(false);
   });
 });
+
+// blockCandidateChars (#526 AC #3): the composed-grapheme view of
+// blockCandidates. Owned by the engine so no consumer re-derives NFC/NFD
+// composition for a blocked pair — it must track blockCandidates exactly and
+// honour the same outputForm every other tier does.
+describe("deriveCarveNeededSet — blockCandidateChars", () => {
+  const alphabet = makeConfirmedAlphabet({ bases: ["a", "e"], marks: [ACUTE] });
+  const blockedWorklist: PlacementWorklist = {
+    ownLetterUnits: ["a", "e", "á"],
+    markUnits: [],
+    blockedCombinations: [{ base: "e", mark: ACUTE }],
+  };
+
+  it("composes each blocked pair into the same concrete grapheme the other tiers use", () => {
+    const result = deriveCarveNeededSet({ alphabet, worklist: blockedWorklist });
+
+    expect(result.blockCandidateChars).toEqual(new Set(["é"]));
+    // NOT a needed character in either tier — the whole point of the signal.
+    expect(result.requiredPrimary.has("é")).toBe(false);
+    expect(result.optionalSecondary.has("é")).toBe(false);
+  });
+
+  it("honours outputForm: 'base-plus-mark' leaves the pair uncomposed, matching requiredPrimary's own treatment", () => {
+    const readyMade = deriveCarveNeededSet({ alphabet, worklist: blockedWorklist, outputForm: "ready-made" });
+    const basePlusMark = deriveCarveNeededSet({ alphabet, worklist: blockedWorklist, outputForm: "base-plus-mark" });
+
+    expect(readyMade.blockCandidateChars).toEqual(new Set(["é"]));
+    expect(basePlusMark.blockCandidateChars).toEqual(new Set(["e" + ACUTE]));
+  });
+
+  it("is empty on both fallback paths (absent and S0-skip worklist), so the consumer's union is a no-op", () => {
+    const absent = deriveCarveNeededSet({ alphabet, worklist: undefined });
+    const skipped = deriveCarveNeededSet({
+      alphabet,
+      worklist: { ownLetterUnits: [], markUnits: [], blockedCombinations: [] },
+    });
+
+    expect(absent.blockCandidateChars.size).toBe(0);
+    expect(skipped.blockCandidateChars.size).toBe(0);
+  });
+
+  it("no shielding is applied here: an ATTESTED combo that is also blocked appears in both requiredPrimary and blockCandidateChars, exactly as it does in blockCandidates", () => {
+    // Parity with blockCandidates (see the attested-stack test above) is the
+    // contract: the studio wiring layer's removal-safety guards are what let
+    // needed win, so filtering here would move that decision and silently
+    // change which surfaces see the candidate.
+    const attested = makeConfirmedAlphabet({
+      bases: ["e"],
+      marks: [ACUTE],
+      attestedStacks: [{ base: "e", marks: [ACUTE] }],
+    });
+    const result = deriveCarveNeededSet({
+      alphabet: attested,
+      worklist: { ownLetterUnits: ["e"], markUnits: [], blockedCombinations: [{ base: "e", mark: ACUTE }] },
+    });
+
+    expect(result.requiredPrimary.has("é")).toBe(true);
+    expect(result.blockCandidateChars).toEqual(new Set(["é"]));
+  });
+});

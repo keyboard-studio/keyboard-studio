@@ -17,7 +17,7 @@
 // of this set at its own call site; the question reads this set raw.
 
 import { useEffect, useMemo, useState } from "react";
-import { composeCombo, deriveCarveNeededSet, normalizationFormForOutputForm } from "@keyboard-studio/engine";
+import { deriveCarveNeededSet, normalizationFormForOutputForm } from "@keyboard-studio/engine";
 import type { CharNormalizationForm } from "@keyboard-studio/engine";
 import { nonAlphabetConfirmedInventory } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -112,17 +112,16 @@ export function useCarveNeededSet(): CarveNeededSetResult {
     [confirmedInventory, alphabet],
   );
 
-  // #526 AC #3: compose each blocked-combination pair into the same concrete
-  // grapheme composeCombo produces everywhere else in this pipeline, then
-  // normalize to `form` — the same normalization every other member of this
-  // hook's sets receives, so a direct Set.has(ch) comparison against
-  // recommendedRemovalChars' `produced` (already normalized to `form` there)
-  // behaves consistently regardless of the chosen output form.
+  // #526 AC #3: the engine has already composed each blocked-combination pair
+  // into its concrete grapheme (CarveNeededSet.blockCandidateChars, using the
+  // same outputForm as every other tier); here we only re-normalize to `form`
+  // — the same normalization every other member of this hook's sets receives,
+  // so a direct Set.has(ch) comparison against recommendedRemovalChars'
+  // `produced` (already normalized to `form` there) behaves consistently
+  // regardless of the chosen output form.
   const blockCandidateChars = useMemo(
-    () => new Set(
-      carveNeeded.blockCandidates.map((bc) => composeCombo(bc.base, [bc.mark], marksOutputForm).normalize(form)),
-    ),
-    [carveNeeded, marksOutputForm, form],
+    () => new Set([...carveNeeded.blockCandidateChars].map((ch) => ch.normalize(form))),
+    [carveNeeded, form],
   );
 
   const tieredNeededSet = useMemo(
