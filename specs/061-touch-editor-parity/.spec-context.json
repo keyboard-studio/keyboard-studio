@@ -1,0 +1,16 @@
+{
+  "workflow": "speckit",
+  "specName": "Touch key editor — Developer-parity remodel",
+  "branch": "061-touch-editor-parity",
+  "currentStep": "specify",
+  "status": "specified",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-06T23:06:13.018Z"
+    }
+  ]
+}
