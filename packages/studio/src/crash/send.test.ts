@@ -77,14 +77,39 @@ function stubFetch(
   return { requests };
 }
 
-/** Wait for the fire-and-forget send to settle. */
+/**
+ * Wait for the fire-and-forget send to settle.
+ *
+ * WAITS FOR A TERMINAL STATE, NOT MERELY "NOT SENDING", and that distinction is
+ * the whole reason this helper has a comment.
+ *
+ * `reportCrash` returns `void` immediately and the work happens on a detached
+ * promise, whose first `await` is a real `crypto.subtle.digest` — so for some
+ * number of ticks after the call the status is still `"idle"`, because
+ * `setState({ status: "sending" })` has not run yet. An earlier version of this
+ * loop broke on `status !== "sending"`, which is true of `"idle"` too: if the
+ * digest had not resolved within the first `setTimeout(0)`, `settle()` returned
+ * before a single `fetch` was issued and the caller asserted against an empty
+ * request log.
+ *
+ * That is a race, not a constant. It passed locally on every run and failed once
+ * on a slower CI runner — the worst shape of flake, since the green result is not
+ * evidence the fast path was correct, only that it was fast.
+ *
+ * Breaking only on `"sent"` / `"failed"` removes the timing dependency: the loop
+ * cannot mistake "has not started" for "has finished". Cases where no send is
+ * expected at all (a session-deduped repeat) simply run the full budget of
+ * zero-delay ticks and return with the status untouched, which is what they
+ * assert anyway.
+ */
 async function settle(): Promise<void> {
-  for (let i = 0; i < 20; i += 1) {
+  for (let i = 0; i < 100; i += 1) {
     await Promise.resolve();
     await new Promise((r) => {
       setTimeout(r, 0);
     });
-    if (getCrashSendSnapshot().status !== "sending") break;
+    const { status } = getCrashSendSnapshot();
+    if (status === "sent" || status === "failed") break;
   }
 }
 
