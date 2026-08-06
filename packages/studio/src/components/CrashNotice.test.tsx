@@ -28,6 +28,10 @@ function sent(overrides: Record<string, unknown> = {}) {
     issueUrl: ISSUE_URL,
     issueNumber: 42,
     action: "created",
+    // The Undo affordance is gated on holding a server-issued retraction token
+    // (FR-074a), not on knowing an issue number. Tests that want the button must
+    // supply one; the `offers no Undo without a token` case below omits it.
+    retractionToken: "stub-token",
     ...overrides,
   });
 }
@@ -93,6 +97,15 @@ describe("Undo window (FR-074, SC-013)", () => {
     render(<CrashNotice />);
     expect(screen.queryByRole("button")).toBeNull();
   });
+
+  it("offers no Undo when the server issued no retraction token (FR-074a)", () => {
+    // Nothing the client could send: the route accepts only a token. An Undo
+    // button here would be one that silently does nothing, which is exactly the
+    // failure the window's expiry exists to prevent.
+    sent({ retractionToken: undefined });
+    render(<CrashNotice onRetract={() => undefined} />);
+    expect(screen.queryByRole("button")).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -100,7 +113,10 @@ describe("Undo window (FR-074, SC-013)", () => {
 // ---------------------------------------------------------------------------
 
 describe("retraction", () => {
-  it("calls the handler with the issue number", () => {
+  it("invokes the handler with no arguments — the target is the token's, not ours", () => {
+    // The retract route derives the issue from the signed token (FR-074a), so
+    // this surface passes nothing. A component that still passed an issue number
+    // would imply it has a say in which report is retracted.
     const retract = vi.fn();
     sent();
     render(<CrashNotice onRetract={retract} />);
@@ -108,7 +124,8 @@ describe("retraction", () => {
     act(() => {
       screen.getByRole("button").click();
     });
-    expect(retract).toHaveBeenCalledWith(42);
+    expect(retract).toHaveBeenCalledTimes(1);
+    expect(retract).toHaveBeenCalledWith();
   });
 
   it("confirms the retraction and removes the Undo affordance", () => {

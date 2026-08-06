@@ -164,6 +164,17 @@ export const CrashReportResponseSchema = z.object({
    * when the comment was skipped by the cap.
    */
   commentId: z.number().int().positive().optional(),
+  /**
+   * Signed capability authorizing retraction of THIS report (FR-074a).
+   *
+   * Opaque to the client, which stores it and echoes it back on Undo without
+   * reading it. It carries the issue number, the action, the comment id, and an
+   * expiry, all under an HMAC — see crash-report-retraction-token.ts.
+   *
+   * Optional in the schema because the retract route's own 200 response reuses
+   * this shape and carries no token: retracting a retraction is not an operation.
+   */
+  retractionToken: z.string().min(1).max(2048).optional(),
 });
 
 export type CrashReportResponse = z.infer<typeof CrashReportResponseSchema>;
@@ -186,13 +197,27 @@ export type CrashReportResponse = z.infer<typeof CrashReportResponseSchema>;
  * calls but defines no client-facing route for them, so FR-074 – FR-077 have no
  * way to reach the server as written. This route fills that gap, mirroring the
  * report route's structure, status vocabulary, and credential.
+ *
+ * NOTE WHAT IS NOT HERE, for the same reason `fingerprint` is absent above.
+ *
+ * There is no `issueNumber`, no `action`, and no `commentId` (FR-074a, P0-6).
+ * An earlier form declared all three, and this route is public, unauthenticated,
+ * and acts on a repository whose issue numbers are sequential and guessable — so
+ * naming the target in the body let any anonymous caller close or comment-delete
+ * an arbitrary crash report belonging to someone else. The 30 s Undo window is UI
+ * state in CrashNotice.tsx and constrains only a caller who loaded the SPA.
+ *
+ * Those three fields are now carried INSIDE the signed `retractionToken` the
+ * report response hands out, and the server reads them from there. A body that
+ * still sends them has them stripped by zod, exactly as a body sending a
+ * `fingerprint` does: not rejected, simply unread.
  */
 export const CrashRetractBodySchema = z.object({
-  issueNumber: z.number().int().positive(),
-  /** What this session's report did — determines which retraction applies. */
-  action: z.enum(["created", "commented", "reopened"]),
-  /** Required to retract a comment; ignored for `"created"`. */
-  commentId: z.number().int().positive().optional(),
+  /**
+   * The capability minted by `POST /report/crash`. Bounds are a sanity check on
+   * an opaque string, not a parse: `verifyRetractionToken` is the real gate.
+   */
+  retractionToken: z.string().min(1).max(2048),
 });
 
 export type CrashRetractBody = z.infer<typeof CrashRetractBodySchema>;

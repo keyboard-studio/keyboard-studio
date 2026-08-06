@@ -71,6 +71,7 @@ import {
 } from "./crash-report-pipeline.js";
 import {
   getCrashReportInstallationToken,
+  getCrashReportRetractionSecret,
   isCrashReportAppConfigured,
 } from "./crash-report-installation-token.js";
 import {
@@ -262,6 +263,12 @@ export async function buildServer(opts: {
    */
   getCrashReportInstallationToken?: () => Promise<string>;
   /**
+   * Signing key for retraction capability tokens (FR-074a). Defaults to the
+   * `CRASH_REPORT_APP_PRIVATE_KEY`-derived key; injectable so a test can mint a
+   * token and retract with it without any env var set.
+   */
+  crashRetractionSecret?: string;
+  /**
    * Injected fetch implementation — defaults to globalThis.fetch.
    *
    * Must satisfy GitHubPipelineFetchFn (statusText + headers.get + text()) so
@@ -361,9 +368,24 @@ export async function buildServer(opts: {
         }
       : undefined);
 
+  // Retraction-token key material (FR-074a). Env-derived in the ordinary case;
+  // `opts.crashRetractionSecret` lets a test drive the retract route with a
+  // fixed key and no env. A dev server standing up the crash routes with an
+  // injected token provider but no secret gets a deterministic placeholder —
+  // acceptable ONLY because it is local dev against a stub GitHub, and it still
+  // means a token minted by one dev-server run does not verify in the next.
+  const crashRetractionSecret =
+    opts.crashRetractionSecret ??
+    getCrashReportRetractionSecret() ??
+    `dev-only-unconfigured-${process.pid}`;
+
   const crashReportConfig: CrashReportPipelineConfig | undefined =
     crashTokenProvider !== undefined
-      ? { getInstallationToken: crashTokenProvider, fetch: pipelineFetch }
+      ? {
+          getInstallationToken: crashTokenProvider,
+          fetch: pipelineFetch,
+          retractionSecret: crashRetractionSecret,
+        }
       : undefined;
 
   // -------------------------------------------------------------------------

@@ -11,6 +11,7 @@
 
 import {
   getCrashReportInstallationToken,
+  getCrashReportRetractionSecret,
   isCrashReportAppConfigured,
 } from "../../utilities/oauth-backend/src/crash-report-installation-token.js";
 import {
@@ -39,6 +40,13 @@ const webCrashFetch: CrashReportFetchFn = async (url, init) => {
 
 function envCrashReportConfig(): CrashReportPipelineConfig | undefined {
   if (!isCrashReportAppConfigured()) return undefined;
+
+  // Same key material the report route signs with (FR-074a). A retract route
+  // that could not read it would reject every legitimate token, so "absent" is
+  // the not-configured 503, not a soft failure.
+  const retractionSecret = getCrashReportRetractionSecret();
+  if (retractionSecret === undefined) return undefined;
+
   return {
     getInstallationToken: async () => {
       const token = await getCrashReportInstallationToken();
@@ -48,6 +56,7 @@ function envCrashReportConfig(): CrashReportPipelineConfig | undefined {
       return token;
     },
     fetch: webCrashFetch,
+    retractionSecret,
   };
 }
 

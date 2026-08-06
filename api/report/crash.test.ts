@@ -13,6 +13,7 @@
 
 import { describe, it, expect } from "vitest";
 import { runCrashReportHandler } from "./crash.js";
+import { verifyRetractionToken } from "../../utilities/oauth-backend/src/crash-report-retraction-token.js";
 import type {
   CrashReportPipelineConfig,
   CrashReportFetchResponse,
@@ -33,6 +34,12 @@ function validBody() {
     appVersion: "0.1.0+a1b2c3d",
   };
 }
+
+/**
+ * Retraction-token signing key (FR-074a). A literal: the seam exists so no env
+ * var, App, or credential has to exist for these tests to run.
+ */
+const TEST_RETRACTION_SECRET = "test-only-retraction-secret";
 
 function postReq(body: unknown): Request {
   return new Request("https://app.example/report/crash", {
@@ -71,6 +78,7 @@ function stubConfig(
   const calls: StubCall[] = [];
   return {
     getInstallationToken: () => Promise.resolve("tok_crash_test"),
+    retractionSecret: TEST_RETRACTION_SECRET,
     fetch: (url, init): Promise<CrashReportFetchResponse> => {
       calls.push({
         url,
@@ -81,7 +89,17 @@ function stubConfig(
       let r: StubResponse;
       if (init.method === "GET" && url.includes("since=")) {
         // Global-creation-cap probe — an empty repo by default.
+        //
+        // PAGED THE WAY GITHUB PAGES IT. A stub that ignored `per_page`/`page`
+        // and handed back a whole fixture in one response is what let the probe's
+        // original single-request form look tested while being unable to trip in
+        // production: `per_page` is capped at 100 and the cap is 200 (FR-106).
         r = overrides.capProbe ?? { ok: true, status: 200, body: [] };
+        if (Array.isArray(r.body)) {
+          const perPage = Number(/per_page=(\d+)/.exec(url)?.[1] ?? "30");
+          const page = Number(/[?&]page=(\d+)/.exec(url)?.[1] ?? "1");
+          r = { ...r, body: r.body.slice((page - 1) * perPage, page * perPage) };
+        }
       } else if (init.method === "POST" && /\/issues$/.test(url.split("?")[0] ?? "")) {
         r = overrides.create ?? createdIssue;
       } else {
@@ -199,11 +217,35 @@ describe("runCrashReportHandler — create path", () => {
     const res = await runCrashReportHandler(postReq(validBody()), config);
 
     expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({
+    // `retractionToken` is asserted separately below — its value is a signature
+    // over a timestamp, so pinning it here would make this a clock test.
+    const filed = (await res.json()) as Record<string, unknown>;
+    expect(filed).toMatchObject({
       issueUrl: "https://github.com/keyboard-studio/crash-reports/issues/42",
       issueNumber: 42,
       action: "created",
     });
+  });
+
+  it("hands back a retraction capability, not an issue number to name (FR-074a)", async () => {
+    // Undo posts this token back and nothing else. Without it the retract route
+    // would read its target off a request body, which on a public endpoint acting
+    // on sequential issue numbers is an authorization hole (P0-6).
+    const config = stubConfig();
+    const res = await runCrashReportHandler(postReq(validBody()), config);
+    const filed = (await res.json()) as { retractionToken?: string };
+
+    expect(typeof filed.retractionToken).toBe("string");
+    expect(
+      verifyRetractionToken(filed.retractionToken as string, TEST_RETRACTION_SECRET),
+    ).toEqual({ issueNumber: 42, action: "created" });
+  });
+
+  it("issues a token that does not verify under another key", async () => {
+    const config = stubConfig();
+    const res = await runCrashReportHandler(postReq(validBody()), config);
+    const filed = (await res.json()) as { retractionToken: string };
+    expect(verifyRetractionToken(filed.retractionToken, "someone-elses-key")).toBeNull();
   });
 
   it("targets keyboard-studio/crash-reports, a source constant (FR-089)", async () => {
@@ -266,12 +308,39 @@ describe("runCrashReportHandler — global creation cap", () => {
   }
 
   it("skips creation and returns 429 rate_limited once the cap is reached", async () => {
+    // 200 creations arrive across two pages of 100, because that is the only way
+    // GitHub can deliver them — see the paging note in the stub.
     const config = stubConfig({ capProbe: { ok: true, status: 200, body: recentIssues(200) } });
     const res = await runCrashReportHandler(postReq(validBody()), config);
 
     expect(res.status).toBe(429);
     expect(await res.json()).toEqual({ error: "rate_limited" });
     expect(createCall(config.calls)).toBeUndefined();
+  });
+
+  it("reads a second page rather than stopping at GitHub's per_page ceiling", async () => {
+    // The regression: `per_page` maxes out at 100 while the cap is 200, so a
+    // single-request probe could never observe enough creations to fire and the
+    // documented last line of defence was unreachable in production.
+    const config = stubConfig({ capProbe: { ok: true, status: 200, body: recentIssues(200) } });
+    await runCrashReportHandler(postReq(validBody()), config);
+
+    const probes = config.calls.filter(
+      (c) => c.method === "GET" && c.url.includes("since="),
+    );
+    expect(probes).toHaveLength(2);
+    expect(probes.every((c) => c.url.includes("per_page=100"))).toBe(true);
+    expect(probes.map((c) => /[?&]page=(\d+)/.exec(c.url)?.[1])).toEqual(["1", "2"]);
+  });
+
+  it("makes exactly one probe on a healthy tracker", async () => {
+    // Pagination must not tax the normal path: a short page has nothing after it.
+    const config = stubConfig({ capProbe: { ok: true, status: 200, body: recentIssues(3) } });
+    await runCrashReportHandler(postReq(validBody()), config);
+
+    expect(
+      config.calls.filter((c) => c.method === "GET" && c.url.includes("since=")),
+    ).toHaveLength(1);
   });
 
   it("sets Retry-After from the window, not a hard-coded literal", async () => {
@@ -340,6 +409,7 @@ describe("runCrashReportHandler — error mapping", () => {
   it("maps a token-mint failure to 502, not 500", async () => {
     const config: CrashReportPipelineConfig = {
       getInstallationToken: () => Promise.reject(new Error("mint failed")),
+      retractionSecret: TEST_RETRACTION_SECRET,
       fetch: () => {
         throw new Error("must not be reached");
       },

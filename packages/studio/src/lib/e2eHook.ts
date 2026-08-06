@@ -134,6 +134,11 @@ export function installE2eHook(): void {
         issueUrl,
         issueNumber,
         action: "created",
+        // A token is required for the Undo affordance to render at all
+        // (FR-074a), and the a11y scan's whole subject is that button. The value
+        // is never verified on this path — no request is made — but it must be
+        // present or the scan silently covers a notice with nothing to scan.
+        retractionToken: "e2e-stub-token",
       });
     },
   };

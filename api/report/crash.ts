@@ -15,6 +15,7 @@
 
 import {
   getCrashReportInstallationToken,
+  getCrashReportRetractionSecret,
   isCrashReportAppConfigured,
 } from "../../utilities/oauth-backend/src/crash-report-installation-token.js";
 import {
@@ -60,6 +61,13 @@ const webCrashFetch: CrashReportFetchFn = async (url, init) => {
 function envCrashReportConfig(): CrashReportPipelineConfig | undefined {
   if (!isCrashReportAppConfigured()) return undefined;
 
+  // Cannot be undefined here — `isCrashReportAppConfigured()` requires the same
+  // env var this reads — but returning `undefined` rather than asserting keeps
+  // "no key material" a 503 the operator can act on instead of a 502 with an
+  // unsigned-token route behind it (FR-074a).
+  const retractionSecret = getCrashReportRetractionSecret();
+  if (retractionSecret === undefined) return undefined;
+
   return {
     getInstallationToken: async () => {
       const token = await getCrashReportInstallationToken();
@@ -69,6 +77,7 @@ function envCrashReportConfig(): CrashReportPipelineConfig | undefined {
       return token;
     },
     fetch: webCrashFetch,
+    retractionSecret,
   };
 }
 

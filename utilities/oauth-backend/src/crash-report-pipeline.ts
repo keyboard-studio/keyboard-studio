@@ -38,6 +38,10 @@
 
 import { createHash } from "node:crypto";
 
+import {
+  mintRetractionToken,
+  verifyRetractionToken,
+} from "./crash-report-retraction-token.js";
 import type {
   CrashContext,
   CrashKind,
@@ -78,6 +82,30 @@ export const CRASH_REPORT_GLOBAL_CREATE_WINDOW_MS = 600_000;
 
 /** Max issues created repo-wide within the window before creation is skipped. */
 export const CRASH_REPORT_GLOBAL_CREATE_CAP = 200;
+
+/**
+ * Page size for the cap probe. GitHub's own hard ceiling for `per_page`.
+ *
+ * This is a CEILING, not a preference: asking for more returns 100 anyway. That
+ * matters because the cap is 200, so a single page can never observe enough
+ * creations to trip it — see `checkGlobalCreateCap`.
+ */
+export const CRASH_REPORT_CREATE_PROBE_PER_PAGE = 100;
+
+/**
+ * How many pages the cap probe may read, DERIVED from the cap rather than
+ * chosen.
+ *
+ * The bound has to be `ceil(cap / per_page)` exactly. Fewer pages and the cap is
+ * unreachable — which is the bug this constant exists to close. More pages and
+ * every probe past the decisive one is a wasted call against the App's 5,000/hr
+ * budget, in the middle of the flood the cap is trying to bound. Deriving it
+ * means raising `CRASH_REPORT_GLOBAL_CREATE_CAP` cannot silently reintroduce the
+ * unreachable-cap bug.
+ */
+export const CRASH_REPORT_CREATE_PROBE_MAX_PAGES = Math.ceil(
+  CRASH_REPORT_GLOBAL_CREATE_CAP / CRASH_REPORT_CREATE_PROBE_PER_PAGE,
+);
 
 // ---------------------------------------------------------------------------
 // Canonicalization (FR-081a – FR-081f) — PURE, no I/O (FR-081e)
@@ -407,6 +435,17 @@ export interface CrashReportPipelineConfig {
    */
   getInstallationToken: () => Promise<string>;
   fetch: CrashReportFetchFn;
+  /**
+   * Key material for signing and verifying retraction capability tokens
+   * (FR-074a). In production this is `CRASH_REPORT_APP_PRIVATE_KEY`, which the
+   * token module domain-separates and hashes before use.
+   *
+   * REQUIRED, not optional, and that is the whole point: an optional field with
+   * a "skip the check when absent" fallback is an authorization bypass one
+   * missing env var away. A route that cannot supply this cannot construct a
+   * config, and a route with no config already 503s.
+   */
+  retractionSecret: string;
 }
 
 export type CrashReportAction = "created" | "commented" | "reopened";
@@ -420,6 +459,16 @@ export type CrashReportHandlerResult =
         action: CrashReportAction;
         /** Set when this request added a comment; lets Undo remove that one. */
         commentId?: number;
+        /**
+         * Signed capability authorizing retraction of THIS report (FR-074a).
+         *
+         * The only thing that makes `POST /report/crash/retract` safe on a public
+         * endpoint: the retract route reads its target out of this token, so a
+         * caller who was never handed one cannot name an issue at all. Absent on
+         * the retract route's own responses — retracting a retraction is not an
+         * operation.
+         */
+        retractionToken?: string;
       };
     }
   | {
@@ -477,7 +526,8 @@ export function mapNonOk(res: CrashReportFetchResponse): CrashReportHandlerResul
 
 export interface GitHubCalls {
   listByLabel(label: string): Promise<CrashReportFetchResponse>;
-  listCreatedSince(sinceIso: string): Promise<CrashReportFetchResponse>;
+  /** One page of the cap probe. `page` is 1-based, as GitHub's API numbers them. */
+  listCreatedSince(sinceIso: string, page: number): Promise<CrashReportFetchResponse>;
   createIssue(payload: {
     title: string;
     body: string;
@@ -520,9 +570,17 @@ export function createGitHubCalls(
       call(
         `${repoBase}/issues?labels=${encodeURIComponent(label)}&state=all&per_page=5`,
       ),
-    listCreatedSince: (sinceIso) =>
+    // `sort=created&direction=desc` is explicit rather than relying on the
+    // default, because the probe's early exit depends on the newest creations
+    // arriving first: `since=` filters on UPDATED time, so an old issue merely
+    // commented on in the window is in the result set too, and only a pinned
+    // created-descending order guarantees those sort BEHIND every in-window
+    // creation instead of interleaving with them.
+    listCreatedSince: (sinceIso, page) =>
       call(
-        `${repoBase}/issues?state=all&since=${encodeURIComponent(sinceIso)}&per_page=100`,
+        `${repoBase}/issues?state=all&since=${encodeURIComponent(sinceIso)}` +
+          `&sort=created&direction=desc` +
+          `&per_page=${CRASH_REPORT_CREATE_PROBE_PER_PAGE}&page=${page}`,
       ),
     createIssue: (payload) => call(`${repoBase}/issues`, "POST", payload),
     addComment: (issueNumber, body) =>
@@ -691,36 +749,72 @@ export function labelNames(issue: GitHubIssue): string[] {
  * may not. A failed probe returns `null` — fails OPEN, matching the dedupe
  * lookup (FR-096): the cap exists to stop a flood, not to become one more way a
  * genuine report is silently dropped.
+ *
+ * ---------------------------------------------------------------------------
+ * WHY THIS PAGINATES, AND WHY IT USUALLY MAKES EXACTLY ONE CALL
+ * ---------------------------------------------------------------------------
+ *
+ * The original single-request form could never trip. `per_page` is capped at 100
+ * by GitHub, so one page observes at most 100 creations, while the cap is 200 —
+ * `createdInWindow >= 200` was unsatisfiable and the documented "last line of
+ * defence" was dead code in production. The unit tests did not catch it because a
+ * stub `fetch` ignores `per_page` and happily returns a 200-element fixture no
+ * real API page could contain.
+ *
+ * The fix is pagination bounded by `CRASH_REPORT_CREATE_PROBE_MAX_PAGES`, with
+ * two early exits that keep the common case free:
+ *
+ *   - A SHORT PAGE means there is nothing after it, so stop.
+ *   - A page contributing ZERO in-window creations means every later page is
+ *     older still (the query pins created-descending order), so stop.
+ *
+ * A healthy tracker returns a handful of issues on page 1 and exits on the first
+ * check — one request, exactly as before. Extra requests are spent only while an
+ * actual flood is in progress, which is the one time they are worth spending.
  */
 export async function checkGlobalCreateCap(
   gh: GitHubCalls,
   now: number,
 ): Promise<CrashReportHandlerResult | null> {
-  const since = new Date(now - CRASH_REPORT_GLOBAL_CREATE_WINDOW_MS).toISOString();
+  const windowStart = now - CRASH_REPORT_GLOBAL_CREATE_WINDOW_MS;
+  const since = new Date(windowStart).toISOString();
 
-  let res: CrashReportFetchResponse;
-  try {
-    res = await gh.listCreatedSince(since);
-  } catch {
-    return null;
+  let createdInWindow = 0;
+
+  for (let page = 1; page <= CRASH_REPORT_CREATE_PROBE_MAX_PAGES; page += 1) {
+    let res: CrashReportFetchResponse;
+    try {
+      res = await gh.listCreatedSince(since, page);
+    } catch {
+      return null;
+    }
+    if (!res.ok) return null;
+
+    let issues: GitHubIssue[];
+    try {
+      issues = (await res.json()) as GitHubIssue[];
+    } catch {
+      return null;
+    }
+    if (!Array.isArray(issues)) return null;
+
+    // `since` filters on UPDATED time, so the response includes issues merely
+    // commented on in the window. Only genuine creations count against a
+    // CREATION cap — otherwise a busy tracker caps itself on comment traffic.
+    const createdThisPage = issues.filter((i) => {
+      const created = Date.parse(
+        (i as unknown as { created_at?: string }).created_at ?? "",
+      );
+      return Number.isFinite(created) && created >= windowStart;
+    }).length;
+
+    createdInWindow += createdThisPage;
+    if (createdInWindow >= CRASH_REPORT_GLOBAL_CREATE_CAP) break;
+
+    // Either exit means no later page can add to the count. See the note above.
+    if (issues.length < CRASH_REPORT_CREATE_PROBE_PER_PAGE) break;
+    if (createdThisPage === 0) break;
   }
-  if (!res.ok) return null;
-
-  let issues: GitHubIssue[];
-  try {
-    issues = (await res.json()) as GitHubIssue[];
-  } catch {
-    return null;
-  }
-  if (!Array.isArray(issues)) return null;
-
-  // `since` filters on UPDATED time, so the response includes issues merely
-  // commented on in the window. Only genuine creations count against a
-  // CREATION cap — otherwise a busy tracker caps itself on comment traffic.
-  const createdInWindow = issues.filter((i) => {
-    const created = Date.parse((i as unknown as { created_at?: string }).created_at ?? "");
-    return Number.isFinite(created) && created >= now - CRASH_REPORT_GLOBAL_CREATE_WINDOW_MS;
-  }).length;
 
   if (createdInWindow < CRASH_REPORT_GLOBAL_CREATE_CAP) return null;
 
@@ -915,6 +1009,8 @@ export async function submitCrashReport(
   const gh = createGitHubCalls(token, config.fetch);
 
   try {
+    let result: CrashReportHandlerResult;
+
     // -----------------------------------------------------------------------
     // Dedupe lookup (FR-090, FR-091)
     //
@@ -944,27 +1040,34 @@ export async function submitCrashReport(
     const match = await findExistingIssue(gh, label);
 
     if (match !== null) {
-      return await handleExistingIssue(gh, match, body, kind, now);
+      result = await handleExistingIssue(gh, match, body, kind, now);
+    } else {
+      const capped = await checkGlobalCreateCap(gh, now);
+      if (capped !== null) return capped;
+
+      const created = await gh.createIssue({
+        title: buildIssueTitle(normalizeMessage(body.message)),
+        body: buildIssueBody(body, fingerprint, kind),
+        labels: [label],
+      });
+      if (!created.ok) return mapNonOk(created);
+      const issue = (await created.json()) as { number: number; html_url: string };
+      result = {
+        ok: true,
+        data: {
+          issueUrl: issue.html_url,
+          issueNumber: issue.number,
+          action: "created",
+        },
+      };
     }
 
-    const capped = await checkGlobalCreateCap(gh, now);
-    if (capped !== null) return capped;
-
-    const created = await gh.createIssue({
-      title: buildIssueTitle(normalizeMessage(body.message)),
-      body: buildIssueBody(body, fingerprint, kind),
-      labels: [label],
-    });
-    if (!created.ok) return mapNonOk(created);
-    const issue = (await created.json()) as { number: number; html_url: string };
-    return {
-      ok: true,
-      data: {
-        issueUrl: issue.html_url,
-        issueNumber: issue.number,
-        action: "created",
-      },
-    };
+    // Every ok path funnels through here, so no success branch can ship without
+    // the capability the retract route requires. Attaching it at the single exit
+    // rather than at each `return` is what makes that structural: a new branch
+    // in handleExistingIssue inherits the token instead of silently omitting it
+    // and making Undo a no-op for that case.
+    return withRetractionToken(result, config.retractionSecret, now);
   } catch {
     // Network-level error — do not propagate internal details.
     return { ok: false, status: 502, error: "submission_unavailable" };
@@ -980,7 +1083,50 @@ export const RETRACTION_COMMENT =
   "Retracted by reporter — this crash report was withdrawn from the studio within the undo window.";
 
 /**
+ * Attach a retraction capability to a successful report result (FR-074a).
+ *
+ * A non-ok result is returned untouched: there is nothing to retract, and
+ * minting a token for a report that was never filed would hand out a capability
+ * naming an issue number the caller supplied nothing to derive.
+ */
+function withRetractionToken(
+  result: CrashReportHandlerResult,
+  secret: string,
+  now: number,
+): CrashReportHandlerResult {
+  if (!result.ok) return result;
+  return {
+    ok: true,
+    data: {
+      ...result.data,
+      retractionToken: mintRetractionToken(
+        {
+          issueNumber: result.data.issueNumber,
+          action: result.data.action,
+          commentId: result.data.commentId,
+        },
+        secret,
+        now,
+      ),
+    },
+  };
+}
+
+/**
  * Retract a report this session just filed.
+ *
+ * THE TARGET COMES FROM THE TOKEN, NEVER FROM THE REQUEST BODY (FR-074a, P0-6).
+ *
+ * This endpoint is public and unauthenticated, and issue numbers on
+ * keyboard-studio/crash-reports are sequential and public. An earlier form read
+ * `issueNumber` / `action` / `commentId` straight off the parsed body, which let
+ * any anonymous caller close or comment-delete an arbitrary crash report that
+ * was not theirs; the 30 s Undo window is UI state in CrashNotice.tsx and binds
+ * only a caller who bothered to load the SPA. The signed token
+ * (crash-report-retraction-token.ts) closes that: the caller supplies one opaque
+ * string, the server reads the parameters out of it, and a token it never issued
+ * does not verify. Same move as removing `fingerprint` from the wire schema
+ * (P0-1) — the forgeable field is gone rather than validated.
  *
  * TWO PATHS, AND NEITHER IS A DELETE OF THE ISSUE.
  *
@@ -1001,18 +1147,19 @@ export const RETRACTION_COMMENT =
  * fact about the bug recurring, not about this author's report, so it stands.
  */
 export async function retractCrashReport(
-  request: {
-    issueNumber: number;
-    action: CrashReportAction;
-    /**
-     * `| undefined` is explicit because `exactOptionalPropertyTypes` is on and
-     * zod's inferred optional widens to it — a bare `commentId?: number` would
-     * reject the parsed body at the call site.
-     */
-    commentId?: number | undefined;
-  },
+  body: { retractionToken: string },
   config: CrashReportPipelineConfig,
+  /** Injectable clock, so token expiry is testable without waiting. */
+  now: number = Date.now(),
 ): Promise<CrashReportHandlerResult> {
+  const request = verifyRetractionToken(body.retractionToken, config.retractionSecret, now);
+  if (request === null) {
+    // 403 with ONE undifferentiated message for every rejection reason. Verified
+    // BEFORE the token mint and before any GitHub call, so a forged or expired
+    // token costs nothing against the App's rate budget.
+    return { ok: false, status: 403, error: "retraction_not_authorized" };
+  }
+
   const token = await config.getInstallationToken();
   const gh = createGitHubCalls(token, config.fetch);
 

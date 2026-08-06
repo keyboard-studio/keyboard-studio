@@ -71,6 +71,15 @@ export interface CrashSendState {
   action?: CrashReportResponse["action"];
   /** Set when the report added a comment; Undo removes that one comment. */
   commentId?: number;
+  /**
+   * The server-issued capability Undo posts back (FR-074a).
+   *
+   * The ONLY thing the retract route accepts. `issueNumber` / `action` /
+   * `commentId` above are kept for the notice's own rendering and are no longer
+   * sent — the server derives them from this token's signature, so a client
+   * cannot name an issue it was not handed a token for.
+   */
+  retractionToken?: string;
   /** True when the stale-chunk carve-out already reloaded once for this failure. */
   retryExhausted?: boolean;
 }
@@ -246,8 +255,13 @@ export function reportCrash(input: {
  * be the third unactionable notice in a row. Never rejects.
  */
 export function retractCrashReport(): void {
-  const { issueNumber, action, commentId } = state;
-  if (issueNumber === undefined || action === undefined) return;
+  // The token is the whole request. Without one there is nothing to send — and
+  // nothing this client could send instead: the route reads its target from the
+  // signature, so a body naming an issue number would be stripped and rejected
+  // (FR-074a). No token means Undo is simply unavailable, which is why
+  // `canRetract` in CrashNotice.tsx gates the affordance on it.
+  const { retractionToken } = state;
+  if (retractionToken === undefined) return;
 
   const controller = new AbortController();
   const timer = setTimeout(() => {
@@ -257,11 +271,7 @@ export function retractCrashReport(): void {
   void fetch(CRASH_RETRACT_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      issueNumber,
-      action,
-      ...(commentId !== undefined ? { commentId } : {}),
-    }),
+    body: JSON.stringify({ retractionToken }),
     signal: controller.signal,
     credentials: "omit",
   })
@@ -310,6 +320,9 @@ async function runReport(input: {
       issueNumber: response.issueNumber,
       action: response.action,
       ...(response.commentId !== undefined ? { commentId: response.commentId } : {}),
+      ...(response.retractionToken !== undefined
+        ? { retractionToken: response.retractionToken }
+        : {}),
     });
   } catch {
     // The whole capture-and-send path is inside this try. A failure here is a

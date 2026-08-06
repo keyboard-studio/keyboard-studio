@@ -38,8 +38,14 @@ export interface CrashNoticeProps {
   /**
    * Retract the report. Injected rather than imported so the notice has no
    * opinion about how retraction reaches the server, and tests need no network.
+   *
+   * TAKES NO ARGUMENTS, and used to take the issue number. The retract route now
+   * reads its target out of the signed `retractionToken` rather than off the
+   * request body (FR-074a), so the number this component can see is no longer
+   * what identifies the report — passing it would imply this surface has a say
+   * in which issue is retracted, and it does not.
    */
-  onRetract?: (issueNumber: number) => void | Promise<void>;
+  onRetract?: () => void | Promise<void>;
 }
 
 export function CrashNotice({ onRetract }: CrashNoticeProps) {
@@ -59,7 +65,7 @@ export function CrashNotice({ onRetract }: CrashNoticeProps) {
     return () => {
       clearTimeout(timer);
     };
-  }, [sent, state.issueNumber]);
+  }, [sent, state.retractionToken]);
 
   // The stale-chunk carve-out already reloaded once and the failure recurred
   // inside the window, so the chunk is genuinely unreachable rather than stale
@@ -81,14 +87,20 @@ export function CrashNotice({ onRetract }: CrashNoticeProps) {
   // real problem, and a second message about the telemetry helps nobody.
   if (!sent) return null;
 
-  const issueNumber = state.issueNumber;
+  // Gated on the TOKEN, not on the issue number (FR-074a). Without a token there
+  // is no request the client can make, so an Undo button would be one that
+  // silently does nothing — the same failure the window's expiry exists to
+  // avoid. A server that returned no token (an older build) therefore offers no
+  // Undo rather than a broken one.
   const canUndo =
-    !undoExpired && !retracted && issueNumber !== undefined && onRetract !== undefined;
+    !undoExpired &&
+    !retracted &&
+    state.retractionToken !== undefined &&
+    onRetract !== undefined;
 
   const retract = (): void => {
-    if (issueNumber === undefined) return;
     setRetracted(true);
-    void Promise.resolve(onRetract?.(issueNumber)).catch(() => {
+    void Promise.resolve(onRetract?.()).catch(() => {
       // Retraction is best-effort, like the send itself. The confirmation
       // stands either way — telling the author their un-send failed would be
       // the third unactionable message in a row.

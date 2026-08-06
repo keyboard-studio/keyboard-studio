@@ -110,6 +110,13 @@ fake-timer test immediately after (SC-013).
 | `"created"` | close the issue + add a "retracted by reporter" comment |
 | `"commented"` | remove **only** this session's comment; the issue is untouched |
 
+**Gated on holding the server's capability token, not on knowing an issue number** (FR-074a). The
+affordance renders only when the report response carried a `retractionToken`, and the retract request
+consists of that token and nothing else — the server derives the issue, action, and comment id from its
+signature. A response without a token therefore offers **no** Undo rather than a button that silently
+does nothing, which is the same failure the window's expiry exists to prevent. The retract callback
+correspondingly takes **no arguments**: this surface has no say in which report is retracted.
+
 The UI copy MUST NOT imply deletion — true deletion is not available to an installation token. Once
 the window elapses or the notice is dismissed, the affordance disappears and the report stands.
 

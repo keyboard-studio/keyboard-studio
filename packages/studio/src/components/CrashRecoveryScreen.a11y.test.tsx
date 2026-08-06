@@ -78,12 +78,14 @@ describe("CrashRecoveryScreen — accessibility", () => {
 // ---------------------------------------------------------------------------
 
 describe("CrashNotice — accessibility", () => {
-  function renderSentNotice(onRetract?: (n: number) => void) {
+  function renderSentNotice(onRetract?: () => void) {
     _setCrashSendStateForTest({
       status: "sent",
       issueUrl: ISSUE_URL,
       issueNumber: 42,
       action: "created",
+      // Undo renders only when a retraction token is held (FR-074a).
+      retractionToken: "stub-token",
     });
     return render(
       <CrashNotice {...(onRetract !== undefined ? { onRetract } : {})} />,

@@ -58,7 +58,7 @@ compromise of the crash route reaches one issue tracker.
 | Variable | Value |
 |---|---|
 | `CRASH_REPORT_APP_ID` | The App's numeric id |
-| `CRASH_REPORT_APP_PRIVATE_KEY` | The PEM private key, **base64-encoded** |
+| `CRASH_REPORT_APP_PRIVATE_KEY` | The PEM private key, **base64-encoded**. Also the key material retraction capability tokens are signed with — see the note below. |
 | `CRASH_REPORT_APP_INSTALLATION_ID` | The installation's numeric id |
 
 Base64-encode the PEM so its newlines survive environment-variable injection:
@@ -71,6 +71,19 @@ Set all three in the Vercel project (Production and Preview). Partial configurat
 "not configured" — the route 503s rather than half-working.
 
 `GITHUB_APP_*` is a different set and must not be reused for any of these.
+
+**There is no fourth variable, and that is deliberate.** Retraction capability tokens (FR-074a) — the
+thing that stops an anonymous caller closing someone else's crash report — are signed with a key
+*derived* from `CRASH_REPORT_APP_PRIVATE_KEY`, domain-separated and hashed. A dedicated
+`CRASH_REPORT_RETRACTION_SECRET` would be one more line on this checklist whose omission silently
+disables an authorization check while everything still appears to work; deriving instead means a route
+that is configured at all is a route whose tokens are signed. The coupling is also the right one:
+rotating the App key rotates the tokens, and both authorize writes to the same repository.
+
+**Rotating the private key invalidates in-flight retraction tokens.** They live for two minutes
+(`CRASH_RETRACTION_TOKEN_TTL_MS`), so the blast radius is that any Undo clicked in the two minutes
+around the rotation silently does nothing — the report stands. Acceptable, and not worth coordinating
+around, but worth knowing before you wonder why one Undo did not take.
 
 ### 5. Add the Vercel Firewall rule
 
@@ -98,6 +111,12 @@ creation cap) bounds legitimate traffic; only the firewall bounds abusive traffi
    creating a second one.
 4. Read the filed issue and confirm it carries no author name, email, or login. This is asserted by
    test (SC-005), but it is worth one human look at real output the first time.
+5. Click **Undo** inside the 30 s window on a freshly created report and confirm the issue closes with
+   a "retracted by reporter" comment. Then confirm the negative case by hand, because it is the one
+   thing no test can prove against the live App: `POST /report/crash/retract` with
+   `{"retractionToken":"forged"}` and with the old body shape
+   `{"issueNumber":1,"action":"created"}` must return `403 retraction_not_authorized` and `400
+   invalid_request` respectively, and issue #1 must still be open afterwards.
 
 ---
 
@@ -110,6 +129,11 @@ creation cap) bounds legitimate traffic; only the firewall bounds abusive traffi
 - **Two racing first occurrences both create** (FR-097). There is no distributed lock. The result is
   occasionally two issues for one bug, which a maintainer closes as a duplicate. The alternative —
   locking — would add a state store this design deliberately does not have (FR-105).
+- **A retraction token can be replayed within its TTL** (FR-074a). The design is stateless (FR-105),
+  so there is no used-token table and no revocation. A replay is idempotent in effect — closing a
+  closed issue is a no-op, deleting a deleted comment 404s to a non-fatal error — and it can only ever
+  reach the one issue the token names, which is a report the holder filed. The alternative is the state
+  store this design deliberately does not have.
 - **Breadcrumb labels are written by call sites** (FR-047), so the client cannot guarantee no author
   text reaches one. The server scrubs every string again before writing to a public issue (FR-033),
   which is why that scrub exists as defence in depth rather than as redundancy.

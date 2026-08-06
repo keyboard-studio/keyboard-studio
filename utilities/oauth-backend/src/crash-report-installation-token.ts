@@ -123,6 +123,25 @@ export async function getCrashReportInstallationToken(): Promise<string | undefi
 }
 
 /**
+ * Key material for retraction capability tokens (FR-074a).
+ *
+ * Returns the RAW, still-base64 `CRASH_REPORT_APP_PRIVATE_KEY` value — never the
+ * decoded PEM. The token module hashes whatever it is given behind a domain
+ * separator, so the encoding is irrelevant to the derivation, and keeping the
+ * decoded key inside `getCrashAuth()` means the PEM has exactly one reader.
+ *
+ * Returns `undefined` when the var is absent, which cannot coexist with a
+ * configured route: `isCrashReportAppConfigured()` requires the same var, so
+ * there is no state where the route is live but retraction tokens are unsigned.
+ * That is why the pipeline config's `retractionSecret` is required rather than
+ * optional — see the note on it in crash-report-pipeline.ts.
+ */
+export function getCrashReportRetractionSecret(): string | undefined {
+  const raw = (process.env["CRASH_REPORT_APP_PRIVATE_KEY"] ?? "").trim();
+  return raw === "" ? undefined : raw;
+}
+
+/**
  * Reset the cached crash-App auth instance. Used in tests to simulate different
  * env-var configurations between cases without a process restart.
  *

@@ -111,4 +111,14 @@ export interface CrashReportResponse {
    * issue — and absent when the comment was skipped by the cap.
    */
   commentId?: number;
+  /**
+   * Opaque capability authorizing retraction of THIS report (FR-074a).
+   *
+   * Held, echoed back on Undo, and never parsed here. It is what makes the
+   * retract endpoint safe: the server reads the issue number, action, comment
+   * id, and expiry out of the signature rather than off the request body, so a
+   * caller holding no token cannot name a target at all. Absent when the server
+   * is an older build, in which case Undo is unavailable — the correct failure.
+   */
+  retractionToken?: string;
 }

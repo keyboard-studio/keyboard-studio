@@ -20,12 +20,21 @@ import {
   REGRESSION_LABEL,
   RETRACTION_COMMENT,
   retractCrashReport,
+  checkGlobalCreateCap,
+  CRASH_REPORT_GLOBAL_CREATE_CAP,
+  CRASH_REPORT_CREATE_PROBE_PER_PAGE,
+  CRASH_REPORT_CREATE_PROBE_MAX_PAGES,
+  type GitHubCalls,
   computeFingerprint,
   fingerprintLabel,
   type CrashReportFetchResponse,
   type CrashReportPipelineConfig,
   type GitHubIssue,
 } from "./crash-report-pipeline.js";
+import {
+  mintRetractionToken,
+  CRASH_RETRACTION_TOKEN_TTL_MS,
+} from "./crash-report-retraction-token.js";
 import type { CrashReportBody } from "./crash-report-schemas.js";
 
 // ---------------------------------------------------------------------------
@@ -33,6 +42,24 @@ import type { CrashReportBody } from "./crash-report-schemas.js";
 // ---------------------------------------------------------------------------
 
 const NOW = Date.parse("2026-08-05T12:00:00.000Z");
+
+/**
+ * Signing key for retraction tokens in these tests.
+ *
+ * A literal, not the real derived key: the point of taking the secret through
+ * the pipeline config is that no env var and no App private key has to exist for
+ * the retraction path to be exercised (FR-136).
+ */
+const TEST_SECRET = "test-only-retraction-secret";
+
+/** A capability token for a report the pipeline "filed" at NOW. */
+function token(grant: {
+  issueNumber: number;
+  action: "created" | "commented" | "reopened";
+  commentId?: number;
+}): string {
+  return mintRetractionToken(grant, TEST_SECRET, NOW);
+}
 
 function body(): CrashReportBody {
   return {
@@ -83,6 +110,7 @@ function stub(options: StubOptions = {}): CrashReportPipelineConfig & {
   const calls: Call[] = [];
   return {
     getInstallationToken: () => Promise.resolve("tok_crash_test"),
+    retractionSecret: TEST_SECRET,
     fetch: (url, init): Promise<CrashReportFetchResponse> => {
       calls.push({
         url,
@@ -356,19 +384,28 @@ describe("bursts", () => {
       created_at: minutesAgo(1),
     }));
     const config = stub({ lookup: [] });
-    // Re-point the cap probe at a full window.
+    // Re-point the cap probe at a full window — PAGED THE WAY GITHUB PAGES IT.
+    //
+    // Slicing by `page`/`per_page` rather than returning all 200 in one response
+    // is what makes this test load-bearing. A stub that ignores those params
+    // hands back a page no real API could produce, and under it the single-request
+    // form of this check passed while being unable to trip at all in production:
+    // `per_page` is capped at 100 by GitHub and the cap is 200.
     const base = config.fetch;
-    config.fetch = (url, init) =>
-      init.method === "GET" && url.includes("since=")
-        ? Promise.resolve({
-            ok: true,
-            status: 200,
-            statusText: "OK",
-            headers: { get: () => null },
-            json: () => Promise.resolve(atCap),
-            text: () => Promise.resolve(""),
-          })
-        : base(url, init);
+    config.fetch = (url, init) => {
+      if (init.method !== "GET" || !url.includes("since=")) return base(url, init);
+      const perPage = Number(/per_page=(\d+)/.exec(url)?.[1] ?? "30");
+      const page = Number(/[?&]page=(\d+)/.exec(url)?.[1] ?? "1");
+      const slice = atCap.slice((page - 1) * perPage, page * perPage);
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        statusText: "OK",
+        headers: { get: () => null },
+        json: () => Promise.resolve(slice),
+        text: () => Promise.resolve(""),
+      });
+    };
 
     const results = [];
     for (let i = 0; i < 50; i += 1) {
@@ -405,6 +442,7 @@ describe("bursts", () => {
     const calls: Call[] = [];
     const config: CrashReportPipelineConfig & { calls: Call[] } = {
       getInstallationToken: () => Promise.resolve("tok"),
+      retractionSecret: TEST_SECRET,
       fetch: (url, init) => {
         calls.push({
           url,
@@ -451,8 +489,9 @@ describe("retraction", () => {
   it("closes the issue and adds a retraction comment for a created report", async () => {
     const config = stub();
     const result = await retractCrashReport(
-      { issueNumber: 42, action: "created" },
+      { retractionToken: token({ issueNumber: 42, action: "created" }) },
       config,
+      NOW,
     );
 
     expect(commentCalls(config.calls)).toHaveLength(1);
@@ -464,7 +503,11 @@ describe("retraction", () => {
 
   it("never deletes the ISSUE — an installation token cannot", async () => {
     const config = stub();
-    await retractCrashReport({ issueNumber: 42, action: "created" }, config);
+    await retractCrashReport(
+      { retractionToken: token({ issueNumber: 42, action: "created" }) },
+      config,
+      NOW,
+    );
 
     const issueDeletes = deleteCalls(config.calls).filter(
       (c) => !c.url.includes("/comments/"),
@@ -475,8 +518,11 @@ describe("retraction", () => {
   it("deletes only this session's comment for a commented report", async () => {
     const config = stub();
     await retractCrashReport(
-      { issueNumber: 42, action: "commented", commentId: 7 },
+      {
+        retractionToken: token({ issueNumber: 42, action: "commented", commentId: 7 }),
+      },
       config,
+      NOW,
     );
 
     const deletes = deleteCalls(config.calls);
@@ -489,8 +535,11 @@ describe("retraction", () => {
     // their report must not close it for the rest.
     const config = stub();
     await retractCrashReport(
-      { issueNumber: 42, action: "commented", commentId: 7 },
+      {
+        retractionToken: token({ issueNumber: 42, action: "commented", commentId: 7 }),
+      },
       config,
+      NOW,
     );
     expect(patchCalls(config.calls)).toHaveLength(0);
   });
@@ -498,8 +547,11 @@ describe("retraction", () => {
   it("adds no comment when retracting a comment", async () => {
     const config = stub();
     await retractCrashReport(
-      { issueNumber: 42, action: "commented", commentId: 7 },
+      {
+        retractionToken: token({ issueNumber: 42, action: "commented", commentId: 7 }),
+      },
       config,
+      NOW,
     );
     expect(commentCalls(config.calls)).toHaveLength(0);
   });
@@ -507,8 +559,9 @@ describe("retraction", () => {
   it("is a non-fatal no-op when no comment id is known", async () => {
     const config = stub();
     const result = await retractCrashReport(
-      { issueNumber: 42, action: "commented" },
+      { retractionToken: token({ issueNumber: 42, action: "commented" }) },
       config,
+      NOW,
     );
 
     // Better to leave the report standing than to guess which comment to remove.
@@ -521,11 +574,168 @@ describe("retraction", () => {
     // report, so it stands.
     const config = stub();
     await retractCrashReport(
-      { issueNumber: 42, action: "reopened", commentId: 9 },
+      {
+        retractionToken: token({ issueNumber: 42, action: "reopened", commentId: 9 }),
+      },
       config,
+      NOW,
     );
     expect(patchCalls(config.calls)).toHaveLength(0);
     expect(deleteCalls(config.calls)).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Retraction authorization (FR-074a, P0-6)
+// ---------------------------------------------------------------------------
+//
+// The property under test is NOT "a valid token works" — the cases above cover
+// that. It is that NOTHING ELSE works. This endpoint is public and acts on a
+// repository whose issue numbers are sequential and guessable, so every case
+// below was, before the capability token, a way for an anonymous caller to close
+// or mutate a crash report belonging to someone else.
+
+describe("retraction authorization", () => {
+  const deleteCalls = (calls: Call[]) => calls.filter((c) => c.method === "DELETE");
+
+  /** Every write this route can make, in one list. */
+  const writeCalls = (calls: Call[]) => calls.filter((c) => c.method !== "GET");
+
+  it("rejects a request carrying no usable token", async () => {
+    const config = stub();
+    const result = await retractCrashReport({ retractionToken: "" }, config, NOW);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.status).toBe(403);
+      expect(result.error).toBe("retraction_not_authorized");
+    }
+  });
+
+  it("makes NO GitHub call for an unauthorized request", async () => {
+    // Verified before the token mint, so a forgery flood costs nothing against
+    // the App's 5,000/hr budget.
+    const config = stub();
+    await retractCrashReport({ retractionToken: "forged" }, config, NOW);
+    expect(config.calls).toEqual([]);
+  });
+
+  it("rejects a token signed with a different key", async () => {
+    const config = stub();
+    const foreign = mintRetractionToken(
+      { issueNumber: 42, action: "created" },
+      "not-the-server-secret",
+      NOW,
+    );
+    const result = await retractCrashReport({ retractionToken: foreign }, config, NOW);
+
+    expect(result.ok).toBe(false);
+    expect(writeCalls(config.calls)).toEqual([]);
+  });
+
+  it("rejects a token whose payload was edited to point at another issue", async () => {
+    // The attack the old body-driven form made trivial: retract issue 1 instead
+    // of your own 42. Re-encoding the payload invalidates the MAC.
+    const original = token({ issueNumber: 42, action: "created" });
+    const [version, payload, mac] = original.split(".");
+    const decoded = JSON.parse(
+      Buffer.from(payload as string, "base64url").toString("utf8"),
+    ) as { i: number };
+    decoded.i = 1;
+    const tampered = [
+      version,
+      Buffer.from(JSON.stringify(decoded), "utf8").toString("base64url"),
+      mac,
+    ].join(".");
+
+    const config = stub();
+    const result = await retractCrashReport({ retractionToken: tampered }, config, NOW);
+
+    expect(result.ok).toBe(false);
+    expect(writeCalls(config.calls)).toEqual([]);
+  });
+
+  it("rejects a token past its TTL", async () => {
+    // The first server-side time bound this route has had. Before it, a captured
+    // request body stayed replayable indefinitely.
+    const config = stub();
+    const result = await retractCrashReport(
+      { retractionToken: token({ issueNumber: 42, action: "created" }) },
+      config,
+      NOW + CRASH_RETRACTION_TOKEN_TTL_MS + 1,
+    );
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.status).toBe(403);
+    expect(config.calls).toEqual([]);
+  });
+
+  it("acts on the comment the TOKEN names, never one named alongside it", async () => {
+    const config = stub();
+    await retractCrashReport(
+      {
+        retractionToken: token({ issueNumber: 42, action: "commented", commentId: 7 }),
+        // Leftovers from the pre-FR-074a body shape. zod strips them on the
+        // wire; the pipeline does not read them here either.
+        ...({ issueNumber: 1, commentId: 999 } as Record<string, never>),
+      },
+      config,
+      NOW,
+    );
+
+    const deletes = deleteCalls(config.calls);
+    expect(deletes).toHaveLength(1);
+    expect(deletes[0]?.url).toContain("/issues/comments/7");
+    expect(deletes[0]?.url).not.toContain("/999");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The token the report hands out (FR-074a)
+// ---------------------------------------------------------------------------
+
+describe("retraction token issuance", () => {
+  it("accompanies a created report and retracts it end to end", async () => {
+    // The round trip, because the two halves are only useful together: a token
+    // the report mints that the retract path rejects is worse than no token.
+    const config = stub({ lookup: [] });
+    const filed = await submitCrashReport(body(), config, NOW);
+    expect(filed.ok).toBe(true);
+    if (!filed.ok) return;
+
+    expect(filed.data.retractionToken).toBeDefined();
+
+    const retracted = await retractCrashReport(
+      { retractionToken: filed.data.retractionToken as string },
+      stub(),
+      NOW,
+    );
+    expect(retracted.ok).toBe(true);
+  });
+
+  it("accompanies a flood-controlled report too", async () => {
+    // A report whose comment was skipped by the cap still told the author a
+    // report was sent, so Undo must still work for it — withholding the token
+    // would make the affordance vanish in exactly that case.
+    const config = stub({ lookup: [issue({ comments: CRASH_REPORT_COMMENT_CAP })] });
+    const filed = await submitCrashReport(body(), config, NOW);
+    expect(filed.ok && filed.data.retractionToken !== undefined).toBe(true);
+  });
+
+  it("binds the comment id, so Undo removes that comment and no other", async () => {
+    const config = stub({ lookup: [issue({ updated_at: minutesAgo(120) })] });
+    const filed = await submitCrashReport(body(), config, NOW);
+    expect(filed.ok && filed.data.commentId).toBe(7);
+    if (!filed.ok) return;
+
+    const target = stub();
+    await retractCrashReport(
+      { retractionToken: filed.data.retractionToken as string },
+      target,
+      NOW,
+    );
+    const deletes = target.calls.filter((c) => c.method === "DELETE");
+    expect(deletes[0]?.url).toContain("/issues/comments/7");
   });
 });
 
@@ -565,5 +775,142 @@ describe("GitHub 429", () => {
     });
     const result = await submitCrashReport(body(), config, NOW);
     expect(!result.ok && result.retryAfterSeconds).toBe(60);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Global creation cap — pagination (FR-106, SC-016)
+// ---------------------------------------------------------------------------
+//
+// WHY THESE TEST checkGlobalCreateCap DIRECTLY rather than through
+// submitCrashReport: the bug being pinned here is arithmetic between two
+// constants and GitHub's own page ceiling, and it is invisible end-to-end. The
+// original form asked for `per_page=100` and tripped at 200, so it could never
+// observe enough creations to fire — the documented "last line of defence" was
+// unreachable in production while every route-level test passed, because a stub
+// fetch happily returns a 200-element page no real API would.
+//
+// So these drive the probe with a page-honouring fake and assert on the page
+// requests themselves.
+
+describe("global creation cap — pagination", () => {
+  /** `n` issues, all created inside the window. */
+  function created(n: number): GitHubIssue[] {
+    return Array.from({ length: n }, (_, i) => ({
+      ...issue({ number: i + 1 }),
+      created_at: minutesAgo(1),
+    })) as GitHubIssue[];
+  }
+
+  /**
+   * A `GitHubCalls` whose cap probe pages exactly as GitHub's does: `per_page`
+   * is honoured, and `page` past the end returns an empty array.
+   */
+  function pagingCalls(all: GitHubIssue[]): GitHubCalls & { pages: number[] } {
+    const pages: number[] = [];
+    const notUsed = (): never => {
+      throw new Error("cap probe must not make any other call");
+    };
+    return {
+      pages,
+      listCreatedSince: (_since, page) => {
+        pages.push(page);
+        const perPage = CRASH_REPORT_CREATE_PROBE_PER_PAGE;
+        const slice = all.slice((page - 1) * perPage, page * perPage);
+        return Promise.resolve({
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          headers: { get: () => null },
+          json: () => Promise.resolve(slice),
+          text: () => Promise.resolve(""),
+        });
+      },
+      listByLabel: notUsed,
+      createIssue: notUsed,
+      addComment: notUsed,
+      patchIssue: notUsed,
+      deleteComment: notUsed,
+    };
+  }
+
+  it("asks for no more than GitHub's per_page ceiling", async () => {
+    // Asking for 200 would look like it worked and silently return 100.
+    expect(CRASH_REPORT_CREATE_PROBE_PER_PAGE).toBeLessThanOrEqual(100);
+  });
+
+  it("reads enough pages to be able to reach the cap at all", async () => {
+    // The regression this file exists to prevent: a page budget below
+    // ceil(cap / per_page) makes the cap unsatisfiable arithmetic.
+    expect(
+      CRASH_REPORT_CREATE_PROBE_MAX_PAGES * CRASH_REPORT_CREATE_PROBE_PER_PAGE,
+    ).toBeGreaterThanOrEqual(CRASH_REPORT_GLOBAL_CREATE_CAP);
+  });
+
+  it("trips at the cap when the creations span more than one page", async () => {
+    const gh = pagingCalls(created(CRASH_REPORT_GLOBAL_CREATE_CAP));
+    const result = await checkGlobalCreateCap(gh, NOW);
+
+    expect(result).not.toBeNull();
+    expect(result?.ok).toBe(false);
+    if (result && !result.ok) expect(result.status).toBe(429);
+    // Two pages of 100 to observe 200 — the whole point.
+    expect(gh.pages).toEqual([1, 2]);
+  });
+
+  it("does not trip one creation below the cap", async () => {
+    const gh = pagingCalls(created(CRASH_REPORT_GLOBAL_CREATE_CAP - 1));
+    expect(await checkGlobalCreateCap(gh, NOW)).toBeNull();
+  });
+
+  it("makes exactly ONE request on a healthy tracker", async () => {
+    // Pagination must not tax the normal path. A short page means there is no
+    // page after it, so the probe stops without asking.
+    const gh = pagingCalls(created(3));
+    expect(await checkGlobalCreateCap(gh, NOW)).toBeNull();
+    expect(gh.pages).toEqual([1]);
+  });
+
+  it("stops at a full page that contributes no in-window creations", async () => {
+    // `since=` filters on UPDATED time, so a busy tracker returns a full page of
+    // old issues merely commented on. Ordered created-descending, those sort
+    // behind every in-window creation — so a page with none means later pages
+    // have none either, and paging on would be pure waste.
+    const old = Array.from({ length: CRASH_REPORT_CREATE_PROBE_PER_PAGE * 2 }, (_, i) => ({
+      ...issue({ number: i + 1 }),
+      created_at: minutesAgo(1_440),
+    })) as GitHubIssue[];
+    const gh = pagingCalls(old);
+
+    expect(await checkGlobalCreateCap(gh, NOW)).toBeNull();
+    expect(gh.pages).toEqual([1]);
+  });
+
+  it("never reads past its page budget", async () => {
+    // A flood far beyond the cap must not turn the probe into its own flood.
+    const gh = pagingCalls(created(CRASH_REPORT_CREATE_PROBE_PER_PAGE * 10));
+    await checkGlobalCreateCap(gh, NOW);
+    expect(gh.pages.length).toBeLessThanOrEqual(CRASH_REPORT_CREATE_PROBE_MAX_PAGES);
+  });
+
+  it("fails OPEN when a later page errors", async () => {
+    // Same posture as the dedupe lookup (FR-096): a dropped crash report is
+    // worse than a duplicate issue.
+    const all = created(CRASH_REPORT_GLOBAL_CREATE_CAP);
+    const gh = pagingCalls(all);
+    const paged = gh.listCreatedSince;
+    gh.listCreatedSince = (since, page) =>
+      page === 2
+        ? Promise.resolve({
+            ok: false,
+            status: 500,
+            statusText: "Server Error",
+            headers: { get: () => null },
+            json: () => Promise.resolve({}),
+            text: () => Promise.resolve(""),
+          })
+        : paged(since, page);
+
+    expect(await checkGlobalCreateCap(gh, NOW)).toBeNull();
   });
 });
