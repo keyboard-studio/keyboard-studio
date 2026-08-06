@@ -154,6 +154,45 @@ export const CrashReportResponseSchema = z.object({
   issueUrl: z.string().url(),
   issueNumber: z.number().int().positive(),
   action: z.enum(["created", "commented", "reopened"]),
+  /**
+   * Id of the comment this request added, when it added one.
+   *
+   * Required by the retraction contract (FR-076): a `"commented"` report is
+   * retracted by removing ONLY this session's comment, and the client cannot
+   * name that comment without being told its id. Absent for a `"created"`
+   * report (nothing to remove — the issue itself is closed instead) and absent
+   * when the comment was skipped by the cap.
+   */
+  commentId: z.number().int().positive().optional(),
 });
 
 export type CrashReportResponse = z.infer<typeof CrashReportResponseSchema>;
+
+// ---------------------------------------------------------------------------
+// POST /report/crash/retract — request body (FR-074 – FR-077)
+// ---------------------------------------------------------------------------
+
+/**
+ * Retract a report this session just filed.
+ *
+ * A SEPARATE ROUTE, not a field on the report body. Retraction is a different
+ * operation on a different resource — it names an issue by number rather than
+ * describing a crash — and folding it into the report schema would mean a
+ * single endpoint whose required fields depend on a mode flag, plus a body
+ * shape where `message` is meaningless. The separation also keeps the report
+ * route's `.refine()` (FR-081) about one thing.
+ *
+ * CONTRACT NOTE: contracts/crash-report-api.md lists the GitHub-side retraction
+ * calls but defines no client-facing route for them, so FR-074 – FR-077 have no
+ * way to reach the server as written. This route fills that gap, mirroring the
+ * report route's structure, status vocabulary, and credential.
+ */
+export const CrashRetractBodySchema = z.object({
+  issueNumber: z.number().int().positive(),
+  /** What this session's report did — determines which retraction applies. */
+  action: z.enum(["created", "commented", "reopened"]),
+  /** Required to retract a comment; ignored for `"created"`. */
+  commentId: z.number().int().positive().optional(),
+});
+
+export type CrashRetractBody = z.infer<typeof CrashRetractBodySchema>;

@@ -22,6 +22,7 @@ import { i18n } from "@lingui/core";
 import "./lib/i18n.ts"; // side-effect: load + activate the boot locale
 import { CrashErrorBoundary } from "./components/CrashErrorBoundary.tsx";
 import { CrashNotice } from "./components/CrashNotice.tsx";
+import { retractCrashReport } from "./crash/send.ts";
 
 export function AppRoot({ children }: { children: ReactNode }) {
   // The crash boundary sits INSIDE the provider for the same reason the
@@ -36,7 +37,7 @@ export function AppRoot({ children }: { children: ReactNode }) {
   return (
     <I18nProvider i18n={i18n}>
       <CrashErrorBoundary>{children}</CrashErrorBoundary>
-      <CrashNotice />
+      <CrashNotice onRetract={retractCrashReport} />
     </I18nProvider>
   );
 }

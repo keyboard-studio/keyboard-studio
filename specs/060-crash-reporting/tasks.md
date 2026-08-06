@@ -259,7 +259,7 @@ retraction comment (`"created"`) or the session's comment is removed (`"commente
 
 ### Tests for User Story 6
 
-- [ ] **T050** [US6] Assert both retract paths and the window: a `"created"` report closes with a retraction comment; a `"commented"` report removes only this session's comment and never touches the issue's state; neither attempts a GitHub delete of the *issue*; and a fake-timer assertion that "Undo" is present for exactly `CRASH_REPORT_UNDO_WINDOW_MS` and absent immediately after (SC-012, SC-013) · `packages/studio/src/components/CrashNotice.test.tsx`
+- [x] **T050** [US6] Assert both retract paths and the window: a `"created"` report closes with a retraction comment; a `"commented"` report removes only this session's comment and never touches the issue's state; neither attempts a GitHub delete of the *issue*; and a fake-timer assertion that "Undo" is present for exactly `CRASH_REPORT_UNDO_WINDOW_MS` and absent immediately after (SC-012, SC-013) · `packages/studio/src/components/CrashNotice.test.tsx`
 
 ### Implementation for User Story 6
 
@@ -267,8 +267,8 @@ retraction comment (`"created"`) or the session's comment is removed (`"commente
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T051** [P] [US6] Add the "Undo" affordance to the notice, visible for exactly `CRASH_REPORT_UNDO_WINDOW_MS` (exported constant, default 30 000). Once the window elapses or the notice is dismissed the affordance disappears and the report stands. UI copy must not imply deletion (FR-074, FR-077) · `packages/studio/src/components/CrashNotice.tsx`
-- [ ] **T052** [P] [US6] Implement the retract branches: for `"created"`, `PATCH` the issue closed and add a "retracted by reporter" comment — never a delete, which an installation token cannot do; for `"commented"`, `DELETE` only this session's comment and leave the issue's state and every other comment untouched (FR-075, FR-076) · `utilities/oauth-backend/src/crash-report-pipeline.ts`
+- [x] **T051** [P] [US6] Add the "Undo" affordance to the notice, visible for exactly `CRASH_REPORT_UNDO_WINDOW_MS` (exported constant, default 30 000). Once the window elapses or the notice is dismissed the affordance disappears and the report stands. UI copy must not imply deletion (FR-074, FR-077) · `packages/studio/src/components/CrashNotice.tsx`
+- [x] **T052** [P] [US6] Implement the retract branches: for `"created"`, `PATCH` the issue closed and add a "retracted by reporter" comment — never a delete, which an installation token cannot do; for `"commented"`, `DELETE` only this session's comment and leave the issue's state and every other comment untouched (FR-075, FR-076) · `utilities/oauth-backend/src/crash-report-pipeline.ts`
 
 **Checkpoint**: all six user stories are independently functional.
 

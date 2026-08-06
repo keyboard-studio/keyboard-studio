@@ -44,6 +44,9 @@ import type {
 /** The endpoint. Same origin — the vercel.json rewrite maps it to the function. */
 export const CRASH_REPORT_ENDPOINT = "/report/crash";
 
+/** The retraction endpoint (FR-074 – FR-077). */
+export const CRASH_RETRACT_ENDPOINT = "/report/crash/retract";
+
 /** Abort budget for the POST. Long enough for a cold function, short enough to not hang a dying tab. */
 export const CRASH_SEND_TIMEOUT_MS = 8_000;
 
@@ -59,6 +62,8 @@ export interface CrashSendState {
   issueUrl?: string;
   issueNumber?: number;
   action?: CrashReportResponse["action"];
+  /** Set when the report added a comment; Undo removes that one comment. */
+  commentId?: number;
   /** True when the stale-chunk carve-out already reloaded once for this failure. */
   retryExhausted?: boolean;
 }
@@ -226,6 +231,39 @@ export function reportCrash(input: {
   });
 }
 
+/**
+ * Withdraw the report this session just filed (FR-074 – FR-077).
+ *
+ * Fire-and-forget for the same reason the send is: the author has already been
+ * told the report is retracted, and a message saying the un-send failed would
+ * be the third unactionable notice in a row. Never rejects.
+ */
+export function retractCrashReport(): void {
+  const { issueNumber, action, commentId } = state;
+  if (issueNumber === undefined || action === undefined) return;
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => {
+    controller.abort();
+  }, CRASH_SEND_TIMEOUT_MS);
+
+  void fetch(CRASH_RETRACT_ENDPOINT, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      issueNumber,
+      action,
+      ...(commentId !== undefined ? { commentId } : {}),
+    }),
+    signal: controller.signal,
+    credentials: "omit",
+  })
+    .catch(() => undefined)
+    .finally(() => {
+      clearTimeout(timer);
+    });
+}
+
 async function runReport(input: {
   kind: CrashKind;
   error: unknown;
@@ -264,6 +302,7 @@ async function runReport(input: {
       issueUrl: response.issueUrl,
       issueNumber: response.issueNumber,
       action: response.action,
+      ...(response.commentId !== undefined ? { commentId: response.commentId } : {}),
     });
   } catch {
     // The whole capture-and-send path is inside this try. A failure here is a

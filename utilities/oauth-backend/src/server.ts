@@ -60,9 +60,13 @@ import {
   type GitHubPipelineFetchFn,
 } from "./github-pipeline.js";
 import { getInstallationToken } from "./installation-token.js";
-import { CrashReportBodySchema } from "./crash-report-schemas.js";
+import {
+  CrashReportBodySchema,
+  CrashRetractBodySchema,
+} from "./crash-report-schemas.js";
 import {
   submitCrashReport,
+  retractCrashReport,
   type CrashReportPipelineConfig,
 } from "./crash-report-pipeline.js";
 import {
@@ -499,6 +503,39 @@ export async function buildServer(opts: {
       result = await submitCrashReport(parsed.data, crashReportConfig);
     } catch {
       // Token-mint failure — 502, never naming which credential is at fault.
+      return reply.status(502).send({ error: "submission_unavailable" });
+    }
+
+    if (!result.ok) {
+      if (result.retryAfterSeconds !== undefined) {
+        reply.header("Retry-After", String(result.retryAfterSeconds));
+      }
+      return reply.status(result.status).send({ error: result.error });
+    }
+    return reply.status(200).send(result.data);
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /report/crash/retract — withdraw a report inside the undo window
+  // (spec 060 FR-074 - FR-077). Local-dev parity with api/report/crash-retract.ts.
+  // -------------------------------------------------------------------------
+  app.post("/report/crash/retract", async (req, reply) => {
+    if (crashReportConfig === undefined) {
+      return reply.status(503).send({ error: "reporting_not_configured" });
+    }
+
+    const parsed = CrashRetractBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.status(400).send({
+        error: "invalid_request",
+        details: parsed.error.issues.map(staticZodDetail),
+      });
+    }
+
+    let result: Awaited<ReturnType<typeof retractCrashReport>>;
+    try {
+      result = await retractCrashReport(parsed.data, crashReportConfig);
+    } catch {
       return reply.status(502).send({ error: "submission_unavailable" });
     }
 

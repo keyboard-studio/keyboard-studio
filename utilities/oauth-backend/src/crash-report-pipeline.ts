@@ -414,7 +414,13 @@ export type CrashReportAction = "created" | "commented" | "reopened";
 export type CrashReportHandlerResult =
   | {
       ok: true;
-      data: { issueUrl: string; issueNumber: number; action: CrashReportAction };
+      data: {
+        issueUrl: string;
+        issueNumber: number;
+        action: CrashReportAction;
+        /** Set when this request added a comment; lets Undo remove that one. */
+        commentId?: number;
+      };
     }
   | {
       ok: false;
@@ -758,6 +764,25 @@ export async function findExistingIssue(
   }
 }
 
+/**
+ * Read the created comment's id from GitHub's response.
+ *
+ * Returned to the client so Undo can remove THIS session's comment and nothing
+ * else (FR-076). A missing or malformed id degrades to "no id", which makes
+ * Undo unavailable for that report — the correct failure: better no retraction
+ * than a retraction that guesses which comment to delete.
+ */
+async function readCommentId(
+  res: CrashReportFetchResponse,
+): Promise<{ commentId?: number }> {
+  try {
+    const json = (await res.json()) as { id?: unknown };
+    return typeof json.id === "number" ? { commentId: json.id } : {};
+  } catch {
+    return {};
+  }
+}
+
 /** Has this issue had a comment recently enough, or often enough, to skip? */
 function commentIsCapped(issue: GitHubIssue, now: number): boolean {
   if (issue.comments >= CRASH_REPORT_COMMENT_CAP) return true;
@@ -804,7 +829,10 @@ async function handleExistingIssue(
       buildRecurrenceComment(body, kind),
     );
     if (!commented.ok) return mapNonOk(commented);
-    return { ok: true, data: { ...found, action: "commented" } };
+    return {
+      ok: true,
+      data: { ...found, action: "commented", ...(await readCommentId(commented)) },
+    };
   }
 
   // --- Closed match ---------------------------------------------------------
@@ -847,7 +875,10 @@ async function handleExistingIssue(
   );
   if (!commented.ok) return mapNonOk(commented);
 
-  return { ok: true, data: { ...found, action: "reopened" } };
+  return {
+    ok: true,
+    data: { ...found, action: "reopened", ...(await readCommentId(commented)) },
+  };
 }
 
 /**
@@ -938,4 +969,101 @@ export async function submitCrashReport(
     // Network-level error — do not propagate internal details.
     return { ok: false, status: 502, error: "submission_unavailable" };
   }
+}
+
+// ---------------------------------------------------------------------------
+// Retraction (FR-074 – FR-077)
+// ---------------------------------------------------------------------------
+
+/** Comment left in place of a retracted report, so the close is explicable. */
+export const RETRACTION_COMMENT =
+  "Retracted by reporter — this crash report was withdrawn from the studio within the undo window.";
+
+/**
+ * Retract a report this session just filed.
+ *
+ * TWO PATHS, AND NEITHER IS A DELETE OF THE ISSUE.
+ *
+ *   "created"   -> CLOSE the issue and add a retraction comment. An
+ *                  installation token cannot delete an issue at all, so a true
+ *                  delete is not merely undesirable, it is unavailable — which
+ *                  is exactly why FR-077 forbids UI copy implying deletion.
+ *                  Closing with an explanatory comment leaves an honest record:
+ *                  a maintainer scanning the tracker sees why it is closed
+ *                  rather than finding a gap in the issue numbers.
+ *
+ *   "commented" -> DELETE only this session's comment. The issue's open/closed
+ *                  state is not touched and no other comment is affected. The
+ *                  issue belongs to everyone who hit that bug; retracting one
+ *                  person's report must not close it for the rest.
+ *
+ * A `"reopened"` report is treated as `"commented"`: the reopen itself is a
+ * fact about the bug recurring, not about this author's report, so it stands.
+ */
+export async function retractCrashReport(
+  request: {
+    issueNumber: number;
+    action: CrashReportAction;
+    /**
+     * `| undefined` is explicit because `exactOptionalPropertyTypes` is on and
+     * zod's inferred optional widens to it — a bare `commentId?: number` would
+     * reject the parsed body at the call site.
+     */
+    commentId?: number | undefined;
+  },
+  config: CrashReportPipelineConfig,
+): Promise<CrashReportHandlerResult> {
+  const token = await config.getInstallationToken();
+  const gh = createGitHubCalls(token, config.fetch);
+
+  try {
+    if (request.action === "created") {
+      const commented = await gh.addComment(request.issueNumber, RETRACTION_COMMENT);
+      if (!commented.ok) return mapNonOk(commented);
+
+      const closed = await gh.patchIssue(request.issueNumber, { state: "closed" });
+      if (!closed.ok) return mapNonOk(closed);
+
+      return {
+        ok: true,
+        data: {
+          issueUrl: issueUrlFor(request.issueNumber),
+          issueNumber: request.issueNumber,
+          action: "created",
+        },
+      };
+    }
+
+    // "commented" / "reopened" — remove only this session's comment.
+    if (request.commentId === undefined) {
+      // Nothing identifiable to remove. Non-fatal: the report simply stands.
+      return {
+        ok: true,
+        data: {
+          issueUrl: issueUrlFor(request.issueNumber),
+          issueNumber: request.issueNumber,
+          action: request.action,
+        },
+      };
+    }
+
+    const deleted = await gh.deleteComment(request.commentId);
+    if (!deleted.ok) return mapNonOk(deleted);
+
+    return {
+      ok: true,
+      data: {
+        issueUrl: issueUrlFor(request.issueNumber),
+        issueNumber: request.issueNumber,
+        action: request.action,
+      },
+    };
+  } catch {
+    return { ok: false, status: 502, error: "submission_unavailable" };
+  }
+}
+
+/** The public URL of an issue in the crash-reports repository. */
+export function issueUrlFor(issueNumber: number): string {
+  return `https://github.com/${CRASH_REPORT_OWNER}/${CRASH_REPORT_REPO}/issues/${issueNumber}`;
 }

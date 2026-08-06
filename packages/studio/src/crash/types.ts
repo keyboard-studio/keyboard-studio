@@ -103,4 +103,12 @@ export interface CrashReportResponse {
   issueUrl: string;
   issueNumber: number;
   action: "created" | "commented" | "reopened";
+  /**
+   * Id of the comment this request added, when it added one.
+   *
+   * Undo needs it to remove THIS session's comment and nothing else (FR-076).
+   * Absent for a `"created"` report — that one is retracted by closing the
+   * issue — and absent when the comment was skipped by the cap.
+   */
+  commentId?: number;
 }

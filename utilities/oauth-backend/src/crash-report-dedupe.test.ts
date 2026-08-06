@@ -18,6 +18,8 @@ import {
   CRASH_REPORT_COMMENT_COOLDOWN_MS,
   CRASH_REPORT_REOPEN_COOLDOWN_MS,
   REGRESSION_LABEL,
+  RETRACTION_COMMENT,
+  retractCrashReport,
   computeFingerprint,
   fingerprintLabel,
   type CrashReportFetchResponse,
@@ -337,6 +339,94 @@ describe("closed match", () => {
     const labels = (patchCalls(config.calls)[0]?.body as { labels: string[] }).labels;
     expect(labels).toContain(fingerprintLabel(fingerprint));
     expect(labels).toContain(REGRESSION_LABEL);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Retraction (FR-075, FR-076, FR-077, SC-012)
+// ---------------------------------------------------------------------------
+
+describe("retraction", () => {
+  const deleteCalls = (calls: Call[]) => calls.filter((c) => c.method === "DELETE");
+
+  it("closes the issue and adds a retraction comment for a created report", async () => {
+    const config = stub();
+    const result = await retractCrashReport(
+      { issueNumber: 42, action: "created" },
+      config,
+    );
+
+    expect(commentCalls(config.calls)).toHaveLength(1);
+    expect(commentCalls(config.calls)[0]?.body).toEqual({ body: RETRACTION_COMMENT });
+    const patch = patchCalls(config.calls)[0];
+    expect((patch?.body as { state: string }).state).toBe("closed");
+    expect(result.ok).toBe(true);
+  });
+
+  it("never deletes the ISSUE — an installation token cannot", async () => {
+    const config = stub();
+    await retractCrashReport({ issueNumber: 42, action: "created" }, config);
+
+    const issueDeletes = deleteCalls(config.calls).filter(
+      (c) => !c.url.includes("/comments/"),
+    );
+    expect(issueDeletes).toEqual([]);
+  });
+
+  it("deletes only this session's comment for a commented report", async () => {
+    const config = stub();
+    await retractCrashReport(
+      { issueNumber: 42, action: "commented", commentId: 7 },
+      config,
+    );
+
+    const deletes = deleteCalls(config.calls);
+    expect(deletes).toHaveLength(1);
+    expect(deletes[0]?.url).toContain("/issues/comments/7");
+  });
+
+  it("never touches the issue's state when retracting a comment", async () => {
+    // The issue belongs to everyone who hit that bug; one person withdrawing
+    // their report must not close it for the rest.
+    const config = stub();
+    await retractCrashReport(
+      { issueNumber: 42, action: "commented", commentId: 7 },
+      config,
+    );
+    expect(patchCalls(config.calls)).toHaveLength(0);
+  });
+
+  it("adds no comment when retracting a comment", async () => {
+    const config = stub();
+    await retractCrashReport(
+      { issueNumber: 42, action: "commented", commentId: 7 },
+      config,
+    );
+    expect(commentCalls(config.calls)).toHaveLength(0);
+  });
+
+  it("is a non-fatal no-op when no comment id is known", async () => {
+    const config = stub();
+    const result = await retractCrashReport(
+      { issueNumber: 42, action: "commented" },
+      config,
+    );
+
+    // Better to leave the report standing than to guess which comment to remove.
+    expect(deleteCalls(config.calls)).toEqual([]);
+    expect(result.ok).toBe(true);
+  });
+
+  it("treats a reopened report as a comment retraction", async () => {
+    // The reopen is a fact about the bug recurring, not about this author's
+    // report, so it stands.
+    const config = stub();
+    await retractCrashReport(
+      { issueNumber: 42, action: "reopened", commentId: 9 },
+      config,
+    );
+    expect(patchCalls(config.calls)).toHaveLength(0);
+    expect(deleteCalls(config.calls)).toHaveLength(1);
   });
 });
 

@@ -446,6 +446,30 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-06T02:59:41.302Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T050",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T03:06:03.747Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T051",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T03:06:03.998Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T052",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T03:06:04.243Z"
     }
   ],
   "telemetryInstanceId": "4d8149dc-5ee9-43f5-9dac-81307541deb6",
@@ -500,6 +524,11 @@
       "decision": "The reopen cooldown is keyed on the presence of the regression label, not on updated_at alone",
       "why": "FR-095 (first hit after a close always reopens) and FR-095a (a repeat inside the cooldown is suppressed) contradict each other if only updated_at is read, because a maintainer closing an issue sets updated_at to now and would put the very next recurrence inside the cooldown. The regression label is the stateless record of we already reopened this, so it separates the signal from the churn.",
       "rejected": "Reading updated_at alone, which drops the first regression report after every close"
+    },
+    {
+      "decision": "Added POST /report/crash/retract as a separate route, plus an optional commentId on the report response",
+      "why": "contracts/crash-report-api.md lists the GitHub-side retraction calls but defines no client-facing route for them, so FR-074-FR-077 had no way to reach the server; and a commented report cannot be retracted without the client being told which comment is its own",
+      "rejected": "A mode flag on the report body, which would make required fields depend on the flag and leave message meaningless for a retraction"
     }
   ],
   "step_summaries": {
@@ -870,6 +899,9 @@
       "tasks": [
         "T051",
         "T050"
+      ],
+      "tests": [
+        "packages/studio/src/components/CrashNotice.test.tsx::Undo window"
       ]
     },
     "FR-075": {
@@ -877,6 +909,9 @@
       "tasks": [
         "T052",
         "T050"
+      ],
+      "tests": [
+        "utilities/oauth-backend/src/crash-report-dedupe.test.ts::retraction"
       ]
     },
     "FR-076": {
@@ -1277,7 +1312,7 @@
       ]
     }
   },
-  "currentTask": "T049",
+  "currentTask": "T052",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1630,6 +1665,32 @@
         "packages/studio/src/main.tsx",
         "packages/studio/src/crash/preMount.ts"
       ]
+    },
+    "T050": {
+      "status": "DONE",
+      "did": "Fake-timer assertions on both window edges (Undo present at window-1ms, absent at window), plus retraction confirmation, failure tolerance, and no deletion-implying copy; server-side both-paths assertions added to the dedupe suite",
+      "files": [
+        "packages/studio/src/components/CrashNotice.test.tsx",
+        "utilities/oauth-backend/src/crash-report-dedupe.test.ts"
+      ]
+    },
+    "T051": {
+      "status": "DONE",
+      "did": "Undo affordance visible for exactly CRASH_REPORT_UNDO_WINDOW_MS (exported, 30000), disappearing on expiry or dismissal, with copy that never implies deletion",
+      "files": [
+        "packages/studio/src/components/CrashNotice.tsx"
+      ]
+    },
+    "T052": {
+      "status": "DONE",
+      "did": "Retract branches: created -> retraction comment + close (never a delete of the issue); commented/reopened -> DELETE only this session's comment, leaving state and other comments untouched. Added the POST /report/crash/retract route, adapter, Fastify mirror, rewrite, and bundle-safety entry",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-pipeline.ts",
+        "api/report/crash-retract.ts",
+        "utilities/oauth-backend/src/server.ts",
+        "vercel.json",
+        "api/bundle-safety.test.ts"
+      ]
     }
   },
   "concerns": [
@@ -1639,6 +1700,10 @@
     },
     {
       "note": "T024 (create branch) landed in Phase 2 wave 5 rather than US1, because T018 the adapter has no pipeline entry point to call otherwise and would not compile. Its US1 tests (T021-T023) are therefore written after the code rather than before.",
+      "step": "implement"
+    },
+    {
+      "note": "The retraction route and the commentId response field are additions the contract document does not describe; contracts/crash-report-api.md should be reconciled with both.",
       "step": "implement"
     }
   ],
