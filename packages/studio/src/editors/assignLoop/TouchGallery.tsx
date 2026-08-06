@@ -240,7 +240,7 @@ import {
 // T118 — the rejection banner's border. `galleryTheme.ts` has no error token of
 // its own; `ui/theme.ts` is where the E/W/I severity palette lives, and this is
 // the same token KeyGridCell/KeyInspector already use for an error severity.
-import { ERROR_RED, ERROR_BG } from "../../ui/theme.ts";
+import { ERROR_RED } from "../../ui/theme.ts";
 
 const selectStyle: CSSProperties = gallerySelectMenuStyle(160);
 
@@ -1480,23 +1480,19 @@ const suggestionDenyBtnStyle: CSSProperties = {
 };
 
 /**
- * Message text style shared by all three suggestion-card variants. RED, not
- * green — the suggestion card is suppressed only when the current character
- * is already covered via COMPOSITION (`showChooser`'s own doc comment:
- * `currentCharBadge?.isComposable`); base/mirror coverage (signal (a),
- * `touchBaseDirectSet`) intentionally does NOT suppress it — a character
- * reachable via desktop-mirror inheritance but with no EXPLICIT touch
- * mechanism yet is exactly the "replace"/"longpress" suggestion's own target
- * scenario. So this still reads as "not yet implemented", matching the
- * badge's own 0-count color (`ERROR_RED`, charMechanisms.ts /
- * CharScrollStrip.tsx) rather than the "already green" treatment this card
- * previously kept even once suggestions were scoped to uncovered characters
- * only.
+ * Message text style shared by all three suggestion-card variants. GREEN
+ * (`#56d364`), not `ERROR_RED` and not neutral — mirrors MechanismGallery's
+ * own suggestion-card convention (its `visibleSuggestions` row, ~line 4291)
+ * so the two galleries' identical "proposal, not error" cards read as one
+ * consistent treatment: same green family as the card's own background/
+ * border and the green Accept button. `ERROR_RED` stays reserved for
+ * genuine error / 0-count "not yet implemented" badge states
+ * (charMechanisms.ts / CharScrollStrip.tsx).
  */
 const suggestionMessageStyle: CSSProperties = {
   margin: 0,
   fontSize: 12,
-  color: ERROR_RED,
+  color: "#56d364",
   fontFamily: FONT,
   fontWeight: 600,
 };
@@ -5005,11 +5001,20 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                 message: "Touch access method suggestion",
               })}
               style={{
-                // RED, not green — see suggestionMessageStyle's own doc
-                // comment for why (suppressed only for a composition-covered
-                // character; base/mirror coverage does not suppress it).
-                background: ERROR_BG,
-                border: `1px solid ${ERROR_RED}`,
+                // GREEN, not red and not blue — mirrors MechanismGallery's
+                // suggestion-card chrome (~line 4192-4193): a suggestion is
+                // a proposal/affordance the author can accept or deny, not
+                // an error state, and this keeps both galleries' identical
+                // card consistent with each other and with the card's own
+                // green Accept button. Literal hexes (not named theme
+                // tokens) because MechanismGallery itself uses these same
+                // literals and no named token exists for this exact green.
+                // `ERROR_RED`/`ERROR_BG` stay reserved for genuine
+                // error/0-count states; `ACCENT` (blue) already means
+                // "currently selected" elsewhere in this file, so reusing
+                // it here would be ambiguous.
+                background: "#0d2218",
+                border: "1px solid #238636",
                 borderRadius: 8,
                 padding: "10px 14px",
                 display: "flex",

@@ -2254,6 +2254,39 @@ describe("TouchGallery — abugida gate and empty-hostkey guard on the longpress
 
     expect(screen.queryByText(/Suggested: long-press/i)).not.toBeNull();
   });
+
+  // -------------------------------------------------------------------------
+  // Style — the suggestion card is GREEN, not red (product decision). Mirrors
+  // MechanismGallery.test.tsx's identical guard ("renders the suggestion row
+  // in the green family, not ERROR_RED/ERROR_BG") for the sibling gallery —
+  // this card previously shipped with ERROR_RED text on an ERROR_BG card
+  // (ambient "not yet implemented" styling) even though it is a
+  // proposal/affordance the author can accept or deny, not an error state.
+  // -------------------------------------------------------------------------
+
+  it("renders the suggestion card in the green family, not ERROR_RED/ERROR_BG", async () => {
+    seedStore({ withInventory: ["ä"] });
+    useWorkingCopyStore.getState().setIrAxes({ scriptClass: "alphabetic" });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const card = screen.getByRole("note", {
+      name: /Touch access method suggestion/i,
+    });
+    // #0d2218 / #238636 — the SAME green pair MechanismGallery's own
+    // suggestion row (and this file's chip/Accept-button treatment) already
+    // use. Never the old ERROR_RED (#f85149) / ERROR_BG (#2a0a0a).
+    expect(card.style.backgroundColor).toBe("rgb(13, 34, 24)"); // #0d2218
+    expect(card.style.borderColor).toBe("rgb(35, 134, 54)"); // #238636
+    expect(card.style.backgroundColor).not.toBe("rgb(42, 10, 10)"); // #2a0a0a
+    expect(card.style.borderColor).not.toBe("rgb(248, 81, 73)"); // #f85149
+
+    const suggestionText = screen.getByText(/Suggested: long-press/i);
+    expect(suggestionText.style.color).toBe("rgb(86, 211, 100)"); // #56d364
+    expect(suggestionText.style.color).not.toBe("rgb(248, 81, 73)"); // #f85149
+  });
 });
 
 // ---------------------------------------------------------------------------
