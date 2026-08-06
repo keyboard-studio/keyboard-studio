@@ -2059,6 +2059,8 @@ function isAlwaysKeepCategory(ch: string): boolean {
   return /^[\p{N}\p{P}\p{S}]$/u.test(ch);
 }
 
+export const ASCII_LETTER_RE = /^[A-Za-z]$/;
+
 /**
  * True iff `ch` is a plain ASCII Latin letter (U+0041-005A / U+0061-007A).
  * Narrower than \p{L} on purpose — a Latin-script letter OUTSIDE this range
@@ -2066,7 +2068,7 @@ function isAlwaysKeepCategory(ch: string): boolean {
  * fall-through, and stays eligible for the ordinary surplus check below.
  */
 function isAsciiLatinLetter(ch: string): boolean {
-  return /^[A-Za-z]$/.test(ch);
+  return ASCII_LETTER_RE.test(ch);
 }
 
 /**
