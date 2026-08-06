@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-08-04",
+  "lastUpdated": "2026-08-06",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -782,6 +782,14 @@
     "specs/058-touch-key-editor": {
       "title": "Feature Specification: Key-level touch layout editing",
       "hash": "sha256:cbf82bb4536eb5e3",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/060-crash-reporting": {
+      "title": "Feature Specification: Crash reporting — an unrecoverable error becomes one actionable, author-anonymous GitHub issue",
+      "hash": "sha256:2db2a4d89d3561b1",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
