@@ -94,6 +94,7 @@ import {
 import type { Location } from "../lib/location.ts";
 import { positionTokenToChar } from "../lib/stepWalk.ts";
 import type { StepWalkMap, StepWalkPositions } from "../lib/stepWalk.ts";
+import type { OutstandingSection } from "../lib/outstandingWork.ts";
 import { resolveMessage } from "../lib/i18nResolve.ts";
 import { createLookupQuestionLabel } from "./lookupQuestionLabel.ts";
 
@@ -146,6 +147,20 @@ export interface ProgressDot {
   /** Pre-resolved so a dot can render a refusal reason instead of a dead
    * control (FR-035 via FR-045) without a second `resolveLocation` call. */
   readonly resolution: LocationResolution;
+  /**
+   * How much required work this SECTION still owes — set only on a mark for a
+   * section the author has already passed that owes something (spec 061 FR-006,
+   * FR-008).
+   *
+   * Its PRESENCE is what distinguishes "outstanding behind" from "not yet
+   * reached", both of which are `kind: "upcoming"` and render the same hollow
+   * square (061 Q4 forbids a fourth shape, FR-031 keeps `ProgressDotKind` a
+   * three-member union). The renderer therefore branches on a field it can see,
+   * rather than guessing at the mark's position relative to the author — a guess
+   * `resolution.reason` cannot support, since `resolveLocation` returns
+   * `reachable` for a visited step whether it sits ahead or behind.
+   */
+  readonly outstandingCount?: number;
 }
 
 export interface ProgressDotsInput {
@@ -175,6 +190,19 @@ export interface ProgressDotsInput {
   readonly stepWalks?: StepWalkMap;
   /** Where the author is inside each step, keyed by step id (same store). */
   readonly stepCursors?: Readonly<Record<string, string>>;
+  /**
+   * What each section still owes, from the ONE derivation
+   * (`lib/outstandingWork.ts`, spec 061 FR-009). A section absent from this map
+   * owes nothing — the derivation never emits a zero.
+   *
+   * Threaded by `components/StudioFooter.tsx` exactly as `stepWalks` is, and for
+   * the same reason: the `decisions-layer` depcruise rule forbids
+   * `decisions/ -> stores/` even for a type-only import, so this module cannot
+   * read the derivation's store inputs itself. Absent behaves exactly as before
+   * this field existed — a passed section then reads complete, because nothing
+   * says otherwise.
+   */
+  readonly outstandingByStepId?: ReadonlyMap<string, OutstandingSection>;
 }
 
 // ---------------------------------------------------------------------------
@@ -212,8 +240,13 @@ const STAGE_LABEL_MESSAGE: Record<string, ReturnType<typeof msg>> = {
 };
 
 /** A manifest step's localized name, falling back to the raw id (never
- * blank, never throws) for a step this map does not (yet) name. */
-function stageLabel(stepId: string, i18n?: I18n): string {
+ * blank, never throws) for a step this map does not (yet) name.
+ *
+ * EXPORTED because FR-020 requires a section to be named identically in the
+ * footer row and in the top-bar outstanding-work nudge, from ONE shared label
+ * source. `hooks/useOutstandingWork.ts` injects this function into the pure
+ * derivation, so the nudge's label and the row's label are the same call. */
+export function stageLabel(stepId: string, i18n?: I18n): string {
   const descriptor = STAGE_LABEL_MESSAGE[stepId];
   return descriptor === undefined ? stepId : resolveMessage(i18n, descriptor);
 }
@@ -429,6 +462,79 @@ function aheadStageDot(
 }
 
 // ---------------------------------------------------------------------------
+// Behind-position stage dot — one per section the author has PASSED (spec 061
+// FR-002, FR-006; closes D-1/D-2).
+//
+// THE BRANCH THAT CALLS THIS ALREADY EXISTED AND HAD NOTHING TO CALL. The
+// stage-dot fallback below guards on "this step contributed nothing finer"
+// (`!isActiveStep && stepRecordDots.length === 0 && walkDotCount === 0`) and
+// then called `aheadStageDot`, which returns `null` for anything at or behind
+// the author (`if (stepIndex <= currentIndex) return null`). So a section that
+// records no survey answer and publishes no walk — `choose_base`, `marks`,
+// `convenience`, `carve`, `touch_seed_source`, five of the eleven — had NO
+// representation once passed, and the row read as a much shorter journey than
+// the author had actually walked. That is D-1/D-2 exactly.
+//
+// FR-003 IS SATISFIED BY THE RESOLVER, not by a second membership rule here. A
+// section the author's path BYPASSED must be absent, never a greyed-out
+// placeholder, and `resolveLocation` already answers that in both of its shapes:
+// an off-track step (`project_name` on the adapt track) resolves
+// `skipped-by-track`, and an off-spine fork the author hopped over
+// (`touch_seed_source`) is not in `visited`, so it resolves `beyond-gate`.
+// Requiring `reachable` therefore emits a mark for exactly the sections that
+// were walked.
+// ---------------------------------------------------------------------------
+
+/**
+ * The mark for `step` when it sits at or behind the author's position, or
+ * `null` when it does not belong in the row.
+ *
+ * `outstanding` is this section's entry from the one derivation
+ * (`lib/outstandingWork.ts`), or `undefined` when it owes nothing. Owing
+ * nothing reads `completed`; owing something keeps the EXISTING hollow shape
+ * (`kind: "upcoming"`, 061 Q4/FR-031 — no fourth member, no fourth
+ * `data-progress-dot-kind` value) and carries `outstandingCount`, which is what
+ * gives it an accessible name distinct from a not-yet-reached mark (FR-008).
+ */
+function behindStageDot(
+  step: { readonly id: string },
+  stepIndex: number,
+  currentIndex: number,
+  ctx: ResolveContext,
+  i18n: I18n | undefined,
+  outstanding: OutstandingSection | undefined,
+): ProgressDot | null {
+  // A terminal `activeStepId` ("done"/"unsupported") arrives as -1. The walk is
+  // over, so nothing is ahead and every visited section is behind — the guard is
+  // "not ahead", not "index < currentIndex", or the whole row would vanish the
+  // moment the author reached Output.
+  if (currentIndex !== -1 && stepIndex > currentIndex) return null;
+  // Reserved / out of scope for v1 — never earns a mark in either direction
+  // (see PACKAGE_STEP_ID).
+  if (step.id === PACKAGE_STEP_ID) return null;
+
+  const location: Location = { route: "survey", step: step.id as StepId };
+  const resolution = resolveLocation(location, ctx);
+  // Not walked, or not on this author's track — absent, never a placeholder
+  // (FR-003 / 057 FR-049a/d). See the block comment above for why the resolver
+  // is the whole test.
+  if (resolution.kind !== "reachable") return null;
+
+  const label = stageLabel(step.id, i18n);
+  if (outstanding === undefined) {
+    return { kind: "completed", id: step.id, location, label, resolution };
+  }
+  return {
+    kind: "upcoming",
+    id: step.id,
+    location,
+    label,
+    resolution,
+    outstandingCount: outstanding.count,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Within-step dots — one per STOP in a published walk (see lib/stepWalk.ts).
 //
 // Kinds inside a step, and why they are these three and not a fourth class:
@@ -481,6 +587,12 @@ function isCharacterWalk(positions: StepWalkPositions): boolean {
  * gallery and lets that in-page navigation take over. Kind mirrors the walk:
  * the author is either standing in it, finished with every character, or
  * has not settled it yet.
+ *
+ * `outstanding` closes D-3 (spec 061). A gallery left with uncovered letters
+ * renders a hollow mark sitting BEHIND the author that was, until this field,
+ * visually AND nominally identical to a stage not yet reached. Carrying the
+ * count here — on the same terms as `behindStageDot` — is what lets the
+ * renderer name the two apart (FR-008) without a fourth shape.
  */
 function collapsedWalkDot(
   stepId: string,
@@ -488,6 +600,7 @@ function collapsedWalkDot(
   isActiveStep: boolean,
   ctx: ResolveContext,
   i18n: I18n | undefined,
+  outstanding: OutstandingSection | undefined,
 ): ProgressDot {
   const location: Location = { route: "survey", step: stepId as StepId };
   const kind: ProgressDotKind = isActiveStep
@@ -501,6 +614,12 @@ function collapsedWalkDot(
     location,
     label: stageLabel(stepId, i18n),
     resolution: resolveLocation(location, ctx),
+    // Only on a mark the author has already passed: the current-position mark
+    // has its own "you are here" name, and the section's own in-page indicators
+    // are what report its remaining work while they are standing in it.
+    ...(!isActiveStep && outstanding !== undefined
+      ? { outstandingCount: outstanding.count }
+      : {}),
   };
 }
 
@@ -512,9 +631,10 @@ function buildWalkDots(
   ctx: ResolveContext,
   lookupQuestionLabel: (questionId: string) => string | undefined,
   i18n: I18n | undefined,
+  outstanding: OutstandingSection | undefined,
 ): ProgressDot[] {
   if (isCharacterWalk(positions)) {
-    return [collapsedWalkDot(stepId, positions, isActiveStep, ctx, i18n)];
+    return [collapsedWalkDot(stepId, positions, isActiveStep, ctx, i18n, outstanding)];
   }
   const shown = positions.filter((position) => !DOTLESS_QUESTION_IDS.has(position.id));
   return shown.map((position) => {
@@ -569,6 +689,7 @@ export function buildProgressDots(input: ProgressDotsInput): readonly ProgressDo
   const { ctx, i18n } = input;
   const walks = input.stepWalks ?? {};
   const cursors = input.stepCursors ?? {};
+  const outstandingByStepId = input.outstandingByStepId;
   const activeStepId = ctx.traversal.activeStepId;
 
   // Which stops each step's walk already covers — see buildCompletedDots's
@@ -609,6 +730,8 @@ export function buildProgressDots(input: ProgressDotsInput): readonly ProgressDo
     row.push(...stepRecordDots);
     byStep.delete(step.id);
 
+    const outstanding = outstandingByStepId?.get(step.id);
+
     const positions = walks[step.id];
     let markedCurrent = false;
     let walkDotCount = 0;
@@ -621,6 +744,7 @@ export function buildProgressDots(input: ProgressDotsInput): readonly ProgressDo
         ctx,
         lookupQuestionLabel,
         i18n,
+        outstanding,
       );
       row.push(...walkDots);
       walkDotCount = walkDots.length;
@@ -639,9 +763,18 @@ export function buildProgressDots(input: ProgressDotsInput): readonly ProgressDo
     // author has answered and then jumped behind carries both its recorded
     // question dots AND a stage dot — the "mix of empty and complete dots for
     // the same stage" the row was reported showing.
+    //
+    // Two directions, one branch (spec 061 FR-002). `aheadStageDot` answers for
+    // a stage still in front of the author; `behindStageDot` answers for one
+    // they have passed. Before 061 only the first existed, so a passed section
+    // with nothing finer to show simply vanished from the row (D-1/D-2). The
+    // two are mutually exclusive by their own index guards, so trying the
+    // second only when the first declines is a lookup, not a precedence rule.
     if (!isActiveStep && stepRecordDots.length === 0 && walkDotCount === 0) {
-      const ahead = aheadStageDot(step, i, currentIndex, ctx, i18n);
-      if (ahead !== null) row.push(ahead);
+      const stageDot =
+        aheadStageDot(step, i, currentIndex, ctx, i18n) ??
+        behindStageDot(step, i, currentIndex, ctx, i18n, outstanding);
+      if (stageDot !== null) row.push(stageDot);
     }
   }
 

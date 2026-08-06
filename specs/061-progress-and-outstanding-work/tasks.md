@@ -18,11 +18,11 @@ own.
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T001** [P] Add `required?: boolean` to `StepWalkPosition`, with a docstring stating the
+- [x] **T001** [P] Add `required?: boolean` to `StepWalkPosition`, with a docstring stating the
       default explicitly — **absent means NOT required** (research R4; absent-means-required would
       make every existing publisher instantly report work the author does not owe) ·
       `packages/studio/src/lib/stepWalk.ts`
-- [ ] **T002** [P] Export the section-label resolver `stageLabel(stepId, i18n)` (currently module-
+- [x] **T002** [P] Export the section-label resolver `stageLabel(stepId, i18n)` (currently module-
       private at `progressDots.ts:216`) so the nudge and the row draw section names from **one**
       shared source per FR-020 ·
       `packages/studio/src/decisions/progressDots.ts`
@@ -36,7 +36,7 @@ row and the nudge. No story work begins until it exists and is unit-tested.
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T003** [P] Create the pure derivation: `OutstandingSection`, `OutstandingWork`,
+- [x] **T003** [P] Create the pure derivation: `OutstandingSection`, `OutstandingWork`,
       `OutstandingWorkInputs`, and `outstandingWork(inputs)` returning `sections` (manifest order),
       `byStepId`, and `nudgeTarget` (the manifest-earliest section **strictly behind**
       `activeStepId` that owes required work, else `null`). Count = uncovered inventory characters
@@ -45,23 +45,23 @@ row and the nudge. No story work begins until it exists and is unit-tested.
       `dashboard/` import; total over an empty `walks`, empty `visited`, and a terminal
       `activeStepId` (FR-009, FR-010, FR-011, FR-012, FR-015, FR-016) ·
       `packages/studio/src/lib/outstandingWork.ts`
-- [ ] **T004** [P] Add the new message ids to the English catalog — `nav.outstandingWork.button`,
+- [~] **T004** [P] PARTIAL (Phase 3): `footer.dot.outstandingBehind` / `footer.dot.notYetReached` landed and `footer.dot.upcoming.ariaLabel` retired. The `nav.outstandingWork.*` ids land with US2 and the `output.*` ids with US3 — each via `messages:extract` in its own phase. Add the new message ids to the English catalog — `nav.outstandingWork.button`,
       `nav.outstandingWork.count`, `footer.dot.outstandingBehind`, `footer.dot.notYetReached`,
       `output.coverageComplaint.{title,body,proceed,goBack}`,
       `output.publishRefused.coverage`. New ids only; re-point nothing (FR-008, FR-021, FR-024,
       FR-026) · `packages/studio/src/locales/en/messages.json`
-- [ ] **T005** [P] Add the same ids to the French catalog so both i18n tiers stay green under
+- [~] **T005** [P] PARTIAL (Phase 3): same split as T004. Add the same ids to the French catalog so both i18n tiers stay green under
       `pnpm lint` · `packages/studio/src/locales/fr/messages.json`
 
 **⟶ Wait for Wave 1 to finish, then:**
 
-- [ ] **T006** [P] Unit-test the derivation, covering the four cases the spec's Test surface names:
+- [x] **T006** [P] Unit-test the derivation, covering the four cases the spec's Test surface names:
       `outstandingWork({ walks: {}, coverage: blocked })` reports **both** galleries (the restored-
       draft case, FR-013); `nudgeTarget` ignores the current section and everything ahead (FR-018)
       and picks the manifest-earliest when several are owed (SC-005); a marked-for-later character
       still raises `count` (FR-014, A3); an unanswered **optional** stop contributes nothing
       (FR-007) · `packages/studio/src/lib/outstandingWork.test.ts`
-- [ ] **T007** [P] Add the React composition seam — reads `useInventoryCoverageGate()`,
+- [x] **T007** [P] Add the React composition seam — reads `useInventoryCoverageGate()`,
       `useStepWalkStore`, `useSurveySessionStore` and the `stageLabel` resolver from T002, memoizes
       on those inputs, and calls `outstandingWork()`. Mirror `useAccountedForGate.ts` exactly; the
       hook holds every store read so the pure module holds none (FR-011, FR-016) ·
@@ -83,7 +83,7 @@ per visible station, and no mark is addressed to a letter.
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T008** [P] [US1] New unit test pinning the row's composition: an **exact ordered match** of
+- [x] **T008** [P] [US1] New unit test pinning the row's composition: an **exact ordered match** of
       the full `(step, kind)` sequence from `buildProgressDots` against the real
       `steps/manifest.ts` with a project open — not a subset matcher, not a minimum count, not a
       snapshot (SC-008, closing D-8). Same file asserts: a bypassed `spine: false` side trail
@@ -91,7 +91,7 @@ per visible station, and no mark is addressed to a letter.
       no `ProgressDot.id` is ever a character token (FR-033, SC-002); a marks series with two
       visible stations yields exactly two marks (SC-003) ·
       `packages/studio/src/decisions/progressDots.manifestRow.test.ts`
-- [ ] **T009** [P] [US1] Replace the shell-level assertion at `StudioShell.test.tsx:2614` —
+- [x] **T009** [P] [US1] Replace the shell-level assertion at `StudioShell.test.tsx:2614` —
       `querySelectorAll("[data-progress-dot-kind]").length` `.toBeGreaterThan(0)` passes with a
       single mark, which **is** the reported defect — with an exact expected count (research R8) ·
       `packages/studio/src/StudioShell.test.tsx`
@@ -100,7 +100,7 @@ per visible station, and no mark is addressed to a letter.
 
 **Wave 2 — independent (different files):**
 
-- [ ] **T010** [P] [US1] Give a passed section a mark: add a *behind*-position counterpart to
+- [x] **T010** [P] [US1] Give a passed section a mark: add a *behind*-position counterpart to
       `aheadStageDot` in the manifest pass of `buildProgressDots`. The existing fallback branch
       (`!isActiveStep && stepRecordDots.length === 0 && walkDotCount === 0`, `progressDots.ts:642`)
       currently calls `aheadStageDot`, which returns `null` for anything at or behind the author —
@@ -111,7 +111,7 @@ per visible station, and no mark is addressed to a letter.
       `ProgressDotKind` stays exactly `"completed" | "current" | "upcoming"` — no fourth member and
       no fourth `data-progress-dot-kind` value (FR-002, FR-006, FR-031, Q4; closes D-1/D-2) ·
       `packages/studio/src/decisions/progressDots.ts`
-- [ ] **T011** [P] [US1] Publish the marks series' within-step walk from its already-computed
+- [x] **T011** [P] [US1] Publish the marks series' within-step walk from its already-computed
       `visibleStations` array (`MarksSeriesStep.tsx:360`) — `publishStepWalk("marks", positions)`
       with `required: true` per station (A2), one position per **visible** station only. Honour an
       external arrival cursor to set `stationIndex`, **except** when the evidence-changed reset has
@@ -119,15 +119,15 @@ per visible station, and no mark is addressed to a letter.
       question segments and `liveResolveContext()` passes `stepPositions`, so this makes each
       station individually jumpable with no resolver change (FR-004; closes D-4) ·
       `packages/studio/src/survey/marks/MarksSeriesStep.tsx`
-- [ ] **T012** [P] [US1] Publish per-question `required` in the survey walk, sourced from the
+- [x] **T012** [P] [US1] Publish per-question `required` in the survey walk, sourced from the
       surface that owns the question rather than inferred by the row (FR-007) ·
       `packages/studio/src/survey/SurveyRunner.tsx`
-- [ ] **T013** [P] [US1] Publish `required: true` on character walk positions — every inventory
+- [x] **T013** [P] [US1] Publish `required: true` on character walk positions — every inventory
       character is required work (A1) · `packages/studio/src/hooks/useCharWalkPosition.ts`
 
 **⟶ Wait for Wave 2 to finish, then:**
 
-- [ ] **T014** [US1] Thread `outstandingByStepId` from `useOutstandingWork()` into
+- [x] **T014** [US1] Thread `outstandingByStepId` from `useOutstandingWork()` into
       `buildProgressDots` exactly as `stepWalks` already arrives (the `decisions-layer` depcruise
       rule forbids `decisions/ -> stores/` even for a type-only import, so the derivation must be an
       input), and give the two hollow shapes **distinct accessible names** through the catalog:
@@ -137,11 +137,11 @@ per visible station, and no mark is addressed to a letter.
 
 **⟶ Wait for T014, then:**
 
-- [ ] **T015** [P] [US1] a11y test: an outstanding mark **behind** the author and an unreached mark
+- [x] **T015** [P] [US1] a11y test: an outstanding mark **behind** the author and an unreached mark
       **ahead** render the same shape and the same `data-progress-dot-kind="upcoming"` but have
       different accessible names (FR-008, house rule 9) ·
       `packages/studio/src/components/StudioFooter.a11y.test.tsx`
-- [ ] **T016** [P] [US1] Extend the marks-series test: two visible stations publish a two-position
+- [x] **T016** [P] [US1] Extend the marks-series test: two visible stations publish a two-position
       walk, each station addressable by its pinned id, and the evidence-changed reset still wins
       over an arrival cursor (FR-004, SC-003) ·
       `packages/studio/src/survey/marks/MarksSeriesStep.test.tsx`

@@ -103,6 +103,31 @@ function completedIds(dots: readonly ProgressDot[]): string[] {
   return dots.filter((d) => d.kind === "completed").map((d) => d.id);
 }
 
+/** Every manifest step id, for telling a SECTION mark apart from a QUESTION dot. */
+const MANIFEST_STEP_IDS: ReadonlySet<string> = new Set(manifest.map((s) => s.id));
+
+/**
+ * Completed QUESTION dots only — the record-derived and walk-derived stops.
+ *
+ * Spec 061 FR-002 gave a passed SECTION a mark of its own (closing D-1/D-2), so
+ * `completedIds` now mixes two classes. The tests below that predate 061 are
+ * about the question class specifically, and reading their expectations means
+ * seeing the questions rather than the sections around them.
+ *
+ * This is NOT the "subset matcher" D-8 is about: the row's full composition
+ * against the real manifest is pinned by an EXACT ordered match in
+ * progressDots.manifestRow.test.ts (SC-008). This helper narrows a focus, it
+ * does not relax a count.
+ */
+function completedQuestionIds(dots: readonly ProgressDot[]): string[] {
+  return completedIds(dots).filter((id) => !MANIFEST_STEP_IDS.has(id));
+}
+
+/** Completed SECTION marks — the 061 class. */
+function completedSectionIds(dots: readonly ProgressDot[]): string[] {
+  return completedIds(dots).filter((id) => MANIFEST_STEP_IDS.has(id));
+}
+
 function upcomingIds(dots: readonly ProgressDot[]): string[] {
   return dots.filter((d) => d.kind === "upcoming").map((d) => d.id);
 }
@@ -126,7 +151,12 @@ describe("completed dots — from the decision record", () => {
       ctx: ctxWith(),
       lookupQuestionLabel: stubLabel,
     });
-    expect(completedIds(dots)).toEqual(["il_language_english", "il_language_autonym"]);
+    expect(completedQuestionIds(dots)).toEqual(["il_language_english", "il_language_autonym"]);
+    // Spec 061 FR-002: the two sections the author has passed that record no
+    // answer of their own now carry a section mark, where before they vanished
+    // from the row entirely (D-1/D-2). The row's full composition against the
+    // real manifest is pinned exactly in progressDots.manifestRow.test.ts.
+    expect(completedSectionIds(dots)).toEqual(["choose_base", "track"]);
   });
 
   it("a revised question — collapsed by effectiveEntries — has exactly one dot", () => {
@@ -140,7 +170,7 @@ describe("completed dots — from the decision record", () => {
       ctx: ctxWith(),
       lookupQuestionLabel: stubLabel,
     });
-    expect(completedIds(dots)).toEqual(["il_language_english"]);
+    expect(completedQuestionIds(dots)).toEqual(["il_language_english"]);
   });
 
   it("PRE_IDENTITY_STEP_ID entries produce no dot — there is no step to jump to", () => {
@@ -153,7 +183,7 @@ describe("completed dots — from the decision record", () => {
       ctx: ctxWith(),
       lookupQuestionLabel: stubLabel,
     });
-    expect(completedIds(dots)).toEqual(["il_language_english"]);
+    expect(completedQuestionIds(dots)).toEqual(["il_language_english"]);
   });
 
   it("editor-action and base-contribution entries never earn a completed dot of their own", () => {
@@ -166,7 +196,7 @@ describe("completed dots — from the decision record", () => {
       ctx: ctxWith(),
       lookupQuestionLabel: stubLabel,
     });
-    expect(completedIds(dots)).toEqual(["il_language_english"]);
+    expect(completedQuestionIds(dots)).toEqual(["il_language_english"]);
   });
 
   it("a truncated record yields dots only for the entries that survived — nothing fabricated", () => {
@@ -180,7 +210,7 @@ describe("completed dots — from the decision record", () => {
       ctx: ctxWith(),
       lookupQuestionLabel: stubLabel,
     });
-    expect(completedIds(dots)).toEqual(["il_language_autonym"]);
+    expect(completedQuestionIds(dots)).toEqual(["il_language_autonym"]);
   });
 
   it("label comes from the injected lookup, falling back to the raw id", () => {
@@ -202,8 +232,13 @@ describe("completed dots — from the decision record", () => {
     const ctx = ctxWith();
     const beforeDots = buildProgressDots({ record: before, ctx, lookupQuestionLabel: stubLabel });
     const afterDots = buildProgressDots({ record: after, ctx, lookupQuestionLabel: stubLabel });
-    expect(completedIds(beforeDots)).toEqual(["il_language_english"]);
-    expect(completedIds(afterDots)).toEqual(["il_language_english", "some_optional_question"]);
+    expect(completedQuestionIds(beforeDots)).toEqual(["il_language_english"]);
+    expect(completedQuestionIds(afterDots)).toEqual([
+      "il_language_english",
+      "some_optional_question",
+    ]);
+    // The section marks around them are unchanged by the growth.
+    expect(completedSectionIds(beforeDots)).toEqual(completedSectionIds(afterDots));
   });
 });
 
@@ -307,8 +342,21 @@ describe("upcoming dots — the projected remaining path", () => {
       }),
       lookupQuestionLabel: stubLabel,
     });
-    expect(completedIds(dots)).toEqual(["il_language_english", "il_language_autonym"]);
+    expect(completedQuestionIds(dots)).toEqual(["il_language_english", "il_language_autonym"]);
+    // The five passed sections that record no answer of their own (spec 061
+    // FR-002). `touch_seed_source` is absent from BOTH classes — the author
+    // hopped over it, and FR-003 / 057 FR-049a/d require absence rather than a
+    // greyed-out placeholder in either direction.
+    expect(completedSectionIds(dots)).toEqual([
+      "choose_base",
+      "track",
+      "marks",
+      "convenience",
+      "carve",
+      "mechanisms",
+    ]);
     expect(upcomingIds(dots)).not.toContain("touch_seed_source");
+    expect(completedSectionIds(dots)).not.toContain("touch_seed_source");
   });
 });
 
@@ -386,7 +434,7 @@ describe("within-step walk dots", () => {
       stepCursors: { characters: "some_optional_question" },
     });
     // The three stops, not one "Characters" dot.
-    expect(completedIds(dots)).toEqual(["il_language_english", "il_language_autonym"]);
+    expect(completedQuestionIds(dots)).toEqual(["il_language_english", "il_language_autonym"]);
     expect(currentDot(dots)?.id).toBe("some_optional_question");
     expect(dots.some((d) => d.id === "characters")).toBe(false);
   });
@@ -644,7 +692,7 @@ describe("il_language_code — the confirmation question, now earns a dot", () =
       ctx: ctxWith(),
       lookupQuestionLabel: stubLabel,
     });
-    expect(completedIds(dots)).toEqual(["il_language_english", "il_language_code"]);
+    expect(completedQuestionIds(dots)).toEqual(["il_language_english", "il_language_code"]);
   });
 
   it("earns a dot from a published walk too — both sources", () => {
@@ -738,7 +786,14 @@ describe("jumping back (T065, FR-063)", () => {
     );
     // The completed QUESTION dots (from the record, never from history) are
     // untouched by the jump — this is what FR-063 actually protects.
-    expect(completedIds(after)).toEqual(completedIds(before));
-    expect(completedIds(after)).toEqual(["il_language_english", "il_language_autonym"]);
+    expect(completedQuestionIds(after)).toEqual(completedQuestionIds(before));
+    expect(completedQuestionIds(after)).toEqual(["il_language_english", "il_language_autonym"]);
+    // The SECTION marks legitimately DO move: `marks`/`convenience`/`carve`/
+    // `mechanisms` sat behind the old position and read complete there; from the
+    // landing point they are ahead again and read as the look-ahead. That is
+    // FR-063's "dots ahead of the landing point are still present" — they are
+    // present, in the class that matches where the author now stands.
+    expect(completedSectionIds(before)).toContain("mechanisms");
+    expect(completedSectionIds(after)).not.toContain("mechanisms");
   });
 });

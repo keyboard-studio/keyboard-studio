@@ -2611,7 +2611,25 @@ describe("StudioShell — journey footer mount (T052, FR-040)", () => {
 
     const footer = document.querySelector("footer");
     expect(footer).not.toBeNull();
-    expect(footer!.querySelectorAll("[data-progress-dot-kind]").length).toBeGreaterThan(0);
+
+    // EXACTLY two marks, not merely "some" (research R8; `.toBeGreaterThan(0)`
+    // is what let the single-mark defect through). No working copy exists yet
+    // (`baseKeyboard` is null), so `resolveLocation` refuses every OTHER
+    // manifest step with reason "no-project", not "beyond-gate" — and
+    // `aheadStageDot` only turns "beyond-gate" into a mark. That leaves
+    // `identity` as the sole contributor:
+    //   1. "upcoming" — the published walk position `il_language_english`
+    //      (`done: false`). No `stepCursor` was published for "identity" in
+    //      this test, so it does not match the (absent) cursor and falls to
+    //      the `done ? "completed" : "upcoming"` branch rather than "current".
+    //   2. "current" — the always-present stage-level fallback dot
+    //      (`buildProgressDots`'s `isActiveStep && !markedCurrent` branch),
+    //      because no walk dot claimed the "current" role above.
+    expect(
+      Array.from(footer!.querySelectorAll("[data-progress-dot-kind]")).map((d) =>
+        d.getAttribute("data-progress-dot-kind"),
+      ),
+    ).toEqual(["upcoming", "current"]);
   });
 
   it("does not mount the footer on the welcome screen", async () => {

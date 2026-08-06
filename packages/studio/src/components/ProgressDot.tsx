@@ -9,9 +9,16 @@
 //
 // Three classes, three shapes (FR-046 — never colour alone):
 //   completed — a filled CIRCLE. The author answered this question.
-//   upcoming  — a hollow SQUARE. A stage still ahead; its accessible name
-//               says so explicitly (FR-043), so it cannot be mistaken for
-//               progress even by a sighted user who does not notice the shape.
+//   upcoming  — a hollow SQUARE, in TWO situations that share the shape by
+//               deliberate decision (spec 061 Q4: no fourth mark shape) and
+//               therefore MUST NOT share an accessible name (061 FR-008):
+//                 · a stage still AHEAD — "not yet reached" (057 FR-043); and
+//                 · a section BEHIND the author that still owes required work.
+//               `ProgressDot.outstandingCount` is what tells them apart, and it
+//               is a structural test rather than a guess about position:
+//               `resolveLocation` returns `reachable` for a visited step whether
+//               it sits ahead of or behind the author, so `resolution.reason`
+//               cannot carry the distinction.
 //   current   — a LARGER circle with a visible ring border AND
 //               `aria-current="step"` — a semantic non-colour cue on top of
 //               the visual one, exactly what FR-060 asks for. It is not a
@@ -26,6 +33,7 @@
 
 import type { CSSProperties } from "react";
 import { useLingui } from "@lingui/react/macro";
+import { plural } from "@lingui/core/macro";
 import { CSS_ACCENT, CSS_BORDER, CSS_TEXT } from "../ui/theme.ts";
 import type { ProgressDot as ProgressDotData } from "../decisions/progressDots.ts";
 
@@ -49,6 +57,11 @@ export function ProgressDot({ dot, onActivate }: ProgressDotProps) {
   const { t } = useLingui();
   const size = SIZE[dot.kind];
 
+  // The hollow square's two meanings, named apart (spec 061 FR-008). Hoisted so
+  // the plural below reads off a plain identifier — that is what makes the
+  // extracted ICU placeholder `{outstandingCount}` rather than a positional one.
+  const outstandingCount = dot.outstandingCount;
+
   const ariaLabel =
     dot.kind === "completed"
       ? t({
@@ -60,10 +73,18 @@ export function ProgressDot({ dot, onActivate }: ProgressDotProps) {
             id: "footer.dot.current.ariaLabel",
             message: `${{ label: dot.label }} — you are here`,
           })
-        : t({
-            id: "footer.dot.upcoming.ariaLabel",
-            message: `${{ label: dot.label }} — not yet reached`,
-          });
+        : outstandingCount !== undefined
+          ? t({
+              id: "footer.dot.outstandingBehind",
+              message: plural(outstandingCount, {
+                one: `${{ label: dot.label }} — # item still needs attention`,
+                other: `${{ label: dot.label }} — # items still need attention`,
+              }),
+            })
+          : t({
+              id: "footer.dot.notYetReached",
+              message: `${{ label: dot.label }} — not yet reached`,
+            });
 
   const shapeStyle: CSSProperties =
     dot.kind === "upcoming"

@@ -516,9 +516,23 @@ export function SurveyRunner({
     [stack, cursor, currentValue],
   );
 
+  // `required` is published per question, from the question descriptor this
+  // runner already holds — spec 061 FR-007 requires the surface that OWNS a
+  // question to declare its required-ness rather than letting the footer row
+  // infer it. A `notice` is excluded because it records no answer at all, so it
+  // could never be "answered" and would report outstanding work forever; that is
+  // the same carve-out `canAdvance` and `buildResumeStack` already make.
   const positions: StepWalkPositions = useMemo(
-    () => stack.map((entry, i) => ({ id: entry.questionId, done: hasValue(liveValues[i]) })),
-    [stack, liveValues],
+    () =>
+      stack.map((entry, i) => {
+        const question = index.get(entry.questionId);
+        return {
+          id: entry.questionId,
+          done: hasValue(liveValues[i]),
+          required: question !== undefined && question.type !== "notice" && question.required === true,
+        };
+      }),
+    [stack, liveValues, index],
   );
 
   const answerDraft: AnswerDraft = useMemo(() => {

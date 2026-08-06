@@ -66,6 +66,25 @@ export interface StepWalkPosition {
    * boundary, deliberately unchanged here).
    */
   readonly done: boolean;
+  /**
+   * Whether leaving this stop unsettled leaves REQUIRED work behind — the input
+   * `lib/outstandingWork.ts` counts, and which both the footer row and the
+   * top-bar nudge report.
+   *
+   * ABSENT MEANS **NOT** REQUIRED. That default is deliberate and is the safe
+   * one: absent-means-required would make every publisher predating this field
+   * instantly contribute outstanding work, so the row would report work the
+   * author does not owe — the same class of dishonesty the outstanding-work
+   * derivation exists to remove. The conservative default is also correct in
+   * practice, because a flow gates its own advance: a section cannot sit BEHIND
+   * the author with a genuinely-required question unanswered.
+   *
+   * Declared by the surface that OWNS the stop, never inferred by a consumer
+   * (FR-007): a character walk and a marks station publish `true` (every
+   * inventory character must be handled, and the marks series gates its own
+   * advance), while `SurveyRunner` publishes each question's own `required`.
+   */
+  readonly required?: boolean;
 }
 
 /** A step's ordered stops. Published by the ONE component that owns the walk. */

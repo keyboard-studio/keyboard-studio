@@ -12,6 +12,7 @@ import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { MarksSeriesStep, computeMarksGate } from "./MarksSeriesStep.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useStepWalkStore } from "../../stores/stepWalkStore.ts";
 
 const ACUTE = "́";
 
@@ -31,6 +32,12 @@ function seedAlphabet(marks: string[], bases: string[] = ["e"]): void {
 beforeEach(() => {
   useWorkingCopyStore.getState().reset();
   useSurveySessionStore.getState().reset();
+  // The within-step walk store (spec 061) is a separate, un-reset-by-default
+  // module store — the new "arrival cursor" cases below deliberately leave a
+  // cursor pointing at a non-first station, which would otherwise leak into
+  // an unrelated later test in this file and land its first render on the
+  // wrong station.
+  useStepWalkStore.getState().reset();
 });
 
 afterEach(() => {
@@ -751,5 +758,153 @@ describe("MarksSeriesStep — S4 open choice (US4)", () => {
     // SC-005 holds on the open-choice rendering too.
     expect(station.textContent).not.toMatch(/unicode/i);
     expect(station.textContent).not.toMatch(/normali[sz]/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Within-step walk + arrival cursor (spec 061 T016, FR-004/SC-003; closes
+// D-4). Before this, the series' up-to-four stations shared ONE footer mark
+// even while the author stood inside them, and no station was individually
+// jumpable. These cases pin the wiring end to end: the published walk shape,
+// external-cursor arrival, and that the 052 FR-023 evidence-changed reset
+// still wins a race against a stale arrival cursor.
+// ---------------------------------------------------------------------------
+
+describe("MarksSeriesStep — within-step walk & arrival cursor (061 T016)", () => {
+  /**
+   * A single mark on a single base ("e" + acute): fully attested, every pair
+   * composes, and there is nothing to overlap or stack — exactly TWO visible
+   * stations, `marks_attachment` then `marks_output_form` (the output-form
+   * notice), never `marks_treatment`/`marks_stacking`. This is the SAME
+   * fixture the SC-002 "at most TWO marks screens" test above already walks
+   * through both stations by name, so the 2-station shape is not a new
+   * assumption — confirmed empirically (a probe walking the series and
+   * logging every rendered testid saw exactly these two and nothing else)
+   * before this test was written on top of it.
+   */
+  function seedTwoStationAlphabet(): void {
+    seedAlphabet([ACUTE], ["e"]);
+  }
+
+  it("publishes a TWO-position walk, one per visible station, each required and in series order", () => {
+    seedTwoStationAlphabet();
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    expect(screen.getByTestId("marks-attachment")).toBeTruthy();
+
+    const positions = useStepWalkStore.getState().walks["marks"];
+    expect(positions).toEqual([
+      { id: "marks_attachment", done: true, required: true },
+      { id: "marks_output_form", done: false, required: true },
+    ]);
+  });
+
+  it("each pinned station id is individually addressable — an external arrival cursor moves the series to it", () => {
+    seedTwoStationAlphabet();
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    // Starts at the first station — nothing has requested otherwise yet.
+    expect(screen.getByTestId("marks-attachment")).toBeTruthy();
+    expect(screen.queryByTestId("marks-output-form")).toBeNull();
+
+    // The footer mark for "marks_output_form" is activated (jumpToLocation's
+    // job in the real app) — simulated directly at the store, exactly as the
+    // task names it: `setStepCursor("marks", "<station id>")`.
+    act(() => {
+      useStepWalkStore.getState().setStepCursor("marks", "marks_output_form");
+    });
+
+    expect(screen.getByTestId("marks-output-form")).toBeTruthy();
+    expect(screen.queryByTestId("marks-attachment")).toBeNull();
+  });
+
+  it("the evidence-changed reset still wins over an arrival cursor naming a later station (052 FR-023)", () => {
+    seedTwoStationAlphabet();
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+
+    // Land on the second station via an arrival cursor, same as the case
+    // above — this is the state a footer-mark jump would leave behind.
+    act(() => {
+      useStepWalkStore.getState().setStepCursor("marks", "marks_output_form");
+    });
+    expect(screen.getByTestId("marks-output-form")).toBeTruthy();
+
+    // Now the EVIDENCE changes — a different mark on a different base, which
+    // is exactly what `alphabetKey` is derived from
+    // (`confirmedAlphabetKey(alphabet)`). Kept to the SAME single-mark/
+    // single-base shape (still exactly `marks_attachment` +
+    // `marks_output_form`, nothing more) so this case isolates the ONE thing
+    // FR-023 governs — precedence over a stale cursor — from a second,
+    // unrelated station-count change. The cursor in the store still names
+    // "marks_output_form" at this instant (it is not cleared as part of the
+    // edit); FR-023 requires the reset to win anyway, because the class the
+    // cursor pointed at may have been re-seeded and has not been walked
+    // again yet.
+    act(() => {
+      useWorkingCopyStore.getState().recordPhase({
+        phase: "B",
+        answers: [],
+        alphabet: {
+          bases: ["a"],
+          marks: ["̀"],
+          attestedStacks: [{ base: "a", marks: ["̀"] }],
+          declaredRoles: {},
+        },
+      });
+    });
+
+    // Back at the first station, not the one the stale cursor names.
+    expect(screen.getByTestId("marks-attachment")).toBeTruthy();
+    expect(screen.queryByTestId("marks-output-form")).toBeNull();
+  });
+
+  it("the reset wins even when the evidence change RESHAPES the station list under the cursor", () => {
+    // The harder shape of the same requirement, and the one that caught a real
+    // ordering defect while 061 was being built. When the evidence change also
+    // changes WHICH stations are visible, a stale `stationIndex` surviving into
+    // the same commit would make the walk-publishing effect write a cursor
+    // naming a DIFFERENT station than the author was on — which the arrival
+    // effect would then read straight back in, quietly defeating FR-023. The
+    // reset is applied during render precisely so no such commit exists; this
+    // case is what proves it, and it fails if that ever moves back into an
+    // effect.
+    seedTwoStationAlphabet();
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    act(() => {
+      useStepWalkStore.getState().setStepCursor("marks", "marks_output_form");
+    });
+    expect(screen.getByTestId("marks-output-form")).toBeTruthy();
+
+    // Two marks attested on the SAME base cluster into one mark class, which
+    // raises `marks_treatment` — a station that did not exist a moment ago, at
+    // the index the stale cursor's station used to occupy.
+    act(() => {
+      useWorkingCopyStore.getState().recordPhase({
+        phase: "B",
+        answers: [],
+        alphabet: {
+          bases: ["e"],
+          marks: [ACUTE, "̀"],
+          attestedStacks: [
+            { base: "e", marks: [ACUTE] },
+            { base: "e", marks: ["̀"] },
+          ],
+          declaredRoles: {},
+        },
+      });
+    });
+
+    expect(screen.getByTestId("marks-attachment")).toBeTruthy();
+    expect(screen.queryByTestId("marks-treatment")).toBeNull();
+    expect(screen.queryByTestId("marks-output-form")).toBeNull();
+    // And the published cursor agrees — the store is not left naming a station
+    // the author is not on.
+    expect(useStepWalkStore.getState().cursors["marks"]).toBe("marks_attachment");
   });
 });

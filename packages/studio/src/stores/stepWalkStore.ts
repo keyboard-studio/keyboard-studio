@@ -50,7 +50,12 @@ function samePositions(a: StepWalkPositions | undefined, b: StepWalkPositions): 
   for (let i = 0; i < a.length; i++) {
     const x = a[i]!;
     const y = b[i]!;
-    if (x.id !== y.id || x.label !== y.label || x.done !== y.done) return false;
+    // `required` is compared alongside the other three: a stop whose
+    // required-ness changed (an evidence-driven question becoming optional)
+    // changes what lib/outstandingWork.ts counts, so it must re-publish.
+    if (x.id !== y.id || x.label !== y.label || x.done !== y.done || x.required !== y.required) {
+      return false;
+    }
   }
   return true;
 }

@@ -87,6 +87,14 @@ export function useCharWalkPosition({
         id: charToPositionToken(char),
         label: charWalkLabel(char),
         done: isDone(char),
+        // Every inventory character is required work (spec 061 A1: "all letters
+        // have to be handled at some point"). Declared by the publisher, per
+        // FR-007 — though note lib/outstandingWork.ts deliberately counts a
+        // gallery's characters from the coverage gate rather than from this
+        // walk, because the walk is session-scoped and absent after a reload
+        // (FR-013). This flag is what makes the declaration honest at the
+        // vocabulary level, not what the count is read from.
+        required: true,
       })),
     // `isDone` closes over the gallery's live assignment state, so it must be a
     // dependency: a character becoming covered has to re-publish, or its dot

@@ -64,6 +64,9 @@ import type { MarkInputOrder } from "@keyboard-studio/contracts";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { peekStepCursor, useStepWalkStore } from "../../stores/stepWalkStore.ts";
+import { MARKS_STEP_ID } from "../../steps/reducer.ts";
+import type { StepWalkPositions } from "../../lib/stepWalk.ts";
 import { lowercaseBaseView, casedBaseCount } from "../charNormUtils.ts";
 import { AttachmentStation } from "./AttachmentStation.tsx";
 import { MarkTreatmentStation } from "./MarkTreatmentStation.tsx";
@@ -366,13 +369,102 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
     return stations;
   }, [proposals, needsTreatmentScreen, posture, stackingEvidence]);
 
-  const [stationIndex, setStationIndex] = useState(0);
+  // ARRIVAL POSITION, resolved before the first render (spec 061 FR-004: the
+  // series "MUST restore to the station named by an activated mark on
+  // arrival"). Read in the state initializer rather than in an effect, for the
+  // reason SurveyRunner reads its own arrival cursor there: a jump writes the
+  // cursor BEFORE this component mounts, and the walk-publishing effect below
+  // writes the cursor for whatever station is current — so an effect-based
+  // arrival read would race a first-render `0` back into the store and lose the
+  // jump the author just made.
+  const [stationIndex, setStationIndex] = useState(() => {
+    const cursor = peekStepCursor(MARKS_STEP_ID);
+    const index = cursor === undefined ? -1 : visibleStations.indexOf(cursor as MarksStationId);
+    return index === -1 ? 0 : index;
+  });
+
   // FR-023: evidence changed → back to the first station; the affected
   // (re-seeded) decisions must be walked again before completing.
-  useEffect(() => {
+  //
+  // ADJUSTED DURING RENDER, not in an effect. As an effect this left a COMMIT in
+  // which `alphabetKey` had already changed but `stationIndex` had not yet reset
+  // — and the walk-publishing effect below runs in that same commit, so it wrote
+  // a cursor derived from the stale index. With the station list itself
+  // reshaped by the same evidence change, that stale cursor could name a
+  // different station than the author was on and be read straight back in by the
+  // arrival effect, defeating the reset FR-023 says keeps precedence. Adjusting
+  // during render (React's documented "adjust state when props change" pattern)
+  // removes the stale commit entirely rather than adding a second guard against
+  // its symptoms.
+  const resetAlphabetKeyRef = useRef(alphabetKey);
+  if (resetAlphabetKeyRef.current !== alphabetKey) {
+    resetAlphabetKeyRef.current = alphabetKey;
     setStationIndex(0);
-  }, [alphabetKey]);
+  }
+
   const currentStation = visibleStations[Math.min(stationIndex, visibleStations.length - 1)];
+
+  // ---------------------------------------------------------------------------
+  // Publish the within-step walk (spec 061 FR-004; closes D-4).
+  //
+  // Until this existed the series' up-to-four stations shared ONE footer mark
+  // even while the author was standing in them, and no station was individually
+  // addressable. Publishing the walk fixes both at once, and the second half
+  // costs nothing extra: the four station ids are already `[a-z0-9_]+`, so they
+  // are legal `Location` question segments, and `liveResolveContext()` passes
+  // `stepPositions` from this very store — the same mechanism that makes a
+  // gallery's character tokens resolvable. No resolver change, no
+  // `questionRegistry` entry (these are stations, not survey questions).
+  //
+  // One position per VISIBLE station (Q2/SC-003), never four placeholders: a
+  // station the evidence never raises is a page the author will never see, and
+  // 057 FR-049a forbids a greyed-out mark for it. The row therefore lengthens as
+  // evidence resolves, which 057 FR-049c already calls expected.
+  //
+  // `required: true` per station (A2) — the series gates its own advance, so a
+  // station the author has not walked is genuinely outstanding.
+  //
+  // `done` is "at or before the cursor". Every station arrives with a proposed
+  // default already filled in (propose-then-confirm, spec v1.3.1 §3c), so
+  // STANDING on one is what settles it — which also means the last station reads
+  // done at the moment `complete()` fires, leaving the whole series complete in
+  // the row once the author moves on.
+  // ---------------------------------------------------------------------------
+  const publishStepWalk = useStepWalkStore((s) => s.publishStepWalk);
+  const setStepCursor = useStepWalkStore((s) => s.setStepCursor);
+  const stationCursor = useStepWalkStore((s) => s.cursors[MARKS_STEP_ID]);
+
+  const stationPositions: StepWalkPositions = useMemo(
+    () =>
+      visibleStations.map((id, i) => ({
+        id,
+        done: i <= stationIndex,
+        required: true,
+      })),
+    [visibleStations, stationIndex],
+  );
+
+  useEffect(() => {
+    publishStepWalk(MARKS_STEP_ID, stationPositions);
+    if (currentStation !== undefined) setStepCursor(MARKS_STEP_ID, currentStation);
+  }, [stationPositions, currentStation, publishStepWalk, setStepCursor]);
+
+  // Honour a cursor written while this component is ALREADY MOUNTED — a footer
+  // mark activated for another station in the step the author is currently on.
+  // That jump changes no route and no step, so nothing remounts and the state
+  // initializer above never re-runs. (Mirrors SurveyRunner's own pair of an
+  // initializer read plus a live-cursor effect.)
+  //
+  // The evidence-changed reset keeps precedence (052 FR-023, and FR-004 says so
+  // explicitly) by construction rather than by a guard here: the reset is
+  // applied during render, so by the time this effect sees a cursor the
+  // publishing effect above has already rewritten it to the first station.
+  useEffect(() => {
+    if (stationCursor === undefined) return;
+    const index = visibleStations.indexOf(stationCursor as MarksStationId);
+    if (index === -1) return;
+    setStationIndex(index);
+  }, [stationCursor, visibleStations]);
 
   // S0 skip: never render — stay TRANSPARENT in the direction of travel. On a
   // forward entry, complete immediately (empty worklist → mechanism gallery).

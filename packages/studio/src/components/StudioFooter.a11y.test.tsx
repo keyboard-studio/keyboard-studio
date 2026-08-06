@@ -15,7 +15,8 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { makeBaseKeyboard } from "@keyboard-studio/contracts";
+import { createVirtualFS, makeBaseKeyboard } from "@keyboard-studio/contracts";
+import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { render } from "../test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
@@ -429,5 +430,106 @@ describe("StudioFooter — jumping back and forward again (FR-045/FR-063)", () =
     // The gate held, with a stated reason, and the author did not move.
     expect(screen.getByRole("status").textContent ?? "").not.toBe("");
     expect(useSurveySessionStore.getState().activeStepId).toBe("track");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Outstanding-behind vs. not-yet-reached (spec 061 T015, FR-008, house rule
+// 9). Both are the SAME hollow-square shape (Q4: no fourth mark) and the SAME
+// `data-progress-dot-kind="upcoming"` — so the ONLY thing that can tell a
+// screen-reader user "you still owe work here" apart from "you have not been
+// here yet" is the accessible name. This is the regression the two catalog
+// ids (`footer.dot.outstandingBehind` / `footer.dot.notYetReached`) exist to
+// guard: if the branch in ProgressDot.tsx ever collapsed back to one label,
+// this test is what would catch it.
+// ---------------------------------------------------------------------------
+
+describe("StudioFooter — outstanding-behind vs. not-yet-reached (061 FR-008)", () => {
+  /**
+   * An instantiated working copy with one confirmed inventory character
+   * ("é") that has no physical mechanism — `useInventoryCoverageGate()`
+   * reports it uncovered, which is what makes `mechanisms` (behind the
+   * author, below) owe required work through `outstandingWork()` rather than
+   * through a within-step walk. Mirrors
+   * `usePreviewArtifact.coverageGate.test.ts`'s `seedInstantiatedWorkingCopy`.
+   */
+  function seedUncoveredInventory(): void {
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir: makeTestIR([]) });
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "B",
+      answers: [],
+      confirmedInventory: ["é"],
+    });
+    // No assignment is ever recorded for "é" — it stays uncovered on desktop,
+    // and `touchLayoutJson` stays null (touch was never authored this
+    // session), so only the DESKTOP gate — and therefore only `mechanisms` —
+    // ends up owing anything (`unimplementedInventory.ts`'s absent-touch
+    // case: `uncovered: []`).
+  }
+
+  it("marks the passed, still-owing gallery and the unreached one behind it with the same shape but different names", () => {
+    seedUncoveredInventory();
+    // Manifest spine order: ... carve -> mechanisms -> touch -> help -> package.
+    // Standing on "touch" puts "mechanisms" BEHIND (walked, still owing) and
+    // "help" AHEAD (never visited) — one section on each side of the current
+    // position, which is what this test needs to tell the two "upcoming"
+    // meanings apart.
+    useSurveySessionStore.setState({
+      activeStepId: "touch",
+      history: [
+        "identity",
+        "choose_base",
+        "track",
+        "characters",
+        "marks",
+        "convenience",
+        "carve",
+        "mechanisms",
+      ],
+      visited: [
+        "identity",
+        "choose_base",
+        "track",
+        "characters",
+        "marks",
+        "convenience",
+        "carve",
+        "mechanisms",
+        "touch",
+      ],
+      selectedTrack: "adapt",
+    });
+
+    render(<StudioFooter />);
+
+    const mechanisms = screen
+      .getAllByRole("button")
+      .find((b) => (b.getAttribute("aria-label") ?? "").startsWith("Mechanisms"));
+    const help = screen
+      .getAllByRole("button")
+      .find((b) => (b.getAttribute("aria-label") ?? "").startsWith("Help"));
+
+    expect(mechanisms).toBeDefined();
+    expect(help).toBeDefined();
+
+    // Same shape, same structural handle for both — a screen-reader user
+    // gets nothing from the DOM class alone.
+    expect(mechanisms!.getAttribute("data-progress-dot-kind")).toBe("upcoming");
+    expect(help!.getAttribute("data-progress-dot-kind")).toBe("upcoming");
+
+    // Different accessible names is the whole test. "mechanisms" still owes
+    // its one uncovered character, so its name states that work remains —
+    // and how much; "help" has simply never been visited, so its name states
+    // that plainly instead, with no count at all.
+    const mechanismsLabel = mechanisms!.getAttribute("aria-label") ?? "";
+    const helpLabel = help!.getAttribute("aria-label") ?? "";
+    expect(mechanismsLabel).toMatch(/still needs? attention/i);
+    expect(mechanismsLabel).toMatch(/\b1\b/);
+    expect(mechanismsLabel).not.toBe(helpLabel);
+    expect(helpLabel).toMatch(/not yet reached/i);
+    expect(helpLabel).not.toMatch(/attention/i);
   });
 });

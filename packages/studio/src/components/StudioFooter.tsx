@@ -51,6 +51,7 @@ import { manifest } from "../steps/manifest.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import { deriveProjectLabel } from "../lib/projectLabel.ts";
 import { jumpToLocation, peekPendingJump } from "../lib/jumpToLocation.ts";
+import { useOutstandingWork } from "../hooks/useOutstandingWork.ts";
 import type { ResolveContext } from "../lib/resolveLocation.ts";
 import {
   buildProgressDots,
@@ -137,6 +138,18 @@ export function StudioFooter() {
     [activeStepId, history, selectedTrack, visited, hasProject, walks],
   );
 
+  // ---------------------------------------------------------------------------
+  // Outstanding required work per section — the ONE derivation (spec 061
+  // FR-009), shared with the top-bar nudge so the two surfaces cannot disagree
+  // about what a section owes or about what it is called (FR-020).
+  //
+  // Threaded in as an INPUT rather than read inside `progressDots.ts`, exactly
+  // as `stepWalks` is: the `decisions-layer` depcruise rule forbids
+  // `decisions/ -> stores/` even for a type-only import, and the derivation's
+  // inputs are three stores.
+  // ---------------------------------------------------------------------------
+  const outstanding = useOutstandingWork();
+
   const dots = useMemo(
     () =>
       buildProgressDots({
@@ -145,9 +158,10 @@ export function StudioFooter() {
         i18n,
         stepWalks: walks,
         stepCursors: cursors,
+        outstandingByStepId: outstanding.byStepId,
         ...(currentQuestion !== undefined ? { currentQuestion } : {}),
       }),
-    [record, ctx, i18n, walks, cursors, currentQuestion],
+    [record, ctx, i18n, walks, cursors, outstanding.byStepId, currentQuestion],
   );
 
   // ---------------------------------------------------------------------------
