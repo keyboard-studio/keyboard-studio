@@ -86,6 +86,70 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-06T02:06:30.803Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:09:20.124Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:15:25.601Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:15:25.872Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:15:26.161Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:15:26.457Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:15:26.752Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:15:27.014Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:15:27.264Z"
     }
   ],
   "telemetryInstanceId": "4d8149dc-5ee9-43f5-9dac-81307541deb6",
@@ -861,7 +925,7 @@
       ]
     }
   },
-  "currentTask": "T004",
+  "currentTask": "T012",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -889,6 +953,63 @@
       "did": "Documented the CRASH_REPORT_APP_* trio as distinct from GITHUB_APP_* with no fallback",
       "files": [
         "utilities/oauth-backend/src/server.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Import-graph gate written and DEMONSTRATED RED against a decisionLogStore fixture (caught the 2-hop transitive engine edge), fixture deleted",
+      "files": [
+        "packages/studio/src/crash/engine-reachability.test.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Defined client payload types (CrashReport, StackFrame, CrashContext, Breadcrumb) with no fingerprint field and no engine import",
+      "files": [
+        "packages/studio/src/crash/types.ts"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Composed appVersion as <pkg.version>+<sha7> with a guarded __KS_COMMIT_SHA__ read that never yields empty",
+      "files": [
+        "packages/studio/src/crash/buildVersion.ts"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Implemented the 50-entry breadcrumb ring; console.error/warn wrappers call the original AND push",
+      "files": [
+        "packages/studio/src/crash/breadcrumbs.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Implemented the client-local fingerprint with FR-081a canonicalization and a direct crypto.subtle.digest call",
+      "files": [
+        "packages/studio/src/crash/fingerprint.ts"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Defined CrashReportBodySchema with every cap, optional kind/stackFrames/stack, no fingerprint or title, and the post-mount .refine()",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-schemas.ts"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Implemented getCrashReportInstallationToken with its own module-scope cache and _resetCrashAuthCache seam",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-installation-token.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Added the six crash.* ids to the en and fr catalogs",
+      "files": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
       ]
     }
   }
