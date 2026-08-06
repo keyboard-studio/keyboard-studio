@@ -98,9 +98,9 @@ a stub GitHub API with the expected redacted body and label, and that the recove
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T021** [P] [US1] Assert identity **absence** directly: build a payload from a fixture working copy carrying real `Attribution.authorName`/`authorEmail`/`copyrightHolder` and a populated `GitHubIdentitySession` + `GoogleIdentitySession`, then assert none of those values appears anywhere in the serialized payload — not merely that the builder didn't throw (FR-034, SC-005) · `packages/studio/src/crash/redact.test.ts`
-- [ ] **T022** [P] [US1] Handler-level create-path test with an injected fetch stub — no real network, no real token. Covers create, `403 → 502 submission_unavailable`, and `503 reporting_not_configured` (FR-136) · `api/report/crash.test.ts`
-- [ ] **T023** [P] [US1] Pin the FR-081d worked example: assert the exact canonicalized string, assert the hash is stable across an input differing only in `line`/`column`/chunk-hash suffix, and assert it differs for a genuinely different `message` or `function` (FR-081d, SC-014) · `utilities/oauth-backend/src/crash-report-pipeline.test.ts`
+- [x] **T021** [P] [US1] Assert identity **absence** directly: build a payload from a fixture working copy carrying real `Attribution.authorName`/`authorEmail`/`copyrightHolder` and a populated `GitHubIdentitySession` + `GoogleIdentitySession`, then assert none of those values appears anywhere in the serialized payload — not merely that the builder didn't throw (FR-034, SC-005) · `packages/studio/src/crash/redact.test.ts`
+- [x] **T022** [P] [US1] Handler-level create-path test with an injected fetch stub — no real network, no real token. Covers create, `403 → 502 submission_unavailable`, and `503 reporting_not_configured` (FR-136) · `api/report/crash.test.ts`
+- [x] **T023** [P] [US1] Pin the FR-081d worked example: assert the exact canonicalized string, assert the hash is stable across an input differing only in `line`/`column`/chunk-hash suffix, and assert it differs for a genuinely different `message` or `function` (FR-081d, SC-014) · `utilities/oauth-backend/src/crash-report-pipeline.test.ts`
 
 ### Implementation for User Story 1
 
