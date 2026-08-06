@@ -61,7 +61,6 @@ export function revealPreMountFallback(): void {
 function preMountAppVersion(): string {
   let sha = "dev";
   try {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (typeof __KS_COMMIT_SHA__ === "string" && __KS_COMMIT_SHA__.length > 0) {
       sha = __KS_COMMIT_SHA__;
     }

@@ -14,7 +14,7 @@ import { installE2eHook } from "./lib/e2eHook.ts";
 import { loadDraft, resolveActiveProjectKey } from "./lib/draftPersistence.ts";
 import { localeReady } from "./lib/i18n.ts";
 import { warmExemplarSource } from "./lib/services.ts";
-import { installConsoleBreadcrumbs } from "./crash/breadcrumbs.ts";
+import { installConsoleBreadcrumbs, pushBreadcrumb } from "./crash/breadcrumbs.ts";
 import { installGlobalCrashHandlers } from "./crash/globalHandlers.ts";
 import { handleStaleChunkFailure } from "./crash/staleChunk.ts";
 import { handlePreMountCrash } from "./crash/preMount.ts";
@@ -140,8 +140,19 @@ async function mountCallbackScreen(provider: OAuthProvider): Promise<void> {
 //
 // `.catch` rather than try/catch: both mount functions are async, so a
 // synchronous try would only catch a throw before the first await.
+// Crash breadcrumbs for navigation (spec 060 FR-045). The studio is
+// hash-routed, so `hashchange` is the whole of its route history — and "which
+// screen were they on" is usually the first thing a maintainer wants from a
+// report. Registered here rather than in a component so it survives a render
+// crash.
+window.addEventListener("hashchange", () => {
+  pushBreadcrumb("route", window.location.hash || "#");
+});
+pushBreadcrumb("route", window.location.hash || "#");
+
 const oauthProvider = detectOAuthCallback();
 if (oauthProvider !== null) {
+  pushBreadcrumb("oauth", `callback:${oauthProvider}`);
   void mountCallbackScreen(oauthProvider).catch(handlePreMountCrash);
 } else {
   void mountApp().catch(handlePreMountCrash);

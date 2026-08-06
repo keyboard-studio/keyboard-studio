@@ -1,5 +1,6 @@
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { pushBreadcrumb } from "../crash/breadcrumbs.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import type { BaseKeyboard, VirtualFS, KeyboardIR, RemovalCapability, TouchLayoutIR, KpsFontEntry, KpsStylesheetEntry } from "@keyboard-studio/contracts";
 import type { CompileResult } from "@keyboard-studio/contracts";
@@ -343,7 +344,23 @@ export function useKeyboardArtifact(
   vfsTransform?: VfsTransform | null,
   onInstantiate?: OnInstantiateCallback | null,
 ): KeyboardArtifactResult {
-  const [stage, setStage] = useState<Stage>({ kind: "idle" });
+  const [stage, setStageRaw] = useState<Stage>({ kind: "idle" });
+
+  /**
+   * Records a crash breadcrumb on every Stage transition (spec 060 FR-045).
+   *
+   * Wrapping the setter rather than instrumenting each of the ~10 call sites
+   * means a future stage cannot be added without its breadcrumb. Only the
+   * discriminant (and the error `step`) is recorded — structural facts, never
+   * the error message, which could carry author content (FR-047).
+   */
+  const setStage = useCallback((next: Stage) => {
+    pushBreadcrumb(
+      "stage",
+      next.kind === "error" ? `error:${next.step}` : next.kind,
+    );
+    setStageRaw(next);
+  }, []);
   const prevBlobUrl = useRef<string | null>(null);
   const prevFontBlobUrl = useRef<string | null>(null);
   // Current OSK font family, paired with prevFontBlobUrl. Persists across

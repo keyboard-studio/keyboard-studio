@@ -38,7 +38,6 @@ const UNSTAMPED_SHA = "dev";
  */
 function readCommitSha(): string {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (typeof __KS_COMMIT_SHA__ === "string" && __KS_COMMIT_SHA__.length > 0) {
       return __KS_COMMIT_SHA__;
     }

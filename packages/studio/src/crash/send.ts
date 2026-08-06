@@ -22,6 +22,13 @@
 //    React-supported way to read an external mutable source, so no reactivity
 //    is lost by staying out of the store layer.
 //
+// NO NEW VALIDATION TIMER (FR-130, decision D3). The `setTimeout`s in this file
+// are single-shot abort budgets for one `fetch` each — they race nothing, run
+// no interval, validate nothing, and emit no diagnostic. Same carve-out
+// CLAUDE.md already grants `AUTOSAVE_DEBOUNCE_MS` and `CLOUD_SYNC_DEBOUNCE_MS`:
+// D3 governs the *validation* cycle, and the studio's single 300 ms debounce
+// remains the only validation cadence.
+//
 // CRASH-IN-THE-CRASH-REPORTER (FR-017, Edge Cases). The entire capture-and-send
 // path is wrapped so that any internal failure is swallowed — at most pushed to
 // the breadcrumb ring — and can never escape as a second unhandled rejection.

@@ -4,7 +4,7 @@
   "branch": "060-crash-reporting",
   "selectedAt": "2026-08-06T01:21:13.282Z",
   "currentStep": "implement",
-  "status": "implementing",
+  "status": "implemented",
   "history": [
     {
       "step": "plan",
@@ -470,6 +470,61 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-06T03:06:04.243Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T053",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T03:41:10.581Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T054",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T03:41:10.851Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T055",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T03:41:11.115Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T056",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T03:41:11.374Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T057",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T03:41:11.611Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T058",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T03:41:11.858Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-06T03:41:12.184Z"
     }
   ],
   "telemetryInstanceId": "4d8149dc-5ee9-43f5-9dac-81307541deb6",
@@ -539,6 +594,9 @@
     "tasks": {
       "summary": "58 tasks across 9 phases (Setup, Foundational, US1-US6, Polish) laid out as 24 waves with explicit join points; 112 requirements mapped to tasks",
       "key_finding": "The FR-013 import-graph gate is placed first in Foundational rather than in its own US4 phase, so every crash-module file is written against a live constraint instead of audited afterwards"
+    },
+    "implement": {
+      "summary": "Crash reporting end to end: self-contained client crash module behind a demonstrated-red import gate, server-authoritative fingerprinting and dedupe on a second GitHub App, stale-deploy carve-out, pre-mount path, and undo."
     }
   },
   "coverage": {
@@ -1312,7 +1370,7 @@
       ]
     }
   },
-  "currentTask": "T052",
+  "currentTask": "T058",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1691,6 +1749,53 @@
         "vercel.json",
         "api/bundle-safety.test.ts"
       ]
+    },
+    "T053": {
+      "status": "DONE",
+      "did": "Wired the FR-045 breadcrumb points: hash-route changes and OAuth callback entry in main.tsx, locale activation in i18n.ts, step advance in surveySessionStore, and Stage transitions via a wrapped setStage so a future stage cannot be added without one",
+      "files": [
+        "packages/studio/src/main.tsx",
+        "packages/studio/src/lib/i18n.ts",
+        "packages/studio/src/stores/surveySessionStore.ts",
+        "packages/studio/src/hooks/useKeyboardArtifact.ts"
+      ]
+    },
+    "T054": {
+      "status": "DONE",
+      "did": "Full studio suite (417 files) ran green unchanged, so no existing test contradicted the new behaviour; added affirmative FR-135 assertions to AppRoot.test.tsx that a child throw now renders the recovery screen and that exactly one boundary covers all three trees",
+      "files": [
+        "packages/studio/src/AppRoot.test.tsx"
+      ]
+    },
+    "T055": {
+      "status": "DONE",
+      "did": "Added the prerequisites runbook: repository, second App with issues:write only, scoped install, the three env vars, the Vercel Firewall rule, the instant kill switch, live-verification steps, and the accepted residual risks",
+      "files": [
+        "specs/060-crash-reporting/runbook.md"
+      ]
+    },
+    "T056": {
+      "status": "DONE",
+      "did": "Audited every timer in src/crash/: three single-shot fetch abort budgets and one UI notice lifetime; the stale-chunk check is a sessionStorage comparison with no timer. None validates or emits a diagnostic, so the single 300ms D3 cycle remains the only validation cadence; documented inline in send.ts",
+      "files": [
+        "packages/studio/src/crash/send.ts"
+      ]
+    },
+    "T057": {
+      "status": "DONE",
+      "did": "Ran and greened every gate: pnpm typecheck, pnpm -r test, the /api suite, pnpm lint including both i18n tiers, and pnpm crew-lint",
+      "files": [
+        "(gates)"
+      ]
+    },
+    "T058": {
+      "status": "DONE",
+      "did": "Walked SC-001 to SC-020 and recorded which test discharges each; the walk found three uncovered (SC-007 pre-mount, and the burst forms of SC-016/SC-017) and added tests for all three rather than assuming the passing suite covered them",
+      "files": [
+        "specs/060-crash-reporting/sc-coverage.md",
+        "packages/studio/src/crash/preMount.test.ts",
+        "utilities/oauth-backend/src/crash-report-dedupe.test.ts"
+      ]
     }
   },
   "concerns": [
@@ -1704,6 +1809,10 @@
     },
     {
       "note": "The retraction route and the commentId response field are additions the contract document does not describe; contracts/crash-report-api.md should be reconciled with both.",
+      "step": "implement"
+    },
+    {
+      "note": "The two Playwright specs (crash-recovery-a11y, crash-engine-chunk-blocked) were authored but not executed - this session ran the vitest lanes only. Written but not seen green; run them before merge.",
       "step": "implement"
     }
   ],
@@ -1722,6 +1831,35 @@
       "what": "FR-013 gate re-demonstrated red after the comment-stripping change, using a real dynamic-import fixture",
       "command": "npx vitest run src/crash/engine-reachability.test.ts with __dyn-fixture.ts present",
       "result": "failed as expected on the dynamic-import assertion; fixture deleted and suite green"
+    },
+    {
+      "what": "repo typecheck",
+      "command": "pnpm typecheck",
+      "result": "0 errors across all 7 workspace projects"
+    },
+    {
+      "what": "workspace test suites",
+      "command": "pnpm -r test",
+      "result": "all green: studio 6403, engine 2926 (+2 skipped), contracts 753, oauth-backend 233, keyboard-lint 115, glottolog 42, llm 9"
+    },
+    {
+      "what": "co-located Vercel function suite, outside pnpm -r",
+      "command": "npx vitest run (api)",
+      "result": "7 files, 99 tests passed, including bundle-safety with both new crash function entries"
+    },
+    {
+      "what": "lint chain including both i18n tiers",
+      "command": "pnpm lint",
+      "result": "0 errors, 186 warnings (pre-existing class); i18n-catalog-lint and content-i18n-lint both green with the six new crash.* ids",
+      "warnings": [
+        "no-console in breadcrumbs.ts is inherent - the module wraps console.error/warn; matches the existing installation-token.ts pattern"
+      ]
+    },
+    {
+      "what": "crew-lint",
+      "command": "pnpm crew-lint",
+      "result": "all 7 checks GREEN"
     }
-  ]
+  ],
+  "last_action": "all 58 tasks done — typecheck clean, pnpm -r test + /api green, lint and crew-lint green; 2 Playwright specs authored but not run"
 }

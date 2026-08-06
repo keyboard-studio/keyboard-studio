@@ -278,17 +278,17 @@ retraction comment (`"created"`) or the session's comment is removed (`"commente
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T053** [P] Wire the FR-045 breadcrumb instrumentation points — hash-route changes, step completions, `Stage` transitions, OAuth callback entry, locale changes. The spec's only SHOULD: a missing breadcrumb degrades debugging convenience, not correctness, so this does not gate the feature · `packages/studio/src/lib/`, step and route call sites
-- [ ] **T054** [P] Update any existing test that incidentally asserts today's "no ErrorBoundary" / "blank page on crash" behaviour so it reflects the new recovery behaviour rather than contradicting it (FR-135) · `packages/studio/src/**/*.test.tsx`
-- [ ] **T055** [P] Add the prerequisites runbook — repository creation, second App creation with `issues: write` only, install scoped to `crash-reports`, the three `CRASH_REPORT_APP_*` values, and the Vercel Firewall rule (20 req / 60 s per IP, deny 429 for 10 min) — plus how to disable the route instantly by unsetting an env var (Prerequisites, FR-106 residual-risk owner) · `specs/060-crash-reporting/runbook.md`
-- [ ] **T056** [P] Confirm no new validation timer was introduced: the stale-chunk check is a one-shot `sessionStorage` comparison and the undo window is a UI notice lifetime — neither validates, neither emits a diagnostic, so the single 300 ms D3 cycle remains the only validation cadence (FR-130) · review `packages/studio/src/crash/`
+- [x] **T053** [P] Wire the FR-045 breadcrumb instrumentation points — hash-route changes, step completions, `Stage` transitions, OAuth callback entry, locale changes. The spec's only SHOULD: a missing breadcrumb degrades debugging convenience, not correctness, so this does not gate the feature · `packages/studio/src/lib/`, step and route call sites
+- [x] **T054** [P] Update any existing test that incidentally asserts today's "no ErrorBoundary" / "blank page on crash" behaviour so it reflects the new recovery behaviour rather than contradicting it (FR-135) · `packages/studio/src/**/*.test.tsx`
+- [x] **T055** [P] Add the prerequisites runbook — repository creation, second App creation with `issues: write` only, install scoped to `crash-reports`, the three `CRASH_REPORT_APP_*` values, and the Vercel Firewall rule (20 req / 60 s per IP, deny 429 for 10 min) — plus how to disable the route instantly by unsetting an env var (Prerequisites, FR-106 residual-risk owner) · `specs/060-crash-reporting/runbook.md`
+- [x] **T056** [P] Confirm no new validation timer was introduced: the stale-chunk check is a one-shot `sessionStorage` comparison and the undo window is a UI notice lifetime — neither validates, neither emits a diagnostic, so the single 300 ms D3 cycle remains the only validation cadence (FR-130) · review `packages/studio/src/crash/`
 
 **⟶ Wait for Wave 1, then:**
 
 **Wave 2 — the full gate sweep:**
 
-- [ ] **T057** Run and green the gates: `pnpm typecheck`, `pnpm -r test`, the `/api` suite (outside `pnpm -r` — its own invocation), `pnpm lint` including both i18n lint tiers, and `pnpm crew-lint` (SC-009, SC-010)
-- [ ] **T058** Walk SC-001 – SC-020 against the suite and record which test discharges each, flagging any left uncovered rather than assuming a passing suite covers them
+- [x] **T057** Run and green the gates: `pnpm typecheck`, `pnpm -r test`, the `/api` suite (outside `pnpm -r` — its own invocation), `pnpm lint` including both i18n lint tiers, and `pnpm crew-lint` (SC-009, SC-010)
+- [x] **T058** Walk SC-001 – SC-020 against the suite and record which test discharges each, flagging any left uncovered rather than assuming a passing suite covers them
 
 ---
 

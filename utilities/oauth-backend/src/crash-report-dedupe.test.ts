@@ -343,6 +343,105 @@ describe("closed match", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Burst behaviour — the shape the criteria actually state (SC-016, SC-017)
+// ---------------------------------------------------------------------------
+
+describe("bursts", () => {
+  it("50 distinct fingerprints at the global cap create nothing (SC-016)", async () => {
+    // The single-request cap test proves the branch; this proves the property
+    // under the load it exists for. A cap that leaks one creation per request
+    // would pass the former and fail this.
+    const atCap = Array.from({ length: 200 }, (_, i) => ({
+      ...issue({ number: i + 1 }),
+      created_at: minutesAgo(1),
+    }));
+    const config = stub({ lookup: [] });
+    // Re-point the cap probe at a full window.
+    const base = config.fetch;
+    config.fetch = (url, init) =>
+      init.method === "GET" && url.includes("since=")
+        ? Promise.resolve({
+            ok: true,
+            status: 200,
+            statusText: "OK",
+            headers: { get: () => null },
+            json: () => Promise.resolve(atCap),
+            text: () => Promise.resolve(""),
+          })
+        : base(url, init);
+
+    const results = [];
+    for (let i = 0; i < 50; i += 1) {
+      results.push(
+        await submitCrashReport(
+          { ...body(), message: `distinct failure number ${i}` },
+          config,
+          NOW,
+        ),
+      );
+    }
+
+    expect(createCalls(config.calls)).toHaveLength(0);
+    expect(results.every((r) => !r.ok && r.status === 429)).toBe(true);
+  });
+
+  it("50 requests against a closed issue reopen it exactly once (SC-017)", async () => {
+    // Without the cooldown this is 50 reopen-plus-label calls — a
+    // publicly-triggerable write amplification, since a closed issue's content
+    // is public and anyone can replay it.
+    let reopened = false;
+    const closed = () =>
+      issue({
+        state: "closed",
+        updated_at: reopened ? new Date(NOW).toISOString() : minutesAgo(120),
+        labels: reopened
+          ? [
+              { name: fingerprintLabel(computeFingerprint(body()).fingerprint) },
+              { name: REGRESSION_LABEL },
+            ]
+          : [{ name: fingerprintLabel(computeFingerprint(body()).fingerprint) }],
+      });
+
+    const calls: Call[] = [];
+    const config: CrashReportPipelineConfig & { calls: Call[] } = {
+      getInstallationToken: () => Promise.resolve("tok"),
+      fetch: (url, init) => {
+        calls.push({
+          url,
+          method: init.method,
+          body: init.body === undefined ? undefined : JSON.parse(init.body),
+        });
+        const respond = (payload: unknown): Promise<CrashReportFetchResponse> =>
+          Promise.resolve({
+            ok: true,
+            status: 200,
+            statusText: "OK",
+            headers: { get: () => null },
+            json: () => Promise.resolve(payload),
+            text: () => Promise.resolve(""),
+          });
+        if (init.method === "GET" && url.includes("labels=")) return respond([closed()]);
+        if (init.method === "GET") return respond([]);
+        if (init.method === "PATCH") {
+          // The reopen lands: subsequent lookups see regression + a fresh
+          // updated_at, which is what the cooldown reads.
+          reopened = true;
+          return respond({});
+        }
+        return respond({ id: 1 });
+      },
+      calls,
+    };
+
+    for (let i = 0; i < 50; i += 1) {
+      await submitCrashReport(body(), config, NOW);
+    }
+
+    expect(patchCalls(calls)).toHaveLength(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Retraction (FR-075, FR-076, FR-077, SC-012)
 // ---------------------------------------------------------------------------
 

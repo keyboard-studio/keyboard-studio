@@ -54,6 +54,7 @@ import type { ScaffoldSpec } from "../hooks/useKeyboardArtifact.ts";
 // R12) — the getState() escape-hatch idiom already used elsewhere in this
 // file (see the trailing comment) for cross-store reads/writes.
 import { useWorkingCopyStore } from "./workingCopyStore.ts";
+import { pushBreadcrumb } from "../crash/breadcrumbs.ts";
 
 // ---------------------------------------------------------------------------
 // CharactersSubStage — internal substage for the characters manifest step.
@@ -664,15 +665,21 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
   ...INITIAL_STATE,
 
   advance: (stepId) =>
-    set((s) => ({
-      history: [...s.history, s.activeStepId],
-      activeStepId: stepId,
-      // Both ends: the step being left is provably visited, and on the very
-      // first advance out of a hydrated-but-unseeded draft it may be the only
-      // evidence of that.
-      visited: withVisited(s.visited, s.activeStepId, stepId),
-      lastNavigation: "advance",
-    })),
+    set((s) => {
+      // Crash breadcrumb (spec 060 FR-045). Step completions are the coarsest
+      // useful "where was the author" signal, and distinct from the decision
+      // log: this records navigation, that records authoring decisions.
+      pushBreadcrumb("step", stepId);
+      return {
+        history: [...s.history, s.activeStepId],
+        activeStepId: stepId,
+        // Both ends: the step being left is provably visited, and on the very
+        // first advance out of a hydrated-but-unseeded draft it may be the only
+        // evidence of that.
+        visited: withVisited(s.visited, s.activeStepId, stepId),
+        lastNavigation: "advance" as const,
+      };
+    }),
 
   popHistory: () =>
     set((s) => {
