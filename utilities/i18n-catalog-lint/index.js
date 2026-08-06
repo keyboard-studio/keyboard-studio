@@ -32,6 +32,11 @@
 //     EMPTY — the shape a Crowdin download produces from a locale with no
 //     translations once untranslated strings export as empty rather than
 //     source text. See utilities/i18n-collapse-guard/git-baseline.js.
+//   • target locales, additionally: no individual key may have reverted from a
+//     real translation back to English. The two checks above are both
+//     ratio-based and need a large fraction of the catalog to fire — neither
+//     can see a HANDFUL of keys reverting in an otherwise-translated catalog,
+//     which is exactly what a real Crowdin sync did once (3 keys of 1214).
 //
 // Fix when it fails:  pnpm --filter @keyboard-studio/studio messages:extract
 //
@@ -47,7 +52,11 @@ const { execFileSync } = require("node:child_process");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { checkEnglishCollapse, checkBaselineRegression } = require("../i18n-collapse-guard/index.js");
+const {
+  checkEnglishCollapse,
+  checkBaselineRegression,
+  checkKeyReversions,
+} = require("../i18n-collapse-guard/index.js");
 const { resolveBaselineRef, readCatalogAtRef } = require("../i18n-collapse-guard/git-baseline.js");
 const { checkCatalogDir } = require("../i18n-catalog-sort/index.js");
 
@@ -120,6 +129,12 @@ if (!baselineRef) {
       "did not run this time. No action needed unless this persists in CI.",
   );
 }
+
+// English's baseline content is the same for every target locale, so this is
+// fetched once here rather than once per locale inside the loop below.
+const baselineEn = baselineRef
+  ? readCatalogAtRef(baselineRef, path.join(COMMITTED_DIR, SOURCE_LOCALE, CATALOG_FILE), REPO_ROOT)
+  : null;
 
 const tmpRoot = fs.mkdtempSync(path.join(os.tmpdir(), "i18n-catalog-check-"));
 let freshLocales = [];
@@ -198,6 +213,7 @@ try {
       const committedSource = readCatalog(
         path.join(COMMITTED_DIR, SOURCE_LOCALE, CATALOG_FILE),
       );
+      let collapseFired = false;
       if (committedSource !== null) {
         const collapse = checkEnglishCollapse({
           en: committedSource,
@@ -205,7 +221,10 @@ try {
           locale,
           catalog: CATALOG_FILE,
         });
-        if (collapse.problem) problems.push(collapse.problem);
+        if (collapse.problem) {
+          problems.push(collapse.problem);
+          collapseFired = true;
+        }
         // A catalog too small to check is reported rather than passing silently
         // — see i18n-collapse-guard's "a skip is reported" note. It goes to
         // `notes`, not `warnings`: nothing is stale, so the extract remediation
@@ -235,6 +254,28 @@ try {
           });
           if (regression.problem) problems.push(regression.problem);
           if (regression.note) notes.push(regression.note);
+
+          // Neither check above can see a HANDFUL of individual keys
+          // reverting to English in an otherwise-translated catalog. This
+          // needs English at the SAME baseline ref too (a key already
+          // legitimately identical to English back then must not be flagged
+          // now), not just the target locale's own baseline. Skipped when the
+          // collapse guard above already fired for this locale/catalog: a
+          // full collapse satisfies this per-key check for nearly every key,
+          // and this guard's own message claims to catch what the collapse
+          // guard "misses" — true for an isolated few keys, misleading here.
+          if (committedSource !== null && baselineEn !== null && !collapseFired) {
+            const reversions = checkKeyReversions({
+              baselineTarget: baseline,
+              currentTarget: committed,
+              baselineEn,
+              currentEn: committedSource,
+              locale,
+              catalog: CATALOG_FILE,
+              baselineLabel: baselineRef,
+            });
+            if (reversions.problem) problems.push(reversions.problem);
+          }
         }
       }
     }

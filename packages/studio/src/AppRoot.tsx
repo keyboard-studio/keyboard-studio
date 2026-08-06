@@ -20,7 +20,24 @@ import type { ReactNode } from "react";
 import { I18nProvider } from "@lingui/react";
 import { i18n } from "@lingui/core";
 import "./lib/i18n.ts"; // side-effect: load + activate the boot locale
+import { CrashErrorBoundary } from "./components/CrashErrorBoundary.tsx";
+import { CrashNotice } from "./components/CrashNotice.tsx";
+import { retractCrashReport } from "./crash/send.ts";
 
 export function AppRoot({ children }: { children: ReactNode }) {
-  return <I18nProvider i18n={i18n}>{children}</I18nProvider>;
+  // The crash boundary sits INSIDE the provider for the same reason the
+  // provider was hoisted here in the first place: its fallback uses the
+  // catalog, so it must be a consumer, never a sibling above it. One boundary
+  // here covers all three trees main.tsx mounts (spec 060 FR-001).
+  //
+  // CrashNotice sits OUTSIDE the boundary, as its sibling. It reports the
+  // `onerror`/`unhandledrejection` cases, where the page is still usable — so
+  // it must survive a render crash in `children` rather than being unmounted by
+  // it. It renders nothing at all until a report has actually been sent.
+  return (
+    <I18nProvider i18n={i18n}>
+      <CrashErrorBoundary>{children}</CrashErrorBoundary>
+      <CrashNotice onRetract={retractCrashReport} />
+    </I18nProvider>
+  );
 }

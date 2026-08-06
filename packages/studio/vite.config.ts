@@ -15,6 +15,16 @@ const PATH_SHIM = fileURLToPath(
 );
 
 export default defineConfig({
+  // Build identity for crash reporting (spec 060, FR-110). A compile-time
+  // constant — NOT an `import.meta.env` read through a helper module — because
+  // a pre-mount crash (FR-114) happens before any env-reading module has
+  // necessarily executed. Vercel sets VERCEL_GIT_COMMIT_SHA on every build; a
+  // local `pnpm dev`/`pnpm build` has no SHA, so it falls back to "dev".
+  define: {
+    __KS_COMMIT_SHA__: JSON.stringify(
+      process.env["VERCEL_GIT_COMMIT_SHA"] ?? "dev",
+    ),
+  },
   plugins: [
     // The Lingui macro transform runs via Babel; @vitejs/plugin-react only
     // spins up Babel when given plugins, so this is the one place dev-server
