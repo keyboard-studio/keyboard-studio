@@ -11,7 +11,11 @@ import {
 } from "./lib/handleOAuthCallback.ts";
 import { rehydrateWorkingCopyFromSession } from "./lib/persistWorkingCopy.ts";
 import { installE2eHook } from "./lib/e2eHook.ts";
-import { loadDraft, resolveActiveProjectKey } from "./lib/draftPersistence.ts";
+import {
+  loadDraft,
+  resolveActiveProjectKey,
+  runBootRenameReconciliation,
+} from "./lib/draftPersistence.ts";
 import { localeReady } from "./lib/i18n.ts";
 import { warmExemplarSource } from "./lib/services.ts";
 import { installConsoleBreadcrumbs, pushBreadcrumb } from "./crash/breadcrumbs.ts";
@@ -81,6 +85,17 @@ async function mountApp(): Promise<void> {
   if (activeProjectKey !== null) {
     loadDraft(activeProjectKey);
   }
+
+  // One-time "My keyboards" rename-duplicate merge (spec 047 US3a, FINDING 3
+  // fix) — a DESTRUCTIVE pass (it `clearDraft`s the losing side of a merge),
+  // so it belongs here, at boot, gated by a persisted flag, and NOT in any
+  // render path. See `runBootRenameReconciliation`'s doc comment in
+  // draftPersistence.ts for why this used to live in `listDrafts()` and why
+  // that was wrong. Placed after the active-project restore above (order
+  // does not matter for correctness — this operates on the index/records,
+  // `loadDraft` on the live stores — but keeping it visually alongside its
+  // sibling boot-time persistence call is the point).
+  runBootRenameReconciliation();
 
   // Rehydrate the working copy from the pre-redirect OAuth snapshot (if
   // present). On a normal (non-OAuth-return) load this is a no-op: the key is

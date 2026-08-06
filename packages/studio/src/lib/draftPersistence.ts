@@ -250,6 +250,33 @@ function existingStatusOverrides(
 }
 
 /**
+ * Merge two rows' lifecycle fields, keeping the STRONGEST status
+ * ("submitted" beats "draft") and that side's `prUrl`, regardless of which
+ * side (`a` or `b`) happens to be the one physically surviving a
+ * `reconcileRenamedProjectRows` merge (Finding 2 fix).
+ *
+ * Before this helper existed, a merge only ever consulted the SURVIVOR's own
+ * current row (`existingStatusOverrides(survivorKey)`) — so a submission
+ * filed under the STALE key (an author who submitted under the original
+ * base-id filing, then kept editing under a since-renamed key) vanished
+ * outright the moment the stale row was `clearDraft`-ed: no code path ever
+ * read `stale`'s own `status`/`prUrl` before deleting it. Comparing both
+ * sides here and keeping whichever is "submitted" (falling back to `a` when
+ * neither is) closes that gap for BOTH of the function's branches — the
+ * "stale is newer, relocate" branch and the far more common "survivor is
+ * already newer, no relocate" branch, which previously did not call this at
+ * all.
+ */
+function strongestStatusOverrides(
+  a: { status?: "draft" | "submitted"; prUrl?: string | null } | undefined,
+  b: { status?: "draft" | "submitted"; prUrl?: string | null } | undefined,
+): { status?: "draft" | "submitted"; prUrl?: string | null } | undefined {
+  if (a?.status === "submitted") return a;
+  if (b?.status === "submitted") return b;
+  return a ?? b;
+}
+
+/**
  * Whether `projectKey`'s stored "My keyboards" index row is already
  * `status: "submitted"` — i.e. FROZEN against further autosave/cloud-sync
  * writes (a submitted project is not re-editable). Used by `saveDraft` and
@@ -330,11 +357,17 @@ function buildServerMeta(
  *   `saveDraft` CAN now write such a record (the F6 pending-slot relaxation,
  *   `PENDING_PROJECT_KEY` + `hasPendingProgress()`), but that write never
  *   reaches the index in the first place — `saveDraft` gates its
- *   `upsertIndexEntry` call to real project keys — so this scan still never
- *   encounters an uninstantiated `ks.draft.<key>.v1` record with a real key
- *   to adopt: the only uninstantiated record on disk is the pending slot
- *   itself, and its key (`PENDING_PROJECT_KEY`) is excluded from the index by
- *   the same rule, not by this scan reaching it and skipping it.
+ *   `upsertIndexEntry` call to real project keys.
+ * - the reserved `PENDING_PROJECT_KEY` slot, EXPLICITLY by name (not merely
+ *   as a side effect of the VR-2 check above). An earlier version of this
+ *   comment claimed the pending slot's record is always uninstantiated, so
+ *   the VR-2 check alone was "enough" to exclude it — that is false: the F6
+ *   relaxation can write a pending-slot record whose `workingCopy` IS already
+ *   instantiated (pre-instantiation identity progress recorded while an
+ *   EARLIER, still-active real project's working copy happens to be the one
+ *   loaded), which would pass the VR-2 check and get adopted as a phantom "My
+ *   keyboards" card. See this module's test suite for the adversarial case
+ *   this closes.
  *
  * Idempotent: a second call adopts nothing, because the first gave every
  * record an index row. Adopted rows land as `status: "draft"` / `prUrl: null`
@@ -364,6 +397,18 @@ export function reconcileProjectIndex(): number {
     if (!key.startsWith(DRAFT_KEY_PREFIX) || !key.endsWith(suffix)) continue;
     const projectKey = key.slice(DRAFT_KEY_PREFIX.length, key.length - suffix.length);
     if (projectKey === "" || indexed.has(projectKey)) continue;
+    // The reserved pending-slot record is excluded from the index BY NAME,
+    // not merely by the VR-2 instantiationMode-null check below. This
+    // module's own doc comment used to claim those two things always
+    // coincide ("the only uninstantiated record on disk is the pending slot
+    // itself"), but `saveDraft`'s F6 relaxation can write a PENDING_PROJECT_KEY
+    // record whose `workingCopy` IS already instantiated (identity-only
+    // progress recorded while a working copy from an EARLIER, still-active
+    // real project happens to be loaded) — that record would otherwise pass
+    // the instantiationMode check below and get adopted as a phantom "My
+    // keyboards" card. Excluding it here, unconditionally, is the same rule
+    // `saveDraft` itself already applies before ever calling `upsertIndexEntry`.
+    if (projectKey === PENDING_PROJECT_KEY) continue;
 
     try {
       const raw = localStorage.getItem(key);
@@ -392,14 +437,225 @@ export function reconcileProjectIndex(): number {
 }
 
 /**
+ * Read + shape-validate one project's draft envelope for reconciliation
+ * purposes only (NOT `loadDraft` — never mutates a store, never touches the
+ * active pointer, never discards a bad record). Returns null for anything
+ * that isn't a well-formed, version-matched envelope with a real working
+ * copy: a reconciliation pass has no business acting on a record it can't
+ * trust.
+ */
+function readEnvelopeForReconciliation(projectKey: string): DurableDraft | null {
+  try {
+    const raw = localStorage.getItem(draftKey(projectKey));
+    if (raw === null) return null;
+    const parsed = JSON.parse(raw) as DurableDraft;
+    if (parsed === null || typeof parsed !== "object") return null;
+    if (parsed.version !== DRAFT_VERSION) return null;
+    if (typeof parsed.savedAt !== "number") return null;
+    if (parsed.workingCopy === null || typeof parsed.workingCopy !== "object") return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * One-time (idempotent) reconciliation, sibling to `reconcileProjectIndex`,
+ * for "My keyboards" index rows left duplicated by the pre-fix defect this
+ * module now closes at the source (see `migrateProjectKeyIfChanged` /
+ * `installDraftAutosave`): an author who renamed a project mid-session,
+ * before this fix shipped, could end up with the SAME project filed under
+ * BOTH its original key and its renamed key, because `upsertIndexEntry` only
+ * ever matches an exact `projectKey` — it has no notion of "these two rows
+ * are the same project." This pass finds and merges exactly that shape.
+ * Steady-state cost after the first pass on a given browser is a linear scan
+ * that merges nothing.
+ *
+ * MERGE PREDICATE — deliberately conservative (a missed merge is a cosmetic
+ * annoyance; a wrong merge destroys an author's work), and NEVER consults
+ * `displayName`. Two distinct index rows `stale` (key K1) and `survivor` (key
+ * K2, K1 !== K2) are merged only when BOTH hold:
+ *
+ *   1. `deriveProjectKeyFromWorkingCopy(stale's OWN stored envelope) === K2`
+ *      — `stale`'s own on-disk content (its `identity.keyboardId ??
+ *      baseKeyboard.id`, the exact lineage `deriveProjectKeyFromWorkingCopy`
+ *      already uses everywhere else in this module) says it belongs under
+ *      K2, not the K1 it happens to be filed under. This is a POSITIVE claim
+ *      from the stale record's own content, not an outside guess.
+ *   2. `deriveProjectKeyFromWorkingCopy(survivor's OWN stored envelope) ===
+ *      K2` — `survivor` is SELF-consistent: it is filed exactly where its own
+ *      content says it belongs.
+ *
+ * Two genuinely distinct keyboards that happen to share a display name are
+ * each self-consistent under condition 2 (their own derived key equals their
+ * own filed key) — self-consistency is the NORMAL case, not evidence of
+ * relatedness — so condition 1 never holds for either of them against the
+ * other, and this predicate never even considers merging them. See this
+ * module's test suite for the negative case pinning exactly that.
+ *
+ * On a match, keeps the newer-`savedAt` content under the SURVIVOR key K2
+ * (ordinarily already K2's own row — see the defect mechanism above — but
+ * compared rather than assumed, in case of an unusual/hand-edited pair),
+ * merges the STRONGEST lifecycle status + `prUrl` from either side
+ * (`strongestStatusOverrides` — Finding 2 fix: a submission recorded under
+ * EITHER key must survive the merge, not just one filed under the survivor),
+ * and removes K1's record + index row entirely via `clearDraft`.
+ *
+ * CHAIN RESOLUTION (multi-hop pile-up fix). An author who was renamed TWICE
+ * before this fix shipped (base -> mid -> final, each rename's stale
+ * autosave subscription overwriting its OLD key with the NEXT identity)
+ * leaves `mid`'s own on-disk content pointing at `final`, not at `mid`
+ * itself — so `base`'s one-hop target (`mid`) is not self-consistent by the
+ * time this scan runs, and treating that as a plain refusal (as a single-hop
+ * check would) leaves `base` a permanent orphan: it can never be re-examined
+ * once `mid`'s own row is later merged away, because `base`'s stored content
+ * still names a key (`mid`) that no longer has a row OR a record to read.
+ * `resolveSurvivorKey` below walks the CURRENT chain (`stale` -> its target
+ * -> that target's own target -> …) to the first self-consistent link before
+ * this function commits to a destination, so `base` resolves directly to
+ * `final` in the SAME pass `mid` does — see this module's test suite for the
+ * three-row pile-up this closes.
+ *
+ * Returns the number of rows merged away (0 in the steady state).
+ */
+function resolveSurvivorKey(
+  startKey: string,
+  remainingKeys: ReadonlySet<string>,
+): { key: string; envelope: DurableDraft } | null {
+  const visited = new Set<string>();
+  let candidate = startKey;
+  for (;;) {
+    if (visited.has(candidate) || !remainingKeys.has(candidate)) return null; // cycle or dead end
+    visited.add(candidate);
+    const envelope = readEnvelopeForReconciliation(candidate);
+    if (envelope === null) return null;
+    const derived = deriveProjectKeyFromWorkingCopy(envelope.workingCopy);
+    if (derived === candidate) return { key: candidate, envelope }; // self-consistent — the true survivor
+    if (derived === null) return null;
+    candidate = derived; // chase the next hop
+  }
+}
+
+export function reconcileRenamedProjectRows(): number {
+  const entries = readProjectIndex();
+  if (entries.length < 2) return 0;
+
+  const remainingKeys = new Set(entries.map((e) => e.projectKey));
+  let merged = 0;
+
+  for (const stale of entries) {
+    if (!remainingKeys.has(stale.projectKey)) continue; // already merged away this pass
+
+    const staleEnvelope = readEnvelopeForReconciliation(stale.projectKey);
+    if (staleEnvelope === null) continue;
+
+    const derivedFromStale = deriveProjectKeyFromWorkingCopy(staleEnvelope.workingCopy);
+    if (derivedFromStale === null || derivedFromStale === stale.projectKey) continue; // self-consistent — not a stale duplicate
+
+    const survivor = resolveSurvivorKey(derivedFromStale, remainingKeys);
+    if (survivor === null || survivor.key === stale.projectKey) continue; // missed merge, never a wrong one
+
+    const { key: survivorKey, envelope: survivorEnvelope } = survivor;
+    const mergedOverrides = strongestStatusOverrides(
+      existingStatusOverrides(survivorKey),
+      { status: stale.status, prUrl: stale.prUrl },
+    );
+
+    if (staleEnvelope.savedAt > survivorEnvelope.savedAt) {
+      // Unusual ordering (the stale key happens to hold the newer content) —
+      // carry that content over to the survivor key before dropping the stale
+      // record, so "keeps the newer savedAt" holds regardless of which side
+      // happened to be written to more recently.
+      const relocated: DurableDraft = { ...staleEnvelope, projectKey: survivorKey };
+      try {
+        localStorage.setItem(draftKey(survivorKey), JSON.stringify(relocated));
+      } catch {
+        continue; // VR-4: leave both records exactly as found rather than merge half-way.
+      }
+      upsertIndexEntry(buildIndexEntry(survivorKey, relocated, mergedOverrides));
+    } else if (mergedOverrides?.status === "submitted") {
+      // The common ordering (survivor already newer) previously left the
+      // survivor's row untouched here — fine when neither side carries a
+      // submission, but a silent status/prUrl loss when `stale` was the
+      // submitted side (Finding 2). Write the merged lifecycle fields onto
+      // the survivor's EXISTING content without disturbing that content.
+      upsertIndexEntry(buildIndexEntry(survivorKey, survivorEnvelope, mergedOverrides));
+    }
+
+    clearDraft(stale.projectKey);
+    remainingKeys.delete(stale.projectKey);
+    merged += 1;
+  }
+
+  return merged;
+}
+
+/**
+ * localStorage key marking that the one-time boot rename-reconciliation
+ * (`runBootRenameReconciliation`, FINDING 3 fix) has already run on this
+ * browser. Versioned (`.v1`) the same way `DRAFT_VERSION`/`DRAFT_INDEX_KEY`
+ * are: if a FUTURE defect is ever found to leave a new class of duplicate
+ * row behind, shipping the fix alongside a bumped suffix (`.v2`) is what
+ * re-triggers reconciliation for every browser on its next boot, rather than
+ * a runtime self-check trying to infer "did something go wrong since last
+ * time" with no reliable signal to do so from.
+ */
+const RENAME_RECONCILED_KEY = "ks.draftIndex.renameReconciled.v1" as const;
+
+/**
+ * One-time boot migration (FINDING 3 fix): runs `reconcileRenamedProjectRows`
+ * (a DESTRUCTIVE merge — it `clearDraft`s the losing side) exactly once per
+ * browser, gated by `RENAME_RECONCILED_KEY`, rather than on every `listDrafts()`
+ * call.
+ *
+ * BEFORE this fix, `listDrafts()` ran the merge itself, and `listDrafts()` is
+ * called from a `useState` LAZY INITIALIZER in `MyKeyboardsList.tsx` and
+ * `CurrentKeyboardIndicator.tsx` — i.e. DURING RENDER — and re-runs on every
+ * `hashchange` (`CurrentKeyboardIndicator`'s own refresh effect). A migration
+ * documented as "one-time" was therefore actually running for the app's whole
+ * lifetime, on every in-app navigation: a React render-purity violation (a
+ * render path must not mutate/delete external state as a side effect) that
+ * also amplified FINDINGs 1 and 2 — every extra invocation is another chance
+ * for a stale subscription's fallout (Finding 1) or a merge that runs before
+ * `existingStatusOverrides` reflects the CURRENT true state (Finding 2) to
+ * fire.
+ *
+ * Called once from `main.tsx`, alongside the existing pre-mount `loadDraft`
+ * call — never from a render path. `listDrafts()` keeps calling the
+ * NON-destructive `reconcileProjectIndex` (it only ADOPTS orphaned records
+ * with no index row; it never deletes anything) inline, because that one is
+ * genuinely idempotent-and-cheap-enough to run on every read, and adopting a
+ * newly-discovered legacy draft the moment "My keyboards" is opened (rather
+ * than only at the last boot) is the whole point of it — see its own doc
+ * comment.
+ */
+export function runBootRenameReconciliation(): number {
+  try {
+    if (localStorage.getItem(RENAME_RECONCILED_KEY) === "1") return 0;
+  } catch {
+    return 0; // VR-4: a security/quota failure must never throw into boot.
+  }
+  const merged = reconcileRenamedProjectRows();
+  try {
+    localStorage.setItem(RENAME_RECONCILED_KEY, "1");
+  } catch {
+    // VR-4: quota/security failure — never throw into boot; worst case this
+    // pass simply runs again next boot, which is safe (idempotent).
+  }
+  return merged;
+}
+
+/**
  * The local "My keyboards" project list, newest-saved first. Public entry
  * point for `MyKeyboardsList` (ported from the dev reference implementation).
  *
- * Reconciles first (see `reconcileProjectIndex`) so a pre-index draft is
- * listed on the author's very first visit to "My keyboards" rather than
- * depending on a boot hook having run. Idempotent and cheap in the steady
- * state: the scan parses only records that are MISSING an index row, which is
- * none once the first call has adopted them.
+ * Reconciles the ADDITIVE gap only (see `reconcileProjectIndex`'s own doc
+ * comment) so a pre-index draft is listed on the author's very first visit
+ * to "My keyboards" rather than depending on a boot hook having run. The
+ * DESTRUCTIVE rename-duplicate merge (`reconcileRenamedProjectRows`) is
+ * deliberately NOT run here any more — see `runBootRenameReconciliation`'s
+ * doc comment (FINDING 3 fix) for why a render-triggered read path must never
+ * be the thing that deletes a "My keyboards" row.
  */
 export function listDrafts(): ProjectIndexEntry[] {
   reconcileProjectIndex();
@@ -814,6 +1070,38 @@ export function discardActiveDraft(): void {
   clearActiveProjectKey();
 }
 
+/**
+ * If `fromProjectKey` names a real project DIFFERENT from `toProjectKey`,
+ * remove `fromProjectKey`'s draft record + "My keyboards" index row — its
+ * content has been re-filed under `toProjectKey`, so the record left behind
+ * under the old key is a stale duplicate of the SAME project, not a second
+ * project. No-op when either key is null or the two are equal: nothing to
+ * migrate (spec 047 US3a's SC-001 — "start keyboard B, keyboard A survives"
+ * — is about two genuinely DISTINCT projects; this function never touches
+ * that case, because every caller only ever supplies two keys for the SAME
+ * project — see `installDraftAutosave`'s doc comment for why that holds).
+ *
+ * Extracted from what used to be `doCommit`'s own inline
+ * rebase-migration check (StudioShell.tsx) so a key change is handled
+ * wherever it is discovered, not only on a genuine base switch. The bug this
+ * closes (duplicate "My keyboards" row after Resume/reload on a renamed
+ * project — StudioShell.resumeRename.test.tsx /
+ * draftPersistence.resumeRename.test.ts) is exactly the same shape as a
+ * rebase: "the project I'm about to install autosave for is filed under a
+ * DIFFERENT key than the one already on record" — doCommit's rebase path is
+ * simply the one call site that already had both keys in hand explicitly.
+ * `installDraftAutosave` below now performs the same check for EVERY
+ * install, not just doCommit's.
+ */
+export function migrateProjectKeyIfChanged(
+  fromProjectKey: string | null,
+  toProjectKey: string | null,
+): void {
+  if (fromProjectKey !== null && toProjectKey !== null && fromProjectKey !== toProjectKey) {
+    clearDraft(fromProjectKey);
+  }
+}
+
 // ---------------------------------------------------------------------------
 // installDraftAutosave (T021)
 // ---------------------------------------------------------------------------
@@ -855,14 +1143,63 @@ export const AUTOSAVE_DEBOUNCE_MS = 500;
  * silently discarded on reload. `saveDraft`'s own VR-2 guard still applies
  * (no-ops if the working copy is somehow not yet instantiated), so this is
  * safe to call unconditionally.
+ *
+ * Key-change migration (closes the duplicate-row defect —
+ * StudioShell.resumeRename.test.tsx / draftPersistence.resumeRename.test.ts):
+ * every install compares the project THIS module already considered active
+ * (`resolveActiveProjectKey()`, read BEFORE it is overwritten below) against
+ * `projectKey`, and migrates via `migrateProjectKeyIfChanged` when they
+ * differ. This is intended for (a) the same project (no-op) or (b) the SAME
+ * project's own prior filing under a since-changed derived key: a genuine
+ * base switch, or a résumé/reload that rehydrates a renamed identity —
+ * never two genuinely UNRELATED "My keyboards" projects (SC-001).
+ *
+ * CORRECTION (P0 fix — this paragraph used to claim the invariant above was
+ * already guaranteed by every caller; it was not). `resumeProject()`
+ * (draftPersistence.ts) re-pins `resolveActiveProjectKey()` to the resumed
+ * project's OWN key, but does NOT itself reinstall this module's autosave
+ * subscription — that lives in a React ref (StudioShell's `SurveyView`,
+ * `autosaveTeardownRef`) this module has no handle on. When the résumé
+ * happens while `SurveyView` is ALREADY mounted (the top-bar
+ * `CurrentKeyboardIndicator` switcher, reachable from every step, not just
+ * `MyKeyboardsList`'s profile-page Resume button — see FINDING 1), no route
+ * change occurs, so `SurveyView` never remounts and `installDraftAutosave`
+ * is never called again for the newly-resumed project. The OLD subscription
+ * — still closed over the ABANDONED project's key — stays subscribed to the
+ * SAME stores, which now hold the NEWLY-resumed project's data. Its next
+ * debounced tick would, absent the guard below, `saveDraft(oldKey)` with the
+ * new project's live content — silently overwriting the abandoned project's
+ * own record with someone else's data AND re-pinning the active pointer back
+ * onto the abandoned key — so that a LATER, unrelated `installDraftAutosave`
+ * call (e.g. starting a brand-new keyboard) sees that stale re-pinned key as
+ * "the project already considered active" and `migrateProjectKeyIfChanged`
+ * deletes it as a false "stale rename filing". That is the FINDING 1
+ * mechanism end-to-end: a caller-sequencing gap turning into real data loss.
+ *
+ * The fix does not try to make every caller sequence the pointer perfectly
+ * (the same fragility that produced the original duplicate-row defect) —
+ * it makes the ORPHANED subscription itself inert. See the guard inside
+ * `scheduleSave` below: a debounced tick only writes when
+ * `resolveActiveProjectKey()` STILL names `projectKey`, i.e. nothing has
+ * repointed the active project since this closure was installed. An orphaned
+ * subscription becomes a harmless no-op (a missed autosave tick, recovered by
+ * the next genuine install for that key) instead of a wrong-project write.
  */
 export function installDraftAutosave(projectKey: string): () => void {
+  // Read BEFORE overwriting below — see the key-change migration note above.
+  const priorProjectKey = resolveActiveProjectKey();
+
   // Record the active project immediately — a reload before the first
   // debounced save still resolves the correct draft on next boot.
   setActiveProjectKey(projectKey);
 
   // Synchronous initial save (P1 fix) — see the doc comment above.
   saveDraft(projectKey);
+
+  // Migrate a stale prior filing only AFTER the new key's record is
+  // confirmed on disk (the line above) — never delete the only copy of the
+  // author's work before its replacement exists.
+  migrateProjectKeyIfChanged(priorProjectKey, projectKey);
 
   let timer: ReturnType<typeof setTimeout> | null = null;
 
@@ -872,6 +1209,26 @@ export function installDraftAutosave(projectKey: string): () => void {
     }
     timer = setTimeout(() => {
       timer = null;
+      // Orphan guard (FINDING 1 fix — see the doc comment above): if the
+      // active project has been repointed to a DIFFERENT key since this
+      // closure was installed (a résumé/switch that happened while the
+      // component owning this subscription stayed mounted, so nothing ever
+      // tore it down), this subscription is stale. Writing now would file the
+      // CURRENT (someone else's) live content under THIS closure's old key —
+      // silently corrupting that project's own record and re-pinning the
+      // pointer back onto it. Skip the write instead: a missed autosave tick
+      // is recoverable (the next real install for this key resumes normal
+      // saves); a wrong-project write is not.
+      //
+      // Cross-reference: for the `switchActiveProject()` path specifically,
+      // `useProjectSwitchStore`'s generation-keyed remount (projectSwitchStore.ts)
+      // closes this same hole structurally — it tears down and reinstalls this
+      // whole subscription, so no orphan is ever created for THAT path. This
+      // guard still earns its place as the backstop for any OTHER orphaned
+      // subscription (any call path that repoints the active project without
+      // tearing down the component that owns this closure). The two overlap
+      // by design on the switch path, not by accident.
+      if (resolveActiveProjectKey() !== projectKey) return;
       saveDraft(projectKey);
     }, AUTOSAVE_DEBOUNCE_MS);
   };
