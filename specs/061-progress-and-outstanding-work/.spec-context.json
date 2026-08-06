@@ -1,0 +1,467 @@
+{
+  "workflow": "companion",
+  "specName": "061-progress-and-outstanding-work",
+  "branch": "061-progress-and-outstanding-work",
+  "selectedAt": "2026-08-06T00:36:51.789Z",
+  "currentStep": "tasks",
+  "status": "ready-to-implement",
+  "history": [
+    {
+      "step": "clarify",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T00:41:02.272Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-06T00:41:02.576Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "ai",
+      "at": "2026-08-06T00:42:43.981Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T00:51:05.783Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T00:52:22.170Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T00:53:19.326Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-06T01:04:26.037Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T01:10:02.592Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T01:11:57.216Z"
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Q1 An activity page is one screen the author acts on: one survey question, one marks station, one gallery. Never one letter or key.",
+      "why": "Row must not duplicate in-page letter navigation (FR-001, FR-033)."
+    },
+    {
+      "decision": "Q2 The marks series contributes one mark per VISIBLE station, each individually addressable.",
+      "why": "A never-raised station is a page the author never sees; 057 FR-049a forbids a greyed placeholder (FR-004, SC-003)."
+    },
+    {
+      "decision": "Q3 Touch Gallery By-character / By-key is ONE activity page, one mark.",
+      "why": "The modes are two views of one page; symmetric with Mechanisms (FR-005).",
+      "rejected": "Two marks, one per view mode."
+    },
+    {
+      "decision": "Q4 A stage behind the author with work still owed renders HOLLOW; no fourth mark shape is added. The behind-vs-ahead distinction moves into the accessible name.",
+      "why": "Keeps 057 three mark classes intact (FR-006, FR-008, FR-031)."
+    },
+    {
+      "decision": "Q5 The nudge may name ONLY sections behind the author; the current section and any ahead are excluded.",
+      "why": "The author is already in the current section and it carries its own in-page indicators (FR-017, FR-018)."
+    },
+    {
+      "decision": "Q6 An incomplete keyboard IS downloadable (.kmp and .zip) after an explicit dismissible-to-safety complaint; publishing to the community repo MUST be refused with its own coverage term.",
+      "why": "It compiles, so blocking download blocks the harmless action; publish is the consequential one (FR-023..FR-027, D-7)."
+    },
+    {
+      "decision": "Q7 / A3 Mark-for-later DEFERS, it does not discharge: a marked letter keeps its section named by the nudge and its stage mark hollow. Marking relaxes only the gallery own completion control.",
+      "why": "All letters must be handled at some point (FR-014). One-term flip if reversed."
+    },
+    {
+      "decision": "R1 The one outstanding-work derivation lives in lib/outstandingWork.ts (pure) with a hooks/useOutstandingWork.ts seam.",
+      "why": "Mirrors the existing accountedForGate/useAccountedForGate idiom (FR-011) and is forced by the decisions-layer depcruise rule, which blocks decisions/ -> stores/ even for type-only imports, so progressDots must receive the result as an input.",
+      "rejected": "Putting it in decisions/ (blocked by the layer rule) or hook-only (not purely unit-testable, which is how D-8 happened)."
+    },
+    {
+      "decision": "R2 A passed section keeps a mark via a behind-position counterpart to aheadStageDot; hollow-behind is kind:upcoming plus a new ProgressDot.outstandingCount field.",
+      "why": "The fallback branch already exists at progressDots.ts:642 and simply has nothing to call for a behind step. outstandingCount lets the accessible name branch on structure, satisfying FR-008 while ProgressDotKind stays a three-member union (FR-031, Q4).",
+      "rejected": "A fourth ProgressDotKind (violates FR-031); inferring behind-ness from resolution.reason (resolveLocation returns reachable for a visited step either side of the cursor)."
+    },
+    {
+      "decision": "R3 MarksSeriesStep publishes a within-step walk from its existing visibleStations array; no resolver change is needed.",
+      "why": "The four station ids are already legal Location question segments, and liveResolveContext passes stepPositions from the walk store - the same path that makes gallery character tokens resolvable. Publishing the walk makes every station jumpable for free.",
+      "rejected": "Promoting each station to a manifest step (reorders the manifest, out of scope) or registering them in questionRegistry (they are not survey questions)."
+    },
+    {
+      "decision": "R4 StepWalkPosition gains required?: boolean where ABSENT MEANS NOT REQUIRED; galleries and marks stations publish required:true explicitly.",
+      "why": "Absent-means-required would make every existing publisher instantly report work the author does not owe - the same dishonesty this feature removes. A flow gates its own advance, so a section cannot be behind the author with a required question unanswered.",
+      "rejected": "Deriving required-ness from questionRegistry (no such field, and it would move the declaration off the owning surface, against FR-007)."
+    },
+    {
+      "decision": "R5 FR-013 is satisfied by SOURCING coverage from useInventoryCoverageGate, not by new persistence.",
+      "why": "That hook already reads phaseResults/touchLayoutJson/confirmedInventory from the working-copy store (the durable draft envelope), not the session-scoped walk store - so coverage is already reload-correct. This is also the real fix for D-3, whose galleries survive today only because clearStepWalk has no production caller.",
+      "rejected": "Persisting walks into the draft envelope (explicitly out of scope); a no-walk-means-unknown branch (a second notion of completeness, forbidden by FR-009)."
+    },
+    {
+      "decision": "R6 jumpToStep and backToUnfinishedGallery collapse into ONE section-id-taking backward-landing action that jumpToLocation calls.",
+      "why": "FR-019 requires generalizing the primitive rather than adding a second nav path. It also fixes a latent bug: visited is what resolveLocation gates on, so a target in visited but absent from history resolves reachable and jumpToLocation reports arrived while jumpToStep silently no-ops.",
+      "rejected": "Letting the nudge call backToUnfinishedGallery directly (leaves D-6 unfixed - no resolution, no refusal reason); adding a third action."
+    },
+    {
+      "decision": "R7 Remove exactly one term (!coverageGate.blocked) from canDownload and give publish its own canPublish coverage term; relax all four arrival refusals; reuse editors/assignLoop/parts/ConfirmDialog for the complaint.",
+      "why": "OutputScreen.tsx:715 passes canSubmit={canDownload}, so publish borrows downloads coverage term - relaxing download alone would silently open publish (D-7, FR-027). ConfirmDialog already documents Escape/backdrop = cancel, which is FR-025 exactly.",
+      "rejected": "A boolean bypass beside the shared flag (FR-027 rules it out by name); a bespoke modal; relaxing only the button and leaving arrival blocked (screen unreachable)."
+    },
+    {
+      "decision": "R8 Pin the row with an exact-ordered-match test against the real manifest and replace the shell-level assertion.",
+      "why": "StudioShell.test.tsx:2614 asserts dot count toBeGreaterThan(0) - it passes with a single mark, which IS the reported defect. SC-008 requires exact match, not a subset or minimum.",
+      "rejected": "A snapshot test, which absorbs a regression on update."
+    }
+  ],
+  "approach": "One new pure derivation (lib/outstandingWork.ts) plus a hooks/useOutstandingWork.ts seam - the existing accountedForGate/useAccountedForGate idiom - consumed by both the footer row and the top-bar nudge so the two cannot disagree. Three existing mechanisms are extended rather than forked: progressDots.ts gains a behind-the-author section mark, MarksSeriesStep starts publishing a walk of its visible stations (which makes them Location-addressable for free via ctx.stepPositions), and jumpToStep/backToUnfinishedGallery collapse into one section-id-taking primitive. On output, the coverage term moves off canDownload onto an independently-derived canPublish, and the four arrival refusals become warnings.",
+  "step_summaries": {
+    "plan": {
+      "summary": "Plan + research + data-model + UI contract written for 061; all eight spec-observed defects traced to concrete code, no constitution violations.",
+      "key_finding": "OutputScreen.tsx:715 passes canSubmit={canDownload} - publish has no coverage term of its own, so relaxing the download gate as Q6 requires would silently make an incomplete keyboard publishable. That single line is the whole of D-7 and the reason FR-027 demands a test asserting publish stays refused while download is permitted."
+    },
+    "tasks": {
+      "summary": "41 tasks in 6 phases (Setup 2, Foundational 5, US1 9, US2 10, US3 9, Polish 6), laid out as 18 waves with explicit join points; all 35 FRs and 8 SCs mapped to tasks.",
+      "key_finding": "Two tasks are hard ordering constraints rather than conveniences: T017 (collapse jumpToStep + backToUnfinishedGallery into one section-id-taking primitive) must land before T022 (the nudge), or D-6 is reintroduced for the duration of a commit; and T027 (canPublish with its own coverage term) must land before T031 flips canSubmit off canDownload, since that one line at OutputScreen.tsx:715 is the whole of D-7."
+    }
+  },
+  "telemetryInstanceId": "f20b7633-7abd-4895-a184-f87e79254a36",
+  "coverage": {
+    "FR-001": {
+      "title": "One mark per activity page; never per letter, per key, or per gallery view mode.",
+      "tasks": [
+        "T008",
+        "T010",
+        "T011"
+      ]
+    },
+    "FR-002": {
+      "title": "A section the author has passed must keep a mark, even when it records no survey answer and publishes no walk.",
+      "tasks": [
+        "T008",
+        "T010"
+      ]
+    },
+    "FR-003": {
+      "title": "A section the path bypassed has no mark at all - absence, never a greyed placeholder.",
+      "tasks": [
+        "T008",
+        "T010"
+      ]
+    },
+    "FR-004": {
+      "title": "The marks series contributes one mark per visible station, each addressable, restoring to the named station on arrival.",
+      "tasks": [
+        "T008",
+        "T011",
+        "T016"
+      ]
+    },
+    "FR-005": {
+      "title": "Each gallery contributes exactly one mark, whatever the inventory size and whichever view mode is active.",
+      "tasks": [
+        "T008",
+        "T013"
+      ]
+    },
+    "FR-006": {
+      "title": "A behind-the-author mark reads complete when the section owes nothing and outstanding when it does.",
+      "tasks": [
+        "T010",
+        "T014"
+      ]
+    },
+    "FR-007": {
+      "title": "An optional unanswered question does not make its section outstanding; required-ness is declared by the owning surface.",
+      "tasks": [
+        "T001",
+        "T006",
+        "T012"
+      ]
+    },
+    "FR-009": {
+      "title": "Exactly one derivation of what a section still owes, consumed by both the progress row and the nudge.",
+      "tasks": [
+        "T003",
+        "T014",
+        "T022"
+      ]
+    },
+    "FR-010": {
+      "title": "Required work is uncovered inventory characters plus unanswered required questions; optional questions contribute nothing.",
+      "tasks": [
+        "T003",
+        "T006"
+      ]
+    },
+    "FR-011": {
+      "title": "The derivation is a pure function with a React composition seam beside it, following the existing gate idiom.",
+      "tasks": [
+        "T003",
+        "T007"
+      ]
+    },
+    "FR-012": {
+      "title": "Character coverage is read from the existing single coverage predicate, never forked or partially inlined.",
+      "tasks": [
+        "T003",
+        "T007"
+      ]
+    },
+    "FR-013": {
+      "title": "The derivation is correct on a restored draft: coverage comes from the working copy, not session-scoped walks.",
+      "tasks": [
+        "T003",
+        "T006",
+        "T007",
+        "T035"
+      ]
+    },
+    "FR-014": {
+      "title": "Marked-for-later characters still count as outstanding for the row and the nudge.",
+      "tasks": [
+        "T006",
+        "T025"
+      ]
+    },
+    "FR-015": {
+      "title": "Each outstanding section yields a Location so both consumers navigate through the one jump implementation.",
+      "tasks": [
+        "T003",
+        "T022"
+      ]
+    },
+    "FR-016": {
+      "title": "The pure module imports no dashboard layer and reads no stores directly.",
+      "tasks": [
+        "T003",
+        "T007"
+      ]
+    },
+    "FR-017": {
+      "title": "One top-bar nudge slot naming the earliest section behind the author that owes required work, with its count.",
+      "tasks": [
+        "T022",
+        "T025"
+      ]
+    },
+    "FR-018": {
+      "title": "The section the author stands in, and any section ahead, are never named by the nudge.",
+      "tasks": [
+        "T003",
+        "T006",
+        "T025"
+      ]
+    },
+    "FR-019": {
+      "title": "Activating the nudge navigates through the same mechanism and refusal rules as a row mark; the backward primitive is generalized, not duplicated.",
+      "tasks": [
+        "T017",
+        "T018",
+        "T022",
+        "T025"
+      ]
+    },
+    "FR-020": {
+      "title": "A section is named identically in the nudge and in the row, from one shared label source.",
+      "tasks": [
+        "T002",
+        "T014",
+        "T022",
+        "T025"
+      ]
+    },
+    "FR-021": {
+      "title": "The nudge strings go through the catalog and take new ids, because the message meaning changed.",
+      "tasks": [
+        "T004",
+        "T005",
+        "T022"
+      ]
+    },
+    "FR-022": {
+      "title": "With nothing owed the nudge is absent, not an empty or disabled slot.",
+      "tasks": [
+        "T022",
+        "T025"
+      ]
+    },
+    "FR-023": {
+      "title": "Incomplete character coverage does not block download of the .kmp or the .zip.",
+      "tasks": [
+        "T027",
+        "T034"
+      ]
+    },
+    "FR-024": {
+      "title": "Requesting an artifact with incomplete coverage first raises a complaint naming what is missing and offering both paths.",
+      "tasks": [
+        "T004",
+        "T031",
+        "T034"
+      ]
+    },
+    "FR-025": {
+      "title": "Dismissing the complaint indirectly by Escape or backdrop takes the safe path and produces no artifact.",
+      "tasks": [
+        "T031",
+        "T034"
+      ]
+    },
+    "FR-026": {
+      "title": "Submitting to the community repository is refused while required letters are missing, and states that reason.",
+      "tasks": [
+        "T031",
+        "T032"
+      ]
+    },
+    "FR-027": {
+      "title": "The publish refusal has its own coverage term, not derived from the download gate, pinned by a test.",
+      "tasks": [
+        "T027",
+        "T033"
+      ]
+    },
+    "FR-028": {
+      "title": "The author can reach the Output screen with incomplete coverage; every arrival gate becomes a warning.",
+      "tasks": [
+        "T028",
+        "T029",
+        "T030"
+      ]
+    },
+    "FR-029": {
+      "title": "The coverage banner stays loud and specific, reworded to say download is possible and submission is not.",
+      "tasks": [
+        "T031"
+      ]
+    },
+    "FR-030": {
+      "title": "No other emission gate is relaxed: compile readiness, instantiation, attribution, licence, and stale-touch all stand.",
+      "tasks": [
+        "T027",
+        "T041"
+      ]
+    },
+    "FR-031": {
+      "title": "The three existing mark classes and their shapes are unchanged; no fourth shape is introduced.",
+      "tasks": [
+        "T008",
+        "T010"
+      ]
+    },
+    "FR-032": {
+      "title": "Row overflow behaviour is unchanged and the footer height does not grow.",
+      "tasks": [
+        "T039"
+      ]
+    },
+    "FR-033": {
+      "title": "Per-letter addressing does not return to the row; the in-page character strip stays the affordance.",
+      "tasks": [
+        "T008"
+      ]
+    },
+    "FR-034": {
+      "title": "No validation timer is introduced.",
+      "tasks": [
+        "T041"
+      ]
+    },
+    "FR-035": {
+      "title": "The coverage predicate fail-closed behaviour on a corrupted touch layout, including disregarding marked letters, is preserved.",
+      "tasks": [
+        "T003",
+        "T041"
+      ]
+    },
+    "FR-008": {
+      "title": "Outstanding-behind and not-yet-reached share a shape, so they must not share an accessible name.",
+      "tasks": [
+        "T004",
+        "T014",
+        "T015"
+      ]
+    },
+    "SC-001": {
+      "title": "Sections represented in the row equals the manifest sections on the path up to the current gallery - none missing, none duplicated.",
+      "tasks": [
+        "T008"
+      ]
+    },
+    "SC-002": {
+      "title": "No mark in the row is ever addressed to a single letter, at any inventory size.",
+      "tasks": [
+        "T008"
+      ]
+    },
+    "SC-003": {
+      "title": "A marks series raising n visible stations contributes exactly n marks, for n from one to four.",
+      "tasks": [
+        "T008",
+        "T016"
+      ]
+    },
+    "SC-004": {
+      "title": "A section left with required work outstanding reads outstanding rather than complete, including after a full page reload.",
+      "tasks": [
+        "T006",
+        "T035"
+      ]
+    },
+    "SC-005": {
+      "title": "With work outstanding in more than one passed section, exactly one nudge is shown and it names the manifest-earliest.",
+      "tasks": [
+        "T006",
+        "T025"
+      ]
+    },
+    "SC-006": {
+      "title": "With incomplete coverage both artifacts download after an explicit acknowledgement and submission is refused, same screen and session.",
+      "tasks": [
+        "T034",
+        "T035"
+      ]
+    },
+    "SC-007": {
+      "title": "The footer height is unchanged and the current-position mark stays visible without manual scrolling at the narrowest width.",
+      "tasks": [
+        "T039"
+      ]
+    },
+    "SC-008": {
+      "title": "The row composition is pinned by an exact-match test against the real manifest, not a subset matcher and not a minimum count.",
+      "tasks": [
+        "T008",
+        "T009"
+      ]
+    }
+  }
+}
