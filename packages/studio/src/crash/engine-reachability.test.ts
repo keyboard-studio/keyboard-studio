@@ -75,6 +75,27 @@ function isTypeOnly(typeKeyword: string | undefined, clause: string): boolean {
   return bindings.length > 0 && bindings.every((b) => /^type[ \t]/.test(b));
 }
 
+/**
+ * Remove block comments and whole-line `//` comments before scanning for code.
+ *
+ * Without this the scan reads prose as code: these modules DOCUMENT the
+ * constraints they honour, so `import()` and `computeSha256Hex` both appear in
+ * comments explaining why they are not used. A substring scan flags exactly the
+ * files that took the most care — turning the file that documents the rule into
+ * the file that violates it.
+ *
+ * Trailing `//` comments are deliberately left alone: stripping them means
+ * deciding whether a `//` is inside a string literal (`https://…`), and a
+ * dynamic import is never written on a line that begins with a comment.
+ */
+function stripComments(source: string): string {
+  return source
+    .replace(/\/\*[\s\S]*?\*\//g, "")
+    .split("\n")
+    .filter((line) => !/^\s*\/\//.test(line))
+    .join("\n");
+}
+
 /** Resolve a relative specifier to an on-disk source file, honouring `.js` → `.ts`/`.tsx`. */
 function resolveRelative(fromFile: string, specifier: string): string | null {
   // Strip Vite query suffixes (`?raw`, `?lingui`) before resolving.
@@ -140,7 +161,7 @@ function walkCrashGraph(entries: string[]): WalkResult {
     // point is that the reporter is already resident when the crash happens.
     // (Only entry-point files are checked — a dynamic import elsewhere in src/
     // is ordinary code splitting and none of this gate's business.)
-    if (entries.includes(file) && DYNAMIC_IMPORT_RE.test(source)) {
+    if (entries.includes(file) && DYNAMIC_IMPORT_RE.test(stripComments(source))) {
       dynamicImports.push(relative(STUDIO_ROOT, file));
     }
     DYNAMIC_IMPORT_RE.lastIndex = 0;
@@ -217,14 +238,10 @@ describe("crash module self-containment (FR-013)", () => {
     // spec calls out, so a failure reads as "you reused the engine's hash
     // helper" rather than the more abstract graph-edge message above.
     //
-    // Matched inside an import statement only. fingerprint.ts names the helper
-    // in prose to explain why it does NOT use it, and a bare substring scan
-    // would flag that comment — turning the file that documents the constraint
-    // into the file that violates it.
+    // Comments are stripped first: fingerprint.ts names the helper in prose to
+    // explain why it does NOT use it.
     const offenders = crashEntryPoints().filter((file) =>
-      /(?:^|\n)[ \t]*(?:import|export)[\s\S]{0,400}?computeSha256Hex/.test(
-        readFileSync(file, "utf8"),
-      ),
+      stripComments(readFileSync(file, "utf8")).includes("computeSha256Hex"),
     );
     expect(offenders.map((f) => relative(STUDIO_ROOT, f))).toEqual([]);
   });

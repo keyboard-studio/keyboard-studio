@@ -358,6 +358,46 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-06T02:49:36.376Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T039",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:54:36.748Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:54:36.977Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T041",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:54:37.217Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T042",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:54:37.452Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T043",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:54:37.692Z"
     }
   ],
   "telemetryInstanceId": "4d8149dc-5ee9-43f5-9dac-81307541deb6",
@@ -460,6 +500,9 @@
       "tasks": [
         "T042",
         "T039"
+      ],
+      "tests": [
+        "packages/studio/src/crash/staleChunk.test.ts::loadEngine rejection forwarding"
       ]
     },
     "FR-006": {
@@ -1173,7 +1216,7 @@
       ]
     }
   },
-  "currentTask": "T038",
+  "currentTask": "T043",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1446,6 +1489,43 @@
       "files": [
         "utilities/oauth-backend/src/crash-report-pipeline.ts"
       ]
+    },
+    "T039": {
+      "status": "DONE",
+      "did": "Asserted the ORIGINAL loadEngine rejection reaches the FR-051 classifier through the cause chain and fires the carve-out, and that a non-matching rejection still reaches ordinary filing",
+      "files": [
+        "packages/studio/src/crash/staleChunk.test.ts"
+      ]
+    },
+    "T040": {
+      "status": "DONE",
+      "did": "Implemented the carve-out: FR-051 pattern, ks.staleChunkReloadedAt one-shot gate against an exported STALE_CHUNK_RELOAD_WINDOW_MS, one reload with no report, no reload on recurrence",
+      "files": [
+        "packages/studio/src/crash/staleChunk.ts"
+      ]
+    },
+    "T041": {
+      "status": "DONE",
+      "did": "Installed the vite:preloadError handler with event.preventDefault() so the same failure is not double-counted, routing into the carve-out",
+      "files": [
+        "packages/studio/src/crash/globalHandlers.ts",
+        "packages/studio/src/main.tsx"
+      ]
+    },
+    "T042": {
+      "status": "DONE",
+      "did": "Fixed P0-3: loadEngine preserves the original import() rejection and the caller attaches it as cause, so the classifier sees the real text while the UI keeps the friendly synthetic string",
+      "files": [
+        "packages/studio/src/hooks/useKeyboardArtifact.ts"
+      ]
+    },
+    "T043": {
+      "status": "DONE",
+      "did": "Retry notice surfaced via crash.report.retry.notice on a recurrence inside the window, with retryExhausted made sticky so the subsequent ordinary filing does not overwrite the message",
+      "files": [
+        "packages/studio/src/components/CrashNotice.tsx",
+        "packages/studio/src/crash/send.ts"
+      ]
     }
   },
   "concerns": [
@@ -1468,6 +1548,11 @@
       "what": "oauth-backend suite after adding the crash route to server.ts",
       "command": "npx vitest run (utilities/oauth-backend)",
       "result": "7 files, 160 tests passed"
+    },
+    {
+      "what": "FR-013 gate re-demonstrated red after the comment-stripping change, using a real dynamic-import fixture",
+      "command": "npx vitest run src/crash/engine-reachability.test.ts with __dyn-fixture.ts present",
+      "result": "failed as expected on the dynamic-import assertion; fixture deleted and suite green"
     }
   ]
 }

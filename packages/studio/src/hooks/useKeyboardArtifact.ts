@@ -42,6 +42,57 @@ interface EngineModule {
   stripDanglingAssetStores?: (kmn: string, fs: VirtualFS) => { kmn: string; stripped: string[] };
 }
 
+/**
+ * The last `import("@keyboard-studio/engine")` rejection, preserved verbatim
+ * (spec 060, FR-005a, P0-3).
+ *
+ * WHY THIS EXISTS. `loadEngine()` collapses every failure to `null`, and the
+ * caller then throws a friendly synthetic string
+ * ("Engine failed to load — check browser console for WASM errors."). That
+ * string is good UX and completely useless to the stale-chunk classifier, which
+ * can only match on the text it is given: a post-deploy chunk 404 says
+ * "Failed to fetch dynamically imported module", the synthetic string does not,
+ * so the carve-out never fires and the failure goes to ordinary filing —
+ * exactly the deploy flood User Story 3 exists to prevent.
+ *
+ * So the original rejection is kept here. The UI keeps showing the friendly
+ * string; the classifier gets the truth.
+ */
+let lastEngineLoadFailure: unknown = null;
+
+/**
+ * Read (and clear) the preserved rejection.
+ *
+ * Cleared on read so a stale failure from an earlier run cannot misclassify a
+ * later, unrelated one.
+ */
+export function takeEngineLoadFailure(): unknown {
+  const failure = lastEngineLoadFailure;
+  lastEngineLoadFailure = null;
+  return failure;
+}
+
+/**
+ * The original rejection's message text, flattened through `cause` chains.
+ *
+ * Bundlers commonly wrap the underlying network error, so the matchable text
+ * can be one or two `cause` levels down from the rejection itself.
+ */
+export function engineLoadFailureMessage(failure: unknown): string {
+  const parts: string[] = [];
+  let current: unknown = failure;
+  for (let depth = 0; depth < 4 && current !== null && current !== undefined; depth += 1) {
+    if (current instanceof Error) {
+      parts.push(current.message);
+      current = current.cause;
+      continue;
+    }
+    if (typeof current === "string") parts.push(current);
+    break;
+  }
+  return parts.join(" | ");
+}
+
 async function loadEngine(): Promise<EngineModule | null> {
   try {
     const mod = await import(
@@ -52,10 +103,14 @@ async function loadEngine(): Promise<EngineModule | null> {
       typeof mod.fetchKeyboardSourceToVfs === "function" &&
       typeof mod.init === "function"
     ) {
+      lastEngineLoadFailure = null;
       return mod as EngineModule;
     }
     return null;
-  } catch {
+  } catch (err: unknown) {
+    // Preserved, not swallowed (FR-005a). The return value stays `null` so
+    // every existing caller behaves exactly as before.
+    lastEngineLoadFailure = err;
     return null;
   }
 }
@@ -546,8 +601,13 @@ export function useKeyboardArtifact(
       engineReadyPromise.current = (async () => {
         const mod = await loadEngine();
         if (mod === null) {
+          // The author sees the friendly string; the classifier must see the
+          // original text (FR-005a). Attaching it as `cause` carries it through
+          // without changing what the Stage: "error" UI renders.
+          const original = takeEngineLoadFailure();
           throw new Error(
             "Engine failed to load — check browser console for WASM errors.",
+            ...(original !== null ? [{ cause: original }] : []),
           );
         }
         engineRef.current = mod;

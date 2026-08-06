@@ -178,7 +178,7 @@ pattern; assert one `location.reload()` and zero POSTs.
 
 ### Tests for User Story 3
 
-- [ ] **T039** [US3] Assert the **original** `loadEngine()` rejection text — not the synthetic `"Engine failed to load…"` string — reaches the FR-051 classifier and the carve-out fires; and that a rejection which does **not** match the pattern still reaches ordinary filing, so the fix doesn't over-suppress genuine engine failures (SC-015) · `packages/studio/src/crash/staleChunk.test.ts`
+- [x] **T039** [US3] Assert the **original** `loadEngine()` rejection text — not the synthetic `"Engine failed to load…"` string — reaches the FR-051 classifier and the carve-out fires; and that a rejection which does **not** match the pattern still reaches ordinary filing, so the fix doesn't over-suppress genuine engine failures (SC-015) · `packages/studio/src/crash/staleChunk.test.ts`
 
 ### Implementation for User Story 3
 
@@ -186,18 +186,18 @@ pattern; assert one `location.reload()` and zero POSTs.
 
 **Wave 1 — the carve-out module, alone:**
 
-- [ ] **T040** [US3] Implement the carve-out: the FR-051 pattern match, the `ks.staleChunkReloadedAt` `sessionStorage` timestamp check against a named `STALE_CHUNK_RELOAD_WINDOW_MS` (default 60 s, single-source, exported), one `location.reload()` on first detection with **no** report filed, and no reload on recurrence within the window. A one-shot comparison, not a debounce — it engages no D3 timer and emits no diagnostic (FR-050–FR-055, FR-130) · `packages/studio/src/crash/staleChunk.ts`
+- [x] **T040** [US3] Implement the carve-out: the FR-051 pattern match, the `ks.staleChunkReloadedAt` `sessionStorage` timestamp check against a named `STALE_CHUNK_RELOAD_WINDOW_MS` (default 60 s, single-source, exported), one `location.reload()` on first detection with **no** report filed, and no reload on recurrence within the window. A one-shot comparison, not a debounce — it engages no D3 timer and emits no diagnostic (FR-050–FR-055, FR-130) · `packages/studio/src/crash/staleChunk.ts`
 
 **⟶ Wait for T040, then:**
 
 **Wave 2 — the two call sites (different files):**
 
-- [ ] **T041** [P] [US3] Install the `vite:preloadError` handler: call `event.preventDefault()` — without it the same failure also surfaces as an unhandled rejection and is double-counted — then route into the carve-out rather than the filing path (FR-004, FR-050) · `packages/studio/src/main.tsx`
-- [ ] **T042** [P] [US3] Fix P0-3: preserve the original `import()` rejection (its `message`, and its `cause` where it wraps another error) through `loadEngine()`'s `catch` and forward it to the classifier **before** any pattern match. The caller MAY still show the friendly synthetic string in the `Stage: "error"` UI, but the classifier must see the original text (FR-005a) · `packages/studio/src/hooks/useKeyboardArtifact.ts`
+- [x] **T041** [P] [US3] Install the `vite:preloadError` handler: call `event.preventDefault()` — without it the same failure also surfaces as an unhandled rejection and is double-counted — then route into the carve-out rather than the filing path (FR-004, FR-050) · `packages/studio/src/main.tsx`
+- [x] **T042** [P] [US3] Fix P0-3: preserve the original `import()` rejection (its `message`, and its `cause` where it wraps another error) through `loadEngine()`'s `catch` and forward it to the classifier **before** any pattern match. The caller MAY still show the friendly synthetic string in the `Stage: "error"` UI, but the classifier must see the original text (FR-005a) · `packages/studio/src/hooks/useKeyboardArtifact.ts`
 
 **⟶ Wait for Wave 2, then:**
 
-- [ ] **T043** [US3] On a recurrence inside the window, surface the plain retry notice via `crash.report.retry.notice` and only then allow the failure through to ordinary filing — it is now genuinely unreachable, not stale (FR-053) · `packages/studio/src/components/CrashNotice.tsx`
+- [x] **T043** [US3] On a recurrence inside the window, surface the plain retry notice via `crash.report.retry.notice` and only then allow the failure through to ordinary filing — it is now genuinely unreachable, not stale (FR-053) · `packages/studio/src/components/CrashNotice.tsx`
 
 **Checkpoint**: a deploy no longer floods the tracker; a genuinely unreachable chunk still files.
 

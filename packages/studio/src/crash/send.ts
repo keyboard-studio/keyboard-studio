@@ -69,7 +69,15 @@ let state: CrashSendState = IDLE;
 const listeners = new Set<() => void>();
 
 function setState(next: CrashSendState): void {
-  state = next;
+  // `retryExhausted` is sticky across the send lifecycle. FR-053 says the retry
+  // notice is raised and THEN the failure is allowed through to ordinary
+  // filing — so the send that follows must not overwrite the flag and flip the
+  // author's message from "reloading didn't help" back to the generic
+  // "a report has been sent".
+  state =
+    state.retryExhausted === true && next.retryExhausted === undefined
+      ? { ...next, retryExhausted: true }
+      : next;
   for (const listener of listeners) {
     try {
       listener();
@@ -100,7 +108,16 @@ export function getCrashSendSnapshot(): CrashSendState {
 
 /** Reset to idle. Used when the notice is dismissed, and by tests. */
 export function resetCrashSendState(): void {
-  setState(IDLE);
+  // Assigned directly rather than through setState, which would preserve the
+  // sticky `retryExhausted` flag and make a reset not reset.
+  state = IDLE;
+  for (const listener of listeners) {
+    try {
+      listener();
+    } catch {
+      // See setState.
+    }
+  }
 }
 
 /**

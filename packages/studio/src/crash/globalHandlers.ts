@@ -44,6 +44,30 @@ export type CrashContextReader = () => CrashContext | undefined;
  */
 export type StaleChunkHandler = (message: string) => boolean;
 
+/**
+ * Every message in a thrown value's `cause` chain, joined.
+ *
+ * The stale-chunk classifier matches on text, and the text it needs is often
+ * not the outermost message: `useKeyboardArtifact` deliberately shows the
+ * author a friendly synthetic string and attaches the original `import()`
+ * rejection as `cause` (FR-005a). Reading only the top message would classify
+ * a stale-deploy chunk 404 as an ordinary engine failure and file it.
+ */
+export function flattenErrorMessage(value: unknown): string {
+  const parts: string[] = [];
+  let current: unknown = value;
+  for (let depth = 0; depth < 4 && current !== null && current !== undefined; depth += 1) {
+    if (current instanceof Error) {
+      parts.push(current.message);
+      current = current.cause;
+      continue;
+    }
+    if (typeof current === "string") parts.push(current);
+    break;
+  }
+  return parts.join(" | ");
+}
+
 let installed = false;
 
 /**
@@ -70,7 +94,8 @@ export function installGlobalCrashHandlers(options: {
     // all there is for a cross-origin script error ("Script error."), which
     // carries no stack and no useful location.
     const error: unknown = event.error ?? event.message;
-    const message = typeof error === "string" ? error : (event.message ?? "");
+    const message =
+      typeof error === "string" ? error : flattenErrorMessage(error) || (event.message ?? "");
 
     if (handleStaleChunk?.(message) === true) {
       pushBreadcrumb("stage", "crash: stale chunk handled, not reported");
@@ -80,16 +105,41 @@ export function installGlobalCrashHandlers(options: {
     reportCrash({ kind: "onerror", error, ...contextOrNothing() });
   });
 
+  // Vite's own signal for a failed lazy chunk. Fires BEFORE the rejection
+  // surfaces, and `preventDefault()` is what stops it also arriving as an
+  // unhandled rejection — without that call the same failure is counted twice:
+  // once here (handled) and once below (filed), which is the double-report the
+  // carve-out is supposed to eliminate.
+  window.addEventListener("vite:preloadError", (event: Event) => {
+    event.preventDefault();
+    const payload = event as Event & { payload?: unknown };
+    const message =
+      payload.payload instanceof Error
+        ? payload.payload.message
+        : "Failed to fetch dynamically imported module";
+
+    if (handleStaleChunk?.(message) === true) {
+      pushBreadcrumb("stage", "crash: preload error, reloaded once");
+      return;
+    }
+    // Reloading already happened and did not help, so this chunk is genuinely
+    // unreachable rather than stale — file it (FR-053).
+    reportCrash({
+      kind: "rejection",
+      error: payload.payload ?? message,
+      ...contextOrNothing(),
+    });
+  });
+
   window.addEventListener(
     "unhandledrejection",
     (event: PromiseRejectionEvent) => {
       const reason: unknown = event.reason;
-      const message =
-        reason instanceof Error
-          ? reason.message
-          : typeof reason === "string"
-            ? reason
-            : "";
+      // Flatten the `cause` chain: `loadEngine()`'s caller wraps the original
+      // rejection in a friendly synthetic string and attaches the truth as
+      // `cause` (FR-005a). Matching only `reason.message` would see the
+      // synthetic string and never fire the carve-out.
+      const message = flattenErrorMessage(reason);
 
       if (handleStaleChunk?.(message) === true) {
         pushBreadcrumb("stage", "crash: stale chunk handled, not reported");
