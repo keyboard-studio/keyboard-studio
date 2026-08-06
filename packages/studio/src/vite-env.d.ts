@@ -5,6 +5,14 @@ declare module "*.yaml?raw" {
   export default src;
 }
 
+/**
+ * Build identity injected by the Vite `define` in vite.config.ts (spec 060,
+ * FR-110/FR-111). The deployed value is `VERCEL_GIT_COMMIT_SHA`; a local build
+ * gets the literal `"dev"`. Substituted at compile time, so it is readable from
+ * a pre-mount crash path before any module has run (FR-114).
+ */
+declare const __KS_COMMIT_SHA__: string;
+
 // Studio build-time environment (Vite `import.meta.env`). Declaring this
 // interface augments Vite's ImportMetaEnv so reads are typed.
 interface ImportMetaEnv {

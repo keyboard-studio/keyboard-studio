@@ -1,0 +1,4 @@
+{"step": "implement", "substep": null, "task": "T001", "kind": "complete", "by": "ai", "at": "2026-08-06T02:06:29.983Z", "did": "Added /report/crash rewrite above the terminal catch-all", "files": ["vercel.json"]}
+{"step": "implement", "substep": null, "task": "T002", "kind": "complete", "by": "ai", "at": "2026-08-06T02:06:30.258Z", "did": "Added Vite define block injecting __KS_COMMIT_SHA__ from VERCEL_GIT_COMMIT_SHA with dev fallback", "files": ["packages/studio/vite.config.ts"]}
+{"step": "implement", "substep": null, "task": "T003", "kind": "complete", "by": "ai", "at": "2026-08-06T02:06:30.517Z", "did": "Declared __KS_COMMIT_SHA__ ambiently", "files": ["packages/studio/src/vite-env.d.ts"]}
+{"step": "implement", "substep": null, "task": "T004", "kind": "complete", "by": "ai", "at": "2026-08-06T02:06:30.803Z", "did": "Documented the CRASH_REPORT_APP_* trio as distinct from GITHUB_APP_* with no fallback", "files": ["utilities/oauth-backend/src/server.ts"]}

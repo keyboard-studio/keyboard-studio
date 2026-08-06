@@ -6,6 +6,7 @@
  *   POST /oauth/refresh          — GitHub refresh_token → new access_token
  *   POST /oauth/google/exchange  — Google authorization_code → identity claims (only when GOOGLE_OAUTH_ENABLED=true)
  *   POST /submit/managed-pr      — Option B org-mediated fork+PR (no user token; 503 until org creds set)
+ *   POST /report/crash           — crash report → issue in keyboard-studio/crash-reports (503 until the crash App creds are set)
  *   GET  /oauth/health           — liveness probe (no auth)
  *
  * Environment variables (see README.md for full reference):
@@ -15,6 +16,18 @@
  *   GITHUB_APP_PRIVATE_KEY        optional — base64-encoded PEM private key for the GitHub App; never logged
  *   GITHUB_APP_INSTALLATION_ID    optional — installation ID of the GitHub App on the org
  *   GITHUB_ORG_LOGIN              optional — org login that owns the standing fork; must be set together with the three GITHUB_APP_* vars
+ *
+ *   CRASH_REPORT_APP_ID           optional — App ID of the SEPARATE crash-reporting GitHub App; POST /report/crash returns 503 until all three CRASH_REPORT_APP_* vars are set
+ *   CRASH_REPORT_APP_PRIVATE_KEY  optional — base64-encoded PEM private key for the crash-reporting App; never logged
+ *   CRASH_REPORT_APP_INSTALLATION_ID optional — installation ID of the crash-reporting App, scoped to keyboard-studio/crash-reports only
+ *
+ *   The CRASH_REPORT_APP_* trio is a DISTINCT credential set from the GITHUB_APP_*
+ *   trio above and MUST NOT fall back to it (spec 060 FR-085, Prerequisites #4).
+ *   The two Apps hold deliberately different permissions: GITHUB_APP_* carries
+ *   contents:write + pull_requests:write on keyboard-studio/keyboards, while the
+ *   crash App carries issues:write on keyboard-studio/crash-reports and nothing
+ *   else. Sharing a minter between them would hand whichever App loaded first to
+ *   both pipelines, granting the crash path write access to the keyboards repo.
  *   GOOGLE_OAUTH_ENABLED   set to "true" to enable the Google identity flow (default off)
  *   GOOGLE_CLIENT_ID       required only when GOOGLE_OAUTH_ENABLED=true
  *   GOOGLE_CLIENT_SECRET   required only when GOOGLE_OAUTH_ENABLED=true — never logged, never in responses
