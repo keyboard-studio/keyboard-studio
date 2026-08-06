@@ -60,6 +60,15 @@ import {
   type GitHubPipelineFetchFn,
 } from "./github-pipeline.js";
 import { getInstallationToken } from "./installation-token.js";
+import { CrashReportBodySchema } from "./crash-report-schemas.js";
+import {
+  submitCrashReport,
+  type CrashReportPipelineConfig,
+} from "./crash-report-pipeline.js";
+import {
+  getCrashReportInstallationToken,
+  isCrashReportAppConfigured,
+} from "./crash-report-installation-token.js";
 import {
   buildDraftConfig,
   getDraftContent,
@@ -240,6 +249,15 @@ export async function buildServer(opts: {
   getInstallationToken?: () => Promise<string>;
   orgLogin?: string;
   /**
+   * Provider callback returning a CRASH-APP installation token per request.
+   * Deliberately a separate option from `getInstallationToken`: passing one
+   * must never configure the other, or the crash route would inherit the
+   * managed-PR App's write access to keyboard-studio/keyboards (FR-085).
+   * When absent, the env-backed crash minter is used if all three
+   * CRASH_REPORT_APP_* vars are set; otherwise POST /report/crash returns 503.
+   */
+  getCrashReportInstallationToken?: () => Promise<string>;
+  /**
    * Injected fetch implementation — defaults to globalThis.fetch.
    *
    * Must satisfy GitHubPipelineFetchFn (statusText + headers.get + text()) so
@@ -320,6 +338,28 @@ export async function buildServer(opts: {
   const managedPRConfig: ManagedPRPipelineConfig | undefined =
     opts.getInstallationToken && opts.orgLogin
       ? { getInstallationToken: opts.getInstallationToken, orgLogin: opts.orgLogin, fetch: pipelineFetch }
+      : undefined;
+
+  // Crash-report pipeline config, gated on its OWN credential set — the
+  // `crashAppConfigured` flag mirrors the `appConfigured` gate above and shares
+  // nothing with it (FR-085). An injected `getCrashReportInstallationToken`
+  // wins so tests can drive the route without env; otherwise the env-backed
+  // minter is used, and only when all three CRASH_REPORT_APP_* vars are set.
+  const crashTokenProvider =
+    opts.getCrashReportInstallationToken ??
+    (isCrashReportAppConfigured()
+      ? async (): Promise<string> => {
+          const t = await getCrashReportInstallationToken();
+          if (t === undefined) {
+            throw new Error("crash-report installation token unexpectedly undefined");
+          }
+          return t;
+        }
+      : undefined);
+
+  const crashReportConfig: CrashReportPipelineConfig | undefined =
+    crashTokenProvider !== undefined
+      ? { getInstallationToken: crashTokenProvider, fetch: pipelineFetch }
       : undefined;
 
   // -------------------------------------------------------------------------
@@ -425,6 +465,48 @@ export async function buildServer(opts: {
         error: result.error,
         ...(result.branchName !== undefined ? { branchName: result.branchName } : {}),
       });
+    }
+    return reply.status(200).send(result.data);
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /report/crash — crash report -> issue in keyboard-studio/crash-reports
+  //
+  // Local-dev parity with the deployed api/report/crash.ts adapter (FR-083):
+  // same route, same schema, same status vocabulary, so a studio running
+  // against `pnpm dev` exercises the real client path rather than a stub.
+  //
+  // No bodyLimit override: CrashReportBodySchema caps the payload at a few KiB,
+  // comfortably inside Fastify's 1 MiB default.
+  // -------------------------------------------------------------------------
+  app.post("/report/crash", async (req, reply) => {
+    if (crashReportConfig === undefined) {
+      // Crash App not provisioned — fail soft. Unsetting one CRASH_REPORT_APP_*
+      // var is also the documented instant kill-switch for this route.
+      return reply.status(503).send({ error: "reporting_not_configured" });
+    }
+
+    const parsed = CrashReportBodySchema.safeParse(req.body);
+    if (!parsed.success) {
+      return reply.status(400).send({
+        error: "invalid_request",
+        details: parsed.error.issues.map(staticZodDetail),
+      });
+    }
+
+    let result: Awaited<ReturnType<typeof submitCrashReport>>;
+    try {
+      result = await submitCrashReport(parsed.data, crashReportConfig);
+    } catch {
+      // Token-mint failure — 502, never naming which credential is at fault.
+      return reply.status(502).send({ error: "submission_unavailable" });
+    }
+
+    if (!result.ok) {
+      if (result.retryAfterSeconds !== undefined) {
+        reply.header("Retry-After", String(result.retryAfterSeconds));
+      }
+      return reply.status(result.status).send({ error: result.error });
     }
     return reply.status(200).send(result.data);
   });

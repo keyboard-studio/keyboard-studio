@@ -174,6 +174,54 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-06T02:21:17.601Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:23:33.164Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:23:33.432Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:26:53.874Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:26:54.126Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:26:54.378Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-06T02:26:54.648Z"
     }
   ],
   "telemetryInstanceId": "4d8149dc-5ee9-43f5-9dac-81307541deb6",
@@ -954,7 +1002,7 @@
       ]
     }
   },
-  "currentTask": "T015",
+  "currentTask": "T024",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -1061,12 +1109,70 @@
       "files": [
         "utilities/oauth-backend/src/crash-report-pipeline.ts"
       ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "Added the minimal REST caller (list-by-label, list-created-since, create, comment, patch, delete-comment) with mapNonOk reproducing the github-pipeline vocabulary, plus the caller-#3 vendoring header and the issue-body renderer",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-pipeline.ts"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Wrapped the whole client capture-and-send path in runReport's try/catch: failures are swallowed to a breadcrumb, reportCrash returns void so no rejection can re-enter the unhandledrejection handler",
+      "files": [
+        "packages/studio/src/crash/send.ts"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "Added the Web-fetch adapter with method guard, 503 reporting_not_configured, 400 invalid_request, and the configOverride test seam",
+      "files": [
+        "api/report/crash.ts"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "Registered the Fastify POST /report/crash mirror gated on a crashAppConfigured-equivalent flag independent of appConfigured",
+      "files": [
+        "utilities/oauth-backend/src/server.ts"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Added api/report/crash.ts to FUNCTION_ENTRIES; the workspace-value-import assertion holds for its whole reachable graph",
+      "files": [
+        "api/bundle-safety.test.ts"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "Implemented the create branch: bug(studio) title <=72 chars ellipsized carrying no kind/fingerprint/build id, the crash/fp-<hash12> label, and the crash-fingerprint body trailer",
+      "files": [
+        "utilities/oauth-backend/src/crash-report-pipeline.ts"
+      ]
     }
   },
   "concerns": [
     {
       "note": "contracts/crash-report-api.md request-body table under-specifies context against FR-040 and data-model section 3; the schema now carries the full set and documents the divergence inline, but the contract doc itself should be reconciled",
       "step": "implement"
+    },
+    {
+      "note": "T024 (create branch) landed in Phase 2 wave 5 rather than US1, because T018 the adapter has no pipeline entry point to call otherwise and would not compile. Its US1 tests (T021-T023) are therefore written after the code rather than before.",
+      "step": "implement"
+    }
+  ],
+  "verified": [
+    {
+      "what": "api suite including the bundle-safety gate with the new function entry",
+      "command": "npx vitest run (api)",
+      "result": "6 files, 79 tests passed"
+    },
+    {
+      "what": "oauth-backend suite after adding the crash route to server.ts",
+      "command": "npx vitest run (utilities/oauth-backend)",
+      "result": "7 files, 160 tests passed"
     }
   ]
 }

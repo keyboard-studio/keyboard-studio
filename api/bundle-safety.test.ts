@@ -47,6 +47,7 @@ const FUNCTION_ENTRIES = [
   "api/drafts/content.ts",
   "api/submit/managed-pr.ts",
   "api/submit/managed-pr-selftest.ts",
+  "api/report/crash.ts",
 ];
 
 /** The scope whose packages are workspace builds rather than registry tarballs. */

@@ -373,3 +373,344 @@ export function scrubBody(body: CrashReportBody): CrashReportBody {
     ...(body.context !== undefined ? { context: scrubContext(body.context) } : {}),
   };
 }
+
+// ---------------------------------------------------------------------------
+// GitHub REST caller #3 — see the vendoring note at the top of this file
+// ---------------------------------------------------------------------------
+
+/**
+ * Pipeline-local fetch abstraction, structurally identical to
+ * `GitHubPipelineFetchResponse` in github-pipeline.ts. Duplicated rather than
+ * imported for the same reason the caller itself is: this module must stay
+ * usable from the `api/**` function bundle without dragging in the managed-PR
+ * pipeline's whole graph.
+ */
+export interface CrashReportFetchResponse {
+  ok: boolean;
+  status: number;
+  statusText: string;
+  headers: { get(name: string): string | null };
+  json(): Promise<unknown>;
+  text(): Promise<string>;
+}
+
+export type CrashReportFetchFn = (
+  url: string,
+  init: { method: string; headers: Record<string, string>; body?: string },
+) => Promise<CrashReportFetchResponse>;
+
+export interface CrashReportPipelineConfig {
+  /**
+   * Returns a crash-App installation token per call, so @octokit/auth-app's
+   * cache/refresh runs per-request rather than at startup (tokens expire ~1 h).
+   * MUST be the crash App's minter, never the managed-PR one (FR-085).
+   */
+  getInstallationToken: () => Promise<string>;
+  fetch: CrashReportFetchFn;
+}
+
+export type CrashReportAction = "created" | "commented" | "reopened";
+
+export type CrashReportHandlerResult =
+  | {
+      ok: true;
+      data: { issueUrl: string; issueNumber: number; action: CrashReportAction };
+    }
+  | {
+      ok: false;
+      status: number;
+      error: string;
+      /** Surfaced via Retry-After on 429. */
+      retryAfterSeconds?: number;
+    };
+
+/** The shape this module reads back from GitHub's issues API. */
+export interface GitHubIssue {
+  number: number;
+  html_url: string;
+  state: "open" | "closed";
+  comments: number;
+  updated_at: string;
+  labels?: Array<{ name: string } | string>;
+}
+
+function buildHeaders(token: string): Record<string, string> {
+  return {
+    Accept: "application/vnd.github+json",
+    Authorization: `Bearer ${token}`,
+    "X-GitHub-Api-Version": "2022-11-28",
+    "Content-Type": "application/json",
+  };
+}
+
+/**
+ * Map a GitHub non-ok response to a safe handler error.
+ *
+ * Reproduces github-pipeline.ts's vocabulary exactly (FR-088): 401/403 mean the
+ * installation token is missing or insufficient — a server-side
+ * misconfiguration — and are surfaced generically, never revealing WHICH
+ * credential or permission is at fault. A caller that could tell "wrong App"
+ * from "missing issues:write" would be a probe for the App's configuration.
+ */
+export function mapNonOk(res: CrashReportFetchResponse): CrashReportHandlerResult {
+  if (res.status === 401 || res.status === 403) {
+    return { ok: false, status: 502, error: "submission_unavailable" };
+  }
+  if (res.status === 429) {
+    // FR-098: honour the header, defaulting to 60 when absent or non-numeric.
+    const ra = Number(res.headers.get("Retry-After") ?? "60");
+    return {
+      ok: false,
+      status: 429,
+      error: "rate_limited",
+      retryAfterSeconds: Number.isFinite(ra) ? ra : 60,
+    };
+  }
+  return { ok: false, status: 502, error: "upstream_error" };
+}
+
+export interface GitHubCalls {
+  listByLabel(label: string): Promise<CrashReportFetchResponse>;
+  listCreatedSince(sinceIso: string): Promise<CrashReportFetchResponse>;
+  createIssue(payload: {
+    title: string;
+    body: string;
+    labels: string[];
+  }): Promise<CrashReportFetchResponse>;
+  addComment(issueNumber: number, body: string): Promise<CrashReportFetchResponse>;
+  patchIssue(
+    issueNumber: number,
+    payload: { state?: "open" | "closed"; labels?: string[] },
+  ): Promise<CrashReportFetchResponse>;
+  deleteComment(commentId: number): Promise<CrashReportFetchResponse>;
+}
+
+/**
+ * The six REST calls this pipeline makes, and nothing else.
+ *
+ * Built per-request around one minted token. Every method returns the raw
+ * response so each branch decides between `mapNonOk` and a branch-specific
+ * recovery — the dedupe lookup, for instance, fails OPEN to creation rather
+ * than surfacing an error (FR-096).
+ */
+export function createGitHubCalls(
+  token: string,
+  fetchFn: CrashReportFetchFn,
+): GitHubCalls {
+  const repoBase = `${API_BASE}/repos/${CRASH_REPORT_OWNER}/${CRASH_REPORT_REPO}`;
+  const call = (
+    url: string,
+    method = "GET",
+    payload?: unknown,
+  ): Promise<CrashReportFetchResponse> =>
+    fetchFn(url, {
+      method,
+      headers: buildHeaders(token),
+      ...(payload !== undefined ? { body: JSON.stringify(payload) } : {}),
+    });
+
+  return {
+    listByLabel: (label) =>
+      call(
+        `${repoBase}/issues?labels=${encodeURIComponent(label)}&state=all&per_page=5`,
+      ),
+    listCreatedSince: (sinceIso) =>
+      call(
+        `${repoBase}/issues?state=all&since=${encodeURIComponent(sinceIso)}&per_page=100`,
+      ),
+    createIssue: (payload) => call(`${repoBase}/issues`, "POST", payload),
+    addComment: (issueNumber, body) =>
+      call(`${repoBase}/issues/${issueNumber}/comments`, "POST", { body }),
+    patchIssue: (issueNumber, payload) =>
+      call(`${repoBase}/issues/${issueNumber}`, "PATCH", payload),
+    // Deletes a COMMENT, never an issue — an installation token cannot delete
+    // an issue, and the retraction contract (FR-075) does not ask it to.
+    deleteComment: (commentId) =>
+      call(`${repoBase}/issues/comments/${commentId}`, "DELETE", undefined),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Issue body
+// ---------------------------------------------------------------------------
+
+/**
+ * Render the issue body.
+ *
+ * The `<!-- crash-fingerprint: … -->` trailer is for AUDITABILITY ONLY
+ * (FR-092): it lets a maintainer confirm by eye that an issue's label matches
+ * its content. Lookup reads the LABEL, never this comment — parsing bodies to
+ * find duplicates would mean fetching every issue on every report.
+ */
+export function buildIssueBody(
+  body: CrashReportBody,
+  fingerprint: string,
+  kind: CrashKind,
+): string {
+  const lines: string[] = [];
+  lines.push(`**Kind:** \`${kind}\``);
+  if (body.appVersion !== undefined) lines.push(`**Build:** \`${body.appVersion}\``);
+  if (body.occurredAt !== undefined) lines.push(`**Occurred at:** ${body.occurredAt}`);
+  lines.push("", "### Message", "", "```", body.message, "```");
+
+  const frames = framesForBody(body);
+  if (frames.length > 0) {
+    lines.push("", "### Stack", "", "```");
+    for (const f of frames) {
+      const position =
+        f.line !== undefined && f.column !== undefined
+          ? `:${f.line}:${f.column}`
+          : "";
+      lines.push(`  at ${f.function} (${f.modulePath}${position})`);
+    }
+    lines.push("```");
+  }
+
+  const ctx = body.context;
+  if (ctx !== undefined) {
+    const rows: string[] = [];
+    if (ctx.keyboardId !== undefined) rows.push(`| keyboard | \`${ctx.keyboardId}\` |`);
+    if (ctx.bcp47Tags !== undefined) {
+      rows.push(`| BCP47 | ${ctx.bcp47Tags.map((t) => `\`${t}\``).join(", ")} |`);
+    }
+    if (ctx.stepId !== undefined) rows.push(`| step | \`${ctx.stepId}\` |`);
+    if (ctx.keyCount !== undefined) rows.push(`| keys | ${ctx.keyCount} |`);
+    if (ctx.exemplarCount !== undefined) {
+      rows.push(`| exemplars | ${ctx.exemplarCount} |`);
+    }
+    if (ctx.browserUA !== undefined) rows.push(`| browser | ${ctx.browserUA} |`);
+    if (ctx.os !== undefined) rows.push(`| os | ${ctx.os} |`);
+    if (rows.length > 0) {
+      lines.push("", "### Context", "", "| | |", "|---|---|", ...rows);
+    }
+
+    if (ctx.decisionTail !== undefined && ctx.decisionTail.length > 0) {
+      lines.push("", "### Recent decisions", "");
+      for (const d of ctx.decisionTail) {
+        lines.push(
+          `- \`${d.id}\`${d.choice !== undefined ? ` -> \`${d.choice}\`` : ""}`,
+        );
+      }
+    }
+
+    if (ctx.breadcrumbs !== undefined && ctx.breadcrumbs.length > 0) {
+      lines.push("", "### Breadcrumbs", "", "```");
+      for (const b of ctx.breadcrumbs) {
+        lines.push(`${b.at} [${b.channel}] ${b.label}`);
+      }
+      lines.push("```");
+    }
+  }
+
+  lines.push("", `<!-- crash-fingerprint: ${fingerprint} -->`);
+  return lines.join("\n");
+}
+
+/** Body of the comment added when a known fingerprint recurs. */
+export function buildRecurrenceComment(
+  body: CrashReportBody,
+  kind: CrashKind,
+): string {
+  const parts = [`Seen again (\`${kind}\`).`];
+  if (body.appVersion !== undefined) parts.push(`Build \`${body.appVersion}\`.`);
+  if (body.occurredAt !== undefined) parts.push(`Occurred at ${body.occurredAt}.`);
+  return parts.join(" ");
+}
+
+// ---------------------------------------------------------------------------
+// Issue title (FR-093a)
+// ---------------------------------------------------------------------------
+
+/** Prefix fixed by CLAUDE.md's `<prefix>(<area>): <description>` grammar. */
+const TITLE_PREFIX = "bug(studio): ";
+
+/** Total title budget, so an issue list stays scannable. */
+export const CRASH_REPORT_TITLE_MAX = 72;
+
+/**
+ * Build the generated issue title: `bug(studio): <normalized message summary>`.
+ *
+ * `bug`, not `auto`. CLAUDE.md reserves `auto` for machine-generated
+ * HOUSEKEEPING with no defect content (dependency bumps, version bumps) and
+ * `bug` for a reported defect. The filer here is a machine, but the content is
+ * a genuine defect an author actually hit — so `bug` classifies the content
+ * correctly even though `auto` would describe the mechanism.
+ *
+ * MUST NOT contain the `kind`, the fingerprint, or the build id (FR-093a) —
+ * those live in the body. A title carrying a 12-hex fingerprint is unreadable
+ * in a repository issue list, which is the one place a title has to work.
+ *
+ * The summary is derived from the CANONICALIZED message, so the quoted
+ * user-supplied substrings normalization already stripped never reach a public
+ * title either.
+ */
+export function buildIssueTitle(normalizedMessage: string): string {
+  const room = CRASH_REPORT_TITLE_MAX - TITLE_PREFIX.length;
+  const summary =
+    normalizedMessage.length <= room
+      ? normalizedMessage
+      : `${normalizedMessage.slice(0, room - 1).trimEnd()}…`;
+  return `${TITLE_PREFIX}${summary}`;
+}
+
+// ---------------------------------------------------------------------------
+// submitCrashReport — the route handler
+// ---------------------------------------------------------------------------
+
+/** Read an issue's label names, tolerating both shapes GitHub returns. */
+export function labelNames(issue: GitHubIssue): string[] {
+  return (issue.labels ?? []).map((l) => (typeof l === "string" ? l : l.name));
+}
+
+/**
+ * Run the crash-report pipeline for a validated body.
+ *
+ * Returns a discriminated result and never throws, in the same shape
+ * github-pipeline.ts uses, so the route can `if (!result.ok)
+ * reply.status(result.status)`.
+ *
+ * Error mapping (all token-leak-safe, per `mapNonOk`):
+ *  - Network throw              -> 502 submission_unavailable
+ *  - GitHub 401/403             -> 502 submission_unavailable (server misconfig)
+ *  - GitHub 429                 -> 429 rate_limited (+ retryAfterSeconds)
+ *  - Global creation cap hit    -> 429 rate_limited (+ retryAfterSeconds)
+ *  - Any other non-ok           -> 502 upstream_error
+ */
+export async function submitCrashReport(
+  rawBody: CrashReportBody,
+  config: CrashReportPipelineConfig,
+): Promise<CrashReportHandlerResult> {
+  // Scrub BEFORE anything is written. The client's allowlist should mean there
+  // is nothing to find; this route accepts a POST from anywhere and everything
+  // it writes lands in a public issue, so "should" is not the control.
+  const body = scrubBody(rawBody);
+  const kind = kindForBody(body);
+  const { fingerprint } = computeFingerprint(body);
+  const label = fingerprintLabel(fingerprint);
+
+  // Minted once per request. A throw here propagates to the caller, which maps
+  // it to 502 submission_unavailable.
+  const token = await config.getInstallationToken();
+  const gh = createGitHubCalls(token, config.fetch);
+
+  try {
+    const created = await gh.createIssue({
+      title: buildIssueTitle(normalizeMessage(body.message)),
+      body: buildIssueBody(body, fingerprint, kind),
+      labels: [label],
+    });
+    if (!created.ok) return mapNonOk(created);
+    const issue = (await created.json()) as { number: number; html_url: string };
+    return {
+      ok: true,
+      data: {
+        issueUrl: issue.html_url,
+        issueNumber: issue.number,
+        action: "created",
+      },
+    };
+  } catch {
+    // Network-level error — do not propagate internal details.
+    return { ok: false, status: 502, error: "submission_unavailable" };
+  }
+}

@@ -65,21 +65,21 @@ route skeleton. No user story can begin until this phase is done.
 
 **Wave 4 — the GitHub caller and the crash-in-the-reporter guard:**
 
-- [ ] **T016** Add the minimal hand-written REST caller covering exactly list-by-label, create, comment, reopen/label-patch, and comment-delete, with `mapNonOk` reproducing the existing vocabulary (`submission_unavailable` / `upstream_error` / `rate_limited` / 401·403 → 502). Header comment in the `github-pipeline.ts:9-24` vendoring style naming this as caller #3 and why extraction is blocked (FR-084, FR-087, FR-088, FR-089) · `utilities/oauth-backend/src/crash-report-pipeline.ts`
-- [ ] **T017** Wrap the entire client capture-and-send path (capture → fingerprint → redact → build → POST) so any internal failure is swallowed silently — at most pushed to the breadcrumb ring — and can never escape as a second unhandled rejection re-entering the same handler (Edge Cases, "crash-in-the-crash-reporter") · `packages/studio/src/crash/send.ts`
+- [x] **T016** Add the minimal hand-written REST caller covering exactly list-by-label, create, comment, reopen/label-patch, and comment-delete, with `mapNonOk` reproducing the existing vocabulary (`submission_unavailable` / `upstream_error` / `rate_limited` / 401·403 → 502). Header comment in the `github-pipeline.ts:9-24` vendoring style naming this as caller #3 and why extraction is blocked (FR-084, FR-087, FR-088, FR-089) · `utilities/oauth-backend/src/crash-report-pipeline.ts`
+- [x] **T017** Wrap the entire client capture-and-send path (capture → fingerprint → redact → build → POST) so any internal failure is swallowed silently — at most pushed to the breadcrumb ring — and can never escape as a second unhandled rejection re-entering the same handler (Edge Cases, "crash-in-the-crash-reporter") · `packages/studio/src/crash/send.ts`
 
 **⟶ Wait for Wave 4, then:**
 
 **Wave 5 — route surfaces (independent of each other):**
 
-- [ ] **T018** [P] Add the thin Web-fetch adapter: method guard → env config (503 `reporting_not_configured` when any `CRASH_REPORT_APP_*` is absent) → schema validation (400 `invalid_request`) → pipeline → status mapping, with the `configOverride` test seam. Structurally mirrors `api/submit/managed-pr.ts` (FR-083, FR-087) · `api/report/crash.ts`
-- [ ] **T019** [P] Register the matching Fastify `POST /report/crash` route for local-dev parity, gated on a `crashAppConfigured` flag mirroring the existing `appConfigured` gate (FR-083) · `utilities/oauth-backend/src/server.ts`
+- [x] **T018** [P] Add the thin Web-fetch adapter: method guard → env config (503 `reporting_not_configured` when any `CRASH_REPORT_APP_*` is absent) → schema validation (400 `invalid_request`) → pipeline → status mapping, with the `configOverride` test seam. Structurally mirrors `api/submit/managed-pr.ts` (FR-083, FR-087) · `api/report/crash.ts`
+- [x] **T019** [P] Register the matching Fastify `POST /report/crash` route for local-dev parity, gated on a `crashAppConfigured` flag mirroring the existing `appConfigured` gate (FR-083) · `utilities/oauth-backend/src/server.ts`
 
 **⟶ Wait for Wave 5, then:**
 
 **Wave 6 — the bundle-safety gate (needs the adapter to exist on disk):**
 
-- [ ] **T020** Add `"api/report/crash.ts"` to `FUNCTION_ENTRIES` and confirm the suite is green — the "imports no workspace package as a value" assertion must hold for the new function's whole reachable graph (FR-086, FR-131, SC-010) · `api/bundle-safety.test.ts`
+- [x] **T020** Add `"api/report/crash.ts"` to `FUNCTION_ENTRIES` and confirm the suite is green — the "imports no workspace package as a value" assertion must hold for the new function's whole reachable graph (FR-086, FR-131, SC-010) · `api/bundle-safety.test.ts`
 
 **Checkpoint**: the crash module, wire schema, minter, canonicalization, GitHub caller, and route all
 exist and are gated. User-story work can begin.
@@ -108,7 +108,7 @@ a stub GitHub API with the expected redacted body and label, and that the recove
 
 **Wave 2 — the create path and the capture surfaces (different files):**
 
-- [ ] **T024** [P] [US1] Implement the create branch: generated title `bug(studio): <normalized message summary>` ≤72 chars ellipsized and carrying neither `kind` nor fingerprint nor build id; the `crash/fp-<hash12>` label; and the `<!-- crash-fingerprint: <hash> -->` body trailer for auditability (FR-092, FR-093, FR-093a) · `utilities/oauth-backend/src/crash-report-pipeline.ts`
+- [x] **T024** [P] [US1] Implement the create branch: generated title `bug(studio): <normalized message summary>` ≤72 chars ellipsized and carrying neither `kind` nor fingerprint nor build id; the `crash/fp-<hash12>` label; and the `<!-- crash-fingerprint: <hash> -->` body trailer for auditability (FR-092, FR-093, FR-093a) · `utilities/oauth-backend/src/crash-report-pipeline.ts`
 - [ ] **T025** [P] [US1] Add the stateless global creation cap: `GET …?state=all&since=<now-window>&per_page=100`, skip creation at `CRASH_REPORT_GLOBAL_CREATE_CAP`, surface a skip as `429 rate_limited` with `Retry-After` computed from the window (FR-106, SC-016) · `utilities/oauth-backend/src/crash-report-pipeline.ts`
 - [ ] **T026** [P] [US1] Build the recovery screen: `role="alert"`, focus moved to its heading on mount, the issue link and any control a real keyboard-operable element (FR-072, FR-120, FR-125) · `packages/studio/src/components/CrashRecoveryScreen.tsx`
 - [ ] **T027** [P] [US1] Build the lighter notice: `aria-live="polite"`, never steals focus, names that a report was sent and links the issue. Consumes `send.ts`'s subscribable via `useSyncExternalStore` (FR-071, FR-073, FR-121) · `packages/studio/src/components/CrashNotice.tsx`
