@@ -236,6 +236,7 @@ import {
   galleryHeaderBtnStyle as headerBtnStyle,
   galleryConfigStyle as configStyle,
   galleryCardStyle as cardStyle,
+  galleryForwardBtnStyle as forwardBtnStyle,
 } from "../../lib/galleryTheme.ts";
 // T118 — the rejection banner's border. `galleryTheme.ts` has no error token of
 // its own; `ui/theme.ts` is where the E/W/I severity palette lives, and this is
@@ -640,6 +641,70 @@ interface TouchMethodChooserProps {
    * "Shift+RAlt", or "Base" for the empty combo) — see
    * `touchLayerComboLabel`. Shown as a preview line below the builder. */
   layerPreviewLabel: string;
+  /** Gates the per-card Apply row below — see `canApply`'s own doc comment
+   * at its definition site. */
+  canApply: boolean;
+  /** Commits the currently-open card's assignment — see `handleApply`. */
+  onApply: () => void;
+}
+
+/**
+ * Apply row for the open touch-method card — bottom-right of the very card
+ * it commits. Mirrors MechanismGallery's `CardApplyRow` byte-for-byte in
+ * approach: replaces the single shared "Apply method" button that used to
+ * sit below all four cards (Sequences card, then Apply + Mark row) with one
+ * row rendered only inside the currently-open card, so exactly one Apply is
+ * ever on screen and "which touch method does this commit?" stops being
+ * ambiguous.
+ *
+ * Keeps the replaced button's `touch.applyMethodAriaLabel` /
+ * `applyMethodButton` message ids verbatim — same accessible name, same
+ * catalog keys, so screen readers, the en/fr catalogs, and every test that
+ * queries this control by accessible name are unaffected by the move.
+ */
+function TouchCardApplyRow({
+  currentChar,
+  canApply,
+  onApply,
+  testId,
+}: {
+  currentChar: string;
+  canApply: boolean;
+  onApply: () => void;
+  /** Per-method testid so a test can assert WHICH card holds the Apply. */
+  testId: string;
+}) {
+  const { t } = useLingui();
+  return (
+    <div
+      data-testid={testId}
+      style={{
+        // Mirrors galleryConfigStyle's horizontal padding so the button's
+        // right edge lines up with the fields it commits.
+        padding: "0 14px 12px",
+        display: "flex",
+        justifyContent: "flex-end",
+      }}
+    >
+      <button
+        type="button"
+        onClick={onApply}
+        disabled={!canApply}
+        aria-label={t({
+          id: "editor.assignLoop.touch.applyMethodAriaLabel",
+          message: `Apply touch method for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
+        })}
+        style={{
+          ...forwardBtnStyle,
+          background: canApply ? BLUE_ACTION : "#21262d",
+          color: canApply ? "#e6edf3" : TEXT_DIM,
+          cursor: canApply ? "pointer" : "not-allowed",
+        }}
+      >
+        <Trans id="editor.assignLoop.applyMethodButton">Apply method</Trans>
+      </button>
+    </div>
+  );
 }
 
 /**
@@ -1077,6 +1142,8 @@ function TouchMethodChooser({
   validLayerCombos,
   layerComboValid,
   layerPreviewLabel,
+  canApply,
+  onApply,
 }: TouchMethodChooserProps) {
   const { t, i18n } = useLingui();
   const layerSelectPlaceholder = t({
@@ -1185,6 +1252,14 @@ function TouchMethodChooser({
             />
           </div>
         )}
+        {method === "longpress_alternates" && (
+          <TouchCardApplyRow
+            currentChar={currentChar}
+            canApply={canApply}
+            onApply={onApply}
+            testId="touch-apply-longpress"
+          />
+        )}
       </div>
 
       {/* 2. Swipe a key (flick) */}
@@ -1286,6 +1361,14 @@ function TouchMethodChooser({
             />
           </div>
         )}
+        {method === "flick_gestures" && (
+          <TouchCardApplyRow
+            currentChar={currentChar}
+            canApply={canApply}
+            onApply={onApply}
+            testId="touch-apply-flick"
+          />
+        )}
       </div>
 
       {/* 3. Tap multiple times (multitap) */}
@@ -1362,6 +1445,14 @@ function TouchMethodChooser({
               layerPreviewLabel={layerPreviewLabel}
             />
           </div>
+        )}
+        {method === "multitap" && (
+          <TouchCardApplyRow
+            currentChar={currentChar}
+            canApply={canApply}
+            onApply={onApply}
+            testId="touch-apply-multitap"
+          />
         )}
       </div>
 
@@ -1440,6 +1531,14 @@ function TouchMethodChooser({
               layerPreviewLabel={layerPreviewLabel}
             />
           </div>
+        )}
+        {method === "touch_key_replace" && (
+          <TouchCardApplyRow
+            currentChar={currentChar}
+            canApply={canApply}
+            onApply={onApply}
+            testId="touch-apply-replace"
+          />
         )}
       </div>
     </div>
@@ -5102,6 +5201,8 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
               validLayerCombos={validLayerCombos}
               layerComboValid={layerComboValid}
               layerPreviewLabel={layerPreviewLabel}
+              canApply={canApply}
+              onApply={handleApply}
             />
           )}
 
@@ -5122,9 +5223,13 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
             modality="touch"
           />
 
-          {/* Apply + Mark for later review. Back and Next/Done live in the
-              shared top toolbar row above so the forward-advance control is
+          {/* Mark for later review. Back and Next/Done live in the shared
+              top toolbar row above so the forward-advance control is
               spatially separated from these editing actions.
+              Apply no longer lives here: it moved into the bottom-right of
+              whichever method card is open (TouchCardApplyRow), so the
+              commit sits with the fields it commits instead of in a row
+              shared by all four methods.
               "Mark for later review" replaces the old "Skip this character"
               control (mechanism-gallery-progression) — see canGoNext's own
               doc comment above for why. */}
@@ -5136,32 +5241,6 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
               alignItems: "center",
             }}
           >
-            {showChooser && (
-              <button
-                type="button"
-                onClick={handleApply}
-                disabled={!canApply}
-                aria-label={t({
-                  id: "editor.assignLoop.touch.applyMethodAriaLabel",
-                  message: `Apply touch method for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
-                })}
-                style={{
-                  padding: "9px 20px",
-                  background: canApply ? BLUE_ACTION : "#21262d",
-                  border: "none",
-                  borderRadius: 6,
-                  color: canApply ? "#e6edf3" : TEXT_DIM,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: canApply ? "pointer" : "not-allowed",
-                  fontFamily: FONT,
-                }}
-              >
-                <Trans id="editor.assignLoop.applyMethodButton">
-                  Apply method
-                </Trans>
-              </button>
-            )}
             <button
               type="button"
               onClick={() => toggleMarkedForLaterTouch(currentChar)}
