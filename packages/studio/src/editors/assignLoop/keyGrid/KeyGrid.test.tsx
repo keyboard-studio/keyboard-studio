@@ -26,11 +26,28 @@ afterEach(() => {
 });
 
 /**
+ * Every `on*` callback `KeyGridProps` requires (spec 061 T002/D1) — supplied
+ * as `vi.fn()` stand-ins so a test that only cares about one or two handlers
+ * doesn't have to restate the rest just to satisfy `tsc`. Spread FIRST in a
+ * render call: a test's own explicit prop, written after this spread, wins
+ * per ordinary JSX prop-merge order (later attributes override earlier ones).
+ */
+function requiredKeyGridHandlers() {
+  return {
+    onKeyDown: vi.fn(),
+    onPlatformChange: vi.fn(),
+    onAddKeyAfter: vi.fn(),
+    onOpenCommandMenu: vi.fn(),
+    onFollowNextLayer: vi.fn(),
+  };
+}
+
+/**
  * The grid's LAYOUT rows and KEY cells, as distinct from the per-row
- * "Fill row / Even out row" control strip, which also carries `role="row"` +
- * `role="gridcell"` (T123/SC-009: `role="grid"` admits only `row`/`rowgroup`
- * children, so a plain `<div>` there failed axe's `aria-required-children` at
- * critical impact — see KeyGrid.tsx's own comment on that strip).
+ * row-actions strip, which also carries `role="row"` + `role="gridcell"`
+ * (T123/SC-009: `role="grid"` admits only `row`/`rowgroup` children, so a
+ * plain `<div>` there failed axe's `aria-required-children` at critical
+ * impact — see KeyGrid.tsx's own comment on that strip).
  *
  * Layout rows are exactly the rows carrying `aria-rowindex`, and key cells
  * exactly the cells carrying `aria-colindex`; the control strip deliberately
@@ -115,8 +132,8 @@ function manyKeyViewModel(count: number): KeyGridViewModel {
 }
 
 describe("KeyGrid — ARIA grid structure", () => {
-  // Regression guard for the T123/SC-009 finding: the per-row "Fill row / Even
-  // out row" strip was a plain <div> child of role="grid", which axe rates a
+  // Regression guard for the T123/SC-009 finding: the per-row row-actions
+  // strip was a plain <div> child of role="grid", which axe rates a
   // CRITICAL `aria-required-children` violation (role="grid" admits only
   // row/rowgroup children; role="row" only gridcell/columnheader/rowheader).
   //
@@ -128,15 +145,16 @@ describe("KeyGrid — ARIA grid structure", () => {
   // the fast lane.
   it("every child of the grid is a row, and every child of a row is a cell or decorative — the invariant axe enforces", () => {
     const vm = makeViewModel([
-      // Two keys and slack, so BOTH row-action buttons render and the
-      // decorative pad/slack spacers are present too — i.e. the fixture
-      // actually contains the elements this invariant is about.
+      // Slack on one row and two keys on it — not load-bearing for what this
+      // test asserts (the row-actions strip renders unconditionally now,
+      // spec 061 T012), but keeps the fixture exercising the decorative
+      // pad/slack spacers too.
       makeRow([makeCell({ id: "K1" }), makeCell({ id: "K2" })], 40),
       makeRow([makeCell({ id: "K3" })]),
     ]);
 
     const { container } = render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+      <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
     const grid = container.querySelector('[role="grid"]');
@@ -174,7 +192,7 @@ describe("KeyGrid — ARIA grid structure", () => {
     ]);
 
     render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+      <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
     expect(screen.getByRole("grid")).toBeTruthy();
@@ -189,7 +207,7 @@ describe("KeyGrid — ARIA grid structure", () => {
     ]);
 
     render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+      <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
     const rows = layoutRows();
@@ -210,7 +228,7 @@ describe("KeyGrid — ARIA grid structure", () => {
   it("gives the grid container an accessible name (aria-label)", () => {
     const vm = makeViewModel([makeRow([makeCell({ id: "K1" })])]);
     render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+      <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
     const grid = screen.getByRole("grid");
@@ -221,6 +239,7 @@ describe("KeyGrid — ARIA grid structure", () => {
     const vm = makeViewModel([makeRow([makeCell({ id: "K1" })])]);
     render(
       <KeyGrid
+        {...requiredKeyGridHandlers()}
         viewModel={vm}
         selectedAddress={null}
         onSelectCell={vi.fn()}
@@ -239,6 +258,7 @@ describe("KeyGrid — single Tab stop (FR-020a)", () => {
     const vm = manyKeyViewModel(300);
     render(
       <KeyGrid
+        {...requiredKeyGridHandlers()}
         viewModel={vm}
         selectedAddress="phone:default:T_150"
         onSelectCell={vi.fn()}
@@ -266,6 +286,7 @@ describe("KeyGrid — single Tab stop (FR-020a)", () => {
     ]);
     render(
       <KeyGrid
+        {...requiredKeyGridHandlers()}
         viewModel={vm}
         selectedAddress="phone:default:K2"
         onSelectCell={vi.fn()}
@@ -292,7 +313,7 @@ describe("KeyGrid — single Tab stop (FR-020a)", () => {
   it("falls back to tabIndex 0 on the FIRST cell when nothing is selected (hasSelectedVisible fallback) — the grid must stay Tab-reachable with no selection", () => {
     const vm = manyKeyViewModel(300);
     render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+      <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
     const gridcells = keyCells();
@@ -311,6 +332,7 @@ describe("KeyGrid — single Tab stop (FR-020a)", () => {
     ]);
     render(
       <KeyGrid
+        {...requiredKeyGridHandlers()}
         viewModel={vm}
         selectedAddress="phone:default:NOT_A_REAL_KEY"
         onSelectCell={vi.fn()}
@@ -336,6 +358,7 @@ describe("KeyGrid — single Tab stop (FR-020a)", () => {
     ]);
     render(
       <KeyGrid
+        {...requiredKeyGridHandlers()}
         viewModel={vm}
         selectedAddress="phone:default:K2"
         onSelectCell={vi.fn()}
@@ -365,6 +388,7 @@ describe("KeyGrid — click selection", () => {
     const vm = makeViewModel([makeRow([makeCell({ id: "K1" }), cellK2])]);
     render(
       <KeyGrid
+        {...requiredKeyGridHandlers()}
         viewModel={vm}
         selectedAddress={null}
         onSelectCell={onSelectCell}
@@ -388,7 +412,7 @@ describe("KeyGrid — proportional geometry from padPct/widthPct (FR-022)", () =
     const vm = makeViewModel([makeRow([key1, key2])]);
 
     render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+      <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
     const pad1 = screen.getByTestId("key-grid-pad-phone:default:K1");
@@ -418,7 +442,7 @@ describe("KeyGrid — proportional geometry from padPct/widthPct (FR-022)", () =
     const vm = makeViewModel([rowA, rowB]);
 
     render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+      <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
     // Row A has no slack — no slack spacer rendered.
@@ -431,7 +455,7 @@ describe("KeyGrid — proportional geometry from padPct/widthPct (FR-022)", () =
   it("treats geometry as read-only — no interactive resize/drag affordance is rendered on a cell or spacer", () => {
     const vm = makeViewModel([makeRow([makeCell({ id: "K1" })])]);
     render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+      <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
     // The only interactive element per key is the gridcell itself (a native
@@ -447,14 +471,14 @@ describe("KeyGrid — proportional geometry from padPct/widthPct (FR-022)", () =
   });
 });
 
-describe("KeyGrid — Fill row / Even out row (T100, FR-022, FR-039)", () => {
+describe("KeyGrid — row slack (FR-039) and the retained row-actions strip (spec 061 T012, FR-007, FR-038, ADR 0002)", () => {
   it("never prints the slack as a number — the slack spacer carries no text content, only a hatch fill", () => {
     const rowA = makeRow([makeCell({ id: "A1", padPct: 15, widthPct: 100 })], 0);
     const rowB = makeRow([makeCell({ id: "B1", padPct: 15, widthPct: 35 })], 65);
     const vm = makeViewModel([rowA, rowB]);
 
     render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+      <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
     const slackB = screen.getByTestId("key-grid-row-slack-1");
@@ -462,116 +486,35 @@ describe("KeyGrid — Fill row / Even out row (T100, FR-022, FR-039)", () => {
     expect(slackB.style.backgroundImage).toContain("repeating-linear-gradient");
   });
 
-  it("renders 'Fill row' only for a row that has slack, and 'Even out row' only for a row with two or more keys", () => {
+  // "Fill row" / "Even out row" were withdrawn by FR-007/ADR 0002 — once the
+  // last key of an under-full row stretches to fill it (US2/T026, out of this
+  // task's scope), there is no slack left for either control to act on. The
+  // container that held them stays (FR-038 forbids regressing spec 058
+  // SC-009's accessibility fix), now rendering unconditionally for every row
+  // with an empty gridcell — spec 061 T026 mounts a metrics readout there.
+  it("renders the row-actions container for every row, unconditionally, regardless of slack or key count", () => {
     const noSlackSingleKey = makeRow(
       [makeCell({ id: "R0K1", padPct: 15, widthPct: 100 })],
       0,
     );
-    const slackSingleKey = makeRow(
-      [makeCell({ id: "R1K1", padPct: 15, widthPct: 35 })],
-      65,
-    );
-    const noSlackTwoKeys = makeRow(
-      [
-        makeCell({ id: "R2K1", padPct: 15, widthPct: 50 }),
-        makeCell({ id: "R2K2", padPct: 15, widthPct: 50 }),
-      ],
-      0,
-    );
     const slackTwoKeys = makeRow(
       [
-        makeCell({ id: "R3K1", padPct: 15, widthPct: 30 }),
-        makeCell({ id: "R3K2", padPct: 15, widthPct: 30 }),
+        makeCell({ id: "R1K1", padPct: 15, widthPct: 30 }),
+        makeCell({ id: "R1K2", padPct: 15, widthPct: 30 }),
       ],
       40,
     );
-    const vm = makeViewModel([
-      noSlackSingleKey,
-      slackSingleKey,
-      noSlackTwoKeys,
-      slackTwoKeys,
-    ]);
+    const vm = makeViewModel([noSlackSingleKey, slackTwoKeys]);
 
     render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+      <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
-    // Row 1 (index 0): no slack, one key — neither action applies.
-    expect(screen.queryByTestId("key-grid-row-actions-0")).toBeNull();
-
-    // Row 2 (index 1): slack, one key — only "Fill row".
-    expect(screen.getByTestId("key-grid-fill-row-1")).toBeTruthy();
-    expect(screen.queryByTestId("key-grid-even-out-row-1")).toBeNull();
-
-    // Row 3 (index 2): no slack, two keys — only "Even out row".
-    expect(screen.queryByTestId("key-grid-fill-row-2")).toBeNull();
-    expect(screen.getByTestId("key-grid-even-out-row-2")).toBeTruthy();
-
-    // Row 4 (index 3): slack AND two keys — both actions.
-    expect(screen.getByTestId("key-grid-fill-row-3")).toBeTruthy();
-    expect(screen.getByTestId("key-grid-even-out-row-3")).toBeTruthy();
+    expect(screen.getByTestId("key-grid-row-actions-0")).toBeTruthy();
+    expect(screen.getByTestId("key-grid-row-actions-1")).toBeTruthy();
   });
 
-  it("names each button with its own 1-based row number, so identical-looking actions on different rows are never confused by an assistive-technology user tabbing between them", () => {
-    const rowA = makeRow([makeCell({ id: "A1", padPct: 15, widthPct: 35 })], 65);
-    const rowB = makeRow([makeCell({ id: "B1", padPct: 15, widthPct: 35 })], 65);
-    const vm = makeViewModel([rowA, rowB]);
-
-    render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
-    );
-
-    expect(screen.getByTestId("key-grid-fill-row-0").textContent).toContain("1");
-    expect(screen.getByTestId("key-grid-fill-row-1").textContent).toContain("2");
-    expect(screen.getByTestId("key-grid-fill-row-0").textContent).not.toBe(
-      screen.getByTestId("key-grid-fill-row-1").textContent,
-    );
-  });
-
-  it("clicking 'Fill row' calls onFillRow with the row's TRUE index into viewModel.rows", () => {
-    const onFillRow = vi.fn();
-    const row = makeRow([makeCell({ id: "K1", padPct: 15, widthPct: 35 })], 65);
-    const vm = makeViewModel([row]);
-
-    render(
-      <KeyGrid
-        viewModel={vm}
-        selectedAddress={null}
-        onSelectCell={vi.fn()}
-        onFillRow={onFillRow}
-      />,
-    );
-
-    fireEvent.click(screen.getByTestId("key-grid-fill-row-0"));
-
-    expect(onFillRow).toHaveBeenCalledTimes(1);
-    expect(onFillRow).toHaveBeenCalledWith(0);
-  });
-
-  it("clicking 'Even out row' calls onEvenOutRow with the row's TRUE index into viewModel.rows", () => {
-    const onEvenOutRow = vi.fn();
-    const row = makeRow([
-      makeCell({ id: "K1", padPct: 15, widthPct: 50 }),
-      makeCell({ id: "K2", padPct: 15, widthPct: 50 }),
-    ]);
-    const vm = makeViewModel([row]);
-
-    render(
-      <KeyGrid
-        viewModel={vm}
-        selectedAddress={null}
-        onSelectCell={vi.fn()}
-        onEvenOutRow={onEvenOutRow}
-      />,
-    );
-
-    fireEvent.click(screen.getByTestId("key-grid-even-out-row-0"));
-
-    expect(onEvenOutRow).toHaveBeenCalledTimes(1);
-    expect(onEvenOutRow).toHaveBeenCalledWith(0);
-  });
-
-  it("does not throw, and changes nothing, when onFillRow/onEvenOutRow are omitted — widths are never silently redistributed (FR-022, FR-039): the actions render, but clicking one without a caller-supplied handler is a no-op", () => {
+  it("renders the row-actions container as a sibling of role=row, never inside it — the ARIA grid's owned elements stay gridcells-only", () => {
     const row = makeRow(
       [
         makeCell({ id: "K1", padPct: 15, widthPct: 30 }),
@@ -582,44 +525,14 @@ describe("KeyGrid — Fill row / Even out row (T100, FR-022, FR-039)", () => {
     const vm = makeViewModel([row]);
 
     render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
-    );
-
-    const fillButton = screen.getByTestId("key-grid-fill-row-0");
-    const evenOutButton = screen.getByTestId("key-grid-even-out-row-0");
-    expect(() => fireEvent.click(fillButton)).not.toThrow();
-    expect(() => fireEvent.click(evenOutButton)).not.toThrow();
-
-    // The view model this component was rendered with is never mutated by
-    // either click — KeyGrid computes no new widths itself (see the module
-    // doc's "Row slack, and the Fill row / Even out row seam").
-    expect(vm.rows[0]?.keys[0]?.widthPct).toBe(30);
-    expect(vm.rows[0]?.keys[1]?.widthPct).toBe(30);
-    expect(vm.rows[0]?.slackPct).toBe(40);
-  });
-
-  it("renders the Fill row / Even out row buttons as siblings of role=row, never inside it — the ARIA grid's owned elements stay gridcells-only", () => {
-    const row = makeRow(
-      [
-        makeCell({ id: "K1", padPct: 15, widthPct: 30 }),
-        makeCell({ id: "K2", padPct: 15, widthPct: 30 }),
-      ],
-      40,
-    );
-    const vm = makeViewModel([row]);
-
-    render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+      <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
     const rowEl = layoutRows()[0];
     expect(
-      rowEl?.querySelector('[data-testid="key-grid-fill-row-0"]'),
+      rowEl?.querySelector('[data-testid="key-grid-row-actions-0"]'),
     ).toBeNull();
-    expect(
-      rowEl?.querySelector('[data-testid="key-grid-even-out-row-0"]'),
-    ).toBeNull();
-    expect(screen.getByTestId("key-grid-fill-row-0")).toBeTruthy();
+    expect(screen.getByTestId("key-grid-row-actions-0")).toBeTruthy();
   });
 });
 
@@ -629,7 +542,7 @@ describe("KeyGrid — codepoint-derived accessible names (docs/accessibility.md 
       makeRow([makeCell({ id: "U_0253", keycap: "ɓ" })]),
     ]);
     render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+      <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
     const label = screen
@@ -644,7 +557,7 @@ describe("KeyGrid — codepoint-derived accessible names (docs/accessibility.md 
       makeRow([makeCell({ id: "sp1", keycap: "", sp: 10 })]),
     ]);
     render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+      <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
     const label = screen
@@ -659,7 +572,7 @@ describe("KeyGrid — codepoint-derived accessible names (docs/accessibility.md 
       makeRow([makeCell({ id: "T_0301", keycap: "´", producedChars: ["́"] })]),
     ]);
     render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+      <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
     const label = screen
@@ -674,7 +587,7 @@ describe("KeyGrid — codepoint-derived accessible names (docs/accessibility.md 
       makeRow([makeCell({ id: "T_empty", keycap: "?", producedChars: [] })]),
     ]);
     render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+      <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
     const label = screen
@@ -692,7 +605,7 @@ describe("KeyGrid — annotations, provenance, and findings surfaced (FR-020)", 
       ]),
     ]);
     render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+      <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
     const label = screen
@@ -706,7 +619,7 @@ describe("KeyGrid — annotations, provenance, and findings surfaced (FR-020)", 
       makeRow([makeCell({ id: "K1", keycap: "a", provenance: "hand-set" })]),
     ]);
     render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+      <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
     const label = screen
@@ -735,7 +648,7 @@ describe("KeyGrid — annotations, provenance, and findings surfaced (FR-020)", 
       ]),
     ]);
     render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+      <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
     const label = screen
@@ -751,7 +664,7 @@ describe("KeyGrid — RTL direction (seam for T066)", () => {
       direction: "rtl",
     });
     render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+      <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
     expect(screen.getByRole("grid").getAttribute("dir")).toBe("rtl");
@@ -760,7 +673,7 @@ describe("KeyGrid — RTL direction (seam for T066)", () => {
   it("defaults to ltr when the view model omits direction (buildKeyGridViewModel's own default)", () => {
     const vm = makeViewModel([makeRow([makeCell({ id: "K1" })])]);
     render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+      <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
     expect(screen.getByRole("grid").getAttribute("dir")).toBe("ltr");
@@ -773,6 +686,7 @@ describe("KeyGrid — onKeyDown seam (for T065's useGridNav)", () => {
     const vm = makeViewModel([makeRow([makeCell({ id: "K1" })])]);
     render(
       <KeyGrid
+        {...requiredKeyGridHandlers()}
         viewModel={vm}
         selectedAddress={null}
         onSelectCell={vi.fn()}
@@ -783,17 +697,6 @@ describe("KeyGrid — onKeyDown seam (for T065's useGridNav)", () => {
     fireEvent.keyDown(screen.getByRole("grid"), { key: "ArrowRight" });
 
     expect(onKeyDown).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not throw when onKeyDown is omitted", () => {
-    const vm = makeViewModel([makeRow([makeCell({ id: "K1" })])]);
-    render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
-    );
-
-    expect(() =>
-      fireEvent.keyDown(screen.getByRole("grid"), { key: "ArrowRight" }),
-    ).not.toThrow();
   });
 });
 
@@ -810,6 +713,7 @@ describe("KeyGrid — per-layer direction resolution + logical Home/End (T066, F
 
     const { unmount } = render(
       <KeyGrid
+        {...requiredKeyGridHandlers()}
         viewModel={rtlLayer}
         selectedAddress={null}
         onSelectCell={vi.fn()}
@@ -820,6 +724,7 @@ describe("KeyGrid — per-layer direction resolution + logical Home/End (T066, F
 
     render(
       <KeyGrid
+        {...requiredKeyGridHandlers()}
         viewModel={ltrLayer}
         selectedAddress={null}
         onSelectCell={vi.fn()}
@@ -833,7 +738,7 @@ describe("KeyGrid — per-layer direction resolution + logical Home/End (T066, F
     const key2 = makeCell({ id: "K2", padPct: 0 });
     const vm = makeViewModel([makeRow([key1, key2])], { direction: "rtl" });
     render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+      <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
     const grid = screen.getByRole("grid");
@@ -870,6 +775,7 @@ describe("KeyGrid — windowing (T067, FR-020j)", () => {
     const vm = manyKeyViewModel(1000);
     render(
       <KeyGrid
+        {...requiredKeyGridHandlers()}
         viewModel={vm}
         selectedAddress="phone:default:T_500"
         onSelectCell={vi.fn()}
@@ -891,6 +797,7 @@ describe("KeyGrid — windowing (T067, FR-020j)", () => {
     const vm = manyKeyViewModel(1000);
     render(
       <KeyGrid
+        {...requiredKeyGridHandlers()}
         viewModel={vm}
         selectedAddress="phone:default:T_500"
         onSelectCell={vi.fn()}
@@ -910,7 +817,7 @@ describe("KeyGrid — windowing (T067, FR-020j)", () => {
   it("falls back to the first MOUNTED cell (not the layer's absolute first key, which may be off-window) when nothing is selected", () => {
     const vm = manyKeyViewModel(1000);
     render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+      <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
     const gridcells = keyCells();
@@ -929,6 +836,7 @@ describe("KeyGrid — windowing (T067, FR-020j)", () => {
     const vm = manyKeyViewModel(1000);
     render(
       <KeyGrid
+        {...requiredKeyGridHandlers()}
         viewModel={vm}
         selectedAddress="phone:default:T_500"
         onSelectCell={vi.fn()}
@@ -943,7 +851,7 @@ describe("KeyGrid — windowing (T067, FR-020j)", () => {
   it("does not window a layout at or under the visible-key budget — every row still mounts (regression guard against over-eager windowing)", () => {
     const vm = manyKeyViewModel(MAX_VISIBLE_KEY_COUNT);
     render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+      <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
     expect(keyCells()).toHaveLength(MAX_VISIBLE_KEY_COUNT);
@@ -958,6 +866,7 @@ describe("KeyGrid — platform tabs (T077, FR-034)", () => {
     const vm = makeViewModel([makeRow([makeCell({ id: "K1" })])]);
     render(
       <KeyGrid
+        {...requiredKeyGridHandlers()}
         viewModel={vm}
         selectedAddress={null}
         onSelectCell={vi.fn()}
@@ -972,7 +881,7 @@ describe("KeyGrid — platform tabs (T077, FR-034)", () => {
   it("renders no tablist when the platforms prop is omitted entirely", () => {
     const vm = makeViewModel([makeRow([makeCell({ id: "K1" })])]);
     render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+      <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
     expect(screen.queryByRole("tablist")).toBeNull();
@@ -982,6 +891,7 @@ describe("KeyGrid — platform tabs (T077, FR-034)", () => {
     const vm = makeViewModel([makeRow([makeCell({ id: "K1" })])]);
     render(
       <KeyGrid
+        {...requiredKeyGridHandlers()}
         viewModel={vm}
         selectedAddress={null}
         onSelectCell={vi.fn()}
@@ -1007,6 +917,7 @@ describe("KeyGrid — platform tabs (T077, FR-034)", () => {
     const vm = makeViewModel([makeRow([makeCell({ id: "K1" })])]);
     render(
       <KeyGrid
+        {...requiredKeyGridHandlers()}
         viewModel={vm}
         selectedAddress={null}
         onSelectCell={vi.fn()}
@@ -1030,6 +941,7 @@ describe("KeyGrid — platform tabs (T077, FR-034)", () => {
     const vm = makeViewModel([makeRow([makeCell({ id: "K1" })])]);
     render(
       <KeyGrid
+        {...requiredKeyGridHandlers()}
         viewModel={vm}
         selectedAddress={null}
         onSelectCell={vi.fn()}
@@ -1053,6 +965,7 @@ describe("KeyGrid — provenance statement (T077, FR-034)", () => {
     const vm = makeViewModel([makeRow([makeCell({ id: "K1" })])]);
     render(
       <KeyGrid
+        {...requiredKeyGridHandlers()}
         viewModel={vm}
         selectedAddress={null}
         onSelectCell={vi.fn()}
@@ -1071,6 +984,7 @@ describe("KeyGrid — provenance statement (T077, FR-034)", () => {
     const vm = makeViewModel([makeRow([makeCell({ id: "K1" })])]);
     render(
       <KeyGrid
+        {...requiredKeyGridHandlers()}
         viewModel={vm}
         selectedAddress={null}
         onSelectCell={vi.fn()}
@@ -1088,7 +1002,7 @@ describe("KeyGrid — provenance statement (T077, FR-034)", () => {
   it("renders no provenance statement when the prop is omitted (a caller not yet wired for it)", () => {
     const vm = makeViewModel([makeRow([makeCell({ id: "K1" })])]);
     render(
-      <KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+      <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
     expect(screen.queryByTestId("key-grid-provenance")).toBeNull();
@@ -1099,6 +1013,7 @@ describe("KeyGrid — provenance statement (T077, FR-034)", () => {
 
     const { unmount } = render(
       <KeyGrid
+        {...requiredKeyGridHandlers()}
         viewModel={vm}
         selectedAddress={null}
         onSelectCell={vi.fn()}
@@ -1110,6 +1025,7 @@ describe("KeyGrid — provenance statement (T077, FR-034)", () => {
 
     render(
       <KeyGrid
+        {...requiredKeyGridHandlers()}
         viewModel={vm}
         selectedAddress={null}
         onSelectCell={vi.fn()}
@@ -1134,6 +1050,7 @@ describe("KeyGridCell — the pointer paths (T111, FR-021)", () => {
     const vm = makeViewModel([makeRow([cell])]);
     render(
       <KeyGrid
+        {...requiredKeyGridHandlers()}
         viewModel={vm}
         selectedAddress={null}
         onSelectCell={vi.fn()}
@@ -1159,14 +1076,6 @@ describe("KeyGridCell — the pointer paths (T111, FR-021)", () => {
 
     fireEvent.mouseLeave(el);
     expect(screen.queryByTestId(ADD_WEDGE)).toBeNull();
-    expect(screen.queryByTestId(MENU_WEDGE)).toBeNull();
-  });
-
-  it("renders no wedge for a command whose callback is absent — an affordance that cannot act is never shown", () => {
-    const { el } = renderOneKey({ onAddKeyAfter: vi.fn() });
-    fireEvent.mouseEnter(el);
-
-    expect(screen.getByTestId(ADD_WEDGE)).not.toBeNull();
     expect(screen.queryByTestId(MENU_WEDGE)).toBeNull();
   });
 
@@ -1263,14 +1172,16 @@ describe("KeyGridCell — the pointer paths (T111, FR-021)", () => {
     expect(notCancelled).toBe(false);
   });
 
-  it("leaves right-click to the browser when no command-menu handler is supplied", () => {
+  it("always opens the command menu on right-click, even on a cell whose test only supplied the default handlers — there is always a menu to put in the browser's place now that the handler is required", () => {
     const { el } = renderOneKey();
 
     const event = new MouseEvent("contextmenu", {
       bubbles: true,
       cancelable: true,
     });
-    expect(el.dispatchEvent(event)).toBe(true);
+    // `false` (event was cancelled) is the assertion: `preventDefault()` ran
+    // unconditionally, so the browser's own menu never appears.
+    expect(el.dispatchEvent(event)).toBe(false);
   });
 
   it("follows the key's 'Goes to' layer on double-click, reporting the resolved nextlayer", () => {

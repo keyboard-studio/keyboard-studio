@@ -64,8 +64,8 @@
 //
 // Acting on a fix is still NOT this component's job: `onApplyFix` reports the
 // author's choice and this file commits nothing, exactly as `onSpChange` does
-// below. See that prop's own doc for why an unwired mount disables the buttons
-// rather than hiding them.
+// below. See that prop's own doc for the required-prop contract (spec 061
+// FR-001, FR-003, research D1).
 //
 // ## Editing is NOT this component's job — except the `sp` control (T096)
 //
@@ -79,14 +79,19 @@
 //
 // T096 (FR-029a) is the first, narrow exception: the full-legal-set `sp`
 // radio control below IS an editing affordance, but this file still does not
-// COMMIT anything. `onSpChange` is an optional callback — mirroring the
-// existing `onEscape` pattern — that fires with the author's chosen value and
-// does nothing else; there is no store import, no engine mutation call, here.
-// Wiring it into the actual key-edit overlay commit (a `SetKeyOp`) alongside
-// T094's add-key and T095's suppress operation is T097's job, per tasks.md's
-// own "wait for T094-T096, then T097" dependency line — composing the three
-// independent W1 tasks into one committed edit path is explicitly what T097
-// exists to do, not something this component should pre-empt.
+// COMMIT anything. `onSpChange` fires with the author's chosen value and does
+// nothing else; there is no store import, no engine mutation call, here —
+// that discipline is unchanged by spec 061's required-prop inversion (D1).
+// What changed is who is allowed to leave it disconnected: spec 061 makes
+// `onSpChange` and `onApplyFix` **required** props (FR-001, FR-003), so a
+// mount that cannot act is a compile-time error caught by `tsc`, not a
+// degraded surface a caller could ship silently — the reverting `sp` radio
+// and the permanently-disabled fix buttons were exactly that degraded
+// surface (see issue #1530 complaint #2, spec 061's "Context: what actually
+// went wrong"). Wiring `onSpChange` into the actual key-edit overlay commit
+// (a `SetKeyOp`) alongside T094's add-key and T095's suppress operation is
+// still the composing caller's job (`TouchGallery.tsx`, spec 061 T013), not
+// something this component pre-empts.
 
 import { useMemo, useCallback, useId, useRef, type Ref } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from "react";
@@ -347,11 +352,19 @@ export interface KeyInspectorProps {
    * Fired when the author picks an `sp` value directly from the full legal
    * set (FR-029a) — never gated on it matching the PROPOSED value; picking a
    * non-proposed value is a legitimate authoring act, not something this
-   * callback screens out. Omitted keeps the control informational-only. See
-   * the module doc's "Editing is NOT this component's job — except the `sp`
-   * control (T096)" section for what this does and does not commit.
+   * callback screens out.
+   *
+   * REQUIRED (spec 061 FR-001, FR-003, research D1): `TouchGallery.tsx` is
+   * this component's one caller, and this control used to be `value`-driven
+   * from `currentSp` with the change handler a no-op `?.()` when unwired —
+   * the DOM snapped back to `currentSp` on every click, which is the
+   * "key-type radio reverts" defect of record (issue #1530 complaint #2).
+   * Making the prop required turns that omission into a build error instead
+   * of a runtime nothing. See the module doc's "Editing is NOT this
+   * component's job — except the `sp` control (T096)" section for what this
+   * still does and does not commit.
    */
-  onSpChange?: (sp: TouchKeySpValue) => void;
+  onSpChange: (sp: TouchKeySpValue) => void;
   /**
    * Fired when the author presses a finding's fix button (T115, FR-041). Like
    * `onSpChange`, this component COMMITS NOTHING: it hands back the fix
@@ -359,13 +372,17 @@ export interface KeyInspectorProps {
    * decides what that means (a `KeyEditOperation`, opening AssignPanel to pick a
    * character, or scrolling the offending key into view).
    *
-   * Omitting it renders every fix button DISABLED rather than hiding the fixes.
-   * That is deliberate: a diagnostic with its remedies visible but not yet wired
-   * is honest, whereas hiding them would make the same finding look
-   * unfixable — and FR-041's promise is that a fix exists, which is true
-   * regardless of whether this particular mount has wired it.
+   * REQUIRED (spec 061 FR-001, FR-003, research D1). This prop used to be
+   * optional, and every fix button rendered `disabled` when it was omitted —
+   * the only caller, `TouchGallery.tsx`, never supplied it, so every fix
+   * button in the shipped app was permanently inert. That reasoning traded on
+   * there being an honest way to leave a mount unwired; FR-003 forecloses
+   * that trade ("an affordance that does not apply MUST be absent" — not
+   * disabled) and the required prop forecloses it a second, stronger way:
+   * there is no unwired mount left to be honest about. Every fix button this
+   * component renders is enabled, and every click reaches the caller.
    */
-  onApplyFix?: (fix: TouchKeyFix, finding: TouchKeyFinding) => void;
+  onApplyFix: (fix: TouchKeyFix, finding: TouchKeyFinding) => void;
   /** Localized panel accessible name override. */
   label?: string;
 }
@@ -576,7 +593,7 @@ export function KeyInspector({
               name="key-inspector-sp"
               value={String(currentSp)}
               ariaLabelledby={spGroupLabelId}
-              onChange={(v) => onSpChange?.(Number(v) as TouchKeySpValue)}
+              onChange={(v) => onSpChange(Number(v) as TouchKeySpValue)}
               options={LEGAL_SP_VALUES.map((value) => ({
                 value: String(value),
                 label: spOptionLabels[value].label,
@@ -765,8 +782,7 @@ export function KeyInspector({
                               type="button"
                               data-testid={`key-inspector-finding-${i}-fix-${fixIndex}`}
                               data-fix-kind={fix.kind}
-                              disabled={onApplyFix === undefined}
-                              onClick={() => onApplyFix?.(fix, finding)}
+                              onClick={() => onApplyFix(fix, finding)}
                               style={{
                                 fontFamily: FONT,
                                 fontSize: 11,
@@ -775,7 +791,7 @@ export function KeyInspector({
                                 border: `1px solid ${BORDER}`,
                                 background: "transparent",
                                 color: TEXT_MAIN,
-                                cursor: onApplyFix === undefined ? "default" : "pointer",
+                                cursor: "pointer",
                               }}
                             >
                               {fixLabel(fix, i18n)}

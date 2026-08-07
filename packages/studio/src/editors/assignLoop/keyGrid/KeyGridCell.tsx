@@ -28,8 +28,21 @@
 // `useKeyCommands.ts`'s (Insert / `ContextMenu`-`Shift+F10` / `Ctrl+Enter`);
 // see that file's "T111's two keyboard routes" section. Neither half
 // re-implements the other — the cell reports pointer INTENT through the three
-// optional callbacks below, and the caller routes both halves into the same
-// handlers.
+// callbacks below, and the caller routes both halves into the same handlers.
+//
+// ## Required callbacks, cell-state gating (spec 061 T003, FR-001, FR-003)
+//
+// All three callbacks below are **required** props, not optional ones — see
+// the defect of record in specs/061-touch-editor-parity/spec.md: an omitted
+// handler used to mean "no wedge renders", which let a caller ship this
+// component unwired without `tsc` ever noticing. Now a missing handler is a
+// build error, and each affordance's visibility is gated on **what the cell
+// itself is**, never on whether a handler happens to be present: the add and
+// menu wedges render iff the cell is not blank/spacer
+// (`showAddWedge`/`showMenuWedge`), the double-click follow fires iff the
+// cell has a `nextlayer` to go to (`canFollowNextLayer`), and right-click
+// always opens the command menu — there is always one to put in place of the
+// browser's now.
 //
 // research.md (§"Hover-revealed `(+)`/`⋯` is Developer's wedge idea, kept
 // deliberately") is explicit that Developer's floating wedges were the right
@@ -96,31 +109,30 @@ export interface KeyGridCellProps {
   registerRef: (address: string, el: HTMLButtonElement | null) => void;
   /**
    * T111 — the `(+)` hover wedge. Keyboard equivalent: Insert
-   * (`useKeyCommands.ts`). Omit and no `(+)` wedge renders at all: an
-   * affordance that cannot act is worse than none, and this is the same
-   * "affordance only when applicable" convention KeyGrid.tsx already applies
-   * to its pad spacer and row actions.
+   * (`useKeyCommands.ts`). **Required** (spec 061 T003/FR-001, FR-003): the
+   * wedge's presence is now gated on `cell` state alone (`showAddWedge =
+   * !isBlank`), never on whether this callback exists — see `handleClick`
+   * below, which calls it unconditionally in the add-wedge branch.
    */
-  // `| undefined` on each is required, not stylistic: `exactOptionalPropertyTypes`
-  // is on, and KeyGrid.tsx forwards its own optional props straight through, so
-  // an EXPLICIT `undefined` has to be assignable here.
-  onAddKeyAfter?: ((cell: KeyGridCellViewModel) => void) | undefined;
+  onAddKeyAfter: (cell: KeyGridCellViewModel) => void;
   /**
    * T111 — the `⋯` hover wedge AND right-click. Keyboard equivalent:
-   * `ContextMenu` / `Shift+F10`. Omitting it drops the `⋯` wedge and leaves
-   * right-click to the browser's own menu.
+   * `ContextMenu` / `Shift+F10`. **Required** — there is always a menu to
+   * open now, so right-click always opens it rather than falling through to
+   * the browser's own (see `handleContextMenu`).
    */
-  onOpenCommandMenu?:
-    | ((cell: KeyGridCellViewModel, anchor: KeyGridCommandMenuAnchor) => void)
-    | undefined;
+  onOpenCommandMenu: (
+    cell: KeyGridCellViewModel,
+    anchor: KeyGridCommandMenuAnchor,
+  ) => void;
   /**
    * T111 — double-click "follows" this key's `nextlayer`. Keyboard
-   * equivalent: `Ctrl+Enter`. Never fired for a key with no `nextlayer`
-   * (there is nothing to follow), regardless of whether the prop is supplied.
+   * equivalent: `Ctrl+Enter`. **Required**, but still never fired for a key
+   * with no `nextlayer` — that is cell state (nothing to follow), not
+   * missing wiring, so `handleDoubleClick`'s early return on
+   * `nextlayer === undefined` stays.
    */
-  onFollowNextLayer?:
-    | ((cell: KeyGridCellViewModel, nextlayer: string) => void)
-    | undefined;
+  onFollowNextLayer: (cell: KeyGridCellViewModel, nextlayer: string) => void;
 }
 
 /**
@@ -300,13 +312,14 @@ export function KeyGridCell({
 
   const ariaLabel = buildCellAriaLabel();
 
-  // T111 (FR-021) — the pointer surface. A blank/spacer key gets no wedges:
-  // it is not an authorable key, and `isBlank` already suppresses its label
-  // and border above.
-  const showAddWedge = !isBlank && onAddKeyAfter !== undefined;
-  const showMenuWedge = !isBlank && onOpenCommandMenu !== undefined;
-  const canFollowNextLayer =
-    cell.nextlayer !== undefined && onFollowNextLayer !== undefined;
+  // T111 (FR-021) — the pointer surface. Both callbacks are required props
+  // now (spec 061 T003), so gating is on CELL STATE alone: a blank/spacer key
+  // gets no wedges because it is not an authorable key, not because a handler
+  // might be missing — `isBlank` already suppresses its label and border
+  // above.
+  const showAddWedge = !isBlank;
+  const showMenuWedge = !isBlank;
+  const canFollowNextLayer = cell.nextlayer !== undefined;
 
   const addWedgeTitle = t({
     id: "editor.assignLoop.keyGrid.cell.addWedgeTitle",
@@ -339,14 +352,14 @@ export function KeyGridCell({
         ? target.closest("[data-key-grid-wedge]")?.getAttribute("data-key-grid-wedge")
         : null;
 
-    if (wedge === WEDGE_ADD && onAddKeyAfter !== undefined) {
+    if (wedge === WEDGE_ADD) {
       // Selection deliberately does NOT move first: the author asked to add a
       // key after THIS one, and `useKeyCommands`'s keyboard route acts on the
       // already-selected cell, so both routes act on the same anchor.
       onAddKeyAfter(cell);
       return;
     }
-    if (wedge === WEDGE_MENU && onOpenCommandMenu !== undefined) {
+    if (wedge === WEDGE_MENU) {
       const rect = event.currentTarget.getBoundingClientRect();
       onOpenCommandMenu(cell, { x: rect.left, y: rect.bottom });
       return;
@@ -354,19 +367,26 @@ export function KeyGridCell({
     onSelect(cell);
   }
 
-  /** Right-click — the same menu the `⋯` wedge and `ContextMenu` open, anchored at the pointer. */
+  /**
+   * Right-click — the same menu the `⋯` wedge and `ContextMenu` open,
+   * anchored at the pointer. Always suppresses the browser's own menu and
+   * opens ours: `onOpenCommandMenu` is a required prop now, so there is
+   * always a menu to put in the browser's place.
+   */
   function handleContextMenu(event: ReactMouseEvent<HTMLButtonElement>): void {
-    if (onOpenCommandMenu === undefined) return;
-    // Suppress the browser's own menu only when we actually have one to put
-    // in its place.
     event.preventDefault();
     onOpenCommandMenu(cell, { x: event.clientX, y: event.clientY });
   }
 
-  /** Double-click follows the key's "Goes to" layer (FR-021); `Ctrl+Enter` is the keyboard route. */
+  /**
+   * Double-click follows the key's "Goes to" layer (FR-021); `Ctrl+Enter` is
+   * the keyboard route. Still gated on `nextlayer` alone — a key that
+   * switches nowhere has nothing to follow, which is cell state, not a
+   * missing handler.
+   */
   function handleDoubleClick(): void {
     const { nextlayer } = cell;
-    if (nextlayer === undefined || onFollowNextLayer === undefined) return;
+    if (nextlayer === undefined) return;
     onFollowNextLayer(cell, nextlayer);
   }
 
