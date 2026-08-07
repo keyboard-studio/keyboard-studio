@@ -6,6 +6,10 @@
 // Component contract under test:
 //   - One character at a time from lettersToAdd (inventory when baseIr is null).
 //   - "Apply method for <char>" button records a MechanismAssignment(scope:"individual").
+//     It lives at the bottom-right of whichever method card is OPEN (CardApplyRow,
+//     testids mechanism-apply-swap / mechanism-apply-deadkey), not in a shared row
+//     below the chooser — so exactly one is on screen and it sits with the fields
+//     it commits. Its accessible name is unchanged by that move.
 //   - "Mark for later review" (mechanism-gallery-progression) is a per-
 //     character toggle — it records nothing in the working copy, but
 //     satisfies canGoNext exactly like an Apply, so Next/Done can advance
@@ -393,6 +397,54 @@ describe("MechanismGallery — current character display", () => {
 // ---------------------------------------------------------------------------
 // Method chooser — sequence (always visible)
 // ---------------------------------------------------------------------------
+
+describe("MechanismGallery — Apply lives in the open method card", () => {
+  it("puts Apply in the open card, and only there", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    // "á" decomposes to a + U+0301, so the §3c default method is deadkey — its
+    // card is the open one, so its card is where Apply belongs.
+    expect(screen.getByTestId("mechanism-apply-deadkey")).toBeTruthy();
+    expect(screen.queryByTestId("mechanism-apply-swap")).toBeNull();
+
+    // Exactly one — the reason for moving it off the shared row. A second Apply
+    // anywhere on screen would reintroduce "which method does this commit?".
+    expect(screen.getAllByRole("button", { name: /Apply method for á/i })).toHaveLength(1);
+  });
+
+  it("follows the author into whichever card they open", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+    expect(screen.getByTestId("mechanism-apply-deadkey")).toBeTruthy();
+
+    // Anchored regex: the swap card's key picker carries the aria-label
+    // "Physical key for Assign to a key", which an unanchored /Assign to a key/
+    // would also match.
+    fireEvent.click(screen.getByRole("button", { name: /^Assign to a key/i }));
+
+    expect(screen.getByTestId("mechanism-apply-swap")).toBeTruthy();
+    expect(screen.queryByTestId("mechanism-apply-deadkey")).toBeNull();
+    expect(screen.getAllByRole("button", { name: /Apply method for á/i })).toHaveLength(1);
+  });
+
+  it("offers no Apply on the sequence card — the right-pane builder owns that", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    });
+
+    fireEvent.click(screen.getByText(/Type a sequence/i));
+
+    expect(screen.queryByTestId("mechanism-apply-swap")).toBeNull();
+    expect(screen.queryByTestId("mechanism-apply-deadkey")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Apply method for á/i })).toBeNull();
+  });
+});
 
 describe("MechanismGallery — sequence method chooser", () => {
   it("shows the 'Type a sequence' option for any character", async () => {

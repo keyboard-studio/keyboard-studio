@@ -3,7 +3,7 @@
   "content.flowQuestion.il_author_email.prompt": "What email address can people use to contact the keyboard author?",
   "content.flowQuestion.il_author_name.help_text": "This name will appear in the keyboard package and in the public keyboard repository. You can use a person's name, an organization name, or a committee name, for example: Bafut Language Committee.",
   "content.flowQuestion.il_author_name.prompt": "Who should be listed as the author of this keyboard?",
-  "content.flowQuestion.il_copyright_holder.help_text": "Name of the person or organization that holds the copyright for this keyboard. This may be you, your employer, or a language organization. Example: 'Bafut Language Committee'",
+  "content.flowQuestion.il_copyright_holder.help_text": "Name of the person or organization that holds the copyright for this keyboard. This may be you, your employer, or a language organization. Example: 'Bafut Language Committee'. If this keyboard is based on an existing one, the original author's copyright is kept automatically and does not need re-entering here.",
   "content.flowQuestion.il_copyright_holder.label": "Copyright holder",
   "content.flowQuestion.il_copyright_holder.prompt": "Who holds the copyright for this keyboard?",
   "content.flowQuestion.il_language_autonym.audit_label": "Language name (own language)",
