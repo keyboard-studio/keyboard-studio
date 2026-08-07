@@ -296,6 +296,25 @@ tasks. `/speckit-analyze` runs as a `km-doc`/`km-synthesis` review check before
 Check enforces them mechanically. It does **not** amend the spec — on conflict `spec.md` +
 [docs/spec-signoff.md](docs/spec-signoff.md) win.
 
+### Commit and push cadence for multi-phase specs
+
+A spec with more than one phase is committed **and pushed** to its feature branch at **every
+success** — don't accumulate several phases in a dirty tree waiting for the whole feature to
+land. A phase whose gates are green is a checkpoint worth getting off the machine.
+
+- **One commit per phase**, its message naming the tasks it closes (`spec 0NN TNNN-TNNN`) and,
+  where two tasks share the same hunks, saying why they landed together.
+- **Out-of-scope work that unblocks the spec** — repairing a shared test helper, say — gets its
+  **own** commit, so it can be reverted or cherry-picked independently of the feature.
+- **Push explicitly**: `git push -u origin <branch>`. Check the upstream first. A branch cut
+  straight from `origin/main` *tracks* `origin/main`, so a bare `git push` targets **main** —
+  verify with `git rev-parse --abbrev-ref --symbolic-full-name '@{u}'` before pushing.
+- **A phase whose gates are not green is not a success.** Commit what is genuinely done, leave
+  the failing task's checkbox unchecked, and record the diagnosis in the commit message — a
+  finding that lives only in a chat transcript is lost.
+- `tasks.md` checkboxes and `.spec-context.json` are progress records: they land with or after
+  the work they describe, never ahead of it.
+
 ### Section extraction — don't shred the architecture
 
 The monolithic `spec.md` is migrating into `specs/NNN-<slug>/` folders one numbered section at a
