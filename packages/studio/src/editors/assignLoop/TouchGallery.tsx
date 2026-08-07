@@ -2972,10 +2972,42 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   );
 
   /** Focus the character field AssignPanel already renders for the selected key — the surface `TouchKeyFix`'s `addRule` kind routes to (see `handleApplyFix` below), matching `handleKeyModeGridKeyDown`'s existing Enter-jump query. */
+  /**
+   * The grid's Enter -> character-field bridge (spec 058 SC-004: assign a
+   * character in 12 keyboard actions, no pointer, no modal).
+   *
+   * Spec 061 T028-T039 moved the assign surface behind a disclosure on the key
+   * property panel, which took the input OUT of the DOM until the disclosure is
+   * open — so the original one-line querySelector silently focused nothing and
+   * the whole keyboard-only path died. Opening the disclosure first restores it.
+   *
+   * `HTMLElement.click()` dispatches only a `click`, never
+   * pointerdown/pointerup/mousedown/mouseup, so SC-004's pointer-event counter
+   * is unaffected: this stays a keyboard-only path, and the author still spends
+   * exactly one action (Enter) to reach the field.
+   *
+   * The `requestAnimationFrame` is required, not defensive — the disclosure is
+   * React state, so the input does not exist until after the re-render.
+   */
   const focusAssignPanelCharacterField = useCallback(() => {
-    keyModeDetailContainerRef.current
-      ?.querySelector<HTMLInputElement>('[data-testid="assign-panel"] input')
-      ?.focus();
+    const container = keyModeDetailContainerRef.current;
+    if (container === null) return;
+    const findInput = (): HTMLInputElement | null =>
+      container.querySelector<HTMLInputElement>('[data-testid="assign-panel"] input');
+
+    const existing = findInput();
+    if (existing !== null) {
+      existing.focus();
+      return;
+    }
+    const disclosure = container.querySelector<HTMLButtonElement>(
+      '[data-testid="key-property-panel-assign-disclosure"]',
+    );
+    if (disclosure === null) return;
+    disclosure.click();
+    requestAnimationFrame(() => {
+      findInput()?.focus();
+    });
   }, []);
 
   // T013 (defect of record) — `onSpChange`: the author picks a key type and

@@ -601,7 +601,7 @@ defect, and where no default is possible the editor says why.
   `area ( "." segment )+`; confirm the engine returns only structured fields and no English prose
   crosses the boundary (FR-037) ·
   `packages/studio/src/locales/`
-- [ ] **T056** [P] Run axe over the touch stage and the existing grid accessibility suite: the grid
+- [x] **T056** [P] Run axe over the touch stage and the existing grid accessibility suite: the grid
   stays a conformant `role="grid"` → `role="row"` → `role="gridcell"` with a roving tabindex and one
   tab stop; `key-grid-live-region` remains the single announcer; the layer selector is a `tablist` at
   ≥2 options and a label at 1; the grid's arrow keys stay **navigation**, never movement; every
@@ -611,10 +611,10 @@ defect, and where no default is possible the editor says why.
   edit — is undoable through the shared chronological `'k'` stack and that the undo affordance names
   what it will undo (FR-040) ·
   `packages/studio/src/editors/assignLoop/TouchGallery.test.tsx`
-- [ ] **T058** [P] Update the touch-editor glossary for `move`, row metrics, declared-vs-rendered
+- [x] **T058** [P] Update the touch-editor glossary for `move`, row metrics, declared-vs-rendered
   width, and the inherited id path; cross-link ADR 0002 and record spec 058 FR-039's withdrawal ·
   `docs/design-notes/touch-editor-glossary.md`
-- [ ] **T059** [P] Add a phonebook row for any keyboard this feature's tests newly reference
+- [x] **T059** [P] Add a phonebook row for any keyboard this feature's tests newly reference
   (`sil_cameroon_qwerty` and any fixture added for the crowding or localized-number-row cases),
   reading each keyboard's `.kps` for name, BCP47 languages and author ·
   `docs/keyboard-index.md`
@@ -624,7 +624,7 @@ defect, and where no default is possible the editor says why.
 - [ ] **T060** [P] Full repeatable gate: `pnpm typecheck`, `pnpm -r test`, `pnpm lint`, plus the three
   standalone vitest configs and `pnpm crew-lint` if any `.claude/**/km-*` file was touched ·
   *(repo root)*
-- [ ] **T061** [P] Run `node utilities/spec-trace check`, then acknowledge the spec units this feature
+- [x] **T061** [P] Run `node utilities/spec-trace check`, then acknowledge the spec units this feature
   changed ·
   `utilities/spec-trace`
 

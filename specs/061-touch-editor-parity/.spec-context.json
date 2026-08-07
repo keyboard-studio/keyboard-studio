@@ -170,6 +170,38 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-07T08:25:00.343Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T056",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-07T08:59:53.652Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T058",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-07T08:59:53.892Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T059",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-07T08:59:54.139Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T061",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-07T08:59:54.376Z"
     }
   ],
   "approach": "Invert the one idiom that caused the defect: the eight editing callbacks on the key-grid surfaces become REQUIRED props, so an unmountable affordance fails tsc instead of rendering inert. On top of that, reach Developer parity in five sequential slices matching the spec's user stories: layer selector, KeymanWeb last-key stretch plus a per-row metrics readout replacing the withdrawn slack hatch, one merged property panel with all eight editable fields plus delete and four self-hiding move buttons, gesture editing in key mode, and unrequested id/keycap proposals. Engine additions stay narrow -- four fields admitted to EditableKeyFields, a move operation, two diagnostic codes, two proposal modules -- and no Pattern/Criterion type is touched.",
@@ -555,9 +587,13 @@
     {
       "note": "PRE-EXISTING spec-058 defect surfaced by un-skipping the SC-006 walk (blame: ef19aa2b, not spec 061). TouchGallery.tsx:2527 - for Case B (imported/import-adapt) every key edit does store.setTouchLayoutJson(emitTouchLayout(promotedLayout)), a full IR round-trip. Measured effect: all 112 keys gain p=hand-set and sp/width/pad normalize to strings. This contradicts spec 035 R9, which applyKeyEditsToRawJson + projection step 1.7 (applyKeyEditsToVfs) exist to honour. Consequence: after one touch key edit an imported layout is entirely hand-set, so re-propagation can never update any key, and per-key layer/default plus platform displayUnderlying/fontsize that the IR does not model are dropped. Blocks SC-006 assertion (c). Complication for any fix: layoutForLintAndGate parses touchLayoutJson for the live grid, so the write cannot simply be deleted; and step 1.7 already re-applies the same overlay, so a naive Case B applier swap risks double-apply.",
       "step": "implement"
+    },
+    {
+      "note": "SC-004 REGRESSION, needs a decision (same class as the T016 one). Spec 058 SC-004 measures a keyboard-only assign in <=12 actions with Enter from the grid landing straight in AssignPanel character field. Spec 061 T028-T039 made Enter focus the key-property-panel REGION instead (correct per the new FR-020b, and asserted by touch-key-grid-a11y), and put the assign surface behind a disclosure inside it. So the author now needs Enter + tab-to-disclosure + Enter + tab-to-field, which likely blows the 12-action budget. This is a design consequence, not a stale test premise: either the panel needs a keyboard shortcut back to the character field, or SC-004 is amended. e2e touch-key-assign fails at the Enter step until decided. Separately: focusAssignPanelCharacterField was silently dead (querySelector for an input the closed disclosure keeps out of the DOM) - repaired to open the disclosure first, which fixes the fix-driven assign path, but that repair is not covered by a test.",
+      "step": "implement"
     }
   ],
-  "currentTask": "T054",
+  "currentTask": "T061",
   "task_summaries": {
     "T016": {
       "status": "DONE",
@@ -650,6 +686,34 @@
       "files": [
         "packages/engine/src/pattern-apply/proposeTouchKeyId.test.ts",
         "packages/engine/src/pattern-apply/keycapRelatedness.test.ts"
+      ]
+    },
+    "T056": {
+      "status": "DONE",
+      "did": "Grid a11y suite green: axe clean in resting and roving-tabindex states, keyboard-only operation intact. Updated two stale setup premises spec 061 invalidated (tab-order anchor, and the editing surface Enter reaches)",
+      "files": [
+        "packages/studio/e2e/touch-key-grid-a11y.spec.ts"
+      ]
+    },
+    "T058": {
+      "status": "DONE",
+      "did": "Recorded spec 058 FR-039's withdrawal in the glossary with the reasoning, cross-linked to ADR 0002 and the 061 spec",
+      "files": [
+        "docs/design-notes/touch-editor-glossary.md"
+      ]
+    },
+    "T059": {
+      "status": "DONE",
+      "did": "Verified: bambara, basic_kbdfr and bj_cree_woods are the only keyboards 061's tests reference and all three already have phonebook rows - no new rows needed",
+      "files": [
+        "docs/keyboard-index.md"
+      ]
+    },
+    "T061": {
+      "status": "DONE",
+      "did": "Acknowledged specs/061-touch-editor-parity only; the other 9 drifting units are pre-existing on main and not this feature's to acknowledge",
+      "files": [
+        "docs/spec-trace.json"
       ]
     }
   }

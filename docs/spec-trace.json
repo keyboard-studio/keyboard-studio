@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-08-06",
+  "lastUpdated": "2026-08-07",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -790,6 +790,14 @@
     "specs/060-crash-reporting": {
       "title": "Feature Specification: Crash reporting — an unrecoverable error becomes one actionable, author-anonymous GitHub issue",
       "hash": "sha256:2db2a4d89d3561b1",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/061-touch-editor-parity": {
+      "title": "Feature Specification: Touch key editor — Developer-parity remodel",
+      "hash": "sha256:0988c764cf351c03",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
