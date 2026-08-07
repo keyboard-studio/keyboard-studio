@@ -28,6 +28,7 @@ import { parseKmnHeaderStores } from "./parseKmnHeaderStores.js";
 import {
   danglingPreviewStripStores,
   alwaysPreviewStripStores,
+  shipDroppableStores,
 } from "../shared/siblingAssetStores.js";
 
 // Packaging-asset stores stripped only when their file is absent from VFS.
@@ -37,6 +38,9 @@ const DANGLING_STORES = danglingPreviewStripStores();
 // presence causes KMW to render the help documentation panel instead of the
 // keyboard layout OSK, which is never useful in the live preview.
 const ALWAYS_STRIP_STORES = alwaysPreviewStripStores();
+
+// Stores dropped from the SHIPPED .kmn when their file is absent — BITMAP today.
+const SHIP_DROPPABLE_STORES = shipDroppableStores();
 
 /**
  * Remove header `store(&ASSET) 'path'` lines that would interfere with the
@@ -100,7 +104,11 @@ function removeHeaderStoreLines(
 }
 
 /**
- * Drop `store(&BITMAP) '<file>'` when `<file>` is not in the VFS.
+ * Drop a ship-droppable store's `store(&NAME) '<file>'` line when `<file>` is
+ * not in the VFS. Which stores qualify is centralized in
+ * {@link shipDroppableStores} (`siblingAssetStores.ts`'s `shipStrip: "dangling"`
+ * attribute) — BITMAP today, named `dropUnbackedBitmapStore` because the icon
+ * is the only store that attribute currently marks.
  *
  * Unlike {@link stripDanglingAssetStores}, this applies to the SHIPPED .kmn, not
  * just the preview: an icon reference with no icon behind it is not a degraded
@@ -116,18 +124,19 @@ function removeHeaderStoreLines(
  * bug to surface, not a line to quietly delete from the author's source.
  *
  * @param kmn The .kmn source text destined for the output tree.
- * @param vfs The VFS the .kmn lives in (icon looked up at `source/<path>`).
- * @returns `{ kmn, dropped }` — `dropped` is the icon path removed, or null when
- *          there was no &BITMAP or its file was present.
+ * @param vfs The VFS the .kmn lives in (sibling looked up at `source/<path>`).
+ * @returns `{ kmn, dropped }` — `dropped` is the sibling path removed, or null
+ *          when no ship-droppable store was found unbacked.
  */
 export function dropUnbackedBitmapStore(
   kmn: string,
   vfs: VirtualFS,
 ): { kmn: string; dropped: string | null } {
-  const bitmap = parseKmnHeaderStores(kmn).find((s) => s.storeName === "BITMAP");
-  if (bitmap === undefined) return { kmn, dropped: null };
-  if (vfs.get(`source/${bitmap.path}`) !== undefined) return { kmn, dropped: null };
+  const unbacked = parseKmnHeaderStores(kmn).find(
+    (s) => SHIP_DROPPABLE_STORES.has(s.storeName) && vfs.get(`source/${s.path}`) === undefined,
+  );
+  if (unbacked === undefined) return { kmn, dropped: null };
 
-  const { kmn: out, stripped } = removeHeaderStoreLines(kmn, new Set(["BITMAP"]));
-  return { kmn: out, dropped: stripped.length > 0 ? bitmap.path : null };
+  const { kmn: out, stripped } = removeHeaderStoreLines(kmn, new Set([unbacked.storeName]));
+  return { kmn: out, dropped: stripped.length > 0 ? unbacked.path : null };
 }
