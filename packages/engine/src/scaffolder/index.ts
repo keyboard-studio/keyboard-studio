@@ -538,11 +538,13 @@ export function generateStubs(
     // icon already has its file here and this stub list would skip it anyway.
     // A base with no icon has no `store(&BITMAP)` either, so there is nothing to
     // satisfy — and a fabricated zero-byte placeholder was actively harmful:
-    // kmcmplib reports "Cannot open the bitmap or icon file for reading" as a
-    // mere *warning* and then emits ZERO artifacts, so an empty file paired with
-    // any surviving &BITMAP reference silently compiled to nothing. Worse, it
-    // defeated stripDanglingAssetStores, which spares a reference whose target
-    // file is present — and the empty stub made it look present.
+    // kmcmplib reports "Cannot open the bitmap or icon file for reading" and then
+    // emits ZERO artifacts, so an empty file paired with any surviving &BITMAP
+    // reference silently compiled to nothing (silently because our own severity
+    // fallback labels that diagnostic a warning — see
+    // ../compiler/stripDanglingAssetStores.ts). Worse, it defeated
+    // stripDanglingAssetStores, which spares a reference whose target file is
+    // present — and the empty stub made it look present.
     //
     // TODO: an author still has no way to give the keyboard an icon of its own —
     // it either inherits the base's or has none. An in-studio icon editor is
@@ -756,8 +758,10 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
       // renamed alongside its &BITMAP reference (renameFilesInVfs + scaffoldIR).
       // If it did NOT — an optional sibling the loader could not fetch — the
       // reference now names a file nobody has, and kmcmplib answers that by
-      // emitting zero artifacts under cover of a warning. Drop the reference so
-      // "no icon" stays a cosmetic loss instead of a keyboard that won't build.
+      // emitting zero artifacts while the diagnostic reaches us under our own
+      // "warning" severity fallback (see stripDanglingAssetStores.ts). Drop the
+      // reference so "no icon" stays a cosmetic loss instead of a keyboard that
+      // won't build.
       warnings.push(...dropBitmapStoreIfUnbacked(vfs, keyboardId));
 
       return {

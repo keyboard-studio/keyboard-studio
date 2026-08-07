@@ -202,8 +202,9 @@ export async function fetchKeyboardSourceToVfs(
       // and consumers that branch on the flag rather than on the content type
       // then treat these bytes as a string. That is how the &BITMAP icon used
       // to be destroyed by a draft snapshot (persistWorkingCopy.serializeEntry)
-      // — and kmcmplib emits ZERO artifacts, reported only as a *warning*, when
-      // it cannot read an icon a header store names.
+      // — and kmcmplib emits ZERO artifacts when it cannot read an icon a header
+      // store names, surfacing here only as a diagnostic our own severity
+      // fallback labels a warning (see stripDanglingAssetStores.ts).
       vfs.set(path, r.bytes, true);
     }
     filesLoaded.push(path);

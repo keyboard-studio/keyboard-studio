@@ -2,10 +2,19 @@
 //
 // kmcmplib refuses to emit ANY artifacts when a header store names a packaging
 // asset file (BITMAP icon, VISUALKEYBOARD .kvks, LAYOUTFILE touch layout, etc.)
-// that it cannot open — it reports "Cannot open the bitmap or icon file for
-// reading" as a *warning* but produces zero artifacts. A live OSK preview does
-// not need any of these packaging assets, so a missing one must not break the
-// preview.
+// that it cannot open — it reports e.g. "Cannot open the bitmap or icon file for
+// reading" and produces zero artifacts. A live OSK preview does not need any of
+// these packaging assets, so a missing one must not break the preview.
+//
+// SEVERITY CAVEAT. These read as `warning` in this repo's compile() output, but
+// that is OUR fallback, not kmcmplib's severity model: upstream
+// kmn_compiler_errors.h defines ERROR_CannotReadBitmapFile = SevError | 0x031
+// (and most of this class likewise — see codeMap.ts's per-code table, where
+// only KMW_EMBEDJS/KMW_HELPFILE are genuinely Warn). kmc-kmn's
+// CompilerMessageSpec does not populate a `severity` field on the message
+// objects it hands our callback, so compiler/index.ts's
+// `message.severity ?? "warning"` fills one in. Do not treat the observed
+// `warning` label as upstream's classification when doing Layer-A fidelity work.
 //
 // Two categories of stores are stripped:
 //
@@ -113,9 +122,11 @@ function removeHeaderStoreLines(
  * Unlike {@link stripDanglingAssetStores}, this applies to the SHIPPED .kmn, not
  * just the preview: an icon reference with no icon behind it is not a degraded
  * package, it is a package that does not build. kmcmplib reports "Cannot open the
- * bitmap or icon file for reading" as a mere *warning* and then emits ZERO
- * artifacts, so the reference has to go rather than be left for the author (or
- * the keyboards-repo CI) to discover as an empty build.
+ * bitmap or icon file for reading" and then emits ZERO artifacts, so the reference
+ * has to go rather than be left for the author (or the keyboards-repo CI) to
+ * discover as an empty build. The zero-artifact outcome is what matters here; the
+ * diagnostic's severity is NOT the `warning` this repo surfaces — see the
+ * severity caveat at the top of this file.
  *
  * The icon is the right store to treat this way because it is the one purely
  * cosmetic packaging asset: a keyboard with no icon is a complete, working

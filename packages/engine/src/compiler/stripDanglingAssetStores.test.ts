@@ -119,10 +119,14 @@ describe("stripDanglingAssetStores", () => {
 //
 // Pinned against the real kmcmplib WASM: an &BITMAP reference with no readable
 // icon behind it does not degrade the build, it empties it. kmcmplib reports
-// "Cannot open the bitmap or icon file for reading" at *warning* severity and
-// then emits no .kmx, no .kvk and no .js at all — a silent build failure, which
-// is why the reference is dropped from the author's source rather than only from
-// the preview compile.
+// "Cannot open the bitmap or icon file for reading" and then emits no .kmx, no
+// .kvk and no .js at all — a silent build failure, which is why the reference is
+// dropped from the author's source rather than only from the preview compile.
+//
+// The severity these arrive at is OUR fallback, not upstream's: kmc-kmn does not
+// populate `severity`, so compiler/index.ts defaults it to "warning" even though
+// kmn_compiler_errors.h defines this one as SevError. See the severity caveat in
+// stripDanglingAssetStores.ts.
 // ---------------------------------------------------------------------------
 
 const WITH_BITMAP = [
@@ -184,10 +188,14 @@ describe("dropUnbackedBitmapStore", () => {
       { path: "source/probe.kmn", content: WITH_BITMAP, isBinary: false },
     ]);
 
-    // Before: kmcmplib emits NOTHING, and says so only as a warning.
+    // Before: kmcmplib emits NOTHING while raising the bitmap diagnostic.
     const before = await compile(vfs, "probe");
     expect(before.artifacts).toEqual([]);
     expect(before.diagnostics.some((d) => /bitmap or icon/i.test(d.message))).toBe(true);
+    // Nothing reaches error/fatal — which pins compiler/index.ts's
+    // `message.severity ?? "warning"` FALLBACK, not kmcmplib's own severity
+    // (upstream types this one SevError). That gap is why the zero-artifact
+    // build is silent, and why this test asserts on artifacts, not severity.
     expect(before.diagnostics.every((d) => d.severity !== "error" && d.severity !== "fatal")).toBe(
       true,
     );
