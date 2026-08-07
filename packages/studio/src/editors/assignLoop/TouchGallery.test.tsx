@@ -5836,6 +5836,12 @@ const KEY_MODE_PARITY_LAYOUT = {
             id: 1,
             key: [
               { id: "T_a", text: "a", output: "a" },
+              // Correlated across the family BY ID, carrying different content
+              // on each member — the shape FR-065's per-layer enumeration
+              // exists for, and the only shape a fan-out can actually apply to
+              // (correlation is by key id). `T_a`/`T_A` deliberately are NOT
+              // correlated, so the two cases can be told apart.
+              { id: "T_x", text: "x", output: "x" },
               { id: "T_shift", text: "shift", nextlayer: "shift" },
             ],
           },
@@ -5843,7 +5849,15 @@ const KEY_MODE_PARITY_LAYOUT = {
       },
       {
         id: "shift",
-        row: [{ id: 1, key: [{ id: "T_A", text: "A", output: "A" }] }],
+        row: [
+          {
+            id: 1,
+            key: [
+              { id: "T_A", text: "A", output: "A" },
+              { id: "T_x", text: "X", output: "X" },
+            ],
+          },
+        ],
       },
       {
         id: "symbols",
@@ -6097,10 +6111,10 @@ describe("TouchGallery — key mode editing (spec 061 T009, FR-009, SC-003, SC-0
     expect(screen.queryByTestId("family-apply-dialog")).toBeNull();
   });
 
-  it("DOES ask about the layer family when a key is deleted", async () => {
+  it("DOES ask about the layer family when a key the siblings also carry is deleted", async () => {
     seedKeyModeParityFixture();
     await renderTouchGalleryInKeyMode();
-    fireEvent.click(screen.getByTestId("key-grid-cell-phone:default:T_a"));
+    fireEvent.click(screen.getByTestId("key-grid-cell-phone:default:T_x"));
 
     await act(async () => {
       fireEvent.click(screen.getByTestId("key-property-panel-delete"));
@@ -6113,6 +6127,30 @@ describe("TouchGallery — key mode editing (spec 061 T009, FR-009, SC-003, SC-0
     // gone from one member and present on the rest is a real break — the one
     // case where "do the same on the siblings?" is the right question.
     expect(screen.getByTestId("family-apply-dialog")).toBeTruthy();
+  });
+
+  // The dead-end the author reported as a dialog that "can't be successfully
+  // confirmed": the fan-out correlates by key id, so a member that does not
+  // carry this id has nothing to apply the edit to. With EVERY member in that
+  // state, the dialog opens with no selectable layer, Apply is disabled by its
+  // own `canConfirm`, and Cancel is the only way out — a question with no
+  // available answer. `T_a` lives on `default` alone, so `shift` cannot answer.
+  it("does not ask about the layer family when no sibling carries the key at all", async () => {
+    seedKeyModeParityFixture();
+    await renderTouchGalleryInKeyMode();
+    fireEvent.click(screen.getByTestId("key-grid-cell-phone:default:T_a"));
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("key-property-panel-delete"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("remove-key-dialog-confirm"));
+    });
+
+    // The anchor-only delete still landed — declining to ask is not declining
+    // to edit.
+    expect(screen.queryByTestId("key-grid-cell-phone:default:T_a")).toBeNull();
+    expect(screen.queryByTestId("family-apply-dialog")).toBeNull();
   });
 
   // -------------------------------------------------------------------------

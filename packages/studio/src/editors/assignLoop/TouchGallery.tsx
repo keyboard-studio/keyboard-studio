@@ -201,6 +201,7 @@ import {
 import { RenameDialog, type RenameDialogConfirmResult } from "./keyGrid/RenameDialog.tsx";
 import {
   FamilyApplyDialog,
+  enumerateFamilyApplyTargets,
   isFamilyApplicableOp,
   type FamilyApplyOp,
 } from "./keyGrid/FamilyApplyDialog.tsx";
@@ -2663,9 +2664,36 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       const grouping = groupLayerFamilies(activeKeyPlatformEntry.layers.map((l) => l.id));
       const family = grouping.families.find((f) => f.layerIds.includes(parts.layerId));
       if (family === undefined || family.layerIds.length <= 1) return;
+
+      // A family with siblings is still not a family with ANSWERABLE siblings.
+      // The dialog correlates by key id, so a member that spells this key
+      // differently resolves as unavailable — and a key whose id is unique per
+      // layer BY CONSTRUCTION makes every member unavailable at once. The
+      // desktop carve's `T_removed_<n>` placeholders are exactly that: the
+      // counter runs across the whole layout, so the carved key on `rightalt`
+      // is `T_removed_3` where its `rightalt-shift` counterpart is
+      // `T_removed_9`, and no sibling ever resolves.
+      //
+      // The dialog disables Apply when nothing is selectable (`canConfirm`),
+      // which for that case means a modal offering a choice it can never
+      // accept — the author can only Cancel, and reported it as a dialog that
+      // "can't be successfully confirmed". Asking a question with no available
+      // answer is worse than not asking: there is nothing to fan out to, so the
+      // anchor-only edit already committed IS the whole outcome.
+      //
+      // Reuses the dialog's own exported enumeration rather than restating what
+      // "applicable" means — a second opinion here is how the gate and the
+      // dialog would come to disagree about which members count.
+      const applicable = enumerateFamilyApplyTargets(
+        effectiveKeyModeLayout ?? EMPTY_TOUCH_LAYOUT,
+        op.address,
+        family.layerIds,
+      ).filter((target) => !target.isAnchor && target.resolved);
+      if (applicable.length === 0) return;
+
       setFamilyApplyState({ op: op as FamilyApplyOp, familyLayerIds: family.layerIds });
     },
-    [activeKeyPlatformEntry],
+    [activeKeyPlatformEntry, effectiveKeyModeLayout],
   );
 
   /**
