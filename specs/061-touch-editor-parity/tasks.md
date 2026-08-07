@@ -135,60 +135,86 @@ assign it, remove a different key, switch to the `shift` layer, and confirm each
 
 **⟶ Wait for T015 to finish, then:**
 
-- [ ] **T016** [US1] Make T009 and T010 pass: `pnpm typecheck`, `pnpm --filter @keyboard-studio/studio test`,
-  then `npx playwright test touch-key-add-remove` — the walk must pass with no edit to its assertions ·
+- [x] **T016** [US1] Make T009 and T010 pass: `pnpm typecheck`, `pnpm --filter @keyboard-studio/studio test`,
+  then `npx playwright test touch-key-add-remove` ·
   `packages/studio/e2e/touch-key-add-remove.spec.ts`,
   `packages/studio/src/editors/assignLoop/TouchGallery.test.tsx`
 
-  **PARTIAL — two of three clauses green; the third is blocked on a spec decision, not on code.**
+  **RESOLVED — all three clauses green.** `pnpm typecheck` clean across all 7 packages;
+  `packages/studio` vitest **422 files / 6495 tests** pass, T009's key-mode integration block
+  included; `npx playwright test touch-key-add-remove` **passes**.
 
-  Green: `pnpm typecheck` clean across all 7 packages; `packages/studio` vitest 419 files /
-  6412 tests pass, T009's key-mode integration block included. **The PR-lane guarantee (FR-009,
-  SC-003, SC-009) is therefore met** — that was always the durable half of the pair.
+  Getting there took a spec decision **and** a real bug fix. Both are recorded here because the
+  original blocker note was wrong about the cause on two of four assertions.
 
-  Red: `npx playwright test touch-key-add-remove` fails its own assertion (a),
-  `indexKeys(outputLayout).size === baseKeys.size + 1` — expected 113, received 152.
+  **1. The spec decision (FR-008 amendment).** The walk's premises were written for a fixture
+  whose import-adapt path rewrites more than the walk assumed, and it was `test.skip`ped from
+  birth, so none of them had ever executed. Measured with an exploration probe at each step of
+  the walk — not inferred:
 
-  **Diagnosis (measured, not inferred).** Driving the walk with an exploration spec and dumping
-  per-layer key counts at each step gives:
+  | measured at | phone:default | rows changed vs shipped | envelope |
+  |---|---|---|---|
+  | shipped source (`baseVfs`) | 38 | — | `{font}` |
+  | after import-adapt, **zero key edits** | 38 | 5 | `{font}` |
+  | after add + assign + suppress | 39 | 6 | `{font, defaultHint}` |
 
-  | point in the walk | phone:default | shift | numeric | rightalt | total |
-  |---|---|---|---|---|---|
-  | shipped source (`baseVfs`) | 38 | 38 | 36 | — | **112** |
-  | after import-adapt, before mechanisms | 38 | 38 | 36 | 38 | **150** |
-  | after add + assign | 39 | 38 | 36 | 39 | **152** |
-  | after suppress-in-place | 39 | 38 | 36 | 39 | **152** |
+  With **zero** key-mode edits the emitted artifact already differs from the shipped source in
+  `source/bambara.kmn`, `source/bambara.kvks` **and** the touch layout: bambara's `.kmn` carries
+  RALT rules while its shipped `.keyman-touch-layout` has no `rightalt` layer, so
+  `propagateDesktopLayersToTouch` synthesizes one (cloning `default`'s geometry), gives `K_SHIFT`
+  a `T_ks_layer_rightalt` longpress, adds explicit `output` fields to the shift layer, and
+  rewrites the `.kvks` (combo → kvks token mapping). All of it lands before the touch stage and
+  is correct product behaviour.
 
-  Two deltas, both upstream of key mode and both correct product behaviour:
+  Four assertions were therefore amended to state their real intent (the fifth, `font`, is
+  untouched and still asserted exactly — a dropped `font` is the regression SC-006 names):
 
-  1. **+38 at import-adapt.** `engine/src/pattern-apply/propagateDesktopLayersToTouch.ts`
-     synthesizes a `phone:rightalt` touch layer by cloning `default`'s geometry, because
-     bambara's shipped `.kmn` carries RALT layer rules (10 of them) while its shipped
-     `.keyman-touch-layout` has no `rightalt` layer. This lands before the touch stage is
-     reached — it is present in the emitted artifact with zero key-mode edits.
-  2. **+1 more on the add.** The synthesized layer is re-derived from `default` on each
-     projection, so the one added key appears in both `default` and its `rightalt` clone. The
-     add therefore raises the whole-file count by 2, not 1.
+  - **(a)** counts keys in the **layer it edited** (`phone:default`, 38 → 39) rather than across
+    the whole file, where the synthesized `rightalt` clone doubles the count.
+  - **(b)** excuses platform `defaultHint`. Measured to the mechanism step, not to key mode: the
+    `sk[]` entries that appear are on `K_W`/`K_X`, the longpress hosts `driveMechanisms` placed
+    ø/Ø on, and `applyTouchAssignmentsToRawJson` promotes `defaultHint: "dot"` on any platform
+    gaining an `sk[]`.
+  - **(c)** now diffs against a **zero-edit projection baseline** captured before the walk edits
+    anything, scoped to layers the shipped source actually has. This is the *stronger* statement
+    of SC-006 — "editing two keys changed only the row those two keys are in" — rather than
+    excusing a hardcoded list of five upstream-churned rows.
+  - **(d)** excuses `.kvks` alongside `.kmn` and the touch layout.
 
-  Suppress-in-place removes no key, exactly as the assertion says. Nothing spec 061 adds
-  causes either delta; the walk was `test.skip`ped from birth, so this premise was never
-  executed.
+  **2. The bug the walk caught (fixed here, own commit).** With the premises corrected, (c) still
+  failed — **12 of 12 rows rewritten** — and that one was real. `TouchGallery.tsx`'s Case B commit
+  branch did `setTouchLayoutJson(emitTouchLayout(promotedLayout))`: a full IR round-trip on every
+  key edit. Since `projectWorkingCopyVfs` step 0 injects `touchLayoutJson` straight into
+  `.keyman-touch-layout`, **that re-emit *was* the emitted artifact**. One key edit rewrote all
+  112 keys of bambara's shipped layout — each gaining `p: "hand-set"` (provenance is materialised
+  on deserialize by design, FR-009, then written back by `emitKey`) and `sp`/`width`/`pad`
+  normalising to the IR's numbers. The provenance stamp is the damaging half: `hand-set` is the
+  never-auto-clobber tag, so **a single touch edit made the whole layout immune to
+  re-propagation**. The IR also drops what it does not model (per-key `layer`/`default`, platform
+  `displayUnderlying`/`fontsize`).
 
-  **Assertion (d) is unsatisfiable for the same root cause** and will fail next once (a) is
-  resolved: its untouched-files filter excuses `.kmn` and the touch layout, but the RALT
-  propagation also rewrites `source/bambara.kvks` (combo → kvks token mapping), which the
-  filter does not excuse.
+  This is a direct spec 035 R9 violation, and it is **pre-existing spec-058 code** (blame
+  `ef19aa2b`; spec 061's T009-T015 commit only renamed a variable on that line). It was invisible
+  because the walk that would have caught it was skipped. The fix routes the Case B branch
+  through `applyKeyEditsToRawJson` — the Case B applier written for exactly this and until now
+  reachable only via projection step 1.7 — seeding from the base's shipped raw JSON on the first
+  edit, and keeping the IR emit only for a reseed-from-desktop layout, which has no shipped
+  source to be faithful to.
 
-  So FR-008's "MUST pass unmodified" cannot be satisfied by any code change inside this
-  feature's scope. The three ways out — amend the two spec-058 assertions to state their real
-  intent (the add introduced one key *into the layer it edited*; the kvks legitimately
-  changes), change the walk's fixture to a base with no unpropagated modifier layer, or accept
-  FR-008 as unmet — are a **spec decision**, deferred to the user rather than taken here.
-  US1's shippable claim rests on the vitest gate, which is green.
+  **Two adjacent findings, recorded not silently absorbed:**
 
-**Checkpoint**: US1 is functional and covered in the PR lane (T009 green). The e2e corroboration
-(T010/T016) is blocked on the spec decision above, **not** on key-mode wiring. Complaints #2–#5 of
-issue #1530 are resolved.
+  - `serializeWorkingCopy` does **not** pass `keyEditOps` to `projectWorkingCopyVfs`, so step 1.7
+    is **inert on the output path**; `touchLayoutJson` is the only route a key edit reaches the
+    artifact. That is why splicing in the commit branch cannot double-apply against 1.7 — and it
+    means step 1.7's careful Case B design is currently dead code on output.
+  - `handleRenameConfirm` (`TouchGallery.tsx`, the rename path) still does the same
+    `emitTouchLayout` round-trip. It is the same defect class, left unfixed here deliberately:
+    `commitTouchKeyRename` performs a complete cross-layer/cross-platform reference fix-up that a
+    single-address raw-JSON `RenameKeyOp` splice would under-apply, and the walk does not rename,
+    so the change could not be verified in this task.
+
+**Checkpoint**: US1 is functional, covered in the PR lane (T009 green) **and** corroborated e2e
+(T010/T016 green). Complaints #2–#5 of issue #1530 are resolved.
 
 ---
 

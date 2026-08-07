@@ -74,6 +74,14 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-07T02:23:43.000Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-07T07:44:12.974Z"
     }
   ],
   "approach": "Invert the one idiom that caused the defect: the eight editing callbacks on the key-grid surfaces become REQUIRED props, so an unmountable affordance fails tsc instead of rendering inert. On top of that, reach Developer parity in five sequential slices matching the spec's user stories: layer selector, KeymanWeb last-key stretch plus a per-row metrics readout replacing the withdrawn slack hatch, one merged property panel with all eight editable fields plus delete and four self-hiding move buttons, gesture editing in key mode, and unrequested id/keycap proposals. Engine additions stay narrow -- four fields admitted to EditableKeyFields, a move operation, two diagnostic codes, two proposal modules -- and no Pattern/Criterion type is touched.",
@@ -122,6 +130,11 @@
       "decision": "Give SC-005 (untouched files byte-identical, untouched keys structurally identical) a vitest twin alongside the e2e walk copy.",
       "why": "Under the Playwright-explores/vitest-gates split, SC-005 assertions living only in the skipped e2e walk would leave the feature strongest safety claim ungated. No browser is needed: apply edits through the mounted component, call runTransform, and compare the emitted VFS against the shipped source. Two independent statements of a fidelity claim is proportionate for the one criterion about not corrupting the author keyboard.",
       "rejected": "One copy only -- either in vitest (losing the full-walk realism the e2e provides) or in Playwright alone (ungated)."
+    },
+    {
+      "decision": "Fix the Case B IR-round-trip defect inside spec 061, in its own commit (out-of-scope-but-unblocking, per the cadence rule)",
+      "why": "SC-006 assertion (c) is correctly catching a real spec-035 R9 violation; amending the assertion would mask a defect that destroys the touch provenance model after a single edit",
+      "rejected": "Normalizing (c) to ignore the p stamp and filing the defect separately; or leaving (c) failing with FR-008 unmet"
     }
   ],
   "step_summaries": {
@@ -439,6 +452,33 @@
     },
     {
       "what": "{what: FR-008 e2e walk, command: npx playwright test touch-key-add-remove.spec.ts, result: UNMET - drive steps fixed and walk now runs add+assign+remove end to end, but fails its own key-count assertion; see report}"
+    },
+    {
+      "what": "T016 amended assertions (a) and (b) — measured via per-step output-VFS probe, not inferred",
+      "command": "npx playwright test touch-key-add-remove",
+      "result": "(a) per-layer add count PASSES; (b) envelope-minus-defaultHint PASSES; (c) FAILS 12/12 rows changed; (d) not reached",
+      "warnings": [
+        "with ZERO key-mode edits the emitted artifact already differs in .kmn, .kvks and the touch layout (rightalt synthesized) - confirms the (a)/(d) amendments",
+        "defaultHint + sk[] on K_W/K_X trace to the mechanism step (PLACED_CHAR hosts), flushed on first touch-layout rewrite"
+      ]
     }
-  ]
+  ],
+  "concerns": [
+    {
+      "note": "PRE-EXISTING spec-058 defect surfaced by un-skipping the SC-006 walk (blame: ef19aa2b, not spec 061). TouchGallery.tsx:2527 - for Case B (imported/import-adapt) every key edit does store.setTouchLayoutJson(emitTouchLayout(promotedLayout)), a full IR round-trip. Measured effect: all 112 keys gain p=hand-set and sp/width/pad normalize to strings. This contradicts spec 035 R9, which applyKeyEditsToRawJson + projection step 1.7 (applyKeyEditsToVfs) exist to honour. Consequence: after one touch key edit an imported layout is entirely hand-set, so re-propagation can never update any key, and per-key layer/default plus platform displayUnderlying/fontsize that the IR does not model are dropped. Blocks SC-006 assertion (c). Complication for any fix: layoutForLintAndGate parses touchLayoutJson for the live grid, so the write cannot simply be deleted; and step 1.7 already re-applies the same overlay, so a naive Case B applier swap risks double-apply.",
+      "step": "implement"
+    }
+  ],
+  "currentTask": "T016",
+  "task_summaries": {
+    "T016": {
+      "status": "DONE",
+      "did": "Un-skipped SC-006 walk now passes: amended (a) per-layer, (b) excused mechanism-owned defaultHint, (c) rebased on a zero-edit projection baseline scoped to shipped layers, (d) excused .kvks; and FIXED the spec-035 R9 violation the walk exposed (Case B key edits no longer round-trip the touch layout through the IR)",
+      "files": [
+        "packages/studio/e2e/touch-key-add-remove.spec.ts",
+        "packages/studio/src/editors/assignLoop/TouchGallery.tsx",
+        "packages/engine/src/index.ts"
+      ]
+    }
+  }
 }

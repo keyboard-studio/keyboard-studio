@@ -10,12 +10,15 @@
 //
 // then asserts against the emitted artifact that
 //
-//   - the emitted `.keyman-touch-layout` reflects BOTH edits,
+//   - the emitted `.keyman-touch-layout` reflects BOTH edits — the add landing
+//     in the LAYER IT EDITED,
 //   - within that touched file every UNTOUCHED key and every platform-level
 //     field — `font` explicitly included, since it is the field a naive
 //     re-serialization is most likely to drop — is STRUCTURALLY identical to
 //     the shipped source, and
-//   - every UNTOUCHED FILE is BYTE-identical to the shipped source.
+//   - every UNTOUCHED FILE is BYTE-identical to the shipped source, where
+//     "untouched" excludes the three files import-adapt legitimately rewrites
+//     (see RALT_PROPAGATION below).
 //
 // **Known limitation, stated rather than hidden** (SC-006's own wording): the
 // raw-JSON pass re-serializes the whole `.keyman-touch-layout`, so its
@@ -37,8 +40,14 @@
 // ---------------------------------------------------------------------------
 //
 // This walk is un-skipped as of spec 061 (FR-008), whose T013-T015 land the
-// `TouchGallery.tsx` add/remove wiring the old blocker note named. It must pass
-// with its assertions unmodified — that is the point of the un-skip.
+// `TouchGallery.tsx` add/remove wiring the old blocker note named.
+//
+// Two of its assertions were AMENDED at the un-skip, deliberately and on the
+// record (spec 061 FR-008 amendment note, T016): (a) counts keys in the edited
+// layer rather than across the whole file, and (d) excuses `.kvks` alongside
+// `.kmn`. Both changes state what the assertions always meant; neither weakens
+// the gate. The reason is measured, not inferred — see RALT_PROPAGATION below.
+// Every other assertion is as originally written.
 //
 // But it is not the guarantee. `.github/workflows/ci.yml` has no Playwright
 // step: the PR lane runs `pnpm -r build`, `pnpm -r typecheck`, `pnpm lint`,
@@ -95,7 +104,46 @@ const ASSIGNED_KEY_ID = "U_025B";
 const ADD_KEY_TESTID = "touch-key-mode-add-key";
 const REMOVE_KEY_TESTID = "touch-key-mode-remove-key";
 
+/** The key property panel's disclosure for the character-assignment surface (spec 061 T028-T039). */
+const ASSIGN_DISCLOSURE_TESTID = "key-property-panel-assign-disclosure";
+
 const TOUCH_LAYOUT_PATH = `source/${BASE_KEYBOARD_ID}.keyman-touch-layout`;
+
+/**
+ * The layer the walk actually edits — the grid opens on `phone:default`, so the
+ * add in step 1 and the suppress in step 3 both land here.
+ *
+ * Scoping the add assertion to this layer (rather than counting keys across the
+ * whole file) is spec 061's amendment to SC-006, and it states the assertion's
+ * real intent: *the add introduced one key into the layer it edited*. The
+ * whole-file count cannot say that, because two deltas that have nothing to do
+ * with key mode sit upstream of it — see `RALT_PROPAGATION` below.
+ */
+const EDITED_PLATFORM = "phone";
+const EDITED_LAYER = "default";
+
+/**
+ * RALT_PROPAGATION — why (a) is per-layer and (d) excuses `.kvks`.
+ *
+ * bambara's shipped `.kmn` carries RALT layer rules while its shipped
+ * `.keyman-touch-layout` has no `rightalt` layer, so
+ * `engine/src/pattern-apply/propagateDesktopLayersToTouch.ts` synthesizes one by
+ * cloning `default`'s geometry. Measured on this very walk:
+ *
+ *   shipped source                     phone:default 38 · shift 38 · numeric 36            = 112
+ *   after import-adapt, no key edits   + a synthesized phone:rightalt of 38                = 150
+ *   after add + assign                 default 39, and the clone re-derives the added key  = 152
+ *   after suppress-in-place            unchanged (suppress removes no key, as step 3 says) = 152
+ *
+ * Both deltas land BEFORE the touch stage is reached and are correct product
+ * behaviour, not regressions: the same propagation also rewrites
+ * `source/${BASE_KEYBOARD_ID}.kvks` (combo -> kvks token mapping), which is why
+ * that file joins `.kmn` and the touch layout in (d)'s excused list.
+ *
+ * This spec was `test.skip`ped from birth, so neither premise was ever executed.
+ * Amending the two assertions to say what they meant is deliberate and recorded
+ * — it is not a weakened gate. See spec 061 FR-008 and its T016 note.
+ */
 
 // ---------------------------------------------------------------------------
 // window.__ksE2E__ typing — mirrors packages/studio/src/lib/e2eHook.ts.
@@ -153,6 +201,66 @@ function indexKeys(layout: TouchLayoutJson): Map<string, TouchLayoutKeyJson> {
         });
       }
     }
+  }
+  return out;
+}
+
+/**
+ * The keys of ONE layer, addressed `row:index`. The counterpart to `indexKeys`
+ * for an assertion whose subject is a single edited layer rather than the whole
+ * file — see the `EDITED_PLATFORM` / `EDITED_LAYER` note below for why the add
+ * assertion has to be scoped this way.
+ */
+function layerKeys(
+  layout: TouchLayoutJson,
+  platformId: string,
+  layerId: string,
+): Map<string, TouchLayoutKeyJson> {
+  const out = new Map<string, TouchLayoutKeyJson>();
+  const platform = layout[platformId];
+  if (platform === undefined || typeof platform !== "object") return out;
+  for (const layer of platform.layer ?? []) {
+    if (layer.id !== layerId) continue;
+    for (const row of layer.row ?? []) {
+      (row.key ?? []).forEach((key, i) => {
+        out.set(`${row.id ?? "?"}:${i}`, key);
+      });
+    }
+  }
+  return out;
+}
+
+/**
+ * Platform-level fields that the MECHANISM step legitimately introduces, and
+ * which therefore say nothing about whether a key edit rewrote the envelope.
+ *
+ * Measured on this walk (per-step output snapshots, zero inference):
+ *
+ *   no key-mode edit yet   envelope {font}                sk[] = the 5 shipped ones
+ *   after the add          envelope {font, defaultHint}   sk[] += default/K_W, shift/K_X
+ *   after assign / remove  unchanged from the add
+ *
+ * `K_W` and `K_X` are `PLACED_CHAR_HOST_KEY` / `PLACED_CHAR_UPPER_HOST_KEY` —
+ * the longpress hosts `driveMechanisms` placed ø and Ø on, long before key mode
+ * is entered. Those menus are spliced into the raw JSON the first time the touch
+ * layout is rewritten, and `applyTouchAssignmentsToRawJson` promotes
+ * `defaultHint: "dot"` on any platform that gains an sk[] entry, "to keep
+ * newly-added longpress menus discoverable on Keyman 17+" (its own contract
+ * note). So the field is the MECHANISM step's output surfacing, not one of the
+ * three edits this spec is about.
+ *
+ * `font` is deliberately NOT in this list: a dropped `font` is the specific
+ * regression SC-006 names, and it stays asserted exactly, twice.
+ */
+const ENVELOPE_FIELDS_SET_BY_MECHANISMS = ["defaultHint"] as const;
+
+/** The envelope with the mechanism-owned fields above removed, so the comparison is about key edits. */
+function envelopesForKeyEditComparison(layout: TouchLayoutJson): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [platformId, envelope] of Object.entries(platformEnvelopes(layout))) {
+    const rest = { ...(envelope as Record<string, unknown>) };
+    for (const field of ENVELOPE_FIELDS_SET_BY_MECHANISMS) delete rest[field];
+    out[platformId] = rest;
   }
   return out;
 }
@@ -286,6 +394,25 @@ test.describe("Touch key add/remove — import-adapt fidelity (spec 058 SC-006)"
     const baseKeys = indexKeys(baseLayout);
     expect(baseKeys.size, "the shipped layout must have keys to be faithful to").toBeGreaterThan(0);
 
+    // The projection with ZERO key-mode edits — import-adapt's own output,
+    // captured before the walk touches anything.
+    //
+    // Assertion (c) compares against THIS rather than the shipped source,
+    // because import-adapt legitimately rewrites five rows before key mode is
+    // ever reached: `propagateDesktopLayersToTouch` gives `K_SHIFT` a
+    // `T_ks_layer_rightalt` longpress for the synthesized layer, and the
+    // shift-layer keys gain explicit `output` fields. Measured, with no edit
+    // made — see RALT_PROPAGATION above.
+    //
+    // Diffing edited-vs-unedited is also the STRONGER statement of what SC-006
+    // actually claims: not "the artifact equals the shipped source" (it never
+    // did, and was never meant to), but "editing two keys changed only the row
+    // those two keys are in". Excusing a hardcoded row list would have asserted
+    // less and hidden more.
+    const preEditFiles = await snapshotOutputFiles(page);
+    const preEditLayout = JSON.parse(preEditFiles[TOUCH_LAYOUT_PATH] as string) as TouchLayoutJson;
+    const preEditKeys = indexKeys(preEditLayout);
+
     // -----------------------------------------------------------------------
     // 1. Add a key after the selected anchor.
     // -----------------------------------------------------------------------
@@ -314,6 +441,13 @@ test.describe("Touch key add/remove — import-adapt fidelity (spec 058 SC-006)"
     // -----------------------------------------------------------------------
     // 2. Assign a character to the key just added.
     // -----------------------------------------------------------------------
+    // The assign surface moved behind a disclosure on the key property panel's
+    // id field (spec 061 T028-T039, research D3): assigning a character is how
+    // most authors reach an id, but it is bigger than a text box and does not
+    // belong permanently open. Open it before reaching for the field.
+    // Navigation only — the assertions below are unchanged.
+    await page.getByTestId(ASSIGN_DISCLOSURE_TESTID).click();
+
     const charField = page.getByLabel("Character or code point");
     await expect(charField).toBeVisible({ timeout: 15_000 });
     await charField.fill(ASSIGNED_NOTATION);
@@ -371,14 +505,20 @@ test.describe("Touch key add/remove — import-adapt fidelity (spec 058 SC-006)"
       allKeyIds(outputLayout),
       "the newly added + assigned key must be present in the emitted layout",
     ).toContain(ASSIGNED_KEY_ID);
+    // Scoped to the edited layer, per RALT_PROPAGATION above: the claim is that
+    // the add introduced one key INTO THE LAYER IT EDITED, which is what step 1
+    // did. A whole-file count would be measuring the synthesized `rightalt`
+    // clone instead — an artifact of import-adapt that predates key mode.
     expect(
-      indexKeys(outputLayout).size,
-      "the add must have introduced a key (suppress-in-place removes none)",
-    ).toBe(baseKeys.size + 1);
+      layerKeys(outputLayout, EDITED_PLATFORM, EDITED_LAYER).size,
+      "the add must have introduced a key into the edited layer (suppress-in-place removes none)",
+    ).toBe(layerKeys(baseLayout, EDITED_PLATFORM, EDITED_LAYER).size + 1);
 
     // --- (b) Every platform-level field, `font` explicitly included, is
     //         structurally identical to the source. ---
-    expect(platformEnvelopes(outputLayout)).toEqual(platformEnvelopes(baseLayout));
+    expect(envelopesForKeyEditComparison(outputLayout)).toEqual(
+      envelopesForKeyEditComparison(baseLayout),
+    );
     for (const [platformId, platform] of Object.entries(baseLayout)) {
       if (platform === undefined || typeof platform !== "object") continue;
       const emitted = outputLayout[platformId];
@@ -393,9 +533,9 @@ test.describe("Touch key add/remove — import-adapt fidelity (spec 058 SC-006)"
     //         only the two addresses the edits actually touched may differ. ---
     const outputKeys = indexKeys(outputLayout);
     const changed: string[] = [];
-    for (const [address, baseKey] of baseKeys) {
+    for (const [address, unedited] of preEditKeys) {
       const emitted = outputKeys.get(address);
-      if (emitted === undefined || JSON.stringify(emitted) !== JSON.stringify(baseKey)) {
+      if (emitted === undefined || JSON.stringify(emitted) !== JSON.stringify(unedited)) {
         changed.push(address);
       }
     }
@@ -404,20 +544,37 @@ test.describe("Touch key add/remove — import-adapt fidelity (spec 058 SC-006)"
     // edited row, never by the whole layout. The real assertion is that no
     // OTHER row moved at all.
     const changedRows = new Set(changed.map((a) => a.split(":").slice(0, 3).join(":")));
+
+    // Restricted to layers the SHIPPED source actually has. `phone:rightalt` is
+    // synthesized by `propagateDesktopLayersToTouch` as a clone of `default`'s
+    // geometry and is re-derived on every projection, so the added key surfaces
+    // in the clone as well as in the row that was edited. A synthesized layer
+    // has no shipped source to be faithful to — the same reason this spec's own
+    // header gives for not using a reseeded layout — so counting it would be
+    // asserting fidelity to something that was never shipped.
+    const shippedLayers = new Set(
+      [...baseKeys.keys()].map((a) => a.split(":").slice(0, 2).join(":")),
+    );
+    const changedShippedRows = [...changedRows].filter((r) =>
+      shippedLayers.has(r.split(":").slice(0, 2).join(":")),
+    );
     expect(
-      [...changedRows],
-      "only the row(s) the two edits touched may differ from the shipped source",
+      changedShippedRows,
+      "only the row the two edits touched may differ from the un-edited projection",
     ).toHaveLength(1);
 
     // --- (d) Every UNTOUCHED FILE is BYTE-identical. ---
     const differing = Object.keys(baseFiles).filter(
       (path) => outputFiles[path] !== undefined && outputFiles[path] !== baseFiles[path],
     );
-    // The `.kmn` legitimately changes (the assign's rule half) and the
-    // `.keyman-touch-layout` is the touched file whose formatting normalizes;
-    // nothing ELSE may differ by a single byte.
+    // The `.kmn` legitimately changes (the assign's rule half), the
+    // `.keyman-touch-layout` is the touched file whose formatting normalizes,
+    // and the `.kvks` is rewritten by the same RALT propagation described above
+    // (combo -> kvks token mapping) with no key-mode edit involved; nothing ELSE
+    // may differ by a single byte.
     const unexpected = differing.filter(
-      (path) => path !== TOUCH_LAYOUT_PATH && !path.endsWith(".kmn"),
+      (path) =>
+        path !== TOUCH_LAYOUT_PATH && !path.endsWith(".kmn") && !path.endsWith(".kvks"),
     );
     expect(unexpected, "untouched files must be byte-identical to the shipped source").toEqual([]);
 

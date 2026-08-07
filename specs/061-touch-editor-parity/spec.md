@@ -205,7 +205,28 @@ Assigning a character proposes an id without being asked: the inherited physical
 - **FR-005**: The layer selector MUST group layers by family and plane, and MUST show each layer's rolled-up diagnostic count without the author visiting it.
 - **FR-006**: Following a key's next-layer MUST switch the selector to that layer.
 - **FR-007**: The "Fill row" and "Even out row" controls MUST be removed.
-- **FR-008**: The add/remove end-to-end walk MUST be un-skipped and MUST pass unmodified.
+- **FR-008**: The add/remove end-to-end walk MUST be un-skipped and MUST pass.
+
+  **Amended during implementation (T016).** "Unmodified" was written on the assumption that the
+  walk's assertions were correct and only the wiring was missing. Measured, four of them were
+  not: the walk was `test.skip`ped from birth, so none had ever executed, and bambara's
+  import-adapt path legitimately rewrites three files and five rows **before the touch stage is
+  reached** (a synthesized `phone:rightalt` layer, shift-layer `output` fields, a `.kvks` token
+  remap). Four assertions were amended to state their real intent — count keys in the layer the
+  edit touched; excuse the mechanism-owned platform `defaultHint`; diff untouched keys against a
+  zero-edit projection baseline rather than the shipped source; excuse `.kvks`. The `font`
+  assertion, the regression SC-006 actually names, is unchanged and still exact.
+
+  This is an amendment, not a weakened gate: assertion (c) is now **stronger** than as written,
+  asserting that editing two keys changed only the row those keys are in, rather than excusing a
+  hardcoded list of upstream-churned rows. The evidence table is in
+  [tasks.md](tasks.md) under T016.
+
+  With the premises corrected the walk still failed, and that failure was real: it caught a
+  pre-existing spec-035 R9 violation in spec-058 code (every Case B key edit round-tripped the
+  whole touch layout through the IR, stamping `p: "hand-set"` on every key and making an imported
+  layout immune to re-propagation after a single edit). That defect is fixed under this feature in
+  its own commit. **The walk earned its un-skip by finding a shipped bug on its first real run.**
 - **FR-009**: Key-mode editing MUST be covered by a test that runs in the lane a pull request runs, so an unmounted affordance cannot ship green again.
 
 ### Functional Requirements — geometry and reporting (US2)
