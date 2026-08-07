@@ -411,6 +411,95 @@ describe("useKeyboardArtifact — open-base proxyBase pass-through (regression g
 });
 
 // ---------------------------------------------------------------------------
+// Regression guard: unbacked &BITMAP on the open-base (Track 2) path.
+//
+// scaffold() (Track 1) has always dropped a store(&BITMAP) reference whose
+// icon never made it into the VFS (dropBitmapStoreIfUnbacked) — otherwise
+// kmcmplib emits ZERO artifacts, reported only as a warning, for a keyboard
+// whose icon fetch failed. The open-base path called fetchKeyboardSourceToVfs
+// directly and never ran the equivalent guard, so the same silent-empty-build
+// bug was reachable when opening/importing an existing keyboard whose icon
+// never arrived (km-triage finding on PR #1551).
+//
+// dropUnbackedBitmapStore is NOT overridden on mockEngine — the mock spreads
+// the real @keyboard-studio/engine module first (importOriginal()), so these
+// tests exercise the real implementation, not a stand-in.
+// ---------------------------------------------------------------------------
+
+describe("useKeyboardArtifact — open-base unbacked &BITMAP guard (regression guard)", () => {
+  const kmnWithBitmap = [
+    "store(&VERSION) '10.0'",
+    "store(&NAME) 'Test Keyboard'",
+    "store(&BITMAP) 'test_kb.ico'",
+    "store(&TARGETS) 'any'",
+    "begin Unicode > use(main)",
+    "group(main) using keys",
+    "+ [K_A] > 'a'",
+    "",
+  ].join("\n");
+
+  it("drops &BITMAP from the working copy when its icon never arrived", async () => {
+    mockEngine.fetchKeyboardSourceToVfs.mockImplementationOnce(
+      (_baseKeyboard: BaseKeyboard, vfs: VirtualFS) => {
+        // No source/test_kb.ico entry — the icon fetch "failed" (optional sibling).
+        vfs.set("source/test_kb.kmn", kmnWithBitmap, false);
+        return Promise.resolve({});
+      },
+    );
+
+    const { useKeyboardArtifact } = await import("./useKeyboardArtifact");
+
+    const { result } = renderHook(() =>
+      useKeyboardArtifact(baseKb, null, null, null),
+    );
+
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(result.current.stage.kind).toBe("ready");
+    if (result.current.stage.kind === "ready") {
+      const kmnEntry = result.current.stage.vfs.get("source/test_kb.kmn");
+      expect(kmnEntry?.content).not.toMatch(/&BITMAP/);
+      expect(
+        result.current.stage.scaffoldWarnings.some((w) =>
+          w.includes("icon 'test_kb.ico' was not available"),
+        ),
+      ).toBe(true);
+    }
+  });
+
+  it("keeps &BITMAP when its icon is present in the VFS", async () => {
+    mockEngine.fetchKeyboardSourceToVfs.mockImplementationOnce(
+      (_baseKeyboard: BaseKeyboard, vfs: VirtualFS) => {
+        vfs.set("source/test_kb.kmn", kmnWithBitmap, false);
+        vfs.set("source/test_kb.ico", new Uint8Array([0, 0, 1, 0]), true);
+        return Promise.resolve({});
+      },
+    );
+
+    const { useKeyboardArtifact } = await import("./useKeyboardArtifact");
+
+    const { result } = renderHook(() =>
+      useKeyboardArtifact(baseKb, null, null, null),
+    );
+
+    await act(async () => {
+      await new Promise<void>((resolve) => setTimeout(resolve, 0));
+    });
+
+    expect(result.current.stage.kind).toBe("ready");
+    if (result.current.stage.kind === "ready") {
+      const kmnEntry = result.current.stage.vfs.get("source/test_kb.kmn");
+      expect(kmnEntry?.content).toMatch(/&BITMAP/);
+      expect(
+        result.current.stage.scaffoldWarnings.some((w) => w.includes("was not available")),
+      ).toBe(false);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Regression guard: Track 1 (no scaffoldSpec) identity-rename compile.
 //
 // projectWorkingCopyVfs's Step 4 id-rename pass renames source/<baseId>.kmn to
