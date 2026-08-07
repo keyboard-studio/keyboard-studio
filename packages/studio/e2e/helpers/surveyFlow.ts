@@ -411,10 +411,28 @@ export async function buildOneCharacterList(
   // A marks-free alphabet auto-skips it (S0 gate) and this is a no-op.
   await driveMarksSeries(page);
 
-  // The convenience question sits between marks and carve. A one-character
-  // alphabet on a Latin base leaves almost all of a-z surplus, so this one
-  // DOES render on the standard walks.
+  // The punctuation page sits between marks and convenience. It has no skip
+  // gate (zero punctuation is a valid answer), so it always renders — the
+  // walks accept it empty.
+  await drivePunctuationStep(page);
+
+  // The convenience question sits between punctuation and carve. A
+  // one-character alphabet on a Latin base leaves almost all of a-z surplus,
+  // so this one DOES render on the standard walks.
   await driveConvenienceStep(page);
+}
+
+/**
+ * Punctuation step — the Phase-B-build-list clone between the marks series
+ * and the convenience question, collecting the language's punctuation with a
+ * right-pane character map. It has no computed skip gate: the walks simply
+ * continue without choosing any punctuation ("Continue without punctuation").
+ */
+export async function drivePunctuationStep(page: Page): Promise<void> {
+  const doneBtn = page.getByTestId("punctuation-done");
+  const visible = await doneBtn.isVisible({ timeout: 5_000 }).catch(() => false);
+  if (!visible) return;
+  await doneBtn.click();
 }
 
 /**
