@@ -46,6 +46,7 @@ import { applyKeyEditsToLayout } from "./applyKeyEditsToLayout.js";
 import { applyKeyEditsToRawJson } from "./applyKeyEditsToRawJson.js";
 import type { KeyEditOperation } from "./keyEditOps.js";
 import { touchKeyAddress } from "./touchKeyAddress.js";
+import { computeRowMetrics } from "./rowMetrics.js";
 
 // ---------------------------------------------------------------------------
 // The one operation list: every kind, once each, plus one deliberately
@@ -291,5 +292,235 @@ describe("applyKeyEdits twin equivalence (T047)", () => {
     expect(caseB.warnings).toHaveLength(1);
     expect(caseA.warnings[0]).toContain("T_NOT_A_RESERVED_SENTINEL");
     expect(caseB.warnings[0]).toContain("T_NOT_A_RESERVED_SENTINEL");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// `move` — spec 061 T028 (FR-020, FR-021)
+//
+// Its own describe block rather than an eighth entry in `buildOps()`: a move
+// changes key POSITIONS, and folding it into the shared list would silently
+// re-index every other operation's assertions in that list. The obligation is
+// the same though — both appliers, one operation list, structural comparison.
+// ---------------------------------------------------------------------------
+
+describe("applyKeyEdits twin equivalence — move (spec 061 T028)", () => {
+  /** Both appliers' results for one op list, ready to compare. */
+  function runBoth(ops: readonly KeyEditOperation[]) {
+    const rawJson = emitTouchLayout(makeTouchKeyRuleJoinLayout());
+    const before = parseTouchLayout(rawJson);
+    const caseA = applyKeyEditsToLayout(before, [...ops]);
+    const caseB = applyKeyEditsToRawJson(rawJson, [...ops]);
+    return { before, caseA, caseB, caseBAsIR: parseTouchLayout(caseB.json) };
+  }
+
+  const phoneDefault = (layout: TouchLayoutIR) =>
+    layout.platforms.find((p) => p.id === "phone")!.layers.find((l) => l.id === "default")!;
+
+  /** Every row's key ids, so a positional assertion reads as a list rather than an index. */
+  const idGrid = (layout: TouchLayoutIR): string[][] =>
+    phoneDefault(layout).rows.map((r) => r.keys.map((k) => k.id));
+
+  function moveOp(keyId: string, direction: "left" | "right" | "up" | "down"): KeyEditOperation {
+    return {
+      seq: 1,
+      kind: "move",
+      address: touchKeyAddress("phone", "default", keyId),
+      direction,
+    };
+  }
+
+  /** Where `keyId` sits, as `[rowIndex, keyIndex]`, or `[-1, -1]`. */
+  function locate(layout: TouchLayoutIR, keyId: string): [number, number] {
+    const grid = idGrid(layout);
+    for (let r = 0; r < grid.length; r++) {
+      const c = grid[r]!.indexOf(keyId);
+      if (c !== -1) return [r, c];
+    }
+    return [-1, -1];
+  }
+
+  it("swaps within the row for `right`, identically on both sides", () => {
+    const { before, caseA, caseBAsIR } = runBoth([moveOp(TOUCH_JOIN_IDS.caseTest, "right")]);
+    const [row, col] = locate(before, TOUCH_JOIN_IDS.caseTest);
+    expect(locate(caseA.layout, TOUCH_JOIN_IDS.caseTest)).toEqual([row, col + 1]);
+    expect(idGrid(caseA.layout)).toEqual(idGrid(caseBAsIR));
+  });
+
+  it("swaps within the row for `left`, identically on both sides", () => {
+    const rawJson = emitTouchLayout(makeTouchKeyRuleJoinLayout());
+    const before = parseTouchLayout(rawJson);
+    // Pick a key that is NOT first in its row, so `left` has room.
+    const grid = idGrid(before);
+    const rowIdx = grid.findIndex((r) => r.length > 1);
+    const target = grid[rowIdx]![1]!;
+
+    const { caseA, caseBAsIR } = runBoth([moveOp(target, "left")]);
+    expect(locate(caseA.layout, target)).toEqual([rowIdx, 0]);
+    expect(idGrid(caseA.layout)).toEqual(idGrid(caseBAsIR));
+  });
+
+  it("transfers to the row below for `down`, clamped to the target row's length", () => {
+    const rawJson = emitTouchLayout(makeTouchKeyRuleJoinLayout());
+    const before = parseTouchLayout(rawJson);
+    // Deliberately NOT `caseTest` — it sits in the fixture's LAST row, where
+    // `down` correctly has no room. Take a key from row 0 instead.
+    const target = idGrid(before)[0]![0]!;
+    const targetRowLength = idGrid(before)[1]!.length;
+
+    const { caseA, caseBAsIR } = runBoth([moveOp(target, "down")]);
+    expect(locate(caseA.layout, target)).toEqual([1, Math.min(0, targetRowLength)]);
+    expect(idGrid(caseA.layout)).toEqual(idGrid(caseBAsIR));
+  });
+
+  it("transfers to the row above for `up`, identically on both sides", () => {
+    const rawJson = emitTouchLayout(makeTouchKeyRuleJoinLayout());
+    const before = parseTouchLayout(rawJson);
+    const target = idGrid(before)[1]![0]!;
+
+    const { caseA, caseBAsIR } = runBoth([moveOp(target, "up")]);
+    const [row] = locate(caseA.layout, target);
+    expect(row).toBe(0);
+    expect(idGrid(caseA.layout)).toEqual(idGrid(caseBAsIR));
+  });
+
+  it("lands at the END of a shorter target row rather than past it", () => {
+    const rawJson = emitTouchLayout(makeTouchKeyRuleJoinLayout());
+    const before = parseTouchLayout(rawJson);
+    // The fixture's rows are 4,4,4,7 — so a key late in the 7-key row moving
+    // UP has an index beyond the 4-key row's length, which is the clamp case.
+    const grid = idGrid(before);
+    const longRow = grid.findIndex((r) => r.length === 7);
+    const target = grid[longRow]![6]!;
+    const shorterRowLength = grid[longRow - 1]!.length;
+
+    const { caseA, caseBAsIR } = runBoth([moveOp(target, "up")]);
+    expect(locate(caseA.layout, target)).toEqual([longRow - 1, shorterRowLength]);
+    expect(idGrid(caseA.layout)).toEqual(idGrid(caseBAsIR));
+  });
+
+  it("never wraps: a key at index 0 moving `left` changes nothing, on both sides", () => {
+    const rawJson = emitTouchLayout(makeTouchKeyRuleJoinLayout());
+    const before = parseTouchLayout(rawJson);
+    const first = idGrid(before)[0]![0]!;
+
+    const { caseA, caseB, caseBAsIR } = runBoth([moveOp(first, "left")]);
+    expect(idGrid(caseA.layout)).toEqual(idGrid(before));
+    expect(idGrid(caseBAsIR)).toEqual(idGrid(before));
+    // Reported, never silent — both sides warn.
+    expect(caseA.warnings).toHaveLength(1);
+    expect(caseB.warnings).toHaveLength(1);
+  });
+
+  it("never wraps: a key in the last row moving `down` changes nothing, on both sides", () => {
+    const rawJson = emitTouchLayout(makeTouchKeyRuleJoinLayout());
+    const before = parseTouchLayout(rawJson);
+    const grid = idGrid(before);
+    const last = grid[grid.length - 1]![0]!;
+
+    const { caseA, caseBAsIR } = runBoth([moveOp(last, "down")]);
+    expect(idGrid(caseA.layout)).toEqual(idGrid(before));
+    expect(idGrid(caseBAsIR)).toEqual(idGrid(before));
+  });
+
+  it("never wraps: a key at the end of its row moving `right` changes nothing", () => {
+    const rawJson = emitTouchLayout(makeTouchKeyRuleJoinLayout());
+    const before = parseTouchLayout(rawJson);
+    const row0 = idGrid(before)[0]!;
+    const lastInRow = row0[row0.length - 1]!;
+
+    const { caseA, caseBAsIR } = runBoth([moveOp(lastInRow, "right")]);
+    expect(idGrid(caseA.layout)).toEqual(idGrid(before));
+    expect(idGrid(caseBAsIR)).toEqual(idGrid(before));
+  });
+
+  it("leaves an emptied source row in place, measuring rowTotal 0 rather than disappearing", () => {
+    const rawJson = emitTouchLayout(makeTouchKeyRuleJoinLayout());
+    const before = parseTouchLayout(rawJson);
+    const rowCountBefore = phoneDefault(before).rows.length;
+    // Empty row 0 by moving every one of its keys down, one op each.
+    const row0 = idGrid(before)[0]!;
+    const ops: KeyEditOperation[] = row0.map((id, i) => ({
+      seq: i + 1,
+      kind: "move",
+      address: touchKeyAddress("phone", "default", id),
+      direction: "down",
+    }));
+
+    const { caseA, caseBAsIR } = runBoth(ops);
+    expect(idGrid(caseA.layout)[0]).toEqual([]);
+    expect(phoneDefault(caseA.layout).rows).toHaveLength(rowCountBefore);
+    expect(computeRowMetrics(phoneDefault(caseA.layout).rows[0]!.keys, "phone").rowTotal).toBe(0);
+    expect(idGrid(caseA.layout)).toEqual(idGrid(caseBAsIR));
+  });
+
+  it("preserves identity, sub-keys, geometry and provenance across a move (FR-021)", () => {
+    // The longpress host is the fixture's richest key: sk[], flick{}, a real
+    // provenance, and a nodeId. Give it geometry first so `width`/`pad` are
+    // present to survive, then move it.
+    const rawJson = emitTouchLayout(makeTouchKeyRuleJoinLayout());
+    const before = parseTouchLayout(rawJson);
+    const address = touchKeyAddress("phone", "default", TOUCH_JOIN_IDS.longpressHost);
+    const ops: KeyEditOperation[] = [
+      { seq: 1, kind: "set", address, fields: { width: 175, pad: 5, hint: "h", layer: "shift" } },
+      { seq: 2, kind: "move", address, direction: "down" },
+    ];
+
+    const caseA = applyKeyEditsToLayout(before, ops);
+    const caseB = applyKeyEditsToRawJson(rawJson, ops);
+    const caseBAsIR = parseTouchLayout(caseB.json);
+
+    const find = (layout: TouchLayoutIR): TouchKeyIR | undefined => {
+      for (const row of phoneDefault(layout).rows) {
+        const hit = row.keys.find((k) => k.id === TOUCH_JOIN_IDS.longpressHost);
+        if (hit) return hit;
+      }
+      return undefined;
+    };
+
+    const original = find(before)!;
+    const movedA = find(caseA.layout)!;
+    const movedB = find(caseBAsIR)!;
+
+    // Identity: Case A splices the existing node, so the nodeId is the SAME
+    // object's — not a freshly minted one. This is the assertion that would
+    // fail if `move` were ever re-implemented as remove + add.
+    expect(movedA.nodeId).toBe(original.nodeId);
+    // Sub-keys and provenance survive untouched.
+    expect(movedA.sk).toEqual(original.sk);
+    expect(movedA.flick).toEqual(original.flick);
+    expect(movedA.multitap).toEqual(original.multitap);
+    expect(movedA.provenance).toEqual(original.provenance);
+    // Geometry and the other newly editable fields survive the move.
+    expect(movedA.width).toBe(175);
+    expect(movedA.pad).toBe(5);
+    expect(movedA.hint).toBe("h");
+    expect(movedA.layer).toBe("shift");
+    // And Case B agrees on all of it except node ids — the one thing the twin
+    // comparison excuses by contract, stripped recursively through `sk`,
+    // `multitap` and `flick` by the same helper the main comparison uses.
+    expect(stripNodeId(movedA)).toEqual(stripNodeId(movedB));
+  });
+
+  it("rejects a family-scoped move on both sides rather than half-applying it", () => {
+    const rawJson = emitTouchLayout(makeTouchKeyRuleJoinLayout());
+    const before = parseTouchLayout(rawJson);
+    const ops: KeyEditOperation[] = [
+      {
+        seq: 1,
+        kind: "move",
+        address: touchKeyAddress("phone", "default", TOUCH_JOIN_IDS.caseTest),
+        direction: "right",
+        scope: "family",
+      },
+    ];
+
+    const caseA = applyKeyEditsToLayout(before, ops);
+    const caseB = applyKeyEditsToRawJson(rawJson, ops);
+    expect(idGrid(caseA.layout)).toEqual(idGrid(before));
+    expect(idGrid(parseTouchLayout(caseB.json))).toEqual(idGrid(before));
+    expect(caseA.orphaned).toHaveLength(1);
+    expect(caseA.warnings).toHaveLength(1);
+    expect(caseB.warnings).toHaveLength(1);
   });
 });

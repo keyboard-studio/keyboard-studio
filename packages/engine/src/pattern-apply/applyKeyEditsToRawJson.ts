@@ -104,6 +104,7 @@
 import type {
   AddKeyOp,
   KeyEditOperation,
+  MoveKeyOp,
   RemoveKeyOp,
   SubKeyLocation,
   SubKeyRef,
@@ -193,6 +194,19 @@ interface ResolvedMainKey {
   readonly row: RawKeyRow;
   readonly keyIndex: number;
   readonly key: RawKey;
+  /**
+   * The containing layer's rows, and this row's index within them — needed by
+   * `move` (spec 061 T032), which is the only operation that reaches beyond the
+   * row it resolved into.
+   *
+   * These are VIEW rows: `buildLayoutView` skips any wire row whose `key` is not
+   * an array, so an index here is not necessarily the wire row's own ordinal.
+   * That is correct for a move, which steps between adjacent *well-formed* rows;
+   * a malformed row is not somewhere a key could be placed anyway. Each view
+   * row's `keys` IS the live wire array, so splicing it mutates the JSON.
+   */
+  readonly layerRows: RawKeyRow[];
+  readonly rowIndex: number;
 }
 
 /** Resolve an operation's `address` against the CURRENT view. `undefined` on
@@ -209,7 +223,13 @@ function resolveMainRawKey(view: RawLayoutView, address: string): ResolvedMainKe
   const layer = platform.layers[located.layerIndex]!;
   const row = layer.rows[located.rowIndex]!;
   const key = row.keys[located.keyIndex]!;
-  return { row, keyIndex: located.keyIndex, key };
+  return {
+    row,
+    keyIndex: located.keyIndex,
+    key,
+    layerRows: layer.rows,
+    rowIndex: located.rowIndex,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -238,12 +258,21 @@ function readEditableFields(target: EditableRawTarget): EditableKeyFields {
   // An sp value outside the legal {0,1,2,8,9,10} set is malformed input, not
   // a case this applier defends against — validity is a Layer A concern.
   const sp = (toWireNumber(target["sp"]) ?? 0) as EditableKeyFields["sp"];
+  // Spec 061 T030 — the four newly editable fields. `width`/`pad` go through
+  // `toWireNumber` because the wire format admits either a number or a numeric
+  // string, the same tolerance `applyRemove` already relies on.
+  const width = toWireNumber(target["width"]);
+  const pad = toWireNumber(target["pad"]);
   return {
     id: target.id ?? "",
     text: typeof target.text === "string" ? target.text : "",
     sp,
     ...(typeof target.output === "string" ? { output: target.output } : {}),
     ...(typeof target.nextlayer === "string" ? { nextlayer: target.nextlayer } : {}),
+    ...(typeof target["hint"] === "string" ? { hint: target["hint"] } : {}),
+    ...(width !== undefined ? { width } : {}),
+    ...(pad !== undefined ? { pad } : {}),
+    ...(typeof target["layer"] === "string" ? { layer: target["layer"] } : {}),
   };
 }
 
@@ -255,6 +284,16 @@ function writeEditableFields(target: EditableRawTarget, fields: EditableKeyField
   else delete target.output;
   if (fields.nextlayer !== undefined) target.nextlayer = fields.nextlayer;
   else delete target.nextlayer;
+  // Spec 061 T030 — same present-or-deleted discipline as the two above, so a
+  // field the merged set omits leaves no stale wire property behind.
+  if (fields.hint !== undefined) target["hint"] = fields.hint;
+  else delete target["hint"];
+  if (fields.width !== undefined) target["width"] = fields.width;
+  else delete target["width"];
+  if (fields.pad !== undefined) target["pad"] = fields.pad;
+  else delete target["pad"];
+  if (fields.layer !== undefined) target["layer"] = fields.layer;
+  else delete target["layer"];
 }
 
 function newRawKeyFromSpec(spec: EditableKeyFields): RawKey {
@@ -294,6 +333,39 @@ function applyAdd(resolved: ResolvedMainKey, op: AddKeyOp): void {
   // blank placeholder despite this task's briefing naming that reuse.
   const insertAt = op.position === "before" ? resolved.keyIndex : resolved.keyIndex + 1;
   resolved.row.keys.splice(insertAt, 0, newRawKeyFromSpec(op.key));
+}
+
+/**
+ * Case B's `move` (spec 061 T032) — the twin of `applyKeyEditsToLayout.ts`'s
+ * `moveKeyWithinLayer`, and held to the same rules by
+ * `applyKeyEdits.twin.test.ts`: swap within the row for `left`/`right`,
+ * transfer to the adjacent row clamped to `min(keyIndex, targetRow.keys.length)`
+ * for `up`/`down`, never wrap, and leave an emptied source row in place.
+ *
+ * Same splice discipline as the IR twin, and for the same FR-021 reason: the
+ * EXISTING wire object is spliced out and back in, never rebuilt. In the raw
+ * path that matters even more than in the IR one — a rebuilt object would drop
+ * every wire field this applier does not know about, which is precisely the
+ * Case B fidelity promise (spec 035) the whole raw path exists to keep.
+ *
+ * Returns false when the move would leave the layer, having changed nothing.
+ */
+function applyMove(resolved: ResolvedMainKey, direction: MoveKeyOp["direction"]): boolean {
+  const { row, keyIndex, layerRows, rowIndex } = resolved;
+
+  if (direction === "left" || direction === "right") {
+    const target = direction === "left" ? keyIndex - 1 : keyIndex + 1;
+    if (target < 0 || target >= row.keys.length) return false;
+    const [node] = row.keys.splice(keyIndex, 1);
+    row.keys.splice(target, 0, node as RawKey);
+    return true;
+  }
+
+  const targetRow = layerRows[direction === "up" ? rowIndex - 1 : rowIndex + 1];
+  if (!targetRow) return false;
+  const [node] = row.keys.splice(keyIndex, 1);
+  targetRow.keys.splice(Math.min(keyIndex, targetRow.keys.length), 0, node as RawKey);
+  return true;
 }
 
 function applyRemove(resolved: ResolvedMainKey, op: RemoveKeyOp): void {
@@ -405,6 +477,21 @@ export function applyKeyEditsToRawJson(
       }
       case "remove": {
         applyRemove(resolved, op);
+        break;
+      }
+      case "move": {
+        if (op.scope === "family") {
+          warnUnresolved(
+            warnings,
+            op,
+            'scope "family" has no shared referent across a layer family for a move',
+          );
+          break;
+        }
+        if (!applyMove(resolved, op.direction)) {
+          // A boundary, not a failure — see the IR twin's own comment.
+          warnUnresolved(warnings, op, `no room to move "${op.direction}"`);
+        }
         break;
       }
       case "setSubKey": {

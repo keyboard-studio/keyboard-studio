@@ -5203,7 +5203,7 @@ describe("TouchGallery — mode selector as an APG tabs pattern (T072, FR-035)",
     expect(keyTab.getAttribute("aria-selected")).toBe("false");
   });
 
-  it("clicking the 'By key' tab switches to the editable schematic grid, labelled 'for editing', while the live preview is labelled 'for testing'; clicking back returns to the character walk", async () => {
+  it("clicking the 'By key' tab switches to the editable schematic grid, labelled 'for editing', with the live preview gone; clicking back returns to the character walk and brings it back", async () => {
     seedStore({ withInventory: ["ä"] });
     await act(async () => {
       render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
@@ -5217,13 +5217,18 @@ describe("TouchGallery — mode selector as an APG tabs pattern (T072, FR-035)",
       fireEvent.click(screen.getByTestId("touch-mode-tab-key"));
     });
 
-    // Two visually/verbally distinct surfaces (FR-020h/FR-035): the grid
-    // pane names itself "for editing"; the OSK preview pane (still rendered,
-    // via the mocked OSKFrame) is now headed "for testing" — never the same
-    // verb, never reading as two ways to do the same thing.
+    // The grid pane still names itself "for editing" (FR-020h/FR-035).
     expect(screen.getByTestId("touch-key-mode-back")).toBeTruthy();
     expect(screen.getByText(/for editing/i)).toBeTruthy();
-    expect(screen.getByText(/for testing/i)).toBeTruthy();
+
+    // But the "for testing" OSK preview is GONE, not merely relabelled —
+    // spec 061 FR-024/T037: key mode uses the full pane width and does not
+    // render the live preview. Spec 058's version of this test asserted the
+    // preview was still there beside the grid, headed "for testing"; that
+    // pairing was the point then and is withdrawn now. The two-distinct-verbs
+    // concern it protected does not survive the change either, since there is
+    // no second surface left to confuse the grid with.
+    expect(screen.queryByText(/for testing/i)).toBeNull();
     // The per-character surface is gone entirely, not just hidden alongside it.
     expect(screen.queryByText("Touch mapping")).toBeNull();
 
@@ -5232,6 +5237,12 @@ describe("TouchGallery — mode selector as an APG tabs pattern (T072, FR-035)",
     });
     expect(screen.getByText("Touch mapping")).toBeTruthy();
     expect(screen.queryByTestId("touch-key-mode-back")).toBeNull();
+    // Character mode gets its preview back — the switch is lossless in both
+    // directions (FR-025). Its heading is "Touch preview", NOT "for testing":
+    // the latter was `editor.assignLoop.touch.keyMode.previewHeading`, a
+    // key-mode-only string that spec 061 T037 made unreachable and T038
+    // removed along with the surface that carried it.
+    expect(screen.getByText("Touch preview")).toBeTruthy();
   });
 
   it("ArrowRight on the tablist moves AND selects the next tab (APG automatic activation)", async () => {
@@ -6034,5 +6045,165 @@ describe("TouchGallery — key mode editing (spec 061 T009, FR-009, SC-003, SC-0
     // After the switch: the grid re-rendered FOR THAT LAYER — "symbols"'
     // own key is now present.
     expect(screen.getByTestId("key-grid-cell-phone:symbols:T_1")).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// SC-005 — untouched files stay byte-identical, untouched keys stay
+// structurally identical (spec 061 T029; research D2)
+//
+// The e2e walk `packages/studio/e2e/touch-key-add-remove.spec.ts` makes the
+// same claim in a real browser. This is its vitest twin, and it exists because
+// `.github/workflows/ci.yml` has NO Playwright step: an assertion that lives
+// only there is something someone once observed, not a regression guard. Two
+// independent statements of a fidelity claim is proportionate for the one
+// criterion about not corrupting the author's keyboard.
+//
+// No browser is needed. This file already mounts the REAL `TouchGallery`
+// against real store state, and `runTransform(kbId)` runs the SAME projection
+// the download path runs, returning the emitted VFS — so the emitted artifact
+// is reachable directly.
+// ---------------------------------------------------------------------------
+
+/** Every file in a VFS as `path -> content`, so two projections can be compared whole. */
+function snapshotFiles(vfs: ReturnType<typeof runTransform>): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const entry of vfs.entries()) {
+    out[entry.path] =
+      typeof entry.content === "string" ? entry.content : `bin:${Array.from(entry.content).join(",")}`;
+  }
+  return out;
+}
+
+interface Sc005Key {
+  id?: string;
+  sp?: number;
+  [k: string]: unknown;
+}
+
+/** Every key in an emitted touch layout, addressed `platform:layer:row:index`. */
+function indexEmittedKeys(json: string): Map<string, Sc005Key> {
+  const out = new Map<string, Sc005Key>();
+  const parsed = JSON.parse(json) as Record<
+    string,
+    { layer?: Array<{ id?: string; row?: Array<{ id?: number; key?: Sc005Key[] }> }> } | undefined
+  >;
+  for (const [platformId, platform] of Object.entries(parsed)) {
+    if (platform === undefined || typeof platform !== "object") continue;
+    for (const layer of platform.layer ?? []) {
+      for (const row of layer.row ?? []) {
+        (row.key ?? []).forEach((key, i) => {
+          out.set(`${platformId}:${layer.id ?? "?"}:${row.id ?? "?"}:${i}`, key);
+        });
+      }
+    }
+  }
+  return out;
+}
+
+const TOUCH_LAYOUT_PATH = "source/basic_kbdus.keyman-touch-layout";
+
+describe("TouchGallery key mode — SC-005 fidelity (spec 061 T029)", () => {
+  it("leaves every UNTOUCHED FILE byte-identical after a handful of key edits", async () => {
+    seedKeyModeParityFixture();
+    await renderTouchGalleryInKeyMode();
+    const before = snapshotFiles(runTransform("basic_kbdus"));
+
+    // Three edits on ONE key, through the real property panel.
+    fireEvent.click(screen.getByTestId("key-grid-cell-phone:default:T_a"));
+    await act(async () => {
+      const keycap = screen
+        .getByTestId("key-property-panel-field-text")
+        .querySelector("input") as HTMLInputElement;
+      fireEvent.change(keycap, { target: { value: "A" } });
+      fireEvent.blur(keycap);
+    });
+    await act(async () => {
+      const width = screen
+        .getByTestId("key-property-panel-field-width")
+        .querySelector("input") as HTMLInputElement;
+      fireEvent.change(width, { target: { value: "150" } });
+      fireEvent.blur(width);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("key-property-panel-move-right"));
+    });
+
+    const after = snapshotFiles(runTransform("basic_kbdus"));
+
+    // The `.keyman-touch-layout` legitimately changes (it is the touched
+    // file), and a `.kmn` may change if an edit wrote a rule. Nothing ELSE may
+    // differ by a single byte.
+    const differing = Object.keys(before).filter(
+      (path) => after[path] !== undefined && after[path] !== before[path],
+    );
+    const unexpected = differing.filter(
+      (path) => path !== TOUCH_LAYOUT_PATH && !path.endsWith(".kmn"),
+    );
+    expect(unexpected).toEqual([]);
+
+    // And nothing may VANISH from the artifact either.
+    const dropped = Object.keys(before).filter((path) => after[path] === undefined);
+    expect(dropped).toEqual([]);
+  });
+
+  it("leaves every UNTOUCHED KEY structurally identical within the touched file", async () => {
+    seedKeyModeParityFixture();
+    await renderTouchGalleryInKeyMode();
+    const beforeLayout = runTransform("basic_kbdus").get(TOUCH_LAYOUT_PATH);
+    expect(typeof beforeLayout?.content).toBe("string");
+    const beforeKeys = indexEmittedKeys(beforeLayout!.content as string);
+    expect(beforeKeys.size).toBeGreaterThan(0);
+
+    // One key edited; every other key in every other layer must be untouched.
+    fireEvent.click(screen.getByTestId("key-grid-cell-phone:default:T_a"));
+    await act(async () => {
+      const keycap = screen
+        .getByTestId("key-property-panel-field-text")
+        .querySelector("input") as HTMLInputElement;
+      fireEvent.change(keycap, { target: { value: "EDITED" } });
+      fireEvent.blur(keycap);
+    });
+
+    const afterLayout = runTransform("basic_kbdus").get(TOUCH_LAYOUT_PATH);
+    const afterKeys = indexEmittedKeys(afterLayout!.content as string);
+
+    const changed: string[] = [];
+    for (const [address, beforeKey] of beforeKeys) {
+      const emitted = afterKeys.get(address);
+      if (emitted === undefined || JSON.stringify(emitted) !== JSON.stringify(beforeKey)) {
+        changed.push(address);
+      }
+    }
+    // Exactly the one key the author edited, and no other — addressed by
+    // POSITION, so a key that merely SHIFTED is not silently excused.
+    expect(changed).toEqual(["phone:default:1:0"]);
+  });
+
+  it("keeps a moved key's own sub-keys and geometry in the emitted artifact (FR-021)", async () => {
+    seedKeyModeParityFixture();
+    await renderTouchGalleryInKeyMode();
+
+    fireEvent.click(screen.getByTestId("key-grid-cell-phone:default:T_a"));
+    await act(async () => {
+      const width = screen
+        .getByTestId("key-property-panel-field-width")
+        .querySelector("input") as HTMLInputElement;
+      fireEvent.change(width, { target: { value: "175" } });
+      fireEvent.blur(width);
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("key-property-panel-move-right"));
+    });
+
+    const emitted = indexEmittedKeys(
+      runTransform("basic_kbdus").get(TOUCH_LAYOUT_PATH)!.content as string,
+    );
+    // T_a moved one place right: it is now index 1 of its row, and it carries
+    // the width the author set — the move preserved it rather than rebuilding
+    // the key from a spec that has no geometry.
+    const moved = emitted.get("phone:default:1:1");
+    expect(moved?.id).toBe("T_a");
+    expect(moved?.["width"]).toBe(175);
   });
 });

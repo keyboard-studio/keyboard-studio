@@ -385,6 +385,20 @@ export interface KeyInspectorProps {
   onApplyFix: (fix: TouchKeyFix, finding: TouchKeyFinding) => void;
   /** Localized panel accessible name override. */
   label?: string;
+  /**
+   * Render as a plain section inside another panel rather than as a
+   * `role="region"` card of its own (spec 061 T035).
+   *
+   * `KeyPropertyPanel` is the single panel FR-018 asks for, and it composes
+   * this component for the display, findings and key-type sections rather than
+   * copying 300 lines of them. Two nested `role="region"`s with two accessible
+   * names would be an honest description of the OLD stacked mount and a false
+   * one of the merged panel — so when embedded this drops the role, the name,
+   * its own border/background and its Escape handling, all of which the parent
+   * now owns. Every `key-inspector-*` test id is unchanged, which is what keeps
+   * the existing assertions meaning what they meant.
+   */
+  embedded?: boolean;
 }
 
 const ROW_STYLE = { display: "flex", flexDirection: "column" as const, gap: 2 };
@@ -412,6 +426,7 @@ export function KeyInspector({
   onSpChange,
   onApplyFix,
   label,
+  embedded = false,
 }: KeyInspectorProps) {
   // `i18n` alongside `t` because findingCopy.ts's composers take an `I18n`
   // rather than being JSX macros — the same split existingMethodLabels.ts's
@@ -503,21 +518,33 @@ export function KeyInspector({
     // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- programmatically focusable REGION (not in the natural Tab order — see FR-020b: Enter/F2 moves focus here explicitly, Tab does not walk through it), the same "focusable container, not a Tab stop" idiom ui/SelectMenu.tsx's own portalled <ul> already uses for an analogous reason.
     <div
       ref={panelRef}
-      role="region"
-      aria-label={panelLabel}
-      tabIndex={-1}
+      // Embedded: a plain section inside KeyPropertyPanel, which owns the
+      // region role, the accessible name, the chrome and the Escape handling.
+      // See the `embedded` prop's own doc for why nesting two named regions
+      // would misdescribe the merged panel.
+      {...(embedded
+        ? {}
+        : {
+            role: "region",
+            "aria-label": panelLabel,
+            tabIndex: -1,
+            onKeyDown: handleKeyDown,
+          })}
       data-testid="key-inspector"
-      onKeyDown={handleKeyDown}
       style={{
         display: "flex",
         flexDirection: "column",
         gap: 10,
-        padding: 12,
-        background: BG_CARD,
-        border: `1px solid ${BORDER}`,
-        borderRadius: 8,
+        ...(embedded
+          ? {}
+          : {
+              padding: 12,
+              background: BG_CARD,
+              border: `1px solid ${BORDER}`,
+              borderRadius: 8,
+              outline: "none",
+            }),
         fontFamily: FONT,
-        outline: "none",
       }}
     >
       {selectedCell === null ? (

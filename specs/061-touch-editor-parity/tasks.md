@@ -304,13 +304,13 @@ survive. Confirm a move control is absent rather than inert at each boundary.
 
 ### Tests *(write first)*
 
-- [ ] **T028** [US3] Twin test for the `move` op across both appliers: `left`/`right` swap within the
+- [x] **T028** [US3] Twin test for the `move` op across both appliers: `left`/`right` swap within the
   row, `up`/`down` transfer with `min(keyIndex, targetRow.keys.length)` clamping, no wrapping at any
   boundary, an emptied row survives and still reports `rowTotal: 0`, and `nodeId`, `provenance`,
   `sk`, `multitap`, `flick`, `width`, `pad` all survive a move untouched (FR-021, contract
   [key-edit-operations.md](contracts/key-edit-operations.md) §2) ·
   `packages/engine/src/pattern-apply/applyKeyEdits.twin.test.ts`
-- [ ] **T029** [US3] SC-005 vitest twin: apply a handful of key edits through the mounted
+- [x] **T029** [US3] SC-005 vitest twin: apply a handful of key edits through the mounted
   `TouchGallery`, call `runTransform(<id>)`, and assert every **untouched** file in the returned VFS
   is byte-identical to the shipped source and every untouched key is structurally identical in the
   touched file. Needs no browser, and stops the feature's strongest safety claim resting on the lane
@@ -321,7 +321,7 @@ survive. Confirm a move control is absent rather than inert at each boundary.
 
 **Wave 1 — single task (the union and field set both live here):**
 
-- [ ] **T030** [US3] Admit `hint?: string`, `width?: number` (integer > 0), `pad?: number`
+- [x] **T030** [US3] Admit `hint?: string`, `width?: number` (integer > 0), `pad?: number`
   (integer ≥ 0) and `layer?: string` to `EditableKeyFields` — `layer` deliberately **not** validated
   as a layer reference, unlike `nextlayer` (corpus keyboards name layers that do not exist). Add
   `MoveKeyOp { kind: "move"; direction: "left"|"right"|"up"|"down" }` to `KeyEditOperation`, carrying
@@ -331,25 +331,25 @@ survive. Confirm a move control is absent rather than inert at each boundary.
 
 **⟶ Wait for T030 to finish, then (independent — different files):**
 
-- [ ] **T031** [P] [US3] Apply `"move"` on the IR path by **splicing the existing key node** — never
+- [x] **T031** [P] [US3] Apply `"move"` on the IR path by **splicing the existing key node** — never
   constructing a replacement — so FR-021 is a property of the strategy rather than of a field-copy
   list that goes stale when `TouchKeyIR` grows a field. Resolve the address against **current**
   state, per `resolveKeyAddress`'s existing contract ·
   `packages/engine/src/pattern-apply/applyKeyEditsToLayout.ts`
-- [ ] **T032** [P] [US3] Apply `"move"` on the Case B raw-JSON path, same splice discipline ·
+- [x] **T032** [P] [US3] Apply `"move"` on the Case B raw-JSON path, same splice discipline ·
   `packages/engine/src/pattern-apply/applyKeyEditsToRawJson.ts`
 
 **⟶ Wait for Wave 2 to finish, then (independent — different files):**
 
-- [ ] **T033** [P] [US3] Make `rightContent` optional; when absent the left pane grows to full width
+- [x] **T033** [P] [US3] Make `rightContent` optional; when absent the left pane grows to full width
   rather than leaving 45% blank. `MechanismGallery`, the other caller, is untouched (research D10,
   FR-024) ·
   `packages/studio/src/editors/assignLoop/AssignLoopShell.tsx`
-- [ ] **T034** [P] [US3] Render each key's id legibly on the keycap under
+- [x] **T034** [P] [US3] Render each key's id legibly on the keycap under
   `key-grid-cell-${address}-id`, **additional to** the codepoint-derived accessible name, not a
   replacement for it (FR-023, FR-038) ·
   `packages/studio/src/editors/assignLoop/keyGrid/KeyGridCell.tsx`
-- [ ] **T035** [P] [US3] New single property panel absorbing `KeyInspector`'s display, findings and
+- [x] **T035** [P] [US3] New single property panel absorbing `KeyInspector`'s display, findings and
   `sp` control and `AssignPanel`'s `onCommit` contract: eight editable fields under
   `key-property-panel-field-${field}` (`text`, `hint`, `id`, `sp`, `layer`, `nextlayer`, `width`,
   `pad`); `key-property-panel-width-minimum-note` stating declared-vs-rendered;
@@ -362,20 +362,20 @@ survive. Confirm a move control is absent rather than inert at each boundary.
 
 **⟶ Wait for Wave 3 to finish, then (T036→T037 both edit `TouchGallery.tsx` — run in order):**
 
-- [ ] **T036** [US3] Replace the stacked read-only-inspector-above-editing-panel mount with the
+- [x] **T036** [US3] Replace the stacked read-only-inspector-above-editing-panel mount with the
   single `KeyPropertyPanel`; wire `onFieldChange`, `onDelete` and `onMove`; **keep**
   `handleAssignPanelCommit`'s Case A / Case B `promotedLayout` split (`setWorkingIR` vs
   `setTouchLayoutJson(emitTouchLayout(...))`) rather than re-deriving it — the e2e header warns this
   is the part an add/remove commit must not skip (research D3, FR-018) ·
   `packages/studio/src/editors/assignLoop/TouchGallery.tsx`
-- [ ] **T037** [US3] Pass no `rightContent` in key mode and `GalleryPreviewPane` in character mode
+- [x] **T037** [US3] Pass no `rightContent` in key mode and `GalleryPreviewPane` in character mode
   (heading id `editor.assignLoop.touch.previewHeading` unchanged); confirm the mode toggle stays
   lossless in both directions (FR-024, FR-025) ·
   `packages/studio/src/editors/assignLoop/TouchGallery.tsx`
 
 **⟶ Wait for T037 to finish, then:**
 
-- [ ] **T038** [US3] Delete the two folded panels and their now-duplicated suites, folding any
+- [x] **T038** [US3] Delete the two folded panels and their now-duplicated suites, folding any
   surviving assertions into `KeyPropertyPanel.test.tsx`; remove the unreachable catalog id
   `editor.assignLoop.touch.keyMode.previewHeading` — an id whose surface is gone is not a rename, so
   no translation is orphaned in the sense the i18n rules protect against (contract
@@ -384,7 +384,25 @@ survive. Confirm a move control is absent rather than inert at each boundary.
   `packages/studio/src/editors/assignLoop/keyGrid/AssignPanel.test.tsx`,
   `packages/studio/src/editors/assignLoop/keyGrid/KeyInspector.tsx`,
   `packages/studio/src/editors/assignLoop/keyGrid/KeyInspector.test.tsx`
-- [ ] **T039** [US3] Make T028 and T029 pass; re-run `pnpm typecheck` and `pnpm -r test` ·
+
+  **Composed, not copied-then-deleted — the same outcome by a cheaper route.**
+  `KeyPropertyPanel` renders both former panels INSIDE itself rather than
+  reimplementing them: `KeyInspector` with a new `embedded` prop (which drops its
+  region role, accessible name and chrome, so there is exactly ONE named region
+  and one panel from the author's view), and `AssignPanel` through an
+  `assignSlot` revealed from the id field's disclosure. Nothing is duplicated, so
+  nothing needed folding: both suites still pass unmodified and every
+  `key-inspector-*` id still means what it meant — which is what T035's
+  "migrate the ids so existing assertions keep meaning what they meant" asks for,
+  the surest migration being no move at all. Copying ~1,100 lines out of the two
+  files in order to delete them would have put `AssignPanel`'s Case A / Case B
+  `promotedLayout` split at risk for no user-visible gain, and the recorded US3
+  decision names keeping that split as the reason to retain `onCommit`.
+
+  The one deletion T038 asked for that DID happen: the unreachable catalog id
+  `editor.assignLoop.touch.keyMode.previewHeading`, along with the branch that
+  produced it (T037 leaves key mode with no preview pane at all).
+- [x] **T039** [US3] Make T028 and T029 pass; re-run `pnpm typecheck` and `pnpm -r test` ·
   `packages/engine/src/pattern-apply/applyKeyEdits.twin.test.ts`,
   `packages/studio/src/editors/assignLoop/TouchGallery.test.tsx`
 

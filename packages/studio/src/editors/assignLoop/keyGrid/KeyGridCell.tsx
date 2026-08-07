@@ -447,6 +447,39 @@ export function KeyGridCell({
           {displayLabel}
         </span>
       )}
+      {/* The key's own id, always (spec 061 T034, FR-023). Developer shows it;
+      without it an author looking at a grid of glyphs cannot tell which key a
+      rule is keyed on, which is the single most common thing they need to know
+      while editing.
+
+      ADDITIONAL to the codepoint-derived accessible name, never a replacement
+      for it (FR-038): `aria-hidden` keeps it out of the accessible tree, where
+      `buildCellAriaLabel` already names the id in words alongside the character
+      and its U+ notation. Rendering it into the tree as well would make a
+      screen reader say the id twice.
+
+      Suppressed on a blank/spacer cell, matching `displayLabel`'s own
+      `!isBlank` guard: a suppressed key's id is a sentinel (`T_BLANK`), and
+      printing it would draw a label onto a cell whose whole point is to look
+      empty. */}
+      {!isBlank && (
+        <span
+          aria-hidden="true"
+          data-testid={`key-grid-cell-${cell.address}-id`}
+          style={{
+            fontSize: 8,
+            lineHeight: 1,
+            fontFamily: FONT_MONO,
+            color: TEXT_DIM,
+            whiteSpace: "nowrap",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            maxWidth: "100%",
+          }}
+        >
+          {cell.id}
+        </span>
+      )}
       {hasAnnotations && (
         <span aria-hidden="true" style={{ fontSize: 8, lineHeight: 1, color: TEXT_DIM }}>
           {cell.annotations.longpress > 0 && `+${cell.annotations.longpress}`}

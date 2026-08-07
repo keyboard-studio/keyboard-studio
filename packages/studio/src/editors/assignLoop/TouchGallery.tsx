@@ -165,7 +165,11 @@ import {
   type KeyGridProvenance,
 } from "./keyGrid/KeyGrid.tsx";
 import { useGridNav } from "./keyGrid/useGridNav.ts";
-import { KeyInspector, type TouchKeySpValue } from "./keyGrid/KeyInspector.tsx";
+import { type TouchKeySpValue } from "./keyGrid/KeyInspector.tsx";
+import {
+  KeyPropertyPanel,
+  type KeyPropertyFieldChange,
+} from "./keyGrid/KeyPropertyPanel.tsx";
 import { AssignPanel, type AssignPanelCommitResult } from "./keyGrid/AssignPanel.tsx";
 import {
   useKeyEditGuards,
@@ -2315,6 +2319,26 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     );
   }, [keyModeViewModel, selectedKeyAddress]);
 
+  // Spec 061 T036 — where the selected key sits, so `KeyPropertyPanel` can
+  // decide which move buttons can act (FR-020: absent, never disabled). Derived
+  // here rather than in the panel because the panel sees one cell and the
+  // answer depends on the whole layer.
+  const selectedKeyPosition = useMemo(() => {
+    if (keyModeViewModel === undefined || selectedKeyAddress === null) return undefined;
+    for (let rowIndex = 0; rowIndex < keyModeViewModel.rows.length; rowIndex++) {
+      const row = keyModeViewModel.rows[rowIndex]!;
+      const keyIndex = row.keys.findIndex((k) => k.address === selectedKeyAddress);
+      if (keyIndex === -1) continue;
+      return {
+        rowIndex,
+        keyIndex,
+        rowCount: keyModeViewModel.rows.length,
+        rowLength: row.keys.length,
+      };
+    }
+    return undefined;
+  }, [keyModeViewModel, selectedKeyAddress]);
+
   // FR-034's honest provenance statement — the same resolvedSeedSource this
   // gallery already threads through buildTouchLayoutJson/deriveSeedLayout
   // above, not a second detection.
@@ -2888,6 +2912,44 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     (sp: TouchKeySpValue) => {
       if (selectedKeyCell === null) return;
       commitKeyEditOp({ address: selectedKeyCell.address, kind: "set", fields: { sp } });
+    },
+    [selectedKeyCell, commitKeyEditOp],
+  );
+
+  // Spec 061 T036 — `onFieldChange`: any of the seven text/number fields the
+  // property panel edits, committed through the SAME `commitKeyEditOp` chain
+  // every other key edit uses, so each one is a single undo entry and rides
+  // the existing validation cycle (FR-039, FR-040).
+  //
+  // An id change routes through `rename` rather than `set`: `applyFieldSemantics`
+  // couples id and output (changing the id clears a stale `output` unless the
+  // patch supplies a new one), and `rename` is the kind that states that intent.
+  // Every other field is a plain `set`.
+  const handleKeyFieldChange = useCallback(
+    (change: KeyPropertyFieldChange) => {
+      if (selectedKeyCell === null) return;
+      const { address } = selectedKeyCell;
+      if (change.field === "id") {
+        const toId = String(change.value).trim();
+        if (toId.length === 0) return;
+        commitKeyEditOp({ address, kind: "rename", toId });
+        return;
+      }
+      commitKeyEditOp({
+        address,
+        kind: "set",
+        fields: { [change.field]: change.value },
+      });
+    },
+    [selectedKeyCell, commitKeyEditOp],
+  );
+
+  // Spec 061 T036 — `onMove`. The panel only renders a direction whose move can
+  // act, so this never emits a boundary no-op (FR-020).
+  const handleKeyMove = useCallback(
+    (direction: "left" | "right" | "up" | "down") => {
+      if (selectedKeyCell === null) return;
+      commitKeyEditOp({ address: selectedKeyCell.address, kind: "move", direction });
     },
     [selectedKeyCell, commitKeyEditOp],
   );
@@ -6497,32 +6559,42 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           />
         )}
 
-        {/* T070/T085 detail surfaces — display (KeyInspector) beside editing
-            (AssignPanel). Both take the SAME selectedKeyCell/effective layout
-            the grid itself renders, so they can never disagree with it. */}
+        {/* ONE panel (spec 061 T036, FR-018). The stacked
+            read-only-inspector-above-editing-panel mount is gone: both
+            surfaces are now composed INSIDE `KeyPropertyPanel`, which adds the
+            eight editable fields, delete and the four move buttons around them.
+            Everything still takes the SAME selectedKeyCell/effective layout the
+            grid renders, so nothing here can disagree with the board. */}
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <KeyInspector
+          <KeyPropertyPanel
             selectedCell={selectedKeyCell}
             {...(effectiveKeyModeLayout !== null
               ? { layout: effectiveKeyModeLayout }
               : {})}
+            {...(selectedKeyPosition !== undefined ? { position: selectedKeyPosition } : {})}
             onSpChange={handleSpChange}
             onApplyFix={handleApplyFix}
+            onFieldChange={handleKeyFieldChange}
+            onDelete={handleOpenRemoveDialog}
+            onMove={handleKeyMove}
+            {...(ir !== null && keyModeRuleIndex !== undefined
+              ? {
+                  assignSlot: (
+                    <AssignPanel
+                      selectedCell={selectedKeyCell}
+                      layout={effectiveKeyModeLayout ?? EMPTY_TOUCH_LAYOUT}
+                      ir={ir}
+                      ruleIndex={keyModeRuleIndex}
+                      inventoryChars={inventory}
+                      capsHandled={capsHandled}
+                      {...(identityBcp47 !== undefined ? { bcp47: identityBcp47 } : {})}
+                      repertoire={inventory}
+                      onCommit={handleAssignPanelCommit}
+                    />
+                  ),
+                }
+              : {})}
           />
-
-          {ir !== null && keyModeRuleIndex !== undefined && (
-            <AssignPanel
-              selectedCell={selectedKeyCell}
-              layout={effectiveKeyModeLayout ?? EMPTY_TOUCH_LAYOUT}
-              ir={ir}
-              ruleIndex={keyModeRuleIndex}
-              inventoryChars={inventory}
-              capsHandled={capsHandled}
-              {...(identityBcp47 !== undefined ? { bcp47: identityBcp47 } : {})}
-              repertoire={inventory}
-              onCommit={handleAssignPanelCommit}
-            />
-          )}
 
           <RemoveKeyDialog
             open={removeDialogOpen}
@@ -6987,16 +7059,17 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // "for editing" label above (keyModeContent). The character-mode wording
   // stays exactly as it was (no id/message change) since that mode never
   // renders anything grid-shaped beside the preview to be confused with.
-  const previewHeading =
-    touchEditorMode === "key"
-      ? t({
-          id: "editor.assignLoop.touch.keyMode.previewHeading",
-          message: "Live keyboard — for testing",
-        })
-      : t({
-          id: "editor.assignLoop.touch.previewHeading",
-          message: "Touch preview",
-        });
+  // Only character mode renders a preview pane at all as of spec 061 T037
+  // (FR-024), so the key-mode branch — and its
+  // `editor.assignLoop.touch.keyMode.previewHeading` id — became unreachable
+  // and is gone (T038). Removing an id whose SURFACE no longer exists is not a
+  // rename, so no translation is orphaned in the sense the i18n rules protect
+  // against; the surviving `editor.assignLoop.touch.previewHeading` is
+  // unchanged.
+  const previewHeading = t({
+    id: "editor.assignLoop.touch.previewHeading",
+    message: "Touch preview",
+  });
 
   return (
     <>
@@ -7012,20 +7085,34 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         modalityLabelPlacement="inline"
         headerExtras={headerExtras}
         leftContent={leftContent}
-        rightContent={
-          <GalleryPreviewPane
-            baseKeyboard={baseKeyboard}
-            stage={stage}
-            retry={retry}
-            {...(handleKeyTap !== undefined ? { onKeyTap: handleKeyTap } : {})}
-            defaultOskMode="touch"
-            heading={previewHeading}
-            warningLabel={t({
-              id: "editor.assignLoop.touch.previewWarnings",
-              message: "Preview warnings:",
+        // Spec 061 T037 (FR-024): key mode passes NO right pane, so the grid
+        // takes the full width instead of sitting in 45% beside a preview it
+        // does not use. Character mode is unchanged — the live OSK preview is
+        // the whole point of that mode, and its heading id
+        // (`editor.assignLoop.touch.previewHeading`) is untouched.
+        //
+        // Spread rather than a `? … : undefined` value, because
+        // `AssignLoopShell` distinguishes an OMITTED `rightContent` (collapse
+        // the split) from an explicitly-passed `undefined`/`null` (render an
+        // empty right pane) — see its own prop doc.
+        {...(touchEditorMode === "key"
+          ? {}
+          : {
+              rightContent: (
+                <GalleryPreviewPane
+                  baseKeyboard={baseKeyboard}
+                  stage={stage}
+                  retry={retry}
+                  {...(handleKeyTap !== undefined ? { onKeyTap: handleKeyTap } : {})}
+                  defaultOskMode="touch"
+                  heading={previewHeading}
+                  warningLabel={t({
+                    id: "editor.assignLoop.touch.previewWarnings",
+                    message: "Preview warnings:",
+                  })}
+                />
+              ),
             })}
-          />
-        }
       />
     </>
   );

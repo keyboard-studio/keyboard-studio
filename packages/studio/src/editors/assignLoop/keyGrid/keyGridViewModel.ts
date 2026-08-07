@@ -187,6 +187,25 @@ export interface KeyGridCellViewModel {
   readonly id: string;
   /** The keycap label (`TouchKeyIR.text`), defaulted to `""` when absent. */
   readonly keycap: string;
+  /**
+   * `TouchKeyIR.hint` — the small secondary label (spec 061 T035).
+   *
+   * Carried on the cell because the property panel edits it and the panel is
+   * driven by the selected CELL, not by the layout. It is deliberately not
+   * rendered on the keycap: the grid already shows the keycap, the id and the
+   * annotation counts, and a fourth string per cell at 48px tall reads as noise.
+   */
+  readonly hint?: string;
+  /**
+   * `TouchKeyIR.layer` — the per-key modifier override (spec 061 T035).
+   *
+   * Named `layerOverride` rather than `layer` because `KeyGridViewModel`
+   * already has a `layerId` meaning the CONTAINING layer, and two fields called
+   * `layer*` meaning opposite things on adjacent objects is exactly the
+   * confusion `TouchKeyIR.layer`'s own doc warns about ("any 'Sends:' display
+   * that reads the containing layer instead of this field is wrong").
+   */
+  readonly layerOverride?: string;
   /** Raw `TouchKeyIR.sp`, undefined meaning the implicit letter class (0). */
   readonly sp: number | undefined;
   readonly nextlayer?: string;
@@ -328,6 +347,12 @@ function buildCell(
     id: key.id,
     keycap: key.text ?? "",
     sp: key.sp,
+    ...(key.hint !== undefined ? { hint: key.hint } : {}),
+    // `layer ?? layerAnnotation` — the same pair, and the same precedence, the
+    // emitter and the key-edit applier both read (see `TouchKeyIR.layer`).
+    ...((key.layer ?? key.layerAnnotation) !== undefined
+      ? { layerOverride: (key.layer ?? key.layerAnnotation) as string }
+      : {}),
     ...(key.nextlayer !== undefined ? { nextlayer: key.nextlayer } : {}),
     padPct: key.pad ?? DEFAULT_KEY_PAD_PCT,
     widthPct: key.width ?? DEFAULT_KEY_WIDTH_PCT,

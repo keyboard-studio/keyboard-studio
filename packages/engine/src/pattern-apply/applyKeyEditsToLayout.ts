@@ -278,6 +278,32 @@ export function applyKeyEditsToLayout(
         break;
       }
 
+      case "move": {
+        // SPLICE THE EXISTING NODE — never construct a replacement. That is
+        // the whole of FR-021: `nodeId`, `provenance`, `sk`, `multitap`,
+        // `flick`, `width` and `pad` survive because the object identity does,
+        // so the guarantee cannot rot the next time `TouchKeyIR` grows a field.
+        // See MoveKeyOp's own doc for why remove+add cannot express this.
+        if (op.scope === "family") {
+          warnings.push(
+            `[key-edit-apply] move at "${op.address}" carries scope "family", which has no shared referent across a layer family — operation skipped`,
+          );
+          orphaned.push(op);
+          break;
+        }
+        const moved = moveKeyWithinLayer(state.workingRows, rowIndex, keyIndex, op.direction);
+        if (!moved) {
+          // At a boundary. A no-op, not a failure: the studio never emits one
+          // (FR-020 makes the control ABSENT rather than inert), and an
+          // overlay replayed against a changed layout may legitimately find
+          // the key already at the edge.
+          warnings.push(
+            `[key-edit-apply] move "${op.direction}" at "${op.address}" has no room in that direction — no change`,
+          );
+        }
+        break;
+      }
+
       case "suppress": {
         // The compound sp+id derivation is shared, exactly once, in
         // keyEditOps.ts (FR-029b) — see applySuppressSemantics's doc for why
@@ -339,14 +365,48 @@ function toEditableFields(key: TouchKeyIR): EditableKeyFields {
     sp: (key.sp ?? 0) as EditableKeyFields["sp"],
     ...(key.output !== undefined ? { output: key.output } : {}),
     ...(key.nextlayer !== undefined ? { nextlayer: key.nextlayer } : {}),
+    // Spec 061 T030 — the four newly editable fields, read from the same key
+    // they are written back onto below.
+    ...(key.hint !== undefined ? { hint: key.hint } : {}),
+    ...(key.width !== undefined ? { width: key.width } : {}),
+    ...(key.pad !== undefined ? { pad: key.pad } : {}),
+    // `layer ?? layerAnnotation` — exactly the fallback `emitTouchLayout`
+    // itself applies (parse-touch.ts: the emitter writes `layer` when present
+    // and falls back to `layerAnnotation` "for keys the editor never touched").
+    // Reading the same pair the emitter reads means an edit that leaves `layer`
+    // alone cannot silently drop an annotation the emitter would have written.
+    ...(layerOf(key) !== undefined ? { layer: layerOf(key) as string } : {}),
   };
 }
 
+/**
+ * A key's effective layer override — the authoritative editable `layer`, else
+ * the read-only `layerAnnotation` both are parsed from. See
+ * `TouchKeyIR.layer`'s own doc for why the two exist and carry the same source
+ * string.
+ */
+function layerOf(key: TouchKeyIR): string | undefined {
+  return key.layer ?? key.layerAnnotation;
+}
+
 /** Write merged editable fields back onto a `TouchKeyIR`, preserving every
- *  other field (nodeId, provenance, hint, layer, default, sk, flick,
- *  multitap, width, pad) untouched. */
+ *  other field (nodeId, provenance, default, sk, flick, multitap) untouched.
+ *
+ *  `hint`, `width`, `pad` and `layer` moved OUT of that preserved set at spec
+ *  061 T030 and into the editable set — they are now written from `fields`, and
+ *  omitted from the result when `fields` omits them, exactly as `output` and
+ *  `nextlayer` already were. */
 function mergeFieldsIntoKey(key: TouchKeyIR, fields: EditableKeyFields): TouchKeyIR {
-  const { output: _omitOutput, nextlayer: _omitNextlayer, ...rest } = key;
+  const {
+    output: _omitOutput,
+    nextlayer: _omitNextlayer,
+    hint: _omitHint,
+    width: _omitWidth,
+    pad: _omitPad,
+    layer: _omitLayer,
+    layerAnnotation: _omitLayerAnnotation,
+    ...rest
+  } = key;
   return {
     ...rest,
     id: fields.id,
@@ -354,6 +414,19 @@ function mergeFieldsIntoKey(key: TouchKeyIR, fields: EditableKeyFields): TouchKe
     sp: fields.sp,
     ...(fields.output !== undefined ? { output: fields.output } : {}),
     ...(fields.nextlayer !== undefined ? { nextlayer: fields.nextlayer } : {}),
+    ...(fields.hint !== undefined ? { hint: fields.hint } : {}),
+    ...(fields.width !== undefined ? { width: fields.width } : {}),
+    ...(fields.pad !== undefined ? { pad: fields.pad } : {}),
+    // Both, together, always. `layer` and `layerAnnotation` are populated from
+    // the SAME wire property on parse and only ever carry the same string
+    // (`TouchKeyIR.layer`'s doc), so writing one without the other would leave
+    // the in-memory IR in a state no parse could produce — and, concretely,
+    // would make this applier disagree with its raw-JSON twin the moment an
+    // author edits `layer`, since Case B writes the wire field and a re-parse
+    // then populates both. Caught by applyKeyEdits.twin.test.ts.
+    ...(fields.layer !== undefined
+      ? { layer: fields.layer, layerAnnotation: fields.layer }
+      : {}),
   };
 }
 
@@ -409,6 +482,55 @@ function writeSubKeyBack(
   return loc.collection === "sk"
     ? { ...key, sk: nextCollection }
     : { ...key, multitap: nextCollection };
+}
+
+// ---------------------------------------------------------------------------
+// `move` — spec 061 T031 (FR-020, FR-021)
+// ---------------------------------------------------------------------------
+
+/**
+ * Move the key at `(rowIndex, keyIndex)` one position in `direction`, by
+ * splicing the EXISTING node out and back in. Returns `false` — changing
+ * nothing — when the move would leave the layer.
+ *
+ * `left`/`right` swap with the neighbour inside the row. `up`/`down` transfer to
+ * the adjacent row at `min(keyIndex, targetRow.keys.length)`, so a key moving
+ * into a shorter row lands at its end rather than past it. Nothing wraps in
+ * either axis: a key at index 0 cannot move left onto the previous row's tail,
+ * and a key in the last row cannot move down to the first.
+ *
+ * An emptied source row is left in place as a row with no keys, deliberately.
+ * Removing it would renumber every row after it, invalidating the `rowIndex` of
+ * every subsequent operation in the same overlay — and an empty row is
+ * well-formed (it measures `rowTotal: 0`, renders nothing, and the author can
+ * move a key back into it).
+ *
+ * The raw-JSON twin (`applyKeyEditsToRawJson.ts`) implements the same rules over
+ * wire objects; both are pinned by `applyKeyEdits.twin.test.ts`.
+ */
+function moveKeyWithinLayer(
+  rows: Array<{ keys: TouchKeyIR[] }>,
+  rowIndex: number,
+  keyIndex: number,
+  direction: "left" | "right" | "up" | "down",
+): boolean {
+  const row = rows[rowIndex];
+  if (!row) return false;
+
+  if (direction === "left" || direction === "right") {
+    const target = direction === "left" ? keyIndex - 1 : keyIndex + 1;
+    if (target < 0 || target >= row.keys.length) return false;
+    const [node] = row.keys.splice(keyIndex, 1);
+    row.keys.splice(target, 0, node as TouchKeyIR);
+    return true;
+  }
+
+  const targetRowIndex = direction === "up" ? rowIndex - 1 : rowIndex + 1;
+  const targetRow = rows[targetRowIndex];
+  if (!targetRow) return false;
+  const [node] = row.keys.splice(keyIndex, 1);
+  targetRow.keys.splice(Math.min(keyIndex, targetRow.keys.length), 0, node as TouchKeyIR);
+  return true;
 }
 
 // ---------------------------------------------------------------------------
