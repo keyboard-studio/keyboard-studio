@@ -11,12 +11,12 @@ import {
 } from "./lib/handleOAuthCallback.ts";
 import { rehydrateWorkingCopyFromSession } from "./lib/persistWorkingCopy.ts";
 import { installE2eHook } from "./lib/e2eHook.ts";
-import { loadDraft, resolveActiveProjectKey } from "./lib/draftPersistence.ts";
+import { flushActiveDraft, loadDraft, resolveActiveProjectKey } from "./lib/draftPersistence.ts";
 import { localeReady } from "./lib/i18n.ts";
 import { warmExemplarSource } from "./lib/services.ts";
 import { installConsoleBreadcrumbs, pushBreadcrumb } from "./crash/breadcrumbs.ts";
 import { installGlobalCrashHandlers } from "./crash/globalHandlers.ts";
-import { handleStaleChunkFailure } from "./crash/staleChunk.ts";
+import { handleStaleChunkFailure, setStaleChunkReload } from "./crash/staleChunk.ts";
 import { handlePreMountCrash } from "./crash/preMount.ts";
 import { safeCollectCrashContext } from "./lib/crashCallerContext.ts";
 
@@ -26,6 +26,21 @@ import { safeCollectCrashContext } from "./lib/crashCallerContext.ts";
 // FR-002, FR-003). The console wrappers call the originals and additionally
 // push to the breadcrumb ring; they never replace console behaviour (FR-044).
 installConsoleBreadcrumbs();
+// What a stale-chunk recovery reload does, registered once for every entry
+// point into the carve-out — the window-level handlers below AND the engine
+// import sites that catch their own rejection (services.ts, useKeyboardArtifact).
+// The active draft is flushed first so in-flight work survives the reload (the
+// ~500 ms autosave may not have fired yet); a flush that throws must not cost
+// the author the reload, which is the part that actually fixes the tab.
+setStaleChunkReload(() => {
+  try {
+    flushActiveDraft();
+  } catch {
+    // Quota, disabled storage, a serialization failure — all better than a tab
+    // stranded on a chunk that no longer exists.
+  }
+  window.location.reload();
+});
 installGlobalCrashHandlers({
   readContext: safeCollectCrashContext,
   // A post-deploy chunk 404 reloads once and files nothing (FR-050). Without
