@@ -486,6 +486,39 @@ export function IdentityLite({
     [],
   );
 
+  // Soft mismatch warning for il_language_code: when the typed/selected code
+  // reverse-resolves (via langtags) to a DIFFERENT language than the one
+  // picked at il_language_english, surface a non-blocking caption so the
+  // author notices before it ships in the .kps <Language> element. Nothing
+  // else catches this — Layer A' only checks that a bcp47 tag is PRESENT
+  // (engine/src/validator/layer-a-prime.ts), never that it matches the
+  // author's actual language.
+  //
+  // Only fires when Q1 resolved to a known langtags entry (resolvedEntryRef
+  // set). Free-text Q1 (no match) has no confirmed English name to compare
+  // against, and typing an arbitrary code in that case is the field's
+  // legitimate escape hatch (spec 030 FR-003/US4-3), not a mistake to flag.
+  const getFieldWarning = useCallback(
+    (questionId: string, value: string | string[] | undefined): string | undefined => {
+      if (questionId !== "il_language_code") return undefined;
+      const selectedName = resolvedEntryRef.current?.englishName;
+      if (selectedName === undefined) return undefined;
+      const typed = typeof value === "string" ? value.trim() : "";
+      if (typed === "") return undefined;
+      const typedName = getLoadedLangtags()?.getLanguageDefaults(typed)?.englishName;
+      if (typedName === undefined) return undefined;
+      if (normalizeForCompare(typedName) === normalizeForCompare(selectedName)) return undefined;
+      return t({
+        id: "survey.identityLite.codeMismatchWarning",
+        message: `${{ code: typed }} is the code for ${{ typedName }} — not ${{ selectedName }}. You can keep it, or pick a different code.`,
+      });
+    },
+    // `t` closes over the live useLingui() binding directly (required for the
+    // lingui macro extractor to track this call site — see the note above
+    // seedFromEntry's i18nRef usage) so it must be a dependency here.
+    [t],
+  );
+
   // Dynamic datalist options (spec 030 US2, per author request). For
   // il_language_autonym the choice list comes from langtags as a FALLBACK CHAIN,
   // not a concatenation: prefer the recorded own-script names (langtags localname
@@ -611,6 +644,7 @@ export function IdentityLite({
         onAnswerCommit={handleAnswerCommit}
         getSeedValue={getSeedValue}
         getSeedProvenance={getSeedProvenance}
+        getFieldWarning={getFieldWarning}
         getSeedOptions={getSeedOptions}
         getNextOverride={getNextOverride}
         onEntryResolved={handleEntryResolved}
