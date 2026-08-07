@@ -337,8 +337,10 @@ vi.mock("../../src/editors/panels/BaseResolution.tsx", () => ({
   },
 }));
 
-vi.mock("../../src/editors/carve/CarveGallery.tsx", () => ({
-  CarveGallery: ({ onComplete, onBack }: { onComplete: () => void; onBack?: () => void }) => {
+// Mocks CarveGalleryV2 (v2, the live carve gallery) — v1's CarveGallery.tsx
+// is retained but commented out in carveAdapter.tsx for rollback.
+vi.mock("../../src/editors/carve/CarveGalleryV2.tsx", () => ({
+  CarveGalleryV2: ({ onComplete, onBack }: { onComplete: () => void; onBack?: () => void }) => {
     mockRefs.carveDone.current = onComplete;
     mockRefs.carveBack.current = onBack ?? null;
     return (

@@ -1,3 +1,8 @@
+// CarveGallery — v1, the rule/node "Rail" carve view. NO LONGER RENDERED:
+// carveAdapter.tsx renders v2 (CarveGalleryV2.tsx) unconditionally; this file
+// is retained only for rollback and its own unit tests. If you ever re-enable
+// v1, note that v2 has adopted this view's "carve-gallery"/"carve-continue"
+// e2e testids — re-enabling v1 alongside v2 would collide on them.
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { Trans, useLingui } from "@lingui/react/macro";
 import { msg, plural } from "@lingui/core/macro";
