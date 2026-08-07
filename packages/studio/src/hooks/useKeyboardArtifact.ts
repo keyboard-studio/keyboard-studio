@@ -13,7 +13,7 @@ export { LOCAL_PROXY_BASE };
 import { findKmnPath } from "../lib/findKmnPath.ts";
 import { findTouchLayoutPath } from "../lib/findTouchLayoutPath.ts";
 import { readVfsText } from "../lib/vfsText.ts";
-import { importOrReload, recoverFromStaleChunk } from "../lib/staleChunkReload.ts";
+import { recoverFromStaleChunk } from "../crash/staleChunk.ts";
 
 interface EngineModule {
   compile: (fs: VirtualFS, keyboardId: string) => Promise<CompileResult>;
@@ -95,11 +95,16 @@ export function engineLoadFailureMessage(failure: unknown): string {
   return parts.join(" | ");
 }
 
+// No `importOrReload` wrapper here, deliberately. This hook has exactly ONE
+// consumer of loadEngine() — the engineReadyPromise below — and its catch
+// already routes through `recoverFromStaleChunk`, covering the `init()` call
+// (the kmc-kmn chunk, the path this bug was reported on) as well as this
+// import. Recovering here too would mean two detections of one failure: the
+// first reloads, the second lands inside the cooldown and is counted as
+// "reloading didn't help".
 async function loadEngine(): Promise<EngineModule | null> {
   try {
-    const mod = await importOrReload(() =>
-      import(/* @vite-ignore */ "@keyboard-studio/engine"),
-    );
+    const mod = await import(/* @vite-ignore */ "@keyboard-studio/engine");
     if (
       typeof mod.compile === "function" &&
       typeof mod.fetchKeyboardSourceToVfs === "function" &&
@@ -639,6 +644,12 @@ export function useKeyboardArtifact(
       // chunk the engine (and, through it, kmc-kmn) is imported from, so the
       // load fails with a module-script/MIME error no retry in this document
       // can fix. Reload instead of stranding the preview on "VFS load failed".
+      //
+      // `err` is the friendly synthetic string above, whose `cause` is the
+      // original rejection loadEngine() preserved (FR-005a) —
+      // `recoverFromStaleChunk` walks the chain, so the classifier matches the
+      // real text rather than the wrapper. The single recovery point for both
+      // the import and `init()`; see the note above loadEngine().
       if (recoverFromStaleChunk(err)) return;
       if (runId.current !== thisRunId) return;
       const message =

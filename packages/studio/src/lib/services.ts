@@ -35,7 +35,7 @@ import {
   getPatternLibraryService as getBrowserPatternLibraryService,
   getPatternByIdSync as getBrowserPatternByIdSync,
 } from "./browserPatternLibrary.ts";
-import { importOrReload } from "./staleChunkReload.ts";
+import { importOrReload } from "../crash/staleChunk.ts";
 
 export const USE_REAL = import.meta.env.VITE_USE_REAL_ENGINE !== "false";
 
@@ -43,8 +43,8 @@ export const USE_REAL = import.meta.env.VITE_USE_REAL_ENGINE !== "false";
 // through it so (a) there is one `import()` expression for Vite to key the
 // engine chunk on, and (b) a chunk a deployment deleted under an open tab is
 // recovered by a reload instead of surfacing as an unfixable MIME/module-script
-// error on whichever accessor the author happened to reach first. See
-// lib/staleChunkReload.ts.
+// error on whichever accessor the author happened to reach first. See the
+// stale-deployment carve-out in crash/staleChunk.ts.
 type EngineModule = typeof import("@keyboard-studio/engine");
 function importEngine(): Promise<EngineModule> {
   return importOrReload(
