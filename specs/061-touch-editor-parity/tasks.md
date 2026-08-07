@@ -24,7 +24,7 @@ pass unmodified, but its standing is evidence, not a gate.
 
 **Wave 1 — single task:**
 
-- [ ] **T001** [US1] Capture the pre-change exploration baseline: drive the touch stage headed
+- [x] **T001** [US1] Capture the pre-change exploration baseline: drive the touch stage headed
   (`npx playwright test --headed`) against `sil_cameroon_qwerty` and record the current behaviour of
   each of issue #1530's six complaints, so SC-001's "demonstrably resolved" has a before to compare
   against ·
@@ -41,33 +41,33 @@ reviews cleanly on top.
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T002** [P] [US1] Make `onSelectCell`, `onKeyDown`, `onPlatformChange`, `onAddKeyAfter`,
+- [x] **T002** [P] [US1] Make `onSelectCell`, `onKeyDown`, `onPlatformChange`, `onAddKeyAfter`,
   `onOpenCommandMenu`, `onFollowNextLayer` **required** on `KeyGridProps`; delete every `?.` call
   site and `=== undefined` render guard, including the dead-button branch at the row actions
   (FR-001, FR-003) ·
   `packages/studio/src/editors/assignLoop/keyGrid/KeyGrid.tsx`
-- [ ] **T003** [P] [US1] Make `onSelectCell`, `onAddKeyAfter`, `onOpenCommandMenu`,
+- [x] **T003** [P] [US1] Make `onSelectCell`, `onAddKeyAfter`, `onOpenCommandMenu`,
   `onFollowNextLayer` **required** on `KeyGridCellProps`; re-gate the add wedge and the double-click
   follow gesture on `cell.nextlayer` / cell state rather than on handler presence (FR-001, FR-003,
   contract [key-mode-ui.md](contracts/key-mode-ui.md) §1) ·
   `packages/studio/src/editors/assignLoop/keyGrid/KeyGridCell.tsx`
-- [ ] **T004** [P] [US1] Make `onSpChange` and `onApplyFix` **required**; delete the controlled-input
+- [x] **T004** [P] [US1] Make `onSpChange` and `onApplyFix` **required**; delete the controlled-input
   guard that produces the reverting key-type radio and the `disabled` fix button (FR-001, FR-003) ·
   `packages/studio/src/editors/assignLoop/keyGrid/KeyInspector.tsx`
 
 **⟶ Wait for Wave 1 to finish, then (each test file must now supply the handlers — different files):**
 
-- [ ] **T005** [P] [US1] Supply every required handler at all mount sites (1,327 lines) ·
+- [x] **T005** [P] [US1] Supply every required handler at all mount sites (1,327 lines) ·
   `packages/studio/src/editors/assignLoop/keyGrid/KeyGrid.test.tsx`
-- [ ] **T006** [P] [US1] Supply every required handler at all mount sites ·
+- [x] **T006** [P] [US1] Supply every required handler at all mount sites ·
   `packages/studio/src/editors/assignLoop/keyGrid/KeyInspector.test.tsx`
-- [ ] **T007** [P] [US1] Supply every required handler at all mount sites (stubs are enough here —
+- [x] **T007** [P] [US1] Supply every required handler at all mount sites (stubs are enough here —
   real wiring lands at T013) ·
   `packages/studio/src/editors/assignLoop/TouchGallery.test.tsx`
 
 **⟶ Wait for Wave 2 to finish, then:**
 
-- [ ] **T008** [US1] Run `pnpm typecheck` and sweep for any remaining mount site of the three
+- [x] **T008** [US1] Run `pnpm typecheck` and sweep for any remaining mount site of the three
   components; confirm no `on*` prop on a key-mode surface is still optional ·
   `packages/studio/src/editors/assignLoop/keyGrid/`
 
@@ -86,13 +86,13 @@ assign it, remove a different key, switch to the `shift` layer, and confirm each
 
 ### Tests *(write first — these must fail before the implementation waves)*
 
-- [ ] **T009** [US1] Add the key-mode integration block: mount the real `TouchGallery` in key mode
+- [x] **T009** [US1] Add the key-mode integration block: mount the real `TouchGallery` in key mode
   against real store state and assert AS1 (the key-type radio holds and the new `sp` reaches the
   emitted artifact via `runTransform`), AS2 (a fix control is enabled and applies to the working
   copy) and AS3 (a layer switch re-renders the grid for that layer). This is the PR-lane guarantee —
   `ci.yml` has no Playwright step (FR-009, SC-003, SC-009) ·
   `packages/studio/src/editors/assignLoop/TouchGallery.test.tsx`
-- [ ] **T010** [US1] Un-skip the add/remove walk — remove `test.skip` and the header's blocker note,
+- [x] **T010** [US1] Un-skip the add/remove walk — remove `test.skip` and the header's blocker note,
   leaving every assertion **unmodified** (FR-008, US1 AS5) ·
   `packages/studio/e2e/touch-key-add-remove.spec.ts`
 
@@ -100,7 +100,7 @@ assign it, remove a different key, switch to the `shift` layer, and confirm each
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T011** [P] [US1] New layer selector: source layer ids from the platform's declared `layers[]`
+- [x] **T011** [P] [US1] New layer selector: source layer ids from the platform's declared `layers[]`
   (never any key's `nextlayer`, which is what makes "including layers no key reaches" true by
   construction); group with the engine's existing `groupLayerFamilies` + `classifyPlane` (research
   D11); roll up finding counts from the already-computed diagnostics map — no second validation pass
@@ -109,7 +109,7 @@ assign it, remove a different key, switch to the `shift` layer, and confirm each
   `key-layer-selector-count-${layerId}` (FR-004, FR-005) ·
   `packages/studio/src/editors/assignLoop/keyGrid/LayerSelector.tsx`,
   `packages/studio/src/editors/assignLoop/keyGrid/LayerSelector.test.tsx`
-- [ ] **T012** [P] [US1] Remove the "Fill row" and "Even out row" controls, their props
+- [x] **T012** [P] [US1] Remove the "Fill row" and "Even out row" controls, their props
   (`onFillRow`, `onEvenOutRow`) and their test ids `key-grid-fill-row-${rowIndex}` /
   `key-grid-even-out-row-${rowIndex}`; drop the matching assertions. `key-grid-row-actions-${rowIndex}`
   **stays** — FR-038 forbids regressing spec 058 SC-009's accessibility fix (FR-007, ADR 0002) ·
@@ -118,16 +118,16 @@ assign it, remove a different key, switch to the `shift` layer, and confirm each
 
 **⟶ Wait for Wave 1 to finish, then (T013→T015 all edit `TouchGallery.tsx` — run in order, one wave each):**
 
-- [ ] **T013** [US1] Supply every required handler (`onSpChange`, `onApplyFix`, `onAddKeyAfter`,
+- [x] **T013** [US1] Supply every required handler (`onSpChange`, `onApplyFix`, `onAddKeyAfter`,
   `onOpenCommandMenu`, `onFollowNextLayer`) and mount the seven components that were built,
   unit-tested and never mounted: `useKeyCommands`, `KeyGridCommandMenu`, `RemoveKeyDialog`,
   `RenameDialog`, `FamilyApplyDialog`, `FindPanel`, `useModeContextCarry` (FR-002) ·
   `packages/studio/src/editors/assignLoop/TouchGallery.tsx`
-- [ ] **T014** [US1] Mount `LayerSelector`, give the control-less `activeKeyLayerId` state its
+- [x] **T014** [US1] Mount `LayerSelector`, give the control-less `activeKeyLayerId` state its
   control, and make following a key's next-layer set the selector to that layer — keeping the
   existing repair effect (FR-004, FR-006) ·
   `packages/studio/src/editors/assignLoop/TouchGallery.tsx`
-- [ ] **T015** [US1] Add the two test ids the un-skip recipe pins **verbatim**:
+- [x] **T015** [US1] Add the two test ids the un-skip recipe pins **verbatim**:
   `touch-key-mode-add-key`, which must act on the **focused** `[role="gridcell"]` without a prior
   click, and `touch-key-mode-remove-key`, which must be reachable while a cell holds focus and open
   `remove-key-dialog` (FR-008, contract [key-mode-ui.md](contracts/key-mode-ui.md) §3) ·
