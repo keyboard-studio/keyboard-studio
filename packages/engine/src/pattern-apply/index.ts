@@ -104,6 +104,19 @@ export {
 } from "./touchKeyAddress.js";
 export type { TouchKeyAddressParts } from "./touchKeyAddress.js";
 
+// Row geometry + the one keys-per-row threshold table (spec 061 T019). A shim
+// over contracts — see rowMetrics.ts for why the definitions cannot live in
+// engine.
+export {
+  DEFAULT_KEY_WIDTH_PCT,
+  DEFAULT_KEY_PAD_PCT,
+  PLATFORM_MAX_KEYS_PER_ROW,
+  platformMaxKeysPerRow,
+  countInteractiveRowKeys,
+  computeRowMetrics,
+} from "./rowMetrics.js";
+export type { RowMetricKey, RowMetrics } from "./rowMetrics.js";
+
 export { enumerateTouchMethodsForChar } from "./enumerateTouchMethodsForChar.js";
 export type { TouchMethodDescriptor } from "./enumerateTouchMethodsForChar.js";
 
@@ -277,6 +290,7 @@ export {
   computeTouchKeyDiagnostics,
   groupTouchKeyFindingsByAddress,
   touchKeyFindingScope,
+  findCrowdedTouchRows,
   findDeadTouchKeys,
   findDuplicateTouchKeyIds,
   findHalfDoneSuppressions,
@@ -296,6 +310,7 @@ export type {
   TouchKeyFindingScope,
   TouchKeyFinding,
   TouchKeyFix,
+  TrimRowFix,
   AddRequiredKeysFix,
   AddRuleFix,
   ClearSpecialLabelFix,

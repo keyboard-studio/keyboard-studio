@@ -175,6 +175,14 @@ function findingTitleDescriptor(finding: TouchKeyFinding): MessageDescriptor {
         id: "editor.assignLoop.keyGrid.finding.mixedSuppressRemove.title",
         message: `Layer "${{ layerId: fieldText(finding, "layerId") }}" mixes hidden keys and deleted keys`,
       });
+    case "TOUCH_KEY_ROW_CROWDED":
+      // Row numbers are 1-based for the author: `fields.rowIndex` is the
+      // 0-based array index every other consumer wants, and the grid's own
+      // `aria-rowindex` is likewise +1 (KeyGrid.tsx).
+      return msg({
+        id: "editor.assignLoop.keyGrid.finding.rowCrowded.title",
+        message: `Row ${{ rowNumber: Number(finding.fields.rowIndex ?? 0) + 1 }} has ${{ interactiveKeyCount: fieldText(finding, "interactiveKeyCount") }} keys, more than ${{ platform: fieldText(finding, "platform") }} fits comfortably`,
+      });
     default: {
       // Exhaustiveness guard — see the module doc. A new code without copy is a
       // compile error here, not a raw identifier rendered at an author.
@@ -287,6 +295,14 @@ function findingDetailDescriptor(finding: TouchKeyFinding): MessageDescriptor | 
         message:
           "Hiding a key keeps its space; deleting one closes the gap. Doing both on one layer usually leaves the spacing looking accidental.",
       });
+    case "TOUCH_KEY_ROW_CROWDED":
+      // Says plainly that nothing is blocked (FR-014). A warning the author
+      // cannot act on, and does not have to, should say so rather than leave
+      // them looking for the thing they broke.
+      return msg({
+        id: "editor.assignLoop.keyGrid.finding.rowCrowded.detail",
+        message: `Past about ${{ platformMaxKeys: fieldText(finding, "platformMaxKeys") }} keys in a row, each key gets too narrow to hit reliably on a small screen. You can leave it this way — nothing here is blocked.`,
+      });
     default:
       return undefined;
   }
@@ -372,6 +388,11 @@ function fixLabelDescriptor(fix: TouchKeyFix): MessageDescriptor {
             id: "editor.assignLoop.keyGrid.fix.setSp.inactive",
             message: "Draw it as inactive on this layer",
           });
+    case "trimRow":
+      return msg({
+        id: "editor.assignLoop.keyGrid.fix.trimRow",
+        message: `Show me this row so I can remove ${{ overBy: fix.overBy }}`,
+      });
     case "reviewKey":
       return msg({
         id: "editor.assignLoop.keyGrid.fix.reviewKey",

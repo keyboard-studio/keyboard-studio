@@ -17,6 +17,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { useLayoutEffect, useRef, useState } from "react";
 import { cleanup, fireEvent, render as rtlRender, renderHook, screen } from "@testing-library/react";
 import { render as renderWithI18n } from "../../../test/renderWithI18n.tsx";
+import { computeRowMetrics } from "@keyboard-studio/engine";
 import { KeyGrid } from "./KeyGrid.tsx";
 import {
   applyFocusRestorationTarget,
@@ -79,13 +80,32 @@ function makeCell(overrides: Partial<KeyGridCellViewModel> & { id: string }): Ke
     producedChars: overrides.producedChars ?? [],
     annotations: overrides.annotations ?? EMPTY_ANNOTATIONS,
     findings: overrides.findings ?? [],
+    // Defaults false; `makeRow` stamps the real value on the row's last cell
+    // (spec 061 T024), so a test never hand-maintains it.
+    isLastInRow: overrides.isLastInRow ?? false,
     ...(overrides.nextlayer !== undefined ? { nextlayer: overrides.nextlayer } : {}),
     ...(overrides.provenance !== undefined ? { provenance: overrides.provenance } : {}),
   };
 }
 
+/**
+ * A row view model with `isLastInRow` and `metrics` derived rather than passed
+ * (spec 061 T024). Stamped in place, matching KeyGrid.test.tsx's own helper —
+ * these are freshly-built local fixtures, and copying would hand the component
+ * a different object than the test holds.
+ */
 function makeRow(keys: readonly KeyGridCellViewModel[], slackPct = 0): KeyGridRowViewModel {
-  return { slackPct, keys };
+  keys.forEach((key, i) => {
+    (key as { isLastInRow: boolean }).isLastInRow = i === keys.length - 1;
+  });
+  return {
+    slackPct,
+    metrics: computeRowMetrics(
+      keys.map((k) => ({ sp: k.sp, width: k.widthPct, pad: k.padPct })),
+      "phone",
+    ),
+    keys,
+  };
 }
 
 function makeViewModel(

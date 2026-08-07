@@ -118,6 +118,7 @@ import {
   resolveSubKeyEntry,
 } from "./keyEditOps.js";
 import { parseTouchKeyAddress } from "./touchKeyAddress.js";
+import { DEFAULT_KEY_PAD_PCT, DEFAULT_KEY_WIDTH_PCT } from "./rowMetrics.js";
 import {
   isRawLayer,
   isRawPlatform,
@@ -259,6 +260,25 @@ function writeEditableFields(target: EditableRawTarget, fields: EditableKeyField
 function newRawKeyFromSpec(spec: EditableKeyFields): RawKey {
   const key: RawKey = { id: spec.id, text: spec.text };
   key["sp"] = spec.sp;
+  // The standard default geometry, written EXPLICITLY (spec 061 T021, FR-016).
+  //
+  // `NewKeySpec` is `EditableKeyFields`, which carries no width or pad, so
+  // there is nothing to inherit and nothing to honour — "regardless of what the
+  // spec carries" is a statement about what this applier must NOT do instead:
+  // it must not split the anchor key's width between the anchor and the new
+  // key, and it must not renormalize the row so the totals stay put. Both were
+  // plausible readings of "add a key without disturbing the layout", and both
+  // are wrong: FR-016 wants the new key at the standard default and the row
+  // legitimately wider, which is exactly what makes FR-014's "allow more keys,
+  // but complain" a coherent pair.
+  //
+  // Materialized rather than left absent for the same reason `provenance` is in
+  // the IR twin: an absent width renders at the default via the view model, so
+  // the two paths agree on screen either way — but only an explicit value
+  // survives into the emitted artifact, where the author (or Keyman Developer)
+  // reads geometry with no view model in the loop.
+  key["width"] = DEFAULT_KEY_WIDTH_PCT;
+  key["pad"] = DEFAULT_KEY_PAD_PCT;
   if (spec.output !== undefined) key.output = spec.output;
   if (spec.nextlayer !== undefined) key.nextlayer = spec.nextlayer;
   return key;

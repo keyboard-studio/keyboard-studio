@@ -8,6 +8,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import type { ComponentProps } from "react";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { render } from "../../../test/renderWithI18n.tsx";
+import { computeRowMetrics } from "@keyboard-studio/engine";
 import {
   KeyGrid,
   logicalRowStart,
@@ -87,6 +88,9 @@ function makeCell(
     producedChars: overrides.producedChars ?? [],
     annotations: overrides.annotations ?? EMPTY_ANNOTATIONS,
     findings: overrides.findings ?? [],
+    // Defaults false; `makeRow` stamps the real value on the row's last cell,
+    // so a test never has to hand-maintain it (spec 061 T024).
+    isLastInRow: overrides.isLastInRow ?? false,
     ...(overrides.nextlayer !== undefined
       ? { nextlayer: overrides.nextlayer }
       : {}),
@@ -96,11 +100,32 @@ function makeCell(
   };
 }
 
+/**
+ * A row view model, with `isLastInRow` and `metrics` derived rather than passed
+ * (spec 061 T024) — so every existing call site keeps its two-argument shape and
+ * the derived fields cannot go stale against the cells they describe.
+ */
 function makeRow(
   keys: readonly KeyGridCellViewModel[],
   slackPct = 0,
+  platform = "phone",
 ): KeyGridRowViewModel {
-  return { slackPct, keys };
+  // Stamped IN PLACE rather than onto copies: several tests assert that a
+  // callback received *the same cell object* they built (`toHaveBeenCalledWith`
+  // is a deep compare, but `onOpenCommandMenu`'s case is an identity one), and
+  // copying here would hand KeyGrid a different object than the test holds.
+  // These are freshly-built local fixtures, so mutating them is safe.
+  keys.forEach((key, i) => {
+    (key as { isLastInRow: boolean }).isLastInRow = i === keys.length - 1;
+  });
+  return {
+    slackPct,
+    metrics: computeRowMetrics(
+      keys.map((k) => ({ sp: k.sp, width: k.widthPct, pad: k.padPct })),
+      platform,
+    ),
+    keys,
+  };
 }
 
 function makeViewModel(
@@ -428,28 +453,52 @@ describe("KeyGrid — proportional geometry from padPct/widthPct (FR-022)", () =
     expect(parseFloat(cell2.style.flexBasis)).toBeCloseTo((50 / 165) * 100, 5);
   });
 
-  it("renders a row's slack as a visible trailing spacer sized relative to the layer's widest row (FR-039)", () => {
+  it("stretches the LAST key of an under-full row to the layer maximum, and renders no slack spacer at all (spec 061 T026, FR-012)", () => {
     // Row A: (15+100) = 115 total. Row B: (15+35) = 50 total -> slack 65.
     // Layer max = 115 (row A, which has slackPct 0 itself).
-    const rowA = makeRow(
-      [makeCell({ id: "A1", padPct: 15, widthPct: 100 })],
-      0,
-    );
-    const rowB = makeRow(
-      [makeCell({ id: "B1", padPct: 15, widthPct: 35 })],
-      65,
-    );
+    const rowA = makeRow([makeCell({ id: "A1", padPct: 15, widthPct: 100 })], 0);
+    const rowB = makeRow([makeCell({ id: "B1", padPct: 15, widthPct: 35 })], 65);
     const vm = makeViewModel([rowA, rowB]);
 
     render(
       <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
-    // Row A has no slack — no slack spacer rendered.
+    // The hatch is gone in both directions — ADR 0002 withdrew it outright.
     expect(screen.queryByTestId("key-grid-row-slack-0")).toBeNull();
+    expect(screen.queryByTestId("key-grid-row-slack-1")).toBeNull();
 
-    const slackB = screen.getByTestId("key-grid-row-slack-1");
-    expect(parseFloat(slackB.style.flexBasis)).toBeCloseTo((65 / 115) * 100, 5);
+    // B1 is its row's last key, so it renders at its own width PLUS the row's
+    // slack: (35 + 65) / 115. That is exactly what KeymanWeb draws.
+    const cells = keyCells();
+    expect(parseFloat(cells[1]!.style.flexBasis)).toBeCloseTo((100 / 115) * 100, 5);
+    // A1 is already at the layer maximum, so it is unchanged by the rule.
+    expect(parseFloat(cells[0]!.style.flexBasis)).toBeCloseTo((100 / 115) * 100, 5);
+  });
+
+  it("stretches only the last key, leaving earlier keys at their declared width (FR-012, FR-015)", () => {
+    const row = makeRow(
+      [
+        makeCell({ id: "K1", padPct: 0, widthPct: 40 }),
+        makeCell({ id: "K2", padPct: 0, widthPct: 40 }),
+      ],
+      20,
+    );
+    const vm = makeViewModel([row]);
+
+    render(
+      <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
+    );
+
+    // Layer max = 40 + 40 + 20 slack = 100.
+    const cells = keyCells();
+    expect(parseFloat(cells[0]!.style.flexBasis)).toBeCloseTo(40, 5);
+    expect(parseFloat(cells[1]!.style.flexBasis)).toBeCloseTo(60, 5);
+    // Together with the (zero) padding, the row now fills the layer exactly —
+    // "nothing clipped", the rendering half of FR-017.
+    expect(
+      parseFloat(cells[0]!.style.flexBasis) + parseFloat(cells[1]!.style.flexBasis),
+    ).toBeCloseTo(100, 5);
   });
 
   it("treats geometry as read-only — no interactive resize/drag affordance is rendered on a cell or spacer", () => {
@@ -472,7 +521,7 @@ describe("KeyGrid — proportional geometry from padPct/widthPct (FR-022)", () =
 });
 
 describe("KeyGrid — row slack (FR-039) and the retained row-actions strip (spec 061 T012, FR-007, FR-038, ADR 0002)", () => {
-  it("never prints the slack as a number — the slack spacer carries no text content, only a hatch fill", () => {
+  it("prints the row's measurements plainly, where the hatch used to gesture at them (spec 061 T026, FR-013)", () => {
     const rowA = makeRow([makeCell({ id: "A1", padPct: 15, widthPct: 100 })], 0);
     const rowB = makeRow([makeCell({ id: "B1", padPct: 15, widthPct: 35 })], 65);
     const vm = makeViewModel([rowA, rowB]);
@@ -481,9 +530,15 @@ describe("KeyGrid — row slack (FR-039) and the retained row-actions strip (spe
       <KeyGrid {...requiredKeyGridHandlers()} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />,
     );
 
-    const slackB = screen.getByTestId("key-grid-row-slack-1");
-    expect(slackB.textContent).toBe("");
-    expect(slackB.style.backgroundImage).toContain("repeating-linear-gradient");
+    // The hatch carried no digits, deliberately. Its replacement is all digits.
+    const readoutB = screen.getByTestId("key-grid-row-metrics-1");
+    expect(readoutB.textContent ?? "").toContain("1 keys");
+    expect(readoutB.textContent ?? "").toContain("35 declared width");
+    expect(readoutB.textContent ?? "").toContain("15 padding");
+    expect(readoutB.textContent ?? "").toContain("50 total");
+    // One readout per layout row, no more.
+    expect(screen.getByTestId("key-grid-row-metrics-0")).toBeTruthy();
+    expect(screen.queryByTestId("key-grid-row-metrics-2")).toBeNull();
   });
 
   // "Fill row" / "Even out row" were withdrawn by FR-007/ADR 0002 — once the

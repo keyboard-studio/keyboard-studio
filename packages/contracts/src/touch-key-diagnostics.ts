@@ -57,7 +57,7 @@
  * | `TOUCH_KEY_LAYER_SWITCH_ACTIVE_MISMATCH` | — (FR-029d) | engine `touchKeyDiagnostics.ts` (T102) |
  * | `TOUCH_KEY_HALF_DONE_SUPPRESSION` | — (FR-029c) | engine `touchKeyDiagnostics.ts` (T101) |
  *
- * Two further codes ride along. They are **not** part of FR-040's nine, and
+ * Three further codes ride along. They are **not** part of FR-040's nine, and
  * SC-007's count should not be read as including them:
  *
  * - `TOUCH_KEY_ID_CASE` — the latent case asymmetry the spec's Edge Cases list
@@ -67,6 +67,11 @@
  * - `TOUCH_KEY_MIXED_SUPPRESS_REMOVE` — FR-029h / US4 AS8, shipped in Phase 8
  *   (T103). Retained verbatim; its detector stays in engine because it reads
  *   the overlay rather than a layout.
+ * - `TOUCH_KEY_ROW_CROWDED` — spec 061 FR-014, the edit-time face of Layer C's
+ *   check 18.3. Unlike every code above it, its Layer C sibling was already
+ *   shipped and calibrated; what spec 061 adds is the edit-time report and,
+ *   more importantly, a single shared threshold table ([row-metrics.ts](./row-metrics.ts))
+ *   so the two surfaces cannot disagree about what "too many" means.
  *
  * ## Severity: three values, only two of them reachable
  *
@@ -105,6 +110,7 @@ import {
   isSpacerKeyClass,
 } from "./touch-coverage";
 import { touchKeyAddress } from "./touch-key-address";
+import { computeRowMetrics } from "./row-metrics";
 
 // ---------------------------------------------------------------------------
 // Severity and codes
@@ -150,7 +156,19 @@ export type TouchKeyFindingCode =
   /** Edge Cases: layout and rule spell one id with different case. A hint — nothing is broken here. */
   | "TOUCH_KEY_ID_CASE"
   /** FR-029h / US4 AS8: one layer's committed edits mix `suppress` and `remove`. */
-  | "TOUCH_KEY_MIXED_SUPPRESS_REMOVE";
+  | "TOUCH_KEY_MIXED_SUPPRESS_REMOVE"
+  /**
+   * Spec 061 FR-014: a row carrying more interactive keys than its platform's
+   * maximum. A third rider, and the first code here whose Layer C sibling
+   * (`KM_WARN_TOUCH_KEYS_PER_ROW`, check 18.3) predates it — the two now read
+   * their thresholds from one table (`row-metrics.ts`).
+   *
+   * Non-blocking by construction: `warning` severity, and nothing in the edit
+   * path consults it before committing. FR-014's operative clause is that
+   * exceeding the maximum "MUST NOT be prevented" — the author is told, and the
+   * edit succeeds.
+   */
+  | "TOUCH_KEY_ROW_CROWDED";
 
 /**
  * What a finding's {@link TouchKeyFinding.address} names. Absent means
@@ -307,6 +325,22 @@ export interface ReviewKeyFix {
 }
 
 /**
+ * Bring a crowded row back under its platform maximum (spec 061 FR-014).
+ *
+ * A descriptor, not a mutation: WHICH `overBy` keys to drop is a question only
+ * the author can answer — the same reasoning {@link ReviewKeyFix} rests on —
+ * so acting on this opens the row for editing rather than deleting anything.
+ * `rowIndex` is carried because this fix's subject is a row, and a
+ * `touchKeyAddress` names only platform + layer + key.
+ */
+export interface TrimRowFix {
+  readonly kind: "trimRow";
+  readonly address: string;
+  readonly rowIndex: number;
+  readonly overBy: number;
+}
+
+/**
  * One offered remedy. Every member carries `address` so the studio can act on a
  * fix without re-deriving where it applies.
  */
@@ -321,6 +355,7 @@ export type TouchKeyFix =
   | MarkAsFrameKeyFix
   | CompleteSuppressionFix
   | SetLayerSwitchSpFix
+  | TrimRowFix
   | ReviewKeyFix;
 
 // ---------------------------------------------------------------------------
@@ -1373,6 +1408,79 @@ export function findLayerSwitchActiveMismatches(
 }
 
 // ---------------------------------------------------------------------------
+// TOUCH_KEY_ROW_CROWDED — spec 061 FR-014. Layer C sibling: check 18.3.
+// ---------------------------------------------------------------------------
+
+/**
+ * A row carrying more interactive keys than its platform allows.
+ *
+ * **This detector owns no thresholds.** The maximum, the interactive-key
+ * predicate and the geometry totals all come from
+ * [row-metrics.ts](./row-metrics.ts), which is also what
+ * `keyboard-lint`'s `check-18-3-keys-per-row.ts` and the studio's remove-key
+ * proposal now read. That is the whole point of research D6: before spec 061 the
+ * phone-10 / tablet-13 pair was written out in two places with a comment asking
+ * a future reader to keep them in sync, and this would have been the third.
+ *
+ * `scope: "layer"` because a row is not a key: the finding is about a
+ * *quantity* of keys, and no single cell is at fault. Its `address` anchors to
+ * the row's first key so the studio can still resolve the finding to a place on
+ * the grid, and `fields.rowIndex` is what the row-level readout actually keys
+ * on. A row with no keys at all cannot be crowded, so the anchor always exists
+ * wherever this fires.
+ *
+ * Severity is `warning` and nothing gates on it — FR-014 requires that going
+ * over the maximum be *reported*, never *prevented*. An author deliberately
+ * building a dense row on a large phone gets told once and is left alone.
+ *
+ * Unruled platforms (`desktop`) produce nothing, because
+ * {@link computeRowMetrics} omits `overMaximumBy` for them — the emptiness is a
+ * property of the shared table, not a second exemption stated here.
+ */
+export function findCrowdedTouchRows(
+  layout: TouchLayoutIR,
+): readonly TouchKeyFinding[] {
+  const findings: TouchKeyFinding[] = [];
+
+  for (const platform of layout.platforms) {
+    for (const layer of platform.layers) {
+      layer.rows.forEach((row, rowIndex) => {
+        const metrics = computeRowMetrics(row.keys, platform.id);
+        if (metrics.overMaximumBy === undefined) return;
+
+        const anchor = row.keys[0];
+        if (anchor === undefined) return;
+        const address = touchKeyAddress(platform.id, layer.id, anchor.id);
+
+        findings.push({
+          code: "TOUCH_KEY_ROW_CROWDED",
+          severity: "warning",
+          address,
+          scope: "layer",
+          fields: {
+            platform: platform.id,
+            layerId: layer.id,
+            rowIndex,
+            interactiveKeyCount: metrics.interactiveKeyCount,
+            platformMaxKeys: metrics.platformMaxKeys,
+          },
+          fixes: [
+            {
+              kind: "trimRow",
+              address,
+              rowIndex,
+              overBy: metrics.overMaximumBy,
+            },
+          ],
+        });
+      });
+    }
+  }
+
+  return findings;
+}
+
+// ---------------------------------------------------------------------------
 // The aggregator
 // ---------------------------------------------------------------------------
 
@@ -1404,6 +1512,7 @@ export function computeTouchKeyDiagnostics(
     ...findLayerSwitchActiveMismatches(layout),
     ...findHalfDoneSuppressions(layout, ruleIndex),
     ...findTouchKeyIdCaseMismatches({ layout, ruleIndex }),
+    ...findCrowdedTouchRows(layout),
   ];
 }
 

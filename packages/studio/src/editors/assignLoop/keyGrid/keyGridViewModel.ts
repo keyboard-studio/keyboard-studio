@@ -121,7 +121,13 @@ import {
   type TouchKeyRuleIndex,
   type TouchLayoutIR,
 } from "@keyboard-studio/contracts";
-import { touchKeyAddress } from "@keyboard-studio/engine";
+import {
+  DEFAULT_KEY_PAD_PCT,
+  DEFAULT_KEY_WIDTH_PCT,
+  computeRowMetrics,
+  touchKeyAddress,
+  type RowMetrics,
+} from "@keyboard-studio/engine";
 
 // ---------------------------------------------------------------------------
 // Geometry — the 100-unit model (FR-022, FR-030's sibling spec text: "the
@@ -129,11 +135,19 @@ import { touchKeyAddress } from "@keyboard-studio/engine";
 // polyfill's own `ActiveKeyBase.DEFAULT_PAD` constant).
 // ---------------------------------------------------------------------------
 
-/** Default key width (percent-like units) when `TouchKeyIR.width` is absent. */
-export const DEFAULT_KEY_WIDTH_PCT = 100;
-
-/** Default left padding (percent-like units) when `TouchKeyIR.pad` is absent. */
-export const DEFAULT_KEY_PAD_PCT = 15;
+/**
+ * The 100-unit model's geometry defaults.
+ *
+ * Declared here originally; the definitions moved to contracts' `row-metrics.ts`
+ * at spec 061 T019 so the engine-side appliers could write the same numbers a
+ * newly added key is measured against (T021 — an applier cannot import the
+ * studio). Re-exported under the same names, so every existing import site of
+ * this module is unchanged.
+ */
+export {
+  DEFAULT_KEY_WIDTH_PCT,
+  DEFAULT_KEY_PAD_PCT,
+} from "@keyboard-studio/engine";
 
 // ---------------------------------------------------------------------------
 // Annotations (longpress / multitap / flick counts)
@@ -186,6 +200,16 @@ export interface KeyGridCellViewModel {
   readonly provenance?: TouchKeyProvenance;
   /** Looked up from `findingsByAddress`; `[]` when the map has no entry. */
   readonly findings: readonly TouchKeyFinding[];
+  /**
+   * True for the last key of its row (spec 061 T024, FR-012).
+   *
+   * The renderer stretches exactly this key to the layer maximum, matching
+   * KeymanWeb's own last-key-fills-the-row rule. It is on the CELL rather than
+   * derived from the index at the render site so the rule is stated once, where
+   * the row is assembled, instead of re-derived by every consumer that draws or
+   * measures a cell.
+   */
+  readonly isLastInRow: boolean;
 }
 
 export interface KeyGridRowViewModel {
@@ -195,15 +219,35 @@ export interface KeyGridRowViewModel {
    * row in the same layer (mirroring the vendored KMW polyfill's own
    * `totalWidth`-is-the-widest-row-in-the-layer convention, spec.md §"Where
    * Developer's model is authoritative … the rule that the last key in a row
-   * stretches to fill the remainder" — this field is the same gap KMW's
-   * renderer silently absorbs into that stretch; FR-039 wants it rendered
-   * visibly instead). A single-row layer, or a layer whose rows are all the
-   * same total width, has `slackPct === 0` for every row. Not clamped: an
-   * over-full row (rare, author-authored) reports a value of 0 here only
-   * because it — by definition — IS the layer max; it never goes negative
+   * stretches to fill the remainder"). A single-row layer, or a layer whose
+   * rows are all the same total width, has `slackPct === 0` for every row. Not
+   * clamped: an over-full row (rare, author-authored) reports a value of 0 here
+   * only because it — by definition — IS the layer max; it never goes negative
    * for the max row, and no other row can exceed the max by construction.
+   *
+   * **Repointed at spec 061 T024 (FR-012, research D5, ADR 0002).** This used
+   * to be a RENDERING input: spec 058's grid drew the gap as a visible diagonal
+   * hatch, deliberately declining to absorb it. FR-012 withdraws that reading —
+   * the last key of every row now stretches by exactly this much, which is what
+   * KeymanWeb does and therefore what the author's keyboard will actually look
+   * like. The field is unchanged and still means the same gap; what changed is
+   * that its consumer is the STRETCH rather than the hatch, and the hatch is
+   * gone. It also remains the input to the "declared vs rendered width"
+   * distinction FR-015 asks be stated to the author.
    */
   readonly slackPct: number;
+  /**
+   * What this row measures, from DECLARED widths (spec 061 T024, FR-013,
+   * FR-015) — computed by the shared `computeRowMetrics`, so the figures the
+   * readout prints are the same ones `TOUCH_KEY_ROW_CROWDED` fires on and the
+   * same ones Layer C's check 18.3 counts. `overMaximumBy` present means this
+   * row is over its platform's maximum.
+   *
+   * Declared, never rendered: the last key renders wider than it is declared
+   * (see `slackPct`), and a readout quoting the rendered figure would make the
+   * author's own numbers look wrong.
+   */
+  readonly metrics: RowMetrics;
   readonly keys: readonly KeyGridCellViewModel[];
 }
 
@@ -275,9 +319,11 @@ function buildCell(
   layerId: string,
   ruleIndex: TouchKeyRuleIndex,
   findingsByAddress: ReadonlyMap<string, readonly TouchKeyFinding[]>,
+  isLastInRow: boolean,
 ): KeyGridCellViewModel {
   const address = touchKeyAddress(platform, layerId, key.id);
   return {
+    isLastInRow,
     address,
     id: key.id,
     keycap: key.text ?? "",
@@ -331,13 +377,27 @@ export function buildKeyGridViewModel(
   if (!layerEntry) return undefined;
 
   const rowKeys = layerEntry.rows.map((row) =>
-    row.keys.map((key) => buildCell(key, platform, layerId, ruleIndex, findingsByAddress)),
+    row.keys.map((key, keyIndex) =>
+      buildCell(
+        key,
+        platform,
+        layerId,
+        ruleIndex,
+        findingsByAddress,
+        keyIndex === row.keys.length - 1,
+      ),
+    ),
   );
   const rowTotals = rowKeys.map(rowTotalPct);
   const layerMax = rowTotals.length > 0 ? Math.max(...rowTotals) : 0;
 
+  // Measured from the LAYOUT's keys, not from the cells built above: the cells
+  // have already defaulted `width`/`pad`, and `computeRowMetrics` applies the
+  // same defaults itself. Passing the layout keys keeps one defaulting step in
+  // the pipeline rather than two that agree.
   const rows: KeyGridRowViewModel[] = rowKeys.map((keys, i) => ({
     slackPct: layerMax - (rowTotals[i] ?? 0),
+    metrics: computeRowMetrics(layerEntry.rows[i]?.keys ?? [], platform),
     keys,
   }));
 

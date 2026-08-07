@@ -89,6 +89,7 @@ import {
   type SubKeyLocation,
 } from "./keyEditOps.js";
 import { parseTouchKeyAddress } from "./touchKeyAddress.js";
+import { DEFAULT_KEY_PAD_PCT, DEFAULT_KEY_WIDTH_PCT } from "./rowMetrics.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -253,6 +254,14 @@ export function applyKeyEditsToLayout(
           provenance: DEFAULT_TOUCH_PROVENANCE,
           text: op.key.text,
           sp: op.key.sp,
+          // The standard default geometry, written explicitly (spec 061 T021,
+          // FR-016) — see the Case B twin's own comment in
+          // applyKeyEditsToRawJson.ts's `newRawKeyFromSpec` for why "regardless
+          // of what the spec carries" is a constraint on what this must NOT do
+          // (split the anchor's width, renormalize the row) rather than a value
+          // to honour, and why the value is materialized instead of left absent.
+          width: DEFAULT_KEY_WIDTH_PCT,
+          pad: DEFAULT_KEY_PAD_PCT,
           ...(op.key.output !== undefined ? { output: op.key.output } : {}),
           ...(op.key.nextlayer !== undefined ? { nextlayer: op.key.nextlayer } : {}),
         };

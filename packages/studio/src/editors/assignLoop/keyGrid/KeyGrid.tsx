@@ -28,27 +28,35 @@
 // A layout of several hundred keys therefore still produces exactly one Tab
 // stop, not several hundred.
 //
-// ## Row slack, and the row-actions strip (spec 061 T012, FR-007, FR-012, ADR 0002)
+// ## Row slack, and the row-actions strip (spec 061 T012/T026, FR-007, FR-012,
+// FR-013, ADR 0002)
 //
-// `KeyGridRowViewModel.slackPct` (keyGridViewModel.ts) still renders as the
-// trailing hatch spacer (`key-grid-row-slack-<rowIndex>`) this phase — a
-// diagonal hatch (`repeating-linear-gradient`) rather than a bare border, so
-// it reads as "reserved/unused space" at a glance and degrades sanely at any
-// width. It stays `aria-hidden` and purely decorative, and carries no
-// digits. FR-012 (rendering the last key of the row stretched, removing this
-// hatch entirely) is US2/T026 work, out of this task's scope.
+// `KeyGridRowViewModel.slackPct` (keyGridViewModel.ts) is the gap between a row
+// and the widest row in its layer. Spec 058 drew that gap as a decorative
+// trailing hatch (`key-grid-row-slack-<rowIndex>`), deliberately declining to
+// absorb it. **FR-012 withdrew that reading.** The hatch and its test id are
+// gone; the slack is now added to the LAST key of the row, which is what
+// KeymanWeb's own renderer does and therefore what the author's keyboard will
+// actually look like. Every row consequently ends flush at the layer maximum.
+//
+// The last key is identified by `KeyGridCellViewModel.isLastInRow`, not by an
+// index comparison here — the rule is stated once, where the row is assembled.
+//
+// This makes a key's RENDERED width differ from its DECLARED one for the last
+// key of every under-full row. That divergence is FR-015's subject, not a bug:
+// the declared width is a minimum, and both the row metrics readout and the key
+// property panel quote the declared figure and say that it is declared.
 //
 // The "Fill row" / "Even out row" buttons that used to sit beside the hatch
-// are gone (FR-007, ADR 0002: once the last key stretches to fill a row,
+// are gone too (FR-007, ADR 0002: once the last key stretches to fill a row,
 // there is no slack left for either control to redistribute). What remains
 // is the **row-actions strip** itself
 // (`key-grid-row-actions-<rowIndex>`) — kept, per FR-038, because removing it
 // would regress spec 058 SC-009's accessibility fix (see "Why this strip
-// carries `role=\"row\"` + an inner `role=\"gridcell\"`" below) and because
-// spec 061's later T026 mounts a per-row metrics readout inside it. It now
-// renders **unconditionally**, once per layout row, with its `role="gridcell"`
-// left empty — an empty flex container costs no visible height or border, so
-// this is a placeholder seam, not a UI regression.
+// carries `role=\"row\"` + an inner `role=\"gridcell\"`" below). It renders
+// **unconditionally**, once per layout row, and its `role="gridcell"` now holds
+// `RowMetricsReadout` (T026): the four printed per-row figures and the
+// non-blocking crowding complaint that replaced the hatch's silent gesture.
 //
 // ## Seams for T065-T071 — do not re-implement any of this here
 //
@@ -164,6 +172,7 @@ import {
 } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { KeyGridCell } from "./KeyGridCell.tsx";
+import { RowMetricsReadout } from "./RowMetricsReadout.tsx";
 import { findingAnnouncement } from "./findingCopy.ts";
 import type { KeyGridCommandMenuAnchor } from "./useKeyCommands.ts";
 import type {
@@ -539,16 +548,6 @@ export function KeyGrid({
 
   const showPlatformTabs = platforms !== undefined && platforms.length > 1;
 
-  // Hover tooltip for the decorative hatch spacer (T100, FR-039) — sighted
-  // mouse users only; the aria-hidden hatch carries no accessible-tree
-  // presence, and this `title` does not change that. See the module doc's
-  // "Row slack, and the Fill row / Even out row seam" for the actual
-  // programmatic equivalent (the "Fill row" button itself).
-  const rowSlackTitle = t({
-    id: "editor.assignLoop.keyGrid.rowSlackTitle",
-    message: "Unused space in this row",
-  });
-
   // T117 — what the grid's own live region says. The SELECTED cell's findings
   // only: an announcement fires on selection change, and reading out a whole
   // layer's diagnostics on every arrow key would make the grid unusable with a
@@ -671,6 +670,11 @@ export function KeyGrid({
         }}
       >
         {windowedRows.map(({ row, rowIndex }) => {
+          // The row's unused width, in the same percentage space the cells use.
+          // It is no longer drawn as anything of its own (the hatch is gone,
+          // ADR 0002 / FR-012) — it is added to the LAST key below, which is
+          // what KeymanWeb does and therefore what the author's keyboard will
+          // look like. A row that IS the layer maximum contributes 0.
           const slackPercent =
             layerMaxUnits > 0 ? (row.slackPct / layerMaxUnits) * 100 : 0;
           return (
@@ -690,9 +694,21 @@ export function KeyGrid({
                 {row.keys.map((cell, colIndex) => {
                   const padPercent =
                     layerMaxUnits > 0 ? (cell.padPct / layerMaxUnits) * 100 : 0;
+                  // FR-012: the last key of every row absorbs the row's slack,
+                  // so every row ends flush at the layer maximum. `isLastInRow`
+                  // comes off the view model rather than being re-derived from
+                  // `colIndex === row.keys.length - 1` here, so the rule is
+                  // stated once (keyGridViewModel.ts) for every consumer that
+                  // draws or measures a cell.
+                  //
+                  // This is the DECLARED width plus the stretch — FR-015's
+                  // "declared width is a minimum" made literal. The property
+                  // panel's width field and the row metrics readout both quote
+                  // the declared figure, and both say so.
                   const widthPercent =
                     layerMaxUnits > 0
-                      ? (cell.widthPct / layerMaxUnits) * 100
+                      ? ((cell.widthPct / layerMaxUnits) * 100) +
+                        (cell.isLastInRow ? slackPercent : 0)
                       : 0;
                   const isSelected = cell.address === selectedAddress;
                   const isTabbable =
@@ -731,37 +747,18 @@ export function KeyGrid({
                     </Fragment>
                   );
                 })}
-                {/* The row's unused slack (FR-039), rendered visibly rather than
-                silently absorbed into the last key's width — see
-                keyGridViewModel.ts's own `slackPct` doc comment. Decorative
-                only: a diagonal hatch, never a printed number (the module
-                doc's "Row slack, and the row-actions strip"). */}
-                {slackPercent > 0 && (
-                  <span
-                    aria-hidden="true"
-                    data-testid={`key-grid-row-slack-${rowIndex}`}
-                    title={rowSlackTitle}
-                    style={{
-                      flexGrow: 0,
-                      flexShrink: 0,
-                      flexBasis: `${slackPercent}%`,
-                      borderLeft: `1px dashed ${TEXT_DIM}`,
-                      borderRadius: 3,
-                      backgroundImage: `repeating-linear-gradient(135deg, ${TEXT_DIM} 0px, ${TEXT_DIM} 1px, transparent 1px, transparent 7px)`,
-                      opacity: 0.5,
-                    }}
-                  />
-                )}
               </div>
               {/* The row-actions strip (spec 061 T012, FR-007, FR-038) — a
               retained container, not a new one: it used to hold "Fill row" /
               "Even out row", both withdrawn by ADR 0002 (the last key now
               stretches to fill a row, so there is nothing left for either
               button to redistribute). It renders UNCONDITIONALLY now, once
-              per layout row, with its `role="gridcell"` left empty — spec 061
-              T026 (a later phase) mounts a per-row metrics readout here. An
-              empty flex container costs no visible height or border, so this
-              is a placeholder seam, not a UI regression.
+              per layout row, and as of spec 061 T026 its `role="gridcell"`
+              holds the per-row metrics readout (FR-013, FR-014) — the printed
+              numbers that replaced the withdrawn slack hatch. The readout goes
+              INSIDE the existing gridcell rather than beside it: the roles
+              below are what SC-009 fixed, and a new grid child would reopen
+              exactly the `aria-required-children` violation they closed.
 
               ## Why this strip carries `role="row"` + an inner `role="gridcell"`
               (T123 / SC-009)
@@ -799,7 +796,9 @@ export function KeyGrid({
                   paddingLeft: 2,
                 }}
               >
-                <div role="gridcell" style={{ display: "flex", gap: 6 }} />
+                <div role="gridcell" style={{ display: "flex", gap: 6 }}>
+                  <RowMetricsReadout rowIndex={rowIndex} metrics={row.metrics} />
+                </div>
               </div>
             </Fragment>
           );

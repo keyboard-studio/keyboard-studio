@@ -2971,6 +2971,15 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           commitKeyEditOp({ address: fix.address, kind: "set", fields: { sp: fix.sp } });
           return;
         }
+        case "trimRow": {
+          // Same shape as `reviewKey`, and for the same reason (spec 061
+          // FR-014): WHICH of a crowded row's keys should go is a judgement
+          // only the author can make, and the crowding is explicitly
+          // non-blocking — so the fix takes them to the row and stops. Anchored
+          // on the row's first key, which is the address the detector carries.
+          setSelectedKeyAddress(fix.address);
+          return;
+        }
         case "reviewKey": {
           // "Look at this key" — ReviewKeyFix's own doc: "FR-041 asks only
           // that a fix be concrete, not that it be a data mutation."

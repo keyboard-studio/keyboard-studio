@@ -18,14 +18,14 @@
 
 import { describe, expect, it } from "vitest";
 
-import { buildTouchKeyRuleIndex } from "@keyboard-studio/contracts";
+import { buildTouchKeyRuleIndex, isSpacerKeyClass } from "@keyboard-studio/contracts";
 import {
   makeTouchKeyRuleJoinFixture,
   TOUCH_JOIN_IDS,
   TOUCH_JOIN_LAYERS,
   TOUCH_JOIN_PRODUCED,
 } from "@keyboard-studio/contracts/fixtures";
-import { touchKeyAddress } from "@keyboard-studio/engine";
+import { applyKeyEditsToLayout, touchKeyAddress } from "@keyboard-studio/engine";
 
 import {
   buildKeyGridViewModel,
@@ -316,5 +316,188 @@ describe("unresolvable selectors", () => {
       layerId: "no-such-layer",
     });
     expect(vm).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 7. Row metrics and the last-key stretch (spec 061 T018/T024; FR-013, FR-015,
+//    FR-017, US2 AS2/AS4)
+// ---------------------------------------------------------------------------
+
+/** The layer maximum, exactly as `buildKeyGridViewModel` derives it: the widest row's declared total. */
+function layerMaxOf(vm: { rows: readonly { metrics: { rowTotal: number } }[] }): number {
+  return Math.max(...vm.rows.map((r) => r.metrics.rowTotal));
+}
+
+describe("row metrics (FR-013)", () => {
+  function defaultLayerVm() {
+    const vm = buildKeyGridViewModel({
+      layout: fixtureLayout(),
+      ruleIndex: fixtureIndex(),
+      platform: PHONE,
+      layerId: TOUCH_JOIN_LAYERS.default,
+    });
+    expect(vm).toBeDefined();
+    return vm!;
+  }
+
+  it("gives every row metrics computed from DECLARED widths", () => {
+    const vm = defaultLayerVm();
+    const perKey = DEFAULT_KEY_WIDTH_PCT + DEFAULT_KEY_PAD_PCT;
+    for (const row of vm.rows) {
+      // Width and padding count EVERY key — a spacer occupies space. The
+      // interactive count does not: the fixture's default layer carries a
+      // `T_BLANK` (see its module doc), which is exactly the difference the
+      // crowding threshold is applied to.
+      expect(row.metrics.keyWidthTotal).toBe(row.keys.length * DEFAULT_KEY_WIDTH_PCT);
+      expect(row.metrics.padTotal).toBe(row.keys.length * DEFAULT_KEY_PAD_PCT);
+      expect(row.metrics.rowTotal).toBe(row.keys.length * perKey);
+      expect(row.metrics.interactiveKeyCount).toBe(
+        row.keys.filter((k) => !isSpacerKeyClass(k.sp)).length,
+      );
+    }
+  });
+
+  it("excludes at least one spacer somewhere in the layer — the count is not just keys.length", () => {
+    const vm = defaultLayerVm();
+    const totalKeys = vm.rows.reduce((n, r) => n + r.keys.length, 0);
+    const totalInteractive = vm.rows.reduce((n, r) => n + r.metrics.interactiveKeyCount, 0);
+    expect(totalInteractive).toBeLessThan(totalKeys);
+  });
+
+  it("keeps rowTotal and slackPct consistent — every row reaches the layer maximum", () => {
+    const vm = defaultLayerVm();
+    const max = layerMaxOf(vm);
+    for (const row of vm.rows) {
+      expect(row.metrics.rowTotal + row.slackPct).toBe(max);
+    }
+  });
+
+  it("reports the phone maximum, and flags the fixture's rows as within it", () => {
+    const vm = defaultLayerVm();
+    for (const row of vm.rows) {
+      expect(row.metrics.platformMaxKeys).toBe(10);
+      expect(row.metrics.overMaximumBy).toBeUndefined();
+    }
+  });
+});
+
+describe("isLastInRow (FR-012)", () => {
+  it("marks exactly the final cell of every row, and no other", () => {
+    const vm = buildKeyGridViewModel({
+      layout: fixtureLayout(),
+      ruleIndex: fixtureIndex(),
+      platform: PHONE,
+      layerId: TOUCH_JOIN_LAYERS.default,
+    })!;
+    for (const row of vm.rows) {
+      const flags = row.keys.map((k) => k.isLastInRow);
+      expect(flags.filter(Boolean)).toHaveLength(1);
+      expect(flags[flags.length - 1]).toBe(true);
+    }
+  });
+
+  it("marks the only cell of a single-key row", () => {
+    const vm = buildKeyGridViewModel({
+      layout: fixtureLayout(),
+      ruleIndex: fixtureIndex(),
+      platform: PHONE,
+      layerId: TOUCH_JOIN_LAYERS.shift,
+    })!;
+    expect(vm.rows[0]!.keys.every((k) => k.isLastInRow)).toBe(true);
+    expect(vm.rows[0]!.keys).toHaveLength(1);
+  });
+});
+
+describe("adding a key to the longest row (FR-016, FR-017, US2 AS4)", () => {
+  /** The layer's widest row, and the fixture's own default layer, after adding one key to it. */
+  function afterAddToLongestRow() {
+    const before = buildKeyGridViewModel({
+      layout: fixtureLayout(),
+      ruleIndex: fixtureIndex(),
+      platform: PHONE,
+      layerId: TOUCH_JOIN_LAYERS.default,
+    })!;
+
+    // The widest row is the fixture's 7-key row (index 3). Add after its last
+    // key, through the REAL applier — so this also pins T021's defaults.
+    const longestRowIndex = before.rows.reduce(
+      (best, row, i) => (row.metrics.rowTotal > before.rows[best]!.metrics.rowTotal ? i : best),
+      0,
+    );
+    const anchor = before.rows[longestRowIndex]!.keys.at(-1)!;
+    const { layout } = applyKeyEditsToLayout(fixtureLayout(), [
+      {
+        seq: 1,
+        address: anchor.address,
+        kind: "add",
+        position: "after",
+        key: { id: "U_007A", text: "z", sp: 0 },
+      },
+    ]);
+    const after = buildKeyGridViewModel({
+      layout,
+      ruleIndex: fixtureIndex(),
+      platform: PHONE,
+      layerId: TOUCH_JOIN_LAYERS.default,
+    })!;
+    return { before, after, longestRowIndex };
+  }
+
+  it("takes the standard default width and padding, never a split of the anchor's", () => {
+    const { before, after, longestRowIndex } = afterAddToLongestRow();
+    const added = after.rows[longestRowIndex]!.keys.find((k) => k.id === "U_007A");
+    expect(added?.widthPct).toBe(DEFAULT_KEY_WIDTH_PCT);
+    expect(added?.padPct).toBe(DEFAULT_KEY_PAD_PCT);
+    // The anchor kept its own width — nothing was split off it.
+    const anchorBefore = before.rows[longestRowIndex]!.keys.at(-1)!;
+    const anchorAfter = after.rows[longestRowIndex]!.keys.find((k) => k.id === anchorBefore.id);
+    expect(anchorAfter?.widthPct).toBe(anchorBefore.widthPct);
+  });
+
+  it("enlarges the layer maximum rather than normalizing the row", () => {
+    const { before, after } = afterAddToLongestRow();
+    expect(layerMaxOf(after)).toBe(
+      layerMaxOf(before) + DEFAULT_KEY_WIDTH_PCT + DEFAULT_KEY_PAD_PCT,
+    );
+  });
+
+  it("narrows every key proportionally — each key's share of the layer shrinks", () => {
+    const { before, after } = afterAddToLongestRow();
+    const maxBefore = layerMaxOf(before);
+    const maxAfter = layerMaxOf(after);
+    for (const row of after.rows) {
+      for (const cell of row.keys) {
+        if (cell.id === "U_007A") continue;
+        expect(cell.widthPct / maxAfter).toBeLessThan(cell.widthPct / maxBefore);
+      }
+    }
+  });
+
+  it("produces no negative width or padding anywhere (FR-017)", () => {
+    const { after } = afterAddToLongestRow();
+    for (const row of after.rows) {
+      expect(row.slackPct).toBeGreaterThanOrEqual(0);
+      for (const cell of row.keys) {
+        expect(cell.widthPct).toBeGreaterThan(0);
+        expect(cell.padPct).toBeGreaterThanOrEqual(0);
+      }
+    }
+  });
+
+  it("clips nothing — every row still reaches exactly the layer maximum", () => {
+    const { after } = afterAddToLongestRow();
+    const max = layerMaxOf(after);
+    for (const row of after.rows) {
+      expect(row.metrics.rowTotal + row.slackPct).toBe(max);
+    }
+  });
+
+  it("leaves every other row's own declared metrics untouched", () => {
+    const { before, after, longestRowIndex } = afterAddToLongestRow();
+    after.rows.forEach((row, i) => {
+      if (i === longestRowIndex) return;
+      expect(row.metrics).toEqual(before.rows[i]!.metrics);
+    });
   });
 });

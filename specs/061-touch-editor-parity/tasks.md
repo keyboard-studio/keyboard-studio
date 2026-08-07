@@ -203,12 +203,12 @@ interactive keys is flagged while a tablet row of 11 is not.
 
 ### Tests *(write first)*
 
-- [ ] **T017** [US2] Engine unit test for `TOUCH_KEY_ROW_CROWDED`: phone row of 11 interactive keys
+- [x] **T017** [US2] Engine unit test for `TOUCH_KEY_ROW_CROWDED`: phone row of 11 interactive keys
   warns, the same row on tablet does not, desktop is unruled, and a row of nothing but blank/spacer
   keys never warns (interactive count excludes `sp` 9/10 via `isSpacerKeyClass`). Assert the finding
   is `warning` severity at `scope: "layer"` and that the edit still succeeds (SC-006, US2 AS3) ·
   `packages/engine/src/pattern-apply/touchKeyDiagnostics.test.ts`
-- [ ] **T018** [US2] View-model test: every row carries `metrics` (`interactiveKeyCount`,
+- [x] **T018** [US2] View-model test: every row carries `metrics` (`interactiveKeyCount`,
   `keyWidthTotal`, `padTotal`, `rowTotal`, `platformMaxKeys?`, `overMaximumBy?`) computed from
   **declared** widths, every cell carries `isLastInRow`, and adding a key to the longest row narrows
   every key proportionally with no negative width and nothing clipped (US2 AS2, AS4, FR-017) ·
@@ -218,20 +218,29 @@ interactive keys is flagged while a tablet row of 11 is not.
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T019** [P] [US2] New shared row-metrics helper owning the **single** threshold table
+- [x] **T019** [P] [US2] New shared row-metrics helper owning the **single** threshold table
   (phone 10, tablet 13, desktop unruled) and the interactive-key count via the canonical
   `isSpacerKeyClass` predicate; export it from the engine index, the studio's only sanctioned door
   (research D6, FR-013) ·
-  `packages/engine/src/pattern-apply/rowMetrics.ts`,
-  `packages/engine/src/pattern-apply/rowMetrics.test.ts`, `packages/engine/src/index.ts`
-- [ ] **T020** [P] [US2] Add `TOUCH_KEY_ROW_CROWDED` to `TouchKeyFindingCode` with its
+  `packages/contracts/src/row-metrics.ts`, `packages/contracts/src/row-metrics.test.ts`,
+  `packages/engine/src/pattern-apply/rowMetrics.ts` (re-export shim), `packages/engine/src/index.ts`
+
+  **Homed in contracts, not engine.** T019 names an engine path and T022 asks Layer C's check
+  18.3 to import the table from it — and both cannot hold: `.dependency-cruiser.cjs`'s
+  `lint-not-to-engine` rule forbids `@keymanapp/keyboard-lint` importing engine at all, so an
+  engine-homed table fails `pnpm lint` the moment the check reads it. Contracts is the one
+  package Layer C, engine and the studio all reach — the same forced placement
+  `touch-key-diagnostics.ts` and `touch-key-rule-join.ts` already have, documented in the same
+  terms. `pattern-apply/rowMetrics.ts` is a re-export shim, so T019's stated path and its
+  "export it from the engine index, the studio's only sanctioned door" both stay true.
+- [x] **T020** [P] [US2] Add `TOUCH_KEY_ROW_CROWDED` to `TouchKeyFindingCode` with its
   `TrimRowFix { kind: "trimRow", address, rowIndex, overBy }` descriptor and structured detail
   `{ rowIndex, interactiveKeyCount, platformMaxKeys }` — no English prose crosses the engine
   boundary — **and** its localized copy entry in the same change, so the `never`-checked exhaustive
   switch never goes red (research D7, FR-014, FR-037) ·
   `packages/contracts/src/touch-key-diagnostics.ts`,
   `packages/studio/src/editors/assignLoop/keyGrid/findingCopy.ts`
-- [ ] **T021** [P] [US2] `add` assigns `DEFAULT_KEY_WIDTH_PCT` (100) and `DEFAULT_KEY_PAD_PCT` (15)
+- [x] **T021** [P] [US2] `add` assigns `DEFAULT_KEY_WIDTH_PCT` (100) and `DEFAULT_KEY_PAD_PCT` (15)
   regardless of what the spec carries; it never splits an anchor key's width and never normalizes
   the row. Adding a key enlarges the layer maximum, which is what makes "allow more keys, but
   complain" safe (FR-016, FR-017, contract [key-edit-operations.md](contracts/key-edit-operations.md) §3.4) ·
@@ -240,23 +249,23 @@ interactive keys is flagged while a tablet row of 11 is not.
 
 **⟶ Wait for Wave 1 to finish, then (independent — different files):**
 
-- [ ] **T022** [P] [US2] Read `MAX_KEYS` from the engine's shared table instead of owning the
+- [x] **T022** [P] [US2] Read `MAX_KEYS` from the engine's shared table instead of owning the
   literal; drop the second restatement in the remove dialog. The Layer C check keeps its code,
   severity, layer and location — only the two-entry table moves (research D6) ·
   `packages/keyboard-lint/src/checks/check-18-3-keys-per-row.ts`,
   `packages/studio/src/editors/assignLoop/keyGrid/RemoveKeyDialog.tsx`
-- [ ] **T023** [P] [US2] Emit `TOUCH_KEY_ROW_CROWDED` from the shared metrics at
+- [x] **T023** [P] [US2] Emit `TOUCH_KEY_ROW_CROWDED` from the shared metrics at
   `interactiveKeyCount > platformMaxKeys`, inside the existing `useTouchKeyDiagnostics` `useMemo` —
   no second timer (FR-014, FR-039, decision D3) ·
   `packages/engine/src/pattern-apply/touchKeyDiagnostics.ts`
-- [ ] **T024** [P] [US2] Add `metrics: KeyGridRowMetrics` to `KeyGridRowViewModel` and
+- [x] **T024** [P] [US2] Add `metrics: KeyGridRowMetrics` to `KeyGridRowViewModel` and
   `isLastInRow: boolean` to `KeyGridCellViewModel`; retain `slackPct` but repoint it from a
   rendering input to the metrics/stretch input (research D5, ADR 0002) ·
   `packages/studio/src/editors/assignLoop/keyGrid/keyGridViewModel.ts`
 
 **⟶ Wait for T024 to finish, then:**
 
-- [ ] **T025** [US2] New per-row metrics readout rendering interactive key count, total key width,
+- [x] **T025** [US2] New per-row metrics readout rendering interactive key count, total key width,
   total padding and row total, plus the crowding complaint. Test ids
   `key-grid-row-metrics-${rowIndex}` and `key-grid-row-crowded-${rowIndex}` (FR-013, FR-014) ·
   `packages/studio/src/editors/assignLoop/keyGrid/RowMetricsReadout.tsx`,
@@ -264,7 +273,7 @@ interactive keys is flagged while a tablet row of 11 is not.
 
 **⟶ Wait for T025 to finish, then:**
 
-- [ ] **T026** [US2] Render the last key of every row at `widthPct + row.slackPct` to match the
+- [x] **T026** [US2] Render the last key of every row at `widthPct + row.slackPct` to match the
   shipping renderer; scale rows proportionally to the layer maximum; delete the slack hatch and its
   test id `key-grid-row-slack-${rowIndex}`; mount `RowMetricsReadout` inside the retained
   `key-grid-row-actions-${rowIndex}` container (FR-010, FR-011, FR-012, FR-013) ·
@@ -273,7 +282,7 @@ interactive keys is flagged while a tablet row of 11 is not.
 
 **⟶ Wait for T026 to finish, then:**
 
-- [ ] **T027** [US2] Make T017 and T018 pass; re-run the grid accessibility suite and confirm spec
+- [x] **T027** [US2] Make T017 and T018 pass; re-run the grid accessibility suite and confirm spec
   058 SC-009's row-actions fix has not regressed now that the readout occupies that container
   (FR-038) ·
   `packages/studio/src/editors/assignLoop/keyGrid/KeyGrid.test.tsx`
