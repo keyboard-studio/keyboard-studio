@@ -21,9 +21,10 @@ these automatically, but only to satisfy `kmc-package`'s "listed file must exist
 | `README.md` | `# <displayName>` — a bare heading |
 | `source/welcome.htm` | `Welcome to <name>` — one line |
 | `source/readme.htm` | `<name> keyboard` — one line |
+| `source/help/<id>.php` | `<?php /* <name> help */ ?>` — an empty PHP comment stub |
 
 None of these will survive a real `keymanapp/keyboards` PR review as-is. The work below is
-upgrading each of them, plus one file the tool never generates at all.
+upgrading each of them.
 
 ## Write order
 
@@ -52,11 +53,13 @@ upgrading each of them, plus one file the tool never generates at all.
    - No install instructions — link to `help.keyman.com/products/` instead
    - No version/copyright
 
-5. **`source/help/<id>.php`** — the tool does **not** generate this for a net-new keyboard (it's
-   only carried over when adapting a base that already had one). Draft `welcome.htm` first, then
-   mirror its body into the `.php` with the correct PHP header and a `pagename` matching
-   help.keyman.com's table-of-contents convention — writing them independently and reconciling
-   afterward is how the two drift apart.
+5. **`source/help/<id>.php`** — the scaffolder writes a bare `<?php /* <name> help */ ?>` stub
+   when the base lacks one (`packages/engine/src/scaffolder/index.ts` `generateStubs`), and
+   carries over the base's file when adapting one that already had help — so treat it like the
+   auto-generated stubs above: upgrade it, don't assume you're creating it from scratch. Draft
+   `welcome.htm` first, then mirror its body into the `.php` with the correct PHP header and a
+   `pagename` matching help.keyman.com's table-of-contents convention — writing them independently
+   and reconciling afterward is how the two drift apart.
 
 6. **`HISTORY.md`** — replace "Initial release." with real bullets (what the keyboard does,
    notable design choices, what it was adapted from). Keep it cumulative on every future version
