@@ -51,11 +51,24 @@
 //
 // RENDER CONTRACT.
 //
-// Returns `null` when there is no current keyboard to name
-// (`deriveProjectLabel` returns `null`) — never an empty shell — the same
-// gate shape `StudioFooter.tsx` uses (FR-040). The caller is expected to
-// additionally gate on `active !== "welcome"`, matching every other
-// project-scoped NavBar control (`AccountControl`, `UnfinishedGalleryIndicator`).
+// This control is present for the WHOLE survey, including the part of Phase A
+// that runs before a base keyboard exists — that is the point of it: an author
+// mid-wizard needs to see which keyboard they are working on and be able to
+// switch away, and the questions that come before base selection are the ones
+// where "which keyboard is this?" is least obvious.
+//
+// So it does NOT take `StudioFooter.tsx`'s FR-040 gate ("no project, no row").
+// The footer names a project's PROGRESS, which genuinely does not exist yet;
+// this control is a persistent switcher whose current-value slot happens to be
+// empty until the project is named. When `deriveProjectLabel` returns `null`
+// the trigger shows `nav.currentKeyboard.none` and the dropdown still offers
+// every other keyboard plus "Manage all keyboards…" — an author who opened the
+// wizard by mistake can leave through it, which a hidden control cannot do.
+//
+// The caller is still expected to gate on `active !== "welcome"`, matching
+// every other NavBar control (`AccountControl`, `UnfinishedGalleryIndicator`):
+// the welcome screen is where you CHOOSE a keyboard, so a switcher there would
+// duplicate the screen's own job.
 
 import type { ReactNode } from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -174,6 +187,11 @@ export function CurrentKeyboardIndicator() {
     id: "nav.currentKeyboard.manageAll",
     message: "Manage all keyboards…",
   });
+  // Distinct from `untitledLabel` on purpose: "Untitled keyboard" describes a
+  // keyboard that exists and has no name (a real index row can be in that
+  // state), whereas this is the pre-instantiation slot — there is no keyboard
+  // yet at all.
+  const noKeyboardLabel = t({ id: "nav.currentKeyboard.none", message: "No keyboard yet" });
 
   const options: SelectMenuOption[] = useMemo(() => {
     const resumableOthers = entries
@@ -185,12 +203,14 @@ export function CurrentKeyboardIndicator() {
     return [
       // The CURRENT project's own row always uses the live label derived
       // above, never whatever `listDrafts()` last snapshotted for it — see
-      // the module header's staleness note.
-      { value: currentProjectKey, label: currentLabel ?? untitledLabel },
+      // the module header's staleness note. Before a keyboard exists the slot
+      // is named rather than dropped, so the trigger always has a value to
+      // display (see RENDER CONTRACT).
+      { value: currentProjectKey, label: currentLabel ?? noKeyboardLabel },
       ...resumableOthers,
       { value: MANAGE_ALL_VALUE, label: manageAllLabel },
     ];
-  }, [entries, currentProjectKey, currentLabel, untitledLabel, manageAllLabel]);
+  }, [entries, currentProjectKey, currentLabel, untitledLabel, noKeyboardLabel, manageAllLabel]);
 
   function handleChange(next: string): void {
     if (next === currentProjectKey) return; // no-op: already the current keyboard
@@ -206,11 +226,6 @@ export function CurrentKeyboardIndicator() {
     // wizard.
     switchActiveProject(next);
   }
-
-  // FR-040-equivalent gate (StudioFooter.tsx): no name, nothing to show — an
-  // empty shell is worse than no control at all. The caller is expected to
-  // additionally gate on `active !== "welcome"` (see module header).
-  if (currentLabel === null) return null;
 
   return (
     <span

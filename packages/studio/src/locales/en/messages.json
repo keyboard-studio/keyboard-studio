@@ -1001,6 +1001,7 @@
   "nav.compare": "Compare",
   "nav.currentKeyboard.label": "Keyboard",
   "nav.currentKeyboard.manageAll": "Manage all keyboards…",
+  "nav.currentKeyboard.none": "No keyboard yet",
   "nav.decisionTrail": "Decisions",
   "nav.flowMap": "Flow Map",
   "nav.language": "Language",

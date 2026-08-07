@@ -131,9 +131,26 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 
 describe("CurrentKeyboardIndicator — visibility and label", () => {
-  it("renders nothing when there is no current keyboard", () => {
-    const { container } = render(<CurrentKeyboardIndicator />);
-    expect(container.firstChild).toBeNull();
+  // The control is present for the WHOLE survey, including the Phase A
+  // questions that run before a base keyboard exists — see the component's
+  // RENDER CONTRACT. It does NOT take StudioFooter's FR-040 "no project, no
+  // row" gate: the empty slot is named, not hidden, so an author mid-wizard
+  // can always see which keyboard they are on and switch away.
+  it("renders with a placeholder when no keyboard exists yet", () => {
+    render(<CurrentKeyboardIndicator />);
+    expect(screen.getByRole("button").textContent).toContain("No keyboard yet");
+  });
+
+  it("still offers the other keyboards and manage-all before a keyboard exists", () => {
+    seedIndexOnly([{ projectKey: "other-kbd", label: "Other keyboard", status: "draft" }]);
+    render(<CurrentKeyboardIndicator />);
+    fireEvent.click(screen.getByRole("button"));
+
+    expect(screen.getAllByRole("option").map((o) => o.textContent)).toEqual([
+      "No keyboard yet",
+      "Other keyboard",
+      "Manage all keyboards…",
+    ]);
   });
 
   it("shows the base keyboard's display name when no override exists", () => {
