@@ -150,3 +150,85 @@ describe('RemovalBanner — dismiss', () => {
     expect(screen.queryByRole('region', { name: 'Removal recommendation' })).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// Post-#526 follow-on — optional, low-priority "Latin alphabet (optional)"
+// group for rows tagged reason: 'cross-script-latin'.
+// ---------------------------------------------------------------------------
+
+function makeCrossScriptLatinRecommended(ch: string): RecommendedRemovalChar {
+  return { ch, contributors: makeContributors({ targetChar: ch }), reason: 'cross-script-latin' };
+}
+
+describe('RemovalBanner — optional cross-script-Latin group', () => {
+  it('does not render the optional group when no row is tagged cross-script-latin', () => {
+    render(<RemovalBanner recommended={[makeRecommended('y')]} languageLabel="ru" onRemoveSelected={vi.fn()} />);
+
+    expect(screen.queryByText(/Latin alphabet \(optional\)/)).toBeNull();
+  });
+
+  it('the primary count/copy excludes cross-script-latin rows', () => {
+    const recommended = [makeRecommended('y'), makeCrossScriptLatinRecommended('a'), makeCrossScriptLatinRecommended('b')];
+    render(<RemovalBanner recommended={recommended} languageLabel="ru" onRemoveSelected={vi.fn()} />);
+
+    expect(screen.getByText(/We recommend removing 1 character(?!s)/)).not.toBeNull();
+  });
+
+  it('renders the optional Latin group with its own heading and body copy naming the target language', () => {
+    const recommended = [makeCrossScriptLatinRecommended('a'), makeCrossScriptLatinRecommended('b')];
+    render(
+      <RemovalBanner
+        recommended={recommended}
+        languageLabel="ru"
+        languageDisplayName="Russian"
+        onRemoveSelected={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText(/Latin alphabet \(optional\)/)).not.toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /Latin alphabet \(optional\)/ }));
+    expect(screen.getByText(/Russian-only keyboard/)).not.toBeNull();
+  });
+
+  it('falls back to "single-script" copy when no display name is available', () => {
+    const recommended = [makeCrossScriptLatinRecommended('a')];
+    render(<RemovalBanner recommended={recommended} languageLabel="ru" onRemoveSelected={vi.fn()} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Latin alphabet \(optional\)/ }));
+    expect(screen.getByText(/single-script keyboard/)).not.toBeNull();
+  });
+
+  it('"Remove Latin letters" cascades only the optional group, not the primary group', () => {
+    const onRemoveSelected = vi.fn();
+    const recommended = [makeRecommended('y'), makeCrossScriptLatinRecommended('a'), makeCrossScriptLatinRecommended('b')];
+    render(<RemovalBanner recommended={recommended} languageLabel="ru" onRemoveSelected={onRemoveSelected} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Latin alphabet \(optional\)/ }));
+    fireEvent.click(screen.getByRole('button', { name: /Remove Latin letters/ }));
+
+    expect(onRemoveSelected).toHaveBeenCalledTimes(1);
+    const selected = onRemoveSelected.mock.calls[0]![0] as RecommendedRemovalChar[];
+    expect(selected.map((r) => r.ch).sort()).toEqual(['a', 'b']);
+  });
+
+  it('unchecking a Latin row excludes it from "Remove Latin letters"', () => {
+    const onRemoveSelected = vi.fn();
+    const recommended = [makeCrossScriptLatinRecommended('a'), makeCrossScriptLatinRecommended('b')];
+    render(<RemovalBanner recommended={recommended} languageLabel="ru" onRemoveSelected={onRemoveSelected} />);
+
+    fireEvent.click(screen.getByRole('button', { name: /Latin alphabet \(optional\)/ }));
+    fireEvent.click(screen.getByLabelText(/Remove U\+0061/i));
+    fireEvent.click(screen.getByRole('button', { name: /Remove Latin letters/ }));
+
+    expect(onRemoveSelected).toHaveBeenCalledTimes(1);
+    const selected = onRemoveSelected.mock.calls[0]![0] as RecommendedRemovalChar[];
+    expect(selected.map((r) => r.ch)).toEqual(['b']);
+  });
+
+  it('renders a dismiss control even when the primary group is empty', () => {
+    const recommended = [makeCrossScriptLatinRecommended('a')];
+    render(<RemovalBanner recommended={recommended} languageLabel="ru" onRemoveSelected={vi.fn()} />);
+
+    expect(screen.getByRole('button', { name: 'Dismiss removal recommendation' })).not.toBeNull();
+  });
+});

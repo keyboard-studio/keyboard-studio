@@ -2,8 +2,8 @@
 
 import { describe, it, expect, afterEach } from 'vitest';
 import { I18n } from '@lingui/core';
-import type { IRRule, IRGroup, IRStore, KeyboardIR, Pattern, StoreItem } from '@keyboard-studio/contracts';
-import { buildProducedSet } from '@keyboard-studio/contracts';
+import type { IRRule, IRGroup, IRStore, KeyboardIR, Pattern, StoreItem, PlacementWorklist } from '@keyboard-studio/contracts';
+import { buildProducedSet, makeConfirmedAlphabet } from '@keyboard-studio/contracts';
 import {
   ruleModifier,
   modifierLabel,
@@ -33,7 +33,8 @@ import {
   isTouchOnlyVkeyName,
 } from './irToCarveNodes.ts';
 import { _setContentCatalogForTesting, _resetContentI18nForTesting } from './contentI18n.ts';
-import { collectCharContributors, parseSlotId, isPlusSeparator } from '@keyboard-studio/engine';
+import { collectCharContributors, parseSlotId, isPlusSeparator, deriveCarveNeededSet } from '@keyboard-studio/engine';
+import { loadLangtags } from './langtagsDefaults.ts';
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -2525,6 +2526,88 @@ describe('recommendedRemovalChars', () => {
       expect(result.map((r) => r.ch)).toEqual(['y']);
     });
   });
+
+  // Post-#526 follow-on (product decision): a non-Latin target's base ASCII
+  // Latin alphabet (desktop base-layout fall-through, spec 040) is no longer
+  // hard-excluded from removal recommendations — it is tagged
+  // `reason: 'cross-script-latin'` and surfaced as a separate, optional,
+  // low-priority group instead (the banner's job), rather than silently kept.
+  describe('cross-script ASCII Latin fall-through — optional, low-priority group (#526 follow-on)', () => {
+    it('recommends surplus ASCII Latin on a Cyrillic (ru-Cyrl, explicit script subtag) target, tagged cross-script-latin', () => {
+      const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+
+      const result = recommendedRemovalChars({ ir, needed: new Set(['q']), bcp47: 'ru-Cyrl' });
+
+      const row = result.find((r) => r.ch === 'y');
+      expect(row).toBeDefined();
+      expect(row?.reason).toBe('cross-script-latin');
+    });
+
+    it('recommends surplus ASCII Latin on a bare "ru" target once langtags has resolved its Cyrillic default script (no explicit script subtag — exercises the getLoadedLangtags() fallback), tagged cross-script-latin', async () => {
+      // Preload the module synchronously the same way the survey's IdentityLite
+      // step already does before an author reaches Carve, so
+      // getLoadedLangtags() inside targetScriptIsLatin resolves non-null here.
+      await loadLangtags();
+      const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+
+      const result = recommendedRemovalChars({ ir, needed: new Set(['q']), bcp47: 'ru' });
+
+      const row = result.find((r) => r.ch === 'y');
+      expect(row).toBeDefined();
+      expect(row?.reason).toBe('cross-script-latin');
+    });
+
+    it('STILL recommends a surplus ASCII Latin letter on a Latin (bfd-Latn) target — no regression, and no cross-script-latin tag', () => {
+      const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+
+      const result = recommendedRemovalChars({ ir, needed: new Set(['q']), bcp47: 'bfd-Latn' });
+
+      const row = result.find((r) => r.ch === 'y');
+      expect(row).toBeDefined();
+      expect(row?.reason).toBeUndefined();
+    });
+
+    it('STILL recommends surplus ASCII Latin when bcp47 is unknown/empty — fail-open unchanged, no tag', () => {
+      const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+
+      const result = recommendedRemovalChars({ ir, needed: new Set(['q']), bcp47: '' });
+
+      const row = result.find((r) => r.ch === 'y');
+      expect(row).toBeDefined();
+      expect(row?.reason).toBeUndefined();
+    });
+
+    it('the primary (non-optional) subset excludes cross-script-latin rows — the banner-split contract', () => {
+      const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+
+      const result = recommendedRemovalChars({ ir, needed: new Set(['q']), bcp47: 'ru-Cyrl' });
+      const primary = result.filter((r) => r.reason !== 'cross-script-latin');
+
+      expect(primary.map((r) => r.ch)).not.toContain('y');
+    });
+
+    it('mirrors the same signal in annotateRemovalRecommendations — a group producing only ASCII Latin is "high" (not suppressed) on a Cyrillic target, tagged recommendationReason', () => {
+      const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+      const nodes = toRailNodes(ir);
+
+      const result = annotateRemovalRecommendations(nodes, ir, new Set(['q']), null, 'ru-Cyrl');
+
+      const group = result.find((n) => n.kind === 'group');
+      expect(group?.recommendation).toBe('high');
+      expect(group?.recommendationReason).toBe('cross-script-latin');
+    });
+
+    it('does NOT tag recommendationReason on a Latin (bfd-Latn) target — no regression', () => {
+      const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+      const nodes = toRailNodes(ir);
+
+      const result = annotateRemovalRecommendations(nodes, ir, new Set(['q']), null, 'bfd-Latn');
+
+      const group = result.find((n) => n.kind === 'group');
+      expect(group?.recommendation).toBe('high');
+      expect(group?.recommendationReason).toBeUndefined();
+    });
+  });
 });
 
 
@@ -2584,6 +2667,210 @@ describe('recommendedRemovalChars — form parameter (spec: base-plus-mark drive
     expect(result.map((r) => r.ch)).toEqual(['y']);
   });
 });
+
+// ---------------------------------------------------------------------------
+// recommendedRemovalChars — combining marks implied by a needed grapheme
+// (#526 fix 3) are shielded even when only the composed grapheme, not the
+// bare mark itself, is a literal `needed` member.
+// ---------------------------------------------------------------------------
+
+describe('recommendedRemovalChars — needed-implied combining mark guard (#526 fix 3)', () => {
+  it('does NOT recommend a bare combining mark literal implied by a needed precomposed grapheme', () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{ nodeId: 'rule-mark', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: '́' }] }], // bare combining acute
+      }],
+    });
+
+    // 'á' (U+00E1) NFD-decomposes to 'a' + U+0301 — the mark is implied.
+    const result = recommendedRemovalChars({ ir, needed: new Set(['á']) });
+
+    expect(result.map((r) => r.ch)).not.toContain('́');
+  });
+
+  it('still recommends a combining mark NOT implied by any needed grapheme', () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{ nodeId: 'rule-mark', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: '̃' }] }], // bare combining tilde — unrelated to 'á'
+      }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['á']) }); // implies only U+0301, not U+0303
+
+    expect(result.map((r) => r.ch)).toContain('̃');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// recommendedRemovalChars — blockCandidateChars (#526 AC #3)
+// ---------------------------------------------------------------------------
+
+describe('recommendedRemovalChars — blockCandidateChars (#526 AC #3)', () => {
+  it('surfaces a block-candidate grapheme (composed from PlacementWorklist.blockedCombinations via composeCombo) as a candidate, tagged reason "blocked-combination", when its rule shape passes the existing guards', () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{ nodeId: 'rule-blocked-combo', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: 'é' }] }],
+      }],
+    });
+
+    const result = recommendedRemovalChars({
+      ir,
+      needed: new Set(['q']), // 'é' absent — surplus
+      blockCandidateChars: new Set(['é']),
+    });
+
+    expect(result.map((r) => r.ch)).toContain('é');
+    expect(result.find((r) => r.ch === 'é')?.reason).toBe('blocked-combination');
+  });
+
+  it('does NOT tag an ordinary CLDR-surplus result with `reason` — only chars named via blockCandidateChars get it', () => {
+    const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
+
+    expect(result.map((r) => r.ch)).toEqual(['y']);
+    expect(result[0]?.reason).toBeUndefined();
+  });
+
+  it('shields an ATTESTED combo even when it is also passed as a blockCandidateChars entry — needed still wins (conservative default: block-candidates never bypass the surplus check)', () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [{ nodeId: 'rule-attested-combo', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: 'é' }] }],
+      }],
+    });
+
+    // 'é' is in `needed` (e.g. an attested stack landed it in requiredPrimary)
+    // even though its base+mark pair is ALSO named in blockedCombinations —
+    // exactly the "attested stack wins" shape carve-needed-set.test.ts pins.
+    const result = recommendedRemovalChars({
+      ir,
+      needed: new Set(['é']),
+      blockCandidateChars: new Set(['é']),
+    });
+
+    expect(result.map((r) => r.ch)).not.toContain('é');
+  });
+
+  it('degrade-when-absent: an empty (or omitted) blockCandidateChars produces byte-identical output to calling without the argument at all', () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [
+          makeCharOnlyRule(), // produces surplus 'y'
+          { nodeId: 'rule-dk', context: [{ kind: 'deadkey', id: 1 }, { kind: 'char', value: 'a' }], output: [{ kind: 'char', value: 'z' }] },
+        ],
+      }],
+    });
+    const needed = new Set(['q']);
+
+    const withoutArg = recommendedRemovalChars({ ir, needed });
+    const withEmptySet = recommendedRemovalChars({ ir, needed, blockCandidateChars: new Set() });
+
+    expect(withEmptySet).toEqual(withoutArg);
+  });
+
+  it('a block-candidate whose sole producer is a deadkey-context rule is still shielded — block-candidates run through the SAME allowlist rule-shielding guard, not a shortcut around it', () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [
+          { nodeId: 'rule-dk-combo', context: [{ kind: 'deadkey', id: 1 }, { kind: 'char', value: 'a' }], output: [{ kind: 'char', value: 'é' }] },
+        ],
+      }],
+    });
+
+    const result = recommendedRemovalChars({
+      ir,
+      needed: new Set(['q']),
+      blockCandidateChars: new Set(['é']),
+    });
+
+    expect(result.map((r) => r.ch)).not.toContain('é');
+  });
+
+  it('a block-candidate whose sole producer is an opaque raw fragment is still shielded', () => {
+    const ir = makeIR({
+      raw: [{
+        nodeId: 'raw-1', reason: 'unsupported-syntax', sourceText: "+ [K_X] > dk(1)",
+        producedOutput: [{ kind: 'char', value: 'é' }],
+      } as unknown as KeyboardIR['raw'][number]],
+    });
+
+    const result = recommendedRemovalChars({
+      ir,
+      needed: new Set(['q']),
+      blockCandidateChars: new Set(['é']),
+    });
+
+    expect(result.map((r) => r.ch)).not.toContain('é');
+  });
+
+  it('a block-candidate grapheme with NO producer at all in the IR is shielded (default-safe — nothing to remove)', () => {
+    const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces only 'y'
+
+    const result = recommendedRemovalChars({
+      ir,
+      needed: new Set(['q']),
+      blockCandidateChars: new Set(['é']), // never produced anywhere in this IR
+    });
+
+    expect(result.map((r) => r.ch)).not.toContain('é');
+    expect(result.map((r) => r.ch)).toEqual(['y']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// #526 AC #2 regression — carve must never recommend removing a reachable
+// productive-mark combo, even when CLDR would call it surplus. No new
+// production logic backs this (see deriveCarveNeededSet's optionalSecondary
+// tier + useCarveNeededSet's union into neededSet); this test pins the
+// existing wiring end-to-end so a future refactor can't silently regress it.
+// ---------------------------------------------------------------------------
+
+describe('#526 AC #2 regression — productive-mark reachable combo is never recommended for removal', () => {
+  it('a reachable base+mark combo for a PRODUCTIVE mark lands in deriveCarveNeededSet.optionalSecondary, and once unioned into `needed` (as useCarveNeededSet does), recommendedRemovalChars never proposes it — even though a CLDR-only needed-set (without this union) would call it surplus', () => {
+    const ACUTE = '́';
+    const alphabet = makeConfirmedAlphabet({
+      bases: ['a', 'e'],
+      marks: [ACUTE],
+    });
+    const worklist: PlacementWorklist = {
+      ownLetterUnits: ['a', 'e'],
+      markUnits: [{ mark: ACUTE, inputOrder: 'postfix' }], // productive
+      blockedCombinations: [],
+    };
+    const carveNeeded = deriveCarveNeededSet({ alphabet, worklist });
+    expect(carveNeeded.optionalSecondary.has('á')).toBe(true); // reachable combo, productive class
+
+    // A bare CLDR exemplar set for this (hypothetical) language does not list
+    // 'á' at all — this is the "CLDR would call it surplus" premise.
+    const cldrOnlyNeeded = new Set(['a', 'e']);
+    expect(cldrOnlyNeeded.has('á')).toBe(false);
+
+    // The real pipeline (useCarveNeededSet) unions optionalSecondary into
+    // `neededSet` before recommendedRemovalChars ever sees it.
+    const neededSet = new Set([...cldrOnlyNeeded, ...carveNeeded.requiredPrimary, ...carveNeeded.optionalSecondary]);
+
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        // Deadkey-composed, exactly how a productive mark's reachable combo
+        // is actually produced — isSimpleRemovableRule would reject this rule
+        // shape too, but the needed-set union is the shield under test here.
+        rules: [{ nodeId: 'rule-a-acute', context: [{ kind: 'deadkey', id: 1 }, { kind: 'char', value: 'a' }], output: [{ kind: 'char', value: 'á' }] }],
+      }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: neededSet });
+
+    expect(result.map((r) => r.ch)).not.toContain('á');
+  });
+});
+
 // ---------------------------------------------------------------------------
 // coordinatedCollateralForSlots (#525/#931 follow-up — manual-carve safety)
 // ---------------------------------------------------------------------------
@@ -3180,6 +3467,28 @@ describe('recommendedRemovalChars — paired proposal rows (spec 051 FR-014)', (
 
     expect(result.map((r) => r.ch)).toContain('ʒ');
     expect(result.find((r) => r.ch === 'ʒ')?.caseGroup).toBeUndefined();
+  });
+
+  it("merges BOTH case-group members' contributors into the folded survivor row (#526 fix 2 — cascadeDelete must drop both cases, not just the survivor's)", () => {
+    const ir = makeIR({
+      groups: [{
+        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        rules: [
+          { nodeId: 'rule-lower', context: [{ kind: 'vkey', name: 'K_1', modifiers: [] }], output: [{ kind: 'char', value: 'ǝ' }] },
+          { nodeId: 'rule-upper', context: [{ kind: 'vkey', name: 'K_2', modifiers: [] }], output: [{ kind: 'char', value: 'Ǝ' }] },
+        ],
+      }],
+    });
+
+    const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
+
+    expect(result).toHaveLength(1);
+    const row = result[0];
+    expect(row?.ch).toBe('ǝ'); // lowercase survivor
+    expect(row?.caseGroup).toEqual(['Ǝ', 'ǝ']);
+    // Both producing rules must be present, not just the lowercase survivor's own.
+    expect(row?.contributors.ruleNodeIds).toEqual(expect.arrayContaining(['rule-lower', 'rule-upper']));
+    expect(row?.contributors.ruleNodeIds).toHaveLength(2);
   });
 });
 
