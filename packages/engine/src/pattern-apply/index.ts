@@ -281,6 +281,22 @@ export type {
   KeyIdMintingRequest,
 } from "./keyIdMinting.js";
 
+// Spec 061 US5 — the inherit-first wrapper and the keycap judgement.
+export { proposeTouchKeyId } from "./proposeTouchKeyId.js";
+export type {
+  TouchKeyIdProposalRequest,
+  TouchKeyIdProposal,
+  TouchKeyIdProposalReason,
+  NoProposalReason,
+} from "./proposeTouchKeyId.js";
+export { proposeKeycap, isKeycapRelated, isCombiningMark } from "./keycapRelatedness.js";
+export type {
+  KeycapProposal,
+  KeycapForm,
+  KeycapConsequence,
+  KeycapRelatednessOptions,
+} from "./keycapRelatedness.js";
+
 // The finding/fix shape and every layout/rule detector live in contracts as of
 // spec 058 T113/T114 (FR-040's one-implementation rule — Layer C cannot import
 // engine); `touchKeyDiagnostics.ts` re-exports them, so this barrel and its
@@ -291,6 +307,7 @@ export {
   groupTouchKeyFindingsByAddress,
   touchKeyFindingScope,
   findCrowdedTouchRows,
+  findKeycapMismatches,
   findDeadTouchKeys,
   findDuplicateTouchKeyIds,
   findHalfDoneSuppressions,

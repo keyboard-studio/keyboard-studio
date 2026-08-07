@@ -506,7 +506,7 @@ never required for any of them.
 
 **Wave 1 — the prerequisite (contract [id-and-keycap-proposals.md](contracts/id-and-keycap-proposals.md) §1.3):**
 
-- [ ] **T044** [US5] Enumerate every reachable character class — titlecase characters, free-standing
+- [x] **T044** [US5] Enumerate every reachable character class — titlecase characters, free-standing
   modifier symbols, emoji sequences, variation selectors, unassigned codepoints, empty output, plus
   the four already-handled minting rows — into a class table. FR-032 is only meaningful once this
   exists, and it is what makes SC-007 checkable rather than aspirational ·
@@ -516,10 +516,10 @@ never required for any of them.
 
 **⟶ Wait for T044 to finish, then (independent — different files):**
 
-- [ ] **T045** [P] [US5] Table-driven test over T044's class table asserting each row yields **either**
+- [x] **T045** [P] [US5] Table-driven test over T044's class table asserting each row yields **either**
   a proposal **or** a stated `noProposalReason` — never silence (SC-007, FR-032) ·
   `packages/engine/src/pattern-apply/proposeTouchKeyId.test.ts`
-- [ ] **T046** [P] [US5] Unit test for the five relatedness tests: identity after NFC, case variants
+- [x] **T046** [P] [US5] Unit test for the five relatedness tests: identity after NFC, case variants
   under BCP47, normalization variants including the NFKD case that makes `1` ↔ `١` related,
   dotted-circle carrier stripping, and spacing-accent stand-ins (`` ` `` ↔ U+0300). A localized
   number row must raise no mismatch (SC-008, US5 AS6) ·
@@ -529,14 +529,14 @@ never required for any of them.
 
 **⟶ Wait for the tests to be written, then (independent — different files):**
 
-- [ ] **T047** [P] [US5] New module exporting `proposeKeycap(output)` — `U+25CC` + the mark for a
+- [x] **T047** [P] [US5] New module exporting `proposeKeycap(output)` — `U+25CC` + the mark for a
   combining mark, the character itself otherwise, with the standalone form offered as an explicit
   non-default `alternative` carrying its `KeycapConsequence` — and `isKeycapRelated(keycap, output, opts)`
   implementing the five tests. **This is the only place compatibility decomposition (NFKD) is used**,
   and the module docstring must say so: the house rule of canonical decomposition for character
   *identity* is unchanged; this is a display judgement (research D8, FR-033, FR-034, FR-036) ·
   `packages/engine/src/pattern-apply/keycapRelatedness.ts`, `packages/engine/src/index.ts`
-- [ ] **T048** [P] [US5] New inherit-first proposer: (1) inherit when `inheritedId` is present and
+- [x] **T048** [P] [US5] New inherit-first proposer: (1) inherit when `inheritedId` is present and
   `producedByKeyId` covers **every** entry of `expectedOutputs` — default *and* modifier outputs —
   writing no rule; (2) otherwise ask whether any physical key already produces the character;
   (3) otherwise delegate to the untouched `proposeKeyId`; (4) otherwise set `noProposalReason`. Add
@@ -547,13 +547,13 @@ never required for any of them.
 
 **⟶ Wait for Wave 3 to finish, then (independent — different files):**
 
-- [ ] **T049** [P] [US5] Add `keycapAuthored?: boolean` to `TouchKeyIR` — additive and optional, so an
+- [x] **T049** [P] [US5] Add `keycapAuthored?: boolean` to `TouchKeyIR` — additive and optional, so an
   absent flag reads as "proposal-managed" for every existing corpus key. Set it **only** from the
   property panel's keycap field on author edit, never from a proposal; the emitter does not write it,
   so it correctly does not survive export→reimport (FR-035) ·
   `packages/contracts/src/keyboard-ir.ts`,
   `packages/studio/src/editors/assignLoop/keyGrid/KeyPropertyPanel.tsx`
-- [ ] **T050** [P] [US5] Add `TOUCH_KEY_KEYCAP_MISMATCH` (severity `hint`, scope `"key"`, never
+- [x] **T050** [P] [US5] Add `TOUCH_KEY_KEYCAP_MISMATCH` (severity `hint`, scope `"key"`, never
   blocking) with its `SetKeycapFix { kind: "setKeycap", address, proposed }` descriptor **and** its
   localized copy entry in the same change (research D7, FR-036, FR-037) ·
   `packages/contracts/src/touch-key-diagnostics.ts`,
@@ -561,7 +561,7 @@ never required for any of them.
 
 **⟶ Wait for Wave 4 to finish, then (independent — different files):**
 
-- [ ] **T051** [P] [US5] Emit the mismatch hint only when **all** five gating conditions pass, checked
+- [x] **T051** [P] [US5] Emit the mismatch hint only when **all** five gating conditions pass, checked
   in order with a bail on the first failure: `sp === 0`; a resolvable output; a non-empty keycap;
   `keycapAuthored` unset; `isKeycapRelated` false. Rides the same `useMemo` cycle — no second timer
   (contract §3.1, FR-036, FR-039) ·

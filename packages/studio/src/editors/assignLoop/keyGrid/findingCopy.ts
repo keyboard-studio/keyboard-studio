@@ -183,6 +183,13 @@ function findingTitleDescriptor(finding: TouchKeyFinding): MessageDescriptor {
         id: "editor.assignLoop.keyGrid.finding.rowCrowded.title",
         message: `Row ${{ rowNumber: Number(finding.fields.rowIndex ?? 0) + 1 }} has ${{ interactiveKeyCount: fieldText(finding, "interactiveKeyCount") }} keys, more than ${{ platform: fieldText(finding, "platform") }} fits comfortably`,
       });
+    case "TOUCH_KEY_KEYCAP_MISMATCH":
+      // Names both halves, because the author needs to compare them to judge
+      // whether the hint is right — this is a judgement call, not a defect.
+      return msg({
+        id: "editor.assignLoop.keyGrid.finding.keycapMismatch.title",
+        message: `This key is labelled "${{ keycap: fieldText(finding, "keycap") }}" but types "${{ output: fieldText(finding, "output") }}"`,
+      });
     default: {
       // Exhaustiveness guard — see the module doc. A new code without copy is a
       // compile error here, not a raw identifier rendered at an author.
@@ -303,6 +310,15 @@ function findingDetailDescriptor(finding: TouchKeyFinding): MessageDescriptor | 
         id: "editor.assignLoop.keyGrid.finding.rowCrowded.detail",
         message: `Past about ${{ platformMaxKeys: fieldText(finding, "platformMaxKeys") }} keys in a row, each key gets too narrow to hit reliably on a small screen. You can leave it this way — nothing here is blocked.`,
       });
+    case "TOUCH_KEY_KEYCAP_MISMATCH":
+      // Says out loud that leaving it is legitimate. A keycap deliberately
+      // unlike its output is a real design choice in plenty of scripts, and
+      // this hint must not read as an accusation.
+      return msg({
+        id: "editor.assignLoop.keyGrid.finding.keycapMismatch.detail",
+        message:
+          "Usually this means the label was left behind when the key changed. If you meant it, leave it — setting the label yourself stops this being mentioned again.",
+      });
     default:
       return undefined;
   }
@@ -392,6 +408,11 @@ function fixLabelDescriptor(fix: TouchKeyFix): MessageDescriptor {
       return msg({
         id: "editor.assignLoop.keyGrid.fix.trimRow",
         message: `Show me this row so I can remove ${{ overBy: fix.overBy }}`,
+      });
+    case "setKeycap":
+      return msg({
+        id: "editor.assignLoop.keyGrid.fix.setKeycap",
+        message: `Label it "${{ proposed: fix.proposed }}"`,
       });
     case "reviewKey":
       return msg({

@@ -168,7 +168,18 @@ export type TouchKeyFindingCode =
    * exceeding the maximum "MUST NOT be prevented" — the author is told, and the
    * edit succeeds.
    */
-  | "TOUCH_KEY_ROW_CROWDED";
+  | "TOUCH_KEY_ROW_CROWDED"
+  /**
+   * Spec 061 FR-036: a key's keycap is not recognisably related to what the key
+   * types — most often a label left over from whatever the key produced before.
+   *
+   * `hint` severity and never blocking, because a keycap that "does not match"
+   * is a judgement, not a defect: plenty of real keyboards label a key with
+   * something deliberately unlike its output. The five gating conditions
+   * (FR-036, contract §3.1) exist to keep this quiet, and an author who set the
+   * keycap themselves (`keycapAuthored`) is never asked about it at all.
+   */
+  | "TOUCH_KEY_KEYCAP_MISMATCH";
 
 /**
  * What a finding's {@link TouchKeyFinding.address} names. Absent means
@@ -341,10 +352,25 @@ export interface TrimRowFix {
 }
 
 /**
+ * Relabel a key with the proposed keycap (spec 061 FR-036, FR-037).
+ *
+ * Unlike {@link TrimRowFix} and {@link ReviewKeyFix}, this one IS a concrete
+ * mutation: `proposeKeycap` already computed the right label, so there is a
+ * single unambiguous answer to apply. Applying it does not set
+ * `keycapAuthored` — the author accepted a proposal rather than writing one.
+ */
+export interface SetKeycapFix {
+  readonly kind: "setKeycap";
+  readonly address: string;
+  readonly proposed: string;
+}
+
+/**
  * One offered remedy. Every member carries `address` so the studio can act on a
  * fix without re-deriving where it applies.
  */
 export type TouchKeyFix =
+  | SetKeycapFix
   | AddRuleFix
   | ConvertToUnicodeIdFix
   | RenameKeyFix

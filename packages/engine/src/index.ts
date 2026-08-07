@@ -271,6 +271,25 @@ export type { CarveNeededSet, DeriveCarveNeededSetArgs } from "./marks/carve-nee
 export { applyMarkGuards, MARKS_GUARD_GROUP, MARKS_UNWRAP_FROM_STORE, MARKS_UNWRAP_TO_STORE } from "./pattern-apply/mark-guards.js";
 export type { MarkGuardsResult } from "./pattern-apply/mark-guards.js";
 
+// spec 061 US5 — id and keycap proposals (FR-029…FR-037). The studio's only
+// sanctioned door to the inherit-first proposer and the keycap judgement.
+export {
+  proposeTouchKeyId,
+  proposeKeycap,
+  isKeycapRelated,
+  isCombiningMark,
+} from "./pattern-apply/index.js";
+export type {
+  TouchKeyIdProposalRequest,
+  TouchKeyIdProposal,
+  TouchKeyIdProposalReason,
+  NoProposalReason,
+  KeycapProposal,
+  KeycapForm,
+  KeycapConsequence,
+  KeycapRelatednessOptions,
+} from "./pattern-apply/index.js";
+
 // spec 058 — key-level touch layout edit overlay: step 1.7 of
 // projectWorkingCopyVfs (the layout half, Case B) plus the shared address
 // parser its rule-half sibling pass reuses (contracts/key-edit-overlay.md).

@@ -67,9 +67,12 @@
 import {
   computeTouchKeyDiagnostics,
   parseTouchKeyAddress,
+  producedByKeyId,
+  touchKeyAddress,
   type TouchKeyDiagnosticInputs,
   type TouchKeyFinding,
 } from "@keyboard-studio/contracts";
+import { isKeycapRelated, proposeKeycap } from "./keycapRelatedness.js";
 
 import type { KeyEditOperation, KeyEditOverlay } from "./keyEditOps.js";
 
@@ -194,6 +197,97 @@ function bucketOp(
   else bucket.removeAddresses.push(op.address);
 }
 
+
+// ---------------------------------------------------------------------------
+// TOUCH_KEY_KEYCAP_MISMATCH — spec 061 FR-036: the label does not match the key
+// ---------------------------------------------------------------------------
+
+/**
+ * A key labelled as one thing that types another — usually a keycap left behind
+ * when the key's output changed.
+ *
+ * **This detector's design is its five gates, not its comparison.** A keycap
+ * that "does not match" is a judgement, not a defect: real keyboards label keys
+ * with things deliberately unlike their output, and a hint that fires on those
+ * is noise that trains authors to ignore the whole diagnostics pane. So the
+ * gates are checked IN ORDER with a bail on the first failure (contract §3.1),
+ * and each one removes a class of legitimate mismatch:
+ *
+ *   1. `sp === 0` — character keys only. A frame key (`1`/`2`), a deadkey-styled
+ *      key (`8`) or a spacer is SUPPOSED to be labelled unlike its output;
+ *      `*Shift*` is the point, not a mistake.
+ *   2. A resolvable output — with nothing to compare against there is no
+ *      judgement to make. A key whose rules produce several different characters
+ *      is deliberately unresolvable: no single one of them is "the" output.
+ *   3. A non-empty keycap — a blank key has no label to be wrong.
+ *   4. `keycapAuthored` unset (FR-035) — an author who typed this label has
+ *      already answered the question this hint would ask.
+ *   5. `isKeycapRelated` false — the actual comparison, and the last thing tried
+ *      because it is the most expensive and the most forgiving.
+ *
+ * Pure and synchronous like every other detector here: it rides the existing
+ * `useMemo` inside the 300 ms cycle and starts no second timer (D3, FR-039).
+ */
+export function findKeycapMismatches(
+  inputs: TouchKeyDiagnosticInputs,
+  opts?: { readonly bcp47?: string },
+): readonly TouchKeyFinding[] {
+  const { layout, ruleIndex } = inputs;
+  const findings: TouchKeyFinding[] = [];
+
+  for (const platform of layout.platforms) {
+    for (const layer of platform.layers) {
+      for (const row of layer.rows) {
+        for (const key of row.keys) {
+          // Gate 1 — character keys only. An ABSENT `sp` is a character key.
+          if (key.sp !== undefined && key.sp !== 0) continue;
+
+          // Gate 2 — a resolvable output. `output` wins; otherwise the rule
+          // join, and only when it names exactly one character.
+          let output = key.output;
+          if (output === undefined || output.length === 0) {
+            if (key.id === undefined || key.id.length === 0) continue;
+            const produced = producedByKeyId(ruleIndex, key.id);
+            if (produced.length !== 1) continue;
+            output = produced[0];
+          }
+          if (output === undefined || output.length === 0) continue;
+
+          // Gate 3 — a non-empty keycap.
+          const keycap = key.text;
+          if (keycap === undefined || keycap.length === 0) continue;
+
+          // Gate 4 — the author's own label is never second-guessed.
+          if (key.keycapAuthored === true) continue;
+
+          // Gate 5 — the comparison.
+          if (isKeycapRelated(keycap, output, opts?.bcp47 === undefined ? {} : { bcp47: opts.bcp47 })) {
+            continue;
+          }
+
+          const proposed = proposeKeycap(output).keycap;
+          findings.push({
+            code: "TOUCH_KEY_KEYCAP_MISMATCH",
+            severity: "hint",
+            address: touchKeyAddress(platform.id, layer.id, key.id ?? ""),
+            scope: "key",
+            fields: { keycap, output },
+            fixes: [
+              {
+                kind: "setKeycap",
+                address: touchKeyAddress(platform.id, layer.id, key.id ?? ""),
+                proposed,
+              },
+            ],
+          } as TouchKeyFinding);
+        }
+      }
+    }
+  }
+
+  return findings;
+}
+
 // ---------------------------------------------------------------------------
 // The combined aggregator
 // ---------------------------------------------------------------------------
@@ -215,7 +309,7 @@ export function computeAllTouchKeyDiagnostics(
   inputs: TouchKeyDiagnosticInputs,
   overlay?: KeyEditOverlay,
 ): readonly TouchKeyFinding[] {
-  const layoutFindings = computeTouchKeyDiagnostics(inputs);
+  const layoutFindings = [...computeTouchKeyDiagnostics(inputs), ...findKeycapMismatches(inputs)];
   if (overlay === undefined || overlay.ops.length === 0) return layoutFindings;
   return [...layoutFindings, ...findMixedSuppressRemove(overlay)];
 }

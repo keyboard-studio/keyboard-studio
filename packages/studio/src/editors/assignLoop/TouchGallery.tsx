@@ -3181,6 +3181,19 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           setSelectedKeyAddress(fix.address);
           return;
         }
+        case "setKeycap": {
+          // Spec 061 FR-036: a real mutation, unlike `trimRow`/`reviewKey` —
+          // `proposeKeycap` already computed the one right label, so there is
+          // nothing for the author to decide. Deliberately does NOT set
+          // `keycapAuthored`: accepting a proposal is not authoring one, and
+          // flagging it would silence the hint for every later change too.
+          commitKeyEditOp({
+            address: fix.address,
+            kind: "set",
+            fields: { text: fix.proposed },
+          });
+          return;
+        }
         case "reviewKey": {
           // "Look at this key" — ReviewKeyFix's own doc: "FR-041 asks only
           // that a fix be concrete, not that it be a data mutation."
