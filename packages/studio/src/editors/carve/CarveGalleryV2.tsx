@@ -1,13 +1,13 @@
-// CarveGalleryV2 — character-first carve gallery (#1399), rendered when the
-// VITE_CARVE_V2 / ?carvev2=1 flag is set (default OFF — carveAdapter otherwise
-// renders the rule/node "Rail" view, CarveGallery.tsx, which is untouched).
-// Making V2 the default is deferred to its own change against #1399.
+// CarveGalleryV2 — character-first carve gallery. v2 is now the
+// default/live carve gallery, rendered unconditionally by carveAdapter.tsx.
+// The former rule/node "Rail" view (v1, CarveGallery.tsx) is retained but
+// commented out in carveAdapter.tsx for rollback.
 //
 // Shows every character the keyboard can type in one panel; the author
 // discards CHARACTERS, not rules. Toggling a character resolves its
 // contributors (irToCharacterView.ts, built on collectCharContributors) and
-// cascades through the SAME workingCopyStore actions CarveGallery already
-// uses (cascadeDelete/cascadeRestore) — no new write path.
+// cascades through the SAME workingCopyStore actions v1 (CarveGallery.tsx)
+// already uses (cascadeDelete/cascadeRestore) — no new write path.
 
 import { useState, useMemo, useCallback } from 'react';
 import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
@@ -227,7 +227,10 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   }
 
   return (
-    <div data-testid="carve-gallery-v2" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--app-bg)', color: 'var(--app-text)' }}>
+    // v2 adopts v1's e2e testid contract ("carve-gallery" / "carve-continue")
+    // now that v2 is the sole live carve gallery — keeps pass-through e2e
+    // specs green with zero edits.
+    <div data-testid="carve-gallery" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--app-bg)', color: 'var(--app-text)' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 22px', borderBottom: '1px solid var(--app-border)', flexShrink: 0 }}>
         {onBack !== undefined && (
@@ -256,7 +259,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
           Skip
         </button>
         <button
-          data-testid="carve-v2-continue"
+          data-testid="carve-continue"
           onClick={onComplete}
           style={{ font: '600 13px var(--app-font)', cursor: 'pointer', color: '#fff', background: 'var(--app-accent)', border: 'none', borderRadius: 8, padding: '9px 18px' }}
         >

@@ -1,22 +1,53 @@
-// E2E: Rule Carver deletion round-trip (spec §11 carve gallery; engine
+// E2E: character-discard deletion round-trip (spec §11 carve gallery; engine
 // pattern-apply/carveFilterIr.ts).
 //
 // Proves the full AC2 chain for the carve feature: importing a keyboard with
-// recognized patterns AND at least one opaque (raw) rule, carving that one
-// opaque rule out via the Inspector's two-step confirm, confirming the live
-// working-copy IR reflects the deletion via the window.__ksE2E__ hook, then
-// confirming the emitted .kmn genuinely omits the deleted rule's distinguishing
+// recognized patterns, discarding a CHARACTER in the v2 character-first carve
+// gallery (CarveGalleryV2.tsx — the live carve gallery; v1's rule/node "Rail"
+// view, CarveGallery.tsx, is retained but commented out in carveAdapter.tsx
+// for rollback and is no longer reachable), confirming the live working-copy
+// IR reflects the cascade deletion via the window.__ksE2E__ hook, then
+// confirming the emitted .kmn genuinely omits the deleted rules' distinguishing
 // output token.
 //
 // Fixture: bj_cree_woods (Western Cree, TH-Woods variant — see
-// docs/keyboard-index.md). Chosen because its source .kmn contains a raw
-// (opaque) fragment at nodeId "rule#93":
+// docs/keyboard-index.md).
+//
+// PORT NOTE (v1 -> v2): the pre-overhaul version of this spec targeted
+// nodeId "rule#93", a raw/opaque fragment —
 //
 //   if(option_key = '') U+1427 any(C_ef) > index(C_efc,3)
 //
-// rule#93 is the ONLY rule in the keyboard that references the C_efc store,
-// so its distinguishing token in the emitted .kmn is "index(C_efc,3)" —
-// present when the rule is kept, absent once it is carved out.
+// — carved out via v1's rule-level Inspector two-step confirm
+// (raw-remove-anyway / raw-confirm-remove). That path has NO v2 equivalent:
+// v2 is character-first, and `collectCharContributors` (engine) can only
+// ever list an opaque RawKmnFragment's contribution in `blocked`
+// (`blockedReasonCode: 'opaque-fragment'`), never in `ruleNodeIds` or
+// `storeSlotIds` — by design, per that function's own header doc ("OPAQUE
+// FRAGMENTS: RawKmnFragment producers can only be whole-fragment-deleted").
+// `characterCellIsToggleable` (irToCharacterView.ts) reads only
+// `ruleNodeIds`/`storeSlotIds`, so every one of the 76 characters
+// rule#93 alone produces (the full C_efc store, referenced by no other
+// rule) renders as a NON-toggleable cell in CarveGalleryV2 — confirmed
+// empirically (parseKmn + collectCharContributors against this exact
+// fixture) before this port, not assumed. `recommendedRemovalChars` shields
+// the same characters for the same reason ("any collectCharContributors
+// `blocked` entry ... shields immediately"). There is currently NO UI path
+// in v2 to discard a character whose sole producer is an opaque fragment —
+// a genuine v1/v2 capability gap, flagged here rather than silently
+// dropped or worked around.
+//
+// This spec is ported to the EQUIVALENT case v2 DOES support: two literal,
+// non-opaque, single-character-output rules — rule#18 (`+ "l" > U+14EC`) and
+// rule#20 (`+ "L" > U+14EC`) — both producing U+14EC (ᓬ, the western-style
+// "l/L" sigma character) and reachable through no other rule or store in
+// this fixture (verified by grep: "U+14EC" appears only on those two source
+// lines). Discarding the character in the v2 gallery cascades to BOTH
+// producing rules at once (`collectCharContributors` returns every rule
+// whose entire output equals the target char), so "U+14EC" disappearing
+// from the emitted .kmn proves the SAME cascade-delete -> re-emit contract
+// AC2 always asserted, just via v2's character-first model instead of
+// v1's rule-first one.
 //
 // Run (Playwright is the global CLI only — see playwright.config.ts header):
 //   cd packages/studio && npx playwright test carve.spec.ts
@@ -48,9 +79,16 @@ import {
 // ---------------------------------------------------------------------------
 
 const BASE_KEYBOARD_ID = "bj_cree_woods";
-const TARGET_NODE_ID = "rule#93";
-// Present in the emitted .kmn iff rule#93 (the sole index(C_efc,...) user) survives.
-const KEPT_ONLY_TOKEN = "index(C_efc,3)";
+// Both producing rules for the target character (see the PORT NOTE above) —
+// discarding the character cascades to both at once.
+const TARGET_RULE_IDS = ["rule#18", "rule#20"];
+// The codepoint-label text CarveGalleryV2's search box and grid cells key on
+// (irToCharacterView.ts's codepointLabel()/CarveGalleryV2.tsx's aria-label).
+const TARGET_CODEPOINT_LABEL = "U+14EC";
+// Present in the emitted .kmn iff EITHER of rule#18/rule#20 (the sole
+// producers of U+14EC in this fixture — verified by grep, no store or other
+// rule references it) survives.
+const KEPT_ONLY_TOKEN = "U+14EC";
 const KMN_ZIP_PATH = `source/${BASE_KEYBOARD_ID}.kmn`;
 
 /**
@@ -59,41 +97,33 @@ const KMN_ZIP_PATH = `source/${BASE_KEYBOARD_ID}.kmn`;
  * idiom e2e/tab-roundtrip.spec.ts and e2e/decision-deeplink.spec.ts use
  * (KNOWN_CONTRAST_DEBT). This is spec 056's open tracker debt
  * (specs/056-ada-accessibility/wcag-2.2-aa-tracker.md, 1.4.3 is an open
- * `unknown` row), not anything introduced or touched by spec 057 — the
- * components (CarveGallery.tsx, RemovalBanner.tsx) are byte-identical to
- * `main` (see specs/057-bulletproof-navigation/evidence/gating-red.md
- * §"Two corrections made to reach a *valid* red").
+ * `unknown` row).
+ *
+ * PORT NOTE (v1 -> v2): this list previously named v1's Rail-only surfaces
+ * (Rail.tsx's carve-card buttons and sticky SectionHeader, GlyphCell.tsx's
+ * cross-reference chips, and CarveGallery.tsx's "Hide info panel" toggle) —
+ * none of those components render anymore now that CarveGalleryV2 is the
+ * live gallery (v1 is commented out in carveAdapter.tsx), so those entries
+ * are retired rather than left as no-op selectors. The RemovalBanner
+ * entries stay: v2 reuses RemovalBanner.tsx unchanged ("reused as-is" per
+ * CarveGalleryV2.tsx's own comment), so its pre-existing debt still applies.
+ * The Continue-button entry is kept conservatively (v2's button reuses the
+ * same var(--app-accent)-background/white-text combo v1's carried) but is
+ * UNVERIFIED against v2's actual render — flagged for a fresh axe pass
+ * rather than assumed.
  */
 const KNOWN_CONTRAST_DEBT: readonly string[] = [
-  // 1.4.3 — CarveGallery's info-panel toggle button.
-  'button[aria-label="Hide info panel"]',
-  // 1.4.3 — CarveGallery's footer "Continue" button.
+  // 1.4.3 — CarveGalleryV2's footer "Continue" button — see the port note
+  // above; unverified against v2's own render, kept conservative.
   'button[data-testid="carve-continue"]',
-  // 1.4.3 — RemovalBanner's dismiss control (assignLoop/parts/RemovalBanner.tsx).
+  // 1.4.3 — RemovalBanner's dismiss control (assignLoop/parts/RemovalBanner.tsx),
+  // reused unchanged by v2.
   'button[aria-label="Dismiss removal recommendation"]',
   // 1.4.3 — RemovalBanner's own region (its collapsed-strip text sits on the
   // green-tinted background at a ratio axe flags). Excluded by the banner's
   // stable aria-label rather than the anonymous div chain axe reports (the
   // chain has no data-testid/aria hook of its own to key on).
   'div[aria-label="Removal recommendation"]',
-  // 1.4.3 — Rail's per-node carve-card buttons: the "kept/total" and
-  // per-modifier breakdown spans inside them (Rail.tsx) fall short.
-  // Excluded by the testid PREFIX (carve-card-<nodeId> varies per fixture,
-  // e.g. "carve-card-group#0") rather than the brittle nth-child span chain
-  // axe reports for the same reason.
-  'button[data-testid^="carve-card-"]',
-  // 1.4.3 — GlyphCell's cross-reference tag chips (assignLoop/parts/
-  // GlyphCell.tsx): "<kind> — go to" / "<kind> — N places". Keyed on the
-  // aria-label SUFFIX because the kind prefix varies ("store", "group", ...)
-  // and the chips carry no testid.
-  'button[aria-label$="go to"]',
-  'button[aria-label$="places"]',
-  // 1.4.3 — Rail's sticky SectionHeader (assignLoop/parts/Rail.tsx): the
-  // tone-colored uppercase section label. The header is an anonymous div
-  // with no testid/aria hook, so it is keyed on its one distinguishing
-  // attribute — the inline-style signature only this header uses. Adding a
-  // programmatic landmark to Rail is 056's call, not this spec's.
-  'div[style*="letter-spacing: 0.13em"]',
 ];
 
 /**
@@ -149,8 +179,8 @@ declare global {
 // Spec
 // ---------------------------------------------------------------------------
 
-test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn", () => {
-  test("deleting rule#93 in the carve gallery removes it from the deleted-node IR state and from the emitted .kmn", async ({ page }) => {
+test.describe("Carve gallery (v2) — discard one character, verify IR + emitted .kmn", () => {
+  test("discarding U+14EC in the carve gallery removes both producing rules from the deleted-node IR state and from the emitted .kmn", async ({ page }) => {
     // ?e2e=1 is the runtime override for installE2eHook() (src/lib/e2eHook.ts)
     // — no VITE_E2E build flag needed. Seed the returning-visitor flag first
     // so the fresh browser context skips WelcomeScreen (see seedReturningVisitor).
@@ -174,42 +204,54 @@ test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn",
     // Phase B.
 
     // ---------------------------------------------------------------------
-    // Carve gallery
+    // Carve gallery (v2 — CarveGalleryV2.tsx, character-first)
     // ---------------------------------------------------------------------
     const carveGallery = page.getByTestId("carve-gallery");
     await expect(carveGallery).toBeVisible({ timeout: 30_000 });
-
-    const targetCard = page.getByTestId(`carve-card-${TARGET_NODE_ID}`);
-    await expect(targetCard).toBeVisible();
-    await expect(targetCard).toHaveAttribute("data-kind", "raw");
 
     // Accessibility gate (spec 056 FR-003): scan the carve gallery screen.
     await expectNoSeriousAxeViolations(page, "carve gallery (bj_cree_woods)", {
       exclude: KNOWN_CONTRAST_DEBT,
     });
 
-    await targetCard.click();
+    // Narrow the character grid to the target character via the search box
+    // (matches on codepoint-label text, irToCharacterView.ts's
+    // codepointLabel()), then click its cell directly — v2 is single-click
+    // discard ("Click any character to discard it — nothing is deleted
+    // until you continue", CarveGalleryV2.tsx's own header copy), unlike
+    // v1's rule-level two-step raw-remove-anyway/raw-confirm-remove confirm.
+    await page.getByLabel("Search a character or code point").fill(TARGET_CODEPOINT_LABEL);
+    const targetCell = page.locator(`button[aria-label*="${TARGET_CODEPOINT_LABEL}"]`);
+    await expect(targetCell).toBeVisible();
+    await expect(targetCell).toHaveAttribute("aria-pressed", "false");
 
-    await page.getByTestId("raw-remove-anyway").click();
-    await page.getByTestId("raw-confirm-remove").click();
+    await targetCell.click();
+    await expect(targetCell).toHaveAttribute("aria-pressed", "true");
 
     // ---------------------------------------------------------------------
     // AC2 checkpoint 1: the IR reflects the deletion.
     //
-    // getWorkingIr().raw still LISTS rule#93 — the raw array is filtered at
-    // emit time by carveFilterIr, not mutated in place. The deletion is
-    // recorded in the deletedNodeIds overlay, which is what this asserts.
+    // getWorkingIr() still LISTS rule#18/rule#20 in their group — the rules
+    // array is filtered at emit time by carveFilterIr, not mutated in place.
+    // The deletion is recorded in the deletedNodeIds overlay, which is what
+    // this asserts (mirrors the v1 spec's identical rule/raw-array-vs-overlay
+    // contract, just over ir.groups[].rules instead of ir.raw).
     // ---------------------------------------------------------------------
     await expect
       .poll(
         () => page.evaluate(() => window.__ksE2E__?.getDeletedNodeIds() ?? []),
         { timeout: 5_000 },
       )
-      .toContain(TARGET_NODE_ID);
+      .toEqual(expect.arrayContaining(TARGET_RULE_IDS));
 
     const workingIr = await page.evaluate(() => window.__ksE2E__?.getWorkingIr() ?? null);
     expect(workingIr).not.toBeNull();
-    expect(workingIr?.raw.some((frag) => frag.nodeId === TARGET_NODE_ID)).toBe(true);
+    for (const ruleId of TARGET_RULE_IDS) {
+      expect(
+        workingIr?.groups.some((g) => g.rules.some((r) => r.nodeId === ruleId)),
+        `expected ${ruleId} still listed in the live (pre-carve-filter) IR`,
+      ).toBe(true);
+    }
 
     await page.getByTestId("carve-continue").click();
 
@@ -230,7 +272,7 @@ test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn",
     });
 
     // ---------------------------------------------------------------------
-    // AC2 checkpoint 2: the emitted .kmn omits the deleted rule.
+    // AC2 checkpoint 2: the emitted .kmn omits both deleted rules.
     // ---------------------------------------------------------------------
     const downloadButton = page.getByTestId("emit-download");
     await expect(downloadButton).toBeEnabled({ timeout: 30_000 });
@@ -302,13 +344,14 @@ test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn",
     await expect(page.getByTestId("emit-download-kmp-error")).toHaveCount(0);
   });
 
-  // Positive control — same walk, but the opaque rule is left in place, so
-  // the emitted .kmn MUST contain the token. This is the guard that proves
-  // the primary test's negative assertion is actually exercising the carve
-  // path rather than passing because the token was never emitted at all
-  // (e.g. a scaffold/base-resolution regression that silently drops raw
-  // fragments before the carve step even runs).
-  test("control: keeping rule#93 leaves its distinguishing token in the emitted .kmn", async ({ page }) => {
+  // Positive control — same walk, but the character (and its two producing
+  // rules) is left in place, so the emitted .kmn MUST contain the token.
+  // This is the guard that proves the primary test's negative assertion is
+  // actually exercising the carve path rather than passing because the
+  // token was never emitted at all (e.g. a scaffold/base-resolution
+  // regression that silently drops these rules before the carve step even
+  // runs).
+  test("control: keeping U+14EC leaves its distinguishing token in the emitted .kmn", async ({ page }) => {
     await seedReturningVisitor(page);
     await page.goto("/?e2e=1");
 
@@ -325,18 +368,19 @@ test.describe("Rule Carver — carve one opaque rule, verify IR + emitted .kmn",
     const carveGallery = page.getByTestId("carve-gallery");
     await expect(carveGallery).toBeVisible({ timeout: 30_000 });
 
-    // Select the card to confirm it is present and raw-kind, but do NOT
-    // remove it — this is the "nothing carved" control path.
-    const targetCard = page.getByTestId(`carve-card-${TARGET_NODE_ID}`);
-    await expect(targetCard).toBeVisible();
-    await expect(targetCard).toHaveAttribute("data-kind", "raw");
+    // Confirm the target cell is present and not (yet) discarded, but do NOT
+    // click it — this is the "nothing carved" control path.
+    await page.getByLabel("Search a character or code point").fill(TARGET_CODEPOINT_LABEL);
+    const targetCell = page.locator(`button[aria-label*="${TARGET_CODEPOINT_LABEL}"]`);
+    await expect(targetCell).toBeVisible();
+    await expect(targetCell).toHaveAttribute("aria-pressed", "false");
 
     await expect
       .poll(
         () => page.evaluate(() => window.__ksE2E__?.getDeletedNodeIds() ?? []),
         { timeout: 5_000 },
       )
-      .not.toContain(TARGET_NODE_ID);
+      .not.toEqual(expect.arrayContaining(TARGET_RULE_IDS));
 
     await page.getByTestId("carve-continue").click();
 
