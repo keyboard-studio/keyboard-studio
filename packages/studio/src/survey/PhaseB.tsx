@@ -7,8 +7,8 @@
 //                 entirely when it does not. Accepting seeds the draft and
 //                 lands on the same build-list page, prefilled; it is not a
 //                 separate persisted DiscoveryMethod.
-//   build-list  — unified "add your whole alphabet": tick CLDR suggestions, type
-//                 the rest of the alphabet, browse+toggle the right-pane
+//   build-list  — unified "add your whole alphabet": type every character
+//                 your language uses, browse+toggle the right-pane
 //                 character map (CharacterMapPane.tsx, rendered by StudioShell's
 //                 SurveyView — see stores/phaseBDraftStore.ts for the shared
 //                 alphabet the two panes both mutate) (DEFAULT)
@@ -1151,7 +1151,7 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
       value: "build-list",
       label: t({
         id: "survey.phaseB.intro.method.buildList",
-        message: "Add your whole alphabet — type every character your language uses and tick suggested ones",
+        message: "Add your whole alphabet — type every character your language uses",
       }),
     },
     {
@@ -1196,7 +1196,7 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
       <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, lineHeight: 1.5 }}>
         <Trans id="survey.phaseB.intro.explanation">
           Both methods feed the same final alphabet.
-          The first method starts with verified suggestions and lets you type the rest of your alphabet yourself.
+          The first method lets you type your whole alphabet directly.
         </Trans>
       </p>
 
