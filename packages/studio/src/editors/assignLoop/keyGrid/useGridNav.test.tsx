@@ -72,6 +72,9 @@ function makeCell(overrides: Partial<KeyGridCellViewModel> & { id: string }): Ke
   const address = overrides.address ?? `phone:default:${overrides.id}`;
   return {
     address,
+    // See KeyGrid.test.tsx's `makeCell` — the address is the right default,
+    // being what the real builder produces for a first occurrence.
+    cellKey: overrides.cellKey ?? address,
     id: overrides.id,
     keycap: overrides.keycap ?? overrides.id,
     sp: overrides.sp,

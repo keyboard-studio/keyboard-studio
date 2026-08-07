@@ -82,6 +82,27 @@
  * layer-level strip reads those from the flat list instead. Filtering them here
  * would just move the same decision to two call sites.
  *
+ * ## Duplicate ids — why a cell has both an `address` and a `cellKey`
+ *
+ * `touchKeyAddress(platform, layerId, key.id)` is derived from the id alone, and
+ * ids are NOT unique within a layer. Real corpus data: the shipped
+ * `sil_cameroon_azerty.keyman-touch-layout` carries `T_BLANK` twenty-five times
+ * and `K_SHIFT` twice inside a single tablet layer. Blank and spacer keys have
+ * nothing to name them, so every scaffolded layout does the same.
+ *
+ * That is fine for the OVERLAY, which is what the address exists for: an
+ * operation names a key, `resolveKeyAddress` finds it, and the address survives
+ * a round trip through the wire format. It is not fine for RENDERING, where
+ * React needs a key unique among siblings — see `cellKey` for the concrete DOM
+ * leak that followed from conflating the two.
+ *
+ * **What this does not fix, and is not trying to:** an address that names three
+ * keys still RESOLVES to the first of them. Selecting the ninth `T_BLANK`
+ * highlights all twenty-five (`isSelected` compares addresses) and the property
+ * panel edits the first. That is a property of the spec-owned address format,
+ * not of this projection, so it is not something this module may quietly
+ * redefine — flagged rather than papered over.
+ *
  * ## `producedChars` semantics — narrower than `computeTouchCoverage`
  *
  * `computeTouchCoverage`'s `collectKeyChars` is deliberately GENEROUS for
@@ -184,6 +205,30 @@ const EMPTY_FINDINGS_MAP: ReadonlyMap<string, readonly TouchKeyFinding[]> = new 
 export interface KeyGridCellViewModel {
   /** Stable `touchKeyAddress(platform, layerId, key.id)` — never hand-rolled. */
   readonly address: string;
+  /**
+   * A RENDER-IDENTITY handle, unique across the layer — `address` when this is
+   * the first key with that address, else `address#<occurrence>`.
+   *
+   * `address` is derived from `key.id` alone, so it is emphatically NOT unique
+   * within a layer: the shipped `sil_cameroon_azerty.keyman-touch-layout` has
+   * `T_BLANK` twenty-five times and `K_SHIFT` twice inside one tablet layer,
+   * and every scaffolded layout reuses one blank id for every filler slot. That
+   * is legitimate — a blank key has nothing to name it — but it makes `address`
+   * unusable as a React `key`, and using it as one leaked DOM: React's keyed
+   * reconciliation maps previous children BY key, so duplicates overwrite each
+   * other, the shadowed fibers are never matched on a later render and never
+   * enter the deletion set, and they stay mounted. Switching layers piled up
+   * orphaned blanks and front-of-row keys on every switch.
+   *
+   * This field exists so the grid has something unique to key on. It is
+   * deliberately NOT a second address: nothing resolves it against a layout,
+   * nothing puts it in an overlay operation, and `address` is unchanged — that
+   * one is the overlay's contract with the engine (`resolveKeyAddress`), and
+   * this was a rendering-identity problem, not an addressing one. See the
+   * "Duplicate ids" section of this module's doc for what the addressing half
+   * still costs.
+   */
+  readonly cellKey: string;
   readonly id: string;
   /** The keycap label (`TouchKeyIR.text`), defaulted to `""` when absent. */
   readonly keycap: string;
@@ -339,11 +384,13 @@ function buildCell(
   ruleIndex: TouchKeyRuleIndex,
   findingsByAddress: ReadonlyMap<string, readonly TouchKeyFinding[]>,
   isLastInRow: boolean,
+  cellKey: string,
 ): KeyGridCellViewModel {
   const address = touchKeyAddress(platform, layerId, key.id);
   return {
     isLastInRow,
     address,
+    cellKey,
     id: key.id,
     keycap: key.text ?? "",
     sp: key.sp,
@@ -401,17 +448,26 @@ export function buildKeyGridViewModel(
   const layerEntry = platformEntry.layers.find((l) => l.id === layerId);
   if (!layerEntry) return undefined;
 
+  // Occurrence counter for `cellKey`, walked in row-major order across the
+  // WHOLE layer — a duplicate id spanning two rows (K_SHIFT at both ends of a
+  // row, T_BLANK filling several) has to disambiguate against every earlier
+  // occurrence, not just the ones in its own row. See `cellKey`'s own doc.
+  const seenAddresses = new Map<string, number>();
   const rowKeys = layerEntry.rows.map((row) =>
-    row.keys.map((key, keyIndex) =>
-      buildCell(
+    row.keys.map((key, keyIndex) => {
+      const address = touchKeyAddress(platform, layerId, key.id);
+      const occurrence = seenAddresses.get(address) ?? 0;
+      seenAddresses.set(address, occurrence + 1);
+      return buildCell(
         key,
         platform,
         layerId,
         ruleIndex,
         findingsByAddress,
         keyIndex === row.keys.length - 1,
-      ),
-    ),
+        occurrence === 0 ? address : `${address}#${occurrence}`,
+      );
+    }),
   );
   const rowTotals = rowKeys.map(rowTotalPct);
   const layerMax = rowTotals.length > 0 ? Math.max(...rowTotals) : 0;

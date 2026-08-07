@@ -80,6 +80,11 @@ function makeCell(
   const address = overrides.address ?? `phone:default:${overrides.id}`;
   return {
     address,
+    // Defaults to the address, matching what `buildKeyGridViewModel` produces
+    // for the FIRST key with a given address. A fixture that deliberately
+    // repeats an address (the duplicate-id tests below) supplies its own, the
+    // way the real builder's occurrence counter would.
+    cellKey: overrides.cellKey ?? address,
     id: overrides.id,
     keycap: overrides.keycap ?? overrides.id,
     sp: overrides.sp,
@@ -1289,5 +1294,125 @@ describe("KeyGridCell — the pointer paths (T111, FR-021)", () => {
     }
     expect(screen.getByTestId("key-grid").querySelectorAll("[draggable='true']")).toHaveLength(0);
     expect(screen.queryAllByRole("separator")).toHaveLength(0);
+  });
+});
+
+describe("KeyGrid — cells stay unique when key ids repeat within a layer", () => {
+  // A layer whose key ids REPEAT is not an edge case: the shipped
+  // `sil_cameroon_azerty.keyman-touch-layout` has `T_BLANK` twenty-five times
+  // and `K_SHIFT` twice inside a single tablet layer, and every scaffolded
+  // layout uses one blank id for every filler slot. Because
+  // `touchKeyAddress(platform, layerId, key.id)` is derived from the id alone,
+  // all of those cells share ONE address.
+  //
+  // That made the address unusable as this grid's React key. React's keyed
+  // reconciliation builds a map of the previous children keyed by key, so
+  // duplicates overwrite each other and only the last fiber per key is
+  // reachable; the shadowed ones are never matched by a subsequent render and
+  // never enter the deletion set either, so they stay mounted. Switching
+  // layers therefore ADDED a set of orphaned blanks and front-of-row keys to
+  // the DOM on every switch, which is exactly what an author sees: "switch to
+  // shift and back to default a few times, the spacing and keys at the front
+  // of the columns multiply".
+  //
+  // The fix is `KeyGridCellViewModel.cellKey` (keyGridViewModel.ts) — an
+  // address disambiguated by its occurrence within the layer. The ADDRESS is
+  // deliberately unchanged: it is the overlay's contract with the engine, and
+  // this is a rendering-identity problem, not an addressing one.
+  function duplicateIdLayer(layerId: string, blanks: number): KeyGridViewModel {
+    // Addresses repeat exactly as the shipped layout's do; `cellKey` carries
+    // the occurrence disambiguator the real builder computes.
+    const shiftAddr = `tablet:${layerId}:K_SHIFT`;
+    const blankAddr = `tablet:${layerId}:T_BLANK`;
+    const cells = [
+      makeCell({ id: "K_SHIFT", address: shiftAddr, cellKey: shiftAddr }),
+      ...Array.from({ length: blanks }, (_, i) =>
+        makeCell({
+          id: "T_BLANK",
+          address: blankAddr,
+          cellKey: i === 0 ? blankAddr : `${blankAddr}#${i}`,
+        }),
+      ),
+      makeCell({ id: "K_SHIFT", address: shiftAddr, cellKey: `${shiftAddr}#1` }),
+    ];
+    return makeViewModel([makeRow(cells, 0, "tablet")], {
+      platform: "tablet",
+      layerId,
+    });
+  }
+
+  it("renders one cell per key no matter how many times the layer is switched", () => {
+    const def = duplicateIdLayer("default", 3);
+    const shift = duplicateIdLayer("shift", 5);
+    const expectedDefault = def.rows[0]!.keys.length;
+    const expectedShift = shift.rows[0]!.keys.length;
+
+    const { rerender } = render(
+      <KeyGrid
+        {...requiredKeyGridHandlers()}
+        viewModel={def}
+        selectedAddress={null}
+        onSelectCell={vi.fn()}
+      />,
+    );
+    expect(keyCells()).toHaveLength(expectedDefault);
+
+    // Three round trips — the author's "a few times".
+    for (let i = 0; i < 3; i++) {
+      rerender(
+        <KeyGrid
+          {...requiredKeyGridHandlers()}
+          viewModel={shift}
+          selectedAddress={null}
+          onSelectCell={vi.fn()}
+        />,
+      );
+      expect(keyCells(), `shift pass ${i + 1}`).toHaveLength(expectedShift);
+
+      rerender(
+        <KeyGrid
+          {...requiredKeyGridHandlers()}
+          viewModel={def}
+          selectedAddress={null}
+          onSelectCell={vi.fn()}
+        />,
+      );
+      expect(keyCells(), `default pass ${i + 1}`).toHaveLength(expectedDefault);
+    }
+  });
+
+  it("renders one decorative pad spacer per key, not an accumulating pile", () => {
+    const def = duplicateIdLayer("default", 3);
+    const shift = duplicateIdLayer("shift", 5);
+
+    const { container, rerender } = render(
+      <KeyGrid
+        {...requiredKeyGridHandlers()}
+        viewModel={def}
+        selectedAddress={null}
+        onSelectCell={vi.fn()}
+      />,
+    );
+    const pads = () => container.querySelectorAll('[data-testid^="key-grid-pad-"]');
+
+    for (let i = 0; i < 3; i++) {
+      rerender(
+        <KeyGrid
+          {...requiredKeyGridHandlers()}
+          viewModel={shift}
+          selectedAddress={null}
+          onSelectCell={vi.fn()}
+        />,
+      );
+      rerender(
+        <KeyGrid
+          {...requiredKeyGridHandlers()}
+          viewModel={def}
+          selectedAddress={null}
+          onSelectCell={vi.fn()}
+        />,
+      );
+    }
+    expect(pads()).toHaveLength(def.rows[0]!.keys.length);
   });
 });

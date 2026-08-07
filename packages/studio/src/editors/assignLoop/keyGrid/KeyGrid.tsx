@@ -715,7 +715,13 @@ export function KeyGrid({
                     isSelected ||
                     (!hasSelectedVisible && cell.address === firstAddress);
                   return (
-                    <Fragment key={cell.address}>
+                    // `cellKey`, never `address`: ids repeat within a layer
+                    // (T_BLANK twenty-five times in one shipped tablet layer),
+                    // so addresses collide, and React silently leaks the
+                    // shadowed fibers — switching layers piled up orphaned
+                    // blanks and front-of-row keys. See `cellKey`'s doc in
+                    // keyGridViewModel.ts.
+                    <Fragment key={cell.cellKey}>
                       {/* Decorative left-padding spacer, not a gridcell — kept
                       aria-hidden and OUTSIDE the aria-colindex count below so
                       an assistive-technology cell iteration never confuses
@@ -723,7 +729,13 @@ export function KeyGrid({
                       {padPercent > 0 && (
                         <span
                           aria-hidden="true"
-                          data-testid={`key-grid-pad-${cell.address}`}
+                          // `cellKey` for the same reason the Fragment above
+                          // uses it: keyed on `address`, a layer's twenty-five
+                          // blanks would all answer to one test id, which
+                          // `getByTestId` treats as an error rather than a
+                          // choice. Identical to the address for any key whose
+                          // id is unique, so existing selectors are unchanged.
+                          data-testid={`key-grid-pad-${cell.cellKey}`}
                           style={{
                             flexGrow: 0,
                             flexShrink: 0,

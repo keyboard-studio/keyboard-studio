@@ -25,6 +25,7 @@ afterEach(() => {
 function makeCell(overrides: Partial<KeyGridCellViewModel> = {}): KeyGridCellViewModel {
   return {
     address: "phone:default:K_A",
+    cellKey: "phone:default:K_A",
     id: "K_A",
     keycap: "a",
     sp: 0,

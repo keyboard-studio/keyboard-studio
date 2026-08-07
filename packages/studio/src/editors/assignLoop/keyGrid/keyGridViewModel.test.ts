@@ -501,3 +501,102 @@ describe("adding a key to the longest row (FR-016, FR-017, US2 AS4)", () => {
     });
   });
 });
+
+// ---------------------------------------------------------------------------
+// 7. cellKey — render identity where the address is ambiguous
+// ---------------------------------------------------------------------------
+
+describe("cellKey — unique per layer even when ids repeat", () => {
+  /**
+   * Clone the fixture's default layer and stuff its first row with repeated
+   * ids, the way a real layout's blank/spacer runs do (the shipped
+   * `sil_cameroon_azerty.keyman-touch-layout` has `T_BLANK` twenty-five times
+   * and `K_SHIFT` twice inside one tablet layer). The shared fixture is not
+   * forked — this reshapes a copy of it, per its "add cases here" rule.
+   */
+  function layoutWithRepeatedIds() {
+    const layout = fixtureLayout();
+    const platform = layout.platforms.find((p) => p.id === PHONE)!;
+    const layer = platform.layers.find((l) => l.id === TOUCH_JOIN_LAYERS.default)!;
+    const blank = { ...layer.rows[0]!.keys[0]!, id: "T_BLANK", sp: 9 };
+    return {
+      ...layout,
+      platforms: layout.platforms.map((p) =>
+        p.id !== PHONE
+          ? p
+          : {
+              ...p,
+              layers: p.layers.map((l) =>
+                l.id !== layer.id
+                  ? l
+                  : {
+                      ...l,
+                      // Two rows, so the counter is proved to run row-major
+                      // across the LAYER rather than restarting per row.
+                      rows: [
+                        { keys: [blank, blank, blank] },
+                        { keys: [blank, blank] },
+                      ],
+                    },
+              ),
+            },
+      ),
+    };
+  }
+
+  it("gives five same-id keys five distinct cellKeys while every address stays equal", () => {
+    const vm = buildKeyGridViewModel({
+      layout: layoutWithRepeatedIds(),
+      ruleIndex: fixtureIndex(),
+      platform: PHONE,
+      layerId: TOUCH_JOIN_LAYERS.default,
+    })!;
+
+    const cells = vm.rows.flatMap((r) => r.keys);
+    expect(cells).toHaveLength(5);
+
+    const address = touchKeyAddress(PHONE, TOUCH_JOIN_LAYERS.default, "T_BLANK");
+    expect(cells.map((c) => c.address)).toEqual(Array(5).fill(address));
+    expect(cells.map((c) => c.cellKey)).toEqual([
+      address,
+      `${address}#1`,
+      `${address}#2`,
+      `${address}#3`,
+      `${address}#4`,
+    ]);
+    expect(new Set(cells.map((c) => c.cellKey)).size).toBe(5);
+  });
+
+  // The shared fixture already carries `T_DUP` twice in one layer, on purpose —
+  // it is the input to the duplicate-id FINDING (see the fixture's own table).
+  // So an unmodified fixture is itself a live case: a duplicate id is a
+  // diagnosable condition the author is told about, not a malformed layout the
+  // grid may refuse to render. Both facts are asserted together here.
+  it("suffixes only the repeats, leaving every unique id's cellKey equal to its address", () => {
+    const vm = buildKeyGridViewModel({
+      layout: fixtureLayout(),
+      ruleIndex: fixtureIndex(),
+      platform: PHONE,
+      layerId: TOUCH_JOIN_LAYERS.default,
+    })!;
+
+    const cells = vm.rows.flatMap((r) => r.keys);
+
+    // The named example the fixture exists to model, asserted explicitly.
+    const duplicates = cells.filter((c) => c.id === TOUCH_JOIN_IDS.duplicate);
+    expect(duplicates).toHaveLength(2);
+    expect(duplicates[0]!.cellKey).toBe(duplicates[0]!.address);
+    expect(duplicates[1]!.cellKey).toBe(`${duplicates[1]!.address}#1`);
+
+    // The rule itself, stated generically — the fixture carries more than one
+    // deliberate duplicate, so enumerating them here would just go stale the
+    // next time a case is added to it.
+    const seen = new Map<string, number>();
+    for (const cell of cells) {
+      const n = seen.get(cell.address) ?? 0;
+      seen.set(cell.address, n + 1);
+      expect(cell.cellKey).toBe(n === 0 ? cell.address : `${cell.address}#${n}`);
+    }
+    expect(new Set(cells.map((c) => c.cellKey)).size).toBe(cells.length);
+  });
+});
