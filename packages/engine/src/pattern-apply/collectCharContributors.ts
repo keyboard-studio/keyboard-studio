@@ -31,6 +31,28 @@
  *     resolves the pairing graph and coordinates the drop across any OTHER
  *     paired store at the same position, so the caller doesn't need to (and
  *     shouldn't) duplicate that resolution here.
+ *   - "IS IT A METHOD?" IS NOT "DOES IT DEPEND ON THE CHAR?": these two
+ *     questions have separate answers, and conflating them was a shipped
+ *     defect. A backspace-reached slot (`any(composed) + [K_BKSP] >
+ *     index(comp-dia,1)`, either spelling — see
+ *     `contributorInputHasBackspace`) is NOT a producing method, so it is
+ *     tagged `producedRole: 'used'` and never surfaces as an "existing
+ *     method". But such a store is a DECONSTRUCTION table whose rows exist
+ *     only for as long as their characters do, so its slots ARE nominated for
+ *     removal. Omitting them instead left the carved character behind in the
+ *     store, which kept it inside `buildProducedSet` and so left its keycap
+ *     standing in both touch paths — see `carveDependentCombos.test.ts` for
+ *     the worked `sil_cameroon_qwerty` `æ` case and the two consumers it
+ *     broke. Whole-rule deletion and the `blocked` classification remain
+ *     excluded for such rules: the surgical unit is the slot, since the rule's
+ *     other rows serve other characters.
+ *   - UNREFERENCED STORES: a store DECLARED but referenced by no rule is
+ *     invisible to the rule walk, so a carved character would survive there in
+ *     the emitted `.kmn` (sil_cameroon_qwerty declares `letter`, `lc` and `uc`
+ *     this way — each appears exactly once in the file, its own declaration).
+ *     A final sweep nominates those slots. Scoped to ZERO-reference stores
+ *     precisely because that makes the drop provably behaviour-neutral, and in
+ *     particular can never reach a `notany()`-consumed store and widen it.
  *   - PRODUCED vs. USED (the §0 "used" gate): a rule's `any()`-consumed INPUT
  *     store occurrence of `target` is only tagged `producedRole: "used"`
  *     (blue, non-deletable) when that SAME rule does NOT also produce
@@ -784,17 +806,32 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
       if (isTriggerRule(rule)) continue;
 
       // Diacritic-removal / correction rules ("type é then backspace -> e")
-      // are not a producing method for a character — skip the WHOLE rule
-      // (never added to ruleNodeIds/storeSlots/descriptors/blocked) when its
-      // input context contains backspace DIRECTLY. buildProducedSet is
-      // untouched, so a char only reachable via such a rule stays badged
-      // "produced"; the completeness FLOOR row covers it once no other
-      // method remains. The STORE-RESOLVED backspace shape (an any()-consumed
-      // store's aligned item IS the backspace vkey) can't be decided per-rule
-      // — it depends on which output slot is being evaluated — so it's
-      // checked per-slot in the store-produced-target loop below, via the
-      // SAME `contributorInputHasBackspace` helper.
-      if (contributorInputHasBackspace(rule.context, undefined)) continue;
+      // are not a PRODUCING method for a character. That answers the
+      // "existing methods" question — but NOT the removal question, and
+      // conflating the two is a defect. Such a rule's output store is a
+      // DECONSTRUCTION table: `any(composed) + [K_BKSP] > index(comp-dia,1)`
+      // pairs each composable output with the same output minus one diacritic.
+      // A row exists there BECAUSE its character exists, so carving that
+      // character must drop the row (and, via applyStoreSlotRemovals' pairing
+      // graph, the coordinated `composed` partner — the now-dead combo).
+      //
+      // Concretely, on sil_cameroon_qwerty: carving `æ` must drop
+      // `comp-dia#52`/`#98`, taking `composed#52` (`ǽ`) and `#98` (`ǣ`) with
+      // them. Skipping the whole rule left `æ` sitting in `comp-dia`, which in
+      // turn kept `æ` inside `buildProducedSet` — so BOTH touch consumers
+      // concluded it was still produced and left its keycap standing:
+      // `collectCarvedKeycapTexts`' survivor guard saw a live cross-paired
+      // producer, and `deriveDesktopModifications`' produced-set diff saw no
+      // change. Nominating the slot here fixes both at once; neither of those
+      // two needs a change of its own.
+      //
+      // So: flag the rule instead of skipping it. Its store slots are still
+      // swept below (nominated for removal, tagged `producedRole: 'used'` so
+      // it never surfaces as a green "this is how you type it" method), while
+      // whole-rule deletion and the `blocked` classification stay excluded
+      // exactly as before — the surgical unit for a correction rule is always
+      // the slot, never the rule, whose other rows serve other characters.
+      const isBackspaceCorrectionRule = contributorInputHasBackspace(rule.context, undefined);
 
       const isDeadkeyRule = rule.context.some((el) => el.kind === 'deadkey');
 
@@ -874,7 +911,29 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
               const alignedAnyEl = resolveAlignedAnyElement(rule.context, { kind: el.kind, offset: el.offset });
               const anyStore = alignedAnyEl !== undefined ? storeMap.get(alignedAnyEl.storeRef) : undefined;
               const baseItem = anyStore?.items[i];
-              if (contributorInputHasBackspace(rule.context, baseItem)) continue;
+
+              // Reached only by pressing backspace — either the rule's context
+              // carries K_BKSP directly, or this slot's ALIGNED input item
+              // resolves to it. Not a producing method, so it gets the `'used'`
+              // role/descriptor (never a green "existing method" row) — but it
+              // IS nominated for removal, because a deconstruction row exists
+              // only for as long as its character does. See the
+              // `isBackspaceCorrectionRule` comment above for the worked
+              // sil_cameroon_qwerty case.
+              if (contributorInputHasBackspace(rule.context, baseItem)) {
+                addStoreSlot(makeSlotId(store.nodeId, i), 'input', {
+                  kind: 'store-slot',
+                  producedChar: target,
+                  producedRole: 'used',
+                  ...storeDisplayNameField(store.name),
+                });
+                addLocation('store', store.name, store.nodeId);
+                // Deliberately does NOT set `storeMatched`: that flag drives
+                // `addRuleLocation` + the `continue` that suppresses the
+                // literal-output branch below, both of which are producer-side
+                // bookkeeping this slot must not claim.
+                continue;
+              }
 
               addStoreSlot(
                 makeSlotId(store.nodeId, i),
@@ -901,6 +960,15 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
         addRuleLocation(rule, group);
         continue;
       }
+
+      // A correction rule never reaches the whole-rule / `blocked` branches
+      // below — unchanged from before this rule stopped being skipped
+      // outright. Its surgical unit is the slot (handled above): the rule
+      // itself serves every OTHER character in its deconstruction table, so
+      // deleting it would strip backspace behaviour from all of them, and a
+      // multi-char literal output reached only by backspace is not a producer
+      // this character can be "blocked" on.
+      if (isBackspaceCorrectionRule) continue;
 
       // (b) Literal target — the character is written out directly as one or
       //     more `char` elements (base+combining runs NFC-compose to one glyph).
@@ -949,6 +1017,62 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
         });
       }
     }
+  }
+
+  // --- 3. Unreferenced-store sweep ("remove it everywhere", file hygiene) ---
+  //
+  // The rule walk above can only reach a store some rule actually mentions. A
+  // store DECLARED but never referenced is invisible to it, so a carved
+  // character stays behind in the emitted `.kmn` — e.g. sil_cameroon_qwerty
+  // declares `store(letter)`, `store(lc)`, `store(uc)`, each appearing exactly
+  // once in the whole file (its own declaration) and consumed by nothing.
+  // Carving `æ` left `æ`/`Æ` sitting in all three.
+  //
+  // Scoped DELIBERATELY to stores with ZERO rule references, which makes the
+  // drop provably behaviour-neutral: no rule matches through them, so nothing
+  // can start or stop firing. In particular this never touches a store reached
+  // by `notany()`, where dropping an item WIDENS what the rule matches — the
+  // opposite of removal, and the hazard the module doc already calls out. A
+  // store referenced by `any()`/`index()`/`outs()` is left entirely to the
+  // rule walk above, which has the rule context needed to judge it.
+  //
+  // System stores (`&NAME`, `&VERSION`, …) are metadata, never character
+  // inventory, and are excluded.
+  const referencedStoreNames = new Set<string>();
+  for (const group of ir.groups) {
+    for (const rule of group.rules) {
+      for (const el of rule.context) {
+        const ref = (el as { storeRef?: string }).storeRef;
+        if (ref !== undefined) referencedStoreNames.add(ref);
+      }
+      for (const el of rule.output) {
+        const ref = (el as { storeRef?: string }).storeRef;
+        if (ref !== undefined) referencedStoreNames.add(ref);
+      }
+    }
+  }
+  for (const frag of ir.raw) {
+    for (const el of frag.producedOutput ?? []) {
+      const ref = (el as { storeRef?: string }).storeRef;
+      if (ref !== undefined) referencedStoreNames.add(ref);
+    }
+  }
+
+  for (const store of ir.stores) {
+    if (store.name.startsWith('&')) continue;
+    if (referencedStoreNames.has(store.name)) continue;
+    let matched = false;
+    store.items.forEach((item, i) => {
+      if (item.kind !== 'char' || item.value.normalize('NFC') !== target) return;
+      addStoreSlot(makeSlotId(store.nodeId, i), 'input', {
+        kind: 'store-slot',
+        producedChar: target,
+        producedRole: 'used',
+        ...storeDisplayNameField(store.name),
+      });
+      matched = true;
+    });
+    if (matched) addLocation('store', store.name, store.nodeId);
   }
 
   return {
