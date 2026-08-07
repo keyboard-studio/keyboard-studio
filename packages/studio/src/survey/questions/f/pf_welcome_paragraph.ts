@@ -6,7 +6,7 @@ import type { QuestionModule, ValidationResult } from "../../types.ts";
 export const definition = {
   id: "pf_welcome_paragraph",
   prompt: "In 1–3 sentences, what is this keyboard for?",
-  audit_label: "Welcome paragraph",
+  audit_label: "Keyboard description",
   help_text:
     "Describe what the keyboard does and who uses it. This text appears at the " +
     "very top of the keyboard's help page, so write it in plain language that " +
