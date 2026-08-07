@@ -386,6 +386,35 @@ function applyRemove(resolved: ResolvedMainKey, op: RemoveKeyOp): void {
   }
 }
 
+/**
+ * Case B's create half of `setSubKey`'s upsert (spec 061 T042, FR-026) — the
+ * twin of `applyKeyEditsToLayout.ts`'s `appendSubKey`.
+ *
+ * `sk`/`multitap` append; `flick` sets its direction. The new entry is built
+ * through the SAME `writeEditableFields` every other write here goes through,
+ * so a created sub-key and an edited one carry exactly the same wire shape —
+ * which is what lets the twin test compare the two appliers structurally after
+ * an add.
+ */
+function appendRawSubKey(
+  mainKey: RawKey,
+  sub: SubKeyRef,
+  fields: Partial<EditableKeyFields>,
+): void {
+  const created: RawSubKey = {};
+  writeEditableFields(
+    created as EditableRawTarget,
+    applyFieldSemantics({ id: sub.id, text: "", sp: 0 }, fields),
+  );
+
+  if (sub.kind === "flick") {
+    mainKey.flick = { ...(mainKey.flick ?? {}), [sub.id]: created };
+    return;
+  }
+  const existing = mainKey[sub.kind] ?? [];
+  mainKey[sub.kind] = [...existing, created];
+}
+
 function describeSub(sub: SubKeyRef): string {
   return `${sub.kind}:${sub.id}`;
 }
@@ -497,11 +526,11 @@ export function applyKeyEditsToRawJson(
       case "setSubKey": {
         const subLoc = resolveSubKeyEntry(resolved.key as unknown as AddressableRawKey, op.sub);
         if (!subLoc) {
-          warnUnresolved(
-            warnings,
-            op,
-            `sub-key "${describeSub(op.sub)}" not found on the resolved key`,
-          );
+          // UPSERT (spec 061 T042, FR-026) — see the IR twin's own comment for
+          // why the spec-058 warn-and-skip behaviour this replaced no longer
+          // holds: key mode must be able to ADD a longpress, multitap or flick,
+          // through the existing operations on the one overlay.
+          appendRawSubKey(resolved.key, op.sub, op.fields);
           break;
         }
         const subKey = subLoc.key as unknown as RawSubKey;

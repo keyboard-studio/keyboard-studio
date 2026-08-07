@@ -204,22 +204,48 @@ export function applyKeyEditsToLayout(
     // of a layer nothing actually changes in (structural-sharing invariant).
     if (op.kind === "setSubKey" || op.kind === "removeSubKey") {
       const subLoc = resolveSubKeyEntry(key, op.sub);
-      if (!subLoc) {
+
+      // `setSubKey` is an UPSERT as of spec 061 T042 (FR-026).
+      //
+      // Spec 058 warned-and-skipped here instead, and said so in both appliers'
+      // docstrings: "the seven operation kinds admit no eighth 'add sub-key'
+      // kind, and increment 1's sub-key editing is display/deletion-only". That
+      // premise is what changed — FR-026 requires key mode to ADD longpresses,
+      // multitaps and flicks, and T042 requires it go through the EXISTING
+      // operations on the one overlay rather than a parallel path that could
+      // let the two editor modes drift. So a `setSubKey` naming a sub-entry
+      // that does not exist yet creates it, from the op's own fields.
+      //
+      // `removeSubKey` still warns on a miss: removing something absent is a
+      // stale address, not an intent.
+      if (!subLoc && op.kind === "removeSubKey") {
         warnings.push(
           `[key-edit-apply] sub-key "${op.sub.kind}:${op.sub.id}" not found on "${op.address}" — operation skipped`,
         );
         orphaned.push(op);
         continue;
       }
+
       const state = getOrCreateLayerState(platformIndex, layerIndex);
       const row = state.workingRows[rowIndex]!;
-      if (op.kind === "setSubKey") {
-        const merged = applyFieldSemantics(toEditableFields(subLoc.key), op.fields);
-        const updatedSub = mergeFieldsIntoKey(subLoc.key, merged);
-        row.keys[keyIndex] = writeSubKeyBack(key, subLoc, updatedSub);
-      } else {
-        row.keys[keyIndex] = writeSubKeyBack(key, subLoc, undefined);
+      if (op.kind === "removeSubKey") {
+        row.keys[keyIndex] = writeSubKeyBack(key, subLoc!, undefined);
+        continue;
       }
+
+      if (subLoc) {
+        const merged = applyFieldSemantics(toEditableFields(subLoc.key), op.fields);
+        row.keys[keyIndex] = writeSubKeyBack(key, subLoc, mergeFieldsIntoKey(subLoc.key, merged));
+        continue;
+      }
+
+      // Create. The sub-ref's `id` IS the new entry's id (and, for a flick, its
+      // direction), matching how `resolveSubKeyEntry` would find it next time.
+      const created = mergeFieldsIntoKey(
+        { nodeId: minter.mint("touchKey"), id: op.sub.id, provenance: DEFAULT_TOUCH_PROVENANCE },
+        applyFieldSemantics({ id: op.sub.id, text: "", sp: 0 }, op.fields),
+      );
+      row.keys[keyIndex] = appendSubKey(key, op.sub, created);
       continue;
     }
 
@@ -482,6 +508,32 @@ function writeSubKeyBack(
   return loc.collection === "sk"
     ? { ...key, sk: nextCollection }
     : { ...key, multitap: nextCollection };
+}
+
+/**
+ * Add a NEW sub-entry to a key (spec 061 T042, FR-026) — the create half of
+ * `setSubKey`'s upsert.
+ *
+ * `sk` and `multitap` append, so a new longpress lands at the end of the menu
+ * where the author expects it. `flick` sets its direction, which is a map key
+ * and therefore has no order to preserve. The raw-JSON twin does the same, and
+ * `applyKeyEdits.twin.test.ts` holds the two to it.
+ */
+function appendSubKey(
+  key: TouchKeyIR,
+  sub: { readonly kind: "sk" | "multitap" | "flick"; readonly id: string },
+  created: TouchKeyIR,
+): TouchKeyIR {
+  if (sub.kind === "flick") {
+    return {
+      ...key,
+      flick: { ...(key.flick ?? {}), [sub.id]: created } as NonNullable<TouchKeyIR["flick"]>,
+    };
+  }
+  const existing = key[sub.kind] ?? [];
+  return sub.kind === "sk"
+    ? { ...key, sk: [...existing, created] }
+    : { ...key, multitap: [...existing, created] };
 }
 
 // ---------------------------------------------------------------------------

@@ -421,7 +421,7 @@ remove one, and confirm all of it in the emitted artifact.
 
 ### Tests *(write first)*
 
-- [ ] **T040** [US4] Add a longpress and a north-east flick in key mode, edit each one's text, remove
+- [x] **T040** [US4] Add a longpress and a north-east flick in key mode, edit each one's text, remove
   one, and assert all of it in the emitted artifact via `runTransform`; then toggle to character
   mode and assert the sub-key edit is present there — the toggle stays lossless in both directions
   (US4 AS3, FR-028) ·
@@ -431,7 +431,7 @@ remove one, and confirm all of it in the emitted artifact.
 
 **Wave 1 — single task:**
 
-- [ ] **T041** [US4] New gesture panel presenting longpresses, multitaps and all eight flick
+- [x] **T041** [US4] New gesture panel presenting longpresses, multitaps and all eight flick
   directions, each with an add control, plus the nested sub-key property panel exposing gesture
   type, keycap and text for editing. Test ids `gesture-panel`, `gesture-panel-longpress`,
   `gesture-panel-multitap`, `gesture-panel-flick`, `gesture-panel-flick-${direction}` (`n`, `ne`,
@@ -442,14 +442,27 @@ remove one, and confirm all of it in the emitted artifact.
 
 **⟶ Wait for T041 to finish, then:**
 
-- [ ] **T042** [US4] Mount `GesturePanel` beneath the property panel in key mode and route every
+- [x] **T042** [US4] Mount `GesturePanel` beneath the property panel in key mode and route every
   gesture edit through the **existing** `setSubKey` / `removeSubKey` operations on the one
   `keyEditOverlay`, so both modes read a single overlay and the toggle cannot drift (FR-026, FR-028) ·
-  `packages/studio/src/editors/assignLoop/TouchGallery.tsx`
+  `packages/studio/src/editors/assignLoop/TouchGallery.tsx`,
+  `packages/engine/src/pattern-apply/applyKeyEditsToLayout.ts`,
+  `packages/engine/src/pattern-apply/applyKeyEditsToRawJson.ts`
+
+  **`setSubKey` had to become an upsert, in both appliers.** Using the existing
+  operations was T042's own constraint, and adding a gesture was not expressible through
+  them: spec 058 made `setSubKey` warn-and-skip on a missing sub-entry, and both appliers'
+  docstrings reasoned that "the seven operation kinds admit no eighth 'add sub-key' kind, and
+  increment 1's sub-key editing is display/deletion-only". FR-026 is exactly what retires that
+  premise. So a `setSubKey` naming a sub-entry that does not exist now CREATES it (`sk`/
+  `multitap` append; `flick` sets its direction), and `removeSubKey` still warns on a miss —
+  removing what is not there is a stale address, not an intent. Both halves are pinned by five
+  new twin-equivalence cases, because a create path that existed on only one applier would be
+  precisely the Case A / Case B drift that test exists to catch.
 
 **⟶ Wait for T042 to finish, then:**
 
-- [ ] **T043** [US4] Make T040 pass ·
+- [x] **T043** [US4] Make T040 pass ·
   `packages/studio/src/editors/assignLoop/TouchGallery.test.tsx`
 
 **Checkpoint**: US4 is independently functional. The most common touch-key edit no longer requires

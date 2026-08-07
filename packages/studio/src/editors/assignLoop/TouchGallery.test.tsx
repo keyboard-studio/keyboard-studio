@@ -6207,3 +6207,160 @@ describe("TouchGallery key mode — SC-005 fidelity (spec 061 T029)", () => {
     expect(moved?.["width"]).toBe(175);
   });
 });
+
+// ---------------------------------------------------------------------------
+// US4 — gestures are editable where the key is (spec 061 T040; FR-026, FR-028)
+//
+// Mounts the REAL `TouchGallery` in key mode, adds a longpress and a north-east
+// flick through the real `GesturePanel`, edits each one's text, removes one, and
+// asserts all of it in the EMITTED ARTIFACT via `runTransform` — not in
+// component state. Then toggles to character mode and back, because FR-028's
+// claim is that a sub-key edit made in either mode is visible in the other, and
+// the only way that can be true is if both modes read the ONE `keyEditOverlay`.
+// ---------------------------------------------------------------------------
+
+/** The `<input>` inside a gesture sub-key field. */
+function gestureInput(field: "text" | "output"): HTMLInputElement {
+  return screen
+    .getByTestId(`gesture-panel-subkey-field-${field}`)
+    .querySelector("input") as HTMLInputElement;
+}
+
+/** Type into a committing field and commit it, as an author would. */
+async function commitInto(input: HTMLInputElement, value: string) {
+  await act(async () => {
+    fireEvent.change(input, { target: { value } });
+    fireEvent.blur(input);
+  });
+}
+
+/** The emitted `T_a` key, read back out of the projected artifact. */
+function emittedKeyTa(): {
+  sk?: Array<{ id?: string; text?: string }>;
+  flick?: Record<string, { id?: string; text?: string } | undefined>;
+} {
+  const content = runTransform("basic_kbdus").get(
+    "source/basic_kbdus.keyman-touch-layout",
+  )!.content as string;
+  const parsed = JSON.parse(content) as {
+    phone: {
+      layer: Array<{
+        id: string;
+        row: Array<{
+          key: Array<{
+            id?: string;
+            sk?: Array<{ id?: string; text?: string }>;
+            flick?: Record<string, { id?: string; text?: string } | undefined>;
+          }>;
+        }>;
+      }>;
+    };
+  };
+  const defaultLayer = parsed.phone.layer.find((l) => l.id === "default")!;
+  for (const row of defaultLayer.row) {
+    const hit = row.key.find((k) => k.id === "T_a");
+    if (hit) return hit;
+  }
+  throw new Error("T_a not found in the emitted artifact");
+}
+
+describe("TouchGallery key mode — gestures (spec 061 T040, US4)", () => {
+  it("adds a longpress and a north-east flick, edits each, removes one, and all of it reaches the emitted artifact", async () => {
+    seedKeyModeParityFixture();
+    await renderTouchGalleryInKeyMode();
+
+    fireEvent.click(screen.getByTestId("key-grid-cell-phone:default:T_a"));
+
+    // The key starts with no gestures at all.
+    expect(emittedKeyTa().sk).toBeUndefined();
+    expect(emittedKeyTa().flick).toBeUndefined();
+
+    // --- Add a longpress, then give it a keycap. ---------------------------
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("gesture-panel-add-longpress"));
+    });
+    // Adding selects it, so its own property panel is already open (FR-027).
+    expect(screen.getByTestId("gesture-panel-subkey-panel")).toBeTruthy();
+    await commitInto(gestureInput("text"), "á");
+
+    // --- Add a north-east flick, then give it a keycap. --------------------
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("gesture-panel-add-flick-ne"));
+    });
+    await commitInto(gestureInput("text"), "Á");
+
+    // Both reached the artifact.
+    const withBoth = emittedKeyTa();
+    expect(withBoth.sk?.map((s) => s.text)).toEqual(["á"]);
+    expect(withBoth.flick?.["ne"]?.text).toBe("Á");
+
+    // --- Remove the flick. -------------------------------------------------
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("gesture-panel-entry-flick-ne"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("gesture-panel-subkey-remove"));
+    });
+
+    const afterRemove = emittedKeyTa();
+    // The longpress survives, the flick is gone — and `flick` is DROPPED
+    // entirely rather than left as an empty object, matching both appliers'
+    // own emptied-collection discipline.
+    expect(afterRemove.sk?.map((s) => s.text)).toEqual(["á"]);
+    expect(afterRemove.flick).toBeUndefined();
+  });
+
+  it("keeps a gesture edit visible across a character/key mode round trip (FR-028)", async () => {
+    seedKeyModeParityFixture();
+    await renderTouchGalleryInKeyMode();
+
+    fireEvent.click(screen.getByTestId("key-grid-cell-phone:default:T_a"));
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("gesture-panel-add-longpress"));
+    });
+    await commitInto(gestureInput("text"), "à");
+
+    const opsAfterEdit = useWorkingCopyStore.getState().keyEditOverlay.ops.length;
+    expect(opsAfterEdit).toBeGreaterThan(0);
+
+    // Toggle to character mode and back.
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("touch-mode-tab-character"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("touch-mode-tab-key"));
+    });
+
+    // The ONE overlay is intact — the toggle wrote nothing and lost nothing.
+    expect(useWorkingCopyStore.getState().keyEditOverlay.ops.length).toBe(opsAfterEdit);
+    // And the edit is still in the emitted artifact, which is the claim that
+    // matters: both modes project from the same overlay.
+    expect(emittedKeyTa().sk?.map((s) => s.text)).toEqual(["à"]);
+
+    // The panel shows it again too, without the author re-selecting anything
+    // they had not already selected.
+    fireEvent.click(screen.getByTestId("key-grid-cell-phone:default:T_a"));
+    expect(screen.getByTestId("gesture-panel")).toBeTruthy();
+    expect(
+      screen.getByTestId("gesture-panel-longpress").textContent ?? "",
+    ).toContain("à");
+  });
+
+  it("commits every gesture edit through the one overlay, one op per edit (FR-028, FR-040)", async () => {
+    seedKeyModeParityFixture();
+    await renderTouchGalleryInKeyMode();
+
+    fireEvent.click(screen.getByTestId("key-grid-cell-phone:default:T_a"));
+    const before = useWorkingCopyStore.getState().keyEditOverlay.ops.length;
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("gesture-panel-add-longpress"));
+    });
+    await commitInto(gestureInput("text"), "â");
+
+    const ops = useWorkingCopyStore.getState().keyEditOverlay.ops;
+    // Exactly two: the add and the keycap edit. Not one per keystroke.
+    expect(ops.length).toBe(before + 2);
+    expect(ops.slice(before).every((op) => op.kind === "setSubKey")).toBe(true);
+  });
+});

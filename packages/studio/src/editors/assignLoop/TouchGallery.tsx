@@ -117,6 +117,7 @@ import {
   caseCounterpart,
   replayKeyEditOverlay,
   parseTouchKeyAddress,
+  resolveKeyAddress,
   touchKeyAddress,
   emitTouchLayout,
   groupLayerFamilies,
@@ -171,6 +172,11 @@ import {
   type KeyPropertyFieldChange,
 } from "./keyGrid/KeyPropertyPanel.tsx";
 import { AssignPanel, type AssignPanelCommitResult } from "./keyGrid/AssignPanel.tsx";
+import {
+  GesturePanel,
+  type GestureKind,
+  type GestureSelection,
+} from "./keyGrid/GesturePanel.tsx";
 import {
   useKeyEditGuards,
   type KeyEditInvalidationWarning,
@@ -2319,6 +2325,20 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     );
   }, [keyModeViewModel, selectedKeyAddress]);
 
+  // Spec 061 T042 — the selected key's own IR node, for `GesturePanel`.
+  // `KeyGridCellViewModel` summarizes sub-keys as COUNTS (keyGridViewModel.ts),
+  // so the gesture panel needs the node itself. Resolved against the EFFECTIVE
+  // (overlay-folded) layout, so a gesture the author added a moment ago is
+  // present here on the next render — the same layout the grid renders from,
+  // never a second source.
+  const selectedKeyNode = useMemo(() => {
+    if (effectiveKeyModeLayout === null || selectedKeyAddress === null) return null;
+    const parts = parseTouchKeyAddress(selectedKeyAddress);
+    if (parts === undefined) return null;
+    const resolved = resolveKeyAddress(effectiveKeyModeLayout, parts);
+    return resolved?.key ?? null;
+  }, [effectiveKeyModeLayout, selectedKeyAddress]);
+
   // Spec 061 T036 — where the selected key sits, so `KeyPropertyPanel` can
   // decide which move buttons can act (FR-020: absent, never disabled). Derived
   // here rather than in the panel because the panel sees one cell and the
@@ -2952,6 +2972,72 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       commitKeyEditOp({ address: selectedKeyCell.address, kind: "move", direction });
     },
     [selectedKeyCell, commitKeyEditOp],
+  );
+
+  // ---------------------------------------------------------------------
+  // Spec 061 T042 — gestures (FR-026, FR-028)
+  //
+  // Every one of the three handlers below commits through the SAME
+  // `commitKeyEditOp` chain and the SAME `setSubKey`/`removeSubKey` operations
+  // the character walk's own sub-key edits use. That is what makes the
+  // character/key mode toggle lossless: there is one overlay, so there is no
+  // second write path for the two modes to drift apart on.
+  // ---------------------------------------------------------------------
+
+  const [selectedGesture, setSelectedGesture] = useState<GestureSelection | null>(null);
+
+  const gestureSubRef = useCallback(
+    (selection: GestureSelection) => ({
+      // `SubKeyRef["kind"]` is the WIRE collection name (`sk`), while the panel
+      // speaks the author's word (`longpress`). Translated in exactly one
+      // place, here, rather than having the panel know the wire vocabulary.
+      kind: selection.kind === "longpress" ? ("sk" as const) : selection.kind,
+      id: selection.id,
+    }),
+    [],
+  );
+
+  const handleAddGesture = useCallback(
+    (kind: GestureKind, id: string) => {
+      if (selectedKeyCell === null) return;
+      commitKeyEditOp({
+        address: selectedKeyCell.address,
+        kind: "setSubKey",
+        sub: gestureSubRef({ kind, id }),
+        // A brand-new entry carries its id and nothing else; the author fills
+        // in the keycap and output through the sub-key panel that opens next.
+        // `setSubKey` upserts as of T042, so this CREATES rather than warning.
+        fields: { id },
+      });
+      setSelectedGesture({ kind, id });
+    },
+    [selectedKeyCell, commitKeyEditOp, gestureSubRef],
+  );
+
+  const handleEditGesture = useCallback(
+    (selection: GestureSelection, fields: { text?: string; output?: string }) => {
+      if (selectedKeyCell === null) return;
+      commitKeyEditOp({
+        address: selectedKeyCell.address,
+        kind: "setSubKey",
+        sub: gestureSubRef(selection),
+        fields,
+      });
+    },
+    [selectedKeyCell, commitKeyEditOp, gestureSubRef],
+  );
+
+  const handleRemoveGesture = useCallback(
+    (selection: GestureSelection) => {
+      if (selectedKeyCell === null) return;
+      commitKeyEditOp({
+        address: selectedKeyCell.address,
+        kind: "removeSubKey",
+        sub: gestureSubRef(selection),
+      });
+      setSelectedGesture(null);
+    },
+    [selectedKeyCell, commitKeyEditOp, gestureSubRef],
   );
 
   // T013 — `onApplyFix`: an exhaustive switch over every `TouchKeyFix` member
@@ -6594,6 +6680,17 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                   ),
                 }
               : {})}
+          />
+
+          {/* Gestures, beneath the property panel (spec 061 T042, FR-026).
+              Renders nothing with no key selected — its own early return. */}
+          <GesturePanel
+            selectedKey={selectedKeyNode}
+            selection={selectedGesture}
+            onSelectGesture={setSelectedGesture}
+            onAddGesture={handleAddGesture}
+            onEditGesture={handleEditGesture}
+            onRemoveGesture={handleRemoveGesture}
           />
 
           <RemoveKeyDialog

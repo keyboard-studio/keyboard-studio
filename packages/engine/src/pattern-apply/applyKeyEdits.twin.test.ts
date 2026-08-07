@@ -524,3 +524,131 @@ describe("applyKeyEdits twin equivalence — move (spec 061 T028)", () => {
     expect(caseB.warnings).toHaveLength(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// `setSubKey` as an UPSERT — spec 061 T042 (FR-026)
+//
+// Spec 058 warned-and-skipped when a `setSubKey` named a sub-entry that did not
+// exist, and both appliers' docstrings said why: increment 1's sub-key editing
+// was display/deletion-only. FR-026 changed that premise — key mode must be able
+// to ADD a longpress, multitap or flick — and T042 requires it go through the
+// EXISTING operations on the one overlay rather than a parallel path the two
+// editor modes could drift on. So the create half needs the same twin guarantee
+// the edit half has.
+// ---------------------------------------------------------------------------
+
+describe("applyKeyEdits twin equivalence — setSubKey upsert (spec 061 T042)", () => {
+  function runBoth(ops: readonly KeyEditOperation[]) {
+    const rawJson = emitTouchLayout(makeTouchKeyRuleJoinLayout());
+    const before = parseTouchLayout(rawJson);
+    const caseA = applyKeyEditsToLayout(before, [...ops]);
+    const caseB = applyKeyEditsToRawJson(rawJson, [...ops]);
+    return { before, caseA, caseB, caseBAsIR: parseTouchLayout(caseB.json) };
+  }
+
+  /** The named key, wherever it sits on phone/default. */
+  function findKey(layout: TouchLayoutIR, keyId: string): TouchKeyIR | undefined {
+    const layer = layout.platforms
+      .find((p) => p.id === "phone")!
+      .layers.find((l) => l.id === "default")!;
+    for (const row of layer.rows) {
+      const hit = row.keys.find((k) => k.id === keyId);
+      if (hit) return hit;
+    }
+    return undefined;
+  }
+
+  const HOST = TOUCH_JOIN_IDS.longpressHost;
+  const address = touchKeyAddress("phone", "default", HOST);
+
+  it("APPENDS a new longpress rather than warning, on both sides", () => {
+    const ops: KeyEditOperation[] = [
+      {
+        seq: 1,
+        kind: "setSubKey",
+        address,
+        sub: { kind: "sk", id: "T_NEW_LONGPRESS_1" },
+        fields: { id: "T_NEW_LONGPRESS_1", text: "á", output: "á" },
+      },
+    ];
+    const { before, caseA, caseB, caseBAsIR } = runBoth(ops);
+
+    const countBefore = findKey(before, HOST)!.sk!.length;
+    const afterA = findKey(caseA.layout, HOST)!;
+    expect(afterA.sk).toHaveLength(countBefore + 1);
+    // Appended, not prepended — a new longpress lands at the end of the menu.
+    expect(afterA.sk!.at(-1)?.text).toBe("á");
+    expect(stripNodeId(afterA)).toEqual(stripNodeId(findKey(caseBAsIR, HOST)!));
+    // No warning on either side: creating is the intent now, not a stale address.
+    expect(caseA.warnings).toHaveLength(0);
+    expect(caseB.warnings).toHaveLength(0);
+    expect(caseA.orphaned).toHaveLength(0);
+  });
+
+  it("CREATES a flick direction the key does not have", () => {
+    const ops: KeyEditOperation[] = [
+      {
+        seq: 1,
+        kind: "setSubKey",
+        address,
+        sub: { kind: "flick", id: "ne" },
+        fields: { id: "ne", text: "Á", output: "Á" },
+      },
+    ];
+    const { before, caseA, caseBAsIR } = runBoth(ops);
+    expect(findKey(before, HOST)!.flick?.["ne"]).toBeUndefined();
+    expect(findKey(caseA.layout, HOST)!.flick?.["ne"]?.text).toBe("Á");
+    expect(stripNodeId(findKey(caseA.layout, HOST)!)).toEqual(
+      stripNodeId(findKey(caseBAsIR, HOST)!),
+    );
+  });
+
+  it("CREATES a multitap collection on a key that has none", () => {
+    const bare = touchKeyAddress("phone", "default", TOUCH_JOIN_IDS.caseTest);
+    const ops: KeyEditOperation[] = [
+      {
+        seq: 1,
+        kind: "setSubKey",
+        address: bare,
+        sub: { kind: "multitap", id: "T_NEW_MULTITAP_1" },
+        fields: { id: "T_NEW_MULTITAP_1", text: "ä" },
+      },
+    ];
+    const { before, caseA, caseBAsIR } = runBoth(ops);
+    expect(findKey(before, TOUCH_JOIN_IDS.caseTest)!.multitap).toBeUndefined();
+    expect(findKey(caseA.layout, TOUCH_JOIN_IDS.caseTest)!.multitap).toHaveLength(1);
+    expect(stripNodeId(findKey(caseA.layout, TOUCH_JOIN_IDS.caseTest)!)).toEqual(
+      stripNodeId(findKey(caseBAsIR, TOUCH_JOIN_IDS.caseTest)!),
+    );
+  });
+
+  it("still EDITS an existing sub-entry rather than adding a second one", () => {
+    const existing = findKey(parseTouchLayout(emitTouchLayout(makeTouchKeyRuleJoinLayout())), HOST)!
+      .sk![0]!;
+    const ops: KeyEditOperation[] = [
+      {
+        seq: 1,
+        kind: "setSubKey",
+        address,
+        sub: { kind: "sk", id: existing.id },
+        fields: { text: "EDITED" },
+      },
+    ];
+    const { before, caseA, caseBAsIR } = runBoth(ops);
+    expect(findKey(caseA.layout, HOST)!.sk).toHaveLength(findKey(before, HOST)!.sk!.length);
+    expect(findKey(caseA.layout, HOST)!.sk![0]?.text).toBe("EDITED");
+    expect(stripNodeId(findKey(caseA.layout, HOST)!)).toEqual(
+      stripNodeId(findKey(caseBAsIR, HOST)!),
+    );
+  });
+
+  it("still WARNS on a removeSubKey naming something absent — removing what is not there is a stale address, not an intent", () => {
+    const ops: KeyEditOperation[] = [
+      { seq: 1, kind: "removeSubKey", address, sub: { kind: "sk", id: "T_NOT_PRESENT" } },
+    ];
+    const { caseA, caseB } = runBoth(ops);
+    expect(caseA.warnings).toHaveLength(1);
+    expect(caseA.orphaned).toHaveLength(1);
+    expect(caseB.warnings).toHaveLength(1);
+  });
+});
