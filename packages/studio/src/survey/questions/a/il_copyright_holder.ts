@@ -27,6 +27,36 @@ import paCopyrightHolder from "../reserve/pa_copyright_holder.ts";
 // — only by not inviting the re-entry in the first place.
 //
 // Composed from the base string so Content's edits there still flow through here.
+
+// Pattern audit (D4 exact-match dedupe shape)
+//
+// Shape: a human-entered attribution/copyright string that flows into the
+// exact-match `Map<string, CopyrightHolder>` dedupe in
+// packages/contracts/src/copyright.ts (`dedupeHolders`, line 239, reached via
+// `addHolder`) can silently emit a duplicate line when the same holder is
+// re-typed with different spacing/spelling than an already-known value.
+//
+// Sibling sites swept for the same shape:
+// - packages/contracts/src/copyright.ts:239 dedupeHolders — SAME-RISK is not
+//   applicable here; this IS the mechanism, not a sibling.
+// - packages/engine/src/scaffolder/index.ts:678-686 (attributionText/addHolder,
+//   fed by resolveInheritedHolders' D5 `baseHolderOverride`) — SAME-RISK.
+// - packages/studio/src/components/OutputScreen.tsx:575-595 (the D5 "Original
+//   copyright holder" free-text `<input name="baseHolder">`) — RESIDUAL-RISK:
+//   shown only on the license-unreadable fallback, where re-entry IS necessary
+//   (so this field's "already retained, don't re-enter" guard cannot apply). It
+//   offers no example or exact-match hint and feeds the same dedupe; if the same
+//   org is later confirmed as `copyrightHolder` with different spacing/spelling,
+//   two lines emit for one org — the same shape, narrower than the parsed-license
+//   path. Not fixed here — surfaced for separate triage.
+// - packages/studio/src/lib/serializeWorkingCopy.ts:409-412 — MITIGATED: calls
+//   the same `resolveInheritedHolders` helper as the scaffolder path rather
+//   than a second implementation, so it carries no independent risk.
+// - packages/engine/src/package-descriptor/build.ts:146-159, `.kps <Author>`/
+//   `store(&COPYRIGHT)` single-line render — N/A: passes through one already-
+//   deduped value, no comparison of its own.
+// - packages/studio/src/survey/questions/reserve/pa_copyright_holder.ts,
+//   il_author_name.ts, il_author_email.ts — N/A: single-value input, no merge.
 export const definition = {
   ...paCopyrightHolder.definition,
   id: "il_copyright_holder",
