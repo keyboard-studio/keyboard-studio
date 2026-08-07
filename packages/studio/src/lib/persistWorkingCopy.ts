@@ -10,8 +10,10 @@
 // consume-and-clear on callback return.
 //
 // Serialization contracts:
-//   - VirtualFS binary entries (isBinary=true): Uint8Array → Base64 for JSON.
-//     Raw JSON.stringify of a Uint8Array produces a corrupt sparse object.
+//   - VirtualFS entries whose content is a Uint8Array (the icon, fonts): bytes →
+//     Base64 for JSON. Raw JSON.stringify of a Uint8Array produces a corrupt
+//     sparse object. Keyed off the content type, NOT the entry's isBinary flag —
+//     see serializeEntry.
 //   - Set<string> fields: spread to [] for storage, new Set(arr) on rehydrate.
 //   - KeyboardIR (baseIr, ir): plain objects, safe for direct JSON round-trip.
 //
@@ -71,6 +73,7 @@ const DRAFT_KEY = "ks.working-copy.draft";
 export interface SerializedEntry {
   path: string;
   content: string; // Base64 if isBinary, verbatim string otherwise
+  /** True iff `content` is Base64 — derived from the payload, see {@link serializeEntry}. */
   isBinary: boolean;
 }
 
@@ -131,16 +134,30 @@ export type WorkingCopySnapshot = Omit<
 };
 
 export function serializeEntry(entry: VirtualFSEntry): SerializedEntry {
-  if (entry.isBinary) {
+  // Encode off the CONTENT TYPE, not the `isBinary` flag. VirtualFS.set defaults
+  // isBinary to false, so any producer that writes bytes as `vfs.set(path, bytes)`
+  // yields an entry holding a Uint8Array while claiming to be text. Trusting the
+  // flag ran that array through `as string`; JSON.stringify then emitted a sparse
+  // `{"0":137,…}` object and the rehydrated entry was no longer bytes at all.
+  // The keyboard icon (&BITMAP) is the file this silently destroyed: kmcmplib
+  // emits ZERO artifacts — reported only as a *warning* — when it cannot read an
+  // icon a header store names, so a resumed draft compiled to nothing.
+  //
+  // `isBinary` in the SERIALIZED record therefore means exactly "content is
+  // Base64", derived from the payload rather than copied from the entry. A
+  // string-content entry that claims isBinary=true (no producer writes one
+  // today) round-trips as text rather than through a Base64 encode that would
+  // mangle it — the flag only drives the zip compression level downstream.
+  if (typeof entry.content !== "string") {
     // Uint8Array → Base64
-    const bytes = entry.content as Uint8Array;
+    const bytes = entry.content;
     let binary = "";
     for (let i = 0; i < bytes.length; i++) {
       binary += String.fromCharCode(bytes[i]!);
     }
     return { path: entry.path, content: btoa(binary), isBinary: true };
   }
-  return { path: entry.path, content: entry.content as string, isBinary: false };
+  return { path: entry.path, content: entry.content, isBinary: false };
 }
 
 export function deserializeEntry(raw: SerializedEntry): VirtualFSEntry {

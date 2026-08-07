@@ -210,6 +210,7 @@ import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
 import { getProducerBadge, allCharsCovered } from "./parts/charMechanisms.ts";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
 import { GalleryEmptyState } from "./parts/GalleryEmptyState.tsx";
+import { GalleryCardApplyRow } from "./parts/GalleryCardApplyRow.tsx";
 import { ProposalCard } from "./parts/ProposalCard.tsx";
 import {
   RemovableChipRow,
@@ -229,7 +230,6 @@ import {
   TEXT_DIM,
   TEXT_MAIN,
   FONT,
-  BLUE_ACTION,
   BG_CARD,
   galleryGhostBtn as ghostBtn,
   gallerySelectMenuStyle,
@@ -240,7 +240,7 @@ import {
 // T118 — the rejection banner's border. `galleryTheme.ts` has no error token of
 // its own; `ui/theme.ts` is where the E/W/I severity palette lives, and this is
 // the same token KeyGridCell/KeyInspector already use for an error severity.
-import { ERROR_RED, ERROR_BG } from "../../ui/theme.ts";
+import { ERROR_RED } from "../../ui/theme.ts";
 
 const selectStyle: CSSProperties = gallerySelectMenuStyle(160);
 
@@ -640,6 +640,55 @@ interface TouchMethodChooserProps {
    * "Shift+RAlt", or "Base" for the empty combo) — see
    * `touchLayerComboLabel`. Shown as a preview line below the builder. */
   layerPreviewLabel: string;
+  /** Gates the per-card Apply row below — see `canApply`'s own doc comment
+   * at its definition site. */
+  canApply: boolean;
+  /** Commits the currently-open card's assignment — see `handleApply`. */
+  onApply: () => void;
+}
+
+/**
+ * Apply row for the open touch-method card — bottom-right of the very card
+ * it commits. Both this and MechanismGallery's `CardApplyRow` now delegate
+ * to the shared `GalleryCardApplyRow`: replaces the single shared "Apply
+ * method" button that used to sit below all four cards (Sequences card,
+ * then Apply + Mark row) with one row rendered only inside the currently-
+ * open card, so exactly one Apply is ever on screen and "which touch method
+ * does this commit?" stops being ambiguous.
+ *
+ * Keeps the replaced button's `touch.applyMethodAriaLabel` /
+ * `applyMethodButton` message ids verbatim — same accessible name, same
+ * catalog keys, so screen readers, the en/fr catalogs, and every test that
+ * queries this control by accessible name are unaffected by the move. This
+ * wrapper's only job is computing that aria-label with its own static
+ * message id, since the lingui `t` macro requires that id to be a literal,
+ * not a variable — that's why the shared component itself takes a
+ * ready-made `ariaLabel` string rather than a `currentChar`.
+ */
+function TouchCardApplyRow({
+  currentChar,
+  canApply,
+  onApply,
+  testId,
+}: {
+  currentChar: string;
+  canApply: boolean;
+  onApply: () => void;
+  /** Per-method testid so a test can assert WHICH card holds the Apply. */
+  testId: string;
+}) {
+  const { t } = useLingui();
+  return (
+    <GalleryCardApplyRow
+      ariaLabel={t({
+        id: "editor.assignLoop.touch.applyMethodAriaLabel",
+        message: `Apply touch method for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
+      })}
+      canApply={canApply}
+      onApply={onApply}
+      testId={testId}
+    />
+  );
 }
 
 /**
@@ -1077,6 +1126,8 @@ function TouchMethodChooser({
   validLayerCombos,
   layerComboValid,
   layerPreviewLabel,
+  canApply,
+  onApply,
 }: TouchMethodChooserProps) {
   const { t, i18n } = useLingui();
   const layerSelectPlaceholder = t({
@@ -1185,6 +1236,14 @@ function TouchMethodChooser({
             />
           </div>
         )}
+        {method === "longpress_alternates" && (
+          <TouchCardApplyRow
+            currentChar={currentChar}
+            canApply={canApply}
+            onApply={onApply}
+            testId="touch-apply-longpress"
+          />
+        )}
       </div>
 
       {/* 2. Swipe a key (flick) */}
@@ -1286,6 +1345,14 @@ function TouchMethodChooser({
             />
           </div>
         )}
+        {method === "flick_gestures" && (
+          <TouchCardApplyRow
+            currentChar={currentChar}
+            canApply={canApply}
+            onApply={onApply}
+            testId="touch-apply-flick"
+          />
+        )}
       </div>
 
       {/* 3. Tap multiple times (multitap) */}
@@ -1362,6 +1429,14 @@ function TouchMethodChooser({
               layerPreviewLabel={layerPreviewLabel}
             />
           </div>
+        )}
+        {method === "multitap" && (
+          <TouchCardApplyRow
+            currentChar={currentChar}
+            canApply={canApply}
+            onApply={onApply}
+            testId="touch-apply-multitap"
+          />
         )}
       </div>
 
@@ -1441,6 +1516,14 @@ function TouchMethodChooser({
             />
           </div>
         )}
+        {method === "touch_key_replace" && (
+          <TouchCardApplyRow
+            currentChar={currentChar}
+            canApply={canApply}
+            onApply={onApply}
+            testId="touch-apply-replace"
+          />
+        )}
       </div>
     </div>
   );
@@ -1477,28 +1560,6 @@ const suggestionDenyBtnStyle: CSSProperties = {
   fontSize: 12,
   cursor: "pointer",
   fontFamily: FONT,
-};
-
-/**
- * Message text style shared by all three suggestion-card variants. RED, not
- * green — the suggestion card is suppressed only when the current character
- * is already covered via COMPOSITION (`showChooser`'s own doc comment:
- * `currentCharBadge?.isComposable`); base/mirror coverage (signal (a),
- * `touchBaseDirectSet`) intentionally does NOT suppress it — a character
- * reachable via desktop-mirror inheritance but with no EXPLICIT touch
- * mechanism yet is exactly the "replace"/"longpress" suggestion's own target
- * scenario. So this still reads as "not yet implemented", matching the
- * badge's own 0-count color (`ERROR_RED`, charMechanisms.ts /
- * CharScrollStrip.tsx) rather than the "already green" treatment this card
- * previously kept even once suggestions were scoped to uncovered characters
- * only.
- */
-const suggestionMessageStyle: CSSProperties = {
-  margin: 0,
-  fontSize: 12,
-  color: ERROR_RED,
-  fontFamily: FONT,
-  fontWeight: 600,
 };
 
 interface SuggestionActionsProps {
@@ -4996,30 +5057,19 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           )}
 
           {/* Suggestion card (shown until accepted/dismissed; skipped entirely
-              when there is no suggestion to offer) */}
-          {!showChooser && (
-            <div
-              role="note"
-              aria-label={t({
-                id: "editor.assignLoop.touch.suggestion.ariaLabel",
-                message: "Touch access method suggestion",
-              })}
-              style={{
-                // RED, not green — see suggestionMessageStyle's own doc
-                // comment for why (suppressed only for a composition-covered
-                // character; base/mirror coverage does not suppress it).
-                background: ERROR_BG,
-                border: `1px solid ${ERROR_RED}`,
-                borderRadius: 8,
-                padding: "10px 14px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 8,
-              }}
-            >
-              {suggestion.kind === "longpress" && (
-                <>
-                  <p style={suggestionMessageStyle}>
+              when there is no suggestion to offer) — consolidated onto the
+              shared `ProposalCard` shell (also used by the bulk-accent
+              summary box above) rather than re-declaring the same green
+              #0d2218/#238636 note chrome a third time. */}
+          {!showChooser &&
+            (suggestion.kind === "longpress" || suggestion.kind === "replace") && (
+              <ProposalCard
+                ariaLabel={t({
+                  id: "editor.assignLoop.touch.suggestion.ariaLabel",
+                  message: "Touch access method suggestion",
+                })}
+                message={
+                  suggestion.kind === "longpress" ? (
                     <Trans id="editor.assignLoop.touch.suggestion.longpressText">
                       Suggested: long-press{" "}
                       {suggestion.hostKey
@@ -5033,24 +5083,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                           })}{" "}
                       to reach {currentCharDisplay}
                     </Trans>
-                  </p>
-                  <SuggestionActions
-                    onAccept={handleUseSuggestion}
-                    onDeny={handleSuggestionChange}
-                    acceptAriaLabel={t({
-                      id: "editor.assignLoop.touch.suggestion.useLongpressAriaLabel",
-                      message: `Use suggested long-press method for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
-                    })}
-                    denyAriaLabel={t({
-                      id: "editor.assignLoop.touch.chooseDifferentMethodAriaLabel",
-                      message: "Choose a different touch method",
-                    })}
-                  />
-                </>
-              )}
-              {suggestion.kind === "replace" && (
-                <>
-                  <p style={suggestionMessageStyle}>
+                  ) : (
                     <Trans id="editor.assignLoop.touch.suggestion.replaceText">
                       Suggested: replace{" "}
                       {suggestion.hostKey
@@ -5064,23 +5097,30 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                           })}{" "}
                       with {currentCharDisplay}
                     </Trans>
-                  </p>
-                  <SuggestionActions
-                    onAccept={handleUseSuggestion}
-                    onDeny={handleSuggestionChange}
-                    acceptAriaLabel={t({
-                      id: "editor.assignLoop.touch.suggestion.useReplaceAriaLabel",
-                      message: `Use suggested replace method for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
-                    })}
-                    denyAriaLabel={t({
-                      id: "editor.assignLoop.touch.chooseDifferentMethodAriaLabel",
-                      message: "Choose a different touch method",
-                    })}
-                  />
-                </>
-              )}
-            </div>
-          )}
+                  )
+                }
+              >
+                <SuggestionActions
+                  onAccept={handleUseSuggestion}
+                  onDeny={handleSuggestionChange}
+                  acceptAriaLabel={
+                    suggestion.kind === "longpress"
+                      ? t({
+                          id: "editor.assignLoop.touch.suggestion.useLongpressAriaLabel",
+                          message: `Use suggested long-press method for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
+                        })
+                      : t({
+                          id: "editor.assignLoop.touch.suggestion.useReplaceAriaLabel",
+                          message: `Use suggested replace method for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
+                        })
+                  }
+                  denyAriaLabel={t({
+                    id: "editor.assignLoop.touch.chooseDifferentMethodAriaLabel",
+                    message: "Choose a different touch method",
+                  })}
+                />
+              </ProposalCard>
+            )}
 
           {/* Method chooser (shown after the suggestion is accepted/dismissed,
               or immediately when there is no suggestion) */}
@@ -5102,6 +5142,8 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
               validLayerCombos={validLayerCombos}
               layerComboValid={layerComboValid}
               layerPreviewLabel={layerPreviewLabel}
+              canApply={canApply}
+              onApply={handleApply}
             />
           )}
 
@@ -5122,9 +5164,13 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
             modality="touch"
           />
 
-          {/* Apply + Mark for later review. Back and Next/Done live in the
-              shared top toolbar row above so the forward-advance control is
+          {/* Mark for later review. Back and Next/Done live in the shared
+              top toolbar row above so the forward-advance control is
               spatially separated from these editing actions.
+              Apply no longer lives here: it moved into the bottom-right of
+              whichever method card is open (TouchCardApplyRow), so the
+              commit sits with the fields it commits instead of in a row
+              shared by all four methods.
               "Mark for later review" replaces the old "Skip this character"
               control (mechanism-gallery-progression) — see canGoNext's own
               doc comment above for why. */}
@@ -5136,32 +5182,6 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
               alignItems: "center",
             }}
           >
-            {showChooser && (
-              <button
-                type="button"
-                onClick={handleApply}
-                disabled={!canApply}
-                aria-label={t({
-                  id: "editor.assignLoop.touch.applyMethodAriaLabel",
-                  message: `Apply touch method for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
-                })}
-                style={{
-                  padding: "9px 20px",
-                  background: canApply ? BLUE_ACTION : "#21262d",
-                  border: "none",
-                  borderRadius: 6,
-                  color: canApply ? "#e6edf3" : TEXT_DIM,
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: canApply ? "pointer" : "not-allowed",
-                  fontFamily: FONT,
-                }}
-              >
-                <Trans id="editor.assignLoop.applyMethodButton">
-                  Apply method
-                </Trans>
-              </button>
-            )}
             <button
               type="button"
               onClick={() => toggleMarkedForLaterTouch(currentChar)}

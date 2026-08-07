@@ -199,6 +199,63 @@ describe("persistWorkingCopy", () => {
     expect(typeof icoEntry?.content).toBe("string");
   });
 
+  // The same critical case, but with the entry's isBinary flag NOT set — which is
+  // what `vfs.set(path, bytes)` produces, since VirtualFS.set defaults the flag to
+  // false. serializeEntry must key off the content type, because keying off the
+  // flag ran the icon's bytes through `as string`: JSON.stringify emitted a sparse
+  // `{"0":0,"1":0,…}` object and the rehydrated "icon" was a plain object. That
+  // reached kmcmplib, which reports an unreadable icon as a *warning* and then
+  // emits zero artifacts — so resuming a draft of any keyboard with an icon
+  // produced no .kmx, no .js, and a blank preview.
+  it("round-trips byte content even when the entry's isBinary flag was never set", () => {
+    const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+
+    const fakeIco = new Uint8Array([0x00, 0x00, 0x01, 0x00, 0x80, 0x81, 0xFF, 0xFE]);
+
+    const vfs = createVirtualFS([
+      { path: "source/test.kmn", content: "c test\n", isBinary: false },
+    ]);
+    // Exactly how the loader writes a fetched icon: no isBinary argument.
+    vfs.set("source/test.ico", fakeIco);
+    expect(vfs.get("source/test.ico")?.isBinary).toBe(false);
+
+    useWorkingCopyStore.setState({
+      instantiationMode: "new-from-base",
+      baseKeyboard: { id: "test_keyboard", displayName: "Test", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
+      baseVfs: vfs,
+      baseIr: ir,
+      ir,
+      identity: null,
+      deletedNodeIds: new Set(),
+      deletedItemIds: new Set(),
+      undoStack: [],
+      phaseResults: [],
+      irAxes: {},
+      desktopLocked: false,
+      touchLayoutJson: null,
+      touchDraft: null,
+      galleryIntrosSeen: { mechanism: false, touch: false },
+    });
+
+    snapshotWorkingCopyToSession();
+
+    // The stored form must be Base64, not a sparse integer-keyed object.
+    const raw = sessionStorage.getItem("ks.working-copy.draft")!;
+    const parsed = JSON.parse(raw) as {
+      baseVfsEntries: Array<{ path: string; content: unknown; isBinary: boolean }>;
+    };
+    const stored = parsed.baseVfsEntries.find((e) => e.path === "source/test.ico");
+    expect(typeof stored?.content).toBe("string");
+    expect(stored?.isBinary).toBe(true);
+
+    useWorkingCopyStore.getState().reset();
+    expect(rehydrateWorkingCopyFromSession()).toBe(true);
+
+    const rehydrated = useWorkingCopyStore.getState().baseVfs?.get("source/test.ico");
+    expect(rehydrated?.content).toBeInstanceOf(Uint8Array);
+    expect(Array.from(rehydrated!.content as Uint8Array)).toEqual(Array.from(fakeIco));
+  });
+
   it("clears the snapshot key after rehydration (consume-and-clear)", () => {
     const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
     const vfs = createVirtualFS([]);

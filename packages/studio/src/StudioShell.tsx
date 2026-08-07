@@ -502,7 +502,14 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     return step?.rightPane ?? "preview";
   }, [activeStepId]);
   const discoveryMethod = useSurveySessionStore((s) => s.discoveryMethod);
-  const showCharacterMap = activeRightPane === "character-map" && discoveryMethod === "build-list";
+  // The discoveryMethod gate applies to the "characters" step ONLY (its
+  // IntroChooser and manual path keep the OSK preview). The punctuation step
+  // declares rightPane:"character-map" too and has no discovery fork — its
+  // map shows unconditionally, scoped to punctuation cells (see the scope
+  // prop at the render site below).
+  const showCharacterMap =
+    activeRightPane === "character-map" &&
+    (activeStepId !== "characters" || discoveryMethod === "build-list");
 
   // NO mount-time reset (spec 057 FR-002/FR-003, defect D-1).
   //
@@ -1555,7 +1562,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
         }}
       >
         {showCharacterMap ? (
-          <CharacterMapPane />
+          <CharacterMapPane scope={activeStepId === "punctuation" ? "punctuation" : "alphabet"} />
         ) : localBase === null ? (
           <div
             style={{

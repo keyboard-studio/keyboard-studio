@@ -203,6 +203,7 @@ const STAGE_LABEL_MESSAGE: Record<string, ReturnType<typeof msg>> = {
   project_name: msg({ id: "footer.stage.projectName", message: "Project name" }),
   characters: msg({ id: "footer.stage.characters", message: "Characters" }),
   marks: msg({ id: "footer.stage.marks", message: "Accents & marks" }),
+  punctuation: msg({ id: "footer.stage.punctuation", message: "Punctuation" }),
   convenience: msg({ id: "footer.stage.convenience", message: "Convenience letters" }),
   carve: msg({ id: "footer.stage.carve", message: "Carve" }),
   mechanisms: msg({ id: "footer.stage.mechanisms", message: "Mechanisms" }),
