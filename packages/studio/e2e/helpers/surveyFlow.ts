@@ -136,7 +136,7 @@ async function waitVisible(locator: Locator, timeout: number): Promise<boolean> 
 /**
  * Drive the identity-lite step to completion (spec 036 language-identify flow).
  *
- * Question order (spec 030 US3, spec 036):
+ * Question order (spec 030 US3, spec 036, spec 059 US1):
  *   1. il_language_english (autocomplete) — free text
  *   2. il_language_region (CONDITIONAL datalist) — only inserted by
  *      IdentityLite's getNextOverride when the resolved langtags entry for
@@ -149,7 +149,18 @@ async function waitVisible(locator: Locator, timeout: number): Promise<boolean> 
  *      (its `next` is static, unconditional); the value itself may be left
  *      blank.
  *   5. il_target_script (select) — choose a script
- *   6. il_script_not_supported (terminal notice, if CJK/Ethi/Hang)
+ *   6. il_script_not_supported (terminal notice, if CJK/Ethi/Hang) — never
+ *      reached by this helper, since it always picks the "other" script.
+ *   7. il_author_name (text) — REQUIRED (validate() rejects blank); reached
+ *      unconditionally for every supported script (il_target_script's
+ *      `next` default-branches here — see il_target_script.ts). Unseeded in
+ *      an unauthenticated e2e run (IdentityLiteAdapter's authorSeed comes
+ *      from useGitHubAuth(), which returns no name/email for a guest), so
+ *      this helper must type a value or the walk parks here forever.
+ *   8. il_author_email (text) — optional (required: false; a private GitHub
+ *      email must never block emission per spec 059).
+ *   9. il_copyright_holder (text) — optional and TERMINAL (`next: null`);
+ *      blank defaults to the author name (D1).
  *
  * This helper detects presence rather than assuming the fixed sequence above,
  * since il_language_region is conditional and may not render at all:
@@ -161,6 +172,13 @@ async function waitVisible(locator: Locator, timeout: number): Promise<boolean> 
  *   - il_language_code is always rendered (unconditional `next`); advances
  *     past it leaving it blank
  *   - selects target script "other" (keeps routing generic, avoids CJK/Ethiopic/Hangul stub)
+ *   - fills the required author name (arbitrary but deterministic, e.g.
+ *     "Alice Example" — the resume/attribution unit tests' own fixture
+ *     identity, reused here rather than inventing a new one)
+ *   - leaves author email and copyright holder blank and advances past both
+ *     (both are optional; no existing walk spec asserts on attribution
+ *     metadata, so there is nothing gained by typing more than the one
+ *     required field)
  *   - advances through all questions
  *   - waits for the base-keyboard picker combobox to appear (phase boundary)
  */
@@ -219,6 +237,36 @@ export async function driveIdentityLite(
   // <select>; see selectMenuOption above for why the option cannot be reached
   // through the trigger's parent.
   await selectMenuOption(page, page.locator("#il_target_script"), script);
+  await surveyAdvance(page).click();
+
+  // Q6: Author name (plain text field) — ALWAYS rendered for every supported
+  // script (il_target_script's default branch goes here unconditionally; only
+  // the gated CJK/Ethiopic/Hangul scripts skip straight to
+  // il_script_not_supported instead, which this helper never selects) AND
+  // REQUIRED (validate() rejects blank — see
+  // questions/reserve/author_display_name.ts, reused by il_author_name.ts).
+  // Unseeded here: IdentityLiteAdapter's authorSeed comes from
+  // useGitHubAuth(), which returns no name/email for an unauthenticated e2e
+  // run, so this field starts genuinely blank. Waited for with the same
+  // 15s timeout as Q4 for the same reason given there: a short presence poll
+  // could misread a slow cold render as "absent" and silently desync the walk
+  // instead of failing loudly.
+  await page.waitForSelector("#il_author_name", { timeout: 15_000 });
+  await page.locator("#il_author_name").fill("Alice Example");
+  await surveyAdvance(page).click();
+
+  // Q7: Author email (plain text field) — always rendered, but optional
+  // (required: false; a private GitHub profile email must never block
+  // emission per spec 059). Left blank and advanced past, mirroring how Q4
+  // treats its optional value: fewer moving parts in a helper sixteen specs
+  // share, and no existing walk spec asserts on attribution metadata.
+  await page.waitForSelector("#il_author_email", { timeout: 15_000 });
+  await surveyAdvance(page).click();
+
+  // Q8: Copyright holder (plain text field) — always rendered and TERMINAL
+  // for identity-lite (`next: null`); optional (a blank answer defaults to
+  // the author name, D1). Left blank for the same reason as Q7.
+  await page.waitForSelector("#il_copyright_holder", { timeout: 15_000 });
   await surveyAdvance(page).click();
 
   // Robustness check for the phase boundary: identity-lite hands off
