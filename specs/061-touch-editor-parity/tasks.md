@@ -140,8 +140,55 @@ assign it, remove a different key, switch to the `shift` layer, and confirm each
   `packages/studio/e2e/touch-key-add-remove.spec.ts`,
   `packages/studio/src/editors/assignLoop/TouchGallery.test.tsx`
 
-**Checkpoint**: US1 is independently functional and shippable. Complaints #2–#5 of issue #1530 are
-resolved; key mode is covered by a test that runs on every pull request.
+  **PARTIAL — two of three clauses green; the third is blocked on a spec decision, not on code.**
+
+  Green: `pnpm typecheck` clean across all 7 packages; `packages/studio` vitest 419 files /
+  6412 tests pass, T009's key-mode integration block included. **The PR-lane guarantee (FR-009,
+  SC-003, SC-009) is therefore met** — that was always the durable half of the pair.
+
+  Red: `npx playwright test touch-key-add-remove` fails its own assertion (a),
+  `indexKeys(outputLayout).size === baseKeys.size + 1` — expected 113, received 152.
+
+  **Diagnosis (measured, not inferred).** Driving the walk with an exploration spec and dumping
+  per-layer key counts at each step gives:
+
+  | point in the walk | phone:default | shift | numeric | rightalt | total |
+  |---|---|---|---|---|---|
+  | shipped source (`baseVfs`) | 38 | 38 | 36 | — | **112** |
+  | after import-adapt, before mechanisms | 38 | 38 | 36 | 38 | **150** |
+  | after add + assign | 39 | 38 | 36 | 39 | **152** |
+  | after suppress-in-place | 39 | 38 | 36 | 39 | **152** |
+
+  Two deltas, both upstream of key mode and both correct product behaviour:
+
+  1. **+38 at import-adapt.** `engine/src/pattern-apply/propagateDesktopLayersToTouch.ts`
+     synthesizes a `phone:rightalt` touch layer by cloning `default`'s geometry, because
+     bambara's shipped `.kmn` carries RALT layer rules (10 of them) while its shipped
+     `.keyman-touch-layout` has no `rightalt` layer. This lands before the touch stage is
+     reached — it is present in the emitted artifact with zero key-mode edits.
+  2. **+1 more on the add.** The synthesized layer is re-derived from `default` on each
+     projection, so the one added key appears in both `default` and its `rightalt` clone. The
+     add therefore raises the whole-file count by 2, not 1.
+
+  Suppress-in-place removes no key, exactly as the assertion says. Nothing spec 061 adds
+  causes either delta; the walk was `test.skip`ped from birth, so this premise was never
+  executed.
+
+  **Assertion (d) is unsatisfiable for the same root cause** and will fail next once (a) is
+  resolved: its untouched-files filter excuses `.kmn` and the touch layout, but the RALT
+  propagation also rewrites `source/bambara.kvks` (combo → kvks token mapping), which the
+  filter does not excuse.
+
+  So FR-008's "MUST pass unmodified" cannot be satisfied by any code change inside this
+  feature's scope. The three ways out — amend the two spec-058 assertions to state their real
+  intent (the add introduced one key *into the layer it edited*; the kvks legitimately
+  changes), change the walk's fixture to a base with no unpropagated modifier layer, or accept
+  FR-008 as unmet — are a **spec decision**, deferred to the user rather than taken here.
+  US1's shippable claim rests on the vitest gate, which is green.
+
+**Checkpoint**: US1 is functional and covered in the PR lane (T009 green). The e2e corroboration
+(T010/T016) is blocked on the spec decision above, **not** on key-mode wiring. Complaints #2–#5 of
+issue #1530 are resolved.
 
 ---
 
