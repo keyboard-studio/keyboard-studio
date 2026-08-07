@@ -26,11 +26,14 @@
 // banner — `main.tsx` calls `loadDraft()` (the boot-time apply) exactly once,
 // pre-mount, so navigating to `#survey` after merely pinning the pointer
 // would NOT actually load the picked project's stores. Instead, Resume here
-// calls `resumeProject()` directly (which applies the draft to both stores
-// via `loadDraft` AND sets the active-project flag `loadDraft` already sets
-// on success — `wasDraftRestoredThisBoot()` — so SurveyView's mount effect
-// does not reset the just-resumed session out from under it), then navigates
-// only on a successful apply.
+// goes through the shared `switchActiveProject()` helper (lib/
+// switchActiveProject.ts), which calls `resumeProject()` directly (applying
+// the draft to both stores via `loadDraft` AND setting the active-project
+// flag `loadDraft` already sets on success — `wasDraftRestoredThisBoot()` —
+// so SurveyView's mount effect does not reset the just-resumed session out
+// from under it), ALSO re-pins draftAutosave.ts's separate active-project
+// pointer (see that helper's own header), then navigates only on a
+// successful apply.
 //
 // Ported from the dev reference implementation's MyKeyboardsList.tsx
 // (specs/047-my-keyboards) with its draft-engine imports rewired onto main's
@@ -44,7 +47,6 @@ import { useGitHubAuth } from "../hooks/useGitHubAuth.ts";
 import {
   listDrafts,
   deleteProject,
-  resumeProject,
   loadDecisionRecordForProject,
   PENDING_PROJECT_KEY,
   type ProjectIndexEntry,
@@ -52,6 +54,7 @@ import {
 import { listServerDrafts, type ServerDraftMeta } from "../lib/serverDraftStore.ts";
 import { relativeTime, type RelativeTimeValue } from "../lib/relativeTime.ts";
 import { navigateTo } from "../lib/navigate.ts";
+import { switchActiveProject } from "../lib/switchActiveProject.ts";
 import { BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT } from "../lib/galleryTheme.ts";
 import { SUCCESS_ACCENT } from "../ui/theme.ts";
 
@@ -287,14 +290,13 @@ export function MyKeyboardsList() {
 
   function handleResume(projectKey: string): void {
     // See the module docstring's "Resume flow" note: main applies the draft
-    // right here (resumeProject), rather than deferring to a resume banner
-    // dev's architecture has and main does not.
-    const applied = resumeProject(projectKey);
-    if (applied) {
-      navigateTo("survey");
-    }
-    // else: a corrupt/wrong-shaped draft failed to apply — leave the card in
+    // right here (resumeProject, via the shared switchActiveProject helper —
+    // see that module's header for why a plain resumeProject() call is not
+    // enough), rather than deferring to a resume banner dev's architecture
+    // has and main does not. switchActiveProject() only navigates on a
+    // successful apply — a corrupt/wrong-shaped draft leaves the card in
     // place rather than silently navigating into an empty wizard.
+    switchActiveProject(projectKey);
   }
 
   // Spec 053 US1: open one project's decision trail. Loads only that project's

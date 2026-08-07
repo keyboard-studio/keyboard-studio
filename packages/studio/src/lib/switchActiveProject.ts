@@ -1,0 +1,79 @@
+// switchActiveProject — shared "resume a DIFFERENT already-instantiated
+// project and navigate into it" primitive.
+//
+// Extracted (P2 synthesis) from two near-identical inline call sites —
+// MyKeyboardsList.tsx's `handleResume` and CurrentKeyboardIndicator.tsx's
+// `handleChange` — each of which restated the SAME "resumeProject() ->
+// navigate only on success" sequence and its own copy of the "only navigate
+// on success" comment. One helper gives FINDING 1 and FINDING 4 a single
+// place to live rather than two.
+//
+// FINDING 4 fix: `resumeProject()` (draftPersistence.ts) re-pins THAT
+// module's own active-project pointer (`ks.draft.active`), but this codebase
+// has a SECOND, deliberately un-unified active-project pointer —
+// `ks.studio.activeProject`, owned by draftAutosave.ts (see that module's
+// header and CurrentKeyboardIndicator.tsx's "TWO RIVAL ACTIVE-PROJECT
+// POINTERS" note) — which `resumeProject()` never touches. Left alone, that
+// second pointer keeps naming the ABANDONED project, so
+// `computeTargetProjectKey`'s `target = stored` branch resolves every
+// SUBSEQUENT write from draftAutosave.ts's OWN debounced autosave / cloud-sync
+// (both run alongside draftPersistence.ts's — see StudioShell.tsx) onto the
+// wrong (old) key, filing the NEWLY-resumed project's live content there —
+// and, for a signed-in author, pushing it to the server under the old
+// project's draftId. `pinActiveProject()` below closes exactly that gap.
+//
+// Deliberately NOT a step toward unifying the two engines (out of scope —
+// see FINDING 4's own writeup): this only makes sure BOTH pointers follow a
+// switch, the same way `resumeProject()` already keeps its own pointer in
+// sync with its own engine.
+//
+// P0 fix (silent autosave loss after an in-place switch): `navigateTo`
+// below is a no-op when the caller is already on `#survey` — writing the
+// hash to its current value fires no `hashchange`, so `StudioShell` never
+// remounts `SurveyView`, and `installDraftAutosave`'s subscription (a React
+// ref inside that component) never gets reinstalled for the newly-resumed
+// project. `useProjectSwitchStore.bump()` is the explicit remount signal
+// that closes that gap — see its own header for why THIS is the one call
+// site it is wired to.
+//
+// Cross-reference (`scheduleSave`'s orphan guard, draftPersistence.ts ~1206):
+// that guard closes the SAME hole from a different angle — it makes a stale
+// subscription's write an inert no-op, for ANY path that orphans one, not
+// just this one. The two are deliberately overlapping here, not simply
+// redundant: the remount is a structural fix for the ONE path that reaches
+// it (this function); the guard remains the backstop for every OTHER path
+// that could repoint the active project without tearing down the component
+// that owns the stale closure.
+//
+// Why a remount, rather than a fourth in-place way to make `SurveyView`'s
+// bookkeeping match a new project (alongside `handleStartOver`'s in-place
+// reset and `handleResumeDraft`/`promotePendingAutosave`'s in-place
+// promotion): this switch's trigger — `CurrentKeyboardIndicator` — lives
+// OUTSIDE `SurveyView` and can fire while `SurveyView` isn't even mounted,
+// so it has no closure over the SurveyView-local refs those two mechanisms
+// update in place. A remount is the only way to reach them from outside.
+import { resumeProject } from "./draftPersistence.ts";
+import { pinActiveProject } from "./draftAutosave.ts";
+import { navigateTo } from "./navigate.ts";
+import { useProjectSwitchStore } from "../stores/projectSwitchStore.ts";
+
+/**
+ * Resume `projectKey` (loading its draft into both stores and pinning it as
+ * the active project on BOTH draft engines' pointers) and navigate into the
+ * survey — but ONLY when the résumé actually succeeded. A corrupt/
+ * wrong-shaped draft leaves the caller exactly where it was rather than
+ * dropping the author into an empty wizard. Returns the same success flag
+ * `resumeProject()` does, so a caller that wants to react to failure still
+ * can.
+ */
+export function switchActiveProject(projectKey: string): boolean {
+  const applied = resumeProject(projectKey);
+  if (applied) {
+    pinActiveProject(projectKey);
+    navigateTo("survey");
+    // P0 fix: force a remount of `SurveyView` even when `navigateTo` above
+    // was a no-op (already on `#survey`) — see this store's own header.
+    useProjectSwitchStore.getState().bump();
+  }
+  return applied;
+}
