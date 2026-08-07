@@ -42,6 +42,16 @@ interface EngineModule {
    * dangling reference must be stripped or the preview shows nothing.
    */
   stripDanglingAssetStores?: (kmn: string, fs: VirtualFS) => { kmn: string; stripped: string[] };
+  /**
+   * Drop a `store(&BITMAP)` icon reference whose file is absent from the VFS.
+   * Unlike {@link stripDanglingAssetStores}, this mutates the WORKING COPY, not
+   * a preview snapshot: an icon reference with nothing behind it is a package
+   * that will not build (kmcmplib emits zero artifacts), so it must not survive
+   * into the shipped `.kmn` either. Called once per fetch on the open-base path
+   * — see the Track 1 scaffolder equivalent this mirrors,
+   * `dropBitmapStoreIfUnbacked` in `packages/engine/src/scaffolder/index.ts`.
+   */
+  dropUnbackedBitmapStore?: (kmn: string, fs: VirtualFS) => { kmn: string; dropped: string | null };
 }
 
 /**
@@ -464,7 +474,8 @@ export function useKeyboardArtifact(
 
       // Strip dangling packaging-asset references before compiling for preview.
       // If the base names a BITMAP / VISUALKEYBOARD / LAYOUTFILE that wasn't
-      // fetched into the VFS, kmcmplib produces ZERO artifacts (only a warning),
+      // fetched into the VFS, kmcmplib produces ZERO artifacts while the
+      // diagnostic arrives under the engine's own "warning" severity fallback,
       // which surfaces as "no usable artifacts" and a blank preview. The preview
       // needs none of these assets; present ones are kept (full-quality OSK).
       // The output/zip path serializes the IR separately and is unaffected.
@@ -731,6 +742,27 @@ export function useKeyboardArtifact(
         // `.kmw-keyboard-<id>` rules (key colors, font-family bindings, etc.)
         // paint the preview the same way they paint a real install.
         prevKeyboardCssBlobUrls.current = buildCssBlobUrls(fetchResult.stylesheets ?? []);
+
+        // The base's icon came across with the rest of source/ (loader). If it
+        // did NOT — an optional sibling the loader could not fetch — the
+        // reference now names a file nobody has, and kmcmplib answers that by
+        // emitting zero artifacts. Track 2 preserves identity (no rename), so
+        // this reads straight off kb.id's .kmn — the same working-copy VFS the
+        // download/output path serializes. Mirrors
+        // the Track 1 scaffolder's dropBitmapStoreIfUnbacked; see EngineModule's
+        // dropUnbackedBitmapStore docstring for why this can't just be the
+        // preview-only stripDanglingAssetStores above.
+        const openBaseKmnPath = findKmnPath(vfs);
+        const openBaseKmnText = openBaseKmnPath ? readVfsText(vfs, openBaseKmnPath) : undefined;
+        if (openBaseKmnPath && openBaseKmnText !== undefined && engineRef.current.dropUnbackedBitmapStore) {
+          const { kmn: cleaned, dropped } = engineRef.current.dropUnbackedBitmapStore(openBaseKmnText, vfs);
+          if (dropped !== null) {
+            vfs.set(openBaseKmnPath, cleaned, false);
+            scaffoldWarnings.push(
+              `icon '${dropped}' was not available, so the &BITMAP reference was dropped; the keyboard builds without an icon`,
+            );
+          }
+        }
       }
     } catch (err: unknown) {
       if (runId.current !== thisRunId) return;

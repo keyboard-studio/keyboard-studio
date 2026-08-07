@@ -35,6 +35,7 @@ import {
   buildKpsContent,
   type PackageDescriptorIdentity,
 } from "../package-descriptor/index.js";
+import { dropUnbackedBitmapStore } from "../compiler/stripDanglingAssetStores.js";
 
 export { scaffoldIR, resetIdentity } from "./scaffold-ir.js";
 export type { ScaffoldIROptions, ScaffoldIRIdentity } from "./scaffold-ir.js";
@@ -224,6 +225,29 @@ export function renameFilesInVfs(vfs: VirtualFS, baseId: string, keyboardId: str
       vfs.set(cssPath, rewritten, false);
     }
   }
+}
+
+/**
+ * Rewrite `source/<keyboardId>.kmn` in place to drop a `store(&BITMAP)` whose
+ * icon file is absent from `vfs`. Returns the warnings to surface (empty when
+ * there was nothing to drop).
+ *
+ * @see dropUnbackedBitmapStore — why the icon, and only the icon, is dropped
+ *      from the shipped source rather than only from the preview compile.
+ */
+function dropBitmapStoreIfUnbacked(vfs: VirtualFS, keyboardId: string): string[] {
+  const kmnPath = `source/${keyboardId}.kmn`;
+  const entry = vfs.get(kmnPath);
+  if (entry === undefined || typeof entry.content !== "string") return [];
+
+  const { kmn, dropped } = dropUnbackedBitmapStore(entry.content, vfs);
+  if (dropped === null) return [];
+
+  vfs.set(kmnPath, kmn, false);
+  return [
+    `icon '${dropped}' was not available, so the &BITMAP reference was dropped; ` +
+      `the keyboard builds without an icon`,
+  ];
 }
 
 function applyTouchLayoutCleanup(vfs: VirtualFS, keyboardId: string): void {
@@ -508,11 +532,24 @@ export function generateStubs(
       path: `source/${keyboardId}.keyman-touch-layout`,
       content: `{"tablet":{"layer":[{"id":"default","row":[]}]}}`,
     },
-    {
-      path: `source/${keyboardId}.ico`,
-      content: new Uint8Array(0),
-      isBinary: true,
-    },
+    // No `source/<id>.ico` stub. Spec §12 lists the icon in the emitted layout,
+    // but only a REAL icon belongs there: the base's own `.ico` is carried over
+    // by the loader and renamed by renameFilesInVfs above, so a base that has an
+    // icon already has its file here and this stub list would skip it anyway.
+    // A base with no icon has no `store(&BITMAP)` either, so there is nothing to
+    // satisfy — and a fabricated zero-byte placeholder was actively harmful:
+    // kmcmplib reports "Cannot open the bitmap or icon file for reading" and then
+    // emits ZERO artifacts, so an empty file paired with any surviving &BITMAP
+    // reference silently compiled to nothing (silently because our own severity
+    // fallback labels that diagnostic a warning — see
+    // ../compiler/stripDanglingAssetStores.ts). Worse, it defeated
+    // stripDanglingAssetStores, which spares a reference whose target file is
+    // present — and the empty stub made it look present.
+    //
+    // TODO: an author still has no way to give the keyboard an icon of its own —
+    // it either inherits the base's or has none. An in-studio icon editor is
+    // tracked as a separate feature; it would write a real `source/<id>.ico` here
+    // and re-add the &BITMAP reference.
     {
       path: `source/welcome.htm`,
       // Shared with the adapt track's output-time stubs — see
@@ -716,6 +753,16 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         emitYear,
         inheritedHolders,
       );
+
+      // The base's icon came across with the rest of source/ (loader) and was
+      // renamed alongside its &BITMAP reference (renameFilesInVfs + scaffoldIR).
+      // If it did NOT — an optional sibling the loader could not fetch — the
+      // reference now names a file nobody has, and kmcmplib answers that by
+      // emitting zero artifacts while the diagnostic reaches us under our own
+      // "warning" severity fallback (see stripDanglingAssetStores.ts). Drop the
+      // reference so "no icon" stays a cosmetic loss instead of a keyboard that
+      // won't build.
+      warnings.push(...dropBitmapStoreIfUnbacked(vfs, keyboardId));
 
       return {
         vfs,

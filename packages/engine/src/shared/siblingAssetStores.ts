@@ -2,9 +2,9 @@
  * siblingAssetStores — the canonical table of .kmn header system-store names
  * that name sibling asset files (VISUALKEYBOARD, LAYOUTFILE, BITMAP, etc.).
  *
- * Four call sites each need a DIFFERENT subset/attribute of this same list —
- * before this module they were four independently hand-maintained literals
- * that could silently drift apart:
+ * Five call sites each need a DIFFERENT subset/attribute of this same list —
+ * before this module they were independently hand-maintained literals that
+ * could silently drift apart:
  *
  *   - {@link parseKmnHeaderStores} (compiler)  — which stores kmcmplib needs
  *     fetched, and whether a missing file is a hard compile error.
@@ -15,8 +15,10 @@
  *     or only when the file is actually missing from the VFS.
  *   - {@link reconcileSiblingAssetPaths} (compiler) — which stores get a
  *     stale sibling reference repaired to the renamed keyboardId file.
+ *   - {@link dropUnbackedBitmapStore} (compiler) — which stores are removed
+ *     from the SHIPPED .kmn when their file never made it into the VFS.
  *
- * This table declares each store's per-purpose attributes ONCE; the four call
+ * This table declares each store's per-purpose attributes ONCE; the call
  * sites derive their subset from it instead of repeating the list. Per-store
  * RATIONALE lives here; per-call-site "why this subset" comments stay at each
  * call site.
@@ -40,6 +42,13 @@ export type PreviewStripMode =
   /** Never stripped for preview. */
   | "never";
 
+/** How a store is stripped from the SHIPPED .kmn (not just the preview). */
+export type ShipStripMode =
+  /** Dropped when its target file is absent from the VFS (a cosmetic-only asset). */
+  | "dangling"
+  /** Never dropped — a missing file is a fetch bug to surface, not a line to delete. */
+  | "never";
+
 export interface SiblingAssetStoreEntry {
   /** Store name without the leading '&' (e.g. "VISUALKEYBOARD"). */
   name: string;
@@ -49,6 +58,8 @@ export interface SiblingAssetStoreEntry {
   scaffoldRename: ScaffoldRenameMode;
   /** Preview-strip behavior (stripDanglingAssetStores). */
   previewStrip: PreviewStripMode;
+  /** Ship-strip behavior — removal from the SHIPPED .kmn (dropUnbackedBitmapStore). */
+  shipStrip: ShipStripMode;
   /** Whether reconcileSiblingAssetPaths repairs a stale reference to this store. */
   reconcileRepair: boolean;
   /**
@@ -87,16 +98,22 @@ export interface SiblingAssetStoreEntry {
  *   - KMW_HELPFILE / KMW_EMBEDJS are always preview-stripped: their presence
  *     makes KMW render its help-panel instead of the keyboard layout OSK,
  *     which is never useful in the live preview, fetched or not.
+ *   - BITMAP is the only store ever ship-stripped: it is the one purely
+ *     cosmetic packaging asset, so a keyboard whose icon never made it into
+ *     the VFS still ships as a complete, working keyboard once the dangling
+ *     reference is dropped. Every other store is load-bearing (a layout, a
+ *     visual keyboard, help/embed content, shared constants) — a missing one
+ *     is a fetch bug to surface in the shipped .kmn, not a line to delete.
  */
 export const SIBLING_ASSET_STORES: readonly SiblingAssetStoreEntry[] = [
-  { name: "LAYOUTFILE", fetchRequired: true, scaffoldRename: "always", previewStrip: "dangling", reconcileRepair: true, extension: ".keyman-touch-layout" },
-  { name: "VISUALKEYBOARD", fetchRequired: true, scaffoldRename: "always", previewStrip: "dangling", reconcileRepair: true, extension: ".kvks" },
-  { name: "BITMAP", fetchRequired: false, scaffoldRename: "bitmap-conditional", previewStrip: "dangling", reconcileRepair: true, extension: ".ico" },
-  { name: "KMW_EMBEDJS", fetchRequired: true, scaffoldRename: "always", previewStrip: "always", reconcileRepair: true, extension: ".js" },
-  { name: "KMW_EMBEDCSS", fetchRequired: false, scaffoldRename: "always", previewStrip: "never", reconcileRepair: true, extension: ".css" },
-  { name: "KMW_HELPFILE", fetchRequired: false, scaffoldRename: "always", previewStrip: "always", reconcileRepair: true, extension: ".htm" },
-  { name: "DISPLAYMAP", fetchRequired: false, scaffoldRename: "never", previewStrip: "dangling", reconcileRepair: true },
-  { name: "INCLUDECODES", fetchRequired: true, scaffoldRename: "never", previewStrip: "never", reconcileRepair: false },
+  { name: "LAYOUTFILE", fetchRequired: true, scaffoldRename: "always", previewStrip: "dangling", shipStrip: "never", reconcileRepair: true, extension: ".keyman-touch-layout" },
+  { name: "VISUALKEYBOARD", fetchRequired: true, scaffoldRename: "always", previewStrip: "dangling", shipStrip: "never", reconcileRepair: true, extension: ".kvks" },
+  { name: "BITMAP", fetchRequired: false, scaffoldRename: "bitmap-conditional", previewStrip: "dangling", shipStrip: "dangling", reconcileRepair: true, extension: ".ico" },
+  { name: "KMW_EMBEDJS", fetchRequired: true, scaffoldRename: "always", previewStrip: "always", shipStrip: "never", reconcileRepair: true, extension: ".js" },
+  { name: "KMW_EMBEDCSS", fetchRequired: false, scaffoldRename: "always", previewStrip: "never", shipStrip: "never", reconcileRepair: true, extension: ".css" },
+  { name: "KMW_HELPFILE", fetchRequired: false, scaffoldRename: "always", previewStrip: "always", shipStrip: "never", reconcileRepair: true, extension: ".htm" },
+  { name: "DISPLAYMAP", fetchRequired: false, scaffoldRename: "never", previewStrip: "dangling", shipStrip: "never", reconcileRepair: true },
+  { name: "INCLUDECODES", fetchRequired: true, scaffoldRename: "never", previewStrip: "never", shipStrip: "never", reconcileRepair: false },
 ];
 
 /** `{ storeName: fetchRequired }` — parseKmnHeaderStores' SYSTEM_STORES shape. */
@@ -117,6 +134,11 @@ export function conditionalScaffoldRenameStores(): string[] {
 /** Store names stripped from a preview compile only when their file is absent from the VFS. */
 export function danglingPreviewStripStores(): Set<string> {
   return new Set(SIBLING_ASSET_STORES.filter((s) => s.previewStrip === "dangling").map((s) => s.name));
+}
+
+/** Store names dropped from the SHIPPED .kmn when their file is absent from the VFS — BITMAP today. */
+export function shipDroppableStores(): Set<string> {
+  return new Set(SIBLING_ASSET_STORES.filter((s) => s.shipStrip === "dangling").map((s) => s.name));
 }
 
 /** Store names stripped from a preview compile unconditionally. */
