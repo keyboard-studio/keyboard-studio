@@ -2666,6 +2666,100 @@ describe("TouchGallery — no suggestion goes straight to chooser", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// Apply lives in the open method card (mirrors MechanismGallery's
+// CardApplyRow placement contract — see that file's own describe block of
+// the same name). TouchCardApplyRow renders per-card, one of
+// touch-apply-longpress / touch-apply-flick / touch-apply-multitap /
+// touch-apply-replace, with no shared row below the chooser anymore.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — Apply lives in the open method card", () => {
+  it("puts Apply in the open (default longpress) card, and only there", async () => {
+    // "中" has no suggestion, so the chooser opens directly at its default
+    // method (longpress_alternates) — see the "no suggestion goes straight
+    // to chooser" describe block above.
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    expect(screen.getByTestId("touch-apply-longpress")).toBeTruthy();
+    expect(screen.queryByTestId("touch-apply-flick")).toBeNull();
+    expect(screen.queryByTestId("touch-apply-multitap")).toBeNull();
+    expect(screen.queryByTestId("touch-apply-replace")).toBeNull();
+
+    // Exactly one — the reason for moving it off the shared row. A second
+    // Apply anywhere on screen would reintroduce "which method does this
+    // commit?".
+    expect(
+      screen.getAllByRole("button", { name: /Apply touch method for/i }),
+    ).toHaveLength(1);
+  });
+
+  it("follows the author into whichever card they open", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    expect(screen.getByTestId("touch-apply-longpress")).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(screen.getByText(/Swipe a key \(flick\)/i));
+    });
+    expect(screen.getByTestId("touch-apply-flick")).toBeTruthy();
+    expect(screen.queryByTestId("touch-apply-longpress")).toBeNull();
+    expect(
+      screen.getAllByRole("button", { name: /Apply touch method for/i }),
+    ).toHaveLength(1);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText(/Tap multiple times \(multitap\)/i));
+    });
+    expect(screen.getByTestId("touch-apply-multitap")).toBeTruthy();
+    expect(screen.queryByTestId("touch-apply-flick")).toBeNull();
+    expect(
+      screen.getAllByRole("button", { name: /Apply touch method for/i }),
+    ).toHaveLength(1);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText(/Replace a key/i));
+    });
+    expect(screen.getByTestId("touch-apply-replace")).toBeTruthy();
+    expect(screen.queryByTestId("touch-apply-multitap")).toBeNull();
+    expect(
+      screen.getAllByRole("button", { name: /Apply touch method for/i }),
+    ).toHaveLength(1);
+  });
+
+  it("keeps the touch-apply warnings banner rendered below the chooser, not duplicated per card", async () => {
+    // Force a warning from the engine so applyTouchWarnings renders — mirrors
+    // the "touch assignment could not be applied" banner's own coverage
+    // elsewhere in this file, just asserting it survives the Apply-row move.
+    buildTouchLayoutJsonSpy.mockImplementation(() => ({
+      json: JSON.stringify({ formatVersion: "1.0", platforms: [] }),
+      warnings: ["could not apply for K_Z"],
+    }));
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(hostKeySelect, "K_A");
+
+    const applyBtn = screen
+      .getAllByRole("button", { name: /Apply touch method for/i })
+      .find((b) => !b.hasAttribute("disabled"));
+    expect(applyBtn).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(applyBtn!);
+    });
+
+    expect(screen.getAllByText(/could not apply for K_Z/i)).toHaveLength(1);
+  });
+});
+
 describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", () => {
   it("revisiting an already-configured character skips the suggestion and does not duplicate its mechanism", async () => {
     // "ä" is decomposable and not in the default layout → longpress suggestion,
