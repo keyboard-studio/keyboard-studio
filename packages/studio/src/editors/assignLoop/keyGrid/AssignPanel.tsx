@@ -103,7 +103,7 @@ import { useId, useMemo, useState, type FormEvent } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import type { KeyboardIR, TouchKeyRuleIndex, TouchLayoutIR } from "@keyboard-studio/contracts";
-import { normalizeTouchKeyId } from "@keyboard-studio/contracts";
+import { createKeyOccurrenceCounter, normalizeTouchKeyId } from "@keyboard-studio/contracts";
 import {
   applyCaseTripleSynthesis,
   applyGuardSynthesis,
@@ -174,10 +174,16 @@ function countSharedCandidateOccurrences(
   let count = 0;
   for (const platform of layout.platforms) {
     for (const layer of platform.layers) {
+      // Per LAYER, row-major — the order the address's occurrence counts in.
+      // Without it, `excludeAddress` (which comes from a grid cell and may
+      // carry an occurrence) would match nothing and the key would be counted
+      // as a collision with itself.
+      const nextOccurrence = createKeyOccurrenceCounter();
       for (const row of layer.rows) {
         for (const key of row.keys) {
+          const address = touchKeyAddress(platform.id, layer.id, key.id, nextOccurrence(key.id));
           if (normalizeTouchKeyId(key.id) !== target) continue;
-          if (touchKeyAddress(platform.id, layer.id, key.id) === excludeAddress) continue;
+          if (address === excludeAddress) continue;
           count++;
         }
       }

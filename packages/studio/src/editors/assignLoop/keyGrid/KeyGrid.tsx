@@ -715,13 +715,17 @@ export function KeyGrid({
                     isSelected ||
                     (!hasSelectedVisible && cell.address === firstAddress);
                   return (
-                    // `cellKey`, never `address`: ids repeat within a layer
-                    // (T_BLANK twenty-five times in one shipped tablet layer),
-                    // so addresses collide, and React silently leaks the
-                    // shadowed fibers — switching layers piled up orphaned
-                    // blanks and front-of-row keys. See `cellKey`'s doc in
-                    // keyGridViewModel.ts.
-                    <Fragment key={cell.cellKey}>
+                    // Keyed on the address, which is unique within a layer
+                    // because it carries an OCCURRENCE (keyGridViewModel.ts,
+                    // "Duplicate ids"). That matters here specifically: ids
+                    // repeat — `T_BLANK` twenty-five times in one shipped
+                    // tablet layer — and duplicate React keys made the grid
+                    // LEAK. React maps previous children by key, so duplicates
+                    // overwrite each other, the shadowed fibers are never
+                    // matched on a later render and never enter the deletion
+                    // set, and they stay mounted; switching layers piled up
+                    // orphaned blanks and front-of-row keys on every switch.
+                    <Fragment key={cell.address}>
                       {/* Decorative left-padding spacer, not a gridcell — kept
                       aria-hidden and OUTSIDE the aria-colindex count below so
                       an assistive-technology cell iteration never confuses
@@ -729,13 +733,7 @@ export function KeyGrid({
                       {padPercent > 0 && (
                         <span
                           aria-hidden="true"
-                          // `cellKey` for the same reason the Fragment above
-                          // uses it: keyed on `address`, a layer's twenty-five
-                          // blanks would all answer to one test id, which
-                          // `getByTestId` treats as an error rather than a
-                          // choice. Identical to the address for any key whose
-                          // id is unique, so existing selectors are unchanged.
-                          data-testid={`key-grid-pad-${cell.cellKey}`}
+                          data-testid={`key-grid-pad-${cell.address}`}
                           style={{
                             flexGrow: 0,
                             flexShrink: 0,

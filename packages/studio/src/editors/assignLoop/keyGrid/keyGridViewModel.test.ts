@@ -25,7 +25,12 @@ import {
   TOUCH_JOIN_LAYERS,
   TOUCH_JOIN_PRODUCED,
 } from "@keyboard-studio/contracts/fixtures";
-import { applyKeyEditsToLayout, touchKeyAddress } from "@keyboard-studio/engine";
+import {
+  applyKeyEditsToLayout,
+  parseTouchKeyAddress,
+  resolveKeyAddress,
+  touchKeyAddress,
+} from "@keyboard-studio/engine";
 
 import {
   buildKeyGridViewModel,
@@ -503,10 +508,10 @@ describe("adding a key to the longest row (FR-016, FR-017, US2 AS4)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 7. cellKey — render identity where the address is ambiguous
+// 7. Occurrence-bearing addresses where an id repeats
 // ---------------------------------------------------------------------------
 
-describe("cellKey — unique per layer even when ids repeat", () => {
+describe("addresses — unique per layer even when ids repeat", () => {
   /**
    * Clone the fixture's default layer and stuff its first row with repeated
    * ids, the way a real layout's blank/spacer runs do (the shipped
@@ -544,7 +549,7 @@ describe("cellKey — unique per layer even when ids repeat", () => {
     };
   }
 
-  it("gives five same-id keys five distinct cellKeys while every address stays equal", () => {
+  it("gives five same-id keys five distinct addresses", () => {
     const vm = buildKeyGridViewModel({
       layout: layoutWithRepeatedIds(),
       ruleIndex: fixtureIndex(),
@@ -556,15 +561,60 @@ describe("cellKey — unique per layer even when ids repeat", () => {
     expect(cells).toHaveLength(5);
 
     const address = touchKeyAddress(PHONE, TOUCH_JOIN_LAYERS.default, "T_BLANK");
-    expect(cells.map((c) => c.address)).toEqual(Array(5).fill(address));
-    expect(cells.map((c) => c.cellKey)).toEqual([
+    expect(cells.map((c) => c.address)).toEqual([
       address,
       `${address}#1`,
       `${address}#2`,
       `${address}#3`,
       `${address}#4`,
     ]);
-    expect(new Set(cells.map((c) => c.cellKey)).size).toBe(5);
+    expect(new Set(cells.map((c) => c.address)).size).toBe(5);
+    // Every one of them resolves back to a DIFFERENT key — the point of the
+    // whole scheme, and what makes an individual blank selectable.
+    const layout = layoutWithRepeatedIds();
+    const resolved = cells.map((c) => resolveKeyAddress(layout, parseTouchKeyAddress(c.address)!));
+    expect(resolved.every((r) => r !== undefined)).toBe(true);
+    expect(new Set(resolved.map((r) => `${r!.rowIndex}:${r!.keyIndex}`)).size).toBe(5);
+  });
+
+  // The point of the whole scheme, end to end: an edit addressed at the FOURTH
+  // blank must land on the fourth blank. Before occurrences the address resolved
+  // to the first every time, so a layer's blanks could not be restored
+  // individually — "it is impossible to put one key back into service".
+  it("an edit addressed at one repeated key lands on THAT key and no other", () => {
+    const layout = layoutWithRepeatedIds();
+    const vm = buildKeyGridViewModel({
+      layout,
+      ruleIndex: fixtureIndex(),
+      platform: PHONE,
+      layerId: TOUCH_JOIN_LAYERS.default,
+    })!;
+
+    const cells = vm.rows.flatMap((r) => r.keys);
+    const target = cells[3]!;
+
+    const { layout: edited, orphaned } = applyKeyEditsToLayout(layout, [
+      { seq: 0, kind: "set", address: target.address, fields: { text: "PICKED" } },
+    ]);
+    expect(orphaned).toEqual([]);
+
+    const after = buildKeyGridViewModel({
+      layout: edited,
+      ruleIndex: fixtureIndex(),
+      platform: PHONE,
+      layerId: TOUCH_JOIN_LAYERS.default,
+    })!.rows.flatMap((r) => r.keys);
+
+    // Exactly one keycap changed, and it is the one that was addressed. The
+    // other four still carry the keycap they were cloned with.
+    const before = cells.map((c) => c.keycap);
+    expect(after.map((c) => c.keycap)).toEqual([
+      before[0]!,
+      before[1]!,
+      before[2]!,
+      "PICKED",
+      before[4]!,
+    ]);
   });
 
   // The shared fixture already carries `T_DUP` twice in one layer, on purpose —
@@ -572,7 +622,7 @@ describe("cellKey — unique per layer even when ids repeat", () => {
   // So an unmodified fixture is itself a live case: a duplicate id is a
   // diagnosable condition the author is told about, not a malformed layout the
   // grid may refuse to render. Both facts are asserted together here.
-  it("suffixes only the repeats, leaving every unique id's cellKey equal to its address", () => {
+  it("suffixes only the repeats, leaving every unique id's address unsuffixed", () => {
     const vm = buildKeyGridViewModel({
       layout: fixtureLayout(),
       ruleIndex: fixtureIndex(),
@@ -585,18 +635,20 @@ describe("cellKey — unique per layer even when ids repeat", () => {
     // The named example the fixture exists to model, asserted explicitly.
     const duplicates = cells.filter((c) => c.id === TOUCH_JOIN_IDS.duplicate);
     expect(duplicates).toHaveLength(2);
-    expect(duplicates[0]!.cellKey).toBe(duplicates[0]!.address);
-    expect(duplicates[1]!.cellKey).toBe(`${duplicates[1]!.address}#1`);
+    const bare = touchKeyAddress(PHONE, TOUCH_JOIN_LAYERS.default, TOUCH_JOIN_IDS.duplicate);
+    expect(duplicates[0]!.address).toBe(bare);
+    expect(duplicates[1]!.address).toBe(`${bare}#1`);
 
     // The rule itself, stated generically — the fixture carries more than one
     // deliberate duplicate, so enumerating them here would just go stale the
     // next time a case is added to it.
     const seen = new Map<string, number>();
     for (const cell of cells) {
-      const n = seen.get(cell.address) ?? 0;
-      seen.set(cell.address, n + 1);
-      expect(cell.cellKey).toBe(n === 0 ? cell.address : `${cell.address}#${n}`);
+      const n = seen.get(cell.id) ?? 0;
+      seen.set(cell.id, n + 1);
+      const expected = touchKeyAddress(PHONE, TOUCH_JOIN_LAYERS.default, cell.id, n);
+      expect(cell.address).toBe(expected);
     }
-    expect(new Set(cells.map((c) => c.cellKey)).size).toBe(cells.length);
+    expect(new Set(cells.map((c) => c.address)).size).toBe(cells.length);
   });
 });

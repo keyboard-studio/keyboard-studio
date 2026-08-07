@@ -80,11 +80,6 @@ function makeCell(
   const address = overrides.address ?? `phone:default:${overrides.id}`;
   return {
     address,
-    // Defaults to the address, matching what `buildKeyGridViewModel` produces
-    // for the FIRST key with a given address. A fixture that deliberately
-    // repeats an address (the duplicate-id tests below) supplies its own, the
-    // way the real builder's occurrence counter would.
-    cellKey: overrides.cellKey ?? address,
     id: overrides.id,
     keycap: overrides.keycap ?? overrides.id,
     sp: overrides.sp,
@@ -1305,35 +1300,34 @@ describe("KeyGrid — cells stay unique when key ids repeat within a layer", () 
   // `touchKeyAddress(platform, layerId, key.id)` is derived from the id alone,
   // all of those cells share ONE address.
   //
-  // That made the address unusable as this grid's React key. React's keyed
-  // reconciliation builds a map of the previous children keyed by key, so
-  // duplicates overwrite each other and only the last fiber per key is
-  // reachable; the shadowed ones are never matched by a subsequent render and
-  // never enter the deletion set either, so they stay mounted. Switching
-  // layers therefore ADDED a set of orphaned blanks and front-of-row keys to
-  // the DOM on every switch, which is exactly what an author sees: "switch to
-  // shift and back to default a few times, the spacing and keys at the front
-  // of the columns multiply".
+  // With one address per id, that address was unusable as this grid's React
+  // key. React's keyed reconciliation builds a map of the previous children
+  // keyed by key, so duplicates overwrite each other and only the last fiber
+  // per key is reachable; the shadowed ones are never matched by a subsequent
+  // render and never enter the deletion set either, so they stay mounted.
+  // Switching layers therefore ADDED a set of orphaned blanks and front-of-row
+  // keys to the DOM on every switch, which is exactly what an author sees:
+  // "switch to shift and back to default a few times, the spacing and keys at
+  // the front of the columns multiply".
   //
-  // The fix is `KeyGridCellViewModel.cellKey` (keyGridViewModel.ts) — an
-  // address disambiguated by its occurrence within the layer. The ADDRESS is
-  // deliberately unchanged: it is the overlay's contract with the engine, and
-  // this is a rendering-identity problem, not an addressing one.
+  // The address now carries an OCCURRENCE (contracts' touch-key-address.ts), so
+  // it is unique within a layer and can serve as the React key directly. These
+  // fixtures supply occurrence-suffixed addresses the way the real builder
+  // does.
   function duplicateIdLayer(layerId: string, blanks: number): KeyGridViewModel {
-    // Addresses repeat exactly as the shipped layout's do; `cellKey` carries
-    // the occurrence disambiguator the real builder computes.
+    // Ids repeat exactly as the shipped layout's do; the ADDRESSES carry the
+    // occurrence suffix `buildKeyGridViewModel` computes for them.
     const shiftAddr = `tablet:${layerId}:K_SHIFT`;
     const blankAddr = `tablet:${layerId}:T_BLANK`;
     const cells = [
-      makeCell({ id: "K_SHIFT", address: shiftAddr, cellKey: shiftAddr }),
+      makeCell({ id: "K_SHIFT", address: shiftAddr }),
       ...Array.from({ length: blanks }, (_, i) =>
         makeCell({
           id: "T_BLANK",
-          address: blankAddr,
-          cellKey: i === 0 ? blankAddr : `${blankAddr}#${i}`,
+          address: i === 0 ? blankAddr : `${blankAddr}#${i}`,
         }),
       ),
-      makeCell({ id: "K_SHIFT", address: shiftAddr, cellKey: `${shiftAddr}#1` }),
+      makeCell({ id: "K_SHIFT", address: `${shiftAddr}#1` }),
     ];
     return makeViewModel([makeRow(cells, 0, "tablet")], {
       platform: "tablet",

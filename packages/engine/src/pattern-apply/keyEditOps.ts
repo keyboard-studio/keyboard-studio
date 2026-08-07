@@ -387,11 +387,29 @@ export function resolveKeyAddress<TKey extends AddressableKeyLike>(
   if (layerIndex === -1) return undefined;
   const layer = platform.layers[layerIndex]!;
 
+  // Walk the layer ROW-MAJOR, counting keys that carry this id, and stop at the
+  // requested occurrence. An address with no occurrence wants the first, which
+  // is what this loop returns on its first match — byte-identical behaviour to
+  // the plain `findIndex` this replaced, for every address that names a unique
+  // id (nearly all of them) and for every address written before occurrences
+  // existed.
+  //
+  // Row-major is not an arbitrary traversal choice: it is the SAME order
+  // `createKeyOccurrenceCounter`'s callers walk in when they build these
+  // addresses. If the builder and this resolver disagreed about the order, an
+  // occurrence-bearing address would resolve to a different key than the one
+  // whose address it is.
+  const wanted = parts.occurrence ?? 0;
+  let seen = 0;
   for (let rowIndex = 0; rowIndex < layer.rows.length; rowIndex++) {
     const row = layer.rows[rowIndex]!;
-    const keyIndex = row.keys.findIndex((k) => k.id === parts.keyId);
-    if (keyIndex !== -1) {
-      return { platformIndex, layerIndex, rowIndex, keyIndex, key: row.keys[keyIndex]! };
+    for (let keyIndex = 0; keyIndex < row.keys.length; keyIndex++) {
+      const key = row.keys[keyIndex]!;
+      if (key.id !== parts.keyId) continue;
+      if (seen === wanted) {
+        return { platformIndex, layerIndex, rowIndex, keyIndex, key };
+      }
+      seen++;
     }
   }
   return undefined;
