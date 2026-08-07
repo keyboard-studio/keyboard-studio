@@ -230,14 +230,12 @@ import {
   TEXT_DIM,
   TEXT_MAIN,
   FONT,
-  BLUE_ACTION,
   BG_CARD,
   galleryGhostBtn as ghostBtn,
   gallerySelectMenuStyle,
   galleryHeaderBtnStyle as headerBtnStyle,
   galleryConfigStyle as configStyle,
   galleryCardStyle as cardStyle,
-  galleryForwardBtnStyle as forwardBtnStyle,
 } from "../../lib/galleryTheme.ts";
 // T118 — the rejection banner's border. `galleryTheme.ts` has no error token of
 // its own; `ui/theme.ts` is where the E/W/I severity palette lives, and this is

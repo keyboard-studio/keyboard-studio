@@ -182,7 +182,6 @@ import {
   TEXT_DIM,
   TEXT_MAIN,
   FONT,
-  BLUE_ACTION,
   galleryGhostBtn as ghostBtn,
   galleryInputStyle as inputStyle,
   galleryForwardBtnStyle as forwardBtnStyle,
