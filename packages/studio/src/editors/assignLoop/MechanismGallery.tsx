@@ -157,6 +157,7 @@ import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
 import { getProducerBadge, allCharsCovered } from "./parts/charMechanisms.ts";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
 import { GalleryEmptyState } from "./parts/GalleryEmptyState.tsx";
+import { GalleryCardApplyRow } from "./parts/GalleryCardApplyRow.tsx";
 import {
   RemovableChipRow,
   HoverDangerChip,
@@ -710,6 +711,11 @@ const VALID_DEADKEY_TRIGGER_KEYS: ReadonlySet<string> = new Set(
  * message ids verbatim — same accessible name, same catalog keys, so screen
  * readers, the en/fr catalogs and every test that queries this control by
  * accessible name are all unaffected by the move.
+ *
+ * Thin wrapper over the shared `GalleryCardApplyRow` (also used by
+ * TouchGallery's `TouchCardApplyRow`) — this component's only job is
+ * computing the aria-label with its own static message id, since the
+ * lingui `t` macro requires that id to be a literal, not a variable.
  */
 function CardApplyRow({
   currentChar,
@@ -725,34 +731,15 @@ function CardApplyRow({
 }) {
   const { t } = useLingui();
   return (
-    <div
-      data-testid={testId}
-      style={{
-        // Mirrors galleryConfigStyle's horizontal padding so the button's right
-        // edge lines up with the fields it commits.
-        padding: "0 14px 12px",
-        display: "flex",
-        justifyContent: "flex-end",
-      }}
-    >
-      <button
-        type="button"
-        onClick={onApply}
-        disabled={!canApply}
-        aria-label={t({
-          id: "editor.assignLoop.applyMethodAriaLabel",
-          message: `Apply method for ${currentChar}`,
-        })}
-        style={{
-          ...forwardBtnStyle,
-          background: canApply ? BLUE_ACTION : "#21262d",
-          color: canApply ? "#e6edf3" : TEXT_DIM,
-          cursor: canApply ? "pointer" : "not-allowed",
-        }}
-      >
-        <Trans id="editor.assignLoop.applyMethodButton">Apply method</Trans>
-      </button>
-    </div>
+    <GalleryCardApplyRow
+      ariaLabel={t({
+        id: "editor.assignLoop.applyMethodAriaLabel",
+        message: `Apply method for ${currentChar}`,
+      })}
+      canApply={canApply}
+      onApply={onApply}
+      testId={testId}
+    />
   );
 }
 

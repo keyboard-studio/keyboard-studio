@@ -210,6 +210,7 @@ import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
 import { getProducerBadge, allCharsCovered } from "./parts/charMechanisms.ts";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
 import { GalleryEmptyState } from "./parts/GalleryEmptyState.tsx";
+import { GalleryCardApplyRow } from "./parts/GalleryCardApplyRow.tsx";
 import { ProposalCard } from "./parts/ProposalCard.tsx";
 import {
   RemovableChipRow,
@@ -650,17 +651,21 @@ interface TouchMethodChooserProps {
 
 /**
  * Apply row for the open touch-method card — bottom-right of the very card
- * it commits. Mirrors MechanismGallery's `CardApplyRow` byte-for-byte in
- * approach: replaces the single shared "Apply method" button that used to
- * sit below all four cards (Sequences card, then Apply + Mark row) with one
- * row rendered only inside the currently-open card, so exactly one Apply is
- * ever on screen and "which touch method does this commit?" stops being
- * ambiguous.
+ * it commits. Both this and MechanismGallery's `CardApplyRow` now delegate
+ * to the shared `GalleryCardApplyRow`: replaces the single shared "Apply
+ * method" button that used to sit below all four cards (Sequences card,
+ * then Apply + Mark row) with one row rendered only inside the currently-
+ * open card, so exactly one Apply is ever on screen and "which touch method
+ * does this commit?" stops being ambiguous.
  *
  * Keeps the replaced button's `touch.applyMethodAriaLabel` /
  * `applyMethodButton` message ids verbatim — same accessible name, same
  * catalog keys, so screen readers, the en/fr catalogs, and every test that
- * queries this control by accessible name are unaffected by the move.
+ * queries this control by accessible name are unaffected by the move. This
+ * wrapper's only job is computing that aria-label with its own static
+ * message id, since the lingui `t` macro requires that id to be a literal,
+ * not a variable — that's why the shared component itself takes a
+ * ready-made `ariaLabel` string rather than a `currentChar`.
  */
 function TouchCardApplyRow({
   currentChar,
@@ -676,34 +681,15 @@ function TouchCardApplyRow({
 }) {
   const { t } = useLingui();
   return (
-    <div
-      data-testid={testId}
-      style={{
-        // Mirrors galleryConfigStyle's horizontal padding so the button's
-        // right edge lines up with the fields it commits.
-        padding: "0 14px 12px",
-        display: "flex",
-        justifyContent: "flex-end",
-      }}
-    >
-      <button
-        type="button"
-        onClick={onApply}
-        disabled={!canApply}
-        aria-label={t({
-          id: "editor.assignLoop.touch.applyMethodAriaLabel",
-          message: `Apply touch method for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
-        })}
-        style={{
-          ...forwardBtnStyle,
-          background: canApply ? BLUE_ACTION : "#21262d",
-          color: canApply ? "#e6edf3" : TEXT_DIM,
-          cursor: canApply ? "pointer" : "not-allowed",
-        }}
-      >
-        <Trans id="editor.assignLoop.applyMethodButton">Apply method</Trans>
-      </button>
-    </div>
+    <GalleryCardApplyRow
+      ariaLabel={t({
+        id: "editor.assignLoop.touch.applyMethodAriaLabel",
+        message: `Apply touch method for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
+      })}
+      canApply={canApply}
+      onApply={onApply}
+      testId={testId}
+    />
   );
 }
 
