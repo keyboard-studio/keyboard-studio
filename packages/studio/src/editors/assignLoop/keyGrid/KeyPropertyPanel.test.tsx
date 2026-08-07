@@ -83,7 +83,7 @@ describe("KeyPropertyPanel — one panel (FR-018)", () => {
     }
   });
 
-  it("edits `sp` through the composed inspector's radio group, not a text box", () => {
+  it("edits `sp` through the composed inspector's dropdown, not a text box", () => {
     renderPanel();
     expect(screen.queryByTestId("key-property-panel-field-sp")).toBeNull();
     expect(screen.getByTestId("key-inspector-sp")).toBeTruthy();

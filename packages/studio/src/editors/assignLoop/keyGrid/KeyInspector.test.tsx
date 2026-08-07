@@ -782,41 +782,53 @@ describe("proposeSpValue — the derivable half of FR-029d, everything else is '
 });
 
 describe("KeyInspector — the `sp` control (FR-029a)", () => {
-  function getSpRadios(): HTMLInputElement[] {
-    return within(screen.getByTestId("key-inspector-sp")).getAllByRole("radio") as HTMLInputElement[];
+  // The control is a `SelectMenu` (see KeyInspector.tsx's own module doc, "The
+  // key-type control is a DROPDOWN, not six radios"): a collapsed trigger
+  // carrying the current value, and a listbox of options once opened. These
+  // helpers are the same idiom ui/SelectMenu.test.tsx uses.
+
+  /** The collapsed trigger inside the `sp` control. */
+  function spTrigger(): HTMLButtonElement {
+    return within(screen.getByTestId("key-inspector-sp")).getByRole("button") as HTMLButtonElement;
+  }
+
+  /** Every option, after opening the list. Portalled to `document.body`, so queried from `screen`, not from within the control. */
+  function openSpOptions(): HTMLElement[] {
+    fireEvent.click(spTrigger());
+    return screen.getAllByRole("option");
   }
 
   it("exposes the full legal set of six values, none of them disabled", () => {
     render(<KeyInspector selectedCell={makeCell({ id: "T_A" })} {...defaultInspectorHandlers()} />);
 
-    const radios = getSpRadios();
-    expect(radios).toHaveLength(6);
-    expect(radios.map((r) => r.value).sort()).toEqual(["0", "1", "10", "2", "8", "9"].sort());
-    for (const radio of radios) {
-      expect(radio.disabled).toBe(false);
+    const options = openSpOptions();
+    expect(options).toHaveLength(6);
+    expect(options.map((o) => o.getAttribute("data-value")).sort()).toEqual(
+      ["0", "1", "10", "2", "8", "9"].sort(),
+    );
+    for (const option of options) {
+      expect(option.getAttribute("aria-disabled")).not.toBe("true");
     }
   });
 
-  it("checks the radio matching the key's current sp, defaulting undefined to character (0)", () => {
+  it("shows the key's current sp on the trigger, defaulting undefined to character (0)", () => {
     render(<KeyInspector selectedCell={makeCell({ id: "T_A" })} {...defaultInspectorHandlers()} />);
-    const radios = getSpRadios();
-    const checked = radios.find((r) => r.checked);
-    expect(checked?.value).toBe("0");
+    expect(spTrigger().getAttribute("data-value")).toBe("0");
+    expect(spTrigger().textContent).toContain("Character");
   });
 
-  it("checks the radio matching an explicitly-set non-default sp (spacer)", () => {
+  it("shows an explicitly-set non-default sp (spacer) on the trigger", () => {
     render(
       <KeyInspector
         selectedCell={makeCell({ id: "T_A", sp: 10 })}
         {...defaultInspectorHandlers()}
       />,
     );
-    const radios = getSpRadios();
-    const checked = radios.find((r) => r.checked);
-    expect(checked?.value).toBe("10");
+    expect(spTrigger().getAttribute("data-value")).toBe("10");
+    expect(spTrigger().textContent).toContain("Spacer");
   });
 
-  it("marks the PROPOSED value even when it differs from the currently-checked value, without disabling either", () => {
+  it("marks the PROPOSED value even when it differs from the current one, without disabling either", () => {
     // T_SHIFT sits on "default" (touchKeyAddress default in makeCell) with
     // nextlayer "shift" — FR-029d proposes inactive (sp:1) here — while the
     // key is currently (wrongly) set to active (sp:2), the exact disagreement
@@ -828,15 +840,16 @@ describe("KeyInspector — the `sp` control (FR-029a)", () => {
       />,
     );
 
-    const proposedBadge = screen.getByTestId("key-inspector-sp-proposed");
-    const proposedRadioLabel = proposedBadge.closest("label");
-    expect(proposedRadioLabel?.querySelector('input[type="radio"]')).toHaveProperty("value", "1");
+    // Collapsed, the trigger shows the CURRENT value and no proposal badge:
+    // sp:2 is not what the studio would propose.
+    expect(spTrigger().getAttribute("data-value")).toBe("2");
+    expect(screen.queryByTestId("key-inspector-sp-proposed")).toBeNull();
 
-    const radios = getSpRadios();
-    const checked = radios.find((r) => r.checked);
-    expect(checked?.value).toBe("2");
-    for (const radio of radios) {
-      expect(radio.disabled).toBe(false);
+    const options = openSpOptions();
+    const badge = screen.getByTestId("key-inspector-sp-proposed");
+    expect(badge.closest('[role="option"]')?.getAttribute("data-value")).toBe("1");
+    for (const option of options) {
+      expect(option.getAttribute("aria-disabled")).not.toBe("true");
     }
   });
 
@@ -844,6 +857,20 @@ describe("KeyInspector — the `sp` control (FR-029a)", () => {
     render(<KeyInspector selectedCell={makeCell({ id: "T_A" })} {...defaultInspectorHandlers()} />);
     const note = screen.getByTestId("key-inspector-sp-note").textContent ?? "";
     expect(note.toLowerCase()).toContain("does not stop a rule from matching");
+  });
+
+  it("explains the SELECTED type, not all six at once", () => {
+    render(
+      <KeyInspector
+        selectedCell={makeCell({ id: "T_BLANK", sp: 9 })}
+        {...defaultInspectorHandlers()}
+      />,
+    );
+    const note = screen.getByTestId("key-inspector-sp-note").textContent ?? "";
+    // Blank's own note, and NOT spacer's — the five types the author did not
+    // choose are not being explained at them.
+    expect(note).toContain("Fills a keycap-shaped hole");
+    expect(note).not.toContain("no visible keycap");
   });
 
   it("fires onSpChange with the numeric value the author picked, even when it is not the proposed one", () => {
@@ -856,10 +883,9 @@ describe("KeyInspector — the `sp` control (FR-029a)", () => {
       />,
     );
 
-    const radios = getSpRadios();
-    const spacerRadio = radios.find((r) => r.value === "10");
-    expect(spacerRadio).toBeTruthy();
-    fireEvent.click(spacerRadio!);
+    const spacer = openSpOptions().find((o) => o.getAttribute("data-value") === "10");
+    expect(spacer).toBeTruthy();
+    fireEvent.click(spacer!);
 
     expect(picks).toEqual([10]);
   });

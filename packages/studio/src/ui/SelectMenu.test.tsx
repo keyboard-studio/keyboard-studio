@@ -497,4 +497,23 @@ describe("SelectMenu", () => {
     fireEvent.keyDown(listbox, { key: "ArrowUp" });
     expect(onChangeSpy).toHaveBeenLastCalledWith("b");
   });
+
+  it("puts ariaDescribedby on the trigger, alongside its name rather than instead of it", () => {
+    render(
+      <>
+        <span id="sp-label">Key type</span>
+        <span id="sp-note">Controls how the key is drawn.</span>
+        <SelectMenu
+          options={OPTIONS}
+          value="a"
+          onChange={() => undefined}
+          ariaLabelledby="sp-label"
+          ariaDescribedby="sp-note"
+        />
+      </>,
+    );
+    const trigger = screen.getByRole("button");
+    expect(trigger.getAttribute("aria-labelledby")).toBe("sp-label");
+    expect(trigger.getAttribute("aria-describedby")).toBe("sp-note");
+  });
 });

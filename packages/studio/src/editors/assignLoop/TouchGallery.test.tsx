@@ -5915,7 +5915,28 @@ async function renderTouchGalleryInKeyMode(
 }
 
 describe("TouchGallery — key mode editing (spec 061 T009, FR-009, SC-003, SC-009)", () => {
-  it("AS1 — the key-type radio holds through its own re-render, and the newly chosen sp reaches the emitted .keyman-touch-layout", async () => {
+  /** The key-type dropdown's collapsed trigger, inside the property panel. */
+  function spTrigger(): HTMLButtonElement {
+    return within(screen.getByTestId("key-inspector-sp")).getByRole(
+      "button",
+    ) as HTMLButtonElement;
+  }
+
+  /** Open the key-type dropdown and pick the option whose `sp` is `value`. */
+  async function pickSp(value: number): Promise<void> {
+    await act(async () => {
+      fireEvent.click(spTrigger());
+    });
+    const option = screen
+      .getAllByRole("option")
+      .find((o) => o.getAttribute("data-value") === String(value));
+    expect(option).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(option!);
+    });
+  }
+
+  it("AS1 — the key-type choice holds through its own re-render, and the newly chosen sp reaches the emitted .keyman-touch-layout", async () => {
     seedKeyModeParityFixture();
     await renderTouchGalleryInKeyMode();
 
@@ -5924,32 +5945,16 @@ describe("TouchGallery — key mode editing (spec 061 T009, FR-009, SC-003, SC-0
     // T_a starts life as an ordinary Character key (`sp` absent -> wire
     // default 0) — confirm the starting state before changing it, so a false
     // pass ("it was Blank all along") is not possible.
-    expect(
-      (screen.getByRole("radio", { name: /Character/i }) as HTMLInputElement)
-        .checked,
-    ).toBe(true);
-    const blankRadio = screen.getByRole("radio", {
-      name: /Blank/i,
-    }) as HTMLInputElement;
-    expect(blankRadio.checked).toBe(false);
+    expect(spTrigger().getAttribute("data-value")).toBe("0");
 
-    await act(async () => {
-      fireEvent.click(blankRadio);
-    });
+    await pickSp(9);
 
     // (a) THE DEFECT OF RECORD (issue #1530 complaint #2, spec 061 AS1): the
-    // radio must hold the newly chosen value through the re-render it
-    // triggers, never snap back to the old one. `TouchGallery` supplies
-    // neither `onSpChange` nor `onApplyFix` to `KeyInspector` today
-    // (confirmed by search before writing this block) — `onSpChange` is a
-    // REQUIRED prop (spec 061 FR-001/research D1), so this either throws for
-    // want of a handler to call, or (once T013 wires it to a real
-    // `commitKeyEdit`) actually flips the working copy. This assertion is
-    // false either way until that wiring lands.
-    expect(
-      (screen.getByRole("radio", { name: /Blank/i }) as HTMLInputElement)
-        .checked,
-    ).toBe(true);
+    // control must hold the newly chosen value through the re-render it
+    // triggers, never snap back to the old one. `onSpChange` is a REQUIRED prop
+    // (spec 061 FR-001/research D1), so an unwired mount is a build error
+    // rather than a control that reverts.
+    expect(spTrigger().getAttribute("data-value")).toBe("9");
 
     // (b) the SAME choice reaches what the author downloads, not just
     // component state — "it persisted into what the author downloads" is
@@ -6045,6 +6050,96 @@ describe("TouchGallery — key mode editing (spec 061 T009, FR-009, SC-003, SC-0
     // After the switch: the grid re-rendered FOR THAT LAYER — "symbols"'
     // own key is now present.
     expect(screen.getByTestId("key-grid-cell-phone:symbols:T_1")).toBeTruthy();
+  });
+
+  // -------------------------------------------------------------------------
+  // The layer-family fan-out is offered for edits that can actually break the
+  // family's parallelism, and NOT for the ones FR-068 exempts
+  // (`keyEditAffectsFamilyParallelism`, engine `layerFamilies.ts`).
+  //
+  // `default` and `shift` are one alphabetic family in KEY_MODE_PARITY_LAYOUT,
+  // so every case below has a sibling for the dialog to offer, and its absence
+  // means the trigger declined rather than that there was nothing to fan out to.
+  // -------------------------------------------------------------------------
+
+  it("does not ask about the layer family when a key type changes within the ordinary classes", async () => {
+    seedKeyModeParityFixture();
+    await renderTouchGalleryInKeyMode();
+    fireEvent.click(screen.getByTestId("key-grid-cell-phone:default:T_a"));
+
+    const opsBefore = useWorkingCopyStore.getState().keyEditOverlay.ops.length;
+    await pickSp(9);
+
+    // The edit landed...
+    expect(useWorkingCopyStore.getState().keyEditOverlay.ops.length).toBe(opsBefore + 1);
+    // ...and nothing offered to repeat it on `shift`. Blanking a key is per-layer
+    // presentation; the fan-out starts with every sibling CHECKED, so asking here
+    // is how an author ends up with an inert key on every layer of the family.
+    expect(screen.queryByTestId("family-apply-dialog")).toBeNull();
+  });
+
+  it("does not ask about the layer family when a keycap changes", async () => {
+    seedKeyModeParityFixture();
+    await renderTouchGalleryInKeyMode();
+    fireEvent.click(screen.getByTestId("key-grid-cell-phone:default:T_a"));
+
+    const keycap = within(screen.getByTestId("key-property-panel-field-text")).getByRole(
+      "textbox",
+    ) as HTMLInputElement;
+    await act(async () => {
+      fireEvent.change(keycap, { target: { value: "ɑ" } });
+      fireEvent.blur(keycap);
+    });
+
+    // `default` carries `a` where `shift` carries `A` — the keycap is the
+    // canonical per-layer property, so copying it across is very often the wrong
+    // edit and must not be proposed.
+    expect(screen.queryByTestId("family-apply-dialog")).toBeNull();
+  });
+
+  it("DOES ask about the layer family when a key is deleted", async () => {
+    seedKeyModeParityFixture();
+    await renderTouchGalleryInKeyMode();
+    fireEvent.click(screen.getByTestId("key-grid-cell-phone:default:T_a"));
+
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("key-property-panel-delete"));
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("remove-key-dialog-confirm"));
+    });
+
+    // Presence is exactly what `findFamilyParallelismBreaks` compares, so a key
+    // gone from one member and present on the rest is a real break — the one
+    // case where "do the same on the siblings?" is the right question.
+    expect(screen.getByTestId("family-apply-dialog")).toBeTruthy();
+  });
+
+  // -------------------------------------------------------------------------
+  // The details panel is BESIDE the board, not below it (issue #1530: "the key
+  // details must show on the same screen as the keyboard").
+  // -------------------------------------------------------------------------
+
+  it("renders the key details in their own column beside the grid, not stacked under it", async () => {
+    seedKeyModeParityFixture();
+    await renderTouchGalleryInKeyMode();
+    fireEvent.click(screen.getByTestId("key-grid-cell-phone:default:T_a"));
+
+    const detailsColumn = screen.getByTestId("touch-key-details-column");
+    const panel = screen.getByTestId("key-property-panel");
+    const grid = screen.getByRole("grid");
+
+    // The panel is in the column; the board is NOT (which is what makes them
+    // siblings that can be side by side, rather than one above the other).
+    expect(detailsColumn.contains(panel)).toBe(true);
+    expect(detailsColumn.contains(grid)).toBe(false);
+
+    // The dialogs stay OUT of the column: it scrolls, and `overflow: auto`
+    // clips a `position: fixed` descendant.
+    await act(async () => {
+      fireEvent.click(screen.getByTestId("key-property-panel-delete"));
+    });
+    expect(detailsColumn.contains(screen.getByTestId("remove-key-dialog"))).toBe(false);
   });
 });
 

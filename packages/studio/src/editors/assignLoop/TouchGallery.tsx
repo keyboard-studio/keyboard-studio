@@ -123,6 +123,7 @@ import {
   applyKeyEditsToRawJson,
   proposeTouchKeyId,
   groupLayerFamilies,
+  keyEditAffectsFamilyParallelism,
   planKeyDeletionRuleRemoval,
   applyKeyDeletionRuleRemoval,
 } from "@keyboard-studio/engine";
@@ -2626,21 +2627,37 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     [checkKeyEditOperation, checkKeyEditRejectionNotices, acknowledgedRejections, keyModeProvenance],
   );
 
-  // T013 (FR-065) — offer the layer-family fan-out after a family-applicable
-  // op (`suppress`/`remove`/`set` — `isFamilyApplicableOp`) commits, per
-  // `FamilyApplyDialog.tsx`'s own module doc ("the seam it was designed
-  // for"). Scoped to the ACTIVE platform's declared layer family the edited
-  // layer belongs to; a family of one (no siblings) offers nothing — there is
-  // nothing to fan out to. This is a deliberately simple trigger (every
-  // family-applicable edit on a >1-member family offers the dialog) rather
-  // than first running `findFamilyParallelismBreaks` to detect a genuine
-  // break — the dialog's own per-member content preview is what lets the
-  // author decide "nothing to do here" for every member, and wiring the
-  // detector as the gate is a follow-up, not required for this op to reach
-  // its caller-designed seam.
+  // T013 (FR-065) — offer the layer-family fan-out after an edit that can
+  // actually leave the family out of step, per `FamilyApplyDialog.tsx`'s own
+  // module doc ("the seam it was designed for"). Scoped to the ACTIVE
+  // platform's declared layer family the edited layer belongs to; a family of
+  // one (no siblings) offers nothing — there is nothing to fan out to.
+  //
+  // TWO predicates gate this, and they are not the same question:
+  //
+  //   - `isFamilyApplicableOp` (the dialog's own) — CAN this op be fanned out
+  //     at all. A capability.
+  //   - `keyEditAffectsFamilyParallelism` (engine, `layerFamilies.ts`) — SHOULD
+  //     the question be asked, i.e. can this edit make the family non-parallel
+  //     in the terms `findFamilyParallelismBreaks` itself checks. A policy.
+  //
+  // The trigger used to be the capability alone, which asked about every `set`
+  // — including a keycap edit, and including a key-type change between the
+  // ordinary classes. Both are properties FR-068 exempts precisely BECAUSE a
+  // family may legitimately differ on them (`default` carries `a` where `shift`
+  // carries `A`), so the dialog was firing on edits its own detector would
+  // never flag. That is not merely noisy: the dialog starts with every sibling
+  // CHECKED (FR-065's "the default must be the proposal"), so an author
+  // dismissing it by reflex fans a blank/spacer across the whole family and
+  // finds an inert key waiting on every layer — the defect of record here.
+  //
+  // The policy lives in the engine beside the check it mirrors, never restated
+  // here: a second opinion about which properties a family may differ on is
+  // exactly how the two would drift apart.
   const maybeOfferFamilyApply = useCallback(
-    (op: PendingKeyEditOperation) => {
+    (op: PendingKeyEditOperation, beforeSp: number | undefined) => {
       if (activeKeyPlatformEntry === undefined) return;
+      if (!keyEditAffectsFamilyParallelism(op, beforeSp)) return;
       const parts = parseTouchKeyAddress(op.address);
       if (parts === undefined) return;
       const grouping = groupLayerFamilies(activeKeyPlatformEntry.layers.map((l) => l.id));
@@ -2649,6 +2666,23 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       setFamilyApplyState({ op: op as FamilyApplyOp, familyLayerIds: family.layerIds });
     },
     [activeKeyPlatformEntry],
+  );
+
+  /**
+   * The `sp` the key at `address` carries in the CURRENT effective layout, for
+   * `maybeOfferFamilyApply`'s frame-boundary test. `undefined` both for a key
+   * with no declared `sp` (the wire default is character/0, which is correctly
+   * not a frame class) and for an address that does not resolve — the two are
+   * not worth distinguishing here, since neither is a frame key.
+   */
+  const resolveKeyEditSubjectSp = useCallback(
+    (address: string): number | undefined => {
+      if (effectiveKeyModeLayout === null) return undefined;
+      const parts = parseTouchKeyAddress(address);
+      if (parts === undefined) return undefined;
+      return resolveKeyAddress(effectiveKeyModeLayout, parts)?.key.sp;
+    },
+    [effectiveKeyModeLayout],
   );
 
   // T013 — the bare-op entry point every key-mode surface OTHER than
@@ -2663,6 +2697,13 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   const commitKeyEditOp = useCallback(
     (op: PendingKeyEditOperation, options?: { readonly offerFamilyApply?: boolean }): boolean => {
       if (layoutForLintAndGate === null) return false;
+
+      // Read BEFORE the commit: `keyEditAffectsFamilyParallelism` asks whether
+      // an `sp` change crosses the frame boundary, which is a claim about the
+      // transition. Resolved after the commit it would compare the new value
+      // with itself and never see a crossing at all.
+      const beforeSp = resolveKeyEditSubjectSp(op.address);
+
       const currentOps = useWorkingCopyStore.getState().keyEditOverlay.ops;
       const asIfCommitted = { ...op, seq: currentOps.length } as KeyEditOperation;
       let promotedLayout: TouchLayoutIR;
@@ -2695,12 +2736,12 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       }
 
       if ((options?.offerFamilyApply ?? true) && isFamilyApplicableOp(op)) {
-        maybeOfferFamilyApply(op);
+        maybeOfferFamilyApply(op, beforeSp);
       }
 
       return committed;
     },
-    [layoutForLintAndGate, commitKeyEditCore, maybeOfferFamilyApply],
+    [layoutForLintAndGate, commitKeyEditCore, maybeOfferFamilyApply, resolveKeyEditSubjectSp],
   );
 
   // ONE commit call site for AssignPanel's `onCommit` (spec 058 T085-T089
@@ -6760,131 +6801,194 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         onKeyDown={handleKeyModeDetailEscape}
         style={{ display: "flex", flexDirection: "column", gap: 12 }}
       >
-        {keyModeViewModel !== undefined ? (
-          <KeyGrid
-            viewModel={keyModeViewModel}
-            selectedAddress={selectedKeyAddress}
-            onSelectCell={handleSelectKeyCell}
-            onKeyDown={handleKeyModeGridKeyDown}
-            label={t({
-              id: "editor.assignLoop.touch.keyMode.gridAriaLabel",
-              message: `Editable touch key layout — ${{ layer: activeKeyLayerId }} layer`,
-            })}
-            platforms={keyModePlatforms}
-            {...(activeKeyPlatformId !== null
-              ? { activePlatformId: activeKeyPlatformId }
-              : {})}
-            onPlatformChange={(platformId) => setActiveKeyPlatformId(platformId)}
-            provenance={keyModeProvenance}
-            onAddKeyAfter={handleAddKeyAfterCell}
-            onOpenCommandMenu={handleOpenCommandMenu}
-            onFollowNextLayer={handleFollowNextLayer}
-          />
-        ) : (
-          <p style={{ margin: 0, fontSize: 13, color: TEXT_DIM, fontFamily: FONT }}>
-            <Trans id="editor.assignLoop.touch.keyMode.notReady">
-              The key layout isn&rsquo;t ready yet.
-            </Trans>
-          </p>
-        )}
+        {/* THE BOARD AND ITS DETAILS, SIDE BY SIDE (issue #1530: "the key
+            details must show on the same screen as the keyboard").
+            They used to be stacked, which put the property panel below the
+            fold of a pane that scrolls: an author changing a key's width could
+            not see the key change. Keyman Developer docks the properties to the
+            right of the design surface, and so does this.
 
-        {commandMenuState !== null && (
-          <KeyGridCommandMenu
-            commands={commandMenuCommands}
-            {...(commandMenuState.anchor !== undefined ? { anchor: commandMenuState.anchor } : {})}
-            onClose={() => {
-              setCommandMenuState(null);
-              dialogInvokerRef.current?.focus();
+            Key mode already passes NO right pane to `AssignLoopShell` (T037,
+            FR-024), so the whole window width is available — this column is
+            carved out of the editor's own space, not out of the live preview's.
+
+            `flexWrap` with a generous grid basis rather than a media query: a
+            narrow window drops the details BELOW the grid on its own, which is
+            the same stacked layout as before and correct at that width. The
+            details column is `sticky` so it stays beside the board while long
+            rows scroll past. */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "flex-start",
+            flexWrap: "wrap",
+            gap: 12,
+          }}
+        >
+          <div
+            style={{
+              flex: "1 1 460px",
+              minWidth: 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
             }}
+          >
+            {keyModeViewModel !== undefined ? (
+              <KeyGrid
+                viewModel={keyModeViewModel}
+                selectedAddress={selectedKeyAddress}
+                onSelectCell={handleSelectKeyCell}
+                onKeyDown={handleKeyModeGridKeyDown}
+                label={t({
+                  id: "editor.assignLoop.touch.keyMode.gridAriaLabel",
+                  message: `Editable touch key layout — ${{ layer: activeKeyLayerId }} layer`,
+                })}
+                platforms={keyModePlatforms}
+                {...(activeKeyPlatformId !== null
+                  ? { activePlatformId: activeKeyPlatformId }
+                  : {})}
+                onPlatformChange={(platformId) => setActiveKeyPlatformId(platformId)}
+                provenance={keyModeProvenance}
+                onAddKeyAfter={handleAddKeyAfterCell}
+                onOpenCommandMenu={handleOpenCommandMenu}
+                onFollowNextLayer={handleFollowNextLayer}
+              />
+            ) : (
+              <p style={{ margin: 0, fontSize: 13, color: TEXT_DIM, fontFamily: FONT }}>
+                <Trans id="editor.assignLoop.touch.keyMode.notReady">
+                  The key layout isn&rsquo;t ready yet.
+                </Trans>
+              </p>
+            )}
+
+            {commandMenuState !== null && (
+              <KeyGridCommandMenu
+                commands={commandMenuCommands}
+                {...(commandMenuState.anchor !== undefined ? { anchor: commandMenuState.anchor } : {})}
+                onClose={() => {
+                  setCommandMenuState(null);
+                  dialogInvokerRef.current?.focus();
+                }}
+              />
+            )}
+
+            {/* Gestures stay UNDER the board, not in the details column: a
+                longpress/flick/multitap editor is a wide surface with its own
+                rows, and Developer likewise puts them in a strip beneath the
+                design area rather than in the properties pane. Renders nothing
+                with no key selected — its own early return. */}
+            <GesturePanel
+              selectedKey={selectedKeyNode}
+              selection={selectedGesture}
+              onSelectGesture={setSelectedGesture}
+              onAddGesture={handleAddGesture}
+              onEditGesture={handleEditGesture}
+              onRemoveGesture={handleRemoveGesture}
+            />
+          </div>
+
+          {/* THE DETAILS COLUMN. `sticky` + its own `overflowY` so a panel
+              taller than the viewport is still fully reachable without
+              scrolling the board away.
+
+              The three dialogs are deliberately NOT in here. They are
+              `position: fixed`, and a fixed descendant is still clipped by an
+              ancestor with `overflow: auto` — the same CSS surprise
+              `ui/SelectMenu.tsx` documents portalling to `document.body` to
+              escape. Mounted below this row instead, where nothing clips them.
+              (`SelectMenu` inside the panel is unaffected: it portals.) */}
+          <div
+            data-testid="touch-key-details-column"
+            style={{
+              flex: "0 1 320px",
+              minWidth: 268,
+              position: "sticky",
+              top: 0,
+              maxHeight: "calc(100vh - 140px)",
+              overflowY: "auto",
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+            }}
+          >
+            {/* ONE panel (spec 061 T036, FR-018). The stacked
+                read-only-inspector-above-editing-panel mount is gone: both
+                surfaces are now composed INSIDE `KeyPropertyPanel`, which adds
+                the eight editable fields, delete and the four move buttons
+                around them. Everything still takes the SAME
+                selectedKeyCell/effective layout the grid renders, so nothing
+                here can disagree with the board. */}
+            <KeyPropertyPanel
+              selectedCell={selectedKeyCell}
+              {...(effectiveKeyModeLayout !== null
+                ? { layout: effectiveKeyModeLayout }
+                : {})}
+              {...(selectedKeyPosition !== undefined ? { position: selectedKeyPosition } : {})}
+              onSpChange={handleSpChange}
+              onApplyFix={handleApplyFix}
+              onFieldChange={handleKeyFieldChange}
+              onDelete={handleOpenRemoveDialog}
+              onMove={handleKeyMove}
+              {...(selectedKeyIdProposal !== undefined
+                ? { idProposal: selectedKeyIdProposal }
+                : {})}
+              {...(ir !== null && keyModeRuleIndex !== undefined
+                ? {
+                    assignSlot: (
+                      <AssignPanel
+                        selectedCell={selectedKeyCell}
+                        layout={effectiveKeyModeLayout ?? EMPTY_TOUCH_LAYOUT}
+                        ir={ir}
+                        ruleIndex={keyModeRuleIndex}
+                        inventoryChars={inventory}
+                        capsHandled={capsHandled}
+                        {...(identityBcp47 !== undefined ? { bcp47: identityBcp47 } : {})}
+                        repertoire={inventory}
+                        onCommit={handleAssignPanelCommit}
+                      />
+                    ),
+                  }
+                : {})}
+            />
+          </div>
+        </div>
+
+        <RemoveKeyDialog
+          open={removeDialogOpen}
+          selectedCell={selectedKeyCell}
+          {...(removeKeyProposal !== undefined
+            ? { proposedOutcome: removeKeyProposal.outcome, proposedReason: removeKeyProposal.reason }
+            : {})}
+          isLastKeyInRow={selectedKeyRow?.keys.length === 1}
+          onCancel={handleRemoveKeyCancel}
+          onConfirm={handleRemoveKeyConfirm}
+        />
+
+        {ir !== null && keyModeRuleIndex !== undefined && (
+          <RenameDialog
+            open={renameDialogTarget !== null}
+            selectedCell={renameDialogTarget}
+            layout={effectiveKeyModeLayout ?? EMPTY_TOUCH_LAYOUT}
+            ir={ir}
+            ruleIndex={keyModeRuleIndex}
+            onCancel={handleRenameCancel}
+            onConfirm={handleRenameConfirm}
           />
         )}
 
-        {/* ONE panel (spec 061 T036, FR-018). The stacked
-            read-only-inspector-above-editing-panel mount is gone: both
-            surfaces are now composed INSIDE `KeyPropertyPanel`, which adds the
-            eight editable fields, delete and the four move buttons around them.
-            Everything still takes the SAME selectedKeyCell/effective layout the
-            grid renders, so nothing here can disagree with the board. */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <KeyPropertyPanel
-            selectedCell={selectedKeyCell}
-            {...(effectiveKeyModeLayout !== null
-              ? { layout: effectiveKeyModeLayout }
-              : {})}
-            {...(selectedKeyPosition !== undefined ? { position: selectedKeyPosition } : {})}
-            onSpChange={handleSpChange}
-            onApplyFix={handleApplyFix}
-            onFieldChange={handleKeyFieldChange}
-            onDelete={handleOpenRemoveDialog}
-            onMove={handleKeyMove}
-            {...(selectedKeyIdProposal !== undefined
-              ? { idProposal: selectedKeyIdProposal }
-              : {})}
-            {...(ir !== null && keyModeRuleIndex !== undefined
-              ? {
-                  assignSlot: (
-                    <AssignPanel
-                      selectedCell={selectedKeyCell}
-                      layout={effectiveKeyModeLayout ?? EMPTY_TOUCH_LAYOUT}
-                      ir={ir}
-                      ruleIndex={keyModeRuleIndex}
-                      inventoryChars={inventory}
-                      capsHandled={capsHandled}
-                      {...(identityBcp47 !== undefined ? { bcp47: identityBcp47 } : {})}
-                      repertoire={inventory}
-                      onCommit={handleAssignPanelCommit}
-                    />
-                  ),
-                }
-              : {})}
+        {familyApplyState !== null && effectiveKeyModeLayout !== null && (
+          <FamilyApplyDialog
+            open
+            op={familyApplyState.op}
+            layout={effectiveKeyModeLayout}
+            familyLayerIds={familyApplyState.familyLayerIds}
+            {...(keyModeRuleIndex !== undefined ? { ruleIndex: keyModeRuleIndex } : {})}
+            onCancel={handleFamilyApplyCancel}
+            onConfirm={handleFamilyApplyConfirm}
           />
-
-          {/* Gestures, beneath the property panel (spec 061 T042, FR-026).
-              Renders nothing with no key selected — its own early return. */}
-          <GesturePanel
-            selectedKey={selectedKeyNode}
-            selection={selectedGesture}
-            onSelectGesture={setSelectedGesture}
-            onAddGesture={handleAddGesture}
-            onEditGesture={handleEditGesture}
-            onRemoveGesture={handleRemoveGesture}
-          />
-
-          <RemoveKeyDialog
-            open={removeDialogOpen}
-            selectedCell={selectedKeyCell}
-            {...(removeKeyProposal !== undefined
-              ? { proposedOutcome: removeKeyProposal.outcome, proposedReason: removeKeyProposal.reason }
-              : {})}
-            isLastKeyInRow={selectedKeyRow?.keys.length === 1}
-            onCancel={handleRemoveKeyCancel}
-            onConfirm={handleRemoveKeyConfirm}
-          />
-
-          {ir !== null && keyModeRuleIndex !== undefined && (
-            <RenameDialog
-              open={renameDialogTarget !== null}
-              selectedCell={renameDialogTarget}
-              layout={effectiveKeyModeLayout ?? EMPTY_TOUCH_LAYOUT}
-              ir={ir}
-              ruleIndex={keyModeRuleIndex}
-              onCancel={handleRenameCancel}
-              onConfirm={handleRenameConfirm}
-            />
-          )}
-
-          {familyApplyState !== null && effectiveKeyModeLayout !== null && (
-            <FamilyApplyDialog
-              open
-              op={familyApplyState.op}
-              layout={effectiveKeyModeLayout}
-              familyLayerIds={familyApplyState.familyLayerIds}
-              {...(keyModeRuleIndex !== undefined ? { ruleIndex: keyModeRuleIndex } : {})}
-              onCancel={handleFamilyApplyCancel}
-              onConfirm={handleFamilyApplyConfirm}
-            />
-          )}
-        </div>
+        )}
 
         {/* FR-036f: warn AT THE MOMENT of the edit when a key-level edit
             invalidates a by-character assignment — never deferred to the

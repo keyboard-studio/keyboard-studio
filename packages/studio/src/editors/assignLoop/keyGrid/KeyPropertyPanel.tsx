@@ -50,15 +50,39 @@
 // disabled control still says "this is a thing you could do here", which is
 // false at a boundary, and FR-003 is explicit that an affordance that does not
 // apply MUST be absent.
+//
+// ## It has to FIT beside the keyboard
+//
+// The panel lives in the detail column to the right of the grid, so its height
+// is a functional constraint, not a matter of taste: a property panel the author
+// must scroll away from the key they are editing is the same defect as one that
+// cannot be edited. Two things buy that space, both in `panelGrid.tsx`:
+//
+//   - the label/control TABLE, replacing label-above-value rows (halves the row
+//     count), and
+//   - hints revealed by FOCUS. Every field's explanation stays in the DOM and
+//     stays wired through `aria-describedby` — a screen reader hears exactly
+//     what it heard before — but is visually collapsed until that field has
+//     focus, which is when a sighted author is reading it. Deleting the text
+//     would have been the cheap version of this and would have cost the
+//     description; hiding it visually costs nothing but the idle height.
 
 import { useCallback, useId, useMemo, useState, type ReactNode, type Ref } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useLingui } from "@lingui/react/macro";
 import type { TouchKeyFix, TouchLayoutIR } from "@keyboard-studio/contracts";
 import type { TouchKeyIdProposal } from "@keyboard-studio/engine";
-import { BG_CARD, BORDER, TEXT_DIM, TEXT_MAIN, FONT } from "../../../lib/galleryTheme.ts";
+import { BG_CARD, BORDER, TEXT_MAIN, FONT } from "../../../lib/galleryTheme.ts";
 import { Button, Label, TextField } from "../../../ui/index.ts";
 import { KeyInspector, type TouchKeySpValue } from "./KeyInspector.tsx";
+import {
+  PANEL_GRID_STYLE,
+  PANEL_HINT_STYLE,
+  PANEL_LABEL_STYLE,
+  PANEL_SECTION_STYLE,
+  PANEL_SPAN_STYLE,
+  visuallyHiddenUnless,
+} from "./panelGrid.tsx";
 import type { KeyGridCellViewModel, TouchKeyFinding } from "./keyGridViewModel.ts";
 
 // ---------------------------------------------------------------------------
@@ -67,10 +91,10 @@ import type { KeyGridCellViewModel, TouchKeyFinding } from "./keyGridViewModel.t
 
 /**
  * The eight fields FR-018 names. `sp` is edited through the composed
- * `KeyInspector`'s radio group rather than a text input — it is a closed set of
- * six values with real explanatory notes, and a free-text box for it would be
- * strictly worse — so it appears in this union for completeness of the contract
- * but has no `key-property-panel-field-sp` input of its own.
+ * `KeyInspector`'s key-type DROPDOWN rather than a text input — it is a closed
+ * set of six named values, and a free-text box for it would be strictly worse —
+ * so it appears in this union for completeness of the contract but has no
+ * `key-property-panel-field-sp` input of its own.
  */
 export type KeyPropertyField =
   | "text"
@@ -117,7 +141,7 @@ export interface KeyPropertyPanelProps {
   onEscape?: () => void;
   /** A field's committed new value. Fired on blur/Enter, never per keystroke. */
   onFieldChange: (change: KeyPropertyFieldChange) => void;
-  /** The key-type radio group (forwarded to the embedded inspector). */
+  /** The key-type dropdown (forwarded to the embedded inspector). */
   onSpChange: (sp: TouchKeySpValue) => void;
   /** A finding's fix button (forwarded to the embedded inspector). */
   onApplyFix: (fix: TouchKeyFix, finding: TouchKeyFinding) => void;
@@ -145,8 +169,22 @@ export interface KeyPropertyPanelProps {
   label?: string;
 }
 
-const ROW_STYLE = { display: "flex", flexDirection: "column" as const, gap: 2 };
-const SECTION_LABEL_STYLE = { fontSize: 11, color: TEXT_DIM, fontFamily: FONT };
+/**
+ * The small ghost button this panel's secondary actions share — the two
+ * disclosures and the four move buttons. Not `ui/Button`: these sit inline in a
+ * compact panel and must not carry a primary/secondary button's padding. Stated
+ * once so the six of them cannot drift apart.
+ */
+const SMALL_BUTTON_STYLE = {
+  fontFamily: FONT,
+  fontSize: 11,
+  padding: "3px 8px",
+  borderRadius: 4,
+  border: `1px solid ${BORDER}`,
+  background: "transparent",
+  color: TEXT_MAIN,
+  cursor: "pointer",
+} as const;
 
 // ---------------------------------------------------------------------------
 // Which moves can act (FR-020) — no wrapping, ever
@@ -184,6 +222,12 @@ export function availableMoveDirections(
  * does not), and would re-run the 300 ms validation cycle on a half-typed id.
  * The local draft resets whenever the incoming value changes, so selecting a
  * different key never leaves the previous key's text in the box.
+ *
+ * Renders as TWO grid children of the enclosing panel grid — the label cell and
+ * the control cell — not as a wrapped pair, which is what lines every label in
+ * the panel up in one column (see `panelGrid.tsx`). `helpText` sits inside the
+ * CONTROL cell, referenced by `aria-describedby` at all times and visible only
+ * while the field has focus.
  */
 function CommittingField({
   field,
@@ -204,6 +248,7 @@ function CommittingField({
   const helpId = useId();
   const [draft, setDraft] = useState(value);
   const [lastSeen, setLastSeen] = useState(value);
+  const [focused, setFocused] = useState(false);
   if (value !== lastSeen) {
     // Derive-during-render rather than an effect: React's own documented
     // "adjusting state when a prop changes" pattern, and it avoids a frame in
@@ -217,30 +262,44 @@ function CommittingField({
   }, [draft, value, onCommit]);
 
   return (
-    <div style={ROW_STYLE} data-testid={`key-property-panel-field-${field}`}>
+    <>
       {/* A real <label htmlFor>, not an aria-label: docs/accessibility.md's
-          "semantic HTML first" rule, and it makes the help text clickable-to-
-          focus like every other labelled control in the studio. */}
-      <Label htmlFor={inputId}>{labelText}</Label>
-      <TextField
-        id={inputId}
-        value={draft}
-        {...(helpText !== undefined ? { "aria-describedby": helpId } : {})}
-        {...(numeric === true ? { inputMode: "numeric" as const } : {})}
-        onChange={(event) => setDraft(event.target.value)}
-        onBlur={commit}
-        onKeyDown={(event: ReactKeyboardEvent<HTMLInputElement>) => {
-          if (event.key !== "Enter") return;
-          event.preventDefault();
-          commit();
-        }}
-      />
-      {helpText !== undefined && (
-        <span id={helpId} style={{ fontSize: 11, color: TEXT_DIM, fontFamily: FONT }}>
-          {helpText}
-        </span>
-      )}
-    </div>
+          "semantic HTML first" rule, and it makes the label clickable-to-focus
+          like every other labelled control in the studio. */}
+      <Label htmlFor={inputId} style={PANEL_LABEL_STYLE}>
+        {labelText}
+      </Label>
+      <div
+        style={{ display: "flex", flexDirection: "column", gap: 2, minWidth: 0 }}
+        data-testid={`key-property-panel-field-${field}`}
+      >
+        <TextField
+          id={inputId}
+          value={draft}
+          {...(helpText !== undefined ? { "aria-describedby": helpId } : {})}
+          {...(numeric === true ? { inputMode: "numeric" as const } : {})}
+          onChange={(event) => setDraft(event.target.value)}
+          onFocus={() => setFocused(true)}
+          onBlur={() => {
+            setFocused(false);
+            commit();
+          }}
+          onKeyDown={(event: ReactKeyboardEvent<HTMLInputElement>) => {
+            if (event.key !== "Enter") return;
+            event.preventDefault();
+            commit();
+          }}
+          style={{ fontSize: 12, padding: "3px 6px" }}
+        />
+        {helpText !== undefined && (
+          // Always in the DOM (the input's `aria-describedby` points here);
+          // visually collapsed until the author is in the field.
+          <span id={helpId} style={{ ...PANEL_HINT_STYLE, ...visuallyHiddenUnless(focused) }}>
+            {helpText}
+          </span>
+        )}
+      </div>
+    </>
   );
 }
 
@@ -390,10 +449,11 @@ export function KeyPropertyPanel({
       data-testid="key-property-panel"
       onKeyDown={handleKeyDown}
       style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 12,
-        padding: 12,
+        // One compact label/control table for the whole panel (panelGrid.tsx),
+        // so the eight fields, the composed inspector's rows and the geometry
+        // section all read as one form rather than three stacked lists.
+        ...PANEL_GRID_STYLE,
+        padding: 10,
         background: BG_CARD,
         border: `1px solid ${BORDER}`,
         borderRadius: 8,
@@ -402,23 +462,25 @@ export function KeyPropertyPanel({
       }}
     >
       {/* Display, key type and diagnostics — the composed inspector. Rendered
-          even with no selection, since it owns the empty state's copy. */}
-      <KeyInspector
-        embedded
-        selectedCell={selectedCell}
-        {...(layout !== undefined ? { layout } : {})}
-        onSpChange={onSpChange}
-        onApplyFix={onApplyFix}
-      />
+          even with no selection, since it owns the empty state's copy. Spans
+          both columns and repeats the same grid inside, which is what keeps its
+          labels in the same column as this panel's own. */}
+      <div style={PANEL_SPAN_STYLE}>
+        <KeyInspector
+          embedded
+          selectedCell={selectedCell}
+          {...(layout !== undefined ? { layout } : {})}
+          onSpChange={onSpChange}
+          onApplyFix={onApplyFix}
+        />
+      </div>
 
       {selectedCell !== null && (
         <>
           {/* --- The editable fields (FR-018) --------------------------- */}
-          <div style={ROW_STYLE}>
-            <span style={SECTION_LABEL_STYLE}>
-              {t({ id: "editor.assignLoop.keyGrid.property.fieldsLabel", message: "Properties" })}
-            </span>
-          </div>
+          <span style={PANEL_SECTION_STYLE}>
+            {t({ id: "editor.assignLoop.keyGrid.property.fieldsLabel", message: "Properties" })}
+          </span>
 
           <CommittingField
             field="text"
@@ -458,107 +520,88 @@ export function KeyPropertyPanel({
               silence: a class the minter cannot handle says so in the
               author's language, and `titlecase-self-third-form` arrives via
               `noCaseTripleReason` because a titlecase character DOES get an
-              id — only its case triple is impossible (character-classes.md
+              id -- only its case triple is impossible (character-classes.md
               row 5). */}
           {noProposalText !== undefined && (
             <p
               data-testid="key-property-panel-no-proposal-reason"
-              style={{ margin: 0, fontSize: 11, color: TEXT_DIM, fontFamily: FONT }}
+              style={{ ...PANEL_SPAN_STYLE, ...PANEL_HINT_STYLE, margin: 0 }}
             >
               {noProposalText}
             </p>
           )}
 
-          {/* The `T_` alternative, behind a disclosure. The `U_` default is
+          {/* The `T_` alternative and the character-assignment surface, both
+              behind their own disclosure, on one line. The `U_` default is
               pre-selected and right for almost every key; the alternative is
-              offered rather than hidden, but it does not get to compete with
-              the default for the author's attention. */}
-          {idProposal?.alternative !== undefined && (
-            <div style={ROW_STYLE}>
-              <button
-                type="button"
-                data-testid="key-property-panel-id-alternatives"
-                aria-expanded={idAlternativesOpen}
-                onClick={() => setIdAlternativesOpen((open) => !open)}
-                style={{
-                  alignSelf: "flex-start",
-                  fontFamily: FONT,
-                  fontSize: 11,
-                  padding: "3px 8px",
-                  borderRadius: 4,
-                  border: `1px solid ${BORDER}`,
-                  background: "transparent",
-                  color: TEXT_MAIN,
-                  cursor: "pointer",
-                }}
-              >
-                {idAlternativesOpen
-                  ? t({
-                      id: "editor.assignLoop.keyGrid.property.id.alternatives.hide",
-                      message: "Hide other id options",
-                    })
-                  : t({
-                      id: "editor.assignLoop.keyGrid.property.id.alternatives.show",
-                      message: "Other id options",
-                    })}
-              </button>
-              {idAlternativesOpen && (
-                <div style={{ ...ROW_STYLE, gap: 4, paddingTop: 4 }}>
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      onFieldChange({
-                        field: "id",
-                        value: idProposal.alternative?.id ?? "",
-                      });
-                      setIdAlternativesOpen(false);
-                    }}
-                  >
-                    {idProposal.alternative.id}
-                  </Button>
-                  <span style={{ fontSize: 11, color: TEXT_DIM, fontFamily: FONT }}>
-                    {alternativeReasonText}
-                  </span>
-                </div>
+              offered rather than hidden, but it does not get to compete with the
+              default for the author's attention. Assigning a character
+              (research D3) is how most authors should reach an id, but it is a
+              bigger surface than a text box and does not belong permanently
+              open. */}
+          {(idProposal?.alternative !== undefined || assignSlot !== undefined) && (
+            <div style={{ ...PANEL_SPAN_STYLE, display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {idProposal?.alternative !== undefined && (
+                <button
+                  type="button"
+                  data-testid="key-property-panel-id-alternatives"
+                  aria-expanded={idAlternativesOpen}
+                  onClick={() => setIdAlternativesOpen((open) => !open)}
+                  style={SMALL_BUTTON_STYLE}
+                >
+                  {idAlternativesOpen
+                    ? t({
+                        id: "editor.assignLoop.keyGrid.property.id.alternatives.hide",
+                        message: "Hide other id options",
+                      })
+                    : t({
+                        id: "editor.assignLoop.keyGrid.property.id.alternatives.show",
+                        message: "Other id options",
+                      })}
+                </button>
+              )}
+              {assignSlot !== undefined && (
+                <button
+                  type="button"
+                  data-testid="key-property-panel-assign-disclosure"
+                  aria-expanded={assignOpen}
+                  onClick={() => setAssignOpen((open) => !open)}
+                  style={SMALL_BUTTON_STYLE}
+                >
+                  {assignOpen
+                    ? t({
+                        id: "editor.assignLoop.keyGrid.property.assign.hide",
+                        message: "Hide character assignment",
+                      })
+                    : t({
+                        id: "editor.assignLoop.keyGrid.property.assign.show",
+                        message: "Assign a character instead",
+                      })}
+                </button>
               )}
             </div>
           )}
 
-          {/* The proposal machinery, behind a disclosure on the id field
-              (research D3): assigning a character is how most authors should
-              reach an id, but it is a bigger surface than a text box and does
-              not belong permanently open. */}
-          {assignSlot !== undefined && (
-            <div style={ROW_STYLE}>
-              <button
-                type="button"
-                data-testid="key-property-panel-assign-disclosure"
-                aria-expanded={assignOpen}
-                onClick={() => setAssignOpen((open) => !open)}
-                style={{
-                  alignSelf: "flex-start",
-                  fontFamily: FONT,
-                  fontSize: 11,
-                  padding: "3px 8px",
-                  borderRadius: 4,
-                  border: `1px solid ${BORDER}`,
-                  background: "transparent",
-                  color: TEXT_MAIN,
-                  cursor: "pointer",
+          {idAlternativesOpen && idProposal?.alternative !== undefined && (
+            <div style={{ ...PANEL_SPAN_STYLE, display: "flex", flexDirection: "column", gap: 4 }}>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  onFieldChange({
+                    field: "id",
+                    value: idProposal.alternative?.id ?? "",
+                  });
+                  setIdAlternativesOpen(false);
                 }}
               >
-                {assignOpen
-                  ? t({
-                      id: "editor.assignLoop.keyGrid.property.assign.hide",
-                      message: "Hide character assignment",
-                    })
-                  : t({
-                      id: "editor.assignLoop.keyGrid.property.assign.show",
-                      message: "Assign a character instead",
-                    })}
-              </button>
-              {assignOpen && assignSlot}
+                {idProposal.alternative.id}
+              </Button>
+              <span style={PANEL_HINT_STYLE}>{alternativeReasonText}</span>
             </div>
+          )}
+
+          {assignOpen && assignSlot !== undefined && (
+            <div style={PANEL_SPAN_STYLE}>{assignSlot}</div>
           )}
 
           <CommittingField
@@ -586,26 +629,9 @@ export function KeyPropertyPanel({
           />
 
           {/* --- Geometry (FR-015) -------------------------------------- */}
-          <div style={ROW_STYLE}>
-            <span id={geometryGroupId} style={SECTION_LABEL_STYLE}>
-              {t({ id: "editor.assignLoop.keyGrid.property.geometryLabel", message: "Size" })}
-            </span>
-            {/* FR-015's own requirement, stated to the author rather than
-                assumed: the number in the width box is a MINIMUM. The last key
-                of each row renders wider, stretching to the widest row — which
-                is why the box can disagree with what is on screen without
-                either being wrong. */}
-            <span
-              data-testid="key-property-panel-width-minimum-note"
-              style={{ fontSize: 11, color: TEXT_DIM, fontFamily: FONT }}
-            >
-              {t({
-                id: "editor.assignLoop.keyGrid.property.widthMinimumNote",
-                message:
-                  "Width is a minimum. The last key in a row is drawn wider than this, stretching to match the widest row.",
-              })}
-            </span>
-          </div>
+          <span id={geometryGroupId} style={PANEL_SECTION_STYLE}>
+            {t({ id: "editor.assignLoop.keyGrid.property.geometryLabel", message: "Size" })}
+          </span>
 
           <CommittingField
             field="width"
@@ -615,6 +641,21 @@ export function KeyPropertyPanel({
               message: "Width (minimum)",
             })}
             value={String(selectedCell.widthPct)}
+            // FR-015's own requirement, stated to the author rather than
+            // assumed: the number in the box is a MINIMUM. The last key of each
+            // row renders wider, stretching to the widest row -- which is why
+            // the box can disagree with what is on screen without either being
+            // wrong. It reads as the width field's own hint because the width
+            // field is the only thing it is about.
+            helpText={
+              <span data-testid="key-property-panel-width-minimum-note">
+                {t({
+                  id: "editor.assignLoop.keyGrid.property.widthMinimumNote",
+                  message:
+                    "Width is a minimum. The last key in a row is drawn wider than this, stretching to match the widest row.",
+                })}
+              </span>
+            }
             onCommit={commitText("width")}
           />
 
@@ -628,45 +669,44 @@ export function KeyPropertyPanel({
 
           {/* --- Move (FR-020) ------------------------------------------ */}
           {moves.length > 0 && (
-            <div style={ROW_STYLE} data-testid="key-property-panel-move">
-              <span style={SECTION_LABEL_STYLE}>
+            <>
+              <span style={PANEL_LABEL_STYLE}>
                 {t({ id: "editor.assignLoop.keyGrid.property.moveLabel", message: "Move" })}
               </span>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              <div
+                style={{ display: "flex", flexWrap: "wrap", gap: 4 }}
+                data-testid="key-property-panel-move"
+              >
                 {moves.map((direction) => (
                   <button
                     key={direction}
                     type="button"
                     data-testid={`key-property-panel-move-${direction}`}
                     onClick={() => onMove(direction)}
-                    style={{
-                      fontFamily: FONT,
-                      fontSize: 11,
-                      padding: "3px 8px",
-                      borderRadius: 4,
-                      border: `1px solid ${BORDER}`,
-                      background: "transparent",
-                      color: TEXT_MAIN,
-                      cursor: "pointer",
-                    }}
+                    style={SMALL_BUTTON_STYLE}
                   >
                     {moveLabels[direction]}
                   </button>
                 ))}
               </div>
-            </div>
+            </>
           )}
 
           {/* --- Delete (FR-019) ---------------------------------------- */}
-          <div style={ROW_STYLE}>
-            <Button
-              variant="secondary"
-              data-testid="key-property-panel-delete"
-              onClick={onDelete}
-            >
+          <div
+            style={{
+              ...PANEL_SPAN_STYLE,
+              display: "flex",
+              alignItems: "center",
+              flexWrap: "wrap",
+              gap: 8,
+              marginTop: 4,
+            }}
+          >
+            <Button variant="secondary" data-testid="key-property-panel-delete" onClick={onDelete}>
               {t({ id: "editor.assignLoop.keyGrid.property.delete", message: "Delete this key" })}
             </Button>
-            <span style={{ fontSize: 11, color: TEXT_DIM, fontFamily: FONT }}>
+            <span style={PANEL_HINT_STYLE}>
               {t({
                 id: "editor.assignLoop.keyGrid.property.delete.help",
                 message: "You will be asked what should happen to the space it leaves.",

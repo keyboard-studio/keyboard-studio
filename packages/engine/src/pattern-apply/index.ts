@@ -200,6 +200,7 @@ export {
   decomposeLayerId,
   groupLayerFamilies,
   findFamilyParallelismBreaks,
+  keyEditAffectsFamilyParallelism,
   classifyPlane,
   severityForPlane,
 } from "./layerFamilies.js";

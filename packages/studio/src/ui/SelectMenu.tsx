@@ -54,6 +54,13 @@ export interface SelectMenuProps {
    */
   ariaLabel?: string;
   /**
+   * Value for `aria-describedby` on the trigger button — a sibling element
+   * explaining the control (as distinct from naming it, which is
+   * `ariaLabelledby`/`ariaLabel`'s job). A native `<select>` takes the same
+   * attribute for the same purpose.
+   */
+  ariaDescribedby?: string;
+  /**
    * Style override merged onto the trigger button, on top of the default
    * `TRIGGER_STYLE` — the "callers may override, merged not replaced" idiom
    * inherited from the now-removed `ui/Dropdown.tsx`, applied to the visible
@@ -254,6 +261,7 @@ export function SelectMenu({
   ariaLabelledby,
   required,
   ariaLabel,
+  ariaDescribedby,
   style,
   renderOptionLabel = defaultRenderLabel,
   resolveKeyToValue,
@@ -499,6 +507,7 @@ export function SelectMenu({
         aria-controls={listId}
         aria-labelledby={ariaLabelledby}
         aria-label={ariaLabelledby === undefined ? ariaLabel : undefined}
+        aria-describedby={ariaDescribedby}
         // Not read by the component itself — a stable, value-based test hook
         // mirroring a native <select>'s own `.value`, since callers can no
         // longer read that off this button directly.

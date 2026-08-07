@@ -412,8 +412,15 @@ export type {
 // warning WITHOUT restating which planes count as independent layouts. The
 // check runs engine-side; only its results and its classification cross the
 // boundary.
+//
+// `keyEditAffectsFamilyParallelism` is that check read FORWARDS, for the studio
+// to decide whether an edit is even worth asking the fan-out question about. It
+// crosses the boundary for the same reason the classification does: the studio
+// owns the dialog, but must not own a second opinion about which properties a
+// family may legitimately differ on (FR-068).
 export {
   findFamilyParallelismBreaks,
+  keyEditAffectsFamilyParallelism,
   classifyPlane,
   severityForPlane,
 } from "./pattern-apply/index.js";

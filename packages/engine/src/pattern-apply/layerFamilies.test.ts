@@ -22,6 +22,11 @@
  *      moved or resized still does.
  *   5. The FR-066 plane classification and severity scoping (T109,
  *      contract §5).
+ *   6. `keyEditAffectsFamilyParallelism` — the same FR-068 property split read
+ *      FORWARDS, over one operation about to be applied. Its whole job is to
+ *      agree with group 4 above: an edit to a property group 4 proves is exempt
+ *      must not be reported as a family concern, and an edit to one group 4
+ *      still flags must be.
  */
 
 import { describe, it, expect } from "vitest";
@@ -33,8 +38,10 @@ import {
   decomposeLayerId,
   findFamilyParallelismBreaks,
   groupLayerFamilies,
+  keyEditAffectsFamilyParallelism,
   severityForPlane,
 } from "./layerFamilies.js";
+import type { UnsequencedKeyEditOperation } from "./keyEditOps.js";
 
 // ---------------------------------------------------------------------------
 // Corpus fixture paths — mirrors the KEYBOARDS_ROOT skip-if-absent idiom in
@@ -680,5 +687,99 @@ describe("severityForPlane — the loud/soft split stated once (T109, contract �
     expect(findings).toHaveLength(1);
     expect(findings[0]!.severity).toBe("hint");
     expect(findings[0]!.fields.planeClass).toBe("unrecognized");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 6. keyEditAffectsFamilyParallelism — the forward-looking twin (see the file
+//    header, group 6)
+// ---------------------------------------------------------------------------
+
+describe("keyEditAffectsFamilyParallelism", () => {
+  const AT = "phone:default:T_a";
+  const setOp = (fields: Record<string, unknown>): UnsequencedKeyEditOperation =>
+    ({ address: AT, kind: "set", fields } as UnsequencedKeyEditOperation);
+
+  it("flags the two edits that change PRESENCE", () => {
+    expect(
+      keyEditAffectsFamilyParallelism({ address: AT, kind: "remove", outcome: "reflow" }, 0),
+    ).toBe(true);
+    expect(
+      keyEditAffectsFamilyParallelism(
+        { address: AT, kind: "suppress", spClass: 9, sentinelId: "T_BLANK" },
+        0,
+      ),
+    ).toBe(true);
+  });
+
+  it("flags a GEOMETRY edit — the properties findFamilyParallelismBreaks compares", () => {
+    expect(keyEditAffectsFamilyParallelism(setOp({ width: 150 }), 0)).toBe(true);
+    expect(keyEditAffectsFamilyParallelism(setOp({ pad: 10 }), 0)).toBe(true);
+  });
+
+  it("does NOT flag the four properties FR-068 exempts", () => {
+    // The same four the group-4 suite above proves yield no finding when they
+    // vary across a family: sp (below), nextlayer, id, keycap text.
+    expect(keyEditAffectsFamilyParallelism(setOp({ text: "A" }), 0)).toBe(false);
+    expect(keyEditAffectsFamilyParallelism(setOp({ hint: "eps" }), 0)).toBe(false);
+    expect(keyEditAffectsFamilyParallelism(setOp({ nextlayer: "shift" }), 0)).toBe(false);
+    expect(keyEditAffectsFamilyParallelism(setOp({ layer: "shift" }), 0)).toBe(false);
+    expect(keyEditAffectsFamilyParallelism(setOp({ id: "U_0041" }), 0)).toBe(false);
+    expect(keyEditAffectsFamilyParallelism({ address: AT, kind: "rename", toId: "U_0041" }, 0)).toBe(
+      false,
+    );
+  });
+
+  it("does NOT flag a key-type change WITHIN the ordinary classes", () => {
+    // character <-> deadkey-styled <-> blank <-> spacer, in both directions:
+    // per-layer presentation, and the case that used to pop the fan-out dialog
+    // on every single key-type change.
+    for (const [before, after] of [
+      [0, 8],
+      [0, 9],
+      [0, 10],
+      [8, 0],
+      [9, 10],
+      [10, 0],
+      [9, 0],
+    ] as const) {
+      expect(keyEditAffectsFamilyParallelism(setOp({ sp: after }), before)).toBe(false);
+    }
+    // `undefined` before is the wire default (character/0), not a frame class.
+    expect(keyEditAffectsFamilyParallelism(setOp({ sp: 9 }), undefined)).toBe(false);
+  });
+
+  it("DOES flag a key-type change that crosses the frame boundary, in either direction", () => {
+    expect(keyEditAffectsFamilyParallelism(setOp({ sp: 1 }), 0)).toBe(true);
+    expect(keyEditAffectsFamilyParallelism(setOp({ sp: 2 }), 9)).toBe(true);
+    expect(keyEditAffectsFamilyParallelism(setOp({ sp: 0 }), 1)).toBe(true);
+    expect(keyEditAffectsFamilyParallelism(setOp({ sp: 10 }), 2)).toBe(true);
+    expect(keyEditAffectsFamilyParallelism(setOp({ sp: 1 }), undefined)).toBe(true);
+  });
+
+  it("does NOT flag the frame classes ALTERNATING — contract §4's 'correct design, not drift'", () => {
+    expect(keyEditAffectsFamilyParallelism(setOp({ sp: 2 }), 1)).toBe(false);
+    expect(keyEditAffectsFamilyParallelism(setOp({ sp: 1 }), 2)).toBe(false);
+  });
+
+  it("reads a MIXED set through its most consequential field", () => {
+    // An ordinary-class sp change is exempt and a width change is not; carried
+    // in one op, the op is still a geometry change.
+    expect(keyEditAffectsFamilyParallelism(setOp({ sp: 9, width: 150 }), 0)).toBe(true);
+  });
+
+  it("returns false for the kinds no fan-out can express", () => {
+    // `add` and `move` DO affect parallelism, but neither is fannable — see the
+    // function's own doc and FamilyApplyDialog's `isFamilyApplicableOp`. Both
+    // gates apply at the call site; this one only says whether to ask.
+    expect(
+      keyEditAffectsFamilyParallelism({ address: AT, kind: "move", direction: "left" }, 0),
+    ).toBe(false);
+    expect(
+      keyEditAffectsFamilyParallelism(
+        { address: AT, kind: "removeSubKey", sub: { kind: "sk", id: "T_a_1" } },
+        0,
+      ),
+    ).toBe(false);
   });
 });
