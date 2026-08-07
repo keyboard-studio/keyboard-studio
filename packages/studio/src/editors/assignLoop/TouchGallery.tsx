@@ -2859,9 +2859,11 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
    * The ONE implementation both "add key after" invocation routes call
    * (`useKeyCommands.ts`'s own module doc, "The one requirement this file
    * exists to satisfy") — Insert, the command-menu's "Add key after" entry
-   * (both via `useKeyCommands`'s own `onAddKeyAfter`), the `(+)` hover wedge
-   * (via `handleAddKeyAfterCell` below), and the pinned `touch-key-mode-add-key`
-   * toolbar trigger (T015) all resolve to this ONE function.
+   * (both via `useKeyCommands`'s own `onAddKeyAfter`) and the `(+)` hover
+   * wedge (via `handleAddKeyAfterCell` below) all resolve to this ONE
+   * function. There is deliberately no pane-level "Add key" button: every
+   * add route starts from a key, so a toolbar copy would be a second way to
+   * say the same thing (see the toolbar's own comment below).
    */
   const handleAddKeyOutcome = useCallback(
     (outcome: AddKeyAfterOutcome) => {
@@ -2890,26 +2892,6 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     },
     [effectiveKeyModeLayout, handleAddKeyOutcome],
   );
-
-  // T015 (FR-008, contract §3) — the add trigger must act on the FOCUSED
-  // cell without a prior click. `KeyGrid`'s own roving tabindex puts
-  // `tabIndex={0}` on the selected cell, or on the grid's FIRST cell when
-  // nothing is selected yet (`KeyGrid.tsx`'s `firstAddress`/
-  // `hasSelectedVisible`, confirmed by reading that file before writing
-  // this) — so resolving the anchor from STATE (never `document.activeElement`,
-  // which a button click would already have stolen focus from) matches
-  // exactly what `Tab` landed on.
-  const resolveAddKeyAnchor = useCallback((): KeyGridCellViewModel | null => {
-    if (selectedKeyCell !== null) return selectedKeyCell;
-    if (keyModeViewModel === undefined) return null;
-    return keyModeViewModel.rows[0]?.keys[0] ?? null;
-  }, [selectedKeyCell, keyModeViewModel]);
-
-  const handleAddKeyModeToolbar = useCallback(() => {
-    const anchor = resolveAddKeyAnchor();
-    if (anchor === null || effectiveKeyModeLayout === null) return;
-    handleAddKeyOutcome(buildAddKeyAfterOutcome(anchor, effectiveKeyModeLayout));
-  }, [resolveAddKeyAnchor, effectiveKeyModeLayout, handleAddKeyOutcome]);
 
   // T111's `⋯` wedge / right-click / `ContextMenu`-`Shift+F10` and
   // `useKeyCommands`'s own keyboard route both open the SAME menu, anchored
@@ -6741,33 +6723,18 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         />
       )}
 
-      {/* T015 (FR-008, contract §3) — the two pinned add/remove triggers.
-          `touch-key-mode-add-key` acts on the focused cell with no prior
-          click (`resolveAddKeyAnchor`); `touch-key-mode-remove-key` is
-          reachable while a cell holds focus and opens `remove-key-dialog`.
-          Per FR-003 the remove trigger is ABSENT — never disabled — while
-          nothing is selected; the add trigger is never gated on a
-          selection, since it must act without one. */}
+      {/* Add and remove are reached FROM A KEY, never from a pane-level
+          toolbar copy. Adding: the `(+)` hover wedge, Insert, and the command
+          menu's "Add key after" — all three anchored on the key the new one
+          follows. Removing: the property panel's "Delete this key" (FR-019),
+          which opens the SAME `remove-key-dialog` this toolbar's button used
+          to. Two controls that do one thing is one control too many: the
+          toolbar pair said nothing the key-anchored routes did not already
+          say, and a second "Remove key" beside the panel's "Delete this key"
+          reads as two different operations. What remains here is the one
+          control that genuinely has no key to hang off: finding a key you
+          cannot yet see. */}
       <div style={{ display: "flex", gap: 8 }}>
-        <button
-          type="button"
-          onClick={handleAddKeyModeToolbar}
-          disabled={keyModeViewModel === undefined}
-          data-testid="touch-key-mode-add-key"
-          style={ghostBtn}
-        >
-          {t({ id: "editor.assignLoop.touch.keyMode.addKeyButton", message: "Add key" })}
-        </button>
-        {selectedKeyCell !== null && (
-          <button
-            type="button"
-            onClick={handleOpenRemoveDialog}
-            data-testid="touch-key-mode-remove-key"
-            style={ghostBtn}
-          >
-            {t({ id: "editor.assignLoop.touch.keyMode.removeKeyButton", message: "Remove key" })}
-          </button>
-        )}
         <button
           type="button"
           onClick={() => setFindPanelOpen((prev) => !prev)}

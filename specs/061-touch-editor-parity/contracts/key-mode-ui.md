@@ -117,21 +117,32 @@ Its accessible name is part of this contract.
 
 ---
 
-## 3. Test ids — pinned by the un-skip recipe (US1, FR-008)
+## 3. The un-skip recipe's add/remove route (US1, FR-008)
 
-These two do not exist yet and **must be created with exactly these strings**. The e2e walk
-declares them as constants at `touch-key-add-remove.spec.ts:99–100` and must pass unmodified.
+**Amended after implementation.** This section originally pinned two pane-level triggers —
+`touch-key-mode-add-key` and `touch-key-mode-remove-key` — to be created verbatim, with the walk
+passing unmodified. Both were removed once the key-anchored routes they duplicated shipped: T111
+(FR-021) gave every key a `(+)` hover wedge, an `Insert` binding, and a command menu carrying
+"Add key after"; FR-019 gave the property panel "Delete this key", which opened
+`remove-key-dialog` — the very dialog the toolbar's "Remove key" opened. Two controls for one
+operation is one too many, and "Remove key" sitting beside "Delete this key" reads as two
+different operations. The walk's NAVIGATION changed accordingly; its assertions did not (the
+same split FR-008's own T016 amendment already draws).
 
-| Id | Attaches to |
+| Route | Reached by |
 |---|---|
-| `touch-key-mode-add-key` | the add-key trigger acting on the currently selected cell |
-| `touch-key-mode-remove-key` | the remove trigger that opens `remove-key-dialog` |
+| add a key after the selected one | `(+)` hover wedge, `Insert`, or the command menu's "Add key after" — all anchored on a key |
+| remove the selected key | `key-property-panel-delete`, which opens `remove-key-dialog` |
 
-The walk drives them as: `Tab` → focus a `[role="gridcell"]` → click `touch-key-mode-add-key` →
-fill `Character or code point` → click `assign-panel-confirm` → `ArrowRight` → click
-`touch-key-mode-remove-key` → `remove-key-dialog-proposed-suppress` → `remove-key-dialog-confirm`.
-The add trigger must therefore act on the **focused cell** without requiring a prior click, and
-the remove trigger must be reachable while a cell holds focus.
+The walk now drives them as: click a `[role="gridcell"]` → `Insert` → fill
+`Character or code point` → click `assign-panel-confirm` → `ArrowRight` → click
+`key-property-panel-delete` → `remove-key-dialog-proposed-suppress` → `remove-key-dialog-confirm`.
+Because every add route acts on the **selected** cell, the walk selects (clicks) the anchor rather
+than merely focusing it.
+
+What survives unchanged is the requirement underneath: add and remove must each be reachable by
+keyboard alone, without a pointer (`Insert` and the panel's own button both are), per FR-020b and
+docs/accessibility.md rule 3.
 
 ## 4. Test ids — new in this feature
 

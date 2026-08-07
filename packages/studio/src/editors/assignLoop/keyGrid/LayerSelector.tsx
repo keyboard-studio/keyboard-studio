@@ -338,11 +338,28 @@ export function LayerSelector({
       aria-label={label ?? defaultAriaLabel}
       data-testid="key-layer-selector"
       onKeyDown={handleTablistKeyDown}
-      style={{ display: "flex", flexDirection: "column", gap: 8, fontFamily: FONT }}
+      // Groups flow INLINE, wrapping only when the row genuinely runs out of
+      // width: "Base" and "Other layers" are usually two or three chips each,
+      // and a block apiece spent a whole line on a handful of buttons,
+      // pushing the grid itself further down a pane that already scrolls.
+      // Each group keeps its own heading immediately before its chips, so
+      // wrapping never separates a heading from what it names.
+      style={{
+        display: "flex",
+        flexWrap: "wrap",
+        alignItems: "center",
+        columnGap: 16,
+        rowGap: 8,
+        fontFamily: FONT,
+      }}
     >
       {groups.map((group) => (
-        <div key={group.planeSegment} data-testid={`key-layer-selector-group-${group.planeSegment}`}>
-          <div style={{ fontSize: 10, color: TEXT_DIM, marginBottom: 4 }}>{group.headingText}</div>
+        <div
+          key={group.planeSegment}
+          data-testid={`key-layer-selector-group-${group.planeSegment}`}
+          style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 6 }}
+        >
+          <div style={{ fontSize: 10, color: TEXT_DIM }}>{group.headingText}</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
             {group.layerIds.map((layerId) => {
               const isActive = layerId === activeLayerId;

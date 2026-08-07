@@ -100,9 +100,15 @@ const PLACED_CHAR_UPPER_HOST_KEY = "K_X";
 const ASSIGNED_NOTATION = "U+025B";
 const ASSIGNED_KEY_ID = "U_025B";
 
-/** Test ids the wiring must expose — pinned verbatim here; spec 061 T015 makes `TouchGallery.tsx` match them. */
-const ADD_KEY_TESTID = "touch-key-mode-add-key";
-const REMOVE_KEY_TESTID = "touch-key-mode-remove-key";
+/**
+ * The remove route this walk drives. Both pane-level triggers spec 061 T015
+ * originally pinned (`touch-key-mode-add-key`, `touch-key-mode-remove-key`)
+ * were removed as duplicates of the key-anchored routes: adding is the `(+)`
+ * wedge / `Insert` / the command menu's "Add key after", and removing is the
+ * property panel's own "Delete this key" (FR-019) — which opened this same
+ * dialog all along.
+ */
+const DELETE_KEY_TESTID = "key-property-panel-delete";
 
 /** The key property panel's disclosure for the character-assignment surface (spec 061 T028-T039). */
 const ASSIGN_DISCLOSURE_TESTID = "key-property-panel-assign-disclosure";
@@ -431,12 +437,21 @@ test.describe("Touch key add/remove — import-adapt fidelity (spec 058 SC-006)"
     // where it belongs; this spec's subject is emitted-artifact fidelity (SC-006).
     // Only the NAVIGATION changed here — every assertion below is as written.
     const gridTabStop = page.locator('[role="gridcell"][tabindex="0"]');
-    await gridTabStop.focus();
+    await gridTabStop.click();
     const anchorCell = page.locator('[role="gridcell"]:focus');
     await expect(anchorCell).toBeVisible();
     const anchorLabel = await anchorCell.getAttribute("aria-label");
 
-    await page.getByTestId(ADD_KEY_TESTID).click();
+    // Add FROM the anchor key, which is where every add route now starts: the
+    // pane-level "Add key" button is gone as a duplicate of the `(+)` hover
+    // wedge / Insert / the command menu's "Add key after", all three of which
+    // are anchored on the key the new one follows. `Insert` is the keyboard
+    // route of that same one function (`useKeyCommands`'s `runAddKeyAfter`),
+    // and unlike hovering a wedge it needs no pointer position — so the walk
+    // stays deterministic. It acts on the SELECTED cell, which is why the tab
+    // stop is clicked rather than merely focused. Navigation only — every
+    // assertion below is as written.
+    await page.keyboard.press("Insert");
 
     // -----------------------------------------------------------------------
     // 2. Assign a character to the key just added.
@@ -477,7 +492,14 @@ test.describe("Touch key add/remove — import-adapt fidelity (spec 058 SC-006)"
     const removeTargetLabel = await removeTarget.getAttribute("aria-label");
     expect(removeTargetLabel, "the removed key must not be the add anchor").not.toBe(anchorLabel);
 
-    await page.getByTestId(REMOVE_KEY_TESTID).click();
+    // Remove from the key's own details panel. The pane-level "Remove key"
+    // button is gone: it opened this very dialog, which is exactly what
+    // "Delete this key" (FR-019) already does for the selected key, and two
+    // differently-worded controls for one operation read as two operations.
+    // ArrowRight moved the SELECTION (`useGridNav` calls the same
+    // `onSelectCell` a click does), so the panel is already showing the cell
+    // asserted above. Navigation only — the assertions are unchanged.
+    await page.getByTestId(DELETE_KEY_TESTID).click();
     await expect(page.getByTestId("remove-key-dialog")).toBeVisible({ timeout: 15_000 });
     // Select "Suppress in place" by its accessible name, not by the proposal
     // badge. `remove-key-dialog-proposed-${outcome}` marks whichever outcome the
