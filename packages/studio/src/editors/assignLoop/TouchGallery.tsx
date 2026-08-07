@@ -234,6 +234,8 @@ import {
   galleryGhostBtn as ghostBtn,
   gallerySelectMenuStyle,
   galleryHeaderBtnStyle as headerBtnStyle,
+  galleryCardHeaderRowStyle as cardHeaderRowStyle,
+  galleryHeaderTitleBtnStyle as headerTitleBtnStyle,
   galleryConfigStyle as configStyle,
   galleryCardStyle as cardStyle,
 } from "../../lib/galleryTheme.ts";
@@ -1163,12 +1165,12 @@ function TouchMethodChooser({
 
       {/* 1. Long-press on a key */}
       <div style={cardStyle(method === "longpress_alternates")}>
-        <div style={{ display: "flex", alignItems: "center" }}>
+        <div style={cardHeaderRowStyle}>
           <button
             type="button"
             aria-pressed={method === "longpress_alternates"}
             onClick={() => onMethodChange("longpress_alternates")}
-            style={{ ...headerBtnStyle, width: "auto", flex: 1 }}
+            style={headerTitleBtnStyle}
           >
             <span
               style={{
@@ -1251,12 +1253,12 @@ function TouchMethodChooser({
 
       {/* 2. Swipe a key (flick) */}
       <div style={cardStyle(method === "flick_gestures")}>
-        <div style={{ display: "flex", alignItems: "center" }}>
+        <div style={cardHeaderRowStyle}>
           <button
             type="button"
             aria-pressed={method === "flick_gestures"}
             onClick={() => onMethodChange("flick_gestures")}
-            style={{ ...headerBtnStyle, width: "auto", flex: 1 }}
+            style={headerTitleBtnStyle}
           >
             <span
               style={{
@@ -1362,12 +1364,12 @@ function TouchMethodChooser({
 
       {/* 3. Tap multiple times (multitap) */}
       <div style={cardStyle(method === "multitap")}>
-        <div style={{ display: "flex", alignItems: "center" }}>
+        <div style={cardHeaderRowStyle}>
           <button
             type="button"
             aria-pressed={method === "multitap"}
             onClick={() => onMethodChange("multitap")}
-            style={{ ...headerBtnStyle, width: "auto", flex: 1 }}
+            style={headerTitleBtnStyle}
           >
             <span
               style={{
@@ -1449,12 +1451,12 @@ function TouchMethodChooser({
 
       {/* 4. Replace a key */}
       <div style={cardStyle(method === "touch_key_replace")}>
-        <div style={{ display: "flex", alignItems: "center" }}>
+        <div style={cardHeaderRowStyle}>
           <button
             type="button"
             aria-pressed={method === "touch_key_replace"}
             onClick={() => onMethodChange("touch_key_replace")}
-            style={{ ...headerBtnStyle, width: "auto", flex: 1 }}
+            style={headerTitleBtnStyle}
           >
             <span
               style={{

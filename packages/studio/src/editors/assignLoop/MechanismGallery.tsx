@@ -187,6 +187,8 @@ import {
   galleryForwardBtnStyle as forwardBtnStyle,
   gallerySelectMenuStyle,
   galleryHeaderBtnStyle as headerBtnStyle,
+  galleryCardHeaderRowStyle as cardHeaderRowStyle,
+  galleryHeaderTitleBtnStyle as headerTitleBtnStyle,
   galleryConfigStyle as configStyle,
   galleryCardStyle as cardStyle,
 } from "../../lib/galleryTheme.ts";
@@ -865,12 +867,12 @@ function MethodChooser({
           per-character default method (see MechanismGallery's
           useState<Method>("swap")), so its card leads the list. */}
       <div style={cardStyle(method === "swap")}>
-        <div style={{ display: "flex", alignItems: "center" }}>
+        <div style={cardHeaderRowStyle}>
           <button
             type="button"
             aria-pressed={method === "swap"}
             onClick={() => onMethodChange("swap")}
-            style={{ ...headerBtnStyle, width: "auto", flex: 1 }}
+            style={headerTitleBtnStyle}
           >
             <span
               style={{
@@ -1248,12 +1250,12 @@ function MethodChooser({
 
       {/* S-02 — always shown */}
       <div style={cardStyle(method === "deadkey")}>
-        <div style={{ display: "flex", alignItems: "center" }}>
+        <div style={cardHeaderRowStyle}>
           <button
             type="button"
             aria-pressed={method === "deadkey"}
             onClick={() => onMethodChange("deadkey")}
-            style={{ ...headerBtnStyle, width: "auto", flex: 1 }}
+            style={headerTitleBtnStyle}
           >
             <span
               style={{
