@@ -1247,6 +1247,7 @@
   "survey.convenience.keepNoneButton": "Keep none",
   "survey.convenience.listAriaLabel": "Letters to keep for convenience",
   "survey.convenience.uncheckHint": "Anything you uncheck will be offered for removal on the next screen. Capital and small letters are kept together.",
+  "survey.identityLite.codeMismatchWarning": "{code} is the code for {typedName} — not {selectedName}. You can keep it, or pick a different code.",
   "survey.identityLite.codeOption.bcp47": "{code} — BCP 47 language subtag",
   "survey.identityLite.codeOption.iso6393": "{code} — ISO 639-3",
   "survey.identityLite.heading": "Let's identify your language",
