@@ -274,9 +274,19 @@ export type { MarkGuardsResult } from "./pattern-apply/mark-guards.js";
 // spec 058 — key-level touch layout edit overlay: step 1.7 of
 // projectWorkingCopyVfs (the layout half, Case B) plus the shared address
 // parser its rule-half sibling pass reuses (contracts/key-edit-overlay.md).
-export { applyKeyEditsToVfs, parseTouchKeyAddress } from "./pattern-apply/index.js";
+// `applyKeyEditsToRawJson` is the Case B applier step 1.7 wraps. It is exported
+// here too because the STUDIO needs it directly: `TouchGallery`'s Case B commit
+// branch keeps `touchLayoutJson` current for the live grid, and doing that by
+// re-emitting the IR is exactly the round-trip spec 035 R9 forbids (spec 061
+// T016 — it stamped provenance onto every key of an imported layout).
+export {
+  applyKeyEditsToVfs,
+  applyKeyEditsToRawJson,
+  parseTouchKeyAddress,
+} from "./pattern-apply/index.js";
 export type {
   ApplyKeyEditsToVfsResult,
+  ApplyKeyEditsToRawJsonResult,
   TouchKeyAddressParts,
   KeyEditOperation,
   RenameKeyOp,

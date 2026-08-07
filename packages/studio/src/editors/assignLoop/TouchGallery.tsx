@@ -120,6 +120,7 @@ import {
   resolveKeyAddress,
   touchKeyAddress,
   emitTouchLayout,
+  applyKeyEditsToRawJson,
   groupLayerFamilies,
   planKeyDeletionRuleRemoval,
   applyKeyDeletionRuleRemoval,
@@ -2524,7 +2525,59 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           store.setWorkingIR({ ...base, touchLayout: promotedLayout });
         }
       } else {
-        store.setTouchLayoutJson(emitTouchLayout(promotedLayout));
+        // Case B (imported / import-adapt) — splice the committed op onto the
+        // RAW JSON via the Case B applier, never through the IR.
+        //
+        // This used to be `setTouchLayoutJson(emitTouchLayout(promotedLayout))`,
+        // and that was a spec 035 R9 violation with teeth (found by spec 061
+        // T016, when the SC-006 walk was un-skipped and measured): because
+        // `projectWorkingCopyVfs` step 0 injects `touchLayoutJson` straight into
+        // `.keyman-touch-layout`, an IR re-emit here WAS the emitted artifact.
+        // One key edit therefore rewrote all 112 keys of bambara's shipped
+        // layout — every key gaining `p: "hand-set"` (provenance is materialised
+        // on deserialize by design, FR-009, then written back out by `emitKey`)
+        // and `sp`/`width`/`pad` normalising to the IR's numbers. The provenance
+        // stamp is the damaging half: `hand-set` is the never-auto-clobber tag,
+        // so a single touch edit made the whole layout immune to re-propagation.
+        // The IR also drops what it does not model — per-key `layer`/`default`,
+        // platform `displayUnderlying`/`fontsize` — which is the loss
+        // `applyKeyEditsToRawJson` was written to prevent in the first place.
+        //
+        // The op is read back from the overlay AFTER `commitKeyEdit` so it
+        // carries its assigned `seq` (the applier reports warnings by it).
+        // Applying only THIS op reproduces the same content as replaying the
+        // whole overlay, because every earlier op is already spliced into
+        // `touchLayoutJson`; and `layoutForLintAndGate` re-parses this string,
+        // so the live grid stays current either way.
+        //
+        // `touchLayoutJson` is null until the first edit decides to emit (the
+        // R11 matrix), so the seed is the BASE's shipped raw JSON — which is
+        // the whole point: that string is the fidelity this branch exists to
+        // preserve. `touchLayoutJson` must carry the edit, because
+        // `serializeWorkingCopy` does not pass `keyEditOps` to the projection,
+        // leaving step 1.7 inert on the output path — this string is the only
+        // route a key edit reaches the artifact. (That gap is why splicing here
+        // cannot double-apply against 1.7, and it is recorded as its own
+        // finding rather than widened into here.)
+        //
+        // A reseed-from-desktop layout has no shipped source to be faithful to,
+        // so the IR emit remains right for it — that is the one case where
+        // there is nothing to lose, and it is also what SC-006 itself says.
+        const committedState = useWorkingCopyStore.getState();
+        const rawJson = committedState.touchLayoutJson ?? resolveBaseTouchJson(baseVfs) ?? null;
+        const committedOp = committedState.keyEditOverlay.ops.at(-1);
+        let spliced = false;
+        if (rawJson !== null && committedOp !== undefined) {
+          try {
+            const result = applyKeyEditsToRawJson(rawJson, [committedOp]);
+            for (const w of result.warnings) devLog.warn("[TouchGallery]", w);
+            store.setTouchLayoutJson(result.json);
+            spliced = true;
+          } catch (err) {
+            devLog.error("[TouchGallery] Case B key-edit raw-JSON splice failed:", err);
+          }
+        }
+        if (!spliced) store.setTouchLayoutJson(emitTouchLayout(promotedLayout));
       }
 
       // T106 (FR-062): a character this edit invalidated AND that has lost
