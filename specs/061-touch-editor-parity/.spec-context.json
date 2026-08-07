@@ -146,6 +146,30 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-07T08:04:25.177Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T052",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-07T08:24:59.830Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T053",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-07T08:25:00.088Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T054",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-07T08:25:00.343Z"
     }
   ],
   "approach": "Invert the one idiom that caused the defect: the eight editing callbacks on the key-grid surfaces become REQUIRED props, so an unmountable affordance fails tsc instead of rendering inert. On top of that, reach Developer parity in five sequential slices matching the spec's user stories: layer selector, KeymanWeb last-key stretch plus a per-row metrics readout replacing the withdrawn slack hatch, one merged property panel with all eight editable fields plus delete and four self-hiding move buttons, gesture editing in key mode, and unrequested id/keycap proposals. Engine additions stay narrow -- four fields admitted to EditableKeyFields, a move operation, two diagnostic codes, two proposal modules -- and no Pattern/Criterion type is touched.",
@@ -533,7 +557,7 @@
       "step": "implement"
     }
   ],
-  "currentTask": "T051",
+  "currentTask": "T054",
   "task_summaries": {
     "T016": {
       "status": "DONE",
@@ -604,6 +628,28 @@
       "files": [
         "packages/engine/src/pattern-apply/touchKeyDiagnostics.ts",
         "packages/engine/src/pattern-apply/index.ts"
+      ]
+    },
+    "T052": {
+      "status": "DONE",
+      "did": "KeyPropertyPanel takes idProposal as a PROP (staying store-free): the proposal pre-fills an empty id field, the T_ alternative sits behind key-property-panel-id-alternatives, and the localized reason renders at key-property-panel-no-proposal-reason, reading both noProposalReason and the titlecase noCaseTripleReason",
+      "files": [
+        "packages/studio/src/editors/assignLoop/keyGrid/KeyPropertyPanel.tsx"
+      ]
+    },
+    "T053": {
+      "status": "DONE",
+      "did": "TouchGallery builds the TouchKeyIdProposalRequest in a useMemo on the existing render cycle - inheritedId from the selected cell, keyModeRuleIndex, expectedOutputs from producedChars - and feeds it to the panel",
+      "files": [
+        "packages/studio/src/editors/assignLoop/TouchGallery.tsx"
+      ]
+    },
+    "T054": {
+      "status": "DONE",
+      "did": "T045 and T046 pass: 43 tests green; full workspace suite green (studio 422/6495, engine 156/2998)",
+      "files": [
+        "packages/engine/src/pattern-apply/proposeTouchKeyId.test.ts",
+        "packages/engine/src/pattern-apply/keycapRelatedness.test.ts"
       ]
     }
   }

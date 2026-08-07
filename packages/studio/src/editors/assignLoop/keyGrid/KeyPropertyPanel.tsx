@@ -55,6 +55,7 @@ import { useCallback, useId, useMemo, useState, type ReactNode, type Ref } from 
 import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useLingui } from "@lingui/react/macro";
 import type { TouchKeyFix, TouchLayoutIR } from "@keyboard-studio/contracts";
+import type { TouchKeyIdProposal } from "@keyboard-studio/engine";
 import { BG_CARD, BORDER, TEXT_DIM, TEXT_MAIN, FONT } from "../../../lib/galleryTheme.ts";
 import { Button, Label, TextField } from "../../../ui/index.ts";
 import { KeyInspector, type TouchKeySpValue } from "./KeyInspector.tsx";
@@ -130,6 +131,16 @@ export interface KeyPropertyPanelProps {
    * unit-testable without the engine's minting machinery.
    */
   assignSlot?: ReactNode;
+  /**
+   * The id proposal for the selected key (spec 061 FR-029…FR-032), or
+   * `undefined` when none has been computed.
+   *
+   * A PROP, not a hook: this panel stays store-free and unit-testable without
+   * the engine's minting machinery, exactly as `assignSlot` does. It carries
+   * either an `id` or a `noProposalReason` — never neither, which is the
+   * invariant SC-007 rests on.
+   */
+  idProposal?: TouchKeyIdProposal;
   /** Localized panel accessible name override. */
   label?: string;
 }
@@ -249,11 +260,84 @@ export function KeyPropertyPanel({
   onDelete,
   onMove,
   assignSlot,
+  idProposal,
   label,
 }: KeyPropertyPanelProps) {
   const { t } = useLingui();
   const geometryGroupId = useId();
   const [assignOpen, setAssignOpen] = useState(false);
+  const [idAlternativesOpen, setIdAlternativesOpen] = useState(false);
+
+  /**
+   * FR-032's "state why", localized.
+   *
+   * Reads BOTH sources deliberately. `noProposalReason` is the genuine
+   * no-id case. `noCaseTripleReason === "titlecase-self-third-form"` is not:
+   * a titlecase character gets an ordinary id and only its CASE TRIPLE is
+   * impossible, so the engine reports it through the long-standing field
+   * rather than contradicting the proposal it just made. Both must reach the
+   * author as an explanation — which is the whole requirement — so the panel
+   * is where they converge (character-classes.md row 5).
+   */
+  const noProposalText = useMemo<string | undefined>(() => {
+    if (idProposal === undefined) return undefined;
+    if (idProposal.noCaseTripleReason === "titlecase-self-third-form") {
+      return t({
+        id: "editor.assignLoop.keyGrid.property.noProposal.titlecaseSelfThirdForm",
+        message:
+          "This character is already its own third case form, so there is no separate capital to pair it with. The id above still applies.",
+      });
+    }
+    switch (idProposal.noProposalReason?.kind) {
+      case "titlecase-self-third-form":
+        return t({
+          id: "editor.assignLoop.keyGrid.property.noProposal.titlecaseSelfThirdForm",
+          message:
+            "This character is already its own third case form, so there is no separate capital to pair it with. The id above still applies.",
+        });
+      case "unassigned-codepoint":
+        return t({
+          id: "editor.assignLoop.keyGrid.property.noProposal.unassignedCodepoint",
+          message:
+            "That code point is not assigned to any character yet, so an id for it would not mean anything. Choose a different character, or type an id yourself.",
+        });
+      case "variation-selector-only":
+        return t({
+          id: "editor.assignLoop.keyGrid.property.noProposal.variationSelectorOnly",
+          message:
+            "That is a variation selector on its own — it changes how a character looks, but there is no character here for it to change.",
+        });
+      case "emoji-sequence-unsupported":
+        return t({
+          id: "editor.assignLoop.keyGrid.property.noProposal.emojiSequenceUnsupported",
+          message:
+            "This is a multi-part emoji, which a single key id cannot represent. You can still type an id yourself.",
+        });
+      case "empty-output":
+        return t({
+          id: "editor.assignLoop.keyGrid.property.noProposal.emptyOutput",
+          message: "This key does not produce anything yet, so there is nothing to name it after.",
+        });
+      default:
+        return undefined;
+    }
+  }, [idProposal, t]);
+
+  /** Why the `T_` alternative might be preferred — structured, never prose (FR-044). */
+  const alternativeReasonText = useMemo<string | undefined>(() => {
+    const reason = idProposal?.alternative?.reason;
+    if (reason === undefined) return undefined;
+    if (reason.kind === "shared-candidate") {
+      return t({
+        id: "editor.assignLoop.keyGrid.property.id.alternatives.sharedCandidate",
+        message: `The same id already appears on ${{ count: reason.count }} other layers or platforms, so one rule serves all of them.`,
+      });
+    }
+    return t({
+      id: "editor.assignLoop.keyGrid.property.id.alternatives.alwaysAvailable",
+      message: "A named id always works, whatever the character.",
+    });
+  }, [idProposal, t]);
 
   const handleKeyDown = useCallback(
     (event: ReactKeyboardEvent<HTMLDivElement>) => {
@@ -357,13 +441,88 @@ export function KeyPropertyPanel({
           <CommittingField
             field="id"
             labelText={t({ id: "editor.assignLoop.keyGrid.property.id", message: "Key id" })}
-            value={selectedCell.id}
+            // The proposal IS the default (spec v1.3.1 §3c, FR-032): a key that
+            // has no id yet shows the proposed one already filled in, so
+            // confirming is the whole interaction and hand-typing an id is
+            // never required. An id the key already carries always wins — a
+            // proposal must not overwrite an author's existing value.
+            value={selectedCell.id.length > 0 ? selectedCell.id : (idProposal?.id ?? "")}
             helpText={t({
               id: "editor.assignLoop.keyGrid.property.id.help",
               message: "What rules match on. Changing it can disconnect the key from its rule.",
             })}
             onCommit={commitText("id")}
           />
+
+          {/* Why there is no proposal (FR-032). The panel never renders
+              silence: a class the minter cannot handle says so in the
+              author's language, and `titlecase-self-third-form` arrives via
+              `noCaseTripleReason` because a titlecase character DOES get an
+              id — only its case triple is impossible (character-classes.md
+              row 5). */}
+          {noProposalText !== undefined && (
+            <p
+              data-testid="key-property-panel-no-proposal-reason"
+              style={{ margin: 0, fontSize: 11, color: TEXT_DIM, fontFamily: FONT }}
+            >
+              {noProposalText}
+            </p>
+          )}
+
+          {/* The `T_` alternative, behind a disclosure. The `U_` default is
+              pre-selected and right for almost every key; the alternative is
+              offered rather than hidden, but it does not get to compete with
+              the default for the author's attention. */}
+          {idProposal?.alternative !== undefined && (
+            <div style={ROW_STYLE}>
+              <button
+                type="button"
+                data-testid="key-property-panel-id-alternatives"
+                aria-expanded={idAlternativesOpen}
+                onClick={() => setIdAlternativesOpen((open) => !open)}
+                style={{
+                  alignSelf: "flex-start",
+                  fontFamily: FONT,
+                  fontSize: 11,
+                  padding: "3px 8px",
+                  borderRadius: 4,
+                  border: `1px solid ${BORDER}`,
+                  background: "transparent",
+                  color: TEXT_MAIN,
+                  cursor: "pointer",
+                }}
+              >
+                {idAlternativesOpen
+                  ? t({
+                      id: "editor.assignLoop.keyGrid.property.id.alternatives.hide",
+                      message: "Hide other id options",
+                    })
+                  : t({
+                      id: "editor.assignLoop.keyGrid.property.id.alternatives.show",
+                      message: "Other id options",
+                    })}
+              </button>
+              {idAlternativesOpen && (
+                <div style={{ ...ROW_STYLE, gap: 4, paddingTop: 4 }}>
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      onFieldChange({
+                        field: "id",
+                        value: idProposal.alternative?.id ?? "",
+                      });
+                      setIdAlternativesOpen(false);
+                    }}
+                  >
+                    {idProposal.alternative.id}
+                  </Button>
+                  <span style={{ fontSize: 11, color: TEXT_DIM, fontFamily: FONT }}>
+                    {alternativeReasonText}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* The proposal machinery, behind a disclosure on the id field
               (research D3): assigning a character is how most authors should

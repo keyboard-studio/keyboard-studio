@@ -566,7 +566,7 @@ never required for any of them.
   `keycapAuthored` unset; `isKeycapRelated` false. Rides the same `useMemo` cycle — no second timer
   (contract §3.1, FR-036, FR-039) ·
   `packages/engine/src/pattern-apply/touchKeyDiagnostics.ts`
-- [ ] **T052** [P] [US5] Show the id proposal as the field's default with alternatives behind
+- [x] **T052** [P] [US5] Show the id proposal as the field's default with alternatives behind
   `key-property-panel-id-alternatives`, and render the localized `NoProposalReason` at
   `key-property-panel-no-proposal-reason` — including `titlecase-self-third-form`, which needs copy
   rather than new engine logic. The case-triple and opaque-acknowledgement controls stay in the
@@ -576,7 +576,7 @@ never required for any of them.
 
 **⟶ Wait for Wave 5 to finish, then:**
 
-- [ ] **T053** [US5] Build the `TouchKeyIdProposalRequest` at assign time — `inheritedId` from the
+- [x] **T053** [US5] Build the `TouchKeyIdProposalRequest` at assign time — `inheritedId` from the
   physical key at this position, the `TouchKeyRuleIndex`, and `expectedOutputs` covering default and
   modifier outputs — and feed the proposal to the panel; propose the keycap alongside it, skipping
   any key whose `keycapAuthored` is set (FR-029, FR-033, FR-035) ·
@@ -584,7 +584,7 @@ never required for any of them.
 
 **⟶ Wait for T053 to finish, then:**
 
-- [ ] **T054** [US5] Make T045 and T046 pass ·
+- [x] **T054** [US5] Make T045 and T046 pass ·
   `packages/engine/src/pattern-apply/proposeTouchKeyId.test.ts`,
   `packages/engine/src/pattern-apply/keycapRelatedness.test.ts`
 

@@ -121,11 +121,12 @@ import {
   touchKeyAddress,
   emitTouchLayout,
   applyKeyEditsToRawJson,
+  proposeTouchKeyId,
   groupLayerFamilies,
   planKeyDeletionRuleRemoval,
   applyKeyDeletionRuleRemoval,
 } from "@keyboard-studio/engine";
-import type { TouchMethodDescriptor } from "@keyboard-studio/engine";
+import type { TouchMethodDescriptor, TouchKeyIdProposal } from "@keyboard-studio/engine";
 import {
   buildTouchLayoutJson,
   deriveSeedLayout,
@@ -4632,6 +4633,45 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       ? identity.bcp47
       : undefined;
 
+  /**
+   * The id proposal for the selected key (spec 061 T053, FR-029…FR-032).
+   *
+   * Built here rather than in the panel because only the gallery holds the
+   * three facts the request needs — and note which fact it does NOT hold:
+   * `TouchKeyIdProposalRequest` carries no row, index or coordinate, so
+   * "never by geometric proximity" (FR-030) cannot be violated from this call
+   * site even by accident.
+   *
+   * `expectedOutputs` covers the DEFAULT and MODIFIER outputs together
+   * (FR-029): inheriting an id is only safe if the physical key still produces
+   * everything it used to, so a key whose shift output moved elsewhere
+   * correctly falls through to minting.
+   *
+   * Rides the existing render cycle as a `useMemo` — no timer, no store read
+   * beyond what is already subscribed (D3, FR-039).
+   */
+  const selectedKeyIdProposal = useMemo<TouchKeyIdProposal | undefined>(() => {
+    if (selectedKeyCell === null || keyModeRuleIndex === undefined) return undefined;
+    const chars = selectedKeyCell.producedChars[0] ?? "";
+    if (chars.length === 0) return undefined;
+    // The id the physical key at this position already carries. Taken from the
+    // cell itself — the only positional fact that reaches the proposer, and one
+    // the caller has already resolved.
+    const inheritedId = selectedKeyCell.id.length > 0 ? selectedKeyCell.id : undefined;
+    const expectedOutputs = [
+      ...new Set(selectedKeyCell.producedChars.filter((c) => c.length > 0)),
+    ];
+    return proposeTouchKeyId({
+      chars,
+      ...(inheritedId !== undefined ? { inheritedId } : {}),
+      ruleIndex: keyModeRuleIndex,
+      expectedOutputs,
+      capsHandled,
+      ...(identityBcp47 !== undefined ? { bcp47: identityBcp47 } : {}),
+    });
+  }, [selectedKeyCell, keyModeRuleIndex, capsHandled, identityBcp47]);
+
+
   // ---------------------------------------------------------------------------
   // Sibling-accent proposal — the longpress accelerator (spec: "accept ù on u
   // -> offer the rest of u's diacritic family in one click"). Independent of
@@ -6729,6 +6769,9 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
             onFieldChange={handleKeyFieldChange}
             onDelete={handleOpenRemoveDialog}
             onMove={handleKeyMove}
+            {...(selectedKeyIdProposal !== undefined
+              ? { idProposal: selectedKeyIdProposal }
+              : {})}
             {...(ir !== null && keyModeRuleIndex !== undefined
               ? {
                   assignSlot: (
