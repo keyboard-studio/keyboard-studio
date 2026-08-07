@@ -2286,6 +2286,15 @@ describe("TouchGallery — abugida gate and empty-hostkey guard on the longpress
     const suggestionText = screen.getByText(/Suggested: long-press/i);
     expect(suggestionText.style.color).toBe("rgb(86, 211, 100)"); // #56d364
     expect(suggestionText.style.color).not.toBe("rgb(248, 81, 73)"); // #f85149
+    // This message renders through the shared ProposalCard, whose <p> sets no
+    // fontWeight — plain/normal weight is intentional here, matching every
+    // other ProposalCard caller (e.g. this gallery's bulk-accent summary
+    // box), not a regression from the old bespoke bold (600) treatment. jsdom
+    // doesn't synthesize a computed "400" for an unset inline style (it
+    // reports "" — verified above), so assert the empty-inline form rather
+    // than a computed value jsdom never actually produces.
+    expect(suggestionText.style.fontWeight).toBe("");
+    expect(suggestionText.style.fontWeight).not.toBe("600");
   });
 });
 
