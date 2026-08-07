@@ -744,15 +744,10 @@ function CardApplyRow({
           message: `Apply method for ${currentChar}`,
         })}
         style={{
-          padding: "9px 20px",
+          ...forwardBtnStyle,
           background: canApply ? BLUE_ACTION : "#21262d",
-          border: "none",
-          borderRadius: 6,
           color: canApply ? "#e6edf3" : TEXT_DIM,
-          fontSize: 13,
-          fontWeight: 600,
           cursor: canApply ? "pointer" : "not-allowed",
-          fontFamily: FONT,
         }}
       >
         <Trans id="editor.assignLoop.applyMethodButton">Apply method</Trans>
