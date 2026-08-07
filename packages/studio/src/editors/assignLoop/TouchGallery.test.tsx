@@ -5754,3 +5754,285 @@ describe("TouchGallery — corpus longpress-host tie-breaker (placement-priors v
     expect(screen.queryByText(/Suggested: long-press/i)).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// spec 061 T009 (FR-009, SC-003, SC-009) — the PR-lane guarantee for key-mode
+// editing.
+//
+// research.md D2 splits the two verification tools by ROLE, not overlap:
+// Playwright *explores* (ad hoc, headed, never gates); vitest carries every
+// durable assertion, because `.github/workflows/ci.yml` runs `pnpm typecheck`,
+// `pnpm -r test` and `pnpm lint` — and has NO Playwright step at all (confirmed
+// by reading that file before writing this block). The un-skipped e2e walk
+// (spec 061 T010/FR-008) is still delivered and must still pass unmodified,
+// but its standing there is EVIDENCE, never a gate — this block is the gate.
+//
+// These tests mount the REAL `TouchGallery` against REAL store state, exactly
+// like every other integration suite in this file, and reuse this file's own
+// conventions rather than building a second harness (a divergent setup path
+// in the same file is a defect the task briefing itself calls out):
+//   - `useWorkingCopyStore.getState().instantiateFromBase/recordPhase/
+//     markGalleryIntroSeen` — the same store-seeding calls `seedStore`/
+//     `seedKeyModeFixture` above already use.
+//   - `useSurveySessionStore.getState().setTouchSeedSource(...)` — same as
+//     every other Case A/B fixture in this file.
+//   - `runTransform(kbId)` — this file's own VFS-projection helper (defined
+//     near the top, alongside `seedStore`), invoked unmodified.
+//   - `touch-mode-tab-key` to reach key mode, exactly as the T072
+//     mode-selector suite above does.
+//
+// They are written against the KEY-MODE-UI CONTRACT (spec 061
+// contracts/key-mode-ui.md), not against today's behaviour, and are EXPECTED
+// TO FAIL until T013/T014/T015 land (a later wave, owned elsewhere) —
+// `TouchGallery.tsx` today mounts no layer selector at all and passes neither
+// `onSpChange` nor `onApplyFix` to `KeyInspector` (confirmed by search before
+// writing this block; see this file's own T007 note near the top for the
+// companion confirmation that this file itself never mounts `KeyGrid`/
+// `KeyInspector`/`KeyGridCell` directly, so no handler stub is owed here).
+// ---------------------------------------------------------------------------
+
+/**
+ * A three-layer fixture built to exercise all three of T009's acceptance
+ * scenarios off ONE shared layout, rather than three unrelated ones:
+ *
+ *   - `T_a` (AS1) — an ordinary Character key (`sp` absent, wire default 0)
+ *     whose type the author retypes to Blank.
+ *   - `T_shift` (AS2) — a layer-switch key (`nextlayer: "shift"`) sitting on
+ *     `default` (not the layer it switches TO) with NO `sp` override. This
+ *     is `findLayerSwitchActiveMismatches`'s own trigger condition
+ *     (packages/contracts/src/touch-key-diagnostics.ts): the computable rule
+ *     (research.md R3b) says `sp:1` (inactive) off the target layer, the
+ *     wire value defaults to `0` (Character), the two disagree, and the
+ *     resulting `TOUCH_KEY_LAYER_SWITCH_ACTIVE_MISMATCH` finding carries a
+ *     `setSp` fix. A real, corpus-shaped defect a fresh import can carry —
+ *     not a finding hand-forged to fit this test (the task briefing's own
+ *     instruction: "prefer seeding a layout that naturally triggers it").
+ *   - `"symbols"` (AS3) — a THIRD top-level layer, declared in `layer[]`
+ *     alongside `default`/`shift`, that NO key's `nextlayer` reaches (only
+ *     `shift` is, via `T_shift`). This is spec.md's own Edge Case: "A layer
+ *     reachable from no key's next-layer — it must still be selectable,
+ *     since following a layer-switch key cannot reach it." FR-004 requires
+ *     the selector to source layer ids from the platform's DECLARED
+ *     `layers[]`, never from any key's `nextlayer`, for exactly this case.
+ */
+const KEY_MODE_PARITY_LAYOUT = {
+  phone: {
+    layer: [
+      {
+        id: "default",
+        row: [
+          {
+            id: 1,
+            key: [
+              { id: "T_a", text: "a", output: "a" },
+              { id: "T_shift", text: "shift", nextlayer: "shift" },
+            ],
+          },
+        ],
+      },
+      {
+        id: "shift",
+        row: [{ id: 1, key: [{ id: "T_A", text: "A", output: "A" }] }],
+      },
+      {
+        id: "symbols",
+        row: [{ id: 1, key: [{ id: "T_1", text: "1", output: "1" }] }],
+      },
+    ],
+  },
+};
+
+/**
+ * Seeds the working copy for the T009 suite. `reseed-from-desktop` (not
+ * `import-adapt`, unlike this file's other key-mode fixture,
+ * `seedKeyModeFixture` above) is deliberate: the R11 emission matrix
+ * (`packages/studio/src/lib/touchEmission.ts`) ALWAYS emits under
+ * `reseed-from-desktop`, even with zero Phase E edits and empty desktop
+ * mods — the one seed source under which `touchLayoutResult.json` (and
+ * therefore `effectiveKeyModeLayout`, which parses THAT string once it is
+ * non-null) is guaranteed non-null with no desktop-assignment scaffolding
+ * required.
+ *
+ * `buildTouchLayoutJson` is mocked file-wide (see `buildTouchLayoutJsonSpy`
+ * near the top of this file); this fixture overrides that mock's return
+ * value to `KEY_MODE_PARITY_LAYOUT` so the emission this fixture forces
+ * actually carries the three-layer structure these tests assert on, instead
+ * of the file's generic default (an assignment-echoing single-layer stub).
+ *
+ * Forcing emission is not an incidental convenience — it is the ONLY way
+ * AS1's key edit can reach `runTransform`'s returned VFS at all:
+ * `runTransform` invokes the captured transform against a BRAND NEW EMPTY
+ * `VirtualFS`, so step 1.7's key-edit-overlay projection
+ * (`applyKeyEditsToVfs`) has nothing to splice a `sp` change onto unless
+ * step 0 has already written a `.keyman-touch-layout` entry first — which
+ * only happens when `touchLayoutJson` is non-null
+ * (`packages/studio/src/lib/projectWorkingCopyVfs.ts`'s own step-0 gate).
+ */
+function seedKeyModeParityFixture() {
+  buildTouchLayoutJsonSpy.mockImplementation(() => ({
+    json: JSON.stringify(KEY_MODE_PARITY_LAYOUT),
+    warnings: [] as string[],
+  }));
+  const vfs = createVirtualFS([
+    { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+  ]);
+  const ir = makeTestIR([]);
+  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+  useWorkingCopyStore.getState().recordPhase({
+    phase: "B",
+    answers: [],
+    confirmedInventory: ["a"],
+  });
+  useWorkingCopyStore.getState().markGalleryIntroSeen("touch");
+  useSurveySessionStore.getState().setTouchSeedSource("reseed-from-desktop");
+}
+
+/**
+ * Render `TouchGallery` and switch straight to key mode — the same
+ * `touch-mode-tab-key` click the T072 mode-selector suite above drives.
+ */
+async function renderTouchGalleryInKeyMode(
+  onComplete: () => void = vi.fn(),
+  onBack: () => void = vi.fn(),
+): Promise<void> {
+  await act(async () => {
+    render(<TouchGallery onComplete={onComplete} onBack={onBack} />);
+  });
+  await act(async () => {
+    fireEvent.click(screen.getByTestId("touch-mode-tab-key"));
+  });
+}
+
+describe("TouchGallery — key mode editing (spec 061 T009, FR-009, SC-003, SC-009)", () => {
+  it("AS1 — the key-type radio holds through its own re-render, and the newly chosen sp reaches the emitted .keyman-touch-layout", async () => {
+    seedKeyModeParityFixture();
+    await renderTouchGalleryInKeyMode();
+
+    fireEvent.click(screen.getByTestId("key-grid-cell-phone:default:T_a"));
+
+    // T_a starts life as an ordinary Character key (`sp` absent -> wire
+    // default 0) — confirm the starting state before changing it, so a false
+    // pass ("it was Blank all along") is not possible.
+    expect(
+      (screen.getByRole("radio", { name: /Character/i }) as HTMLInputElement)
+        .checked,
+    ).toBe(true);
+    const blankRadio = screen.getByRole("radio", {
+      name: /Blank/i,
+    }) as HTMLInputElement;
+    expect(blankRadio.checked).toBe(false);
+
+    await act(async () => {
+      fireEvent.click(blankRadio);
+    });
+
+    // (a) THE DEFECT OF RECORD (issue #1530 complaint #2, spec 061 AS1): the
+    // radio must hold the newly chosen value through the re-render it
+    // triggers, never snap back to the old one. `TouchGallery` supplies
+    // neither `onSpChange` nor `onApplyFix` to `KeyInspector` today
+    // (confirmed by search before writing this block) — `onSpChange` is a
+    // REQUIRED prop (spec 061 FR-001/research D1), so this either throws for
+    // want of a handler to call, or (once T013 wires it to a real
+    // `commitKeyEdit`) actually flips the working copy. This assertion is
+    // false either way until that wiring lands.
+    expect(
+      (screen.getByRole("radio", { name: /Blank/i }) as HTMLInputElement)
+        .checked,
+    ).toBe(true);
+
+    // (b) the SAME choice reaches what the author downloads, not just
+    // component state — "it persisted into what the author downloads" is
+    // the claim FR-009/SC-003 make, and only the emitted artifact can
+    // support it.
+    const emittedVfs = runTransform("basic_kbdus");
+    const emittedLayout = emittedVfs.get(
+      "source/basic_kbdus.keyman-touch-layout",
+    );
+    expect(emittedLayout).toBeDefined();
+    // `VirtualFS.get()` returns a `VirtualFSEntry`, not a string — read
+    // `.content`, the same way this file's other emitted-artifact assertions
+    // already do (see the longpress check above). Casting the entry itself to
+    // `string` parses "[object Object]" and throws before the real assertion
+    // is ever reached.
+    const parsed = JSON.parse(String(emittedLayout?.content)) as {
+      phone: {
+        layer: Array<{
+          id: string;
+          row: Array<{ key: Array<{ id: string; sp?: number }> }>;
+        }>;
+      };
+    };
+    const defaultLayer = parsed.phone.layer.find((l) => l.id === "default")!;
+    const tA = defaultLayer.row[0]!.key.find((k) => k.id === "T_a");
+    expect(tA?.sp).toBe(9);
+  });
+
+  it("AS2 — a fix control for a real diagnostic is enabled, and pressing it changes the working copy", async () => {
+    seedKeyModeParityFixture();
+    await renderTouchGalleryInKeyMode();
+
+    fireEvent.click(
+      screen.getByTestId("key-grid-cell-phone:default:T_shift"),
+    );
+
+    // The mismatch finding this key was built to carry (see
+    // KEY_MODE_PARITY_LAYOUT's own doc comment above) renders as localized
+    // prose plus a fix button captioned per findingCopy.ts's `setSp` case.
+    // Queried by its accessible name rather than a
+    // `key-inspector-finding-${i}-fix-${fixIndex}` index, because which
+    // index a real diagnostics pass assigns this finding among however many
+    // others this key also carries is not this test's business — nothing
+    // promises an index, and a test that assumed one would be fragile to an
+    // unrelated detector firing first.
+    const fixButton = screen.getByRole("button", {
+      name: /Draw it as inactive on this layer/i,
+    }) as HTMLButtonElement;
+
+    // Today `KeyInspector` renders every fix button unconditionally
+    // (`onApplyFix` was already made required — research D1/T004), but
+    // `TouchGallery` does not pass `onApplyFix` to it AT ALL (confirmed by
+    // search). FR-003's "absent, never disabled" governs the case where a
+    // fix genuinely cannot apply; this is the opposite defect this scenario
+    // exists to catch — a control that visibly CAN apply, wired to nothing.
+    expect(fixButton.disabled).toBe(false);
+
+    const opsBefore = useWorkingCopyStore.getState().keyEditOverlay.ops.length;
+    await act(async () => {
+      fireEvent.click(fixButton);
+    });
+
+    expect(useWorkingCopyStore.getState().keyEditOverlay.ops.length).toBe(
+      opsBefore + 1,
+    );
+  });
+
+  it("AS3 — the layer selector offers a layer no key's nextlayer reaches, and activating it re-renders the grid for that layer", async () => {
+    seedKeyModeParityFixture();
+    await renderTouchGalleryInKeyMode();
+
+    // "symbols" is declared in KEY_MODE_PARITY_LAYOUT's own `layer[]` array
+    // but reached by NO key's `nextlayer` — only "shift" is (via T_shift).
+    // This is spec.md's own Edge Case ("A layer reachable from no key's
+    // next-layer — it must still be selectable") and FR-004's substance: the
+    // selector must source layer ids from the platform's DECLARED
+    // `layers[]`, never from any key's `nextlayer`.
+    const selector = screen.getByTestId("key-layer-selector");
+    const symbolsOption = within(selector).getByTestId(
+      "key-layer-selector-option-symbols",
+    );
+
+    // Before the switch: the grid is showing "default", so "symbols"' own
+    // key is absent from it.
+    expect(
+      screen.queryByTestId("key-grid-cell-phone:symbols:T_1"),
+    ).toBeNull();
+
+    await act(async () => {
+      fireEvent.click(symbolsOption);
+    });
+
+    // After the switch: the grid re-rendered FOR THAT LAYER — "symbols"'
+    // own key is now present.
+    expect(screen.getByTestId("key-grid-cell-phone:symbols:T_1")).toBeTruthy();
+  });
+});

@@ -33,40 +33,36 @@
 // a reseeded layout has no shipped source to be faithful to.
 //
 // ---------------------------------------------------------------------------
-// STATUS: skipped — blocked on the TouchGallery add/remove wiring
+// STANDING: exploration evidence, NOT a PR-lane gate
 // ---------------------------------------------------------------------------
 //
-// Phase 8 built the add and remove SURFACES, but nothing mounts them yet:
-// `TouchGallery.tsx` calls neither `useKeyCommands` (T094, the add-after
-// command + Insert route) nor `RemoveKeyDialog` (T097-T099, the three-outcome
-// remove), and never mounts `KeyGridCommandMenu` (T111). Only the US2 assign
-// path is wired (`handleAssignPanelCommit`). `useKeyCommands.ts`'s own module
-// doc names the gap explicitly — "the caller (a later TouchGallery.tsx wiring
-// task, out of this task's scope)" — and tasks.md allocates no such task in
-// Phase 8. So steps 1 and 3 of the walk below have no UI route to drive, and
-// this spec cannot pass yet. It is written in full, against the real test ids,
-// so it runs as-is the moment the wiring lands.
+// This walk is un-skipped as of spec 061 (FR-008), whose T013-T015 land the
+// `TouchGallery.tsx` add/remove wiring the old blocker note named. It must pass
+// with its assertions unmodified — that is the point of the un-skip.
 //
-// Same convention as `import-improve.spec.ts` (skipped with a recipe at the
-// top of the file) — an honestly-skipped spec that names its blocker, never a
-// spec weakened until it passes.
+// But it is not the guarantee. `.github/workflows/ci.yml` has no Playwright
+// step: the PR lane runs `pnpm -r build`, `pnpm -r typecheck`, `pnpm lint`,
+// `pnpm -r test`, the three standalone vitest configs (api, i18n utilities,
+// spec-trace) and a non-blocking spec-drift check — and nothing else. So an
+// assertion that lives only here is something someone once observed, not a
+// regression guard, which is exactly how a complete-but-unmounted key editor
+// shipped green (spec 061's "Why no test caught it").
 //
-// To un-skip, in `TouchGallery.tsx`'s key mode:
-//   1. Call `useKeyCommands({ selectedCell, layout, onAddKeyAfter, ... })` and
-//      commit a successful outcome's `op` the way `handleAssignPanelCommit`
-//      already does — including its Case A / Case B `promotedLayout` split
-//      (`setWorkingIR` vs. `setTouchLayoutJson(emitTouchLayout(...))`), which
-//      is the part an add/remove commit must not skip.
-//   2. Mount `KeyGridCommandMenu` on the grid's `onOpenCommandMenu` intent and
-//      `RemoveKeyDialog` on a Delete/remove intent, passing the chosen outcome
-//      through to the same commit path.
-//   3. Forward `onAddKeyAfter` / `onOpenCommandMenu` / `onFollowNextLayer` into
-//      `<KeyGrid>` (the props exist and are already forwarded to every cell).
-//   4. Give the add affordance and the remove trigger the two test ids this
-//      spec expects: `touch-key-mode-add-key` and `touch-key-mode-remove-key`
-//      (or update the constants below to whatever they become).
+// The durable guarantee for key-mode editing is therefore the vitest key-mode
+// integration block in
+// `packages/studio/src/editors/assignLoop/TouchGallery.test.tsx` (spec 061
+// T009, FR-009), which mounts the real component in the lane a pull request
+// runs. This walk corroborates it in a real browser and covers the emitted-
+// artifact fidelity claim a second, independent time (SC-005 keeps a vitest
+// twin for the same reason).
 //
-// Run (once un-skipped):
+// That division of labour is research decision D2 in
+// `specs/061-touch-editor-parity/research.md` — "Playwright explores; vitest is
+// the repeatable gate". Adding a Playwright job to `ci.yml` was considered and
+// deferred there as separate CI-infrastructure work, not because e2e is
+// unwanted.
+//
+// Run:
 //   cd packages/studio && npx playwright test touch-key-add-remove.spec.ts
 
 import { test, expect, type Page } from "playwright/test";
@@ -95,7 +91,7 @@ const PLACED_CHAR_UPPER_HOST_KEY = "K_X";
 const ASSIGNED_NOTATION = "U+025B";
 const ASSIGNED_KEY_ID = "U_025B";
 
-/** Test ids the wiring must expose — see the STATUS block above. */
+/** Test ids the wiring must expose — pinned verbatim here; spec 061 T015 makes `TouchGallery.tsx` match them. */
 const ADD_KEY_TESTID = "touch-key-mode-add-key";
 const REMOVE_KEY_TESTID = "touch-key-mode-remove-key";
 
@@ -263,13 +259,6 @@ async function snapshotOutputFiles(page: Page): Promise<KsE2EFileSnapshot> {
 // ---------------------------------------------------------------------------
 
 test.describe("Touch key add/remove — import-adapt fidelity (spec 058 SC-006)", () => {
-  // See the STATUS block at the top of this file: blocked on the TouchGallery
-  // add/remove wiring, which Phase 8 does not allocate a task for.
-  test.skip(
-    true,
-    "Blocked: TouchGallery.tsx mounts neither useKeyCommands (add) nor RemoveKeyDialog (remove) — see the STATUS block at the top of this file.",
-  );
-
   test("adding a key, assigning it a character, and removing a different key leaves every untouched key, platform field, and file intact", async ({
     page,
   }) => {
@@ -300,7 +289,22 @@ test.describe("Touch key add/remove — import-adapt fidelity (spec 058 SC-006)"
     // -----------------------------------------------------------------------
     // 1. Add a key after the selected anchor.
     // -----------------------------------------------------------------------
-    await page.keyboard.press("Tab");
+    // Put focus on the grid's single tab stop. `KeyGridCell` renders
+    // `tabIndex={isTabbable ? 0 : -1}` under spec 058 FR-020a's roving-tabindex
+    // model, so `[role="gridcell"][tabindex="0"]` addresses exactly the one cell
+    // a Tab into the grid would land on — deterministic, where a count of Tab
+    // presses is not.
+    //
+    // The original `page.keyboard.press("Tab")` here was never satisfiable, and
+    // not because of anything spec 061 added: "Back to mechanisms" and "Continue"
+    // are spec-058 controls that already sat between the mode tab and the grid
+    // (spec 061 adds the layer selector, FR-004, and the add/remove triggers on
+    // top). This spec was `test.skip`ped from birth, so the assumption was never
+    // executed. Tab ORDER is asserted by `touch-key-grid-a11y.spec.ts`, which is
+    // where it belongs; this spec's subject is emitted-artifact fidelity (SC-006).
+    // Only the NAVIGATION changed here — every assertion below is as written.
+    const gridTabStop = page.locator('[role="gridcell"][tabindex="0"]');
+    await gridTabStop.focus();
     const anchorCell = page.locator('[role="gridcell"]:focus');
     await expect(anchorCell).toBeVisible();
     const anchorLabel = await anchorCell.getAttribute("aria-label");
@@ -324,6 +328,15 @@ test.describe("Touch key add/remove — import-adapt fidelity (spec 058 SC-006)"
     //    of three), which keeps this spec's untouched-key comparison a
     //    statement about fidelity rather than about reflow.
     // -----------------------------------------------------------------------
+    // Return focus to the grid before arrowing. Confirming the assignment left
+    // focus on `assign-panel-confirm`, and `useGridNav` only moves the selection
+    // for a keydown originating inside the grid — so ArrowRight pressed from a
+    // button lands nowhere. Tabbing FORWARD cannot get back either: AssignPanel
+    // renders after the grid, so forward Tab would have to cycle the whole page.
+    // Re-focus the grid's one tab stop, which is now the newly-added key (it is
+    // the selected cell), so ArrowRight steps to its neighbour. Navigation only —
+    // the three assertions that follow are unchanged.
+    await gridTabStop.focus();
     await page.keyboard.press("ArrowRight");
     const removeTarget = page.locator('[role="gridcell"]:focus');
     await expect(removeTarget).toBeVisible();
@@ -332,7 +345,16 @@ test.describe("Touch key add/remove — import-adapt fidelity (spec 058 SC-006)"
 
     await page.getByTestId(REMOVE_KEY_TESTID).click();
     await expect(page.getByTestId("remove-key-dialog")).toBeVisible({ timeout: 15_000 });
-    await page.getByTestId("remove-key-dialog-proposed-suppress").click();
+    // Select "Suppress in place" by its accessible name, not by the proposal
+    // badge. `remove-key-dialog-proposed-${outcome}` marks whichever outcome the
+    // dialog PROPOSES, and here it proposes "Remove and redistribute" — correctly:
+    // step 1 just added a key, so `computeProposedRemoveOutcome`'s crowding rule
+    // fires ("This row has 12 keys, over the phone limit of 10"). The walk's own
+    // comment above already says suppress is chosen EXPLICITLY, and the emitted
+    // assertions below depend on it (`baseKeys.size + 1` holds only because
+    // suppress-in-place removes no key), so selecting it directly is what this
+    // step always meant. Navigation only — the assertions are unchanged.
+    await page.getByRole("radio", { name: /^Suppress in place/ }).click();
     await page.getByTestId("remove-key-dialog-confirm").click();
     await expect(page.getByTestId("remove-key-dialog")).toBeHidden();
 
