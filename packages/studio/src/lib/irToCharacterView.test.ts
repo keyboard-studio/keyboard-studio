@@ -702,15 +702,15 @@ describe('characterCellIds / characterCellIsToggleable', () => {
     expect(characterCellIds(cell)).toEqual(['store#s#0']);
   });
 
-  it('is NOT toggleable when the character has no removable producer at all (isolated store, unreferenced by any rule)', () => {
+  it('is toggleable when the character lives only in an unreferenced store slot', () => {
     const store: IRStore = { nodeId: 'store#s', name: 'S', items: [{ kind: 'char', value: 'z' }], isSystem: false };
     const ir = makeIR({ stores: [store] });
 
     const cells = irToCharacterView(ir, new Map(), new Set(), new Set());
     const cell = cells.find((c) => c.ch === 'z')!;
 
-    expect(characterCellIsToggleable(cell)).toBe(false);
-    expect(characterCellIds(cell)).toEqual([]);
+    expect(characterCellIsToggleable(cell)).toBe(true);
+    expect(characterCellIds(cell)).toEqual(['store#s#0']);
   });
 });
 

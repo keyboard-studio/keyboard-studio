@@ -368,11 +368,18 @@ describe('collectCharContributors', () => {
     expect(result.ruleNodeIds).toHaveLength(0);
   });
 
-  it('a diacritic-removal rule (composed-shaped: any(composed) + [K_BKSP] > index(comp-dia,1)) is skipped entirely, not just its store slot', () => {
-    // Updated for the backspace-input filter: this rule's context contains
-    // K_BKSP (type à, then backspace -> a), so the WHOLE rule is now dropped
-    // — it previously surfaced an INPUT-store slot for "à" here, which is
-    // exactly the "correction" method the filter exists to hide.
+  it('a diacritic-removal rule (composed-shaped: any(composed) + [K_BKSP] > index(comp-dia,1)) contributes its slot for REMOVAL but never as a producing method', () => {
+    // A correction rule is not a producing METHOD for a character — but its
+    // store IS a deconstruction table, and a row there exists only for as long
+    // as its character does. So the slot must be nominated for removal while
+    // staying out of the green "existing methods" list.
+    //
+    // This assertion previously required the whole rule to be invisible
+    // (`storeSlotIds` empty). That conflated the two questions and was the
+    // defect: on sil_cameroon_qwerty it left `æ` sitting in `comp-dia` after
+    // the carve, which kept `æ` inside `buildProducedSet` and so left its
+    // touch/desktop keycap standing. The producing-method exclusion is now
+    // carried by `producedRole: 'used'` instead of by omission.
     const composed = makeStore('sid-composed', 'composed', [
       { kind: 'char', value: 'à' }, { kind: 'char', value: 'é' },
     ]);
@@ -392,9 +399,15 @@ describe('collectCharContributors', () => {
       groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
     });
     const result = collectCharContributors(ir, 'à');
-    expect(result.storeSlotIds).not.toContain('sid-composed#0');
-    expect(result.storeSlotIds).toHaveLength(0);
-    expect(result.descriptors).toHaveLength(0);
+    // Nominated for removal — dropping "à" must take this unwrap row with it
+    // (and, via applyStoreSlotRemovals' pairing graph, its coordinated
+    // comp-dia partner).
+    expect(result.storeSlots).toEqual([{ slotId: 'sid-composed#0', role: 'input' }]);
+    // ...but never as a producing method, and never as a whole-rule delete:
+    // the rule's other rows serve other characters.
+    expect(result.descriptors.every((d) => d.producedRole === 'used')).toBe(true);
+    expect(result.ruleNodeIds).toHaveLength(0);
+    expect(result.blocked).toHaveLength(0);
   });
 
   it('returns the targetChar NFC-normalized', () => {
@@ -828,13 +841,14 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
     ]);
   });
 
-  it('kind "store-slot": an aligned any()-consumed store item that resolves to backspace (K_BKSP) is NOT attributed', () => {
+  it('kind "store-slot": an aligned any()-consumed store item resolving to backspace (K_BKSP) is nominated for removal but never badged "produced"', () => {
     // The aligned store item is {kind:'vkey', name:'K_BKSP'} — the char is
     // only reachable through pressing Backspace, not typed directly in the
-    // rule's context. Widened backspace filter (module doc, contributorInputHasBackspace):
-    // a store-slot contributor must be dropped when backspace is reachable
-    // via ANY input path, not just a direct context vkey. Was previously
-    // attributed with `inputKeystroke: 'Backspace'`; now dropped entirely.
+    // rule's context. This is the STORE-RESOLVED spelling of the same
+    // deconstruction shape the direct-context `[K_BKSP]` case covers, so it
+    // gets the same treatment: `producedRole: 'used'` (no green method row),
+    // but still a removal target. It was previously omitted entirely, which is
+    // the conflation the sil_cameroon_qwerty `æ` case exposed.
     const keys = makeStore('sid-keys', 'keys', [{ kind: 'vkey', name: 'K_BKSP' }]);
     const tbl = makeStore('sid-tbl', 'tbl2', [{ kind: 'char', value: 'a' }]);
     const rule = makeRule('r-tbl2',
@@ -846,8 +860,13 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
       groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
     });
     const result = collectCharContributors(ir, 'a');
-    expect(result.storeSlotIds).toHaveLength(0);
-    expect(result.descriptors).toHaveLength(0);
+    expect(result.storeSlots).toEqual([{ slotId: 'sid-tbl#0', role: 'input' }]);
+    expect(result.descriptors).toEqual([
+      { kind: 'store-slot', producedChar: 'a', producedRole: 'used' },
+    ]);
+    // No `inputKeystroke: 'Backspace'` — pressing Backspace is not a way to
+    // type the character, which is what that field would claim.
+    expect(result.descriptors.some((d) => d.inputKeystroke !== undefined)).toBe(false);
   });
 
   it('kind "store-slot": a NON-backspace aligned any()-consumed vkey item is still attributed (widening is not over-broad)', () => {
@@ -1175,9 +1194,15 @@ describe('collectCharContributors — produced vs. used (rule-level production g
     // The rule's OTHER any()-input occurrence of 'a' (keys2#1, non-backspace)
     // IS attributed as "used" — the §0 gate no longer wrongly suppresses this
     // legitimate blue row now that `ruleProducesChar` correctly reports this
-    // rule does NOT produce 'a'.
-    expect(result.storeSlots).toEqual([{ slotId: 'sid-keys#1', role: 'input' }]);
+    // rule does NOT produce 'a'. The backspace-aligned OUTPUT slot (tbl2#0)
+    // joins it as a removal target, also "used": reachable only by pressing
+    // Backspace, so a deconstruction row rather than a method.
+    expect(result.storeSlots).toEqual([
+      { slotId: 'sid-keys#1', role: 'input' },
+      { slotId: 'sid-tbl#0', role: 'input' },
+    ]);
     expect(result.descriptors).toEqual([
+      { kind: 'store-slot', producedChar: 'a', producedRole: 'used' },
       { kind: 'store-slot', producedChar: 'a', producedRole: 'used' },
     ]);
   });
