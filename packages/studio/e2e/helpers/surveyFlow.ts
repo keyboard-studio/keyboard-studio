@@ -150,6 +150,14 @@ async function waitVisible(locator: Locator, timeout: number): Promise<boolean> 
  *      blank.
  *   5. il_target_script (select) — choose a script
  *   6. il_script_not_supported (terminal notice, if CJK/Ethi/Hang)
+ *   7. il_author_name (text, REQUIRED) — spec 059 US1 attribution; the
+ *      DEFAULT (non-gated) branch out of il_target_script continues here
+ *      rather than ending the flow. Pre-fills from the authenticated GitHub
+ *      profile in the real app (FR-001); an unauthenticated E2E session has
+ *      no profile to pre-fill from, so this helper fills it explicitly.
+ *   8. il_author_email (text, optional) — left blank, same as il_language_code
+ *   9. il_copyright_holder (text, optional, TERMINAL — `next: null`) — left
+ *      blank; D1 defaults it to the author name
  *
  * This helper detects presence rather than assuming the fixed sequence above,
  * since il_language_region is conditional and may not render at all:
@@ -161,7 +169,8 @@ async function waitVisible(locator: Locator, timeout: number): Promise<boolean> 
  *   - il_language_code is always rendered (unconditional `next`); advances
  *     past it leaving it blank
  *   - selects target script "other" (keeps routing generic, avoids CJK/Ethiopic/Hangul stub)
- *   - advances through all questions
+ *   - fills il_author_name (required) and advances past the optional
+ *     il_author_email / il_copyright_holder leaving both blank
  *   - waits for the base-keyboard picker combobox to appear (phase boundary)
  */
 export async function driveIdentityLite(
@@ -181,12 +190,19 @@ export async function driveIdentityLite(
      * "the author's tag" from "no tag".
      */
     languageCode?: string;
+    /**
+     * Author name for il_author_name (spec 059 US1) — REQUIRED, unlike every
+     * other option here. OMIT to use the default; every existing walk relies
+     * on that default rather than passing this explicitly.
+     */
+    authorName?: string;
   },
 ): Promise<void> {
   const english = options?.english ?? "Test";
   const autonym = options?.autonym ?? "Test Autonym";
   const script = options?.script ?? "other";
   const languageCode = options?.languageCode;
+  const authorName = options?.authorName ?? "Test Author";
 
   // Q1: English name (autocomplete) — spec 036 starts here
   await fillComboboxFreeText(page, "#il_language_english", english);
@@ -211,7 +227,12 @@ export async function driveIdentityLite(
   // used elsewhere and leave the field blank (the value is optional).
   await page.waitForSelector("#il_language_code", { timeout: 15_000 });
   if (languageCode !== undefined) {
-    await page.locator("#il_language_code").fill(languageCode);
+    // Same autocomplete control as il_language_english/il_language_autonym:
+    // typing a real code like "fr" opens a suggestion listbox, and a stray
+    // option (e.g. "Arpitan — France (frp)") sitting over the Next button
+    // would otherwise intercept the click below. fillComboboxFreeText fills
+    // the value and presses Escape to dismiss the listbox without clearing it.
+    await fillComboboxFreeText(page, "#il_language_code", languageCode);
   }
   await surveyAdvance(page).click();
 
@@ -219,6 +240,23 @@ export async function driveIdentityLite(
   // <select>; see selectMenuOption above for why the option cannot be reached
   // through the trigger's parent.
   await selectMenuOption(page, page.locator("#il_target_script"), script);
+  await surveyAdvance(page).click();
+
+  // Q7: Author name (spec 059 US1) — REQUIRED. Pre-fills from the
+  // authenticated GitHub profile in the real app; there is none in an E2E
+  // session, so this must be filled explicitly or Next stays disabled forever.
+  await page.waitForSelector("#il_author_name", { timeout: 15_000 });
+  await page.locator("#il_author_name").fill(authorName);
+  await surveyAdvance(page).click();
+
+  // Q8: Author email — optional, always rendered; left blank (private-email
+  // authors are a real, supported case per D7).
+  await page.waitForSelector("#il_author_email", { timeout: 15_000 });
+  await surveyAdvance(page).click();
+
+  // Q9: Copyright holder — optional, TERMINAL (`next: null`); left blank
+  // (D1 defaults it to the author name). This hands off to the base picker.
+  await page.waitForSelector("#il_copyright_holder", { timeout: 15_000 });
   await surveyAdvance(page).click();
 
   // Robustness check for the phase boundary: identity-lite hands off
@@ -373,10 +411,28 @@ export async function buildOneCharacterList(
   // A marks-free alphabet auto-skips it (S0 gate) and this is a no-op.
   await driveMarksSeries(page);
 
-  // The convenience question sits between marks and carve. A one-character
-  // alphabet on a Latin base leaves almost all of a-z surplus, so this one
-  // DOES render on the standard walks.
+  // The punctuation page sits between marks and convenience. It has no skip
+  // gate (zero punctuation is a valid answer), so it always renders — the
+  // walks accept it empty.
+  await drivePunctuationStep(page);
+
+  // The convenience question sits between punctuation and carve. A
+  // one-character alphabet on a Latin base leaves almost all of a-z surplus,
+  // so this one DOES render on the standard walks.
   await driveConvenienceStep(page);
+}
+
+/**
+ * Punctuation step — the Phase-B-build-list clone between the marks series
+ * and the convenience question, collecting the language's punctuation with a
+ * right-pane character map. It has no computed skip gate: the walks simply
+ * continue without choosing any punctuation ("Continue without punctuation").
+ */
+export async function drivePunctuationStep(page: Page): Promise<void> {
+  const doneBtn = page.getByTestId("punctuation-done");
+  const visible = await doneBtn.isVisible({ timeout: 5_000 }).catch(() => false);
+  if (!visible) return;
+  await doneBtn.click();
 }
 
 /**
@@ -671,8 +727,12 @@ export async function driveTouchGallery(page: Page): Promise<void> {
  * This helper:
  *   1. Fills the welcome paragraph
  *   2. Fills the first usage tip
- *   3. Advances through remaining optional questions in a bounded loop
- *   4. Detects arrival at #output (phase boundary)
+ *   3. Answers pf_more_detail_gate "No" (the minimum-friction Phase F
+ *      revision's required Yes/No gate, which unconditionally follows
+ *      pf_usage_tip_1) — the minimal path every existing walk wants, rather
+ *      than opening the optional documentation battery
+ *   4. Advances through remaining optional questions in a bounded loop
+ *   5. Detects arrival at #output (phase boundary)
  *
  * @param page Page instance
  * @param welcomeText Welcome paragraph text (e.g. "Welcome to the keyboard.")
@@ -687,9 +747,26 @@ export async function driveHelpPhase(
   await surveyAdvance(page).click();
 
   await page.locator("#pf_usage_tip_1").fill(usageTipText);
+  await surveyAdvance(page).click();
 
-  // Advance through remaining optional questions until we reach #output
+  // pf_more_detail_gate — required, and pf_usage_tip_1's `next` points here
+  // unconditionally, so it is reliably the very next question. "No" routes
+  // straight to pf_credits, skipping the opt-in battery (scope/variety,
+  // provenance, canonical order, glossary, examples, troubleshooting, related
+  // keyboards, limitations, further reading, project URL).
+  const moreDetailNo = page.getByRole("radio", { name: "No" });
+  await moreDetailNo.waitFor({ state: "visible", timeout: 15_000 });
+  await moreDetailNo.check();
+  await surveyAdvance(page).click();
+
+  // Advance through remaining optional questions until we reach #output.
+  // Assert Next is enabled before each click: if a future question in this
+  // tail ever becomes required/gated (as il_author_name and pf_more_detail_gate
+  // did above), a disabled Next would make .click() hang on actionability until
+  // the test timeout — the same stale-helper hang this walk was fixed for. The
+  // assertion fails fast instead, naming the question that stalled the walk.
   for (let guard = 0; guard < 15; guard++) {
+    await expect(surveyAdvance(page)).not.toBeDisabled({ timeout: 15_000 });
     await surveyAdvance(page).click();
     if (/#output$/.test(page.url())) {
       return;

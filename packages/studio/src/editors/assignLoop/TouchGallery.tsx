@@ -241,7 +241,7 @@ import {
 // T118 — the rejection banner's border. `galleryTheme.ts` has no error token of
 // its own; `ui/theme.ts` is where the E/W/I severity palette lives, and this is
 // the same token KeyGridCell/KeyInspector already use for an error severity.
-import { ERROR_RED, ERROR_BG } from "../../ui/theme.ts";
+import { ERROR_RED } from "../../ui/theme.ts";
 
 const selectStyle: CSSProperties = gallerySelectMenuStyle(160);
 
@@ -1576,28 +1576,6 @@ const suggestionDenyBtnStyle: CSSProperties = {
   fontSize: 12,
   cursor: "pointer",
   fontFamily: FONT,
-};
-
-/**
- * Message text style shared by all three suggestion-card variants. RED, not
- * green — the suggestion card is suppressed only when the current character
- * is already covered via COMPOSITION (`showChooser`'s own doc comment:
- * `currentCharBadge?.isComposable`); base/mirror coverage (signal (a),
- * `touchBaseDirectSet`) intentionally does NOT suppress it — a character
- * reachable via desktop-mirror inheritance but with no EXPLICIT touch
- * mechanism yet is exactly the "replace"/"longpress" suggestion's own target
- * scenario. So this still reads as "not yet implemented", matching the
- * badge's own 0-count color (`ERROR_RED`, charMechanisms.ts /
- * CharScrollStrip.tsx) rather than the "already green" treatment this card
- * previously kept even once suggestions were scoped to uncovered characters
- * only.
- */
-const suggestionMessageStyle: CSSProperties = {
-  margin: 0,
-  fontSize: 12,
-  color: ERROR_RED,
-  fontFamily: FONT,
-  fontWeight: 600,
 };
 
 interface SuggestionActionsProps {
@@ -5095,30 +5073,19 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           )}
 
           {/* Suggestion card (shown until accepted/dismissed; skipped entirely
-              when there is no suggestion to offer) */}
-          {!showChooser && (
-            <div
-              role="note"
-              aria-label={t({
-                id: "editor.assignLoop.touch.suggestion.ariaLabel",
-                message: "Touch access method suggestion",
-              })}
-              style={{
-                // RED, not green — see suggestionMessageStyle's own doc
-                // comment for why (suppressed only for a composition-covered
-                // character; base/mirror coverage does not suppress it).
-                background: ERROR_BG,
-                border: `1px solid ${ERROR_RED}`,
-                borderRadius: 8,
-                padding: "10px 14px",
-                display: "flex",
-                flexDirection: "column",
-                gap: 8,
-              }}
-            >
-              {suggestion.kind === "longpress" && (
-                <>
-                  <p style={suggestionMessageStyle}>
+              when there is no suggestion to offer) — consolidated onto the
+              shared `ProposalCard` shell (also used by the bulk-accent
+              summary box above) rather than re-declaring the same green
+              #0d2218/#238636 note chrome a third time. */}
+          {!showChooser &&
+            (suggestion.kind === "longpress" || suggestion.kind === "replace") && (
+              <ProposalCard
+                ariaLabel={t({
+                  id: "editor.assignLoop.touch.suggestion.ariaLabel",
+                  message: "Touch access method suggestion",
+                })}
+                message={
+                  suggestion.kind === "longpress" ? (
                     <Trans id="editor.assignLoop.touch.suggestion.longpressText">
                       Suggested: long-press{" "}
                       {suggestion.hostKey
@@ -5132,24 +5099,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                           })}{" "}
                       to reach {currentCharDisplay}
                     </Trans>
-                  </p>
-                  <SuggestionActions
-                    onAccept={handleUseSuggestion}
-                    onDeny={handleSuggestionChange}
-                    acceptAriaLabel={t({
-                      id: "editor.assignLoop.touch.suggestion.useLongpressAriaLabel",
-                      message: `Use suggested long-press method for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
-                    })}
-                    denyAriaLabel={t({
-                      id: "editor.assignLoop.touch.chooseDifferentMethodAriaLabel",
-                      message: "Choose a different touch method",
-                    })}
-                  />
-                </>
-              )}
-              {suggestion.kind === "replace" && (
-                <>
-                  <p style={suggestionMessageStyle}>
+                  ) : (
                     <Trans id="editor.assignLoop.touch.suggestion.replaceText">
                       Suggested: replace{" "}
                       {suggestion.hostKey
@@ -5163,23 +5113,30 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                           })}{" "}
                       with {currentCharDisplay}
                     </Trans>
-                  </p>
-                  <SuggestionActions
-                    onAccept={handleUseSuggestion}
-                    onDeny={handleSuggestionChange}
-                    acceptAriaLabel={t({
-                      id: "editor.assignLoop.touch.suggestion.useReplaceAriaLabel",
-                      message: `Use suggested replace method for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
-                    })}
-                    denyAriaLabel={t({
-                      id: "editor.assignLoop.touch.chooseDifferentMethodAriaLabel",
-                      message: "Choose a different touch method",
-                    })}
-                  />
-                </>
-              )}
-            </div>
-          )}
+                  )
+                }
+              >
+                <SuggestionActions
+                  onAccept={handleUseSuggestion}
+                  onDeny={handleSuggestionChange}
+                  acceptAriaLabel={
+                    suggestion.kind === "longpress"
+                      ? t({
+                          id: "editor.assignLoop.touch.suggestion.useLongpressAriaLabel",
+                          message: `Use suggested long-press method for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
+                        })
+                      : t({
+                          id: "editor.assignLoop.touch.suggestion.useReplaceAriaLabel",
+                          message: `Use suggested replace method for ${{ notation: toUPlusNotation(currentChar) }} ${{ char: currentChar }}`,
+                        })
+                  }
+                  denyAriaLabel={t({
+                    id: "editor.assignLoop.touch.chooseDifferentMethodAriaLabel",
+                    message: "Choose a different touch method",
+                  })}
+                />
+              </ProposalCard>
+            )}
 
           {/* Method chooser (shown after the suggestion is accepted/dismissed,
               or immediately when there is no suggestion) */}

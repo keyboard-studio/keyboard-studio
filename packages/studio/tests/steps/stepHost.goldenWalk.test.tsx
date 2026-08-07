@@ -714,7 +714,7 @@ async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: St
 /**
  * Drive the full copy-track walk.
  * identity -> choose_base -> track(copy) -> project_name ->
- * characters(prefill->B) -> carve -> mechanisms ->
+ * characters(prefill->B) -> punctuation -> carve -> mechanisms ->
  * touch_seed_source -> touch -> help -> done
  *
  * S-03 sequences build inline in the Mechanism Gallery's method chooser (the
@@ -735,10 +735,13 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
     { stepId: "track", testId: "track-copy" },
     { stepId: "project_name", testId: "project-name-next" },
     { stepId: "characters/prefill", testId: "prefill-confirm" },
-    // marks and convenience both skip transparently inside this window; the
-    // convenience skip is async (see StepAction.settleFor), so wait for carve's
-    // own control to exist before closing the window.
-    { stepId: "characters/B", testId: "phaseB-complete", settleFor: "carve-complete" },
+    // marks skips transparently inside this window, landing on punctuation.
+    { stepId: "characters/B", testId: "phaseB-complete", settleFor: "punctuation-done" },
+    // The punctuation page (between marks and convenience) has no skip gate —
+    // the walk accepts it empty. The convenience skip that follows it is async
+    // (see StepAction.settleFor), so wait for carve's own control to exist
+    // before closing this window.
+    { stepId: "punctuation", testId: "punctuation-done", settleFor: "carve-complete" },
     { stepId: "carve", testId: "carve-complete" },
     { stepId: "mechanisms", testId: "mechanisms-complete" },
     { stepId: "touch_seed_source", testId: "seed-source-complete", async: true },
@@ -750,7 +753,7 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
 /**
  * Drive the full adapt-track walk.
  * identity -> choose_base -> track(adapt) ->
- * characters(prefill->B) -> carve -> mechanisms ->
+ * characters(prefill->B) -> punctuation -> carve -> mechanisms ->
  * touch_seed_source -> touch -> help -> done
  * project_name MUST NOT appear. See driveCopyTrack's docstring for why
  * touch_seed_source appears (spec 035 R4/R12 fork memory) and why there is no
@@ -762,10 +765,11 @@ async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Pro
     { stepId: "choose_base", testIds: ["base-preview", "base-confirm"] },
     { stepId: "track", testId: "track-adapt" },
     { stepId: "characters/prefill", testId: "prefill-confirm" },
-    // marks and convenience both skip transparently inside this window; the
-    // convenience skip is async (see StepAction.settleFor), so wait for carve's
-    // own control to exist before closing the window.
-    { stepId: "characters/B", testId: "phaseB-complete", settleFor: "carve-complete" },
+    // marks skips transparently inside this window, landing on punctuation.
+    { stepId: "characters/B", testId: "phaseB-complete", settleFor: "punctuation-done" },
+    // See driveCopyTrack — the ungated punctuation page, accepted empty, whose
+    // window absorbs the async convenience skip.
+    { stepId: "punctuation", testId: "punctuation-done", settleFor: "carve-complete" },
     { stepId: "carve", testId: "carve-complete" },
     { stepId: "mechanisms", testId: "mechanisms-complete" },
     { stepId: "touch_seed_source", testId: "seed-source-complete", async: true },
