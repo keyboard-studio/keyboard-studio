@@ -1,6 +1,7 @@
-// CarveGalleryV2 — character-first carve gallery (#1399), behind the
-// VITE_CARVE_V2 / ?carvev2=1 flag (see carveAdapter.tsx). Sibling to
-// CarveGallery.tsx — that file (the rule/node "Rail" view) is untouched.
+// CarveGalleryV2 — character-first carve gallery (#1399), rendered when the
+// VITE_CARVE_V2 / ?carvev2=1 flag is set (default OFF — carveAdapter otherwise
+// renders the rule/node "Rail" view, CarveGallery.tsx, which is untouched).
+// Making V2 the default is deferred to its own change against #1399.
 //
 // Shows every character the keyboard can type in one panel; the author
 // discards CHARACTERS, not rules. Toggling a character resolves its
@@ -68,6 +69,10 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   const removalCapabilities = useWorkingCopyStore((s) => s.removalCapabilities);
   const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
   const confirmedInventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
+  // Target-language display name (e.g. "Russian"), sourced the same way Phase A's
+  // identity resolution already populates it — used only for the optional
+  // cross-script-Latin group's "...for a {name}-only keyboard" copy (RemovalBanner).
+  const identityDisplayName = useWorkingCopyStore((s) => s.identity?.displayName);
   const isItemDeleted = useWorkingCopyStore((s) => s.isItemDeleted);
   // Subscribed PURELY to force a re-render when the set mutates —
   // isItemDeleted above is a stable `(id) => get().deletedItemIds.has(id)`
@@ -99,6 +104,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     form: carveNormalizationForm,
     bcp47: identityBcp47,
     hasSignal,
+    blockCandidateChars,
   } = useCarveNeededSet();
 
   // Base characters the author chose to KEEP at the pre-carve convenience
@@ -120,9 +126,15 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
 
   const recommended = useMemo(
     () => (instantiationMode !== null && hasSignal && ir
-      ? recommendedRemovalChars({ ir, needed: neededSet, bcp47: identityBcp47, form: carveNormalizationForm })
+      ? recommendedRemovalChars({
+        ir,
+        needed: neededSet,
+        bcp47: identityBcp47,
+        form: carveNormalizationForm,
+        blockCandidateChars,
+      })
       : []),
-    [ir, instantiationMode, hasSignal, neededSet, identityBcp47, carveNormalizationForm],
+    [ir, instantiationMode, hasSignal, neededSet, identityBcp47, carveNormalizationForm, blockCandidateChars],
   );
   // irToCharacterView's internal lookup key is always NFC-normalized
   // (irToCharacterView.ts) — recommended[].ch is normalized to `form` (NFD on
@@ -256,6 +268,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
       <RemovalBanner
         recommended={recommended}
         languageLabel={identityBcp47 ?? 'your target language'}
+        languageDisplayName={identityDisplayName}
         onRemoveSelected={handleRemoveSelectedRecommended}
       />
 

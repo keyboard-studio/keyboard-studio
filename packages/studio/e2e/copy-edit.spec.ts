@@ -328,7 +328,9 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     await expect(downloadBtn).not.toBeDisabled({ timeout: 60_000 });
 
     // Also verify that the button label indicates it is ready (not "Downloading…").
-    await expect(downloadBtn).toHaveText("Download .zip");
+    // "Download source .zip" (not "Download .zip") since the .kmp package
+    // became the primary download; see output.download.button.download.
+    await expect(downloadBtn).toHaveText("Download source .zip");
   });
 
   test("emitted .kps declares the author's language and name; .kvks and welcome.htm are non-empty", async ({

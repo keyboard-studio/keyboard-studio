@@ -1,16 +1,14 @@
-// Tests for PhaseB BuildListView, SuggestionPanel, CharChipEditor, and parseSpacedChars.
+// Tests for PhaseB BuildListView, CharChipEditor, and parseSpacedChars.
 //
 // Strategy:
 //   - parseSpacedChars: exported pure function, tested directly.
-//   - BuildListView / SuggestionPanel: tested through the exported PhaseB component.
-//     The IntroChooser renders first with "build-list" pre-selected; clicking
+//   - BuildListView: tested through the exported PhaseB component. The
+//     IntroChooser renders first with "build-list" pre-selected; clicking
 //     "Continue" transitions to BuildListView.
-//   - suggestMissingChars is mocked via vi.mock("../lib/services.ts") so no
-//     network or CLDR calls occur.
 //   - useWorkingCopyStore is seeded directly before each test that needs a baseIr.
 
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { screen, fireEvent, act, cleanup, waitFor } from "@testing-library/react";
+import { screen, fireEvent, act, cleanup } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { PhaseB, parseSpacedChars } from "./PhaseB.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -23,14 +21,9 @@ import type { SurveyPhaseResult, IRGroup, IRRule } from "@keyboard-studio/contra
 // vi.hoisted — mutable reference shared across all mock factories.
 // ---------------------------------------------------------------------------
 
-const { getSuggestResult, getSourcedExemplars } = vi.hoisted(() => {
-  let _result: import("../lib/services.ts").MissingCharSuggestions | null = null;
+const { getSourcedExemplars } = vi.hoisted(() => {
   let _inventory: import("../lib/services.ts").SourcedInventory | null = null;
   return {
-    getSuggestResult: {
-      get: () => _result,
-      set: (v: import("../lib/services.ts").MissingCharSuggestions | null) => { _result = v; },
-    },
     getSourcedExemplars: {
       get: () => _inventory,
       set: (v: import("../lib/services.ts").SourcedInventory | null) => { _inventory = v; },
@@ -39,16 +32,11 @@ const { getSuggestResult, getSourcedExemplars } = vi.hoisted(() => {
 });
 
 // ---------------------------------------------------------------------------
-// Mock services — controls suggestMissingChars return value deterministically.
+// Mock services — no network or CLDR calls occur.
 // ---------------------------------------------------------------------------
 
 vi.mock("../lib/services.ts", () => ({
   USE_REAL: false,
-  suggestMissingChars: async (
-    _bcp47: string,
-    _baseIr: unknown,
-    _languageName?: string,
-  ) => getSuggestResult.get(),
   // Spec 044: the IntroChooser resolves a sourced exemplar inventory to decide
   // whether to offer the "start from the alphabet we already have" option.
   // Null here keeps every test in this file on the pre-044 two-option list;
@@ -86,7 +74,6 @@ function irProducing(chars: string[]) {
 
 beforeEach(() => {
   useWorkingCopyStore.getState().reset();
-  getSuggestResult.set(null);
   // discoveryMethod (surveySessionStore) and the draft alphabet
   // (phaseBDraftStore) are now module-level singletons shared across every
   // <PhaseB> mount (spec character-map pane work) rather than PhaseB-local
@@ -165,254 +152,7 @@ describe("parseSpacedChars", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 2. SuggestionPanel — null suggestMissingChars (or no bcp47_tag)
-// ---------------------------------------------------------------------------
-
-describe("SuggestionPanel — null / no verified data", () => {
-  it("shows neutral note when suggestMissingChars returns null and baseIr is set", async () => {
-    // Seed a non-null baseIr so the panel doesn't bail on the no-baseIr guard.
-    useWorkingCopyStore.getState().instantiateFromBase(
-      {
-        id: "test_kb",
-        path: "release/t/test_kb",
-        script: "Latn",
-        targets: ["windows"],
-        displayName: "Test",
-        version: "1.0",
-      },
-      { vfs: { files: new Map() }, ir: irProducing([]) },
-    );
-    // suggestMissingChars returns null (already set by beforeEach).
-    await renderBuildListView({ bcp47_tag: "yo" });
-    // Wait for the async effect to settle.
-    await waitFor(() => { expect(screen.getByText(/No verified character list/i)).toBeTruthy(); });
-    // No suggestion chip group should be rendered.
-    expect(
-      screen.queryByRole("group", {
-        name: /Suggested main characters/i,
-      }),
-    ).toBeNull();
-  });
-
-  it("shows neutral note when no bcp47_tag is in context", async () => {
-    await renderBuildListView({}); // no bcp47_tag
-    // With no bcp47, the panel guard fires synchronously.
-    expect(screen.getByText(/No verified character list/i)).toBeTruthy();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 3. SuggestionPanel — data path: main chips render unchecked; toggling adds char
-// ---------------------------------------------------------------------------
-
-describe("SuggestionPanel — data path with main suggestions", () => {
-  beforeEach(() => {
-    // Seed a non-null baseIr.
-    useWorkingCopyStore.getState().instantiateFromBase(
-      {
-        id: "test_kb",
-        path: "release/t/test_kb",
-        script: "Latn",
-        targets: ["windows"],
-        displayName: "Test",
-        version: "1.0",
-      },
-      { vfs: { files: new Map() }, ir: irProducing([]) },
-    );
-    // suggestMissingChars returns two main chars, no auxiliary.
-    getSuggestResult.set({
-      bcp47: "yo",
-      main: ["ẹ", "ọ"], // ẹ ọ
-      auxiliary: [],
-    });
-  });
-
-  it("renders main suggestion chips after data loads", async () => {
-    await renderBuildListView({ bcp47_tag: "yo" });
-    await waitFor(() => {
-      expect(screen.queryByRole("group", { name: /Suggested main characters/i })).not.toBeNull();
-    });
-    const chipGroup = screen.getByRole("group", { name: /Suggested main characters/i });
-    expect(chipGroup.querySelectorAll("button").length).toBe(2);
-  });
-
-  it("main chips start in unchecked state (aria-pressed=false)", async () => {
-    await renderBuildListView({ bcp47_tag: "yo" });
-    await waitFor(() => {
-      expect(screen.queryByRole("group", { name: /Suggested main characters/i })).not.toBeNull();
-    });
-    const chipGroup = screen.getByRole("group", { name: /Suggested main characters/i });
-    for (const btn of Array.from(chipGroup.querySelectorAll("button"))) {
-      expect(btn.getAttribute("aria-pressed")).toBe("false");
-    }
-  });
-
-  it("clicking a suggestion chip adds it to the alphabet and drops it from the panel", async () => {
-    await renderBuildListView({ bcp47_tag: "yo" });
-    await waitFor(() => {
-      expect(screen.queryByRole("group", { name: /Suggested main characters/i })).not.toBeNull();
-    });
-    const chipGroup = screen.getByRole("group", { name: /Suggested main characters/i });
-    await act(async () => {
-      fireEvent.click(chipGroup.querySelectorAll("button")[0]!);
-    });
-    // The panel offers only what is still MISSING, so a ticked character leaves
-    // it — it now lives (removably) in "Your alphabet" below. This is the fold
-    // that stops the exemplar prefill from re-suggesting the whole alphabet it
-    // just seeded.
-    const remaining = Array.from(
-      screen
-        .getByRole("group", { name: /Suggested main characters/i })
-        .querySelectorAll("button"),
-    );
-    expect(remaining.length).toBe(1);
-    expect(remaining[0]!.getAttribute("aria-label")).toMatch(/ọ/);
-    // The Done button should reflect 1 character.
-    expect(screen.getByRole("button", { name: /Done/i }).textContent).toMatch(/1 character/);
-  });
-
-  it("does not offer a character already in the alphabet, in either case", async () => {
-    // "Ẹ" is the uppercase of the suggested "ẹ" — having it counts as covered.
-    usePhaseBDraftStore.getState().setAll(["Ẹ"]);
-    await renderBuildListView({ bcp47_tag: "yo" });
-    await waitFor(() => {
-      expect(screen.queryByRole("group", { name: /Suggested main characters/i })).not.toBeNull();
-    });
-    const labels = Array.from(
-      screen
-        .getByRole("group", { name: /Suggested main characters/i })
-        .querySelectorAll("button"),
-    ).map((b) => b.getAttribute("aria-label") ?? "");
-    expect(labels.some((l) => l.includes("ẹ"))).toBe(false);
-    expect(labels.some((l) => l.includes("ọ"))).toBe(true);
-  });
-
-  it("folds away the synthesized uppercase twin of a suggested letter", async () => {
-    // suggestMissingChars reports each cased letter twice (cldr.ts's
-    // augmentSpecialsWithUppercase); only the lowercase is offered, since
-    // ticking it brings its uppercase along.
-    getSuggestResult.set({ bcp47: "yo", main: ["ẹ", "Ẹ"], auxiliary: [] });
-    await renderBuildListView({ bcp47_tag: "yo" });
-    await waitFor(() => {
-      expect(screen.queryByRole("group", { name: /Suggested main characters/i })).not.toBeNull();
-    });
-    const labels = Array.from(
-      screen
-        .getByRole("group", { name: /Suggested main characters/i })
-        .querySelectorAll("button"),
-    ).map((b) => b.getAttribute("aria-label") ?? "");
-    expect(labels.length).toBe(1);
-    expect(labels[0]).toMatch(/ẹ/);
-  });
-
-  it("says everything is already added when the whole suggestion set is in the draft", async () => {
-    usePhaseBDraftStore.getState().setAll(["ẹ", "ọ"]);
-    await renderBuildListView({ bcp47_tag: "yo" });
-    await waitFor(() => {
-      expect(screen.queryByText(/Every suggested character is already/i)).not.toBeNull();
-    });
-    // Distinct from the "base covers it" note — the base produces nothing here.
-    expect(screen.queryByText(/already covers this language/i)).toBeNull();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 4. Auxiliary tier collapsed by default; expanding reveals chips
-// ---------------------------------------------------------------------------
-
-describe("SuggestionPanel — auxiliary tier expand/collapse", () => {
-  beforeEach(() => {
-    useWorkingCopyStore.getState().instantiateFromBase(
-      {
-        id: "test_kb",
-        path: "release/t/test_kb",
-        script: "Latn",
-        targets: ["windows"],
-        displayName: "Test",
-        version: "1.0",
-      },
-      { vfs: { files: new Map() }, ir: irProducing([]) },
-    );
-    getSuggestResult.set({
-      bcp47: "yo",
-      main: ["ẹ"], // ẹ
-      auxiliary: ["ü"], // ü
-    });
-  });
-
-  it("auxiliary chip group is NOT visible initially (collapsed)", async () => {
-    await renderBuildListView({ bcp47_tag: "yo" });
-    await waitFor(() => {
-      expect(screen.queryByRole("group", { name: /Suggested main characters/i })).not.toBeNull();
-    });
-    // The auxiliary group should not be rendered yet.
-    expect(
-      screen.queryByRole("group", { name: /Suggested auxiliary characters/i }),
-    ).toBeNull();
-  });
-
-  it("clicking the loanword toggle reveals auxiliary chips", async () => {
-    await renderBuildListView({ bcp47_tag: "yo" });
-    await waitFor(() => {
-      expect(screen.queryByRole("group", { name: /Suggested main characters/i })).not.toBeNull();
-    });
-    const toggle = screen.getByRole("button", { name: /loanwords/i });
-    await act(async () => {
-      fireEvent.click(toggle);
-    });
-    // Now auxiliary group should be visible.
-    expect(
-      screen.queryByRole("group", { name: /Suggested auxiliary characters/i }),
-    ).not.toBeNull();
-  });
-
-  it("auxiliary toggle has aria-expanded=false before click, true after", async () => {
-    await renderBuildListView({ bcp47_tag: "yo" });
-    await waitFor(() => {
-      expect(screen.queryByRole("group", { name: /Suggested main characters/i })).not.toBeNull();
-    });
-    const toggle = screen.getByRole("button", { name: /loanwords/i });
-    expect(toggle.getAttribute("aria-expanded")).toBe("false");
-    await act(async () => {
-      fireEvent.click(toggle);
-    });
-    expect(toggle.getAttribute("aria-expanded")).toBe("true");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 5. Empty main+auxiliary — "already covers" message
-// ---------------------------------------------------------------------------
-
-describe("SuggestionPanel — empty main and auxiliary (base covers all)", () => {
-  it("renders the 'already covers' message when both arrays are empty", async () => {
-    useWorkingCopyStore.getState().instantiateFromBase(
-      {
-        id: "test_kb",
-        path: "release/t/test_kb",
-        script: "Latn",
-        targets: ["windows"],
-        displayName: "Test",
-        version: "1.0",
-      },
-      { vfs: { files: new Map() }, ir: irProducing([]) },
-    );
-    getSuggestResult.set({
-      bcp47: "yo",
-      main: [],
-      auxiliary: [],
-    });
-    await renderBuildListView({ bcp47_tag: "yo" });
-    await waitFor(() => {
-      expect(
-        screen.queryByText(/already covers this language/i),
-      ).not.toBeNull();
-    });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 6. CharChipEditor: typing + add accumulates chips; removing works
+// CharChipEditor: typing + add accumulates chips; removing works
 // ---------------------------------------------------------------------------
 
 describe("CharChipEditor", () => {
@@ -491,11 +231,11 @@ describe("CharChipEditor", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 7. End-to-end: suggestion tick + typed char → onComplete with deduped NFC union
+// 7. End-to-end: typed chars → onComplete with deduped NFC union
 // ---------------------------------------------------------------------------
 
 describe("BuildListView — end-to-end onComplete", () => {
-  it("Done fires onComplete with NFC-normalized, deduped union of ticked + typed chars", async () => {
+  it("Done fires onComplete with NFC-normalized, deduped union of typed chars", async () => {
     useWorkingCopyStore.getState().instantiateFromBase(
       {
         id: "test_kb",
@@ -507,12 +247,6 @@ describe("BuildListView — end-to-end onComplete", () => {
       },
       { vfs: { files: new Map() }, ir: irProducing([]) },
     );
-    // suggestMissingChars returns one main char ẹ and one aux ü
-    getSuggestResult.set({
-      bcp47: "yo",
-      main: ["ẹ"], // ẹ
-      auxiliary: ["ü"], // ü
-    });
     const onComplete = vi.fn<[SurveyPhaseResult], void>();
     render(
       <PhaseB
@@ -525,20 +259,16 @@ describe("BuildListView — end-to-end onComplete", () => {
       fireEvent.click(screen.getByRole("button", { name: /continue/i }));
     });
 
-    // Wait for CLDR suggestions to load.
-    await waitFor(() => {
-      expect(screen.queryByRole("group", { name: /Suggested main characters/i })).not.toBeNull();
-    });
-
-    // Tick the ẹ suggestion chip.
-    const chipGroup = screen.getByRole("group", { name: /Suggested main characters/i });
-    const chip = chipGroup.querySelectorAll("button")[0]!;
+    // Type a character (ẹ).
+    const input = screen.getByRole("textbox", { name: /Character to add/i });
     await act(async () => {
-      fireEvent.click(chip);
+      fireEvent.change(input, { target: { value: "ẹ" } }); // ẹ
+    });
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /\+ Add/i }));
     });
 
     // Type an additional character (ọ).
-    const input = screen.getByRole("textbox", { name: /Character to add/i });
     await act(async () => {
       fireEvent.change(input, { target: { value: "ọ" } }); // ọ
     });

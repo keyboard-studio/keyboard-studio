@@ -3,7 +3,7 @@
   "specName": "059-identity-in-package",
   "branch": "057-identity-in-package",
   "currentStep": "implement",
-  "status": "implemented",
+  "status": "completed",
   "telemetryInstanceId": "bb856c95-2aed-4764-98f4-6871615fe581",
   "history": [
     {
@@ -103,6 +103,13 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-08-05T16:58:26.556Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-06T13:31:12.601Z"
     }
   ],
   "decisions": [

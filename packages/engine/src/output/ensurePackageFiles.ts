@@ -26,7 +26,9 @@ export interface EnsurePackageFilesInput {
   vfs: VirtualFS;
   /** Author-facing name, for the stub text. */
   displayName: string;
-  /** Copyright holder for a generated LICENSE.md. Defaults to `displayName`. */
+  /** Copyright holder for a generated LICENSE.md. When absent (or blank), the
+   *  copyright line is omitted rather than falling back to `displayName`
+   *  (spec 059 FR-004) — see the `holder` derivation below. */
   copyright?: string;
   /** Year for a generated LICENSE.md. Defaults to the current year. */
   year?: number;

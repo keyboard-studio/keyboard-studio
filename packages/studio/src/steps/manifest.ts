@@ -7,8 +7,8 @@
 //
 // SPINE ORDER (FR-012, M2):
 //   Identity → choose base → Track → [project_name (spine:false)] →
-//   Characters (Phase A/B questions) → Marks → Convenience → Carve →
-//   Mechanisms → [lock: "physical"] →
+//   Characters (Phase A/B questions) → Marks → Punctuation → Convenience →
+//   Carve → Mechanisms → [lock: "physical"] →
 //   touch_seed_source (spine:false) → touch →
 //   [lock: "touch"] → Help → Package (reserved)
 //
@@ -27,6 +27,7 @@ import { irPath } from "@keyboard-studio/contracts";
 import type { Step } from "./types.ts";
 import { CharactersStep } from "../survey/CharactersStep.tsx";
 import { MarksSeriesStep } from "../survey/marks/MarksSeriesStep.tsx";
+import { PunctuationStep } from "../survey/punctuation/PunctuationStep.tsx";
 import { ConvenienceCharsStep } from "../survey/convenience/ConvenienceCharsStep.tsx";
 import {
   identityStep,
@@ -87,8 +88,8 @@ const charactersStep: Step = {
 //
 // Rules encoded here:
 //   M2 — spine order: Identity → choose_base → track → Characters → Marks →
-//         Convenience → Carve → Mechanisms → (lock physical) → touch →
-//         (lock touch) → Help → Package
+//         Punctuation → Convenience → Carve → Mechanisms → (lock physical) →
+//         touch → (lock touch) → Help → Package
 //   M3 — exactly one lock:"physical" and one lock:"touch", in that order.
 //   M4 — touch_seed_source is spine:false with joinTarget resolving to "touch".
 //   M4b — project_name is spine:false with joinTarget:"characters" (copy-track fork).
@@ -131,6 +132,29 @@ export const manifest: readonly Step[] = [
     inputs: [],
     writes: [],
     component: MarksSeriesStep,
+  } satisfies Step,
+
+  // --- Punctuation (clone of the Phase B build-list, scoped to punctuation) ---
+  // Runs after the marks series, before the convenience question: the page the
+  // character map's letters/numerals/marks fold points at (the alphabet map
+  // deliberately withholds punctuation — see CharacterMapPane.tsx). Same
+  // build-list anatomy as Phase B — suggestions, type-in, right-pane character
+  // map (scope "punctuation") — all toggling the shared phaseBDraftStore
+  // draft. Emits its picks as confirmedInventory on a phase:"C" result (see
+  // PunctuationStep.tsx for why not "B"), which the merged session unions in,
+  // shielding them from carve and placing any the base cannot type.
+  {
+    kind: "editor-step",
+    id: "punctuation",
+    title: "Punctuation",
+    spine: true,
+    inputs: [],
+    writes: [],
+    component: PunctuationStep,
+    // Right pane swaps to the interactive character map, as on the Phase B
+    // build-list screen — but unconditionally: this step has no
+    // discoveryMethod fork (SurveyView's gate special-cases "characters" only).
+    rightPane: "character-map",
   } satisfies Step,
 
   // --- Convenience characters (pre-carve keep question) ---
@@ -200,7 +224,7 @@ export function validateManifestShape(): void {
   // M2 — spine order.
   const expectedSpine = [
     "identity", "choose_base", "track", "characters",
-    "marks", "convenience", "carve", "mechanisms", "touch", "help", "package",
+    "marks", "punctuation", "convenience", "carve", "mechanisms", "touch", "help", "package",
   ];
   for (let i = 0; i < expectedSpine.length; i++) {
     const expected = expectedSpine[i];
