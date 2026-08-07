@@ -289,9 +289,12 @@ test.describe("Touch key AssignPanel — keyboard-only assign (spec 058 SC-004)"
     // 2. Arrows — move from the first cell to the target key.
     await press("ArrowRight");
 
-    // 3. Enter — jump straight into AssignPanel's character field (the
-    //    composition's own grid Enter -> field bridge).
-    await press("Enter");
+    // 3. F2 — jump straight into AssignPanel's character field.
+    //    Spec 061 split the two keys: Enter opens the property panel (FR-020b),
+    //    F2 edits the value, which is the grid convention and what keeps this
+    //    walk's action budget honest now that the assign surface sits behind a
+    //    disclosure. Still ONE action, so the count below is unchanged.
+    await press("F2");
     const charField = page.getByLabel("Character or code point");
     await expect(charField).toBeFocused();
 

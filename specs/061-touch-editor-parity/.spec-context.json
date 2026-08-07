@@ -255,6 +255,11 @@
       "decision": "Fix the Case B IR-round-trip defect inside spec 061, in its own commit (out-of-scope-but-unblocking, per the cadence rule)",
       "why": "SC-006 assertion (c) is correctly catching a real spec-035 R9 violation; amending the assertion would mask a defect that destroys the touch provenance model after a single edit",
       "rejected": "Normalizing (c) to ignore the p stamp and filing the defect separately; or leaving (c) failing with FR-008 unmet"
+    },
+    {
+      "decision": "Split Enter and F2 at the grid: Enter opens the key-property-panel region (FR-020b unchanged), F2 lands directly in the character field, opening the assign disclosure on the way",
+      "why": "Restores spec 058 SC-004 keyboard-only assign inside its 12-action budget without reopening the property-panel remodel or weakening FR-020b; F2-edits-the-value is the grid convention and the key was already claimed",
+      "rejected": "Amending SC-004 budget; or opening the assign disclosure by default (partly reopens research D3)"
     }
   ],
   "step_summaries": {

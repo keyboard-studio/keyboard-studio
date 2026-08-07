@@ -252,6 +252,16 @@ export interface UseKeyInspectorFocusBridgeOptions {
    */
   selectedAddress: string | null;
   /**
+   * Edit this cell's VALUE — F2's target (spec 061).
+   *
+   * Optional: with no handler, F2 keeps its original meaning and focuses the
+   * panel exactly as Enter does, so a caller that has no assign surface is
+   * unaffected. Where it IS provided, it must land the caret in the character
+   * field, opening whatever disclosure is in the way — that is what keeps spec
+   * 058 SC-004's keyboard-only assign inside its action budget.
+   */
+  onEditValue?: () => void;
+  /**
    * The DOM ancestor BOTH the grid's cells and (ideally) this bridge's own
    * lookups are scoped within — mirrors `useGridNav.ts`'s own
    * `applyFocusRestorationTarget` container-scoping rationale: an unscoped,
@@ -301,16 +311,30 @@ export interface UseKeyInspectorFocusBridgeResult {
 export function useKeyInspectorFocusBridge({
   selectedAddress,
   containerRef,
+  onEditValue,
 }: UseKeyInspectorFocusBridgeOptions): UseKeyInspectorFocusBridgeResult {
   const inspectorRef = useRef<HTMLDivElement | null>(null);
 
-  const handleGridKeyDown = useCallback((event: ReactKeyboardEvent) => {
-    if (event.key !== "Enter" && event.key !== "F2") return;
-    const target = event.target;
-    if (!(target instanceof Element) || target.closest('[role="gridcell"]') === null) return;
-    event.preventDefault();
-    inspectorRef.current?.focus();
-  }, []);
+  const handleGridKeyDown = useCallback(
+    (event: ReactKeyboardEvent) => {
+      if (event.key !== "Enter" && event.key !== "F2") return;
+      const target = event.target;
+      if (!(target instanceof Element) || target.closest('[role="gridcell"]') === null) return;
+      event.preventDefault();
+      // Spec 061: the two keys diverge, because the panel absorbed the assign
+      // surface and put it behind a disclosure. Enter opens the DETAIL (the
+      // panel region — FR-020b, unchanged). F2 edits the VALUE, landing
+      // straight in the character field, which is the grid convention and what
+      // spec 058 SC-004 measures: assigning a character must stay one keypress
+      // away from the cell, not Enter-then-tab-to-a-disclosure.
+      if (event.key === "F2" && onEditValue !== undefined) {
+        onEditValue();
+        return;
+      }
+      inspectorRef.current?.focus();
+    },
+    [onEditValue],
+  );
 
   const handleEscape = useCallback(() => {
     if (selectedAddress === null) return;

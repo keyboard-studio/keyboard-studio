@@ -3406,17 +3406,33 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       if (e.defaultPrevented) return;
       keyCommands.handleKeyDown(e);
       if (e.defaultPrevented) return;
-      if (e.key !== "Enter") return;
+      if (e.key !== "Enter" && e.key !== "F2") return;
       const target = e.target;
       if (!(target instanceof Element) || target.closest('[role="gridcell"]') === null) {
         return;
       }
       e.preventDefault();
+      // Spec 061: Enter and F2 diverge, because the property panel absorbed the
+      // assign surface and put it behind a disclosure (T028-T039).
+      //
+      //   Enter -> the panel REGION. FR-020b's "selection versus editing"
+      //            contract, unchanged, and what the a11y suite pins.
+      //   F2    -> the character field itself, opening the disclosure on the
+      //            way. The grid convention (F2 edits the value) and what keeps
+      //            spec 058 SC-004's keyboard-only assign inside its action
+      //            budget: assigning stays ONE keypress from the cell.
+      //
+      // Before this, Enter ran a querySelector for an input the closed
+      // disclosure keeps out of the DOM, so it focused nothing at all.
+      if (e.key === "F2") {
+        focusAssignPanelCharacterField();
+        return;
+      }
       keyModeDetailContainerRef.current
-        ?.querySelector<HTMLInputElement>('[data-testid="assign-panel"] input')
+        ?.querySelector<HTMLElement>('[data-testid="key-property-panel"]')
         ?.focus();
     },
-    [keyModeGridNav, keyCommands],
+    [keyModeGridNav, keyCommands, focusAssignPanelCharacterField],
   );
 
   // Escape anywhere in the grid/inspector/panel detail region returns focus
