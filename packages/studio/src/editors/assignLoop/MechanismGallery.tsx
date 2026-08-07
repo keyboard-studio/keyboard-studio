@@ -692,14 +692,16 @@ const VALID_DEADKEY_TRIGGER_KEYS: ReadonlySet<string> = new Set(
 // guards) rather than inline.
 
 /**
- * Apply row for the open method card — bottom-right of the very card it commits.
+ * Apply control for the open method card — top-right of its header, on the
+ * same line as the card's title.
  *
  * Replaces the single shared "Apply method" button that used to sit below the
- * whole chooser: an author fills one card's fields top-to-bottom, so the commit
- * belongs at the end of THAT card rather than in a row serving all three. Only
- * the selected card renders one, so exactly one Apply is ever on screen and
- * "which method is this about to record?" stops being a question the layout can
- * answer ambiguously.
+ * whole chooser (and, briefly, a bottom-right-of-card placement): an author
+ * fills one card's fields top-to-bottom, so the commit belongs with THAT
+ * card rather than in a row serving all three. Only the selected card
+ * renders one, so exactly one Apply is ever on screen and "which method is
+ * this about to record?" stops being a question the layout can answer
+ * ambiguously.
  *
  * Deliberately NOT rendered for method === "sequence": that card holds no fields
  * of its own (the builder opens in the right pane, in place of the live preview)
@@ -863,30 +865,40 @@ function MethodChooser({
           per-character default method (see MechanismGallery's
           useState<Method>("swap")), so its card leads the list. */}
       <div style={cardStyle(method === "swap")}>
-        <button
-          type="button"
-          aria-pressed={method === "swap"}
-          onClick={() => onMethodChange("swap")}
-          style={headerBtnStyle}
-        >
-          <span
-            style={{
-              fontWeight: 600,
-              color: method === "swap" ? ACCENT : TEXT_MAIN,
-            }}
+        <div style={{ display: "flex", alignItems: "center" }}>
+          <button
+            type="button"
+            aria-pressed={method === "swap"}
+            onClick={() => onMethodChange("swap")}
+            style={{ ...headerBtnStyle, width: "auto", flex: 1 }}
           >
-            <Trans id="editor.assignLoop.method.swap.title">
-              Assign to a key
-            </Trans>
-          </span>
-          {method !== "swap" && (
-            <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              <Trans id="editor.assignLoop.method.swap.summary">
-                Dedicate one physical key to produce {currentCharDisplay}
+            <span
+              style={{
+                fontWeight: 600,
+                color: method === "swap" ? ACCENT : TEXT_MAIN,
+              }}
+            >
+              <Trans id="editor.assignLoop.method.swap.title">
+                Assign to a key
               </Trans>
             </span>
+            {method !== "swap" && (
+              <span style={{ fontSize: 11, color: TEXT_DIM }}>
+                <Trans id="editor.assignLoop.method.swap.summary">
+                  Dedicate one physical key to produce {currentCharDisplay}
+                </Trans>
+              </span>
+            )}
+          </button>
+          {method === "swap" && (
+            <CardApplyRow
+              currentChar={currentChar}
+              canApply={canApply}
+              onApply={onApply}
+              testId="mechanism-apply-swap"
+            />
           )}
-        </button>
+        </div>
         {method === "swap" &&
           (() => {
             const filledRaltTokens = raltTokens.filter(
@@ -1176,14 +1188,6 @@ function MethodChooser({
               </div>
             );
           })()}
-        {method === "swap" && (
-          <CardApplyRow
-            currentChar={currentChar}
-            canApply={canApply}
-            onApply={onApply}
-            testId="mechanism-apply-swap"
-          />
-        )}
       </div>
 
       {/* S-03 — always shown */}
@@ -1244,31 +1248,41 @@ function MethodChooser({
 
       {/* S-02 — always shown */}
       <div style={cardStyle(method === "deadkey")}>
-        <button
-          type="button"
-          aria-pressed={method === "deadkey"}
-          onClick={() => onMethodChange("deadkey")}
-          style={headerBtnStyle}
-        >
-          <span
-            style={{
-              fontWeight: 600,
-              color: method === "deadkey" ? ACCENT : TEXT_MAIN,
-            }}
+        <div style={{ display: "flex", alignItems: "center" }}>
+          <button
+            type="button"
+            aria-pressed={method === "deadkey"}
+            onClick={() => onMethodChange("deadkey")}
+            style={{ ...headerBtnStyle, width: "auto", flex: 1 }}
           >
-            <Trans id="editor.assignLoop.method.deadkey.title">
-              Tap a trigger key, then a letter
-            </Trans>
-          </span>
-          {method !== "deadkey" && (
-            <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              <Trans id="editor.assignLoop.method.deadkey.summary">
-                Trigger &rarr; {deadkeyBaseSummaryDisplay} &rarr;{" "}
-                {currentCharDisplay}
+            <span
+              style={{
+                fontWeight: 600,
+                color: method === "deadkey" ? ACCENT : TEXT_MAIN,
+              }}
+            >
+              <Trans id="editor.assignLoop.method.deadkey.title">
+                Tap a trigger key, then a letter
               </Trans>
             </span>
+            {method !== "deadkey" && (
+              <span style={{ fontSize: 11, color: TEXT_DIM }}>
+                <Trans id="editor.assignLoop.method.deadkey.summary">
+                  Trigger &rarr; {deadkeyBaseSummaryDisplay} &rarr;{" "}
+                  {currentCharDisplay}
+                </Trans>
+              </span>
+            )}
+          </button>
+          {method === "deadkey" && (
+            <CardApplyRow
+              currentChar={currentChar}
+              canApply={canApply}
+              onApply={onApply}
+              testId="mechanism-apply-deadkey"
+            />
           )}
-        </button>
+        </div>
         {method === "deadkey" && (
           <div style={configStyle}>
             <div
@@ -1397,14 +1411,6 @@ function MethodChooser({
               </Trans>
             </p>
           </div>
-        )}
-        {method === "deadkey" && (
-          <CardApplyRow
-            currentChar={currentChar}
-            canApply={canApply}
-            onApply={onApply}
-            testId="mechanism-apply-deadkey"
-          />
         )}
       </div>
     </div>
@@ -4749,10 +4755,11 @@ export function MechanismGallery({
                   shared top toolbar row above (see leftContent's top of
                   pane) so the forward-advance control is spatially separated
                   from these editing actions.
-                  Apply no longer lives here: it moved into the bottom-right of
-                  whichever method card is open (CardApplyRow), so the commit
-                  sits with the fields it commits instead of in a row shared by
-                  all three methods. The "hidden for method === 'sequence'"
+                  Apply no longer lives here: it moved into the header of
+                  whichever method card is open (CardApplyRow, top-right, same
+                  line as the card's title), so the commit sits with the card
+                  it commits instead of in a row shared by all three methods.
+                  The "hidden for method === 'sequence'"
                   special case went with it — that card simply renders no Apply,
                   because SequenceBuilderPanel in the right pane owns its own.
                   "Mark for later review" replaces the old "Skip this
