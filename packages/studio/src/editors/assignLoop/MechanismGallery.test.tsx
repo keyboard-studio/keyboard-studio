@@ -6,10 +6,11 @@
 // Component contract under test:
 //   - One character at a time from lettersToAdd (inventory when baseIr is null).
 //   - "Apply method for <char>" button records a MechanismAssignment(scope:"individual").
-//     It lives at the bottom-right of whichever method card is OPEN (CardApplyRow,
-//     testids mechanism-apply-swap / mechanism-apply-deadkey), not in a shared row
-//     below the chooser — so exactly one is on screen and it sits with the fields
-//     it commits. Its accessible name is unchanged by that move.
+//     It lives at the top-right of whichever method card is OPEN, on the same line
+//     as the card's title (CardApplyRow, testids mechanism-apply-swap /
+//     mechanism-apply-deadkey), not in a shared row below the chooser — so exactly
+//     one is on screen and it sits with the fields it commits. Its accessible name
+//     is unchanged by that move.
 //   - "Mark for later review" (mechanism-gallery-progression) is a per-
 //     character toggle — it records nothing in the working copy, but
 //     satisfies canGoNext exactly like an Apply, so Next/Done can advance

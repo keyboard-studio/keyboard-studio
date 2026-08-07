@@ -234,6 +234,8 @@ import {
   galleryGhostBtn as ghostBtn,
   gallerySelectMenuStyle,
   galleryHeaderBtnStyle as headerBtnStyle,
+  galleryCardHeaderRowStyle as cardHeaderRowStyle,
+  galleryHeaderTitleBtnStyle as headerTitleBtnStyle,
   galleryConfigStyle as configStyle,
   galleryCardStyle as cardStyle,
 } from "../../lib/galleryTheme.ts";
@@ -648,13 +650,14 @@ interface TouchMethodChooserProps {
 }
 
 /**
- * Apply row for the open touch-method card — bottom-right of the very card
- * it commits. Both this and MechanismGallery's `CardApplyRow` now delegate
- * to the shared `GalleryCardApplyRow`: replaces the single shared "Apply
- * method" button that used to sit below all four cards (Sequences card,
- * then Apply + Mark row) with one row rendered only inside the currently-
- * open card, so exactly one Apply is ever on screen and "which touch method
- * does this commit?" stops being ambiguous.
+ * Apply control for the open touch-method card — top-right of its header, on
+ * the same line as the card's title. Both this and MechanismGallery's
+ * `CardApplyRow` now delegate to the shared `GalleryCardApplyRow`: replaces
+ * the single shared "Apply method" button that used to sit below all four
+ * cards (Sequences card, then Apply + Mark row) with one control rendered
+ * only inside the currently-open card's header, so exactly one Apply is
+ * ever on screen and "which touch method does this commit?" stops being
+ * ambiguous.
  *
  * Keeps the replaced button's `touch.applyMethodAriaLabel` /
  * `applyMethodButton` message ids verbatim — same accessible name, same
@@ -1162,31 +1165,41 @@ function TouchMethodChooser({
 
       {/* 1. Long-press on a key */}
       <div style={cardStyle(method === "longpress_alternates")}>
-        <button
-          type="button"
-          aria-pressed={method === "longpress_alternates"}
-          onClick={() => onMethodChange("longpress_alternates")}
-          style={headerBtnStyle}
-        >
-          <span
-            style={{
-              fontWeight: 600,
-              color: method === "longpress_alternates" ? ACCENT : TEXT_MAIN,
-            }}
+        <div style={cardHeaderRowStyle}>
+          <button
+            type="button"
+            aria-pressed={method === "longpress_alternates"}
+            onClick={() => onMethodChange("longpress_alternates")}
+            style={headerTitleBtnStyle}
           >
-            <Trans id="editor.assignLoop.touch.method.longpress.title">
-              Long-press on a key
-            </Trans>
-          </span>
-          {method !== "longpress_alternates" && (
-            <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              <Trans id="editor.assignLoop.touch.method.longpress.summary">
-                Hold a key to reveal {currentCharDisplay} as a long-press
-                option.
+            <span
+              style={{
+                fontWeight: 600,
+                color: method === "longpress_alternates" ? ACCENT : TEXT_MAIN,
+              }}
+            >
+              <Trans id="editor.assignLoop.touch.method.longpress.title">
+                Long-press on a key
               </Trans>
             </span>
+            {method !== "longpress_alternates" && (
+              <span style={{ fontSize: 11, color: TEXT_DIM }}>
+                <Trans id="editor.assignLoop.touch.method.longpress.summary">
+                  Hold a key to reveal {currentCharDisplay} as a long-press
+                  option.
+                </Trans>
+              </span>
+            )}
+          </button>
+          {method === "longpress_alternates" && (
+            <TouchCardApplyRow
+              currentChar={currentChar}
+              canApply={canApply}
+              onApply={onApply}
+              testId="touch-apply-longpress"
+            />
           )}
-        </button>
+        </div>
         {method === "longpress_alternates" && (
           <div style={configStyle}>
             <div
@@ -1236,42 +1249,44 @@ function TouchMethodChooser({
             />
           </div>
         )}
-        {method === "longpress_alternates" && (
-          <TouchCardApplyRow
-            currentChar={currentChar}
-            canApply={canApply}
-            onApply={onApply}
-            testId="touch-apply-longpress"
-          />
-        )}
       </div>
 
       {/* 2. Swipe a key (flick) */}
       <div style={cardStyle(method === "flick_gestures")}>
-        <button
-          type="button"
-          aria-pressed={method === "flick_gestures"}
-          onClick={() => onMethodChange("flick_gestures")}
-          style={headerBtnStyle}
-        >
-          <span
-            style={{
-              fontWeight: 600,
-              color: method === "flick_gestures" ? ACCENT : TEXT_MAIN,
-            }}
+        <div style={cardHeaderRowStyle}>
+          <button
+            type="button"
+            aria-pressed={method === "flick_gestures"}
+            onClick={() => onMethodChange("flick_gestures")}
+            style={headerTitleBtnStyle}
           >
-            <Trans id="editor.assignLoop.touch.method.flick.title">
-              Swipe a key (flick)
-            </Trans>
-          </span>
-          {method !== "flick_gestures" && (
-            <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              <Trans id="editor.assignLoop.touch.method.flick.summary">
-                Swipe a key in a direction to produce {currentCharDisplay}.
+            <span
+              style={{
+                fontWeight: 600,
+                color: method === "flick_gestures" ? ACCENT : TEXT_MAIN,
+              }}
+            >
+              <Trans id="editor.assignLoop.touch.method.flick.title">
+                Swipe a key (flick)
               </Trans>
             </span>
+            {method !== "flick_gestures" && (
+              <span style={{ fontSize: 11, color: TEXT_DIM }}>
+                <Trans id="editor.assignLoop.touch.method.flick.summary">
+                  Swipe a key in a direction to produce {currentCharDisplay}.
+                </Trans>
+              </span>
+            )}
+          </button>
+          {method === "flick_gestures" && (
+            <TouchCardApplyRow
+              currentChar={currentChar}
+              canApply={canApply}
+              onApply={onApply}
+              testId="touch-apply-flick"
+            />
           )}
-        </button>
+        </div>
         {method === "flick_gestures" && (
           <div style={configStyle}>
             <div
@@ -1345,42 +1360,44 @@ function TouchMethodChooser({
             />
           </div>
         )}
-        {method === "flick_gestures" && (
-          <TouchCardApplyRow
-            currentChar={currentChar}
-            canApply={canApply}
-            onApply={onApply}
-            testId="touch-apply-flick"
-          />
-        )}
       </div>
 
       {/* 3. Tap multiple times (multitap) */}
       <div style={cardStyle(method === "multitap")}>
-        <button
-          type="button"
-          aria-pressed={method === "multitap"}
-          onClick={() => onMethodChange("multitap")}
-          style={headerBtnStyle}
-        >
-          <span
-            style={{
-              fontWeight: 600,
-              color: method === "multitap" ? ACCENT : TEXT_MAIN,
-            }}
+        <div style={cardHeaderRowStyle}>
+          <button
+            type="button"
+            aria-pressed={method === "multitap"}
+            onClick={() => onMethodChange("multitap")}
+            style={headerTitleBtnStyle}
           >
-            <Trans id="editor.assignLoop.touch.method.multitap.title">
-              Tap multiple times (multitap)
-            </Trans>
-          </span>
-          {method !== "multitap" && (
-            <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              <Trans id="editor.assignLoop.touch.method.multitap.summary">
-                Tap a key rapidly more than once to reach {currentCharDisplay}.
+            <span
+              style={{
+                fontWeight: 600,
+                color: method === "multitap" ? ACCENT : TEXT_MAIN,
+              }}
+            >
+              <Trans id="editor.assignLoop.touch.method.multitap.title">
+                Tap multiple times (multitap)
               </Trans>
             </span>
+            {method !== "multitap" && (
+              <span style={{ fontSize: 11, color: TEXT_DIM }}>
+                <Trans id="editor.assignLoop.touch.method.multitap.summary">
+                  Tap a key rapidly more than once to reach {currentCharDisplay}.
+                </Trans>
+              </span>
+            )}
+          </button>
+          {method === "multitap" && (
+            <TouchCardApplyRow
+              currentChar={currentChar}
+              canApply={canApply}
+              onApply={onApply}
+              testId="touch-apply-multitap"
+            />
           )}
-        </button>
+        </div>
         {method === "multitap" && (
           <div style={configStyle}>
             <div
@@ -1430,43 +1447,45 @@ function TouchMethodChooser({
             />
           </div>
         )}
-        {method === "multitap" && (
-          <TouchCardApplyRow
-            currentChar={currentChar}
-            canApply={canApply}
-            onApply={onApply}
-            testId="touch-apply-multitap"
-          />
-        )}
       </div>
 
       {/* 4. Replace a key */}
       <div style={cardStyle(method === "touch_key_replace")}>
-        <button
-          type="button"
-          aria-pressed={method === "touch_key_replace"}
-          onClick={() => onMethodChange("touch_key_replace")}
-          style={headerBtnStyle}
-        >
-          <span
-            style={{
-              fontWeight: 600,
-              color: method === "touch_key_replace" ? ACCENT : TEXT_MAIN,
-            }}
+        <div style={cardHeaderRowStyle}>
+          <button
+            type="button"
+            aria-pressed={method === "touch_key_replace"}
+            onClick={() => onMethodChange("touch_key_replace")}
+            style={headerTitleBtnStyle}
           >
-            <Trans id="editor.assignLoop.touch.method.replace.title">
-              Replace a key
-            </Trans>
-          </span>
-          {method !== "touch_key_replace" && (
-            <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              <Trans id="editor.assignLoop.touch.method.replace.summary">
-                Make a key type {currentCharDisplay} directly on the touch
-                keyboard.
+            <span
+              style={{
+                fontWeight: 600,
+                color: method === "touch_key_replace" ? ACCENT : TEXT_MAIN,
+              }}
+            >
+              <Trans id="editor.assignLoop.touch.method.replace.title">
+                Replace a key
               </Trans>
             </span>
+            {method !== "touch_key_replace" && (
+              <span style={{ fontSize: 11, color: TEXT_DIM }}>
+                <Trans id="editor.assignLoop.touch.method.replace.summary">
+                  Make a key type {currentCharDisplay} directly on the touch
+                  keyboard.
+                </Trans>
+              </span>
+            )}
+          </button>
+          {method === "touch_key_replace" && (
+            <TouchCardApplyRow
+              currentChar={currentChar}
+              canApply={canApply}
+              onApply={onApply}
+              testId="touch-apply-replace"
+            />
           )}
-        </button>
+        </div>
         {method === "touch_key_replace" && (
           <div style={configStyle}>
             <div
@@ -1515,14 +1534,6 @@ function TouchMethodChooser({
               layerPreviewLabel={layerPreviewLabel}
             />
           </div>
-        )}
-        {method === "touch_key_replace" && (
-          <TouchCardApplyRow
-            currentChar={currentChar}
-            canApply={canApply}
-            onApply={onApply}
-            testId="touch-apply-replace"
-          />
         )}
       </div>
     </div>
@@ -5167,10 +5178,10 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           {/* Mark for later review. Back and Next/Done live in the shared
               top toolbar row above so the forward-advance control is
               spatially separated from these editing actions.
-              Apply no longer lives here: it moved into the bottom-right of
-              whichever method card is open (TouchCardApplyRow), so the
-              commit sits with the fields it commits instead of in a row
-              shared by all four methods.
+              Apply no longer lives here: it moved into the header of
+              whichever method card is open (TouchCardApplyRow, top-right,
+              same line as the card's title), so the commit sits with the
+              card it commits instead of in a row shared by all four methods.
               "Mark for later review" replaces the old "Skip this character"
               control (mechanism-gallery-progression) — see canGoNext's own
               doc comment above for why. */}

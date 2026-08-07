@@ -1,11 +1,14 @@
-// GalleryCardApplyRow — shared "Apply method" row for the open method card,
-// bottom-right of the very card it commits. Factored out of MechanismGallery's
-// `CardApplyRow` and TouchGallery's `TouchCardApplyRow`, which were byte-
-// identical except for the accessible name: only the caller knows which
-// character/notation belongs in the aria-label, and the lingui `t` macro
-// needs its message id as a literal (never a variable) for static
-// extraction, so each gallery keeps computing its own aria-label with its
-// own message id and hands the finished string down here.
+// GalleryCardApplyRow — shared "Apply method" control for the open method
+// card, top-right of the card's header, on the same line as its title.
+// Rendered as a sibling of the header's title-toggle button inside a flex
+// row (never nested inside it — a `<button>` cannot contain another
+// `<button>`). Factored out of MechanismGallery's `CardApplyRow` and
+// TouchGallery's `TouchCardApplyRow`, which were byte-identical except for
+// the accessible name: only the caller knows which character/notation
+// belongs in the aria-label, and the lingui `t` macro needs its message id
+// as a literal (never a variable) for static extraction, so each gallery
+// keeps computing its own aria-label with its own message id and hands the
+// finished string down here.
 //
 // Deliberately NOT rendered for method === "sequence" on the desktop side:
 // that card holds no fields of its own (the builder opens in the right pane,
@@ -42,30 +45,23 @@ export function GalleryCardApplyRow({
   testId,
 }: GalleryCardApplyRowProps) {
   return (
-    <div
+    <button
+      type="button"
       data-testid={testId}
+      onClick={onApply}
+      disabled={!canApply}
+      aria-label={ariaLabel}
       style={{
-        // Mirrors galleryConfigStyle's horizontal padding so the button's
-        // right edge lines up with the fields it commits.
-        padding: "0 14px 12px",
-        display: "flex",
-        justifyContent: "flex-end",
+        ...forwardBtnStyle,
+        flexShrink: 0,
+        marginRight: 14,
+        padding: "6px 16px",
+        background: canApply ? BLUE_ACTION : "#21262d",
+        color: canApply ? "#e6edf3" : TEXT_DIM,
+        cursor: canApply ? "pointer" : "not-allowed",
       }}
     >
-      <button
-        type="button"
-        onClick={onApply}
-        disabled={!canApply}
-        aria-label={ariaLabel}
-        style={{
-          ...forwardBtnStyle,
-          background: canApply ? BLUE_ACTION : "#21262d",
-          color: canApply ? "#e6edf3" : TEXT_DIM,
-          cursor: canApply ? "pointer" : "not-allowed",
-        }}
-      >
-        <Trans id="editor.assignLoop.applyMethodButton">Apply method</Trans>
-      </button>
-    </div>
+      <Trans id="editor.assignLoop.applyMethodButton">Apply method</Trans>
+    </button>
   );
 }
