@@ -38,7 +38,6 @@ export function useDocsPreview(): DocsPreview {
 
   return useMemo(() => {
     const displayName = identity?.displayName ?? baseKeyboard?.displayName ?? "";
-    const keyboardId = baseKeyboard?.id ?? "";
     // The base IR's own header.targets — a synchronous approximation of the
     // final projected .kmn's store(&TARGETS) (which projectWorkingCopyForOutput
     // reads instead, after carve/identity/rename have run). Good enough for a
@@ -49,7 +48,6 @@ export function useDocsPreview(): DocsPreview {
       displayName,
       ...(identity?.bcp47 !== undefined && identity.bcp47 !== "" ? { primaryBcp47: identity.bcp47 } : {}),
       platforms,
-      keyboardId,
     };
     return {
       readmeMd: renderReadmeMd(input),

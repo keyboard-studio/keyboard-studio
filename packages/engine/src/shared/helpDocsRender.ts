@@ -32,7 +32,6 @@ export interface HelpDocsRenderInput {
   displayName: string;
   primaryBcp47?: string;
   platforms: string[];
-  keyboardId: string;
 }
 
 // Opt-in "additional detail" battery (FR-011/FR-014), fixed order per research D-10.

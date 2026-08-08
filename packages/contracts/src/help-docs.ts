@@ -27,7 +27,18 @@ export interface HelpDocsAnswers {
   /** pf_project_url line 2, when a second line is given. */
   projectHelpUrl?: string;
 
-  /** pf_doc_language. Absent/blank means English (existing question default). */
+  /**
+   * pf_doc_language. Absent/blank means English (existing question default).
+   *
+   * Write-time author guidance only — it instructs which language(s) to
+   * write the OTHER free-text answers in (the question's own prompt: "This
+   * decides how you write every answer that follows"). No render path reads
+   * this field: the renderer displays whatever prose the author wrote
+   * verbatim, in any of the three cases. The shipped `<html lang>` attribute
+   * is a separate concern already covered by FR-006, driven by the
+   * keyboard's `primaryBcp47`, not by this field. Recorded here for
+   * provenance/audit only.
+   */
   docLanguage?: "english" | "target" | "bilingual";
 
   // Opt-in "additional detail" battery (FR-011/FR-014) — order in research D-10.

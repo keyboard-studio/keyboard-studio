@@ -449,7 +449,6 @@ export async function projectWorkingCopyForOutput(
     displayName: identity?.displayName ?? baseKeyboard.displayName,
     ...(identityForProjection.bcp47 !== undefined ? { primaryBcp47: identityForProjection.bcp47 } : {}),
     platforms: parseTargetTokens(projectedKmnText),
-    keyboardId: resolvedKeyboardId,
   };
   clonedVfs.set("README.md", renderReadmeMd(docsInput), false);
   clonedVfs.set("source/readme.htm", renderReadmeHtm(docsInput), false);

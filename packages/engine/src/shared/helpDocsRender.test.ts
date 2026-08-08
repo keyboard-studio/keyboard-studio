@@ -15,7 +15,6 @@ function baseInput(overrides: Partial<HelpDocsRenderInput> = {}): HelpDocsRender
     answers: null,
     displayName: "Piaroa",
     platforms: [],
-    keyboardId: "pid_piaroa",
     ...overrides,
   };
 }
