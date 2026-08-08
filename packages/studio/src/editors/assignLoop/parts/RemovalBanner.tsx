@@ -166,12 +166,19 @@ export function RemovalBanner({ recommended, languageLabel, languageDisplayName,
 
   const selectedLatin = optionalLatin.filter((r) => !uncheckedChs.has(r.ch));
   const hasPairedLatinRow = optionalLatin.some((r) => r.caseGroup !== undefined);
-  // "{descriptor} keyboard" — descriptor is the display name + "-only" when a
-  // display name is available (e.g. "Russian-only"), else the neutral
-  // "single-script" fallback (avoids showing a raw bcp47 tag or nothing).
-  const keyboardDescriptor = languageDisplayName !== undefined && languageDisplayName.length > 0
-    ? `${languageDisplayName}-only`
-    : 'single-script';
+  // Two complete catalog sentences rather than one sentence with an assembled
+  // English fragment interpolated in — a translator needs to restructure the
+  // whole "…-only keyboard"/"single-script keyboard" phrase per locale, not
+  // just fill in a name (see issue #1561).
+  const latinOptionalBody = languageDisplayName !== undefined && languageDisplayName.length > 0
+    ? t({
+        id: "editor.assignLoop.removalBanner.latinOptionalBodyNamed",
+        message: `Keep these for URLs, code, and English words — or remove them for a ${{ language: languageDisplayName }}-only keyboard.`,
+      })
+    : t({
+        id: "editor.assignLoop.removalBanner.latinOptionalBodyGeneric",
+        message: `Keep these for URLs, code, and English words — or remove them for a single-script keyboard.`,
+      });
 
   const dismissButton = (
     <button
@@ -294,10 +301,7 @@ export function RemovalBanner({ recommended, languageLabel, languageDisplayName,
           {latinOpen && (
             <div id="removal-banner-latin-checklist" style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 10 }}>
               <p style={{ margin: 0, font: '400 12px var(--app-font)', color: 'var(--app-text-muted)' }}>
-                {t({
-                  id: "editor.assignLoop.removalBanner.latinOptionalBody",
-                  message: `Keep these for URLs, code, and English words — or remove them for a ${{ descriptor: keyboardDescriptor }} keyboard.`,
-                })}
+                {latinOptionalBody}
               </p>
               <Checklist
                 items={optionalLatin}
