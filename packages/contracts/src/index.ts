@@ -5,7 +5,6 @@
 // ---------------------------------------------------------------------------
 export * from "./assignmentMap";
 export * from "./attribution";
-export * from "./help-docs";
 export * from "./axes";
 export * from "./axisFill";
 export * from "./baseKeyboard";
@@ -17,6 +16,7 @@ export * from "./criteria";
 // alongside the survey/IR types it derives from rather than under a subpath —
 // engine, studio, and the packaged sidecar all read the same shapes.
 export * from "./decisionRecord";
+export * from "./help-docs";
 export * from "./keyboard-ir";
 export * from "./keyboardId";
 // The single authoritative key-budget determination (spec 052 FR-016); axis A7

@@ -40,4 +40,5 @@ export const DESCRIPTOR_CONSUMED_FIELDS: ReadonlySet<string> = new Set([
   "displayName",
   "bcp47",
   "languageName",
+  "websiteUrl",
 ]);
