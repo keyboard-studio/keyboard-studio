@@ -17,3 +17,13 @@ export function escapeHtml(s: string): string {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&#39;");
 }
+
+/**
+ * Defuse a PHP block-comment terminator ('*'+'/') inside text destined for a
+ * `/* ... *\/` PHP comment. Shared by the scaffolder's help.php stub and
+ * helpDocsRender's FR-002 fallback so both emit byte-identical placeholder
+ * text (spec 061 D-04) from one copy of the escaping rule.
+ */
+export function phpCommentEscape(s: string): string {
+  return s.replace(/\*\//g, "* /");
+}

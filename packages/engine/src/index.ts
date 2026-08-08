@@ -122,11 +122,23 @@ export {
   buildLanguagesBlock,
   applyIdentityToKps,
   DESCRIPTOR_CONSUMED_FIELDS,
+  parseTargetTokens,
 } from "./package-descriptor/index.js";
 export type {
   PackageDescriptorIdentity,
   ApplyIdentityToKpsResult,
 } from "./package-descriptor/index.js";
+
+// spec 061 — help-docs rendering. The one implementation both the output
+// projection and the in-studio preview (Story 2) render from (FR-005/FR-010).
+export {
+  buildDocSections,
+  renderReadmeMd,
+  renderReadmeHtm,
+  renderWelcomeHtm,
+  renderHelpPhp,
+} from "./shared/helpDocsRender.js";
+export type { DocSection, HelpDocsRenderInput } from "./shared/helpDocsRender.js";
 
 // Issue #19 — scaffolder (template-cleanup pipeline).
 export {

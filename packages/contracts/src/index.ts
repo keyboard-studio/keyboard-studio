@@ -5,6 +5,7 @@
 // ---------------------------------------------------------------------------
 export * from "./assignmentMap";
 export * from "./attribution";
+export * from "./help-docs";
 export * from "./axes";
 export * from "./axisFill";
 export * from "./baseKeyboard";

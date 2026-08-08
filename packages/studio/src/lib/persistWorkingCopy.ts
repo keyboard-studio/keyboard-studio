@@ -233,6 +233,11 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     licenseUnparseable: s.licenseUnparseable,
     baseHolderOverride: s.baseHolderOverride,
     baseLicenseText: s.baseLicenseText,
+    // spec 061: plain JSON / strings, straight passthrough — same reasoning as
+    // attribution/baseLicenseText above.
+    helpDocs: s.helpDocs,
+    baseWelcomeHtmText: s.baseWelcomeHtmText,
+    baseHelpPhpText: s.baseHelpPhpText,
     ir: s.ir,
     deletedNodeIds: [...s.deletedNodeIds],
     deletedItemIds: [...s.deletedItemIds],
@@ -292,6 +297,11 @@ export function prepareWorkingCopySnapshot(snapshot: WorkingCopySnapshot): Parti
     licenseUnparseable: snapshot.licenseUnparseable ?? null,
     baseHolderOverride: snapshot.baseHolderOverride ?? null,
     baseLicenseText: snapshot.baseLicenseText ?? null,
+    // Tolerate snapshots saved before spec 061 landed: an absent value must
+    // not clobber the store defaults with undefined.
+    helpDocs: snapshot.helpDocs ?? null,
+    baseWelcomeHtmText: snapshot.baseWelcomeHtmText ?? null,
+    baseHelpPhpText: snapshot.baseHelpPhpText ?? null,
     ir: snapshot.ir,
     removalCapabilities,
     deletedNodeIds: new Set(snapshot.deletedNodeIds),

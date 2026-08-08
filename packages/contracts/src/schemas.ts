@@ -51,6 +51,7 @@ import type {
   EditorActionType,
 } from "./decisionRecord";
 import { DECISION_RECORD_FORMAT } from "./decisionRecord";
+import type { HelpDocsAnswers } from "./help-docs";
 
 // ---------------------------------------------------------------------------
 // Leaf enums — mirror the string-literal unions in the contract types.
@@ -709,6 +710,32 @@ export const DecisionRecordSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// HelpDocsAnswers (spec 061) — the author-supplied side of a keyboard's shipped
+// documentation, mirroring help-docs.ts.
+// ---------------------------------------------------------------------------
+
+export const HelpDocsAnswersSchema = z.object({
+  description: z.string(),
+  usageTips: z.array(z.string()),
+  credits: z.string().optional(),
+  contactInfo: z.string().optional(),
+  projectHomeUrl: z.string().optional(),
+  projectHelpUrl: z.string().optional(),
+  docLanguage: z.enum(["english", "target", "bilingual"]).optional(),
+  designRationale: z.string().optional(),
+  fontGuidance: z.string().optional(),
+  canonicalOrder: z.string().optional(),
+  scriptGlossary: z.string().optional(),
+  exampleWords: z.string().optional(),
+  scopeVariety: z.string().optional(),
+  provenanceBasis: z.string().optional(),
+  troubleshooting: z.string().optional(),
+  knownLimitations: z.string().optional(),
+  relatedKeyboards: z.string().optional(),
+  furtherReading: z.string().optional(),
+});
+
+// ---------------------------------------------------------------------------
 // Compile-time drift guards.
 //
 // Each canonical schema's inferred type must stay assignable to the locked
@@ -861,3 +888,6 @@ type _BaseContributionGuard = Expect<
 type _DecisionPayloadGuard = Expect<AssignableTo<z.infer<typeof DecisionPayloadSchema>, DecisionPayload>>;
 type _DecisionEntryGuard = Expect<AssignableTo<z.infer<typeof DecisionEntrySchema>, DecisionEntry>>;
 type _DecisionRecordGuard = Expect<AssignableTo<z.infer<typeof DecisionRecordSchema>, DecisionRecord>>;
+type _HelpDocsAnswersGuard = Expect<
+  AssignableTo<z.infer<typeof HelpDocsAnswersSchema>, HelpDocsAnswers>
+>;

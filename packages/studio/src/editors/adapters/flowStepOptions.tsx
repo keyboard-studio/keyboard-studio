@@ -13,7 +13,7 @@
 // EditorStepProps-compatible components that register in registerEditorSteps.ts.
 
 import { slugifyKeyboardId } from "@keyboard-studio/contracts";
-import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type { SurveyPhaseResult, HelpDocsAnswers } from "@keyboard-studio/contracts";
 import { makeFlowStepComponent } from "./makeFlowStepComponent.tsx";
 import type { FlowStepOptions, FlowStepDeps } from "./makeFlowStepComponent.tsx";
 
@@ -231,6 +231,83 @@ export type PhaseFPayload = SurveyPhaseResult;
  */
 const CTX_AUTHOR_CONTACT = "author_contact";
 
+type OptInField =
+  | "designRationale" | "fontGuidance" | "canonicalOrder" | "scriptGlossary"
+  | "exampleWords" | "scopeVariety" | "provenanceBasis" | "troubleshooting"
+  | "knownLimitations" | "relatedKeyboards" | "furtherReading";
+
+/** The opt-in "additional detail" battery — HelpDocsAnswers field ↔ Phase F question id. */
+const OPT_IN_QUESTION_IDS: ReadonlyArray<[OptInField, string]> = [
+  ["designRationale", "pf_design_rationale"],
+  ["fontGuidance", "pf_font_guidance"],
+  ["canonicalOrder", "pf_canonical_order"],
+  ["scriptGlossary", "pf_script_glossary"],
+  ["exampleWords", "pf_example_words"],
+  ["scopeVariety", "pf_scope_variety"],
+  ["provenanceBasis", "pf_provenance_basis"],
+  ["troubleshooting", "pf_troubleshooting"],
+  ["knownLimitations", "pf_known_limitations"],
+  ["relatedKeyboards", "pf_related_keyboards"],
+  ["furtherReading", "pf_further_reading"],
+];
+
+function getTextAnswer(result: SurveyPhaseResult, questionId: string): string | undefined {
+  const answer = result.answers.find((a) => a.questionId === questionId);
+  return answer !== undefined && typeof answer.value === "string" ? answer.value : undefined;
+}
+
+/**
+ * Build `HelpDocsAnswers` from a Phase F `SurveyPhaseResult`, or `undefined`
+ * when the one required question (`pf_welcome_paragraph`) is blank — the
+ * caller (phaseFOptions.onCommit) then skips `setHelpDocs` entirely, leaving
+ * the store field exactly as it was (spec 061 research D-01).
+ *
+ * `pf_usage_tip_3`/`_4`/`_5` are deliberately not read — only `_1`/`_2` are
+ * reachable in the live flow (research D-11). `pf_project_url` splits on a
+ * newline into `projectHomeUrl`/`projectHelpUrl` — the question's own
+ * documented "one or two lines" format (FR-004).
+ */
+export function extractHelpDocs(result: SurveyPhaseResult): HelpDocsAnswers | undefined {
+  const description = getTextAnswer(result, "pf_welcome_paragraph")?.trim() ?? "";
+  if (description === "") return undefined;
+
+  const usageTips = [
+    getTextAnswer(result, "pf_usage_tip_1"),
+    getTextAnswer(result, "pf_usage_tip_2"),
+  ]
+    .map((t) => t?.trim() ?? "")
+    .filter((t) => t !== "");
+
+  const helpDocs: HelpDocsAnswers = { description, usageTips };
+
+  const credits = getTextAnswer(result, "pf_credits")?.trim();
+  if (credits !== undefined && credits !== "") helpDocs.credits = credits;
+
+  const contactInfo = getTextAnswer(result, "pf_contact_info")?.trim();
+  if (contactInfo !== undefined && contactInfo !== "") helpDocs.contactInfo = contactInfo;
+
+  const projectUrl = getTextAnswer(result, "pf_project_url");
+  if (projectUrl !== undefined) {
+    const lines = projectUrl.split("\n").map((l) => l.trim()).filter((l) => l !== "");
+    if (lines[0] !== undefined) helpDocs.projectHomeUrl = lines[0];
+    if (lines[1] !== undefined) helpDocs.projectHelpUrl = lines[1];
+  }
+
+  const docLanguage = getTextAnswer(result, "pf_doc_language");
+  if (docLanguage === "english" || docLanguage === "target" || docLanguage === "bilingual") {
+    helpDocs.docLanguage = docLanguage;
+  }
+
+  for (const [field, questionId] of OPT_IN_QUESTION_IDS) {
+    const value = getTextAnswer(result, questionId)?.trim();
+    if (value !== undefined && value !== "") {
+      helpDocs[field] = value;
+    }
+  }
+
+  return helpDocs;
+}
+
 export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {
   flowRef: "phase_f_helpdocs",
   title: "Phase F — Help documentation",
@@ -267,7 +344,15 @@ export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {
     return result;
   },
 
-  // No onCommit — PhaseF had no pre-onComplete store writes.
+  onCommit(result: PhaseFPayload, deps: FlowStepDeps): void {
+    // spec 061: wire the previously-inert Phase F answers into the working
+    // copy. Skipped entirely (not setHelpDocs(null)) when the required
+    // description is blank — see extractHelpDocs's doc comment.
+    const extracted = extractHelpDocs(result);
+    if (extracted !== undefined) {
+      deps.setHelpDocs(extracted);
+    }
+  },
 };
 
 // ---------------------------------------------------------------------------
