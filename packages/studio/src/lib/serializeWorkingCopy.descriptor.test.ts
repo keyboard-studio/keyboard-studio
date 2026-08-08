@@ -366,3 +366,56 @@ describe("delivered artifact — a descriptor always ships, even with no identit
     expect(kps).not.toContain("und");
   });
 });
+
+// ---------------------------------------------------------------------------
+// spec 061 FR-012 — the Phase F project link reaches the descriptor's
+// <WebSite>, on BOTH the generate path (adapt, no descriptor yet) and the
+// patch path (copy, a scaffolded descriptor already exists).
+// ---------------------------------------------------------------------------
+
+describe("delivered artifact — <WebSite> from helpDocs.projectHomeUrl (spec 061 FR-012)", () => {
+  it("adapt track (generate path): emits <WebSite> from projectHomeUrl", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedAdaptTrackWithoutDescriptor("1.0");
+    useWorkingCopyStore.getState().setIdentity(AUTHOR_IDENTITY);
+    useWorkingCopyStore.getState().setHelpDocs({
+      description: "A keyboard for testing.",
+      usageTips: [],
+      projectHomeUrl: "https://example.com",
+      projectHelpUrl: "https://example.com/help",
+    });
+
+    await serializeWorkingCopy();
+
+    const kps = descriptorText("basic_kbdus");
+    expect(kps).toContain('<WebSite URL="https://example.com">https://example.com</WebSite>');
+    // Only the home-page line — never the help-page line (research D-06).
+    expect(kps).not.toContain("example.com/help");
+  });
+
+  it("copy track (patch path): emits <WebSite> into the scaffolded descriptor", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedCopyTrack();
+    useWorkingCopyStore.getState().setIdentity(AUTHOR_IDENTITY);
+    useWorkingCopyStore.getState().setHelpDocs({
+      description: "A keyboard for testing.",
+      usageTips: [],
+      projectHomeUrl: "https://example.com",
+    });
+
+    await serializeWorkingCopy();
+
+    const kps = descriptorText("basic_kbdus");
+    expect(kps).toContain('<WebSite URL="https://example.com">https://example.com</WebSite>');
+  });
+
+  it("omits <WebSite> when no project URL was ever given", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedAdaptTrackWithoutDescriptor("1.0");
+    useWorkingCopyStore.getState().setIdentity(AUTHOR_IDENTITY);
+
+    await serializeWorkingCopy();
+
+    expect(descriptorText("basic_kbdus")).not.toContain("WebSite");
+  });
+});

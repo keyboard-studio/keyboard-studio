@@ -22,7 +22,7 @@
 
 import { create } from "zustand";
 import type {
-  Attribution, AxisFill, BaseKeyboard, KeyboardIR, LintFinding, RemovalCapability, VirtualFS } from "@keyboard-studio/contracts";
+  Attribution, AxisFill, BaseKeyboard, HelpDocsAnswers, KeyboardIR, LintFinding, RemovalCapability, VirtualFS } from "@keyboard-studio/contracts";
 import { detectMarkInputOrderFromImport, renameTouchKey } from "@keyboard-studio/engine";
 import type { KeyEditOperation, KeyEditOverlay } from "@keyboard-studio/engine";
 import {
@@ -311,6 +311,33 @@ export interface WorkingCopyState {
    * the one parser, shared by both emission paths.
    */
   baseLicenseText: string | null;
+
+  // -- Help docs (spec 061) -----------------------------------------------------
+  /**
+   * The author's Phase F help-docs answers, or null until Phase F's `onCommit`
+   * first fires (mirrors `attribution`'s own null-until-set convention).
+   *
+   * The SINGLE source the engine's help-docs render module reads for
+   * README.md, readme.htm, welcome.htm, and help/<id>.php — replaced wholesale
+   * on every subsequent `onCommit`, never partially patched.
+   */
+  helpDocs: HelpDocsAnswers | null;
+
+  /**
+   * The base keyboard's own `source/welcome.htm`, verbatim, or null when it
+   * has none (spec 061 FR-013), or on Track 1 (nothing to merge with).
+   *
+   * Same fetch-don't-write contract as {@link baseLicenseText}: the loader
+   * deliberately never writes this into the VFS, so the output-projection
+   * merge step needs it here to preserve the original body below new answers.
+   */
+  baseWelcomeHtmText: string | null;
+
+  /**
+   * The base keyboard's own `source/help/<id>.php`, verbatim, or null. Same
+   * fetch-don't-write contract as {@link baseWelcomeHtmText}.
+   */
+  baseHelpPhpText: string | null;
 
   // -- Carve working IR (irStore slots) ----------------------------------------
   /**
@@ -772,6 +799,19 @@ export interface WorkingCopyState {
   setBaseLicenseText: (text: string | null) => void;
 
   /**
+   * Record (or clear) the author's Phase F help-docs answers (spec 061).
+   * Whole-value replace, matching `setAttribution`'s semantics exactly — no
+   * partial-patch variant.
+   */
+  setHelpDocs: (helpDocs: HelpDocsAnswers | null) => void;
+
+  /** Retain the base's verbatim welcome.htm so the output merge can read it. */
+  setBaseWelcomeHtmText: (text: string | null) => void;
+
+  /** Retain the base's verbatim help/<id>.php so the output merge can read it. */
+  setBaseHelpPhpText: (text: string | null) => void;
+
+  /**
    * Returns true once instantiateFromBase or instantiateFromExisting has been
    * called (i.e. baseKeyboard is non-null). Callers that need the full triple
    * (base + VFS + IR) should check all three slots directly.
@@ -968,6 +1008,7 @@ export type WorkingCopyData = Omit<
   | "instantiateFromBase" | "instantiateFromExisting" | "setIdentity" | "isInstantiated"
   | "setAttribution" | "setLicenseUnparseable" | "setBaseHolderOverride"
   | "setBaseLicenseText"
+  | "setHelpDocs" | "setBaseWelcomeHtmText" | "setBaseHelpPhpText"
   | "markStale" | "clearStale"
   | "setValidatorFindings"
   | "setAxisFills"
@@ -986,6 +1027,9 @@ const INITIAL_STATE: WorkingCopyData = {
   licenseUnparseable: null,
   baseHolderOverride: null,
   baseLicenseText: null,
+  helpDocs: null,
+  baseWelcomeHtmText: null,
+  baseHelpPhpText: null,
   // carve IR slots
   ir: null,
   removalCapabilities: new Map(),
@@ -1543,6 +1587,12 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   setBaseHolderOverride: (holder) => set({ baseHolderOverride: holder }),
 
   setBaseLicenseText: (text) => set({ baseLicenseText: text }),
+
+  setHelpDocs: (helpDocs) => set({ helpDocs }),
+
+  setBaseWelcomeHtmText: (text) => set({ baseWelcomeHtmText: text }),
+
+  setBaseHelpPhpText: (text) => set({ baseHelpPhpText: text }),
 
   isInstantiated: () => get().baseKeyboard !== null,
 

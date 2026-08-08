@@ -14,14 +14,14 @@
 // PhaseProjectName.integration.test.tsx.
 
 import { describe, it, expect, vi, afterEach } from "vitest";
-import { trackOptions, phaseFOptions } from "./flowStepOptions.tsx";
+import { trackOptions, phaseFOptions, extractHelpDocs } from "./flowStepOptions.tsx";
 import type { TrackPayload } from "./flowStepOptions.tsx";
 import type { FlowStepDeps } from "./makeFlowStepComponent.tsx";
 import pfContactInfoMod from "../../survey/questions/f/pf_contact_info.ts";
 import pfCreditsMod from "../../survey/questions/f/pf_credits.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type { HelpDocsAnswers, SurveyAnswer, SurveyPhaseResult } from "@keyboard-studio/contracts";
 
 afterEach(() => {
   useSurveySessionStore.getState().reset();
@@ -39,6 +39,7 @@ function buildDeps(overrides?: Partial<FlowStepDeps>): {
   setSelectedTrackSpy: ReturnType<typeof vi.fn>;
   setScaffoldSpecSpy: ReturnType<typeof vi.fn>;
   setIdentitySpy: ReturnType<typeof vi.fn>;
+  setHelpDocsSpy: ReturnType<typeof vi.fn>;
 } {
   const setSelectedTrackSpy = vi.fn(
     (t: "copy" | "adapt" | null) => useSurveySessionStore.getState().setSelectedTrack(t),
@@ -50,6 +51,9 @@ function buildDeps(overrides?: Partial<FlowStepDeps>): {
   const setIdentitySpy = vi.fn(
     (patch: { keyboardId: string; displayName: string }) =>
       useWorkingCopyStore.getState().setIdentity(patch),
+  );
+  const setHelpDocsSpy = vi.fn(
+    (patch: HelpDocsAnswers | null) => useWorkingCopyStore.getState().setHelpDocs(patch),
   );
 
   const deps: FlowStepDeps = {
@@ -63,10 +67,11 @@ function buildDeps(overrides?: Partial<FlowStepDeps>): {
     displayNameRef: { current: "" },
     selectedTrack: null,
     scaffoldSpec: null,
+    setHelpDocs: setHelpDocsSpy,
     ...overrides,
   };
 
-  return { deps, setSelectedTrackSpy, setScaffoldSpecSpy, setIdentitySpy };
+  return { deps, setSelectedTrackSpy, setScaffoldSpecSpy, setIdentitySpy, setHelpDocsSpy };
 }
 
 function buildResult(
@@ -258,8 +263,172 @@ describe("phaseFOptions — record shape", () => {
     expect(phaseFOptions.usesFindings).toBe(true);
   });
 
-  it("declares no onCommit (PhaseFAdapter had no pre-onComplete store writes)", () => {
-    expect(phaseFOptions.onCommit).toBeUndefined();
+  it("declares an onCommit (spec 061: wires help-docs answers into the working copy)", () => {
+    expect(phaseFOptions.onCommit).toBeDefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// phaseFOptions.onCommit (spec 061)
+// ---------------------------------------------------------------------------
+
+function buildResultG(answers: SurveyAnswer[]): SurveyPhaseResult {
+  return { phase: "G", answers };
+}
+
+describe("phaseFOptions.onCommit", () => {
+  it("calls setHelpDocs when the required description is answered", () => {
+    const { deps, setHelpDocsSpy } = buildDeps();
+    const result = buildResultG([
+      { questionId: "pf_welcome_paragraph", answerType: "text", value: "A keyboard for Piaroa." },
+    ]);
+
+    phaseFOptions.onCommit!(result, deps);
+
+    expect(setHelpDocsSpy).toHaveBeenCalledExactlyOnceWith({
+      description: "A keyboard for Piaroa.",
+      usageTips: [],
+    });
+    expect(useWorkingCopyStore.getState().helpDocs).toEqual({
+      description: "A keyboard for Piaroa.",
+      usageTips: [],
+    });
+  });
+
+  it("does NOT call setHelpDocs when the description is blank", () => {
+    const { deps, setHelpDocsSpy } = buildDeps();
+    const result = buildResultG([]);
+
+    phaseFOptions.onCommit!(result, deps);
+
+    expect(setHelpDocsSpy).not.toHaveBeenCalled();
+    expect(useWorkingCopyStore.getState().helpDocs).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// extractHelpDocs (spec 061 US1/US3/US4)
+// ---------------------------------------------------------------------------
+
+function textAnswer(questionId: string, value: string): SurveyAnswer {
+  return { questionId, answerType: "text", value };
+}
+
+describe("extractHelpDocs — US1 required description", () => {
+  it("returns { description, usageTips: [] } when only the description is answered", () => {
+    const result = buildResultG([textAnswer("pf_welcome_paragraph", "A keyboard for Piaroa.")]);
+    expect(extractHelpDocs(result)).toEqual({
+      description: "A keyboard for Piaroa.",
+      usageTips: [],
+    });
+  });
+
+  it("returns undefined when the description is absent", () => {
+    expect(extractHelpDocs(buildResultG([]))).toBeUndefined();
+  });
+
+  it("returns undefined when the description is whitespace-only", () => {
+    const result = buildResultG([textAnswer("pf_welcome_paragraph", "   ")]);
+    expect(extractHelpDocs(result)).toBeUndefined();
+  });
+});
+
+describe("extractHelpDocs — US3 optional default-path answers", () => {
+  it("captures usageTips from pf_usage_tip_1/_2, credits, contactInfo", () => {
+    const result = buildResultG([
+      textAnswer("pf_welcome_paragraph", "A keyboard for Piaroa."),
+      textAnswer("pf_usage_tip_1", "Type slowly at first."),
+      textAnswer("pf_usage_tip_2", "Long-press for accents."),
+      textAnswer("pf_credits", "Jane Doe"),
+      textAnswer("pf_contact_info", "jane@example.com"),
+    ]);
+    expect(extractHelpDocs(result)).toEqual({
+      description: "A keyboard for Piaroa.",
+      usageTips: ["Type slowly at first.", "Long-press for accents."],
+      credits: "Jane Doe",
+      contactInfo: "jane@example.com",
+    });
+  });
+
+  it("does NOT read pf_usage_tip_3/_4/_5 — only _1/_2 are reachable (research D-11)", () => {
+    const result = buildResultG([
+      textAnswer("pf_welcome_paragraph", "A keyboard for Piaroa."),
+      textAnswer("pf_usage_tip_3", "should never be read"),
+    ]);
+    expect(extractHelpDocs(result)?.usageTips).toEqual([]);
+  });
+
+  it("splits a two-line pf_project_url answer into projectHomeUrl/projectHelpUrl", () => {
+    const result = buildResultG([
+      textAnswer("pf_welcome_paragraph", "A keyboard for Piaroa."),
+      textAnswer("pf_project_url", "https://example.com\nhttps://example.com/help"),
+    ]);
+    expect(extractHelpDocs(result)).toEqual({
+      description: "A keyboard for Piaroa.",
+      usageTips: [],
+      projectHomeUrl: "https://example.com",
+      projectHelpUrl: "https://example.com/help",
+    });
+  });
+
+  it("populates only projectHomeUrl when pf_project_url has a single line", () => {
+    const result = buildResultG([
+      textAnswer("pf_welcome_paragraph", "A keyboard for Piaroa."),
+      textAnswer("pf_project_url", "https://example.com"),
+    ]);
+    const extracted = extractHelpDocs(result);
+    expect(extracted?.projectHomeUrl).toBe("https://example.com");
+    expect(extracted?.projectHelpUrl).toBeUndefined();
+  });
+});
+
+describe("extractHelpDocs — US4 opt-in additional-detail battery", () => {
+  it("captures all eleven opt-in fields when answered (FR-011/FR-014)", () => {
+    const result = buildResultG([
+      textAnswer("pf_welcome_paragraph", "A keyboard for Piaroa."),
+      textAnswer("pf_design_rationale", "a"),
+      textAnswer("pf_font_guidance", "b"),
+      textAnswer("pf_canonical_order", "c"),
+      textAnswer("pf_script_glossary", "d"),
+      textAnswer("pf_example_words", "e"),
+      textAnswer("pf_scope_variety", "f"),
+      textAnswer("pf_provenance_basis", "g"),
+      textAnswer("pf_troubleshooting", "h"),
+      textAnswer("pf_known_limitations", "i"),
+      textAnswer("pf_related_keyboards", "j"),
+      textAnswer("pf_further_reading", "k"),
+    ]);
+    expect(extractHelpDocs(result)).toEqual({
+      description: "A keyboard for Piaroa.",
+      usageTips: [],
+      designRationale: "a",
+      fontGuidance: "b",
+      canonicalOrder: "c",
+      scriptGlossary: "d",
+      exampleWords: "e",
+      scopeVariety: "f",
+      provenanceBasis: "g",
+      troubleshooting: "h",
+      knownLimitations: "i",
+      relatedKeyboards: "j",
+      furtherReading: "k",
+    });
+  });
+
+  // Acceptance Scenario 2 (spec.md US4): validates the EXISTING survey
+  // routing carries through unchanged, not new generation logic — a
+  // Latin-script session never reaches pf_canonical_order, so it is simply
+  // absent from the result's answers; a non-Latin-script session's result
+  // carries it. extractHelpDocs's own job is only to read what is present.
+  it("includes canonicalOrder only when the survey routed the author to it", () => {
+    const nonLatin = buildResultG([
+      textAnswer("pf_welcome_paragraph", "A keyboard for Dagbani."),
+      textAnswer("pf_canonical_order", "Base then mark, left to right."),
+    ]);
+    expect(extractHelpDocs(nonLatin)?.canonicalOrder).toBe("Base then mark, left to right.");
+
+    const latin = buildResultG([textAnswer("pf_welcome_paragraph", "A keyboard for French.")]);
+    expect(extractHelpDocs(latin)?.canonicalOrder).toBeUndefined();
   });
 });
 

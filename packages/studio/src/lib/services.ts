@@ -189,7 +189,6 @@ export async function getCompile(): Promise<CompileFn> {
 // it rides the same lazy engine import as the rest of the output path.
 type EnsurePackageFilesFn = (input: {
   vfs: VirtualFS;
-  displayName: string;
   copyright?: string;
   year?: number;
 }) => { created: string[] };

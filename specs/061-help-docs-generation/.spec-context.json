@@ -1,0 +1,544 @@
+{
+  "workflow": "companion",
+  "specName": "061-help-docs-generation",
+  "branch": "061-help-docs-generation",
+  "selectedAt": "2026-08-07T19:25:11.688Z",
+  "currentStep": "implement",
+  "status": "implemented",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-07T19:55:56.324Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T19:57:01.694Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-07T19:57:02.034Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-07T20:15:39.785Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-07T20:15:40.321Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T20:16:00.875Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-07T20:16:00.891Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-07T20:59:31.611Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-07T23:37:04.366Z"
+    }
+  ],
+  "telemetryInstanceId": "de800adf-15bc-4ea9-9219-0288577076ae",
+  "approach": "Wire Phase F answers into a new helpDocs field on the working-copy store (sibling to attribution, not KeyboardIR), populated via a dedicated onCommit hook on Phase F's step options. A new pure render module in the engine turns those answers plus existing design-derived metadata into README.md/readme.htm/welcome.htm/help/<id>.php, hooked into projectWorkingCopyForOutput so all three delivery modes regenerate on every produce.",
+  "decisions": [
+    {
+      "decision": "Populate helpDocs via a dedicated onCommit store action, not the generic writes/mutate pipe",
+      "why": "the generic pipe is unimplemented for every live question module today (T014); attribution already proves the dedicated-action pattern end to end",
+      "rejected": "implementing the project-wide writes/mutate mechanism as a side effect of this feature"
+    },
+    {
+      "decision": "Hook doc rendering into projectWorkingCopyForOutput, not buildOutputBundle/ensurePackageFiles",
+      "why": "only projectWorkingCopyForOutput is shared by all three delivery modes (.kmp, .zip, GitHub PR); ensurePackageFiles is download-only and write-if-absent, which cannot satisfy FR-010 regenerate-every-time",
+      "rejected": "calling the new render step separately from all three call sites"
+    },
+    {
+      "decision": "Fetch the base keyboard own welcome.htm/help.php as side-channel fields (baseWelcomeHtmText/baseHelpPhpText), mirroring baseLicenseText",
+      "why": "fetchKeyboardSourceToVfs never fetches these today, so FR-013 merge has nothing to merge with until they are fetched; baseLicenseText is an exact existing precedent for fetch-without-writing-to-VFS",
+      "rejected": "writing the base docs straight into the authoring VFS at fetch time and merging in place"
+    },
+    {
+      "decision": "Project link (FR-012) maps to the kps <WebSite> element, home-page line only",
+      "why": "sampled the ../keyboards corpus directly - single <WebSite URL=...> element is the only convention in use (250+ keyboards), no precedent for a second entry",
+      "rejected": "emitting a second <WebSite> for the help-page line"
+    },
+    {
+      "decision": "docs/keyboard-documentation-plan.md ships on this branch as a Setup task",
+      "why": "spec.md Governing Context cites it as already-authoritative but it exists only on the unmerged km/keyboard-documentation-plan branch",
+      "rejected": "leaving the citation dangling and re-deriving its content informally"
+    },
+    {
+      "decision": "km-lead post-implement review cycle: km-verification+km-qc+km-frontend+km-synthesis run in parallel; 2 P1s fixed directly (stale comments in packageDocs.ts/buildOutputBundle.ts) plus 2 missing test cases added (setHtmlLang replace-path, mergeWithBase no-anchor fallback); remaining P2s deferred as noted concerns",
+      "why": "no P0 blockers found; P1s were cheap mechanical fixes, so fixed inline rather than a second dispatch cycle"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "plan.md + research.md (11 decisions) + data-model.md + contracts/help-docs-contract.md written; helpDocs stored beside attribution, rendered via a new pure engine module hooked into projectWorkingCopyForOutput",
+      "key_finding": "fetchKeyboardSourceToVfs never fetches the bases welcome.htm/help.php today, so FR-013 merge is unimplementable without extending it first"
+    },
+    "tasks": {
+      "summary": "tasks.md written: 35 tasks across Setup, Foundational (9 tasks, 3 waves), 4 user-story phases (P1-P4), and Polish; all 15 FRs mapped to tasks"
+    }
+  },
+  "coverage": {
+    "FR-001": {
+      "title": "System MUST carry the required description answer into every shipped documentation file",
+      "tasks": [
+        "T002",
+        "T006",
+        "T007",
+        "T008",
+        "T011",
+        "T012",
+        "T013",
+        "T014"
+      ]
+    },
+    "FR-002": {
+      "title": "System MUST leave placeholder text unchanged when the required description is unanswered",
+      "tasks": [
+        "T007",
+        "T009",
+        "T010",
+        "T012"
+      ]
+    },
+    "FR-003": {
+      "title": "System MUST render each optional default-path answer and omit its section when blank",
+      "tasks": [
+        "T019",
+        "T023"
+      ]
+    },
+    "FR-004": {
+      "title": "System MUST split a two-line project-link answer into distinct labeled README links",
+      "tasks": [
+        "T020",
+        "T024"
+      ]
+    },
+    "FR-005": {
+      "title": "System MUST keep welcome.htm and the online help page identical wherever they cover the same answers",
+      "tasks": [
+        "T007",
+        "T032"
+      ]
+    },
+    "FR-006": {
+      "title": "System MUST set the shipped welcome page and help page language to the keyboards primary language",
+      "tasks": [
+        "T007"
+      ]
+    },
+    "FR-007": {
+      "title": "System MUST NOT embed a version number or copyright year in the four shipped doc files",
+      "tasks": [
+        "T007"
+      ]
+    },
+    "FR-008": {
+      "title": "System MUST list only the keyboards actually-supported platforms in README",
+      "tasks": [
+        "T025"
+      ]
+    },
+    "FR-009": {
+      "title": "System MUST safely render HTML-significant characters in free-text answers",
+      "tasks": [
+        "T007",
+        "T010"
+      ]
+    },
+    "FR-010": {
+      "title": "System MUST regenerate shipped documentation from current answers on every output production",
+      "tasks": [
+        "T008"
+      ]
+    },
+    "FR-011": {
+      "title": "System MUST render each opt-in additional-detail answer as its own labeled section, omitted when blank",
+      "tasks": [
+        "T027",
+        "T028",
+        "T030",
+        "T031"
+      ]
+    },
+    "FR-012": {
+      "title": "System MUST record a supplied project link in the keyboards package metadata",
+      "tasks": [
+        "T004",
+        "T021",
+        "T026"
+      ]
+    },
+    "FR-013": {
+      "title": "System MUST merge new help-docs answers alongside an adapted keyboards existing hand-authored docs",
+      "tasks": [
+        "T003",
+        "T006",
+        "T007",
+        "T010"
+      ]
+    },
+    "FR-014": {
+      "title": "System MUST render the full opt-in additional-detail battery in scope for this feature",
+      "tasks": [
+        "T030",
+        "T031"
+      ]
+    },
+    "FR-015": {
+      "title": "System MUST provide an in-studio preview of rendered documentation that updates as answers change",
+      "tasks": [
+        "T015",
+        "T016",
+        "T017"
+      ]
+    }
+  },
+  "currentTask": "T035",
+  "verified": [
+    {
+      "what": "km-verification: FR-002/FR-013/FR-010 claims",
+      "result": "pass",
+      "command": "vitest run (137 tests, engine+studio)"
+    },
+    {
+      "what": "km-qc: engine-side render/descriptor code quality",
+      "result": "PASS 88/100 (0 P0, 3 P1, 3 P2)"
+    },
+    {
+      "what": "km-frontend: studio wiring, preview hook/panel, a11y, i18n",
+      "result": "PASS WITH NOTES (0 P0/P1, 2 P2)"
+    },
+    {
+      "what": "km-synthesis: integration fit across contracts/engine/studio",
+      "result": "PARTIAL FIT, 0 P0, 1 P1 (stale comment)"
+    }
+  ],
+  "concerns": [
+    {
+      "note": "helpDocsRender.ts P2s not fixed: unquoted <html lang> not rewritten (low corpus likelihood); re-adapting output this tool previously produced would nest a second merge-boundary heading",
+      "step": "implement",
+      "kind": "deferred"
+    },
+    {
+      "note": "useDocsPreview.ts keyboardId derivation (baseKeyboard?.id) does not match serializeWorkingCopy.ts resolvedKeyboardId post-rename; harmless today since HelpDocsRenderInput.keyboardId is unread, but would drift silently if a future change starts reading it",
+      "step": "implement",
+      "kind": "deferred"
+    }
+  ]
+}
