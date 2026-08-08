@@ -35,6 +35,7 @@ Owned by `/km-doc`. Update this file whenever a doc is added, archived, or re-sc
 | Doc | Purpose | Update Triggers | Status |
 |---|---|---|---|
 | [`docs/making-a-template.md`](making-a-template.md) | Template authoring guide | Template pipeline changes | live |
+| [`docs/keyboard-documentation-plan.md`](keyboard-documentation-plan.md) | Generic plan/checklist for writing an authored keyboard's docs (README, HISTORY, LICENSE, welcome/readme.htm, help.php) | Doc-generation stubs change; criteria.md doc-section changes | live |
 | [`docs/Checking Keyman Keyboard Pull Requests.md`](<Checking Keyman Keyboard Pull Requests.md>) | PR review checklist | Criteria or review-process changes | live |
 | [`docs/triage-scheduling.md`](triage-scheduling.md) | Issue triage and scheduling guide | Process changes | live |
 | [`docs/workflow-model.md`](workflow-model.md) | Hybrid authoring flow (Track 1 + Track 2), working-copy spine, node vocabulary, question inventory, efficiency findings, decisions; spec §8 is authoritative | Spec §8 workflow changes; two-track authoring changes | live |
