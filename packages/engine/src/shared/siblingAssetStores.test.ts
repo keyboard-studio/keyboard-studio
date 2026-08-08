@@ -1,10 +1,11 @@
 // Freezes the derived membership of each siblingAssetStores.ts subset, so a
 // future table edit that silently changes what a call site sees fails loudly.
-// The expected sets below are exactly today's four pre-consolidation literals
+// The expected sets below are exactly today's pre-consolidation literals
 // (parseKmnHeaderStores.SYSTEM_STORES, scaffold-ir.PATH_STORES + BITMAP,
 // stripDanglingAssetStores.{DANGLING_STORES,ALWAYS_STRIP_STORES},
-// reconcileSiblingAssetPaths.SIBLING_PATH_STORES), plus the fifth,
-// scaffolder's renameFilesInVfs asset-extension list.
+// reconcileSiblingAssetPaths.SIBLING_PATH_STORES, dropUnbackedBitmapStore's
+// former hardcoded "BITMAP"), plus the scaffolder's renameFilesInVfs
+// asset-extension list.
 
 import { describe, it, expect } from "vitest";
 import {
@@ -13,6 +14,7 @@ import {
   conditionalScaffoldRenameStores,
   danglingPreviewStripStores,
   alwaysPreviewStripStores,
+  shipDroppableStores,
   reconcileRepairStores,
   assetFileExtensions,
 } from "./siblingAssetStores.js";
@@ -51,6 +53,10 @@ describe("siblingAssetStores — frozen derived subsets", () => {
     expect(alwaysPreviewStripStores()).toEqual(new Set(["KMW_HELPFILE", "KMW_EMBEDJS"]));
   });
 
+  it("shipDroppableStores matches dropUnbackedBitmapStore's original hardcoded BITMAP", () => {
+    expect(shipDroppableStores()).toEqual(new Set(["BITMAP"]));
+  });
+
   it("reconcileRepairStores matches reconcileSiblingAssetPaths' original SIBLING_PATH_STORES", () => {
     expect(reconcileRepairStores()).toEqual(
       new Set([
@@ -70,6 +76,7 @@ describe("siblingAssetStores — frozen derived subsets", () => {
     expect(conditionalScaffoldRenameStores()).not.toContain("INCLUDECODES");
     expect(danglingPreviewStripStores().has("INCLUDECODES")).toBe(false);
     expect(alwaysPreviewStripStores().has("INCLUDECODES")).toBe(false);
+    expect(shipDroppableStores().has("INCLUDECODES")).toBe(false);
     expect(reconcileRepairStores().has("INCLUDECODES")).toBe(false);
   });
 

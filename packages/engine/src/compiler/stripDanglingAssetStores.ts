@@ -2,10 +2,19 @@
 //
 // kmcmplib refuses to emit ANY artifacts when a header store names a packaging
 // asset file (BITMAP icon, VISUALKEYBOARD .kvks, LAYOUTFILE touch layout, etc.)
-// that it cannot open — it reports "Cannot open the bitmap or icon file for
-// reading" as a *warning* but produces zero artifacts. A live OSK preview does
-// not need any of these packaging assets, so a missing one must not break the
-// preview.
+// that it cannot open — it reports e.g. "Cannot open the bitmap or icon file for
+// reading" and produces zero artifacts. A live OSK preview does not need any of
+// these packaging assets, so a missing one must not break the preview.
+//
+// SEVERITY CAVEAT. These read as `warning` in this repo's compile() output, but
+// that is OUR fallback, not kmcmplib's severity model: upstream
+// kmn_compiler_errors.h defines ERROR_CannotReadBitmapFile = SevError | 0x031
+// (and most of this class likewise — see codeMap.ts's per-code table, where
+// only KMW_EMBEDJS/KMW_HELPFILE are genuinely Warn). kmc-kmn's
+// CompilerMessageSpec does not populate a `severity` field on the message
+// objects it hands our callback, so compiler/index.ts's
+// `message.severity ?? "warning"` fills one in. Do not treat the observed
+// `warning` label as upstream's classification when doing Layer-A fidelity work.
 //
 // Two categories of stores are stripped:
 //
@@ -20,12 +29,15 @@
 //    file was fetched into VFS.
 //
 // The full output/zip path does NOT use this — it serializes the unmodified IR.
+// {@link dropUnbackedBitmapStore} below is the one asset-store removal that DOES
+// apply to the shipped .kmn; see its docstring for why the icon is the exception.
 
 import type { VirtualFS } from "@keyboard-studio/contracts";
 import { parseKmnHeaderStores } from "./parseKmnHeaderStores.js";
 import {
   danglingPreviewStripStores,
   alwaysPreviewStripStores,
+  shipDroppableStores,
 } from "../shared/siblingAssetStores.js";
 
 // Packaging-asset stores stripped only when their file is absent from VFS.
@@ -35,6 +47,9 @@ const DANGLING_STORES = danglingPreviewStripStores();
 // presence causes KMW to render the help documentation panel instead of the
 // keyboard layout OSK, which is never useful in the live preview.
 const ALWAYS_STRIP_STORES = alwaysPreviewStripStores();
+
+// Stores dropped from the SHIPPED .kmn when their file is absent — BITMAP today.
+const SHIP_DROPPABLE_STORES = shipDroppableStores();
 
 /**
  * Remove header `store(&ASSET) 'path'` lines that would interfere with the
@@ -62,13 +77,23 @@ export function stripDanglingAssetStores(
   );
   if (toStrip.length === 0) return { kmn, stripped: [] };
 
-  const toStripNames = new Set(toStrip.map((s) => s.storeName));
+  return removeHeaderStoreLines(kmn, new Set(toStrip.map((s) => s.storeName)));
+}
 
+/**
+ * Remove the named `store(&NAME) 'path'` lines from a .kmn header.
+ *
+ * Only the header (text before `begin`) is touched — a `store(&X)` after `begin`
+ * would be unusual, and this mirrors {@link parseKmnHeaderStores}, which also
+ * scans the header only. Returns `{ kmn, stripped }`, `stripped` listing the
+ * store names actually removed.
+ */
+function removeHeaderStoreLines(
+  kmn: string,
+  names: ReadonlySet<string>,
+): { kmn: string; stripped: string[] } {
   const stripped: string[] = [];
 
-  // Remove the matching store lines. Only touch the header (before `begin`);
-  // a store(&X) after begin would be unusual, and we mirror parseKmnHeaderStores
-  // which only scans the header.
   const beginMatch = /^\s*begin\s/im.exec(kmn);
   const headerEnd = beginMatch !== null ? beginMatch.index : kmn.length;
 
@@ -77,7 +102,7 @@ export function stripDanglingAssetStores(
   const rest = kmn.slice(headerEnd);
 
   const newHeader = header.replace(storeLineRe, (line, name: string) => {
-    if (toStripNames.has((name ?? "").toUpperCase())) {
+    if (names.has((name ?? "").toUpperCase())) {
       stripped.push((name ?? "").toUpperCase());
       return "";
     }
@@ -85,4 +110,44 @@ export function stripDanglingAssetStores(
   });
 
   return { kmn: newHeader + rest, stripped };
+}
+
+/**
+ * Drop a ship-droppable store's `store(&NAME) '<file>'` line when `<file>` is
+ * not in the VFS. Which stores qualify is centralized in
+ * {@link shipDroppableStores} (`siblingAssetStores.ts`'s `shipStrip: "dangling"`
+ * attribute) — BITMAP today, named `dropUnbackedBitmapStore` because the icon
+ * is the only store that attribute currently marks.
+ *
+ * Unlike {@link stripDanglingAssetStores}, this applies to the SHIPPED .kmn, not
+ * just the preview: an icon reference with no icon behind it is not a degraded
+ * package, it is a package that does not build. kmcmplib reports "Cannot open the
+ * bitmap or icon file for reading" and then emits ZERO artifacts, so the reference
+ * has to go rather than be left for the author (or the keyboards-repo CI) to
+ * discover as an empty build. The zero-artifact outcome is what matters here; the
+ * diagnostic's severity is NOT the `warning` this repo surfaces — see the
+ * severity caveat at the top of this file.
+ *
+ * The icon is the right store to treat this way because it is the one purely
+ * cosmetic packaging asset: a keyboard with no icon is a complete, working
+ * keyboard. The other dangling-asset stores are load-bearing — VISUALKEYBOARD
+ * and LAYOUTFILE name the keyboard's own layouts — so a missing one is a fetch
+ * bug to surface, not a line to quietly delete from the author's source.
+ *
+ * @param kmn The .kmn source text destined for the output tree.
+ * @param vfs The VFS the .kmn lives in (sibling looked up at `source/<path>`).
+ * @returns `{ kmn, dropped }` — `dropped` is the sibling path removed, or null
+ *          when no ship-droppable store was found unbacked.
+ */
+export function dropUnbackedBitmapStore(
+  kmn: string,
+  vfs: VirtualFS,
+): { kmn: string; dropped: string | null } {
+  const unbacked = parseKmnHeaderStores(kmn).find(
+    (s) => SHIP_DROPPABLE_STORES.has(s.storeName) && vfs.get(`source/${s.path}`) === undefined,
+  );
+  if (unbacked === undefined) return { kmn, dropped: null };
+
+  const { kmn: out, stripped } = removeHeaderStoreLines(kmn, new Set([unbacked.storeName]));
+  return { kmn: out, dropped: stripped.length > 0 ? unbacked.path : null };
 }

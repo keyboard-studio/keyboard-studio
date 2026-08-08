@@ -22,6 +22,7 @@
       "source": "/local-kbd-proxy/:path*",
       "destination": "https://raw.githubusercontent.com/keyboard-studio/keyboards/master/:path*"
     },
+    { "source": "/assets/:path*", "destination": "/assets/:path*" },
     { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [

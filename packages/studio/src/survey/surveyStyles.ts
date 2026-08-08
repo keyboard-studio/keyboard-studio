@@ -106,7 +106,7 @@ export const sectionHeading: CSSProperties = {
 };
 
 // ---------------------------------------------------------------------------
-// Divider `<hr>` (BuildListView)
+// Divider `<hr>` (PunctuationStep)
 // ---------------------------------------------------------------------------
 
 export const divider: CSSProperties = {

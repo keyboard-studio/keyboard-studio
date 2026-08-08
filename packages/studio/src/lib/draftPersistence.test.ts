@@ -53,6 +53,7 @@ import {
   discardActiveDraft,
   deriveProjectKeyFromWorkingCopy,
   installDraftAutosave,
+  resumeProject,
   flushActiveDraft,
   wasDraftRestoredThisBoot,
   restoredDraftSavedAt,
@@ -1018,6 +1019,52 @@ describe("draftPersistence", () => {
 
       vi.advanceTimersByTime(5000); // well past 500ms
       expect(localStorage.getItem(draftKey(pk))).toBeNull();
+    });
+
+    it("FINDING 1 fix: an orphaned subscription (active pointer moved on without teardown) skips its debounced write instead of overwriting the wrong key", () => {
+      vi.useFakeTimers();
+      const abandoned = "autosave-orphan-a";
+      const resumed = "autosave-orphan-b";
+
+      // Install autosave for the FIRST project, same as SurveyView's mount
+      // effect would for whatever project is active when the author starts.
+      instantiateMinimal(abandoned);
+      installDraftAutosave(abandoned); // no teardown captured — nothing ever tears this down
+
+      const abandonedRecordBefore = localStorage.getItem(draftKey(abandoned));
+      expect(abandonedRecordBefore).not.toBeNull();
+
+      // The author switches to a DIFFERENT, already-instantiated project via
+      // resumeProject() (the same primitive MyKeyboardsList's Resume button
+      // and CurrentKeyboardIndicator's top-bar switcher both use) — WITHOUT
+      // anything tearing down the FIRST subscription (the exact gap a switch
+      // that happens while SurveyView stays mounted leaves behind — see
+      // installDraftAutosave's own doc comment).
+      instantiateMinimal(resumed);
+      saveDraft(resumed); // create resumed's own real record to resume into
+      useWorkingCopyStore.getState().reset();
+      useSurveySessionStore.getState().reset();
+      usePhaseBDraftStore.getState().reset();
+      expect(resumeProject(resumed)).toBe(true);
+      expect(resolveActiveProjectKey()).toBe(resumed);
+
+      // The orphaned subscription (still closed over `abandoned`) is still
+      // subscribed to the SAME stores, which now hold `resumed`'s data. Any
+      // mutation would, absent the guard, schedule a write that would file
+      // `resumed`'s content under `abandoned`'s key.
+      useWorkingCopyStore.getState().lockDesktop();
+      vi.advanceTimersByTime(1000); // well past the 500ms debounce window
+
+      // The orphan's write must be SKIPPED: `abandoned`'s record is untouched
+      // (not overwritten with `resumed`'s content) and the active pointer
+      // must NOT have been re-pinned back onto `abandoned`.
+      expect(localStorage.getItem(draftKey(abandoned))).toBe(abandonedRecordBefore);
+      expect(resolveActiveProjectKey()).toBe(resumed);
+
+      // `resumed`'s own record is also unaffected by the orphan (it never
+      // wrote to `resumed`'s key at all — it wrote nowhere).
+      const resumedEnvelope = JSON.parse(localStorage.getItem(draftKey(resumed))!) as DurableDraft;
+      expect(resumedEnvelope.projectKey).toBe(resumed);
     });
 
     it("coalesces rapid mutations into a single write — the debounce restarts rather than stacking", () => {

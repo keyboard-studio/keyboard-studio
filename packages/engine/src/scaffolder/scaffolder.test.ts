@@ -46,6 +46,16 @@ function makeTextResponse(text: string): Response {
   } as unknown as Response;
 }
 
+/** Binary (non-UTF8-decodable) response, for the icon / font siblings. */
+function makeBytesResponse(bytes: Uint8Array): Response {
+  return {
+    ok: true,
+    status: 200,
+    text: async () => new TextDecoder().decode(bytes),
+    arrayBuffer: async () => bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength),
+  } as unknown as Response;
+}
+
 function makeNotFoundResponse(): Response {
   return {
     ok: false,
@@ -163,7 +173,6 @@ describe("createScaffolderService", () => {
         "source/my_keyboard.kps",
         "source/my_keyboard.kvks",
         "source/my_keyboard.keyman-touch-layout",
-        "source/my_keyboard.ico",
         "source/welcome.htm",
         "source/readme.htm",
         "source/help/my_keyboard.php",
@@ -176,6 +185,56 @@ describe("createScaffolderService", () => {
       for (const path of requiredPaths) {
         expect(vfs.get(path), `missing: ${path}`).toBeDefined();
       }
+    });
+
+    // `source/<id>.ico` is in the spec §12 layout, but only a real icon belongs
+    // there. A zero-byte placeholder is indistinguishable from a missing icon to
+    // kmcmplib — it warns "Cannot open the bitmap or icon file for reading" and
+    // then emits ZERO artifacts — so an empty stub turned "this base has no icon"
+    // into a keyboard that silently compiles to nothing.
+    it("fabricates no icon when the base has none, and drops the &BITMAP reference", async () => {
+      const mockFetch = vi.fn().mockImplementation((url: string) => {
+        if (url.includes(".kmn")) return Promise.resolve(makeTextResponse(BASE_KMN));
+        return Promise.resolve(makeNotFoundResponse());
+      });
+
+      const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
+      const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard");
+
+      expect(vfs.get("source/my_keyboard.ico")).toBeUndefined();
+      expect(vfs.get("source/my_keyboard.kmn")!.content as string).not.toMatch(/&BITMAP/i);
+    });
+
+    it("carries the base's icon over as binary bytes and keeps its &BITMAP reference", async () => {
+      // A recognizable non-UTF8 byte run: a lone 0x80..0x8F sequence is invalid
+      // UTF-8, so a text round-trip would replace it with U+FFFD and the assertion
+      // on exact bytes would fail.
+      const iconBytes = new Uint8Array([0x00, 0x00, 0x01, 0x00, 0x80, 0x81, 0xff, 0xfe]);
+      const mockFetch = vi.fn().mockImplementation((url: string) => {
+        if (url.endsWith("base_keyboard.ico")) return Promise.resolve(makeBytesResponse(iconBytes));
+        if (url.includes(".kmn")) {
+          return Promise.resolve(
+            makeTextResponse(`store(&BITMAP) 'base_keyboard.ico'\n${BASE_KMN}`),
+          );
+        }
+        return Promise.resolve(makeNotFoundResponse());
+      });
+
+      const service = createScaffolderService({ fetchImpl: mockFetch as typeof fetch });
+      const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard");
+
+      // Renamed to the new id (the base's icon basename matched the base id), so
+      // the &BITMAP reference must follow it.
+      const ico = vfs.get("source/my_keyboard.ico");
+      expect(ico).toBeDefined();
+      expect(ico!.content).toBeInstanceOf(Uint8Array);
+      expect(Array.from(ico!.content as Uint8Array)).toEqual(Array.from(iconBytes));
+      // isBinary must be set, not left at VirtualFS.set's false default: the draft
+      // snapshot and the zip both read this flag.
+      expect(ico!.isBinary).toBe(true);
+      expect(vfs.get("source/my_keyboard.kmn")!.content as string).toContain(
+        "store(&BITMAP) 'my_keyboard.ico'",
+      );
     });
 
     it("runAllChecks returns no findings on scaffolded KMN", async () => {

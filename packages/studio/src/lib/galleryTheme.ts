@@ -114,6 +114,29 @@ export const galleryHeaderBtnStyle: CSSProperties = {
 };
 
 /**
+ * Method-card header ROW — lays the title-toggle button and the card's
+ * Apply control side by side on one line. Shared by MethodChooser
+ * (MechanismGallery.tsx) and TouchMethodChooser (TouchGallery.tsx); factored
+ * here so the two galleries can no longer drift apart (see file header).
+ */
+export const galleryCardHeaderRowStyle: CSSProperties = {
+  display: "flex",
+  alignItems: "center",
+};
+
+/**
+ * Title-toggle button INSIDE a card header row — the shared
+ * `galleryHeaderBtnStyle` (full-width, column-stacked title/summary) reduced
+ * to `width: "auto"` and told to `flex: 1` so it takes the row's remaining
+ * space beside the Apply control. Shared by both galleries' card headers.
+ */
+export const galleryHeaderTitleBtnStyle: CSSProperties = {
+  ...galleryHeaderBtnStyle,
+  width: "auto",
+  flex: 1,
+};
+
+/**
  * Inline config-panel wrapper shown below an expanded method-card header —
  * shared by MethodChooser and TouchMethodChooser.
  */

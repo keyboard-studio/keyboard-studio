@@ -1,12 +1,13 @@
-// CarveGalleryV2 — character-first carve gallery (#1399), behind the
-// VITE_CARVE_V2 / ?carvev2=1 flag (see carveAdapter.tsx). Sibling to
-// CarveGallery.tsx — that file (the rule/node "Rail" view) is untouched.
+// CarveGalleryV2 — character-first carve gallery. v2 is now the
+// default/live carve gallery, rendered unconditionally by carveAdapter.tsx.
+// The former rule/node "Rail" view (v1, CarveGallery.tsx) is retained but
+// commented out in carveAdapter.tsx for rollback.
 //
 // Shows every character the keyboard can type in one panel; the author
 // discards CHARACTERS, not rules. Toggling a character resolves its
 // contributors (irToCharacterView.ts, built on collectCharContributors) and
-// cascades through the SAME workingCopyStore actions CarveGallery already
-// uses (cascadeDelete/cascadeRestore) — no new write path.
+// cascades through the SAME workingCopyStore actions v1 (CarveGallery.tsx)
+// already uses (cascadeDelete/cascadeRestore) — no new write path.
 
 import { useState, useMemo, useCallback } from 'react';
 import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
@@ -68,6 +69,10 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   const removalCapabilities = useWorkingCopyStore((s) => s.removalCapabilities);
   const instantiationMode = useWorkingCopyStore((s) => s.instantiationMode);
   const confirmedInventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
+  // Target-language display name (e.g. "Russian"), sourced the same way Phase A's
+  // identity resolution already populates it — used only for the optional
+  // cross-script-Latin group's "...for a {name}-only keyboard" copy (RemovalBanner).
+  const identityDisplayName = useWorkingCopyStore((s) => s.identity?.displayName);
   const isItemDeleted = useWorkingCopyStore((s) => s.isItemDeleted);
   // Subscribed PURELY to force a re-render when the set mutates —
   // isItemDeleted above is a stable `(id) => get().deletedItemIds.has(id)`
@@ -99,6 +104,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     form: carveNormalizationForm,
     bcp47: identityBcp47,
     hasSignal,
+    blockCandidateChars,
   } = useCarveNeededSet();
 
   // Base characters the author chose to KEEP at the pre-carve convenience
@@ -120,9 +126,15 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
 
   const recommended = useMemo(
     () => (instantiationMode !== null && hasSignal && ir
-      ? recommendedRemovalChars({ ir, needed: neededSet, bcp47: identityBcp47, form: carveNormalizationForm })
+      ? recommendedRemovalChars({
+        ir,
+        needed: neededSet,
+        bcp47: identityBcp47,
+        form: carveNormalizationForm,
+        blockCandidateChars,
+      })
       : []),
-    [ir, instantiationMode, hasSignal, neededSet, identityBcp47, carveNormalizationForm],
+    [ir, instantiationMode, hasSignal, neededSet, identityBcp47, carveNormalizationForm, blockCandidateChars],
   );
   // irToCharacterView's internal lookup key is always NFC-normalized
   // (irToCharacterView.ts) — recommended[].ch is normalized to `form` (NFD on
@@ -215,7 +227,10 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   }
 
   return (
-    <div data-testid="carve-gallery-v2" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--app-bg)', color: 'var(--app-text)' }}>
+    // v2 adopts v1's e2e testid contract ("carve-gallery" / "carve-continue")
+    // now that v2 is the sole live carve gallery — keeps pass-through e2e
+    // specs green with zero edits.
+    <div data-testid="carve-gallery" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--app-bg)', color: 'var(--app-text)' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 22px', borderBottom: '1px solid var(--app-border)', flexShrink: 0 }}>
         {onBack !== undefined && (
@@ -244,7 +259,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
           Skip
         </button>
         <button
-          data-testid="carve-v2-continue"
+          data-testid="carve-continue"
           onClick={onComplete}
           style={{ font: '600 13px var(--app-font)', cursor: 'pointer', color: '#fff', background: 'var(--app-accent)', border: 'none', borderRadius: 8, padding: '9px 18px' }}
         >
@@ -256,6 +271,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
       <RemovalBanner
         recommended={recommended}
         languageLabel={identityBcp47 ?? 'your target language'}
+        languageDisplayName={identityDisplayName}
         onRemoveSelected={handleRemoveSelectedRecommended}
       />
 

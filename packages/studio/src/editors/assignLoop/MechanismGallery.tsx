@@ -157,6 +157,7 @@ import { CharScrollStrip } from "./parts/CharScrollStrip.tsx";
 import { getProducerBadge, allCharsCovered } from "./parts/charMechanisms.ts";
 import { UsesSequencesCard } from "./parts/UsesSequencesCard.tsx";
 import { GalleryEmptyState } from "./parts/GalleryEmptyState.tsx";
+import { GalleryCardApplyRow } from "./parts/GalleryCardApplyRow.tsx";
 import {
   RemovableChipRow,
   HoverDangerChip,
@@ -181,12 +182,13 @@ import {
   TEXT_DIM,
   TEXT_MAIN,
   FONT,
-  BLUE_ACTION,
   galleryGhostBtn as ghostBtn,
   galleryInputStyle as inputStyle,
   galleryForwardBtnStyle as forwardBtnStyle,
   gallerySelectMenuStyle,
   galleryHeaderBtnStyle as headerBtnStyle,
+  galleryCardHeaderRowStyle as cardHeaderRowStyle,
+  galleryHeaderTitleBtnStyle as headerTitleBtnStyle,
   galleryConfigStyle as configStyle,
   galleryCardStyle as cardStyle,
 } from "../../lib/galleryTheme.ts";
@@ -660,6 +662,10 @@ interface MethodChooserProps {
   modifierPool: ModifierToken[];
   /** Tokens already used elsewhere in the working IR — rendered bold + "(in use)". */
   modifierTokensInUse: ReadonlySet<ModifierToken>;
+  /** Whether the open card's fields currently form a committable assignment. */
+  canApply: boolean;
+  /** Commit the open card's entry — MechanismGallery's handleApply (plus unlock). */
+  onApply: () => void;
 }
 
 const DEADKEY_OPTIONS = [
@@ -687,6 +693,59 @@ const VALID_DEADKEY_TRIGGER_KEYS: ReadonlySet<string> = new Set(
 // it's used via GalleryEmptyState.tsx (the no-base-keyboard/no-inventory
 // guards) rather than inline.
 
+/**
+ * Apply control for the open method card — top-right of its header, on the
+ * same line as the card's title.
+ *
+ * Replaces the single shared "Apply method" button that used to sit below the
+ * whole chooser (and, briefly, a bottom-right-of-card placement): an author
+ * fills one card's fields top-to-bottom, so the commit belongs with THAT
+ * card rather than in a row serving all three. Only the selected card
+ * renders one, so exactly one Apply is ever on screen and "which method is
+ * this about to record?" stops being a question the layout can answer
+ * ambiguously.
+ *
+ * Deliberately NOT rendered for method === "sequence": that card holds no fields
+ * of its own (the builder opens in the right pane, in place of the live preview)
+ * and SequenceBuilderPanel owns its own Apply, so a button here would appear to
+ * commit something this card does not hold.
+ *
+ * Keeps the replaced button's `applyMethodAriaLabel` / `applyMethodButton`
+ * message ids verbatim — same accessible name, same catalog keys, so screen
+ * readers, the en/fr catalogs and every test that queries this control by
+ * accessible name are all unaffected by the move.
+ *
+ * Thin wrapper over the shared `GalleryCardApplyRow` (also used by
+ * TouchGallery's `TouchCardApplyRow`) — this component's only job is
+ * computing the aria-label with its own static message id, since the
+ * lingui `t` macro requires that id to be a literal, not a variable.
+ */
+function CardApplyRow({
+  currentChar,
+  canApply,
+  onApply,
+  testId,
+}: {
+  currentChar: string;
+  canApply: boolean;
+  onApply: () => void;
+  /** Per-method testid so a test can assert WHICH card holds the Apply. */
+  testId: string;
+}) {
+  const { t } = useLingui();
+  return (
+    <GalleryCardApplyRow
+      ariaLabel={t({
+        id: "editor.assignLoop.applyMethodAriaLabel",
+        message: `Apply method for ${currentChar}`,
+      })}
+      canApply={canApply}
+      onApply={onApply}
+      testId={testId}
+    />
+  );
+}
+
 function MethodChooser({
   currentChar,
   method,
@@ -707,6 +766,8 @@ function MethodChooser({
   onRemoveRaltSlot,
   modifierPool,
   modifierTokensInUse,
+  canApply,
+  onApply,
 }: MethodChooserProps) {
   const { t, i18n } = useLingui();
   const deadkeyBaseLetterResolveOptions =
@@ -806,30 +867,40 @@ function MethodChooser({
           per-character default method (see MechanismGallery's
           useState<Method>("swap")), so its card leads the list. */}
       <div style={cardStyle(method === "swap")}>
-        <button
-          type="button"
-          aria-pressed={method === "swap"}
-          onClick={() => onMethodChange("swap")}
-          style={headerBtnStyle}
-        >
-          <span
-            style={{
-              fontWeight: 600,
-              color: method === "swap" ? ACCENT : TEXT_MAIN,
-            }}
+        <div style={cardHeaderRowStyle}>
+          <button
+            type="button"
+            aria-pressed={method === "swap"}
+            onClick={() => onMethodChange("swap")}
+            style={headerTitleBtnStyle}
           >
-            <Trans id="editor.assignLoop.method.swap.title">
-              Assign to a key
-            </Trans>
-          </span>
-          {method !== "swap" && (
-            <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              <Trans id="editor.assignLoop.method.swap.summary">
-                Dedicate one physical key to produce {currentCharDisplay}
+            <span
+              style={{
+                fontWeight: 600,
+                color: method === "swap" ? ACCENT : TEXT_MAIN,
+              }}
+            >
+              <Trans id="editor.assignLoop.method.swap.title">
+                Assign to a key
               </Trans>
             </span>
+            {method !== "swap" && (
+              <span style={{ fontSize: 11, color: TEXT_DIM }}>
+                <Trans id="editor.assignLoop.method.swap.summary">
+                  Dedicate one physical key to produce {currentCharDisplay}
+                </Trans>
+              </span>
+            )}
+          </button>
+          {method === "swap" && (
+            <CardApplyRow
+              currentChar={currentChar}
+              canApply={canApply}
+              onApply={onApply}
+              testId="mechanism-apply-swap"
+            />
           )}
-        </button>
+        </div>
         {method === "swap" &&
           (() => {
             const filledRaltTokens = raltTokens.filter(
@@ -1179,31 +1250,41 @@ function MethodChooser({
 
       {/* S-02 — always shown */}
       <div style={cardStyle(method === "deadkey")}>
-        <button
-          type="button"
-          aria-pressed={method === "deadkey"}
-          onClick={() => onMethodChange("deadkey")}
-          style={headerBtnStyle}
-        >
-          <span
-            style={{
-              fontWeight: 600,
-              color: method === "deadkey" ? ACCENT : TEXT_MAIN,
-            }}
+        <div style={cardHeaderRowStyle}>
+          <button
+            type="button"
+            aria-pressed={method === "deadkey"}
+            onClick={() => onMethodChange("deadkey")}
+            style={headerTitleBtnStyle}
           >
-            <Trans id="editor.assignLoop.method.deadkey.title">
-              Tap a trigger key, then a letter
-            </Trans>
-          </span>
-          {method !== "deadkey" && (
-            <span style={{ fontSize: 11, color: TEXT_DIM }}>
-              <Trans id="editor.assignLoop.method.deadkey.summary">
-                Trigger &rarr; {deadkeyBaseSummaryDisplay} &rarr;{" "}
-                {currentCharDisplay}
+            <span
+              style={{
+                fontWeight: 600,
+                color: method === "deadkey" ? ACCENT : TEXT_MAIN,
+              }}
+            >
+              <Trans id="editor.assignLoop.method.deadkey.title">
+                Tap a trigger key, then a letter
               </Trans>
             </span>
+            {method !== "deadkey" && (
+              <span style={{ fontSize: 11, color: TEXT_DIM }}>
+                <Trans id="editor.assignLoop.method.deadkey.summary">
+                  Trigger &rarr; {deadkeyBaseSummaryDisplay} &rarr;{" "}
+                  {currentCharDisplay}
+                </Trans>
+              </span>
+            )}
+          </button>
+          {method === "deadkey" && (
+            <CardApplyRow
+              currentChar={currentChar}
+              canApply={canApply}
+              onApply={onApply}
+              testId="mechanism-apply-deadkey"
+            />
           )}
-        </button>
+        </div>
         {method === "deadkey" && (
           <div style={configStyle}>
             <div
@@ -4373,6 +4454,14 @@ export function MechanismGallery({
               onRemoveRaltSlot={handleRemoveRaltSlot}
               modifierPool={modifierPool}
               modifierTokensInUse={modifierTokensInUse}
+              canApply={canApply}
+              // Auto-unlock on first edit — see handleUnlock. Same wrapper the
+              // shared Apply button carried before the control moved into the
+              // cards, so applying from a locked gallery still unlocks first.
+              onApply={() => {
+                if (locked) handleUnlock();
+                handleApply();
+              }}
             />
 
             {/* Case-pair companion proposal — propose-then-confirm, never
@@ -4664,13 +4753,17 @@ export function MechanismGallery({
               modality="physical"
             />
 
-            {/* Apply + Mark for later review. Back and Next/Done live in the
+            {/* Mark for later review. Back and Next/Done live in the
                   shared top toolbar row above (see leftContent's top of
                   pane) so the forward-advance control is spatially separated
-                  from these editing actions. The generic "Apply method"
-                  button is hidden for method === "sequence" — the sequence
-                  builder (right pane, see rightContent below) owns its own
-                  Apply.
+                  from these editing actions.
+                  Apply no longer lives here: it moved into the header of
+                  whichever method card is open (CardApplyRow, top-right, same
+                  line as the card's title), so the commit sits with the card
+                  it commits instead of in a row shared by all three methods.
+                  The "hidden for method === 'sequence'"
+                  special case went with it — that card simply renders no Apply,
+                  because SequenceBuilderPanel in the right pane owns its own.
                   "Mark for later review" replaces the old "Skip this
                   character" control (mechanism-gallery-progression):
                   Skip previously advanced the walk while recording nothing,
@@ -4690,36 +4783,6 @@ export function MechanismGallery({
                 alignItems: "center",
               }}
             >
-              {method !== "sequence" && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    // Auto-unlock on first edit — see handleUnlock.
-                    if (locked) handleUnlock();
-                    handleApply();
-                  }}
-                  disabled={!canApply}
-                  aria-label={t({
-                    id: "editor.assignLoop.applyMethodAriaLabel",
-                    message: `Apply method for ${currentChar}`,
-                  })}
-                  style={{
-                    padding: "9px 20px",
-                    background: canApply ? BLUE_ACTION : "#21262d",
-                    border: "none",
-                    borderRadius: 6,
-                    color: canApply ? "#e6edf3" : TEXT_DIM,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: canApply ? "pointer" : "not-allowed",
-                    fontFamily: FONT,
-                  }}
-                >
-                  <Trans id="editor.assignLoop.applyMethodButton">
-                    Apply method
-                  </Trans>
-                </button>
-              )}
               <button
                 type="button"
                 onClick={() => {

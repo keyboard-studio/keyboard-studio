@@ -13,6 +13,7 @@ export { LOCAL_PROXY_BASE };
 import { findKmnPath } from "../lib/findKmnPath.ts";
 import { findTouchLayoutPath } from "../lib/findTouchLayoutPath.ts";
 import { readVfsText } from "../lib/vfsText.ts";
+import { recoverFromStaleChunk } from "../crash/staleChunk.ts";
 
 interface EngineModule {
   compile: (fs: VirtualFS, keyboardId: string) => Promise<CompileResult>;
@@ -41,6 +42,16 @@ interface EngineModule {
    * dangling reference must be stripped or the preview shows nothing.
    */
   stripDanglingAssetStores?: (kmn: string, fs: VirtualFS) => { kmn: string; stripped: string[] };
+  /**
+   * Drop a `store(&BITMAP)` icon reference whose file is absent from the VFS.
+   * Unlike {@link stripDanglingAssetStores}, this mutates the WORKING COPY, not
+   * a preview snapshot: an icon reference with nothing behind it is a package
+   * that will not build (kmcmplib emits zero artifacts), so it must not survive
+   * into the shipped `.kmn` either. Called once per fetch on the open-base path
+   * — see the Track 1 scaffolder equivalent this mirrors,
+   * `dropBitmapStoreIfUnbacked` in `packages/engine/src/scaffolder/index.ts`.
+   */
+  dropUnbackedBitmapStore?: (kmn: string, fs: VirtualFS) => { kmn: string; dropped: string | null };
 }
 
 /**
@@ -94,11 +105,16 @@ export function engineLoadFailureMessage(failure: unknown): string {
   return parts.join(" | ");
 }
 
+// No `importOrReload` wrapper here, deliberately. This hook has exactly ONE
+// consumer of loadEngine() — the engineReadyPromise below — and its catch
+// already routes through `recoverFromStaleChunk`, covering the `init()` call
+// (the kmc-kmn chunk, the path this bug was reported on) as well as this
+// import. Recovering here too would mean two detections of one failure: the
+// first reloads, the second lands inside the cooldown and is counted as
+// "reloading didn't help".
 async function loadEngine(): Promise<EngineModule | null> {
   try {
-    const mod = await import(
-      /* @vite-ignore */ "@keyboard-studio/engine"
-    );
+    const mod = await import(/* @vite-ignore */ "@keyboard-studio/engine");
     if (
       typeof mod.compile === "function" &&
       typeof mod.fetchKeyboardSourceToVfs === "function" &&
@@ -458,7 +474,8 @@ export function useKeyboardArtifact(
 
       // Strip dangling packaging-asset references before compiling for preview.
       // If the base names a BITMAP / VISUALKEYBOARD / LAYOUTFILE that wasn't
-      // fetched into the VFS, kmcmplib produces ZERO artifacts (only a warning),
+      // fetched into the VFS, kmcmplib produces ZERO artifacts while the
+      // diagnostic arrives under the engine's own "warning" severity fallback,
       // which surfaces as "no usable artifacts" and a blank preview. The preview
       // needs none of these assets; present ones are kept (full-quality OSK).
       // The output/zip path serializes the IR separately and is unaffected.
@@ -634,6 +651,17 @@ export function useKeyboardArtifact(
     try {
       await engineReadyPromise.current;
     } catch (err: unknown) {
+      // A deployment that landed while this tab was open deletes the hashed
+      // chunk the engine (and, through it, kmc-kmn) is imported from, so the
+      // load fails with a module-script/MIME error no retry in this document
+      // can fix. Reload instead of stranding the preview on "VFS load failed".
+      //
+      // `err` is the friendly synthetic string above, whose `cause` is the
+      // original rejection loadEngine() preserved (FR-005a) —
+      // `recoverFromStaleChunk` walks the chain, so the classifier matches the
+      // real text rather than the wrapper. The single recovery point for both
+      // the import and `init()`; see the note above loadEngine().
+      if (recoverFromStaleChunk(err)) return;
       if (runId.current !== thisRunId) return;
       const message =
         err instanceof Error ? err.message : "WASM engine failed to load";
@@ -714,6 +742,27 @@ export function useKeyboardArtifact(
         // `.kmw-keyboard-<id>` rules (key colors, font-family bindings, etc.)
         // paint the preview the same way they paint a real install.
         prevKeyboardCssBlobUrls.current = buildCssBlobUrls(fetchResult.stylesheets ?? []);
+
+        // The base's icon came across with the rest of source/ (loader). If it
+        // did NOT — an optional sibling the loader could not fetch — the
+        // reference now names a file nobody has, and kmcmplib answers that by
+        // emitting zero artifacts. Track 2 preserves identity (no rename), so
+        // this reads straight off kb.id's .kmn — the same working-copy VFS the
+        // download/output path serializes. Mirrors
+        // the Track 1 scaffolder's dropBitmapStoreIfUnbacked; see EngineModule's
+        // dropUnbackedBitmapStore docstring for why this can't just be the
+        // preview-only stripDanglingAssetStores above.
+        const openBaseKmnPath = findKmnPath(vfs);
+        const openBaseKmnText = openBaseKmnPath ? readVfsText(vfs, openBaseKmnPath) : undefined;
+        if (openBaseKmnPath && openBaseKmnText !== undefined && engineRef.current.dropUnbackedBitmapStore) {
+          const { kmn: cleaned, dropped } = engineRef.current.dropUnbackedBitmapStore(openBaseKmnText, vfs);
+          if (dropped !== null) {
+            vfs.set(openBaseKmnPath, cleaned, false);
+            scaffoldWarnings.push(
+              `icon '${dropped}' was not available, so the &BITMAP reference was dropped; the keyboard builds without an icon`,
+            );
+          }
+        }
       }
     } catch (err: unknown) {
       if (runId.current !== thisRunId) return;

@@ -28,6 +28,7 @@ import {
 import type { StepWalkPositions } from "../lib/stepWalk.ts";
 import { secondaryButton, primaryButton } from "./surveyStyles.ts";
 import { handleEnterToAdvance } from "./enterToAdvance.ts";
+import { WARNING } from "../ui/theme.ts";
 
 // ---------------------------------------------------------------------------
 // Condition evaluator
@@ -264,6 +265,24 @@ export interface SurveyRunnerProps {
    */
   getSeedProvenance?: (questionId: string) => LangtagsProvenance | undefined;
   /**
+   * Called at render with the current question id and its LIVE value (the
+   * same value passed to QuestionField, including uncommitted typing — not
+   * just the last committed answer) to surface a non-blocking warning caption
+   * beneath the field. Return a message to show it, or undefined for none.
+   *
+   * Purely advisory, like getSeedProvenance's caption: it never gates Next or
+   * blocks auto-advance. Introduced for il_language_code (spec discussion,
+   * not yet a numbered spec item) to flag when a typed/selected code resolves
+   * to a different language than the one already picked at
+   * il_language_english — a mistake nothing else in the validator layers
+   * catches, since Layer A' only checks bcp47 presence, not correctness.
+   *
+   * Takes priority over getSeedProvenance's caption when both would fire —
+   * showing "this code looks wrong" is more actionable than "this was
+   * suggested from langtags" for the same field at the same time.
+   */
+  getFieldWarning?: (questionId: string, value: string | string[] | undefined) => string | undefined;
+  /**
    * Called when rendering a question to retrieve DYNAMIC datalist options — e.g.
    * the resolved langtags entry's local names for il_language_autonym (spec 030
    * US2). When it returns a non-empty array, SurveyRunner uses it as the field's
@@ -326,6 +345,7 @@ export function SurveyRunner({
   onAnswerCommit,
   getSeedValue,
   getSeedProvenance,
+  getFieldWarning,
   getSeedOptions,
   getNextOverride,
   onEntryResolved,
@@ -348,6 +368,8 @@ export function SurveyRunner({
   getSeedValueRef.current = getSeedValue;
   const getSeedProvenanceRef = useRef(getSeedProvenance);
   getSeedProvenanceRef.current = getSeedProvenance;
+  const getFieldWarningRef = useRef(getFieldWarning);
+  getFieldWarningRef.current = getFieldWarning;
   const getSeedOptionsRef = useRef(getSeedOptions);
   getSeedOptionsRef.current = getSeedOptions;
   const getNextOverrideRef = useRef(getNextOverride);
@@ -908,11 +930,33 @@ export function SurveyRunner({
           {...(findingsByQuestionId !== undefined ? { findingsByQuestionId } : {})}
         />
 
-        {/* Provenance caption — only rendered when the current question was seeded
-            from langtags (FR-007). The aria-live region announces the caption to
-            screen readers when it appears. The caption is purely informational;
-            it does not block or gate the input (FR-008). */}
+        {/* Field warning / provenance caption — at most one renders. The warning
+            (getFieldWarning) takes priority when both apply: it is the more
+            actionable message, and it recomputes on every keystroke since it
+            reads the LIVE value, not just the seed. The provenance caption
+            (FR-007) is purely informational and does not block or gate the
+            input (FR-008); the warning is equally non-gating — it flags a
+            likely mistake without preventing Next or auto-advance. Both ride
+            the same aria-live region so only one is ever announced. */}
         {(() => {
+          const warning = getFieldWarningRef.current?.(currentQId, value);
+          if (warning !== undefined) {
+            return (
+              <p
+                role="status"
+                aria-live="polite"
+                style={{
+                  margin: 0,
+                  fontSize: 12,
+                  color: WARNING,
+                  fontStyle: "italic",
+                  lineHeight: 1.5,
+                }}
+              >
+                {warning}
+              </p>
+            );
+          }
           const provenance = getSeedProvenanceRef.current?.(currentQId);
           if (provenance === undefined) return null;
           return (

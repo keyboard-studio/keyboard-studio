@@ -516,4 +516,166 @@ describe("SelectMenu", () => {
     expect(trigger.getAttribute("aria-labelledby")).toBe("sp-label");
     expect(trigger.getAttribute("aria-describedby")).toBe("sp-note");
   });
+
+  // Explicit regression guard for the default commitMode ("onHighlight"):
+  // proves the new commitMode prop's default path is bit-for-bit the
+  // pre-existing selection-follows-focus contract every current consumer
+  // (LocaleSwitcher, MultiSelect-adjacent pickers, etc.) relies on. The test
+  // above already exercises this incidentally; this one names the guarantee
+  // directly and does not rely on any `commitMode` prop being passed at all.
+  it("commitMode default ('onHighlight'): ArrowDown still calls onChange immediately, same as before this prop existed", () => {
+    const onChange = vi.fn();
+    render(<SelectMenu options={OPTIONS} value="a" onChange={onChange} />);
+    fireEvent.click(screen.getByRole("button"));
+    const listbox = screen.getByRole("listbox");
+    fireEvent.keyDown(listbox, { key: "ArrowDown" });
+    expect(onChange).toHaveBeenCalledWith("b");
+    expect(onChange).toHaveBeenCalledTimes(1);
+  });
+
+  describe('commitMode="onExplicitSelect" (arrow moves the highlight only; Enter/Space/click commits)', () => {
+    it("ArrowDown/ArrowUp move the highlight and update aria-activedescendant WITHOUT calling onChange", () => {
+      const onChange = vi.fn();
+      render(
+        <SelectMenu
+          id="explicit-select"
+          options={OPTIONS}
+          value="a"
+          onChange={onChange}
+          commitMode="onExplicitSelect"
+        />,
+      );
+      fireEvent.click(screen.getByRole("button"));
+      const listbox = screen.getByRole("listbox");
+      const alpha = screen.getByRole("option", { name: "Alpha" });
+      const beta = screen.getByRole("option", { name: "Beta" });
+      expect(listbox.getAttribute("aria-activedescendant")).toBe(alpha.id);
+
+      fireEvent.keyDown(listbox, { key: "ArrowDown" });
+      expect(onChange).not.toHaveBeenCalled();
+      expect(listbox.getAttribute("aria-activedescendant")).toBe(beta.id);
+
+      fireEvent.keyDown(listbox, { key: "ArrowUp" });
+      expect(onChange).not.toHaveBeenCalled();
+      expect(listbox.getAttribute("aria-activedescendant")).toBe(alpha.id);
+    });
+
+    it("Enter on the highlighted option commits (calls onChange exactly once) and closes the list", () => {
+      const onChange = vi.fn();
+      render(
+        <SelectMenu
+          id="explicit-select"
+          options={OPTIONS}
+          value="a"
+          onChange={onChange}
+          commitMode="onExplicitSelect"
+        />,
+      );
+      fireEvent.click(screen.getByRole("button"));
+      const listbox = screen.getByRole("listbox");
+      fireEvent.keyDown(listbox, { key: "ArrowDown" });
+      expect(onChange).not.toHaveBeenCalled();
+
+      fireEvent.keyDown(listbox, { key: "Enter" });
+      expect(onChange).toHaveBeenCalledWith("b");
+      expect(onChange).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole("listbox")).toBeNull();
+    });
+
+    it("Space on the highlighted option also commits", () => {
+      const onChange = vi.fn();
+      render(
+        <SelectMenu
+          id="explicit-select"
+          options={OPTIONS}
+          value="a"
+          onChange={onChange}
+          commitMode="onExplicitSelect"
+        />,
+      );
+      fireEvent.click(screen.getByRole("button"));
+      const listbox = screen.getByRole("listbox");
+      fireEvent.keyDown(listbox, { key: "ArrowDown" });
+      fireEvent.keyDown(listbox, { key: " " });
+      expect(onChange).toHaveBeenCalledWith("b");
+      expect(onChange).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole("listbox")).toBeNull();
+    });
+
+    it("Escape closes without committing — no onChange, and the trigger still shows the original value", () => {
+      const onChange = vi.fn();
+      render(
+        <SelectMenu
+          id="explicit-select"
+          options={OPTIONS}
+          value="a"
+          onChange={onChange}
+          commitMode="onExplicitSelect"
+        />,
+      );
+      const trigger = screen.getByRole("button");
+      fireEvent.click(trigger);
+      const listbox = screen.getByRole("listbox");
+      // Traverse away from the true selection before abandoning.
+      fireEvent.keyDown(listbox, { key: "ArrowDown" });
+      fireEvent.keyDown(listbox, { key: "Escape" });
+
+      expect(onChange).not.toHaveBeenCalled();
+      expect(screen.queryByRole("listbox")).toBeNull();
+      // No phantom selection: the trigger's displayed value is still the
+      // real `value` prop ("a"/"Alpha"), never the abandoned highlight
+      // ("b"/"Beta").
+      expect(trigger.textContent).toContain("Alpha");
+      expect(trigger.getAttribute("data-value")).toBe("a");
+    });
+
+    it("aria-selected marks the genuinely selected option throughout traversal, distinct from aria-activedescendant on the highlight", () => {
+      render(
+        <SelectMenu
+          id="explicit-select"
+          options={OPTIONS}
+          value="a"
+          onChange={() => undefined}
+          commitMode="onExplicitSelect"
+        />,
+      );
+      fireEvent.click(screen.getByRole("button"));
+      const listbox = screen.getByRole("listbox");
+      const alpha = screen.getByRole("option", { name: "Alpha" });
+      const beta = screen.getByRole("option", { name: "Beta" });
+
+      fireEvent.keyDown(listbox, { key: "ArrowDown" });
+
+      // The highlight has moved to Beta (aria-activedescendant), but the
+      // real selection is still Alpha (aria-selected) — onChange was never
+      // called under this mode by an arrow press alone.
+      expect(listbox.getAttribute("aria-activedescendant")).toBe(beta.id);
+      expect(alpha.getAttribute("aria-selected")).toBe("true");
+      expect(beta.getAttribute("aria-selected")).toBe("false");
+    });
+
+    it("re-syncs the highlight to the true value on a fresh open, not wherever a previous abandoned traversal left off", () => {
+      const onChange = vi.fn();
+      render(
+        <SelectMenu
+          id="explicit-select"
+          options={OPTIONS}
+          value="a"
+          onChange={onChange}
+          commitMode="onExplicitSelect"
+        />,
+      );
+      const trigger = screen.getByRole("button");
+      fireEvent.click(trigger);
+      let listbox = screen.getByRole("listbox");
+      fireEvent.keyDown(listbox, { key: "ArrowDown" }); // highlight -> Beta
+      fireEvent.keyDown(listbox, { key: "Escape" }); // abandon, no commit
+
+      fireEvent.click(trigger); // reopen
+      listbox = screen.getByRole("listbox");
+      const alpha = screen.getByRole("option", { name: "Alpha" });
+      expect(listbox.getAttribute("aria-activedescendant")).toBe(alpha.id);
+      expect(onChange).not.toHaveBeenCalled();
+    });
+  });
 });

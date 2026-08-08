@@ -92,6 +92,31 @@ export interface SelectMenuProps {
    * `options` membership check.
    */
   resolveKeyToValue?: (event: React.KeyboardEvent) => string | null;
+  /**
+   * Separates arrow-key *highlight* movement from *commit* (calling
+   * `onChange`). Defaults to `"onHighlight"` — today's contract, unchanged
+   * for every existing call site: ArrowUp/ArrowDown call `onChange`
+   * immediately as the highlight moves (selection-follows-focus), so
+   * `aria-activedescendant` always tracks the same option `aria-selected`
+   * marks. Harmless for a consumer like LocaleSwitcher, where `onChange` is
+   * just picking a value.
+   *
+   * `"onExplicitSelect"` is for a consumer where `onChange` has a real side
+   * effect beyond picking a value (e.g. CurrentKeyboardIndicator, which
+   * resumes a different project and navigates on `onChange`) — a
+   * keyboard-only user arrowing through the list must not trigger that
+   * side effect on every keypress. Under this mode, arrow keys move a
+   * local highlight and update `aria-activedescendant` WITHOUT calling
+   * `onChange`; `onChange` fires only on Enter/Space on the highlighted
+   * option, or a click. Escape/Tab close the list without committing — the
+   * highlight is local state that is never written back to `value`, so an
+   * abandoned traversal leaves no phantom selection and the trigger keeps
+   * showing the real, unchanged selection throughout. `aria-selected`
+   * continues to mark the genuinely selected (`value`-matching) option, not
+   * the highlight — `aria-activedescendant` is the only attribute that
+   * moves with the highlight.
+   */
+  commitMode?: "onHighlight" | "onExplicitSelect";
 }
 
 const TRIGGER_STYLE: React.CSSProperties = {
@@ -247,11 +272,16 @@ const OPTION_ROW_CLASSNAME = "ks-hit-target";
  * handling depends on this focus hand-off — without it the list's
  * onKeyDown is dead code, since focus never leaves the trigger button.
  *
- * Active-option announcement: arrow keys commit the selection immediately
- * (selection-follows-focus, see handleListKeyDown), so the `<ul>` carries
- * `aria-activedescendant` pointing at the selected option's id and it
- * updates on every ArrowUp/ArrowDown — assistive tech announces the active
- * option without a separate highlighted-vs-selected distinction.
+ * Active-option announcement: under the default `commitMode` ("onHighlight"),
+ * arrow keys commit the selection immediately (selection-follows-focus, see
+ * handleListKeyDown), so the `<ul>`'s `aria-activedescendant` points at the
+ * selected option's id and updates on every ArrowUp/ArrowDown — assistive
+ * tech announces the active option without a separate
+ * highlighted-vs-selected distinction. Under `commitMode="onExplicitSelect"`
+ * the highlight (`highlightedValue`) is tracked separately from the
+ * committed `value` — `aria-activedescendant` follows the highlight,
+ * `aria-selected` stays on the true selection, and only Enter/Space/click
+ * commits (see the `commitMode` prop doc comment).
  */
 export function SelectMenu({
   options,
@@ -265,7 +295,9 @@ export function SelectMenu({
   style,
   renderOptionLabel = defaultRenderLabel,
   resolveKeyToValue,
+  commitMode = "onHighlight",
 }: SelectMenuProps): React.ReactElement {
+  const isExplicitSelect = commitMode === "onExplicitSelect";
   const [open, setOpen] = useState(false);
   // null until the first position computation after opening (see the
   // layout effect below) — the portalled list only renders once this is
@@ -280,17 +312,40 @@ export function SelectMenu({
   // portalled `<ul>` rather than a plain `ref={listRef}`.
   const listRef = useRef<HTMLUListElement | null>(null);
 
+  // Only meaningful under commitMode="onExplicitSelect" (see that prop's doc
+  // comment) — tracks the arrow-key highlight separately from the committed
+  // `value`, so traversal never calls `onChange` until Enter/Space/click.
+  // Unused under the default "onHighlight" mode (highlightedOption below
+  // falls back to selectedOption in that mode), so this state's existence
+  // has no effect on that path.
+  const [highlightedValue, setHighlightedValue] = useState<string>(value);
+
+  // Re-syncs the highlight to the true current selection every time the menu
+  // opens, so a fresh open always highlights `value` rather than wherever a
+  // previous open's abandoned traversal left off.
+  useEffect(() => {
+    if (open) {
+      setHighlightedValue(value);
+    }
+  }, [open, value]);
+
   const selectedOption = options.find((opt) => opt.value === value);
   const listId = id !== undefined ? `${id}-listbox` : undefined;
-  // Arrow-key navigation here commits the selection immediately (see
-  // handleListKeyDown below) — selection-follows-focus — so the "active"
-  // option for a11y purposes IS always the currently-selected option; no
-  // separate highlightedIndex is needed. Guarded on `id` being defined:
-  // without it there is no stable option id to reference, so omit the
-  // attribute rather than emit a broken `undefined-option-...` ref.
+  // Under the default "onHighlight" mode, arrow-key navigation commits the
+  // selection immediately (see handleListKeyDown below) — selection-
+  // follows-focus — so the "active" option for a11y purposes IS always the
+  // currently-selected option. Under "onExplicitSelect", the highlight can
+  // differ from the committed selection while traversing (see
+  // highlightedValue above).
+  const highlightedOption = isExplicitSelect
+    ? options.find((opt) => opt.value === highlightedValue)
+    : selectedOption;
+  // Guarded on `id` being defined: without it there is no stable option id
+  // to reference, so omit the attribute rather than emit a broken
+  // `undefined-option-...` ref.
   const activeDescendantId =
-    id !== undefined && selectedOption !== undefined
-      ? `${id}-option-${selectedOption.value}`
+    id !== undefined && highlightedOption !== undefined
+      ? `${id}-option-${highlightedOption.value}`
       : undefined;
 
   const close = useCallback(() => {
@@ -480,7 +535,12 @@ export function SelectMenu({
     }
     if (e.key === "ArrowDown" || e.key === "ArrowUp") {
       e.preventDefault();
-      const currentIndex = options.findIndex((opt) => opt.value === value);
+      // Under "onExplicitSelect", navigate relative to the current
+      // highlight (not the committed `value`) — see the commitMode prop's
+      // doc comment. Under the default mode these are the same value.
+      const currentIndex = options.findIndex(
+        (opt) => opt.value === (isExplicitSelect ? highlightedValue : value),
+      );
       const delta = e.key === "ArrowDown" ? 1 : -1;
       const nextIndex =
         currentIndex === -1
@@ -488,11 +548,27 @@ export function SelectMenu({
           : (currentIndex + delta + options.length) % options.length;
       const nextOption = options[nextIndex];
       if (nextOption !== undefined) {
-        onChange(nextOption.value);
+        if (isExplicitSelect) {
+          // Move the highlight only — no onChange, no commit.
+          setHighlightedValue(nextOption.value);
+        } else {
+          onChange(nextOption.value);
+        }
       }
-    } else if (e.key === "Enter") {
+    } else if (e.key === "Enter" || (isExplicitSelect && e.key === " ")) {
       e.preventDefault();
-      closeAndRefocusTrigger();
+      if (isExplicitSelect) {
+        // Commit the highlighted option now — the one place under this
+        // mode that calls onChange from the keyboard.
+        const matched = options.find((opt) => opt.value === highlightedValue);
+        if (matched !== undefined) {
+          selectOption(matched);
+        } else {
+          closeAndRefocusTrigger();
+        }
+      } else {
+        closeAndRefocusTrigger();
+      }
     }
   };
 

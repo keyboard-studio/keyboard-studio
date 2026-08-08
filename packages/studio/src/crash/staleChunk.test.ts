@@ -13,10 +13,14 @@
 // silently disables crash reporting for every genuine engine failure, which is
 // a strictly worse bug than the flood.
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import {
   handleStaleChunkFailure,
+  importOrReload,
+  isStaleChunkError,
   isStaleChunkFailure,
+  recoverFromStaleChunk,
+  setStaleChunkReload,
   STALE_CHUNK_RELOAD_WINDOW_MS,
   STALE_CHUNK_RELOAD_KEY,
   _resetStaleChunkState,
@@ -88,6 +92,14 @@ describe("stale-chunk pattern (FR-051)", () => {
     ["Chrome", CHROME_CHUNK_404],
     ["Firefox", "error loading dynamically imported module"],
     ["Safari", "Importing a module script failed."],
+    // The SPA catch-all rewrite used to answer a missing chunk with index.html,
+    // so the browser complained about the MIME type instead of the 404. The
+    // rewrite is fixed, but tabs open across that deploy still say this.
+    [
+      "Chrome's module-script MIME complaint",
+      'Failed to load module script: Expected a JavaScript-or-Wasm module script but the server responded with a MIME type of "text/html".',
+    ],
+    ["Vite's CSS preload helper", "Unable to preload CSS for /assets/index-abc.css"],
   ])("matches the %s wording", (_browser, message) => {
     expect(isStaleChunkFailure(message)).toBe(true);
   });
@@ -181,5 +193,147 @@ describe("one-shot reload gate", () => {
     });
     expect(handled).toBe(false);
     expect(reloads).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The import-site entry point — same gate, thrown value instead of a message
+// ---------------------------------------------------------------------------
+//
+// `globalHandlers.ts` only sees what nobody caught. An import site that catches
+// its own rejection (services.ts's engine seam, useKeyboardArtifact) therefore
+// has to classify it itself, and it holds the thrown value with its `cause`
+// chain intact rather than a flattened string.
+
+describe("isStaleChunkError (thrown values)", () => {
+  it.each([
+    ["Chrome dynamic import", CHROME_CHUNK_404],
+    [
+      "Chrome module script MIME",
+      'Failed to load module script: Expected a JavaScript-or-Wasm module script but the server responded with a MIME type of "text/html".',
+    ],
+    ["Firefox", "error loading dynamically imported module: /assets/main-abc.js"],
+    ["Safari", "Importing a module script failed."],
+    ["Vite CSS preload", "Unable to preload CSS for /assets/index-abc.css"],
+  ])("recognises the %s phrasing", (_label, message) => {
+    expect(isStaleChunkError(new Error(message))).toBe(true);
+  });
+
+  it("sees through the engine's CompilerLoadError wrapping", () => {
+    // What the studio actually receives when the kmc-kmn chunk is the missing
+    // one: the engine re-reports it rather than rethrowing verbatim.
+    expect(isStaleChunkError(new Error(`kmc-kmn load failed: ${CHROME_CHUNK_404}`))).toBe(true);
+  });
+
+  it("sees through a cause chain", () => {
+    const wrapped = new Error("VFS load failed", { cause: new Error(CHROME_CHUNK_404) });
+    expect(isStaleChunkError(wrapped)).toBe(true);
+  });
+
+  it("does not match unrelated failures", () => {
+    expect(isStaleChunkError(new Error("compile failed: syntax error"))).toBe(false);
+    expect(isStaleChunkError(new TypeError("Failed to fetch"))).toBe(false);
+    expect(isStaleChunkError(null)).toBe(false);
+  });
+});
+
+describe("recoverFromStaleChunk", () => {
+  const reload = vi.fn();
+
+  beforeEach(() => {
+    reload.mockClear();
+    setStaleChunkReload(reload);
+  });
+
+  it("uses the reload main.tsx registered — the one that flushes the draft", () => {
+    // Registered, not passed: the import sites have no `reload` argument to
+    // give, which is exactly how the draft flush reached them.
+    expect(recoverFromStaleChunk(new Error(CHROME_CHUNK_404))).toBe(true);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("leaves unrelated errors alone", () => {
+    expect(recoverFromStaleChunk(new Error("network offline"))).toBe(false);
+    expect(reload).not.toHaveBeenCalled();
+  });
+
+  it("reloads at most once per window so a broken deploy cannot loop", () => {
+    expect(recoverFromStaleChunk(new Error(CHROME_CHUNK_404), { now: NOW })).toBe(true);
+    expect(recoverFromStaleChunk(new Error(CHROME_CHUNK_404), { now: NOW + 1_000 })).toBe(false);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("shares its one cooldown with the window-level entry point", () => {
+    // The failure Vite reports globally and the rejection the importing code
+    // catches are the SAME failure. Two gates would reload twice for it.
+    expect(handleStaleChunkFailure(CHROME_CHUNK_404, { now: NOW })).toBe(true);
+    expect(recoverFromStaleChunk(new Error(CHROME_CHUNK_404), { now: NOW })).toBe(false);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("recovers again once the window has elapsed", () => {
+    recoverFromStaleChunk(new Error(CHROME_CHUNK_404), { now: NOW });
+    expect(
+      recoverFromStaleChunk(new Error(CHROME_CHUNK_404), {
+        now: NOW + STALE_CHUNK_RELOAD_WINDOW_MS + 1,
+      }),
+    ).toBe(true);
+    expect(reload).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("importOrReload", () => {
+  const reload = vi.fn();
+
+  beforeEach(() => {
+    reload.mockClear();
+    setStaleChunkReload(reload);
+  });
+
+  it("passes the module through on success", async () => {
+    await expect(importOrReload(async () => "mod")).resolves.toBe("mod");
+    expect(reload).not.toHaveBeenCalled();
+  });
+
+  it("reloads and still rethrows on a stale chunk", async () => {
+    // Always rethrows: the caller's own error path still runs, because a
+    // reload that the cooldown suppressed must not look like a success.
+    const err = new Error(CHROME_CHUNK_404);
+    await expect(importOrReload(() => Promise.reject(err))).rejects.toBe(err);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("rethrows an unrelated failure without reloading", async () => {
+    const err = new Error("engine init failed");
+    await expect(importOrReload(() => Promise.reject(err))).rejects.toBe(err);
+    expect(reload).not.toHaveBeenCalled();
+  });
+});
+
+describe("the engine-load path recovers on the original text (FR-005a)", () => {
+  const reload = vi.fn();
+
+  beforeEach(() => {
+    reload.mockClear();
+    setStaleChunkReload(reload);
+  });
+
+  it("recovers from the synthetic wrapper useKeyboardArtifact throws", () => {
+    // Exactly the value that reaches the engineReadyPromise catch:
+    // loadEngine() collapses the rejection to `null` and preserves it, the
+    // caller shows the author the friendly string and carries the truth as
+    // `cause`. If recovery matched only the outer message this would be false,
+    // and the tab would sit on "VFS load failed" until reloaded by hand.
+    const thrown = new Error(SYNTHETIC, { cause: new Error(CHROME_CHUNK_404) });
+    expect(recoverFromStaleChunk(thrown)).toBe(true);
+    expect(reload).toHaveBeenCalledTimes(1);
+  });
+
+  it("still lets a genuine engine failure through to filing", () => {
+    const thrown = new Error(SYNTHETIC, {
+      cause: new Error("WebAssembly.instantiate(): expected magic word"),
+    });
+    expect(recoverFromStaleChunk(thrown)).toBe(false);
+    expect(reload).not.toHaveBeenCalled();
   });
 });

@@ -40,6 +40,27 @@ Exported — not module-private — so tests assert against the constant rather 
 `sessionStorage` keys: `ks.staleChunkReloadedAt` (FR-052) and the per-fingerprint dedupe cache
 (FR-101).
 
+**One key, one cooldown, one owner.** `src/crash/staleChunk.ts` is the only module allowed to hold
+the reload gate. A second module tracking the same failure class with its own key gives the same
+deploy two reloads and lets the two pattern lists drift apart — so the import-site helpers below live
+here rather than beside their callers.
+
+## Carve-out entry points (FR-050 – FR-053)
+
+Two, because the window only ever sees what nobody caught. Both funnel through the same one-shot gate,
+so a failure observed by both costs exactly one reload.
+
+| Export | Caller | Takes |
+|---|---|---|
+| `handleStaleChunkFailure(message, opts?)` | `globalHandlers.ts`'s `onerror` / `unhandledrejection` / `vite:preloadError` | the flattened message |
+| `recoverFromStaleChunk(err, opts?)` | an import site's own `catch` — `useKeyboardArtifact`'s engine-ready promise | the thrown value, `cause` chain intact |
+| `importOrReload(load)` | a lazy load whose site swallows or rewrites the rejection — `services.ts`'s `importEngine()` seam | the loader thunk; always rethrows |
+| `setStaleChunkReload(reload)` | `main.tsx`, once at boot | what a recovery reload does (flush the active draft, then reload) |
+
+`setStaleChunkReload` is registration rather than an import because `draftPersistence.ts` is reachable
+from `services.ts`, which reaches this module — a direct import would close a dependency cycle, and
+the FR-013 self-containment gate keeps this module's graph small regardless.
+
 ---
 
 ## Capture surfaces
@@ -76,8 +97,15 @@ classifier MUST see the original text.
 **Stale-chunk pattern (FR-051):**
 
 ```
-/failed to fetch dynamically imported module|error loading dynamically imported module|importing a module script failed/i
+/failed to fetch dynamically imported module|error loading dynamically imported module|importing a module script failed|failed to load module script|unable to preload css/i
 ```
+
+The last two alternatives were added after a production report of this exact failure. `failed to load
+module script` is what Chrome says when the SPA catch-all rewrite answers a missing chunk with
+`index.html` — the browser complains about the MIME type instead of the 404, so the original three
+alternatives matched nothing and the carve-out never fired. (`vercel.json` no longer rewrites
+`/assets/*`, but a tab open across that deploy still reports it this way.) `unable to preload css` is
+Vite's own preload helper wording for the same class.
 
 ---
 

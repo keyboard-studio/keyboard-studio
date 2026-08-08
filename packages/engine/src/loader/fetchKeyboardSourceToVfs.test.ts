@@ -462,3 +462,73 @@ group(main) using keys
     expect(error.message).toContain("sil_euro_latin");
   });
 });
+
+// ---------------------------------------------------------------------------
+// Test 8: binary siblings are FLAGGED binary, not just stored as bytes
+//
+// VirtualFS.set defaults isBinary to false, so `vfs.set(path, bytes)` produces an
+// entry that holds a Uint8Array while claiming to be text. Consumers that branch
+// on the flag rather than on the content type then mishandle it — the working-copy
+// draft snapshot (studio persistWorkingCopy.serializeEntry) ran the icon's bytes
+// through `as string`, JSON.stringify turned that into a sparse `{"0":…}` object,
+// and the resumed session's icon was no longer an icon. kmcmplib answers an icon
+// it cannot read with a *warning* and zero artifacts, so the whole compile went
+// quiet: no .kmx, no .js, an empty preview.
+// ---------------------------------------------------------------------------
+
+describe("fetchKeyboardSourceToVfs — binary siblings carry isBinary", () => {
+  // Invalid UTF-8 on purpose: a text round-trip would substitute U+FFFD and the
+  // byte-exact assertion below would catch it.
+  const iconBytes = new Uint8Array([0x00, 0x00, 0x01, 0x00, 0x80, 0x81, 0xff, 0xfe]);
+
+  it("writes the &BITMAP icon as byte-exact, isBinary-flagged content", async () => {
+    const { fetchImpl } = makeMockFetch({
+      [sourceUrl(euroLatinKb, "sil_euro_latin.kmn")]: {
+        ok: true,
+        status: 200,
+        body: kmnWithOptionalSiblings,
+      },
+      [sourceUrl(euroLatinKb, "sil_euro_latin.ico")]: {
+        ok: true,
+        status: 200,
+        body: iconBytes,
+      },
+      [sourceUrl(euroLatinKb, "help.htm")]: { ok: false, status: 404, body: "" },
+      [sourceUrl(euroLatinKb, "sil_euro_latin.kps")]: { ok: false, status: 404, body: "" },
+      [`${PROXY}/${euroLatinKb.path}/sil_euro_latin.kpj`]: { ok: false, status: 404, body: "" },
+    });
+
+    const vfs = createVirtualFS();
+    await fetchKeyboardSourceToVfs(euroLatinKb, vfs, { proxyBase: PROXY, fetchImpl });
+
+    const ico = vfs.get("source/sil_euro_latin.ico");
+    expect(ico).toBeDefined();
+    expect(ico!.isBinary).toBe(true);
+    expect(ico!.content).toBeInstanceOf(Uint8Array);
+    expect(Array.from(ico!.content as Uint8Array)).toEqual(Array.from(iconBytes));
+  });
+
+  it("still writes text siblings as unflagged strings", async () => {
+    const { fetchImpl } = makeMockFetch({
+      [sourceUrl(euroLatinKb, "sil_euro_latin.kmn")]: {
+        ok: true,
+        status: 200,
+        body: kmnWithEmbedJs,
+      },
+      [sourceUrl(euroLatinKb, "sil_euro_latin_js.txt")]: {
+        ok: true,
+        status: 200,
+        body: "// embed\n",
+      },
+      [sourceUrl(euroLatinKb, "sil_euro_latin.kps")]: { ok: false, status: 404, body: "" },
+      [`${PROXY}/${euroLatinKb.path}/sil_euro_latin.kpj`]: { ok: false, status: 404, body: "" },
+    });
+
+    const vfs = createVirtualFS();
+    await fetchKeyboardSourceToVfs(euroLatinKb, vfs, { proxyBase: PROXY, fetchImpl });
+
+    const js = vfs.get("source/sil_euro_latin_js.txt");
+    expect(js!.isBinary).toBe(false);
+    expect(typeof js!.content).toBe("string");
+  });
+});

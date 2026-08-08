@@ -55,11 +55,22 @@
     ],
     "storeMutations": [
       "advance",
-      "advance",
       "advance"
     ],
     "workingCopyMutations": [
       "recordPhase",
+      "recordPhase"
+    ],
+    "navigateTo": []
+  },
+  {
+    "stepId": "punctuation",
+    "applyStepCompletion": [],
+    "storeMutations": [
+      "advance",
+      "advance"
+    ],
+    "workingCopyMutations": [
       "recordPhase",
       "recordPhase"
     ],

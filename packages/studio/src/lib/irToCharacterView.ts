@@ -13,7 +13,7 @@ import type { KeyboardIR, RemovalCapability, StoreItem } from '@keyboard-studio/
 import { buildProducedSet } from '@keyboard-studio/contracts';
 import { collectCharContributors, isParallelIndexFanOut, isPlusSeparator } from '@keyboard-studio/engine';
 import type { CharContributors } from '@keyboard-studio/engine';
-import { toRailNodes, invisibleCharLabel, keySequenceLabel, desktopVkeyLabel, displayChar, charProducers, isNotAForwardTypingPath } from './irToCarveNodes.ts';
+import { toRailNodes, invisibleCharLabel, keySequenceLabel, desktopVkeyLabel, displayChar, charProducers, isNotAForwardTypingPath, ASCII_LETTER_RE } from './irToCarveNodes.ts';
 import type { CharProducer } from './irToCarveNodes.ts';
 
 // ---------------------------------------------------------------------------
@@ -64,8 +64,6 @@ export const SOURCE_DETAIL_LABEL: Record<CharacterSource, string> = {
   store: 'Store',
   'advanced-rule': 'Advanced rule',
 };
-
-const ASCII_LETTER_RE = /^[A-Za-z]$/;
 
 /**
  * Classify a single (already-NFC, dotted-circle-stripped) character into a

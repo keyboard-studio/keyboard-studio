@@ -2254,6 +2254,48 @@ describe("TouchGallery — abugida gate and empty-hostkey guard on the longpress
 
     expect(screen.queryByText(/Suggested: long-press/i)).not.toBeNull();
   });
+
+  // -------------------------------------------------------------------------
+  // Style — the suggestion card is GREEN, not red (product decision). Mirrors
+  // MechanismGallery.test.tsx's identical guard ("renders the suggestion row
+  // in the green family, not ERROR_RED/ERROR_BG") for the sibling gallery —
+  // this card previously shipped with ERROR_RED text on an ERROR_BG card
+  // (ambient "not yet implemented" styling) even though it is a
+  // proposal/affordance the author can accept or deny, not an error state.
+  // -------------------------------------------------------------------------
+
+  it("renders the suggestion card in the green family, not ERROR_RED/ERROR_BG", async () => {
+    seedStore({ withInventory: ["ä"] });
+    useWorkingCopyStore.getState().setIrAxes({ scriptClass: "alphabetic" });
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const card = screen.getByRole("note", {
+      name: /Touch access method suggestion/i,
+    });
+    // #0d2218 / #238636 — the SAME green pair MechanismGallery's own
+    // suggestion row (and this file's chip/Accept-button treatment) already
+    // use. Never the old ERROR_RED (#f85149) / ERROR_BG (#2a0a0a).
+    expect(card.style.backgroundColor).toBe("rgb(13, 34, 24)"); // #0d2218
+    expect(card.style.borderColor).toBe("rgb(35, 134, 54)"); // #238636
+    expect(card.style.backgroundColor).not.toBe("rgb(42, 10, 10)"); // #2a0a0a
+    expect(card.style.borderColor).not.toBe("rgb(248, 81, 73)"); // #f85149
+
+    const suggestionText = screen.getByText(/Suggested: long-press/i);
+    expect(suggestionText.style.color).toBe("rgb(86, 211, 100)"); // #56d364
+    expect(suggestionText.style.color).not.toBe("rgb(248, 81, 73)"); // #f85149
+    // This message renders through the shared ProposalCard, whose <p> sets no
+    // fontWeight — plain/normal weight is intentional here, matching every
+    // other ProposalCard caller (e.g. this gallery's bulk-accent summary
+    // box), not a regression from the old bespoke bold (600) treatment. jsdom
+    // doesn't synthesize a computed "400" for an unset inline style (it
+    // reports "" — verified above), so assert the empty-inline form rather
+    // than a computed value jsdom never actually produces.
+    expect(suggestionText.style.fontWeight).toBe("");
+    expect(suggestionText.style.fontWeight).not.toBe("600");
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -2621,6 +2663,100 @@ describe("TouchGallery — no suggestion goes straight to chooser", () => {
     expect(
       screen.queryAllByRole("button").some((b) => b.textContent?.trim() === "Apply method"),
     ).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Apply lives in the open method card (mirrors MechanismGallery's
+// CardApplyRow placement contract — see that file's own describe block of
+// the same name). TouchCardApplyRow renders per-card, one of
+// touch-apply-longpress / touch-apply-flick / touch-apply-multitap /
+// touch-apply-replace, with no shared row below the chooser anymore.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — Apply lives in the open method card", () => {
+  it("puts Apply in the open (default longpress) card, and only there", async () => {
+    // "中" has no suggestion, so the chooser opens directly at its default
+    // method (longpress_alternates) — see the "no suggestion goes straight
+    // to chooser" describe block above.
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    expect(screen.getByTestId("touch-apply-longpress")).toBeTruthy();
+    expect(screen.queryByTestId("touch-apply-flick")).toBeNull();
+    expect(screen.queryByTestId("touch-apply-multitap")).toBeNull();
+    expect(screen.queryByTestId("touch-apply-replace")).toBeNull();
+
+    // Exactly one — the reason for moving it off the shared row. A second
+    // Apply anywhere on screen would reintroduce "which method does this
+    // commit?".
+    expect(
+      screen.getAllByRole("button", { name: /Apply touch method for/i }),
+    ).toHaveLength(1);
+  });
+
+  it("follows the author into whichever card they open", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+    expect(screen.getByTestId("touch-apply-longpress")).toBeTruthy();
+
+    await act(async () => {
+      fireEvent.click(screen.getByText(/Swipe a key \(flick\)/i));
+    });
+    expect(screen.getByTestId("touch-apply-flick")).toBeTruthy();
+    expect(screen.queryByTestId("touch-apply-longpress")).toBeNull();
+    expect(
+      screen.getAllByRole("button", { name: /Apply touch method for/i }),
+    ).toHaveLength(1);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText(/Tap multiple times \(multitap\)/i));
+    });
+    expect(screen.getByTestId("touch-apply-multitap")).toBeTruthy();
+    expect(screen.queryByTestId("touch-apply-flick")).toBeNull();
+    expect(
+      screen.getAllByRole("button", { name: /Apply touch method for/i }),
+    ).toHaveLength(1);
+
+    await act(async () => {
+      fireEvent.click(screen.getByText(/Replace a key/i));
+    });
+    expect(screen.getByTestId("touch-apply-replace")).toBeTruthy();
+    expect(screen.queryByTestId("touch-apply-multitap")).toBeNull();
+    expect(
+      screen.getAllByRole("button", { name: /Apply touch method for/i }),
+    ).toHaveLength(1);
+  });
+
+  it("keeps the touch-apply warnings banner rendered below the chooser, not duplicated per card", async () => {
+    // Force a warning from the engine so applyTouchWarnings renders — mirrors
+    // the "touch assignment could not be applied" banner's own coverage
+    // elsewhere in this file, just asserting it survives the Apply-row move.
+    buildTouchLayoutJsonSpy.mockImplementation(() => ({
+      json: JSON.stringify({ formatVersion: "1.0", platforms: [] }),
+      warnings: ["could not apply for K_Z"],
+    }));
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+    });
+
+    const hostKeySelect = screen.getByRole("button", { name: /host key/i });
+    await changeSelectMenu(hostKeySelect, "K_A");
+
+    const applyBtn = screen
+      .getAllByRole("button", { name: /Apply touch method for/i })
+      .find((b) => !b.hasAttribute("disabled"));
+    expect(applyBtn).toBeTruthy();
+    await act(async () => {
+      fireEvent.click(applyBtn!);
+    });
+
+    expect(screen.getAllByText(/could not apply for K_Z/i)).toHaveLength(1);
   });
 });
 

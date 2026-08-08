@@ -3,8 +3,10 @@
 **For**: Content (survey text is Content-owned — Constitution Article VI)
 **From**: Engine, spec [059-keyboard-attribution](spec.md)
 **Date**: 2026-08-04
-**Status**: Engine work COMPLETE and shipped. **No prompt text was changed** — that is this
-hand-off.
+**Status**: Engine work COMPLETE and shipped. Items 1–4 remain open for Content — no prompt text
+was changed for them. **Item 5 has since been applied** (route B — see the note under it), because
+it is a correctness guard rather than wording. The sentence used is a placeholder Content is free
+to rewrite; what needs to stay is something covering that behaviour.
 
 ---
 
@@ -114,6 +116,20 @@ making the matching cleverer — it has to be prevented by telling the author.
 **Suggested**: the help text for this question should state that the original author's copyright is
 kept automatically and does not need re-entering. Engine has no way to convey that; only the
 question can.
+
+**APPLIED** — via route B, appended to the base help text in
+`survey/questions/a/il_copyright_holder.ts`:
+
+> …Example: 'Bafut Language Committee'. *If this keyboard is based on an existing one, the original
+> author's copyright is kept automatically and does not need re-entering here.*
+
+Composed from the demoted module's string rather than replacing it, so Content's edits there still
+reach this question. Pinned by two assertions in
+`tests/survey/questions/a/il_copyright_holder.test.ts` so the guard cannot be dropped silently —
+if Content rewrites the sentence, those assertions (`"kept automatically"`,
+`"does not need re-entering"`) are the ones to update. Items 1–4 are untouched and still Content's
+call, including item 4's related "blank means the same as you" gap, which route A assigns to the
+shared Phase A module.
 
 ---
 
