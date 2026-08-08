@@ -311,6 +311,15 @@ function collectDiscardTargets(
       // A brand-new key touches no pre-existing content.
       return [];
 
+    case "move":
+      // A move relocates the EXISTING node — both appliers splice it rather
+      // than rebuilding it, precisely so nothing is discarded (FR-021). The
+      // key keeps its id, its output and every sub-key, so there is no
+      // collateral to report. Spelled out as its own branch rather than left
+      // to a default, so the exhaustive switch keeps failing the build when a
+      // future op kind IS lossy.
+      return [];
+
     case "remove":
     case "suppress": {
       const targets: DiscardTarget[] = [

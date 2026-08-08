@@ -333,11 +333,13 @@ describe("buildTouchLayoutJson — Case B (router → raw path)", () => {
       const phoneDefaultKeys = parsed.phone.layer[0]!.row[0]!.key;
       const tabletDefaultKeys = parsed.tablet.layer[0]!.row[0]!.key;
 
-      // phone: primary `text` carved -> inert placeholder (id changed, text/output gone).
-      // Found by a field the carve never touches (`sp`), since its `id` changes.
-      const kaPlaceholder = phoneDefaultKeys.find((k) => k["sp"] === "1");
+      // phone: primary `text` carved -> emptied to the corpus blank (`T_BLANK`
+      // + `sp` 10), text/output gone. This used to look the placeholder up by
+      // `sp`, "a field the carve never touches" — no longer true, and
+      // deliberately so: leaving `sp` alone was what left a carved key drawing
+      // as an ordinary live keycap. The id is now the direct handle.
+      const kaPlaceholder = phoneDefaultKeys.find((k) => k["id"] === "T_BLANK");
       expect(kaPlaceholder).toBeDefined();
-      expect(kaPlaceholder!["id"]).not.toBe("K_A");
       expect(kaPlaceholder!["text"]).toBeUndefined();
       expect(kaPlaceholder!["output"]).toBeUndefined();
 
@@ -353,11 +355,11 @@ describe("buildTouchLayoutJson — Case B (router → raw path)", () => {
       const kb = tabletDefaultKeys.find((k) => k["id"] === "K_B")!;
       expect(kb["sk"]).toEqual([]);
 
-      // tablet: primary `output` carved -> inert placeholder (id changed, output gone).
-      const kcPlaceholder = tabletDefaultKeys.find((k) => k["id"] !== "K_B");
+      // tablet: primary `output` carved -> emptied to the same corpus blank.
+      const kcPlaceholder = tabletDefaultKeys.find((k) => k["id"] === "T_BLANK");
       expect(kcPlaceholder).toBeDefined();
-      expect(kcPlaceholder!["id"]).not.toBe("K_C");
       expect(kcPlaceholder!["output"]).toBeUndefined();
+      expect(kcPlaceholder!["sp"]).toBe(10);
     });
 
     it("reflects the placement as a longpress alternate on the placement host key", () => {
@@ -384,13 +386,16 @@ describe("buildTouchLayoutJson — Case B (router → raw path)", () => {
       expect(shiftKey).toEqual({ id: "K_A", output: "Á", layer: "shift" });
     });
 
-    it("preserves string-form sp/width/pad on the carved placeholder and layer/width on the placement key", () => {
+    it("preserves string-form width/pad on the carved placeholder and layer/width on the placement key", () => {
       const parsed = parseResult(buildMultiPlatform());
       const phoneDefaultKeys = parsed.phone.layer[0]!.row[0]!.key;
 
-      const kaPlaceholder = phoneDefaultKeys.find((k) => k["sp"] === "1")!;
-      expect(kaPlaceholder["sp"]).toBe("1");
-      expect(typeof kaPlaceholder["sp"]).toBe("string");
+      const kaPlaceholder = phoneDefaultKeys.find((k) => k["id"] === "T_BLANK")!;
+      // `sp` is the one field the carve now REWRITES — see the sibling test
+      // above. Width and pad keep their string spelling, which is the fidelity
+      // claim this test actually exists to make: the raw path must not
+      // renormalize fields it had no reason to touch.
+      expect(kaPlaceholder["sp"]).toBe(10);
       expect(kaPlaceholder["width"]).toBe("150");
       expect(typeof kaPlaceholder["width"]).toBe("string");
       expect(kaPlaceholder["pad"]).toBe("5");

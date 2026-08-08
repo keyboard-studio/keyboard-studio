@@ -64,8 +64,8 @@
 //
 // Acting on a fix is still NOT this component's job: `onApplyFix` reports the
 // author's choice and this file commits nothing, exactly as `onSpChange` does
-// below. See that prop's own doc for why an unwired mount disables the buttons
-// rather than hiding them.
+// below. See that prop's own doc for the required-prop contract (spec 061
+// FR-001, FR-003, research D1).
 //
 // ## Editing is NOT this component's job — except the `sp` control (T096)
 //
@@ -78,17 +78,40 @@
 // children is the seam — no restructuring needed when that lands.
 //
 // T096 (FR-029a) is the first, narrow exception: the full-legal-set `sp`
-// radio control below IS an editing affordance, but this file still does not
-// COMMIT anything. `onSpChange` is an optional callback — mirroring the
-// existing `onEscape` pattern — that fires with the author's chosen value and
-// does nothing else; there is no store import, no engine mutation call, here.
-// Wiring it into the actual key-edit overlay commit (a `SetKeyOp`) alongside
-// T094's add-key and T095's suppress operation is T097's job, per tasks.md's
-// own "wait for T094-T096, then T097" dependency line — composing the three
-// independent W1 tasks into one committed edit path is explicitly what T097
-// exists to do, not something this component should pre-empt.
+// control below IS an editing affordance, but this file still does not
+// COMMIT anything. `onSpChange` fires with the author's chosen value and does
+// nothing else; there is no store import, no engine mutation call, here —
+// that discipline is unchanged by spec 061's required-prop inversion (D1).
+// What changed is who is allowed to leave it disconnected: spec 061 makes
+// `onSpChange` and `onApplyFix` **required** props (FR-001, FR-003), so a
+// mount that cannot act is a compile-time error caught by `tsc`, not a
+// degraded surface a caller could ship silently — the reverting `sp` control
+// and the permanently-disabled fix buttons were exactly that degraded
+// surface (see issue #1530 complaint #2, spec 061's "Context: what actually
+// went wrong"). Wiring `onSpChange` into the actual key-edit overlay commit
+// (a `SetKeyOp`) alongside T094's add-key and T095's suppress operation is
+// still the composing caller's job (`TouchGallery.tsx`, spec 061 T013), not
+// something this component pre-empts.
+//
+// ## The key-type control is a DROPDOWN, not six radios
+//
+// It began as a `RadioGroup` over all six values, each with its own explanatory
+// note — about 200px of a panel that has to fit beside the keyboard it is
+// editing, which it did not. The set is closed, mutually exclusive, and named,
+// which is precisely what a select is for; Keyman Developer's own "Key Type"
+// control is a dropdown for the same reason.
+//
+// Nothing about FR-029a is given up in the trade. The full legal set is still
+// offered, still with no value disabled, and the FR-029d PROPOSAL still rides on
+// its own option — `SelectMenu`'s `renderOptionLabel` hook carries the badge
+// into both the option row and the collapsed trigger, so "which one would the
+// studio pick" survives the control change rather than being flattened into
+// prose. What was six always-visible notes is now the SELECTED type's own note,
+// one line, beneath the control: an author reading about "Spacer" is choosing
+// Spacer, and the other five explanations were answering a question nobody had
+// asked yet.
 
-import { useMemo, useCallback, useId, useRef, type Ref } from "react";
+import { useMemo, useCallback, useId, useRef, useState, type Ref } from "react";
 import type { KeyboardEvent as ReactKeyboardEvent, RefObject } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
@@ -98,7 +121,14 @@ import { codepointLabel } from "../../../survey/codepointLabel.ts";
 import { displayChar } from "../../../lib/irToCarveNodes.ts";
 import { BG_CARD, BORDER, TEXT_DIM, TEXT_MAIN, FONT } from "../../../lib/galleryTheme.ts";
 import { ERROR_RED, FONT_MONO, WARNING } from "../../../ui/theme.ts";
-import { Badge, RadioGroup } from "../../../ui/index.ts";
+import { Badge, SelectMenu } from "../../../ui/index.ts";
+import {
+  PANEL_GRID_STYLE,
+  PANEL_HINT_STYLE,
+  PANEL_LABEL_STYLE,
+  PANEL_SPAN_STYLE,
+  visuallyHiddenUnless,
+} from "./panelGrid.tsx";
 import type { KeyGridCellViewModel, TouchKeyFinding } from "./keyGridViewModel.ts";
 import type { TouchKeyFix } from "@keyboard-studio/contracts";
 import {
@@ -247,6 +277,16 @@ export interface UseKeyInspectorFocusBridgeOptions {
    */
   selectedAddress: string | null;
   /**
+   * Edit this cell's VALUE — F2's target (spec 061).
+   *
+   * Optional: with no handler, F2 keeps its original meaning and focuses the
+   * panel exactly as Enter does, so a caller that has no assign surface is
+   * unaffected. Where it IS provided, it must land the caret in the character
+   * field, opening whatever disclosure is in the way — that is what keeps spec
+   * 058 SC-004's keyboard-only assign inside its action budget.
+   */
+  onEditValue?: () => void;
+  /**
    * The DOM ancestor BOTH the grid's cells and (ideally) this bridge's own
    * lookups are scoped within — mirrors `useGridNav.ts`'s own
    * `applyFocusRestorationTarget` container-scoping rationale: an unscoped,
@@ -296,16 +336,30 @@ export interface UseKeyInspectorFocusBridgeResult {
 export function useKeyInspectorFocusBridge({
   selectedAddress,
   containerRef,
+  onEditValue,
 }: UseKeyInspectorFocusBridgeOptions): UseKeyInspectorFocusBridgeResult {
   const inspectorRef = useRef<HTMLDivElement | null>(null);
 
-  const handleGridKeyDown = useCallback((event: ReactKeyboardEvent) => {
-    if (event.key !== "Enter" && event.key !== "F2") return;
-    const target = event.target;
-    if (!(target instanceof Element) || target.closest('[role="gridcell"]') === null) return;
-    event.preventDefault();
-    inspectorRef.current?.focus();
-  }, []);
+  const handleGridKeyDown = useCallback(
+    (event: ReactKeyboardEvent) => {
+      if (event.key !== "Enter" && event.key !== "F2") return;
+      const target = event.target;
+      if (!(target instanceof Element) || target.closest('[role="gridcell"]') === null) return;
+      event.preventDefault();
+      // Spec 061: the two keys diverge, because the panel absorbed the assign
+      // surface and put it behind a disclosure. Enter opens the DETAIL (the
+      // panel region — FR-020b, unchanged). F2 edits the VALUE, landing
+      // straight in the character field, which is the grid convention and what
+      // spec 058 SC-004 measures: assigning a character must stay one keypress
+      // away from the cell, not Enter-then-tab-to-a-disclosure.
+      if (event.key === "F2" && onEditValue !== undefined) {
+        onEditValue();
+        return;
+      }
+      inspectorRef.current?.focus();
+    },
+    [onEditValue],
+  );
 
   const handleEscape = useCallback(() => {
     if (selectedAddress === null) return;
@@ -347,11 +401,19 @@ export interface KeyInspectorProps {
    * Fired when the author picks an `sp` value directly from the full legal
    * set (FR-029a) — never gated on it matching the PROPOSED value; picking a
    * non-proposed value is a legitimate authoring act, not something this
-   * callback screens out. Omitted keeps the control informational-only. See
-   * the module doc's "Editing is NOT this component's job — except the `sp`
-   * control (T096)" section for what this does and does not commit.
+   * callback screens out.
+   *
+   * REQUIRED (spec 061 FR-001, FR-003, research D1): `TouchGallery.tsx` is
+   * this component's one caller, and this control used to be `value`-driven
+   * from `currentSp` with the change handler a no-op `?.()` when unwired —
+   * the DOM snapped back to `currentSp` on every click, which is the
+   * "key type reverts" defect of record (issue #1530 complaint #2).
+   * Making the prop required turns that omission into a build error instead
+   * of a runtime nothing. See the module doc's "Editing is NOT this
+   * component's job — except the `sp` control (T096)" section for what this
+   * still does and does not commit.
    */
-  onSpChange?: (sp: TouchKeySpValue) => void;
+  onSpChange: (sp: TouchKeySpValue) => void;
   /**
    * Fired when the author presses a finding's fix button (T115, FR-041). Like
    * `onSpChange`, this component COMMITS NOTHING: it hands back the fix
@@ -359,19 +421,35 @@ export interface KeyInspectorProps {
    * decides what that means (a `KeyEditOperation`, opening AssignPanel to pick a
    * character, or scrolling the offending key into view).
    *
-   * Omitting it renders every fix button DISABLED rather than hiding the fixes.
-   * That is deliberate: a diagnostic with its remedies visible but not yet wired
-   * is honest, whereas hiding them would make the same finding look
-   * unfixable — and FR-041's promise is that a fix exists, which is true
-   * regardless of whether this particular mount has wired it.
+   * REQUIRED (spec 061 FR-001, FR-003, research D1). This prop used to be
+   * optional, and every fix button rendered `disabled` when it was omitted —
+   * the only caller, `TouchGallery.tsx`, never supplied it, so every fix
+   * button in the shipped app was permanently inert. That reasoning traded on
+   * there being an honest way to leave a mount unwired; FR-003 forecloses
+   * that trade ("an affordance that does not apply MUST be absent" — not
+   * disabled) and the required prop forecloses it a second, stronger way:
+   * there is no unwired mount left to be honest about. Every fix button this
+   * component renders is enabled, and every click reaches the caller.
    */
-  onApplyFix?: (fix: TouchKeyFix, finding: TouchKeyFinding) => void;
+  onApplyFix: (fix: TouchKeyFix, finding: TouchKeyFinding) => void;
   /** Localized panel accessible name override. */
   label?: string;
+  /**
+   * Render as a plain section inside another panel rather than as a
+   * `role="region"` card of its own (spec 061 T035).
+   *
+   * `KeyPropertyPanel` is the single panel FR-018 asks for, and it composes
+   * this component for the display, findings and key-type sections rather than
+   * copying 300 lines of them. Two nested `role="region"`s with two accessible
+   * names would be an honest description of the OLD stacked mount and a false
+   * one of the merged panel — so when embedded this drops the role, the name,
+   * its own border/background and its Escape handling, all of which the parent
+   * now owns. Every `key-inspector-*` test id is unchanged, which is what keeps
+   * the existing assertions meaning what they meant.
+   */
+  embedded?: boolean;
 }
 
-const ROW_STYLE = { display: "flex", flexDirection: "column" as const, gap: 2 };
-const FIELD_LABEL_STYLE = { fontSize: 11, color: TEXT_DIM, fontFamily: FONT };
 const FIELD_VALUE_STYLE = { fontSize: 13, color: TEXT_MAIN, fontFamily: FONT };
 
 /**
@@ -395,12 +473,21 @@ export function KeyInspector({
   onSpChange,
   onApplyFix,
   label,
+  embedded = false,
 }: KeyInspectorProps) {
   // `i18n` alongside `t` because findingCopy.ts's composers take an `I18n`
   // rather than being JSX macros — the same split existingMethodLabels.ts's
   // callers already use.
   const { t, i18n } = useLingui();
   const spGroupLabelId = useId();
+  const spNoteId = useId();
+  /**
+   * Whether the key-type control has focus, and so whether its general caveat
+   * is visible. Never gates the caveat's PRESENCE — the note element and the
+   * `aria-describedby` pointing at it are unconditional; only the visual bulk is
+   * conditional (see the note's own comment below).
+   */
+  const [spNoteExpanded, setSpNoteExpanded] = useState(false);
 
   const sendsInfo = useMemo(
     () => (selectedCell !== null ? resolveSendsLayer(selectedCell, layout) : undefined),
@@ -486,34 +573,60 @@ export function KeyInspector({
     // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- programmatically focusable REGION (not in the natural Tab order — see FR-020b: Enter/F2 moves focus here explicitly, Tab does not walk through it), the same "focusable container, not a Tab stop" idiom ui/SelectMenu.tsx's own portalled <ul> already uses for an analogous reason.
     <div
       ref={panelRef}
-      role="region"
-      aria-label={panelLabel}
-      tabIndex={-1}
+      // Embedded: a plain section inside KeyPropertyPanel, which owns the
+      // region role, the accessible name, the chrome and the Escape handling.
+      // See the `embedded` prop's own doc for why nesting two named regions
+      // would misdescribe the merged panel.
+      {...(embedded
+        ? {}
+        : {
+            role: "region",
+            "aria-label": panelLabel,
+            tabIndex: -1,
+            onKeyDown: handleKeyDown,
+          })}
       data-testid="key-inspector"
-      onKeyDown={handleKeyDown}
       style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 10,
-        padding: 12,
-        background: BG_CARD,
-        border: `1px solid ${BORDER}`,
-        borderRadius: 8,
+        // The compact label/control table (panelGrid.tsx) rather than a stack
+        // of label-above-value rows: this panel has to fit beside the keyboard
+        // it edits. See that module's doc for why the geometry is shared.
+        ...PANEL_GRID_STYLE,
+        ...(embedded
+          ? {}
+          : {
+              padding: 12,
+              background: BG_CARD,
+              border: `1px solid ${BORDER}`,
+              borderRadius: 8,
+              outline: "none",
+            }),
         fontFamily: FONT,
-        outline: "none",
       }}
     >
       {selectedCell === null ? (
-        <p data-testid="key-inspector-empty" style={{ ...FIELD_VALUE_STYLE, color: TEXT_DIM, margin: 0 }}>
+        <p
+          data-testid="key-inspector-empty"
+          style={{ ...FIELD_VALUE_STYLE, ...PANEL_SPAN_STYLE, color: TEXT_DIM, margin: 0 }}
+        >
           <Trans id="editor.assignLoop.keyGrid.inspector.emptyState">
             Select a key to see its details.
           </Trans>
         </p>
       ) : (
         <>
-          {/* Keycap + id */}
-          <div style={ROW_STYLE} data-testid="key-inspector-header">
-            <span style={{ ...FIELD_VALUE_STYLE, fontFamily: FONT_MONO, fontSize: 16 }}>
+          {/* Keycap + id — one line spanning both columns: it names the key the
+              rows below are about, so it is a heading, not a field. */}
+          <div
+            style={{
+              ...PANEL_SPAN_STYLE,
+              display: "flex",
+              alignItems: "baseline",
+              justifyContent: "space-between",
+              gap: 8,
+            }}
+            data-testid="key-inspector-header"
+          >
+            <span style={{ ...FIELD_VALUE_STYLE, fontFamily: FONT_MONO, fontSize: 15 }}>
               {isBlank
                 ? t({
                     id: "editor.assignLoop.keyGrid.inspector.blankKey",
@@ -526,7 +639,7 @@ export function KeyInspector({
                       message: "(no keycap)",
                     })}
             </span>
-            <span style={FIELD_LABEL_STYLE} data-testid="key-inspector-id">
+            <span style={PANEL_HINT_STYLE} data-testid="key-inspector-id">
               {t({
                 id: "editor.assignLoop.keyGrid.inspector.idLabel",
                 message: `Id: ${{ id: selectedCell.id }}`,
@@ -536,16 +649,16 @@ export function KeyInspector({
 
           {/* "Sends:" — the FR-030 crux */}
           {sendsInfo !== undefined && (
-            <div style={ROW_STYLE} data-testid="key-inspector-sends">
-              <span style={FIELD_LABEL_STYLE}>
+            <>
+              <span style={PANEL_LABEL_STYLE}>
                 {t({ id: "editor.assignLoop.keyGrid.inspector.sendsLabel", message: "Sends" })}
               </span>
-              <span style={FIELD_VALUE_STYLE}>
+              <span style={{ ...FIELD_VALUE_STYLE, fontSize: 12 }} data-testid="key-inspector-sends">
                 {sendsInfo.effectiveLayerId}
                 {sendsInfo.superseded && (
                   <span
                     data-testid="key-inspector-sends-override-note"
-                    style={{ color: TEXT_DIM, marginLeft: 6, fontSize: 12 }}
+                    style={{ color: TEXT_DIM, marginLeft: 6, fontSize: 11 }}
                   >
                     {t({
                       id: "editor.assignLoop.keyGrid.inspector.sendsOverrideNote",
@@ -554,53 +667,77 @@ export function KeyInspector({
                   </span>
                 )}
               </span>
-            </div>
+            </>
           )}
 
-          {/* Key type ("sp") — full legal set, always selectable (FR-029a). */}
-          <div style={ROW_STYLE} data-testid="key-inspector-sp">
-            <span id={spGroupLabelId} style={FIELD_LABEL_STYLE}>
-              {t({ id: "editor.assignLoop.keyGrid.inspector.sp.label", message: "Key type" })}
-            </span>
-            <span
-              data-testid="key-inspector-sp-note"
-              style={{ ...FIELD_VALUE_STYLE, color: TEXT_DIM, fontSize: 12 }}
-            >
-              {t({
-                id: "editor.assignLoop.keyGrid.inspector.sp.note",
-                message:
-                  "Key type controls how this key is drawn and whether it can be tapped. It does not stop a rule from matching — the key's id controls what it sends.",
-              })}
-            </span>
-            <RadioGroup
-              name="key-inspector-sp"
+          {/* Key type ("sp") — full legal set, always selectable (FR-029a),
+              as a dropdown (see the module doc for why not six radios). */}
+          <span id={spGroupLabelId} style={PANEL_LABEL_STYLE}>
+            {t({ id: "editor.assignLoop.keyGrid.inspector.sp.label", message: "Key type" })}
+          </span>
+          <div
+            data-testid="key-inspector-sp"
+            style={{ display: "flex", flexDirection: "column", gap: 3 }}
+            // Focus events bubble in React, so this catches the dropdown
+            // trigger's own focus without reaching into `SelectMenu`.
+            onFocus={() => setSpNoteExpanded(true)}
+            onBlur={() => setSpNoteExpanded(false)}
+          >
+            <SelectMenu
               value={String(currentSp)}
               ariaLabelledby={spGroupLabelId}
-              onChange={(v) => onSpChange?.(Number(v) as TouchKeySpValue)}
+              ariaDescribedby={spNoteId}
+              onChange={(v) => onSpChange(Number(v) as TouchKeySpValue)}
               options={LEGAL_SP_VALUES.map((value) => ({
                 value: String(value),
                 label: spOptionLabels[value].label,
-                note: spOptionLabels[value].note,
-                ...(value === proposedSp
-                  ? {
-                      detail: (
-                        <span data-testid="key-inspector-sp-proposed">
-                          <Badge tone="accent">{proposedBadgeLabel}</Badge>
-                        </span>
-                      ),
-                    }
-                  : {}),
               }))}
+              // The FR-029d proposal rides on its own option and on the
+              // collapsed trigger, so "which one would the studio pick" is still
+              // visible without opening the list.
+              renderOptionLabel={(opt) => (
+                <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  {opt.label}
+                  {opt.value === String(proposedSp) && (
+                    <span data-testid="key-inspector-sp-proposed">
+                      <Badge tone="accent">{proposedBadgeLabel}</Badge>
+                    </span>
+                  )}
+                </span>
+              )}
+              style={{ fontSize: 12, padding: "3px 8px" }}
             />
+            {/* The SELECTED type's own note, always visible, plus the caveat
+                that holds for every type — key type is about drawing and
+                tappability, not about whether a rule matches — revealed when the
+                control has focus. Same "in the DOM and described, visible when
+                you are reading it" rule the property panel's field hints follow
+                (panelGrid.tsx), and for the same reason: it is four lines in a
+                column that has to fit beside the keyboard. */}
+            <span
+              id={spNoteId}
+              data-testid="key-inspector-sp-note"
+              style={PANEL_HINT_STYLE}
+            >
+              {spOptionLabels[currentSp].note}
+              <span style={visuallyHiddenUnless(spNoteExpanded)}>
+                {" "}
+                {t({
+                  id: "editor.assignLoop.keyGrid.inspector.sp.note",
+                  message:
+                    "Key type controls how this key is drawn and whether it can be tapped. It does not stop a rule from matching — the key's id controls what it sends.",
+                })}
+              </span>
+            </span>
           </div>
 
           {/* Produced characters */}
-          <div style={ROW_STYLE} data-testid="key-inspector-produces">
-            <span style={FIELD_LABEL_STYLE}>
-              {t({ id: "editor.assignLoop.keyGrid.inspector.producesLabel", message: "Produces" })}
-            </span>
+          <span style={PANEL_LABEL_STYLE}>
+            {t({ id: "editor.assignLoop.keyGrid.inspector.producesLabel", message: "Produces" })}
+          </span>
+          <div data-testid="key-inspector-produces">
             {selectedCell.producedChars.length === 0 ? (
-              <span style={{ ...FIELD_VALUE_STYLE, color: TEXT_DIM }}>
+              <span style={{ ...PANEL_HINT_STYLE }}>
                 {t({
                   id: "editor.assignLoop.keyGrid.inspector.noOutput",
                   message: "No output — this key is unassigned.",
@@ -609,7 +746,7 @@ export function KeyInspector({
             ) : (
               <ul style={{ margin: 0, padding: 0, listStyle: "none" }}>
                 {selectedCell.producedChars.map((ch) => (
-                  <li key={ch} style={FIELD_VALUE_STYLE}>
+                  <li key={ch} style={{ ...FIELD_VALUE_STYLE, fontSize: 12 }}>
                     {ch} <span style={{ color: TEXT_DIM, fontSize: 11 }}>({codepointLabel(ch).title})</span>
                   </li>
                 ))}
@@ -619,11 +756,11 @@ export function KeyInspector({
 
           {/* Provenance */}
           {selectedCell.provenance !== undefined && selectedCell.provenance !== "hand-set" && (
-            <div style={ROW_STYLE} data-testid="key-inspector-provenance">
-              <span style={FIELD_LABEL_STYLE}>
+            <>
+              <span style={PANEL_LABEL_STYLE}>
                 {t({ id: "editor.assignLoop.keyGrid.inspector.provenanceLabel", message: "Placement" })}
               </span>
-              <span style={FIELD_VALUE_STYLE}>
+              <span style={PANEL_HINT_STYLE} data-testid="key-inspector-provenance">
                 {selectedCell.provenance === "base-derived"
                   ? t({
                       id: "editor.assignLoop.keyGrid.inspector.provenanceBaseDerived",
@@ -634,18 +771,21 @@ export function KeyInspector({
                       message: "Auto-suggested from the physical layout.",
                     })}
               </span>
-            </div>
+            </>
           )}
 
           {/* Annotations */}
           {(selectedCell.annotations.longpress > 0 ||
             selectedCell.annotations.multitap > 0 ||
             selectedCell.annotations.flick > 0) && (
-            <div style={ROW_STYLE} data-testid="key-inspector-annotations">
-              <span style={FIELD_LABEL_STYLE}>
+            <>
+              <span style={PANEL_LABEL_STYLE}>
                 {t({ id: "editor.assignLoop.keyGrid.inspector.annotationsLabel", message: "Sub-keys" })}
               </span>
-              <span style={FIELD_VALUE_STYLE}>
+              <span
+                style={{ ...FIELD_VALUE_STYLE, fontSize: 12 }}
+                data-testid="key-inspector-annotations"
+              >
                 {selectedCell.annotations.longpress > 0 &&
                   t({
                     id: "editor.assignLoop.keyGrid.inspector.longpressCount",
@@ -675,15 +815,19 @@ export function KeyInspector({
                     }),
                   })}
               </span>
-            </div>
+            </>
           )}
 
           {/* Findings — T115/T116/T117: localized copy plus a concrete fix
               action per diagnostic. Severity is carried by the chip's LETTER
               and by the visible severity word beside it, never by colour alone
-              (FR-050, US5 AS4). */}
-          <div style={ROW_STYLE} data-testid="key-inspector-findings">
-            <span style={FIELD_LABEL_STYLE}>
+              (FR-050, US5 AS4). Spans both columns: a finding is a sentence with
+              buttons under it, not a value in a label/value table. */}
+          <div
+            style={{ ...PANEL_SPAN_STYLE, display: "flex", flexDirection: "column", gap: 4 }}
+            data-testid="key-inspector-findings"
+          >
+            <span style={PANEL_HINT_STYLE}>
               {selectedCell.findings.length === 0
                 ? t({
                     id: "editor.assignLoop.keyGrid.inspector.findingsNone",
@@ -765,8 +909,7 @@ export function KeyInspector({
                               type="button"
                               data-testid={`key-inspector-finding-${i}-fix-${fixIndex}`}
                               data-fix-kind={fix.kind}
-                              disabled={onApplyFix === undefined}
-                              onClick={() => onApplyFix?.(fix, finding)}
+                              onClick={() => onApplyFix(fix, finding)}
                               style={{
                                 fontFamily: FONT,
                                 fontSize: 11,
@@ -775,7 +918,7 @@ export function KeyInspector({
                                 border: `1px solid ${BORDER}`,
                                 background: "transparent",
                                 color: TEXT_MAIN,
-                                cursor: onApplyFix === undefined ? "default" : "pointer",
+                                cursor: "pointer",
                               }}
                             >
                               {fixLabel(fix, i18n)}

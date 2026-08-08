@@ -99,7 +99,13 @@ test.describe("Touch key grid — accessibility (spec 058 SC-009)", () => {
     // Focus the header control immediately before the grid in DOM order via the
     // DOM API — `.focus()` dispatches no pointer event, so this is setup, not a
     // measured action. The counter goes in after it.
-    await page.getByTestId("touch-key-mode-continue").focus();
+    //
+    // That control is `touch-key-mode-find-toggle`, not `touch-key-mode-continue`:
+    // spec 061 T013-T015 added the layer selector and the add / remove / find
+    // key commands BETWEEN Continue and the grid, so Continue is no longer
+    // adjacent to it. Setup only — assertion (3a) below is unchanged, and it is
+    // the one that matters: one Tab, several hundred keys, a single stop.
+    await page.getByTestId("touch-key-mode-find-toggle").focus();
     await installPointerEventCounter(page);
 
     // --- (3a) One Tab enters the grid: the single roving-tabindex stop
@@ -132,10 +138,15 @@ test.describe("Touch key grid — accessibility (spec 058 SC-009)", () => {
     // cell focusable" change would break.
     await expect(page.locator('[role="gridcell"][tabindex="0"]')).toHaveCount(1);
 
-    // --- (3c) Enter reaches the inspector, Escape returns to the cell. Both
-    //          keyboard-only, per FR-020b's selection-vs-editing contract. ---
+    // --- (3c) Enter reaches the editing surface, Escape returns to the cell.
+    //          Both keyboard-only, per FR-020b's selection-vs-editing contract. ---
+    //
+    // That surface is `key-property-panel` as of spec 061 T028-T039: the one
+    // panel absorbed the inspector AND the assign panel, which now sits behind
+    // a disclosure inside it. FR-020b's contract is unchanged and is still what
+    // this asserts — Enter leaves selection for editing, Escape comes back.
     await page.keyboard.press("Enter");
-    await expect(page.getByTestId("assign-panel")).toBeVisible();
+    await expect(page.getByTestId("key-property-panel")).toBeVisible();
     await page.keyboard.press("Escape");
     await expect(page.locator('[role="gridcell"]:focus')).toBeVisible();
 

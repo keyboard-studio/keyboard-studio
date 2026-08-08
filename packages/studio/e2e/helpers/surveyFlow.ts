@@ -136,7 +136,7 @@ async function waitVisible(locator: Locator, timeout: number): Promise<boolean> 
 /**
  * Drive the identity-lite step to completion (spec 036 language-identify flow).
  *
- * Question order (spec 030 US3, spec 036):
+ * Question order (spec 030 US3, spec 036, spec 059 US1):
  *   1. il_language_english (autocomplete) — free text
  *   2. il_language_region (CONDITIONAL datalist) — only inserted by
  *      IdentityLite's getNextOverride when the resolved langtags entry for
@@ -149,15 +149,18 @@ async function waitVisible(locator: Locator, timeout: number): Promise<boolean> 
  *      (its `next` is static, unconditional); the value itself may be left
  *      blank.
  *   5. il_target_script (select) — choose a script
- *   6. il_script_not_supported (terminal notice, if CJK/Ethi/Hang)
- *   7. il_author_name (text, REQUIRED) — spec 059 US1 attribution; the
- *      DEFAULT (non-gated) branch out of il_target_script continues here
- *      rather than ending the flow. Pre-fills from the authenticated GitHub
- *      profile in the real app (FR-001); an unauthenticated E2E session has
- *      no profile to pre-fill from, so this helper fills it explicitly.
- *   8. il_author_email (text, optional) — left blank, same as il_language_code
- *   9. il_copyright_holder (text, optional, TERMINAL — `next: null`) — left
- *      blank; D1 defaults it to the author name
+ *   6. il_script_not_supported (terminal notice, if CJK/Ethi/Hang) — never
+ *      reached by this helper, since it always picks the "other" script.
+ *   7. il_author_name (text) — REQUIRED (validate() rejects blank); reached
+ *      unconditionally for every supported script (il_target_script's
+ *      `next` default-branches here — see il_target_script.ts). Unseeded in
+ *      an unauthenticated e2e run (IdentityLiteAdapter's authorSeed comes
+ *      from useGitHubAuth(), which returns no name/email for a guest), so
+ *      this helper must type a value or the walk parks here forever.
+ *   8. il_author_email (text) — optional (required: false; a private GitHub
+ *      email must never block emission per spec 059).
+ *   9. il_copyright_holder (text) — optional and TERMINAL (`next: null`);
+ *      blank defaults to the author name (D1).
  *
  * This helper detects presence rather than assuming the fixed sequence above,
  * since il_language_region is conditional and may not render at all:
@@ -242,19 +245,28 @@ export async function driveIdentityLite(
   await selectMenuOption(page, page.locator("#il_target_script"), script);
   await surveyAdvance(page).click();
 
-  // Q7: Author name (spec 059 US1) — REQUIRED. Pre-fills from the
-  // authenticated GitHub profile in the real app; there is none in an E2E
-  // session, so this must be filled explicitly or Next stays disabled forever.
+
+  // Q6: Author name (plain text field) — ALWAYS rendered for every supported
+  // script (il_target_script's default branch goes here unconditionally; only
+  // the gated CJK/Ethiopic/Hangul scripts skip straight to
+  // il_script_not_supported instead, which this helper never selects) AND
+  // REQUIRED (validate() rejects blank — see
+  // questions/reserve/author_display_name.ts, reused by il_author_name.ts).
+  // Unseeded here: IdentityLiteAdapter's authorSeed comes from
+  // useGitHubAuth(), which returns no name/email for an unauthenticated e2e
+  // run, so this field starts genuinely blank.
   await page.waitForSelector("#il_author_name", { timeout: 15_000 });
   await page.locator("#il_author_name").fill(authorName);
   await surveyAdvance(page).click();
 
-  // Q8: Author email — optional, always rendered; left blank (private-email
-  // authors are a real, supported case per D7).
+  // Q7: Author email (plain text field) — always rendered, but optional
+  // (required: false; a private GitHub profile email must never block
+  // emission per spec 059). Left blank (private-email authors are a real,
+  // supported case per D7).
   await page.waitForSelector("#il_author_email", { timeout: 15_000 });
   await surveyAdvance(page).click();
 
-  // Q9: Copyright holder — optional, TERMINAL (`next: null`); left blank
+  // Q8: Copyright holder — optional, TERMINAL (`next: null`); left blank
   // (D1 defaults it to the author name). This hands off to the base picker.
   await page.waitForSelector("#il_copyright_holder", { timeout: 15_000 });
   await surveyAdvance(page).click();

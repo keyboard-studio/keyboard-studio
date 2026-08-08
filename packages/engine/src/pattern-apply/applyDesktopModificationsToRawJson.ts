@@ -26,9 +26,10 @@
  *     when the phone platform has no shift layer.
  *   - Removals — walk EVERY platform/layer/row/key. Drop matching sk[]/
  *     flick{}/multitap[] entries. A key whose primary production (text/
- *     output/U_-id) is carved is never deleted — it becomes an inert
- *     `T_removed_<n>` placeholder (id changed, text/output cleared) so row
- *     geometry/widths stay stable (R9). Matching is canonical (NFC) —
+ *     output/U_-id) is carved is never deleted — it becomes the corpus's own
+ *     blank (`T_BLANK` + `sp` 10, see `BLANK_KEY_ID` in
+ *     touch-mechanism-shared.ts; text/output cleared) so row geometry/widths
+ *     stay stable (R9). Matching is canonical (NFC) —
  *     {@link keyMatchesRemovalSet}. Running removals last means a hostKey
  *     that was both placed onto and later (re-)carved is evaluated by its
  *     current post-placement production, not a stale one placements could
@@ -47,6 +48,8 @@
 
 import { charToUnicodeKeyId } from "../shared/touch-ids.js";
 import {
+  BLANK_KEY_ID,
+  BLANK_KEY_SP,
   buildRemovalSet,
   isTouchKeyPrimaryProduction,
   isTouchSubKeyDuplicate,
@@ -105,11 +108,6 @@ export function applyDesktopModificationsToRawJson(
 // ---------------------------------------------------------------------------
 
 function removeAcrossRawLayout(layout: RawTouchLayout, removalSet: ReadonlySet<string>): void {
-  // Deterministic per-document counter for T_removed_<n> placeholder ids —
-  // increments only when a key's primary production is actually carved.
-  let placeholderCounter = 0;
-  const mintPlaceholderId = () => `T_removed_${placeholderCounter++}`;
-
   for (const pName of Object.keys(layout)) {
     const platform = layout[pName];
     if (!platform || typeof platform !== "object") continue;
@@ -121,7 +119,7 @@ function removeAcrossRawLayout(layout: RawTouchLayout, removalSet: ReadonlySet<s
       for (const row of layer.row) {
         if (!Array.isArray(row.key)) continue;
         for (const key of row.key) {
-          stripRemovedFromRawKey(key, removalSet, mintPlaceholderId);
+          stripRemovedFromRawKey(key, removalSet);
         }
       }
     }
@@ -129,11 +127,7 @@ function removeAcrossRawLayout(layout: RawTouchLayout, removalSet: ReadonlySet<s
 }
 
 /** Mutate `key` in place, dropping carved gesture entries / primary production. */
-function stripRemovedFromRawKey(
-  key: RawKey,
-  removalSet: ReadonlySet<string>,
-  mintPlaceholderId: () => string,
-): void {
+function stripRemovedFromRawKey(key: RawKey, removalSet: ReadonlySet<string>): void {
   if (Array.isArray(key.sk)) {
     key.sk = key.sk.filter((s) => !keyMatchesRemovalSet(s, removalSet));
   }
@@ -151,9 +145,16 @@ function stripRemovedFromRawKey(
 
   if (keyMatchesRemovalSet(key, removalSet)) {
     // Never delete the key object — row geometry/widths stay stable (R9).
-    key.id = mintPlaceholderId();
+    // The emptied-key spelling is shared with the IR twin (BLANK_KEY_ID /
+    // BLANK_KEY_SP in touch-mechanism-shared.ts), which carries the full
+    // rationale and the corpus measurement behind it. `sp` is written as a
+    // NUMBER, matching how every other raw writer in this package sets it
+    // (`applyKeyEditsToRawJson.ts`'s writeFieldsToRawKey / newRawKeyFromSpec);
+    // the wire-format reader coerces either spelling.
+    key.id = BLANK_KEY_ID;
     delete key.text;
     delete key.output;
+    key.sp = BLANK_KEY_SP;
   }
 }
 

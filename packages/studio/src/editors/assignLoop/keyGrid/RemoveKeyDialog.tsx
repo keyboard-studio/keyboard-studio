@@ -114,12 +114,13 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import {
+  PLATFORM_MAX_KEYS_PER_ROW,
+  countInteractiveRowKeys,
   decomposeLayerId,
   proposeSuppressFields,
   type KeyEditOperation,
   type SuppressShapeChoice,
 } from "@keyboard-studio/engine";
-import { isSpacerKeyClass } from "@keyboard-studio/contracts";
 import { Badge, Button, Checkbox, Notice, RadioGroup } from "../../../ui/index.ts";
 import type { RadioOption } from "../../../ui/index.ts";
 import { BG_CARD, BORDER, TEXT_DIM, TEXT_MAIN, FONT } from "../../../lib/galleryTheme.ts";
@@ -230,19 +231,24 @@ export function buildRemoveKeyDialogConfirmResult(
 
 /**
  * Platform key-count limits a touch row must stay under before it counts as
- * "crowded" (FR-029g's third bullet). Sourced from
- * [check-18-3-keys-per-row.ts](../../../../../keyboard-lint/src/checks/check-18-3-keys-per-row.ts)'s
- * own `MAX_KEYS` table (`KM_WARN_TOUCH_KEYS_PER_ROW`) — restated here as a
- * plain object rather than imported, since `@keymanapp/keyboard-lint` is a
- * Layer C engine-side package this studio component does not otherwise
- * depend on; keep the two tables in sync if either changes. `desktop` has no
- * rule there and is likewise absent here — a platform id with no entry in
- * this table never counts as over the limit.
+ * "crowded" (FR-029g's third bullet).
+ *
+ * **No longer a restatement (spec 061 T022, research D6).** This used to be a
+ * hand-copied twin of `check-18-3-keys-per-row.ts`'s `MAX_KEYS`, carrying a
+ * comment asking a future reader to keep the two in sync — the copy the shared
+ * table was created to retire. It is now an alias for
+ * `PLATFORM_MAX_KEYS_PER_ROW`, read through the engine's barrel (this package's
+ * only sanctioned door into engine), so the hygiene check, the edit-time
+ * `TOUCH_KEY_ROW_CROWDED` finding and this proposal cannot disagree about what
+ * "crowded" means.
+ *
+ * The name is kept rather than renamed at every call site: it reads correctly
+ * where it is used, and this file's own tests pin the numbers through it.
+ * `desktop` remains absent — a platform id with no entry never counts as over
+ * the limit.
  */
-export const PLATFORM_ROW_KEY_LIMIT: Readonly<Record<string, number>> = {
-  phone: 10,
-  tablet: 13,
-};
+export const PLATFORM_ROW_KEY_LIMIT: Readonly<Record<string, number>> =
+  PLATFORM_MAX_KEYS_PER_ROW;
 
 /** The two FR-029g layer-kind categories a removal proposal keys off. */
 export type RemoveKeyDialogLayerKind = "twin" | "standalone";
@@ -266,11 +272,6 @@ export type RemoveKeyDialogLayerKind = "twin" | "standalone";
 export function classifyLayerKind(layerId: string): RemoveKeyDialogLayerKind {
   const decomposition = decomposeLayerId(layerId);
   return decomposition.kind === "parsed" && decomposition.plane === undefined ? "twin" : "standalone";
-}
-
-/** Interactive (non-`sp:9`/`sp:10`) key count, matching check-18-3's own filter — never re-derived. */
-function countInteractiveRowKeys(rowKeys: readonly KeyGridCellViewModel[]): number {
-  return rowKeys.filter((key) => !isSpacerKeyClass(key.sp)).length;
 }
 
 export interface ProposeRemoveKeyOutcomeInput {

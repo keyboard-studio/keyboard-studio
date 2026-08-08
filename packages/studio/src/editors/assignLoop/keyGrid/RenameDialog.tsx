@@ -114,6 +114,7 @@ import { useEffect, useId, useMemo, useRef, useState, type FormEvent, type Keybo
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import {
+  createKeyOccurrenceCounter,
   bindingsForKeyId,
   normalizeTouchKeyId,
   type KeyboardIR,
@@ -174,9 +175,13 @@ function collectLayerScopeIds(
   if (platform === undefined) return out;
   const layer = platform.layers.find((l) => l.id === layerId);
   if (layer === undefined) return out;
+  const nextOccurrence = createKeyOccurrenceCounter();
   for (const row of layer.rows) {
     for (const k of row.keys) {
-      if (touchKeyAddress(platformId, layerId, k.id) === excludeAddress) continue;
+      // Occurrence-aware so `excludeAddress` — a grid cell's address, which may
+      // carry one — excludes the key being renamed and not merely the first key
+      // that happens to share its id.
+      if (touchKeyAddress(platformId, layerId, k.id, nextOccurrence(k.id)) === excludeAddress) continue;
       out.push({ id: k.id, ...(k.layer !== undefined ? { layer: k.layer } : {}) });
     }
   }
@@ -188,9 +193,12 @@ function collectAllTopLevelIds(layout: TouchLayoutIR, excludeAddress: string): E
   const out: ExistingKeyIdInScope[] = [];
   for (const platform of layout.platforms) {
     for (const layer of platform.layers) {
+      const nextOccurrence = createKeyOccurrenceCounter();
       for (const row of layer.rows) {
         for (const k of row.keys) {
-          if (touchKeyAddress(platform.id, layer.id, k.id) === excludeAddress) continue;
+          if (touchKeyAddress(platform.id, layer.id, k.id, nextOccurrence(k.id)) === excludeAddress) {
+            continue;
+          }
           out.push({ id: k.id, ...(k.layer !== undefined ? { layer: k.layer } : {}) });
         }
       }
@@ -280,9 +288,12 @@ export function computeRenameImpact(
 
   for (const platform of layout.platforms) {
     for (const layer of platform.layers) {
+      const nextOccurrence = createKeyOccurrenceCounter();
       for (const row of layer.rows) {
         for (const topKey of row.keys) {
-          const isTargetKey = touchKeyAddress(platform.id, layer.id, topKey.id) === targetAddress;
+          const isTargetKey =
+            touchKeyAddress(platform.id, layer.id, topKey.id, nextOccurrence(topKey.id)) ===
+            targetAddress;
           for (const id of collectIdOccurrencesInKey(topKey)) {
             if (normalizeTouchKeyId(id) !== targetNorm) continue;
             // Exclude exactly the top-level key being renamed itself; a

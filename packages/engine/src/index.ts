@@ -271,15 +271,46 @@ export type { CarveNeededSet, DeriveCarveNeededSetArgs } from "./marks/carve-nee
 export { applyMarkGuards, MARKS_GUARD_GROUP, MARKS_UNWRAP_FROM_STORE, MARKS_UNWRAP_TO_STORE } from "./pattern-apply/mark-guards.js";
 export type { MarkGuardsResult } from "./pattern-apply/mark-guards.js";
 
+// spec 061 US5 — id and keycap proposals (FR-029…FR-037). The studio's only
+// sanctioned door to the inherit-first proposer and the keycap judgement.
+export {
+  proposeTouchKeyId,
+  proposeKeycap,
+  isKeycapRelated,
+  isCombiningMark,
+} from "./pattern-apply/index.js";
+export type {
+  TouchKeyIdProposalRequest,
+  TouchKeyIdProposal,
+  TouchKeyIdProposalReason,
+  NoProposalReason,
+  KeycapProposal,
+  KeycapForm,
+  KeycapConsequence,
+  KeycapRelatednessOptions,
+} from "./pattern-apply/index.js";
+
 // spec 058 — key-level touch layout edit overlay: step 1.7 of
 // projectWorkingCopyVfs (the layout half, Case B) plus the shared address
 // parser its rule-half sibling pass reuses (contracts/key-edit-overlay.md).
-export { applyKeyEditsToVfs, parseTouchKeyAddress } from "./pattern-apply/index.js";
+// `applyKeyEditsToRawJson` is the Case B applier step 1.7 wraps. It is exported
+// here too because the STUDIO needs it directly: `TouchGallery`'s Case B commit
+// branch keeps `touchLayoutJson` current for the live grid, and doing that by
+// re-emitting the IR is exactly the round-trip spec 035 R9 forbids (spec 061
+// T016 — it stamped provenance onto every key of an imported layout).
+export {
+  applyKeyEditsToVfs,
+  applyKeyEditsToRawJson,
+  parseTouchKeyAddress,
+} from "./pattern-apply/index.js";
 export type {
   ApplyKeyEditsToVfsResult,
+  ApplyKeyEditsToRawJsonResult,
   TouchKeyAddressParts,
   KeyEditOperation,
   RenameKeyOp,
+  RowMetricKey,
+  RowMetrics,
 } from "./pattern-apply/index.js";
 
 // spec 058 T059 — the studio-side address-matched provenance promotion path
@@ -381,8 +412,15 @@ export type {
 // warning WITHOUT restating which planes count as independent layouts. The
 // check runs engine-side; only its results and its classification cross the
 // boundary.
+//
+// `keyEditAffectsFamilyParallelism` is that check read FORWARDS, for the studio
+// to decide whether an edit is even worth asking the fan-out question about. It
+// crosses the boundary for the same reason the classification does: the studio
+// owns the dialog, but must not own a second opinion about which properties a
+// family may legitimately differ on (FR-068).
 export {
   findFamilyParallelismBreaks,
+  keyEditAffectsFamilyParallelism,
   classifyPlane,
   severityForPlane,
 } from "./pattern-apply/index.js";
@@ -487,7 +525,7 @@ export type {
 } from "./pattern-apply/index.js";
 
 // Pattern-apply: slot substitution + MechanismAssignment[] to .kmn injection.
-export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, carveFilterIr, applyKeycapLabelsToVfs, applyCarveKeycapRemovalsToVfs, collectCarvedKeycapTexts, resolveRenderableMechanisms, applyTouchAssignments, applyTouchAssignmentsToRawJson, applyDesktopModifications, applyDesktopModificationsToRawJson, propagateDesktopLayersToTouch, applyStoreSlotRemovals, classifyStoreSlotEdit, describeStorePairing, analyzeStores, storeRoleOf, buildProducerIndex, parseSlotId, makeSlotId, collectCharContributors, collectCompositionMethod, isMnemonicLayout, keyHasCapsHandling, buildShiftRuleLines, buildBaseRuleLines, buildCasePairRuleLines, planShiftAssignment, MODIFIER_EXCLUSIONS, canonicalizeCombo, comboToKeySpec, parseKeySpec, comboToTouchLayerId, comboToKvksShiftToken, collectModifierTokensInUse, collectLayerCombosInUse, buildComboKeyMap, addableTouchLayerTokens, optionsForTouchLayerSlot, isPlusSeparator, touchKeyAddress, touchSubKeyAddress, touchFlickAddress, enumerateTouchMethodsForChar, applyTouchKeycapRemovalsToLayout, applyTouchKeycapRemovalsToRawJson, applyTouchKeycapRemovalsToVfs, buildSessionProducedSet } from "./pattern-apply/index.js";
+export { substituteSlots, applyAssignments, applyAssignmentsToVfs, applyCarveToVfs, carveFilterIr, applyKeycapLabelsToVfs, applyCarveKeycapRemovalsToVfs, collectCarvedKeycapTexts, resolveRenderableMechanisms, applyTouchAssignments, applyTouchAssignmentsToRawJson, applyDesktopModifications, applyDesktopModificationsToRawJson, propagateDesktopLayersToTouch, applyStoreSlotRemovals, classifyStoreSlotEdit, describeStorePairing, analyzeStores, storeRoleOf, buildProducerIndex, parseSlotId, makeSlotId, collectCharContributors, collectCompositionMethod, isMnemonicLayout, keyHasCapsHandling, buildShiftRuleLines, buildBaseRuleLines, buildCasePairRuleLines, planShiftAssignment, MODIFIER_EXCLUSIONS, canonicalizeCombo, comboToKeySpec, parseKeySpec, comboToTouchLayerId, comboToKvksShiftToken, collectModifierTokensInUse, collectLayerCombosInUse, buildComboKeyMap, addableTouchLayerTokens, optionsForTouchLayerSlot, isPlusSeparator, touchKeyAddress, touchSubKeyAddress, touchFlickAddress, PLATFORM_MAX_KEYS_PER_ROW, platformMaxKeysPerRow, countInteractiveRowKeys, computeRowMetrics, DEFAULT_KEY_WIDTH_PCT, DEFAULT_KEY_PAD_PCT, enumerateTouchMethodsForChar, applyTouchKeycapRemovalsToLayout, applyTouchKeycapRemovalsToRawJson, applyTouchKeycapRemovalsToVfs, buildSessionProducedSet } from "./pattern-apply/index.js";
 export type { SubstituteResult, ApplyAssignmentsResult, ApplyTouchAssignmentsResult, ApplyTouchAssignmentsToRawJsonResult, DesktopModifications, ApplyDesktopModificationsResult, ApplyDesktopModificationsToRawJsonResult, PropagateDesktopLayersToTouchResult, ApplyCarveToVfsOpts, CarveKeycapRemovalInput, StoreSlotRemovalResult, StoreSlotEditMode, StoreSlotBlockReason, StorePairingDescription, StoreAnalysis, StoreRole, ProducerIndex, CharContributors, ContributorDescriptor, ShiftAssignmentPlan, ModifierToken, TouchMethodDescriptor, ApplyTouchKeycapRemovalsResult, ApplyTouchKeycapRemovalsToRawJsonResult, KeyEditOverlay } from "./pattern-apply/index.js";
 
 // Facet-transform (spec 039): switch a base's source-construction facet value on
