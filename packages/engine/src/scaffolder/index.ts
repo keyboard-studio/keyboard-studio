@@ -31,6 +31,7 @@ import { assetFileExtensions } from "../shared/siblingAssetStores.js";
 // block (attributionText -> renderLicense), because a derived keyboard must
 // RETAIN the base's holders rather than state a single one (spec 059 US2).
 import { welcomeHtm, readmeHtm } from "../shared/packageDocs.js";
+import { phpCommentEscape } from "../shared/escapeHtml.js";
 import {
   buildKpsContent,
   type PackageDescriptorIdentity,
@@ -49,11 +50,6 @@ export type { ScaffoldTouchLayoutResult } from "./scaffoldTouchLayout.js";
 export interface ScaffolderServiceOptions {
   proxyBase?: string;
   fetchImpl?: FetchFn;
-}
-
-// Defuse PHP block-comment terminator '*/' for stub generation.
-function phpCommentEscape(s: string): string {
-  return s.replace(/\*\//g, "* /");
 }
 
 /**

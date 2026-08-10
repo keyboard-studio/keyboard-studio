@@ -31,7 +31,13 @@ import {
   generateStubs,
   resolveInheritedHolders,
   stageAdaptHistory,
+  parseTargetTokens,
+  renderReadmeMd,
+  renderReadmeHtm,
+  renderWelcomeHtm,
+  renderHelpPhp,
 } from "@keyboard-studio/engine";
+import type { HelpDocsRenderInput } from "@keyboard-studio/engine";
 import { readVfsText } from "./vfsText.ts";
 import { snapshotDecisionRecord } from "../decisions/decisionLogStore.ts";
 
@@ -148,7 +154,7 @@ export async function projectWorkingCopyForOutput(
 ): Promise<ProjectWorkingCopyForOutputResult | null> {
   // 1. Read current working-copy store state.
   const state = useWorkingCopyStore.getState();
-  const { baseVfs, baseIr, baseKeyboard, deletedNodeIds, deletedItemIds, deletedTouchKeyIds, phaseResults, identity, touchLayoutJson, instantiationMode, attribution, baseLicenseText, baseHolderOverride } = state;
+  const { baseVfs, baseIr, baseKeyboard, deletedNodeIds, deletedItemIds, deletedTouchKeyIds, phaseResults, identity, touchLayoutJson, instantiationMode, attribution, baseLicenseText, baseHolderOverride, helpDocs, baseWelcomeHtmText, baseHelpPhpText } = state;
 
   // Not-instantiated guard.
   if (baseVfs === null || baseIr === null || baseKeyboard === null) {
@@ -264,11 +270,16 @@ export async function projectWorkingCopyForOutput(
   // Routed through the existing single writer rather than generating a
   // descriptor here: a second writer is the defect package-descriptor/ exists to
   // prevent.
+  // spec 061 FR-012: thread the project link (home-page line only, research
+  // D-06) through the SAME single descriptor writer every other identity
+  // field reaches, rather than a second `<WebSite>` writer.
+  const websiteUrl = helpDocs?.projectHomeUrl;
   let identityForProjection: IdentityOverlay = identity !== null ? {
     ...(identity.displayName !== undefined ? { displayName: identity.displayName } : {}),
     ...(identity.bcp47 !== undefined ? { bcp47: identity.bcp47 } : {}),
     ...(identity.languageName !== undefined ? { languageName: identity.languageName } : {}),
-  } : { displayName: baseKeyboard.displayName };
+    ...(websiteUrl !== undefined ? { websiteUrl } : {}),
+  } : { displayName: baseKeyboard.displayName, ...(websiteUrl !== undefined ? { websiteUrl } : {}) };
   // Accumulated warnings for the adapt path — merged with projection warnings below.
   const adaptWarnings: string[] = [];
   if (instantiationMode === "adapt-existing") {
@@ -423,6 +434,26 @@ export async function projectWorkingCopyForOutput(
       inherited,
     );
   }
+
+  // 5c. spec 061 FR-010: regenerate the shipped documentation files from the
+  //     author's CURRENT help-docs answers on EVERY call — not a write-if-absent
+  //     guard — so an edited answer is reflected in the very next production
+  //     rather than a stale prior render (SC-004). Shared by all three delivery
+  //     modes because they all call this one function (research D-03).
+  //     Platforms come from the PROJECTED .kmn's own store(&TARGETS), the same
+  //     regex the package descriptor already runs (FR-008) — never re-derived
+  //     from BaseKeyboard, which can disagree with what this build actually emits.
+  const projectedKmnText = readVfsText(clonedVfs, `source/${resolvedKeyboardId}.kmn`) ?? "";
+  const docsInput: HelpDocsRenderInput = {
+    answers: helpDocs,
+    displayName: identity?.displayName ?? baseKeyboard.displayName,
+    ...(identityForProjection.bcp47 !== undefined ? { primaryBcp47: identityForProjection.bcp47 } : {}),
+    platforms: parseTargetTokens(projectedKmnText),
+  };
+  clonedVfs.set("README.md", renderReadmeMd(docsInput), false);
+  clonedVfs.set("source/readme.htm", renderReadmeHtm(docsInput), false);
+  clonedVfs.set("source/welcome.htm", renderWelcomeHtm(docsInput, baseWelcomeHtmText), false);
+  clonedVfs.set(`source/help/${resolvedKeyboardId}.php`, renderHelpPhp(docsInput, baseHelpPhpText), false);
 
   // 6. Merge the adapt-path warnings (HISTORY/.kps staging) with the projection
   //    warnings. Both output paths (zip + PR) surface the same set.

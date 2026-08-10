@@ -42,5 +42,14 @@ export const fixtures: QuestionModule["fixtures"] = {
 };
 
 
-const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [] };
+// Output reach (spec 059 FR-016): `writes` stays `[]` — this question writes no
+// KeyboardIR — while `outputs` states that the answer nevertheless reaches an
+// emitted artifact, here the package descriptor's <WebSite> element.
+const mod: QuestionModule = {
+  definition,
+  fixtures,
+  inputs: [],
+  writes: [],
+  outputs: [{ target: "package-descriptor", field: "websiteUrl" }],
+};
 export default mod;

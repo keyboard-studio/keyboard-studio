@@ -58,11 +58,12 @@ const INFO_ELEMENT_RE = /(<Info>)([\s\S]*?)(<\/Info>)/;
 /**
  * Write the author's identity into `source/<keyboardId>.kps`.
  *
- * Mutates `vfs` in place. Writes exactly the four identity elements named in the
- * contract (§2) and touches nothing else: `<Files>`, `<System>`, `<Options>`, and
- * `<Version>` are left as they stand. In particular the `<Version>` element stays
- * owned by the adapt path's existing bump patch and by `<FollowKeyboardVersion/>`,
- * so FR-008's agreement between descriptor and source is not disturbed here.
+ * Mutates `vfs` in place. Writes the identity elements named in the contract
+ * (§2) plus `<WebSite>` (spec 061 FR-012) and touches nothing else: `<Files>`,
+ * `<System>`, `<Options>`, and `<Version>` are left as they stand. In
+ * particular the `<Version>` element stays owned by the adapt path's existing
+ * bump patch and by `<FollowKeyboardVersion/>`, so FR-008's agreement between
+ * descriptor and source is not disturbed here.
  *
  * @param kmnText the emitted `.kmn`, read only when GENERATING (the `<Files>` list
  *   must mirror what this build produces, so it is derived from the final source).
@@ -158,6 +159,7 @@ function patchKpsIdentity(
     out = out.replace(INFO_ELEMENT_RE, (_m, open: string, body: string, close: string) => {
       let patched = replaceElementText(body, "Name", escapedName);
       patched = replaceElementText(patched, "Description", escapedDescription);
+      patched = patchWebSite(patched, identity.websiteUrl);
       return `${open}${patched}${close}`;
     });
   } else {
@@ -193,6 +195,33 @@ function patchKpsIdentity(
   }
 
   return { text: out, unwritable };
+}
+
+/**
+ * `<Info>`'s `<WebSite>` element (spec 061 FR-012), inserted immediately after
+ * `<Description>` — the same placement `buildKpsContent`'s generate path
+ * uses. A blank/absent `websiteUrl` REMOVES any existing element rather than
+ * leaving a stale one: clearing the Phase F answer must not leave a dead link
+ * in a package the author re-produces (FR-010/SC-004).
+ */
+function patchWebSite(body: string, websiteUrl: string | undefined): string {
+  const existing = /<WebSite\b[^>]*>[\s\S]*?<\/WebSite\s*>/i;
+  const url = websiteUrl?.trim() ?? "";
+
+  if (url === "") {
+    return body.replace(existing, "");
+  }
+
+  const escapedUrl = escapeHtml(url);
+  const element = `<WebSite URL="${escapedUrl}">${escapedUrl}</WebSite>`;
+  if (existing.test(body)) {
+    return body.replace(existing, element);
+  }
+  if (/<\/Description\s*>/i.test(body)) {
+    return body.replace(/<\/Description\s*>/i, (m) => `${m}\n    ${element}`);
+  }
+  // No <Description> anchor either (unusual) — append rather than drop it.
+  return `${body}\n    ${element}`;
 }
 
 /**

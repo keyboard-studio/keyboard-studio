@@ -8,7 +8,9 @@
 // Pipeline:
 //   projectWorkingCopyForOutput()   carve + assignments + identity + descriptor
 //                                   + id rename  (shared with the PR path)
-//     -> ensurePackageFiles()       welcome/readme/LICENSE the descriptor lists
+//     -> ensurePackageFiles()       LICENSE the descriptor lists (welcome.htm/
+//                                   readme.htm are written unconditionally by
+//                                   projectWorkingCopyForOutput itself — spec 061)
 //     -> compile()                  the projected .kmn, under its final id
 //     -> stage build/<id>.{kmx,kvk,js}
 //
@@ -80,15 +82,15 @@ export async function buildOutputBundle(): Promise<OutputBundle | null> {
   const { vfs, keyboardId, displayName, version } = projected;
   const warnings = [...projected.warnings];
 
-  // The descriptor lists welcome.htm / readme.htm; the adapt track has neither.
+  // The descriptor lists LICENSE.md; the adapt track may have none of its own.
   // Report what had to be synthesized — a silently generated file is how the
   // missing descriptor stayed invisible for as long as it did.
   try {
     const ensurePackageFiles = await getEnsurePackageFiles();
     // No copyright holder is plumbed: `IdentityPatch` does not carry one (only
-    // the projection's own input shape does), so the stub falls back to the
-    // display name rather than inventing a store field for it here.
-    const { created } = ensurePackageFiles({ vfs, displayName });
+    // the projection's own input shape does), so the stub omits the copyright
+    // line rather than inventing a store field for it here.
+    const { created } = ensurePackageFiles({ vfs });
     if (created.length > 0) {
       devLog.info("[output] synthesized package files:", created);
       warnings.push(

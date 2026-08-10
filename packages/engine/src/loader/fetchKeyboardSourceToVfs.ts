@@ -70,6 +70,19 @@ export interface FetchKeyboardSourceResult {
    * same path would collide with it.
    */
   baseLicenseText?: string;
+  /**
+   * The base keyboard's own `source/welcome.htm`, verbatim, or undefined when
+   * it has none (spec 061 FR-013). Fetched for merge purposes at render time
+   * only — NOT written into the VFS, since that path is where the *rendered*
+   * (merged) file belongs, not the base's raw copy.
+   */
+  baseWelcomeHtmText?: string;
+  /**
+   * The base keyboard's own `source/help/<id>.php`, verbatim, or undefined
+   * when it has none. Same fetch-don't-write contract as
+   * {@link baseWelcomeHtmText}.
+   */
+  baseHelpPhpText?: string;
 }
 
 const DEFAULT_PROXY = "/kbd-proxy";
@@ -389,6 +402,21 @@ export async function fetchKeyboardSourceToVfs(
     baseLicenseText = licenseResp.text;
   }
 
+  // spec 061 FR-013: the base's own welcome.htm / help.php, for merge purposes
+  // at render time only — not written into the VFS (see baseWelcomeHtmText
+  // doc comment). Absence is non-fatal and NOT a warning, same tolerance as
+  // baseLicenseText: most bases have no help page at all.
+  let baseWelcomeHtmText: string | undefined;
+  const welcomeResp = await getText(`${baseUrl}/source/welcome.htm`, fetchImpl);
+  if (welcomeResp.ok && welcomeResp.text !== undefined) {
+    baseWelcomeHtmText = welcomeResp.text;
+  }
+  let baseHelpPhpText: string | undefined;
+  const helpPhpResp = await getText(`${baseUrl}/source/help/${baseKeyboard.id}.php`, fetchImpl);
+  if (helpPhpResp.ok && helpPhpResp.text !== undefined) {
+    baseHelpPhpText = helpPhpResp.text;
+  }
+
   return {
     options,
     filesLoaded,
@@ -396,5 +424,7 @@ export async function fetchKeyboardSourceToVfs(
     fonts,
     stylesheets,
     ...(baseLicenseText !== undefined ? { baseLicenseText } : {}),
+    ...(baseWelcomeHtmText !== undefined ? { baseWelcomeHtmText } : {}),
+    ...(baseHelpPhpText !== undefined ? { baseHelpPhpText } : {}),
   };
 }

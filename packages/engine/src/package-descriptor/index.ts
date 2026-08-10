@@ -16,7 +16,7 @@
 // descriptor the zip does — which it only does while the write rides the shared
 // projection.
 
-export { buildKpsContent, buildLanguageElement, buildLanguagesBlock } from "./build.js";
+export { buildKpsContent, buildLanguageElement, buildLanguagesBlock, parseTargetTokens } from "./build.js";
 export type { PackageDescriptorIdentity } from "./build.js";
 export { applyIdentityToKps } from "./patch.js";
 export type { ApplyIdentityToKpsResult } from "./patch.js";
@@ -40,4 +40,5 @@ export const DESCRIPTOR_CONSUMED_FIELDS: ReadonlySet<string> = new Set([
   "displayName",
   "bcp47",
   "languageName",
+  "websiteUrl",
 ]);

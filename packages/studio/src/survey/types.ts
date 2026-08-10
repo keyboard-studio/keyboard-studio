@@ -140,7 +140,7 @@ export type OutputTargetId = "package-descriptor";
  * own fields (`lib/projectWorkingCopyVfs.ts`) so the counterfactual can vary the
  * declared field directly rather than translating between two vocabularies.
  */
-export type IdentityOverlayField = "displayName" | "bcp47" | "languageName";
+export type IdentityOverlayField = "displayName" | "bcp47" | "languageName" | "websiteUrl";
 
 /** One output artifact + field a question's answer reaches. */
 export interface OutputWrite {

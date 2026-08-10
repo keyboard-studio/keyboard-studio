@@ -191,6 +191,65 @@ describe("applyIdentityToKps — a blank display name never leaves the base's st
   });
 });
 
+describe("applyIdentityToKps — <WebSite> on the patch path (spec 061 FR-012)", () => {
+  it("inserts <WebSite> right after <Description> when none exists yet", () => {
+    const vfs = vfsWith("source/bm_sil.kps", frenchBaseDescriptor());
+    applyIdentityToKps(
+      vfs,
+      "bm_sil",
+      { displayName: "Bambara", languageTag: "bm", websiteUrl: "https://example.com" },
+      KMN,
+    );
+    const kps = textAt(vfs, "source/bm_sil.kps");
+    expect(kps).toContain(
+      '<WebSite URL="https://example.com">https://example.com</WebSite>',
+    );
+    expect(kps.indexOf("</Description>")).toBeLessThan(kps.indexOf("<WebSite"));
+  });
+
+  it("replaces an existing <WebSite> rather than duplicating it", () => {
+    const vfs = vfsWith(
+      "source/bm_sil.kps",
+      buildKpsContent(
+        "bm_sil",
+        { displayName: "French AZERTY", languageTag: "fr", websiteUrl: "https://old.example.com" },
+        KMN,
+        "1.0",
+      ),
+    );
+    applyIdentityToKps(
+      vfs,
+      "bm_sil",
+      { displayName: "Bambara", languageTag: "bm", websiteUrl: "https://new.example.com" },
+      KMN,
+    );
+    const kps = textAt(vfs, "source/bm_sil.kps");
+    expect(kps).toContain("https://new.example.com");
+    expect(kps).not.toContain("old.example.com");
+    expect(kps.match(/<WebSite\b/g)).toHaveLength(1);
+  });
+
+  it("removes an existing <WebSite> when websiteUrl is now blank (cleared answer)", () => {
+    const vfs = vfsWith(
+      "source/bm_sil.kps",
+      buildKpsContent(
+        "bm_sil",
+        { displayName: "French AZERTY", languageTag: "fr", websiteUrl: "https://old.example.com" },
+        KMN,
+        "1.0",
+      ),
+    );
+    applyIdentityToKps(vfs, "bm_sil", { displayName: "Bambara", languageTag: "bm" }, KMN);
+    expect(textAt(vfs, "source/bm_sil.kps")).not.toContain("WebSite");
+  });
+
+  it("leaves the descriptor unchanged when there was never a <WebSite> and none is given", () => {
+    const vfs = vfsWith("source/bm_sil.kps", frenchBaseDescriptor());
+    applyIdentityToKps(vfs, "bm_sil", { displayName: "Bambara", languageTag: "bm" }, KMN);
+    expect(textAt(vfs, "source/bm_sil.kps")).not.toContain("WebSite");
+  });
+});
+
 describe("applyIdentityToKps — generating an absent descriptor (US3, FR-006, D-09)", () => {
   it("generates the descriptor and reports that it did", () => {
     const vfs = createVirtualFS();

@@ -21,7 +21,15 @@ interface EngineModule {
     baseKeyboard: BaseKeyboard,
     fs: VirtualFS,
     opts?: { proxyBase?: string }
-  ) => Promise<{ options?: Record<string, unknown>; filesLoaded?: string[]; warnings?: string[]; fonts?: KpsFontEntry[]; stylesheets?: KpsStylesheetEntry[] }>;
+  ) => Promise<{
+    options?: Record<string, unknown>;
+    filesLoaded?: string[];
+    warnings?: string[];
+    fonts?: KpsFontEntry[];
+    stylesheets?: KpsStylesheetEntry[];
+    baseWelcomeHtmText?: string;
+    baseHelpPhpText?: string;
+  }>;
   init: () => Promise<void>;
   isReady?: () => boolean;
   parseKmn?: (text: string, keyboardId: string) => { ir: KeyboardIR; opaqueFeatures: Array<{ feature: string; count: number }> };
@@ -731,6 +739,13 @@ export function useKeyboardArtifact(
           FETCH_TIMEOUT_MS,
           "Loading keyboard source",
         );
+        // spec 061 FR-013: retain the base's own welcome.htm/help.php verbatim
+        // so the Track 2 output-projection merge has something to preserve.
+        // Track 1 (scaffold branch above) never sets these — a brand-new
+        // keyboard has no prior docs of its own to merge with (research D-05).
+        const wc = useWorkingCopyStore.getState();
+        wc.setBaseWelcomeHtmText(fetchResult.baseWelcomeHtmText ?? null);
+        wc.setBaseHelpPhpText(fetchResult.baseHelpPhpText ?? null);
         // Build a blob URL for the OSK font so the frame can inject an
         // @font-face rule before the keyboard JS executes. Stored in refs so
         // it survives recompile() (the font only changes on a new fetch).
