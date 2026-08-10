@@ -67,11 +67,14 @@ import "./lib/i18n.ts"; // side-effect: load + activate the default (en) catalog
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
 import { CurrentKeyboardIndicator } from "./components/CurrentKeyboardIndicator.tsx";
 import { LocaleSwitcher } from "./components/LocaleSwitcher.tsx";
+import { ThemeSwitcher } from "./components/ThemeSwitcher.tsx";
+import { PhaseStepper } from "./components/PhaseStepper.tsx";
 import { ProfileScreen } from "./components/ProfileScreen.tsx";
 import { UnfinishedGalleryIndicator } from "./components/UnfinishedGalleryIndicator.tsx";
 import { AccountControl } from "./components/AccountControl.tsx";
 import { hasVisited } from "./lib/firstVisit.ts";
 import { manifest, validateManifestShape } from "./steps/manifest.ts";
+import { validatePhaseMap } from "./steps/phases.ts";
 import { applyStepCompletion, type ReducerDeps } from "./steps/reducer.ts";
 import { createStudioDecisionRecorder } from "./decisions/createStudioDecisionRecorder.ts";
 import { createSourceSnapshotter } from "./decisions/snapshotSource.ts";
@@ -304,22 +307,44 @@ function NavBar({
         msg({ id: "nav.ariaLabel", message: "Studio navigation" }),
       )}
       style={{
-        height: 48,
+        height: "var(--topbar-h)",
         flexShrink: 0,
         display: "flex",
         alignItems: "center",
         gap: 4,
         padding: "0 16px",
-        background: "var(--bg)",
-        borderBottom: "1px solid #283040",
+        background: "var(--app-surface)",
+        borderBottom: "1px solid var(--app-border)",
         boxSizing: "border-box",
       }}
     >
-      {/* Left group — current-keyboard indicator (first; same welcome gate
-          as AccountControl/UnfinishedGalleryIndicator — nothing to name
-          before a keyboard exists) + tab links. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 4, flex: 1 }}>
+      {/* Left zone — brand mark, then the current-keyboard indicator (same
+          welcome gate as AccountControl/UnfinishedGalleryIndicator — nothing
+          to name before a keyboard exists). flex: 1 1 0 balances the right
+          zone so the center zone (the tab list) sits optically centered. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 9, flex: "1 1 0", minWidth: 0 }}>
+        <span
+          style={{
+            fontSize: 15,
+            fontWeight: 700,
+            letterSpacing: "-0.01em",
+            color: "var(--app-text)",
+            fontFamily: "var(--app-font)",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {/* Wrapped like every other occurrence of the product name
+              (welcome.title, profile.accountKind.signedIn) — translators
+              decide whether it transliterates, we don't decide for them. */}
+          <Trans id="nav.wordmark">Keyboard Studio</Trans>
+        </span>
         {active !== "welcome" && <CurrentKeyboardIndicator />}
+      </div>
+
+      {/* Center zone — tab links. flex: 0 0 auto — sized to its content, not
+          stretched, which is what keeps it centered between the two flex:1
+          side zones rather than left- or right-anchored. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 4, flex: "0 0 auto" }}>
         {NAV_ITEMS.map(({ id, label }) => {
           const isActive = id === active;
           const isBlocked = id === "output" && outputBlocked;
@@ -335,9 +360,18 @@ function NavBar({
                 fontSize: 14,
                 fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
                 textDecoration: "none",
-                color: isBlocked ? "#6e7681" : isActive ? "#6ea8fe" : "#e6edf3",
-                opacity: isBlocked ? 0.6 : 1,
-                borderBottom: isActive ? "2px solid #6ea8fe" : "2px solid transparent",
+                // Blocked state signals via COLOR ALONE (var(--app-text-disabled),
+                // itself a reduced-alpha token) — it must not also stack an
+                // `opacity` on top, which double-dims and can drop the state
+                // below contrast requirements the token was already tuned for.
+                color: isBlocked
+                  ? "var(--app-text-disabled)"
+                  : isActive
+                    ? "var(--app-accent-text)"
+                    : "var(--app-text)",
+                borderBottom: isActive
+                  ? "2px solid var(--app-accent)"
+                  : "2px solid transparent",
                 lineHeight: "40px",
                 whiteSpace: "nowrap",
                 transition: "color 120ms ease, border-bottom-color 120ms ease",
@@ -349,15 +383,17 @@ function NavBar({
         })}
       </div>
 
-      {/* Right group — unfinished-gallery return indicator (hidden on
-          welcome, same as the account control below — nothing to return to
-          before a keyboard exists) + locale switcher (all routes) + account
-          control (hidden on the welcome route) + survey reset in the far
-          corner. The reset is last so it can't crowd the controls beside it;
-          it renders only while a survey is mounted (startOverStore publishes
-          the handler from SurveyView, which exists on the #survey route
-          alone). */}
-      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      {/* Right zone — unfinished-gallery return indicator (hidden on welcome,
+          same as the account control — nothing to return to before a keyboard
+          exists) + locale switcher + theme switcher (all routes) + account
+          control (hidden on welcome) + survey reset in the far corner.
+          flex: 1 1 0 mirrors the left zone's width so the center zone stays
+          centered; justify-content: flex-end keeps these controls pinned to
+          the right edge within that zone. The reset is last so it can't crowd
+          the controls beside it; it renders only while a survey is mounted
+          (startOverStore publishes the handler from SurveyView, which exists
+          on the #survey route alone). */}
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12, flex: "1 1 0" }}>
         {active !== "welcome" && (
           <UnfinishedGalleryIndicator
             desktopCount={unfinishedDesktopCount}
@@ -366,6 +402,7 @@ function NavBar({
           />
         )}
         <LocaleSwitcher />
+        <ThemeSwitcher />
         {active !== "welcome" && <AccountControl />}
         {startOver !== null && <SurveyResetButton onReset={startOver} />}
       </div>
@@ -435,6 +472,10 @@ const SURVEY_LEFT_MAX_PCT = 65;
 // once here at module load so a misshapen manifest is a hard error before any
 // render — fail fast so CI catches it.
 validateManifestShape();
+// validatePhaseMap (steps/phases.ts) is the phase-stepper's counterpart guard
+// — same "fail fast at module load" treatment, run right alongside the
+// manifest shape guard so a phase/manifest drift is caught before any render.
+validatePhaseMap();
 
 // manifestIndexOf and nextSpineStepAfter have moved to steps/advance.ts
 // (spec 028 Stage 5, T006). They are no longer needed in SurveyView.
@@ -1572,16 +1613,29 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
               justifyContent: "center",
               flexDirection: "column",
               gap: 12,
-              color: "#9aa7b8",
+              color: "var(--app-text-subtle)",
               fontSize: 14,
               textAlign: "center",
             }}
           >
             {/* Decorative icon stand-in: aria-hidden (conveys nothing the next
-                line doesn't), and opacity floor 0.6 — #9aa7b8 over #0d1117 at
-                0.6 is 3.5:1, the minimum that clears the 3:1 large-text
-                contrast bar for sighted low-vision users (1.4.3). */}
-            <span aria-hidden="true" style={{ fontSize: 32, opacity: 0.6, fontFamily: "monospace" }}>[kb]</span>
+                line doesn't).
+                The previous version inherited its color and dimmed it with
+                opacity: 0.6. That opacity was tuned against the ORIGINAL
+                literal color-on-background pair, and the comment here flagged
+                that it needed re-verifying once both sides became tokens —
+                which epic #533 did. The axe gate in e2e/boot-smoke.spec.ts then
+                failed it as a serious color-contrast violation.
+                Fixed by naming the color outright and dropping the opacity:
+                stacking a dim on top of a color is the one thing the design
+                system forbids, because the two multiply into an unreadable
+                value. --app-text-muted clears AA on both themes on its own. */}
+            <span
+              aria-hidden="true"
+              style={{ fontSize: 32, fontFamily: "var(--app-font-mono)", color: "var(--app-text-muted)" }}
+            >
+              [kb]
+            </span>
             <span>
               <Trans id="preview.empty.hint">
                 Choose a base keyboard in the wizard to see a live preview here.
@@ -1599,7 +1653,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
                 flexWrap: "wrap",
               }}
             >
-              <h2 style={{ margin: 0, fontSize: "1.1rem", color: "#6ea8fe" }}>
+              <h2 style={{ margin: 0, fontSize: "1.1rem", color: "var(--app-accent-text)" }}>
                 {localBase.displayName}
               </h2>
               <OskModeToggle value={oskMode} onChange={setOskMode} />
@@ -1639,6 +1693,14 @@ export function StudioShell() {
   // NOT bump on a mid-session identity/keyboardId rename (Phase A's custom
   // keyboard id field) — only on an actual switch to a different project.
   const projectSwitchGeneration = useProjectSwitchStore((s) => s.generation);
+
+  // Phase stepper (epic #533). Read from the SAME store field SurveyView and
+  // StepHost already read (`surveySessionStore.activeStepId` — see this
+  // file's SurveyView, ~line 425, and StepHost.tsx) rather than inventing a
+  // second selector; the stepper is presentational, so the store read lives
+  // here (where every other cross-cutting NavBar/StudioShell signal is read)
+  // and is passed down as a plain prop.
+  const surveyActiveStepId = useSurveySessionStore((s) => s.activeStepId);
 
   // ---------------------------------------------------------------------------
   // Completeness report — T042/US3.
@@ -1923,6 +1985,13 @@ export function StudioShell() {
         unfinishedTouchCount={unfinishedTouchCount}
         onNavigateToUnfinishedGallery={handleNavigateToUnfinishedGallery}
       />
+      {/* Phase stepper — survey route only. Phases (A-F) map to
+          the manifest steps the survey walks (steps/phases.ts); they are
+          meaningless on Compare/Output/Decisions/Flow Map/Profile, so this is
+          a route gate, not an always-mounted component that happens to
+          render nothing elsewhere (unlike StudioFooter below, which decides
+          for itself). */}
+      {route === "survey" && <PhaseStepper activeStepId={surveyActiveStepId} />}
       <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>{content}</div>
       {/* Spec 057 US4/US6 (T052, FR-040): the narrow journey footer. Mounted
           unconditionally rather than per-route because `StudioFooter` returns

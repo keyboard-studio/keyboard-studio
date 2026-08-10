@@ -13,7 +13,7 @@ interface StoreChipProps {
 
 // StoreChip — a single per-character toggle chip inside a store's detail
 // view (StoreDetail). Visuals mirror the pre-#523 static store-char spans
-// (invisibleCharLabel, KIND_COLOR.store top border, Lora glyph styling).
+// (invisibleCharLabel, KIND_COLOR.store top border, glyph-font styling).
 // Interaction (toggle-on-click, aria-disabled) is borrowed from GlyphCell;
 // hover/focus info has two paths mirroring GlyphCell's own split — a
 // disabled chip surfaces its blocked-reason text, an enabled chip surfaces
@@ -72,7 +72,7 @@ export const StoreChip = memo(function StoreChip({ chip, off, onToggle }: StoreC
           {label}
         </span>
       ) : (
-        <span style={{ font: "400 22px/1 'Lora', serif", color: off ? 'var(--app-text-subtle)' : 'var(--app-text)' }}>
+        <span style={{ font: "400 22px/1 var(--app-font-glyph)", color: off ? 'var(--app-text-subtle)' : 'var(--app-text)' }}>
           {displayChar(chip.ch)}
         </span>
       )}

@@ -123,15 +123,17 @@ export function InheritancePostureStep({
   return (
     <div
       style={{
-        background: "#0d1117",
-        color: "#e6edf3",
-        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+        // No background of its own (epic #533). This panel renders INSIDE the
+        // survey card, so painting its own near-black made it a second, darker
+        // island within an already-surfaced card. It inherits the card now.
+        color: "var(--app-text)",
+        fontFamily: "var(--app-font)",
       }}
     >
-      <h2 style={{ margin: "0 0 8px 0", fontSize: "1.1rem", color: "#6ea8fe", fontWeight: 600 }}>
+      <h2 style={{ margin: "0 0 8px 0", fontSize: 18, color: "var(--app-text)", fontWeight: 600, lineHeight: 1.3 }}>
         <Trans id="adaptation.posture.heading">Carry forward from your starting keyboard</Trans>
       </h2>
-      <p style={{ margin: "0 0 20px 0", fontSize: 13, color: "#8b949e" }}>
+      <p style={{ margin: "0 0 20px 0", fontSize: 14, lineHeight: 1.6, color: "var(--app-text-muted)" }}>
         <Trans id="adaptation.posture.intro">
           Each choice below governs every related proposal at once. Confirm the
           defaults, or change any of them — nothing is applied silently, and you can
@@ -143,16 +145,21 @@ export function InheritancePostureStep({
         {governed.map((entry) => (
           <fieldset
             key={entry.facet}
-            style={{ border: "1px solid #30363d", borderRadius: 6, padding: "10px 12px", margin: 0 }}
+            style={{
+              border: "1px solid var(--app-border)",
+              borderRadius: "var(--app-radius-sm)",
+              padding: "10px 12px",
+              margin: 0,
+            }}
           >
-            <legend style={{ fontSize: 13, color: "#e6edf3", padding: "0 6px" }}>
+            <legend style={{ fontSize: 13, color: "var(--app-text)", padding: "0 6px" }}>
               {t(FACET_LABELS[entry.facet])}
             </legend>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 12 }}>
               {(["keep", "propose", "discard"] as const).map((p) => (
                 <label
                   key={p}
-                  style={{ fontSize: 13, color: "#c9d1d9", display: "flex", gap: 6, alignItems: "center" }}
+                  style={{ fontSize: 13, color: "var(--app-text)", display: "flex", gap: 6, alignItems: "center" }}
                 >
                   <input
                     type="radio"
@@ -166,7 +173,7 @@ export function InheritancePostureStep({
                 </label>
               ))}
             </div>
-            <p style={{ margin: "8px 0 0 0", fontSize: 11, color: "#6e7681" }}>
+            <p style={{ margin: "8px 0 0 0", fontSize: 11, color: "var(--app-text-subtle)" }}>
               {entry.provenance} ({provenanceTier})
             </p>
           </fieldset>

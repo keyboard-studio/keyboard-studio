@@ -310,7 +310,7 @@ export function extractHelpDocs(result: SurveyPhaseResult): HelpDocsAnswers | un
 
 export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {
   flowRef: "phase_f_helpdocs",
-  title: "Phase F — Help documentation",
+  title: "Help documentation",
 
   buildContext(deps: FlowStepDeps) {
     // Match PhaseFAdapter: pass surveyContext from session store.

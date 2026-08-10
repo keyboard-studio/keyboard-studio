@@ -474,7 +474,7 @@ export async function drivePunctuationStep(page: Page): Promise<void> {
  */
 export async function driveConvenienceStep(page: Page): Promise<void> {
   const continueBtn = page.getByTestId("convenience-continue");
-  const carveGallery = page.getByTestId("carve-gallery");
+  const carveGallery = page.getByTestId("carve-gallery-v2");
   await Promise.race([
     continueBtn.waitFor({ state: "visible", timeout: 20_000 }),
     carveGallery.waitFor({ state: "visible", timeout: 20_000 }),
@@ -511,7 +511,7 @@ export async function driveMarksSeries(page: Page): Promise<void> {
   const continueBtn = page.getByTestId("marks-continue");
   const nextLandmarks = [
     page.getByTestId("convenience-continue"),
-    page.getByTestId("carve-gallery"),
+    page.getByTestId("carve-gallery-v2"),
   ];
   for (let i = 0; i < 6; i++) {
     const timeout = i === 0 ? 20_000 : 5_000;

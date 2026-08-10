@@ -39,7 +39,7 @@ const avatarButtonStyle: React.CSSProperties = {
   height: AVATAR_SIZE,
   borderRadius: "50%",
   background: ACCENT,
-  color: "#0d1117",
+  color: "var(--app-text-on-accent)",
   border: "none",
   cursor: "pointer",
   fontFamily: FONT,
@@ -75,7 +75,7 @@ const panelStyle: React.CSSProperties = {
   border: `1px solid ${BORDER}`,
   borderRadius: 8,
   padding: "8px 0",
-  boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+  boxShadow: "0 8px 24px color-mix(in srgb, var(--app-bg) 22%, transparent)",
   zIndex: 200,
 };
 
@@ -123,9 +123,9 @@ const githubProviderButtonStyle: React.CSSProperties = {
   width: "calc(100% - 32px)",
   margin: "4px 16px",
   padding: "8px 12px",
-  background: "#238636",
-  color: "#e6edf3",
-  border: "1px solid #2ea043",
+  background: "#238636", // GitHub brand green
+  color: "var(--app-text-on-accent)",
+  border: "1px solid #2ea043", // GitHub brand green (border)
   borderRadius: 6,
   fontSize: 13,
   fontWeight: 600,
@@ -140,9 +140,9 @@ const googleProviderButtonStyle: React.CSSProperties = {
   width: "calc(100% - 32px)",
   margin: "4px 16px",
   padding: "8px 12px",
-  background: "#1a73e8",
-  color: "#ffffff",
-  border: "1px solid #1a73e8",
+  background: "#1a73e8", // Google brand blue
+  color: "var(--app-text-on-accent)",
+  border: "1px solid #1a73e8", // Google brand blue (border)
   borderRadius: 6,
   fontSize: 13,
   fontWeight: 600,
@@ -213,7 +213,7 @@ export function AccountControl() {
           width: AVATAR_SIZE,
           height: AVATAR_SIZE,
           borderRadius: "50%",
-          background: "#283040",
+          background: "var(--app-surface-2)",
           flexShrink: 0,
         }}
         aria-hidden="true"

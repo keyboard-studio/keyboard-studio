@@ -76,13 +76,50 @@ function setCached(fontStack: string, char: string, value: boolean): void {
 // cost once, on first use.
 // ---------------------------------------------------------------------------
 
+interface FontsApi {
+  ready?: Promise<unknown>;
+  status?: string;
+}
+
 let fontsReadyState: boolean | null = null;
-let fontsReadyPromise: Promise<void> | null = null;
+const readySubscribers = new Set<() => void>();
+
+/**
+ * Wait for the font set to STOP CHANGING, not merely for the first in-flight
+ * batch to finish.
+ *
+ * `document.fonts.ready` resolves for whatever loads are pending at the moment
+ * you read it. Google Fonts serves Noto Sans (our glyph face) as many
+ * `unicode-range` subsets that the browser requests LAZILY — only once text
+ * needing that range is laid out. So the first `ready` can, and routinely does,
+ * resolve before the subset covering a given script has even been requested.
+ *
+ * Measuring at that point compares a font that has not loaded yet against the
+ * generic baseline, concludes "unsupported", and — because the answer is
+ * cached — pins a placeholder box onto a character the browser goes on to
+ * render perfectly a moment later. That is the "boxes appear and disappear as
+ * I move around" behaviour: each re-render re-reads a cache that was populated
+ * mid-load.
+ *
+ * Re-arming while `status === "loading"` means we measure once, after the font
+ * set has genuinely settled, and notify subscribers exactly once.
+ */
+function armReadyGate(fontsApi: FontsApi): void {
+  void fontsApi.ready?.then(() => {
+    if (fontsApi.status === "loading") {
+      armReadyGate(fontsApi);
+      return;
+    }
+    fontsReadyState = true;
+    // Copy before iterating: a subscriber may unsubscribe during its own call.
+    for (const cb of [...readySubscribers]) cb();
+    readySubscribers.clear();
+  });
+}
 
 function initFontsReadyTracking(): void {
   if (fontsReadyState !== null) return;
-  const fontsApi =
-    typeof document === "undefined" ? undefined : (document as { fonts?: { ready?: Promise<unknown> } }).fonts;
+  const fontsApi = typeof document === "undefined" ? undefined : (document as { fonts?: FontsApi }).fonts;
   if (fontsApi === undefined || typeof fontsApi.ready?.then !== "function") {
     // No FontFace Loading API at all (SSR, jsdom, older browsers) — nothing
     // to wait for; proceed immediately (real measurement is separately
@@ -91,9 +128,7 @@ function initFontsReadyTracking(): void {
     return;
   }
   fontsReadyState = false;
-  fontsReadyPromise = fontsApi.ready.then(() => {
-    fontsReadyState = true;
-  });
+  armReadyGate(fontsApi);
 }
 
 function fontsAreReady(): boolean {
@@ -115,12 +150,9 @@ export function onFontsReady(cb: () => void): () => void {
     cb();
     return () => {};
   }
-  let cancelled = false;
-  fontsReadyPromise?.then(() => {
-    if (!cancelled) cb();
-  });
+  readySubscribers.add(cb);
   return () => {
-    cancelled = true;
+    readySubscribers.delete(cb);
   };
 }
 

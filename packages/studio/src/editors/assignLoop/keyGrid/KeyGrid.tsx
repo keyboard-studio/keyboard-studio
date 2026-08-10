@@ -594,7 +594,7 @@ export function KeyGrid({
                 onClick={() => onPlatformChange(p.id)}
                 style={{
                   padding: "6px 12px",
-                  background: isActive ? "#0d2840" : "transparent",
+                  background: isActive ? "var(--app-accent-subtle)" : "transparent",
                   border: `1px solid ${isActive ? ACCENT : BORDER}`,
                   borderRadius: 6,
                   color: isActive ? TEXT_MAIN : TEXT_DIM,

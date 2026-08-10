@@ -67,7 +67,7 @@ const bannerStyle: CSSProperties = {
 const primaryButton: CSSProperties = {
   padding: "6px 14px",
   background: BLUE_ACTION,
-  color: "#fff",
+  color: "var(--app-text-on-accent)",
   border: "none",
   borderRadius: 6,
   cursor: "pointer",

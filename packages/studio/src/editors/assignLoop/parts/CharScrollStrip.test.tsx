@@ -143,7 +143,10 @@ describe("CharScrollStrip — producer-count badge", () => {
 
     const badge = screen.getByTestId("char-scroll-badge-0061");
     expect(badge.textContent).toBe("0");
-    expect(badge.style.color).toBe("rgb(248, 81, 73)"); // #f85149 — the badge-bad color
+    // The badge-bad color is now the --app-danger token (epic #533). jsdom does
+    // not resolve custom properties, so assert the token reference itself —
+    // the theme layer owns which red it resolves to per theme.
+    expect(badge.style.color).toBe("var(--app-danger)");
   });
 
   it("badges a produced character GREEN at count >= 1, with the count as its text", () => {
@@ -168,7 +171,10 @@ describe("CharScrollStrip — producer-count badge", () => {
 
     const badge = screen.getByTestId("char-scroll-badge-0061");
     expect(badge.textContent).toBe("1");
-    expect(badge.style.color).toBe("rgb(86, 211, 100)"); // #56d364 — the badge-good color
+    // The badge-good color is now the --app-success-text token (epic #533) —
+    // jsdom does not resolve custom properties, so assert the token
+    // reference itself, matching the badge-bad assertion above.
+    expect(badge.style.color).toBe("var(--app-success-text)");
   });
 
   it("computes each chip's badge from the shared getProducerBadge selector, not a re-derived count — a modality mismatch still reads 0", () => {
@@ -208,7 +214,7 @@ describe("CharScrollStrip — producer-count badge", () => {
 
     const badge = screen.getByTestId("char-scroll-badge-0061");
     expect(badge.textContent).toBe("1");
-    expect(badge.style.color).toBe("rgb(86, 211, 100)"); // #56d364 — the badge-good color
+    expect(badge.style.color).toBe("var(--app-success-text)");
   });
 
   it("keeps a seed-reachable character at 1 once its 'already in layout' suggestion is accepted (touch_inherited is not double-counted)", () => {

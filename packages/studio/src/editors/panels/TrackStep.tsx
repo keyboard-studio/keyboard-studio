@@ -20,7 +20,7 @@ export interface TrackStepProps {
 const HEADING: React.CSSProperties = {
   margin: "0 0 8px 0",
   fontSize: "1.1rem",
-  color: "#6ea8fe",
+  color: "var(--app-accent-text)",
   fontWeight: 600,
 };
 
@@ -38,7 +38,7 @@ export function TrackStep({ base, onNext, onBack }: TrackStepProps) {
   }
 
   return (
-    <div style={{ color: "#e6edf3", fontFamily: "system-ui, sans-serif" }}>
+    <div style={{ color: "var(--app-text)", fontFamily: "system-ui, sans-serif" }}>
       <h2 style={HEADING}><Trans id="editor.trackStep.heading">How do you want to use this base?</Trans></h2>
       <p style={SUBTLE}>
         <Trans id="editor.trackStep.intro">

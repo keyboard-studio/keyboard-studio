@@ -27,13 +27,20 @@
  *
  * Turkic case-folding caveat
  * ---------------------------
- * JS toUpperCase/toLowerCase mishandles the Turkic dotted-I system (i/I/ı/İ).
- * Case-fold suppression (exact-NFC-only matching) applies ONLY when the
- * effective script is Latin. Effective script = the explicit script subtag if
- * the tag carries one, otherwise the locale's default script. Default scripts:
+ * JS toUpperCase/toLowerCase mishandles the Turkic dotted-I system: on a
+ * Latin-script Turkic locale, 'i'.toUpperCase() should be 'İ' (dotted capital
+ * I) and 'I'.toLowerCase() should be 'ı' (dotless i), but JS always folds
+ * i <-> I and ı <-> I instead. The hazard is confined to exactly those four
+ * characters — i (U+0069), I (U+0049), ı (U+0131), İ (U+0130) — so the
+ * exact-NFC-only exception applies ONLY to that hazard set, not to every
+ * character in the locale. Any other letter (e.g. "Ç"/"ç", "Ş"/"ş") still
+ * case-folds normally on a Turkic locale; only i/I/ı/İ require an exact match.
+ * The exception applies ONLY when the effective script is Latin. Effective
+ * script = the explicit script subtag if the tag carries one, otherwise the
+ * locale's default script. Default scripts:
  *   tr → Latn (suppressed), az → Latn (suppressed), kk → Cyrl (NOT suppressed).
  * For example, bare "kk" defaults to Cyrillic and uses normal JS case-fold;
- * "kk-Latn" is Latin-script Kazakh and suppresses case-fold.
+ * "kk-Latn" is Latin-script Kazakh and suppresses case-fold for i/I/ı/İ only.
  */
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
@@ -71,6 +78,24 @@ export interface MissingCharSuggestions {
  * `effectiveScriptIsLatin()`. Default scripts: tr → Latn, az → Latn, kk → Cyrl.
  */
 const TURKIC_LOCALES = new Set(["tr", "az", "kk"]);
+
+/**
+ * The dotted-I hazard set: the only four characters where JS's
+ * toUpperCase/toLowerCase disagrees with Latin-script Turkic case pairing.
+ * i (U+0069) and I (U+0049) are the ASCII pair; ı (U+0131, dotless i) and
+ * İ (U+0130, dotted capital I) are the Turkic-specific pair. JS folds
+ * i <-> I and ı <-> I, but Turkish pairs i <-> İ and ı <-> I — so within this
+ * set, a JS fold is never trustworthy and only an exact (post-normalization)
+ * match may declare coverage. Every other character folds normally even on
+ * a Latin-script Turkic locale (see `isCovered`).
+ */
+const DOTTED_I_HAZARD = new Set(["i", "I", "ı", "İ"]);
+
+/** Greek sigma forms: JS's 'Σ'.toLowerCase() yields only the medial form (σ),
+ * never the final form (ς), even though both fold up to Σ. See `isCovered`.
+ */
+const GREEK_CAPITAL_SIGMA = "Σ"; // Σ
+const GREEK_FINAL_SIGMA = "ς"; // ς (word-final lowercase)
 
 /**
  * Default scripts for primaries in TURKIC_LOCALES.
@@ -164,41 +189,59 @@ export type CharNormalizationForm = "NFC" | "NFD";
  * Returns true if the candidate character is considered "covered" by the
  * keyboard's produced set.
  *
- * For most locales: covered if the exact form (per `form`) OR its case-folded
- * counterpart (toUpperCase / toLowerCase) is present in the produced set.
+ * Covered if the exact form (per `form`) OR its case-folded counterpart
+ * (toUpperCase / toLowerCase) is present in the produced set — EXCEPT for the
+ * dotted-I hazard set (i / I / ı / İ, see `DOTTED_I_HAZARD`) on a Latin-script
+ * Turkic locale (tr, az, kk-Latn, etc.), where JS's fold disagrees with
+ * Turkic case pairing: those four characters require an exact match only,
+ * and do NOT fold into each other. Every other character on a Turkic locale
+ * (e.g. "Ç"/"ç") still folds normally — the exception is narrow, not a
+ * blanket suppression for the whole locale. Cyrillic-script Turkic (bare kk,
+ * kk-Cyrl, az-Cyrl) is not Latin-script, so `isTurkic` is false for it and
+ * normal case-fold applies throughout, including to its "i" letter.
  *
- * For Latin-script Turkic locales (tr, az, kk-Latn, etc.): covered ONLY if the
- * exact form is present, because JS case folding mishandles i / I /
- * dotless-i / dotted-I. Cyrillic-script Turkic (bare kk, kk-Cyrl, az-Cyrl)
- * uses normal case-fold — the dotted-I hazard is Latin-only.
+ * Also treats Greek's two lowercase sigma forms — σ (medial, U+03C3) and ς
+ * (final, U+03C2) — as mutually covering Σ: both uppercase to Σ, but JS's
+ * 'Σ'.toLowerCase() yields only σ, so an author who entered only the final
+ * form ς would otherwise see Σ reported as uncovered.
  *
  * `ch` is normalized to `form` before every comparison (idempotent if the
  * caller already normalized it). `produced` is NOT re-normalized here — the
  * caller is responsible for having built it in the SAME `form` (this is the
  * "apples to apples" contract the carve gallery comparison depends on; see
- * `isCharCoveredForLocale`'s doc). Case-folding (G5, the Turkic-aware
- * exception) always runs IN ADDITION to normalization, never instead of it.
+ * `isCharCoveredForLocale`'s doc). Case-folding (G5, the narrowed Turkic-aware
+ * exception, and the Greek sigma equivalence) always runs IN ADDITION to
+ * normalization, never instead of it.
  */
 function isCovered(ch: string, produced: Set<string>, isTurkic: boolean, form: CharNormalizationForm = "NFC"): boolean {
   const normalized = ch.normalize(form);
   if (produced.has(normalized)) return true;
-  if (isTurkic) return false;
+  // Dotted-I hazard: within this set only, a JS case-fold is untrustworthy on
+  // a Latin-script Turkic locale, so only the exact-match check above counts.
+  if (isTurkic && DOTTED_I_HAZARD.has(normalized)) return false;
   // Case-fold check: uppercase or lowercase counterpart covers the candidate
   const upper = normalized.toUpperCase();
   if (upper !== normalized && produced.has(upper)) return true;
   const lower = normalized.toLowerCase();
   if (lower !== normalized && produced.has(lower)) return true;
+  // Greek sigma equivalence: Σ is covered by EITHER lowercase form (σ or ς);
+  // the `lower` check above already covers Σ via σ (JS's default fold), so
+  // this only needs to add the final form ς that JS's fold misses.
+  if (normalized === GREEK_CAPITAL_SIGMA && produced.has(GREEK_FINAL_SIGMA)) {
+    return true;
+  }
   return false;
 }
 
 /**
- * Returns true when case-fold matching must be suppressed for `bcp47`
- * (the Turkic dotted-I hazard — see the module docstring). Exposed so
- * callers outside this module (e.g. the studio's surplus-recommendation
- * pass, #525 items 2/4) can reuse the exact same exception-aware fold that
- * `isCovered`/`suggestMissingCharacters` already use, rather than
- * re-deriving a naive `toLowerCase()` comparison that would mis-handle
- * Turkic i/İ/ı/I.
+ * Returns true when `bcp47` is a Latin-script Turkic locale, i.e. when
+ * `isCovered`'s narrow dotted-I hazard exception (i/I/ı/İ require an exact
+ * match; every other character still case-folds normally — see the module
+ * docstring) applies. Exposed so callers outside this module (e.g. the
+ * studio's surplus-recommendation pass, #525 items 2/4) can reuse the exact
+ * same exception-aware fold that `isCovered`/`suggestMissingCharacters`
+ * already use, rather than re-deriving a naive `toLowerCase()` comparison
+ * that would mis-handle Turkic i/İ/ı/I.
  */
 export function isTurkicCaseFoldSuppressed(bcp47: string): boolean {
   const primary = primarySubtag(bcp47);
@@ -208,8 +251,9 @@ export function isTurkicCaseFoldSuppressed(bcp47: string): boolean {
 /**
  * Returns true when `ch` is covered by `coveringSet` under the same
  * exception-aware case fold `isCovered` uses internally — exact match (in
- * `form`), or (for non-Turkic-Latin locales) its uppercase/lowercase
- * counterpart.
+ * `form`), or its uppercase/lowercase counterpart (Greek sigma's final form
+ * ς included), except for the narrow Turkic dotted-I hazard set (i/I/ı/İ on
+ * a Latin-script Turkic locale), which requires an exact match only.
  *
  * Exported for the studio's language-driven surplus signal (#525 items 2/4):
  * a keyboard-produced character should count as "needed" if it case-folds

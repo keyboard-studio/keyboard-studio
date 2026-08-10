@@ -59,7 +59,7 @@ const avatarStyle: React.CSSProperties = {
   height: AVATAR_SIZE,
   borderRadius: "50%",
   background: ACCENT,
-  color: "#0d1117",
+  color: "var(--app-text-on-accent)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -78,7 +78,7 @@ const verifyingAvatarStyle: React.CSSProperties = {
   width: AVATAR_SIZE,
   height: AVATAR_SIZE,
   borderRadius: "50%",
-  background: "#283040",
+  background: "var(--app-surface-2)",
   flexShrink: 0,
 };
 
@@ -115,7 +115,7 @@ const linkedProviderStyle: React.CSSProperties = {
 const connectProviderStyle: React.CSSProperties = {
   ...columnButtonStyle,
   background: ACCENT,
-  color: "#0d1117",
+  color: "var(--app-text-on-accent)",
   borderColor: ACCENT,
 };
 

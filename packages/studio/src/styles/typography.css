@@ -1,0 +1,22 @@
+/* Font-stack tokens (theme-invariant). */
+:root {
+  --app-font:       'Source Sans 3', system-ui, -apple-system, sans-serif;
+  --app-font-mono:  ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+
+  /* Glyph-display font — used by GlyphCell / CarveGalleryV2 tiles for the
+   * large character-preview glyph. Was 'Lora' (a serif), an incidental
+   * choice inherited from ad-hoc tile styling rather than a deliberate
+   * pick; Noto Sans is the design system's multilingual face and covers far
+   * more scripts than Lora does, so it takes over this token. Already
+   * loaded — see index.html's Google Fonts link. */
+  --app-font-glyph: 'Noto Sans', 'Source Sans 3', system-ui, sans-serif;
+
+  /* Preserves the old --serif legacy token's literal stack (Lora) under its
+   * own name, now that --app-font-glyph no longer means "Lora". Nothing in
+   * the app currently renders through --serif (only referenced in a
+   * surveyStyles.ts comment), but it is kept for parity with the rest of
+   * the legacy alias set. */
+  --app-font-serif: 'Lora', Georgia, serif;
+
+  --app-display:    'Playfair Display', Georgia, serif;
+}

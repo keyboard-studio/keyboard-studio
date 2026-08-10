@@ -40,8 +40,12 @@ describe("project_display_name — validate() edge cases", () => {
 });
 
 describe("project_display_name — definition shape", () => {
-  it("type is text", () => {
-    expect(definition.type).toBe("text");
+  // short_text, not text. `text` dispatches to a 4-row RESIZABLE Textarea
+  // (QuestionField's type dispatch); a keyboard's display name is one short
+  // line, so the paragraph box invited multi-line input the field cannot
+  // represent. Changed with the epic #533 UI pass.
+  it("type is short_text (single-line field, not a resizable textarea)", () => {
+    expect(definition.type).toBe("short_text");
   });
 
   it("required is true", () => {

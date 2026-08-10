@@ -41,11 +41,11 @@ describe("Card — CARD_BASE styles (selected=false)", () => {
   it("applies CARD_BASE styles", () => {
     const { container } = render(<Card>Option</Card>);
     const btn = container.querySelector("button") as HTMLButtonElement;
-    expect(btn.style.background).toBe("rgb(22, 27, 34)");
-    expect(btn.style.borderColor).toBe("rgb(48, 54, 61)");
+    expect(btn.style.background).toBe("var(--app-surface)");
+    expect(btn.style.borderColor).toBe("var(--app-border)");
     expect(btn.style.display).toBe("flex");
     expect(btn.style.flexDirection).toBe("column");
-    expect(btn.style.borderRadius).toBe("8px");
+    expect(btn.style.borderRadius).toBe("var(--app-radius)");
     expect(btn.style.cursor).toBe("pointer");
     expect(btn.style.textAlign).toBe("left");
   });
@@ -55,8 +55,9 @@ describe("Card — CARD_SELECTED styles (selected=true)", () => {
   it("applies CARD_SELECTED styles", () => {
     const { container } = render(<Card selected>Option</Card>);
     const btn = container.querySelector("button") as HTMLButtonElement;
-    expect(btn.style.background).toBe("rgb(13, 31, 56)");
-    expect(btn.style.borderColor).toBe("rgb(110, 168, 254)");
+    expect(btn.style.background).toBe("var(--app-accent-subtle)");
+    expect(btn.style.borderColor).toBe("var(--app-accent)");
+    expect(btn.style.boxShadow).toBe("0 0 0 3px var(--app-accent-ring)");
   });
 });
 
@@ -64,19 +65,19 @@ describe("Card — selected toggle via prop change", () => {
   it("switches from CARD_BASE to CARD_SELECTED background when selected becomes true", () => {
     const { container, rerender } = render(<Card selected={false}>Option</Card>);
     const btn = container.querySelector("button") as HTMLButtonElement;
-    expect(btn.style.background).toBe("rgb(22, 27, 34)");
+    expect(btn.style.background).toBe("var(--app-surface)");
 
     rerender(<Card selected={true}>Option</Card>);
-    expect(btn.style.background).toBe("rgb(13, 31, 56)");
+    expect(btn.style.background).toBe("var(--app-accent-subtle)");
   });
 
   it("switches back from CARD_SELECTED to CARD_BASE when selected becomes false", () => {
     const { container, rerender } = render(<Card selected={true}>Option</Card>);
     const btn = container.querySelector("button") as HTMLButtonElement;
-    expect(btn.style.background).toBe("rgb(13, 31, 56)");
+    expect(btn.style.background).toBe("var(--app-accent-subtle)");
 
     rerender(<Card selected={false}>Option</Card>);
-    expect(btn.style.background).toBe("rgb(22, 27, 34)");
+    expect(btn.style.background).toBe("var(--app-surface)");
   });
 });
 

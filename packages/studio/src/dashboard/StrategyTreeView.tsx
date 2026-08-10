@@ -34,8 +34,8 @@ function StrategyChip({
         fontFamily: SANS,
         fontSize: 12.5,
         background: primary ? COLORS.blue.dark : COLORS.gray.border,
-        color: primary ? "#fff" : COLORS.gray.textMuted,
-        border: `1px solid ${primary ? "#388bfd" : COLORS.gray.borderStrong}`,
+        color: primary ? "var(--app-text-on-accent)" : COLORS.gray.textMuted,
+        border: `1px solid ${primary ? "var(--app-accent)" : COLORS.gray.borderStrong}`,
         whiteSpace: "nowrap",
       }}
     >
@@ -119,7 +119,7 @@ export function StrategyTreeView({ axisFills }: StrategyTreeViewProps) {
                 style={{
                   fontFamily: MONO,
                   fontSize: 12,
-                  color: "#fff",
+                  color: "var(--app-text-on-accent)",
                   background: COLORS.gray.borderStrong,
                   borderRadius: 4,
                   padding: "2px 8px",

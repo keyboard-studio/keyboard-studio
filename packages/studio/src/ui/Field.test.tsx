@@ -8,10 +8,10 @@
 // No @testing-library/jest-dom — DOM APIs used directly, matching
 // TextField.test.tsx / Badge.test.tsx pattern.
 //
-// jsdom hex normalizations:
-//   #8b949e → rgb(139, 148, 158)  (TEXT_DIM / HELP_STYLE color)
-//   #f0a0a0 → rgb(240, 160, 160)  (ERROR_TEXT / error slot color)
-//   #e74c3c → rgb(231, 76, 60)    (required marker from Label stub)
+// theme.ts constants resolve to `var(--app-*)` token strings (epic #533):
+//   TEXT_DIM   → var(--app-text-muted)   (HELP_STYLE color)
+//   ERROR_TEXT → var(--app-danger-text)  (error slot color)
+//   #e74c3c    → rgb(231, 76, 60)        (required marker from Label stub — jsdom hex normalization)
 
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, cleanup } from "@testing-library/react";
@@ -143,14 +143,14 @@ describe("Field — help slot", () => {
     expect(container.querySelector("p")).not.toBeNull();
   });
 
-  it("help <p> has HELP_STYLE color (#8b949e)", () => {
+  it("help <p> has HELP_STYLE color (var(--app-text-muted))", () => {
     const { container } = render(
       <Field help="Some hint">
         <input />
       </Field>,
     );
     const p = container.querySelector("p") as HTMLElement;
-    expect(p.style.color).toBe("rgb(139, 148, 158)");
+    expect(p.style.color).toBe("var(--app-text-muted)");
   });
 
   it("help <p> has fontSize 12px", () => {
@@ -231,14 +231,14 @@ describe("Field — error slot", () => {
     expect(container.querySelector("[role='alert']")).toBeNull();
   });
 
-  it("error text applies ERROR_TEXT color (#f0a0a0)", () => {
+  it("error text applies ERROR_TEXT color (var(--app-danger-text))", () => {
     const { container } = render(
       <Field error="Invalid">
         <input />
       </Field>,
     );
     const alert = container.querySelector("[role='alert']") as HTMLElement;
-    expect(alert.style.color).toBe("rgb(240, 160, 160)");
+    expect(alert.style.color).toBe("var(--app-danger-text)");
   });
 
   it("error text has fontSize 12px", () => {

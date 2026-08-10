@@ -2,7 +2,8 @@
 //
 // FR-005: renders the same element + role + resolved styles as the inline
 // control it replaces. The base LABEL_STYLE values are reproduced verbatim.
-// The `required` prop adds the existing #e74c3c asterisk marker.
+// The `required` prop adds the asterisk marker, now `var(--app-danger-text)`
+// (epic #533 — was the raw hex #e74c3c before the token layer).
 // Native style/className pass-through ensures call-site overrides survive
 // exactly (Decision 2).
 
@@ -12,8 +13,8 @@ import { TEXT_MAIN } from "./theme.ts";
 
 export type LabelProps = React.HTMLAttributes<HTMLElement> & {
   /**
-   * When true, renders the asterisk required marker in #e74c3c with
-   * aria-label="required" — matching QuestionField.tsx exactly.
+   * When true, renders the asterisk required marker in var(--app-danger-text)
+   * with aria-label="required" — matching QuestionField.tsx exactly.
    */
   required?: boolean;
   /**
@@ -39,8 +40,9 @@ const BASE_STYLE: React.CSSProperties = {
 
 /**
  * Label primitive. Matches the `<label>` + `LABEL_STYLE` rendering in
- * QuestionField.tsx exactly (fontSize 13, color #e6edf3, fontWeight 600,
- * display block, marginBottom 6). Accepts all native label/span HTML attributes.
+ * QuestionField.tsx exactly (fontSize 13, color TEXT_MAIN (var(--app-text)),
+ * fontWeight 600, display block, marginBottom 6). Accepts all native
+ * label/span HTML attributes.
  *
  * Use `as="span"` for group headings (radiogroup / checkbox group) where a
  * `<label>` element is semantically incorrect. All styles are identical; only
@@ -61,7 +63,7 @@ export function Label({
       {required === true && (
         <span
           aria-label={t({ id: "ui.label.required", message: "required" })}
-          style={{ color: "#e74c3c", marginLeft: 4 }}
+          style={{ color: "var(--app-danger-text)", marginLeft: 4 }}
         >
           *
         </span>

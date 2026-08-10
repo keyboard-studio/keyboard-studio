@@ -47,7 +47,7 @@ const sectionHeadingStyle: CSSProperties = {
   fontSize: "0.9rem",
   textTransform: "uppercase",
   letterSpacing: "0.08em",
-  color: "#9aa7b8",
+  color: "var(--app-text-subtle)",
   fontWeight: 600,
   margin: "0 0 12px",
 };
@@ -57,9 +57,9 @@ export function LintDemo() {
     <div
       style={{
         padding: 32,
-        background: "#0d1117",
+        background: "var(--app-bg)",
         minHeight: "100vh",
-        color: "#e6edf3",
+        color: "var(--app-text)",
         fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
         boxSizing: "border-box",
       }}

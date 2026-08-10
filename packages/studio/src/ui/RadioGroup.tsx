@@ -2,9 +2,11 @@
 // Replaces RadioField (mode="list") and BoolField (mode="bool") from
 // survey/QuestionField.tsx (FR-005 zero-diff).
 //
-// Accent colors preserved verbatim:
-//   list mode: #6ea8fe  (RadioField accentColor)
-//   bool mode: #3fb950  (BoolField accentColor)
+// Accent colors (epic #533 — theme.ts constants are `var(--app-*)` tokens):
+//   list mode: ACCENT (var(--app-accent))       — was raw hex #6ea8fe
+//   bool mode: var(--app-success)               — was raw hex #3fb950
+//   (#3fb950 is the navy theme's own --app-success value, so this is a
+//   like-for-like token swap, not a new color choice.)
 
 import React from "react";
 import {
@@ -42,7 +44,7 @@ export interface RadioGroupProps {
   value: string | null;
   /** Options for list mode. Ignored in bool mode (yes/no are synthesized). */
   options: RadioOption[];
-  /** Override accent color. Defaults are mode-driven (#6ea8fe list / #3fb950 bool). */
+  /** Override accent color. Defaults are mode-driven (ACCENT list / var(--app-success) bool). */
   accent?: string;
   onChange: (value: string) => void;
   /**
@@ -83,8 +85,8 @@ const NOTE_STYLE: React.CSSProperties = {
 
 /** list-mode accent — matches RadioField verbatim */
 const LIST_ACCENT = ACCENT;
-/** bool-mode accent — matches BoolField verbatim */
-const BOOL_ACCENT = "#3fb950";
+/** bool-mode accent — matches BoolField's navy-theme value, now token-backed */
+const BOOL_ACCENT = "var(--app-success)";
 
 interface RadioItemProps {
   inputId: string;
@@ -144,8 +146,9 @@ function RadioItem({
 }
 
 /** Radio group primitive. Renders role="radiogroup" identical to RadioField /
- *  BoolField (FR-005). Bool mode synthesizes yes/no options with the green
- *  accent #3fb950; list mode uses #6ea8fe. */
+ *  BoolField (FR-005). Bool mode synthesizes yes/no options with the
+ *  success-green accent (var(--app-success)); list mode uses the accent
+ *  token (var(--app-accent)). */
 export function RadioGroup({
   mode = "list",
   name,

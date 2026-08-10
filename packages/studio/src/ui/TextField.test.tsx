@@ -3,7 +3,7 @@
 // Coverage:
 //   1. Renders an <input type="text"> element.
 //   2. Passed props (value, onChange, disabled, placeholder) work.
-//   3. The error variant applies ERROR_BORDER (#7a2a2a) as border color.
+//   3. The error variant applies ERROR_BORDER (var(--app-danger-border)) as border color.
 //   4. The mono variant applies CSS_FONT_MONO (var(--app-font-mono)) as fontFamily.
 //   5. style override passes through (merges over base styles).
 //   6. className override passes through.
@@ -11,13 +11,12 @@
 import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { TextField } from "./TextField.tsx";
-import { CSS_FONT_MONO } from "./theme.ts";
+import { CSS_FONT_MONO, FONT } from "./theme.ts";
 
-// jsdom always normalizes hex colors to rgb() in computed/inline styles.
-// These are the jsdom-serialized equivalents of ERROR_BORDER (#7a2a2a) and
-// BORDER (#30363d) — verified by inspection of the rgb() expansion.
-const ERROR_BORDER_RGB = "rgb(122, 42, 42)";
-const BORDER_RGB = "rgb(48, 54, 61)";
+// theme.ts constants resolve to `var(--app-*)` token strings (epic #533) —
+// jsdom does not resolve CSS custom properties, so the raw string is preserved.
+const ERROR_BORDER_TOKEN = "var(--app-danger-border)";
+const BORDER_TOKEN = "var(--app-border)";
 
 afterEach(() => {
   cleanup();
@@ -58,17 +57,16 @@ describe("TextField — prop passthrough", () => {
 });
 
 describe("TextField — error variant", () => {
-  it("applies ERROR_BORDER (#7a2a2a) when error=true", () => {
+  it("applies ERROR_BORDER (var(--app-danger-border)) when error=true", () => {
     render(<TextField error />);
     const el = screen.getByRole("textbox") as HTMLInputElement;
-    // jsdom normalizes hex to rgb(); compare against the known rgb() expansion.
-    expect(el.style.borderColor).toBe(ERROR_BORDER_RGB);
+    expect(el.style.borderColor).toBe(ERROR_BORDER_TOKEN);
   });
 
-  it("applies normal BORDER (#30363d) when error is not set", () => {
+  it("applies normal BORDER (var(--app-border)) when error is not set", () => {
     render(<TextField />);
     const el = screen.getByRole("textbox") as HTMLInputElement;
-    expect(el.style.borderColor).toBe(BORDER_RGB);
+    expect(el.style.borderColor).toBe(BORDER_TOKEN);
   });
 });
 
@@ -79,12 +77,12 @@ describe("TextField — mono variant", () => {
     expect(el.style.fontFamily).toBe(CSS_FONT_MONO);
   });
 
-  it("applies FONT (system-ui stack) when mono is not set", () => {
+  it("applies FONT (var(--app-font)) when mono is not set", () => {
     render(<TextField />);
     const el = screen.getByRole("textbox") as HTMLInputElement;
-    // jsdom may normalize single quotes in font-family to double quotes.
-    // Assert on the presence of the primary font token rather than exact string.
-    expect(el.style.fontFamily).toContain("system-ui");
+    // theme.ts constants resolve to `var(--app-*)` token strings (epic #533) —
+    // jsdom does not resolve CSS custom properties, so the raw string is preserved.
+    expect(el.style.fontFamily).toBe(FONT);
   });
 });
 

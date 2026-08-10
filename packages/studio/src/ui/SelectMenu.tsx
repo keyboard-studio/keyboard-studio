@@ -119,6 +119,9 @@ export interface SelectMenuProps {
   commitMode?: "onHighlight" | "onExplicitSelect";
 }
 
+// Border is split into borderWidth/borderStyle/borderColor (rather than the
+// `border: "1px solid <token>"` shorthand): jsdom's style-shorthand parser
+// cannot decompose a shorthand value containing an unresolved `var(...)`.
 const TRIGGER_STYLE: React.CSSProperties = {
   width: "100%",
   display: "flex",
@@ -127,8 +130,10 @@ const TRIGGER_STYLE: React.CSSProperties = {
   gap: 8,
   padding: "0 10px",
   background: BG_PAGE,
-  border: `1px solid ${BORDER}`,
-  borderRadius: 6,
+  borderWidth: "1px",
+  borderStyle: "solid",
+  borderColor: BORDER,
+  borderRadius: "var(--app-radius-sm)",
   color: TEXT_MAIN,
   fontSize: 14,
   fontFamily: FONT,
@@ -158,9 +163,13 @@ const LIST_STYLE: React.CSSProperties = {
   padding: 4,
   listStyle: "none",
   background: BG_PAGE,
-  border: `1px solid ${BORDER}`,
-  borderRadius: 6,
-  boxShadow: "0 4px 12px rgba(0, 0, 0, 0.4)",
+  borderWidth: "1px",
+  borderStyle: "solid",
+  borderColor: BORDER,
+  borderRadius: "var(--app-radius-sm)",
+  // A popover/menu surface floating above the page — the geometry layer's
+  // "pop" shadow token (geometry.css) is exactly this use case.
+  boxShadow: "var(--app-shadow-pop)",
   maxHeight: MENU_MAX_HEIGHT,
   overflowY: "auto",
 };
@@ -205,7 +214,7 @@ const OPTION_ROW_STYLE: React.CSSProperties = {
   padding: "6px 8px",
   background: "transparent",
   borderLeft: "3px solid transparent",
-  borderRadius: 4,
+  borderRadius: "var(--app-radius-sm)",
   color: TEXT_MAIN,
   fontSize: 14,
   fontFamily: FONT,
@@ -216,19 +225,14 @@ function defaultRenderLabel(opt: SelectMenuOption): React.ReactNode {
   return opt.label;
 }
 
-// Derives the option-row hover background from the theme accent (ACCENT,
-// `#6ea8fe` in theme.ts) at 12% opacity, instead of hardcoding a second copy
-// of the accent's RGB triplet. Keeps this in sync automatically if ACCENT
-// ever changes.
-function hexToRgba(hex: string, alpha: number): string {
-  const stripped = hex.replace("#", "");
-  const r = parseInt(stripped.slice(0, 2), 16);
-  const g = parseInt(stripped.slice(2, 4), 16);
-  const b = parseInt(stripped.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-}
-
-const OPTION_HOVER_BG = hexToRgba(ACCENT, 0.12);
+// Option-row hover background — epic #533 replaced the theme accent
+// constant with a `var(--app-accent)` string, so the old hand-rolled
+// hex-to-rgba(…, 0.12) helper (which parsed ACCENT as a literal hex color)
+// no longer has a hex value to parse. `--app-accent-bg` is the token built
+// for exactly this "accent wash" role (colors.css) and is themed
+// consistently across light/navy, so it replaces the helper outright rather
+// than reimplementing alpha-blending over a CSS var (not resolvable in JS).
+const OPTION_HOVER_BG = "var(--app-accent-bg)";
 
 // Issue #536: bump the option row to the >=44px coarse-pointer hit target,
 // same convention as RadioGroup/MultiSelect.
@@ -628,6 +632,16 @@ export function SelectMenu({
                   onClick={() => selectOption(opt)}
                   style={{
                     ...OPTION_ROW_STYLE,
+                    // Selected-row fill: the accent-subtle wash from the
+                    // design handoff's selection rule (border + ring + subtle
+                    // fill). The 3px ring itself is intentionally skipped
+                    // here — it reads as a per-card affordance (see
+                    // Card.tsx's CARD_SELECTED); stamping it on every row of
+                    // a dense, scrollable listbox would double up with the
+                    // adjacent rows' borders and read as visual noise. The
+                    // left accent bar plus the subtle fill together still
+                    // make the selected option unambiguous.
+                    background: isSelected ? "var(--app-accent-subtle)" : "transparent",
                     borderLeftColor: isSelected ? ACCENT : "transparent",
                     color: isSelected ? ACCENT : TEXT_MAIN,
                   }}
@@ -635,7 +649,9 @@ export function SelectMenu({
                     e.currentTarget.style.background = OPTION_HOVER_BG;
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
+                    e.currentTarget.style.background = isSelected
+                      ? "var(--app-accent-subtle)"
+                      : "transparent";
                   }}
                 >
                   {renderOptionLabel(opt)}

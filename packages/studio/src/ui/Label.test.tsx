@@ -35,10 +35,10 @@ describe("Label", () => {
     expect(marker.textContent).toBe("*");
   });
 
-  it("required marker uses the exact #e74c3c color", () => {
+  it("required marker uses the danger-text token (var(--app-danger-text))", () => {
     renderWithI18n(<Label required>Label</Label>);
     const marker = screen.getByLabelText("required");
-    expect((marker as HTMLElement).style.color).toBe("rgb(231, 76, 60)");
+    expect((marker as HTMLElement).style.color).toBe("var(--app-danger-text)");
   });
 
   it("required is false by default — no asterisk rendered", () => {

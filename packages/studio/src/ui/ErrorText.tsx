@@ -8,10 +8,10 @@
 //             spec says error/warning → role="alert"; preserved as specified)
 //   hint    → role="status"  (TrackOneIdentityPanel base-warn: role="status")
 //
-// Colors (FR-005 zero-diff, no normalization):
-//   error   → ERROR_TEXT (#f0a0a0) — verbatim from ScaffoldForm/TrackOneIdentityPanel
-//   warning → WARNING    (#d29922) — verbatim from TrackOneIdentityPanel base-warn
-//   hint    → CSS_TEXT_MUTED (var(--app-text-muted)) — verified against source
+// Colors (epic #533 — theme.ts constants are `var(--app-*)` token strings):
+//   error   → ERROR_TEXT (var(--app-danger-text))
+//   warning → WARNING    (var(--app-warning-text))
+//   hint    → CSS_TEXT_MUTED (var(--app-text-muted))
 
 import React from "react";
 import { ERROR_TEXT, WARNING, CSS_TEXT_MUTED } from "./theme.ts";

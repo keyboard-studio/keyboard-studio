@@ -310,7 +310,7 @@ export function PhaseA({ context = {}, onComplete, onBack, findingsByQuestionId 
   return (
     <div style={phaseContainer}>
       <h2 style={phaseHeading}>
-        <Trans id="survey.phaseA.heading">Phase A — Language identity</Trans>
+        <Trans id="survey.phaseA.heading">Language identity</Trans>
       </h2>
       <SurveyRunner
         key={flow.flow_id}

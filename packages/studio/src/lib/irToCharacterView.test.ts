@@ -136,6 +136,50 @@ describe('irToCharacterView', () => {
 });
 
 // ---------------------------------------------------------------------------
+// #533 — input-only match-table stores never surface as removable/typeable
+// characters. Cameroon's `composed` (matched only by a Backspace repair rule)
+// and `diablock` (matched only by a bare "context" no-op guard rule) are
+// never actually PRODUCED by any rule — classifyStoreSlotEdit's
+// input-only-match-table reason (applyStoreSlotRemovals.ts) makes
+// storeCharChips omit their chips entirely, so they must never reach the
+// flattened character-first gallery either.
+// ---------------------------------------------------------------------------
+
+describe('irToCharacterView — input-only match-table stores are omitted (#533)', () => {
+  it('never surfaces a character whose ONLY store is matched by a Backspace-repair rule (composed/comp-dia shape)', () => {
+    const composedStore: IRStore = { nodeId: 'store#composed', name: 'composed', items: [{ kind: 'char', value: 'à' }], isSystem: false };
+    const compDiaStore: IRStore = { nodeId: 'store#comp-dia', name: 'comp-dia', items: [{ kind: 'char', value: 'a' }], isSystem: false };
+    const bkspRule: IRRule = {
+      nodeId: 'r-bksp',
+      context: [{ kind: 'any', storeRef: 'composed' }, { kind: 'raw', text: '+' }, { kind: 'vkey', name: 'K_BKSP', modifiers: [] }],
+      output: [{ kind: 'index', storeRef: 'comp-dia', offset: 1 }],
+    };
+    const ir = makeIR({ groups: [makeGroup([bkspRule])], stores: [composedStore, compDiaStore] });
+
+    const cells = irToCharacterView(ir, new Map(), new Set(), new Set());
+
+    // 'à' lives ONLY in `composed` — never emitted by any rule — so it must not appear.
+    expect(cells.some((c) => c.ch === 'à')).toBe(false);
+    // 'a' still surfaces via the real output store's own store-chip fallback.
+    expect(cells.find((c) => c.ch === 'a')).toMatchObject({ source: 'store' });
+  });
+
+  it('never surfaces a character whose ONLY store is matched by a bare "context" no-op guard rule (diablock shape)', () => {
+    const diablockStore: IRStore = { nodeId: 'store#diablock', name: 'diablock', items: [{ kind: 'char', value: '°' }], isSystem: false };
+    const guardRule: IRRule = {
+      nodeId: 'r-guard',
+      context: [{ kind: 'any', storeRef: 'diablock' }, { kind: 'raw', text: '+' }, { kind: 'vkey', name: 'K_C', modifiers: ['RALT'] }],
+      output: [{ kind: 'raw', text: 'context' }],
+    };
+    const ir = makeIR({ groups: [makeGroup([guardRule])], stores: [diablockStore] });
+
+    const cells = irToCharacterView(ir, new Map(), new Set(), new Set());
+
+    expect(cells.some((c) => c.ch === '°')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // #1399 — surfacing characters produced ONLY by advanced (opaque) blocks
 // ---------------------------------------------------------------------------
 

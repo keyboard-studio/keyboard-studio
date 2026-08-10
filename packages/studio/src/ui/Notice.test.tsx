@@ -36,22 +36,22 @@ describe("Notice — tone→role mapping", () => {
 });
 
 describe("Notice — tone colors", () => {
-  it("info tone uses TEXT_DIM color (#8b949e → rgb(139, 148, 158))", () => {
+  it("info tone uses TEXT_DIM color (var(--app-text-muted))", () => {
     const { container } = render(<Notice tone="info">Info</Notice>);
     const el = container.querySelector("div") as HTMLElement;
-    expect(el.style.color).toBe("rgb(139, 148, 158)");
+    expect(el.style.color).toBe("var(--app-text-muted)");
   });
 
-  it("warn tone uses WARNING color (#d29922 → rgb(210, 153, 34))", () => {
+  it("warn tone uses WARNING color (var(--app-warning-text))", () => {
     const { container } = render(<Notice tone="warn">Warn</Notice>);
     const el = container.querySelector("div") as HTMLElement;
-    expect(el.style.color).toBe("rgb(210, 153, 34)");
+    expect(el.style.color).toBe("var(--app-warning-text)");
   });
 
-  it("error tone uses ERROR_TEXT color (#f0a0a0 → rgb(240, 160, 160))", () => {
+  it("error tone uses ERROR_TEXT color (var(--app-danger-text))", () => {
     const { container } = render(<Notice tone="error">Error</Notice>);
     const el = container.querySelector("div") as HTMLElement;
-    expect(el.style.color).toBe("rgb(240, 160, 160)");
+    expect(el.style.color).toBe("var(--app-danger-text)");
   });
 });
 
@@ -61,6 +61,6 @@ describe("Notice — base layout styles", () => {
     const el = container.querySelector("div") as HTMLElement;
     expect(el.style.padding).toBe("14px 16px");
     expect(el.style.fontSize).toBe("13px");
-    expect(el.style.borderRadius).toBe("8px");
+    expect(el.style.borderRadius).toBe("var(--app-radius)");
   });
 });

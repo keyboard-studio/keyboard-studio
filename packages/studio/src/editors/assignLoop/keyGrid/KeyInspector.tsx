@@ -138,13 +138,14 @@ import {
   severityLabel,
 } from "./findingCopy.ts";
 
-// Layer C's info-severity blue has no existing named token in ui/theme.ts —
-// KeyGridCell.tsx already made this same observation (its own `INFO_BLUE`
-// const, same value) when it needed the identical E/W/I severity convention.
-// Duplicated here rather than imported, since KeyGridCell.tsx does not export
-// it (and this task does not touch that file) — if `ui/theme.ts` ever gains a
-// real token for it, both call sites should move onto it together.
-const INFO_BLUE = "#58a6ff";
+// Layer C's info-severity blue has no dedicated *-severity named export in
+// ui/theme.ts — KeyGridCell.tsx already made this same observation (its own
+// `INFO_BLUE` const, same value) when it needed the identical E/W/I severity
+// convention. Duplicated here rather than imported, since KeyGridCell.tsx
+// does not export it — both now reuse the accent-text token directly (epic
+// #533); if `ui/theme.ts` ever gains a dedicated severity token, both call
+// sites should move onto it together.
+const INFO_BLUE = "var(--app-accent-text)";
 
 // ---------------------------------------------------------------------------
 // "Sends:" derivation (FR-030) — the crux of this component
@@ -868,7 +869,9 @@ export function KeyInspector({
                             borderRadius: 3,
                             fontWeight: 700,
                             fontSize: 9,
-                            color: "#0d1117",
+                            // Dark text on the bright severity-dot fill —
+                            // matches KeyGridCell.tsx's identical badge.
+                            color: "var(--app-bg)",
                             background: sev.color,
                             flexShrink: 0,
                           }}

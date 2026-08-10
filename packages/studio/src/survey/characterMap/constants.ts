@@ -4,4 +4,4 @@
 // amber BORDER only (the filled background read as too distracting); paired with
 // an accessible-name hint (never colour alone) so the signal is not
 // colour-dependent.
-export const BASE_OUTPUT_BORDER = "#c9a227";
+export const BASE_OUTPUT_BORDER = "var(--app-warning)";

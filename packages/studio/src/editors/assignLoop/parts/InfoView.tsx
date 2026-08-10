@@ -356,7 +356,7 @@ export function InfoView() {
         <span style={{ color: 'var(--app-text-subtle)', fontSize: 11 }}>
           <Trans id="editor.assignLoop.infoView.typesEyebrow">types</Trans>
         </span>
-        <span style={{ font: "400 18px/1 'Lora', Georgia, serif", color: 'var(--app-text)' }}>
+        <span style={{ font: "400 18px/1 var(--app-font-glyph)", color: 'var(--app-text)' }}>
           {displayChar(info.ch)}
         </span>
       </div>

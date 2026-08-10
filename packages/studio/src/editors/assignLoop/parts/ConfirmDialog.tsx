@@ -123,13 +123,13 @@ export function ConfirmDialog({
         width: 'calc(100vw - 40px)',
         background: 'var(--app-surface)',
         color: 'var(--app-text)',
-        boxShadow: '0 8px 40px rgba(0,0,0,.35)',
+        boxShadow: '0 8px 40px color-mix(in srgb, var(--sil-black) 35%, transparent)',
         // Override default UA backdrop with a semi-transparent one
       }}
     >
       <style>{`
         dialog::backdrop {
-          background: rgba(0,0,0,.45);
+          background: color-mix(in srgb, var(--sil-black) 45%, transparent);
         }
       `}</style>
       <div style={{ padding: '24px 26px 20px' }}>
@@ -178,7 +178,7 @@ export function ConfirmDialog({
             onClick={onPrimary}
             style={{
               ...btnBase,
-              color: '#fff',
+              color: 'var(--app-text-on-accent)',
               background: 'var(--app-accent)',
               padding: '9px 18px',
             }}

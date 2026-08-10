@@ -70,8 +70,8 @@ import {
 const warningBannerStyle: React.CSSProperties = {
   marginTop: 4,
   padding: "8px 12px",
-  background: "#2a1a00",
-  border: "1px solid #d29922",
+  background: "var(--app-warning-bg)",
+  border: "1px solid var(--app-warning-border)",
   borderRadius: 6,
   fontSize: 12,
   fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
@@ -285,8 +285,8 @@ export function OutputScreen() {
         flexDirection: "row",
         height: "100%",
         width: "100%",
-        background: "#0d1117",
-        color: "#e6edf3",
+        background: "var(--app-bg)",
+        color: "var(--app-text)",
         fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
         overflow: "hidden",
       }}
@@ -348,7 +348,7 @@ export function OutputScreen() {
           boxSizing: "border-box",
         }}
       >
-        <h2 style={{ margin: 0, fontSize: "1.1rem", color: "#6ea8fe" }}>
+        <h2 style={{ margin: 0, fontSize: "1.1rem", color: "var(--app-accent-text)" }}>
           <Trans id="output.heading">Output</Trans>
         </h2>
         {baseKeyboard !== null && (
@@ -368,9 +368,9 @@ export function OutputScreen() {
                 alignSelf: "flex-start",
                 marginTop: 4,
                 padding: "9px 18px",
-                background: kmpActionable ? "#1f6feb" : "#161b22",
-                color: kmpActionable ? "#e6edf3" : "#484f58",
-                border: "1px solid #283040",
+                background: kmpActionable ? "var(--app-accent)" : "var(--app-surface)",
+                color: kmpActionable ? "var(--app-text-on-accent)" : "var(--app-text-disabled)",
+                border: "1px solid var(--app-border)",
                 borderRadius: 6,
                 fontSize: 14,
                 fontWeight: 600,
@@ -389,7 +389,7 @@ export function OutputScreen() {
               style={{
                 margin: 0,
                 fontSize: 12,
-                color: "#8b949e",
+                color: "var(--app-text-muted)",
                 lineHeight: 1.5,
                 maxWidth: "46ch",
               }}
@@ -407,8 +407,8 @@ export function OutputScreen() {
                 data-testid="emit-download-kmp-error"
                 style={{
                   ...warningBannerStyle,
-                  color: "#f85149",
-                  borderColor: "#f85149",
+                  color: "var(--app-danger-text)",
+                  borderColor: "var(--app-danger)",
                   lineHeight: 1.5,
                 }}
               >
@@ -423,7 +423,7 @@ export function OutputScreen() {
                     ))}
                   </ul>
                 )}
-                <div style={{ marginTop: 6, color: "#9aa7b8" }}>
+                <div style={{ marginTop: 6, color: "var(--app-text-subtle)" }}>
                   <Trans id="output.download.kmp.error.zipStillAvailable">
                     You can still download the source .zip below.
                   </Trans>
@@ -442,8 +442,8 @@ export function OutputScreen() {
                 alignSelf: "flex-start",
                 padding: "6px 14px",
                 background: "transparent",
-                color: zipActionable ? "#9aa7b8" : "#484f58",
-                border: "1px solid #283040",
+                color: zipActionable ? "var(--app-text-subtle)" : "var(--app-text-disabled)",
+                border: "1px solid var(--app-border)",
                 borderRadius: 6,
                 fontSize: 12,
                 cursor: zipActionable ? "pointer" : "not-allowed",
@@ -461,7 +461,7 @@ export function OutputScreen() {
               style={{
                 margin: 0,
                 fontSize: 12,
-                color: "#8b949e",
+                color: "var(--app-text-muted)",
                 lineHeight: 1.5,
                 maxWidth: "46ch",
               }}
@@ -474,7 +474,7 @@ export function OutputScreen() {
             {touchStale && (
               <div
                 role="alert"
-                style={{ ...warningBannerStyle, color: "#d29922", lineHeight: 1.5 }}
+                style={{ ...warningBannerStyle, color: "var(--app-warning-text)", lineHeight: 1.5 }}
               >
                 {"[WARN] "}
                 <Trans id="output.status.touchStale">
@@ -494,7 +494,7 @@ export function OutputScreen() {
             {coverageBlocked && (
               <div
                 role="alert"
-                style={{ ...warningBannerStyle, color: "#f85149", borderColor: "#f85149", lineHeight: 1.5 }}
+                style={{ ...warningBannerStyle, color: "var(--app-danger-text)", borderColor: "var(--app-danger)", lineHeight: 1.5 }}
               >
                 {"[ERROR] "}
                 {touchLayoutCorrupted ? (
@@ -517,7 +517,7 @@ export function OutputScreen() {
                     background: "none",
                     border: "none",
                     padding: 0,
-                    color: "#f85149",
+                    color: "var(--app-danger-text)",
                     textDecoration: "underline",
                     cursor: "pointer",
                     font: "inherit",
@@ -538,8 +538,8 @@ export function OutputScreen() {
                 data-testid="license-unreadable"
                 style={{
                   ...warningBannerStyle,
-                  color: "#f85149",
-                  borderColor: "#f85149",
+                  color: "var(--app-danger-text)",
+                  borderColor: "var(--app-danger)",
                   lineHeight: 1.5,
                   maxWidth: 560,
                 }}
@@ -586,9 +586,9 @@ export function OutputScreen() {
                     style={{
                       flex: 1,
                       padding: "5px 8px",
-                      background: "#0d1117",
-                      color: "#e6edf3",
-                      border: "1px solid #283040",
+                      background: "var(--app-bg)",
+                      color: "var(--app-text)",
+                      border: "1px solid var(--app-border)",
                       borderRadius: 4,
                       fontSize: 12,
                     }}
@@ -598,9 +598,9 @@ export function OutputScreen() {
                     data-testid="resolve-base-holder"
                     style={{
                       padding: "5px 12px",
-                      background: "#1f6feb",
-                      color: "#e6edf3",
-                      border: "1px solid #283040",
+                      background: "var(--app-accent)",
+                      color: "var(--app-text-on-accent)",
+                      border: "1px solid var(--app-border)",
                       borderRadius: 4,
                       fontSize: 12,
                       cursor: "pointer",
@@ -619,7 +619,7 @@ export function OutputScreen() {
                 role="status"
                 aria-live="polite"
                 data-testid="attribution-required"
-                style={{ ...warningBannerStyle, color: "#d29922", lineHeight: 1.5 }}
+                style={{ ...warningBannerStyle, color: "var(--app-warning-text)", lineHeight: 1.5 }}
               >
                 {"[WARN] "}
                 <Trans id="output.status.attributionRequired">
@@ -629,7 +629,7 @@ export function OutputScreen() {
               </div>
             )}
             {downloadError !== null && (
-              <div role="alert" style={{ fontSize: 11, color: "#f0a0a0", marginTop: 4 }}>
+              <div role="alert" style={{ fontSize: 11, color: "var(--app-danger-text)", marginTop: 4 }}>
                 {downloadError}
               </div>
             )}
@@ -643,7 +643,7 @@ export function OutputScreen() {
                 })}
                 style={warningBannerStyle}
               >
-                <div style={{ color: "#d29922", fontWeight: 600, marginBottom: 4 }}>
+                <div style={{ color: "var(--app-warning-text)", fontWeight: 600, marginBottom: 4 }}>
                   {"[WARN] "}
                   <Trans id="output.download.warnings.header">
                     Download completed with warnings:
@@ -653,7 +653,7 @@ export function OutputScreen() {
                   style={{
                     margin: 0,
                     paddingLeft: 18,
-                    color: "#d29922",
+                    color: "var(--app-warning-text)",
                     lineHeight: 1.6,
                   }}
                 >
@@ -667,7 +667,7 @@ export function OutputScreen() {
               <div
                 role="status"
                 aria-live="polite"
-                style={{ fontSize: 12, color: "#d29922", marginTop: 4 }}
+                style={{ fontSize: 12, color: "var(--app-warning-text)", marginTop: 4 }}
               >
                 {"[WARN] "}
                 <Trans id="output.identity.warn">
@@ -692,7 +692,7 @@ export function OutputScreen() {
                     background: "none",
                     border: "none",
                     padding: 0,
-                    color: "#d29922",
+                    color: "var(--app-warning-text)",
                     textDecoration: "underline",
                     cursor: "pointer",
                     font: "inherit",

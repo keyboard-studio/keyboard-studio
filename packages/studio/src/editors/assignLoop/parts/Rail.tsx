@@ -49,8 +49,10 @@ function buildStoreSubs(
 ): { key: StoreSubGroup; label: string; chip: string; color: string }[] {
   return [
     { key: 'input', label: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.input", message: "Input" })), chip: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.inputChip", message: "in" })), color: 'var(--app-accent-text)' },
-    { key: 'output', label: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.output", message: "Output" })), chip: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.outputChip", message: "out" })), color: '#7dbf8e' },
-    { key: 'both', label: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.both", message: "Input + Output" })), chip: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.bothChip", message: "in+out" })), color: '#c8b0e8' },
+    // Matches Inspector.tsx's RoleChip 'output'/'input+output' colors —
+    // same categorical role taxonomy, kept in sync (see that file's comment).
+    { key: 'output', label: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.output", message: "Output" })), chip: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.outputChip", message: "out" })), color: 'var(--app-success-text)' },
+    { key: 'both', label: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.both", message: "Input + Output" })), chip: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.bothChip", message: "in+out" })), color: 'var(--sil-violet-60)' },
     { key: 'pattern', label: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.pattern", message: "Pattern" })), chip: '', color: KIND_COLOR.pattern },
     { key: 'unused', label: resolveMessage(i18n, msg({ id: "editor.assignLoop.rail.storeSub.unused", message: "Unused" })), chip: '', color: 'var(--app-text-subtle)' },
   ];

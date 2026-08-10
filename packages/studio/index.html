@@ -1,5 +1,14 @@
 <!DOCTYPE html>
-<html lang="en">
+<!--
+  class="sil-app" data-theme="navy" are static (not injected by JS) so the
+  navy theme paints before React (or even theme.ts) ever runs: html/body
+  need --app-* tokens above the React root, SelectMenu portals its listbox
+  to document.body (outside the #root subtree), and a static attribute means
+  zero FOUC and zero extra test setup for the default theme. theme.ts's
+  applyTheme() only needs to *change* this attribute for a non-default
+  choice, not create it. See src/lib/theme.ts.
+-->
+<html lang="en" class="sil-app" data-theme="navy">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />

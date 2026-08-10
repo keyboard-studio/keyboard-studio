@@ -130,8 +130,8 @@ export function OSKFrame({
         minHeight: 380,
         borderRadius: 12,
         overflow: "hidden",
-        border: "1px solid #283040",
-        background: "#0d1117",
+        border: "1px solid var(--app-border)",
+        background: "var(--app-bg)",
       }}
     >
       <iframe
@@ -150,7 +150,10 @@ export function OSKFrame({
           height: 560,
           border: "0",
           display: "block",
-          background: "#14191f",
+          // Unified with the app surface (epic #533). Was a one-off near-black
+          // (#14191f) that made the keyboard preview read as a foreign panel
+          // floating in the navy shell.
+          background: "var(--app-surface)",
         }}
         aria-busy={stage.kind !== "ready" && stage.kind !== "idle"}
       />
@@ -164,9 +167,9 @@ export function OSKFrame({
             right: 6,
             fontSize: 11,
             padding: "6px 10px",
-            background: "rgba(240,184,110,0.12)",
-            color: "#f0b86e",
-            border: "1px solid rgba(240,184,110,0.4)",
+            background: "var(--app-warning-bg)",
+            color: "var(--app-warning-text)",
+            border: "1px solid var(--app-warning-border)",
             borderRadius: 6,
             fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
           }}

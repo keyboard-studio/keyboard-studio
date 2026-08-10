@@ -81,8 +81,8 @@ export function PreviewPaneOverlay({ stage, onRetry }: PreviewPaneOverlayProps) 
       style={{
         position: "absolute",
         inset: 0,
-        background: "rgba(13,17,23,0.92)",
-        color: "#e6edf3",
+        background: "color-mix(in srgb, var(--app-bg) 92%, transparent)",
+        color: "var(--app-text)",
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
@@ -99,7 +99,7 @@ export function PreviewPaneOverlay({ stage, onRetry }: PreviewPaneOverlayProps) 
         style={{
           fontSize: 16,
           fontWeight: 600,
-          color: isError ? "#f0b86e" : "#6ea8fe",
+          color: isError ? "var(--app-warning-text)" : "var(--app-accent-text)",
         }}
       >
         {title}
@@ -108,7 +108,7 @@ export function PreviewPaneOverlay({ stage, onRetry }: PreviewPaneOverlayProps) 
         <div
           style={{
             fontSize: 12,
-            color: "#9aa7b8",
+            color: "var(--app-text-subtle)",
             fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
             maxWidth: 480,
           }}
@@ -124,9 +124,9 @@ export function PreviewPaneOverlay({ stage, onRetry }: PreviewPaneOverlayProps) 
             marginTop: 8,
             padding: "8px 16px",
             borderRadius: 8,
-            border: "1px solid #6ea8fe",
-            background: "rgba(110,168,254,0.18)",
-            color: "#6ea8fe",
+            border: "1px solid var(--app-accent)",
+            background: "color-mix(in srgb, var(--app-accent) 18%, transparent)",
+            color: "var(--app-accent-text)",
             cursor: "pointer",
             fontWeight: 600,
           }}

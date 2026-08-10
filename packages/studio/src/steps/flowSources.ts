@@ -82,7 +82,7 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
   identity_lite: {
     id: "identity_lite",
     raw: identityLiteModularRaw,
-    title: "Identity-lite (Phase A head)",
+    title: "Identity-lite",
     // phaseARegistry now holds ONLY the il_* modules (the demoted battery was
     // physically relocated to questions/reserve/), so computeReserveNodes
     // yields nothing here: the demoted Phase A battery is not surfaced as
@@ -97,7 +97,7 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
   track: {
     id: "track",
     raw: trackModularRaw,
-    title: "Phase G — track selection",
+    title: "Track selection",
     registry: phaseTrackRegistry,
     status: "live",
   },
@@ -105,7 +105,7 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
   project_name: {
     id: "project_name",
     raw: projectNameModularRaw,
-    title: "Phase G — project name",
+    title: "Project name",
     registry: phaseProjectRegistry,
     status: "live",
   },
@@ -113,7 +113,7 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
   phase_b_characters: {
     id: "phase_b_characters",
     raw: phaseBModularRaw,
-    title: "Phase B — character discovery",
+    title: "Character discovery",
     registry: phaseBRegistry,
     status: "live",
   },
@@ -121,7 +121,7 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
   phase_f_helpdocs: {
     id: "phase_f_helpdocs",
     raw: phaseFModularRaw,
-    title: "Phase F — help docs",
+    title: "Help docs",
     registry: phaseFRegistry,
     status: "live",
   },
@@ -137,7 +137,7 @@ export const flowSources: Readonly<Record<string, FlowSource>> = {
   phase_a_identity: {
     id: "phase_a_identity",
     raw: phaseAIdentityModularRaw,
-    title: "Phase A — full identity (reserve/library)",
+    title: "Full identity (reserve/library)",
     registry: reserveRegistry,
     status: "proposed",
   },

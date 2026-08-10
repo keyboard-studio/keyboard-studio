@@ -123,7 +123,7 @@ export const GlyphCell = memo(function GlyphCell({
             {keys.length}⨯
           </span>
         )}
-        <span style={{ font: "400 24px/1 'Lora', Georgia, serif", color: off ? 'var(--app-text-subtle)' : 'var(--app-text)' }}>
+        <span style={{ font: "400 24px/1 var(--app-font-glyph)", color: off ? 'var(--app-text-subtle)' : 'var(--app-text)' }}>
           {display}
         </span>
         <KeySeq keys={keys} prefix={modifierLabel} dim={off} />

@@ -25,7 +25,7 @@ import {
 import { mergeClassNames } from "./classNames.ts";
 
 export type TextareaProps = React.TextareaHTMLAttributes<HTMLTextAreaElement> & {
-  /** When true, applies ERROR_BORDER (#7a2a2a) as the border color. */
+  /** When true, applies ERROR_BORDER (var(--app-danger-border)) as the border color. */
   error?: boolean;
   /**
    * CSS `resize` value. Defaults to `"none"` — free resize is reserved for
@@ -42,7 +42,7 @@ const BASE_STYLE: React.CSSProperties = {
   background: BG_PAGE,
   borderWidth: "1px",
   borderStyle: "solid",
-  borderRadius: 6,
+  borderRadius: "var(--app-radius-sm)",
   color: TEXT_MAIN,
   fontSize: 14,
   fontFamily: FONT,

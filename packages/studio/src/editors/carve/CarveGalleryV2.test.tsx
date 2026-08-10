@@ -1,6 +1,9 @@
 // Unit tests for CarveGalleryV2.tsx — the character-first carve gallery
-// (#1399). Component-level coverage was previously zero for this file; this
-// suite exercises the behavior CarveGallery.test.tsx already covers for the
+// (#1399), including the #533 "suggested to discard" first-group redesign
+// (recommendedRemovalChars rows render as the FIRST group of the gallery
+// instead of a standing banner — see CarveGalleryV2.tsx's header comment).
+// Component-level coverage was previously zero for this file; this suite
+// exercises the behavior CarveGallery.test.tsx already covers for the
 // sibling rule/node "Rail" view, adapted to V2's flatter, dialog-free
 // interaction model (toggleCell/toggleGroup call cascadeDelete/cascadeRestore
 // directly — there is no ConfirmDialog in this view).
@@ -9,6 +12,12 @@
 // else) exactly as in CarveGallery.test.tsx, so cascade behavior is driven
 // deterministically. neededCharsForLanguage (../../lib/services.ts) is also
 // mocked to keep the suite offline/deterministic, per that file's pattern.
+// recommendedRemovalChars (../../lib/irToCarveNodes.ts) is mocked the SAME
+// way (importActual, default implementation forwards to the real function)
+// so most tests exercise the real derivation, but the cross-script-Latin
+// test can inject a `reason: 'cross-script-latin'` row directly rather than
+// reconstructing a real non-Latin bcp47/langtags scenario — the same
+// short-circuit RemovalBanner.test.tsx uses for its own optional-Latin cases.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { cleanup, fireEvent, screen, within } from '@testing-library/react';
@@ -19,8 +28,9 @@ import { basicKbdus } from '@keyboard-studio/contracts/fixtures';
 import { CarveGalleryV2 } from './CarveGalleryV2.tsx';
 import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
 import type { CharContributors } from '@keyboard-studio/engine';
+import type { RecommendedRemovalChar } from '../../lib/irToCarveNodes.ts';
 
-const { collectCharContributorsMock, neededCharsResult } = vi.hoisted(() => {
+const { collectCharContributorsMock, neededCharsResult, recommendedRemovalCharsMock } = vi.hoisted(() => {
   let _needed: Set<string> | null = null;
   return {
     collectCharContributorsMock: vi.fn(),
@@ -28,6 +38,7 @@ const { collectCharContributorsMock, neededCharsResult } = vi.hoisted(() => {
       get: () => _needed,
       set: (v: Set<string> | null) => { _needed = v; },
     },
+    recommendedRemovalCharsMock: vi.fn(),
   };
 });
 
@@ -36,6 +47,19 @@ vi.mock('@keyboard-studio/engine', async () => {
   return {
     ...actual,
     collectCharContributors: collectCharContributorsMock,
+  };
+});
+
+// Default implementation forwards to the real function — set ONCE here
+// (module init), never in afterEach's mockReset, so a plain
+// `mockReturnValueOnce`/`mockImplementationOnce` in one test reverts to the
+// real derivation for every other test without extra bookkeeping.
+vi.mock('../../lib/irToCarveNodes.ts', async () => {
+  const actual = await vi.importActual<typeof import('../../lib/irToCarveNodes.ts')>('../../lib/irToCarveNodes.ts');
+  recommendedRemovalCharsMock.mockImplementation(actual.recommendedRemovalChars);
+  return {
+    ...actual,
+    recommendedRemovalChars: recommendedRemovalCharsMock,
   };
 });
 
@@ -127,6 +151,15 @@ function renderGalleryV2(ir: KeyboardIR, caps: Map<string, RemovalCapability> = 
   const vfs = createVirtualFS();
   useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir, removalCapabilities: caps });
   return render(<CarveGalleryV2 onComplete={vi.fn()} />);
+}
+
+/** A fabricated RecommendedRemovalChar row — used only by the recommendedRemovalCharsMock override tests. */
+function makeRow(ch: string, ruleNodeIds: string[], reason?: RecommendedRemovalChar['reason']): RecommendedRemovalChar {
+  return {
+    ch,
+    contributors: { ...emptyContributors(ch), ruleNodeIds },
+    ...(reason !== undefined ? { reason } : {}),
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -277,11 +310,13 @@ describe('CarveGalleryV2 — group-by toggle', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 6. RemovalBanner — renders once recommendedRemovalChars resolves >= 1 char.
+// 6. Suggested-to-discard first group (#533 — design handoff option 1b).
+// recommendedRemovalChars rows render as the FIRST group of the gallery
+// (RecommendedGroupCard), replacing the old standing RemovalBanner.
 // ---------------------------------------------------------------------------
 
-describe('CarveGalleryV2 — removal recommendation banner', () => {
-  it('renders the banner once the CLDR-driven needed-set leaves a surplus character', async () => {
+describe('CarveGalleryV2 — suggested-to-discard group', () => {
+  it('renders a recommended character in the suggested group and NOT in the normal groups below (no duplicates)', async () => {
     mockFixtureContributors();
     // 'a' is needed — 'C' (a plain letter, never in an always-keep category)
     // is surplus and becomes recommended-removal. 'q' is deliberately NOT a
@@ -294,15 +329,101 @@ describe('CarveGalleryV2 — removal recommendation banner', () => {
 
     renderGalleryV2(makeFixtureIR());
 
-    await screen.findByText(/We recommend removing 1 character/);
-    expect(screen.getByRole('region', { name: 'Removal recommendation' })).not.toBeNull();
+    const suggestedGroup = await screen.findByTestId('carve-v2-suggested-group');
+    expect(within(suggestedGroup).getByRole('button', { name: 'C — U+0043' })).not.toBeNull();
+
+    // 'C' is a basic-letter alongside 'a' — the normal "Basic letters" group
+    // below must show 'a' but must NOT also show 'C' a second time.
+    const basicLettersGroup = screen.getByRole('region', { name: 'Basic letters' });
+    expect(within(basicLettersGroup).getByRole('button', { name: 'a — U+0061' })).not.toBeNull();
+    expect(within(basicLettersGroup).queryByRole('button', { name: 'C — U+0043' })).toBeNull();
   });
 
-  it('does not render the banner when there is no recommendation signal at all', () => {
+  it('does not render the suggested group when there is no recommendation signal at all', () => {
     mockFixtureContributors();
     renderGalleryV2(makeFixtureIR());
 
-    expect(screen.queryByText(/We recommend removing/)).toBeNull();
-    expect(screen.queryByRole('region', { name: 'Removal recommendation' })).toBeNull();
+    expect(screen.queryByTestId('carve-v2-suggested-group')).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Suggested to discard' })).toBeNull();
+  });
+
+  it('hides the suggested group entirely once a search query is entered', async () => {
+    mockFixtureContributors();
+    neededCharsResult.set(new Set(['a']));
+    renderGalleryV2(makeFixtureIR());
+
+    await screen.findByTestId('carve-v2-suggested-group');
+
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Search a character or code point' }), { target: { value: 'C' } });
+
+    expect(screen.queryByTestId('carve-v2-suggested-group')).toBeNull();
+    // The grid itself must still be able to answer the query — 'C' is
+    // findable there while the card that would otherwise show it is hidden.
+    expect(screen.getByRole('button', { name: 'C — U+0043' })).not.toBeNull();
+  });
+
+  it('bulk-discards every recommended character, then flips to a restore affordance', async () => {
+    mockFixtureContributors();
+    neededCharsResult.set(new Set(['a']));
+    renderGalleryV2(makeFixtureIR());
+
+    await screen.findByTestId('carve-v2-suggested-group');
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(false);
+
+    const toggleAll = screen.getByTestId('carve-v2-suggested-toggle-all');
+    expect(toggleAll.textContent).toMatch(/Discard all/);
+
+    fireEvent.click(toggleAll);
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(true);
+    expect(screen.getByTestId('carve-v2-suggested-toggle-all').textContent).toBe('Restore all');
+
+    fireEvent.click(screen.getByTestId('carve-v2-suggested-toggle-all'));
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(false);
+    expect(screen.getByTestId('carve-v2-suggested-toggle-all').textContent).toMatch(/Discard all/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 7. Optional-Latin group — reason: 'cross-script-latin' rows split into
+// their own secondary, collapsible group (preserved from RemovalBanner's
+// post-#526 follow-on split; see RemovalBanner.tsx's header comment).
+// ---------------------------------------------------------------------------
+
+describe('CarveGalleryV2 — optional Latin group', () => {
+  it('renders the optional-Latin group separately from the primary suggested group', async () => {
+    mockFixtureContributors();
+    // Non-null (even empty) flips useCarveNeededSet's hasSignal true, which
+    // gates whether CarveGalleryV2 calls recommendedRemovalChars at all — the
+    // mocked return value below is what actually drives this test, not the
+    // needed-set contents.
+    neededCharsResult.set(new Set());
+    recommendedRemovalCharsMock.mockReturnValueOnce([
+      makeRow('a', ['r-a']),
+      makeRow('C', ['r-shiftc'], 'cross-script-latin'),
+    ]);
+
+    renderGalleryV2(makeFixtureIR());
+
+    const suggestedGroup = await screen.findByTestId('carve-v2-suggested-group');
+    const optionalGroup = screen.getByTestId('carve-v2-optional-latin-group');
+    expect(suggestedGroup).not.toBe(optionalGroup);
+
+    // 'a' (no reason) is in the primary group; 'C' (cross-script-latin) is
+    // NOT — it belongs only to the optional group.
+    expect(within(suggestedGroup).getByRole('button', { name: 'a — U+0061' })).not.toBeNull();
+    expect(within(suggestedGroup).queryByRole('button', { name: 'C — U+0043' })).toBeNull();
+
+    // The optional group starts collapsed (mirrors RemovalBanner's default);
+    // expand it via its own disclosure control to reach the character cell.
+    fireEvent.click(within(optionalGroup).getByRole('button', { name: /Latin alphabet \(optional\)/ }));
+    expect(within(optionalGroup).getByRole('button', { name: 'C — U+0043' })).not.toBeNull();
+  });
+
+  it('does not render the optional-Latin group when no row is tagged cross-script-latin', () => {
+    mockFixtureContributors();
+    neededCharsResult.set(new Set(['a']));
+    renderGalleryV2(makeFixtureIR());
+
+    expect(screen.queryByTestId('carve-v2-optional-latin-group')).toBeNull();
   });
 });

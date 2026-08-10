@@ -1088,7 +1088,9 @@ describe("TouchGallery — character-scroll-strip producer badge (integration)",
     const stripBefore = screen.getByTestId("char-scroll-strip");
     const badgeBefore = within(stripBefore).getByTestId("char-scroll-badge-4E2D");
     expect(badgeBefore.textContent).toBe("0");
-    expect(badgeBefore.style.color).toBe("rgb(248, 81, 73)"); // #f85149 — badge-bad color
+    // badge-bad color is now the --app-danger token (epic #533); jsdom does not
+    // resolve custom properties, so assert the token reference itself.
+    expect(badgeBefore.style.color).toBe("var(--app-danger)");
 
     // Drive the real touch Apply flow (long-press K_A, the chooser's default
     // active method) — the same interaction the "multiple methods per
@@ -1109,7 +1111,7 @@ describe("TouchGallery — character-scroll-strip producer badge (integration)",
         "char-scroll-badge-4E2D",
       );
       expect(badgeAfter.textContent).toBe("1");
-      expect(badgeAfter.style.color).toBe("rgb(86, 211, 100)"); // #56d364 — badge-good color
+      expect(badgeAfter.style.color).toBe("var(--app-success-text)");
     });
   });
 });
@@ -3453,8 +3455,8 @@ describe("TouchGallery — Existing methods color model (produced vs. used)", ()
     });
     // GREEN (produced), not blue — a layer-switch key still produces the
     // char; color tracks produced-vs-used, not deletability.
-    expect(row!.style.color).toBe("rgb(86, 211, 100)"); // #56d364
-    expect(row!.style.backgroundColor).toBe("rgb(13, 34, 24)"); // #0d2218
+    expect(row!.style.color).toBe("var(--app-success-text)");
+    expect(row!.style.background).toBe("var(--app-success-bg)");
     // Static: a <span>, not a <button> — no delete affordance at all.
     expect(row!.tagName).toBe("SPAN");
     expect(

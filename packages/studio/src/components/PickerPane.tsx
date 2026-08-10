@@ -124,7 +124,7 @@ function BaseProvenance({ kb }: { kb: BaseKeyboard }) {
           fontSize: 11,
           textTransform: "uppercase",
           letterSpacing: "0.08em",
-          color: "#9aa7b8",
+          color: "var(--app-text-subtle)",
           fontWeight: 700,
         }}
       >
@@ -133,7 +133,7 @@ function BaseProvenance({ kb }: { kb: BaseKeyboard }) {
       <dl style={{ margin: 0, display: "grid", gridTemplateColumns: "auto 1fr", gap: "4px 8px" }}>
         {rows.map((row) => (
           <div key={row.field} style={{ display: "contents" }}>
-            <dt style={{ color: "#9aa7b8", fontSize: 13 }}>{row.label}</dt>
+            <dt style={{ color: "var(--app-text-subtle)", fontSize: 13 }}>{row.label}</dt>
             <dd style={{ margin: 0, color: TEXT_MAIN, fontSize: 13, fontFamily: FONT_MONO }}>
               {row.value}
             </dd>
@@ -186,7 +186,7 @@ export function PickerPane({
           "Keyboard Studio"
         )}
       </h1>
-      <p style={{ margin: 0, color: "#9aa7b8", fontSize: 13 }}>
+      <p style={{ margin: 0, color: "var(--app-text-subtle)", fontSize: 13 }}>
         {shipping ? (
           <Trans id="picker.shipping.intro">
             Check the details below, then download or submit your keyboard from the right.

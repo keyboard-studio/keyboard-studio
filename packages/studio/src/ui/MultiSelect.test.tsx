@@ -51,11 +51,11 @@ describe("MultiSelect", () => {
     expect(onChange).toHaveBeenCalledWith(["en"]);
   });
 
-  it("uses accentColor #6ea8fe on each checkbox", () => {
+  it("uses accentColor var(--app-accent) on each checkbox", () => {
     render(<MultiSelect options={OPTIONS} selected={[]} onChange={() => undefined} />);
     const checkboxes = screen.getAllByRole("checkbox") as HTMLInputElement[];
     for (const cb of checkboxes) {
-      expect(cb.style.accentColor).toBe("#6ea8fe");
+      expect(cb.style.accentColor).toBe("var(--app-accent)");
     }
   });
 

@@ -69,8 +69,10 @@ describe("project_keyboard_id — slugifyKeyboardId integration (seed derivation
 });
 
 describe("project_keyboard_id — definition shape", () => {
-  it("type is text", () => {
-    expect(definition.type).toBe("text");
+  // short_text, not text — an identifier is one token, never a paragraph.
+  // See project_display_name.test.ts for the full reasoning (epic #533).
+  it("type is short_text (single-line field, not a resizable textarea)", () => {
+    expect(definition.type).toBe("short_text");
   });
 
   it("required is true", () => {

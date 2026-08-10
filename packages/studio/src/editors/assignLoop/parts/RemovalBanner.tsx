@@ -107,7 +107,7 @@ function Checklist({ items, uncheckedChs, toggle, ariaLabel, hasPairedRow }: Che
                   aria-label={rowAriaLabel}
                   style={{ cursor: 'pointer' }}
                 />
-                <span style={{ font: "400 16px/1 'Lora', serif", color: 'var(--app-text)' }}>
+                <span style={{ font: "400 16px/1 var(--app-font-glyph)", color: 'var(--app-text)' }}>
                   {glyphLabel}
                 </span>
                 <span style={{ font: '600 10px/1 var(--app-font-mono)', color: 'var(--app-text-subtle)', letterSpacing: '.03em' }}>
@@ -250,7 +250,7 @@ export function RemovalBanner({ recommended, languageLabel, languageDisplayName,
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: 6,
                     font: '600 12.5px var(--app-font)', cursor: selected.length === 0 ? 'default' : 'pointer',
-                    color: '#fff', background: selected.length === 0 ? 'var(--app-text-subtle)' : 'var(--sil-green)',
+                    color: 'var(--app-text-on-accent)', background: selected.length === 0 ? 'var(--app-text-subtle)' : 'var(--sil-green)',
                     border: 'none', borderRadius: 8, padding: '8px 16px', opacity: selected.length === 0 ? 0.6 : 1,
                   }}
                 >

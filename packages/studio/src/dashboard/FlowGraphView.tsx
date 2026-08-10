@@ -27,10 +27,17 @@ function truncatePath(path: string, maxLen = 28): string {
   return path.length > maxLen ? path.slice(0, maxLen - 1) + "…" : path;
 }
 
+// Edge colors are --app-* tokens (epic #533) so this stays theme-aware
+// (light / navy) — see colors.css. `conditional` is the one exact hex the
+// design handoff named explicitly (var(--app-warning-text)); `linear` and
+// `default` have no equivalent literal in the handoff's mapping table, so
+// they're picked by role: `linear` is a plain structural connector (a
+// border-weight neutral), `default` is the muted "else" branch (one step
+// dimmer, alongside its dashed stroke).
 const EDGE_COLOR: Record<GraphEdge["kind"], string> = {
-  linear: "#4d5b7c",
-  conditional: "#d29922",
-  default: "#6e7681",
+  linear: "var(--app-border)",
+  conditional: "var(--app-warning-text)",
+  default: "var(--app-text-subtle)",
 };
 
 // Extra vertical room rendered below the last node row. Edges leaving the
@@ -44,8 +51,12 @@ const CANVAS_BOTTOM_PAD = 80;
 
 // Walked-path highlight (spec 053, FR-023). Deliberately outside the EDGE_COLOR
 // palette and outside every nodeRole() border colour, so "this keyboard went here"
-// can never be confused with an edge kind or a node role.
-const WALKED_COLOR = "#f778ba";
+// can never be confused with an edge kind or a node role. `var(--app-danger)` is
+// the one status token this page's nodeRole()/EDGE_COLOR never otherwise reaches
+// (accent/warning/success/teal/violet are all claimed — see nodeRole below), so
+// tokenizing this (epic #533) trades the original literal pink (#f778ba) for red,
+// not for a hue that could collide with an existing role.
+const WALKED_COLOR = "var(--app-danger)";
 
 // Alternative-answer panel (spec 053, FR-026). `position: sticky` with `left: 0`
 // keeps it readable while the (often much wider) graph canvas is scrolled
@@ -56,8 +67,8 @@ const panelStyle: CSSProperties = {
   margin: 12,
   padding: 12,
   maxWidth: 720,
-  background: "#0d1117",
-  border: "1px solid #30363d",
+  background: "var(--app-bg)",
+  border: "1px solid var(--app-border)",
   borderRadius: 6,
 };
 
@@ -65,7 +76,7 @@ const linkButtonStyle: CSSProperties = {
   background: "none",
   border: "none",
   padding: 0,
-  color: "#6ea8fe",
+  color: "var(--app-accent-text)",
   fontFamily: SANS,
   fontSize: 12,
   textDecoration: "underline",
@@ -76,7 +87,7 @@ const noticeStyle: CSSProperties = {
   margin: 0,
   fontFamily: SANS,
   fontSize: 12,
-  color: "#8b949e",
+  color: "var(--app-text-muted)",
 };
 
 interface Pt {
@@ -126,29 +137,43 @@ function nodeRole(n: PositionedNode): {
 } {
   // Library-not-in-flow nodes (registered Phase B modules not in the live manifest)
   // are rendered with a distinct muted purple palette and a "reserve" badge so it is
-  // immediately clear they do NOT run in the current survey.
+  // immediately clear they do NOT run in the current survey. No --app-purple semantic
+  // token exists (epic #533's colors.css), so this reuses the SIL violet brand family
+  // (brand.css) — theme-invariant, but distinct from every other role on this page.
   if (n.kind === "library-not-in-flow") {
-    return { border: "#6e40c9", bg: "#1a1030", badgeKind: "reserve", badgeBg: "#4a2a8a" };
+    return {
+      border: "var(--sil-violet)",
+      bg: "var(--sil-violet-10)",
+      badgeKind: "reserve",
+      badgeBg: "var(--sil-violet-dark)",
+    };
   }
   // Stub nodes (galleries / wizard steps not yet in the question registry).
   if (n.kind === "stub") {
-    return { border: "#58a6ff", bg: "#0d2035", badgeKind: "stub", badgeBg: "#1c4a7a" };
+    return { border: "var(--app-accent)", bg: "var(--app-accent-bg)", badgeKind: "stub", badgeBg: "var(--app-accent)" };
   }
   // Proposed-flow nodes (spec 025): a distinct teal palette + "proposed" badge so
   // it is immediately clear they render only in the Library section and do NOT run.
+  // No --app-teal semantic token exists; reuses the SIL light-blue brand family
+  // (brand.css) for the same reason as the violet reuse above.
   if (n.kind === "proposed") {
-    return { border: "#39c5cf", bg: "#0c2a2e", badgeKind: "proposed", badgeBg: "#1b6b73" };
+    return {
+      border: "var(--sil-light-blue)",
+      bg: "var(--sil-light-blue-10)",
+      badgeKind: "proposed",
+      badgeBg: "var(--sil-light-blue-dark)",
+    };
   }
   // Live nodes — standard role-based styling.
   if (n.isEntry)
-    return { border: "#6ea8fe", bg: "#11203a", badgeKind: "entry", badgeBg: "#1f6feb" };
+    return { border: "var(--app-accent)", bg: "var(--app-accent-bg)", badgeKind: "entry", badgeBg: "var(--app-accent)" };
   if (n.isGate)
-    return { border: "#d29922", bg: "#241c10", badgeKind: "gate", badgeBg: "#9e6a03" };
+    return { border: "var(--app-warning-text)", bg: "var(--app-warning-bg)", badgeKind: "gate", badgeBg: "var(--app-warning)" };
   if (n.engineResolved)
-    return { border: "#6e7681", bg: "#14181f", badgeKind: "engine", badgeBg: "#373e47" };
+    return { border: "var(--app-text-subtle)", bg: "var(--app-surface-2)", badgeKind: "engine", badgeBg: "var(--app-border-strong)" };
   if (n.isTerminal)
-    return { border: "#3fb950", bg: "#0f2417", badgeKind: "terminal", badgeBg: "#238636" };
-  return { border: "#30363d", bg: "#161b22", badgeKind: null, badgeBg: "#30363d" };
+    return { border: "var(--app-success-text)", bg: "var(--app-success-bg)", badgeKind: "terminal", badgeBg: "var(--app-success)" };
+  return { border: "var(--app-border)", bg: "var(--app-surface)", badgeKind: null, badgeBg: "var(--app-border)" };
 }
 
 interface FlowGraphViewProps {
@@ -251,9 +276,9 @@ export function FlowGraphView({ graph, pathOverlay, resolveAlternative }: FlowGr
     <div
       style={{
         overflow: "auto",
-        border: "1px solid #21262d",
+        border: "1px solid var(--app-border)",
         borderRadius: 8,
-        background: "#0b0f14",
+        background: "var(--app-bg)",
       }}
     >
       <div
@@ -281,7 +306,9 @@ export function FlowGraphView({ graph, pathOverlay, resolveAlternative }: FlowGr
                 markerHeight="7"
                 orient="auto-start-reverse"
               >
-                <path d="M 0 0 L 10 5 L 0 10 z" fill={EDGE_COLOR[kind]} />
+                {/* CSS var() does not substitute in SVG presentation attributes
+                    (fill=/stroke=) — must go through `style` instead. */}
+                <path d="M 0 0 L 10 5 L 0 10 z" style={{ fill: EDGE_COLOR[kind] }} />
               </marker>
             ))}
           </defs>
@@ -294,7 +321,7 @@ export function FlowGraphView({ graph, pathOverlay, resolveAlternative }: FlowGr
                 key={`${e.from}->${e.to}-${i}`}
                 d={edgePath(from, to)}
                 fill="none"
-                stroke={EDGE_COLOR[e.kind]}
+                style={{ stroke: EDGE_COLOR[e.kind] }}
                 strokeWidth={1.5}
                 strokeDasharray={e.kind === "default" ? "5 4" : undefined}
                 markerEnd={`url(#arrow-${graph.flowId}-${e.kind})`}
@@ -328,7 +355,7 @@ export function FlowGraphView({ graph, pathOverlay, resolveAlternative }: FlowGr
                   data-walked-edge={key}
                   d={edgePath(from, to)}
                   fill="none"
-                  stroke={WALKED_COLOR}
+                  style={{ stroke: WALKED_COLOR }}
                   strokeWidth={3}
                   strokeOpacity={0.85}
                 />
@@ -345,7 +372,7 @@ export function FlowGraphView({ graph, pathOverlay, resolveAlternative }: FlowGr
                   height={NODE_H + 6}
                   rx={9}
                   fill="none"
-                  stroke={WALKED_COLOR}
+                  style={{ stroke: WALKED_COLOR }}
                   strokeWidth={2}
                 />
               ) : null,
@@ -374,8 +401,8 @@ export function FlowGraphView({ graph, pathOverlay, resolveAlternative }: FlowGr
                 padding: "1px 6px",
                 fontSize: 11,
                 fontFamily: MONO,
-                color: e.kind === "conditional" ? "#e3b341" : "#adbac7",
-                background: "#0b0f14",
+                color: e.kind === "conditional" ? "var(--app-warning-text)" : "var(--app-text-muted)",
+                background: "var(--app-bg)",
                 border: `1px solid ${EDGE_COLOR[e.kind]}`,
                 borderRadius: 4,
                 whiteSpace: "nowrap",
@@ -443,7 +470,7 @@ export function FlowGraphView({ graph, pathOverlay, resolveAlternative }: FlowGr
                   style={{
                     fontFamily: MONO,
                     fontSize: 11.5,
-                    color: "#6ea8fe",
+                    color: "var(--app-accent-text)",
                     fontWeight: 600,
                     whiteSpace: "nowrap",
                     overflow: "hidden",
@@ -492,9 +519,9 @@ export function FlowGraphView({ graph, pathOverlay, resolveAlternative }: FlowGr
                       fontFamily: SANS,
                       fontSize: 9,
                       lineHeight: "13px",
-                      color: "#e3b341",
-                      background: "#241c10",
-                      border: "1px solid #9e6a03",
+                      color: "var(--app-warning-text)",
+                      background: "var(--app-warning-bg)",
+                      border: "1px solid var(--app-warning)",
                       borderRadius: 3,
                       padding: "0 4px",
                       whiteSpace: "nowrap",
@@ -509,7 +536,7 @@ export function FlowGraphView({ graph, pathOverlay, resolveAlternative }: FlowGr
                       fontFamily: SANS,
                       fontSize: 9.5,
                       lineHeight: "14px",
-                      color: "#fff",
+                      color: "var(--app-text-on-accent)",
                       background: role.badgeBg,
                       borderRadius: 3,
                       padding: "0 5px",
@@ -527,9 +554,9 @@ export function FlowGraphView({ graph, pathOverlay, resolveAlternative }: FlowGr
                       fontFamily: SANS,
                       fontSize: 9,
                       lineHeight: "14px",
-                      color: "#e3b341",
-                      background: "#241c10",
-                      border: "1px solid #9e6a03",
+                      color: "var(--app-warning-text)",
+                      background: "var(--app-warning-bg)",
+                      border: "1px solid var(--app-warning)",
                       borderRadius: 3,
                       padding: "0 4px",
                       whiteSpace: "nowrap",
@@ -547,7 +574,7 @@ export function FlowGraphView({ graph, pathOverlay, resolveAlternative }: FlowGr
                 style={{
                   fontFamily: SANS,
                   fontSize: 10.5,
-                  color: "#8b949e",
+                  color: "var(--app-text-muted)",
                   lineHeight: "13px",
                   display: "-webkit-box",
                   WebkitLineClamp: 2,
@@ -555,7 +582,7 @@ export function FlowGraphView({ graph, pathOverlay, resolveAlternative }: FlowGr
                   overflow: "hidden",
                 }}
               >
-                <span style={{ color: "#586069" }}>
+                <span style={{ color: "var(--app-text-disabled)" }}>
                   {hasMetadata ? (n.stepKind ?? n.type) : n.type}
                 </span>
                 {n.label !== n.id ? ` · ${n.label}` : ""}
@@ -565,14 +592,14 @@ export function FlowGraphView({ graph, pathOverlay, resolveAlternative }: FlowGr
                   style={{
                     fontFamily: MONO,
                     fontSize: 9.5,
-                    color: "#6e7681",
+                    color: "var(--app-text-subtle)",
                     lineHeight: "13px",
                     overflow: "hidden",
                     whiteSpace: "nowrap",
                     textOverflow: "ellipsis",
                   }}
                 >
-                  <span style={{ color: "#3fb950" }}>
+                  <span style={{ color: "var(--app-success-text)" }}>
                     <Trans id="dashboard.flowGraph.metadata.writes">writes:</Trans>
                   </span>{" "}
                   {n.writePaths !== undefined && n.writePaths.length > 0
@@ -585,14 +612,14 @@ export function FlowGraphView({ graph, pathOverlay, resolveAlternative }: FlowGr
                   style={{
                     fontFamily: MONO,
                     fontSize: 9.5,
-                    color: "#6e7681",
+                    color: "var(--app-text-subtle)",
                     lineHeight: "13px",
                     overflow: "hidden",
                     whiteSpace: "nowrap",
                     textOverflow: "ellipsis",
                   }}
                 >
-                  <span style={{ color: "#58a6ff" }}>
+                  <span style={{ color: "var(--app-accent-text)" }}>
                     <Trans id="dashboard.flowGraph.metadata.inputs">inputs:</Trans>
                   </span>{" "}
                   {n.inputPaths!.length > 0
@@ -616,7 +643,7 @@ export function FlowGraphView({ graph, pathOverlay, resolveAlternative }: FlowGr
             <strong
               ref={panelHeadingRef}
               tabIndex={-1}
-              style={{ fontFamily: SANS, fontSize: 12.5, color: "#e6edf3", flex: 1 }}
+              style={{ fontFamily: SANS, fontSize: 12.5, color: "var(--app-text)", flex: 1 }}
             >
               {t({
                 id: "dashboard.flowGraph.alternative.title",
@@ -637,7 +664,7 @@ export function FlowGraphView({ graph, pathOverlay, resolveAlternative }: FlowGr
           </div>
 
           {/* Structural information — read off the graph, derived from nothing. */}
-          <div style={{ fontFamily: MONO, fontSize: 11, color: "#8b949e", lineHeight: "16px" }}>
+          <div style={{ fontFamily: MONO, fontSize: 11, color: "var(--app-text-muted)", lineHeight: "16px" }}>
             <div>{inspectedNode.stepKind ?? inspectedNode.type}</div>
             <div>
               <Trans id="dashboard.flowGraph.metadata.writes">writes:</Trans>{" "}
@@ -666,7 +693,7 @@ export function FlowGraphView({ graph, pathOverlay, resolveAlternative }: FlowGr
               margin: "10px 0 6px",
               fontFamily: SANS,
               fontSize: 12,
-              color: "#adbac7",
+              color: "var(--app-text-muted)",
             }}
           >
             {t({
@@ -687,9 +714,9 @@ export function FlowGraphView({ graph, pathOverlay, resolveAlternative }: FlowGr
                 fontFamily: MONO,
                 fontSize: 12,
                 padding: "3px 6px",
-                color: "#e6edf3",
-                background: "#0b0f14",
-                border: "1px solid #30363d",
+                color: "var(--app-text)",
+                background: "var(--app-bg)",
+                border: "1px solid var(--app-border)",
                 borderRadius: 4,
               }}
             />

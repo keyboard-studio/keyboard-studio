@@ -867,6 +867,162 @@ describe("classifyStoreSlotEdit — decision table", () => {
 });
 
 // ---------------------------------------------------------------------------
+// 7a. classifyStoreSlotEdit — input-only-match-table (#533 carve gallery
+// over-count: a store like Cameroon's `composed`/`diablock` is referenced by
+// any() but never actually PRODUCED by any rule — its any() reference lives
+// entirely inside a Backspace/Delete repair rule or a bare `context` no-op
+// guard, never a genuine forward-typing rule). Covers BOTH sibling shapes
+// (edit-only trigger AND bare-context guard) and proves a genuine paired
+// input store (dkf/dkt-style: any() paired via a RESOLVED index() output,
+// reached with no edit/undo trigger at all) is NOT over-blocked.
+// ---------------------------------------------------------------------------
+
+describe("classifyStoreSlotEdit — input-only-match-table", () => {
+  it('blocks a store whose ONLY any() reference is inside a Backspace-triggered repair rule (Cameroon composed/comp-dia shape)', () => {
+    const composed: IRStore = {
+      nodeId: "s#composed",
+      name: "composed",
+      items: [{ kind: "char", value: "à" }],
+      isSystem: false,
+    };
+    const compDia: IRStore = {
+      nodeId: "s#comp-dia",
+      name: "comp-dia",
+      items: [{ kind: "char", value: "a" }],
+      isSystem: false,
+    };
+    const rule: IRRule = {
+      nodeId: "rule#bksp",
+      context: [
+        { kind: "any", storeRef: "composed" },
+        { kind: "raw", text: "+" },
+        { kind: "vkey", name: "K_BKSP", modifiers: [] },
+      ],
+      output: [{ kind: "index", storeRef: "comp-dia", offset: 1 }],
+    };
+    const group: IRGroup = { nodeId: "g#0", name: "main", usingKeys: true, rules: [rule], readonly: false };
+    const ir = makeTestIR([group], [composed, compDia]);
+
+    expect(classifyStoreSlotEdit(composed, ir)).toEqual({
+      mode: "blocked",
+      reason: "input-only-match-table",
+    });
+    // The real OUTPUT store (comp-dia) is unaffected — coordinated with
+    // composed, but still a normal drop from its own entry point.
+    expect(classifyStoreSlotEdit(compDia, ir)).toEqual({
+      mode: "drop",
+      coordinatedWith: ["composed"],
+    });
+  });
+
+  it('blocks a store whose ONLY any() reference is inside a bare "context" no-op guard rule (Cameroon diablock shape)', () => {
+    const diablock: IRStore = {
+      nodeId: "s#diablock",
+      name: "diablock",
+      items: [{ kind: "char", value: "°" }],
+      isSystem: false,
+    };
+    const rule: IRRule = {
+      nodeId: "rule#guard",
+      context: [
+        { kind: "any", storeRef: "diablock" },
+        { kind: "raw", text: "+" },
+        { kind: "vkey", name: "K_C", modifiers: ["RALT"] },
+      ],
+      output: [{ kind: "raw", text: "context" }],
+    };
+    const group: IRGroup = { nodeId: "g#0", name: "main", usingKeys: true, rules: [rule], readonly: false };
+    const ir = makeTestIR([group], [diablock]);
+
+    expect(classifyStoreSlotEdit(diablock, ir)).toEqual({
+      mode: "blocked",
+      reason: "input-only-match-table",
+    });
+  });
+
+  it("does NOT block a dkf/dkt-style paired input store — its any() reference has no `+` at all, so it is never flagged edit-only (do not over-block)", () => {
+    const ir = makeBaseIr();
+    const dkf = ir.stores.find((s) => s.name === "dkfX")!;
+    const dkt = ir.stores.find((s) => s.name === "dktX")!;
+    expect(classifyStoreSlotEdit(dkf, ir)).toEqual({ mode: "drop", coordinatedWith: ["dktX"] });
+    expect(classifyStoreSlotEdit(dkt, ir)).toEqual({ mode: "drop", coordinatedWith: ["dkfX"] });
+  });
+
+  it("does NOT block a store that is itself an index()/outs() output target, even if it also has an edit-only any() reference elsewhere", () => {
+    const store: IRStore = {
+      nodeId: "s#both",
+      name: "bothStore",
+      items: [{ kind: "char", value: "a" }],
+      isSystem: false,
+    };
+    const bkspRule: IRRule = {
+      nodeId: "rule#bksp",
+      context: [
+        { kind: "any", storeRef: "bothStore" },
+        { kind: "raw", text: "+" },
+        { kind: "vkey", name: "K_BKSP", modifiers: [] },
+      ],
+      output: [{ kind: "raw", text: "context" }],
+    };
+    const emitRule: IRRule = {
+      nodeId: "rule#emit",
+      context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
+      output: [{ kind: "outs", storeRef: "bothStore" }],
+    };
+    const group: IRGroup = {
+      nodeId: "g#0",
+      name: "main",
+      usingKeys: true,
+      rules: [bkspRule, emitRule],
+      readonly: false,
+    };
+    const ir = makeTestIR([group], [store]);
+    // Blocked, but for the PRE-EXISTING outs() reason, not input-only-match-table —
+    // asIndexOutputTarget is true, so the new check never fires for this store.
+    expect(classifyStoreSlotEdit(store, ir)).toEqual({
+      mode: "blocked",
+      reason: "outs-reference-unanalyzed",
+    });
+  });
+
+  it("does NOT block a store with a Backspace-triggered any() reference AND a genuine forward-typing any() reference elsewhere (mixed usage stays editable)", () => {
+    const store: IRStore = {
+      nodeId: "s#mixed",
+      name: "mixedStore",
+      items: [{ kind: "char", value: "a" }],
+      isSystem: false,
+    };
+    const bkspRule: IRRule = {
+      nodeId: "rule#bksp",
+      context: [
+        { kind: "any", storeRef: "mixedStore" },
+        { kind: "raw", text: "+" },
+        { kind: "vkey", name: "K_BKSP", modifiers: [] },
+      ],
+      output: [{ kind: "raw", text: "context" }],
+    };
+    const typingRule: IRRule = {
+      nodeId: "rule#typing",
+      context: [
+        { kind: "any", storeRef: "mixedStore" },
+        { kind: "raw", text: "+" },
+        { kind: "vkey", name: "K_X", modifiers: [] },
+      ],
+      output: [{ kind: "char", value: "y" }],
+    };
+    const group: IRGroup = {
+      nodeId: "g#0",
+      name: "main",
+      usingKeys: true,
+      rules: [bkspRule, typingRule],
+      readonly: false,
+    };
+    const ir = makeTestIR([group], [store]);
+    expect(classifyStoreSlotEdit(store, ir)).toEqual({ mode: "drop", coordinatedWith: [] });
+  });
+});
+
+// ---------------------------------------------------------------------------
 // 7b. describeStorePairing — the single source of truth for "Linked pair"
 // style display (studio Inspector), covering the four cases: none, self,
 // cross, unresolved.

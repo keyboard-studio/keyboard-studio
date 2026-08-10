@@ -90,6 +90,19 @@ function arrayValue(v: string | string[] | undefined): string[] {
   return Array.isArray(v) ? v : [];
 }
 
+// Epic #533: the question prompt is the type-hierarchy anchor a step's card
+// content — bumped from the ui/Label.tsx default (13px, shared by every
+// other label in the app) up to a real prompt size. Applied here (an
+// override via Label's own `style` pass-through) rather than in Label.tsx
+// itself, since that primitive is used well beyond the survey and its
+// default size is correct for those call sites.
+const QUESTION_PROMPT_STYLE: React.CSSProperties = {
+  fontSize: 18,
+  fontWeight: 600,
+  color: "var(--app-text)",
+  lineHeight: 1.3,
+};
+
 // ---------------------------------------------------------------------------
 // Text / short_text  →  ui TextField / Textarea
 // ---------------------------------------------------------------------------
@@ -561,18 +574,22 @@ function StyledCombobox({
     }
   }
 
-  // Issue #536: sized to --control-h (34px) instead of a fixed padded box;
-  // `.ks-control .ks-focus-ring .ks-hit-target` (index.css) give this the
-  // same accent-ring focus + >=44px touch target as every other single-line
-  // control (TextField, Dropdown).
+  // Epic #533: fixed 42px height + 15px type, matching the rest of the
+  // design system's text inputs (was --control-h's 34px/14px). The focus
+  // ring itself still comes from `.ks-focus-ring:focus-visible` (index.css) —
+  // it already reads var(--app-accent) / var(--app-accent-ring), so no
+  // inline focus style is needed here; `.ks-hit-target` still gives this the
+  // same >=44px touch target as every other single-line control (TextField,
+  // Dropdown).
   const inputStyle: React.CSSProperties = {
     width: "100%",
-    padding: "0 10px",
-    background: "#0d1117",
-    border: "1px solid #30363d",
-    borderRadius: 6,
-    color: "#e6edf3",
-    fontSize: 14,
+    height: 42,
+    padding: "0 12px",
+    background: "var(--app-surface)",
+    border: "1px solid var(--app-border-strong)",
+    borderRadius: "var(--app-radius-sm)",
+    color: "var(--app-text)",
+    fontSize: 15,
     fontFamily: "inherit",
     boxSizing: "border-box",
     outline: "none",
@@ -615,12 +632,12 @@ function StyledCombobox({
             margin: 0,
             padding: 4,
             listStyle: "none",
-            background: "#161b22",
-            border: "1px solid #30363d",
-            borderRadius: 6,
+            background: "var(--app-overlay)",
+            border: "1px solid var(--app-border)",
+            borderRadius: "var(--app-radius-sm)",
             maxHeight: 240,
             overflowY: "auto",
-            boxShadow: "0 6px 20px rgba(0,0,0,0.4)",
+            boxShadow: "var(--app-shadow-pop)",
           }}
         >
           {options.map((opt, i) => (
@@ -642,8 +659,8 @@ function StyledCombobox({
                 borderRadius: 4,
                 cursor: "pointer",
                 fontSize: 13,
-                color: "#e6edf3",
-                background: i === highlight ? "#1f6feb" : "transparent",
+                color: i === highlight ? "var(--app-accent-text)" : "var(--app-text)",
+                background: i === highlight ? "var(--app-accent-subtle)" : "transparent",
               }}
             >
               {opt.label}
@@ -879,11 +896,17 @@ export function QuestionField({
             as="span"
             id={`label-${question.id}`}
             required={question.required === true}
+            style={QUESTION_PROMPT_STYLE}
           >
             {labelText}
           </Label>
         ) : (
-          <Label id={`label-${question.id}`} htmlFor={question.id} required={question.required === true}>
+          <Label
+            id={`label-${question.id}`}
+            htmlFor={question.id}
+            required={question.required === true}
+            style={QUESTION_PROMPT_STYLE}
+          >
             {labelText}
           </Label>
         );

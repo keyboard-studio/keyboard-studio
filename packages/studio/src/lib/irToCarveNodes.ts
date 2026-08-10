@@ -735,6 +735,12 @@ function blockReasonToDisabledReason(reason: StoreSlotBlockReason): string {
       return "This store is passed to another group's rules via outs() — removing a character here could break a mechanism hidden behind that hand-off, so it isn't safe to prove yet.";
     case 'system-store':
       return "This is a system store the compiler manages directly — it isn't meant to be edited here.";
+    case 'input-only-match-table':
+      // Not surfaced today: storeCharChips omits chips for this reason entirely
+      // (the gallery's promise is characters the keyboard can TYPE, and this
+      // store's items never are) rather than showing a disabled explanation.
+      // Case kept so this switch stays exhaustive over StoreSlotBlockReason.
+      return "This store only matches already-typed text (e.g. a Backspace repair or a no-op guard rule) — it never produces a character, so it isn't shown here.";
   }
 }
 
@@ -752,6 +758,14 @@ export function storeCharChips(store: IRStore, ir: KeyboardIR, analysis?: StoreA
     ? classifyStoreSlotEdit(store, ir, analysis)
     : classifyStoreSlotEdit(store, ir);
   const chips: StoreCharChip[] = [];
+
+  // 'input-only-match-table' items are never emitted by any rule (a match
+  // table over already-typed buffer content, e.g. a Backspace repair source)
+  // — omitted entirely rather than shown disabled, since the gallery's promise
+  // is "characters this keyboard can produce" and these never are (see report).
+  if (editMode.mode === 'blocked' && editMode.reason === 'input-only-match-table') {
+    return chips;
+  }
 
   store.items.forEach((item, itemsIndex) => {
     if (item.kind !== 'char') return;
