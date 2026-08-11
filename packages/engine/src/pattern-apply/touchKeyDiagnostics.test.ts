@@ -31,6 +31,7 @@ import type {
 import {
   findCrowdedTouchRows,
   findHalfDoneSuppressions,
+  findKeycapMismatches,
   findLayerSwitchActiveMismatches,
   findMixedSuppressRemove,
   type CompleteSuppressionFix,
@@ -39,7 +40,8 @@ import {
   type TrimRowFix,
 } from "./touchKeyDiagnostics.js";
 import type { KeyEditOverlay, RemoveKeyOp, SuppressKeyOp } from "./keyEditOps.js";
-import { touchKeyAddress } from "./touchKeyAddress.js";
+import { resolveKeyAddress } from "./keyEditOps.js";
+import { parseTouchKeyAddress, touchKeyAddress } from "./touchKeyAddress.js";
 
 // ---------------------------------------------------------------------------
 // Small local helpers
@@ -462,6 +464,54 @@ describe("findCrowdedTouchRows", () => {
     expect(finding?.address).toBe(touchKeyAddress("phone", "default", "U_61"));
   });
 
+  it("anchors by OCCURRENCE when the anchor's id repeats earlier in the layer", () => {
+    // Two crowded rows whose first key carries the same id as an earlier key —
+    // the routine case, since a row often begins with a `T_BLANK`/`T_SPACER`.
+    // A bare address would send `resolveKeyAddress` to row 0's key, in an
+    // uncrowded row, and the studio's `trimRow` handler navigates purely off it.
+    const layout: TouchLayoutIR = {
+      platforms: [
+        {
+          id: "phone",
+          layers: [
+            {
+              id: "default",
+              rows: [{ keys: letters(4) }, { keys: letters(11) }, { keys: letters(13) }],
+            },
+          ],
+        },
+      ],
+      nodeIds: [],
+    };
+    const findings = findCrowdedTouchRows(layout);
+    expect(findings.map((f) => f.address)).toEqual([
+      touchKeyAddress("phone", "default", "U_61", 1),
+      touchKeyAddress("phone", "default", "U_61", 2),
+    ]);
+    // The fix's own address is the same one — the studio reads it, not the finding's.
+    expect(findings.map((f) => (f.fixes[0] as TrimRowFix).address)).toEqual(
+      findings.map((f) => f.address),
+    );
+  });
+
+  it("resolves an occurrence-bearing anchor back to the crowded row's own key", () => {
+    const layout: TouchLayoutIR = {
+      platforms: [
+        {
+          id: "phone",
+          layers: [
+            { id: "default", rows: [{ keys: letters(4) }, { keys: letters(11) }] },
+          ],
+        },
+      ],
+      nodeIds: [],
+    };
+    const finding = findCrowdedTouchRows(layout)[0];
+    const parts = parseTouchKeyAddress(finding?.address ?? "");
+    expect(parts).toBeDefined();
+    expect(resolveKeyAddress(layout, parts!)?.rowIndex).toBe(1);
+  });
+
   it("reports each offending row with its own index and leaves compliant rows alone", () => {
     const layout: TouchLayoutIR = {
       platforms: [
@@ -482,6 +532,61 @@ describe("findCrowdedTouchRows", () => {
     expect(findings.map((f) => (f.fixes[0] as TrimRowFix).overBy)).toEqual([1, 3]);
   });
 
+  it("reports nothing for an empty row rather than throwing on a missing anchor", () => {
+    const layout: TouchLayoutIR = {
+      platforms: [{ id: "phone", layers: [{ id: "default", rows: [{ keys: [] }] }] }],
+      nodeIds: [],
+    };
+    expect(findCrowdedTouchRows(layout)).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findKeycapMismatches — the engine-side sibling of the occurrence-bearing
+// addresses every contracts detector now builds. Its `setKeycap` fix MUTATES
+// the key at its address, so a bare address for a repeated id would relabel
+// the wrong copy.
+// ---------------------------------------------------------------------------
+
+describe("findKeycapMismatches addresses the copy it found", () => {
+  it("names the occurrence when the mismatched key's id repeats in the layer", () => {
+    const layout: TouchLayoutIR = {
+      platforms: [
+        {
+          id: "phone",
+          layers: [
+            {
+              id: "default",
+              rows: [
+                {
+                  keys: [
+                    // Correctly labelled — no finding, but it still counts.
+                    key("T_A", { sp: 0, output: "a", text: "a" }),
+                    // Same id, stale keycap: this is the one to relabel.
+                    key("T_A", { sp: 0, output: "a", text: "z" }),
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      nodeIds: [],
+    };
+    const findings = findKeycapMismatches({
+      ir: { raw: [] } as unknown as Parameters<typeof findKeycapMismatches>[0]["ir"],
+      layout,
+      ruleIndex: emptyRuleIndex(),
+    });
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.address).toBe(touchKeyAddress("phone", "default", "T_A", 1));
+    expect((findings[0]?.fixes[0] as { address: string }).address).toBe(
+      touchKeyAddress("phone", "default", "T_A", 1),
+    );
+  });
+});
+
+describe("findCrowdedTouchRows — degenerate input", () => {
   it("reports nothing for an empty row rather than throwing on a missing anchor", () => {
     const layout: TouchLayoutIR = {
       platforms: [{ id: "phone", layers: [{ id: "default", rows: [{ keys: [] }] }] }],

@@ -66,6 +66,7 @@
 
 import {
   computeTouchKeyDiagnostics,
+  createKeyOccurrenceCounter,
   parseTouchKeyAddress,
   producedByKeyId,
   touchKeyAddress,
@@ -237,8 +238,14 @@ export function findKeycapMismatches(
 
   for (const platform of layout.platforms) {
     for (const layer of platform.layers) {
+      // One counter per layer, tallying EVERY key row-major — the same walk
+      // order `resolveKeyAddress` uses. The `setKeycap` fix below mutates the
+      // key at its address, and a bare address for an id that repeats in the
+      // layer resolves to the first such key, not this one.
+      const nextOccurrence = createKeyOccurrenceCounter();
       for (const row of layer.rows) {
         for (const key of row.keys) {
+          const occurrence = nextOccurrence(key.id ?? "");
           // Gate 1 — character keys only. An ABSENT `sp` is a character key.
           if (key.sp !== undefined && key.sp !== 0) continue;
 
@@ -269,13 +276,13 @@ export function findKeycapMismatches(
           findings.push({
             code: "TOUCH_KEY_KEYCAP_MISMATCH",
             severity: "hint",
-            address: touchKeyAddress(platform.id, layer.id, key.id ?? ""),
+            address: touchKeyAddress(platform.id, layer.id, key.id ?? "", occurrence),
             scope: "key",
             fields: { keycap, output },
             fixes: [
               {
                 kind: "setKeycap",
-                address: touchKeyAddress(platform.id, layer.id, key.id ?? ""),
+                address: touchKeyAddress(platform.id, layer.id, key.id ?? "", occurrence),
                 proposed,
               },
             ],
