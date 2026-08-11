@@ -91,10 +91,13 @@ describe("output projection completes the scaffold stubs (Track 1)", () => {
 
     const projected = await projectWorkingCopyForOutput();
     expect(projected).not.toBeNull();
-    // welcome.htm is the stub-only artifact: step 5b writes it, nothing else
-    // does, so its absence is what "generateStubs did not run" looks like from
-    // the delivered tree.
-    expect(readVfsText(projected!.vfs, "source/welcome.htm")).toBeUndefined();
+    // LICENSE.md is the stub-only artifact now: step 5c (spec 061) writes
+    // welcome.htm/readme.htm/README.md/help.php on EVERY track (falling back
+    // to the same placeholder text generateStubs used to write), so those
+    // paths' presence no longer distinguishes the tracks. LICENSE.md is
+    // untouched by step 5c, so its absence is what "generateStubs did not
+    // run" looks like from the delivered tree.
+    expect(readVfsText(projected!.vfs, "LICENSE.md")).toBeUndefined();
     // The .kps is NOT a counter-example. Step 5b still skips this track; the
     // descriptor here comes from step 3.6, which runs on BOTH tracks
     // (spec 059 FR-006). It cannot mask imported package metadata — the
@@ -106,5 +109,64 @@ describe("output projection completes the scaffold stubs (Track 1)", () => {
     const kps = readVfsText(projected!.vfs, `source/${keyboardId}.kps`);
     expect(kps).toBeDefined();
     expect(kps).toContain(`<ID>${keyboardId}</ID>`);
+  });
+});
+
+// spec 061 US1: the required Phase F answer reaches every shipped doc file,
+// and the placeholder fallback is untouched when the author never answered.
+describe("output projection regenerates help docs from helpDocs (spec 061)", () => {
+  it("carries the description into all 4 files when helpDocs is set (FR-001/SC-001)", async () => {
+    const keyboardId = basicKbdus.id;
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: makeFetchedVfs(keyboardId), ir: makeTestIR([]) });
+    useWorkingCopyStore.getState().setHelpDocs({
+      description: "A keyboard for testing.",
+      usageTips: [],
+    });
+
+    const projected = await projectWorkingCopyForOutput();
+    expect(projected).not.toBeNull();
+
+    expect(readVfsText(projected!.vfs, "README.md")).toContain("A keyboard for testing.");
+    expect(readVfsText(projected!.vfs, "source/readme.htm")).toContain("A keyboard for testing.");
+    expect(readVfsText(projected!.vfs, "source/welcome.htm")).toContain("A keyboard for testing.");
+    expect(readVfsText(projected!.vfs, `source/help/${keyboardId}.php`)).toContain(
+      "A keyboard for testing.",
+    );
+  });
+
+  it("falls back to today's exact placeholders when helpDocs is null (FR-002)", async () => {
+    const keyboardId = basicKbdus.id;
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: makeFetchedVfs(keyboardId), ir: makeTestIR([]) });
+
+    const projected = await projectWorkingCopyForOutput();
+    expect(projected).not.toBeNull();
+
+    expect(readVfsText(projected!.vfs, "README.md")).toBe(`# ${basicKbdus.displayName}\n`);
+    expect(readVfsText(projected!.vfs, "source/welcome.htm")).toBe(
+      `<html><body><p>Welcome to ${basicKbdus.displayName}</p></body></html>`,
+    );
+    expect(readVfsText(projected!.vfs, `source/help/${keyboardId}.php`)).toBe(
+      `<?php /* ${basicKbdus.displayName} help */ ?>`,
+    );
+  });
+
+  it("regenerates from a REVISED answer on the next production (FR-010/SC-004)", async () => {
+    const keyboardId = basicKbdus.id;
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: makeFetchedVfs(keyboardId), ir: makeTestIR([]) });
+    useWorkingCopyStore.getState().setHelpDocs({ description: "First answer.", usageTips: [] });
+    await projectWorkingCopyForOutput();
+
+    useWorkingCopyStore.getState().setHelpDocs({ description: "Revised answer.", usageTips: [] });
+    const second = await projectWorkingCopyForOutput();
+
+    const welcome = readVfsText(second!.vfs, "source/welcome.htm");
+    expect(welcome).toContain("Revised answer.");
+    expect(welcome).not.toContain("First answer.");
   });
 });

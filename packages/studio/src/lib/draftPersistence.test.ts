@@ -1192,6 +1192,63 @@ describe("draftPersistence", () => {
       expect(rec.displayName).toBe("My Custom Keyboard");
       expect(rec.languageTag).toBe("yo-Latn");
     });
+
+    // #1578: a same-session switch (no intervening reload) between a
+    // Track-1 scaffolded project (A, whose label comes from
+    // surveySessionStore.scaffoldSpec — deriveProjectLabel's tier 1) and a
+    // plain adapted project (B, whose label falls back to the base's own
+    // displayName) must not let A's scaffoldSpec leak into B's derived
+    // label. `envelope.traversal` (snapshotTraversal/applyTraversalSnapshot)
+    // already carries `scaffoldSpec` as part of its broader
+    // SurveySessionData snapshot and fully overwrites it on every
+    // `loadDraft` call — this pins that behavior so it can't silently
+    // regress.
+    it("switching FROM a Track-1 scaffolded project TO a plain one, in one session, does not leak the former's scaffoldSpec into the latter's label", () => {
+      instantiateMinimal("proj_a");
+      useSurveySessionStore.getState().setScaffoldSpec({
+        keyboardId: "proj_a",
+        displayName: "Testish Keyboard",
+      });
+      saveDraft("proj_a");
+      expect(
+        (JSON.parse(localStorage.getItem(draftKey("proj_a"))!) as DurableDraft).displayName,
+      ).toBe("Testish Keyboard");
+
+      useWorkingCopyStore.getState().reset();
+      useSurveySessionStore.getState().reset();
+      const baseB = {
+        id: "proj_b",
+        displayName: "French Basic",
+        languages: [],
+      } as unknown as BaseKeyboard;
+      useWorkingCopyStore.getState().instantiateFromBase(baseB, {
+        vfs: createVirtualFS([]),
+        ir: makeMinimalIr(),
+      });
+      saveDraft("proj_b");
+      expect(
+        (JSON.parse(localStorage.getItem(draftKey("proj_b"))!) as DurableDraft).displayName,
+      ).toBe("French Basic");
+
+      // The same-session switch: resume A, then resume B — as "My
+      // keyboards"'s Resume action does, with no reload in between.
+      expect(loadDraft("proj_a")).toBe(true);
+      expect(useSurveySessionStore.getState().scaffoldSpec?.displayName).toBe("Testish Keyboard");
+
+      expect(loadDraft("proj_b")).toBe(true);
+      // B never scaffolded — its own record has no scaffoldSpec, so resuming
+      // it must clear A's leftover, not leave it standing.
+      expect(useSurveySessionStore.getState().scaffoldSpec).toBeNull();
+
+      saveDraft("proj_b");
+      expect(
+        (JSON.parse(localStorage.getItem(draftKey("proj_b"))!) as DurableDraft).displayName,
+      ).toBe("French Basic");
+
+      // Switching back confirms A's own record was never touched either.
+      expect(loadDraft("proj_a")).toBe(true);
+      expect(useSurveySessionStore.getState().scaffoldSpec?.displayName).toBe("Testish Keyboard");
+    });
   });
 
   // ---------------------------------------------------------------------------

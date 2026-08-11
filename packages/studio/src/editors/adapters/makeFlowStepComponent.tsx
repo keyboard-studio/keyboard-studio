@@ -30,7 +30,7 @@ import { useMemo, useRef, useCallback } from "react";
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
-import type { SurveyPhaseResult, LintFinding } from "@keyboard-studio/contracts";
+import type { SurveyPhaseResult, LintFinding, HelpDocsAnswers } from "@keyboard-studio/contracts";
 import { resolveMessage } from "../../lib/i18nResolve.ts";
 import { FlowStepHost } from "../../survey/FlowStepHost.tsx";
 import { loadModularFlow } from "../../survey/loadModularFlow.ts";
@@ -103,6 +103,13 @@ export interface FlowStepDeps {
    * the identity-derived default once it is set (flowStepOptions.tsx).
    */
   scaffoldSpec: { keyboardId: string; displayName: string } | null;
+  /**
+   * Record (or clear) the author's Phase F help-docs answers (spec 061).
+   * phaseFOptions.onCommit calls this with `extractHelpDocs`'s result whenever
+   * it successfully extracts a required description — mirrors `setIdentity`'s
+   * store-write role above, for the help-docs feature's own field.
+   */
+  setHelpDocs: (patch: HelpDocsAnswers | null) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -197,6 +204,7 @@ export function makeFlowStepComponent<Extracted>(
     const setSelectedTrack = useSurveySessionStore((s) => s.setSelectedTrack);
     const setScaffoldSpec = useSurveySessionStore((s) => s.setScaffoldSpec);
     const setStoreIdentity = useWorkingCopyStore((s) => s.setIdentity);
+    const setHelpDocs = useWorkingCopyStore((s) => s.setHelpDocs);
     const selectedTrack = useSurveySessionStore((s) => s.selectedTrack);
     const scaffoldSpec = useSurveySessionStore((s) => s.scaffoldSpec);
 
@@ -224,6 +232,7 @@ export function makeFlowStepComponent<Extracted>(
       displayNameRef,
       selectedTrack,
       scaffoldSpec,
+      setHelpDocs,
     };
 
     // Context derived from current deps.

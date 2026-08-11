@@ -130,6 +130,36 @@ describe("buildKpsContent — escaping (contract §3)", () => {
   });
 });
 
+describe("buildKpsContent — <WebSite> (spec 061 FR-012, research D-06)", () => {
+  it("emits <WebSite> from websiteUrl, URL duplicated as attribute and text", () => {
+    const kps = buildKpsContent(
+      "bm_sil",
+      { displayName: "Bambara", websiteUrl: "https://example.com" },
+      KMN,
+    );
+    expect(kps).toContain(
+      '<WebSite URL="https://example.com">https://example.com</WebSite>',
+    );
+  });
+
+  it("omits <WebSite> entirely when websiteUrl is absent or blank", () => {
+    expect(buildKpsContent("bm_sil", { displayName: "Bambara" }, KMN)).not.toContain("WebSite");
+    expect(
+      buildKpsContent("bm_sil", { displayName: "Bambara", websiteUrl: "   " }, KMN),
+    ).not.toContain("WebSite");
+  });
+
+  it("escapes the URL", () => {
+    const kps = buildKpsContent(
+      "bm_sil",
+      { displayName: "Bambara", websiteUrl: "https://example.com/?a=1&b=2" },
+      KMN,
+    );
+    expect(kps).toContain("https://example.com/?a=1&amp;b=2");
+    expect(kps).not.toMatch(/&(?!amp;|lt;|gt;|quot;|#39;)/);
+  });
+});
+
 describe("buildKpsContent — the parts this feature does NOT own (contract §2)", () => {
   it("keeps the Files list derived from the emitted .kmn's targets", () => {
     const kps = buildKpsContent("bm_sil", { displayName: "Bambara" }, KMN);
@@ -160,5 +190,11 @@ describe("buildKpsContent — the parts this feature does NOT own (contract §2)
     expect(kps).toContain("<ReadMeFile>readme.htm</ReadMeFile>");
     expect(kps).toContain("<WelcomeFile>welcome.htm</WelcomeFile>");
     expect(kps.startsWith('<?xml version="1.0" encoding="utf-8"?>')).toBe(true);
+  });
+
+  it("lists LICENSE.md in <Files>, one level above this .kps's own source/ directory (criterion 8.4)", () => {
+    const kps = buildKpsContent("bm_sil", { displayName: "Bambara" }, KMN);
+    expect(kps).toContain("<Name>..\\LICENSE.md</Name>");
+    expect(kps).toMatch(/<Name>\.\.\\LICENSE\.md<\/Name>\s*<FileType>\.md<\/FileType>/);
   });
 });

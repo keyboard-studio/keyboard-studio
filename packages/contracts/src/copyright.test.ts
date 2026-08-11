@@ -9,6 +9,7 @@ import {
   parseCopyright,
   renderLicense,
   renderHolderLine,
+  renderHolderLineNoYear,
   orderHolders,
   addHolder,
   dedupeHolders,
@@ -159,6 +160,42 @@ describe("renderHolderLine — year forms (contract P6)", () => {
   });
   it("renders three or more years as a comma list", () => {
     expect(renderHolderLine(h([2016, 2019, 2024]))).toBe("Copyright © 2016, 2019, 2024 Foo");
+  });
+});
+
+describe("renderHolderLineNoYear — the .kmn/.kps metadata mirror (criterion 4.6, #1545)", () => {
+  const h = (years: number[]): CopyrightHolder => ({
+    name: "Foo",
+    years,
+    marker: "©",
+    inherited: false,
+  });
+
+  it("omits the year even when the holder has one", () => {
+    expect(renderHolderLineNoYear(h([2016]))).toBe("Copyright © Foo");
+  });
+
+  it("omits a year range the same way", () => {
+    expect(renderHolderLineNoYear(h([2016, 2021]))).toBe("Copyright © Foo");
+  });
+
+  it("does not fall back to the verbatim raw line, unlike renderHolderLine", () => {
+    // A raw line with a year must NOT leak through — that's the whole point:
+    // renderHolderLine would return `raw` verbatim (see its own contract),
+    // which is exactly the year-bearing text this function exists to avoid.
+    const withRaw: CopyrightHolder = {
+      name: "Foo",
+      years: [2016],
+      marker: "©",
+      inherited: true,
+      raw: "Copyright © 2016 Foo",
+    };
+    expect(renderHolderLine(withRaw)).toBe("Copyright © 2016 Foo");
+    expect(renderHolderLineNoYear(withRaw)).toBe("Copyright © Foo");
+  });
+
+  it("preserves the marker style", () => {
+    expect(renderHolderLineNoYear({ ...h([2016]), marker: "(c)" })).toBe("Copyright (c) Foo");
   });
 });
 

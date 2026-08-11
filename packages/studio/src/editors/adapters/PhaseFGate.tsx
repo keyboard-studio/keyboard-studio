@@ -29,6 +29,7 @@ import { useInventoryCoverageGate } from "../../hooks/useInventoryCoverageGate.t
 import { formatCoverageBannerParts } from "../../lib/unimplementedInventory.ts";
 import { ConfirmDialog } from "../assignLoop/parts/ConfirmDialog.tsx";
 import { PhaseFStepFactoryComponent } from "./flowStepOptions.tsx";
+import { DocsPreviewPanel } from "../../components/DocsPreviewPanel.tsx";
 import type { EditorStepProps } from "../../steps/types.ts";
 
 export function PhaseFGate(props: EditorStepProps): React.ReactElement {
@@ -80,6 +81,7 @@ export function PhaseFGate(props: EditorStepProps): React.ReactElement {
   return (
     <>
       <PhaseFStepFactoryComponent {...props} />
+      <DocsPreviewPanel />
       <ConfirmDialog
         open={blocked}
         title={t({

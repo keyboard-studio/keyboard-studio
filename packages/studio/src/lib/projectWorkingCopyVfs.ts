@@ -223,6 +223,12 @@ export type IdentityOverlay = {
    * it to is out of scope, so this never reaches the `.kmn`.
    */
   languageName?: string;
+  /**
+   * The project link, written into the descriptor's `<WebSite>` element
+   * (spec 061 FR-012). Sourced from `HelpDocsAnswers.projectHomeUrl` only —
+   * never the help-page line (research D-06). Omitted entirely when absent.
+   */
+  websiteUrl?: string;
 };
 
 export interface ProjectWorkingCopyVfsResult {
@@ -666,6 +672,9 @@ export function projectWorkingCopyVfs(
         : {}),
       ...(identity.languageName !== undefined && identity.languageName !== ""
         ? { languageName: identity.languageName }
+        : {}),
+      ...(identity.websiteUrl !== undefined && identity.websiteUrl !== ""
+        ? { websiteUrl: identity.websiteUrl }
         : {}),
     };
     // `applyIdentityToKps` never throws — an absent or unreadable descriptor
