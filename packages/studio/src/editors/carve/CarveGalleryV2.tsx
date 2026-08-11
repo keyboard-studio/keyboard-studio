@@ -313,7 +313,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
             border: '1px solid var(--app-border-strong)', borderRadius: 8, background: 'var(--app-surface-2)',
           }}
         >
-          <legend style={{ font: '600 10.5px var(--app-font)', letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--app-text-subtle)', padding: '0 6px 0 0' }}>
+          <legend style={{ font: '600 10.5px var(--app-font)', letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--app-text-muted)', padding: '0 6px 0 0' }}>
             Group by
           </legend>
           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, font: '600 12px var(--app-font)', color: groupBy === 'category' ? 'var(--app-accent-text)' : 'var(--app-text-muted)', cursor: 'pointer' }}>
@@ -492,7 +492,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                   <span style={{
                     display: 'inline-flex', alignItems: 'center', font: '600 11.5px var(--app-font)',
                     padding: '3px 9px', borderRadius: 999,
-                    color: cell.inAlpha ? '#fff' : 'var(--app-text-subtle)',
+                    color: cell.inAlpha ? '#fff' : 'var(--app-text-muted)',
                     background: cell.inAlpha ? 'var(--sil-green)' : 'var(--app-surface-2)',
                     border: cell.inAlpha ? 'none' : '1px solid var(--app-border-strong)',
                   }}>
@@ -507,9 +507,9 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                   style={{
                     width: '100%', font: '600 13px var(--app-font)', cursor: toggleable ? 'pointer' : 'default',
                     padding: '9px 14px', borderRadius: 8, opacity: toggleable ? 1 : 0.5,
-                    color: discarded ? '#fff' : 'var(--app-danger)',
+                    color: discarded ? '#fff' : 'var(--danger-text)',
                     background: discarded ? 'var(--sil-green)' : 'transparent',
-                    border: discarded ? 'none' : '1px solid var(--app-danger)',
+                    border: discarded ? 'none' : '1px solid var(--danger-text)',
                   }}
                 >
                   {discarded ? 'Restore this character' : 'Discard this character'}

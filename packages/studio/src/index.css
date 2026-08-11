@@ -18,6 +18,10 @@
   --green:         #3fb950;
   --green-hover:   #56d364;
   --danger:        #f24e3c;
+  /* Lighter danger variant for text/borders directly on --app-bg/--card-2
+     (spec 056, #1619) — --danger itself is 4.35:1 there, just under the
+     4.5:1 AA text threshold; mirrors the --amber/--amber-text pattern. */
+  --danger-text:   #f4695a;
   --danger-bg:     rgba(242,78,60,0.12);
   --ui:      'Source Sans 3', system-ui, -apple-system, sans-serif;
   --display: 'Playfair Display', Georgia, serif;
