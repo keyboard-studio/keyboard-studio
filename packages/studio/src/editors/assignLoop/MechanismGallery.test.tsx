@@ -1402,8 +1402,8 @@ describe("MechanismGallery — Existing methods SHOW-ALL (composition + floor)",
     });
     // GREEN (produced), not blue — composition rows produce the character;
     // color tracks produced-vs-used, not deletability.
-    expect(compositionRow!.style.color).toBe("rgb(86, 211, 100)"); // #56d364
-    expect(compositionRow!.style.backgroundColor).toBe("rgb(13, 34, 24)"); // #0d2218
+    expect(compositionRow!.style.color).toBe("var(--app-success-text)"); // --app-success-text token (epic #533)
+    expect(compositionRow!.style.background).toBe("var(--app-success-bg)"); // GREEN_CHIP_BG shorthand (epic #533)
     // Static: a <span>, not a <button> — no delete affordance at all.
     expect(compositionRow!.tagName).toBe("SPAN");
     expect(compositionRow!.textContent).toBe("U + ◌̂ → Û - NOT DELETABLE"); // real path + suffix, no "×"
@@ -1461,8 +1461,8 @@ describe("MechanismGallery — Existing methods SHOW-ALL (composition + floor)",
       blockedRow = screen.getByText("Bundled with other output — can't remove z alone - NOT DELETABLE");
       expect(blockedRow).toBeTruthy();
     });
-    expect(blockedRow!.style.color).toBe("rgb(86, 211, 100)"); // #56d364 — GREEN, not blue
-    expect(blockedRow!.style.backgroundColor).toBe("rgb(13, 34, 24)"); // #0d2218
+    expect(blockedRow!.style.color).toBe("var(--app-success-text)"); // GREEN, not blue (--app-success-text token, epic #533)
+    expect(blockedRow!.style.background).toBe("var(--app-success-bg)"); // GREEN_CHIP_BG shorthand (epic #533)
     expect(blockedRow!.tagName).toBe("SPAN");
     expect(
       screen.queryByRole("button", { name: /Remove existing method/i }),
@@ -1520,8 +1520,8 @@ describe("MechanismGallery — Existing methods SHOW-ALL (composition + floor)",
       );
       expect(floorRow).toBeTruthy();
     });
-    expect(floorRow!.style.color).toBe("rgb(86, 211, 100)"); // #56d364 — GREEN, not blue
-    expect(floorRow!.style.backgroundColor).toBe("rgb(13, 34, 24)"); // #0d2218
+    expect(floorRow!.style.color).toBe("var(--app-success-text)"); // GREEN, not blue (--app-success-text token, epic #533)
+    expect(floorRow!.style.background).toBe("var(--app-success-bg)"); // GREEN_CHIP_BG shorthand (epic #533)
     expect(floorRow!.tagName).toBe("SPAN");
     expect(
       screen.queryByRole("button", { name: /Remove existing method/i }),
@@ -1649,8 +1649,8 @@ describe("MechanismGallery — Existing methods curation (producedRole + keystro
     });
     // GREEN, and it genuinely carries the delete affordance — the "×" glyph
     // plus a working onClick, not just the right color.
-    expect(deleteButton!.style.color).toBe("rgb(86, 211, 100)"); // #56d364
-    expect(deleteButton!.style.backgroundColor).toBe("rgb(13, 34, 24)"); // #0d2218
+    expect(deleteButton!.style.color).toBe("var(--app-success-text)"); // --app-success-text token (epic #533)
+    expect(deleteButton!.style.background).toBe("var(--app-success-bg)"); // GREEN_CHIP_BG shorthand (epic #533)
     expect(deleteButton!.textContent).toContain("×");
     fireEvent.click(deleteButton!);
     await waitFor(() => {
@@ -1704,8 +1704,8 @@ describe("MechanismGallery — Existing methods curation (producedRole + keystro
     });
     // BLUE — this row only USES "z" as input (a deadkey base), it never
     // produces it, so it gets the one color reserved for "used" rows.
-    expect(usedRow!.style.color).toBe("rgb(88, 166, 255)"); // #58a6ff
-    expect(usedRow!.style.backgroundColor).toBe("rgb(28, 42, 58)"); // #1c2a3a
+    expect(usedRow!.style.color).toBe("var(--app-accent-text)"); // BLUE_CHIP_TEXT (epic #533)
+    expect(usedRow!.style.background).toBe("var(--app-accent-subtle)"); // BLUE_CHIP_BG shorthand (epic #533)
     expect(usedRow!.tagName).toBe("SPAN");
     // A "used" contributor is never a removal target for this char — no
     // delete button, same treatment as composition/unattributed/blocked.
@@ -2029,7 +2029,10 @@ describe("MechanismGallery — character-scroll-strip producer badge (integratio
     const strip = screen.getByTestId("char-scroll-strip");
     const badgeBefore = within(strip).getByTestId("char-scroll-badge-00E1");
     expect(badgeBefore.textContent).toBe("0");
-    expect(badgeBefore.style.color).toBe("rgb(248, 81, 73)"); // #f85149 — badge-bad color
+    // badge-bad/good colors are now the --app-danger/--app-success-text
+    // tokens (epic #533); jsdom does not resolve custom properties, so assert
+    // the token references themselves.
+    expect(badgeBefore.style.color).toBe("var(--app-danger)");
 
     // "á" defaults to the pre-enabled deadkey method (§3c) — apply directly,
     // the same real Apply flow the "apply (deadkey)" describe block above
@@ -2042,7 +2045,7 @@ describe("MechanismGallery — character-scroll-strip producer badge (integratio
         "char-scroll-badge-00E1",
       );
       expect(badgeAfter.textContent).toBe("1");
-      expect(badgeAfter.style.color).toBe("rgb(86, 211, 100)"); // #56d364 — badge-good color
+      expect(badgeAfter.style.color).toBe("var(--app-success-text)");
     });
   });
 
@@ -2123,7 +2126,7 @@ describe("MechanismGallery — character-scroll-strip producer badge (integratio
     // from the session-aware, composable-augmented set and is green 1.
     const ezhCaronBadge = within(strip).getByTestId("char-scroll-badge-01EF");
     expect(ezhCaronBadge.textContent).toBe("1");
-    expect(ezhCaronBadge.style.color).toBe("rgb(86, 211, 100)"); // #56d364 — badge-good color
+    expect(ezhCaronBadge.style.color).toBe("var(--app-success-text)"); // badge-good color (--app-success-text token, epic #533)
 
     // Walk MEMBERSHIP is untouched: ǯ carries no MechanismAssignment of its
     // own, so it must still be a real chip an author can navigate to — the
@@ -2209,7 +2212,7 @@ describe("MechanismGallery — character-scroll-strip producer badge (integratio
     const strip = screen.getByTestId("char-scroll-strip");
     const ezhCaronBadge = within(strip).getByTestId("char-scroll-badge-01EF");
     expect(ezhCaronBadge.textContent).toBe("2");
-    expect(ezhCaronBadge.style.color).toBe("rgb(86, 211, 100)"); // #56d364 — badge-good color
+    expect(ezhCaronBadge.style.color).toBe("var(--app-success-text)"); // badge-good color (--app-success-text token, epic #533)
 
     // Compose marker present — ǯ IS composable (in addition to its own key).
     expect(
@@ -2264,7 +2267,7 @@ describe("MechanismGallery — character-scroll-strip producer badge (integratio
     const strip = screen.getByTestId("char-scroll-strip");
     const ezhBadge = within(strip).getByTestId("char-scroll-badge-0292");
     expect(ezhBadge.textContent).toBe("2");
-    expect(ezhBadge.style.color).toBe("rgb(86, 211, 100)"); // #56d364 — badge-good color
+    expect(ezhBadge.style.color).toBe("var(--app-success-text)"); // badge-good color (--app-success-text token, epic #533)
     expect(
       screen.queryByTestId("char-scroll-badge-compose-0292"),
     ).toBeNull();
@@ -3603,14 +3606,14 @@ describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, 
     // #0d2218 / #238636 — the SAME green pair CharScrollStrip's badgeGood
     // treatment and the "Applied methods" chips already use elsewhere in
     // this gallery. Never the old ERROR_RED (#f85149) / ERROR_BG (#2a0a0a).
-    expect(row.style.backgroundColor).toBe("rgb(13, 34, 24)"); // #0d2218
-    expect(row.style.borderColor).toBe("rgb(35, 134, 54)"); // #238636
-    expect(row.style.backgroundColor).not.toBe("rgb(42, 10, 10)"); // #2a0a0a
-    expect(row.style.borderColor).not.toBe("rgb(248, 81, 73)"); // #f85149
+    expect(row.style.background).toBe("var(--app-success-bg)"); // GREEN_CHIP_BG shorthand (epic #533)
+    expect(row.style.border).toBe("1px solid var(--app-success)"); // GREEN_CHIP_BORDER shorthand (epic #533)
+    expect(row.style.background).not.toBe("var(--app-danger-bg)");
+    expect(row.style.border).not.toBe("1px solid var(--app-danger)");
 
     const suggestionText = screen.getByText(/Suggested: Deadkey → 'f' for 'ƒ'/i);
-    expect(suggestionText.style.color).toBe("rgb(86, 211, 100)"); // #56d364
-    expect(suggestionText.style.color).not.toBe("rgb(248, 81, 73)"); // #f85149
+    expect(suggestionText.style.color).toBe("var(--app-success-text)"); // --app-success-text token (epic #533)
+    expect(suggestionText.style.color).not.toBe("var(--app-danger)");
   });
 });
 

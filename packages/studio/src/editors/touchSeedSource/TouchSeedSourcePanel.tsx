@@ -201,7 +201,7 @@ const previewEyebrowStyle: CSSProperties = {
 const choiceCardStyle = (active: boolean): CSSProperties => ({
   borderRadius: 8,
   border: `1px solid ${active ? ACCENT : BORDER}`,
-  background: active ? "#0d2840" : BG_CARD,
+  background: active ? "var(--app-accent-subtle)" : BG_CARD,
   padding: "14px 16px",
   display: "flex",
   flexDirection: "column",
@@ -214,10 +214,10 @@ const choiceCardStyle = (active: boolean): CSSProperties => ({
 
 const confirmBtnStyle = (warn: boolean): CSSProperties => ({
   padding: "10px 24px",
-  background: warn ? "#7a2a2a" : BLUE_ACTION,
+  background: warn ? "var(--app-danger)" : BLUE_ACTION,
   border: "none",
   borderRadius: 6,
-  color: "#e6edf3",
+  color: "var(--app-text-on-accent)",
   fontSize: 14,
   fontWeight: 600,
   cursor: "pointer",
@@ -391,7 +391,7 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
           <button
             type="button"
             onClick={onBack}
-            aria-label={t({ id: "editor.assignLoop.touch.backToMechanismsPhaseCAriaLabel", message: "Back to mechanisms (Phase C)" })}
+            aria-label={t({ id: "editor.assignLoop.touch.backToMechanismsPhaseCAriaLabel", message: "Back to mechanisms" })}
             data-testid="seed-source-back"
             style={ghostBtn}
           >
@@ -485,7 +485,7 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
             {showDraftWarning && (
               <p
                 data-testid="seed-source-draft-warning"
-                style={{ margin: "0 0 14px 0", fontSize: 12, color: "#f0a0a0", fontFamily: FONT }}
+                style={{ margin: "0 0 14px 0", fontSize: 12, color: "var(--app-danger-text)", fontFamily: FONT }}
               >
                 <Trans id="editor.touchSeed.draftWarning">
                   [WARN] Changing the seed source will discard your in-progress touch edits.
@@ -538,7 +538,7 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
                 {preview !== null && !hasPhonePlatform && (
                   <p
                     data-testid="seed-source-no-phone-warn"
-                    style={{ margin: "10px 0 0 0", fontSize: 12, color: "#d29922", fontFamily: FONT }}
+                    style={{ margin: "10px 0 0 0", fontSize: 12, color: "var(--app-warning-text)", fontFamily: FONT }}
                   >
                     <Trans id="editor.touchSeed.noPhonePlatformWarning">[WARN] this layout has no phone platform.</Trans>
                   </p>
@@ -555,7 +555,7 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
                 {currentSeedPreview !== null && currentSeedPreview.unplacedChars.length > 0 && (
                   <p
                     data-testid="seed-source-reseed-extras-note"
-                    style={{ margin: "10px 0 0 0", fontSize: 12, color: "#d29922", fontFamily: FONT }}
+                    style={{ margin: "10px 0 0 0", fontSize: 12, color: "var(--app-warning-text)", fontFamily: FONT }}
                   >
                     <Trans id="editor.touchSeed.reseedUnplacedNote">
                       [WARN] {unplacedCountLabel} from the desktop layout could not be

@@ -25,11 +25,11 @@ describe("Button — element", () => {
 });
 
 describe("Button — primary variant (enabled)", () => {
-  it("applies blue background, white text, pointer cursor, and padding", () => {
+  it("applies accent background, on-accent text, pointer cursor, and padding", () => {
     const { container } = render(<Button variant="primary">Next</Button>);
     const btn = container.querySelector("button") as HTMLButtonElement;
-    expect(btn.style.background).toBe("rgb(31, 111, 235)");
-    expect(btn.style.color).toBe("rgb(255, 255, 255)");
+    expect(btn.style.background).toBe("var(--app-accent)");
+    expect(btn.style.color).toBe("var(--app-text-on-accent)");
     expect(btn.style.cursor).toBe("pointer");
     expect(btn.style.padding).toBe("8px 18px");
   });
@@ -45,7 +45,7 @@ describe("Button — primary variant (disabled)", () => {
     const btn = container.querySelector("button") as HTMLButtonElement;
     expect(btn.disabled).toBe(true);
     expect(btn.style.background).toBe("transparent");
-    expect(btn.style.color).toBe("rgb(72, 79, 88)");
+    expect(btn.style.color).toBe("var(--app-text-disabled)");
     expect(btn.style.cursor).toBe("not-allowed");
   });
 });
@@ -55,8 +55,8 @@ describe("Button — back variant", () => {
     const { container } = render(<Button variant="back">{"← Back"}</Button>);
     const btn = container.querySelector("button") as HTMLButtonElement;
     expect(btn.style.background).toBe("transparent");
-    expect(btn.style.color).toBe("rgb(139, 148, 158)");
-    expect(btn.style.borderColor).toBe("rgb(48, 54, 61)");
+    expect(btn.style.color).toBe("var(--app-text-muted)");
+    expect(btn.style.borderColor).toBe("var(--app-border)");
     expect(btn.style.padding).toBe("6px 14px");
   });
 });

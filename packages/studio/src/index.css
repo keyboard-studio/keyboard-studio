@@ -1,62 +1,12 @@
-:root {
-  --bg:            #15203a;
-  --card:          #1f2c49;
-  --card-2:        #27365a;
-  --border:        #33436a;
-  --border-strong: #44588a;
-  --text:          #eaf1fb;
-  --muted:         #aebcd6;
-  --subtle:        #8493b6;
-  --amber:         #d9a441;
-  --amber-text:    #ecc26a;
-  --amber-bg:      rgba(217,164,65,0.12);
-  --amber-border:  rgba(217,164,65,0.42);
-  --accent:        #5aa7f0;
-  --accent-bg:     rgba(90,167,240,0.16);
-  --primary:       #2b6fd6;
-  --primary-hover: #3f80e3;
-  --green:         #3fb950;
-  --green-hover:   #56d364;
-  --danger:        #f24e3c;
-  /* Lighter danger variant for text/borders directly on --app-bg/--card-2
-     (spec 056, #1619) — --danger itself is 4.35:1 there, just under the
-     4.5:1 AA text threshold; mirrors the --amber/--amber-text pattern. */
-  --danger-text:   #f4695a;
-  --danger-bg:     rgba(242,78,60,0.12);
-  --ui:      'Source Sans 3', system-ui, -apple-system, sans-serif;
-  --display: 'Playfair Display', Georgia, serif;
-  --mono:    ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
-  --serif:   'Lora', Georgia, serif;
-
-  /* --app-* aliases — used by carve components to match the prototype verbatim */
-  --app-bg:            #18243f;
-  --app-surface:       var(--card);
-  --app-surface-2:     var(--card-2);
-  --app-border:        var(--border);
-  --app-border-strong: var(--border-strong);
-  --app-text:          var(--text);
-  --app-text-muted:    var(--muted);
-  --app-text-subtle:   var(--subtle);
-  --app-accent:        var(--accent);
-  --app-accent-hover:  #74b6f4;
-  --app-accent-subtle: #243c61;
-  --app-accent-text:   #8fc4f6;
-  --app-font:          var(--ui);
-  --app-font-mono:     var(--mono);
-  /* Glyph-display font — same 'Lora' serif stack already used ad hoc for
-     character tiles (GlyphCell, RemovalBanner, StatusBar); named here so
-     CarveGalleryV2 can reference one token instead of repeating the stack. */
-  --app-font-glyph:    'Lora', Georgia, serif;
-  --app-danger:        var(--danger);
-  --sil-orange:        var(--amber);
-  --sil-orange-dark:   var(--amber-text);
-  --sil-green:         #509E2F;
-  --sil-green-dark:    #38751C;
-
-  /* Shared control conventions (issue #536) */
-  --control-h:         34px;
-  --app-accent-ring:   rgba(90, 167, 240, 0.45);
-}
+/* Token-layer import manifest (epic #533). Import order is cascade order:
+ * brand (raw palette) -> colors (semantic --app-* light/navy) -> typography
+ * -> geometry -> legacy (deprecated aliases, must load last so its
+ * naming-collision override in legacy.css wins — see the comment there). */
+@import "./styles/brand.css";
+@import "./styles/colors.css";
+@import "./styles/typography.css";
+@import "./styles/geometry.css";
+@import "./styles/legacy.css";
 
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--ui); }

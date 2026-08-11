@@ -58,7 +58,7 @@ import {
   TEXT_MAIN,
   FONT,
   ERROR_RED,
-  phaseContainer,
+  surveyPageColumn,
   phaseHeading,
   phaseHeadingFlush,
   mutedParaFlush,
@@ -755,9 +755,9 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
           a filled draft is NOT a completed step — Done still has to be pressed. */}
       <h2 style={phaseHeadingFlush} data-testid="phase-b-heading">
         {hasProposedChars ? (
-          <Trans id="survey.phaseB.buildList.headingConfirm">Phase B — Confirm your alphabet</Trans>
+          <Trans id="survey.phaseB.buildList.headingConfirm">Confirm your alphabet</Trans>
         ) : (
-          <Trans id="survey.phaseB.buildList.heading">Phase B — Add your whole alphabet</Trans>
+          <Trans id="survey.phaseB.buildList.heading">Add your whole alphabet</Trans>
         )}
       </h2>
 
@@ -1069,11 +1069,15 @@ export function PhaseB({ context = {}, onComplete, onBack, findingsByQuestionId,
     });
   }
 
-  // Manual path — use a patched flow that skips the intro question
+  // Manual path — use a patched flow that skips the intro question.
+  // surveyPageColumn (epic #533), matching IdentityLite/FlowStepHost/Prefill's
+  // outer column — SurveyRunner itself now always renders its question in the
+  // shared card + the ghost-Back/spacer/primary nav row (SurveyRunner.tsx),
+  // so this heading only needs to sit above it, not wrap it in a card.
   return (
-    <div style={phaseContainer}>
+    <div style={surveyPageColumn}>
       <h2 style={phaseHeading}>
-        <Trans id="survey.phaseB.manual.heading">Phase B — Character inventory</Trans>
+        <Trans id="survey.phaseB.manual.heading">Character inventory</Trans>
       </h2>
       <SurveyRunner
         key={manualFlow.flow_id}
@@ -1188,7 +1192,7 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
       }}
     >
       <h2 style={phaseHeadingFlush}>
-        <Trans id="survey.phaseB.intro.heading">Phase B — Character discovery</Trans>
+        <Trans id="survey.phaseB.intro.heading">Character discovery</Trans>
       </h2>
       <p style={mutedParaFlush}>
         <Trans id="survey.phaseB.intro.question">How would you like to add the alphabet {languageName} uses?</Trans>

@@ -17,10 +17,10 @@ import { BG_CARD, CARD_BORDER, FONT_MONO, SUCCESS_ACCENT, TEXT_MAIN } from "../u
 // it renders in the panel's default TEXT_MAIN foreground (see below).
 // ---------------------------------------------------------------------------
 export const SEVERITY_COLOR: Record<string, string> = {
-  fatal: "#f0a0a0",
-  error: "#f0a0a0",
-  hint: "#6ea8fe",
-  info: "#6ea8fe",
+  fatal: "var(--app-danger-text)",
+  error: "var(--app-danger-text)",
+  hint: "var(--app-accent-text)",
+  info: "var(--app-accent-text)",
 };
 
 /** Warning glyph shown before "Warning: <message>" for warning-severity items. */
@@ -64,7 +64,7 @@ export function DiagnosticsPanel({ diagnostics }: { diagnostics: CompilerDiagnos
           fontSize: 11,
           textTransform: "uppercase",
           letterSpacing: "0.08em",
-          color: "#9aa7b8",
+          color: "var(--app-text-subtle)",
           fontWeight: 700,
           marginBottom: 8,
         }}
@@ -140,7 +140,7 @@ export function DiagnosticsPanel({ diagnostics }: { diagnostics: CompilerDiagnos
                   message: `Severity: ${d.severity}`,
                 })}
                 style={{
-                  color: SEVERITY_COLOR[d.severity] ?? "#e6edf3",
+                  color: SEVERITY_COLOR[d.severity] ?? "var(--app-text)",
                   minWidth: 50,
                   fontWeight: 700,
                   flexShrink: 0,

@@ -1,0 +1,65 @@
+/* DEPRECATED aliases — to be deleted incrementally --------------------------
+ * These are the pre-design-system token names (index.css's original :root,
+ * before epic #533). Every one of them now points at an --app-* semantic
+ * token instead of holding a literal value, so every existing
+ * `var(--bg)`-style call site becomes theme-aware with zero component edits.
+ * New code should reference the --app-* token directly; migrate a call site
+ * off one of these names when you touch it anyway, but don't go out of your
+ * way — this file is the deletion plan, not a deadline.
+ */
+:root {
+  --bg:            var(--app-bg);
+  --card:          var(--app-surface);
+  --card-2:        var(--app-surface-2);
+  --border:        var(--app-border);
+  --border-strong: var(--app-border-strong);
+  --text:          var(--app-text);
+  --muted:         var(--app-text-muted);
+  --subtle:        var(--app-text-subtle);
+
+  --amber:         var(--app-warning);
+  --amber-text:    var(--app-warning-text);
+  --amber-bg:      var(--app-warning-bg);
+  --amber-border:  var(--app-warning-border);
+
+  --accent:        var(--app-accent);
+  --accent-bg:     var(--app-accent-bg);
+
+  --primary:       var(--app-primary);
+  --primary-hover: var(--app-primary-hover);
+
+  --green:         var(--app-success);
+  --green-hover:   var(--app-success-hover);
+
+  --danger:        var(--app-danger);
+  --danger-bg:     var(--app-danger-bg);
+
+  --ui:            var(--app-font);
+  --display:       var(--app-display);
+  --mono:          var(--app-font-mono);
+  --serif:         var(--app-font-serif);
+
+  /* NAMING-COLLISION OVERRIDE — read before touching.
+   * brand.css defines --sil-orange / --sil-orange-dark as the TRUE SIL
+   * brand orange (#FF6B00 / #C24F00). But ~10 existing component files
+   * (Inspector.tsx, DepBanner.tsx, CarveGallery.tsx, RemovalBanner.tsx,
+   * BaseKeyboardPicker.tsx, Badge.tsx tone="warn", GlyphCell.tsx, ui/theme.ts)
+   * already consume `var(--sil-orange)` / `var(--sil-orange-dark)` directly
+   * as their "warning" color, wired to the OLD amber values
+   * (#D9A441 / #ECC26A) since before this token layer existed. Letting
+   * brand.css's literal win would silently recolor every one of those —
+   * a real appearance change in the default (navy) theme, which this pass
+   * must not cause. So these two names are re-pointed here (legacy.css
+   * imports last, so this wins the cascade) at the warning semantic tokens
+   * instead of the raw brand color, preserving today's rendering exactly
+   * and making those ~10 call sites theme-aware for free.
+   * --sil-green / --sil-green-dark have no such conflict — the brand
+   * literal (#509E2F / #38751C) already matches what those tokens rendered
+   * before this change, so they're left alone, sourced straight from
+   * brand.css.
+   * Fixing this properly means migrating those ~10 call sites onto
+   * --app-warning / --app-warning-text directly and deleting this override
+   * — a real (if probably desirable) visual change, and out of scope here. */
+  --sil-orange:      var(--app-warning);
+  --sil-orange-dark: var(--app-warning-text);
+}

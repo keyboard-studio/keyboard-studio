@@ -78,3 +78,15 @@ export function InfoIcon({ size = 14 }: IconProps) {
     </Icon>
   );
 }
+
+/** A trash-can glyph — the icon-chip mark for a "suggested to discard" group (#1399 carve gallery redesign). No emoji; single-stroke, round caps, currentColor, per house style. */
+export function DiscardIcon({ size = 14 }: IconProps) {
+  return (
+    <Icon size={size}>
+      <path d="M3 6h18" />
+      <path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2" />
+      <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" />
+      <path d="M10 11v6M14 11v6" />
+    </Icon>
+  );
+}

@@ -45,12 +45,12 @@ describe("RadioGroup — list mode (default)", () => {
     expect(onChange).toHaveBeenCalledWith("y");
   });
 
-  it("uses list-mode accent #6ea8fe by default", () => {
+  it("uses list-mode accent var(--app-accent) by default", () => {
     render(
       <RadioGroup name="test" value={null} options={LIST_OPTIONS} onChange={() => undefined} />
     );
     const radio = screen.getAllByRole("radio")[0] as HTMLInputElement;
-    expect(radio.style.accentColor).toBe("#6ea8fe");
+    expect(radio.style.accentColor).toBe("var(--app-accent)");
   });
 
   it("renders a note span when option.note is present", () => {
@@ -139,14 +139,14 @@ describe("RadioGroup — bool mode", () => {
     expect(onChange).toHaveBeenCalledWith("false");
   });
 
-  it("uses green accent #3fb950 in bool mode — not list accent", () => {
+  it("uses success-green accent var(--app-success) in bool mode — not list accent", () => {
     render(
       <RadioGroup mode="bool" name="q1" value={null} options={[]} onChange={() => undefined} />
     );
     const radios = screen.getAllByRole("radio") as HTMLInputElement[];
     for (const radio of radios) {
-      expect(radio.style.accentColor).toBe("#3fb950");
-      expect(radio.style.accentColor).not.toBe("#6ea8fe");
+      expect(radio.style.accentColor).toBe("var(--app-success)");
+      expect(radio.style.accentColor).not.toBe("var(--app-accent)");
     }
   });
 

@@ -13,7 +13,17 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import type { IdentityLiteResult } from "./IdentityLite.tsx";
 import type { FiredQuestion } from "../adaptation/firing.ts";
-import { secondaryButton, primaryButton } from "./surveyStyles.ts";
+import {
+  secondaryButton,
+  primaryButton,
+  surveyCard,
+  surveyPageColumn,
+  phaseHeading,
+  leadParagraph,
+  TEXT_DIM,
+  TEXT_MAIN,
+} from "./surveyStyles.ts";
+import { CSS_TEXT_SUBTLE } from "../ui/theme.ts";
 import { handleEnterToAdvance } from "./enterToAdvance.ts";
 import { resolveMessage } from "../lib/i18nResolve.ts";
 import { resolveContentString } from "../lib/contentI18n.ts";
@@ -127,62 +137,62 @@ export function Prefill({ identity, base, onConfirm, onBack }: PrefillProps) {
        the bubbled keydown only ADDS a keyboard capability (Enter-to-advance,
        see the comment on handleKeyDown); the container is not made
        pointer-interactive and every control inside stays independently
-       keyboard-operable. */
-    <div
-      onKeyDown={handleKeyDown}
-      style={{
-        background: "#0d1117",
-        color: "#e6edf3",
-        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-      }}
-    >
-      <h2 style={{ margin: "0 0 8px 0", fontSize: "1.1rem", color: "#6ea8fe", fontWeight: 600 }}>
+       keyboard-operable. Attached at this outer level (rather than only
+       around the card) so Enter still confirms from anywhere in the panel,
+       including the nav row below the card — unchanged behavior, epic #533
+       moved the nav row outside the card visually only. */
+    <div onKeyDown={handleKeyDown} style={surveyPageColumn}>
+      <h2 style={phaseHeading}>
         <Trans id="survey.prefill.heading">Confirm the basics</Trans>
       </h2>
-      <p style={{ margin: "0 0 20px 0", fontSize: 13, color: "#8b949e" }}>
+      <p style={leadParagraph}>
         <Trans id="survey.prefill.intro">
           Based on your script and chosen keyboard, here is what we will assume.
           Confirm to continue, or go back to change a choice.
         </Trans>
       </p>
 
-      <dl
-        style={{
-          margin: "0 0 20px 0",
-          display: "grid",
-          gridTemplateColumns: "max-content 1fr",
-          gap: "10px 16px",
-          alignItems: "baseline",
-        }}
-      >
-        {rows.map((row) => (
-          <div key={row.label} style={{ display: "contents" }}>
-            <dt style={{ fontSize: 13, color: "#8b949e", whiteSpace: "nowrap" }}>{row.label}</dt>
-            <dd style={{ margin: 0, fontSize: 14, color: "#e6edf3" }}>
-              <strong>{row.value}</strong>
-              {row.note !== undefined && (
-                <span style={{ marginLeft: 8, fontSize: 11, color: "#6e7681" }}>{row.note}</span>
-              )}
-            </dd>
-          </div>
-        ))}
-      </dl>
+      <div style={surveyCard}>
+        <dl
+          style={{
+            margin: "0 0 20px 0",
+            display: "grid",
+            gridTemplateColumns: "max-content 1fr",
+            gap: "10px 16px",
+            alignItems: "baseline",
+          }}
+        >
+          {rows.map((row) => (
+            <div key={row.label} style={{ display: "contents" }}>
+              <dt style={{ fontSize: 13, color: TEXT_DIM, whiteSpace: "nowrap" }}>{row.label}</dt>
+              <dd style={{ margin: 0, fontSize: 14, color: TEXT_MAIN }}>
+                <strong>{row.value}</strong>
+                {row.note !== undefined && (
+                  <span style={{ marginLeft: 8, fontSize: 11, color: CSS_TEXT_SUBTLE }}>{row.note}</span>
+                )}
+              </dd>
+            </div>
+          ))}
+        </dl>
 
-      <p
-        style={{
-          margin: "0 0 20px 0",
-          fontSize: 12,
-          color: "#6e7681",
-          lineHeight: 1.5,
-        }}
-      >
-        <Trans id="survey.prefill.deferredNote">
-          Spare keys (A7), the full BCP47 tag, display name, and copyright are
-          confirmed later from your base keyboard and the documentation step.
-        </Trans>
-      </p>
+        <p
+          style={{
+            margin: 0,
+            fontSize: 12,
+            color: CSS_TEXT_SUBTLE,
+            lineHeight: 1.5,
+          }}
+        >
+          <Trans id="survey.prefill.deferredNote">
+            Spare keys (A7), the full BCP47 tag, display name, and copyright are
+            confirmed later from your base keyboard and the documentation step.
+          </Trans>
+        </p>
+      </div>
 
-      <div style={{ display: "flex", gap: 8 }}>
+      {/* Nav row (epic #533): ghost Back left, flex:1 spacer, primary Confirm
+          right — the same shape as SurveyRunner's nav row below its card. */}
+      <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 22 }}>
         {onBack !== undefined && (
           <button
             type="button"
@@ -194,6 +204,7 @@ export function Prefill({ identity, base, onConfirm, onBack }: PrefillProps) {
             <Trans id="survey.prefill.backButton">← Back</Trans>
           </button>
         )}
+        <div aria-hidden="true" style={{ flex: 1 }} />
         <button
           type="button"
           data-testid="prefill-confirm"

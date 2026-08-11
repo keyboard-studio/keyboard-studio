@@ -144,7 +144,7 @@ export function KeyPickerField({
             </span>
           )}
           {resolution.kind === "customError" && customChar.trim().length > 0 && (
-            <span role="alert" style={{ fontSize: 11, color: "#f85149", opacity: 0.85, fontFamily: FONT }}>
+            <span role="alert" style={{ fontSize: 11, color: "var(--app-danger-text)", opacity: 0.85, fontFamily: FONT }}>
               {resolution.reason}
             </span>
           )}

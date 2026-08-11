@@ -18,6 +18,7 @@ import {
   runBootRenameReconciliation,
 } from "./lib/draftPersistence.ts";
 import { localeReady } from "./lib/i18n.ts";
+import { applyTheme, DEFAULT_THEME, loadSavedTheme } from "./lib/theme.ts";
 import { warmExemplarSource } from "./lib/services.ts";
 import { installConsoleBreadcrumbs, pushBreadcrumb } from "./crash/breadcrumbs.ts";
 import { installGlobalCrashHandlers } from "./crash/globalHandlers.ts";
@@ -53,6 +54,13 @@ installGlobalCrashHandlers({
   // unactionable report within minutes of every deploy.
   handleStaleChunk: (message) => handleStaleChunkFailure(message),
 });
+
+// Paint the persisted/default theme before anything mounts (epic #533).
+// index.html already hardcodes data-theme="navy" for zero-FOUC on the
+// common case; this only needs to *change* the attribute when a saved
+// non-default choice exists. Synchronous and side-effecting at module
+// evaluation, same as i18n.ts's own bootstrap immediately below.
+applyTheme(loadSavedTheme() ?? DEFAULT_THEME);
 
 function requireRoot(): HTMLElement {
   const rootEl = document.getElementById("root");

@@ -32,7 +32,7 @@ export function LocaleSwitcher() {
         alignItems: "center",
         gap: 6,
         fontSize: 13,
-        color: "#e6edf3",
+        color: "var(--app-text)",
         fontFamily:
           "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
       }}

@@ -18,14 +18,21 @@ export type CardProps = React.HTMLAttributes<HTMLElement> & {
   as?: "button" | "div";
 };
 
+// Border is split into borderWidth/borderStyle/borderColor (rather than the
+// `border: "1px solid <token>"` shorthand): jsdom's style-shorthand parser
+// cannot decompose a shorthand value containing an unresolved `var(...)`, so
+// `.style.borderColor` reads back empty in tests even though a real browser
+// renders it correctly.
 const STYLE_BASE: React.CSSProperties = {
   display: "flex",
   flexDirection: "column",
   gap: 6,
   padding: "12px 16px",
   background: BG_CARD,
-  border: `1px solid ${BORDER}`,
-  borderRadius: 8,
+  borderWidth: "1px",
+  borderStyle: "solid",
+  borderColor: BORDER,
+  borderRadius: "var(--app-radius)",
   color: TEXT_MAIN,
   fontSize: 14,
   cursor: "pointer",
@@ -33,13 +40,16 @@ const STYLE_BASE: React.CSSProperties = {
   fontFamily: FONT,
   width: "100%",
   boxSizing: "border-box" as const,
-  transition: "border-color 120ms ease, background 120ms ease",
+  transition: "border-color 120ms ease, background 120ms ease, box-shadow 120ms ease",
 };
 
+// Selection is always accent border + a 3px accent ring + a subtle accent
+// fill — never a drop shadow (design handoff rule #1).
 const STYLE_SELECTED: React.CSSProperties = {
   ...STYLE_BASE,
-  border: `1px solid ${ACCENT}`,
-  background: "#0d1f38",
+  borderColor: ACCENT,
+  boxShadow: "0 0 0 3px var(--app-accent-ring)",
+  background: "var(--app-accent-subtle)",
 };
 
 /**

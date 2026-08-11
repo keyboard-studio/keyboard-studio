@@ -431,7 +431,7 @@ export function FindPanel({ layout, ruleIndex, onJumpToResult, label }: FindPane
                 padding: "6px 8px",
                 borderRadius: 4,
                 cursor: "pointer",
-                background: isActive ? "#0d2840" : "transparent",
+                background: isActive ? "var(--app-accent-subtle)" : "transparent",
                 border: `1px solid ${isActive ? ACCENT : "transparent"}`,
               }}
             >

@@ -26,7 +26,7 @@ export function DocsPreviewPanel(): React.ReactElement {
   const preview = useDocsPreview();
 
   return (
-    <div style={{ borderTop: "1px solid var(--app-border, #ccc)", marginTop: 16, paddingTop: 12 }}>
+    <div style={{ borderTop: "1px solid var(--app-border)", marginTop: 16, paddingTop: 12 }}>
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
@@ -50,7 +50,7 @@ export function DocsPreviewPanel(): React.ReactElement {
             <pre
               style={{
                 whiteSpace: "pre-wrap", margin: 0, padding: 10, fontSize: 12,
-                border: "1px solid var(--app-border, #ccc)", borderRadius: 4, maxHeight: 200, overflow: "auto",
+                border: "1px solid var(--app-border)", borderRadius: 4, maxHeight: 200, overflow: "auto",
               }}
             >
               {preview.readmeMd}
@@ -65,7 +65,7 @@ export function DocsPreviewPanel(): React.ReactElement {
               title={t({ id: "editor.help.docsPreview.readmeHtmHeading", message: "Package popup text" })}
               srcDoc={preview.readmeHtm}
               sandbox=""
-              style={{ width: "100%", minHeight: 100, border: "1px solid var(--app-border, #ccc)", borderRadius: 4 }}
+              style={{ width: "100%", minHeight: 100, border: "1px solid var(--app-border)", borderRadius: 4 }}
             />
           </section>
 
@@ -77,7 +77,7 @@ export function DocsPreviewPanel(): React.ReactElement {
               title={t({ id: "editor.help.docsPreview.welcomeHtmHeading", message: "Welcome page" })}
               srcDoc={preview.welcomeHtm}
               sandbox=""
-              style={{ width: "100%", minHeight: 200, border: "1px solid var(--app-border, #ccc)", borderRadius: 4 }}
+              style={{ width: "100%", minHeight: 200, border: "1px solid var(--app-border)", borderRadius: 4 }}
             />
           </section>
 
@@ -89,7 +89,7 @@ export function DocsPreviewPanel(): React.ReactElement {
               title={t({ id: "editor.help.docsPreview.helpPhpHeading", message: "Online help page" })}
               srcDoc={preview.helpPhp}
               sandbox=""
-              style={{ width: "100%", minHeight: 200, border: "1px solid var(--app-border, #ccc)", borderRadius: 4 }}
+              style={{ width: "100%", minHeight: 200, border: "1px solid var(--app-border)", borderRadius: 4 }}
             />
           </section>
         </div>

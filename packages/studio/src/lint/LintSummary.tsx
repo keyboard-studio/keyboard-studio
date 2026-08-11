@@ -61,9 +61,9 @@ export function LintSummary({ findings }: LintSummaryProps) {
   return (
     <div
       style={{
-        border: "1px solid #283040",
+        border: "1px solid var(--app-border)",
         borderRadius: 8,
-        background: "#161b22",
+        background: "var(--app-surface)",
         padding: 12,
         display: "flex",
         flexDirection: "column",
@@ -109,7 +109,7 @@ export function LintSummary({ findings }: LintSummaryProps) {
           <span
             style={{
               fontSize: 13,
-              color: "#7ee787",
+              color: "var(--app-success-text)",
               display: "flex",
               alignItems: "center",
               gap: 6,
@@ -144,7 +144,7 @@ export function LintSummary({ findings }: LintSummaryProps) {
                 </span>
                 {/* Separator dot between badges, not after the last one */}
                 {idx < activeSeverities.length - 1 && (
-                  <span aria-hidden="true" style={{ color: "#283040" }}>
+                  <span aria-hidden="true" style={{ color: "var(--app-border)" }}>
                     ·
                   </span>
                 )}

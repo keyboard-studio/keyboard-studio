@@ -49,7 +49,7 @@ export type Section = "flow" | "routing" | "strategy" | "completeness";
 
 function LegendItem({ swatch, border, dashed, label }: { swatch: string; border: string; dashed?: boolean; label: string }) {
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "#adbac7" }}>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--app-text-muted)" }}>
       <span
         style={{
           width: 14,
@@ -67,9 +67,11 @@ function LegendItem({ swatch, border, dashed, label }: { swatch: string; border:
 
 function EdgeLegendItem({ color, dashed, label }: { color: string; dashed?: boolean; label: string }) {
   return (
-    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "#adbac7" }}>
+    <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--app-text-muted)" }}>
       <svg width="26" height="10" style={{ flexShrink: 0 }}>
-        <line x1="0" y1="5" x2="26" y2="5" stroke={color} strokeWidth="1.5" strokeDasharray={dashed ? "4 3" : undefined} />
+        {/* CSS var() does not substitute in SVG presentation attributes — must go
+            through `style`. */}
+        <line x1="0" y1="5" x2="26" y2="5" style={{ stroke: color }} strokeWidth="1.5" strokeDasharray={dashed ? "4 3" : undefined} />
       </svg>
       {label}
     </span>
@@ -85,60 +87,64 @@ function FlowLegend() {
         flexWrap: "wrap",
         gap: 16,
         padding: "10px 14px",
-        background: "#0b0f14",
-        border: "1px solid #21262d",
+        background: "var(--app-bg)",
+        border: "1px solid var(--app-border)",
         borderRadius: 8,
         marginBottom: 16,
       }}
     >
       <LegendItem
-        swatch="#11203a"
-        border="#6ea8fe"
+        swatch="var(--app-accent-bg)"
+        border="var(--app-accent)"
         label={t({ id: "dashboard.flowLegend.entry", message: "entry" })}
       />
       <LegendItem
-        swatch="#241c10"
-        border="#d29922"
+        swatch="var(--app-warning-bg)"
+        border="var(--app-warning-text)"
         label={t({ id: "dashboard.flowLegend.gate", message: "gate (conditional next)" })}
       />
       <LegendItem
-        swatch="#14181f"
-        border="#6e7681"
+        swatch="var(--app-surface-2)"
+        border="var(--app-text-subtle)"
         dashed
         label={t({ id: "dashboard.flowLegend.engineResolved", message: "engine-resolved (not shown)" })}
       />
       <LegendItem
-        swatch="#0f2417"
-        border="#3fb950"
+        swatch="var(--app-success-bg)"
+        border="var(--app-success-text)"
         label={t({ id: "dashboard.flowLegend.terminal", message: "terminal" })}
       />
+      {/* No --app-purple semantic token exists; reuses the SIL violet brand
+          family (brand.css) — same reasoning as FlowGraphView's nodeRole(). */}
       <LegendItem
-        swatch="#1a1030"
-        border="#6e40c9"
+        swatch="var(--sil-violet-10)"
+        border="var(--sil-violet)"
         label={t({ id: "dashboard.flowLegend.reserve", message: "reserve (not in live flow)" })}
       />
       <LegendItem
-        swatch="#0d2035"
-        border="#58a6ff"
+        swatch="var(--app-accent-bg)"
+        border="var(--app-accent)"
         label={t({ id: "dashboard.flowLegend.stub", message: "stub (gallery / wizard step)" })}
       />
+      {/* No --app-teal semantic token exists; reuses the SIL light-blue brand
+          family (brand.css) — same reasoning as FlowGraphView's nodeRole(). */}
       <LegendItem
-        swatch="#0c2a2e"
-        border="#39c5cf"
+        swatch="var(--sil-light-blue-10)"
+        border="var(--sil-light-blue)"
         label={t({ id: "dashboard.flowLegend.proposed", message: "proposed (Library — not live)" })}
       />
-      <span style={{ width: 1, alignSelf: "stretch", background: "#21262d" }} />
+      <span style={{ width: 1, alignSelf: "stretch", background: "var(--app-border)" }} />
       <EdgeLegendItem
-        color="#d29922"
+        color="var(--app-warning-text)"
         label={t({ id: "dashboard.flowLegend.edge.conditional", message: "conditional branch" })}
       />
       <EdgeLegendItem
-        color="#6e7681"
+        color="var(--app-text-subtle)"
         dashed
         label={t({ id: "dashboard.flowLegend.edge.default", message: "default (else)" })}
       />
       <EdgeLegendItem
-        color="#4d5b7c"
+        color="var(--app-border)"
         label={t({ id: "dashboard.flowLegend.edge.linear", message: "linear next" })}
       />
     </div>
@@ -148,7 +154,7 @@ function FlowLegend() {
 /** Parse-failure banner shared by the drill-down and Library proposed-flow sections. */
 function ParseErrorBanner({ error }: { error: string }) {
   return (
-    <div style={{ color: "#ff9492", fontFamily: MONO, fontSize: 12, padding: 12, border: "1px solid #763a3a", borderRadius: 6 }}>
+    <div style={{ color: "var(--app-danger-text)", fontFamily: MONO, fontSize: 12, padding: 12, border: "1px solid var(--app-danger)", borderRadius: 6 }}>
       <Trans id="dashboard.flow.parseError">Failed to parse: {error}</Trans>
     </div>
   );
@@ -159,14 +165,14 @@ function DanglingTargetsWarning({ targets }: { targets: readonly string[] }) {
   return (
     <div
       style={{
-        color: "#e3b341",
+        color: "var(--app-warning-text)",
         fontFamily: MONO,
         fontSize: 12,
         padding: "8px 12px",
         marginBottom: 8,
-        border: "1px solid #9e6a03",
+        border: "1px solid var(--app-warning)",
         borderRadius: 6,
-        background: "#241c10",
+        background: "var(--app-warning-bg)",
       }}
     >
       <Trans id="dashboard.flow.danglingTargets">
@@ -186,10 +192,10 @@ function SectionTab({ active, onClick, children }: { active: boolean; onClick: (
         fontSize: 13,
         fontFamily: SANS,
         cursor: "pointer",
-        background: active ? "rgba(110,168,254,0.14)" : "transparent",
-        color: active ? "#6ea8fe" : "#adbac7",
+        background: active ? "var(--app-accent-bg)" : "transparent",
+        color: active ? "var(--app-accent-text)" : "var(--app-text-muted)",
         border: "1px solid",
-        borderColor: active ? "#1f6feb" : "#30363d",
+        borderColor: active ? "var(--app-accent)" : "var(--app-border)",
         borderRadius: 6,
       }}
     >
@@ -205,7 +211,7 @@ function SectionTab({ active, onClick, children }: { active: boolean; onClick: (
 function CompletenessView({ report }: { report: CompletenessReport | undefined }) {
   if (report === undefined) {
     return (
-      <div style={{ color: "#8b949e", fontFamily: MONO, fontSize: 13, padding: "16px 0" }}>
+      <div style={{ color: "var(--app-text-muted)", fontFamily: MONO, fontSize: 13, padding: "16px 0" }}>
         <Trans id="dashboard.completeness.emptyState">
           No completeness report available. Open a keyboard to begin.
         </Trans>
@@ -222,21 +228,21 @@ function CompletenessView({ report }: { report: CompletenessReport | undefined }
   const SECTION_STYLE: React.CSSProperties = {
     marginBottom: 20,
     padding: "12px 16px",
-    border: "1px solid #21262d",
+    border: "1px solid var(--app-border)",
     borderRadius: 8,
-    background: "#0b0f14",
+    background: "var(--app-bg)",
   };
 
   const HEADING_STYLE: React.CSSProperties = {
     margin: "0 0 8px",
     fontSize: 13,
     fontWeight: 600,
-    color: "#e6edf3",
+    color: "var(--app-text)",
   };
 
-  const OK_STYLE: React.CSSProperties = { color: "#3fb950", fontFamily: MONO, fontSize: 12 };
-  const ERR_STYLE: React.CSSProperties = { color: "#ff9492", fontFamily: MONO, fontSize: 12 };
-  const WARN_STYLE: React.CSSProperties = { color: "#e3b341", fontFamily: MONO, fontSize: 12 };
+  const OK_STYLE: React.CSSProperties = { color: "var(--app-success-text)", fontFamily: MONO, fontSize: 12 };
+  const ERR_STYLE: React.CSSProperties = { color: "var(--app-danger-text)", fontFamily: MONO, fontSize: 12 };
+  const WARN_STYLE: React.CSSProperties = { color: "var(--app-warning-text)", fontFamily: MONO, fontSize: 12 };
 
   return (
     <div>
@@ -246,9 +252,9 @@ function CompletenessView({ report }: { report: CompletenessReport | undefined }
           marginBottom: 20,
           padding: "10px 16px",
           borderRadius: 8,
-          border: `1px solid ${hasIssues ? "#9e6a03" : "#238636"}`,
-          background: hasIssues ? "#241c10" : "#0f2417",
-          color: hasIssues ? "#e3b341" : "#3fb950",
+          border: `1px solid ${hasIssues ? "var(--app-warning)" : "var(--app-success)"}`,
+          background: hasIssues ? "var(--app-warning-bg)" : "var(--app-success-bg)",
+          color: hasIssues ? "var(--app-warning-text)" : "var(--app-success-text)",
           fontFamily: MONO,
           fontSize: 13,
         }}
@@ -276,7 +282,7 @@ function CompletenessView({ report }: { report: CompletenessReport | undefined }
             <Trans id="dashboard.completeness.c1.empty">No stale steps (nothing re-opened)</Trans>
           </span>
         ) : (
-          <ul style={{ margin: 0, padding: "0 0 0 16px", color: "#e3b341", fontFamily: MONO, fontSize: 12 }}>
+          <ul style={{ margin: 0, padding: "0 0 0 16px", color: "var(--app-warning-text)", fontFamily: MONO, fontSize: 12 }}>
             {[...report.stale].map((id) => (
               <li key={id}>{id}</li>
             ))}
@@ -340,7 +346,7 @@ function CompletenessView({ report }: { report: CompletenessReport | undefined }
             <Trans id="dashboard.completeness.c4.unshippable">
               Unshippable spine prefix indices: {report.unshippablePrefixes.join(", ")}
             </Trans>
-            <div style={{ marginTop: 4, fontSize: 11, color: "#8b949e" }}>
+            <div style={{ marginTop: 4, fontSize: 11, color: "var(--app-text-muted)" }}>
               <Trans id="dashboard.completeness.c4.note">
                 (A prefix is unshippable when it includes a lock step whose gate has not been applied.)
               </Trans>
@@ -516,16 +522,16 @@ export function FlowMapView({
         overflow: "auto",
         padding: 24,
         boxSizing: "border-box",
-        background: "#0d1117",
-        color: "#e6edf3",
+        background: "var(--app-bg)",
+        color: "var(--app-text)",
         fontFamily: SANS,
       }}
     >
       <div style={{ display: "flex", alignItems: "baseline", gap: 12, flexWrap: "wrap", marginBottom: 4 }}>
-        <h1 style={{ margin: 0, fontSize: 20, color: "#e6edf3" }}>
+        <h1 style={{ margin: 0, fontSize: 20, color: "var(--app-text)" }}>
           <Trans id="dashboard.flowMap.title">Flow Map</Trans>
         </h1>
-        <span style={{ fontSize: 12.5, color: "#6e7681" }}>
+        <span style={{ fontSize: 12.5, color: "var(--app-text-subtle)" }}>
           <Trans id="dashboard.flowMap.subtitle">
             developer view · auto-generated from{" "}
             <code style={{ fontFamily: MONO }}>content/flows/*.modular.yaml</code> +{" "}
@@ -533,7 +539,7 @@ export function FlowMapView({
           </Trans>
         </span>
       </div>
-      <p style={{ margin: "0 0 16px", fontSize: 13, color: "#8b949e", maxWidth: 920 }}>
+      <p style={{ margin: "0 0 16px", fontSize: 13, color: "var(--app-text-muted)", maxWidth: 920 }}>
         <Trans id="dashboard.flowMap.description">
           A live map of the survey questions, where each branch goes, and the strategy decision tree. It rebuilds
           from source — change a flow&rsquo;s question order or a selector rule, rebuild, and this updates.
@@ -562,8 +568,8 @@ export function FlowMapView({
           {/* Spec 015: the manifest spine, projected onto the map (kind:"stub" nodes). */}
           <section style={{ marginBottom: 28 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
-              <h2 style={{ margin: 0, fontSize: 15, color: "#6ea8fe" }}>{manifestSpine.title}</h2>
-              <span style={{ fontSize: 11.5, color: "#6e7681", fontFamily: MONO }}>
+              <h2 style={{ margin: 0, fontSize: 15, color: "var(--app-accent-text)" }}>{manifestSpine.title}</h2>
+              <span style={{ fontSize: 11.5, color: "var(--app-text-subtle)", fontFamily: MONO }}>
                 {manifestSpine.flowId} · {manifestSpine.nodes.length} steps · {manifestSpine.edges.length} edges
               </span>
             </div>
@@ -589,12 +595,12 @@ export function FlowMapView({
             const stepDrillDowns = drillDowns[stepId] ?? [];
             return (
               <div key={stepId}>
-                <h2 style={{ margin: "0 0 4px", fontSize: 15, color: "#6ea8fe" }}>
+                <h2 style={{ margin: "0 0 4px", fontSize: 15, color: "var(--app-accent-text)" }}>
                   <Trans id="dashboard.flowMap.drillDownsUnder">
                     Drill-downs under <code style={{ fontFamily: MONO }}>{stepId}</code>
                   </Trans>
                 </h2>
-                <p style={{ margin: "0 0 16px", fontSize: 12, color: "#6e7681", maxWidth: 920 }}>
+                <p style={{ margin: "0 0 16px", fontSize: 12, color: "var(--app-text-subtle)", maxWidth: 920 }}>
                   <Trans id="dashboard.flowMap.drillDownsDescription">
                     Question flows hung as registry-keyed drill-downs under the manifest
                     <code style={{ fontFamily: MONO }}> {stepId}</code> step.
@@ -603,8 +609,8 @@ export function FlowMapView({
                 {stepDrillDowns.map(({ graph, error, title, registryKey }) => (
                   <section key={title} style={{ marginBottom: 28 }}>
                     <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
-                      <h3 style={{ margin: 0, fontSize: 14, color: "#adbac7" }}>{title}</h3>
-                      <span style={{ fontSize: 11.5, color: "#6e7681", fontFamily: MONO }}>
+                      <h3 style={{ margin: 0, fontSize: 14, color: "var(--app-text-muted)" }}>{title}</h3>
+                      <span style={{ fontSize: 11.5, color: "var(--app-text-subtle)", fontFamily: MONO }}>
                         drill-down key: {registryKey}
                         {graph !== null && ` · ${graph.flowId} · ${graph.nodes.length} questions · ${graph.edges.length} edges`}
                       </span>
@@ -624,12 +630,12 @@ export function FlowMapView({
               graphs, clearly separated from the live flow (ADR-0001). These do NOT
               run in the live survey and are excluded from the rendered<->runtime
               bijection. */}
-          <section style={{ marginTop: 36, borderTop: "1px solid #21262d", paddingTop: 24 }}>
+          <section style={{ marginTop: 36, borderTop: "1px solid var(--app-border)", paddingTop: 24 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 4, flexWrap: "wrap" }}>
-              <h2 style={{ margin: 0, fontSize: 15, color: "#39c5cf" }}>
+              <h2 style={{ margin: 0, fontSize: 15, color: "var(--sil-light-blue)" }}>
                 <Trans id="dashboard.library.heading">Library — proposed flows</Trans>
               </h2>
-              <span style={{ fontSize: 11.5, color: "#6e7681", fontFamily: MONO }}>
+              <span style={{ fontSize: 11.5, color: "var(--app-text-subtle)", fontFamily: MONO }}>
                 {t({
                   id: "dashboard.library.count",
                   message: plural(library.proposed.length, {
@@ -639,7 +645,7 @@ export function FlowMapView({
                 })}
               </span>
             </div>
-            <p style={{ margin: "0 0 16px", fontSize: 12, color: "#6e7681", maxWidth: 920 }}>
+            <p style={{ margin: "0 0 16px", fontSize: 12, color: "var(--app-text-subtle)", maxWidth: 920 }}>
               <Trans id="dashboard.library.description">
                 Ordered graphs of flows registered as{" "}
                 <code style={{ fontFamily: MONO }}>{'status:"proposed"'}</code> — browsable
@@ -652,14 +658,14 @@ export function FlowMapView({
             {library.dualReferenced.length > 0 && (
               <div
                 style={{
-                  color: "#e3b341",
+                  color: "var(--app-warning-text)",
                   fontFamily: MONO,
                   fontSize: 12,
                   padding: "8px 12px",
                   marginBottom: 16,
-                  border: "1px solid #9e6a03",
+                  border: "1px solid var(--app-warning)",
                   borderRadius: 6,
-                  background: "#241c10",
+                  background: "var(--app-warning-bg)",
                 }}
               >
                 {"[WARN] "}
@@ -673,8 +679,8 @@ export function FlowMapView({
             {library.proposed.map(({ id, graph, error, title }) => (
               <section key={id} style={{ marginBottom: 28 }}>
                 <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 8, flexWrap: "wrap" }}>
-                  <h3 style={{ margin: 0, fontSize: 14, color: "#adbac7" }}>{title}</h3>
-                  <span style={{ fontSize: 11.5, color: "#6e7681", fontFamily: MONO }}>
+                  <h3 style={{ margin: 0, fontSize: 14, color: "var(--app-text-muted)" }}>{title}</h3>
+                  <span style={{ fontSize: 11.5, color: "var(--app-text-subtle)", fontFamily: MONO }}>
                     proposed flow: {id}
                     {graph !== null && ` · ${graph.nodes.length} questions · ${graph.edges.length} edges`}
                   </span>
@@ -689,18 +695,18 @@ export function FlowMapView({
 
             {/* Flat reserve — questions in NO flow at all (neither live nor proposed). */}
             <div style={{ marginTop: 8 }}>
-              <h3 style={{ margin: "0 0 6px", fontSize: 13, color: "#adbac7" }}>
+              <h3 style={{ margin: "0 0 6px", fontSize: 13, color: "var(--app-text-muted)" }}>
                 <Trans id="dashboard.library.reserve.heading">Reserve — questions in no flow</Trans>
               </h3>
               {library.reserve.length === 0 ? (
-                <span style={{ color: "#3fb950", fontFamily: MONO, fontSize: 12 }}>
+                <span style={{ color: "var(--app-success-text)", fontFamily: MONO, fontSize: 12 }}>
                   {"[OK] "}
                   <Trans id="dashboard.library.reserve.ok">
                     Every registered question belongs to a live or proposed flow.
                   </Trans>
                 </span>
               ) : (
-                <ul style={{ margin: 0, padding: "0 0 0 16px", color: "#8b949e", fontFamily: MONO, fontSize: 12 }}>
+                <ul style={{ margin: 0, padding: "0 0 0 16px", color: "var(--app-text-muted)", fontFamily: MONO, fontSize: 12 }}>
                   {library.reserve.map((n) => (
                     <li key={n.id}>{n.id}</li>
                   ))}
@@ -712,12 +718,15 @@ export function FlowMapView({
           {/* Leftover questions — registered but used by NO live flow. Kept for
               reference / future reuse (spec-022 no-delete); never run by the live
               survey and never rendered as reserve clog inside a live drill-down. */}
-          <section style={{ marginTop: 36, borderTop: "1px solid #21262d", paddingTop: 24 }}>
+          <section style={{ marginTop: 36, borderTop: "1px solid var(--app-border)", paddingTop: 24 }}>
             <div style={{ display: "flex", alignItems: "baseline", gap: 12, marginBottom: 4, flexWrap: "wrap" }}>
-              <h2 style={{ margin: 0, fontSize: 15, color: "#6e40c9" }}>
+              {/* No --app-purple semantic token exists; reuses the SIL violet
+                  brand family (brand.css) — same reasoning as FlowGraphView's
+                  nodeRole(). */}
+              <h2 style={{ margin: 0, fontSize: 15, color: "var(--sil-violet)" }}>
                 <Trans id="dashboard.leftover.heading">Leftover questions</Trans>
               </h2>
-              <span style={{ fontSize: 11.5, color: "#6e7681", fontFamily: MONO }}>
+              <span style={{ fontSize: 11.5, color: "var(--app-text-subtle)", fontFamily: MONO }}>
                 {t({
                   id: "dashboard.leftover.count",
                   message: plural(leftover.length, {
@@ -727,7 +736,7 @@ export function FlowMapView({
                 })}
               </span>
             </div>
-            <p style={{ margin: "0 0 16px", fontSize: 12, color: "#6e7681", maxWidth: 920 }}>
+            <p style={{ margin: "0 0 16px", fontSize: 12, color: "var(--app-text-subtle)", maxWidth: 920 }}>
               <Trans id="dashboard.leftover.description">
                 Registered questions that no live flow currently uses — kept for reference and
                 possible reuse, never run by the live survey. Re-add an id to a live flow YAML to
@@ -736,18 +745,18 @@ export function FlowMapView({
               </Trans>
             </p>
             {leftover.length === 0 ? (
-              <span style={{ color: "#3fb950", fontFamily: MONO, fontSize: 12 }}>
+              <span style={{ color: "var(--app-success-text)", fontFamily: MONO, fontSize: 12 }}>
                 {"[OK] "}
                 <Trans id="dashboard.leftover.empty">
                   Every registered question is used by a live flow.
                 </Trans>
               </span>
             ) : (
-              <ul style={{ margin: 0, padding: "0 0 0 16px", color: "#8b949e", fontFamily: MONO, fontSize: 12 }}>
+              <ul style={{ margin: 0, padding: "0 0 0 16px", color: "var(--app-text-muted)", fontFamily: MONO, fontSize: 12 }}>
                 {leftover.map((n) => (
                   <li key={n.id}>
                     {n.id}
-                    {n.label !== n.id && <span style={{ color: "#6e7681" }}> — {n.label}</span>}
+                    {n.label !== n.id && <span style={{ color: "var(--app-text-subtle)" }}> — {n.label}</span>}
                   </li>
                 ))}
               </ul>

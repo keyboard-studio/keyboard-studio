@@ -32,5 +32,5 @@ export const PANE_SECONDARY_BUTTON: CSSProperties = {
   borderRadius: 6,
   border: `1px solid ${CARD_BORDER}`,
   background: BG_CARD,
-  color: "#9aa7b8",
+  color: "var(--app-text-subtle)",
 };

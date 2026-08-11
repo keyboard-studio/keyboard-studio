@@ -411,7 +411,7 @@ export function SequenceBuilderPanel({
           </span>
         )}
         {contentReflection.kind === "error" && (
-          <span role="alert" style={{ fontSize: 10, color: "#f85149", opacity: 0.85, fontFamily: FONT }}>
+          <span role="alert" style={{ fontSize: 10, color: "var(--app-danger-text)", opacity: 0.85, fontFamily: FONT }}>
             {contentReflection.reason}
           </span>
         )}
@@ -447,12 +447,12 @@ export function SequenceBuilderPanel({
           </span>
         )}
         {indicatorReflection.kind === "error" && (
-          <span role="alert" style={{ fontSize: 10, color: "#f85149", opacity: 0.85, fontFamily: FONT }}>
+          <span role="alert" style={{ fontSize: 10, color: "var(--app-danger-text)", opacity: 0.85, fontFamily: FONT }}>
             {indicatorReflection.reason}
           </span>
         )}
         {indicatorUnresolvable && (
-          <span role="alert" style={{ fontSize: 10, color: "#f85149", opacity: 0.85, fontFamily: FONT }}>
+          <span role="alert" style={{ fontSize: 10, color: "var(--app-danger-text)", opacity: 0.85, fontFamily: FONT }}>
             <Trans id="editor.sequences.indicatorUnresolvableWarning">
               '{indicatorResolved.ok ? indicatorResolved.value : ""}' isn't a key on
               this layout — pick a character that maps to a physical key.
@@ -486,10 +486,10 @@ export function SequenceBuilderPanel({
           })}
           style={{
             padding: "7px 16px",
-            background: canApply ? BLUE_ACTION : "#21262d",
+            background: canApply ? BLUE_ACTION : "var(--app-surface-2)",
             border: "none",
             borderRadius: 6,
-            color: canApply ? "#e6edf3" : TEXT_DIM,
+            color: canApply ? "var(--app-text-on-accent)" : TEXT_DIM,
             fontSize: 13,
             fontWeight: 600,
             cursor: canApply ? "pointer" : "not-allowed",
@@ -499,7 +499,7 @@ export function SequenceBuilderPanel({
           <Trans id="editor.sequences.applyButton">Apply</Trans>
         </button>
         {existingSequenceMechanisms.length > 0 && (
-          <span role="status" aria-live="polite" style={{ fontSize: 12, color: "#56d364", fontFamily: FONT }}>
+          <span role="status" aria-live="polite" style={{ fontSize: 12, color: "var(--app-success-text)", fontFamily: FONT }}>
             {t({
               id: "editor.sequences.recordedCount",
               message: plural(existingSequenceMechanisms.length, {

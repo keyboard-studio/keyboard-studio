@@ -1,13 +1,15 @@
 // ProposalCard — the shared green "note" card shell used by every
 // propose-then-confirm banner AND the sibling-accent bulk summary box in the
 // assignLoop galleries. Purely presentational: it owns the role="note"
-// container, the #0d2218/#238636 card styling, and the message paragraph.
-// Callers supply the message and their own action(s) as `children` — a
-// two-button confirm/decline pair (ProposalBanner) or a single "Remove all"
-// button (the bulk box) — so the shell never assumes a button model.
+// container, the shared green-chip token styling (GREEN_CHIP_BG/BORDER/TEXT
+// — see RemovableChipRow.tsx), and the message paragraph. Callers supply the
+// message and their own action(s) as `children` — a two-button
+// confirm/decline pair (ProposalBanner) or a single "Remove all" button (the
+// bulk box) — so the shell never assumes a button model.
 
 import type { ReactNode } from "react";
 import { FONT } from "../../../lib/galleryTheme.ts";
+import { GREEN_CHIP_BG, GREEN_CHIP_BORDER, GREEN_CHIP_TEXT } from "./RemovableChipRow.tsx";
 
 export interface ProposalCardProps {
   /** Accessible name for the outer `role="note"` region. */
@@ -25,8 +27,8 @@ export function ProposalCard({ ariaLabel, message, children }: ProposalCardProps
       role="note"
       aria-label={ariaLabel}
       style={{
-        background: "#0d2218",
-        border: "1px solid #238636",
+        background: GREEN_CHIP_BG,
+        border: `1px solid ${GREEN_CHIP_BORDER}`,
         borderRadius: 8,
         padding: "10px 14px",
         display: "flex",
@@ -38,7 +40,7 @@ export function ProposalCard({ ariaLabel, message, children }: ProposalCardProps
         style={{
           margin: 0,
           fontSize: 12,
-          color: "#56d364",
+          color: GREEN_CHIP_TEXT,
           fontFamily: FONT,
         }}
       >

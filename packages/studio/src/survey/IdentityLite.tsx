@@ -10,6 +10,7 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import type { Attribution, SurveyPhaseResult, LintFinding, LangtagsProvenance, LanguageDefaults, LanguageSummary } from "@keyboard-studio/contracts";
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import { loadModularFlow } from "./loadModularFlow.ts";
+import { surveyPageColumn, phaseHeading, leadParagraph } from "./surveyStyles.ts";
 import type { SurveyContext, FlowOption } from "./types.ts";
 import { deriveScriptPrefill, normalizeTargetScript } from "../lib/scriptAxes.ts";
 import type { IdentityLiteResult } from "./identityLiteResult.ts";
@@ -618,45 +619,39 @@ export function IdentityLite({
   }
 
   return (
-    <div
-      data-testid="identity-panel"
-      style={{
-        background: "#0d1117",
-        color: "#e6edf3",
-        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-      }}
-    >
-      <h2
-        style={{
-          margin: "0 0 20px 0",
-          fontSize: "1.1rem",
-          color: "#6ea8fe",
-          fontWeight: 600,
-        }}
-      >
-        <Trans id="survey.identityLite.heading">Let's identify your language</Trans>
-      </h2>
-      <SurveyRunner
-        key={flow.flow_id}
-        flow={flow}
-        context={context}
-        onComplete={handleComplete}
-        onAnswerCommit={handleAnswerCommit}
-        getSeedValue={getSeedValue}
-        getSeedProvenance={getSeedProvenance}
-        getFieldWarning={getFieldWarning}
-        getSeedOptions={getSeedOptions}
-        getNextOverride={getNextOverride}
-        onEntryResolved={handleEntryResolved}
-        advanceOnSelect
-        // 220px ≈ the tallest identity question's label + help text + field, so
-        // Back/Next hold a steady vertical position as the help text varies in
-        // length across Q1–Q5 (tuned by eye against the live flow).
-        contentMinHeight={220}
-        {...(onBack !== undefined ? { onBack } : {})}
-        {...(findingsByQuestionId !== undefined ? { findingsByQuestionId } : {})}
-        {...(resumeAnswers !== undefined ? { resumeAnswers } : {})}
-      />
+    <div style={surveyPageColumn}>
+      <div data-testid="identity-panel">
+        <h2 style={phaseHeading}>
+          <Trans id="survey.identityLite.heading">Let's identify your language</Trans>
+        </h2>
+        <p style={leadParagraph}>
+          <Trans id="survey.identityLite.lead">
+            Answer a few quick questions about your language. Nothing is final — you can
+            change any answer later.
+          </Trans>
+        </p>
+        <SurveyRunner
+          key={flow.flow_id}
+          flow={flow}
+          context={context}
+          onComplete={handleComplete}
+          onAnswerCommit={handleAnswerCommit}
+          getSeedValue={getSeedValue}
+          getSeedProvenance={getSeedProvenance}
+          getFieldWarning={getFieldWarning}
+          getSeedOptions={getSeedOptions}
+          getNextOverride={getNextOverride}
+          onEntryResolved={handleEntryResolved}
+          advanceOnSelect
+          // 220px ≈ the tallest identity question's label + help text + field, so
+          // Back/Next hold a steady vertical position as the help text varies in
+          // length across Q1–Q5 (tuned by eye against the live flow).
+          contentMinHeight={220}
+          {...(onBack !== undefined ? { onBack } : {})}
+          {...(findingsByQuestionId !== undefined ? { findingsByQuestionId } : {})}
+          {...(resumeAnswers !== undefined ? { resumeAnswers } : {})}
+        />
+      </div>
     </div>
   );
 }

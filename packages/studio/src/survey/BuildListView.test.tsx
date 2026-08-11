@@ -330,14 +330,14 @@ describe("BuildListView — Back navigation", () => {
   it("clicking Back shows the IntroChooser again", async () => {
     await renderBuildListView({});
     // We should be in BuildListView now.
-    expect(screen.queryByText(/Phase B — Add your whole alphabet/i)).not.toBeNull();
+    expect(screen.queryByText(/Add your whole alphabet/i)).not.toBeNull();
     // Find and click the Back button in BuildListView.
     const backBtn = screen.getByRole("button", { name: /^Back$/i });
     await act(async () => {
       fireEvent.click(backBtn);
     });
     // IntroChooser should be visible again.
-    expect(screen.queryByText(/Phase B — Character discovery/i)).not.toBeNull();
+    expect(screen.queryByText(/Character discovery/i)).not.toBeNull();
   });
 });
 

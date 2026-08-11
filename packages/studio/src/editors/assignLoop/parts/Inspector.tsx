@@ -246,9 +246,16 @@ type RoleType = 'input' | 'output' | 'input+output';
 function RoleChip({ storeRole }: { storeRole: RoleType }) {
   const { t } = useLingui();
   const styles = {
-    'input+output': { bg: 'color-mix(in srgb, #b8a0d8 18%, var(--app-surface))', border: '1px solid color-mix(in srgb, #b8a0d8 50%, transparent)', color: '#c8b0e8', label: t({ id: "editor.assignLoop.inspector.roleChip.inOut", message: "in+out" }) },
+    // 'input+output'/'output' are the same categorical role-taxonomy scheme
+    // Rail.tsx's buildStoreSubs uses for its own sub-section chips — kept in
+    // sync so a store reads the same role color in both the Rail and the
+    // Inspector. No dedicated categorical purple token exists (see
+    // KindBadge.tsx's KIND_COLOR comment); 'output' reuses the semantic
+    // success token since "this store's output side" and "produced" read
+    // naturally as the same green already used elsewhere in this file.
+    'input+output': { bg: 'color-mix(in srgb, var(--sil-violet) 18%, var(--app-surface))', border: '1px solid color-mix(in srgb, var(--sil-violet) 50%, transparent)', color: 'var(--sil-violet-60)', label: t({ id: "editor.assignLoop.inspector.roleChip.inOut", message: "in+out" }) },
     'input': { bg: 'var(--app-accent-subtle)', border: '1px solid var(--app-border)', color: 'var(--app-accent-text)', label: t({ id: "editor.assignLoop.inspector.roleChip.input", message: "input" }) },
-    'output': { bg: 'color-mix(in srgb, #7dbf8e 15%, var(--app-surface))', border: '1px solid color-mix(in srgb, #7dbf8e 40%, transparent)', color: '#7dbf8e', label: t({ id: "editor.assignLoop.inspector.roleChip.output", message: "output" }) },
+    'output': { bg: 'color-mix(in srgb, var(--app-success) 15%, var(--app-surface))', border: '1px solid color-mix(in srgb, var(--app-success) 40%, transparent)', color: 'var(--app-success-text)', label: t({ id: "editor.assignLoop.inspector.roleChip.output", message: "output" }) },
   }[storeRole];
   return (
     <span style={{ font: '600 10px/1 var(--app-font)', padding: '3px 7px', borderRadius: 5, background: styles.bg, border: styles.border, color: styles.color }}>

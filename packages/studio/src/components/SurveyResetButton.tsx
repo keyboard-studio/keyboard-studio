@@ -60,7 +60,7 @@ const CONFIRM_PANEL_STYLE: CSSProperties = {
   background: BG_CARD,
   border: `1px solid ${BORDER}`,
   borderRadius: 8,
-  boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+  boxShadow: "0 8px 24px color-mix(in srgb, var(--app-bg) 22%, transparent)",
 };
 
 const CONFIRM_TEXT_STYLE: CSSProperties = {

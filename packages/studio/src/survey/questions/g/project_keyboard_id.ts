@@ -16,7 +16,9 @@ import type { QuestionModule, ValidationResult } from "../../types.ts";
 
 export const definition = {
   id: "project_keyboard_id",
-  type: "text" as const,
+  // short_text (single-line TextField) — an identifier is one token, never a
+  // paragraph. See project_display_name for the same reasoning.
+  type: "short_text" as const,
   prompt: "Confirm the keyboard ID",
   help_text:
     "The keyboard ID is a short lowercase identifier used as the folder name in " +

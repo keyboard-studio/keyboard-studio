@@ -57,7 +57,7 @@ const STEP_TITLE_MESSAGES: Record<string, MessageDescriptor> = {
   project_name: msg({ id: "step.projectName.title", message: "Name your keyboard" }),
   phase_f_helpdocs: msg({
     id: "step.phaseF.title",
-    message: "Phase F — Help documentation",
+    message: "Help documentation",
   }),
 };
 

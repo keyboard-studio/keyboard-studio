@@ -62,7 +62,7 @@ export function KmnEditor({ vfs, onRecompile }: KmnEditorProps) {
           border: `1px solid ${CARD_BORDER}`,
           borderRadius: 8,
           fontSize: 12,
-          color: "#9aa7b8",
+          color: "var(--app-text-subtle)",
           fontFamily: FONT_MONO,
         }}
       >
@@ -84,7 +84,7 @@ export function KmnEditor({ vfs, onRecompile }: KmnEditorProps) {
           fontSize: 11,
           textTransform: "uppercase",
           letterSpacing: "0.08em",
-          color: "#9aa7b8",
+          color: "var(--app-text-subtle)",
           fontWeight: 700,
         }}
       >
@@ -99,7 +99,7 @@ export function KmnEditor({ vfs, onRecompile }: KmnEditorProps) {
         style={{
           width: "100%",
           boxSizing: "border-box",
-          background: "#0d1117",
+          background: "var(--app-bg)",
           color: TEXT_MAIN,
           border: `1px solid ${CARD_BORDER}`,
           borderRadius: 8,
@@ -114,7 +114,7 @@ export function KmnEditor({ vfs, onRecompile }: KmnEditorProps) {
       <div
         style={{
           fontSize: 11,
-          color: "#484f58",
+          color: "var(--app-text-disabled)",
           fontFamily: FONT_MONO,
         }}
         aria-live="polite"

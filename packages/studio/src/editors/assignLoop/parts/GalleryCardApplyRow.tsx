@@ -25,6 +25,7 @@ import {
   BLUE_ACTION,
   TEXT_DIM,
 } from "../../../lib/galleryTheme.ts";
+import { CSS_TEXT_ON_ACCENT } from "../../../ui/theme.ts";
 
 export interface GalleryCardApplyRowProps {
   /** Accessible name for the Apply button — computed by the caller via the
@@ -56,8 +57,8 @@ export function GalleryCardApplyRow({
         flexShrink: 0,
         marginRight: 14,
         padding: "6px 16px",
-        background: canApply ? BLUE_ACTION : "#21262d",
-        color: canApply ? "#e6edf3" : TEXT_DIM,
+        background: canApply ? BLUE_ACTION : "var(--app-surface-2)",
+        color: canApply ? CSS_TEXT_ON_ACCENT : TEXT_DIM,
         cursor: canApply ? "pointer" : "not-allowed",
       }}
     >

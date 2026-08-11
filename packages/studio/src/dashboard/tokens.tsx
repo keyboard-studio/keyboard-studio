@@ -3,32 +3,57 @@
 export const MONO = "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace";
 export const SANS = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
 
-// Semantic color palette for dashboard views
+// Semantic color palette for dashboard views (epic #533) — every value is an
+// existing --app-* semantic token (colors.css) so every consumer stays
+// theme-aware (light / navy) for free. Where no --app-* semantic exists yet
+// (teal, purple — this page's "proposed"/"reserve" categories), the closest
+// existing brand token (brand.css's --sil-*) is reused instead of a raw hex
+// literal; these two are flagged as a gap, not silently invented.
+//
+// Pattern per status family: "base"/"light" (readable-as-TEXT shade) ->
+// var(--app-{status}-text); "dark" (border/fill shade) -> var(--app-{status});
+// "bg" (background tint) -> var(--app-{status}-bg). See colors.css's own
+// header comment for why the plain status token is the one meant for
+// borders/fills and the "-text" variant is the one meant for text.
 export const COLORS = {
-  // Primary blues
-  blue: { base: "#6ea8fe", dark: "#1f6feb", light: "#79c0ff", bg: "#11203a" },
-  // Success greens
-  green: { base: "#3fb950", dark: "#238636", bg: "#0f2417" },
-  // Warning ambers
-  amber: { base: "#e3b341", dark: "#9e6a03", light: "#d29922", bg: "#241c10" },
-  // Error reds
-  red: { base: "#ff9492", dark: "#763a3a", bg: "#3d1d1d" },
-  // Teal (proposed/library)
-  teal: { base: "#39c5cf", dark: "#1b6b73", bg: "#0c2a2e" },
-  // Purple (reserve)
-  purple: { base: "#6e40c9", dark: "#4a2a8a", bg: "#1a1030" },
-  // Grays
+  // Primary blues — the app's one accent family.
+  blue: {
+    base: "var(--app-accent-text)",
+    dark: "var(--app-accent)",
+    light: "var(--app-accent-text)",
+    bg: "var(--app-accent-bg)",
+  },
+  // Success greens.
+  green: { base: "var(--app-success-text)", dark: "var(--app-success)", bg: "var(--app-success-bg)" },
+  // Warning ambers.
+  amber: {
+    base: "var(--app-warning-text)",
+    dark: "var(--app-warning)",
+    light: "var(--app-warning-text)",
+    bg: "var(--app-warning-bg)",
+  },
+  // Error reds.
+  red: { base: "var(--app-danger-text)", dark: "var(--app-danger)", bg: "var(--app-danger-bg)" },
+  // Teal (proposed/library) — no --app-teal semantic exists; closest existing
+  // token is the SIL light-blue brand family.
+  teal: { base: "var(--sil-light-blue)", dark: "var(--sil-light-blue-dark)", bg: "var(--sil-light-blue-10)" },
+  // Purple (reserve) — no --app-purple semantic exists; closest existing
+  // token is the SIL violet brand family.
+  purple: { base: "var(--sil-violet)", dark: "var(--sil-violet-dark)", bg: "var(--sil-violet-10)" },
+  // Grays — four text weights map onto the app's text/muted/subtle/disabled
+  // tiers by relative lightness; the two background/panel tiers map onto
+  // surface/surface-2.
   gray: {
-    text: "#e6edf3",
-    textMuted: "#adbac7",
-    textDim: "#8b949e",
-    textVeryDim: "#6e7681",
-    border: "#21262d",
-    borderStrong: "#30363d",
-    bg: "#0b0f14",
-    bgPanel: "#11161d",
-    bgCard: "#161b22",
-    bgCanvas: "#0d1117",
+    text: "var(--app-text)",
+    textMuted: "var(--app-text-muted)",
+    textDim: "var(--app-text-subtle)",
+    textVeryDim: "var(--app-text-disabled)",
+    border: "var(--app-border)",
+    borderStrong: "var(--app-border-strong)",
+    bg: "var(--app-bg)",
+    bgPanel: "var(--app-surface-2)",
+    bgCard: "var(--app-surface)",
+    bgCanvas: "var(--app-bg)",
   },
 } as const;
 

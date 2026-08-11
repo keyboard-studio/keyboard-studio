@@ -68,7 +68,7 @@ const FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
 const sectionStyle: React.CSSProperties = {
   marginTop: 20,
   paddingTop: 16,
-  borderTop: "1px solid #283040",
+  borderTop: "1px solid var(--app-border)",
   display: "flex",
   flexDirection: "column",
   gap: 10,
@@ -78,13 +78,13 @@ const labelStyle: React.CSSProperties = {
   fontSize: 11,
   textTransform: "uppercase",
   letterSpacing: "0.08em",
-  color: "#6ea8fe",
+  color: "var(--app-accent-text)",
   fontWeight: 700,
 };
 
 const fieldLabelStyle: React.CSSProperties = {
   fontSize: 12,
-  color: "#9aa7b8",
+  color: "var(--app-text-subtle)",
   marginBottom: 3,
   display: "block",
 };
@@ -93,9 +93,9 @@ const inputStyle: React.CSSProperties = {
   width: "100%",
   boxSizing: "border-box",
   padding: "6px 8px",
-  background: "#0d1117",
-  color: "#e6edf3",
-  border: "1px solid #30363d",
+  background: "var(--app-bg)",
+  color: "var(--app-text)",
+  border: "1px solid var(--app-border)",
   borderRadius: 6,
   fontSize: 13,
   fontFamily: FONT,
@@ -104,7 +104,7 @@ const inputStyle: React.CSSProperties = {
 
 const inputInvalidStyle: React.CSSProperties = {
   ...inputStyle,
-  borderColor: "#f0a0a0",
+  borderColor: "var(--app-danger)",
 };
 
 function submitButtonStyle(enabled: boolean): React.CSSProperties {
@@ -112,9 +112,9 @@ function submitButtonStyle(enabled: boolean): React.CSSProperties {
     alignSelf: "flex-start",
     marginTop: 4,
     padding: "8px 20px",
-    background: enabled ? "#1f6feb" : "#161b22",
-    color: enabled ? "#e6edf3" : "#484f58",
-    border: "1px solid #283040",
+    background: enabled ? "var(--app-accent)" : "var(--app-surface)",
+    color: enabled ? "var(--app-text-on-accent)" : "var(--app-text-disabled)",
+    border: "1px solid var(--app-border)",
     borderRadius: 6,
     fontSize: 13,
     fontWeight: 600,
@@ -126,17 +126,17 @@ function submitButtonStyle(enabled: boolean): React.CSSProperties {
 
 const successPanelStyle: React.CSSProperties = {
   padding: "12px 16px",
-  background: "#0f2a1a",
-  border: "1px solid #2ea043",
+  background: "var(--app-success-bg)",
+  border: "1px solid var(--app-success-border)",
   borderRadius: 6,
   fontSize: 13,
-  color: "#7ee787",
+  color: "var(--app-success-text)",
   lineHeight: 1.6,
 };
 
 const errorStyle: React.CSSProperties = {
   fontSize: 12,
-  color: "#f0a0a0",
+  color: "var(--app-danger-text)",
   marginTop: 4,
 };
 
@@ -360,7 +360,7 @@ export function ManagedPRSubmitPanel({
           <div style={{ fontWeight: 600, marginBottom: 6 }}>
             <Trans id="output.submit.success.heading">Your submission is being reviewed.</Trans>
           </div>
-          <div style={{ fontSize: 12, color: "#9aa7b8" }}>
+          <div style={{ fontSize: 12, color: "var(--app-text-subtle)" }}>
             <Trans id="output.submit.success.body">
               The keyboard studio team will review your keyboard and may reach out
               via the email you provided.{" "}
@@ -368,7 +368,7 @@ export function ManagedPRSubmitPanel({
                 href={submitState.prUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={{ color: "#6ea8fe" }}
+                style={{ color: "var(--app-accent-text)" }}
                 aria-label={t({
                   id: "output.submit.success.linkAriaLabel",
                   message: "View your keyboard submission",
@@ -397,7 +397,7 @@ export function ManagedPRSubmitPanel({
       <div style={labelStyle}>
         <Trans id="output.submit.sectionLabel">Submit to community repository</Trans>
       </div>
-      <p style={{ margin: 0, fontSize: 12, color: "#9aa7b8", lineHeight: 1.5 }}>
+      <p style={{ margin: 0, fontSize: 12, color: "var(--app-text-subtle)", lineHeight: 1.5 }}>
         <Trans id="output.submit.intro">
           Provide your name and email for attribution, confirm the copyright
           statement, and submit. We handle the technical side.
@@ -489,7 +489,7 @@ export function ManagedPRSubmitPanel({
           htmlFor={copyrightId}
           style={{
             fontSize: 12,
-            color: "#9aa7b8",
+            color: "var(--app-text-subtle)",
             lineHeight: 1.5,
             cursor: isSubmitting ? "not-allowed" : "pointer",
           }}
@@ -551,7 +551,7 @@ export function ManagedPRSubmitPanel({
               background: "none",
               border: "none",
               padding: 0,
-              color: "#f0a0a0",
+              color: "var(--app-danger-text)",
               textDecoration: "underline",
               cursor: "pointer",
               font: "inherit",

@@ -43,8 +43,17 @@ function countMatches(source: string, re: RegExp): number {
  * binding or a doc-comment mention — the V3 invariant is about executable code.
  */
 function codeOnly(source: string): string {
+  // 0. Normalize CRLF -> LF FIRST. Without this the whole function silently
+  //    no-ops on a Windows checkout (core.autocrlf rewrites the working tree
+  //    even though the blobs are LF): step 2 splits on "\n", leaving a trailing
+  //    "\r" on every line, and `/\/\/.*$/` then cannot match, because in JS
+  //    regex `.` excludes \r as a line terminator — so `.*` stops short of `$`
+  //    and the replace does nothing. Line comments survived, and this probe
+  //    failed on its OWN compliance comment ("no second debounce / async loop
+  //    — V3/Article IV") while the code it guards was perfectly synchronous.
+  const lf = source.replace(/\r\n/g, "\n");
   // 1. Remove block comments (non-greedy, spanning lines).
-  const noBlocks = source.replace(/\/\*[\s\S]*?\*\//g, "");
+  const noBlocks = lf.replace(/\/\*[\s\S]*?\*\//g, "");
   // 2. Remove import statements and line comments.
   return noBlocks
     .split("\n")

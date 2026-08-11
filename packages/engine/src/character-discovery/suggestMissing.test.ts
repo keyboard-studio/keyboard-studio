@@ -872,3 +872,99 @@ describe("spec 044 — all four tiers reach the needed set", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// 15. Narrowed Turkic hazard exception + Greek sigma equivalence.
+//
+// Regression lock for the carve-recommender defect: `isTurkic` used to
+// suppress case-folding for EVERY character on a Latin-script Turkic locale
+// (not just the dotted-I family), so on a Turkish/Azerbaijani/Latin-Kazakh
+// keyboard, every capital an author typed as lowercase-only was reported
+// "uncovered" and became a removal candidate. The fix narrows the exception
+// to exactly i/I/ı/İ, and separately closes a Greek sigma gap where an
+// author who typed only the word-final sigma (ς) had the capital (Σ)
+// reported uncovered because JS's 'Σ'.toLowerCase() yields only the medial
+// form (σ).
+// ---------------------------------------------------------------------------
+
+describe("isCharCoveredForLocale — narrowed Turkic hazard exception (regression per measured defect table)", () => {
+  it("en: uppercase A/B/C covered by lowercase a/b/c (regression — locale unaffected by the fix)", () => {
+    const produced = new Set(["a", "b", "c"]);
+    expect(isCharCoveredForLocale("A", produced, "en")).toBe(true);
+    expect(isCharCoveredForLocale("B", produced, "en")).toBe(true);
+    expect(isCharCoveredForLocale("C", produced, "en")).toBe(true);
+  });
+
+  it("tr: uppercase A/B/C are covered by lowercase a/b/c (previously wrongly flagged for removal)", () => {
+    const produced = new Set(["a", "b", "c"]);
+    expect(isCharCoveredForLocale("A", produced, "tr")).toBe(true);
+    expect(isCharCoveredForLocale("B", produced, "tr")).toBe(true);
+    expect(isCharCoveredForLocale("C", produced, "tr")).toBe(true);
+  });
+
+  it("az: uppercase A/B are covered by lowercase a/b (previously wrongly flagged for removal)", () => {
+    const produced = new Set(["a", "b"]);
+    expect(isCharCoveredForLocale("A", produced, "az")).toBe(true);
+    expect(isCharCoveredForLocale("B", produced, "az")).toBe(true);
+  });
+
+  it("kk-Latn: uppercase A/B are covered by lowercase a/b (previously wrongly flagged for removal)", () => {
+    const produced = new Set(["a", "b"]);
+    expect(isCharCoveredForLocale("A", produced, "kk-Latn")).toBe(true);
+    expect(isCharCoveredForLocale("B", produced, "kk-Latn")).toBe(true);
+  });
+
+  it("tr: A is covered by a (non-hazard letters still fold normally)", () => {
+    expect(isCharCoveredForLocale("A", new Set(["a"]), "tr")).toBe(true);
+  });
+
+  it("tr: İ is NOT covered by i (dotted-I hazard stays exact-match-only)", () => {
+    expect(isCharCoveredForLocale("İ", new Set(["i"]), "tr")).toBe(false);
+  });
+
+  it("tr: I is NOT covered by ı (dotted-I hazard stays exact-match-only)", () => {
+    expect(isCharCoveredForLocale("I", new Set(["ı"]), "tr")).toBe(false);
+  });
+
+  it("tr: i and ı remain distinct — neither covers the other", () => {
+    expect(isCharCoveredForLocale("i", new Set(["ı"]), "tr")).toBe(false);
+    expect(isCharCoveredForLocale("ı", new Set(["i"]), "tr")).toBe(false);
+  });
+
+  it("az behaves like tr for the dotted-I hazard set", () => {
+    expect(isCharCoveredForLocale("İ", new Set(["i"]), "az")).toBe(false);
+    expect(isCharCoveredForLocale("I", new Set(["ı"]), "az")).toBe(false);
+  });
+
+  it("kk-Latn behaves like tr for the dotted-I hazard set", () => {
+    expect(isCharCoveredForLocale("İ", new Set(["i"]), "kk-Latn")).toBe(false);
+    expect(isCharCoveredForLocale("I", new Set(["ı"]), "kk-Latn")).toBe(false);
+  });
+
+  it("el: Σ is covered by σ alone (medial lowercase, JS's default fold)", () => {
+    expect(isCharCoveredForLocale("Σ", new Set(["α", "σ"]), "el")).toBe(true);
+  });
+
+  it("el: Σ is covered by ς alone (final lowercase — the sigma gap this fix closes)", () => {
+    // Previously flagged for removal: JS's 'Σ'.toLowerCase() yields only σ,
+    // so an author who typed only the word-final sigma ς had Σ reported
+    // uncovered.
+    expect(isCharCoveredForLocale("Σ", new Set(["α", "ς"]), "el")).toBe(true);
+  });
+
+  it("el: Σ is covered when both σ and ς are present", () => {
+    expect(isCharCoveredForLocale("Σ", new Set(["α", "σ", "ς"]), "el")).toBe(true);
+  });
+
+  it("ru: Cyrillic case-fold is unaffected by the fix (regression)", () => {
+    expect(isCharCoveredForLocale("А", new Set(["а"]), "ru")).toBe(true);
+  });
+
+  it("de: sharp-S case-fold (ß/ẞ) is unaffected by the fix (regression)", () => {
+    expect(isCharCoveredForLocale("ẞ", new Set(["ß"]), "de")).toBe(true);
+  });
+
+  it("ka: Georgian exact-match coverage is unaffected by the fix (regression)", () => {
+    expect(isCharCoveredForLocale("ა", new Set(["ა"]), "ka")).toBe(true);
+  });
+});

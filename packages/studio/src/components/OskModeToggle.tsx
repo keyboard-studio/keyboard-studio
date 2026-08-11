@@ -30,9 +30,9 @@ export function OskModeToggle({ value, onChange, disabled }: OskModeToggleProps)
         style={{
           padding: "8px 16px",
           borderRadius: 0,
-          border: "1px solid #283040",
-          background: active ? "rgba(110,168,254,0.18)" : "#161b22",
-          color: active ? "#6ea8fe" : "#e6edf3",
+          border: "1px solid var(--app-border)",
+          background: active ? "var(--app-accent-subtle)" : "var(--app-surface)",
+          color: active ? "var(--app-accent-text)" : "var(--app-text)",
           fontWeight: active ? 600 : 500,
           cursor: disabled ? "not-allowed" : "pointer",
           fontSize: 13,

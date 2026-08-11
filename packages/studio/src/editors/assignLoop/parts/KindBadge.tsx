@@ -5,11 +5,19 @@ import type { CardKind } from '../../../lib/irToCarveNodes.ts';
 import { resolveMessage } from './carveShared.tsx';
 export type { CardKind } from '../../../lib/irToCarveNodes.ts';
 
+// Categorical (not status/severity) taxonomy palette — one decorative hue per
+// CardKind, deliberately distinct from the --app-danger/warning/success/
+// accent semantic tokens (a "kind" is not a severity). No dedicated
+// categorical CSS tokens exist yet (epic #533 scoped the --app-* set to
+// status/surface roles), so this maps each kind onto the closest existing
+// SIL brand token (brand.css) rather than inventing a fifth palette —
+// visual hue drifts slightly from the pre-token literals, which is the
+// expected/disclosed trade-off of standardizing on the brand ramp.
 export const KIND_COLOR: Record<CardKind, string> = {
-  pattern: '#6fbbd4',
-  group:   '#f18407',
-  store:   '#8b5cc4',
-  raw:     '#b90529',
+  pattern: 'var(--sil-light-blue-60)',
+  group:   'var(--sil-orange)',
+  store:   'var(--sil-violet)',
+  raw:     'var(--sil-red-dark)',
 };
 
 // Chrome (human-readable category labels) — built per-render via the

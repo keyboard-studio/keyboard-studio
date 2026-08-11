@@ -753,6 +753,17 @@ export function storeCharChips(store: IRStore, ir: KeyboardIR, analysis?: StoreA
     : classifyStoreSlotEdit(store, ir);
   const chips: StoreCharChip[] = [];
 
+  // matchTableOnly stores are never emitted by any rule (a match table over
+  // already-typed buffer content, e.g. a Backspace repair source) — omitted
+  // entirely rather than shown disabled, since the gallery's promise is
+  // "characters this keyboard can produce" and these never are. Still a
+  // normal, unblocked `drop` at the engine level (nothing positionally
+  // depends on these items — see StoreSlotEditMode's doc comment), so this
+  // is a display-only omission, not a refusal to edit.
+  if (editMode.mode === 'drop' && editMode.matchTableOnly === true) {
+    return chips;
+  }
+
   store.items.forEach((item, itemsIndex) => {
     if (item.kind !== 'char') return;
     const chipId = `${store.nodeId}#${itemsIndex}`;

@@ -656,7 +656,7 @@ export function RenameDialog({
     <>
       {/* Fixed transparent backdrop — click outside to cancel (mirrors AccountControl.tsx's own convention). */}
       <div
-        style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 299 }}
+        style={{ position: "fixed", inset: 0, background: "color-mix(in srgb, var(--sil-black) 50%, transparent)", zIndex: 299 }}
         onClick={onCancel}
         aria-hidden="true"
       />
@@ -685,7 +685,7 @@ export function RenameDialog({
           border: `1px solid ${BORDER}`,
           borderRadius: 8,
           fontFamily: FONT,
-          boxShadow: "0 8px 24px rgba(0,0,0,0.5)",
+          boxShadow: "0 8px 24px color-mix(in srgb, var(--sil-black) 50%, transparent)",
         }}
       >
         <div style={{ fontSize: 13, color: TEXT_MAIN }} data-testid="rename-dialog-target">

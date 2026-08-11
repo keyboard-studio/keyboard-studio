@@ -128,16 +128,16 @@ const actionCardStyle: React.CSSProperties = {
 
 const githubButtonStyle: React.CSSProperties = {
   ...providerButtonBase,
-  background: "#238636",
-  color: "#e6edf3",
-  border: "1px solid #2ea043",
+  background: "#238636", // GitHub brand green
+  color: "var(--app-text-on-accent)",
+  border: "1px solid #2ea043", // GitHub brand green (border)
 };
 
 const googleButtonStyle: React.CSSProperties = {
   ...providerButtonBase,
-  background: "#1a73e8",
-  color: "#ffffff",
-  border: "1px solid #1a73e8",
+  background: "#1a73e8", // Google brand blue
+  color: "var(--app-text-on-accent)",
+  border: "1px solid #1a73e8", // Google brand blue (border)
 };
 
 export function WelcomeScreen() {
@@ -351,7 +351,7 @@ export function WelcomeScreen() {
                 margin: 0,
                 fontSize: 13,
                 lineHeight: 1.5,
-                color: "#f0a0a0",
+                color: "var(--app-danger-text)",
                 fontFamily: FONT,
               }}
             >

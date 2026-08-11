@@ -129,7 +129,7 @@ export function RowMetricsReadout({ rowIndex, metrics }: RowMetricsReadoutProps)
           // region firing on each cycle would talk over the author mid-edit.
           // The selected cell's own aria-live announcement (findingCopy.ts's
           // `findingAnnouncement`) is where a diagnostic gets spoken.
-          style={{ color: "#d29922", fontWeight: 600 }}
+          style={{ color: "var(--app-warning-text)", fontWeight: 600 }}
         >
           {/* The word "Crowded" carries the signal; the amber is decoration
               only, so colour is never the sole carrier (accessibility rule 7). */}
