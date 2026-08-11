@@ -134,7 +134,7 @@ export function TrackOneIdentityPanel() {
         flexDirection: "column",
         gap: 12,
         padding: 16,
-        background: "#161b22",
+        background: "var(--app-surface)",
         border: `1px solid ${CARD_BORDER}`,
         borderRadius: 12,
       }}
@@ -144,7 +144,7 @@ export function TrackOneIdentityPanel() {
           fontSize: 11,
           textTransform: "uppercase",
           letterSpacing: "0.08em",
-          color: "#7ee787",
+          color: "var(--app-success-text)",
           fontWeight: 700,
         }}
       >
@@ -153,14 +153,14 @@ export function TrackOneIdentityPanel() {
 
       {/* Display name */}
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        {/* one-off: hint TEXT_DIM — Label default is #e6edf3; override via style passthrough */}
+        {/* one-off: hint TEXT_DIM — Label default is var(--app-text); override via style passthrough */}
         <Label
           htmlFor="identity-display-name"
           style={{ fontSize: 12, color: TEXT_DIM, fontWeight: 600, marginBottom: 0 }}
         >
           <Trans id="editor.trackOneIdentity.displayNameLabel">Display name</Trans>
         </Label>
-        {/* one-off: input border CARD_BORDER — TextField BORDER is #30363d; override via style passthrough */}
+        {/* one-off: input border CARD_BORDER — TextField BORDER is var(--app-border); override via style passthrough */}
         <TextField
           id="identity-display-name"
           value={displayName}
@@ -183,14 +183,14 @@ export function TrackOneIdentityPanel() {
 
       {/* Keyboard id */}
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        {/* one-off: hint TEXT_DIM — Label default is #e6edf3; override via style passthrough */}
+        {/* one-off: hint TEXT_DIM — Label default is var(--app-text); override via style passthrough */}
         <Label
           htmlFor="identity-keyboard-id"
           style={{ fontSize: 12, color: TEXT_DIM, fontWeight: 600, marginBottom: 0 }}
         >
           <Trans id="editor.trackOneIdentity.keyboardIdLabel">Keyboard ID</Trans>
         </Label>
-        {/* one-off: input border CARD_BORDER — TextField BORDER is #30363d; override via style passthrough */}
+        {/* one-off: input border CARD_BORDER — TextField BORDER is var(--app-border); override via style passthrough */}
         <TextField
           id="identity-keyboard-id"
           mono

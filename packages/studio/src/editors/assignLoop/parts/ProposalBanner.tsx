@@ -3,8 +3,8 @@
 //
 // Extracted from CasePairProposalBanner.tsx and SiblingAccentProposalBanner.tsx,
 // which were byte-identical copies of this markup/styling (role="note", the
-// green #0d2218/#238636 card, an Accept/Decline button pair) differing only
-// in the message content and the two buttons' labels/aria-labels/handlers.
+// green ProposalCard, an Accept/Decline button pair) differing only in the
+// message content and the two buttons' labels/aria-labels/handlers.
 // Purely presentational — callers own their own proposal shape, message
 // composition (including any <Trans> macros — a message is a ReactNode, not
 // a template string, so callers keep full control of their own i18n ids),
@@ -55,10 +55,10 @@ export function ProposalBanner({
           aria-label={confirmAriaLabel}
           style={{
             padding: "5px 14px",
-            background: "#238636",
+            background: "var(--app-success)",
             border: "none",
             borderRadius: 5,
-            color: "#e6edf3",
+            color: "var(--app-text-on-accent)",
             fontSize: 12,
             fontWeight: 600,
             cursor: "pointer",

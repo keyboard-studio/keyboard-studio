@@ -14,23 +14,36 @@ export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   variant?: ButtonVariant;
 };
 
+// Border is split into borderWidth/borderStyle/borderColor (rather than the
+// `border: "1px solid <token>"` shorthand) throughout this file: jsdom's
+// style-shorthand parser cannot decompose a shorthand value containing an
+// unresolved `var(...)`, so `.style.borderColor` reads back empty in tests
+// even though a real browser renders it correctly. Longhand sidesteps that
+// entirely and is no less readable.
 const STYLE_PRIMARY_ENABLED: React.CSSProperties = {
   padding: "8px 18px",
   background: BLUE_ACTION,
-  border: `1px solid ${BLUE_ACTION}`,
-  borderRadius: 6,
-  color: "#fff",
+  borderWidth: "1px",
+  borderStyle: "solid",
+  borderColor: BLUE_ACTION,
+  borderRadius: "var(--app-radius-sm)",
+  color: "var(--app-text-on-accent)",
   fontSize: 13,
   cursor: "pointer",
   fontFamily: FONT,
 };
 
+// Never recolor AND dim the same element (design handoff rule #2): a
+// disabled button uses --app-text-disabled alone, with no opacity stacked
+// on top — the muted color already carries the "can't interact" signal.
 const STYLE_PRIMARY_DISABLED: React.CSSProperties = {
   padding: "8px 18px",
   background: "transparent",
-  border: `1px solid ${BORDER}`,
-  borderRadius: 6,
-  color: "#484f58",
+  borderWidth: "1px",
+  borderStyle: "solid",
+  borderColor: BORDER,
+  borderRadius: "var(--app-radius-sm)",
+  color: "var(--app-text-disabled)",
   fontSize: 13,
   cursor: "not-allowed",
   fontFamily: FONT,
@@ -40,8 +53,10 @@ const STYLE_BACK: React.CSSProperties = {
   marginTop: 20,
   padding: "6px 14px",
   background: "transparent",
-  border: `1px solid ${BORDER}`,
-  borderRadius: 6,
+  borderWidth: "1px",
+  borderStyle: "solid",
+  borderColor: BORDER,
+  borderRadius: "var(--app-radius-sm)",
   color: TEXT_DIM,
   fontSize: 13,
   cursor: "pointer",

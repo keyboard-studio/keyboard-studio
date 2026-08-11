@@ -30,7 +30,7 @@ const FONT = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif";
 const sectionStyle: React.CSSProperties = {
   marginTop: 16,
   paddingTop: 16,
-  borderTop: "1px solid #283040",
+  borderTop: "1px solid var(--app-border)",
   display: "flex",
   flexDirection: "column",
   gap: 10,
@@ -41,7 +41,7 @@ const labelStyle: React.CSSProperties = {
   fontSize: 11,
   textTransform: "uppercase",
   letterSpacing: "0.08em",
-  color: "#7ee787",
+  color: "var(--app-success-text)",
   fontWeight: 700,
 };
 
@@ -54,9 +54,9 @@ const githubButtonStyle: React.CSSProperties = {
   alignItems: "center",
   gap: 8,
   padding: "8px 16px",
-  background: "#238636",
-  color: "#e6edf3",
-  border: "1px solid #2ea043",
+  background: "#238636", // GitHub brand green
+  color: "var(--app-text-on-accent)",
+  border: "1px solid #2ea043", // GitHub brand green (border)
   borderRadius: 6,
   fontSize: 13,
   fontWeight: 600,
@@ -71,9 +71,9 @@ const googleButtonStyle: React.CSSProperties = {
   alignItems: "center",
   gap: 8,
   padding: "8px 16px",
-  background: "#1a73e8",
-  color: "#ffffff",
-  border: "1px solid #1a73e8",
+  background: "#1a73e8", // Google brand blue
+  color: "var(--app-text-on-accent)",
+  border: "1px solid #1a73e8", // Google brand blue (border)
   borderRadius: 6,
   fontSize: 13,
   fontWeight: 600,
@@ -85,8 +85,8 @@ const googleButtonStyle: React.CSSProperties = {
 const secondaryButtonStyle: React.CSSProperties = {
   padding: "6px 12px",
   background: "transparent",
-  color: "#9aa7b8",
-  border: "1px solid #283040",
+  color: "var(--app-text-subtle)",
+  border: "1px solid var(--app-border)",
   borderRadius: 6,
   fontSize: 12,
   cursor: "pointer",
@@ -96,13 +96,13 @@ const secondaryButtonStyle: React.CSSProperties = {
 
 const statusLineStyle: React.CSSProperties = {
   fontSize: 13,
-  color: "#7ee787",
+  color: "var(--app-success-text)",
   display: "flex",
   alignItems: "center",
   gap: 8,
 };
 
-const alertStyle: React.CSSProperties = { fontSize: 12, color: "#f0a0a0" };
+const alertStyle: React.CSSProperties = { fontSize: 12, color: "var(--app-danger-text)" };
 
 export function SignUpPanel() {
   const { t } = useLingui();
@@ -126,7 +126,7 @@ export function SignUpPanel() {
         <div style={labelStyle}>
           <Trans id="output.identity.account.label">Account</Trans>
         </div>
-        <div role="status" aria-live="polite" style={{ fontSize: 13, color: "#9aa7b8" }}>
+        <div role="status" aria-live="polite" style={{ fontSize: 13, color: "var(--app-text-subtle)" }}>
           <Trans id="output.identity.checkingGithub">Checking GitHub sign-in...</Trans>
         </div>
       </section>
@@ -222,7 +222,7 @@ export function SignUpPanel() {
       <div style={labelStyle}>
         <Trans id="output.identity.submit.label">Submit your keyboard</Trans>
       </div>
-      <p style={{ margin: 0, fontSize: 12, color: "#9aa7b8", lineHeight: 1.5 }}>
+      <p style={{ margin: 0, fontSize: 12, color: "var(--app-text-subtle)", lineHeight: 1.5 }}>
         <Trans id="output.identity.submit.intro">
           Sign up to submit your keyboard to the community repository. We handle
           the technical side — you just choose how to sign in.

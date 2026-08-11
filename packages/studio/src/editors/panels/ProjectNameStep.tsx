@@ -20,7 +20,7 @@ export interface ProjectNameStepProps {
 const HEADING: React.CSSProperties = {
   margin: "0 0 8px 0",
   fontSize: "1.1rem",
-  color: "#6ea8fe",
+  color: "var(--app-accent-text)",
   fontWeight: 600,
 };
 
@@ -64,7 +64,7 @@ export function ProjectNameStep({
   }
 
   return (
-    <div style={{ color: "#e6edf3", fontFamily: "system-ui, sans-serif" }}>
+    <div style={{ color: "var(--app-text)", fontFamily: "system-ui, sans-serif" }}>
       <h2 style={HEADING}><Trans id="editor.projectName.heading">Name your keyboard</Trans></h2>
       <p style={SUBTLE}>
         <Trans id="editor.projectName.intro">
@@ -73,7 +73,7 @@ export function ProjectNameStep({
       </p>
 
       <div style={{ marginBottom: 20 }}>
-        {/* Label base color is #e6edf3; TEXT_DIM — pass through. */}
+        {/* Label base color is var(--app-text); TEXT_DIM — pass through. */}
         <Label htmlFor="project-display-name" style={{ color: TEXT_DIM, fontWeight: "normal" }}>
           <Trans id="editor.projectName.displayNameLabel">Display name</Trans>
         </Label>

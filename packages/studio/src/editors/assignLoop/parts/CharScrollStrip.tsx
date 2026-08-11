@@ -7,7 +7,11 @@
 //
 // Each chip shows:
 //   - the character's glyph (via displayChar — combining marks get a dotted
-//     circle prefix so they're visible standalone), rendered in WHITE;
+//     circle prefix so they're visible standalone), rendered in the theme's
+//     main text color (TEXT_MAIN) so it stays legible against BG_CARD in
+//     both the light and navy themes (epic #533 — the old hardcoded white
+//     only worked because the pre-token app had exactly one, always-dark
+//     theme);
 //   - a small count badge below it — the number of INDEPENDENT ways that
 //     character can be produced in the caller's modality: a deletion-safety
 //     signal (per product decision, a char reachable BOTH by its own key AND
@@ -59,9 +63,15 @@ import {
   BORDER,
   ACCENT,
   TEXT_DIM,
+  TEXT_MAIN,
   FONT,
 } from "../../../lib/galleryTheme.ts";
 import { ERROR_RED, ERROR_BG } from "../../../ui/theme.ts";
+import {
+  GREEN_CHIP_BG,
+  GREEN_CHIP_BORDER,
+  GREEN_CHIP_TEXT,
+} from "./RemovableChipRow.tsx";
 
 const WHEEL_SCROLL_FACTOR = 0.6; // dampen wheel delta so the strip pans a bit slower than the raw device delta
 
@@ -470,7 +480,7 @@ export function CharScrollStrip({
                 alignItems: "center",
                 gap: 4,
                 padding: isSelected ? "10px 12px" : "8px 10px",
-                background: isSelected ? "#0d2840" : BG_CARD,
+                background: isSelected ? "var(--app-accent-subtle)" : BG_CARD,
                 border: `1px solid ${isSelected ? ACCENT : BORDER}`,
                 borderRadius: 8,
                 cursor: "pointer",
@@ -483,7 +493,7 @@ export function CharScrollStrip({
                   lineHeight: 1,
                   fontFamily:
                     "ui-monospace, 'Cascadia Code', Consolas, monospace",
-                  color: "#ffffff",
+                  color: TEXT_MAIN,
                 }}
               >
                 {displayChar(c)}
@@ -522,7 +532,7 @@ export function CharScrollStrip({
                     fontSize: 10,
                     fontWeight: 600,
                     lineHeight: "16px",
-                    background: badgeGood ? "#0d2218" : ERROR_BG,
+                    background: badgeGood ? GREEN_CHIP_BG : ERROR_BG,
                     // Composable chars get a DASHED border (never color
                     // alone) in addition to the `⊕` marker below — a shape
                     // distinction visible in grayscale. This span's own
@@ -531,9 +541,9 @@ export function CharScrollStrip({
                     // a caller reading this badge's textContent for the
                     // count keeps getting exactly the number.
                     border: `1px ${badge.isComposable ? "dashed" : "solid"} ${
-                      badgeGood ? "#238636" : ERROR_RED
+                      badgeGood ? GREEN_CHIP_BORDER : ERROR_RED
                     }`,
-                    color: badgeGood ? "#56d364" : ERROR_RED,
+                    color: badgeGood ? GREEN_CHIP_TEXT : ERROR_RED,
                   }}
                 >
                   {count}

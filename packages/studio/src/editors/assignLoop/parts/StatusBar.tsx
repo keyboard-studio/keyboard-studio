@@ -24,7 +24,7 @@ const menuPanel: React.CSSProperties = {
   position: 'absolute', top: 'calc(100% + 10px)', right: 0, zIndex: 41,
   width: 400, maxWidth: '92vw',
   background: 'var(--app-surface)', border: '1px solid var(--app-border-strong)',
-  borderRadius: 12, boxShadow: '0 16px 44px rgba(20,40,80,.18)', overflow: 'hidden',
+  borderRadius: 12, boxShadow: '0 16px 44px color-mix(in srgb, var(--sil-black) 18%, transparent)', overflow: 'hidden',
 };
 const menuHeader: React.CSSProperties = {
   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
@@ -79,7 +79,7 @@ function RemovedMenu({ list, onRestore, onRestoreAll, onClose }: RemovedMenuProp
               ) : (
                 <>
                   <span style={{ flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', minWidth: 34, height: 34, padding: '0 7px', background: 'var(--app-surface-2)', border: '1px solid var(--app-border)', borderRadius: 7 }}>
-                    <span style={{ font: "400 18px/1 'Lora', serif", color: 'var(--app-text)' }}>
+                    <span style={{ font: "400 18px/1 var(--app-font-glyph)", color: 'var(--app-text)' }}>
                       {displayChar(it.ch)}
                     </span>
                   </span>
@@ -89,7 +89,7 @@ function RemovedMenu({ list, onRestore, onRestoreAll, onClose }: RemovedMenuProp
                   </div>
                 </>
               )}
-              <button onClick={() => onRestore(it)} style={{ flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 11px', background: 'var(--sil-green)', border: '1px solid var(--sil-green-dark)', borderRadius: 7, color: '#fff', font: '600 12.5px var(--app-font)', cursor: 'pointer' }}>
+              <button onClick={() => onRestore(it)} style={{ flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 11px', background: 'var(--sil-green)', border: '1px solid var(--sil-green-dark)', borderRadius: 7, color: 'var(--app-text-on-accent)', font: '600 12.5px var(--app-font)', cursor: 'pointer' }}>
                 <CheckIcon size={12} /> <Trans id="editor.assignLoop.statusBar.keepButton">Keep</Trans>
               </button>
             </div>

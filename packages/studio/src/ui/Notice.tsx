@@ -8,21 +8,25 @@ export type NoticeProps = {
   children: React.ReactNode;
 };
 
-const TONE_TOKENS: Record<NoticeTone, { role: React.AriaRole; color: string; border: string }> = {
+// borderColor (not the `border: "1px solid <token>"` shorthand) per tone:
+// jsdom's style-shorthand parser cannot decompose a shorthand value
+// containing an unresolved `var(...)`, so `.style.borderColor` reads back
+// empty in tests even though a real browser renders it correctly.
+const TONE_TOKENS: Record<NoticeTone, { role: React.AriaRole; color: string; borderColor: string }> = {
   info: {
     role: "note",
     color: TEXT_DIM,
-    border: `1px solid ${BORDER}`,
+    borderColor: BORDER,
   },
   warn: {
     role: "status",
     color: WARNING,
-    border: `1px solid ${BORDER}`,
+    borderColor: BORDER,
   },
   error: {
     role: "alert",
     color: ERROR_TEXT,
-    border: `1px solid ${ERROR_BORDER}`,
+    borderColor: ERROR_BORDER,
   },
 };
 
@@ -35,8 +39,10 @@ export function Notice({ tone = "info", children }: NoticeProps): React.ReactEle
       style={{
         padding: "14px 16px",
         background: BG_CARD,
-        border: tokens.border,
-        borderRadius: 8,
+        borderWidth: "1px",
+        borderStyle: "solid",
+        borderColor: tokens.borderColor,
+        borderRadius: "var(--app-radius)",
         fontSize: 13,
         color: tokens.color,
         lineHeight: 1.6,

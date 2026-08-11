@@ -66,7 +66,7 @@ export function CompareScreen() {
         height: "100%",
         width: "100%",
         background: "var(--bg)",
-        color: "#e6edf3",
+        color: "var(--app-text)",
         fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
         overflow: "hidden",
       }}
@@ -91,7 +91,7 @@ export function CompareScreen() {
         <h1 style={{ margin: 0, fontSize: "1.4rem", letterSpacing: "-0.01em" }}>
           <Trans id="compare.heading">Compare another keyboard</Trans>
         </h1>
-        <p style={{ margin: 0, color: "#9aa7b8", fontSize: 13 }}>
+        <p style={{ margin: 0, color: "var(--app-text-subtle)", fontSize: 13 }}>
           <Trans id="compare.intro">
             Load any keyboard to see how it works — type into it and read its source.
             Nothing you do here changes your own keyboard.
@@ -138,7 +138,7 @@ export function CompareScreen() {
             flexWrap: "wrap",
           }}
         >
-          <h2 style={{ margin: 0, fontSize: "1.1rem", color: "#6ea8fe" }}>
+          <h2 style={{ margin: 0, fontSize: "1.1rem", color: "var(--app-accent-text)" }}>
             {artifact.baseKeyboard?.displayName ??
               t({ id: "compare.empty.title", message: "No keyboard loaded" })}
           </h2>

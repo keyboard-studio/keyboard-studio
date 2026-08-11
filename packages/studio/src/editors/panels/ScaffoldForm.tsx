@@ -43,7 +43,7 @@ export function ScaffoldForm({ onSubmit }: ScaffoldFormProps) {
         flexDirection: "column",
         gap: 12,
         padding: 16,
-        background: "#161b22",
+        background: "var(--app-surface)",
         border: `1px solid ${CARD_BORDER}`,
         borderRadius: 12,
       }}
@@ -53,7 +53,9 @@ export function ScaffoldForm({ onSubmit }: ScaffoldFormProps) {
           fontSize: 11,
           textTransform: "uppercase",
           letterSpacing: "0.08em",
-          color: "#d2a8ff",
+          // Divergent decorative eyebrow color — no --app-* semantic token
+          // matches this purple; nearest brand tint is --sil-violet-40 (epic #533).
+          color: "var(--sil-violet-40)",
           fontWeight: 700,
         }}
       >
@@ -62,12 +64,12 @@ export function ScaffoldForm({ onSubmit }: ScaffoldFormProps) {
 
       {/* Keyboard ID field row */}
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        {/* Label color TEXT_DIM diverges from primitive default #e6edf3 — style passthrough */}
+        {/* Label color TEXT_DIM diverges from primitive default var(--app-text) — style passthrough */}
         <Label htmlFor="scaffold-keyboard-id" style={SCAFFOLD_LABEL_STYLE}>
           <Trans id="editor.scaffold.keyboardIdLabel">Keyboard ID</Trans>
         </Label>
-        {/* TextField: error prop sets ERROR_BORDER #7a2a2a (matches original #7a2a2a exactly).
-            Normal border CARD_BORDER diverges from primitive default #30363d — style passthrough. */}
+        {/* TextField: error prop sets ERROR_BORDER (var(--app-danger-border)) — matches original exactly.
+            Normal border CARD_BORDER diverges from primitive default var(--app-border) — style passthrough. */}
         <TextField
           id="scaffold-keyboard-id"
           value={keyboardId}
@@ -85,7 +87,7 @@ export function ScaffoldForm({ onSubmit }: ScaffoldFormProps) {
               : { ...SCAFFOLD_FIELD_BORDER, fontFamily: FONT_MONO }
           }
         />
-        {/* ErrorText tone="error" renders role="alert" + #f0a0a0 — matches original exactly.
+        {/* ErrorText tone="error" renders role="alert" + var(--app-danger-text) — matches original exactly.
             Outer div carries the aria-describedby target id; ErrorText has no id passthrough. */}
         {showIdError && (
           <div id="scaffold-id-error">
@@ -96,11 +98,11 @@ export function ScaffoldForm({ onSubmit }: ScaffoldFormProps) {
 
       {/* Display name field row */}
       <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-        {/* Label color TEXT_DIM diverges from primitive default #e6edf3 — style passthrough */}
+        {/* Label color TEXT_DIM diverges from primitive default var(--app-text) — style passthrough */}
         <Label htmlFor="scaffold-display-name" style={SCAFFOLD_LABEL_STYLE}>
           <Trans id="editor.scaffold.displayNameLabel">Display name</Trans>
         </Label>
-        {/* Border CARD_BORDER diverges from primitive default #30363d — style passthrough */}
+        {/* Border CARD_BORDER diverges from primitive default var(--app-border) — style passthrough */}
         <TextField
           id="scaffold-display-name"
           value={displayName}
@@ -111,7 +113,7 @@ export function ScaffoldForm({ onSubmit }: ScaffoldFormProps) {
         />
       </div>
 
-      {/* one-off: success-green submit #238636 */}
+      {/* one-off: success-green submit — var(--app-success) */}
       <Button
         type="submit"
         variant="secondary"
@@ -119,8 +121,8 @@ export function ScaffoldForm({ onSubmit }: ScaffoldFormProps) {
         style={{
           alignSelf: "flex-start",
           padding: "7px 16px",
-          background: isValid ? "#238636" : "#161b22",
-          color: isValid ? "#e6edf3" : "#484f58",
+          background: isValid ? "var(--app-success)" : "var(--app-surface)",
+          color: isValid ? "var(--app-text)" : "var(--app-text-disabled)",
           border: `1px solid ${CARD_BORDER}`,
           borderRadius: 6,
           fontSize: 13,

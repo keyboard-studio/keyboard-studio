@@ -98,12 +98,12 @@ export function GalleryPreviewPane({
           role="alert"
           aria-live="polite"
           style={{
-            background: "#2a1a00",
-            border: "1px solid #f0883e",
+            background: "var(--app-warning-bg)",
+            border: "1px solid var(--app-warning)",
             borderRadius: 6,
             padding: "8px 12px",
             fontSize: 12,
-            color: "#f0883e",
+            color: "var(--app-warning-text)",
             fontFamily: FONT,
           }}
         >
@@ -121,12 +121,12 @@ export function GalleryPreviewPane({
           role="alert"
           aria-live="polite"
           style={{
-            background: "#2a1a00",
-            border: "1px solid #f0883e",
+            background: "var(--app-warning-bg)",
+            border: "1px solid var(--app-warning)",
             borderRadius: 6,
             padding: "8px 12px",
             fontSize: 12,
-            color: "#f0883e",
+            color: "var(--app-warning-text)",
             fontFamily: FONT,
           }}
         >
@@ -170,10 +170,10 @@ export function GalleryPreviewPane({
           aria-live="assertive"
           style={{
             padding: "16px 20px",
-            background: "#2a0a0a",
-            border: "1px solid #f85149",
+            background: "var(--app-danger-bg)",
+            border: "1px solid var(--app-danger)",
             borderRadius: 8,
-            color: "#f85149",
+            color: "var(--app-danger-text)",
             fontSize: 13,
             fontFamily: FONT,
           }}
@@ -189,9 +189,9 @@ export function GalleryPreviewPane({
               style={{
                 padding: "5px 12px",
                 background: "transparent",
-                border: "1px solid #f85149",
+                border: "1px solid var(--app-danger)",
                 borderRadius: 4,
-                color: "#f85149",
+                color: "var(--app-danger-text)",
                 fontSize: 12,
                 cursor: "pointer",
                 fontFamily: FONT,
@@ -234,7 +234,7 @@ export function GalleryPreviewPane({
             fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
           }}
         >
-          <span style={{ color: "#d29922" }}>
+          <span style={{ color: "var(--app-warning-text)" }}>
             {t({
               id: "editor.assignLoop.preview.diagnosticsCount",
               message: plural(stage.compileResult.diagnostics.length, {

@@ -26,7 +26,19 @@ import {
   type AnswerDraft,
 } from "../stores/stepWalkStore.ts";
 import type { StepWalkPositions } from "../lib/stepWalk.ts";
-import { secondaryButton, primaryButton } from "./surveyStyles.ts";
+import {
+  secondaryButton,
+  primaryButton,
+  surveyCard,
+  FONT,
+  TEXT_MAIN,
+  TEXT_DIM,
+  ACCENT,
+  BORDER,
+  CHIP_GLYPH_ACCENT,
+  CHECKED_CHIP_BG,
+} from "./surveyStyles.ts";
+import { CSS_TEXT_SUBTLE } from "../ui/theme.ts";
 import { handleEnterToAdvance } from "./enterToAdvance.ts";
 import { WARNING } from "../ui/theme.ts";
 
@@ -605,8 +617,8 @@ export function SurveyRunner({
       <div
         style={{
           padding: 32,
-          color: "#8b949e",
-          fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
+          color: TEXT_DIM,
+          fontFamily: FONT,
         }}
       >
         <Trans id="survey.surveyRunner.complete">Survey complete.</Trans>
@@ -806,9 +818,8 @@ export function SurveyRunner({
       style={{
         display: "flex",
         flexDirection: "column",
-        gap: 24,
-        fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-        color: "#e6edf3",
+        fontFamily: FONT,
+        color: TEXT_MAIN,
       }}
     >
       {/* Progress indicator */}
@@ -820,19 +831,22 @@ export function SurveyRunner({
         })}
         style={{
           fontSize: 12,
-          color: "#8b949e",
+          color: CSS_TEXT_SUBTLE,
           display: "flex",
           alignItems: "center",
-          gap: 8,
+          gap: 12,
+          marginBottom: 22,
         }}
       >
-        <span><Trans id="survey.surveyRunner.progressLabel">Step {stepNum} of ~{approxTotal}</Trans></span>
+        <span style={{ whiteSpace: "nowrap", fontVariantNumeric: "tabular-nums" }}>
+          <Trans id="survey.surveyRunner.progressLabel">Step {stepNum} of ~{approxTotal}</Trans>
+        </span>
         <div
           aria-hidden="true"
           style={{
             flex: 1,
-            height: 3,
-            background: "#30363d",
+            height: 4,
+            background: BORDER,
             borderRadius: 2,
             overflow: "hidden",
           }}
@@ -841,7 +855,7 @@ export function SurveyRunner({
             style={{
               height: "100%",
               width: `${Math.min(100, (stepNum / approxTotal) * 100)}%`,
-              background: "#6ea8fe",
+              background: ACCENT,
               borderRadius: 2,
               transition: "width 200ms ease",
             }}
@@ -861,6 +875,7 @@ export function SurveyRunner({
               display: "flex",
               alignItems: "center",
               gap: 8,
+              marginBottom: 12,
             }}
           >
             <button
@@ -888,10 +903,10 @@ export function SurveyRunner({
               }}
               style={{
                 padding: "3px 10px",
-                background: pinned ? "#2d3748" : "transparent",
-                border: `1px solid ${pinned ? "#6ea8fe" : "#484f58"}`,
+                background: pinned ? CHECKED_CHIP_BG : "transparent",
+                border: `1px solid ${pinned ? ACCENT : BORDER}`,
                 borderRadius: 12,
-                color: pinned ? "#6ea8fe" : "#8b949e",
+                color: pinned ? CHIP_GLYPH_ACCENT : TEXT_DIM,
                 fontSize: 11,
                 cursor: "pointer",
                 fontFamily: "inherit",
@@ -911,13 +926,16 @@ export function SurveyRunner({
       {/* Question + caption block. When contentMinHeight is set (identity-lite),
           the block reserves a fixed minimum height so the Back/Next controls
           below sit at a stable vertical position across questions whose help
-          text differs in length. */}
+          text differs in length. Wrapped in the shared surveyCard shape (epic
+          #533) so the card marks only the current question, not the whole
+          runner. */}
       <div
         style={{
           display: "flex",
           flexDirection: "column",
           gap: 12,
           ...(contentMinHeight !== undefined ? { minHeight: contentMinHeight } : {}),
+          ...surveyCard,
         }}
       >
         <QuestionField
@@ -965,7 +983,7 @@ export function SurveyRunner({
               style={{
                 margin: 0,
                 fontSize: 12,
-                color: "#8b949e",
+                color: TEXT_DIM,
                 fontStyle: "italic",
                 lineHeight: 1.5,
               }}
@@ -976,9 +994,18 @@ export function SurveyRunner({
         })()}
       </div>
 
-      {/* Navigation */}
-      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-        {canGoBack && (
+      {/* Navigation (epic #533): the primary button dims via opacity when
+          disabled (rather than swapping to the disabled background/text
+          colors), and sits at the row's right edge behind a flex:1 spacer —
+          Back (when present) stays pinned left. */}
+      {(() => {
+        const nextButtonStyle: React.CSSProperties = {
+          ...primaryButton(false),
+          transition: "background 120ms ease",
+          ...(!canAdvance ? { opacity: 0.5, cursor: "not-allowed" } : {}),
+        };
+
+        const backButtonEl = canGoBack ? (
           <button
             type="button"
             data-testid="survey-back"
@@ -988,23 +1015,34 @@ export function SurveyRunner({
           >
             <Trans id="survey.surveyRunner.backButton">Back</Trans>
           </button>
-        )}
-        <button
-          type="button"
-          data-testid="survey-advance"
-          onClick={handleNext}
-          disabled={!canAdvance}
-          aria-describedby={progressDescId}
-          className="ks-focus-ring ks-hit-target"
-          style={{ ...primaryButton(!canAdvance), transition: "background 120ms ease" }}
-        >
-          {isLastQuestion ? (
-            <Trans id="survey.surveyRunner.finishButton">Finish</Trans>
-          ) : (
-            <Trans id="survey.surveyRunner.nextButton">Next</Trans>
-          )}
-        </button>
-      </div>
+        ) : null;
+
+        const nextButtonEl = (
+          <button
+            type="button"
+            data-testid="survey-advance"
+            onClick={handleNext}
+            disabled={!canAdvance}
+            aria-describedby={progressDescId}
+            className="ks-focus-ring ks-hit-target"
+            style={nextButtonStyle}
+          >
+            {isLastQuestion ? (
+              <Trans id="survey.surveyRunner.finishButton">Finish</Trans>
+            ) : (
+              <Trans id="survey.surveyRunner.nextButton">Next</Trans>
+            )}
+          </button>
+        );
+
+        return (
+          <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 22 }}>
+            {backButtonEl}
+            <div aria-hidden="true" style={{ flex: 1 }} />
+            {nextButtonEl}
+          </div>
+        );
+      })()}
     </div>
   );
 }

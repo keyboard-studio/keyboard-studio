@@ -83,16 +83,17 @@ import { plural } from "@lingui/core/macro";
 import { isSpacerKeyClass, type TouchKeyFinding } from "@keyboard-studio/contracts";
 import { codepointLabel } from "../../../survey/codepointLabel.ts";
 import { displayChar } from "../../../lib/irToCarveNodes.ts";
-import { BG_CARD, BORDER, ACCENT, TEXT_DIM, FONT } from "../../../lib/galleryTheme.ts";
+import { BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT } from "../../../lib/galleryTheme.ts";
 import { ERROR_RED, FONT_MONO, WARNING } from "../../../ui/theme.ts";
 import type { KeyGridCellViewModel } from "./keyGridViewModel.ts";
 import type { KeyGridCommandMenuAnchor } from "./useKeyCommands.ts";
 import { severityLabel } from "./findingCopy.ts";
 
-// Layer C's info-severity blue has no existing named token in ui/theme.ts
-// (WARNING/ERROR_RED cover Layer B/A already) — matches the editor gutter's
-// own Layer C convention (docs/architecture.md "Editor gutter diagnostics").
-const INFO_BLUE = "#58a6ff";
+// Layer C's info-severity blue has no dedicated *-severity named export in
+// ui/theme.ts (WARNING/ERROR_RED cover Layer B/A already) — matches the
+// editor gutter's own Layer C convention (docs/architecture.md "Editor
+// gutter diagnostics"). Reuses the accent-text token directly (epic #533).
+const INFO_BLUE = "var(--app-accent-text)";
 
 export interface KeyGridCellProps {
   cell: KeyGridCellViewModel;
@@ -423,10 +424,10 @@ export function KeyGridCell({
         gap: 2,
         padding: "4px 2px",
         height: 48,
-        background: isSelected ? "#0d2840" : isBlank ? "transparent" : BG_CARD,
+        background: isSelected ? "var(--app-accent-subtle)" : isBlank ? "transparent" : BG_CARD,
         border: `1px solid ${isSelected ? ACCENT : isBlank ? "transparent" : BORDER}`,
         borderRadius: 4,
-        color: isBlank ? TEXT_DIM : "#e6edf3",
+        color: isBlank ? TEXT_DIM : TEXT_MAIN,
         cursor: "pointer",
         fontFamily: FONT,
         overflow: "hidden",
@@ -576,7 +577,12 @@ export function KeyGridCell({
             textAlign: "center",
             borderRadius: 2,
             fontWeight: 700,
-            color: "#0d1117",
+            // Dark text on the bright severity-dot fill (finding.color) —
+            // var(--app-bg) matches the old literal exactly in the navy
+            // theme; see the report's "does not map cleanly" note for the
+            // light-theme caveat this shares with the mapping table's other
+            // "dark text on a bright fill" cases.
+            color: "var(--app-bg)",
             background: finding.color,
           }}
         >

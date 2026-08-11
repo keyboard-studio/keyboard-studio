@@ -24,7 +24,7 @@ import {
 import { mergeClassNames } from "./classNames.ts";
 
 export type TextFieldProps = React.InputHTMLAttributes<HTMLInputElement> & {
-  /** When true, applies ERROR_BORDER (#7a2a2a) as the border color. */
+  /** When true, applies ERROR_BORDER (var(--app-danger-border)) as the border color. */
   error?: boolean;
   /** When true, applies CSS_FONT_MONO (var(--app-font-mono)) as fontFamily. */
   mono?: boolean;
@@ -36,7 +36,7 @@ const BASE_STYLE: React.CSSProperties = {
   background: BG_PAGE,
   borderWidth: "1px",
   borderStyle: "solid",
-  borderRadius: 6,
+  borderRadius: "var(--app-radius-sm)",
   color: TEXT_MAIN,
   fontSize: 14,
   boxSizing: "border-box",

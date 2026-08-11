@@ -5,8 +5,8 @@
 //   2. tone="error" → role="alert".
 //   3. tone="warning" → role="alert".
 //   4. tone="hint" → role="status".
-//   5. Error tone applies ERROR_TEXT color (#f0a0a0).
-//   6. Warning tone applies WARNING color (#d29922).
+//   5. Error tone applies ERROR_TEXT color (var(--app-danger-text)).
+//   6. Warning tone applies WARNING color (var(--app-warning-text)).
 //   7. Hint tone applies CSS_TEXT_MUTED (var(--app-text-muted)).
 //   8. Children appear as text content.
 
@@ -53,18 +53,17 @@ describe("ErrorText — tone→role mapping", () => {
 });
 
 describe("ErrorText — tone colors", () => {
-  it("error tone uses ERROR_TEXT (#f0a0a0)", () => {
+  it("error tone uses ERROR_TEXT (var(--app-danger-text))", () => {
     const { container } = render(<ErrorText tone="error">err</ErrorText>);
     const el = container.querySelector("div") as HTMLElement;
-    // jsdom parses #f0a0a0 → rgb(240, 160, 160)
-    expect(el.style.color).toBe("rgb(240, 160, 160)");
+    // CSS vars are not resolved in jsdom; the raw string is preserved.
+    expect(el.style.color).toBe("var(--app-danger-text)");
   });
 
-  it("warning tone uses WARNING (#d29922)", () => {
+  it("warning tone uses WARNING (var(--app-warning-text))", () => {
     const { container } = render(<ErrorText tone="warning">warn</ErrorText>);
     const el = container.querySelector("div") as HTMLElement;
-    // jsdom parses #d29922 → rgb(210, 153, 34)
-    expect(el.style.color).toBe("rgb(210, 153, 34)");
+    expect(el.style.color).toBe("var(--app-warning-text)");
   });
 
   it("hint tone uses CSS_TEXT_MUTED (var(--app-text-muted))", () => {

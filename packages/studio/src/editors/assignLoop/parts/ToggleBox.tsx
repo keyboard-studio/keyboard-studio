@@ -27,7 +27,7 @@ export function ToggleBox({ glyph, state, size = 30, onClick }: ToggleBoxProps) 
       }}
     >
       {glyph !== undefined && (
-        <span style={{ font: `400 ${Math.round(size * 0.55)}px/1 'Lora', serif`, color: off ? 'var(--app-text-subtle)' : 'var(--app-accent-text)' }}>
+        <span style={{ font: `400 ${Math.round(size * 0.55)}px/1 var(--app-font-glyph)`, color: off ? 'var(--app-text-subtle)' : 'var(--app-accent-text)' }}>
           {glyph}
         </span>
       )}
@@ -39,13 +39,13 @@ export function ToggleBox({ glyph, state, size = 30, onClick }: ToggleBoxProps) 
         display: 'flex', alignItems: 'center', justifyContent: 'center',
       }}>
         {off ? (
-          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="4.5" strokeLinecap="round">
+          <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="var(--app-text-on-accent)" strokeWidth="4.5" strokeLinecap="round">
             <path d="M12 5v14M5 12h14" />
           </svg>
         ) : partial ? (
-          <span style={{ width: 7, height: 2.3, background: '#fff', borderRadius: 2 }} />
+          <span style={{ width: 7, height: 2.3, background: 'var(--app-text-on-accent)', borderRadius: 2 }} />
         ) : (
-          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round">
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="var(--app-text-on-accent)" strokeWidth="4.5" strokeLinecap="round" strokeLinejoin="round">
             <path d="M20 6 9 17l-5-5" />
           </svg>
         )}

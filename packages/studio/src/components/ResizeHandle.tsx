@@ -24,7 +24,7 @@ export function ResizeHandle({ onPointerDown }: ResizeHandleProps) {
       style={{
         width: 6,
         flexShrink: 0,
-        background: hovered ? "#3d5070" : "#283040",
+        background: hovered ? "var(--app-border-strong)" : "var(--app-border)",
         cursor: "col-resize",
         userSelect: "none",
         transition: "background 120ms ease",

@@ -59,7 +59,7 @@ export const galleryForwardBtnStyle: CSSProperties = {
   background: BLUE_ACTION,
   border: "none",
   borderRadius: 6,
-  color: "#e6edf3",
+  color: "var(--app-text-on-accent)",
   fontSize: 13,
   fontWeight: 600,
   cursor: "pointer",
@@ -167,7 +167,7 @@ export const galleryConfigStyle: CSSProperties = {
 export const galleryCardStyle = (active: boolean): CSSProperties => ({
   borderRadius: 8,
   border: `1px solid ${active ? ACCENT : BORDER}`,
-  background: active ? "#0d2840" : BG_PAGE,
+  background: active ? "var(--app-accent-subtle)" : BG_PAGE,
   overflow: "visible",
   transition: "border-color 120ms ease, background 120ms ease",
 });

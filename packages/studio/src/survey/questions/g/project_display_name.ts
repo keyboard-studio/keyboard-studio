@@ -12,7 +12,10 @@ import type { QuestionModule, ValidationResult } from "../../types.ts";
 
 export const definition = {
   id: "project_display_name",
-  type: "text" as const,
+  // short_text (single-line TextField), not text (4-row resizable Textarea).
+  // A keyboard's display name is one short line — a paragraph box invited
+  // multi-line input the field can't represent and read as a defect.
+  type: "short_text" as const,
   prompt: "What is the display name for your new keyboard?",
   audit_label: "Keyboard display name",
   help_text:

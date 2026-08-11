@@ -152,7 +152,7 @@ export function GalleryIntroSplash({
               background: BLUE_ACTION,
               border: "none",
               borderRadius: 6,
-              color: "#e6edf3",
+              color: "var(--app-text-on-accent)",
               fontSize: 14,
               fontWeight: 600,
               cursor: "pointer",

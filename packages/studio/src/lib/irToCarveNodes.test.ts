@@ -1495,6 +1495,43 @@ describe('storeCharChips — per-class action mapping (classifyStoreSlotEdit dis
     expect(chips[0]!.action).toBe('disabled');
     expect(chips[0]!.disabledReason).toMatch(/pairing/i);
   });
+
+  it('omitted (input-only-match-table, Backspace-repair shape): a store matched only by a Backspace-triggered rule produces NO chips at all — never a disabled chip (#533 carve gallery over-count)', () => {
+    const composed = makeChipStore('store#composed', 'composed', [{ kind: 'char', value: 'à' }]);
+    const compDia = makeChipStore('store#comp-dia', 'comp-dia', [{ kind: 'char', value: 'a' }]);
+    const rule: IRRule = {
+      nodeId: 'rule#bksp',
+      context: [
+        { kind: 'any', storeRef: 'composed' },
+        { kind: 'raw', text: '+' },
+        { kind: 'vkey', name: 'K_BKSP', modifiers: [] },
+      ],
+      output: [{ kind: 'index', storeRef: 'comp-dia', offset: 1 }],
+    };
+    const ir = makeChipIR([makeChipGroup('g1', [rule])], [composed, compDia]);
+
+    expect(storeCharChips(composed, ir)).toEqual([]);
+    // The real output store is unaffected — still a normal drop chip.
+    const dkChips = storeCharChips(compDia, ir);
+    expect(dkChips).toHaveLength(1);
+    expect(dkChips[0]!.action).toBe('drop');
+  });
+
+  it('omitted (input-only-match-table, bare "context" guard shape): a store matched only by a no-op guard rule produces NO chips at all (#533 sibling site)', () => {
+    const diablock = makeChipStore('store#diablock', 'diablock', [{ kind: 'char', value: '°' }]);
+    const rule: IRRule = {
+      nodeId: 'rule#guard',
+      context: [
+        { kind: 'any', storeRef: 'diablock' },
+        { kind: 'raw', text: '+' },
+        { kind: 'vkey', name: 'K_C', modifiers: ['RALT'] },
+      ],
+      output: [{ kind: 'raw', text: 'context' }],
+    };
+    const ir = makeChipIR([makeChipGroup('g1', [rule])], [diablock]);
+
+    expect(storeCharChips(diablock, ir)).toEqual([]);
+  });
 });
 
 // ---------------------------------------------------------------------------

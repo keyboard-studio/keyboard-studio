@@ -106,7 +106,7 @@
 // Untouched stores keep the same object reference; groups/comments/raw are passed
 // through by reference.
 
-import type { KeyboardIR, IRStore } from "@keyboard-studio/contracts";
+import type { KeyboardIR, IRStore, ContextElement } from "@keyboard-studio/contracts";
 import { parseSlotId } from "./slotId.js";
 import { isPlusSeparator } from "../shared/rule-shape.js";
 
@@ -166,6 +166,19 @@ export interface StoreSlotRemovalResult {
  *                                   call, so it fails CLOSED rather than risk treating
  *                                   a positionally-load-bearing store as safe to drop.
  *
+ * A store whose `any()` context references live ONLY inside rules that add no new
+ * content (an edit/undo repair or a bare `context` no-op guard — see
+ * {@link ruleAddsNoNewContent}), and that is never itself an `index()`/`outs()` output
+ * target, is NOT blocked here — it is still perfectly safe to drop (nothing else
+ * depends on its positions). It is instead flagged `matchTableOnly` on the `drop`
+ * result (see {@link StoreSlotEditMode}) — display-only metadata for a caller like the
+ * studio's chip UI that wants to distinguish "this store's items are never actually
+ * PRODUCED by any rule" from an ordinary drop, without refusing the edit itself. See
+ * the {@link StoreSlotEditMode} doc comment for the full rationale — this used to be
+ * a block reason (`input-only-match-table`) until it was found to also block the
+ * engine's own dependent-combo cleanup (carving a character that lives ONLY in such a
+ * store, e.g. a Backspace-unwrap input half, must still drop its row).
+ *
  * (Replaces the earlier `dual-use` and `paired-input` reasons: both were
  * coarse stand-ins for "an any()-source and an index()-output target might
  * be positionally related, so refuse everything." The pairing graph now
@@ -187,9 +200,27 @@ export type StoreSlotBlockReason =
  * pairing graph ties them together. An empty array means a plain,
  * uncoordinated drop (unpaired any()-source, outs()-only output target, or
  * entirely unreferenced).
+ *
+ * `matchTableOnly` (drop only, omitted when false) is true when the store's
+ * `any()` context references live ONLY inside rules that add no new content
+ * (an edit/undo repair or a bare `context` no-op guard — see
+ * {@link ruleAddsNoNewContent}) and it is never itself an `index()`/`outs()`
+ * output target — i.e. this store's own items are never actually PRODUCED
+ * by any rule; it only matches ALREADY-TYPED buffer content (e.g. a
+ * precomposed grapheme an application NFC-normalized behind the scenes, or a
+ * modifier chord guarded off punctuation). The edit is still a normal,
+ * unblocked `drop` — nothing positionally depends on this store's items — but
+ * a caller like the studio's chip UI can use this flag to avoid OFFERING
+ * these items as removable "characters this keyboard can type", since they
+ * never are. An ordinary paired input store (e.g. a dk()/any() deadkey
+ * selector) has no `+` in its rule's context at all, so it is never flagged
+ * here (do not confuse with a block reason — this was `input-only-match-table`
+ * as a block reason until that was found to also block the engine's own
+ * dependent-combo cleanup; see the module-level `StoreSlotBlockReason` doc
+ * comment above).
  */
 export type StoreSlotEditMode =
-  | { mode: "drop"; coordinatedWith: string[] }
+  | { mode: "drop"; coordinatedWith: string[]; matchTableOnly?: boolean }
   | { mode: "blocked"; reason: StoreSlotBlockReason };
 
 // ---------------------------------------------------------------------------
@@ -206,6 +237,15 @@ interface StoreUsageFlags {
   asContextIndex: boolean;
   /** Store is an index()/outs() output target in some rule (spec 051 T004). */
   asIndexOutputTarget: boolean;
+  /**
+   * Store is an any() context source in at least one rule that actually adds
+   * new content — i.e. NOT an edit/undo (Backspace/Delete) repair rule and
+   * NOT a bare `context` no-op guard rule (see {@link ruleAddsNoNewContent}).
+   * False for a store whose ONLY any() references live inside such rules — a
+   * match table over already-typed buffer content, or a guard that changes
+   * nothing, never a production source.
+   */
+  asAnySourceInTypingRule: boolean;
 }
 
 /**
@@ -273,6 +313,58 @@ export interface StoreAnalysis {
   outsReferencedNames: Set<string>;
 }
 
+// Trigger vkeys whose Keyman role is "erase/undo a level of composition" —
+// i.e. react to text ALREADY in the buffer — rather than "compose new
+// content" via a genuine forward keystroke. Mirrors NON_TYPING_TRIGGER_VKEYS
+// in the studio's irToCarveNodes.ts (isNotAForwardTypingPath); kept as a
+// separate engine-side copy because the engine must not import from the
+// studio package (team-boundary invariant, spec §12) — update both sets if
+// this list ever changes.
+const NON_TYPING_TRIGGER_VKEYS = new Set(["K_BKSP", "K_DEL"]);
+
+/**
+ * True when `context`'s own trigger — the element right of the last `+`
+ * separator, or the sole element for a bare single-element context with no
+ * `+` at all — is an edit/undo key (Backspace/Delete) rather than a genuine
+ * forward-typing keystroke. Used to tell an input-only MATCH TABLE (e.g. a
+ * store that only matches an already-composed grapheme so a Backspace can
+ * decompose it) apart from a genuine paired input store (e.g. a dk()/any()
+ * deadkey selector, whose rule has no `+` at all and so is never flagged
+ * here) — see {@link StoreSlotEditMode} `matchTableOnly`.
+ */
+function isEditOnlyTriggerRule(context: ContextElement[]): boolean {
+  const plusIdx = context.findIndex(isPlusSeparator);
+  const triggerEl = plusIdx === -1 ? (context.length === 1 ? context[0] : undefined) : context[plusIdx + 1];
+  return triggerEl !== undefined && triggerEl.kind === "vkey" && NON_TYPING_TRIGGER_VKEYS.has(triggerEl.name.toUpperCase());
+}
+
+/**
+ * True when `output` is the bare `context` guard keyword — kmcmplib's
+ * "reproduce the match unchanged" no-op (parsed as `{kind:"raw",
+ * text:"context"}`; distinct from the numbered `context(N)` context-position
+ * element, a different construct). A rule with this output emits NOTHING —
+ * it exists purely to eat a combination so a more general rule doesn't fire
+ * (e.g. Cameroon's `any(diablock) + [RALT K_C] > context` guards a
+ * modifier chord against firing on punctuation). A store referenced by
+ * any()/notany() ONLY inside such guard rules is a match table exactly like
+ * an edit-only-trigger store — see {@link StoreSlotEditMode}
+ * `matchTableOnly`.
+ */
+function isBareContextGuardOutput(output: { kind: string; text?: string }[]): boolean {
+  return output.length === 1 && output[0]?.kind === "raw" && output[0].text?.trim().toLowerCase() === "context";
+}
+
+/**
+ * True when `rule` emits no new content at all — combining
+ * {@link isEditOnlyTriggerRule} (an edit/undo repair) and
+ * {@link isBareContextGuardOutput} (a no-op guard). A store referenced by
+ * any() ONLY inside such rules, and never itself an index()/outs() output
+ * target, is never actually produced anywhere in the IR.
+ */
+function ruleAddsNoNewContent(rule: { context: ContextElement[]; output: { kind: string; text?: string }[] }): boolean {
+  return isEditOnlyTriggerRule(rule.context) || isBareContextGuardOutput(rule.output);
+}
+
 /**
  * Scan every rule once and build the shared usage + pairing analysis for the
  * whole IR. Reimplemented inline rather than importing a studio helper — the
@@ -284,7 +376,13 @@ export function analyzeStores(ir: KeyboardIR): StoreAnalysis {
   const ensureUsage = (name: string): StoreUsageFlags => {
     let usage = usageByName.get(name);
     if (usage === undefined) {
-      usage = { asAnySource: false, asNotAny: false, asContextIndex: false, asIndexOutputTarget: false };
+      usage = {
+        asAnySource: false,
+        asNotAny: false,
+        asContextIndex: false,
+        asIndexOutputTarget: false,
+        asAnySourceInTypingRule: false,
+      };
       usageByName.set(name, usage);
     }
     return usage;
@@ -317,9 +415,13 @@ export function analyzeStores(ir: KeyboardIR): StoreAnalysis {
 
   for (const group of ir.groups) {
     for (const rule of group.rules) {
+      const noNewContent = ruleAddsNoNewContent(rule);
+
       for (const el of rule.context) {
         if (el.kind === "any") {
-          ensureUsage(el.storeRef).asAnySource = true;
+          const usage = ensureUsage(el.storeRef);
+          usage.asAnySource = true;
+          if (!noNewContent) usage.asAnySourceInTypingRule = true;
         } else if (el.kind === "notany") {
           ensureUsage(el.storeRef).asNotAny = true;
         } else if (el.kind === "index") {
@@ -386,11 +488,19 @@ export function analyzeStores(ir: KeyboardIR): StoreAnalysis {
  *   5. any store in its pairing set has unresolved index() pairing,
  *      or is itself system/notany/context-index-aligned     → blocked (that member's reason)
  *   6. otherwise                                            → "drop", coordinated with its
- *                                                              pair-set peers (may be empty)
+ *                                                              pair-set peers (may be empty),
+ *                                                              flagged `matchTableOnly` when
+ *                                                              `store`'s own any() references
+ *                                                              live ONLY inside edit/undo or
+ *                                                              bare-guard rules (see
+ *                                                              {@link StoreSlotEditMode})
  *
  * Steps 4-5 evaluate the WHOLE pair-set (not just `store` itself): a
  * coordinated drop touches every member, so if any member is unsafe to
  * touch, the whole coordinated group is unsafe from ANY entry point.
+ * `matchTableOnly` deliberately looks only at `store`'s OWN usage flags (not
+ * its pair-set) — it is a "does this store's own content ever get emitted?"
+ * question, orthogonal to the positional-safety question steps 4-5 answer.
  */
 function classifyStoreWithAnalysis(store: IRStore, analysis: StoreAnalysis): StoreSlotEditMode {
   if (store.isSystem) {
@@ -404,6 +514,10 @@ function classifyStoreWithAnalysis(store: IRStore, analysis: StoreAnalysis): Sto
   if (usage?.asContextIndex === true) {
     return { mode: "blocked", reason: "context-index-aligned" };
   }
+  const matchTableOnly =
+    usage?.asAnySource === true &&
+    usage.asIndexOutputTarget !== true &&
+    usage.asAnySourceInTypingRule !== true;
 
   const members = analysis.pairSets.get(store.name) ?? new Set([store.name]);
 
@@ -430,7 +544,7 @@ function classifyStoreWithAnalysis(store: IRStore, analysis: StoreAnalysis): Sto
   }
 
   const coordinatedWith = [...members].filter((name) => name !== store.name).sort();
-  return { mode: "drop", coordinatedWith };
+  return matchTableOnly ? { mode: "drop", coordinatedWith, matchTableOnly } : { mode: "drop", coordinatedWith };
 }
 
 /**

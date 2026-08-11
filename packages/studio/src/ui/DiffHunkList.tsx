@@ -22,12 +22,17 @@ export type DiffHunkListProps = {
 
 // Wide content scrolls inside its own box — a hunk from a long .kmn line must not
 // make the whole surrounding view scroll sideways.
+// Border is split into borderWidth/borderStyle/borderColor (rather than the
+// `border: "1px solid <token>"` shorthand): jsdom's style-shorthand parser
+// cannot decompose a shorthand value containing an unresolved `var(...)`.
 const containerStyle: React.CSSProperties = {
   margin: "6px 0 0",
   padding: 8,
-  background: "rgba(255,255,255,0.03)",
-  border: `1px solid ${BORDER}`,
-  borderRadius: 4,
+  background: "var(--app-surface-2)",
+  borderWidth: "1px",
+  borderStyle: "solid",
+  borderColor: BORDER,
+  borderRadius: "var(--app-radius-sm)",
   fontFamily: FONT_MONO,
   fontSize: 12,
   overflowX: "auto",
@@ -36,8 +41,8 @@ const containerStyle: React.CSSProperties = {
 
 /** Line colour by unified-diff prefix. Added and removed must be distinguishable. */
 function lineColor(line: string): string {
-  if (line.startsWith("+")) return "#7ee787";
-  if (line.startsWith("-")) return "#ffa198";
+  if (line.startsWith("+")) return "var(--app-success-text)";
+  if (line.startsWith("-")) return "var(--app-danger-text)";
   return TEXT_DIM;
 }
 

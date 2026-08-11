@@ -89,7 +89,7 @@ export interface DecisionTrailViewProps {
 const containerStyle: React.CSSProperties = {
   padding: 24,
   fontFamily: FONT,
-  color: "var(--app-text, #e6edf3)",
+  color: "var(--app-text)",
   height: "100%",
   overflowY: "auto",
   boxSizing: "border-box",

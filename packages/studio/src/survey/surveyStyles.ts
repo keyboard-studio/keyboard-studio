@@ -30,6 +30,7 @@ import {
   ERROR_RED,
   CHECKED_CHIP_BG,
   DISABLED_DIVIDER,
+  CSS_TEXT_ON_ACCENT,
 } from "../ui/theme.ts";
 
 export {
@@ -57,12 +58,23 @@ export const phaseContainer: CSSProperties = {
   fontFamily: FONT,
 };
 
-/** The phase `<h2>` heading with its 20px bottom margin (PhaseA/B/F). */
+/**
+ * The phase `<h2>` screen title (PhaseA/B/F, and — via the survey card
+ * shells below — FlowStepHost/IdentityLite/Prefill). Epic #533: this used
+ * to be `fontSize: "1.1rem"` in the accent color, which read as a debug-
+ * panel label rather than a product screen title. Now the display face
+ * (Playfair Display) at a real heading size, set in the primary text color
+ * — the accent is reserved for the survey card's top rule, not the title
+ * text itself.
+ */
 export const phaseHeading: CSSProperties = {
   margin: "0 0 20px 0",
-  fontSize: "1.1rem",
-  color: ACCENT,
+  fontFamily: "var(--app-display)",
+  fontSize: 30,
   fontWeight: 600,
+  letterSpacing: "-0.01em",
+  lineHeight: 1.25,
+  color: TEXT_MAIN,
 };
 
 /**
@@ -71,10 +83,8 @@ export const phaseHeading: CSSProperties = {
  * (PhaseB's BuildListView and IntroChooser).
  */
 export const phaseHeadingFlush: CSSProperties = {
+  ...phaseHeading,
   margin: 0,
-  fontSize: "1.1rem",
-  color: ACCENT,
-  fontWeight: 600,
 };
 
 // ---------------------------------------------------------------------------
@@ -142,7 +152,11 @@ export function primaryButton(disabled: boolean): CSSProperties {
     background: disabled ? DISABLED_DIVIDER : BLUE_ACTION,
     border: `1px solid ${BORDER}`,
     borderRadius: 6,
-    color: disabled ? TEXT_DIM : TEXT_MAIN,
+    // Enabled state sits on the ACCENT fill, so it needs the on-accent token,
+    // not the page text colour. TEXT_MAIN here measured 2.43:1 on light and
+    // 2.25:1 on navy — unreadable in both themes, and invisible to the old
+    // gate because nothing scanned a screen with a primary button on it.
+    color: disabled ? TEXT_DIM : CSS_TEXT_ON_ACCENT,
     fontSize: 13,
     cursor: disabled ? "not-allowed" : "pointer",
     fontFamily: "inherit",
@@ -329,11 +343,51 @@ export function chipIndicatorColor(selected: boolean): string {
 // ---------------------------------------------------------------------------
 
 export const helpText: CSSProperties = {
-  fontSize: 12,
+  fontSize: 14,
   color: TEXT_DIM,
-  lineHeight: 1.5,
+  lineHeight: 1.6,
   marginBottom: 10,
   whiteSpace: "pre-wrap",
+};
+
+// ---------------------------------------------------------------------------
+// Survey card shell (epic #533) — the wrapper every top-level survey step
+// (FlowStepHost, IdentityLite, Prefill) renders its title + SurveyRunner
+// into. Replaces the old flat `background: "#0d1117"` panel that read as a
+// separate near-black product floating in the navy shell: a surface one
+// step lighter than the page background, with a thin border and a 3px
+// accent rule on top to mark it as "the current step", the same card
+// language the rest of the design system uses elsewhere.
+// ---------------------------------------------------------------------------
+
+export const surveyCard: CSSProperties = {
+  background: BG_CARD,
+  color: TEXT_MAIN,
+  fontFamily: FONT,
+  border: `1px solid ${BORDER}`,
+  borderTop: `3px solid ${ACCENT}`,
+  borderRadius: "var(--app-radius-lg)",
+  padding: 24,
+};
+
+/**
+ * Centered column the survey card sits in — keeps a long line length
+ * readable on a wide pane instead of stretching the card edge-to-edge.
+ */
+export const surveyPageColumn: CSSProperties = {
+  maxWidth: 640,
+  margin: "0 auto",
+  padding: "40px 24px 64px",
+};
+
+/** Lead paragraph under a screen title (e.g. Prefill's intro sentence). */
+export const leadParagraph: CSSProperties = {
+  margin: "0 0 20px 0",
+  fontSize: 15,
+  lineHeight: 1.55,
+  color: TEXT_DIM,
+  maxWidth: 560,
+  textWrap: "pretty",
 };
 
 // ---------------------------------------------------------------------------

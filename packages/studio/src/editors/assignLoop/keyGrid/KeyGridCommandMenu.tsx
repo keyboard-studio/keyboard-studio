@@ -202,7 +202,7 @@ export function KeyGridCommandMenu({
             alignItems: "baseline",
             gap: 12,
             padding: "5px 8px",
-            background: index === activeIndex ? "#0d2840" : "transparent",
+            background: index === activeIndex ? "var(--app-accent-subtle)" : "transparent",
             border: `1px solid ${index === activeIndex ? ACCENT : "transparent"}`,
             borderRadius: 4,
             color: command.enabled ? TEXT_MAIN : TEXT_DIM,

@@ -3,8 +3,8 @@
 // Coverage:
 //   1. Renders a <textarea> element.
 //   2. Passed props (value, onChange, disabled, placeholder, rows) work.
-//   3. The error variant applies ERROR_BORDER (#7a2a2a) as border color.
-//   4. Default border is BORDER (#30363d) when error is not set.
+//   3. The error variant applies ERROR_BORDER (var(--app-danger-border)) as border color.
+//   4. Default border is BORDER (var(--app-border)) when error is not set.
 //   5. resize defaults to "none"; the `resize` prop opts into "vertical" (#536).
 //   6. style override passes through (merges over base styles).
 //   7. className override passes through (merged with the shared ks-* classes).
@@ -13,9 +13,10 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { Textarea } from "./Textarea.tsx";
 
-// jsdom always normalizes hex colors to rgb() in inline styles.
-const ERROR_BORDER_RGB = "rgb(122, 42, 42)"; // #7a2a2a
-const BORDER_RGB = "rgb(48, 54, 61)";        // #30363d
+// theme.ts constants resolve to `var(--app-*)` token strings (epic #533) —
+// jsdom does not resolve CSS custom properties, so the raw string is preserved.
+const ERROR_BORDER_TOKEN = "var(--app-danger-border)";
+const BORDER_TOKEN = "var(--app-border)";
 
 afterEach(() => {
   cleanup();
@@ -61,17 +62,16 @@ describe("Textarea — prop passthrough", () => {
 });
 
 describe("Textarea — error variant", () => {
-  it("applies ERROR_BORDER (#7a2a2a) when error=true", () => {
+  it("applies ERROR_BORDER (var(--app-danger-border)) when error=true", () => {
     render(<Textarea error />);
     const el = screen.getByRole("textbox") as HTMLTextAreaElement;
-    // jsdom normalizes hex to rgb(); compare against the known rgb() expansion.
-    expect(el.style.borderColor).toBe(ERROR_BORDER_RGB);
+    expect(el.style.borderColor).toBe(ERROR_BORDER_TOKEN);
   });
 
-  it("applies normal BORDER (#30363d) when error is not set", () => {
+  it("applies normal BORDER (var(--app-border)) when error is not set", () => {
     render(<Textarea />);
     const el = screen.getByRole("textbox") as HTMLTextAreaElement;
-    expect(el.style.borderColor).toBe(BORDER_RGB);
+    expect(el.style.borderColor).toBe(BORDER_TOKEN);
   });
 });
 

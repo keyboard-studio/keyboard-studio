@@ -90,7 +90,7 @@ export function SearchFiltersPopover({
               background: BG_PAGE,
               border: `1px solid ${BORDER}`,
               borderRadius: 6,
-              boxShadow: "0 4px 12px rgba(0, 0, 0, 0.4)",
+              boxShadow: "var(--app-shadow-pop)",
               fontSize: 12,
               color: TEXT_DIM,
             }}

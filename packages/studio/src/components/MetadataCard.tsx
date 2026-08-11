@@ -43,7 +43,7 @@ const TRY_HINTS: Record<string, { intro: MessageDescriptor; examples: string[] }
 function Row({ k, v }: { k: string; v: string }) {
   return (
     <div style={{ display: "flex", gap: 8, fontSize: 13 }}>
-      <span style={{ color: "#9aa7b8", minWidth: 90 }}>{k}</span>
+      <span style={{ color: "var(--app-text-subtle)", minWidth: 90 }}>{k}</span>
       <span style={{ color: TEXT_MAIN, fontFamily: FONT_MONO }}>{v}</span>
     </div>
   );
@@ -102,14 +102,17 @@ export function MetadataCard({ kb }: { kb: BaseKeyboard }) {
               fontSize: 11,
               textTransform: "uppercase",
               letterSpacing: "0.08em",
-              color: "#d2a8ff",
+              // No purple token exists in the design system (colors.css) —
+              // this collapses onto the accent-text token rather than
+              // inventing a new custom property outside this pass's scope.
+              color: "var(--app-accent-text)",
               fontWeight: 700,
               marginBottom: 8,
             }}
           >
             <Trans id="metadata.tryTyping.heading">Try typing</Trans>
           </div>
-          <div style={{ fontSize: 13, color: "#9aa7b8", marginBottom: 8 }}>
+          <div style={{ fontSize: 13, color: "var(--app-text-subtle)", marginBottom: 8 }}>
             {t(hint.intro)}
           </div>
           <ul

@@ -14,16 +14,20 @@ export function UnsupportedScriptStub({ script }: UnsupportedScriptStubProps) {
       role="status"
       style={{
         padding: "32px 24px",
-        border: "1px dashed #f0b86e",
+        border: "1px dashed var(--app-warning-border)",
         borderRadius: 12,
-        background: "rgba(240,184,110,0.06)",
-        color: "#f0b86e",
+        background: "var(--app-warning-bg)",
+        color: "var(--app-warning-text)",
         textAlign: "center",
         fontSize: 14,
         lineHeight: 1.6,
       }}
     >
-      <strong style={{ color: "#fff" }}>
+      {/* Heading was pure white — only readable because the whole app was a
+          near-black shell before the design-system token layer landed (see
+          issue 533). On the light theme, white-on-amber-tint fails contrast,
+          so this now shares the warning-text token with the body copy below. */}
+      <strong style={{ color: "var(--app-warning-text)" }}>
         <Trans id="unsupported.heading">Preview not available in v1.0</Trans>
       </strong>
       <div style={{ marginTop: 8 }}>

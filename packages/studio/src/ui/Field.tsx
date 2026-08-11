@@ -27,7 +27,7 @@ import {
 /** Replicates HELP_STYLE from QuestionField.tsx. */
 const HELP_STYLE: React.CSSProperties = {
   fontSize: 12,
-  color: TEXT_DIM,    // #8b949e
+  color: TEXT_DIM,    // var(--app-text-muted)
   lineHeight: 1.5,
   marginBottom: 10,
   whiteSpace: "pre-wrap",
@@ -36,7 +36,7 @@ const HELP_STYLE: React.CSSProperties = {
 /** Replicates the error text style from ScaffoldForm.tsx. */
 const ERROR_STYLE: React.CSSProperties = {
   fontSize: 12,
-  color: ERROR_TEXT,  // #f0a0a0
+  color: ERROR_TEXT,  // var(--app-danger-text)
   lineHeight: 1.4,
 };
 

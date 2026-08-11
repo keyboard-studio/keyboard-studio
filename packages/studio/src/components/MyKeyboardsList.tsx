@@ -176,7 +176,7 @@ function badgeStyle(status: ProjectIndexEntry["status"]): React.CSSProperties {
     fontWeight: 700,
     padding: "2px 8px",
     borderRadius: 999,
-    color: "#0d1117",
+    color: "var(--app-text-on-accent)",
     background: status === "submitted" ? SUCCESS_ACCENT : ACCENT,
   };
 }

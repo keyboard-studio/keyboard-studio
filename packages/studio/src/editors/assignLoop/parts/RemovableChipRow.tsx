@@ -14,7 +14,25 @@
 
 import { useState, type CSSProperties, type ReactNode } from "react";
 import { TEXT_DIM } from "../../../lib/galleryTheme.ts";
-import { ERROR_RED } from "../../../ui/theme.ts";
+import { ERROR_RED, ERROR_BG } from "../../../ui/theme.ts";
+
+// Shared "producer/deletable" green chip palette — background/border/text —
+// used by every "Added"/"Configured"/"Existing methods (produced)" chip
+// across MechanismGallery.tsx, TouchGallery.tsx, ProposalCard.tsx, and this
+// file's own NonDeletableMethodChip "green" variant (epic #533 token sweep:
+// these were byte-identical hex literals — #0d2218/#238636/#56d364 —
+// hand-copied across all four sites; now one definition).
+export const GREEN_CHIP_BG = "var(--app-success-bg)";
+export const GREEN_CHIP_BORDER = "var(--app-success)";
+export const GREEN_CHIP_TEXT = "var(--app-success-text)";
+
+// Shared "Sequences"/blue non-deletable chip palette — background/border/
+// text — used by MechanismGallery.tsx's "Sequences" chip row + inline
+// "Sequence recorded" badge, and TouchGallery's equivalents. Same epic #533
+// consolidation as the green palette above (was #1c2a3a/#58a6ff/#58a6ff).
+export const BLUE_CHIP_BG = "var(--app-accent-subtle)";
+export const BLUE_CHIP_BORDER = "var(--app-accent)";
+export const BLUE_CHIP_TEXT = "var(--app-accent-text)";
 
 export interface RemovableChipItem {
   /** React list key — must be unique within the row. */
@@ -61,7 +79,7 @@ export interface RemovableChipRowProps {
 
 /** Shared "danger" hover palette — the studio-wide red used across every
  *  deletable neon-green chip on hover (see {@link RemovableChipRowProps.hoverDanger}). */
-const DANGER_BG = "#2a0a0a";
+const DANGER_BG = ERROR_BG;
 
 /**
  * Shared hover-red chip button. Takes a fully-formed `baseStyle` (including
@@ -128,13 +146,13 @@ export function HoverDangerChip({
  * Palette for a non-deletable "Existing methods" chip (MechanismGallery
  * desktop + TouchGallery touch) — see {@link NonDeletableMethodChip}'s doc
  * comment for the two variants' meaning. Colors match the deletable green
- * chip's own palette (`#0d2218`/`#238636`/`#56d364`) so a green row reads as
- * one consistent color regardless of whether it happens to carry the "×"
- * delete affordance.
+ * chip's own palette ({@link GREEN_CHIP_BG}/{@link GREEN_CHIP_BORDER}/
+ * {@link GREEN_CHIP_TEXT}) so a green row reads as one consistent color
+ * regardless of whether it happens to carry the "×" delete affordance.
  */
 const NON_DELETABLE_CHIP_PALETTE = {
-  green: { background: "#0d2218", border: "#238636", color: "#56d364" },
-  blue: { background: "#1c2a3a", border: "#58a6ff", color: "#58a6ff" },
+  green: { background: GREEN_CHIP_BG, border: GREEN_CHIP_BORDER, color: GREEN_CHIP_TEXT },
+  blue: { background: BLUE_CHIP_BG, border: BLUE_CHIP_BORDER, color: BLUE_CHIP_TEXT },
 } as const;
 
 export type NonDeletableChipVariant = keyof typeof NON_DELETABLE_CHIP_PALETTE;

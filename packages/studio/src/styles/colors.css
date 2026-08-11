@@ -1,0 +1,143 @@
+/* Semantic --app-* color tokens — light (default :root) + navy override ----
+ * These are the tokens components should reference (var(--app-*)); brand.css
+ * supplies the raw palette they're built from, legacy.css maps the pre-D3
+ * token names onto these so every existing call site becomes theme-aware
+ * with zero component edits.
+ *
+ * Status triples (danger/warning/success): full-strength brand color is
+ * fine for borders/rules/fills but FAILS contrast as *text* on the navy
+ * surface colors, so each status gets 4 tokens: the base (--app-danger),
+ * and -text/-border/-bg. On navy the -text variant resolves to the brand's
+ * -60 tint; on light it resolves to the brand's -dark variant.
+ */
+:root {
+  --app-bg:               #F3F5F7;
+  --app-surface:          #FFFFFF;
+  --app-surface-2:        #F8FAFB;
+  --app-overlay:          #FFFFFF;
+  --app-border:           #E3E7EB;
+  --app-border-strong:    #CFD6DC;
+  --app-text:             #18242E;
+  --app-text-muted:       #5B6976;
+  /* DARKENED from the design system's #8995A1, which failed WCAG AA.
+     Measured as normal-size text (AA needs 4.5:1):
+                     page #F3F5F7   surface #FFF   surface-2 #F8FAFB
+       #8995A1 (DS)      2.79            3.05           2.92      <- fails all
+       #65717E (here)    4.56            4.98           4.76      <- passes all
+       --app-text-muted  5.16            5.63           5.38
+     #65717E is the LIGHTEST value that clears 4.5:1 on all three light
+     surfaces, so it keeps a real (if narrow) step below --app-text-muted
+     instead of collapsing into it.
+
+     Why the token and not the call sites: this tone is used 134 times across
+     35 files, and its entire job is quiet caption/label/hint text. A token
+     whose purpose is readable-but-quiet text, that is not readable, is a
+     broken token — not 134 individual misuses. The navy value below needs no
+     change (it already scores 5.01:1 on the navy page background), which is
+     exactly why this went unnoticed: every one of those 134 sites reads fine
+     in the default theme.
+
+     Gated by e2e/light-theme-a11y.spec.ts, which scans both the root renders
+     and the dense wizard screens on light. Do not raise this back toward
+     #8995A1 for visual quietness — that reintroduces the failure everywhere
+     at once. */
+  --app-text-subtle:      #65717E;
+  --app-text-disabled:    rgba(24, 36, 46, 0.35);
+  --app-text-on-accent:   #FFFFFF;
+
+  --app-accent:           var(--sil-blue);
+  --app-accent-hover:     var(--sil-blue-dark);
+  --app-accent-press:     #023E70;
+  --app-accent-subtle:    var(--sil-blue-10);
+  --app-accent-bg:        var(--sil-blue-10);
+  --app-accent-text:      var(--sil-blue);
+  --app-accent-ring:      rgba(0, 167, 225, .35);
+
+  /* --app-primary is distinct from --app-accent only because the legacy
+     --primary / --primary-hover tokens (OAuthCallbackScreen) predate accent
+     and were never consolidated; new code should prefer --app-accent. */
+  --app-primary:          var(--sil-blue);
+  --app-primary-hover:    var(--sil-blue-dark);
+
+  --app-danger:           var(--sil-red);
+  --app-danger-text:      var(--sil-red-dark);
+  --app-danger-border:    var(--sil-red-20);
+  --app-danger-bg:        var(--sil-red-10);
+
+  --app-warning:          var(--sil-yellow);
+  /* ORANGE-dark, not yellow-dark. Warning TEXT has to be readable, and yellow
+     cannot carry small text on a light ground:
+       --sil-yellow-dark #D99408 on white -> 2.56:1   (fails; was the value)
+       --sil-orange-dark #C24F00 on white -> 4.76:1   (passes)
+     The fill/border warning tokens below still use the yellow ramp — yellow is
+     fine as a background or a rule, just not as a glyph. Navy keeps its own
+     lighter amber (#ECC26A), which works there because the ground is dark. */
+  --app-warning-text:     var(--sil-orange-dark);
+  --app-warning-border:   var(--sil-yellow-20);
+  --app-warning-bg:       var(--sil-yellow-10);
+
+  --app-success:          var(--sil-green);
+  --app-success-hover:    var(--sil-green-dark);
+  --app-success-text:     var(--sil-green-dark);
+  --app-success-border:   var(--sil-green-20);
+  --app-success-bg:       var(--sil-green-10);
+}
+
+/* Navy theme override. Selector matches the static class+attribute the
+ * <html> element carries (see index.html) — same element as :root, so every
+ * property below must be listed explicitly or it silently falls back to the
+ * light value above (that's how `--app-danger` almost regressed here: the
+ * light default is the brand red #D52227, but the navy app has shipped
+ * #F24E3C as "danger" since before this token layer existed). */
+.sil-app[data-theme="navy"] {
+  /* Unifies the two navy backgrounds that existed pre-token-layer: the
+     html/body reset was #15203A, the newer --app-bg alias was already
+     #18243F. This is the one intentional appearance change in this pass. */
+  --app-bg:               #18243F;
+  --app-surface:          #1F2C49;
+  --app-surface-2:        #27365A;
+  --app-overlay:          #1F2C49;
+  --app-border:           #33436A;
+  --app-border-strong:    #44588A;
+  --app-text:             #EAF1FB;
+  --app-text-muted:       #AEBCD6;
+  --app-text-subtle:      #8493B6;
+  --app-text-disabled:    rgba(234, 241, 251, 0.35);
+  /* DARK, not white — and this override is load-bearing.
+     Navy's accent is a LIGHT blue (#5AA7F0), the inverse of light's dark
+     #005CB9, so text sitting ON the accent fill has to invert too:
+       #FFFFFF on #5AA7F0  -> 2.55:1   (fails; the inherited light value)
+       #18243F on #5AA7F0  -> 6.03:1   (passes)
+     Without this line the navy theme silently inherits :root's #FFFFFF and
+     every accent-filled control — 46 call sites — renders white-on-pale-blue.
+     The value is --app-bg, so "text on accent" reads as the page ground
+     punched out of the accent, which is also what the design intends. */
+  --app-text-on-accent:   #18243F;
+
+  --app-accent:           #5AA7F0;
+  --app-accent-hover:     #74B6F4;
+  --app-accent-press:     #3D8FE0;
+  --app-accent-subtle:    #243C61;
+  --app-accent-bg:        rgba(90, 167, 240, 0.16);
+  --app-accent-text:      #8FC4F6;
+  --app-accent-ring:      rgba(90, 167, 240, .45);
+
+  --app-primary:          #2B6FD6;
+  --app-primary-hover:    #3F80E3;
+
+  --app-danger:           #F24E3C;
+  --app-danger-text:      var(--sil-red-60);
+  --app-danger-border:    rgba(242, 78, 60, 0.42);
+  --app-danger-bg:        rgba(242, 78, 60, 0.12);
+
+  --app-warning:          #D9A441;
+  --app-warning-text:     #ECC26A;
+  --app-warning-border:   rgba(217, 164, 65, 0.42);
+  --app-warning-bg:       rgba(217, 164, 65, 0.12);
+
+  --app-success:          #3FB950;
+  --app-success-hover:    #56D364;
+  --app-success-text:     var(--sil-green-60);
+  --app-success-border:   rgba(63, 185, 80, 0.42);
+  --app-success-bg:       rgba(63, 185, 80, 0.12);
+}

@@ -909,7 +909,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
           </button>
           <button
             onClick={() => { keepAll(); onComplete(); }}
-            style={{ font: '600 13.5px var(--app-font)', cursor: 'pointer', color: '#fff', background: 'var(--app-accent)', border: 'none', borderRadius: 9, padding: '10px 22px' }}
+            style={{ font: '600 13.5px var(--app-font)', cursor: 'pointer', color: 'var(--app-text-on-accent)', background: 'var(--app-accent)', border: 'none', borderRadius: 9, padding: '10px 22px' }}
           >
             <Trans id="editor.carve.skipCarverButton">Skip Rule Carver →</Trans>
           </button>
@@ -960,7 +960,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
         )}
         <div style={{ flex: 1 }}>
           <div style={{ font: '600 10.5px/1 var(--app-font)', letterSpacing: '.14em', textTransform: 'uppercase', color: 'var(--app-text-subtle)' }}>
-            <Trans id="editor.carve.phaseDEyebrow">Phase D · Carve</Trans>
+            <Trans id="editor.carve.phaseDEyebrow">Discard</Trans>
           </div>
           <h1 style={{ margin: '6px 0 0', font: "500 23px/1.1 'Playfair Display', serif", color: 'var(--app-text)' }}>
             <Trans id="editor.carve.heading">Review your keyboard's rules</Trans>
@@ -974,7 +974,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
           onFocus={() => setInfo({ kind: 'text', title: t({ id: "editor.carve.infoPanelHoverTitle", message: "Info panel" }), body: t({ id: "editor.carve.infoPanelHoverBody", message: "Show or hide this panel. It describes whatever your cursor is over." }) })}
           onMouseLeave={clearInfo}
           onBlur={clearInfo}
-          style={{ font: '600 13px var(--app-font)', cursor: 'pointer', borderRadius: 8, padding: '7px 13px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5, marginRight: 4, background: infoOpen ? 'var(--app-accent)' : 'transparent', color: infoOpen ? '#fff' : 'var(--app-text-muted)', border: infoOpen ? '1px solid var(--app-accent)' : '1px solid var(--app-border-strong)', fontWeight: infoOpen ? 700 : 600 }}
+          style={{ font: '600 13px var(--app-font)', cursor: 'pointer', borderRadius: 8, padding: '7px 13px', whiteSpace: 'nowrap', display: 'flex', alignItems: 'center', gap: 5, marginRight: 4, background: infoOpen ? 'var(--app-accent)' : 'transparent', color: infoOpen ? 'var(--app-text-on-accent)' : 'var(--app-text-muted)', border: infoOpen ? '1px solid var(--app-accent)' : '1px solid var(--app-border-strong)', fontWeight: infoOpen ? 700 : 600 }}
         >
           <InfoIcon size={14} />
           <Trans id="editor.carve.infoButton">Info</Trans>
@@ -996,7 +996,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
           onFocus={() => setInfo({ kind: 'text', title: t({ id: "editor.carve.continueHoverTitle", message: "Continue" }), body: t({ id: "editor.carve.continueHoverBody", message: "Save your changes and move to the next step." }) })}
           onMouseLeave={clearInfo}
           onBlur={clearInfo}
-          style={{ font: '600 13px var(--app-font)', cursor: 'pointer', color: '#fff', background: 'var(--app-accent)', border: 'none', borderRadius: 8, padding: '9px 18px' }}
+          style={{ font: '600 13px var(--app-font)', cursor: 'pointer', color: 'var(--app-text-on-accent)', background: 'var(--app-accent)', border: 'none', borderRadius: 8, padding: '9px 18px' }}
         >
           <Trans id="editor.carve.continueButton">Continue →</Trans>
         </button>
