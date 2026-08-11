@@ -161,8 +161,8 @@ export function deriveCarveNeededSet(args: DeriveCarveNeededSetArgs): CarveNeede
 
   // Reachability lookup, straight from blockedCombinations (SC-007: every
   // unchecked base × mark pair is blocked regardless of mental model).
-  const blockedSet = new Set(resolvedWorklist.blockedCombinations.map((b) => `${b.base} ${b.mark}`));
-  const isReachable = (base: string, mark: string): boolean => !blockedSet.has(`${base} ${mark}`);
+  const blockedSet = new Set(resolvedWorklist.blockedCombinations.map((b) => `${b.base}\x00${b.mark}`));
+  const isReachable = (base: string, mark: string): boolean => !blockedSet.has(`${base}\x00${mark}`);
 
   for (const mark of resolvedAlphabet.marks) {
     if (productiveMarks.has(mark)) {
