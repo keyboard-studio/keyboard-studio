@@ -390,18 +390,18 @@ describe("attribution reaches the delivered zip (spec 059 T027)", () => {
     expect(license).not.toMatch(/Copyright © \d{4} Zip Test/);
   });
 
-  // SC-003: one source of truth — the three artifacts cannot disagree.
-  it("the .kmn COPYRIGHT store agrees with LICENSE.md", async () => {
+  // SC-003: one source of truth on the HOLDER — the .kmn/.kps mirrors omit
+  // the year (criterion 4.6/#1545); LICENSE.md alone carries it.
+  it("the .kmn COPYRIGHT store agrees with LICENSE.md's holder", async () => {
     const { read } = await zipFiles({ attribution: ATTRIBUTION, emitYear: 2026 });
-    const expected = "Copyright © 2026 Bafut Language Committee";
-    expect(read("LICENSE.md")).toContain(expected);
-    expect(read(".kmn")).toContain(`store(&COPYRIGHT) '${expected}'`);
+    expect(read("LICENSE.md")).toContain("Copyright © 2026 Bafut Language Committee");
+    expect(read(".kmn")).toContain("store(&COPYRIGHT) 'Copyright © Bafut Language Committee'");
   });
 
   it("the .kps carries the same holder plus the author with a mailto", async () => {
     const { read } = await zipFiles({ attribution: ATTRIBUTION, emitYear: 2026 });
     const kps = read(".kps");
-    expect(kps).toContain("Copyright © 2026 Bafut Language Committee");
+    expect(kps).toContain("Copyright © Bafut Language Committee");
     expect(kps).toContain('<Author URL="mailto:alice@example.org">Alice Example</Author>');
   });
 

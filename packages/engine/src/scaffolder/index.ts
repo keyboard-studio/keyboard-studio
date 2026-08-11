@@ -9,7 +9,7 @@ import {
   createVirtualFS,
   validateScaffolderKeyboardId as contractsValidateKeyboardId,
   renderLicense,
-  renderHolderLine,
+  renderHolderLineNoYear,
   effectiveHolder,
   parseCopyright,
   addHolder,
@@ -345,18 +345,23 @@ function applyTouchLayoutCleanup(vfs: VirtualFS, keyboardId: string): void {
  * The primary is the CURRENT session's holder when there is one, otherwise the
  * newest inherited holder. Portions keep the chronological D3 order.
  *
- * `LICENSE.md` remains the authoritative notice (D4) with one holder per line;
- * these two fields are metadata mirrors of it. Note the deliberate consequence:
- * `parseCopyright` reads this back as ONE compound holder rather than several,
- * exactly as it does for fv_dakelh today. That is acceptable because D4 makes
- * `LICENSE.md` the source a fork reads — the `.kmn` is not a lossless fallback
- * for a multi-generation chain.
+ * NO YEAR (#1545, criterion 4.6): unlike `LICENSE.md` — the authoritative
+ * notice (D4), one holder per line, years intact via `renderLicense` — these
+ * two fields are metadata mirrors that must not need yearly upkeep. Uses
+ * `renderHolderLineNoYear`, not `renderHolderLine`, precisely so an inherited
+ * holder's verbatim `raw` line (which almost always carries a year) never
+ * leaks a year into this mirror.
+ *
+ * Note the deliberate consequence: `parseCopyright` reads this back as ONE
+ * compound holder rather than several, exactly as it does for fv_dakelh
+ * today. That is acceptable because D4 makes `LICENSE.md` the source a fork
+ * reads — the `.kmn` is not a lossless fallback for a multi-generation chain.
  */
 function singleLineNotice(
   block: readonly import("@keyboard-studio/contracts").CopyrightHolder[],
 ): string | null {
   if (block.length === 0) return null;
-  if (block.length === 1) return renderHolderLine(block[0]!);
+  if (block.length === 1) return renderHolderLineNoYear(block[0]!);
 
   // Primary: the holder added this session, else the newest inherited one
   // (block is in D3 order, oldest first).
@@ -367,9 +372,9 @@ function singleLineNotice(
   // Portions drop the leading "Copyright" — the primary clause already carries
   // it, matching the corpus form.
   const portionText = portions
-    .map((h) => renderHolderLine(h).replace(/^Copyright\s+/, ""))
+    .map((h) => renderHolderLineNoYear(h).replace(/^Copyright\s+/, ""))
     .join(", ");
-  return `${renderHolderLine(primary)}. Portions ${portionText}`;
+  return `${renderHolderLineNoYear(primary)}. Portions ${portionText}`;
 }
 
 /**
