@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-08-07",
+  "lastUpdated": "2026-08-11",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -304,7 +304,7 @@
     },
     "specs/008-data-flow": {
       "title": "Feature spec — Data flow (spec.md §8)",
-      "hash": "sha256:875f2eb1789213b2",
+      "hash": "sha256:3c2ed2a28f95f6bb",
       "status": "partial",
       "implements": [
         "packages/contracts/src/surveySession.ts",
@@ -317,7 +317,7 @@
     },
     "docs/architecture.md": {
       "title": "Keyboard Studio — architecture & meta-flow",
-      "hash": "sha256:ffda58f45aad2350",
+      "hash": "sha256:73a4cf2ef32f5d19",
       "status": "reference",
       "implements": [],
       "decisions": [],
@@ -781,7 +781,7 @@
     },
     "specs/058-touch-key-editor": {
       "title": "Feature Specification: Key-level touch layout editing",
-      "hash": "sha256:cbf82bb4536eb5e3",
+      "hash": "sha256:f1b1f635d6695f0c",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -789,7 +789,7 @@
     },
     "specs/060-crash-reporting": {
       "title": "Feature Specification: Crash reporting — an unrecoverable error becomes one actionable, author-anonymous GitHub issue",
-      "hash": "sha256:2db2a4d89d3561b1",
+      "hash": "sha256:2b5b1b185a7faf43",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -798,6 +798,46 @@
     "specs/061-touch-editor-parity": {
       "title": "Feature Specification: Touch key editor — Developer-parity remodel",
       "hash": "sha256:0988c764cf351c03",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/057-bulletproof-navigation": {
+      "title": "Feature Specification: Bulletproof navigation — return where you were, compare without consequence, and jump back to any decision",
+      "hash": "sha256:acd0344ca4aeb0ea",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/058-output-screen-picker-scope": {
+      "title": "Feature Specification: Output-screen picker scope",
+      "hash": "sha256:0f09b23ec78cb803",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/059-identity-in-package": {
+      "title": "Feature Specification: Identity in the package — the author's language reaches the `.kps`, and the trail can show it",
+      "hash": "sha256:cb6fc96eddacc6bc",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/059-keyboard-attribution": {
+      "title": "Feature Specification: Keyboard attribution and license provenance",
+      "hash": "sha256:9b1c0b486746afde",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/061-help-docs-generation": {
+      "title": "Feature Specification: Help documentation generation from Phase F answers",
+      "hash": "sha256:dd3e4384355ed0d7",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
