@@ -287,7 +287,12 @@ export type KeyIdMintingPath =
   | "unicode-default"
   | "combining-mark-guard"
   | "multi-codepoint-string"
-  | "case-triple";
+  | "case-triple"
+  // Spec 061 FR-029/FR-030: the id was not minted at all — it was kept from the
+  // physical key at this position, or taken from a key that already produces the
+  // character. `proposeKeyId` never returns it; only `proposeTouchKeyId` does.
+  // It lives in this union so a proposal has ONE path vocabulary to render.
+  | "inherited";
 
 /**
  * Why a requested case triple was not produced. The titlecase case is called

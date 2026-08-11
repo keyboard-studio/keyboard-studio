@@ -23,5 +23,6 @@ export {
   touchSubKeyAddress,
   touchFlickAddress,
   parseTouchKeyAddress,
+  createKeyOccurrenceCounter,
 } from "@keyboard-studio/contracts";
-export type { TouchKeyAddressParts } from "@keyboard-studio/contracts";
+export type { TouchKeyAddressParts, TouchKeyOccurrence } from "@keyboard-studio/contracts";

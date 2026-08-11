@@ -13,7 +13,8 @@
 
 import { describe, it, expect } from "vitest";
 import { applyDesktopModifications } from "./applyDesktopModifications.js";
-import type { TouchLayoutIR, TouchKeyIR } from "@keyboard-studio/contracts";
+import { BLANK_KEY_ID, BLANK_KEY_SP } from "./touch-mechanism-shared.js";
+import { isSpacerKeyClass, type TouchLayoutIR, type TouchKeyIR } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -105,7 +106,7 @@ describe("applyDesktopModifications — removals purge every producer form", () 
     const phoneDef = phone.layers.find((l) => l.id === "default")!;
     const phoneAll = phoneDef.rows.flatMap((r) => r.keys);
     expect(phoneAll.find((k) => k.id === "K_A")).toBeUndefined();
-    expect(phoneAll.some((k) => k.id.startsWith("T_removed_"))).toBe(true);
+    expect(phoneAll.some((k) => k.id === BLANK_KEY_ID)).toBe(true);
 
     // Tablet K_A's sk[] entry for "a" is dropped too.
     const tablet = out.platforms.find((p) => p.id === "tablet")!;
@@ -147,7 +148,7 @@ describe("applyDesktopModifications — canonical NFC matching", () => {
     // Primary production matched via NFC-normalized comparison -> inert placeholder.
     expect(getKey(out, "K_A")).toBeUndefined();
     const all = phoneDefaultKeys(out);
-    const placeholder = all.find((k) => k.id.startsWith("T_removed_"))!;
+    const placeholder = all.find((k) => k.id === BLANK_KEY_ID)!;
     expect(placeholder).toBeDefined();
     expect(placeholder.text).toBeUndefined();
     expect(placeholder.output).toBeUndefined();
@@ -169,7 +170,7 @@ describe("applyDesktopModifications — canonical NFC matching", () => {
     const { layout: out } = applyDesktopModifications(layout, { removals: ["ã"], placements: [] });
 
     expect(getKey(out, "U_0061_0303")).toBeUndefined();
-    const placeholder = phoneDefaultKeys(out).find((k) => k.id.startsWith("T_removed_"))!;
+    const placeholder = phoneDefaultKeys(out).find((k) => k.id === BLANK_KEY_ID)!;
     expect(placeholder).toBeDefined();
   });
 });
@@ -192,19 +193,57 @@ describe("applyDesktopModifications — primary-key removal produces an inert pl
     // Row still has exactly 2 keys — the key object was never dropped.
     expect(all).toHaveLength(2);
 
-    const placeholder = all.find((k) => k.id.startsWith("T_removed_"))!;
+    const placeholder = all.find((k) => k.id === BLANK_KEY_ID)!;
     expect(placeholder).toBeDefined();
     expect(placeholder.nodeId).toBe("node_K_A");
     expect(placeholder.text).toBeUndefined();
     expect(placeholder.output).toBeUndefined();
-    // Geometry fields survive verbatim.
-    expect(placeholder.sp).toBe(0);
+    // GEOMETRY survives verbatim — that is the whole reason the key object is
+    // kept rather than deleted (R9).
     expect(placeholder.width).toBe(100);
     expect(placeholder.pad).toBe(10);
     expect(placeholder.nextlayer).toBe("shift");
+    // `sp` does NOT survive, deliberately. It used to, and the result was a key
+    // that produced nothing while still drawing as an ordinary character keycap
+    // — the mirror of FR-029c's half-done suppression ("a live key that looks
+    // dead"), and reported as carved keys being "unnecessarily visible". The
+    // placeholder is now the non-interactive SPACER class: it holds its width,
+    // which is what R9 needs, without drawing a keycap.
+    expect(placeholder.sp).toBe(10);
   });
 
-  it("uses a deterministic T_removed_<n> counter across multiple removed keys", () => {
+  // The defect this pins: a carved key produced nothing but still drew as an
+  // ordinary character keycap, so an author looking at the rightalt layers saw
+  // a full set of live-looking keys that silently did nothing.
+  it("draws the placeholder as non-interactive, whatever class the carved key had", () => {
+    const layout = makeLayout([
+      makeKey("K_A", { text: "a", output: "a", sp: 0 }),
+      makeKey("K_B", { text: "b", output: "b", sp: 8 }),
+    ]);
+    const { layout: out } = applyDesktopModifications(layout, {
+      removals: ["a", "b"],
+      placements: [],
+    });
+
+    const placeholders = phoneDefaultKeys(out).filter((k) => k.id === BLANK_KEY_ID);
+    expect(placeholders).toHaveLength(2);
+    for (const placeholder of placeholders) {
+      expect(isSpacerKeyClass(placeholder.sp)).toBe(true);
+    }
+  });
+
+  // Every emptied key is the SAME blank, deliberately. This replaced a
+  // per-key `T_removed_<n>` mint, whose uniqueness bought individual
+  // addressability but produced an id that appears nowhere in the corpus and
+  // still drew as a live keycap. The corpus writes its blanks one way, and
+  // matching it is what makes an adapted keyboard look like the one it came
+  // from — `sil_cameroon_azerty` alone ships 66 `T_BLANK`s of its own.
+  //
+  // The cost is real and named rather than hidden: `touchKeyAddress` is built
+  // from the id, so these three share one address, exactly as that base's own
+  // blanks already do. Per-occurrence addressing is the outstanding work that
+  // makes them individually selectable again.
+  it("writes every emptied key as the same corpus blank", () => {
     const layout = makeLayout([
       makeKey("K_A", { text: "a", output: "a" }),
       makeKey("K_B", { text: "b", output: "b" }),
@@ -214,10 +253,13 @@ describe("applyDesktopModifications — primary-key removal produces an inert pl
       removals: ["a", "b", "c"],
       placements: [],
     });
-    const ids = phoneDefaultKeys(out)
-      .map((k) => k.id)
-      .filter((id) => id.startsWith("T_removed_"));
-    expect(ids).toEqual(["T_removed_0", "T_removed_1", "T_removed_2"]);
+
+    const keys = phoneDefaultKeys(out);
+    expect(keys).toHaveLength(3);
+    expect(keys.map((k) => k.id)).toEqual([BLANK_KEY_ID, BLANK_KEY_ID, BLANK_KEY_ID]);
+    expect(keys.map((k) => k.sp)).toEqual([BLANK_KEY_SP, BLANK_KEY_SP, BLANK_KEY_SP]);
+    // No trace of the retired mint.
+    expect(keys.some((k) => k.id.startsWith("T_removed_"))).toBe(false);
   });
 
   it("does not orphan-guard — removing the sole producer of a char is allowed here", () => {

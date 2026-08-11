@@ -55,10 +55,14 @@
 //
 // ## What this component deliberately does NOT do
 //
-// - Decide WHEN to open. That is the caller's call, off
-//   `findFamilyParallelismBreaks`'s findings (T107) — this component never
-//   runs the check itself, exactly as `RemoveKeyDialog` never computes its own
-//   `proposedOutcome`.
+// - Decide WHEN to open. That is the caller's call — this component never runs
+//   the check itself, exactly as `RemoveKeyDialog` never computes its own
+//   `proposedOutcome`. {@link isFamilyApplicableOp} answers only whether an op
+//   CAN be fanned out; whether the question is worth asking is the engine's
+//   `keyEditAffectsFamilyParallelism` (`layerFamilies.ts`), read forwards off
+//   the same FR-068 property split `findFamilyParallelismBreaks` (T107) checks
+//   backwards. Both gates apply, and the caller (`TouchGallery.tsx`'s
+//   `maybeOfferFamilyApply`) applies them in that order.
 // - Re-run the parallelism check after applying. The caller's next render
 //   recomputes findings from the mutated layout, the same way every other
 //   surface in this directory gets its post-commit truth.
@@ -191,12 +195,18 @@ export function enumerateFamilyApplyTargets(
   if (parts === undefined) return [];
 
   return familyLayerIds.map((layerId) => {
+    // The anchor's OCCURRENCE carries across: correlation is by (id,
+    // occurrence), so the third `T_BLANK` on `default` corresponds to the third
+    // on `shift`, not to whichever blank happens to come first there.
     const address =
-      layerId === parts.layerId ? anchorAddress : touchKeyAddress(parts.platform, layerId, parts.keyId);
+      layerId === parts.layerId
+        ? anchorAddress
+        : touchKeyAddress(parts.platform, layerId, parts.keyId, parts.occurrence);
     const resolved = resolveKeyAddress(layout, {
       platform: parts.platform,
       layerId,
       keyId: parts.keyId,
+      ...(parts.occurrence !== undefined ? { occurrence: parts.occurrence } : {}),
     });
     return {
       layerId,
@@ -263,7 +273,10 @@ export function buildFamilyApplyOps(
   if (parts === undefined) return [];
   return layerIds
     .filter((layerId) => layerId !== parts.layerId)
-    .map((layerId) => ({ ...op, address: touchKeyAddress(parts.platform, layerId, parts.keyId) }));
+    .map((layerId) => ({
+      ...op,
+      address: touchKeyAddress(parts.platform, layerId, parts.keyId, parts.occurrence),
+    }));
 }
 
 // ---------------------------------------------------------------------------

@@ -12,7 +12,7 @@
 //   4. The `sp` (key type) control.
 //   5. SC-007 (T121): every diagnostic reachable in the UI with a working fix.
 
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { useRef } from "react";
 import { cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { render } from "../../../test/renderWithI18n.tsx";
@@ -43,6 +43,19 @@ afterEach(() => {
 });
 
 const EMPTY_ANNOTATIONS: KeyGridAnnotationCounts = { longpress: 0, multitap: 0, flick: 0 };
+
+/**
+ * `onSpChange` and `onApplyFix` are required props as of spec 061's D1
+ * (`packages/studio/src/editors/assignLoop/keyGrid/KeyInspector.tsx`) — every
+ * mount in this file must now supply both, even where a test asserts on
+ * neither. Spread this at a mount site to satisfy the type without pasting
+ * two `vi.fn()`s per call; a test that asserts a specific call supplies its
+ * own handler for that prop instead (and can still spread this for the
+ * other one).
+ */
+function defaultInspectorHandlers() {
+  return { onSpChange: vi.fn(), onApplyFix: vi.fn() };
+}
 
 function makeCell(overrides: Partial<KeyGridCellViewModel> & { id: string }): KeyGridCellViewModel {
   const address = overrides.address ?? touchKeyAddress("phone", "default", overrides.id);
@@ -93,6 +106,7 @@ function FocusHarness({ cell }: { cell: KeyGridCellViewModel }) {
         panelRef={bridge.inspectorRef}
         selectedCell={cell}
         onEscape={bridge.handleEscape}
+        {...defaultInspectorHandlers()}
       />
     </div>
   );
@@ -176,7 +190,12 @@ function NoSelectionHarness() {
   const bridge = useKeyInspectorFocusBridge({ selectedAddress: null, containerRef });
   return (
     <div ref={containerRef}>
-      <KeyInspector panelRef={bridge.inspectorRef} selectedCell={null} onEscape={bridge.handleEscape} />
+      <KeyInspector
+        panelRef={bridge.inspectorRef}
+        selectedCell={null}
+        onEscape={bridge.handleEscape}
+        {...defaultInspectorHandlers()}
+      />
     </div>
   );
 }
@@ -256,7 +275,11 @@ describe("resolveSendsLayer — key.layer supersedes the containing layer (FR-03
   it("renders the override note in the panel only for the superseding key", () => {
     const layout = makeSendsLayout({ id: "T_OVERRIDE", layer: "shift" });
     render(
-      <KeyInspector selectedCell={makeCell({ id: "T_OVERRIDE" })} layout={layout} />,
+      <KeyInspector
+        selectedCell={makeCell({ id: "T_OVERRIDE" })}
+        layout={layout}
+        {...defaultInspectorHandlers()}
+      />,
     );
 
     expect(screen.getByTestId("key-inspector-sends").textContent).toContain("shift");
@@ -265,7 +288,13 @@ describe("resolveSendsLayer — key.layer supersedes the containing layer (FR-03
 
   it("renders no override note for a key with no layer override", () => {
     const layout = makeSendsLayout({ id: "T_PLAIN" });
-    render(<KeyInspector selectedCell={makeCell({ id: "T_PLAIN" })} layout={layout} />);
+    render(
+      <KeyInspector
+        selectedCell={makeCell({ id: "T_PLAIN" })}
+        layout={layout}
+        {...defaultInspectorHandlers()}
+      />,
+    );
 
     expect(screen.getByTestId("key-inspector-sends").textContent).toContain("default");
     expect(screen.queryByTestId("key-inspector-sends-override-note")).toBeNull();
@@ -278,12 +307,17 @@ describe("resolveSendsLayer — key.layer supersedes the containing layer (FR-03
 
 describe("KeyInspector — display fields", () => {
   it("shows the empty state when nothing is selected", () => {
-    render(<KeyInspector selectedCell={null} />);
+    render(<KeyInspector selectedCell={null} {...defaultInspectorHandlers()} />);
     expect(screen.getByTestId("key-inspector-empty")).toBeTruthy();
   });
 
   it("shows 'no output' when producedChars is empty", () => {
-    render(<KeyInspector selectedCell={makeCell({ id: "T_A", producedChars: [] })} />);
+    render(
+      <KeyInspector
+        selectedCell={makeCell({ id: "T_A", producedChars: [] })}
+        {...defaultInspectorHandlers()}
+      />,
+    );
     expect(screen.getByTestId("key-inspector-produces").textContent?.toLowerCase()).toContain(
       "no output",
     );
@@ -291,7 +325,10 @@ describe("KeyInspector — display fields", () => {
 
   it("lists every produced character with its codepoint label", () => {
     render(
-      <KeyInspector selectedCell={makeCell({ id: "T_A", producedChars: ["ɛ"] })} />,
+      <KeyInspector
+        selectedCell={makeCell({ id: "T_A", producedChars: ["ɛ"] })}
+        {...defaultInspectorHandlers()}
+      />,
     );
     const produces = screen.getByTestId("key-inspector-produces");
     expect(produces.textContent).toContain("ɛ");
@@ -302,11 +339,17 @@ describe("KeyInspector — display fields", () => {
     const { rerender } = render(
       <KeyInspector
         selectedCell={makeCell({ id: "T_A", provenance: "base-derived" })}
+        {...defaultInspectorHandlers()}
       />,
     );
     expect(screen.getByTestId("key-inspector-provenance")).toBeTruthy();
 
-    rerender(<KeyInspector selectedCell={makeCell({ id: "T_A", provenance: "hand-set" })} />);
+    rerender(
+      <KeyInspector
+        selectedCell={makeCell({ id: "T_A", provenance: "hand-set" })}
+        {...defaultInspectorHandlers()}
+      />,
+    );
     expect(screen.queryByTestId("key-inspector-provenance")).toBeNull();
   });
 
@@ -317,6 +360,7 @@ describe("KeyInspector — display fields", () => {
           id: "T_A",
           annotations: { longpress: 2, multitap: 0, flick: 1 },
         })}
+        {...defaultInspectorHandlers()}
       />,
     );
     const annotations = screen.getByTestId("key-inspector-annotations");
@@ -341,7 +385,12 @@ describe("KeyInspector — display fields", () => {
         fixes: [{ kind: "setSp", address: "phone:default:T_A", sp: 2 }],
       },
     ];
-    render(<KeyInspector selectedCell={makeCell({ id: "T_A", findings })} />);
+    render(
+      <KeyInspector
+        selectedCell={makeCell({ id: "T_A", findings })}
+        {...defaultInspectorHandlers()}
+      />,
+    );
 
     expect(
       screen.getByTestId("key-inspector-finding-0-severity").textContent,
@@ -632,6 +681,7 @@ describe("SC-007 — every diagnostic is reachable in the UI with a working fix 
       render(
         <KeyInspector
           selectedCell={makeCell({ id: "T_A", findings: [finding!] })}
+          onSpChange={vi.fn()}
           onApplyFix={(fix, f) => applied.push({ fixKind: fix.kind, findingCode: f.code })}
         />,
       );
@@ -670,19 +720,30 @@ describe("SC-007 — every diagnostic is reachable in the UI with a working fix 
     expect(SC007_CODES.length).toBeGreaterThanOrEqual(8);
   });
 
-  it("renders no fix button as actionable when the caller cannot act — honest, not hidden", () => {
+  // Formerly "renders no fix button as actionable when the caller cannot act
+  // — honest, not hidden": that title described the pre-D1 world, where
+  // `onApplyFix` was optional and an unwired mount rendered every fix button
+  // `disabled` rather than hiding it. FR-003 forecloses that middle ground —
+  // "an affordance that does not apply MUST be absent" — and D1 forecloses it
+  // a second, stronger way: `onApplyFix` is now a required prop, so there is
+  // no unwired mount left to render honestly-disabled. What survives from the
+  // old test is the substance FR-003 actually cares about here: a fix button
+  // must never render in a state where activating it has no effect.
+  it("never renders a fix button disabled — onApplyFix being required means every mount can act", () => {
     const { layout, ir, ruleIndex } = SC007_CASES.TOUCH_KEY_NO_RULE.inputs();
     const finding = computeAllTouchKeyDiagnostics({ ir, layout, ruleIndex }).find(
       (f) => f.code === "TOUCH_KEY_NO_RULE",
     );
 
-    // onApplyFix omitted: the fix is still SHOWN (FR-041's promise that a fix
-    // exists remains true) but disabled, rather than hidden — hiding it would
-    // make the same finding look unfixable.
-    render(<KeyInspector selectedCell={makeCell({ id: "T_A", findings: [finding!] })} />);
+    render(
+      <KeyInspector
+        selectedCell={makeCell({ id: "T_A", findings: [finding!] })}
+        {...defaultInspectorHandlers()}
+      />,
+    );
 
     const fixBtn = screen.getByTestId("key-inspector-finding-0-fix-0") as HTMLButtonElement;
-    expect(fixBtn.disabled).toBe(true);
+    expect(fixBtn.disabled).toBe(false);
   });
 });
 
@@ -721,58 +782,95 @@ describe("proposeSpValue — the derivable half of FR-029d, everything else is '
 });
 
 describe("KeyInspector — the `sp` control (FR-029a)", () => {
-  function getSpRadios(): HTMLInputElement[] {
-    return within(screen.getByTestId("key-inspector-sp")).getAllByRole("radio") as HTMLInputElement[];
+  // The control is a `SelectMenu` (see KeyInspector.tsx's own module doc, "The
+  // key-type control is a DROPDOWN, not six radios"): a collapsed trigger
+  // carrying the current value, and a listbox of options once opened. These
+  // helpers are the same idiom ui/SelectMenu.test.tsx uses.
+
+  /** The collapsed trigger inside the `sp` control. */
+  function spTrigger(): HTMLButtonElement {
+    return within(screen.getByTestId("key-inspector-sp")).getByRole("button") as HTMLButtonElement;
+  }
+
+  /** Every option, after opening the list. Portalled to `document.body`, so queried from `screen`, not from within the control. */
+  function openSpOptions(): HTMLElement[] {
+    fireEvent.click(spTrigger());
+    return screen.getAllByRole("option");
   }
 
   it("exposes the full legal set of six values, none of them disabled", () => {
-    render(<KeyInspector selectedCell={makeCell({ id: "T_A" })} />);
+    render(<KeyInspector selectedCell={makeCell({ id: "T_A" })} {...defaultInspectorHandlers()} />);
 
-    const radios = getSpRadios();
-    expect(radios).toHaveLength(6);
-    expect(radios.map((r) => r.value).sort()).toEqual(["0", "1", "10", "2", "8", "9"].sort());
-    for (const radio of radios) {
-      expect(radio.disabled).toBe(false);
+    const options = openSpOptions();
+    expect(options).toHaveLength(6);
+    expect(options.map((o) => o.getAttribute("data-value")).sort()).toEqual(
+      ["0", "1", "10", "2", "8", "9"].sort(),
+    );
+    for (const option of options) {
+      expect(option.getAttribute("aria-disabled")).not.toBe("true");
     }
   });
 
-  it("checks the radio matching the key's current sp, defaulting undefined to character (0)", () => {
-    render(<KeyInspector selectedCell={makeCell({ id: "T_A" })} />);
-    const radios = getSpRadios();
-    const checked = radios.find((r) => r.checked);
-    expect(checked?.value).toBe("0");
+  it("shows the key's current sp on the trigger, defaulting undefined to character (0)", () => {
+    render(<KeyInspector selectedCell={makeCell({ id: "T_A" })} {...defaultInspectorHandlers()} />);
+    expect(spTrigger().getAttribute("data-value")).toBe("0");
+    expect(spTrigger().textContent).toContain("Character");
   });
 
-  it("checks the radio matching an explicitly-set non-default sp (spacer)", () => {
-    render(<KeyInspector selectedCell={makeCell({ id: "T_A", sp: 10 })} />);
-    const radios = getSpRadios();
-    const checked = radios.find((r) => r.checked);
-    expect(checked?.value).toBe("10");
+  it("shows an explicitly-set non-default sp (spacer) on the trigger", () => {
+    render(
+      <KeyInspector
+        selectedCell={makeCell({ id: "T_A", sp: 10 })}
+        {...defaultInspectorHandlers()}
+      />,
+    );
+    expect(spTrigger().getAttribute("data-value")).toBe("10");
+    expect(spTrigger().textContent).toContain("Spacer");
   });
 
-  it("marks the PROPOSED value even when it differs from the currently-checked value, without disabling either", () => {
+  it("marks the PROPOSED value even when it differs from the current one, without disabling either", () => {
     // T_SHIFT sits on "default" (touchKeyAddress default in makeCell) with
     // nextlayer "shift" — FR-029d proposes inactive (sp:1) here — while the
     // key is currently (wrongly) set to active (sp:2), the exact disagreement
     // T102's diagnostic (not this component) will one day report.
-    render(<KeyInspector selectedCell={makeCell({ id: "T_SHIFT", sp: 2, nextlayer: "shift" })} />);
+    render(
+      <KeyInspector
+        selectedCell={makeCell({ id: "T_SHIFT", sp: 2, nextlayer: "shift" })}
+        {...defaultInspectorHandlers()}
+      />,
+    );
 
-    const proposedBadge = screen.getByTestId("key-inspector-sp-proposed");
-    const proposedRadioLabel = proposedBadge.closest("label");
-    expect(proposedRadioLabel?.querySelector('input[type="radio"]')).toHaveProperty("value", "1");
+    // Collapsed, the trigger shows the CURRENT value and no proposal badge:
+    // sp:2 is not what the studio would propose.
+    expect(spTrigger().getAttribute("data-value")).toBe("2");
+    expect(screen.queryByTestId("key-inspector-sp-proposed")).toBeNull();
 
-    const radios = getSpRadios();
-    const checked = radios.find((r) => r.checked);
-    expect(checked?.value).toBe("2");
-    for (const radio of radios) {
-      expect(radio.disabled).toBe(false);
+    const options = openSpOptions();
+    const badge = screen.getByTestId("key-inspector-sp-proposed");
+    expect(badge.closest('[role="option"]')?.getAttribute("data-value")).toBe("1");
+    for (const option of options) {
+      expect(option.getAttribute("aria-disabled")).not.toBe("true");
     }
   });
 
   it("states that key type governs rendering/interactivity, not rule matching", () => {
-    render(<KeyInspector selectedCell={makeCell({ id: "T_A" })} />);
+    render(<KeyInspector selectedCell={makeCell({ id: "T_A" })} {...defaultInspectorHandlers()} />);
     const note = screen.getByTestId("key-inspector-sp-note").textContent ?? "";
     expect(note.toLowerCase()).toContain("does not stop a rule from matching");
+  });
+
+  it("explains the SELECTED type, not all six at once", () => {
+    render(
+      <KeyInspector
+        selectedCell={makeCell({ id: "T_BLANK", sp: 9 })}
+        {...defaultInspectorHandlers()}
+      />,
+    );
+    const note = screen.getByTestId("key-inspector-sp-note").textContent ?? "";
+    // Blank's own note, and NOT spacer's — the five types the author did not
+    // choose are not being explained at them.
+    expect(note).toContain("Fills a keycap-shaped hole");
+    expect(note).not.toContain("no visible keycap");
   });
 
   it("fires onSpChange with the numeric value the author picked, even when it is not the proposed one", () => {
@@ -781,22 +879,21 @@ describe("KeyInspector — the `sp` control (FR-029a)", () => {
       <KeyInspector
         selectedCell={makeCell({ id: "T_A" })}
         onSpChange={(sp) => picks.push(sp)}
+        onApplyFix={vi.fn()}
       />,
     );
 
-    const radios = getSpRadios();
-    const spacerRadio = radios.find((r) => r.value === "10");
-    expect(spacerRadio).toBeTruthy();
-    fireEvent.click(spacerRadio!);
+    const spacer = openSpOptions().find((o) => o.getAttribute("data-value") === "10");
+    expect(spacer).toBeTruthy();
+    fireEvent.click(spacer!);
 
     expect(picks).toEqual([10]);
   });
 
-  it("does nothing (and does not throw) when onSpChange is omitted", () => {
-    render(<KeyInspector selectedCell={makeCell({ id: "T_A" })} />);
-    const radios = getSpRadios();
-    const spacerRadio = radios.find((r) => r.value === "10");
-
-    expect(() => fireEvent.click(spacerRadio!)).not.toThrow();
-  });
+  // Formerly "does nothing (and does not throw) when onSpChange is omitted".
+  // `onSpChange` is now a required prop (D1) — there is no omitted-handler
+  // mount left to exercise, and the reverting-radio defect that test guarded
+  // against is now a `tsc` error rather than a runtime path. The substance
+  // that survives — picking a value fires the handler with that value — is
+  // already the assertion directly above; nothing here needs a second test.
 });
