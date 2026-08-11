@@ -160,6 +160,18 @@ describe("PunctuationStep — sourced suggestions", () => {
     expect(lastResult(onComplete).confirmedInventory).toEqual(["।"]);
   });
 
+  it("renders the suggestion chip's accessible name as one full catalog sentence, not an assembled fragment (#1589)", async () => {
+    mocks.inventory = {
+      source: "cldr",
+      confidence: "high",
+      characters: [{ char: "।", tier: "punctuation" }],
+      digraphs: [],
+    };
+    render(<PunctuationStep onComplete={vi.fn()} />);
+
+    expect(await screen.findByRole("button", { name: "Add । (U+0964)" })).toBeTruthy();
+  });
+
   it("says so when the source has no punctuation tier for the language", async () => {
     mocks.inventory = {
       source: "cldr",

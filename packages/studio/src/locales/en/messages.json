@@ -1385,7 +1385,7 @@
   "survey.punctuation.suggestedGroupAriaLabel": "Suggested punctuation — tick to add",
   "survey.punctuation.suggestedHeading": "Suggested punctuation",
   "survey.punctuation.suggestedSectionAriaLabel": "Suggested punctuation",
-  "survey.punctuation.suggestionChip.addAction": "Add",
+  "survey.punctuation.suggestionChip.addAriaLabel": "Add {char} ({cp})",
   "survey.punctuation.suggestionsLoading": "Checking for suggested punctuation…",
   "survey.punctuation.typeHeading": "Type your punctuation",
   "survey.punctuation.typeHelp": "Type any punctuation marks that are missing (for example: ! ? « »), then press Enter or + Add.",
