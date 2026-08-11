@@ -2277,17 +2277,22 @@ describe("TouchGallery — abugida gate and empty-hostkey guard on the longpress
     const card = screen.getByRole("note", {
       name: /Touch access method suggestion/i,
     });
-    // #0d2218 / #238636 — the SAME green pair MechanismGallery's own
-    // suggestion row (and this file's chip/Accept-button treatment) already
-    // use. Never the old ERROR_RED (#f85149) / ERROR_BG (#2a0a0a).
-    expect(card.style.backgroundColor).toBe("rgb(13, 34, 24)"); // #0d2218
-    expect(card.style.borderColor).toBe("rgb(35, 134, 54)"); // #238636
-    expect(card.style.backgroundColor).not.toBe("rgb(42, 10, 10)"); // #2a0a0a
-    expect(card.style.borderColor).not.toBe("rgb(248, 81, 73)"); // #f85149
+    // GREEN_CHIP_BG/BORDER/TEXT (epic #533) — the SAME shared green-chip
+    // tokens MechanismGallery's own suggestion row and this file's
+    // chip/Accept-button treatment already use (RemovableChipRow.tsx). Never
+    // the danger palette. background/border are set as SHORTHAND properties
+    // (ProposalCard.tsx), and jsdom does not decompose a `var(...)` shorthand
+    // into its longhand -Color sub-properties, so assert the shorthand
+    // strings themselves rather than .backgroundColor/.borderColor (which
+    // read back empty here even though real browsers render fine).
+    expect(card.style.background).toBe("var(--app-success-bg)");
+    expect(card.style.border).toBe("1px solid var(--app-success)");
+    expect(card.style.background).not.toBe("var(--app-danger-bg)");
+    expect(card.style.border).not.toBe("1px solid var(--app-danger)");
 
     const suggestionText = screen.getByText(/Suggested: long-press/i);
-    expect(suggestionText.style.color).toBe("rgb(86, 211, 100)"); // #56d364
-    expect(suggestionText.style.color).not.toBe("rgb(248, 81, 73)"); // #f85149
+    expect(suggestionText.style.color).toBe("var(--app-success-text)");
+    expect(suggestionText.style.color).not.toBe("var(--app-danger)");
     // This message renders through the shared ProposalCard, whose <p> sets no
     // fontWeight — plain/normal weight is intentional here, matching every
     // other ProposalCard caller (e.g. this gallery's bulk-accent summary

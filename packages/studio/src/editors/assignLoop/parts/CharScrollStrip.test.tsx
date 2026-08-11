@@ -288,7 +288,10 @@ describe("CharScrollStrip — 'mark for later review' blue flag (mechanism-galle
     const flag = screen.getByTestId("char-scroll-badge-marked-0061");
     expect(flag.getAttribute("aria-hidden")).toBe("true");
     expect(flag.textContent).toBe("⚑");
-    expect(flag.style.color).toBe("rgb(110, 168, 254)"); // #6ea8fe — ACCENT, never the badge's amber/green/red palette
+    // ACCENT is now the --app-accent token (epic #533); jsdom does not resolve
+    // custom properties, so assert the token reference itself — never the
+    // badge's amber/green/red palette either way.
+    expect(flag.style.color).toBe("var(--app-accent)");
   });
 
   it("appends a 'marked for later review' clause to the chip's own accessible name — never the ONLY signal (docs/accessibility.md)", () => {

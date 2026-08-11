@@ -258,6 +258,9 @@ import {
   RemovableChipRow,
   HoverDangerChip,
   NonDeletableMethodChip,
+  GREEN_CHIP_BG,
+  GREEN_CHIP_BORDER,
+  GREEN_CHIP_TEXT,
 } from "./parts/RemovableChipRow.tsx";
 import { SelectMenu, type SelectMenuOption } from "../../ui/SelectMenu.tsx";
 import { KEY_OPTIONS, VALID_HOST_KEYS } from "../../lib/keyOptions.ts";
@@ -932,7 +935,7 @@ function TouchLayerBuilder({
       {!layerComboValid && (
         <p
           role="status"
-          style={{ margin: 0, fontSize: 11, color: "#d29922", fontFamily: FONT }}
+          style={{ margin: 0, fontSize: 11, color: "var(--app-warning-text)", fontFamily: FONT }}
         >
           {notYetValidNote}
         </p>
@@ -1607,10 +1610,10 @@ function TouchMethodChooser({
 
 const suggestionAcceptBtnStyle: CSSProperties = {
   padding: "5px 14px",
-  background: "#238636",
+  background: "var(--app-success)",
   border: "none",
   borderRadius: 5,
-  color: "#e6edf3",
+  color: "var(--app-text-on-accent)",
   fontSize: 12,
   fontWeight: 600,
   cursor: "pointer",
@@ -5718,7 +5721,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         onBack={onBack}
         backAriaLabel={t({
           id: "editor.assignLoop.touch.backToMechanismsPhaseCAriaLabel",
-          message: "Back to mechanisms (Phase C)",
+          message: "Back to mechanisms",
         })}
       />
     );
@@ -5933,7 +5936,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
               onClick={onBack}
               aria-label={t({
                 id: "editor.assignLoop.touch.backToMechanismsPhaseCAriaLabel",
-                message: "Back to mechanisms (Phase C)",
+                message: "Back to mechanisms",
               })}
               style={ghostBtn}
             >
@@ -5946,10 +5949,10 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                 onClick={handleContinue}
                 style={{
                   padding: "9px 20px",
-                  background: "#238636",
+                  background: "var(--app-success)",
                   border: "none",
                   borderRadius: 6,
-                  color: "#e6edf3",
+                  color: "var(--app-text-on-accent)",
                   fontSize: 13,
                   fontWeight: 600,
                   cursor: "pointer",
@@ -6020,7 +6023,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                   currentIdx <= 0
                     ? t({
                         id: "editor.assignLoop.touch.backToMechanismsPhaseCAriaLabel",
-                        message: "Back to mechanisms (Phase C)",
+                        message: "Back to mechanisms",
                       })
                     : t({
                         id: "editor.assignLoop.touch.backToPreviousCharacterAriaLabel",
@@ -6062,10 +6065,12 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                   aria-label={touchForwardButton.ariaLabel}
                   style={{
                     padding: "9px 20px",
-                    background: !touchForwardButton.disabled ? "#238636" : "#21262d",
+                    background: !touchForwardButton.disabled
+                      ? "var(--app-success)"
+                      : "var(--app-surface-2)",
                     border: "none",
                     borderRadius: 6,
-                    color: !touchForwardButton.disabled ? "#e6edf3" : TEXT_DIM,
+                    color: !touchForwardButton.disabled ? "var(--app-text-on-accent)" : TEXT_DIM,
                     fontSize: 13,
                     fontWeight: 600,
                     cursor: !touchForwardButton.disabled ? "pointer" : "not-allowed",
@@ -6126,9 +6131,9 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                       alignSelf: "flex-start",
                       padding: "4px 12px",
                       background: "transparent",
-                      border: "1px solid #238636",
+                      border: `1px solid ${GREEN_CHIP_BORDER}`,
                       borderRadius: 6,
-                      color: "#56d364",
+                      color: GREEN_CHIP_TEXT,
                       fontSize: 12,
                       cursor: "pointer",
                       fontFamily: FONT,
@@ -6322,12 +6327,12 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                 // outline->filled, and the label text itself changes. Kept in
                 // sync with MechanismGallery's desktop equivalent.
                 background: markedTouchSet.has(currentChar)
-                  ? "rgba(227,179,65,0.16)"
+                  ? "var(--app-warning-bg)"
                   : "transparent",
                 border: markedTouchSet.has(currentChar)
-                  ? "1px solid #9e6a03"
+                  ? "1px solid var(--app-warning-border)"
                   : `1px solid ${ACCENT}`,
-                color: markedTouchSet.has(currentChar) ? "#e3b341" : ACCENT,
+                color: markedTouchSet.has(currentChar) ? "var(--app-warning-text)" : ACCENT,
                 fontSize: 12,
                 fontWeight: markedTouchSet.has(currentChar) ? 600 : 500,
                 cursor: "pointer",
@@ -6382,7 +6387,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                 fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
               }}
             >
-              <div style={{ color: "#d29922", marginBottom: 4 }}>
+              <div style={{ color: "var(--app-warning-text)", marginBottom: 4 }}>
                 {t({
                   id: "editor.assignLoop.touch.applyWarningsHeading",
                   message: plural(touchApplyWarnings.length, {
@@ -6430,9 +6435,9 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
             id: "editor.assignLoop.touch.configuredGroupAriaLabel",
             message: "Configured characters — click to remove",
           })}
-          chipBackground="#0d2218"
-          chipBorder="#238636"
-          chipColor="#56d364"
+          chipBackground={GREEN_CHIP_BG}
+          chipBorder={GREEN_CHIP_BORDER}
+          chipColor={GREEN_CHIP_TEXT}
           chipPadding="4px 10px"
           chipFontSize={12}
           chipWhiteSpaceNowrap
@@ -6537,10 +6542,10 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                     alignItems: "center",
                     gap: 4,
                     padding: "3px 8px",
-                    background: "#0d2218",
-                    border: "1px solid #238636",
+                    background: GREEN_CHIP_BG,
+                    border: `1px solid ${GREEN_CHIP_BORDER}`,
                     borderRadius: 12,
-                    color: "#56d364",
+                    color: GREEN_CHIP_TEXT,
                     fontSize: 11,
                     fontFamily:
                       "ui-monospace, 'Cascadia Code', Consolas, monospace",
@@ -6629,7 +6634,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
                     alignItems: "center",
                     gap: 4,
                     padding: "3px 8px",
-                    background: "#161b22",
+                    background: "var(--app-surface)",
                     border: `1px solid ${BORDER}`,
                     borderRadius: 12,
                     color: TEXT_DIM,
@@ -7326,7 +7331,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
               onClick={() => handleSwitchTouchEditorMode(tab.id)}
               style={{
                 padding: "4px 10px",
-                background: isActive ? "#0d2840" : "transparent",
+                background: isActive ? "var(--app-accent-subtle)" : "transparent",
                 border: `1px solid ${isActive ? ACCENT : BORDER}`,
                 borderRadius: 6,
                 color: isActive ? TEXT_MAIN : TEXT_DIM,

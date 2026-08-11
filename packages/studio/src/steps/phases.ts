@@ -55,6 +55,7 @@ export type StepId =
   | "project_name"
   | "characters"
   | "marks"
+  | "punctuation"
   | "convenience"
   | "carve"
   | "mechanisms"
@@ -95,7 +96,13 @@ export const PHASES: readonly PhaseDef[] = [
   {
     letter: "C",
     label: msg({ id: "phaseStepper.phase.c", message: "Characters" }),
-    stepIds: ["characters", "marks", "convenience"],
+    // punctuation added post-rebase (main's f75ede1c "punctuation survey
+    // step"): it sits between marks and convenience on the manifest spine
+    // and emits its picks on a phase:"C" SurveyPhaseResult (see its own
+    // header comment in manifest.ts) — same C-phase membership as the other
+    // three, added here because validatePhaseMap() throws at module load
+    // for any manifest step with no phase (this is that guard doing its job).
+    stepIds: ["characters", "marks", "punctuation", "convenience"],
   },
   {
     letter: "D",

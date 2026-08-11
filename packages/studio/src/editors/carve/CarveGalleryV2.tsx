@@ -129,13 +129,32 @@ function CharacterCellButton({ cell, discarded, isSelected, flag, onSelect, onTo
         padding: '10px 4px 8px', borderRadius: 8, cursor: 'pointer',
         background: isSelected ? 'var(--app-accent-subtle)' : (discarded ? 'var(--app-surface-2)' : 'var(--app-surface)'),
         border: `1px solid ${isSelected ? 'var(--app-accent)' : 'var(--app-border)'}`,
-        opacity: discarded ? 0.55 : 1,
       }}
     >
-      <span style={{ font: "400 22px/1 var(--app-font-glyph)", color: 'var(--app-text)' }}>
+      {/* Opacity moved OFF the button and onto the glyph alone (was on the
+          whole button, epic #533 axe gate). Whole-button opacity blends BOTH
+          the codepoint text and its own cell background toward the same page
+          background, which converges them toward each other — the two
+          similar near-white/near-navy tones lose their differentiation from
+          one another regardless of the opacity value chosen, so no number
+          fixes it (measured: text-vs-cell-background contrast stays ~2.1-2.7
+          at every opacity from .55 to .7). The glyph is the one element where
+          "fading toward invisible" is the correct signal; the codepoint is
+          the one WCAG guidance elsewhere in this app (docs/accessibility.md)
+          says must stay a legible, reliable identifier even when the glyph
+          itself has no font coverage — it should never be the thing that
+          fades. */}
+      <span style={{ font: "400 22px/1 var(--app-font-glyph)", color: 'var(--app-text)', opacity: discarded ? 0.55 : 1 }}>
         {displayChar(cell.ch)}
       </span>
-      <span style={{ fontSize: 9.5, fontFamily: 'var(--app-font-mono)', color: 'var(--app-text-subtle)' }}>
+      {/* --app-text-muted, not --app-text-subtle. Subtle measures only 4.51:1
+          on navy against this cell's OWN background (--app-surface) — passing
+          by a margin too thin to trust — and drops further on the discarded
+          cell's --app-surface-2. Muted clears 5.38-7.24:1 across every
+          theme/background combination this cell can render. No opacity here:
+          per the comment above, this text must stay legible in the discarded
+          state, not fade with the glyph. */}
+      <span style={{ fontSize: 9.5, fontFamily: 'var(--app-font-mono)', color: 'var(--app-text-muted)' }}>
         {codepointLabel(cell.ch)}
       </span>
       {/* No keystroke sequence here on purpose. The details rail already shows
@@ -153,9 +172,14 @@ function CharacterCellButton({ cell, discarded, isSelected, flag, onSelect, onTo
           //   --sil-green #509E2F on a white cell -> 3.35:1
           // The -text variants exist for exactly this (they resolve to the
           // -dark shade on light and the -60 tint on navy).
+          // "discarded" uses --app-text-muted, not --app-text-subtle: subtle
+          // measures only 3.88:1 on navy against this cell's --app-surface-2
+          // background (this label only ever renders on an already-discarded,
+          // surface-2 cell) — a real failure, not a thin-margin pass. Muted
+          // clears every theme/background combination this cell can render.
           color:
             flag === 'discarded'
-              ? 'var(--app-text-subtle)'
+              ? 'var(--app-text-muted)'
               : flag === 'suggested'
                 ? 'var(--app-warning-text)'
                 : 'var(--app-success-text)',

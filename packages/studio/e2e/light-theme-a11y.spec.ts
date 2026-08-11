@@ -25,6 +25,7 @@ import {
   chooseAdaptTrack,
   confirmPrefill,
   buildOneCharacterList,
+  drivePunctuationStep,
 } from "./helpers/surveyFlow";
 import { expectNoSeriousAxeViolations } from "./helpers/axe";
 
@@ -135,10 +136,18 @@ test("dense wizard screens have no serious axe violations on light", async ({ pa
 
   await buildOneCharacterList(page, "᙮");
 
+  // Punctuation — a new spine step (main, post-#533) between the marks series
+  // and convenience: unconditional, so it always renders. drivePunctuationStep
+  // is a self-guarding no-op if the step isn't showing, so this is safe
+  // regardless of manifest order. Without this call the walk stalled here and
+  // the "discard gallery" wait below timed out waiting for a screen it could
+  // never reach — not an app bug, this spec simply predated the step.
+  await drivePunctuationStep(page);
+
   // Discard gallery — the character grid, the suggested-to-discard card with
   // its red top rule and red bulk button, and the details rail. The single
   // largest concentration of colour decisions in the app.
-  await expect(page.getByTestId("carve-gallery-v2")).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
   await expectNoSeriousAxeViolations(page, "discard gallery (light)", {
     exclude: KMW_FRAME_CONTRAST_DEBT,
   });

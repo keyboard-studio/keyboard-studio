@@ -162,6 +162,12 @@ import {
   RemovableChipRow,
   HoverDangerChip,
   NonDeletableMethodChip,
+  GREEN_CHIP_BG,
+  GREEN_CHIP_BORDER,
+  GREEN_CHIP_TEXT,
+  BLUE_CHIP_BG,
+  BLUE_CHIP_BORDER,
+  BLUE_CHIP_TEXT,
 } from "./parts/RemovableChipRow.tsx";
 import {
   unimplementedDesktopChars,
@@ -1178,7 +1184,7 @@ function MethodChooser({
                     style={{
                       margin: 0,
                       fontSize: 11,
-                      color: "#d29922",
+                      color: "var(--app-warning-text)",
                       fontFamily: FONT,
                     }}
                   >
@@ -1363,7 +1369,7 @@ function MethodChooser({
                     role="alert"
                     style={{
                       fontSize: 10,
-                      color: "#f85149",
+                      color: "var(--app-danger-text)",
                       opacity: 0.85,
                       fontFamily: FONT,
                     }}
@@ -1377,7 +1383,7 @@ function MethodChooser({
                     aria-live="polite"
                     style={{
                       fontSize: 10,
-                      color: "#d29922",
+                      color: "var(--app-warning-text)",
                       opacity: 0.9,
                       fontFamily: FONT,
                     }}
@@ -3929,10 +3935,10 @@ export function MechanismGallery({
                 disabled: nextDisabled,
                 style: {
                   padding: "9px 20px",
-                  background: !nextDisabled ? "#238636" : "#21262d",
+                  background: !nextDisabled ? "var(--app-success)" : "var(--app-surface-2)",
                   border: "none",
                   borderRadius: 6,
-                  color: !nextDisabled ? "#e6edf3" : TEXT_DIM,
+                  color: !nextDisabled ? "var(--app-text-on-accent)" : TEXT_DIM,
                   fontSize: 13,
                   fontWeight: 600,
                   cursor: !nextDisabled ? "pointer" : "not-allowed",
@@ -4270,8 +4276,8 @@ export function MechanismGallery({
                   // proposal/applied-method chips (Applied methods chips
                   // below, CharScrollStrip's badgeGood treatment) rather
                   // than a new pair.
-                  background: "#0d2218",
-                  border: "1px solid #238636",
+                  background: GREEN_CHIP_BG,
+                  border: `1px solid ${GREEN_CHIP_BORDER}`,
                   borderRadius: 8,
                   padding: "10px 14px",
                   display: "flex",
@@ -4369,7 +4375,7 @@ export function MechanismGallery({
                           // Matches the row's own green background/border
                           // (see the row-container style above) — a
                           // suggestion is a proposal, not an error.
-                          color: "#56d364",
+                          color: GREEN_CHIP_TEXT,
                           fontFamily: FONT,
                           fontWeight: 600,
                         }}
@@ -4388,10 +4394,10 @@ export function MechanismGallery({
                           aria-label={acceptAriaLabel}
                           style={{
                             padding: "5px 14px",
-                            background: "#238636",
+                            background: "var(--app-success)",
                             border: "none",
                             borderRadius: 5,
-                            color: "#e6edf3",
+                            color: "var(--app-text-on-accent)",
                             fontSize: 12,
                             fontWeight: 600,
                             cursor: "pointer",
@@ -4482,7 +4488,7 @@ export function MechanismGallery({
                 style={{
                   margin: 0,
                   fontSize: 12,
-                  color: "#56d364",
+                  color: GREEN_CHIP_TEXT,
                   fontFamily: FONT,
                 }}
               >
@@ -4554,10 +4560,10 @@ export function MechanismGallery({
                           alignItems: "center",
                           gap: 4,
                           padding: "3px 8px",
-                          background: "#0d2218",
-                          border: "1px solid #238636",
+                          background: GREEN_CHIP_BG,
+                          border: `1px solid ${GREEN_CHIP_BORDER}`,
                           borderRadius: 12,
-                          color: "#56d364",
+                          color: GREEN_CHIP_TEXT,
                           fontSize: 11,
                           fontFamily:
                             "ui-monospace, 'Cascadia Code', Consolas, monospace",
@@ -4646,10 +4652,10 @@ export function MechanismGallery({
                           alignItems: "center",
                           gap: 4,
                           padding: "3px 8px",
-                          background: "#0d2218",
-                          border: "1px solid #238636",
+                          background: GREEN_CHIP_BG,
+                          border: `1px solid ${GREEN_CHIP_BORDER}`,
                           borderRadius: 12,
-                          color: "#56d364",
+                          color: GREEN_CHIP_TEXT,
                           fontSize: 11,
                           fontFamily:
                             "ui-monospace, 'Cascadia Code', Consolas, monospace",
@@ -4691,7 +4697,7 @@ export function MechanismGallery({
                   }}
                 >
                   <span
-                    style={{ fontSize: 12, color: "#58a6ff", fontFamily: FONT }}
+                    style={{ fontSize: 12, color: BLUE_CHIP_TEXT, fontFamily: FONT }}
                   >
                     <Trans id="editor.assignLoop.sequenceRecordedBadge">
                       Sequence recorded
@@ -4717,10 +4723,10 @@ export function MechanismGallery({
                       alignItems: "center",
                       gap: 4,
                       padding: "3px 8px",
-                      background: "#0d1f33",
-                      border: "1px solid #58a6ff",
+                      background: BLUE_CHIP_BG,
+                      border: `1px solid ${BLUE_CHIP_BORDER}`,
                       borderRadius: 12,
-                      color: "#58a6ff",
+                      color: BLUE_CHIP_TEXT,
                       fontSize: 11,
                       fontFamily:
                         "ui-monospace, 'Cascadia Code', Consolas, monospace",
@@ -4815,12 +4821,14 @@ export function MechanismGallery({
                   // fill/outline treatment flips, the flag glyph below flips
                   // outline->filled, and the label text itself changes.
                   background: markedDesktopSet.has(currentChar)
-                    ? "rgba(227,179,65,0.16)"
+                    ? "var(--app-warning-bg)"
                     : "transparent",
                   border: markedDesktopSet.has(currentChar)
-                    ? "1px solid #9e6a03"
+                    ? "1px solid var(--app-warning-border)"
                     : `1px solid ${ACCENT}`,
-                  color: markedDesktopSet.has(currentChar) ? "#e3b341" : ACCENT,
+                  color: markedDesktopSet.has(currentChar)
+                    ? "var(--app-warning-text)"
+                    : ACCENT,
                   fontSize: 12,
                   fontWeight: markedDesktopSet.has(currentChar) ? 600 : 500,
                   cursor: "pointer",
@@ -4855,9 +4863,9 @@ export function MechanismGallery({
               id: "editor.assignLoop.addedGroupAriaLabel",
               message: "Added characters — click to remove",
             })}
-            chipBackground="#0d2218"
-            chipBorder="#238636"
-            chipColor="#56d364"
+            chipBackground={GREEN_CHIP_BG}
+            chipBorder={GREEN_CHIP_BORDER}
+            chipColor={GREEN_CHIP_TEXT}
             hoverDanger
             items={[...coveredChars].map((c) => ({
               key: c,
@@ -4887,9 +4895,9 @@ export function MechanismGallery({
               id: "editor.assignLoop.sequencesGroupAriaLabel",
               message: "Characters with a recorded sequence — click to remove",
             })}
-            chipBackground="#1c2a3a"
-            chipBorder="#58a6ff"
-            chipColor="#58a6ff"
+            chipBackground={BLUE_CHIP_BG}
+            chipBorder={BLUE_CHIP_BORDER}
+            chipColor={BLUE_CHIP_TEXT}
             hoverDanger={false}
             items={sequenceRecordedChars.map((c) => ({
               key: c,
@@ -4915,10 +4923,10 @@ export function MechanismGallery({
           aria-live="assertive"
           style={{
             padding: "10px 14px",
-            background: "#2a0a0a",
-            border: "1px solid #f85149",
+            background: "var(--app-danger-bg)",
+            border: "1px solid var(--app-danger)",
             borderRadius: 6,
-            color: "#f85149",
+            color: "var(--app-danger-text)",
             fontSize: 12,
             fontFamily: FONT,
           }}
