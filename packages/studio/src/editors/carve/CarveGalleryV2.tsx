@@ -248,7 +248,15 @@ function RecommendedGroupCard({
   const bulkButtonStyle = destructiveBulkButton === true && !allDiscarded
     ? {
         font: '600 12.5px var(--app-font)', cursor: 'pointer',
-        color: 'var(--app-text-on-accent)', background: 'var(--sil-red-dark)',
+        // NOT --app-text-on-accent: that token flips per theme to pair with
+        // --app-accent (dark text on navy's light-blue accent, white text on
+        // light's dark-blue accent) — --sil-red-dark is a fixed dark red in
+        // BOTH themes (brand.css has no navy override for it), so pairing it
+        // with the flipping token gives navy theme dark-on-dark (#18243f on
+        // #a6121f, 2:1) while looking fine in light theme, which is exactly
+        // how this shipped unnoticed. White is correct against this fixed
+        // dark fill in either theme.
+        color: '#fff', background: 'var(--sil-red-dark)',
         border: 'none', borderRadius: 8, padding: '9px 16px',
       }
     : destructiveBulkButton === true
