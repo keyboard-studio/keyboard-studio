@@ -696,15 +696,15 @@ describe("attribution emission (spec 059)", () => {
     };
   }
 
-  // SC-003: one source of truth. 22 shipped keyboards disagree between their
-  // LICENSE.md and .kmn because those strings were built independently.
-  it("SC-003: LICENSE.md, store(&COPYRIGHT) and .kps <Copyright> all agree on the holder", async () => {
+  // SC-003: one source of truth (on the HOLDER — the .kmn/.kps mirrors omit
+  // the year per criterion 4.6/#1545; LICENSE.md alone carries it).
+  it("SC-003: LICENSE.md, store(&COPYRIGHT) and .kps <Copyright> agree on the holder", async () => {
     const { vfs } = await scaffoldWith({ attribution: ATTRIBUTION, emitYear: YEAR });
     const { license, kmn, kps } = texts(vfs);
-    const expected = `Copyright © ${YEAR} Bafut Language Committee`;
-    expect(license).toContain(expected);
-    expect(kmn).toContain(`store(&COPYRIGHT) '${expected}'`);
-    expect(kps).toContain(`<Copyright URL="">${expected}</Copyright>`);
+    expect(license).toContain(`Copyright © ${YEAR} Bafut Language Committee`);
+    const expectedMirror = "Copyright © Bafut Language Committee";
+    expect(kmn).toContain(`store(&COPYRIGHT) '${expectedMirror}'`);
+    expect(kps).toContain(`<Copyright URL="">${expectedMirror}</Copyright>`);
   });
 
   // SC-001: the bug this feature exists to fix.
@@ -742,7 +742,7 @@ describe("attribution emission (spec 059)", () => {
   it("stops resetIdentity fabricating a holder — the base's line is replaced by the CONFIRMED one", async () => {
     const { vfs } = await scaffoldWith({ attribution: ATTRIBUTION, emitYear: YEAR });
     const { kmn } = texts(vfs);
-    expect(kmn).toContain("store(&COPYRIGHT) 'Copyright © 2026 Bafut Language Committee'");
+    expect(kmn).toContain("store(&COPYRIGHT) 'Copyright © Bafut Language Committee'");
     expect(kmn).not.toContain("Copyright © 2026 My Keyboard");
   });
 
@@ -1078,15 +1078,14 @@ describe("single-line copyright metadata uses the Portions convention (spec 059 
 
   it("a single holder needs no Portions clause", async () => {
     const f = await fields(null);
-    expect(f.kmnStore).toBe("Copyright © 2026 New Author");
+    // No year (#1545, criterion 4.6) — LICENSE.md alone carries it.
+    expect(f.kmnStore).toBe("Copyright © New Author");
     expect(f.kmnStore).not.toContain("Portions");
   });
 
   it("two holders collapse to <primary>. Portions <earlier>", async () => {
     const f = await fields(ONE);
-    expect(f.kmnStore).toBe(
-      "Copyright © 2026 New Author. Portions (c) 2016-2021 Original Author",
-    );
+    expect(f.kmnStore).toBe("Copyright © New Author. Portions (c) Original Author");
   });
 
   // The DERIVING author is primary; the base author becomes Portions. That is the
@@ -1101,15 +1100,16 @@ describe("single-line copyright metadata uses the Portions convention (spec 059 
   it("three holders list the earlier ones comma-separated inside Portions", async () => {
     const f = await fields(TWO);
     expect(f.kmnStore).toBe(
-      "Copyright © 2026 New Author. Portions (c) 2016-2021 Original Author, © 2024 Second Gen",
+      "Copyright © New Author. Portions (c) Original Author, © Second Gen",
     );
   });
 
-  it("inherited markers are preserved inside the Portions clause", async () => {
+  it("inherited markers are preserved inside the Portions clause, years are not (#1545)", async () => {
     const f = await fields(TWO);
     // (c) from the first inherited line, © from the second — neither normalised.
-    expect(f.kmnStore).toContain("(c) 2016-2021 Original Author");
-    expect(f.kmnStore).toContain("© 2024 Second Gen");
+    expect(f.kmnStore).toContain("(c) Original Author");
+    expect(f.kmnStore).toContain("© Second Gen");
+    expect(f.kmnStore).not.toMatch(/\d{4}/);
   });
 
   it("the .kps carries the identical string — the two files cannot disagree (SC-003)", async () => {
