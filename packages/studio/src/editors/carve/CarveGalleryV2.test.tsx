@@ -13,7 +13,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { cleanup, fireEvent, screen, within } from '@testing-library/react';
 import { render } from '../../test/renderWithI18n.tsx';
-import type { IRRule, IRGroup, IRStore, KeyboardIR, RemovalCapability } from '@keyboard-studio/contracts';
+import type { IRRule, IRGroup, IRStore, KeyboardIR, RemovalCapability, PlacementWorklist } from '@keyboard-studio/contracts';
 import { createVirtualFS } from '@keyboard-studio/contracts';
 import { basicKbdus } from '@keyboard-studio/contracts/fixtures';
 import { CarveGalleryV2 } from './CarveGalleryV2.tsx';
@@ -304,5 +304,63 @@ describe('CarveGalleryV2 — removal recommendation banner', () => {
 
     expect(screen.queryByText(/We recommend removing/)).toBeNull();
     expect(screen.queryByRole('region', { name: 'Removal recommendation' })).toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // #1558 — the default carve surface (CarveGalleryV2, since #1579 retired the
+  // v1/v2 flag) must forward useCarveNeededSet's blockCandidateChars through
+  // to recommendedRemovalChars, exactly as CarveGallery.tsx (v1) already did.
+  // The existing tests above only exercise the plain CLDR-surplus path; this
+  // one is built so 'ç' can NEVER reach the banner via that path — it is not
+  // a member of buildProducedSet(ir) at all (no rule in this fixture literally
+  // outputs it), so `candidateChars` only ever contains it when the
+  // blockCandidateChars argument unions it in. If the component's call site
+  // ever drops that argument (the #1558 bug, reintroduced), 'ç' has zero path
+  // to the banner and this test fails.
+  // -------------------------------------------------------------------------
+  const CEDILLA = '̧'; // combining cedilla — composeCombo('c', [CEDILLA]) -> 'ç' (U+00E7)
+
+  it('surfaces a blocked-combination candidate on the banner via blockCandidateChars — not reachable through the plain needed-set-surplus path alone', async () => {
+    // 'a' -> literal 'a' (kept: unioned into `needed` below).
+    // 'r-generic' -> literal 'x' (kept: also unioned into `needed`), standing
+    // in for whatever real rule the compiled keyboard resolves the 'c'+cedilla
+    // combo through — its own literal output is deliberately NOT 'ç', so
+    // buildProducedSet(ir) never counts 'ç' as produced.
+    const ir = makeIR([makeGroup('g-main', 'main', [
+      makeSimpleRule('r-a', 'K_A', 'a'),
+      makeSimpleRule('r-generic', 'K_X', 'x'),
+    ])]);
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => {
+      if (ch === 'a') return { ...emptyContributors(ch), ruleNodeIds: ['r-a'] };
+      if (ch === 'x') return { ...emptyContributors(ch), ruleNodeIds: ['r-generic'] };
+      // 'ç' resolves (only when queried) to the SAME rule shape — a stand-in
+      // for the deeper resolution collectCharContributors performs beyond
+      // buildProducedSet's naive literal-output scan.
+      if (ch === 'ç') return { ...emptyContributors(ch), ruleNodeIds: ['r-generic'] };
+      return emptyContributors(ch);
+    });
+    // Both of this fixture's REAL produced characters are needed, so nothing
+    // is surplus yet — confirms the "before" state has no banner at all.
+    neededCharsResult.set(new Set(['a', 'x']));
+
+    renderGalleryV2(ir);
+
+    expect(screen.queryByRole('region', { name: 'Removal recommendation' })).toBeNull();
+
+    // instantiateFromExisting (inside renderGalleryV2) resets the session, so
+    // the worklist is seeded AFTER render — same ordering CarveGallery.test.tsx
+    // uses for retainedConvenienceChars (session fields reset by instantiation).
+    const worklist: PlacementWorklist = {
+      ownLetterUnits: [],
+      markUnits: [],
+      blockedCombinations: [{ base: 'c', mark: CEDILLA }],
+    };
+    useWorkingCopyStore.setState((s) => ({ session: { ...s.session, marksWorklist: worklist } }));
+
+    await screen.findByText(/We recommend removing 1 character(?!s)/);
+    expect(screen.getByRole('region', { name: 'Removal recommendation' })).not.toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { expanded: false, name: /We recommend removing/ }));
+    expect(screen.getByRole('checkbox', { name: 'Remove U+00E7' })).not.toBeNull();
   });
 });
