@@ -69,6 +69,9 @@ ESLint over `packages/*/src`, then in order:
   [utilities/test-antipattern-lint/index.js](../utilities/test-antipattern-lint/index.js), bans
   `expect(true).toBe(true)`-style tautologies across all `packages/*/**/*.test.ts` and hardcoded
   survey question-order `.map((q) => q.id)).toEqual([…])` snapshots.
+- `pnpm run token-lint` — [utilities/token-lint/index.js](../utilities/token-lint/index.js), bans
+  hard-coded hex/rgb/hsl color literals in `packages/studio/src/**/*.ts(x)` against a baseline
+  ratchet (see utilities/token-lint/README.md).
 
 ### Catalog sort order
 
