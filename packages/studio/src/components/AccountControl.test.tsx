@@ -106,14 +106,12 @@ describe("AccountControl — signed out (guest)", () => {
     expect(googleConnect).toHaveBeenCalledOnce();
   });
 
-  it("closes the popover when the backdrop is clicked", () => {
+  it("closes the popover on a pointer-down outside the control", () => {
     mockAuth({ status: "idle" });
     renderAccountControl();
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
-    const dialog = screen.getByRole("dialog", { name: "Sign in options" });
-    // Backdrop is the fixed div immediately before the dialog in the DOM.
-    const backdrop = dialog.previousElementSibling as HTMLElement;
-    fireEvent.click(backdrop);
+    expect(screen.getByRole("dialog", { name: "Sign in options" })).toBeTruthy();
+    fireEvent.pointerDown(document.body);
     expect(screen.queryByRole("dialog")).toBeNull();
   });
 });

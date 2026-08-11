@@ -15,11 +15,16 @@
 // cannot reflow the sibling nav controls the way an inline swap would.
 //
 // The armed state disarms on Escape or on any pointer-down outside the
-// control, so a stray click can't leave a live "Yes" button around.
+// control (shared with AccountControl via useDismissablePopover, #1513), so a
+// stray click can't leave a live "Yes" button around.
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { BG_CARD, BORDER, ERROR_RED, FONT, TEXT_DIM } from "../ui/theme.ts";
+import { BORDER, ERROR_RED, FONT, TEXT_DIM } from "../ui/theme.ts";
+import {
+  useDismissablePopover,
+  POPOVER_PANEL_STYLE,
+} from "../ui/useDismissablePopover.ts";
 
 interface SurveyResetButtonProps {
   /** Start the survey over entirely (stores + saved draft). */
@@ -49,18 +54,11 @@ const RESET_BTN_STYLE: CSSProperties = {
 
 /** Confirm popover — below-right of the trigger, above the survey content. */
 const CONFIRM_PANEL_STYLE: CSSProperties = {
-  position: "absolute",
-  top: "calc(100% + 6px)",
-  right: 0,
-  zIndex: 200,
+  ...POPOVER_PANEL_STYLE,
   display: "flex",
   alignItems: "center",
   gap: 8,
   padding: "8px 10px",
-  background: BG_CARD,
-  border: `1px solid ${BORDER}`,
-  borderRadius: 8,
-  boxShadow: "0 8px 24px color-mix(in srgb, var(--app-bg) 22%, transparent)",
 };
 
 const CONFIRM_TEXT_STYLE: CSSProperties = {
@@ -84,27 +82,13 @@ export function SurveyResetButton({ onReset }: SurveyResetButtonProps) {
   const [confirming, setConfirming] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
-  // While armed, disarm on Escape or on pointer-down anywhere outside the
-  // control. Listeners exist only while confirming so the idle button adds
-  // no document-level handlers.
-  useEffect(() => {
-    if (!confirming) return;
-    function onKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape") setConfirming(false);
-    }
-    function onPointerDown(e: PointerEvent) {
-      const container = containerRef.current;
-      if (container !== null && e.target instanceof Node && !container.contains(e.target)) {
-        setConfirming(false);
-      }
-    }
-    document.addEventListener("keydown", onKeyDown);
-    document.addEventListener("pointerdown", onPointerDown);
-    return () => {
-      document.removeEventListener("keydown", onKeyDown);
-      document.removeEventListener("pointerdown", onPointerDown);
-    };
-  }, [confirming]);
+  // Disarm on Escape or on pointer-down anywhere outside the control. No
+  // panelRef/triggerRef: this popover deliberately leaves focus where the
+  // author put it (see file header).
+  useDismissablePopover(confirming, {
+    containerRef,
+    onClose: () => setConfirming(false),
+  });
 
   return (
     <div ref={containerRef} style={CONTAINER_STYLE} data-testid="survey-reset">

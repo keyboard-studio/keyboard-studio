@@ -9,17 +9,15 @@
 //                 buttons (GitHub / Google) that call the same connect() flow
 //                 used on the Welcome screen and in SignUpPanel
 //
-// Outside-click handling uses a fixed transparent backdrop <div> behind the
-// open panel — a CSP-safe, zero-dependency pattern consistent with how other
-// overlay controls work in the codebase.
+// Outside-click and Escape dismissal, plus the open/close focus handoff, are
+// shared with SurveyResetButton via useDismissablePopover (issue #1513).
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useIdentitySession } from "../hooks/useIdentitySession.ts";
 import { navigateTo } from "../lib/navigate.ts";
 import { GitHubMark, GoogleMark } from "./ProviderMarks.tsx";
 import {
-  BG_CARD,
   BORDER,
   ACCENT,
   TEXT_DIM,
@@ -27,6 +25,10 @@ import {
   FONT,
 } from "../lib/galleryTheme.ts";
 import { ERROR_TEXT } from "../ui/theme.ts";
+import {
+  useDismissablePopover,
+  POPOVER_PANEL_STYLE,
+} from "../ui/useDismissablePopover.ts";
 
 // ---------------------------------------------------------------------------
 // Shared style helpers
@@ -67,23 +69,9 @@ const signInButtonStyle: React.CSSProperties = {
 
 /** Dropdown / popover panel anchored below-right of the trigger. */
 const panelStyle: React.CSSProperties = {
-  position: "absolute",
-  top: "calc(100% + 6px)",
-  right: 0,
+  ...POPOVER_PANEL_STYLE,
   minWidth: 200,
-  background: BG_CARD,
-  border: `1px solid ${BORDER}`,
-  borderRadius: 8,
   padding: "8px 0",
-  boxShadow: "0 8px 24px color-mix(in srgb, var(--app-bg) 22%, transparent)",
-  zIndex: 200,
-};
-
-/** Fixed transparent backdrop — sits below the panel, swallows outside clicks. */
-const backdropStyle: React.CSSProperties = {
-  position: "fixed",
-  inset: 0,
-  zIndex: 199,
 };
 
 const menuItemStyle: React.CSSProperties = {
@@ -163,11 +151,20 @@ const errorStyle: React.CSSProperties = {
 
 export function AccountControl() {
   const { t } = useLingui();
-  const { isSignedIn, isVerifying, displayName, initial, github, google, signOut } =
-    useIdentitySession();
+  const {
+    isSignedIn,
+    isVerifying,
+    displayName,
+    initial,
+    github,
+    google,
+    signOut,
+  } = useIdentitySession();
 
   const [open, setOpen] = useState(false);
 
+  // Ref wrapping trigger + panel — a pointerdown outside it closes.
+  const containerRef = useRef<HTMLDivElement>(null);
   // Ref to the trigger button — used to return focus on panel close.
   const triggerRef = useRef<HTMLButtonElement>(null);
   // Ref to the open panel — used to move focus into it on open.
@@ -176,33 +173,12 @@ export function AccountControl() {
   const close = () => setOpen(false);
   const toggle = () => setOpen((v) => !v);
 
-  // Move focus into the panel when it opens; return focus to trigger on close.
-  useEffect(() => {
-    if (open) {
-      // Focus the first focusable element in the panel (first button).
-      const firstFocusable = panelRef.current?.querySelector<HTMLElement>(
-        "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])",
-      );
-      firstFocusable?.focus();
-    } else {
-      // Return focus to the trigger when the panel closes.
-      triggerRef.current?.focus();
-    }
-  }, [open]);
-
-  // Escape key closes the open panel from anywhere on the document.
-  useEffect(() => {
-    if (!open) return;
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        close();
-      }
-    };
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  }, [open]);
+  useDismissablePopover(open, {
+    containerRef,
+    onClose: close,
+    panelRef,
+    triggerRef,
+  });
 
   // During the initial token-verify pass, render a neutral dim placeholder so
   // the control does not flicker between the guest and signed-in states.
@@ -224,10 +200,16 @@ export function AccountControl() {
   if (isSignedIn) {
     const label =
       displayName !== null
-        ? t({ id: "account.avatar.ariaLabel.named", message: `Account: ${displayName}` })
-        : t({ id: "account.avatar.ariaLabel.generic", message: "Account menu" });
+        ? t({
+            id: "account.avatar.ariaLabel.named",
+            message: `Account: ${displayName}`,
+          })
+        : t({
+            id: "account.avatar.ariaLabel.generic",
+            message: "Account menu",
+          });
     return (
-      <div style={{ position: "relative", flexShrink: 0 }}>
+      <div ref={containerRef} style={{ position: "relative", flexShrink: 0 }}>
         <button
           ref={triggerRef}
           type="button"
@@ -241,41 +223,36 @@ export function AccountControl() {
         </button>
 
         {open && (
-          <>
-            {/* Transparent backdrop — click outside to close */}
-            <div style={backdropStyle} onClick={close} aria-hidden="true" />
-
-            <div ref={panelRef} role="menu" style={panelStyle}>
-              {displayName !== null && (
-                <div style={dimTextStyle} role="none">
-                  {displayName}
-                </div>
-              )}
-              <div style={dividerStyle} role="none" />
-              <button
-                type="button"
-                role="menuitem"
-                style={menuItemStyle}
-                onClick={() => {
-                  navigateTo("profile");
-                  close();
-                }}
-              >
-                <Trans id="account.menu.profile">Profile</Trans>
-              </button>
-              <button
-                type="button"
-                role="menuitem"
-                style={menuItemStyle}
-                onClick={() => {
-                  signOut();
-                  close();
-                }}
-              >
-                <Trans id="account.menu.signOut">Sign out</Trans>
-              </button>
-            </div>
-          </>
+          <div ref={panelRef} role="menu" style={panelStyle}>
+            {displayName !== null && (
+              <div style={dimTextStyle} role="none">
+                {displayName}
+              </div>
+            )}
+            <div style={dividerStyle} role="none" />
+            <button
+              type="button"
+              role="menuitem"
+              style={menuItemStyle}
+              onClick={() => {
+                navigateTo("profile");
+                close();
+              }}
+            >
+              <Trans id="account.menu.profile">Profile</Trans>
+            </button>
+            <button
+              type="button"
+              role="menuitem"
+              style={menuItemStyle}
+              onClick={() => {
+                signOut();
+                close();
+              }}
+            >
+              <Trans id="account.menu.signOut">Sign out</Trans>
+            </button>
+          </div>
         )}
       </div>
     );
@@ -283,7 +260,7 @@ export function AccountControl() {
 
   // Guest state — "Sign in" button + provider popover
   return (
-    <div style={{ position: "relative", flexShrink: 0 }}>
+    <div ref={containerRef} style={{ position: "relative", flexShrink: 0 }}>
       <button
         ref={triggerRef}
         type="button"
@@ -296,53 +273,51 @@ export function AccountControl() {
       </button>
 
       {open && (
-        <>
-          {/* Transparent backdrop — click outside to close */}
-          <div style={backdropStyle} onClick={close} aria-hidden="true" />
-
-          <div
-            ref={panelRef}
-            role="dialog"
-            aria-label={t({ id: "account.signIn.dialogAriaLabel", message: "Sign in options" })}
-            aria-modal="true"
-            style={panelStyle}
+        <div
+          ref={panelRef}
+          role="dialog"
+          aria-label={t({
+            id: "account.signIn.dialogAriaLabel",
+            message: "Sign in options",
+          })}
+          aria-modal="true"
+          style={panelStyle}
+        >
+          <button
+            type="button"
+            style={githubProviderButtonStyle}
+            onClick={() => {
+              void github.connect("identity");
+              // connect() redirects; no need to close
+            }}
           >
-            <button
-              type="button"
-              style={githubProviderButtonStyle}
-              onClick={() => {
-                void github.connect("identity");
-                // connect() redirects; no need to close
-              }}
-            >
-              <GitHubMark />
-              <Trans id="account.signIn.github">Sign in with GitHub</Trans>
-            </button>
+            <GitHubMark />
+            <Trans id="account.signIn.github">Sign in with GitHub</Trans>
+          </button>
 
-            <button
-              type="button"
-              style={googleProviderButtonStyle}
-              onClick={() => {
-                void google.connect();
-                // connect() redirects; no need to close
-              }}
-            >
-              <GoogleMark />
-              <Trans id="account.signIn.google">Sign in with Google</Trans>
-            </button>
+          <button
+            type="button"
+            style={googleProviderButtonStyle}
+            onClick={() => {
+              void google.connect();
+              // connect() redirects; no need to close
+            }}
+          >
+            <GoogleMark />
+            <Trans id="account.signIn.google">Sign in with Google</Trans>
+          </button>
 
-            {github.error !== null && (
-              <div role="alert" style={errorStyle}>
-                {github.error}
-              </div>
-            )}
-            {google.error !== null && (
-              <div role="alert" style={errorStyle}>
-                {google.error}
-              </div>
-            )}
-          </div>
-        </>
+          {github.error !== null && (
+            <div role="alert" style={errorStyle}>
+              {github.error}
+            </div>
+          )}
+          {google.error !== null && (
+            <div role="alert" style={errorStyle}>
+              {google.error}
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
