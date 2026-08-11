@@ -57,6 +57,7 @@ import { navigateTo } from "../lib/navigate.ts";
 import { switchActiveProject } from "../lib/switchActiveProject.ts";
 import { BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT } from "../lib/galleryTheme.ts";
 import { SUCCESS_ACCENT } from "../ui/theme.ts";
+import { ErrorText } from "../ui/ErrorText.tsx";
 
 // ---------------------------------------------------------------------------
 // Merge / dedupe
@@ -164,6 +165,27 @@ const cardTitleStyle: React.CSSProperties = {
   overflowWrap: "anywhere",
 };
 
+// #1577: the draft-row title is a real <button>, not a plain <span> — reset
+// button chrome so it still READS as the title, but stays a genuine
+// interactive element (keyboard-operable, in the tab order) rather than
+// dead-to-the-pointer text. A submitted row's title stays a plain span: it
+// has nothing to resume into (frozen/read-only, no Resume button either).
+const cardTitleButtonStyle: React.CSSProperties = {
+  ...cardTitleStyle,
+  background: "transparent",
+  border: "none",
+  padding: 0,
+  margin: 0,
+  // Longhand, not the `font` shorthand: `font`
+  // resets EVERY font sub-property to its inherited value, which would
+  // silently undo the fontWeight/fontSize the cardTitleStyle spread above
+  // just set — buttons don't inherit font-family from the UA stylesheet by
+  // default, so only that one needs resetting.
+  fontFamily: "inherit",
+  textAlign: "left",
+  cursor: "pointer",
+};
+
 const metaLineStyle: React.CSSProperties = {
   fontSize: 12,
   color: TEXT_DIM,
@@ -233,6 +255,12 @@ export function MyKeyboardsList() {
 
   const [entries, setEntries] = useState<ProjectIndexEntry[]>(() => listDrafts());
   const [loading, setLoading] = useState(false);
+  // #1577: switchActiveProject()'s return value used to be discarded, so a
+  // failed resume (corrupt/wrong-shaped draft) looked identical to the
+  // inert-card defect this issue also fixes — nothing visibly happened
+  // either way. Tracks at most one project at a time; clicking any row's
+  // Resume (successful or not) replaces whichever key was here before.
+  const [failedResumeKey, setFailedResumeKey] = useState<string | null>(null);
 
   // Guards against setting state after unmount (e.g. navigating away while the
   // signed-in cloud fetch is still in flight).
@@ -296,7 +324,15 @@ export function MyKeyboardsList() {
     // has and main does not. switchActiveProject() only navigates on a
     // successful apply — a corrupt/wrong-shaped draft leaves the card in
     // place rather than silently navigating into an empty wizard.
-    switchActiveProject(projectKey);
+    //
+    // #1577: the return value used to be discarded here, so a failed resume
+    // (corrupt/wrong-shaped draft) was indistinguishable from the inert-card
+    // defect this issue also fixes — the author clicked and nothing visibly
+    // happened either way. A successful resume navigates away immediately
+    // (see switchActiveProject), so this component never actually renders
+    // the `applied === true` state — the write only matters for `false`.
+    const applied = switchActiveProject(projectKey);
+    setFailedResumeKey(applied ? null : projectKey);
   }
 
   // Spec 053 US1: open one project's decision trail. Loads only that project's
@@ -416,7 +452,32 @@ export function MyKeyboardsList() {
             return (
               <li key={entry.projectKey} style={cardStyle} data-testid="my-keyboards-card">
                 <div style={cardTitleRowStyle}>
-                  <span style={cardTitleStyle}>{name}</span>
+                  {/* #1577: the name activates Resume for a draft row — the
+                      whole-card click target the issue asked for, via the
+                      name rather than the card itself so the Decisions/
+                      Delete buttons below never end up nested inside an
+                      interactive ancestor (invalid markup). A submitted row
+                      has nothing to resume into, so its title stays inert
+                      text, matching the fact that it renders no Resume
+                      button either. */}
+                  {entry.status === "draft" ? (
+                    // Accessible name is the bare name (its own text content,
+                    // no aria-label) — deliberately distinct from the
+                    // existing "Resume {name}" action button below, so
+                    // assistive tech and role+name test queries can still
+                    // tell the two apart even though they do the same thing.
+                    // Surrounding context (the Draft badge, the adjacent
+                    // explicit Resume button) supplies the verb.
+                    <button
+                      type="button"
+                      style={cardTitleButtonStyle}
+                      onClick={() => handleResume(entry.projectKey)}
+                    >
+                      {name}
+                    </button>
+                  ) : (
+                    <span style={cardTitleStyle}>{name}</span>
+                  )}
                   <span
                     style={badgeStyle(entry.status)}
                     aria-label={t({
@@ -427,6 +488,18 @@ export function MyKeyboardsList() {
                     {status}
                   </span>
                 </div>
+
+                {/* #1577: surfaces a failed resume instead of swallowing it —
+                    previously indistinguishable from the inert-card defect
+                    this issue also fixes (author clicks, nothing happens). */}
+                {failedResumeKey === entry.projectKey && (
+                  <ErrorText tone="error">
+                    {t({
+                      id: "profile.myKeyboards.resumeFailed",
+                      message: "Couldn't resume this keyboard — its saved data looks corrupted.",
+                    })}
+                  </ErrorText>
+                )}
 
                 {entry.langTag !== null && <div style={metaLineStyle}>{entry.langTag}</div>}
                 <div style={metaLineStyle}>{lastEditedLabel(relative)}</div>

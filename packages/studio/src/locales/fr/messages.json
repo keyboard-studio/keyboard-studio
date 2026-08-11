@@ -1244,6 +1244,7 @@
   "profile.myKeyboards.loading": "Chargement de vos claviers…",
   "profile.myKeyboards.resumeAriaLabel": "Reprendre {name}",
   "profile.myKeyboards.resumeButton": "Reprendre",
+  "profile.myKeyboards.resumeFailed": "",
   "profile.myKeyboards.sectionAriaLabel": "Mes claviers",
   "profile.myKeyboards.status.draft": "Brouillon",
   "profile.myKeyboards.status.submitted": "Soumis",
