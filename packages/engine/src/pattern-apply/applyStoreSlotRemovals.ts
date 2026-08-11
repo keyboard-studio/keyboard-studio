@@ -165,23 +165,19 @@ export interface StoreSlotRemovalResult {
  *                                   reached indirectly through an `outs()`-nested group
  *                                   call, so it fails CLOSED rather than risk treating
  *                                   a positionally-load-bearing store as safe to drop.
- * - `input-only-match-table`    — store is referenced by `any()` context ONLY inside
- *                                   rules that add no new content — an edit/undo repair
- *                                   (Backspace/Delete trigger) or a bare `context` no-op
- *                                   guard (see {@link ruleAddsNoNewContent}) — never
- *                                   inside a genuine forward-typing rule, and the store
- *                                   is never itself an `index()`/`outs()` output target.
- *                                   Such a store matches ALREADY-TYPED buffer content
- *                                   (e.g. a precomposed grapheme an application
- *                                   NFC-normalized behind the scenes, or a modifier chord
- *                                   guarded off punctuation) to decide how to react —
- *                                   its own items are never emitted by any rule, so
- *                                   offering them as removable "characters this keyboard
- *                                   can type" is a category error. Distinct from an
- *                                   ordinary paired input store (e.g. a dk()/any() deadkey
- *                                   selector store) — that store's any() reference IS a
- *                                   genuine forward-typing rule, so it does not qualify
- *                                   for this reason and stays a normal `drop`.
+ *
+ * A store whose `any()` context references live ONLY inside rules that add no new
+ * content (an edit/undo repair or a bare `context` no-op guard — see
+ * {@link ruleAddsNoNewContent}), and that is never itself an `index()`/`outs()` output
+ * target, is NOT blocked here — it is still perfectly safe to drop (nothing else
+ * depends on its positions). It is instead flagged `matchTableOnly` on the `drop`
+ * result (see {@link StoreSlotEditMode}) — display-only metadata for a caller like the
+ * studio's chip UI that wants to distinguish "this store's items are never actually
+ * PRODUCED by any rule" from an ordinary drop, without refusing the edit itself. See
+ * the {@link StoreSlotEditMode} doc comment for the full rationale — this used to be
+ * a block reason (`input-only-match-table`) until it was found to also block the
+ * engine's own dependent-combo cleanup (carving a character that lives ONLY in such a
+ * store, e.g. a Backspace-unwrap input half, must still drop its row).
  *
  * (Replaces the earlier `dual-use` and `paired-input` reasons: both were
  * coarse stand-ins for "an any()-source and an index()-output target might
@@ -194,8 +190,7 @@ export type StoreSlotBlockReason =
   | "notany-widens"
   | "context-index-aligned"
   | "unresolved-index-pairing"
-  | "outs-reference-unanalyzed"
-  | "input-only-match-table";
+  | "outs-reference-unanalyzed";
 
 /**
  * Per-store edit mode chosen by {@link classifyStoreSlotEdit}.
@@ -205,9 +200,27 @@ export type StoreSlotBlockReason =
  * pairing graph ties them together. An empty array means a plain,
  * uncoordinated drop (unpaired any()-source, outs()-only output target, or
  * entirely unreferenced).
+ *
+ * `matchTableOnly` (drop only, omitted when false) is true when the store's
+ * `any()` context references live ONLY inside rules that add no new content
+ * (an edit/undo repair or a bare `context` no-op guard — see
+ * {@link ruleAddsNoNewContent}) and it is never itself an `index()`/`outs()`
+ * output target — i.e. this store's own items are never actually PRODUCED
+ * by any rule; it only matches ALREADY-TYPED buffer content (e.g. a
+ * precomposed grapheme an application NFC-normalized behind the scenes, or a
+ * modifier chord guarded off punctuation). The edit is still a normal,
+ * unblocked `drop` — nothing positionally depends on this store's items — but
+ * a caller like the studio's chip UI can use this flag to avoid OFFERING
+ * these items as removable "characters this keyboard can type", since they
+ * never are. An ordinary paired input store (e.g. a dk()/any() deadkey
+ * selector) has no `+` in its rule's context at all, so it is never flagged
+ * here (do not confuse with a block reason — this was `input-only-match-table`
+ * as a block reason until that was found to also block the engine's own
+ * dependent-combo cleanup; see the module-level `StoreSlotBlockReason` doc
+ * comment above).
  */
 export type StoreSlotEditMode =
-  | { mode: "drop"; coordinatedWith: string[] }
+  | { mode: "drop"; coordinatedWith: string[]; matchTableOnly?: boolean }
   | { mode: "blocked"; reason: StoreSlotBlockReason };
 
 // ---------------------------------------------------------------------------
@@ -317,7 +330,7 @@ const NON_TYPING_TRIGGER_VKEYS = new Set(["K_BKSP", "K_DEL"]);
  * store that only matches an already-composed grapheme so a Backspace can
  * decompose it) apart from a genuine paired input store (e.g. a dk()/any()
  * deadkey selector, whose rule has no `+` at all and so is never flagged
- * here) — see {@link StoreSlotBlockReason} `"input-only-match-table"`.
+ * here) — see {@link StoreSlotEditMode} `matchTableOnly`.
  */
 function isEditOnlyTriggerRule(context: ContextElement[]): boolean {
   const plusIdx = context.findIndex(isPlusSeparator);
@@ -334,8 +347,8 @@ function isEditOnlyTriggerRule(context: ContextElement[]): boolean {
  * (e.g. Cameroon's `any(diablock) + [RALT K_C] > context` guards a
  * modifier chord against firing on punctuation). A store referenced by
  * any()/notany() ONLY inside such guard rules is a match table exactly like
- * an edit-only-trigger store — see {@link StoreSlotBlockReason}
- * `"input-only-match-table"`.
+ * an edit-only-trigger store — see {@link StoreSlotEditMode}
+ * `matchTableOnly`.
  */
 function isBareContextGuardOutput(output: { kind: string; text?: string }[]): boolean {
   return output.length === 1 && output[0]?.kind === "raw" && output[0].text?.trim().toLowerCase() === "context";
@@ -470,26 +483,24 @@ export function analyzeStores(ir: KeyboardIR): StoreAnalysis {
  *   1. `store.isSystem`                                    → blocked "system-store"
  *   2. referenced by `notany()`                            → blocked "notany-widens"
  *   3. referenced by `index()` in context                  → blocked "context-index-aligned"
- *   4. any() context source ONLY inside edit/undo (Backspace/
- *      Delete) rules, never a genuine forward-typing rule,
- *      and never itself an index()/outs() output target      → blocked "input-only-match-table"
- *   5. any store in its pairing set is referenced by `outs()`
+ *   4. any store in its pairing set is referenced by `outs()`
  *      anywhere in the IR (Amendment 4, fail-closed)         → blocked "outs-reference-unanalyzed"
- *   6. any store in its pairing set has unresolved index() pairing,
+ *   5. any store in its pairing set has unresolved index() pairing,
  *      or is itself system/notany/context-index-aligned     → blocked (that member's reason)
- *   7. otherwise                                            → "drop", coordinated with its
- *                                                              pair-set peers (may be empty)
+ *   6. otherwise                                            → "drop", coordinated with its
+ *                                                              pair-set peers (may be empty),
+ *                                                              flagged `matchTableOnly` when
+ *                                                              `store`'s own any() references
+ *                                                              live ONLY inside edit/undo or
+ *                                                              bare-guard rules (see
+ *                                                              {@link StoreSlotEditMode})
  *
- * Step 4 looks only at `store`'s OWN usage flags (not its pair-set) — it is a
- * "does this store's own content ever get emitted?" question, orthogonal to
- * the positional-safety question steps 5-6 answer for the whole pair-set. A
- * genuine paired input store (e.g. a dk()/any() deadkey selector) has no `+`
- * in its rule's context at all, so it is never flagged edit-only and reaches
- * step 7 as before.
- *
- * Steps 5-6 evaluate the WHOLE pair-set (not just `store` itself): a
+ * Steps 4-5 evaluate the WHOLE pair-set (not just `store` itself): a
  * coordinated drop touches every member, so if any member is unsafe to
  * touch, the whole coordinated group is unsafe from ANY entry point.
+ * `matchTableOnly` deliberately looks only at `store`'s OWN usage flags (not
+ * its pair-set) — it is a "does this store's own content ever get emitted?"
+ * question, orthogonal to the positional-safety question steps 4-5 answer.
  */
 function classifyStoreWithAnalysis(store: IRStore, analysis: StoreAnalysis): StoreSlotEditMode {
   if (store.isSystem) {
@@ -503,13 +514,10 @@ function classifyStoreWithAnalysis(store: IRStore, analysis: StoreAnalysis): Sto
   if (usage?.asContextIndex === true) {
     return { mode: "blocked", reason: "context-index-aligned" };
   }
-  if (
+  const matchTableOnly =
     usage?.asAnySource === true &&
     usage.asIndexOutputTarget !== true &&
-    usage.asAnySourceInTypingRule !== true
-  ) {
-    return { mode: "blocked", reason: "input-only-match-table" };
-  }
+    usage.asAnySourceInTypingRule !== true;
 
   const members = analysis.pairSets.get(store.name) ?? new Set([store.name]);
 
@@ -536,7 +544,7 @@ function classifyStoreWithAnalysis(store: IRStore, analysis: StoreAnalysis): Sto
   }
 
   const coordinatedWith = [...members].filter((name) => name !== store.name).sort();
-  return { mode: "drop", coordinatedWith };
+  return matchTableOnly ? { mode: "drop", coordinatedWith, matchTableOnly } : { mode: "drop", coordinatedWith };
 }
 
 /**
@@ -656,12 +664,6 @@ function blockReasonMessage(reason: StoreSlotBlockReason): string {
         "it (or a store in its pairing set) is referenced by outs() in a rule's output; this module " +
         "cannot trace index() usage reached indirectly through an outs()-nested group call, so edits " +
         "are blocked conservatively rather than risk corrupting a hidden positional consumer."
-      );
-    case "input-only-match-table":
-      return (
-        "it is only matched by any() inside an edit/undo (Backspace/Delete) repair rule or a bare " +
-        "context no-op guard rule, never produced by any rule; its items are a match table, not " +
-        "typeable output."
       );
   }
 }

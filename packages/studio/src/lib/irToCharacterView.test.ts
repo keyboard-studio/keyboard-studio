@@ -140,7 +140,8 @@ describe('irToCharacterView', () => {
 // characters. Cameroon's `composed` (matched only by a Backspace repair rule)
 // and `diablock` (matched only by a bare "context" no-op guard rule) are
 // never actually PRODUCED by any rule — classifyStoreSlotEdit's
-// input-only-match-table reason (applyStoreSlotRemovals.ts) makes
+// `matchTableOnly` drop-mode flag (applyStoreSlotRemovals.ts; still a normal,
+// unblocked drop — nothing positionally depends on these items) makes
 // storeCharChips omit their chips entirely, so they must never reach the
 // flattened character-first gallery either.
 // ---------------------------------------------------------------------------

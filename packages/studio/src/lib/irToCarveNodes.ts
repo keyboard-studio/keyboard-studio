@@ -735,12 +735,6 @@ function blockReasonToDisabledReason(reason: StoreSlotBlockReason): string {
       return "This store is passed to another group's rules via outs() — removing a character here could break a mechanism hidden behind that hand-off, so it isn't safe to prove yet.";
     case 'system-store':
       return "This is a system store the compiler manages directly — it isn't meant to be edited here.";
-    case 'input-only-match-table':
-      // Not surfaced today: storeCharChips omits chips for this reason entirely
-      // (the gallery's promise is characters the keyboard can TYPE, and this
-      // store's items never are) rather than showing a disabled explanation.
-      // Case kept so this switch stays exhaustive over StoreSlotBlockReason.
-      return "This store only matches already-typed text (e.g. a Backspace repair or a no-op guard rule) — it never produces a character, so it isn't shown here.";
   }
 }
 
@@ -759,11 +753,14 @@ export function storeCharChips(store: IRStore, ir: KeyboardIR, analysis?: StoreA
     : classifyStoreSlotEdit(store, ir);
   const chips: StoreCharChip[] = [];
 
-  // 'input-only-match-table' items are never emitted by any rule (a match
-  // table over already-typed buffer content, e.g. a Backspace repair source)
-  // — omitted entirely rather than shown disabled, since the gallery's promise
-  // is "characters this keyboard can produce" and these never are (see report).
-  if (editMode.mode === 'blocked' && editMode.reason === 'input-only-match-table') {
+  // matchTableOnly stores are never emitted by any rule (a match table over
+  // already-typed buffer content, e.g. a Backspace repair source) — omitted
+  // entirely rather than shown disabled, since the gallery's promise is
+  // "characters this keyboard can produce" and these never are. Still a
+  // normal, unblocked `drop` at the engine level (nothing positionally
+  // depends on these items — see StoreSlotEditMode's doc comment), so this
+  // is a display-only omission, not a refusal to edit.
+  if (editMode.mode === 'drop' && editMode.matchTableOnly === true) {
     return chips;
   }
 
