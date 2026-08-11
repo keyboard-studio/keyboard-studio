@@ -119,12 +119,21 @@ function isVariationSelectorOnly(chars: string): boolean {
  * multi-codepoint string, so minting would give it a `U_` id carrying the first
  * codepoint's worth of meaning and quietly lose the rest
  * (character-classes.md row 7).
+ *
+ * **`Extended_Pictographic` content is required, on BOTH joiner branches.**
+ * Neither joiner is emoji-exclusive: ZWJ (U+200D) is linguistically
+ * load-bearing — Devanagari/Bengali/Kannada conjunct control, Sinhala and
+ * Malayalam chillu formation, Arabic cursive joining — and U+FE0F likewise
+ * appears in non-emoji variation sequences. A key authoring one of those types
+ * an ordinary multi-codepoint string (row 3) and must get an id, not the
+ * `emoji-sequence-unsupported` refusal, so the joiner alone cannot decide this;
+ * it is the joiner AND a pictograph that makes a sequence emoji.
  */
 function isEmojiSequence(chars: string): boolean {
   const cps = [...chars];
   if (cps.length < 2) return false;
-  if (chars.includes(ZWJ)) return true;
-  return chars.includes(VARIATION_SELECTOR_16) && /\p{Extended_Pictographic}/u.test(chars);
+  if (!/\p{Extended_Pictographic}/u.test(chars)) return false;
+  return chars.includes(ZWJ) || chars.includes(VARIATION_SELECTOR_16);
 }
 
 /** Any codepoint has no Unicode assignment. */

@@ -30,11 +30,11 @@ assign flow, without editing files by hand. Two consequences:
 |---|---|---|---|---|
 | 1 | **Plain character** — any single assigned, non-combining, non-emoji codepoint (`Ll`, `Lu`, `Nd`, `Po`, `Sm`, …) | `ø` U+00F8 | `unicode-default` → `U_00F8`, with the `T_` alternative | `character` |
 | 2 | **Combining mark** — `Mn`, `Mc`, `Me` | U+0301 | `combining-mark-guard` (guard rule **in addition** to the producing rule) | `dotted-circle-carrier`, standalone offered as `alternative` |
-| 3 | **Multi-codepoint string** — two or more codepoints, no ZWJ and no emoji-presentation selector | `ch`; `a` + U+0301 | `multi-codepoint-string` | `character` (the whole string) |
+| 3 | **Multi-codepoint string** — two or more codepoints, with no `Extended_Pictographic` content (a ZWJ or U+FE0F alone does not disqualify it — see row 7) | `ch`; `a` + U+0301; `ന` + U+0D4D + ZWJ | `multi-codepoint-string` | `character` (the whole string) |
 | 4 | **Cased single letter, triple requested** — `caseTripleRequested` and a `\p{Ll}`/`\p{Lu}` counterpart exists | `e` with CAPS handled | `case-triple` | `character` |
 | 5 | **Titlecase character** — General_Category `Lt` | `ǅ` U+01C5 | **Proposal**: `unicode-default` → `U_01C5`. If a triple was requested, `noCaseTripleReason: "titlecase-self-third-form"` states why there is no trio | `character` |
 | 6 | **Free-standing modifier symbol** — `Sk` spacing accents and modifier letters | `` ` `` U+0060; `ˆ` U+02C6 | `unicode-default` — a spacing character, so nothing special for the id | `character` |
-| 7 | **Emoji sequence** — contains ZWJ (U+200D) or an emoji-presentation variation selector (U+FE0F) | 👩‍💻; ❤️ | `noProposalReason: { kind: "emoji-sequence-unsupported" }` | — |
+| 7 | **Emoji sequence** — carries `Extended_Pictographic` content **and** a joiner: ZWJ (U+200D) or an emoji-presentation variation selector (U+FE0F) | 👩‍💻; ❤️ | `noProposalReason: { kind: "emoji-sequence-unsupported" }` | — |
 | 8 | **Variation selector alone** — the output is only U+FE0E/U+FE0F or a `VARIATION SELECTOR-n`, with no base | U+FE0F | `noProposalReason: { kind: "variation-selector-only" }` | — |
 | 9 | **Unassigned codepoint** — a codepoint with no Unicode assignment | U+0378 | `noProposalReason: { kind: "unassigned-codepoint" }` | — |
 | 10 | **Empty output** — the empty string, or a keycap that is a bare U+25CC carrier crediting no character | `""` | `noProposalReason: { kind: "empty-output" }` | — |
@@ -53,6 +53,14 @@ who asked for a triple must not be met with silence.
 **Row 7 subsumes part of row 3.** A ZWJ sequence *is* a multi-codepoint string, so the check order
 matters: emoji-sequence detection runs **before** the multi-codepoint path, or a 👩‍💻 would mint a
 `U_` id for its first codepoint's worth of meaning and quietly lose the rest.
+
+**Neither joiner is emoji-exclusive, so row 7 needs both halves.** ZWJ is linguistically
+load-bearing — Devanagari/Bengali/Kannada conjunct control, Sinhala and Malayalam chillu formation,
+Arabic cursive joining — and U+FE0F appears in non-emoji variation sequences too. Row 7 therefore
+requires `Extended_Pictographic` content *in addition* to the joiner; a Malayalam chillu
+(`ന` + U+0D4D + ZWJ) is an ordinary row-3 string and gets an id. Keying row 7 on the joiner alone
+refuses a legitimate key with `emoji-sequence-unsupported`, which is a refusal the author cannot
+act on.
 
 **Row 8 is narrower than row 7.** A base character followed by a non-emoji variation selector (a
 CJK ideographic variation sequence, say) is row 3 — a legitimate multi-codepoint string. Row 8 is

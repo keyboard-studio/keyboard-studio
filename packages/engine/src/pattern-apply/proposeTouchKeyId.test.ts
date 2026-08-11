@@ -82,6 +82,24 @@ const CLASS_TABLE: readonly ClassRow[] = [
     expect: "proposal",
     path: "multi-codepoint-string",
   },
+  {
+    // Malayalam chillu: ന + virama + ZWJ. A joiner, no pictograph — row 3, not
+    // row 7. The linguistic uses of ZWJ are the reason row 7 requires
+    // `Extended_Pictographic` content rather than keying on the joiner alone.
+    row: 3,
+    name: "multi-codepoint string joined by ZWJ",
+    chars: "ന്‍",
+    expect: "proposal",
+    path: "multi-codepoint-string",
+  },
+  {
+    // Devanagari explicit conjunct control: क + virama + ZWJ + ष.
+    row: 3,
+    name: "multi-codepoint string with an interior ZWJ",
+    chars: "क्‍ष",
+    expect: "proposal",
+    path: "multi-codepoint-string",
+  },
   { row: 5, name: "titlecase character", chars: "ǅ", expect: "proposal" },
   { row: 6, name: "free-standing modifier symbol", chars: "ˆ", expect: "proposal" },
   {
