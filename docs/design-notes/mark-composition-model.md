@@ -56,7 +56,10 @@ default to NFC.
 ## The uniformity invariant (monolingual keyboards)
 
 **A monolingual keyboard — this app's target — is uniformly NFC or uniformly
-NFD. Never a mix.** Mixed-encoding keyboards (e.g. `sil_cameroon_azerty`:
+NFD. Never a mix.** This governs the form the keyboard **elects for the clusters
+it newly composes**; it is not a claim about every byte the keyboard ever emits
+(see the context-tolerance invariant below, where echoing back the host's form is
+correct behaviour, not a violation). Mixed-encoding keyboards (e.g. `sil_cameroon_azerty`:
 composed French + decomposed Cameroonian orthographies) are a product of
 multilingual/country-scale scope, colonial heritage, and Unicode history —
 supported reality upstream, out of scope as an output of this studio. A
@@ -84,12 +87,37 @@ Consequences:
   transform Track 1 instantiation needs whenever the designer picks NFD over
   a base with composed outputs (the common case for a Cameroonian-language
   derivation from Cam AZERTY). Record as a consequence; do not silently
-  implement.
+  implement. **Not the same question as context tolerance** — that migration
+  changes which form the keyboard *outputs*; spec 062 changes which forms it
+  *matches*, and leaves the output election alone. Neither resolves the other.
 - **No silent normalization.** Nothing in the codec/emit path may normalize
   IR bytes; normalization of IR is only legal through a consented
   facet-transform with an output-level diff. (Inventory-layer NFC
   normalization in `character-discovery` is fine — there NFC is a canonical
   dedup key for grapheme identity, and decomposition is always recoverable.)
+
+## The context-tolerance invariant (the other half)
+
+**Output is uniform. Context is tolerant.** A keyboard emits exactly one
+normalization form. It *matches* the whole canonical equivalence class of its
+context.
+
+This is the second invariant, and until now only the first had a name. The two
+are not in tension: uniformity is what makes the keyboard's own output
+predictable to search, spellcheck, rendering and backspace; tolerance is what
+lets it survive a buffer it did not author. Stating only uniformity is what makes
+the Cameroon posture below — and the write-back policy in spec 062 — look like
+violations rather than the other half of the rule.
+
+Upstream says the same thing, as manual advice. Keyman's
+`developer/language/guide/unicode.md` §Normalisation: *"One appropriate solution
+is to include both normal Unicode normalisation forms (NFC and NFD) in the
+context of rules. Make sure that your output always targets a single
+normalisation form."* Sentence one is tolerance; sentence two is uniformity.
+
+Specified in [specs/062-canonical-context-tolerance/](../../specs/062-canonical-context-tolerance/spec.md);
+the engine-side alternative and the decision on whether to pursue it are in
+[keyman-normalization-campaign.md](keyman-normalization-campaign.md).
 
 ## The attachment matrix
 
@@ -134,9 +162,11 @@ each composed form with its **one-mark-shorter predecessor** (not its bare
 base). ệ and ê are distinct inputs with distinct outputs; backspace unwinds
 the same path entry followed.
 
-One computed per-pair table therefore feeds four consumers: the
+One computed per-pair table therefore feeds five consumers: the
 `orth.mark-composition-posture` facet, the output-form proposal, the
-stepwise unwrap stores, and the blocking rules. Build
+stepwise unwrap stores, the blocking rules, and — per the context-tolerance
+invariant above — the **canonical context variants**, since each composed form's
+decomposition is exactly the context variant a tolerant rule needs. Build
 `nfc-posture-of-inventory` (the facet's `planned` derivation) as that shared
 pure function.
 
