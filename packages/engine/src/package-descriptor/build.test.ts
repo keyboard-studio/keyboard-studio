@@ -191,4 +191,10 @@ describe("buildKpsContent — the parts this feature does NOT own (contract §2)
     expect(kps).toContain("<WelcomeFile>welcome.htm</WelcomeFile>");
     expect(kps.startsWith('<?xml version="1.0" encoding="utf-8"?>')).toBe(true);
   });
+
+  it("lists LICENSE.md in <Files>, one level above this .kps's own source/ directory (criterion 8.4)", () => {
+    const kps = buildKpsContent("bm_sil", { displayName: "Bambara" }, KMN);
+    expect(kps).toContain("<Name>..\\LICENSE.md</Name>");
+    expect(kps).toMatch(/<Name>\.\.\\LICENSE\.md<\/Name>\s*<FileType>\.md<\/FileType>/);
+  });
 });
