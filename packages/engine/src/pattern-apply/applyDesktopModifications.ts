@@ -18,8 +18,9 @@
  *   2. Removals — walk EVERY platform/layer/row/key and strip any trace of a
  *      carved character (text/output/U_-id-decoded, plus sk/flick/multitap
  *      entries). A key whose primary production is carved is never deleted —
- *      it becomes an inert `T_removed_<n>` placeholder so row geometry stays
- *      stable (R9).
+ *      it becomes the corpus's own blank (`T_BLANK` + `sp` 10, see
+ *      {@link BLANK_KEY_ID}) so row geometry stays stable (R9) without leaving
+ *      a dead key that still draws as a live one.
  *      Running removals AFTER placements matters: if a hostKey is both the
  *      target of a Phase C placement and later has its (now-superseded)
  *      character carved, the removal pass sees the key's CURRENT (placed)
@@ -36,6 +37,8 @@ import type { TouchLayoutIR, TouchKeyIR } from "@keyboard-studio/contracts";
 import { NodeIdMinter } from "../shared/node-ids.js";
 import { charToUnicodeKeyId } from "../shared/touch-ids.js";
 import {
+  BLANK_KEY_ID,
+  BLANK_KEY_SP,
   buildRemovalSet,
   isTouchKeyPrimaryProduction,
   isTouchSubKeyDuplicate,
@@ -95,11 +98,6 @@ export function applyDesktopModifications(
  * replaced when one of its keys actually changed.
  */
 function removeAcrossLayout(layout: TouchLayoutIR, removalSet: ReadonlySet<string>): TouchLayoutIR {
-  // Deterministic per-layout counter for T_removed_<n> placeholder ids —
-  // increments only when a key's primary production is actually carved.
-  let placeholderCounter = 0;
-  const mintPlaceholderId = () => `T_removed_${placeholderCounter++}`;
-
   let anyPlatformChanged = false;
   const newPlatforms = layout.platforms.map((platform) => {
     let anyLayerChanged = false;
@@ -108,7 +106,7 @@ function removeAcrossLayout(layout: TouchLayoutIR, removalSet: ReadonlySet<strin
       const newRows = layer.rows.map((row) => {
         let anyKeyChanged = false;
         const newKeys = row.keys.map((key) => {
-          const { key: nextKey, changed } = stripRemovedFromKey(key, removalSet, mintPlaceholderId);
+          const { key: nextKey, changed } = stripRemovedFromKey(key, removalSet);
           if (changed) anyKeyChanged = true;
           return nextKey;
         });
@@ -132,14 +130,13 @@ function removeAcrossLayout(layout: TouchLayoutIR, removalSet: ReadonlySet<strin
 /**
  * Strip carved-character traces from a single key: drop matching sk/flick/
  * multitap entries, and — if the key's own primary production (text/output/
- * U_-id) is carved — convert it to an inert `T_removed_<n>` placeholder
- * (never delete the key object, so row geometry/widths stay stable — R9).
- * Gesture entries for OTHER characters are kept on the placeholder.
+ * U_-id) is carved — convert it to the corpus's own blank ({@link BLANK_KEY_ID}
+ * + {@link BLANK_KEY_SP}), never deleting the key object, so row geometry/widths
+ * stay stable (R9). Gesture entries for OTHER characters are kept on it.
  */
 function stripRemovedFromKey(
   key: TouchKeyIR,
   removalSet: ReadonlySet<string>,
-  mintPlaceholderId: () => string,
 ): { key: TouchKeyIR; changed: boolean } {
   let sk = key.sk;
   if (sk) {
@@ -183,8 +180,37 @@ function stripRemovedFromKey(
   // placeholder. `text`/`output` are cleared (destructure-omit, not set to
   // `undefined`, to satisfy exactOptionalPropertyTypes); every other field
   // (geometry, nextlayer, the filtered sk/flick/multitap above) is kept.
+  //
+  // An emptied key becomes the corpus's own blank: `T_BLANK` + `sp` 10.
+  //
+  // `sp` is the substance. Clearing production while leaving `sp` at its old
+  // value (in practice `0`, the character class) is exactly the half-done
+  // neutralization FR-029c names — `applySuppressSemantics`'s own doc puts it as
+  // "a half-done suppression is a live key that looks dead". This is the mirror
+  // image: a DEAD key that looks LIVE. The author saw a full-size,
+  // ordinary-looking keycap that silently emitted nothing.
+  //
+  // The pairing is the CORPUS's, measured rather than assumed: across
+  // ../keyboards, `T_BLANK` occurs 117 times and carries `sp` 10 every single
+  // time — never 9 — and `T_SPACER` another 106 times, also always 10. Sixty-six
+  // of those `T_BLANK`s are in `sil_cameroon_azerty` alone. So the blank a
+  // Keyman author recognizes is the spacer class, and an emptied key written any
+  // other way would be a shape this corpus does not contain.
+  //
+  // Deliberately NOT `proposeSuppressFields("keycap-hole")`, whose pairing is
+  // `T_BLANK` + 9 (key-id-policy.md §2): that combination appears nowhere in the
+  // corpus, so this path states its own pairing rather than inheriting one that
+  // would contradict the shipped layouts it has to blend into. Flagged as a
+  // discrepancy in the suppress policy rather than silently reconciled here —
+  // changing what `suppress` writes is a separate, spec-owned decision.
+  //
+  // Consequence worth knowing: every emptied key in a layer now shares the id
+  // `T_BLANK`, and `touchKeyAddress` is built from the id alone, so they share
+  // one address. That is the same condition the shipped layout already creates
+  // with its own 66 blanks; it is a property of the address scheme, not of this
+  // function, and it is why per-occurrence addressing is the outstanding work.
   const { text: _droppedText, output: _droppedOutput, ...rest } = base;
-  const placeholder: TouchKeyIR = { ...rest, id: mintPlaceholderId() };
+  const placeholder: TouchKeyIR = { ...rest, id: BLANK_KEY_ID, sp: BLANK_KEY_SP };
   return { key: placeholder, changed: true };
 }
 

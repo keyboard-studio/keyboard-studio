@@ -106,6 +106,40 @@ export function isDeadkeyStyledKeyClass(sp: number | undefined): boolean {
   return sp === DEADKEY_SP_VALUE;
 }
 
+/**
+ * The two `sp` classes that mark a FRAME key: `1` (upstream `special`, drawn
+ * inactive) and `2` (upstream `specialActive`, drawn engaged on the layer it
+ * switches to).
+ */
+const FRAME_SP_VALUES = new Set([1, 2]);
+
+/**
+ * True when a touch key's `sp` marks it as a FRAME key — sp:1 (inactive) or
+ * sp:2 (active). Canonical predicate for that pair; do not re-derive the
+ * literal set elsewhere (same convention {@link isSpacerKeyClass} states).
+ *
+ * The frame classes are the keyboard's *chrome*: layer switches, `K_BKSP`,
+ * `K_ENTER`, the globe key. Two consequences depend on naming them, and both
+ * are about a family of modifier layers rather than about one key:
+ *
+ * - Alternation *between* 1 and 2 across a family is correct design, not drift
+ *   (`layerFamilies.ts`'s FR-068 property split), so a frame key must be
+ *   correlated across siblings by something other than the properties that
+ *   legitimately vary.
+ * - Crossing INTO or OUT OF the pair is a different kind of edit from moving
+ *   around inside the ordinary classes: it changes which correlation namespace
+ *   the key belongs to at all, which is why it is the one `sp` change that
+ *   still counts as a family-parallelism concern
+ *   (`keyEditAffectsFamilyParallelism`).
+ *
+ * Note this is a claim about `sp` ALONE. A key carrying a `nextlayer` is also a
+ * layer switch whatever its `sp` says; callers needing that wider question ask
+ * it themselves (see `layerFamilies.ts`'s `isFrameOrLayerSwitchKey`).
+ */
+export function isFrameKeyClass(sp: number | undefined): boolean {
+  return sp !== undefined && FRAME_SP_VALUES.has(sp);
+}
+
 /** A single `U_<HEX>` hex group: 4-6 hex digits. */
 const HEX_GROUP_RE = /^[0-9A-Fa-f]{4,6}$/;
 
@@ -139,8 +173,15 @@ export function decodeUnicodeKeyId(id: string): string | undefined {
   return decoded;
 }
 
-/** U+25CC DOTTED CIRCLE — the conventional combining-mark placeholder on a keycap. */
-const DOTTED_CIRCLE = "◌";
+/**
+ * U+25CC DOTTED CIRCLE — the conventional combining-mark placeholder on a keycap.
+ *
+ * Exported because engine's `keycapRelatedness.ts` needs the same literal for a
+ * different question (does a keycap still stand for what the key types?). The
+ * two pieces of logic stay separate — they encode different invariants — but the
+ * character does not get a second spelling.
+ */
+export const DOTTED_CIRCLE = "◌";
 
 /** Every char is a combining mark: Mn (nonspacing), Mc (spacing), or Me (enclosing). */
 const ALL_COMBINING_RE = /^[\p{Mn}\p{Mc}\p{Me}]+$/u;

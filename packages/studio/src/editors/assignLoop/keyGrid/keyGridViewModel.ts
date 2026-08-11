@@ -82,6 +82,32 @@
  * layer-level strip reads those from the flat list instead. Filtering them here
  * would just move the same decision to two call sites.
  *
+ * ## Duplicate ids — every cell gets its own address
+ *
+ * `touchKeyAddress` is derived from the key id, and ids are NOT unique within a
+ * layer: the shipped `sil_cameroon_azerty.keyman-touch-layout` carries
+ * `T_BLANK` twenty-five times and `K_SHIFT` twice inside a single tablet layer,
+ * and every scaffolded layout reuses one blank id for every filler slot. Blank
+ * and spacer keys have nothing to name them.
+ *
+ * Cells therefore address by (id, OCCURRENCE) — `createKeyOccurrenceCounter`
+ * (contracts), walked row-major across the layer, feeding the builder's
+ * occurrence argument. `phone:default:T_BLANK` is the first blank,
+ * `phone:default:T_BLANK#3` the fourth, and `resolveKeyAddress` finds exactly
+ * the key the cell named.
+ *
+ * This module must walk in the SAME row-major order the resolver counts in.
+ * That is the whole contract between them, and why the counter is a shared
+ * contracts primitive rather than a tally kept here.
+ *
+ * Two things this fixed at once: selecting one blank no longer selects all
+ * twenty-five (`isSelected` compares addresses) and no longer edits the first
+ * one instead of the chosen one; and the grid can key its React children on the
+ * address again, because the address is now genuinely unique among siblings.
+ * A `cellKey` field briefly existed for that second job alone, when the address
+ * could not do it — it is gone, rather than left as a second identity concept
+ * that would immediately start drifting from the first.
+ *
  * ## `producedChars` semantics — narrower than `computeTouchCoverage`
  *
  * `computeTouchCoverage`'s `collectKeyChars` is deliberately GENEROUS for
@@ -112,6 +138,7 @@
  */
 
 import {
+  createKeyOccurrenceCounter,
   decodeUnicodeKeyId,
   isSpacerKeyClass,
   producedByKeyId,
@@ -121,7 +148,13 @@ import {
   type TouchKeyRuleIndex,
   type TouchLayoutIR,
 } from "@keyboard-studio/contracts";
-import { touchKeyAddress } from "@keyboard-studio/engine";
+import {
+  DEFAULT_KEY_PAD_PCT,
+  DEFAULT_KEY_WIDTH_PCT,
+  computeRowMetrics,
+  touchKeyAddress,
+  type RowMetrics,
+} from "@keyboard-studio/engine";
 
 // ---------------------------------------------------------------------------
 // Geometry — the 100-unit model (FR-022, FR-030's sibling spec text: "the
@@ -129,11 +162,19 @@ import { touchKeyAddress } from "@keyboard-studio/engine";
 // polyfill's own `ActiveKeyBase.DEFAULT_PAD` constant).
 // ---------------------------------------------------------------------------
 
-/** Default key width (percent-like units) when `TouchKeyIR.width` is absent. */
-export const DEFAULT_KEY_WIDTH_PCT = 100;
-
-/** Default left padding (percent-like units) when `TouchKeyIR.pad` is absent. */
-export const DEFAULT_KEY_PAD_PCT = 15;
+/**
+ * The 100-unit model's geometry defaults.
+ *
+ * Declared here originally; the definitions moved to contracts' `row-metrics.ts`
+ * at spec 061 T019 so the engine-side appliers could write the same numbers a
+ * newly added key is measured against (T021 — an applier cannot import the
+ * studio). Re-exported under the same names, so every existing import site of
+ * this module is unchanged.
+ */
+export {
+  DEFAULT_KEY_WIDTH_PCT,
+  DEFAULT_KEY_PAD_PCT,
+} from "@keyboard-studio/engine";
 
 // ---------------------------------------------------------------------------
 // Annotations (longpress / multitap / flick counts)
@@ -168,11 +209,35 @@ const EMPTY_FINDINGS_MAP: ReadonlyMap<string, readonly TouchKeyFinding[]> = new 
 // ---------------------------------------------------------------------------
 
 export interface KeyGridCellViewModel {
-  /** Stable `touchKeyAddress(platform, layerId, key.id)` — never hand-rolled. */
+  /**
+   * Stable `touchKeyAddress(platform, layerId, key.id, occurrence)` — never
+   * hand-rolled, and unique within the layer (see the module doc's "Duplicate
+   * ids"). This is both the engine-facing handle an overlay operation carries
+   * and the identity the grid keys its React children on.
+   */
   readonly address: string;
   readonly id: string;
   /** The keycap label (`TouchKeyIR.text`), defaulted to `""` when absent. */
   readonly keycap: string;
+  /**
+   * `TouchKeyIR.hint` — the small secondary label (spec 061 T035).
+   *
+   * Carried on the cell because the property panel edits it and the panel is
+   * driven by the selected CELL, not by the layout. It is deliberately not
+   * rendered on the keycap: the grid already shows the keycap, the id and the
+   * annotation counts, and a fourth string per cell at 48px tall reads as noise.
+   */
+  readonly hint?: string;
+  /**
+   * `TouchKeyIR.layer` — the per-key modifier override (spec 061 T035).
+   *
+   * Named `layerOverride` rather than `layer` because `KeyGridViewModel`
+   * already has a `layerId` meaning the CONTAINING layer, and two fields called
+   * `layer*` meaning opposite things on adjacent objects is exactly the
+   * confusion `TouchKeyIR.layer`'s own doc warns about ("any 'Sends:' display
+   * that reads the containing layer instead of this field is wrong").
+   */
+  readonly layerOverride?: string;
   /** Raw `TouchKeyIR.sp`, undefined meaning the implicit letter class (0). */
   readonly sp: number | undefined;
   readonly nextlayer?: string;
@@ -186,6 +251,16 @@ export interface KeyGridCellViewModel {
   readonly provenance?: TouchKeyProvenance;
   /** Looked up from `findingsByAddress`; `[]` when the map has no entry. */
   readonly findings: readonly TouchKeyFinding[];
+  /**
+   * True for the last key of its row (spec 061 T024, FR-012).
+   *
+   * The renderer stretches exactly this key to the layer maximum, matching
+   * KeymanWeb's own last-key-fills-the-row rule. It is on the CELL rather than
+   * derived from the index at the render site so the rule is stated once, where
+   * the row is assembled, instead of re-derived by every consumer that draws or
+   * measures a cell.
+   */
+  readonly isLastInRow: boolean;
 }
 
 export interface KeyGridRowViewModel {
@@ -195,15 +270,35 @@ export interface KeyGridRowViewModel {
    * row in the same layer (mirroring the vendored KMW polyfill's own
    * `totalWidth`-is-the-widest-row-in-the-layer convention, spec.md §"Where
    * Developer's model is authoritative … the rule that the last key in a row
-   * stretches to fill the remainder" — this field is the same gap KMW's
-   * renderer silently absorbs into that stretch; FR-039 wants it rendered
-   * visibly instead). A single-row layer, or a layer whose rows are all the
-   * same total width, has `slackPct === 0` for every row. Not clamped: an
-   * over-full row (rare, author-authored) reports a value of 0 here only
-   * because it — by definition — IS the layer max; it never goes negative
+   * stretches to fill the remainder"). A single-row layer, or a layer whose
+   * rows are all the same total width, has `slackPct === 0` for every row. Not
+   * clamped: an over-full row (rare, author-authored) reports a value of 0 here
+   * only because it — by definition — IS the layer max; it never goes negative
    * for the max row, and no other row can exceed the max by construction.
+   *
+   * **Repointed at spec 061 T024 (FR-012, research D5, ADR 0002).** This used
+   * to be a RENDERING input: spec 058's grid drew the gap as a visible diagonal
+   * hatch, deliberately declining to absorb it. FR-012 withdraws that reading —
+   * the last key of every row now stretches by exactly this much, which is what
+   * KeymanWeb does and therefore what the author's keyboard will actually look
+   * like. The field is unchanged and still means the same gap; what changed is
+   * that its consumer is the STRETCH rather than the hatch, and the hatch is
+   * gone. It also remains the input to the "declared vs rendered width"
+   * distinction FR-015 asks be stated to the author.
    */
   readonly slackPct: number;
+  /**
+   * What this row measures, from DECLARED widths (spec 061 T024, FR-013,
+   * FR-015) — computed by the shared `computeRowMetrics`, so the figures the
+   * readout prints are the same ones `TOUCH_KEY_ROW_CROWDED` fires on and the
+   * same ones Layer C's check 18.3 counts. `overMaximumBy` present means this
+   * row is over its platform's maximum.
+   *
+   * Declared, never rendered: the last key renders wider than it is declared
+   * (see `slackPct`), and a readout quoting the rendered figure would make the
+   * author's own numbers look wrong.
+   */
+  readonly metrics: RowMetrics;
   readonly keys: readonly KeyGridCellViewModel[];
 }
 
@@ -275,13 +370,21 @@ function buildCell(
   layerId: string,
   ruleIndex: TouchKeyRuleIndex,
   findingsByAddress: ReadonlyMap<string, readonly TouchKeyFinding[]>,
+  isLastInRow: boolean,
+  address: string,
 ): KeyGridCellViewModel {
-  const address = touchKeyAddress(platform, layerId, key.id);
   return {
+    isLastInRow,
     address,
     id: key.id,
     keycap: key.text ?? "",
     sp: key.sp,
+    ...(key.hint !== undefined ? { hint: key.hint } : {}),
+    // `layer ?? layerAnnotation` — the same pair, and the same precedence, the
+    // emitter and the key-edit applier both read (see `TouchKeyIR.layer`).
+    ...((key.layer ?? key.layerAnnotation) !== undefined
+      ? { layerOverride: (key.layer ?? key.layerAnnotation) as string }
+      : {}),
     ...(key.nextlayer !== undefined ? { nextlayer: key.nextlayer } : {}),
     padPct: key.pad ?? DEFAULT_KEY_PAD_PCT,
     widthPct: key.width ?? DEFAULT_KEY_WIDTH_PCT,
@@ -330,14 +433,35 @@ export function buildKeyGridViewModel(
   const layerEntry = platformEntry.layers.find((l) => l.id === layerId);
   if (!layerEntry) return undefined;
 
+  // ONE counter for the whole layer, advanced in row-major order — a duplicate
+  // id spanning two rows (`K_SHIFT` at both ends of a row, `T_BLANK` filling
+  // several) must disambiguate against every earlier occurrence, not just the
+  // ones in its own row. This is the order `resolveKeyAddress` counts in; see
+  // the module doc's "Duplicate ids".
+  const nextOccurrence = createKeyOccurrenceCounter();
   const rowKeys = layerEntry.rows.map((row) =>
-    row.keys.map((key) => buildCell(key, platform, layerId, ruleIndex, findingsByAddress)),
+    row.keys.map((key, keyIndex) =>
+      buildCell(
+        key,
+        platform,
+        layerId,
+        ruleIndex,
+        findingsByAddress,
+        keyIndex === row.keys.length - 1,
+        touchKeyAddress(platform, layerId, key.id, nextOccurrence(key.id)),
+      ),
+    ),
   );
   const rowTotals = rowKeys.map(rowTotalPct);
   const layerMax = rowTotals.length > 0 ? Math.max(...rowTotals) : 0;
 
+  // Measured from the LAYOUT's keys, not from the cells built above: the cells
+  // have already defaulted `width`/`pad`, and `computeRowMetrics` applies the
+  // same defaults itself. Passing the layout keys keeps one defaulting step in
+  // the pipeline rather than two that agree.
   const rows: KeyGridRowViewModel[] = rowKeys.map((keys, i) => ({
     slackPct: layerMax - (rowTotals[i] ?? 0),
+    metrics: computeRowMetrics(layerEntry.rows[i]?.keys ?? [], platform),
     keys,
   }));
 

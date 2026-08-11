@@ -25,6 +25,8 @@ import { describe, it, expect } from "vitest";
 import type { KeyboardIR, TouchKeyIR, TouchKeyRuleIndex, TouchLayoutIR } from "./keyboard-ir";
 import {
   computeTouchKeyDiagnostics,
+  findDuplicateTouchKeyIds,
+  findLayerSwitchActiveMismatches,
   findMissingRequiredTouchKeys,
   findMissingTouchLayers,
   findSpecialLabelOnNormalKeys,
@@ -345,5 +347,113 @@ describe("groupTouchKeyFindingsByAddress", () => {
 
   it("returns an empty map for no findings", () => {
     expect(groupTouchKeyFindingsByAddress([]).size).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Occurrence-bearing addresses
+//
+// Duplicate ids within one layer are routine corpus shape, and MOST fixes
+// mutate the key at their address (`renameKey`, `setSp`, `repointNextlayer`,
+// `clearSpecialLabel`, `markAsFrameKey`). A bare address for a repeated id
+// resolves to the FIRST key with that id in the layer, so an off-by-an-
+// occurrence address edits a key the author never selected. Every detector
+// therefore counts occurrences with `createKeyOccurrenceCounter`, in the
+// row-major order `resolveKeyAddress` walks.
+// ---------------------------------------------------------------------------
+
+describe("detector addresses name the occurrence they found", () => {
+  /** Two keys sharing an id: only the second is defective. */
+  function twice(id: string, extra: Partial<Omit<TouchKeyIR, "nodeId" | "id">>): TouchLayoutIR {
+    return oneLayer(key(id, { sp: 0 }), key(id, extra));
+  }
+
+  it("findUnidentifiedTouchKeys — the copy it reported", () => {
+    // Two valid `T_OK` keys ahead of the defective one, so a walker that
+    // counted only the keys it reports would hand out occurrence 0 here.
+    const layout = oneLayer(
+      key("T_OK", { sp: 0 }),
+      key("T_OK", { sp: 0 }),
+      key("MYKEY", { sp: 0 }),
+    );
+    expect(findUnidentifiedTouchKeys(layout)[0]?.address).toBe(
+      touchKeyAddress("phone", "default", "MYKEY"),
+    );
+
+    // A repeated unresolvable id is ONE finding — the per-(layer, anchor, id)
+    // dedup is unchanged by occurrence-bearing addresses — and its address
+    // names the copy that was reported, which is the first.
+    const repeated = oneLayer(key("MYKEY", { sp: 0 }), key("MYKEY", { sp: 0 }));
+    expect(findUnidentifiedTouchKeys(repeated).map((f) => f.address)).toEqual([
+      touchKeyAddress("phone", "default", "MYKEY"),
+    ]);
+  });
+
+  it("findSpecialLabelOnNormalKeys — the copy carrying the label", () => {
+    const layout = twice("T_X", { sp: 0, text: "*Shift*" });
+    const findings = findSpecialLabelOnNormalKeys(layout);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.address).toBe(touchKeyAddress("phone", "default", "T_X", 1));
+    // Both offered fixes mutate the addressed key, so both must carry it.
+    expect(findings[0]?.fixes.map((f) => (f as { address: string }).address)).toEqual([
+      touchKeyAddress("phone", "default", "T_X", 1),
+      touchKeyAddress("phone", "default", "T_X", 1),
+    ]);
+  });
+
+  it("findMissingTouchLayers — the copy whose nextlayer dangles", () => {
+    const layout = twice("K_SHIFT", { sp: 1, nextlayer: "nosuchlayer" });
+    const findings = findMissingTouchLayers(layout);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.address).toBe(touchKeyAddress("phone", "default", "K_SHIFT", 1));
+  });
+
+  it("findLayerSwitchActiveMismatches — the copy with the wrong sp", () => {
+    // `K_SHIFT` twice in one layer is attested corpus shape; only the second
+    // has the mismatched `sp`, and `setSp` would otherwise rewrite the first.
+    const layout = oneLayer(
+      key("K_SHIFT", { sp: 1, nextlayer: "shift" }),
+      key("K_SHIFT", { sp: 0, nextlayer: "shift" }),
+    );
+    const findings = findLayerSwitchActiveMismatches(layout);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.address).toBe(touchKeyAddress("phone", "default", "K_SHIFT", 1));
+    expect((findings[0]?.fixes[0] as { address: string }).address).toBe(
+      touchKeyAddress("phone", "default", "K_SHIFT", 1),
+    );
+  });
+
+  it("findDuplicateTouchKeyIds — the duplicate, never the original it collides with", () => {
+    const layout = oneLayer(key("T_A", { sp: 0 }), key("T_A", { sp: 0 }), key("T_A", { sp: 0 }));
+    const findings = findDuplicateTouchKeyIds(layout);
+    // Reported on the second occurrence only — one finding for three copies.
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.address).toBe(touchKeyAddress("phone", "default", "T_A", 1));
+  });
+
+  it("findDuplicateTouchKeyIds counts raw ids, not its own exemption-filtered buckets", () => {
+    // Two exempt spacers share an id ahead of the reported pair, so the
+    // detector's `seen` map and the address's occurrence disagree by two —
+    // which is why the occurrence is counted separately from the bucket.
+    const layout = oneLayer(
+      key("T_A", { sp: 10 }),
+      key("T_A", { sp: 10 }),
+      key("T_A", { sp: 0 }),
+      key("T_A", { sp: 0 }),
+    );
+    const findings = findDuplicateTouchKeyIds(layout);
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.address).toBe(touchKeyAddress("phone", "default", "T_A", 3));
+  });
+
+  it("counts per layer, so an id repeated across layers starts over at zero", () => {
+    const layout = makeLayout([
+      { id: "default", keys: [key("T_X", { sp: 0, text: "*a*" })] },
+      { id: "shift", keys: [key("T_X", { sp: 0, text: "*a*" })] },
+    ]);
+    expect(findSpecialLabelOnNormalKeys(layout).map((f) => f.address)).toEqual([
+      touchKeyAddress("phone", "default", "T_X"),
+      touchKeyAddress("phone", "shift", "T_X"),
+    ]);
   });
 });

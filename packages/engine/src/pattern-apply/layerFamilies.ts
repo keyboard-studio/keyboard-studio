@@ -58,8 +58,9 @@
  * FR-066's "must not be nagged" is a property of the grouping, not a filter.
  */
 
-import type { TouchKeyIR, TouchLayoutIR } from "@keyboard-studio/contracts";
+import { isFrameKeyClass, type TouchKeyIR, type TouchLayoutIR } from "@keyboard-studio/contracts";
 
+import type { UnsequencedKeyEditOperation } from "./keyEditOps.js";
 import {
   MODIFIER_EXCLUSIONS,
   TOUCH_LAYER_PRECEDENCE_ORDER,
@@ -411,16 +412,6 @@ interface KeyGridPosition {
 // ---------------------------------------------------------------------------
 
 /**
- * The two `sp` (key class) values that mark a frame key: `1` frame/inactive
- * (upstream `special`) and `2` active frame (upstream `specialActive`). The
- * alternation between them ACROSS a family is correct design, not drift
- * (contract §4's first row) — which is precisely why a key carrying either
- * one must be correlated by something other than the properties that
- * legitimately vary.
- */
-const FRAME_SP_VALUES: ReadonlySet<number> = new Set([1, 2]);
-
-/**
  * True when `key` is a frame or layer-switch key, and so subject to FR-068's
  * property exemption. Keyed on the key BEING one — carrying a `nextlayer`, or
  * classed as a frame key by `sp` — never on a row index: "the bottom row" is a
@@ -430,11 +421,14 @@ const FRAME_SP_VALUES: ReadonlySet<number> = new Set([1, 2]);
  * `sp` is included alongside `nextlayer` because the frame classes cover
  * control keys that switch no layer at all — `K_BKSP`/`K_ENTER` are ordinarily
  * authored `sp:1` with no `nextlayer` — and contract §4 scopes the exemption to
- * "has a `nextlayer`, or is otherwise identified as a control key".
+ * "has a `nextlayer`, or is otherwise identified as a control key". The `sp`
+ * half reads contracts' canonical `isFrameKeyClass` rather than restating the
+ * `{1, 2}` literal, so this module and the studio's family-apply trigger cannot
+ * disagree about which classes are "frame".
  */
 function isFrameOrLayerSwitchKey(key: TouchKeyIR): boolean {
   if (key.nextlayer !== undefined && key.nextlayer.length > 0) return true;
-  return key.sp !== undefined && FRAME_SP_VALUES.has(key.sp);
+  return isFrameKeyClass(key.sp);
 }
 
 /**
@@ -594,6 +588,85 @@ export function findFamilyParallelismBreaks(
     if (finding !== undefined) findings.push(finding);
   }
   return findings;
+}
+
+// ---------------------------------------------------------------------------
+// Which EDITS a family can be non-parallel about — the forward-looking twin of
+// findFamilyParallelismBreaks above.
+// ---------------------------------------------------------------------------
+
+/**
+ * True when applying `op` to one member of a layer family can leave that family
+ * out of step with its siblings — i.e. when FR-065's "apply it across the
+ * family?" question is worth asking at all.
+ *
+ * ## Why this exists, and why it is derived from FR-068 rather than invented
+ *
+ * {@link findFamilyParallelismBreaks} answers the question BACKWARDS: given two
+ * layouts, which keys are already out of step. A studio offering the fan-out at
+ * the moment of an edit needs it FORWARDS: given the edit about to land, is
+ * "out of step" even a possible outcome. Both must answer from the same premise
+ * or the author gets asked about edits the check would never have flagged — and
+ * the premise is FR-068's property split, already stated once above: the check
+ * compares **presence, position and width**, and exempts **`sp`, `nextlayer`,
+ * `id` and keycap `text`**, because those four legitimately differ across a
+ * family. That is the whole rule, read forwards:
+ *
+ * - `remove` / `suppress` change PRESENCE (suppress removes a key's
+ *   interactivity and neutralizes its id, so what is left is present but no
+ *   longer a key the family can be in step about). Always relevant.
+ * - `set` carrying `width` or `pad` changes GEOMETRY. Relevant.
+ * - `set` carrying `sp` is relevant **only when it crosses the frame boundary**
+ *   (`isFrameKeyClass`): moving between the ordinary classes — character,
+ *   deadkey-styled, blank, spacer — is per-layer presentation the exempt list
+ *   covers, whereas crossing into or out of `{1, 2}` changes which correlation
+ *   namespace the key is compared under at all ({@link frameCorrelationKey}),
+ *   which is a family-structural change.
+ * - `set` carrying only `text`/`hint`/`id`/`layer`/`nextlayer`, and `rename`,
+ *   are the exempt properties outright. NOT relevant — and this is the case
+ *   that matters most in practice: `default` carries `a` where `shift` carries
+ *   `A`, so fanning out a keycap or an id is very often the WRONG edit, and
+ *   asking about it teaches authors to dismiss the dialog unread.
+ * - `add`, `move`, `setSubKey`, `removeSubKey` return `false` here. `add` and
+ *   `move` genuinely do affect parallelism, but neither is fannable — see
+ *   `FamilyApplyDialog`'s `isFamilyApplicableOp` (an `add` needs a per-layer id
+ *   proposal; a `move` has no shared referent across siblings, which
+ *   `MoveKeyOp`'s own doc and both appliers already refuse). A caller must
+ *   still gate on that predicate too; this one says only whether the QUESTION
+ *   is worth asking.
+ *
+ * `beforeSp` is the `sp` the key carries BEFORE `op` is applied (the caller
+ * resolves it — `undefined` for an absent `sp`, which the wire treats as
+ * character/0 and so is correctly not a frame class). It is needed because
+ * "crossed the frame boundary" is a claim about a transition, not about the new
+ * value: a caller that passes the POST-edit `sp` would report every
+ * frame-to-frame `1 -> 2` alternation — the one `sp` change contract §4's first
+ * row calls correct design.
+ */
+export function keyEditAffectsFamilyParallelism(
+  op: UnsequencedKeyEditOperation,
+  beforeSp: number | undefined,
+): boolean {
+  switch (op.kind) {
+    case "remove":
+    case "suppress":
+      return true;
+    case "set": {
+      if (op.fields.width !== undefined || op.fields.pad !== undefined) return true;
+      if (op.fields.sp === undefined) return false;
+      return isFrameKeyClass(op.fields.sp) !== isFrameKeyClass(beforeSp);
+    }
+    case "add":
+    case "move":
+    case "rename":
+    case "setSubKey":
+    case "removeSubKey":
+      return false;
+    default: {
+      const exhaustive: never = op;
+      return Boolean(exhaustive);
+    }
+  }
 }
 
 /**

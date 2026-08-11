@@ -57,7 +57,7 @@
  * | `TOUCH_KEY_LAYER_SWITCH_ACTIVE_MISMATCH` | — (FR-029d) | engine `touchKeyDiagnostics.ts` (T102) |
  * | `TOUCH_KEY_HALF_DONE_SUPPRESSION` | — (FR-029c) | engine `touchKeyDiagnostics.ts` (T101) |
  *
- * Two further codes ride along. They are **not** part of FR-040's nine, and
+ * Three further codes ride along. They are **not** part of FR-040's nine, and
  * SC-007's count should not be read as including them:
  *
  * - `TOUCH_KEY_ID_CASE` — the latent case asymmetry the spec's Edge Cases list
@@ -67,6 +67,11 @@
  * - `TOUCH_KEY_MIXED_SUPPRESS_REMOVE` — FR-029h / US4 AS8, shipped in Phase 8
  *   (T103). Retained verbatim; its detector stays in engine because it reads
  *   the overlay rather than a layout.
+ * - `TOUCH_KEY_ROW_CROWDED` — spec 061 FR-014, the edit-time face of Layer C's
+ *   check 18.3. Unlike every code above it, its Layer C sibling was already
+ *   shipped and calibrated; what spec 061 adds is the edit-time report and,
+ *   more importantly, a single shared threshold table ([row-metrics.ts](./row-metrics.ts))
+ *   so the two surfaces cannot disagree about what "too many" means.
  *
  * ## Severity: three values, only two of them reachable
  *
@@ -104,7 +109,8 @@ import {
   isDeadkeyStyledKeyClass,
   isSpacerKeyClass,
 } from "./touch-coverage";
-import { touchKeyAddress } from "./touch-key-address";
+import { createKeyOccurrenceCounter, touchKeyAddress } from "./touch-key-address";
+import { computeRowMetrics } from "./row-metrics";
 
 // ---------------------------------------------------------------------------
 // Severity and codes
@@ -150,7 +156,30 @@ export type TouchKeyFindingCode =
   /** Edge Cases: layout and rule spell one id with different case. A hint — nothing is broken here. */
   | "TOUCH_KEY_ID_CASE"
   /** FR-029h / US4 AS8: one layer's committed edits mix `suppress` and `remove`. */
-  | "TOUCH_KEY_MIXED_SUPPRESS_REMOVE";
+  | "TOUCH_KEY_MIXED_SUPPRESS_REMOVE"
+  /**
+   * Spec 061 FR-014: a row carrying more interactive keys than its platform's
+   * maximum. A third rider, and the first code here whose Layer C sibling
+   * (`KM_WARN_TOUCH_KEYS_PER_ROW`, check 18.3) predates it — the two now read
+   * their thresholds from one table (`row-metrics.ts`).
+   *
+   * Non-blocking by construction: `warning` severity, and nothing in the edit
+   * path consults it before committing. FR-014's operative clause is that
+   * exceeding the maximum "MUST NOT be prevented" — the author is told, and the
+   * edit succeeds.
+   */
+  | "TOUCH_KEY_ROW_CROWDED"
+  /**
+   * Spec 061 FR-036: a key's keycap is not recognisably related to what the key
+   * types — most often a label left over from whatever the key produced before.
+   *
+   * `hint` severity and never blocking, because a keycap that "does not match"
+   * is a judgement, not a defect: plenty of real keyboards label a key with
+   * something deliberately unlike its output. The five gating conditions
+   * (FR-036, contract §3.1) exist to keep this quiet, and an author who set the
+   * keycap themselves (`keycapAuthored`) is never asked about it at all.
+   */
+  | "TOUCH_KEY_KEYCAP_MISMATCH";
 
 /**
  * What a finding's {@link TouchKeyFinding.address} names. Absent means
@@ -307,10 +336,41 @@ export interface ReviewKeyFix {
 }
 
 /**
+ * Bring a crowded row back under its platform maximum (spec 061 FR-014).
+ *
+ * A descriptor, not a mutation: WHICH `overBy` keys to drop is a question only
+ * the author can answer — the same reasoning {@link ReviewKeyFix} rests on —
+ * so acting on this opens the row for editing rather than deleting anything.
+ * `rowIndex` is carried because this fix's subject is a row, and a
+ * `touchKeyAddress` names only platform + layer + key.
+ */
+export interface TrimRowFix {
+  readonly kind: "trimRow";
+  readonly address: string;
+  readonly rowIndex: number;
+  readonly overBy: number;
+}
+
+/**
+ * Relabel a key with the proposed keycap (spec 061 FR-036, FR-037).
+ *
+ * Unlike {@link TrimRowFix} and {@link ReviewKeyFix}, this one IS a concrete
+ * mutation: `proposeKeycap` already computed the right label, so there is a
+ * single unambiguous answer to apply. Applying it does not set
+ * `keycapAuthored` — the author accepted a proposal rather than writing one.
+ */
+export interface SetKeycapFix {
+  readonly kind: "setKeycap";
+  readonly address: string;
+  readonly proposed: string;
+}
+
+/**
  * One offered remedy. Every member carries `address` so the studio can act on a
  * fix without re-deriving where it applies.
  */
 export type TouchKeyFix =
+  | SetKeycapFix
   | AddRuleFix
   | ConvertToUnicodeIdFix
   | RenameKeyFix
@@ -321,6 +381,7 @@ export type TouchKeyFix =
   | MarkAsFrameKeyFix
   | CompleteSuppressionFix
   | SetLayerSwitchSpFix
+  | TrimRowFix
   | ReviewKeyFix;
 
 // ---------------------------------------------------------------------------
@@ -464,6 +525,24 @@ export interface TouchKeyContext {
   rowIndex: number;
   key: TouchKeyIR;
   keyIndex: number;
+  /**
+   * Which key with this id, counted row-major within the layer from 0
+   * ({@link createKeyOccurrenceCounter}) — the fourth argument
+   * {@link touchKeyAddress} wants.
+   *
+   * **Every detector below passes this.** Duplicate ids inside one layer are
+   * routine, not rare (`T_BLANK` alone is spelled dozens of times in a single
+   * corpus layer), and a bare address for a repeated id resolves to the FIRST
+   * key with that id anywhere in the layer. Most fixes MUTATE the key at their
+   * address — `setSp`, `renameKey`, `repointNextlayer`, `completeSuppression`,
+   * `clearSpecialLabel`, `markAsFrameKey` — so an address off by an occurrence
+   * does not merely mis-navigate: it edits a key the author never selected.
+   *
+   * In {@link walkTouchKeysDeep} this stays the occurrence of the MAIN key,
+   * which is the key an address anchors to ({@link mainKeyOf}); a sub-entry is
+   * addressed by its own `sk`/`multitap`/`flick` id, not by an occurrence.
+   */
+  occurrence: number;
 }
 
 /**
@@ -473,6 +552,10 @@ export interface TouchKeyContext {
  * Does not descend into a key's own `sk`/`multitap`/`flick` sub-keys — those
  * are a different traversal shape (recursive, not row/column positioned). Use
  * {@link walkTouchKeysDeep} when every id in the file must be seen.
+ *
+ * Counts occurrences as it goes, with one counter per (platform, layer) and in
+ * the row-major order `resolveKeyAddress` walks — this walker is why no detector
+ * has to keep its own tally, and why none of them can drift from that order.
  */
 export function walkTouchKeys(
   layout: TouchLayoutIR,
@@ -480,9 +563,18 @@ export function walkTouchKeys(
 ): void {
   for (const platform of layout.platforms) {
     for (const layer of platform.layers) {
+      const nextOccurrence = createKeyOccurrenceCounter();
       layer.rows.forEach((row, rowIndex) => {
         row.keys.forEach((key, keyIndex) => {
-          cb({ platform, layer, row, rowIndex, key, keyIndex });
+          cb({
+            platform,
+            layer,
+            row,
+            rowIndex,
+            key,
+            keyIndex,
+            occurrence: nextOccurrence(key.id),
+          });
         });
       });
     }
@@ -618,7 +710,7 @@ export function findDeadTouchKeys(
   const findings: TouchKeyFinding[] = [];
   const reported = new Set<string>();
 
-  walkTouchKeysDeep(layout, ({ platform, layer, key, path }) => {
+  walkTouchKeysDeep(layout, ({ platform, layer, key, path, occurrence }) => {
     // Scope: custom ids only. A `K_` key resolves against the compiled-in
     // keyword table and has a physical position whether or not a rule mentions it.
     if (!isCustomTouchKeyId(key.id)) return;
@@ -642,7 +734,7 @@ export function findDeadTouchKeys(
     reported.add(normalized);
 
     const anchor = mainKeyOf(key, path);
-    const address = touchKeyAddress(platform.id, layer.id, anchor.id);
+    const address = touchKeyAddress(platform.id, layer.id, anchor.id, occurrence);
     findings.push({
       code: "TOUCH_KEY_NO_RULE",
       severity,
@@ -794,7 +886,7 @@ function findNearMissId(
   return undefined;
 }
 
-/** Address of the first main key whose normalized id matches, or `undefined`. Main keys only — a fix must address something the appliers can resolve. */
+/** Address of the first main key whose normalized id matches, or `undefined`. Main keys only — a fix must address something the appliers can resolve. Occurrence 0 by construction, and deliberately: "the first" is the whole contract of this helper. */
 function locateKeyById(
   layout: TouchLayoutIR,
   normalizedId: string,
@@ -831,7 +923,7 @@ export function findTouchKeyIdCaseMismatches(inputs: {
   const findings: TouchKeyFinding[] = [];
   const reported = new Set<string>();
 
-  walkTouchKeysDeep(layout, ({ platform, layer, key, path }) => {
+  walkTouchKeysDeep(layout, ({ platform, layer, key, path, occurrence }) => {
     if (key.id.length === 0) return;
     const normalized = normalizeTouchKeyId(key.id);
     if (reported.has(normalized)) return;
@@ -849,6 +941,7 @@ export function findTouchKeyIdCaseMismatches(inputs: {
       platform.id,
       layer.id,
       mainKeyOf(key, path).id,
+      occurrence,
     );
     findings.push({
       code: "TOUCH_KEY_ID_CASE",
@@ -875,7 +968,9 @@ export function findTouchKeyIdCaseMismatches(inputs: {
  *
  * Scope is per (platform, layer) deliberately: the same id appearing on
  * `default` and on `shift` is the normal case, not a defect. Reported on the
- * SECOND occurrence only, so N copies yield N-1 findings.
+ * SECOND occurrence only, so N copies yield N-1 findings — and the address
+ * names THAT key, occurrence and all, so the offered `renameKey` renames the
+ * copy the finding is about rather than the original it collides with.
  *
  * **The third exemption is what makes this shippable.** A per-key `layer`
  * override disambiguates two same-id keys — they emit under different modifier
@@ -893,9 +988,16 @@ export function findDuplicateTouchKeyIds(
       // Keyed by id AND by the `layer` override, so two keys that differ only
       // in their override land in different buckets and never collide.
       const seen = new Map<string, number>();
+      // A SEPARATE tally from `seen`, and necessarily so: `seen` is bucketed by
+      // normalized id + `layer` override and skips every exempt key, whereas an
+      // address's occurrence counts raw ids over every key in the layer. This
+      // detector is the one whose finding is ALWAYS about a repeated id, so it
+      // is also the one whose address was always off by at least one.
+      const nextOccurrence = createKeyOccurrenceCounter();
 
       for (const row of layer.rows) {
         for (const key of row.keys) {
+          const occurrence = nextOccurrence(key.id);
           if (key.id.length === 0) continue;
           // EXEMPTION 1: sentinel and auto-minted/reserved ids. Several
           // `T_BLANK` keys in one layer is the idiom, not a collision.
@@ -924,7 +1026,7 @@ export function findDuplicateTouchKeyIds(
           seen.set(bucket, count);
           if (count !== 2) continue;
 
-          const address = touchKeyAddress(platform.id, layer.id, key.id);
+          const address = touchKeyAddress(platform.id, layer.id, key.id, occurrence);
           findings.push({
             code: "TOUCH_KEY_DUPLICATE_ID",
             severity: "warning",
@@ -1068,9 +1170,14 @@ export function findMissingTouchLayers(
     const reported = new Set<string>();
 
     for (const layer of platform.layers) {
+      const nextOccurrence = createKeyOccurrenceCounter();
       // Same traversal order as `collectNextlayerKeys`: each main key, then its
       // own sub-entries, before the next main key.
-      const visit = (key: TouchKeyIR, anchor: TouchKeyIR): void => {
+      const visit = (
+        key: TouchKeyIR,
+        anchor: TouchKeyIR,
+        anchorOccurrence: number,
+      ): void => {
         const target = key.nextlayer;
         if (
           target !== undefined &&
@@ -1080,7 +1187,12 @@ export function findMissingTouchLayers(
           const bucket = `${layer.id}\u0000${target}`;
           if (!reported.has(bucket)) {
             reported.add(bucket);
-            const address = touchKeyAddress(platform.id, layer.id, anchor.id);
+            const address = touchKeyAddress(
+              platform.id,
+              layer.id,
+              anchor.id,
+              anchorOccurrence,
+            );
             findings.push({
               code: "TOUCH_KEY_MISSING_LAYER",
               severity: "warning",
@@ -1103,16 +1215,16 @@ export function findMissingTouchLayers(
             });
           }
         }
-        for (const sub of key.sk ?? []) visit(sub, anchor);
-        for (const sub of key.multitap ?? []) visit(sub, anchor);
+        for (const sub of key.sk ?? []) visit(sub, anchor, anchorOccurrence);
+        for (const sub of key.multitap ?? []) visit(sub, anchor, anchorOccurrence);
         if (key.flick) {
           for (const sub of Object.values(key.flick)) {
-            if (sub) visit(sub, anchor);
+            if (sub) visit(sub, anchor, anchorOccurrence);
           }
         }
       };
       for (const row of layer.rows) {
-        for (const key of row.keys) visit(key, key);
+        for (const key of row.keys) visit(key, key, nextOccurrence(key.id));
       }
     }
   }
@@ -1150,7 +1262,7 @@ export function findUnidentifiedTouchKeys(
   const findings: TouchKeyFinding[] = [];
   const reported = new Set<string>();
 
-  walkTouchKeysDeep(layout, ({ platform, layer, key, path }) => {
+  walkTouchKeysDeep(layout, ({ platform, layer, key, path, occurrence }) => {
     if (isSpacerKeyClass(key.sp)) return;
     if (key.id.length > 0 && isJoinableKeyId(key.id)) return;
 
@@ -1162,7 +1274,7 @@ export function findUnidentifiedTouchKeys(
     if (reported.has(bucket)) return;
     reported.add(bucket);
 
-    const address = touchKeyAddress(platform.id, layer.id, anchor.id);
+    const address = touchKeyAddress(platform.id, layer.id, anchor.id, occurrence);
     findings.push({
       code: "TOUCH_KEY_UNIDENTIFIED",
       severity: "warning",
@@ -1200,14 +1312,14 @@ export function findSpecialLabelOnNormalKeys(
 ): readonly TouchKeyFinding[] {
   const findings: TouchKeyFinding[] = [];
 
-  walkTouchKeysDeep(layout, ({ platform, layer, key, path }) => {
+  walkTouchKeysDeep(layout, ({ platform, layer, key, path, occurrence }) => {
     const text = key.text;
     if (text === undefined || !SPECIAL_LABEL_PATTERN.test(text)) return;
     if (key.sp === 1 || key.sp === 2) return;
     if (isSpacerKeyClass(key.sp)) return;
 
     const anchor = mainKeyOf(key, path);
-    const address = touchKeyAddress(platform.id, layer.id, anchor.id);
+    const address = touchKeyAddress(platform.id, layer.id, anchor.id, occurrence);
     findings.push({
       code: "TOUCH_KEY_SPECIAL_LABEL_ON_NORMAL",
       severity: "warning",
@@ -1272,8 +1384,8 @@ export function findHalfDoneSuppressions(
 ): readonly TouchKeyFinding[] {
   const findings: TouchKeyFinding[] = [];
 
-  walkTouchKeys(layout, ({ platform, layer, key }) => {
-    const address = touchKeyAddress(platform.id, layer.id, key.id);
+  walkTouchKeys(layout, ({ platform, layer, key, occurrence }) => {
+    const address = touchKeyAddress(platform.id, layer.id, key.id, occurrence);
 
     if (isSpacerKeyClass(key.sp)) {
       // Branch A: rendering says "hidden", but the id was never neutralized.
@@ -1345,7 +1457,7 @@ export function findLayerSwitchActiveMismatches(
 ): readonly TouchKeyFinding[] {
   const findings: TouchKeyFinding[] = [];
 
-  walkTouchKeys(layout, ({ platform, layer, key }) => {
+  walkTouchKeys(layout, ({ platform, layer, key, occurrence }) => {
     if (key.nextlayer === undefined || key.nextlayer.length === 0) return;
     if (isSpacerKeyClass(key.sp)) return;
 
@@ -1353,7 +1465,9 @@ export function findLayerSwitchActiveMismatches(
     const effectiveSp = key.sp ?? 0;
     if (effectiveSp === expectedSp) return;
 
-    const address = touchKeyAddress(platform.id, layer.id, key.id);
+    // Occurrence-bearing: `K_SHIFT` twice in one layer is attested corpus
+    // shape, and the `setSp` fix MUTATES the key at this address.
+    const address = touchKeyAddress(platform.id, layer.id, key.id, occurrence);
     findings.push({
       code: "TOUCH_KEY_LAYER_SWITCH_ACTIVE_MISMATCH",
       severity: "warning",
@@ -1368,6 +1482,95 @@ export function findLayerSwitchActiveMismatches(
       fixes: [{ kind: "setSp", address, sp: expectedSp }],
     });
   });
+
+  return findings;
+}
+
+// ---------------------------------------------------------------------------
+// TOUCH_KEY_ROW_CROWDED — spec 061 FR-014. Layer C sibling: check 18.3.
+// ---------------------------------------------------------------------------
+
+/**
+ * A row carrying more interactive keys than its platform allows.
+ *
+ * **This detector owns no thresholds.** The maximum, the interactive-key
+ * predicate and the geometry totals all come from
+ * [row-metrics.ts](./row-metrics.ts), which is also what
+ * `keyboard-lint`'s `check-18-3-keys-per-row.ts` and the studio's remove-key
+ * proposal now read. That is the whole point of research D6: before spec 061 the
+ * phone-10 / tablet-13 pair was written out in two places with a comment asking
+ * a future reader to keep them in sync, and this would have been the third.
+ *
+ * `scope: "layer"` because a row is not a key: the finding is about a
+ * *quantity* of keys, and no single cell is at fault. Its `address` anchors to
+ * the row's first key so the studio can still resolve the finding to a place on
+ * the grid, and `fields.rowIndex` is what the row-level readout actually keys
+ * on. A row with no keys at all cannot be crowded, so the anchor always exists
+ * wherever this fires.
+ *
+ * **The anchor address carries its occurrence** ({@link createKeyOccurrenceCounter}),
+ * so the layer is walked row-major even for the rows this detector will not
+ * report. A crowded row's first key is very often one whose id repeats in the
+ * layer — `T_BLANK` and `T_SPACER` are spelled dozens of times inside a single
+ * corpus layer — and a bare address for a repeated id resolves to the FIRST key
+ * with that id anywhere in the layer. `TouchGallery`'s `trimRow` handler
+ * navigates purely off this address, so without the occurrence, acting on the
+ * fix could select an unrelated key in an uncrowded row.
+ *
+ * Severity is `warning` and nothing gates on it — FR-014 requires that going
+ * over the maximum be *reported*, never *prevented*. An author deliberately
+ * building a dense row on a large phone gets told once and is left alone.
+ *
+ * Unruled platforms (`desktop`) produce nothing, because
+ * {@link computeRowMetrics} omits `overMaximumBy` for them — the emptiness is a
+ * property of the shared table, not a second exemption stated here.
+ */
+export function findCrowdedTouchRows(
+  layout: TouchLayoutIR,
+): readonly TouchKeyFinding[] {
+  const findings: TouchKeyFinding[] = [];
+
+  for (const platform of layout.platforms) {
+    for (const layer of platform.layers) {
+      const nextOccurrence = createKeyOccurrenceCounter();
+      layer.rows.forEach((row, rowIndex) => {
+        // Tally EVERY key in the layer, row-major, BEFORE deciding whether this
+        // row fires: an occurrence counts from the layer's start, so skipping
+        // the uncrowded rows would hand out addresses `resolveKeyAddress` walks
+        // past.
+        const occurrences = row.keys.map((key) => nextOccurrence(key.id));
+
+        const metrics = computeRowMetrics(row.keys, platform.id);
+        if (metrics.overMaximumBy === undefined) return;
+
+        const anchor = row.keys[0];
+        if (anchor === undefined) return;
+        const address = touchKeyAddress(platform.id, layer.id, anchor.id, occurrences[0]);
+
+        findings.push({
+          code: "TOUCH_KEY_ROW_CROWDED",
+          severity: "warning",
+          address,
+          scope: "layer",
+          fields: {
+            platform: platform.id,
+            layerId: layer.id,
+            rowIndex,
+            interactiveKeyCount: metrics.interactiveKeyCount,
+            platformMaxKeys: metrics.platformMaxKeys,
+          },
+          fixes: [
+            {
+              kind: "trimRow",
+              address,
+              rowIndex,
+              overBy: metrics.overMaximumBy,
+            },
+          ],
+        });
+      });
+    }
+  }
 
   return findings;
 }
@@ -1404,6 +1607,7 @@ export function computeTouchKeyDiagnostics(
     ...findLayerSwitchActiveMismatches(layout),
     ...findHalfDoneSuppressions(layout, ruleIndex),
     ...findTouchKeyIdCaseMismatches({ layout, ruleIndex }),
+    ...findCrowdedTouchRows(layout),
   ];
 }
 

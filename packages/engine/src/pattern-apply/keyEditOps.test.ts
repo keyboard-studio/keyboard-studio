@@ -50,6 +50,16 @@ function mainKeyParts(platform: string, layerId: string, keyId: string) {
   return { platform, layerId, keyId } as const;
 }
 
+/** Row index the given `T_DUPE` occurrence resolves to — for the row-major check. */
+function resolved0RowOf(layout: TouchLayoutIR, occurrence: number): number | undefined {
+  return resolveKeyAddress(layout, {
+    platform: "phone",
+    layerId: "default",
+    keyId: "T_DUPE",
+    occurrence,
+  })?.rowIndex;
+}
+
 /** Walk every key/sub-key in a layout and collect every "text" value present,
  *  for a blunt "did the patch leak onto some OTHER key" check. */
 function allTextValues(layout: TouchLayoutIR): string[] {
@@ -95,13 +105,79 @@ describe("resolveKeyAddress", () => {
     expect(resolved?.rowIndex).toBe(3);
   });
 
-  it("returns the FIRST match when an id is duplicated in-layer (documented limitation)", () => {
+  // An address with no occurrence means "the first", which is exactly what this
+  // resolver always returned — so every address written before occurrences
+  // existed (persisted overlay ops, `deletedTouchKeyIds` entries) still names
+  // the same key. That backward compatibility is the whole reason the suffix is
+  // additive rather than mandatory.
+  it("returns the FIRST match when an id is duplicated in-layer and no occurrence is named", () => {
     const layout = makeTouchKeyRuleJoinLayout();
     const resolved = resolveKeyAddress(
       layout,
       mainKeyParts("phone", "default", TOUCH_JOIN_IDS.duplicate),
     );
     expect(resolved?.keyIndex).toBe(0);
+  });
+
+  it("resolves the NAMED occurrence when an id is duplicated in-layer", () => {
+    const layout = makeTouchKeyRuleJoinLayout();
+    const first = resolveKeyAddress(layout, {
+      ...mainKeyParts("phone", "default", TOUCH_JOIN_IDS.duplicate),
+      occurrence: 0,
+    });
+    const second = resolveKeyAddress(layout, {
+      ...mainKeyParts("phone", "default", TOUCH_JOIN_IDS.duplicate),
+      occurrence: 1,
+    });
+
+    expect(first).toBeDefined();
+    expect(second).toBeDefined();
+    // Genuinely different keys — this is what makes an individual blank
+    // selectable and editable rather than every edit landing on the first.
+    expect(`${second!.rowIndex}:${second!.keyIndex}`).not.toBe(
+      `${first!.rowIndex}:${first!.keyIndex}`,
+    );
+    expect(second!.key.id).toBe(TOUCH_JOIN_IDS.duplicate);
+  });
+
+  it("counts occurrences ROW-MAJOR across the layer, not per row", () => {
+    // Two rows, each holding two `T_DUPE`s: occurrence 2 must be the first key
+    // of the SECOND row. A per-row tally would resolve it to row 0 and hand the
+    // author a different key than the one whose address they hold.
+    const dupe = (n: number) => ({ nodeId: `n${n}`, id: "T_DUPE", text: String(n) });
+    const layout: TouchLayoutIR = {
+      platforms: [
+        {
+          id: "phone",
+          layers: [
+            {
+              id: "default",
+              rows: [{ keys: [dupe(0), dupe(1)] }, { keys: [dupe(2), dupe(3)] }],
+            },
+          ],
+        },
+      ],
+      nodeIds: [],
+    };
+
+    for (const occurrence of [0, 1, 2, 3]) {
+      const resolved = resolveKeyAddress(layout, {
+        ...mainKeyParts("phone", "default", "T_DUPE"),
+        occurrence,
+      });
+      expect(resolved?.key.text).toBe(String(occurrence));
+    }
+    expect(resolved0RowOf(layout, 2)).toBe(1);
+  });
+
+  it("returns undefined for an occurrence past the last matching key", () => {
+    const layout = makeTouchKeyRuleJoinLayout();
+    expect(
+      resolveKeyAddress(layout, {
+        ...mainKeyParts("phone", "default", TOUCH_JOIN_IDS.duplicate),
+        occurrence: 99,
+      }),
+    ).toBeUndefined();
   });
 
   it("distinguishes platforms carrying the same key id", () => {

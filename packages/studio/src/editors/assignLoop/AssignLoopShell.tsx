@@ -51,9 +51,22 @@ export interface AssignLoopShellProps {
   headerExtras?: ReactNode;
   /** LEFT pane content (flexBasis 45%, bordered, scrollable). */
   leftContent: ReactNode;
-  /** RIGHT pane content (flexGrow 1, padded, scrollable). Caller owns any
-   * loading/error conditional rendering before passing this in. */
-  rightContent: ReactNode;
+  /**
+   * RIGHT pane content (flexGrow 1, padded, scrollable). Caller owns any
+   * loading/error conditional rendering before passing this in.
+   *
+   * **Optional as of spec 061 T033 (FR-024).** When omitted the right pane is
+   * not rendered at all and the left pane grows to the full width, rather than
+   * leaving 55% of the surface blank. Key mode uses this: it has no live OSK
+   * preview to show, and the grid genuinely needs the room. Character mode
+   * still passes `GalleryPreviewPane`, and `MechanismGallery` — the other
+   * caller — is untouched (research D10).
+   *
+   * Note the distinction from passing `null`: an explicitly-passed `null` is
+   * still a caller saying "render an empty right pane". Omitting the prop is
+   * what collapses the split.
+   */
+  rightContent?: ReactNode;
 }
 
 /**
@@ -69,6 +82,10 @@ export function AssignLoopShell({
   leftContent,
   rightContent,
 }: AssignLoopShellProps) {
+  // `undefined` means "no right pane at all" (T033); an explicit `null` is a
+  // caller asking for an empty one, and still gets the two-pane split.
+  const hasRightPane = rightContent !== undefined;
+
   const modalityLabelSpan = (
     <span
       style={{
@@ -137,30 +154,45 @@ export function AssignLoopShell({
           overflow: "hidden",
         }}
       >
-        {/* LEFT pane */}
+        {/* LEFT pane — full width when there is no right pane (T033, FR-024). */}
         <div
-          style={{
-            flexBasis: `${ASSIGN_LOOP_LEFT_PANE_PCT}%`,
-            flexShrink: 0,
-            borderRight: `1px solid ${BORDER}`,
-            overflowY: "auto",
-            boxSizing: "border-box",
-          }}
+          style={
+            hasRightPane
+              ? {
+                  flexBasis: `${ASSIGN_LOOP_LEFT_PANE_PCT}%`,
+                  flexShrink: 0,
+                  borderRight: `1px solid ${BORDER}`,
+                  overflowY: "auto",
+                  boxSizing: "border-box",
+                }
+              : {
+                  // No basis, no border, no shrink cap: the single pane simply
+                  // takes the row. Keeping the same element (rather than
+                  // branching the tree) means nothing inside it remounts when a
+                  // caller toggles the right pane — which is what makes the
+                  // character/key mode switch lossless (FR-025).
+                  flexGrow: 1,
+                  overflowY: "auto",
+                  boxSizing: "border-box",
+                }
+          }
         >
           {leftContent}
         </div>
 
         {/* RIGHT pane */}
-        <div
-          style={{
-            flexGrow: 1,
-            overflowY: "auto",
-            padding: "24px 20px",
-            boxSizing: "border-box",
-          }}
-        >
-          {rightContent}
-        </div>
+        {hasRightPane && (
+          <div
+            style={{
+              flexGrow: 1,
+              overflowY: "auto",
+              padding: "24px 20px",
+              boxSizing: "border-box",
+            }}
+          >
+            {rightContent}
+          </div>
+        )}
       </div>
     </div>
   );

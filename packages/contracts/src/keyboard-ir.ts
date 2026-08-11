@@ -110,6 +110,27 @@ export interface TouchKeyIR {
    * `"physical-suggested"` are the auto-managed states re-propagation owns.
    */
   provenance?: TouchKeyProvenance;
+  /**
+   * The author typed this key's keycap themselves (spec 061 FR-035).
+   *
+   * Additive and optional on purpose: an ABSENT flag reads as
+   * "proposal-managed", which is the right default for every key in every
+   * existing corpus layout — none of them were authored through the property
+   * panel, so none of them have an author's keycap to protect.
+   *
+   * Set **only** from the property panel's keycap field on an author edit,
+   * never from a proposal. Its one job is to suppress
+   * `TOUCH_KEY_KEYCAP_MISMATCH`: an author who deliberately labelled a key
+   * something unrelated to its output has already answered the question the
+   * hint would ask.
+   *
+   * `emitKey` does **not** write it, so it does not survive export → reimport.
+   * That is correct rather than a gap: it is a record of an editing session's
+   * intent, not a property of the keyboard, and a reimported layout has no
+   * author's-intent claim to make. A round-tripped key simply becomes
+   * proposal-managed again.
+   */
+  keycapAuthored?: boolean;
   /** Small label shown in the key corner to signal a longpress menu exists. */
   hint?: string;
   output?: string;

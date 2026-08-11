@@ -78,11 +78,33 @@ import { RESERVED_SENTINEL_KEY_IDS } from "./keyIdMinting.js";
 export type EditableKeySp = 0 | 1 | 2 | 8 | 9 | 10;
 
 /**
- * The fields Increment 1 authors on a key (contract §3). Deliberately
- * narrower than `TouchKeyIR`: no `nodeId`, `provenance`, `hint`, `layer`,
- * `default`, `sk`/`multitap`/`flick` (those are structural, not per-field
- * editable), and no `width`/`pad` (geometry stays read-only — see the
- * module docstring).
+ * The fields an author edits on a key (contract §3).
+ *
+ * Still deliberately narrower than `TouchKeyIR`: no `nodeId`, no `provenance`,
+ * no `default`, and no `sk`/`multitap`/`flick` — those last are structural, not
+ * per-field editable, and are authored through `setSubKey`/`removeSubKey`.
+ *
+ * **Spec 061 T030 admitted four more** (FR-018's "all eight editable fields").
+ * All four already exist on `TouchKeyIR`, so nothing about the IR changed, and
+ * `EditableKeyFields` has no zod mirror in `schemas.ts` — so contracts' Article I
+ * drift guard is not engaged and this is an additive, non-breaking widening:
+ *
+ * - **`hint`** — the small secondary label a key can carry.
+ * - **`width` / `pad`** — geometry, read-only for spec 058's Increment 1 and
+ *   opened here. FR-015 makes the declared width a *minimum*: the last key of a
+ *   row renders stretched past it, which is why editing the declared figure is
+ *   safe — it can never make a row unrenderable, only narrower than its
+ *   rendering. The studio validates `width` as an integer > 0 and `pad` as an
+ *   integer >= 0 before committing; this module does not, for the same reason it
+ *   does not validate `text` (see below).
+ * - **`layer`** — the per-key modifier override. **Deliberately NOT validated as
+ *   a layer reference**, unlike `nextlayer`: corpus keyboards routinely name
+ *   layers that do not exist in their own file, and `findDuplicateTouchKeyIds`
+ *   already treats this field as free-form when it uses it to disambiguate two
+ *   same-id keys. Validating it would reject files that ship and work today.
+ *
+ * `remove`'s `"redistribute"` outcome still writes `width` as a CONSEQUENCE of
+ * removing a key rather than as an authored field, and that path is unchanged.
  */
 export interface EditableKeyFields {
   readonly id: string;
@@ -90,6 +112,14 @@ export interface EditableKeyFields {
   readonly output?: string;
   readonly sp: EditableKeySp;
   readonly nextlayer?: string;
+  /** Secondary label (spec 061 T030). */
+  readonly hint?: string;
+  /** Declared width in the 100-unit model — a MINIMUM, not the rendered width (FR-015). */
+  readonly width?: number;
+  /** Declared left padding in the 100-unit model. */
+  readonly pad?: number;
+  /** Per-key modifier override. Free-form by design — see the interface doc. */
+  readonly layer?: string;
 }
 
 /**
@@ -155,6 +185,47 @@ export interface RemoveKeyOp extends KeyEditOperationBase {
 }
 
 /**
+ * Move a key one position in a direction (spec 061 T030, FR-020, FR-021).
+ *
+ * ## Why a DIRECTION, and no key spec
+ *
+ * A move cannot be composed from `remove` + `add`. {@link NewKeySpec} carries no
+ * `sk`, `multitap`, `flick`, `nodeId` or `provenance`, so a re-add would discard
+ * every sub-key and mint a fresh `nodeId` — and the `nodeId` is what key
+ * addressing, the decision trail, and spec 035's Case B byte-preservation all
+ * key off. FR-021 ("moving a key MUST preserve its identity, sub-keys, geometry
+ * and provenance") is therefore satisfied by *how* both appliers implement this:
+ * they splice the existing node, never construct a replacement. That makes
+ * FR-021 a property of the strategy rather than of a field-copy list that goes
+ * stale the next time `TouchKeyIR` grows a field.
+ *
+ * The op carries a direction rather than an absolute `{toRow, toIndex}` target
+ * because an absolute target goes stale under replay: an earlier operation in
+ * the same overlay may have changed a row's length, whereas a direction
+ * re-resolves against whatever the current state is (research D4).
+ *
+ * ## No wrapping, ever
+ *
+ * `left`/`right` swap within the row and stop at its ends; `up`/`down` transfer
+ * to the adjacent row, clamped to `min(keyIndex, targetRow.keys.length)`, and
+ * stop at the first and last rows. A move that cannot act is a no-op in the
+ * appliers — but the studio never emits one, because FR-020 requires the
+ * corresponding control be *absent* rather than inert.
+ *
+ * ## `scope: "family"` is rejected
+ *
+ * A family fan-out repeats an operation across a layer family's siblings, which
+ * is meaningful for a field edit and meaningless for a position change — the
+ * siblings' rows are not required to be the same length, so "the same move" has
+ * no shared referent. Passing it is a programming error, reported as a warning
+ * by both appliers rather than silently half-applied.
+ */
+export interface MoveKeyOp extends KeyEditOperationBase {
+  readonly kind: "move";
+  readonly direction: "left" | "right" | "up" | "down";
+}
+
+/**
  * One operation, not two (contract §3): sets a non-interactive `sp` AND
  * neutralizes the id to a ruleless sentinel in the same commit, so
  * rendering (`sp`) and output (`id`) can never desynchronize into a live
@@ -192,9 +263,20 @@ export type KeyEditOperation =
   | RenameKeyOp
   | AddKeyOp
   | RemoveKeyOp
+  | MoveKeyOp
   | SuppressKeyOp
   | SetSubKeyOp
   | RemoveSubKeyOp;
+
+/**
+ * True when a `scope: "family"` fan-out is a programming error for this
+ * operation. Stated once here so both appliers report it identically rather
+ * than each deciding for itself — see {@link MoveKeyOp}'s doc for why a move is
+ * the one kind with no shared referent across a layer family.
+ */
+export function rejectsFamilyScope(op: KeyEditOperation): boolean {
+  return op.kind === "move";
+}
 
 // ---------------------------------------------------------------------------
 // Declared output (spec 058 T060 / FR-033b)
@@ -205,12 +287,12 @@ export type KeyEditOperation =
  * its own fields — no layout lookup, no resolver. `undefined` (never `""`)
  * when the operation carries no declared output of its own.
  *
- * Exactly three of the seven kinds ever author `output` directly:
+ * Exactly three of the eight kinds ever author `output` directly:
  * - `add` — a brand-new key's `key.output`;
  * - `set` / `setSubKey` — a patch that happens to touch `fields.output`.
  *
- * The other four — `rename`, `remove`, `suppress`, `removeSubKey` — name an
- * EXISTING key or sub-entry by address/sub-ref only; they never repeat its
+ * The other five — `rename`, `remove`, `move`, `suppress`, `removeSubKey` — name
+ * an EXISTING key or sub-entry by address/sub-ref only; they never repeat its
  * content, so this function returns `undefined` for them even though the key
  * they touch may well produce a character. That gap is deliberate: this
  * function answers "what does the OPERATION ITSELF say", not "what does the
@@ -305,11 +387,29 @@ export function resolveKeyAddress<TKey extends AddressableKeyLike>(
   if (layerIndex === -1) return undefined;
   const layer = platform.layers[layerIndex]!;
 
+  // Walk the layer ROW-MAJOR, counting keys that carry this id, and stop at the
+  // requested occurrence. An address with no occurrence wants the first, which
+  // is what this loop returns on its first match — byte-identical behaviour to
+  // the plain `findIndex` this replaced, for every address that names a unique
+  // id (nearly all of them) and for every address written before occurrences
+  // existed.
+  //
+  // Row-major is not an arbitrary traversal choice: it is the SAME order
+  // `createKeyOccurrenceCounter`'s callers walk in when they build these
+  // addresses. If the builder and this resolver disagreed about the order, an
+  // occurrence-bearing address would resolve to a different key than the one
+  // whose address it is.
+  const wanted = parts.occurrence ?? 0;
+  let seen = 0;
   for (let rowIndex = 0; rowIndex < layer.rows.length; rowIndex++) {
     const row = layer.rows[rowIndex]!;
-    const keyIndex = row.keys.findIndex((k) => k.id === parts.keyId);
-    if (keyIndex !== -1) {
-      return { platformIndex, layerIndex, rowIndex, keyIndex, key: row.keys[keyIndex]! };
+    for (let keyIndex = 0; keyIndex < row.keys.length; keyIndex++) {
+      const key = row.keys[keyIndex]!;
+      if (key.id !== parts.keyId) continue;
+      if (seen === wanted) {
+        return { platformIndex, layerIndex, rowIndex, keyIndex, key };
+      }
+      seen++;
     }
   }
   return undefined;
@@ -371,6 +471,13 @@ export function applyFieldSemantics(
 
   const output = clearOutput ? undefined : (patch.output ?? current.output);
   const nextlayer = patch.nextlayer ?? current.nextlayer;
+  // The four fields spec 061 T030 admitted. Plain override-if-present, exactly
+  // like `nextlayer`: none of them participates in the id/output coupling
+  // above, so none of them is cleared by an id change.
+  const hint = patch.hint ?? current.hint;
+  const width = patch.width ?? current.width;
+  const pad = patch.pad ?? current.pad;
+  const layer = patch.layer ?? current.layer;
 
   return {
     id: patch.id ?? current.id,
@@ -378,6 +485,10 @@ export function applyFieldSemantics(
     sp: patch.sp ?? current.sp,
     ...(output !== undefined ? { output } : {}),
     ...(nextlayer !== undefined ? { nextlayer } : {}),
+    ...(hint !== undefined ? { hint } : {}),
+    ...(width !== undefined ? { width } : {}),
+    ...(pad !== undefined ? { pad } : {}),
+    ...(layer !== undefined ? { layer } : {}),
   };
 }
 
@@ -548,14 +659,15 @@ export type UnsequencedKeyEditOperation =
   | Omit<RenameKeyOp, "seq">
   | Omit<AddKeyOp, "seq">
   | Omit<RemoveKeyOp, "seq">
+  | Omit<MoveKeyOp, "seq">
   | Omit<SuppressKeyOp, "seq">
   | Omit<SetSubKeyOp, "seq">
   | Omit<RemoveSubKeyOp, "seq">;
 
 /**
  * The resulting id an operation would write, or `undefined` for the operations
- * that author no id at all (`remove`, `removeSubKey`, and a `set`/`setSubKey`
- * patch that happens not to touch `id`).
+ * that author no id at all (`remove`, `move`, `removeSubKey`, and a
+ * `set`/`setSubKey` patch that happens not to touch `id`).
  *
  * `suppress` is deliberately excluded even though it DOES set an id:
  * {@link applySuppressSemantics} already rejects a non-reserved sentinel, and

@@ -29,15 +29,19 @@ import type {
   TouchLayoutIR,
 } from "@keyboard-studio/contracts";
 import {
+  findCrowdedTouchRows,
   findHalfDoneSuppressions,
+  findKeycapMismatches,
   findLayerSwitchActiveMismatches,
   findMixedSuppressRemove,
   type CompleteSuppressionFix,
   type ReviewKeyFix,
   type SetLayerSwitchSpFix,
+  type TrimRowFix,
 } from "./touchKeyDiagnostics.js";
 import type { KeyEditOverlay, RemoveKeyOp, SuppressKeyOp } from "./keyEditOps.js";
-import { touchKeyAddress } from "./touchKeyAddress.js";
+import { resolveKeyAddress } from "./keyEditOps.js";
+import { parseTouchKeyAddress, touchKeyAddress } from "./touchKeyAddress.js";
 
 // ---------------------------------------------------------------------------
 // Small local helpers
@@ -369,5 +373,225 @@ describe("findMixedSuppressRemove", () => {
     // The malformed suppress address is dropped (never-throw), the rename is
     // not counted at all, and the lone remove has no suppress counterpart.
     expect(findMixedSuppressRemove(overlay)).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findCrowdedTouchRows (spec 061 T017, FR-014)
+//
+// `makeLayout` above gives every layer exactly one row, which is all this
+// detector needs; the multi-row case is covered by the row-index assertion,
+// which uses its own inline layout.
+// ---------------------------------------------------------------------------
+
+describe("findCrowdedTouchRows", () => {
+  /** `n` interactive keys, ids distinct so nothing else in the suite could dedup them. */
+  function letters(n: number): TouchKeyIR[] {
+    return Array.from({ length: n }, (_unused, i) => key(`U_${(0x61 + i).toString(16)}`, { sp: 0 }));
+  }
+
+  /** A one-platform layout under an explicit platform id — `makeLayout` hardcodes "phone". */
+  function layoutOn(platformId: string, keys: readonly TouchKeyIR[]): TouchLayoutIR {
+    return {
+      platforms: [{ id: platformId, layers: [{ id: "default", rows: [{ keys: [...keys] }] }] }],
+      nodeIds: [],
+    };
+  }
+
+  it("warns for a phone row of 11 interactive keys", () => {
+    const findings = findCrowdedTouchRows(layoutOn("phone", letters(11)));
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.code).toBe("TOUCH_KEY_ROW_CROWDED");
+  });
+
+  it("does not warn for the same row on tablet", () => {
+    expect(findCrowdedTouchRows(layoutOn("tablet", letters(11)))).toHaveLength(0);
+  });
+
+  it("does not warn on desktop, which is unruled however long the row", () => {
+    expect(findCrowdedTouchRows(layoutOn("desktop", letters(40)))).toHaveLength(0);
+  });
+
+  it("does not warn for a phone row exactly at the maximum", () => {
+    expect(findCrowdedTouchRows(layoutOn("phone", letters(10)))).toHaveLength(0);
+  });
+
+  it("never warns for a row of nothing but blank/spacer keys, however long", () => {
+    const spacers = Array.from({ length: 20 }, (_unused, i) =>
+      key(`T_BLANK_${i}`, { sp: i % 2 === 0 ? 9 : 10 }),
+    );
+    expect(findCrowdedTouchRows(layoutOn("phone", spacers))).toHaveLength(0);
+  });
+
+  it("counts deadkey-styled (sp:8) keys, which are interactive and do crowd", () => {
+    const deadkeyStyled = Array.from({ length: 11 }, (_unused, i) => key(`T_D${i}`, { sp: 8 }));
+    expect(findCrowdedTouchRows(layoutOn("phone", deadkeyStyled))).toHaveLength(1);
+  });
+
+  it("excludes spacers from the count, so a long row of mostly spacers stays silent", () => {
+    const mixed = [...letters(9), ...Array.from({ length: 8 }, (_u, i) => key(`T_S${i}`, { sp: 10 }))];
+    expect(findCrowdedTouchRows(layoutOn("phone", mixed))).toHaveLength(0);
+  });
+
+  it("is a non-blocking warning at layer scope, not a key-scoped error (SC-006, US2 AS3)", () => {
+    const finding = findCrowdedTouchRows(layoutOn("phone", letters(12)))[0];
+    expect(finding?.severity).toBe("warning");
+    expect(finding?.scope).toBe("layer");
+  });
+
+  it("carries structured detail only — no English prose crosses the boundary (FR-037)", () => {
+    const finding = findCrowdedTouchRows(layoutOn("phone", letters(12)))[0];
+    expect(finding?.fields).toMatchObject({
+      platform: "phone",
+      layerId: "default",
+      rowIndex: 0,
+      interactiveKeyCount: 12,
+      platformMaxKeys: 10,
+    });
+    expect(finding?.fields).not.toHaveProperty("message");
+  });
+
+  it("offers a trimRow fix naming the overage", () => {
+    const finding = findCrowdedTouchRows(layoutOn("phone", letters(12)))[0];
+    const fix = finding?.fixes[0] as TrimRowFix | undefined;
+    expect(fix?.kind).toBe("trimRow");
+    expect(fix?.overBy).toBe(2);
+    expect(fix?.rowIndex).toBe(0);
+  });
+
+  it("anchors on the row's first key, so the finding resolves to a place on the grid", () => {
+    const finding = findCrowdedTouchRows(layoutOn("phone", letters(11)))[0];
+    expect(finding?.address).toBe(touchKeyAddress("phone", "default", "U_61"));
+  });
+
+  it("anchors by OCCURRENCE when the anchor's id repeats earlier in the layer", () => {
+    // Two crowded rows whose first key carries the same id as an earlier key —
+    // the routine case, since a row often begins with a `T_BLANK`/`T_SPACER`.
+    // A bare address would send `resolveKeyAddress` to row 0's key, in an
+    // uncrowded row, and the studio's `trimRow` handler navigates purely off it.
+    const layout: TouchLayoutIR = {
+      platforms: [
+        {
+          id: "phone",
+          layers: [
+            {
+              id: "default",
+              rows: [{ keys: letters(4) }, { keys: letters(11) }, { keys: letters(13) }],
+            },
+          ],
+        },
+      ],
+      nodeIds: [],
+    };
+    const findings = findCrowdedTouchRows(layout);
+    expect(findings.map((f) => f.address)).toEqual([
+      touchKeyAddress("phone", "default", "U_61", 1),
+      touchKeyAddress("phone", "default", "U_61", 2),
+    ]);
+    // The fix's own address is the same one — the studio reads it, not the finding's.
+    expect(findings.map((f) => (f.fixes[0] as TrimRowFix).address)).toEqual(
+      findings.map((f) => f.address),
+    );
+  });
+
+  it("resolves an occurrence-bearing anchor back to the crowded row's own key", () => {
+    const layout: TouchLayoutIR = {
+      platforms: [
+        {
+          id: "phone",
+          layers: [
+            { id: "default", rows: [{ keys: letters(4) }, { keys: letters(11) }] },
+          ],
+        },
+      ],
+      nodeIds: [],
+    };
+    const finding = findCrowdedTouchRows(layout)[0];
+    const parts = parseTouchKeyAddress(finding?.address ?? "");
+    expect(parts).toBeDefined();
+    expect(resolveKeyAddress(layout, parts!)?.rowIndex).toBe(1);
+  });
+
+  it("reports each offending row with its own index and leaves compliant rows alone", () => {
+    const layout: TouchLayoutIR = {
+      platforms: [
+        {
+          id: "phone",
+          layers: [
+            {
+              id: "default",
+              rows: [{ keys: letters(4) }, { keys: letters(11) }, { keys: letters(13) }],
+            },
+          ],
+        },
+      ],
+      nodeIds: [],
+    };
+    const findings = findCrowdedTouchRows(layout);
+    expect(findings.map((f) => f.fields.rowIndex)).toEqual([1, 2]);
+    expect(findings.map((f) => (f.fixes[0] as TrimRowFix).overBy)).toEqual([1, 3]);
+  });
+
+  it("reports nothing for an empty row rather than throwing on a missing anchor", () => {
+    const layout: TouchLayoutIR = {
+      platforms: [{ id: "phone", layers: [{ id: "default", rows: [{ keys: [] }] }] }],
+      nodeIds: [],
+    };
+    expect(findCrowdedTouchRows(layout)).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// findKeycapMismatches — the engine-side sibling of the occurrence-bearing
+// addresses every contracts detector now builds. Its `setKeycap` fix MUTATES
+// the key at its address, so a bare address for a repeated id would relabel
+// the wrong copy.
+// ---------------------------------------------------------------------------
+
+describe("findKeycapMismatches addresses the copy it found", () => {
+  it("names the occurrence when the mismatched key's id repeats in the layer", () => {
+    const layout: TouchLayoutIR = {
+      platforms: [
+        {
+          id: "phone",
+          layers: [
+            {
+              id: "default",
+              rows: [
+                {
+                  keys: [
+                    // Correctly labelled — no finding, but it still counts.
+                    key("T_A", { sp: 0, output: "a", text: "a" }),
+                    // Same id, stale keycap: this is the one to relabel.
+                    key("T_A", { sp: 0, output: "a", text: "z" }),
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+      nodeIds: [],
+    };
+    const findings = findKeycapMismatches({
+      ir: { raw: [] } as unknown as Parameters<typeof findKeycapMismatches>[0]["ir"],
+      layout,
+      ruleIndex: emptyRuleIndex(),
+    });
+    expect(findings).toHaveLength(1);
+    expect(findings[0]?.address).toBe(touchKeyAddress("phone", "default", "T_A", 1));
+    expect((findings[0]?.fixes[0] as { address: string }).address).toBe(
+      touchKeyAddress("phone", "default", "T_A", 1),
+    );
+  });
+});
+
+describe("findCrowdedTouchRows — degenerate input", () => {
+  it("reports nothing for an empty row rather than throwing on a missing anchor", () => {
+    const layout: TouchLayoutIR = {
+      platforms: [{ id: "phone", layers: [{ id: "default", rows: [{ keys: [] }] }] }],
+      nodeIds: [],
+    };
+    expect(findCrowdedTouchRows(layout)).toHaveLength(0);
   });
 });

@@ -1009,18 +1009,6 @@ export interface CarveNode {
    * Undefined on nodes produced directly by toRailNodes() before annotation runs.
    */
   recommendation?: 'high' | 'medium' | 'none' | undefined;
-  /**
-   * Present only when `recommendation === 'high'` AND every character this
-   * node produces is a cross-script ASCII Latin base-layout fall-through
-   * char (`isBasicLatinCrossScriptFallthrough`) — e.g. a Russian keyboard's
-   * un-adapted `a-z` group. Such a node is still 'high' (not suppressed —
-   * product decision, post-#526 follow-on), but the rail/grid should treat
-   * it as an OPTIONAL, low-priority suggestion (mirrors
-   * `RecommendedRemovalChar.reason === 'cross-script-latin'` at the
-   * character-level banner signal) rather than the ordinary "safe to
-   * remove" recommendation. Undefined for every ordinary 'high' node.
-   */
-  recommendationReason?: 'cross-script-latin' | undefined;
 }
 
 /**
@@ -2490,11 +2478,11 @@ function isStructuralExclusion(node: CarveNode, ir: KeyboardIR, ownedNodeIds: Se
  * Cross-script ASCII Latin fall-through (`isBasicLatinCrossScriptFallthrough`,
  * post-#526 follow-on) is no longer a hard exclude here: a char that only
  * qualifies on that ground still runs through the ordinary surplus/dependency
- * checks below. A node ends up 'high' with `recommendationReason:
- * 'cross-script-latin'` when EVERY character it produces is such a
- * fall-through char (see CarveNode.recommendationReason) — the rail/grid can
- * use that to present it as an optional, low-priority suggestion rather than
- * the ordinary "safe to remove" one, instead of suppressing it outright.
+ * checks below and ends up 'high' like any other fully-surplus node, rather
+ * than being suppressed outright. (A node-level tag distinguishing this case
+ * — `recommendationReason` — existed briefly but had no live consumer; #1560
+ * dropped it. The character-level equivalent, `RecommendedRemovalChar.reason
+ * === 'cross-script-latin'`, is live via RemovalBanner and unaffected.)
  */
 export function annotateRemovalRecommendations(
   nodes: CarveNode[],
@@ -2564,16 +2552,7 @@ export function annotateRemovalRecommendations(
     // that exists only to support a mechanism the author didn't select in
     // Phase C survey answers) once that mechanism-selection data is threaded
     // through to the carve step.
-    //
-    // Cross-script ASCII Latin fall-through (post-#526 follow-on): a node
-    // whose EVERY produced character is such a fall-through char (on a
-    // non-Latin target) is still 'high' — never suppressed — but tagged so
-    // the rail/grid can present it as an optional, low-priority suggestion
-    // rather than the ordinary "safe to remove" one.
-    const allCrossScriptLatin = [...produced].every((ch) => isBasicLatinCrossScriptFallthrough(ch, bcp47));
-    return allCrossScriptLatin
-      ? { ...node, recommendation: 'high', recommendationReason: 'cross-script-latin' }
-      : { ...node, recommendation: 'high' };
+    return { ...node, recommendation: 'high' };
   });
 }
 

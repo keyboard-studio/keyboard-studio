@@ -12,12 +12,11 @@
 // this increment (no drag/resize) — see `keyEditOps.ts`'s own module doc,
 // "What the union deliberately does NOT admit, and why": `width`/`pad` are
 // absent from `EditableKeyFields`, so nothing this component can emit today
-// actually COMMITS a width change to the overlay. `onFillRow`/`onEvenOutRow`
-// (T100, FR-022/FR-039) are therefore a CALLER-WIRED SEAM, not a
-// self-contained feature — see "Row slack, and the Fill row / Even out row
-// seam" below for the full contract and for why widening the operation
-// union to admit one is a locked-contract question this file does not
-// improvise past.
+// actually COMMITS a width change to the overlay. The "Fill row"/"Even out
+// row" controls that used to live here were withdrawn by spec 061 (FR-007,
+// ADR 0002 — the grid renders the last key of an under-full row stretched,
+// so there is no slack left for either control to act on) — see "Row slack,
+// and the row-actions strip" below for what remains.
 //
 // ## Single Tab stop (FR-020a)
 //
@@ -29,64 +28,35 @@
 // A layout of several hundred keys therefore still produces exactly one Tab
 // stop, not several hundred.
 //
-// ## Row slack, and the Fill row / Even out row seam (T100, FR-022, FR-039)
+// ## Row slack, and the row-actions strip (spec 061 T012/T026, FR-007, FR-012,
+// FR-013, ADR 0002)
 //
-// `KeyGridRowViewModel.slackPct` (keyGridViewModel.ts) is already the exact
-// derived quantity FR-039 wants surfaced — this file does not recompute it,
-// only renders it and reacts to it. Two distinct things happen per row:
+// `KeyGridRowViewModel.slackPct` (keyGridViewModel.ts) is the gap between a row
+// and the widest row in its layer. Spec 058 drew that gap as a decorative
+// trailing hatch (`key-grid-row-slack-<rowIndex>`), deliberately declining to
+// absorb it. **FR-012 withdrew that reading.** The hatch and its test id are
+// gone; the slack is now added to the LAST key of the row, which is what
+// KeymanWeb's own renderer does and therefore what the author's keyboard will
+// actually look like. Every row consequently ends flush at the layer maximum.
 //
-// - **The visual.** The trailing spacer (`key-grid-row-slack-<rowIndex>`)
-//   carries a diagonal hatch (`repeating-linear-gradient`) rather than a
-//   bare border — a hatch reads as "reserved/unused space" at a glance (the
-//   same convention design tools use for empty canvas), degrades sanely at
-//   any width (the stripe pattern keeps repeating rather than becoming
-//   illegible text at a narrow flexBasis), and — the FR-039 point — carries
-//   no digits at all. It stays `aria-hidden` and purely decorative; it is
-//   not the accessibility story (see below).
-// - **The actions.** "Fill row" (only rendered when `slackPct > 0` — there
-//   is nothing to fill otherwise, same "affordance only when applicable"
-//   convention as the pad spacer above) and "Even out row" (rendered when
-//   the row has two or more keys — a single-key row has nothing to even out
-//   across) are ORDINARY buttons, siblings of the `role="row"` div rather
-//   than children of it: the ARIA APG grid pattern's owned-element rule
-//   wants a row's children to be gridcells, so an action control that
-//   is NOT a gridcell (it does not participate in `useGridNav`'s cursor
-//   model at all) lives outside that div instead of inside it. This is
-//   also why they are not folded into `KeyGridCommandDescriptor` /
-//   `useKeyCommands.ts` (a PER-KEY command layer, T094) — these two are
-//   PER-ROW, a different addressing granularity, and that hook's file is
-//   out of this task's edit scope regardless.
+// The last key is identified by `KeyGridCellViewModel.isLastInRow`, not by an
+// index comparison here — the rule is stated once, where the row is assembled.
 //
-// **Why clicking either button does not, by itself, change any width:**
-// `onFillRow`/`onEvenOutRow` are optional props. When a caller supplies
-// neither, clicking is a no-op (`onFillRow?.(rowIndex)`) — the same
-// optional-callback idiom this file already uses for `onPlatformChange`
-// below. That is not a stub to feel bad about: FR-022/FR-039's "widths are
-// never silently redistributed" holds trivially precisely BECAUSE nothing
-// happens without an explicit, author-invoked, CALLER-SUPPLIED handler, and
-// today no caller CAN supply one that actually commits anything — see
-// `keyEditOps.ts`'s module doc, "What the union deliberately does NOT
-// admit": `width`/`pad` are absent from `EditableKeyFields`, and the ONLY
-// thing in that union that ever writes a width is `remove`'s own
-// `"redistribute"` outcome, as a side effect of removing a key, never as a
-// directly-authored field. There is no `KeyEditOperation` kind this
-// component could construct and hand to `commitKeyEdit` that would fill or
-// even out a row today. Inventing one is exactly the "row and layer
-// operations... flagged as Increment 3 work" that module's own doc warns
-// against widening ad hoc — so this component stops at the seam: it names
-// the row (`rowIndex`, the TRUE index into `viewModel.rows`, i.e. what
-// `windowedRows`' own `rowIndex` already carries — NOT the windowed slice's
-// local position, and one less than the 1-based `aria-rowindex` already on
-// the row div), and leaves "what happens next" to whichever future task
-// extends `keyEditOps.ts`'s union and wires a real handler through.
+// This makes a key's RENDERED width differ from its DECLARED one for the last
+// key of every under-full row. That divergence is FR-015's subject, not a bug:
+// the declared width is a minimum, and both the row metrics readout and the key
+// property panel quote the declared figure and say that it is declared.
 //
-// **The accessible equivalent to the visual hatch:** a screen reader user
-// does not see the hatch, but the mere PRESENCE of an enabled "Fill row N"
-// button already tells them the same fact the hatch tells a sighted author
-// — this row has unused space — without a percentage or unit count ever
-// being read aloud, matching the FR-039 "not printed as numbers" intent for
-// assistive tech too, not only for sighted rendering. A row with no slack
-// renders no "Fill row" button at all, the same way it renders no hatch.
+// The "Fill row" / "Even out row" buttons that used to sit beside the hatch
+// are gone too (FR-007, ADR 0002: once the last key stretches to fill a row,
+// there is no slack left for either control to redistribute). What remains
+// is the **row-actions strip** itself
+// (`key-grid-row-actions-<rowIndex>`) — kept, per FR-038, because removing it
+// would regress spec 058 SC-009's accessibility fix (see "Why this strip
+// carries `role=\"row\"` + an inner `role=\"gridcell\"`" below). It renders
+// **unconditionally**, once per layout row, and its `role="gridcell"` now holds
+// `RowMetricsReadout` (T026): the four printed per-row figures and the
+// non-blocking crowding complaint that replaced the hatch's silent gesture.
 //
 // ## Seams for T065-T071 — do not re-implement any of this here
 //
@@ -202,6 +172,7 @@ import {
 } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { KeyGridCell } from "./KeyGridCell.tsx";
+import { RowMetricsReadout } from "./RowMetricsReadout.tsx";
 import { findingAnnouncement } from "./findingCopy.ts";
 import type { KeyGridCommandMenuAnchor } from "./useKeyCommands.ts";
 import type {
@@ -277,12 +248,17 @@ export interface KeyGridProps {
   /** Selection change — from a click here, or (once T065 lands) from `useGridNav`'s arrow/Home/End handling calling this same callback. */
   onSelectCell: (cell: KeyGridCellViewModel) => void;
   /**
-   * Grid-level keydown seam for T065's `useGridNav`. Left undefined, the
-   * grid degrades to Tab (single stop in/out) + click + native button
-   * Enter/Space activation only, with no arrow movement — this component
-   * never attaches its own keydown handling.
+   * Grid-level keydown handling — **required** (spec 061 T002/D1, FR-001).
+   * Composing `useGridNav`'s arrow/Home/End navigation with
+   * `useKeyCommands`'s Insert/`ContextMenu`/`Ctrl+Enter` handling into one
+   * function is the caller's job, not this component's: this component only
+   * forwards whatever it is given verbatim onto the grid container (see the
+   * module doc's "Seams for T065-T071"). A caller with nothing else to add
+   * can still pass a no-op — but a mount that forgets this prop entirely now
+   * fails `tsc`, rather than silently shipping a grid with no arrow-key
+   * movement.
    */
-  onKeyDown?: KeyboardEventHandler<HTMLDivElement>;
+  onKeyDown: KeyboardEventHandler<HTMLDivElement>;
   /** Localized accessible name for the grid. Defaults to a generic label naming the layer when the caller does not supply a more specific one (e.g. one that also names the platform). */
   label?: string;
   /**
@@ -291,45 +267,39 @@ export interface KeyGridProps {
    * layout (the common case) never shows a choice that isn't real. The
    * caller owns which `viewModel` corresponds to which platform; this
    * component only renders the switcher and reports the click/keypress back.
+   * Data, not an editing affordance, so it stays optional (spec 061 contract
+   * key-mode-ui.md §1).
    */
   platforms?: readonly KeyGridPlatformTab[];
   /** Which of `platforms` is active. Ignored when `platforms` has fewer than 2 entries. */
   activePlatformId?: string;
-  /** Fired when the author picks a different platform tab (click, or Left/Right/Home/End inside the tablist). */
-  onPlatformChange?: (platformId: string) => void;
+  /**
+   * Fired when the author picks a different platform tab (click, or
+   * Left/Right/Home/End inside the tablist). **Required** (spec 061 T002):
+   * with no tablist rendered for fewer than 2 platforms, this simply never
+   * fires in that case — but a mount that CAN show a tablist must be able to
+   * act on it.
+   */
+  onPlatformChange: (platformId: string) => void;
   /** Honest, jargon-free statement of how this layout came to exist (T077, FR-034). Omit to render no statement. */
   provenance?: KeyGridProvenance;
   /**
-   * Fired when the author clicks "Fill row" for a row with unused slack
-   * (T100, FR-022, FR-039). `rowIndex` is the row's TRUE index into
-   * `viewModel.rows` (not the windowed slice's local position — see the
-   * module doc's "Row slack, and the Fill row / Even out row seam"). Omit to
-   * leave the action inert: see that same section for why an omitted
-   * handler is a no-op rather than a fallback default — this component
-   * never computes or commits a width change itself.
-   */
-  onFillRow?: (rowIndex: number) => void;
-  /**
-   * Fired when the author clicks "Even out row" for a row with two or more
-   * keys (T100, FR-022, FR-039). Same `rowIndex` convention and same
-   * omitted-is-inert contract as `onFillRow` above.
-   */
-  onEvenOutRow?: (rowIndex: number) => void;
-  /**
    * T111 (FR-021) — the per-key pointer commands, forwarded verbatim to every
-   * `KeyGridCell`. Each is optional and independently omittable: an omitted
-   * callback means that cell renders no affordance for it at all (see
-   * `KeyGridCell.tsx`'s own prop docs). This component adds no behaviour of
-   * its own around them — it only passes them down, the same way it forwards
-   * `onSelectCell`. Their KEYBOARD equivalents are `useKeyCommands.ts`'s and
-   * arrive through `onKeyDown`, not through these props.
+   * `KeyGridCell`. **Required** (spec 061 T002/T003, FR-001, FR-003): each
+   * affordance's visibility is gated on the CELL's own state in
+   * `KeyGridCell.tsx` (blank/spacer, `nextlayer` presence), never on whether
+   * a handler happens to exist — see that file's own prop docs. This
+   * component adds no behaviour of its own around them — it only passes them
+   * down, the same way it forwards `onSelectCell`. Their KEYBOARD equivalents
+   * are `useKeyCommands.ts`'s and arrive through `onKeyDown`, not through
+   * these props.
    */
-  onAddKeyAfter?: (cell: KeyGridCellViewModel) => void;
-  onOpenCommandMenu?: (
+  onAddKeyAfter: (cell: KeyGridCellViewModel) => void;
+  onOpenCommandMenu: (
     cell: KeyGridCellViewModel,
     anchor: KeyGridCommandMenuAnchor,
   ) => void;
-  onFollowNextLayer?: (cell: KeyGridCellViewModel, nextlayer: string) => void;
+  onFollowNextLayer: (cell: KeyGridCellViewModel, nextlayer: string) => void;
 }
 
 /** Sum of `widthPct + padPct` across a row's keys, in the 100-unit model's raw units (mirrors keyGridViewModel.ts's own `rowTotalPct`, recomputed here rather than exported since it's a cheap, pure, single-formula derivation). */
@@ -349,8 +319,6 @@ export function KeyGrid({
   activePlatformId,
   onPlatformChange,
   provenance,
-  onFillRow,
-  onEvenOutRow,
   onAddKeyAfter,
   onOpenCommandMenu,
   onFollowNextLayer,
@@ -492,7 +460,7 @@ export function KeyGrid({
     e.preventDefault();
     const next = platforms[nextIndex];
     if (!next) return;
-    onPlatformChange?.(next.id);
+    onPlatformChange(next.id);
     platformTabRefs.current.get(next.id)?.focus();
   };
 
@@ -580,16 +548,6 @@ export function KeyGrid({
 
   const showPlatformTabs = platforms !== undefined && platforms.length > 1;
 
-  // Hover tooltip for the decorative hatch spacer (T100, FR-039) — sighted
-  // mouse users only; the aria-hidden hatch carries no accessible-tree
-  // presence, and this `title` does not change that. See the module doc's
-  // "Row slack, and the Fill row / Even out row seam" for the actual
-  // programmatic equivalent (the "Fill row" button itself).
-  const rowSlackTitle = t({
-    id: "editor.assignLoop.keyGrid.rowSlackTitle",
-    message: "Unused space in this row",
-  });
-
   // T117 — what the grid's own live region says. The SELECTED cell's findings
   // only: an announcement fires on selection change, and reading out a whole
   // layer's diagnostics on every arrow key would make the grid unusable with a
@@ -633,7 +591,7 @@ export function KeyGrid({
                 aria-controls={gridId}
                 tabIndex={isActive ? 0 : -1}
                 data-testid={`key-grid-platform-tab-${p.id}`}
-                onClick={() => onPlatformChange?.(p.id)}
+                onClick={() => onPlatformChange(p.id)}
                 style={{
                   padding: "6px 12px",
                   background: isActive ? "#0d2840" : "transparent",
@@ -712,12 +670,13 @@ export function KeyGrid({
         }}
       >
         {windowedRows.map(({ row, rowIndex }) => {
+          // The row's unused width, in the same percentage space the cells use.
+          // It is no longer drawn as anything of its own (the hatch is gone,
+          // ADR 0002 / FR-012) — it is added to the LAST key below, which is
+          // what KeymanWeb does and therefore what the author's keyboard will
+          // look like. A row that IS the layer maximum contributes 0.
           const slackPercent =
             layerMaxUnits > 0 ? (row.slackPct / layerMaxUnits) * 100 : 0;
-          // See the module doc's "Row slack, and the Fill row / Even out
-          // row seam" (T100, FR-022, FR-039) for both booleans' rationale.
-          const canFillRow = row.slackPct > 0;
-          const canEvenOutRow = row.keys.length >= 2;
           return (
             <Fragment key={rowIndex}>
               <div
@@ -735,15 +694,37 @@ export function KeyGrid({
                 {row.keys.map((cell, colIndex) => {
                   const padPercent =
                     layerMaxUnits > 0 ? (cell.padPct / layerMaxUnits) * 100 : 0;
+                  // FR-012: the last key of every row absorbs the row's slack,
+                  // so every row ends flush at the layer maximum. `isLastInRow`
+                  // comes off the view model rather than being re-derived from
+                  // `colIndex === row.keys.length - 1` here, so the rule is
+                  // stated once (keyGridViewModel.ts) for every consumer that
+                  // draws or measures a cell.
+                  //
+                  // This is the DECLARED width plus the stretch — FR-015's
+                  // "declared width is a minimum" made literal. The property
+                  // panel's width field and the row metrics readout both quote
+                  // the declared figure, and both say so.
                   const widthPercent =
                     layerMaxUnits > 0
-                      ? (cell.widthPct / layerMaxUnits) * 100
+                      ? ((cell.widthPct / layerMaxUnits) * 100) +
+                        (cell.isLastInRow ? slackPercent : 0)
                       : 0;
                   const isSelected = cell.address === selectedAddress;
                   const isTabbable =
                     isSelected ||
                     (!hasSelectedVisible && cell.address === firstAddress);
                   return (
+                    // Keyed on the address, which is unique within a layer
+                    // because it carries an OCCURRENCE (keyGridViewModel.ts,
+                    // "Duplicate ids"). That matters here specifically: ids
+                    // repeat — `T_BLANK` twenty-five times in one shipped
+                    // tablet layer — and duplicate React keys made the grid
+                    // LEAK. React maps previous children by key, so duplicates
+                    // overwrite each other, the shadowed fibers are never
+                    // matched on a later render and never enter the deletion
+                    // set, and they stay mounted; switching layers piled up
+                    // orphaned blanks and front-of-row keys on every switch.
                     <Fragment key={cell.address}>
                       {/* Decorative left-padding spacer, not a gridcell — kept
                       aria-hidden and OUTSIDE the aria-colindex count below so
@@ -776,35 +757,18 @@ export function KeyGrid({
                     </Fragment>
                   );
                 })}
-                {/* The row's unused slack (FR-039), rendered visibly rather than
-                silently absorbed into the last key's width — see
-                keyGridViewModel.ts's own `slackPct` doc comment. Decorative
-                only: a diagonal hatch, never a printed number (the module
-                doc's "Row slack, and the Fill row / Even out row seam"). */}
-                {slackPercent > 0 && (
-                  <span
-                    aria-hidden="true"
-                    data-testid={`key-grid-row-slack-${rowIndex}`}
-                    title={rowSlackTitle}
-                    style={{
-                      flexGrow: 0,
-                      flexShrink: 0,
-                      flexBasis: `${slackPercent}%`,
-                      borderLeft: `1px dashed ${TEXT_DIM}`,
-                      borderRadius: 3,
-                      backgroundImage: `repeating-linear-gradient(135deg, ${TEXT_DIM} 0px, ${TEXT_DIM} 1px, transparent 1px, transparent 7px)`,
-                      opacity: 0.5,
-                    }}
-                  />
-                )}
               </div>
-              {/* Fill row / Even out row (T100, FR-022, FR-039) — ordinary
-              buttons that are NOT gridcells in useGridNav's cursor model (see
-              the module doc's "Row slack, and the Fill row / Even out row
-              seam"). Rendered only when at least one action actually applies
-              to this row — a row with no slack and only one key gets neither
-              button, the same "affordance only when applicable" convention the
-              pad spacer above already follows.
+              {/* The row-actions strip (spec 061 T012, FR-007, FR-038) — a
+              retained container, not a new one: it used to hold "Fill row" /
+              "Even out row", both withdrawn by ADR 0002 (the last key now
+              stretches to fill a row, so there is nothing left for either
+              button to redistribute). It renders UNCONDITIONALLY now, once
+              per layout row, and as of spec 061 T026 its `role="gridcell"`
+              holds the per-row metrics readout (FR-013, FR-014) — the printed
+              numbers that replaced the withdrawn slack hatch. The readout goes
+              INSIDE the existing gridcell rather than beside it: the roles
+              below are what SC-009 fixed, and a new grid child would reopen
+              exactly the `aria-required-children` violation they closed.
 
               ## Why this strip carries `role="row"` + an inner `role="gridcell"`
               (T123 / SC-009)
@@ -828,72 +792,24 @@ export function KeyGrid({
               differs from the DOM row count by design — the grid windows rows).
               Numbering a control strip as if it were a layout row would make
               both figures lie. */}
-              {(canFillRow || canEvenOutRow) && (
-                <div
-                  role="row"
-                  // Same tabIndex={-1} convention as the layout rows above:
-                  // programmatically focusable, never a Tab stop of its own.
-                  // The BUTTONS inside remain ordinary Tab stops — they are how
-                  // the actions are reached, and unlike a gridcell they are not
-                  // part of useGridNav's arrow-key cursor.
-                  tabIndex={-1}
-                  data-testid={`key-grid-row-actions-${rowIndex}`}
-                  style={{
-                    display: "flex",
-                    gap: 6,
-                    marginTop: -2,
-                    marginBottom: 2,
-                    paddingLeft: 2,
-                  }}
-                >
+              <div
+                role="row"
+                // Same tabIndex={-1} convention as the layout rows above:
+                // programmatically focusable, never a Tab stop of its own.
+                tabIndex={-1}
+                data-testid={`key-grid-row-actions-${rowIndex}`}
+                style={{
+                  display: "flex",
+                  gap: 6,
+                  marginTop: -2,
+                  marginBottom: 2,
+                  paddingLeft: 2,
+                }}
+              >
                 <div role="gridcell" style={{ display: "flex", gap: 6 }}>
-                  {canFillRow && (
-                    <button
-                      type="button"
-                      data-testid={`key-grid-fill-row-${rowIndex}`}
-                      onClick={() => onFillRow?.(rowIndex)}
-                      style={{
-                        padding: "2px 8px",
-                        background: "transparent",
-                        border: `1px dashed ${BORDER}`,
-                        borderRadius: 4,
-                        color: TEXT_DIM,
-                        fontSize: 11,
-                        cursor: "pointer",
-                        fontFamily: FONT,
-                      }}
-                    >
-                      {t({
-                        id: "editor.assignLoop.keyGrid.fillRow",
-                        message: `Fill row ${{ n: rowIndex + 1 }}`,
-                      })}
-                    </button>
-                  )}
-                  {canEvenOutRow && (
-                    <button
-                      type="button"
-                      data-testid={`key-grid-even-out-row-${rowIndex}`}
-                      onClick={() => onEvenOutRow?.(rowIndex)}
-                      style={{
-                        padding: "2px 8px",
-                        background: "transparent",
-                        border: `1px dashed ${BORDER}`,
-                        borderRadius: 4,
-                        color: TEXT_DIM,
-                        fontSize: 11,
-                        cursor: "pointer",
-                        fontFamily: FONT,
-                      }}
-                    >
-                      {t({
-                        id: "editor.assignLoop.keyGrid.evenOutRow",
-                        message: `Even out row ${{ n: rowIndex + 1 }}`,
-                      })}
-                    </button>
-                  )}
+                  <RowMetricsReadout rowIndex={rowIndex} metrics={row.metrics} />
                 </div>
-                </div>
-              )}
+              </div>
             </Fragment>
           );
         })}

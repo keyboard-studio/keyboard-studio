@@ -104,6 +104,19 @@ export {
 } from "./touchKeyAddress.js";
 export type { TouchKeyAddressParts } from "./touchKeyAddress.js";
 
+// Row geometry + the one keys-per-row threshold table (spec 061 T019). A shim
+// over contracts — see rowMetrics.ts for why the definitions cannot live in
+// engine.
+export {
+  DEFAULT_KEY_WIDTH_PCT,
+  DEFAULT_KEY_PAD_PCT,
+  PLATFORM_MAX_KEYS_PER_ROW,
+  platformMaxKeysPerRow,
+  countInteractiveRowKeys,
+  computeRowMetrics,
+} from "./rowMetrics.js";
+export type { RowMetricKey, RowMetrics } from "./rowMetrics.js";
+
 export { enumerateTouchMethodsForChar } from "./enumerateTouchMethodsForChar.js";
 export type { TouchMethodDescriptor } from "./enumerateTouchMethodsForChar.js";
 
@@ -187,6 +200,7 @@ export {
   decomposeLayerId,
   groupLayerFamilies,
   findFamilyParallelismBreaks,
+  keyEditAffectsFamilyParallelism,
   classifyPlane,
   severityForPlane,
 } from "./layerFamilies.js";
@@ -268,6 +282,22 @@ export type {
   KeyIdMintingRequest,
 } from "./keyIdMinting.js";
 
+// Spec 061 US5 — the inherit-first wrapper and the keycap judgement.
+export { proposeTouchKeyId } from "./proposeTouchKeyId.js";
+export type {
+  TouchKeyIdProposalRequest,
+  TouchKeyIdProposal,
+  TouchKeyIdProposalReason,
+  NoProposalReason,
+} from "./proposeTouchKeyId.js";
+export { proposeKeycap, isKeycapRelated, isCombiningMark } from "./keycapRelatedness.js";
+export type {
+  KeycapProposal,
+  KeycapForm,
+  KeycapConsequence,
+  KeycapRelatednessOptions,
+} from "./keycapRelatedness.js";
+
 // The finding/fix shape and every layout/rule detector live in contracts as of
 // spec 058 T113/T114 (FR-040's one-implementation rule — Layer C cannot import
 // engine); `touchKeyDiagnostics.ts` re-exports them, so this barrel and its
@@ -277,6 +307,8 @@ export {
   computeTouchKeyDiagnostics,
   groupTouchKeyFindingsByAddress,
   touchKeyFindingScope,
+  findCrowdedTouchRows,
+  findKeycapMismatches,
   findDeadTouchKeys,
   findDuplicateTouchKeyIds,
   findHalfDoneSuppressions,
@@ -296,6 +328,7 @@ export type {
   TouchKeyFindingScope,
   TouchKeyFinding,
   TouchKeyFix,
+  TrimRowFix,
   AddRequiredKeysFix,
   AddRuleFix,
   ClearSpecialLabelFix,

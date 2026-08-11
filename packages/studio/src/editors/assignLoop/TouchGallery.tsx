@@ -83,6 +83,8 @@ import type {
   TouchKeyRuleIndex,
   DiscoveryAxisVector,
   PlacementMap,
+  TouchKeyFix,
+  TouchKeyFinding,
 } from "@keyboard-studio/contracts";
 import {
   toUPlusNotation,
@@ -96,6 +98,7 @@ import type {
   DesktopModifications,
   ModifierToken,
   KeyEditOperation,
+  KeyIdRejectionReason,
 } from "@keyboard-studio/engine";
 import {
   parseTouchLayout,
@@ -114,10 +117,17 @@ import {
   caseCounterpart,
   replayKeyEditOverlay,
   parseTouchKeyAddress,
+  resolveKeyAddress,
   touchKeyAddress,
   emitTouchLayout,
+  applyKeyEditsToRawJson,
+  proposeTouchKeyId,
+  groupLayerFamilies,
+  keyEditAffectsFamilyParallelism,
+  planKeyDeletionRuleRemoval,
+  applyKeyDeletionRuleRemoval,
 } from "@keyboard-studio/engine";
-import type { TouchMethodDescriptor } from "@keyboard-studio/engine";
+import type { TouchMethodDescriptor, TouchKeyIdProposal } from "@keyboard-studio/engine";
 import {
   buildTouchLayoutJson,
   deriveSeedLayout,
@@ -146,6 +156,7 @@ import {
   type BulkAccentGroup,
   type TouchEditorMode,
   type UndoEntry,
+  type PendingKeyEditOperation,
 } from "../../stores/workingCopyStore.ts";
 import {
   buildKeyGridViewModel,
@@ -158,13 +169,44 @@ import {
   type KeyGridProvenance,
 } from "./keyGrid/KeyGrid.tsx";
 import { useGridNav } from "./keyGrid/useGridNav.ts";
-import { KeyInspector } from "./keyGrid/KeyInspector.tsx";
+import { type TouchKeySpValue } from "./keyGrid/KeyInspector.tsx";
+import {
+  KeyPropertyPanel,
+  type KeyPropertyFieldChange,
+} from "./keyGrid/KeyPropertyPanel.tsx";
 import { AssignPanel, type AssignPanelCommitResult } from "./keyGrid/AssignPanel.tsx";
+import {
+  GesturePanel,
+  type GestureKind,
+  type GestureSelection,
+} from "./keyGrid/GesturePanel.tsx";
 import {
   useKeyEditGuards,
   type KeyEditInvalidationWarning,
   type KeyEditRejectionNotice,
 } from "./keyGrid/useKeyEditGuards.ts";
+import { LayerSelector } from "./keyGrid/LayerSelector.tsx";
+import {
+  useKeyCommands,
+  buildAddKeyAfterOutcome,
+  type AddKeyAfterOutcome,
+  type KeyGridCommandMenuAnchor,
+} from "./keyGrid/useKeyCommands.ts";
+import { KeyGridCommandMenu } from "./keyGrid/KeyGridCommandMenu.tsx";
+import {
+  RemoveKeyDialog,
+  computeProposedRemoveOutcome,
+  type RemoveKeyDialogConfirmResult,
+} from "./keyGrid/RemoveKeyDialog.tsx";
+import { RenameDialog, type RenameDialogConfirmResult } from "./keyGrid/RenameDialog.tsx";
+import {
+  FamilyApplyDialog,
+  enumerateFamilyApplyTargets,
+  isFamilyApplicableOp,
+  type FamilyApplyOp,
+} from "./keyGrid/FamilyApplyDialog.tsx";
+import { FindPanel, type FindPanelResult } from "./keyGrid/FindPanel.tsx";
+import { useModeContextCarry } from "./keyGrid/useModeContextCarry.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { collateInventory } from "../../survey/collation.ts";
 import { nfcDedup } from "../../survey/charNormUtils.ts";
@@ -261,6 +303,19 @@ const EMPTY_MODS: DesktopModifications = { removals: [], placements: [] };
  * `emptyKeyGridViewModel` already uses for `useGridNav` below.
  */
 const EMPTY_TOUCH_LAYOUT: TouchLayoutIR = { platforms: [], nodeIds: [] };
+
+/**
+ * Stable empty `TouchKeyRuleIndex` — the same "hooks cannot be called
+ * conditionally" idiom as `EMPTY_TOUCH_LAYOUT` above, for `useModeContextCarry`
+ * (T013/T014), which takes a required `ruleIndex` but `keyModeRuleIndex` is
+ * `undefined` before the working IR has loaded.
+ */
+const EMPTY_TOUCH_RULE_INDEX: TouchKeyRuleIndex = {
+  byId: new Map(),
+  spellings: new Map(),
+  producingIds: new Set(),
+  opaqueFragmentCount: 0,
+};
 
 /**
  * Whether a touch layer id carries a casing component (FR-013) — `"shift"`
@@ -2256,6 +2311,28 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     overlay: keyEditOverlay,
   });
 
+  // T014 (FR-005) — the layer selector's rolled-up finding counts, read off
+  // the ALREADY-COMPUTED `keyModeDiagnostics` above (a `useMemo` grouping its
+  // flat `findings` list by the layer segment of each finding's own
+  // `address`) — no second validation pass, no new timer (FR-039, decision
+  // D3). Scoped to the active platform: a finding on a different platform's
+  // same-named layer must not bleed into this platform's tablist. A finding
+  // whose address does not parse (the `"rule"`-scope orphan check, which
+  // names no platform/layer at all — see `TouchKeyFindingScope`'s own doc)
+  // is silently excluded from the rollup rather than crashing it.
+  const keyLayerFindingCounts = useMemo<ReadonlyMap<string, number>>(() => {
+    const counts = new Map<string, number>();
+    for (const finding of keyModeDiagnostics.findings) {
+      const parts = parseTouchKeyAddress(finding.address);
+      if (parts === undefined) continue;
+      if (activeKeyPlatformId !== null && parts.platform !== activeKeyPlatformId) {
+        continue;
+      }
+      counts.set(parts.layerId, (counts.get(parts.layerId) ?? 0) + 1);
+    }
+    return counts;
+  }, [keyModeDiagnostics, activeKeyPlatformId]);
+
   const keyModeViewModel = useMemo<KeyGridViewModel | undefined>(() => {
     if (
       effectiveKeyModeLayout === null ||
@@ -2309,6 +2386,53 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       if (found !== undefined) return found;
     }
     return null;
+  }, [keyModeViewModel, selectedKeyAddress]);
+
+  // T015 — the row `selectedKeyCell` belongs to, for `RemoveKeyDialog`'s
+  // `rowKeys`/`isLastKeyInRow` inputs (that component has no row-membership
+  // data of its own; see its module doc, "T099"). Re-derived from
+  // `keyModeViewModel` for the same reason `selectedKeyCell` is above.
+  const selectedKeyRow = useMemo(() => {
+    if (keyModeViewModel === undefined || selectedKeyAddress === null) {
+      return undefined;
+    }
+    return keyModeViewModel.rows.find((row) =>
+      row.keys.some((k) => k.address === selectedKeyAddress),
+    );
+  }, [keyModeViewModel, selectedKeyAddress]);
+
+  // Spec 061 T042 — the selected key's own IR node, for `GesturePanel`.
+  // `KeyGridCellViewModel` summarizes sub-keys as COUNTS (keyGridViewModel.ts),
+  // so the gesture panel needs the node itself. Resolved against the EFFECTIVE
+  // (overlay-folded) layout, so a gesture the author added a moment ago is
+  // present here on the next render — the same layout the grid renders from,
+  // never a second source.
+  const selectedKeyNode = useMemo(() => {
+    if (effectiveKeyModeLayout === null || selectedKeyAddress === null) return null;
+    const parts = parseTouchKeyAddress(selectedKeyAddress);
+    if (parts === undefined) return null;
+    const resolved = resolveKeyAddress(effectiveKeyModeLayout, parts);
+    return resolved?.key ?? null;
+  }, [effectiveKeyModeLayout, selectedKeyAddress]);
+
+  // Spec 061 T036 — where the selected key sits, so `KeyPropertyPanel` can
+  // decide which move buttons can act (FR-020: absent, never disabled). Derived
+  // here rather than in the panel because the panel sees one cell and the
+  // answer depends on the whole layer.
+  const selectedKeyPosition = useMemo(() => {
+    if (keyModeViewModel === undefined || selectedKeyAddress === null) return undefined;
+    for (let rowIndex = 0; rowIndex < keyModeViewModel.rows.length; rowIndex++) {
+      const row = keyModeViewModel.rows[rowIndex]!;
+      const keyIndex = row.keys.findIndex((k) => k.address === selectedKeyAddress);
+      if (keyIndex === -1) continue;
+      return {
+        rowIndex,
+        keyIndex,
+        rowCount: keyModeViewModel.rows.length,
+        rowLength: row.keys.length,
+      };
+    }
+    return undefined;
   }, [keyModeViewModel, selectedKeyAddress]);
 
   // FR-034's honest provenance statement — the same resolvedSeedSource this
@@ -2401,22 +2525,45 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     readonly string[]
   >([]);
 
-  // ONE commit call site for AssignPanel's `onCommit` (spec 058 T085-T089
-  // composition) — reuses the EXISTING key-edit overlay / undo-stack action
-  // (`commitKeyEdit`, landed in Phase 5b) and the EXISTING overlay-preserving
-  // IR setter (`setWorkingIR`, spec-014's mutate seam) rather than adding a
-  // second write path. AssignPanel itself never calls either — see that
-  // file's own module doc, "Store-free, like every other file in this
-  // directory".
-  const handleAssignPanelCommit = useCallback(
-    (result: AssignPanelCommitResult) => {
+  // ---------------------------------------------------------------------------
+  // T013 — the single-writer commit chain (key-edit-overlay.md's own
+  // language: "do not create a second write path"). `commitKeyEditCore` is
+  // the ONE place every key-mode surface's guard-check / store-commit /
+  // Case-A-Case-B promotion sequence lives — `handleAssignPanelCommit` below
+  // delegates to it (keeping only its own AssignPanel-specific extras:
+  // `result.nextIr`, the ALREADY-derived `result.promotedLayout`, and the
+  // `charTouch` worklist pruning), and `commitKeyEditOp` (further below) is
+  // the bare-op entry point every OTHER surface (`useKeyCommands`,
+  // `RemoveKeyDialog`, `RenameDialog`'s own rename op, `FamilyApplyDialog`'s
+  // fan-out) calls, deriving its own promoted layout via
+  // `replayKeyEditOverlay` — the SAME primitive `keyModeOverlayReplay` above
+  // already uses, never a second folding rule.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Guard-check, commit, and Case A/B promote ONE key-edit op. `promotedLayout`
+   * is supplied by the caller (either AssignPanel's own already-derived one,
+   * or `commitKeyEditOp`'s replay-derived one) rather than computed here, so
+   * this function stays the single place the PROMOTION SPLIT itself is
+   * written, without also being the only place a promoted layout can come
+   * from. `onGuardsPassed` runs after the rejection gate (FR-045: "the
+   * invalid state never exists" — nothing here runs before it) and before the
+   * store commit, so a caller needing to apply something else first (only
+   * AssignPanel's `result.nextIr` today) can do so at the right moment.
+   */
+  const commitKeyEditCore = useCallback(
+    (
+      op: PendingKeyEditOperation,
+      promotedLayout: TouchLayoutIR,
+      onGuardsPassed?: () => void,
+    ): { committed: boolean; warnings: readonly KeyEditInvalidationWarning[] } => {
       // T118 (FR-045) FIRST: there is no point warning about a lost character
       // for an edit that is about to be refused. A hard rejection returns
       // without touching the store at all — that is what "the invalid state
       // never exists" means, and why no finding is emitted for it.
-      const rejections = checkKeyEditRejectionNotices(result.op);
+      const rejections = checkKeyEditRejectionNotices(op);
       const unwaived = rejections.filter(
-        (r) => r.blocking || !acknowledgedRejections.has(`${result.op.address}:${r.reason}`),
+        (r) => r.blocking || !acknowledgedRejections.has(`${op.address}:${r.reason}`),
       );
       if (unwaived.length > 0) {
         setKeyEditRejections(unwaived);
@@ -2427,31 +2574,85 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         if (waivable.length > 0) {
           setAcknowledgedRejections((prev) => {
             const next = new Set(prev);
-            for (const r of waivable) next.add(`${result.op.address}:${r.reason}`);
+            for (const r of waivable) next.add(`${op.address}:${r.reason}`);
             return next;
           });
         }
-        return;
+        return { committed: false, warnings: [] };
       }
       setKeyEditRejections([]);
 
-      const warnings = checkKeyEditOperation(result.op);
+      const warnings = checkKeyEditOperation(op);
       setKeyEditInvalidationWarnings(warnings);
 
-      const store = useWorkingCopyStore.getState();
-      store.commitKeyEdit(result.op);
+      onGuardsPassed?.();
 
-      if (result.nextIr !== undefined) {
-        store.setWorkingIR(result.nextIr);
-      }
+      const store = useWorkingCopyStore.getState();
+      store.commitKeyEdit(op);
 
       if (keyModeProvenance === "derived-from-base") {
-        const base = result.nextIr ?? store.ir;
+        // `store.ir` is read AFTER `onGuardsPassed` — the moment AssignPanel's
+        // own `result.nextIr` (a freshly minted rule) would already have
+        // landed via `setWorkingIR` — so the promoted layout is stitched onto
+        // the FRESH ir, never a stale one.
+        const base = store.ir;
         if (base !== null) {
-          store.setWorkingIR({ ...base, touchLayout: result.promotedLayout });
+          store.setWorkingIR({ ...base, touchLayout: promotedLayout });
         }
       } else {
-        store.setTouchLayoutJson(emitTouchLayout(result.promotedLayout));
+        // Case B (imported / import-adapt) — splice the committed op onto the
+        // RAW JSON via the Case B applier, never through the IR.
+        //
+        // This used to be `setTouchLayoutJson(emitTouchLayout(promotedLayout))`,
+        // and that was a spec 035 R9 violation with teeth (found by spec 061
+        // T016, when the SC-006 walk was un-skipped and measured): because
+        // `projectWorkingCopyVfs` step 0 injects `touchLayoutJson` straight into
+        // `.keyman-touch-layout`, an IR re-emit here WAS the emitted artifact.
+        // One key edit therefore rewrote all 112 keys of bambara's shipped
+        // layout — every key gaining `p: "hand-set"` (provenance is materialised
+        // on deserialize by design, FR-009, then written back out by `emitKey`)
+        // and `sp`/`width`/`pad` normalising to the IR's numbers. The provenance
+        // stamp is the damaging half: `hand-set` is the never-auto-clobber tag,
+        // so a single touch edit made the whole layout immune to re-propagation.
+        // The IR also drops what it does not model — per-key `layer`/`default`,
+        // platform `displayUnderlying`/`fontsize` — which is the loss
+        // `applyKeyEditsToRawJson` was written to prevent in the first place.
+        //
+        // The op is read back from the overlay AFTER `commitKeyEdit` so it
+        // carries its assigned `seq` (the applier reports warnings by it).
+        // Applying only THIS op reproduces the same content as replaying the
+        // whole overlay, because every earlier op is already spliced into
+        // `touchLayoutJson`; and `layoutForLintAndGate` re-parses this string,
+        // so the live grid stays current either way.
+        //
+        // `touchLayoutJson` is null until the first edit decides to emit (the
+        // R11 matrix), so the seed is the BASE's shipped raw JSON — which is
+        // the whole point: that string is the fidelity this branch exists to
+        // preserve. `touchLayoutJson` must carry the edit, because
+        // `serializeWorkingCopy` does not pass `keyEditOps` to the projection,
+        // leaving step 1.7 inert on the output path — this string is the only
+        // route a key edit reaches the artifact. (That gap is why splicing here
+        // cannot double-apply against 1.7, and it is recorded as its own
+        // finding rather than widened into here.)
+        //
+        // A reseed-from-desktop layout has no shipped source to be faithful to,
+        // so the IR emit remains right for it — that is the one case where
+        // there is nothing to lose, and it is also what SC-006 itself says.
+        const committedState = useWorkingCopyStore.getState();
+        const rawJson = committedState.touchLayoutJson ?? resolveBaseTouchJson(baseVfs) ?? null;
+        const committedOp = committedState.keyEditOverlay.ops.at(-1);
+        let spliced = false;
+        if (rawJson !== null && committedOp !== undefined) {
+          try {
+            const result = applyKeyEditsToRawJson(rawJson, [committedOp]);
+            for (const w of result.warnings) devLog.warn("[TouchGallery]", w);
+            store.setTouchLayoutJson(result.json);
+            spliced = true;
+          } catch (err) {
+            devLog.error("[TouchGallery] Case B key-edit raw-JSON splice failed:", err);
+          }
+        }
+        if (!spliced) store.setTouchLayoutJson(emitTouchLayout(promotedLayout));
       }
 
       // T106 (FR-062): a character this edit invalidated AND that has lost
@@ -2494,6 +2695,173 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         });
       }
 
+      return { committed: true, warnings };
+    },
+    [checkKeyEditOperation, checkKeyEditRejectionNotices, acknowledgedRejections, keyModeProvenance],
+  );
+
+  // T013 (FR-065) — offer the layer-family fan-out after an edit that can
+  // actually leave the family out of step, per `FamilyApplyDialog.tsx`'s own
+  // module doc ("the seam it was designed for"). Scoped to the ACTIVE
+  // platform's declared layer family the edited layer belongs to; a family of
+  // one (no siblings) offers nothing — there is nothing to fan out to.
+  //
+  // TWO predicates gate this, and they are not the same question:
+  //
+  //   - `isFamilyApplicableOp` (the dialog's own) — CAN this op be fanned out
+  //     at all. A capability.
+  //   - `keyEditAffectsFamilyParallelism` (engine, `layerFamilies.ts`) — SHOULD
+  //     the question be asked, i.e. can this edit make the family non-parallel
+  //     in the terms `findFamilyParallelismBreaks` itself checks. A policy.
+  //
+  // The trigger used to be the capability alone, which asked about every `set`
+  // — including a keycap edit, and including a key-type change between the
+  // ordinary classes. Both are properties FR-068 exempts precisely BECAUSE a
+  // family may legitimately differ on them (`default` carries `a` where `shift`
+  // carries `A`), so the dialog was firing on edits its own detector would
+  // never flag. That is not merely noisy: the dialog starts with every sibling
+  // CHECKED (FR-065's "the default must be the proposal"), so an author
+  // dismissing it by reflex fans a blank/spacer across the whole family and
+  // finds an inert key waiting on every layer — the defect of record here.
+  //
+  // The policy lives in the engine beside the check it mirrors, never restated
+  // here: a second opinion about which properties a family may differ on is
+  // exactly how the two would drift apart.
+  const maybeOfferFamilyApply = useCallback(
+    (op: PendingKeyEditOperation, beforeSp: number | undefined) => {
+      if (activeKeyPlatformEntry === undefined) return;
+      if (!keyEditAffectsFamilyParallelism(op, beforeSp)) return;
+      const parts = parseTouchKeyAddress(op.address);
+      if (parts === undefined) return;
+      const grouping = groupLayerFamilies(activeKeyPlatformEntry.layers.map((l) => l.id));
+      const family = grouping.families.find((f) => f.layerIds.includes(parts.layerId));
+      if (family === undefined || family.layerIds.length <= 1) return;
+
+      // A family with siblings is still not a family with ANSWERABLE siblings.
+      // The dialog correlates by key id, so a member that spells this key
+      // differently resolves as unavailable — and a key whose id is unique per
+      // layer BY CONSTRUCTION makes every member unavailable at once. The
+      // desktop carve's `T_removed_<n>` placeholders are exactly that: the
+      // counter runs across the whole layout, so the carved key on `rightalt`
+      // is `T_removed_3` where its `rightalt-shift` counterpart is
+      // `T_removed_9`, and no sibling ever resolves.
+      //
+      // The dialog disables Apply when nothing is selectable (`canConfirm`),
+      // which for that case means a modal offering a choice it can never
+      // accept — the author can only Cancel, and reported it as a dialog that
+      // "can't be successfully confirmed". Asking a question with no available
+      // answer is worse than not asking: there is nothing to fan out to, so the
+      // anchor-only edit already committed IS the whole outcome.
+      //
+      // Reuses the dialog's own exported enumeration rather than restating what
+      // "applicable" means — a second opinion here is how the gate and the
+      // dialog would come to disagree about which members count.
+      const applicable = enumerateFamilyApplyTargets(
+        effectiveKeyModeLayout ?? EMPTY_TOUCH_LAYOUT,
+        op.address,
+        family.layerIds,
+      ).filter((target) => !target.isAnchor && target.resolved);
+      if (applicable.length === 0) return;
+
+      setFamilyApplyState({ op: op as FamilyApplyOp, familyLayerIds: family.layerIds });
+    },
+    [activeKeyPlatformEntry, effectiveKeyModeLayout],
+  );
+
+  /**
+   * The `sp` the key at `address` carries in the CURRENT effective layout, for
+   * `maybeOfferFamilyApply`'s frame-boundary test. `undefined` both for a key
+   * with no declared `sp` (the wire default is character/0, which is correctly
+   * not a frame class) and for an address that does not resolve — the two are
+   * not worth distinguishing here, since neither is a frame key.
+   */
+  const resolveKeyEditSubjectSp = useCallback(
+    (address: string): number | undefined => {
+      if (effectiveKeyModeLayout === null) return undefined;
+      const parts = parseTouchKeyAddress(address);
+      if (parts === undefined) return undefined;
+      return resolveKeyAddress(effectiveKeyModeLayout, parts)?.key.sp;
+    },
+    [effectiveKeyModeLayout],
+  );
+
+  // T013 — the bare-op entry point every key-mode surface OTHER than
+  // AssignPanel commits through (`useKeyCommands`'s add, `RemoveKeyDialog`'s
+  // suppress/remove, `RenameDialog`'s rename op, `FamilyApplyDialog`'s
+  // fan-out ops, and every `onApplyFix` fix that maps to a single op). Derives
+  // its own promoted layout by replaying the CURRENT overlay plus `op` onto
+  // `layoutForLintAndGate` — the same primitive `keyModeOverlayReplay` already
+  // uses — so this is never a second folding rule. Returns whether the op
+  // actually committed, so a caller can decide whether to close its own
+  // transient UI state (a dialog, a picker) only on success.
+  const commitKeyEditOp = useCallback(
+    (op: PendingKeyEditOperation, options?: { readonly offerFamilyApply?: boolean }): boolean => {
+      if (layoutForLintAndGate === null) return false;
+
+      // Read BEFORE the commit: `keyEditAffectsFamilyParallelism` asks whether
+      // an `sp` change crosses the frame boundary, which is a claim about the
+      // transition. Resolved after the commit it would compare the new value
+      // with itself and never see a crossing at all.
+      const beforeSp = resolveKeyEditSubjectSp(op.address);
+
+      const currentOps = useWorkingCopyStore.getState().keyEditOverlay.ops;
+      const asIfCommitted = { ...op, seq: currentOps.length } as KeyEditOperation;
+      let promotedLayout: TouchLayoutIR;
+      try {
+        promotedLayout = replayKeyEditOverlay(layoutForLintAndGate, {
+          ops: [...currentOps, asIfCommitted],
+        }).layout;
+      } catch (err) {
+        devLog.error("[TouchGallery] commitKeyEditOp promotion derivation failed:", err);
+        return false;
+      }
+
+      const { committed } = commitKeyEditCore(op, promotedLayout);
+      if (!committed) return false;
+
+      // Selection-follow — the SAME "a successful commit must not silently
+      // strand the selection" rule `handleAssignPanelCommit` already applies
+      // for a renaming `set`, extended here to the `add` kind (the new key's
+      // own address, at the anchor's platform/layer).
+      if (op.kind === "set" && op.fields.id !== undefined) {
+        const parts = parseTouchKeyAddress(op.address);
+        if (parts !== undefined) {
+          setSelectedKeyAddress(touchKeyAddress(parts.platform, parts.layerId, op.fields.id));
+        }
+      } else if (op.kind === "add") {
+        const parts = parseTouchKeyAddress(op.address);
+        if (parts !== undefined) {
+          setSelectedKeyAddress(touchKeyAddress(parts.platform, parts.layerId, op.key.id));
+        }
+      }
+
+      if ((options?.offerFamilyApply ?? true) && isFamilyApplicableOp(op)) {
+        maybeOfferFamilyApply(op, beforeSp);
+      }
+
+      return committed;
+    },
+    [layoutForLintAndGate, commitKeyEditCore, maybeOfferFamilyApply, resolveKeyEditSubjectSp],
+  );
+
+  // ONE commit call site for AssignPanel's `onCommit` (spec 058 T085-T089
+  // composition) — reuses the EXISTING key-edit overlay / undo-stack action
+  // (`commitKeyEdit`, landed in Phase 5b) and the EXISTING overlay-preserving
+  // IR setter (`setWorkingIR`, spec-014's mutate seam) rather than adding a
+  // second write path. AssignPanel itself never calls either — see that
+  // file's own module doc, "Store-free, like every other file in this
+  // directory". Delegates the guard/commit/promotion core to
+  // `commitKeyEditCore` (T013) — see that function's own doc for why the
+  // Case A/B split lives there now rather than being re-derived here.
+  const handleAssignPanelCommit = useCallback(
+    (result: AssignPanelCommitResult) => {
+      const { committed } = commitKeyEditCore(result.op, result.promotedLayout, () => {
+        if (result.nextIr !== undefined) {
+          useWorkingCopyStore.getState().setWorkingIR(result.nextIr);
+        }
+      });
+      if (!committed) return;
+
       // touchKeyAddress.ts builds the address from the key's OWN id, so a
       // "set" op that renames the key (the U_/T_ minting path — virtually
       // always) changes the address that SAME key now resolves under. Follow
@@ -2507,13 +2875,635 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         }
       }
     },
-    [
-      checkKeyEditOperation,
-      checkKeyEditRejectionNotices,
-      acknowledgedRejections,
-      keyModeProvenance,
-    ],
+    [commitKeyEditCore],
   );
+
+  // ---------------------------------------------------------------------------
+  // T013 — the seven previously-orphaned surfaces (FR-002): `useKeyCommands`
+  // (this section), `KeyGridCommandMenu`/`RemoveKeyDialog`/`RenameDialog`/
+  // `FamilyApplyDialog`/`FindPanel` (mounted in the JSX below), and
+  // `useModeContextCarry` (wired into `handleSwitchTouchEditorMode` further
+  // down, after `currentChar`/`setCurrentChar` exist).
+  // ---------------------------------------------------------------------------
+
+  /** T118-style rejection surface for `useKeyCommands`' own `KeyIdRejectionReason` union — a DIFFERENT union from `KeyEditRejection["reason"]` (RenameDialog.tsx's `useRejectionReasonText` is the existing composer for exactly this union; this mirrors it rather than reimplementing it, and maps the reason onto the closest `KeyEditRejectionNotice.reason` literal so the SAME rendered surface, `key-edit-rejections`, carries it). */
+  const composeKeyIdRejectionMessage = useCallback(
+    (reason: KeyIdRejectionReason): string => {
+      switch (reason) {
+        case "malformed":
+          return t({
+            id: "editor.assignLoop.keyGrid.addKeyAfter.reject.malformed",
+            message: "That key could not be added — its position is not addressable.",
+          });
+        case "duplicate-in-layer":
+          return t({
+            id: "editor.assignLoop.keyGrid.addKeyAfter.reject.duplicateInLayer",
+            message: "Another key on this layer already uses the id the new key would get. Rename or remove it first.",
+          });
+        case "case-only-collision":
+          return t({
+            id: "editor.assignLoop.keyGrid.addKeyAfter.reject.caseOnlyCollision",
+            message: "The new key's id differs only by letter case from an existing one — Keyman treats the two as the same key.",
+          });
+        case "unicode-out-of-range":
+        case "unicode-unpadded":
+        case "reserved-prefix":
+        case "reserved-sentinel":
+        case "reserved-private-use":
+        default:
+          return t({
+            id: "editor.assignLoop.keyGrid.addKeyAfter.reject.generic",
+            message: "That key could not be added.",
+          });
+      }
+    },
+    [t],
+  );
+
+  /** Maps `useKeyCommands`' `KeyIdRejectionReason` onto the closest `KeyEditRejection["reason"]` literal — see `composeKeyIdRejectionMessage`'s own comment for why the reason UNIONS differ while the RENDER SURFACE is shared. */
+  function mapAddKeyRejectionReason(reason: KeyIdRejectionReason): KeyEditRejectionNotice["reason"] {
+    return reason === "duplicate-in-layer" || reason === "case-only-collision"
+      ? "in-layer-id-collision"
+      : "invalid-identifier";
+  }
+
+  /**
+   * The ONE implementation both "add key after" invocation routes call
+   * (`useKeyCommands.ts`'s own module doc, "The one requirement this file
+   * exists to satisfy") — Insert, the command-menu's "Add key after" entry
+   * (both via `useKeyCommands`'s own `onAddKeyAfter`) and the `(+)` hover
+   * wedge (via `handleAddKeyAfterCell` below) all resolve to this ONE
+   * function. There is deliberately no pane-level "Add key" button: every
+   * add route starts from a key, so a toolbar copy would be a second way to
+   * say the same thing (see the toolbar's own comment below).
+   */
+  const handleAddKeyOutcome = useCallback(
+    (outcome: AddKeyAfterOutcome) => {
+      if (!outcome.ok) {
+        setKeyEditRejections([
+          {
+            reason: mapAddKeyRejectionReason(outcome.reason),
+            blocking: true,
+            keyId: "",
+            message: composeKeyIdRejectionMessage(outcome.reason),
+          },
+        ]);
+        return;
+      }
+      setKeyEditRejections([]);
+      commitKeyEditOp(outcome.result.op);
+    },
+    [commitKeyEditOp, composeKeyIdRejectionMessage],
+  );
+
+  /** The `(+)` hover wedge's pointer route (`KeyGrid`'s required `onAddKeyAfter` prop) — computes the SAME outcome Insert does (`buildAddKeyAfterOutcome`) and routes it through the SAME `handleAddKeyOutcome`, never a second path. */
+  const handleAddKeyAfterCell = useCallback(
+    (cell: KeyGridCellViewModel) => {
+      if (effectiveKeyModeLayout === null) return;
+      handleAddKeyOutcome(buildAddKeyAfterOutcome(cell, effectiveKeyModeLayout));
+    },
+    [effectiveKeyModeLayout, handleAddKeyOutcome],
+  );
+
+  // T111's `⋯` wedge / right-click / `ContextMenu`-`Shift+F10` and
+  // `useKeyCommands`'s own keyboard route both open the SAME menu, anchored
+  // where the pointer route supplies (see `KeyGridCommandMenu.tsx`'s own
+  // "Positioning" section for why a keyboard invocation supplies none).
+  const [commandMenuState, setCommandMenuState] = useState<{
+    readonly cell: KeyGridCellViewModel;
+    readonly anchor?: KeyGridCommandMenuAnchor;
+  } | null>(null);
+  const dialogInvokerRef = useRef<HTMLElement | null>(null);
+  // Attaches the grid+inspector+panel detail region — see this ref's own
+  // mount site (further below, alongside `handleKeyModeGridKeyDown`) for the
+  // Escape/Enter behavior it backs. Declared here (earlier than that mount
+  // site) because `focusAssignPanelCharacterField` below needs it, and every
+  // `useRef` object is stable across a component's whole lifetime regardless
+  // of where in the body it is declared.
+  const keyModeDetailContainerRef = useRef<HTMLDivElement | null>(null);
+  const [renameDialogTarget, setRenameDialogTarget] = useState<KeyGridCellViewModel | null>(null);
+  const [removeDialogOpen, setRemoveDialogOpen] = useState(false);
+  const [familyApplyState, setFamilyApplyState] = useState<{
+    readonly op: FamilyApplyOp;
+    readonly familyLayerIds: readonly string[];
+  } | null>(null);
+  const [findPanelOpen, setFindPanelOpen] = useState(false);
+  const [repointNextlayerPrompt, setRepointNextlayerPrompt] = useState<{
+    readonly address: string;
+    readonly candidates: readonly string[];
+  } | null>(null);
+
+  const handleOpenCommandMenu = useCallback(
+    (cell: KeyGridCellViewModel, anchor?: KeyGridCommandMenuAnchor) => {
+      dialogInvokerRef.current =
+        document.activeElement instanceof HTMLElement ? document.activeElement : null;
+      setCommandMenuState(anchor !== undefined ? { cell, anchor } : { cell });
+    },
+    [],
+  );
+
+  // T014 (FR-006) — following a key's "Goes to" layer switches the layer
+  // selector to that layer, and reasonably selects the SAME key id there
+  // (falling back to no selection if it does not resolve on the target
+  // layer, which `selectedKeyCell`'s own lookup already handles safely).
+  // Both the double-click route (`KeyGridCell`) and `Ctrl+Enter`
+  // (`useKeyCommands`) funnel into this ONE callback.
+  const handleFollowNextLayer = useCallback(
+    (cell: KeyGridCellViewModel, nextlayer: string) => {
+      setActiveKeyLayerId(nextlayer);
+      const parts = parseTouchKeyAddress(cell.address);
+      if (parts !== undefined) {
+        setSelectedKeyAddress(touchKeyAddress(parts.platform, nextlayer, parts.keyId));
+      }
+    },
+    [],
+  );
+
+  // T013 — the command layer (spec 058 T094; FR-029, US4 AS1). `onAddKeyAfter`/
+  // `onOpenCommandMenu`/`onFollowNextLayer` are the SAME functions the `(+)`/
+  // `⋯` hover wedges and double-click gesture call — see each callback's own
+  // comment for why this is "one implementation, several invocation routes".
+  const keyCommands = useKeyCommands({
+    selectedCell: selectedKeyCell,
+    layout: effectiveKeyModeLayout ?? EMPTY_TOUCH_LAYOUT,
+    onAddKeyAfter: handleAddKeyOutcome,
+    onOpenCommandMenu: handleOpenCommandMenu,
+    onFollowNextLayer: handleFollowNextLayer,
+    i18n,
+  });
+
+  // T014/T013 (FR-036c) — character<->key mode-switch context carry. Holds no
+  // state of its own (see its own module doc); wired into the ONE mode-switch
+  // seam, `handleSwitchTouchEditorMode` (declared further below, after
+  // `currentChar`/`setCurrentChar` exist) — per that function's own comment,
+  // "do not scatter setTouchEditorMode calls".
+  const modeContextCarry = useModeContextCarry({
+    layout: effectiveKeyModeLayout ?? EMPTY_TOUCH_LAYOUT,
+    ruleIndex: keyModeRuleIndex ?? EMPTY_TOUCH_RULE_INDEX,
+    activePlatform: activeKeyPlatformId ?? "",
+  });
+
+  // Rename ("Rename key") and Remove ("Remove key") are not part of
+  // `useKeyCommands`' own descriptor list (that hook's module doc: T095/
+  // T097-T099 "wire their own onXxx callback prop... and append one more
+  // descriptor" — future tasks that would extend the HOOK itself, which is
+  // off-limits to this change). This composes them alongside it instead, so
+  // the command menu offers a complete set without a second hook.
+  const openRenameDialog = useCallback((cell: KeyGridCellViewModel) => {
+    dialogInvokerRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setRenameDialogTarget(cell);
+  }, []);
+
+  const handleOpenRemoveDialog = useCallback(() => {
+    if (selectedKeyCell === null) return;
+    dialogInvokerRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    setRemoveDialogOpen(true);
+  }, [selectedKeyCell]);
+
+  const extraCommandMenuCommands = useMemo(() => {
+    const renameLabel = t({
+      id: "editor.assignLoop.keyGrid.commands.renameKey",
+      message: "Rename key",
+    });
+    const removeLabel = t({
+      id: "editor.assignLoop.keyGrid.commands.removeKey",
+      message: "Remove key",
+    });
+    return [
+      {
+        id: "rename-key",
+        label: renameLabel,
+        enabled: selectedKeyCell !== null,
+        run: () => {
+          if (selectedKeyCell !== null) openRenameDialog(selectedKeyCell);
+        },
+      },
+      {
+        id: "remove-key",
+        label: removeLabel,
+        enabled: selectedKeyCell !== null,
+        run: handleOpenRemoveDialog,
+      },
+    ];
+  }, [selectedKeyCell, openRenameDialog, handleOpenRemoveDialog, t]);
+
+  const commandMenuCommands = useMemo(
+    () => [...keyCommands.commands, ...extraCommandMenuCommands],
+    [keyCommands.commands, extraCommandMenuCommands],
+  );
+
+  /** Focus the character field AssignPanel already renders for the selected key — the surface `TouchKeyFix`'s `addRule` kind routes to (see `handleApplyFix` below), matching `handleKeyModeGridKeyDown`'s existing Enter-jump query. */
+  /**
+   * The grid's Enter -> character-field bridge (spec 058 SC-004: assign a
+   * character in 12 keyboard actions, no pointer, no modal).
+   *
+   * Spec 061 T028-T039 moved the assign surface behind a disclosure on the key
+   * property panel, which took the input OUT of the DOM until the disclosure is
+   * open — so the original one-line querySelector silently focused nothing and
+   * the whole keyboard-only path died. Opening the disclosure first restores it.
+   *
+   * `HTMLElement.click()` dispatches only a `click`, never
+   * pointerdown/pointerup/mousedown/mouseup, so SC-004's pointer-event counter
+   * is unaffected: this stays a keyboard-only path, and the author still spends
+   * exactly one action (Enter) to reach the field.
+   *
+   * The `requestAnimationFrame` is required, not defensive — the disclosure is
+   * React state, so the input does not exist until after the re-render.
+   */
+  const focusAssignPanelCharacterField = useCallback(() => {
+    const container = keyModeDetailContainerRef.current;
+    if (container === null) return;
+    const findInput = (): HTMLInputElement | null =>
+      container.querySelector<HTMLInputElement>('[data-testid="assign-panel"] input');
+
+    const existing = findInput();
+    if (existing !== null) {
+      existing.focus();
+      return;
+    }
+    const disclosure = container.querySelector<HTMLButtonElement>(
+      '[data-testid="key-property-panel-assign-disclosure"]',
+    );
+    if (disclosure === null) return;
+    disclosure.click();
+    requestAnimationFrame(() => {
+      findInput()?.focus();
+    });
+  }, []);
+
+  // T013 (defect of record) — `onSpChange`: the author picks a key type and
+  // it must HOLD and reach the emitted artifact (issue #1530 complaint #2,
+  // spec 061 AS1). Commits a `set` op carrying the chosen `sp` through the
+  // shared chain.
+  const handleSpChange = useCallback(
+    (sp: TouchKeySpValue) => {
+      if (selectedKeyCell === null) return;
+      commitKeyEditOp({ address: selectedKeyCell.address, kind: "set", fields: { sp } });
+    },
+    [selectedKeyCell, commitKeyEditOp],
+  );
+
+  // Spec 061 T036 — `onFieldChange`: any of the seven text/number fields the
+  // property panel edits, committed through the SAME `commitKeyEditOp` chain
+  // every other key edit uses, so each one is a single undo entry and rides
+  // the existing validation cycle (FR-039, FR-040).
+  //
+  // An id change routes through `rename` rather than `set`: `applyFieldSemantics`
+  // couples id and output (changing the id clears a stale `output` unless the
+  // patch supplies a new one), and `rename` is the kind that states that intent.
+  // Every other field is a plain `set`.
+  const handleKeyFieldChange = useCallback(
+    (change: KeyPropertyFieldChange) => {
+      if (selectedKeyCell === null) return;
+      const { address } = selectedKeyCell;
+      if (change.field === "id") {
+        const toId = String(change.value).trim();
+        if (toId.length === 0) return;
+        commitKeyEditOp({ address, kind: "rename", toId });
+        return;
+      }
+      commitKeyEditOp({
+        address,
+        kind: "set",
+        fields: { [change.field]: change.value },
+      });
+    },
+    [selectedKeyCell, commitKeyEditOp],
+  );
+
+  // Spec 061 T036 — `onMove`. The panel only renders a direction whose move can
+  // act, so this never emits a boundary no-op (FR-020).
+  const handleKeyMove = useCallback(
+    (direction: "left" | "right" | "up" | "down") => {
+      if (selectedKeyCell === null) return;
+      commitKeyEditOp({ address: selectedKeyCell.address, kind: "move", direction });
+    },
+    [selectedKeyCell, commitKeyEditOp],
+  );
+
+  // ---------------------------------------------------------------------
+  // Spec 061 T042 — gestures (FR-026, FR-028)
+  //
+  // Every one of the three handlers below commits through the SAME
+  // `commitKeyEditOp` chain and the SAME `setSubKey`/`removeSubKey` operations
+  // the character walk's own sub-key edits use. That is what makes the
+  // character/key mode toggle lossless: there is one overlay, so there is no
+  // second write path for the two modes to drift apart on.
+  // ---------------------------------------------------------------------
+
+  const [selectedGesture, setSelectedGesture] = useState<GestureSelection | null>(null);
+
+  const gestureSubRef = useCallback(
+    (selection: GestureSelection) => ({
+      // `SubKeyRef["kind"]` is the WIRE collection name (`sk`), while the panel
+      // speaks the author's word (`longpress`). Translated in exactly one
+      // place, here, rather than having the panel know the wire vocabulary.
+      kind: selection.kind === "longpress" ? ("sk" as const) : selection.kind,
+      id: selection.id,
+    }),
+    [],
+  );
+
+  const handleAddGesture = useCallback(
+    (kind: GestureKind, id: string) => {
+      if (selectedKeyCell === null) return;
+      commitKeyEditOp({
+        address: selectedKeyCell.address,
+        kind: "setSubKey",
+        sub: gestureSubRef({ kind, id }),
+        // A brand-new entry carries its id and nothing else; the author fills
+        // in the keycap and output through the sub-key panel that opens next.
+        // `setSubKey` upserts as of T042, so this CREATES rather than warning.
+        fields: { id },
+      });
+      setSelectedGesture({ kind, id });
+    },
+    [selectedKeyCell, commitKeyEditOp, gestureSubRef],
+  );
+
+  const handleEditGesture = useCallback(
+    (selection: GestureSelection, fields: { text?: string; output?: string }) => {
+      if (selectedKeyCell === null) return;
+      commitKeyEditOp({
+        address: selectedKeyCell.address,
+        kind: "setSubKey",
+        sub: gestureSubRef(selection),
+        fields,
+      });
+    },
+    [selectedKeyCell, commitKeyEditOp, gestureSubRef],
+  );
+
+  const handleRemoveGesture = useCallback(
+    (selection: GestureSelection) => {
+      if (selectedKeyCell === null) return;
+      commitKeyEditOp({
+        address: selectedKeyCell.address,
+        kind: "removeSubKey",
+        sub: gestureSubRef(selection),
+      });
+      setSelectedGesture(null);
+    },
+    [selectedKeyCell, commitKeyEditOp, gestureSubRef],
+  );
+
+  // T013 — `onApplyFix`: an exhaustive switch over every `TouchKeyFix` member
+  // (a `never` check below fails the build if a future fix kind is added and
+  // left unhandled — contracts/touch-key-diagnostics.ts's own module doc
+  // calls this out as "a real commitment"). Every kind that maps to exactly
+  // one op commits it through `commitKeyEditOp`; a kind that needs the author
+  // to pick something (a character, an id) routes to the surface that can
+  // (AssignPanel / RenameDialog), per this task's own briefing.
+  const handleApplyFix = useCallback(
+    (fix: TouchKeyFix, _finding: TouchKeyFinding) => {
+      switch (fix.kind) {
+        case "addRule": {
+          // No single op expresses "write a rule for this character" — the
+          // selected key's own AssignPanel already renders the character
+          // field this needs.
+          focusAssignPanelCharacterField();
+          return;
+        }
+        case "convertToUnicodeId":
+        case "renameKey": {
+          // Both need the author to confirm an id — RenameDialog already
+          // proposes the SAME unicode-default id `computeProposedRenameId`
+          // would compute for `convertToUnicodeId`'s own `toId` (when
+          // present), so opening it is the one place that decision is made,
+          // rather than re-deriving `toId` here.
+          if (selectedKeyCell !== null) openRenameDialog(selectedKeyCell);
+          return;
+        }
+        case "repointNextlayer": {
+          const only = fix.candidates.length === 1 ? fix.candidates[0] : undefined;
+          if (only !== undefined) {
+            commitKeyEditOp({ address: fix.address, kind: "set", fields: { nextlayer: only } });
+            return;
+          }
+          setRepointNextlayerPrompt({ address: fix.address, candidates: fix.candidates });
+          return;
+        }
+        case "removeNextlayer": {
+          // No operation in today's `KeyEditOperation` union can CLEAR an
+          // optional field — `applyFieldSemantics`' own docstring
+          // (keyEditOps.ts): "this function does not otherwise support
+          // clearing an optional field... a set-authoring limitation the
+          // studio must express some other way (e.g. a full replace)," which
+          // does not exist yet. Selecting the key keeps the finding visible
+          // in context; an honest "not yet" rather than inventing a
+          // mutation the engine cannot express (see this task's own report
+          // for the follow-up this leaves).
+          setSelectedKeyAddress(fix.address);
+          return;
+        }
+        case "addRequiredKeys": {
+          for (const keyId of fix.keyIds) {
+            commitKeyEditOp(
+              { address: fix.address, kind: "add", position: "after", key: { id: keyId, text: "", sp: 0 } },
+              { offerFamilyApply: false },
+            );
+          }
+          return;
+        }
+        case "clearSpecialLabel": {
+          commitKeyEditOp({ address: fix.address, kind: "set", fields: { text: fix.text } });
+          return;
+        }
+        case "markAsFrameKey": {
+          commitKeyEditOp({ address: fix.address, kind: "set", fields: { sp: 1 } });
+          return;
+        }
+        case "completeSuppression": {
+          commitKeyEditOp({
+            address: fix.address,
+            kind: "suppress",
+            spClass: fix.spClass,
+            sentinelId: fix.sentinelId,
+          });
+          return;
+        }
+        case "setSp": {
+          commitKeyEditOp({ address: fix.address, kind: "set", fields: { sp: fix.sp } });
+          return;
+        }
+        case "trimRow": {
+          // Same shape as `reviewKey`, and for the same reason (spec 061
+          // FR-014): WHICH of a crowded row's keys should go is a judgement
+          // only the author can make, and the crowding is explicitly
+          // non-blocking — so the fix takes them to the row and stops. Anchored
+          // on the row's first key, which is the address the detector carries.
+          setSelectedKeyAddress(fix.address);
+          return;
+        }
+        case "setKeycap": {
+          // Spec 061 FR-036: a real mutation, unlike `trimRow`/`reviewKey` —
+          // `proposeKeycap` already computed the one right label, so there is
+          // nothing for the author to decide. Deliberately does NOT set
+          // `keycapAuthored`: accepting a proposal is not authoring one, and
+          // flagging it would silence the hint for every later change too.
+          commitKeyEditOp({
+            address: fix.address,
+            kind: "set",
+            fields: { text: fix.proposed },
+          });
+          return;
+        }
+        case "reviewKey": {
+          // "Look at this key" — ReviewKeyFix's own doc: "FR-041 asks only
+          // that a fix be concrete, not that it be a data mutation."
+          // Selecting the key IS the whole fix.
+          setSelectedKeyAddress(fix.address);
+          return;
+        }
+        default: {
+          const exhaustive: never = fix;
+          devLog.error("[TouchGallery] onApplyFix: unhandled TouchKeyFix kind", exhaustive);
+        }
+      }
+    },
+    [selectedKeyCell, commitKeyEditOp, focusAssignPanelCharacterField, openRenameDialog],
+  );
+
+  // T013 — RemoveKeyDialog's proposal (FR-029g), from the row `selectedKeyCell`
+  // belongs to (`selectedKeyRow`, T015) — recomputed per selection/layer, not
+  // hand-forged.
+  const removeKeyProposal = useMemo(() => {
+    if (selectedKeyRow === undefined || activeKeyPlatformId === null) return undefined;
+    return computeProposedRemoveOutcome({
+      platform: activeKeyPlatformId,
+      layerId: activeKeyLayerId,
+      rowKeys: selectedKeyRow.keys,
+      i18n,
+    });
+  }, [selectedKeyRow, activeKeyPlatformId, activeKeyLayerId, i18n]);
+
+  const handleRemoveKeyConfirm = useCallback(
+    (result: RemoveKeyDialogConfirmResult) => {
+      setRemoveDialogOpen(false);
+      commitKeyEditOp(result.op);
+      dialogInvokerRef.current?.focus();
+    },
+    [commitKeyEditOp],
+  );
+
+  const handleRemoveKeyCancel = useCallback(() => {
+    setRemoveDialogOpen(false);
+    dialogInvokerRef.current?.focus();
+  }, []);
+
+  // T013 — RenameDialog's confirm. Unlike every other surface here, a rename
+  // does not go through `commitKeyEditOp`'s generic replay-derived promotion:
+  // `store.commitTouchKeyRename` (workingCopyStore.ts) is the COMPLETE
+  // reference fix-up (every `.kmn` binding, every layer/platform occurrence,
+  // address-matched provenance promotion) that a bare `RenameKeyOp` replay
+  // cannot perform on its own — see that action's own doc comment. It
+  // mutates `ir.touchLayout` directly via `setWorkingIR`, so Case B
+  // (imported-existing) needs its OWN promotion afterward: `touchLayoutJson`
+  // is re-emitted from the SAME `ir.touchLayout` `commitTouchKeyRename` just
+  // wrote, never re-derived independently.
+  const handleRenameConfirm = useCallback(
+    (result: RenameDialogConfirmResult) => {
+      const rejections = checkKeyEditRejectionNotices(result.op);
+      const unwaived = rejections.filter(
+        (r) => r.blocking || !acknowledgedRejections.has(`${result.op.address}:${r.reason}`),
+      );
+      if (unwaived.length > 0) {
+        setKeyEditRejections(unwaived);
+        const waivable = unwaived.filter((r) => !r.blocking);
+        if (waivable.length > 0) {
+          setAcknowledgedRejections((prev) => {
+            const next = new Set(prev);
+            for (const r of waivable) next.add(`${result.op.address}:${r.reason}`);
+            return next;
+          });
+        }
+        setRenameDialogTarget(null);
+        dialogInvokerRef.current?.focus();
+        return;
+      }
+      setKeyEditRejections([]);
+      const warnings = checkKeyEditOperation(result.op);
+      setKeyEditInvalidationWarnings(warnings);
+
+      const store = useWorkingCopyStore.getState();
+      const outcome = store.commitTouchKeyRename(result.oldId, result.newId);
+      if (outcome.changed) {
+        // The overlay entry is recorded too — for the shared chronological
+        // undo stack (FR-040) and so `keyModeOverlayReplay`'s bookkeeping
+        // stays honest that a 'k' edit happened here — but the LAYOUT
+        // mutation itself already landed via `commitTouchKeyRename` above;
+        // this does not re-derive or re-apply it.
+        store.commitKeyEdit(result.op);
+
+        const updatedIr = useWorkingCopyStore.getState().ir;
+        if (keyModeProvenance !== "derived-from-base" && updatedIr?.touchLayout !== undefined) {
+          store.setTouchLayoutJson(emitTouchLayout(updatedIr.touchLayout));
+        }
+
+        // T092 — best-effort orphan-rule cleanup, reusing
+        // `planKeyDeletionRuleRemoval`/`applyKeyDeletionRuleRemoval`
+        // verbatim. `commitTouchKeyRename` already retargets every `.kmn`
+        // binding it finds for `oldId` to `newId`, so this most often finds
+        // nothing left to remove — it is kept for the case its own reference
+        // walk does not reach (a binding matched by a different scope than
+        // this rename's own), never a re-implementation of that walk.
+        if (result.orphanCleanup?.removeGenerated === true && updatedIr !== null) {
+          const ruleIndex2 = buildTouchKeyRuleIndex(updatedIr);
+          const plan = planKeyDeletionRuleRemoval(updatedIr, ruleIndex2, result.oldId);
+          const removal = applyKeyDeletionRuleRemoval(updatedIr, ruleIndex2, plan, result.oldId);
+          if (removal.changed) store.setWorkingIR(removal.ir);
+        }
+
+        const parts = parseTouchKeyAddress(result.op.address);
+        if (parts !== undefined) {
+          setSelectedKeyAddress(touchKeyAddress(parts.platform, parts.layerId, result.newId));
+        }
+      }
+      setRenameDialogTarget(null);
+      dialogInvokerRef.current?.focus();
+    },
+    [checkKeyEditOperation, checkKeyEditRejectionNotices, acknowledgedRejections, keyModeProvenance],
+  );
+
+  const handleRenameCancel = useCallback(() => {
+    setRenameDialogTarget(null);
+    dialogInvokerRef.current?.focus();
+  }, []);
+
+  const handleFamilyApplyConfirm = useCallback(
+    (ops: readonly FamilyApplyOp[]) => {
+      setFamilyApplyState(null);
+      // `FamilyApplyOp` is `Omit<KeyEditOperation, "seq">` (FamilyApplyDialog.tsx)
+      // — a non-distributive Omit, which TS collapses to each member's COMMON
+      // fields only. `commitKeyEditOp` wants the real per-kind shape
+      // (`PendingKeyEditOperation`, `workingCopyStore.ts`'s own distributive
+      // Omit) — `buildFamilyApplyOps` (that dialog's own pure function)
+      // constructs every op by spreading the author's ORIGINAL, already
+      // correctly-shaped op (`{ ...op, address }`), so this narrows a type
+      // TS cannot itself distribute, not the actual runtime value.
+      for (const op of ops) commitKeyEditOp(op as PendingKeyEditOperation, { offerFamilyApply: false });
+      dialogInvokerRef.current?.focus();
+    },
+    [commitKeyEditOp],
+  );
+
+  const handleFamilyApplyCancel = useCallback(() => {
+    setFamilyApplyState(null);
+    dialogInvokerRef.current?.focus();
+  }, []);
+
+  // T013 — FindPanel's jump: switches the active platform AND layer before
+  // selecting the address, per that component's own module doc ("Seams left
+  // for later tasks" — "a future composing task can switch the grid's active
+  // platform/layer... and then select address there").
+  const handleFindJump = useCallback((result: FindPanelResult) => {
+    setActiveKeyPlatformId(result.platform);
+    setActiveKeyLayerId(result.layerId);
+    setSelectedKeyAddress(result.address);
+    setFindPanelOpen(false);
+  }, []);
 
   // Grid Enter -> AssignPanel's character field (SC-004's keyboard-only
   // path): a native gridcell <button> already answers Enter/Space with its
@@ -2524,23 +3514,48 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // `useKeyInspectorFocusBridge.handleEscape` (KeyInspector.tsx) uses for its
   // own cell lookup. Composed ALONGSIDE `useGridNav`'s own handler (which
   // never touches Enter — RECOGNIZED_KEYS there is arrows/Home/End only), not
-  // instead of it.
-  const keyModeDetailContainerRef = useRef<HTMLDivElement | null>(null);
+  // instead of it. `keyModeDetailContainerRef` itself is declared earlier
+  // (alongside `dialogInvokerRef`) because `focusAssignPanelCharacterField`
+  // needs it too.
   const handleKeyModeGridKeyDown = useCallback(
     (e: ReactKeyboardEvent<HTMLDivElement>) => {
+      // useGridNav owns navigation (arrows/Home/End); composed ALONGSIDE
+      // (never in place of) useKeyCommands' own command keys (Insert /
+      // ContextMenu-Shift+F10 / Ctrl+Enter) — the two hooks' recognized-key
+      // sets are disjoint (T013, useKeyCommands.ts's own module doc), and
+      // each preserves the existing `defaultPrevented` short-circuit
+      // ordering below it.
       keyModeGridNav.handleKeyDown(e);
       if (e.defaultPrevented) return;
-      if (e.key !== "Enter") return;
+      keyCommands.handleKeyDown(e);
+      if (e.defaultPrevented) return;
+      if (e.key !== "Enter" && e.key !== "F2") return;
       const target = e.target;
       if (!(target instanceof Element) || target.closest('[role="gridcell"]') === null) {
         return;
       }
       e.preventDefault();
+      // Spec 061: Enter and F2 diverge, because the property panel absorbed the
+      // assign surface and put it behind a disclosure (T028-T039).
+      //
+      //   Enter -> the panel REGION. FR-020b's "selection versus editing"
+      //            contract, unchanged, and what the a11y suite pins.
+      //   F2    -> the character field itself, opening the disclosure on the
+      //            way. The grid convention (F2 edits the value) and what keeps
+      //            spec 058 SC-004's keyboard-only assign inside its action
+      //            budget: assigning stays ONE keypress from the cell.
+      //
+      // Before this, Enter ran a querySelector for an input the closed
+      // disclosure keeps out of the DOM, so it focused nothing at all.
+      if (e.key === "F2") {
+        focusAssignPanelCharacterField();
+        return;
+      }
       keyModeDetailContainerRef.current
-        ?.querySelector<HTMLInputElement>('[data-testid="assign-panel"] input')
+        ?.querySelector<HTMLElement>('[data-testid="key-property-panel"]')
         ?.focus();
     },
-    [keyModeGridNav],
+    [keyModeGridNav, keyCommands, focusAssignPanelCharacterField],
   );
 
   // Escape anywhere in the grid/inspector/panel detail region returns focus
@@ -2567,26 +3582,14 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     [undoStack, keyEditOverlay],
   );
 
-  // ---------------------------------------------------------------------------
-  // ONE call site for a mode switch (T074 seam — do not scatter
-  // setTouchEditorMode calls across the tab click handler, the tablist's
-  // keyboard handler, and the propose-banner's accept button).
-  //
-  // FR-036c (T074, useModeContextCarry.ts — a sibling task, not implemented
-  // here) needs to select/reveal the producing key(s) when switching
-  // character->key, and land on a produced character when switching
-  // key->character. Every mode switch in this file — tab click, tab
-  // Left/Right/Home/End, and the T073 propose-banner's "Switch to key view" —
-  // already routes through this one function, so that hook has exactly one
-  // place to wrap (or this function can be extended in place) rather than
-  // three independent call sites that could drift.
-  // ---------------------------------------------------------------------------
-  const handleSwitchTouchEditorMode = useCallback(
-    (mode: TouchEditorMode) => {
-      setTouchEditorMode(mode);
-    },
-    [setTouchEditorMode],
-  );
+  // T013/T014 — `handleSwitchTouchEditorMode` (the ONE mode-switch call site,
+  // T074) is declared further below, after `currentChar`/`setCurrentChar`
+  // exist — `useModeContextCarry` (FR-036c) needs both halves of the
+  // character<->key carry, and reordering the six-line function itself is
+  // simpler and less error-prone than threading `currentChar` through refs
+  // to keep it here. Every mode switch in this file (tab click, tab
+  // Left/Right/Home/End, the T073 propose-banner's "Switch to key view")
+  // still routes through that one function — see its own comment there.
 
   // VFS transform: the shared working-copy projection factory (T054), NOT a
   // hand-rolled local transform. The previous local `vfsTransform` here
@@ -2799,6 +3802,64 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     // Only re-run when the walk list itself changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [touchLettersToAddKey]);
+
+  // ---------------------------------------------------------------------------
+  // ONE call site for a mode switch (T074 seam — do not scatter
+  // setTouchEditorMode calls across the tab click handler, the tablist's
+  // keyboard handler, and the propose-banner's accept button).
+  //
+  // T013/T014 (FR-036c) — `useModeContextCarry` needs to select/reveal the
+  // producing (or candidate) key(s) when switching character->key, and land
+  // on a produced character when switching key->character. Every mode switch
+  // in this file — tab click, tab Left/Right/Home/End, and the T073
+  // propose-banner's "Switch to key view" — already routes through this one
+  // function, so the carry logic lives here exactly once rather than at
+  // three independent call sites that could drift. Declared here (moved down
+  // from its original position, further up) because it needs `currentChar`/
+  // `setCurrentChar`, declared just above — the reorder carries no other
+  // behavior change: nothing between the two positions ever called this
+  // function (confirmed by search before moving it).
+  // ---------------------------------------------------------------------------
+  const handleSwitchTouchEditorMode = useCallback(
+    (mode: TouchEditorMode) => {
+      if (mode === "key" && touchEditorMode === "character") {
+        // character -> by-key: select and reveal the producing (or
+        // candidate) key(s) for the character the walk is currently on.
+        if (currentChar !== null && effectiveKeyModeLayout !== null && keyModeRuleIndex !== undefined) {
+          const carry = modeContextCarry.carryFromCharacter(currentChar);
+          if (carry.primary !== undefined) {
+            const parts = parseTouchKeyAddress(carry.primary);
+            if (parts !== undefined) {
+              setActiveKeyPlatformId(parts.platform);
+              setActiveKeyLayerId(parts.layerId);
+            }
+            setSelectedKeyAddress(carry.primary);
+          }
+        }
+      } else if (mode === "character" && touchEditorMode === "key") {
+        // by-key -> character: land the walk on a character the selected key
+        // produces, when it produces one.
+        if (
+          selectedKeyAddress !== null &&
+          effectiveKeyModeLayout !== null &&
+          keyModeRuleIndex !== undefined
+        ) {
+          const char = modeContextCarry.carryFromKey(selectedKeyAddress);
+          if (char !== undefined) setCurrentChar(char);
+        }
+      }
+      setTouchEditorMode(mode);
+    },
+    [
+      touchEditorMode,
+      currentChar,
+      selectedKeyAddress,
+      effectiveKeyModeLayout,
+      keyModeRuleIndex,
+      modeContextCarry,
+      setTouchEditorMode,
+    ],
+  );
 
   // FR-008 completion gate (mechanism-gallery-progression): names of chars
   // with no reachable touch mechanism on the final layout — computed LIVE
@@ -3742,6 +4803,45 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     identity?.bcp47 !== undefined && identity.bcp47 !== ""
       ? identity.bcp47
       : undefined;
+
+  /**
+   * The id proposal for the selected key (spec 061 T053, FR-029…FR-032).
+   *
+   * Built here rather than in the panel because only the gallery holds the
+   * three facts the request needs — and note which fact it does NOT hold:
+   * `TouchKeyIdProposalRequest` carries no row, index or coordinate, so
+   * "never by geometric proximity" (FR-030) cannot be violated from this call
+   * site even by accident.
+   *
+   * `expectedOutputs` covers the DEFAULT and MODIFIER outputs together
+   * (FR-029): inheriting an id is only safe if the physical key still produces
+   * everything it used to, so a key whose shift output moved elsewhere
+   * correctly falls through to minting.
+   *
+   * Rides the existing render cycle as a `useMemo` — no timer, no store read
+   * beyond what is already subscribed (D3, FR-039).
+   */
+  const selectedKeyIdProposal = useMemo<TouchKeyIdProposal | undefined>(() => {
+    if (selectedKeyCell === null || keyModeRuleIndex === undefined) return undefined;
+    const chars = selectedKeyCell.producedChars[0] ?? "";
+    if (chars.length === 0) return undefined;
+    // The id the physical key at this position already carries. Taken from the
+    // cell itself — the only positional fact that reaches the proposer, and one
+    // the caller has already resolved.
+    const inheritedId = selectedKeyCell.id.length > 0 ? selectedKeyCell.id : undefined;
+    const expectedOutputs = [
+      ...new Set(selectedKeyCell.producedChars.filter((c) => c.length > 0)),
+    ];
+    return proposeTouchKeyId({
+      chars,
+      ...(inheritedId !== undefined ? { inheritedId } : {}),
+      ruleIndex: keyModeRuleIndex,
+      expectedOutputs,
+      capsHandled,
+      ...(identityBcp47 !== undefined ? { bcp47: identityBcp47 } : {}),
+    });
+  }, [selectedKeyCell, keyModeRuleIndex, capsHandled, identityBcp47]);
+
 
   // ---------------------------------------------------------------------------
   // Sibling-accent proposal — the longpress accelerator (spec: "accept ù on u
@@ -5641,6 +6741,78 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         </Trans>
       </p>
 
+      {/* T014 (FR-004/FR-006) — the layer selector, above the grid. Sourced
+          from the ACTIVE PLATFORM's DECLARED `layers[]` (never any key's
+          `nextlayer`), which is what makes "including layers no key's
+          next-layer reaches" true by construction. */}
+      {activeKeyPlatformEntry !== undefined && (
+        <LayerSelector
+          layerIds={activeKeyPlatformEntry.layers.map((l) => l.id)}
+          activeLayerId={activeKeyLayerId}
+          onSelectLayer={setActiveKeyLayerId}
+          findingCountsByLayerId={keyLayerFindingCounts}
+        />
+      )}
+
+      {/* Add and remove are reached FROM A KEY, never from a pane-level
+          toolbar copy. Adding: the `(+)` hover wedge, Insert, and the command
+          menu's "Add key after" — all three anchored on the key the new one
+          follows. Removing: the property panel's "Delete this key" (FR-019),
+          which opens the SAME `remove-key-dialog` this toolbar's button used
+          to. Two controls that do one thing is one control too many: the
+          toolbar pair said nothing the key-anchored routes did not already
+          say, and a second "Remove key" beside the panel's "Delete this key"
+          reads as two different operations. What remains here is the one
+          control that genuinely has no key to hang off: finding a key you
+          cannot yet see. */}
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          type="button"
+          onClick={() => setFindPanelOpen((prev) => !prev)}
+          data-testid="touch-key-mode-find-toggle"
+          style={ghostBtn}
+        >
+          {t({ id: "editor.assignLoop.touch.keyMode.findButton", message: "Find a key" })}
+        </button>
+      </div>
+
+      {findPanelOpen && effectiveKeyModeLayout !== null && keyModeRuleIndex !== undefined && (
+        <FindPanel
+          layout={effectiveKeyModeLayout}
+          ruleIndex={keyModeRuleIndex}
+          onJumpToResult={handleFindJump}
+        />
+      )}
+
+      {repointNextlayerPrompt !== null && (
+        <div
+          role="group"
+          aria-label={t({
+            id: "editor.assignLoop.touch.keyMode.repointNextlayerPromptLabel",
+            message: "Choose the layer to go to",
+          })}
+          style={{ display: "flex", alignItems: "center", gap: 8 }}
+        >
+          <SelectMenu
+            value=""
+            onChange={(v) => {
+              commitKeyEditOp({
+                address: repointNextlayerPrompt.address,
+                kind: "set",
+                fields: { nextlayer: v },
+              });
+              setRepointNextlayerPrompt(null);
+            }}
+            ariaLabel={t({
+              id: "editor.assignLoop.touch.keyMode.repointNextlayerPromptLabel",
+              message: "Choose the layer to go to",
+            })}
+            options={repointNextlayerPrompt.candidates.map((c) => ({ value: c, label: c }))}
+            style={selectStyle}
+          />
+        </div>
+      )}
+
       {/* Grid + inspector + AssignPanel share ONE detail region (spec 058
           T085-T089 composition): Escape anywhere inside it returns focus to
           the selected cell (handleKeyModeDetailEscape), and Enter on a
@@ -5655,56 +6827,194 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         onKeyDown={handleKeyModeDetailEscape}
         style={{ display: "flex", flexDirection: "column", gap: 12 }}
       >
-        {keyModeViewModel !== undefined ? (
-          <KeyGrid
-            viewModel={keyModeViewModel}
-            selectedAddress={selectedKeyAddress}
-            onSelectCell={handleSelectKeyCell}
-            onKeyDown={handleKeyModeGridKeyDown}
-            label={t({
-              id: "editor.assignLoop.touch.keyMode.gridAriaLabel",
-              message: `Editable touch key layout — ${{ layer: activeKeyLayerId }} layer`,
-            })}
-            platforms={keyModePlatforms}
-            {...(activeKeyPlatformId !== null
-              ? { activePlatformId: activeKeyPlatformId }
-              : {})}
-            onPlatformChange={(platformId) => setActiveKeyPlatformId(platformId)}
-            provenance={keyModeProvenance}
+        {/* THE BOARD AND ITS DETAILS, SIDE BY SIDE (issue #1530: "the key
+            details must show on the same screen as the keyboard").
+            They used to be stacked, which put the property panel below the
+            fold of a pane that scrolls: an author changing a key's width could
+            not see the key change. Keyman Developer docks the properties to the
+            right of the design surface, and so does this.
+
+            Key mode already passes NO right pane to `AssignLoopShell` (T037,
+            FR-024), so the whole window width is available — this column is
+            carved out of the editor's own space, not out of the live preview's.
+
+            `flexWrap` with a generous grid basis rather than a media query: a
+            narrow window drops the details BELOW the grid on its own, which is
+            the same stacked layout as before and correct at that width. The
+            details column is `sticky` so it stays beside the board while long
+            rows scroll past. */}
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "row",
+            alignItems: "flex-start",
+            flexWrap: "wrap",
+            gap: 12,
+          }}
+        >
+          <div
+            style={{
+              flex: "1 1 460px",
+              minWidth: 0,
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+            }}
+          >
+            {keyModeViewModel !== undefined ? (
+              <KeyGrid
+                viewModel={keyModeViewModel}
+                selectedAddress={selectedKeyAddress}
+                onSelectCell={handleSelectKeyCell}
+                onKeyDown={handleKeyModeGridKeyDown}
+                label={t({
+                  id: "editor.assignLoop.touch.keyMode.gridAriaLabel",
+                  message: `Editable touch key layout — ${{ layer: activeKeyLayerId }} layer`,
+                })}
+                platforms={keyModePlatforms}
+                {...(activeKeyPlatformId !== null
+                  ? { activePlatformId: activeKeyPlatformId }
+                  : {})}
+                onPlatformChange={(platformId) => setActiveKeyPlatformId(platformId)}
+                provenance={keyModeProvenance}
+                onAddKeyAfter={handleAddKeyAfterCell}
+                onOpenCommandMenu={handleOpenCommandMenu}
+                onFollowNextLayer={handleFollowNextLayer}
+              />
+            ) : (
+              <p style={{ margin: 0, fontSize: 13, color: TEXT_DIM, fontFamily: FONT }}>
+                <Trans id="editor.assignLoop.touch.keyMode.notReady">
+                  The key layout isn&rsquo;t ready yet.
+                </Trans>
+              </p>
+            )}
+
+            {commandMenuState !== null && (
+              <KeyGridCommandMenu
+                commands={commandMenuCommands}
+                {...(commandMenuState.anchor !== undefined ? { anchor: commandMenuState.anchor } : {})}
+                onClose={() => {
+                  setCommandMenuState(null);
+                  dialogInvokerRef.current?.focus();
+                }}
+              />
+            )}
+
+            {/* Gestures stay UNDER the board, not in the details column: a
+                longpress/flick/multitap editor is a wide surface with its own
+                rows, and Developer likewise puts them in a strip beneath the
+                design area rather than in the properties pane. Renders nothing
+                with no key selected — its own early return. */}
+            <GesturePanel
+              selectedKey={selectedKeyNode}
+              selection={selectedGesture}
+              onSelectGesture={setSelectedGesture}
+              onAddGesture={handleAddGesture}
+              onEditGesture={handleEditGesture}
+              onRemoveGesture={handleRemoveGesture}
+            />
+          </div>
+
+          {/* THE DETAILS COLUMN. `sticky` + its own `overflowY` so a panel
+              taller than the viewport is still fully reachable without
+              scrolling the board away.
+
+              The three dialogs are deliberately NOT in here. They are
+              `position: fixed`, and a fixed descendant is still clipped by an
+              ancestor with `overflow: auto` — the same CSS surprise
+              `ui/SelectMenu.tsx` documents portalling to `document.body` to
+              escape. Mounted below this row instead, where nothing clips them.
+              (`SelectMenu` inside the panel is unaffected: it portals.) */}
+          <div
+            data-testid="touch-key-details-column"
+            style={{
+              flex: "0 1 320px",
+              minWidth: 268,
+              position: "sticky",
+              top: 0,
+              maxHeight: "calc(100vh - 140px)",
+              overflowY: "auto",
+              display: "flex",
+              flexDirection: "column",
+              gap: 12,
+            }}
+          >
+            {/* ONE panel (spec 061 T036, FR-018). The stacked
+                read-only-inspector-above-editing-panel mount is gone: both
+                surfaces are now composed INSIDE `KeyPropertyPanel`, which adds
+                the eight editable fields, delete and the four move buttons
+                around them. Everything still takes the SAME
+                selectedKeyCell/effective layout the grid renders, so nothing
+                here can disagree with the board. */}
+            <KeyPropertyPanel
+              selectedCell={selectedKeyCell}
+              {...(effectiveKeyModeLayout !== null
+                ? { layout: effectiveKeyModeLayout }
+                : {})}
+              {...(selectedKeyPosition !== undefined ? { position: selectedKeyPosition } : {})}
+              onSpChange={handleSpChange}
+              onApplyFix={handleApplyFix}
+              onFieldChange={handleKeyFieldChange}
+              onDelete={handleOpenRemoveDialog}
+              onMove={handleKeyMove}
+              {...(selectedKeyIdProposal !== undefined
+                ? { idProposal: selectedKeyIdProposal }
+                : {})}
+              {...(ir !== null && keyModeRuleIndex !== undefined
+                ? {
+                    assignSlot: (
+                      <AssignPanel
+                        selectedCell={selectedKeyCell}
+                        layout={effectiveKeyModeLayout ?? EMPTY_TOUCH_LAYOUT}
+                        ir={ir}
+                        ruleIndex={keyModeRuleIndex}
+                        inventoryChars={inventory}
+                        capsHandled={capsHandled}
+                        {...(identityBcp47 !== undefined ? { bcp47: identityBcp47 } : {})}
+                        repertoire={inventory}
+                        onCommit={handleAssignPanelCommit}
+                      />
+                    ),
+                  }
+                : {})}
+            />
+          </div>
+        </div>
+
+        <RemoveKeyDialog
+          open={removeDialogOpen}
+          selectedCell={selectedKeyCell}
+          {...(removeKeyProposal !== undefined
+            ? { proposedOutcome: removeKeyProposal.outcome, proposedReason: removeKeyProposal.reason }
+            : {})}
+          isLastKeyInRow={selectedKeyRow?.keys.length === 1}
+          onCancel={handleRemoveKeyCancel}
+          onConfirm={handleRemoveKeyConfirm}
+        />
+
+        {ir !== null && keyModeRuleIndex !== undefined && (
+          <RenameDialog
+            open={renameDialogTarget !== null}
+            selectedCell={renameDialogTarget}
+            layout={effectiveKeyModeLayout ?? EMPTY_TOUCH_LAYOUT}
+            ir={ir}
+            ruleIndex={keyModeRuleIndex}
+            onCancel={handleRenameCancel}
+            onConfirm={handleRenameConfirm}
           />
-        ) : (
-          <p style={{ margin: 0, fontSize: 13, color: TEXT_DIM, fontFamily: FONT }}>
-            <Trans id="editor.assignLoop.touch.keyMode.notReady">
-              The key layout isn&rsquo;t ready yet.
-            </Trans>
-          </p>
         )}
 
-        {/* T070/T085 detail surfaces — display (KeyInspector) beside editing
-            (AssignPanel). Both take the SAME selectedKeyCell/effective layout
-            the grid itself renders, so they can never disagree with it. */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <KeyInspector
-            selectedCell={selectedKeyCell}
-            {...(effectiveKeyModeLayout !== null
-              ? { layout: effectiveKeyModeLayout }
-              : {})}
+        {familyApplyState !== null && effectiveKeyModeLayout !== null && (
+          <FamilyApplyDialog
+            open
+            op={familyApplyState.op}
+            layout={effectiveKeyModeLayout}
+            familyLayerIds={familyApplyState.familyLayerIds}
+            {...(keyModeRuleIndex !== undefined ? { ruleIndex: keyModeRuleIndex } : {})}
+            onCancel={handleFamilyApplyCancel}
+            onConfirm={handleFamilyApplyConfirm}
           />
-
-          {ir !== null && keyModeRuleIndex !== undefined && (
-            <AssignPanel
-              selectedCell={selectedKeyCell}
-              layout={effectiveKeyModeLayout ?? EMPTY_TOUCH_LAYOUT}
-              ir={ir}
-              ruleIndex={keyModeRuleIndex}
-              inventoryChars={inventory}
-              capsHandled={capsHandled}
-              {...(identityBcp47 !== undefined ? { bcp47: identityBcp47 } : {})}
-              repertoire={inventory}
-              onCommit={handleAssignPanelCommit}
-            />
-          )}
-        </div>
+        )}
 
         {/* FR-036f: warn AT THE MOMENT of the edit when a key-level edit
             invalidates a by-character assignment — never deferred to the
@@ -6133,16 +7443,17 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // "for editing" label above (keyModeContent). The character-mode wording
   // stays exactly as it was (no id/message change) since that mode never
   // renders anything grid-shaped beside the preview to be confused with.
-  const previewHeading =
-    touchEditorMode === "key"
-      ? t({
-          id: "editor.assignLoop.touch.keyMode.previewHeading",
-          message: "Live keyboard — for testing",
-        })
-      : t({
-          id: "editor.assignLoop.touch.previewHeading",
-          message: "Touch preview",
-        });
+  // Only character mode renders a preview pane at all as of spec 061 T037
+  // (FR-024), so the key-mode branch — and its
+  // `editor.assignLoop.touch.keyMode.previewHeading` id — became unreachable
+  // and is gone (T038). Removing an id whose SURFACE no longer exists is not a
+  // rename, so no translation is orphaned in the sense the i18n rules protect
+  // against; the surviving `editor.assignLoop.touch.previewHeading` is
+  // unchanged.
+  const previewHeading = t({
+    id: "editor.assignLoop.touch.previewHeading",
+    message: "Touch preview",
+  });
 
   return (
     <>
@@ -6158,20 +7469,34 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         modalityLabelPlacement="inline"
         headerExtras={headerExtras}
         leftContent={leftContent}
-        rightContent={
-          <GalleryPreviewPane
-            baseKeyboard={baseKeyboard}
-            stage={stage}
-            retry={retry}
-            {...(handleKeyTap !== undefined ? { onKeyTap: handleKeyTap } : {})}
-            defaultOskMode="touch"
-            heading={previewHeading}
-            warningLabel={t({
-              id: "editor.assignLoop.touch.previewWarnings",
-              message: "Preview warnings:",
+        // Spec 061 T037 (FR-024): key mode passes NO right pane, so the grid
+        // takes the full width instead of sitting in 45% beside a preview it
+        // does not use. Character mode is unchanged — the live OSK preview is
+        // the whole point of that mode, and its heading id
+        // (`editor.assignLoop.touch.previewHeading`) is untouched.
+        //
+        // Spread rather than a `? … : undefined` value, because
+        // `AssignLoopShell` distinguishes an OMITTED `rightContent` (collapse
+        // the split) from an explicitly-passed `undefined`/`null` (render an
+        // empty right pane) — see its own prop doc.
+        {...(touchEditorMode === "key"
+          ? {}
+          : {
+              rightContent: (
+                <GalleryPreviewPane
+                  baseKeyboard={baseKeyboard}
+                  stage={stage}
+                  retry={retry}
+                  {...(handleKeyTap !== undefined ? { onKeyTap: handleKeyTap } : {})}
+                  defaultOskMode="touch"
+                  heading={previewHeading}
+                  warningLabel={t({
+                    id: "editor.assignLoop.touch.previewWarnings",
+                    message: "Preview warnings:",
+                  })}
+                />
+              ),
             })}
-          />
-        }
       />
     </>
   );
