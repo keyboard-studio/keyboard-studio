@@ -243,12 +243,16 @@ test.describe("Touch key AssignPanel — keyboard-only assign (spec 058 SC-004)"
     await enterTouchKeyMode(page);
 
     // Position focus on a known, already-focusable element immediately
-    // before the grid in DOM order (the header row's own "Continue" button —
-    // see TouchGallery.tsx keyModeContent) via the DOM API directly, NOT a
-    // click: `.focus()` dispatches no pointer event at all, so this is pure
-    // setup for the keyboard-only measurement below, not a discrete action of
-    // its own and not a pointer event to be measured against.
-    await page.getByTestId("touch-key-mode-continue").focus();
+    // before the grid in DOM order via the DOM API directly, NOT a click:
+    // `.focus()` dispatches no pointer event at all, so this is pure setup for
+    // the keyboard-only measurement below, not a discrete action of its own and
+    // not a pointer event to be measured against.
+    //
+    // That element is the "Find a key" toggle, not "Continue": spec 061
+    // T013-T015 inserted the layer selector and the add / remove / find key
+    // commands between Continue and the grid. Setup only — the 12-action budget
+    // counts `press()` calls, and this is not one of them.
+    await page.getByTestId("touch-key-mode-find-toggle").focus();
 
     // --- Instrumentation: no pointer event anywhere in the counted sequence,
     //     and no modal detour. Installed AFTER navigation/setup so neither is
@@ -285,9 +289,12 @@ test.describe("Touch key AssignPanel — keyboard-only assign (spec 058 SC-004)"
     // 2. Arrows — move from the first cell to the target key.
     await press("ArrowRight");
 
-    // 3. Enter — jump straight into AssignPanel's character field (the
-    //    composition's own grid Enter -> field bridge).
-    await press("Enter");
+    // 3. F2 — jump straight into AssignPanel's character field.
+    //    Spec 061 split the two keys: Enter opens the property panel (FR-020b),
+    //    F2 edits the value, which is the grid convention and what keeps this
+    //    walk's action budget honest now that the assign surface sits behind a
+    //    disclosure. Still ONE action, so the count below is unchanged.
+    await press("F2");
     const charField = page.getByLabel("Character or code point");
     await expect(charField).toBeFocused();
 

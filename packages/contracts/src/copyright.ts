@@ -337,3 +337,20 @@ export function renderLicense(block: CopyrightBlock): string {
   const lines = orderHolders(block).map(renderHolderLine);
   return `${lines.join("\n")}\n\n${MIT_BODY}\n`;
 }
+
+/**
+ * Render one holder as a `Copyright …` line with NO year — for the `.kmn`
+ * `store(&COPYRIGHT)` / `.kps <Copyright>` metadata mirrors only (criterion
+ * 4.6, docs/criteria.md:54: the year belongs in `LICENSE.md` alone, so it
+ * doesn't need yearly upkeep in two more places).
+ *
+ * Deliberately does NOT delegate to `renderHolderLine` and does NOT use
+ * `raw`: an inherited holder's verbatim source line almost always carries a
+ * year, and re-emitting it here would silently reintroduce the exact thing
+ * this function exists to omit. Reconstructs from `marker`/`name` alone,
+ * which are populated best-effort for every holder regardless of `raw`
+ * (see `CopyrightHolder.raw`'s own doc).
+ */
+export function renderHolderLineNoYear(h: CopyrightHolder): string {
+  return `Copyright ${h.marker} ${h.name}`;
+}

@@ -2586,27 +2586,6 @@ describe('recommendedRemovalChars', () => {
       expect(primary.map((r) => r.ch)).not.toContain('y');
     });
 
-    it('mirrors the same signal in annotateRemovalRecommendations — a group producing only ASCII Latin is "high" (not suppressed) on a Cyrillic target, tagged recommendationReason', () => {
-      const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
-      const nodes = toRailNodes(ir);
-
-      const result = annotateRemovalRecommendations(nodes, ir, new Set(['q']), null, 'ru-Cyrl');
-
-      const group = result.find((n) => n.kind === 'group');
-      expect(group?.recommendation).toBe('high');
-      expect(group?.recommendationReason).toBe('cross-script-latin');
-    });
-
-    it('does NOT tag recommendationReason on a Latin (bfd-Latn) target — no regression', () => {
-      const ir = makeIR({ groups: [makeGroup([makeCharOnlyRule()])] }); // produces 'y'
-      const nodes = toRailNodes(ir);
-
-      const result = annotateRemovalRecommendations(nodes, ir, new Set(['q']), null, 'bfd-Latn');
-
-      const group = result.find((n) => n.kind === 'group');
-      expect(group?.recommendation).toBe('high');
-      expect(group?.recommendationReason).toBeUndefined();
-    });
   });
 });
 

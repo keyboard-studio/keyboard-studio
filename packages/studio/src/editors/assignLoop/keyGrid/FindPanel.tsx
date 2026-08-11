@@ -60,6 +60,7 @@ import type { KeyboardEvent as ReactKeyboardEvent } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import {
+  createKeyOccurrenceCounter,
   isSpacerKeyClass,
   type TouchKeyRuleIndex,
   type TouchLayoutIR,
@@ -140,7 +141,7 @@ function hostAddressOf(descriptor: TouchMethodDescriptor): string {
   // already-stable — never re-derived here) recover it.
   const parts = parseTouchKeyAddress(descriptor.id);
   if (parts === undefined) return descriptor.id; // defensive; never expected for a well-formed descriptor
-  return touchKeyAddress(parts.platform, parts.layerId, parts.keyId);
+  return touchKeyAddress(parts.platform, parts.layerId, parts.keyId, parts.occurrence);
 }
 
 /** Substring match (case-insensitive) on every main key's `id`, across every platform/layer. */
@@ -150,11 +151,15 @@ function collectIdResults(layout: TouchLayoutIR, query: string): FindPanelResult
   const out: FindPanelResult[] = [];
   for (const platform of layout.platforms) {
     for (const layer of platform.layers) {
+      // Occurrence-aware, so a hit on the ninth `T_BLANK` jumps to the ninth
+      // rather than to the first.
+      const nextOccurrence = createKeyOccurrenceCounter();
       for (const row of layer.rows) {
         for (const key of row.keys) {
+          const address = touchKeyAddress(platform.id, layer.id, key.id, nextOccurrence(key.id));
           if (!key.id.toLowerCase().includes(needle)) continue;
           out.push({
-            address: touchKeyAddress(platform.id, layer.id, key.id),
+            address,
             platform: platform.id,
             layerId: layer.id,
             keyId: key.id,

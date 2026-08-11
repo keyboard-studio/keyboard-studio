@@ -255,9 +255,12 @@ One feature branch per km-lead cycle. Convention: `km/<short-task-slug>`.
 - All specialist commits during the cycle target that branch.
 - `km-archivist` opens a PR against `main` at cycle close with `closes #N` or `refs #N` per the
   policy below.
-- **Direct-to-main only when the user explicitly authorizes it** for that specific commit.
+- **Direct-to-main is not available.** An active ruleset requires a pull request on the default
+  branch, so a direct push is rejected by the server no matter who authorizes it — see
+  [the commit and push cadence](#commit-and-push-cadence-for-multi-phase-specs) for what the
+  rulesets enforce. Landing work on `main` means opening a PR.
 
-When in doubt, branch.
+When in doubt, branch. Pushing that branch needs no permission — see the cadence section above.
 
 ### Issue closure policy
 
@@ -295,6 +298,46 @@ tasks. `/speckit-analyze` runs as a `km-doc`/`km-synthesis` review check before
 `.specify/memory/constitution.md` restates the locked gates so `/speckit-plan`'s Constitution
 Check enforces them mechanically. It does **not** amend the spec — on conflict `spec.md` +
 [docs/spec-signoff.md](docs/spec-signoff.md) win.
+
+### Commit and push cadence for multi-phase specs
+
+**Successes are committed and pushed by default — don't ask first.** A spec with more than one
+phase gets one commit per phase, pushed to its feature branch as that phase's gates go green.
+Don't accumulate several phases in a dirty tree waiting for the whole feature to land; a green
+phase is a checkpoint worth getting off the machine.
+
+That default is safe because `main` cannot be reached by accident. Two **active rulesets** guard
+the default branch — rulesets are the current mechanism, and the legacy
+`repos/{o}/{r}/branches/main/protection` endpoint reports "Branch not protected" for this repo,
+which is misleading; query `repos/{o}/{r}/rulesets` instead:
+
+- **`main: PR + review`** — a pull request is required, so nothing lands on `main` by direct push.
+- **`main: CI + integrity`** — `build` and `km-triage/review` must pass, and `non_fast_forward`
+  plus `deletion` are blocked, so `main` can be neither force-pushed nor deleted.
+
+The branch-and-PR pair is therefore the failsafe: pushing a feature branch cannot endanger `main`.
+
+**What this default covers, and what it does not.** It authorises committing and pushing to the
+**feature branch**. It does not authorise:
+
+- **Merging a PR.** `required_approving_review_count` is **0**, so the rulesets would let a PR
+  merge with no human approval — CI is the gate, review is not. That makes the merge a
+  deliberate human decision; never merge unasked.
+- **Force-pushing or rewriting already-pushed history**, on any branch.
+- **Direct-to-main**, which the ruleset blocks regardless.
+
+- **One commit per phase**, its message naming the tasks it closes (`spec 0NN TNNN-TNNN`) and,
+  where two tasks share the same hunks, saying why they landed together.
+- **Out-of-scope work that unblocks the spec** — repairing a shared test helper, say — gets its
+  **own** commit, so it can be reverted or cherry-picked independently of the feature.
+- **Push explicitly**: `git push -u origin <branch>`. Check the upstream first. A branch cut
+  straight from `origin/main` *tracks* `origin/main`, so a bare `git push` targets **main** —
+  verify with `git rev-parse --abbrev-ref --symbolic-full-name '@{u}'` before pushing.
+- **A phase whose gates are not green is not a success.** Commit what is genuinely done, leave
+  the failing task's checkbox unchecked, and record the diagnosis in the commit message — a
+  finding that lives only in a chat transcript is lost.
+- `tasks.md` checkboxes and `.spec-context.json` are progress records: they land with or after
+  the work they describe, never ahead of it.
 
 ### Section extraction — don't shred the architecture
 

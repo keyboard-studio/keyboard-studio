@@ -14,6 +14,7 @@
 
 import { describe, it, expect } from "vitest";
 import { applyDesktopModificationsToRawJson } from "./applyDesktopModificationsToRawJson.js";
+import { BLANK_KEY_ID, BLANK_KEY_SP } from "./touch-mechanism-shared.js";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -203,7 +204,7 @@ describe("applyDesktopModificationsToRawJson — removals purge every producer f
     const tabletDef = parsed.tablet.layer.find((l) => l.id === "default")!;
     const tabletKeys = tabletDef.row.flatMap((r) => r.key);
     expect(tabletKeys.find((k) => k["id"] === "K_A")).toBeUndefined();
-    expect(tabletKeys.some((k) => (k["id"] as string).startsWith("T_removed_"))).toBe(true);
+    expect(tabletKeys.some((k) => k["id"] === BLANK_KEY_ID)).toBe(true);
 
     // Phone K_A's sk[] entry for "a" is dropped too.
     const phoneDef = parsed.phone.layer.find((l) => l.id === "default")!;
@@ -250,7 +251,7 @@ describe("applyDesktopModificationsToRawJson — canonical NFC matching", () => 
     const defLayer = parsed.phone.layer.find((l) => l.id === "default")!;
     const allKeys = defLayer.row.flatMap((r) => r.key);
     expect(allKeys.find((k) => k["id"] === "K_A")).toBeUndefined();
-    const placeholder = allKeys.find((k) => (k["id"] as string).startsWith("T_removed_"))!;
+    const placeholder = allKeys.find((k) => k["id"] === BLANK_KEY_ID)!;
     expect(placeholder).toBeDefined();
     expect(placeholder["text"]).toBeUndefined();
   });
@@ -281,7 +282,7 @@ describe("applyDesktopModificationsToRawJson — canonical NFC matching", () => 
     const defLayer = parsed.phone.layer.find((l) => l.id === "default")!;
     const allKeys = defLayer.row.flatMap((r) => r.key);
     expect(allKeys.find((k) => k["id"] === "U_0061_0303")).toBeUndefined();
-    const placeholder = allKeys.find((k) => (k["id"] as string).startsWith("T_removed_"))!;
+    const placeholder = allKeys.find((k) => k["id"] === BLANK_KEY_ID)!;
     expect(placeholder).toBeDefined();
   });
 });
@@ -308,16 +309,26 @@ describe("applyDesktopModificationsToRawJson — primary-key removal produces an
     // Row still has exactly 2 keys — the key object was never dropped.
     expect(allKeys).toHaveLength(2);
 
-    const placeholder = allKeys.find((k) => (k["id"] as string).startsWith("T_removed_"))!;
+    const placeholder = allKeys.find((k) => k["id"] === BLANK_KEY_ID)!;
     expect(placeholder).toBeDefined();
     expect(placeholder["text"]).toBeUndefined();
-    expect(placeholder["sp"]).toBe("0");
+    // Geometry survives verbatim, wire strings and all — the R9 reason the key
+    // object is kept rather than deleted.
     expect(placeholder["width"]).toBe("100");
     expect(placeholder["pad"]).toBe("15");
     expect(placeholder["nextlayer"]).toBe("shift");
+    // `sp` is deliberately overwritten with the non-interactive spacer class —
+    // see the IR twin's version of this assertion for why. Written as a NUMBER
+    // even though the source key spelled it `"0"`: every raw writer in this
+    // package sets `sp` numerically (`applyKeyEditsToRawJson.ts`'s
+    // `writeFieldsToRawKey`/`newRawKeyFromSpec`), and the wire format's own
+    // reader coerces either spelling.
+    expect(placeholder["sp"]).toBe(10);
   });
 
-  it("uses a deterministic T_removed_<n> counter across multiple removed keys", () => {
+  // The raw twin's half of the retired `T_removed_<n>` mint — see the IR
+  // twin's version of this test for the reasoning and the cost.
+  it("writes every emptied key as the same corpus blank", () => {
     const json = makePhoneOnlyJson([
       { id: "K_A", text: "a" },
       { id: "K_B", text: "b" },
@@ -329,11 +340,9 @@ describe("applyDesktopModificationsToRawJson — primary-key removal produces an
     });
     const parsed = JSON.parse(out) as { phone: { layer: Array<{ id: string; row: Array<{ key: Array<Record<string, unknown>> }> }> } };
     const defLayer = parsed.phone.layer.find((l) => l.id === "default")!;
-    const ids = defLayer.row
-      .flatMap((r) => r.key)
-      .map((k) => k["id"] as string)
-      .filter((id) => id.startsWith("T_removed_"));
-    expect(ids).toEqual(["T_removed_0", "T_removed_1", "T_removed_2"]);
+    const keys = defLayer.row.flatMap((r) => r.key);
+    expect(keys.map((k) => k["id"])).toEqual([BLANK_KEY_ID, BLANK_KEY_ID, BLANK_KEY_ID]);
+    expect(keys.map((k) => k["sp"])).toEqual([BLANK_KEY_SP, BLANK_KEY_SP, BLANK_KEY_SP]);
   });
 });
 

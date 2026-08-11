@@ -17,6 +17,7 @@ import {
   computeTouchCoverage,
   decodeUnicodeKeyId,
   isDeadkeyStyledKeyClass,
+  isFrameKeyClass,
   isSpacerKeyClass,
   stripDottedCircle,
 } from "./touch-coverage.js";
@@ -475,6 +476,23 @@ describe("computeTouchCoverage — the corrected sp enum (FR-012)", () => {
     }
     expect(isSpacerKeyClass(undefined)).toBe(false);
     expect(isDeadkeyStyledKeyClass(undefined)).toBe(false);
+  });
+
+  it("isFrameKeyClass claims exactly {1, 2}, and is disjoint from the other two", () => {
+    expect(isFrameKeyClass(1)).toBe(true);
+    expect(isFrameKeyClass(2)).toBe(true);
+    // 0 is the wire default (character), and `undefined` means the same — so
+    // neither is a frame class. That matters for the family-parallelism
+    // trigger, which reads an absent `sp` as "not frame" rather than "unknown".
+    expect(isFrameKeyClass(0)).toBe(false);
+    expect(isFrameKeyClass(undefined)).toBe(false);
+    for (const sp of [8, 9, 10]) {
+      expect(isFrameKeyClass(sp)).toBe(false);
+    }
+    for (const sp of [1, 2]) {
+      expect(isSpacerKeyClass(sp)).toBe(false);
+      expect(isDeadkeyStyledKeyClass(sp)).toBe(false);
+    }
   });
 });
 

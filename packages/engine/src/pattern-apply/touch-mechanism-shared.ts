@@ -11,6 +11,38 @@
 import { unicodeKeyIdToChar } from "../shared/touch-ids.js";
 
 /**
+ * What an EMPTIED touch key is written as — the key a carve leaves behind once
+ * its production is gone.
+ *
+ * `T_BLANK` + `sp` 10, which is the corpus's own spelling rather than a choice
+ * made here. Measured across ../keyboards: `T_BLANK` occurs 117 times and
+ * carries `sp` 10 on every one of them; `T_SPACER` another 106 times, likewise
+ * always 10. `T_BLANK` with `sp` 9 does not occur at all. Sixty-six of those
+ * `T_BLANK`s are in `sil_cameroon_azerty`, so a keyboard adapted from it ends
+ * up with emptied keys written exactly the way its own shipped blanks are.
+ *
+ * `sp` is the load-bearing half. A key whose production is cleared but whose
+ * `sp` still says "character" is a dead key that draws as a live one — the
+ * mirror of the half-done suppression FR-029c forbids, and what an author sees
+ * as a full-size keycap that silently emits nothing. Spacer rather than blank
+ * because the key only survives the carve to hold its row's width stable (R9),
+ * and a spacer holds width without drawing a keycap.
+ *
+ * Stated here, once, so the IR applier and its raw-JSON twin cannot disagree
+ * about what an emptied key looks like — the same reason every other predicate
+ * in this module is shared rather than duplicated.
+ *
+ * NOT taken from `proposeSuppressFields`, whose `keycap-hole` shape pairs
+ * `T_BLANK` with `sp` 9 (key-id-policy.md §2). That combination appears nowhere
+ * in the corpus. The discrepancy is flagged, not silently reconciled: changing
+ * what a `suppress` operation writes is a separate, spec-owned decision.
+ */
+export const BLANK_KEY_ID = "T_BLANK";
+
+/** @see {@link BLANK_KEY_ID} — the `sp` class that pairs with it. */
+export const BLANK_KEY_SP = 10;
+
+/**
  * Return `true` when an existing sub-key (sk[] or multitap[] entry) already
  * represents `char` — either by its displayed text/output value OR by a
  * `U_<HEX>` id that maps to the same code point.

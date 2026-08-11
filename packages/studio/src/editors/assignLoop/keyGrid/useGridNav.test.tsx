@@ -17,6 +17,7 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { useLayoutEffect, useRef, useState } from "react";
 import { cleanup, fireEvent, render as rtlRender, renderHook, screen } from "@testing-library/react";
 import { render as renderWithI18n } from "../../../test/renderWithI18n.tsx";
+import { computeRowMetrics } from "@keyboard-studio/engine";
 import { KeyGrid } from "./KeyGrid.tsx";
 import {
   applyFocusRestorationTarget,
@@ -41,6 +42,32 @@ afterEach(() => {
 
 const EMPTY_ANNOTATIONS: KeyGridAnnotationCounts = { longpress: 0, multitap: 0, flick: 0 };
 
+/**
+ * The editing callbacks `KeyGridProps` requires (spec 061 T002/FR-001), as
+ * `vi.fn()` stubs. Mirrors `KeyGrid.test.tsx`'s own helper of the same name
+ * rather than being imported from it — a test file exporting fixtures to
+ * another test file couples two suites that are deliberately independent.
+ *
+ * Needed here even though these tests are about NAVIGATION, not editing: the
+ * five props are required, so a mount that omits them is a type error. It is
+ * only a *latent* one today, because `packages/studio/tsconfig.json` excludes
+ * this package's test files from `pnpm typecheck` — which is precisely why
+ * spec 061 T008 sweeps for mount sites by hand rather than trusting `tsc` to
+ * have found them all. `tsc` is the real gate for PRODUCTION mounts, where the
+ * defect of record actually lived; test mounts need the sweep.
+ *
+ * Shared at module scope rather than called per mount: no test here asserts on
+ * these handlers, and one stable identity keeps the props referentially equal
+ * across a harness's re-renders instead of minting five new functions each pass.
+ */
+const NAV_HANDLERS = {
+  onKeyDown: vi.fn(),
+  onPlatformChange: vi.fn(),
+  onAddKeyAfter: vi.fn(),
+  onOpenCommandMenu: vi.fn(),
+  onFollowNextLayer: vi.fn(),
+};
+
 function makeCell(overrides: Partial<KeyGridCellViewModel> & { id: string }): KeyGridCellViewModel {
   const address = overrides.address ?? `phone:default:${overrides.id}`;
   return {
@@ -53,13 +80,32 @@ function makeCell(overrides: Partial<KeyGridCellViewModel> & { id: string }): Ke
     producedChars: overrides.producedChars ?? [],
     annotations: overrides.annotations ?? EMPTY_ANNOTATIONS,
     findings: overrides.findings ?? [],
+    // Defaults false; `makeRow` stamps the real value on the row's last cell
+    // (spec 061 T024), so a test never hand-maintains it.
+    isLastInRow: overrides.isLastInRow ?? false,
     ...(overrides.nextlayer !== undefined ? { nextlayer: overrides.nextlayer } : {}),
     ...(overrides.provenance !== undefined ? { provenance: overrides.provenance } : {}),
   };
 }
 
+/**
+ * A row view model with `isLastInRow` and `metrics` derived rather than passed
+ * (spec 061 T024). Stamped in place, matching KeyGrid.test.tsx's own helper —
+ * these are freshly-built local fixtures, and copying would hand the component
+ * a different object than the test holds.
+ */
 function makeRow(keys: readonly KeyGridCellViewModel[], slackPct = 0): KeyGridRowViewModel {
-  return { slackPct, keys };
+  keys.forEach((key, i) => {
+    (key as { isLastInRow: boolean }).isLastInRow = i === keys.length - 1;
+  });
+  return {
+    slackPct,
+    metrics: computeRowMetrics(
+      keys.map((k) => ({ sp: k.sp, width: k.widthPct, pad: k.padPct })),
+      "phone",
+    ),
+    keys,
+  };
 }
 
 function makeViewModel(
@@ -539,7 +585,7 @@ describe("useGridNav — applyFocusRestorationTarget: concrete DOM guarantee, fo
         <button data-testid="remove-k2" onClick={removeK2}>
           remove
         </button>
-        <KeyGrid viewModel={vm} selectedAddress={selected} onSelectCell={(c) => setSelected(c.address)} />
+        <KeyGrid {...NAV_HANDLERS} viewModel={vm} selectedAddress={selected} onSelectCell={(c) => setSelected(c.address)} />
       </div>
     );
   }
@@ -592,7 +638,7 @@ describe("useGridNav — applyFocusRestorationTarget: concrete DOM guarantee, fo
           <button data-testid="remove-k2" onClick={removeK2}>
             remove
           </button>
-          <KeyGrid viewModel={vm} selectedAddress={selected} onSelectCell={(c) => setSelected(c.address)} />
+          <KeyGrid {...NAV_HANDLERS} viewModel={vm} selectedAddress={selected} onSelectCell={(c) => setSelected(c.address)} />
         </div>
       );
     }
@@ -615,7 +661,7 @@ describe("useGridNav — applyFocusRestorationTarget: row/container tiers (reach
     // Mirrors resolveFocusAfterRemoval's own level-3 fixture (see the
     // precedence-3 test above): row 0 emptied entirely, row 1 untouched.
     const vm = makeViewModel([makeRow([]), makeRow([makeCell({ id: "K1", address: "phone:default:K1" })])]);
-    const { container } = renderWithI18n(<KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />);
+    const { container } = renderWithI18n(<KeyGrid {...NAV_HANDLERS} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />);
 
     const applied = applyFocusRestorationTarget(container.querySelector('[role="grid"]'), vm, {
       kind: "row",
@@ -630,7 +676,7 @@ describe("useGridNav — applyFocusRestorationTarget: row/container tiers (reach
 
   it("focuses the real KeyGrid container element for a 'container' target (precedence level 4 -- no rows survive at all)", () => {
     const vm = makeViewModel([]);
-    const { container } = renderWithI18n(<KeyGrid viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />);
+    const { container } = renderWithI18n(<KeyGrid {...NAV_HANDLERS} viewModel={vm} selectedAddress={null} onSelectCell={vi.fn()} />);
 
     const gridEl = container.querySelector('[role="grid"]');
     const applied = applyFocusRestorationTarget(gridEl, vm, { kind: "container" });
@@ -646,7 +692,7 @@ describe("useGridNav — applyFocusRestorationTarget: row/container tiers (reach
       makeRow([makeCell({ id: "K3" })]),
     ]);
     const { container } = renderWithI18n(
-      <KeyGrid viewModel={vm} selectedAddress="phone:default:K2" onSelectCell={vi.fn()} />,
+      <KeyGrid {...NAV_HANDLERS} viewModel={vm} selectedAddress="phone:default:K2" onSelectCell={vi.fn()} />,
     );
 
     const gridEl = container.querySelector('[role="grid"]');
