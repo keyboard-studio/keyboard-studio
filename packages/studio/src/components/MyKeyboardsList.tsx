@@ -176,7 +176,7 @@ const cardTitleButtonStyle: React.CSSProperties = {
   border: "none",
   padding: 0,
   margin: 0,
-  // Longhand, not the `font` shorthand (km-triage catch on #1603): `font`
+  // Longhand, not the `font` shorthand: `font`
   // resets EVERY font sub-property to its inherited value, which would
   // silently undo the fontWeight/fontSize the cardTitleStyle spread above
   // just set — buttons don't inherit font-family from the UA stylesheet by
