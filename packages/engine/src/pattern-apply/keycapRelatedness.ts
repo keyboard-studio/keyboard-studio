@@ -25,8 +25,11 @@
  * severity. Keep it that way.
  */
 
-/** The dotted-circle carrier a combining mark is shown on. */
-const DOTTED_CIRCLE = "◌";
+// The dotted-circle carrier a combining mark is shown on. Imported, not
+// restated: contracts' `touch-coverage.ts` already owns this literal for
+// `stripDottedCircle`. `stripCarrier` below keeps its own logic — it encodes a
+// different invariant — but the character itself has one spelling.
+import { DOTTED_CIRCLE } from "@keyboard-studio/contracts";
 
 /** Which rule produced a proposed keycap. */
 export type KeycapForm = "character" | "dotted-circle-carrier";

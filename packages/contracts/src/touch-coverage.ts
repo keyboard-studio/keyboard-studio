@@ -173,8 +173,15 @@ export function decodeUnicodeKeyId(id: string): string | undefined {
   return decoded;
 }
 
-/** U+25CC DOTTED CIRCLE — the conventional combining-mark placeholder on a keycap. */
-const DOTTED_CIRCLE = "◌";
+/**
+ * U+25CC DOTTED CIRCLE — the conventional combining-mark placeholder on a keycap.
+ *
+ * Exported because engine's `keycapRelatedness.ts` needs the same literal for a
+ * different question (does a keycap still stand for what the key types?). The
+ * two pieces of logic stay separate — they encode different invariants — but the
+ * character does not get a second spelling.
+ */
+export const DOTTED_CIRCLE = "◌";
 
 /** Every char is a combining mark: Mn (nonspacing), Mc (spacing), or Me (enclosing). */
 const ALL_COMBINING_RE = /^[\p{Mn}\p{Mc}\p{Me}]+$/u;
