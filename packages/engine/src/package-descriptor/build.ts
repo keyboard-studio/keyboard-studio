@@ -123,6 +123,11 @@ export function buildKpsContent(
   if (emitsJs) files.push(`..\\build\\${keyboardId}.js`);
   if (hasVisualKeyboard) files.push(`..\\build\\${keyboardId}.kvk`);
   files.push("welcome.htm", "readme.htm");
+  // LICENSE.md lives at the keyboard root, one level above this .kps's own
+  // `source/` directory — like the `..\build\` artifacts, not like
+  // welcome.htm/readme.htm, which sit alongside the .kps itself (criterion
+  // 8.4-kps-includes-license-md).
+  files.push("..\\LICENSE.md");
 
   const fileEntries = files
     .map((f) => {
