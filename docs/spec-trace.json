@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-08-06",
+  "lastUpdated": "2026-08-11",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -790,6 +790,14 @@
     "specs/060-crash-reporting": {
       "title": "Feature Specification: Crash reporting — an unrecoverable error becomes one actionable, author-anonymous GitHub issue",
       "hash": "sha256:2db2a4d89d3561b1",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/061-help-docs-generation": {
+      "title": "Feature Specification: Help documentation generation from Phase F answers",
+      "hash": "sha256:dd3e4384355ed0d7",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
