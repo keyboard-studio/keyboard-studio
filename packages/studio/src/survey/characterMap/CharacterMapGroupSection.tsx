@@ -208,9 +208,6 @@ export function CharacterMapGroupSection({
               // Yellow "your base keyboard already types this" affordance,
               // shown until the author selects the glyph into the alphabet.
               const isBaseOutput = !selected && baseProduced.has(cell.char.normalize("NFC"));
-              const actionLabel = selected
-                ? t({ id: "survey.characterMapPane.cell.removeAction", message: "Remove" })
-                : t({ id: "survey.characterMapPane.cell.addAction", message: "Add" });
               // Accessible name carries the base-output fact (never colour
               // alone) so screen-reader users get the same signal.
               const baseOutputHint = isBaseOutput
@@ -219,13 +216,27 @@ export function CharacterMapGroupSection({
                     message: " — from your base keyboard",
                   })
                 : "";
+              // One catalog sentence per action, both variables interpolated
+              // by the translator, rather than assembling a translated action
+              // word with raw char/codepoint data via template literal — that
+              // locks in English word order for every locale (#1589/#1596
+              // sibling; mirrors PunctuationStep.tsx's fix).
+              const cellAriaLabel = selected
+                ? t({
+                    id: "survey.characterMapPane.cell.removeAriaLabel",
+                    message: `Remove ${{ char: cell.char }} (${{ cp }})${{ baseOutputHint }}`,
+                  })
+                : t({
+                    id: "survey.characterMapPane.cell.addAriaLabel",
+                    message: `Add ${{ char: cell.char }} (${{ cp }})${{ baseOutputHint }}`,
+                  });
               return (
                 <button
                   key={cell.char}
                   type="button"
                   onClick={() => onToggleCell(cell)}
                   aria-pressed={selected}
-                  aria-label={`${actionLabel} ${cell.char} (${cp})${baseOutputHint}`}
+                  aria-label={cellAriaLabel}
                   style={
                     isBaseOutput
                       ? { ...charChip(false, zoom), border: `1px solid ${BASE_OUTPUT_BORDER}` }
