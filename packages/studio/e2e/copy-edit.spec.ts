@@ -73,12 +73,31 @@ const FIXTURE = {
 // (T011). Keep in sync with docs/keyboard-index.md.
 //
 //   Latin     — basic_kbdfr          (fr, Latn)  — also the primary FIXTURE above
-//   Cyrillic  — russian_mnemonic_r   (ru, Cyrl)
+//   Cyrillic  — basic_kbdru          (ru, Cyrl)  — Windows "Russian Basic"
 //   Greek     — basic_kbdhe          (el, Grek)  — Windows Greek "Hellenic" basic
 //   Georgian  — basic_kbdgeo         (ka, Geor)
-//   Armenian  — armenian_mnemonic_r  (hy, Armn)
+//   Armenian  — basic_kbdarme        (hy, Armn)  — Windows "Armenian Eastern Basic"
 //
 // NB: `basic_kbdgr` is GERMAN (Windows "GR" = German), NOT Greek — do not use it.
+//
+// #1439: russian_mnemonic_r/armenian_mnemonic_r previously covered Cyrl/Armn
+// here — both are mnemonic keyboards (phonetic QWERTY remap by design/name,
+// not the &MNEMONICLAYOUT store flag, so no lint can catch this; see the
+// issue's precision note), a style this project doesn't support. Worse, they
+// were the suite's most reliable passes while both `basic_*` rows (the styles
+// this project DOES support) timed out, so the matrix's green signal was
+// carried substantially by keyboards we don't support. Swapped for
+// basic_kbdru/basic_kbdarme (both codec-clean: verified via a direct parse()
+// call — 0 opaque fragments/features, ~164/173 rules each).
+//
+// A sixth, bonus Latn row is added below for Cameroon AZERTY
+// (sil_cameroon_azerty) — a real SIL production keyboard (278 BCP47
+// languages), squarely the kind of keyboard this tool targets, unlike the
+// synthetic basic_kbdfr walk. It also exercises touch-derivation (it ships a
+// .keyman-touch-layout) and gives specs/051-carve-orthography-trim an
+// end-to-end walk: `ɨ` is that spec's own worked example of the `ɨ`/`i`
+// surplus interaction, and is in this keyboard's .kmn for `agq` (Aghem), one
+// of its declared languages.
 // ---------------------------------------------------------------------------
 
 interface ProvenScriptFixture {
@@ -93,11 +112,14 @@ interface ProvenScriptFixture {
 }
 
 const PROVEN_SCRIPT_BASES: ReadonlyArray<ProvenScriptFixture> = [
-  { script: "Latn", baseKeyboardId: "basic_kbdfr",         languageCode: "fr", targetScript: "Latn", charToAdd: "é" },
-  { script: "Cyrl", baseKeyboardId: "russian_mnemonic_r",  languageCode: "ru", targetScript: "Cyrl", charToAdd: "я" },
-  { script: "Grek", baseKeyboardId: "basic_kbdhe",         languageCode: "el", targetScript: "Grek", charToAdd: "ω" },
-  { script: "Geor", baseKeyboardId: "basic_kbdgeo",        languageCode: "ka", targetScript: "Geor", charToAdd: "ქ" },
-  { script: "Armn", baseKeyboardId: "armenian_mnemonic_r", languageCode: "hy", targetScript: "Armn", charToAdd: "ա" },
+  { script: "Latn", baseKeyboardId: "basic_kbdfr",         languageCode: "fr",  targetScript: "Latn", charToAdd: "é" },
+  { script: "Cyrl", baseKeyboardId: "basic_kbdru",         languageCode: "ru",  targetScript: "Cyrl", charToAdd: "я" },
+  { script: "Grek", baseKeyboardId: "basic_kbdhe",         languageCode: "el",  targetScript: "Grek", charToAdd: "ω" },
+  { script: "Geor", baseKeyboardId: "basic_kbdgeo",        languageCode: "ka",  targetScript: "Geor", charToAdd: "ქ" },
+  { script: "Armn", baseKeyboardId: "basic_kbdarme",       languageCode: "hy",  targetScript: "Armn", charToAdd: "ա" },
+  // Bonus row (#1439) — see the header comment above for why this is here
+  // alongside, not instead of, basic_kbdfr's Latn row.
+  { script: "Latn", baseKeyboardId: "sil_cameroon_azerty", languageCode: "agq", targetScript: "Latn", charToAdd: "ɨ" },
 ];
 
 /**
@@ -444,7 +466,7 @@ test.describe("spec 034 proven-script walks + publish paths", () => {
   });
 
   // --- T010: Cyrillic end-to-end walk (identity → ZIP), asserting the ZIP compiles.
-  test("T010 [US1]: Cyrillic (russian_mnemonic_r) walks identity → downloadable, compilable ZIP", async ({
+  test("T010 [US1]: Cyrillic (basic_kbdru) walks identity → downloadable, compilable ZIP", async ({
     page,
   }) => {
     const cyrl = PROVEN_SCRIPT_BASES.find((f) => f.script === "Cyrl")!;
@@ -463,7 +485,8 @@ test.describe("spec 034 proven-script walks + publish paths", () => {
     expect(kmn![1].length, ".kmn must be non-empty").toBeGreaterThan(0);
   });
 
-  // --- T011: all five proven scripts reach a downloadable ZIP (FR-011, SC-004).
+  // --- T011: all five proven scripts (FR-011, SC-004), plus a bonus Cameroon
+  // AZERTY Latn case (#1439), reach a downloadable ZIP.
   for (const fx of PROVEN_SCRIPT_BASES) {
     test(`T011 [US1]: ${fx.script} (${fx.baseKeyboardId}) reaches a downloadable ZIP`, async ({
       page,
