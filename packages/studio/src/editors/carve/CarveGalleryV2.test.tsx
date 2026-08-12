@@ -466,7 +466,7 @@ describe('CarveGalleryV2 — optional Latin group', () => {
 
     renderGalleryV2(ir);
 
-    expect(screen.queryByRole('region', { name: 'Removal recommendation' })).toBeNull();
+    expect(screen.queryByTestId('carve-v2-suggested-group')).toBeNull();
 
     // instantiateFromExisting (inside renderGalleryV2) resets the session, so
     // the worklist is seeded AFTER render — same ordering CarveGallery.test.tsx
@@ -478,10 +478,19 @@ describe('CarveGalleryV2 — optional Latin group', () => {
     };
     useWorkingCopyStore.setState((s) => ({ session: { ...s.session, marksWorklist: worklist } }));
 
-    await screen.findByText(/We recommend removing 1 character(?!s)/);
-    expect(screen.getByRole('region', { name: 'Removal recommendation' })).not.toBeNull();
+    // The suggested-to-discard card (CarveGalleryV2's post-#533 replacement
+    // for the old standing RemovalBanner — see recommendedRowIds's sibling
+    // tests above) surfaces 'ç', even though it's never a member of
+    // irToCharacterView's cellsByCh (it is a block-CANDIDATE, never actually
+    // produced — that's what "blocked" means). Confirms the fix below the
+    // component synthesizes a fallback cell for exactly this case rather
+    // than silently dropping the row.
+    const suggestedGroup = await screen.findByTestId('carve-v2-suggested-group');
+    expect(screen.getByRole('region', { name: 'Suggested to discard' })).not.toBeNull();
+    const candidateCell = within(suggestedGroup).getByRole('button', { name: 'ç — U+00E7' });
+    expect(candidateCell).not.toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { expanded: false, name: /We recommend removing/ }));
-    expect(screen.getByRole('checkbox', { name: 'Remove U+00E7' })).not.toBeNull();
+    fireEvent.click(candidateCell);
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-generic')).toBe(true);
   });
 });

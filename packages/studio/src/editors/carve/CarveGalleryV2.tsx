@@ -17,7 +17,7 @@ import { recommendedRemovalChars, displayChar } from '../../lib/irToCarveNodes.t
 import type { RecommendedRemovalChar } from '../../lib/irToCarveNodes.ts';
 import {
   irToCharacterView, groupCharacterCells, characterCellIds, characterCellIsToggleable,
-  characterDisplayName, SOURCE_DETAIL_LABEL,
+  characterDisplayName, SOURCE_DETAIL_LABEL, classifyCharacterCategory,
 } from '../../lib/irToCharacterView.ts';
 import type { CharacterCell, CharacterGroup } from '../../lib/irToCharacterView.ts';
 import { KeySeq } from '../assignLoop/parts/KeySeq.tsx';
@@ -338,8 +338,28 @@ function RecommendedGroupCard({
           </p>
           <div id={`${testId}-body`} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(76px, 1fr))', gap: 8 }}>
             {rows.map((row) => {
-              const cell = cellsByCh.get(row.ch.normalize('NFC'));
-              if (cell === undefined) return null;
+              // A block-candidate row (reason: 'blocked-combination') names a
+              // character that is, by definition, never actually produced —
+              // that's what "blocked" means — so it has no entry in cellsByCh
+              // (built from the IR's REAL producers, irToCharacterView.ts).
+              // Synthesizing a minimal cell from the row itself (rather than
+              // dropping the row) is what makes such a recommendation visible
+              // and actionable at all; without this, blockCandidateChars
+              // reaching `recommended` (verified correct — see
+              // useCarveNeededSet.ts) was a no-op in the UI, silently
+              // reintroducing the #526/#1558 visibility gap via a different
+              // mechanism than the one #1618's regression test was written
+              // to catch (a dropped function argument, not a missing cell).
+              const cell = cellsByCh.get(row.ch.normalize('NFC')) ?? {
+                ch: row.ch,
+                keys: [],
+                waysToType: [],
+                category: classifyCharacterCategory(row.ch),
+                source: 'advanced-rule' as const,
+                inAlpha: false,
+                reco: true,
+                contributors: row.contributors,
+              };
               const discarded = isRowDiscarded(row, isItemDeleted);
               return (
                 <CharacterCellButton
