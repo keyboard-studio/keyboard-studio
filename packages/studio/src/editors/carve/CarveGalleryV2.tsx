@@ -825,7 +825,13 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                   <span style={{
                     display: 'inline-flex', alignItems: 'center', font: '600 11.5px var(--app-font)',
                     padding: '3px 9px', borderRadius: 999,
-                    color: cell.inAlpha ? 'var(--app-text-on-accent)' : 'var(--app-text-subtle)',
+                    // NOT --app-text-on-accent: --sil-green has no navy override (fixed
+                    // fill in both themes), but that token flips per theme to pair with
+                    // --app-accent instead — white-on-green is 3.35:1 in light (fails
+                    // AA), and the navy value is only 4.6:1 (too thin a margin to trust,
+                    // see #1620). --sil-black clears 6.2:1+ against this fill in both
+                    // themes, same rationale as --sil-white against --sil-red-dark below.
+                    color: cell.inAlpha ? 'var(--sil-black)' : 'var(--app-text-subtle)',
                     background: cell.inAlpha ? 'var(--sil-green)' : 'var(--app-surface-2)',
                     border: cell.inAlpha ? 'none' : '1px solid var(--app-border-strong)',
                   }}>
@@ -840,7 +846,8 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                   style={{
                     width: '100%', font: '600 13px var(--app-font)', cursor: toggleable ? 'pointer' : 'default',
                     padding: '9px 14px', borderRadius: 8, opacity: toggleable ? 1 : 0.5,
-                    color: discarded ? 'var(--app-text-on-accent)' : 'var(--app-danger)',
+                    // See the --sil-black rationale above — same fixed --sil-green fill.
+                    color: discarded ? 'var(--sil-black)' : 'var(--app-danger)',
                     background: discarded ? 'var(--sil-green)' : 'transparent',
                     border: discarded ? 'none' : '1px solid var(--app-danger)',
                   }}

@@ -593,8 +593,10 @@ export interface WorkingCopyState {
    * as a single grouped cascade, pushing ONE batch undo entry so a single
    * undoDelete() call reverses the entire cascade.
    *
-   * - `ruleNodeIds`:  nodeIds to add to deletedNodeIds (whole-rule deletes).
-   * - `storeSlotIds`: itemIds (format "<storeNodeId>#<index>") to add to deletedItemIds.
+   * Both `ruleNodeIds` (whole-rule deletes) and `storeSlotIds` (format
+   * "<storeNodeId>#<index>") route through the ITEM channel exclusively —
+   * added to `deletedItemIds`, never `deletedNodeIds`. See the implementation
+   * comment below for why.
    *
    * Either array may be empty; at least one must be non-empty for the action to push
    * an undo entry. If both are empty this is a no-op.

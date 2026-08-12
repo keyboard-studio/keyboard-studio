@@ -317,6 +317,15 @@ async function buildToLevel(page: Page, level: Level, h: Harness): Promise<void>
   h.note("Phase B done (added ᙮); at carve gallery");
   if (level === "L6-phaseB-done") return;
 
+  // BROKEN (refs #1628): carve-card-<id> / raw-remove-anyway / raw-confirm-remove
+  // are v1 CarveGallery/Rail/Inspector test-ids. CarveGalleryV2 is the sole
+  // live carve gallery now (carveAdapter.tsx renders it unconditionally; v1 is
+  // commented out) and never renders these ids, so targetCard.toBeVisible()
+  // below times out — every L7-carve-deleted scenario in the matrix currently
+  // fails here. Needs porting to CarveGalleryV2's actual discard interaction
+  // (see CarveGalleryV2.test.tsx for its real test-ids) before L7 is reachable
+  // again; left as-is rather than silently deleted since the matrix's other
+  // six levels are unaffected and still validate real behavior.
   const targetCard = page.getByTestId(`carve-card-${CARVE_NODE_ID}`);
   await expect(targetCard).toBeVisible({ timeout: 30_000 });
   await targetCard.click();
