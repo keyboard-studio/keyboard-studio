@@ -48,6 +48,15 @@ export interface KsE2EHook {
   /** nodeIds currently marked deleted via the carve gallery. */
   getDeletedNodeIds: () => string[];
   /**
+   * itemIds (rule nodeIds + store-slot ids, "<storeNodeId>#<index>") marked
+   * deleted via cascadeDelete — CarveGalleryV2's discard path. cascadeDelete
+   * routes BOTH whole-rule deletes and store-slot drops through this ITEM
+   * channel (deletedItemIds), never deletedNodeIds (see workingCopyStore.ts's
+   * cascadeDelete doc comment) — so a V2 discard is asserted here, not via
+   * getDeletedNodeIds(), which only reflects v1 CarveGallery's deleteNode path.
+   */
+  getDeletedItemIds: () => string[];
+  /**
    * The instantiated working copy's base keyboard id, or null before
    * instantiation. Added for the F1 (switch-base rebase) regression spec —
    * lets a test assert which base the WORKING COPY is on, independent of
@@ -115,6 +124,7 @@ export function installE2eHook(): void {
   window.__ksE2E__ = {
     getWorkingIr: () => useWorkingCopyStore.getState().ir,
     getDeletedNodeIds: () => [...useWorkingCopyStore.getState().deletedNodeIds],
+    getDeletedItemIds: () => [...useWorkingCopyStore.getState().deletedItemIds],
     getBaseKeyboardId: () => useWorkingCopyStore.getState().baseKeyboard?.id ?? null,
     getPhaseResultsCount: () => useWorkingCopyStore.getState().phaseResults.length,
     snapshotBaseFiles: () => {

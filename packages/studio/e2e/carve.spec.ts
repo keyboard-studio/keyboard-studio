@@ -150,6 +150,7 @@ const KNOWN_CONTRAST_DEBT_OUTPUT: readonly string[] = [
 interface KsE2EHook {
   getWorkingIr(): KeyboardIR | null;
   getDeletedNodeIds(): string[];
+  getDeletedItemIds(): string[];
 }
 
 declare global {
@@ -180,7 +181,7 @@ declare global {
 // ---------------------------------------------------------------------------
 
 test.describe("Carve gallery (v2) — discard one character, verify IR + emitted .kmn", () => {
-  test("discarding U+14EC in the carve gallery removes both producing rules from the deleted-node IR state and from the emitted .kmn", async ({ page }) => {
+  test("discarding U+14EC in the carve gallery removes both producing rules from the deleted-item IR state and from the emitted .kmn", async ({ page }) => {
     // ?e2e=1 is the runtime override for installE2eHook() (src/lib/e2eHook.ts)
     // — no VITE_E2E build flag needed. Seed the returning-visitor flag first
     // so the fresh browser context skips WelcomeScreen (see seedReturningVisitor).
@@ -233,13 +234,15 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
     //
     // getWorkingIr() still LISTS rule#18/rule#20 in their group — the rules
     // array is filtered at emit time by carveFilterIr, not mutated in place.
-    // The deletion is recorded in the deletedNodeIds overlay, which is what
-    // this asserts (mirrors the v1 spec's identical rule/raw-array-vs-overlay
-    // contract, just over ir.groups[].rules instead of ir.raw).
+    // The deletion is recorded in the deletedItemIds overlay (asserted via
+    // getDeletedItemIds(), NOT getDeletedNodeIds() — CarveGalleryV2's
+    // cascadeDelete routes whole-rule deletes through the item channel by
+    // design; getDeletedNodeIds() only reflects v1 CarveGallery's deleteNode
+    // path and stays empty here — see e2eHook.ts's getDeletedItemIds doc).
     // ---------------------------------------------------------------------
     await expect
       .poll(
-        () => page.evaluate(() => window.__ksE2E__?.getDeletedNodeIds() ?? []),
+        () => page.evaluate(() => window.__ksE2E__?.getDeletedItemIds() ?? []),
         { timeout: 5_000 },
       )
       .toEqual(expect.arrayContaining(TARGET_RULE_IDS));
@@ -377,7 +380,7 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
 
     await expect
       .poll(
-        () => page.evaluate(() => window.__ksE2E__?.getDeletedNodeIds() ?? []),
+        () => page.evaluate(() => window.__ksE2E__?.getDeletedItemIds() ?? []),
         { timeout: 5_000 },
       )
       .not.toEqual(expect.arrayContaining(TARGET_RULE_IDS));
