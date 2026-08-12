@@ -256,7 +256,7 @@ function RecommendedGroupCard({
         // #a6121f, 2:1) while looking fine in light theme, which is exactly
         // how this shipped unnoticed. White is correct against this fixed
         // dark fill in either theme.
-        color: 'white', background: 'var(--sil-red-dark)',
+        color: 'var(--sil-white)', background: 'var(--sil-red-dark)',
         border: 'none', borderRadius: 8, padding: '9px 16px',
       }
     : destructiveBulkButton === true
