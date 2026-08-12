@@ -20,6 +20,7 @@ import {
   characterDisplayName, SOURCE_DETAIL_LABEL, classifyCharacterCategory,
 } from '../../lib/irToCharacterView.ts';
 import type { CharacterCell, CharacterGroup } from '../../lib/irToCharacterView.ts';
+import type { CharContributors } from '@keyboard-studio/engine';
 import { KeySeq } from '../assignLoop/parts/KeySeq.tsx';
 import { UndoIcon, DiscardIcon, ChevronIcon } from '../assignLoop/parts/carveShared.tsx';
 import { useCarveNeededSet } from '../../hooks/useCarveNeededSet.ts';
@@ -60,6 +61,29 @@ const GROUP_DOT: Record<string, string> = {
 
 function codepointLabel(ch: string): string {
   return `U+${ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`;
+}
+
+// A block-candidate row (reason: 'blocked-combination') names a character
+// that is, by definition, never actually produced — that's what "blocked"
+// means — so it has no entry in cellsByCh (built from the IR's REAL
+// producers, irToCharacterView.ts). Synthesizing a minimal cell from the
+// row itself is what makes such a recommendation visible, hoverable, and
+// actionable at all; `ch` is re-normalized to NFC here to match every other
+// CharacterCell.ch producer's contract (irToCharacterView.ts), since a row's
+// `ch` may still be in `carveNormalizationForm` (NFD on base-plus-mark
+// keyboards).
+function synthesizeFallbackCell(ch: string, contributors: CharContributors): CharacterCell {
+  const normalized = ch.normalize('NFC');
+  return {
+    ch: normalized,
+    keys: [],
+    waysToType: [],
+    category: classifyCharacterCategory(normalized),
+    source: 'advanced-rule',
+    inAlpha: false,
+    reco: true,
+    contributors,
+  };
 }
 
 /** True when every contributor id for this cell is currently deleted (or the cell has no toggleable ids at all — never "discarded", always kept). */
@@ -338,28 +362,11 @@ function RecommendedGroupCard({
           </p>
           <div id={`${testId}-body`} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(76px, 1fr))', gap: 8 }}>
             {rows.map((row) => {
-              // A block-candidate row (reason: 'blocked-combination') names a
-              // character that is, by definition, never actually produced —
-              // that's what "blocked" means — so it has no entry in cellsByCh
-              // (built from the IR's REAL producers, irToCharacterView.ts).
-              // Synthesizing a minimal cell from the row itself (rather than
-              // dropping the row) is what makes such a recommendation visible
-              // and actionable at all; without this, blockCandidateChars
-              // reaching `recommended` (verified correct — see
-              // useCarveNeededSet.ts) was a no-op in the UI, silently
-              // reintroducing the #526/#1558 visibility gap via a different
-              // mechanism than the one #1618's regression test was written
-              // to catch (a dropped function argument, not a missing cell).
-              const cell = cellsByCh.get(row.ch.normalize('NFC')) ?? {
-                ch: row.ch,
-                keys: [],
-                waysToType: [],
-                category: classifyCharacterCategory(row.ch),
-                source: 'advanced-rule' as const,
-                inAlpha: false,
-                reco: true,
-                contributors: row.contributors,
-              };
+              // cellsByCh is pre-augmented (see its useMemo below) with a
+              // synthesizeFallbackCell entry for every recommended row absent
+              // from the IR's real producers, so this get() always resolves —
+              // the ?? fallback here is belt-and-suspenders, not the fix.
+              const cell = cellsByCh.get(row.ch.normalize('NFC')) ?? synthesizeFallbackCell(row.ch, row.contributors);
               const discarded = isRowDiscarded(row, isItemDeleted);
               return (
                 <CharacterCellButton
@@ -468,8 +475,20 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   // groups render THE SAME cell shape (glyph + codepoint) the groups below
   // render, keyed by the recommendation row's own `ch` (which is normalized
   // to `carveNormalizationForm`, hence the NFC re-normalize here, mirroring
-  // recommendedCharSet above).
-  const cellsByCh = useMemo(() => new Map(cells.map((c) => [c.ch, c])), [cells]);
+  // recommendedCharSet above). Also backfilled with a synthesizeFallbackCell
+  // entry for every recommended row absent from `cells` (block-candidate
+  // characters, never actually produced) — this map is the SAME map
+  // RecommendedGroupCard and selectedCell below both read, so hovering or
+  // selecting a candidate cell resolves its own details rather than
+  // silently falling back to an unrelated character.
+  const cellsByCh = useMemo(() => {
+    const map = new Map(cells.map((c) => [c.ch, c]));
+    for (const row of recommended) {
+      const key = row.ch.normalize('NFC');
+      if (!map.has(key)) map.set(key, synthesizeFallbackCell(row.ch, row.contributors));
+    }
+    return map;
+  }, [cells, recommended]);
 
   // Post-#526 split (RemovalBanner's prior home): cross-script-Latin rows
   // never drive the primary "Suggested to discard" group — they get their
@@ -577,9 +596,12 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     [filteredCells, groupBy],
   );
 
+  // cellsByCh (not cells) is the lookup here: selectedCh may be a
+  // block-candidate character that's absent from cells but present in
+  // cellsByCh via synthesizeFallbackCell — see that memo's comment above.
   const selectedCell = useMemo<CharacterCell | undefined>(
-    () => cells.find((c) => c.ch === selectedCh) ?? cells[0],
-    [cells, selectedCh],
+    () => (selectedCh !== null ? cellsByCh.get(selectedCh) : undefined) ?? cells[0],
+    [cellsByCh, cells, selectedCh],
   );
 
   if (!ir) {
