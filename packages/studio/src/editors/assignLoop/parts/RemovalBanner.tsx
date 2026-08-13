@@ -22,6 +22,10 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import type { RecommendedRemovalChar } from '../../../lib/irToCarveNodes.ts';
 import { displayChar, invisibleCharLabel } from '../../../lib/irToCarveNodes.ts';
+// Aliased: `Checklist` below already has a local `codepointLabel` string
+// (the rendered/aria-label text) whose name feeds an i18n placeholder — see
+// its own comment. Importing under a different name avoids shadowing it.
+import { codepointLabel as computeCodepointLabel } from '../../../survey/codepointLabel.ts';
 import { ChevronIcon, CheckIcon } from './carveShared.tsx';
 
 interface RemovalBannerProps {
@@ -41,11 +45,17 @@ interface RemovalBannerProps {
   onRemoveSelected: (selected: RecommendedRemovalChar[]) => void;
 }
 
-/** Author-facing label for a checklist row: an invisible/combining-mark name, else its codepoint. */
+/**
+ * Author-facing label for a checklist row: an invisible/combining-mark name,
+ * else its codepoint(s). `ch` here can be a block-candidate grapheme
+ * (recommendedRemovalChars' blockCandidateChars, composed via composeCombo),
+ * which stays multi-code-point for a base+mark pair with no precomposed form
+ * — so this names every code point, not just the first (PR #1625 pattern audit).
+ */
 function charCodepointLabel(ch: string): string {
   const inv = invisibleCharLabel(ch);
   if (inv !== null) return inv;
-  return `U+${ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`;
+  return computeCodepointLabel(ch).title;
 }
 
 interface ChecklistProps {
