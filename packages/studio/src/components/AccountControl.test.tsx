@@ -114,6 +114,23 @@ describe("AccountControl — signed out (guest)", () => {
     fireEvent.pointerDown(document.body);
     expect(screen.queryByRole("dialog")).toBeNull();
   });
+
+  it("renders a backdrop that swallows outside clicks (aria-modal dialog) and closes on click", () => {
+    // Regression: useDismissablePopover's document-pointerdown listener has
+    // no DOM presence of its own, so it cannot intercept an outside click
+    // before it reaches whatever is rendered behind the dialog. A real
+    // click-catching backdrop element (fixed, full-viewport, below the
+    // panel in z-index) is required for an aria-modal="true" dialog.
+    mockAuth({ status: "idle" });
+    renderAccountControl();
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    const dialog = screen.getByRole("dialog", { name: "Sign in options" });
+    const backdrop = dialog.previousElementSibling as HTMLElement;
+    expect(backdrop).toBeTruthy();
+    expect(backdrop.getAttribute("aria-hidden")).toBe("true");
+    fireEvent.click(backdrop);
+    expect(screen.queryByRole("dialog")).toBeNull();
+  });
 });
 
 describe("AccountControl — signed in (GitHub)", () => {
@@ -159,6 +176,18 @@ describe("AccountControl — signed in (GitHub)", () => {
     mockAuth({ status: "needs-scope", login: "octocat" });
     renderAccountControl();
     expect(screen.getByRole("button", { name: /Account: octocat/i })).toBeTruthy();
+  });
+
+  it("renders a backdrop that swallows outside clicks and closes the menu on click", () => {
+    mockAuth({ status: "connected", login: "octocat" });
+    renderAccountControl();
+    fireEvent.click(screen.getByRole("button", { name: /Account: octocat/i }));
+    const menu = screen.getByRole("menu");
+    const backdrop = menu.previousElementSibling as HTMLElement;
+    expect(backdrop).toBeTruthy();
+    expect(backdrop.getAttribute("aria-hidden")).toBe("true");
+    fireEvent.click(backdrop);
+    expect(screen.queryByRole("menu")).toBeNull();
   });
 });
 

@@ -145,6 +145,20 @@ const errorStyle: React.CSSProperties = {
   fontFamily: FONT,
 };
 
+/**
+ * Fixed transparent backdrop — sits below the panel, swallows outside
+ * clicks so they don't also activate whatever is rendered behind it.
+ * useDismissablePopover's document-pointerdown listener closes the panel on
+ * an outside click, but has no DOM presence of its own to intercept that
+ * click before it reaches the element underneath — this restores the
+ * click-catcher both AccountControl popovers had before that hook existed.
+ */
+const modalBackdropStyle: React.CSSProperties = {
+  position: "fixed",
+  inset: 0,
+  zIndex: 199,
+};
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -223,36 +237,41 @@ export function AccountControl() {
         </button>
 
         {open && (
-          <div ref={panelRef} role="menu" style={panelStyle}>
-            {displayName !== null && (
-              <div style={dimTextStyle} role="none">
-                {displayName}
-              </div>
-            )}
-            <div style={dividerStyle} role="none" />
-            <button
-              type="button"
-              role="menuitem"
-              style={menuItemStyle}
-              onClick={() => {
-                navigateTo("profile");
-                close();
-              }}
-            >
-              <Trans id="account.menu.profile">Profile</Trans>
-            </button>
-            <button
-              type="button"
-              role="menuitem"
-              style={menuItemStyle}
-              onClick={() => {
-                signOut();
-                close();
-              }}
-            >
-              <Trans id="account.menu.signOut">Sign out</Trans>
-            </button>
-          </div>
+          <>
+            {/* Transparent backdrop — click outside to close, and to swallow the click */}
+            <div style={modalBackdropStyle} onClick={close} aria-hidden="true" />
+
+            <div ref={panelRef} role="menu" style={panelStyle}>
+              {displayName !== null && (
+                <div style={dimTextStyle} role="none">
+                  {displayName}
+                </div>
+              )}
+              <div style={dividerStyle} role="none" />
+              <button
+                type="button"
+                role="menuitem"
+                style={menuItemStyle}
+                onClick={() => {
+                  navigateTo("profile");
+                  close();
+                }}
+              >
+                <Trans id="account.menu.profile">Profile</Trans>
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                style={menuItemStyle}
+                onClick={() => {
+                  signOut();
+                  close();
+                }}
+              >
+                <Trans id="account.menu.signOut">Sign out</Trans>
+              </button>
+            </div>
+          </>
         )}
       </div>
     );
@@ -273,51 +292,56 @@ export function AccountControl() {
       </button>
 
       {open && (
-        <div
-          ref={panelRef}
-          role="dialog"
-          aria-label={t({
-            id: "account.signIn.dialogAriaLabel",
-            message: "Sign in options",
-          })}
-          aria-modal="true"
-          style={panelStyle}
-        >
-          <button
-            type="button"
-            style={githubProviderButtonStyle}
-            onClick={() => {
-              void github.connect("identity");
-              // connect() redirects; no need to close
-            }}
-          >
-            <GitHubMark />
-            <Trans id="account.signIn.github">Sign in with GitHub</Trans>
-          </button>
+        <>
+          {/* Transparent backdrop — click outside to close, and to swallow the click */}
+          <div style={modalBackdropStyle} onClick={close} aria-hidden="true" />
 
-          <button
-            type="button"
-            style={googleProviderButtonStyle}
-            onClick={() => {
-              void google.connect();
-              // connect() redirects; no need to close
-            }}
+          <div
+            ref={panelRef}
+            role="dialog"
+            aria-label={t({
+              id: "account.signIn.dialogAriaLabel",
+              message: "Sign in options",
+            })}
+            aria-modal="true"
+            style={panelStyle}
           >
-            <GoogleMark />
-            <Trans id="account.signIn.google">Sign in with Google</Trans>
-          </button>
+            <button
+              type="button"
+              style={githubProviderButtonStyle}
+              onClick={() => {
+                void github.connect("identity");
+                // connect() redirects; no need to close
+              }}
+            >
+              <GitHubMark />
+              <Trans id="account.signIn.github">Sign in with GitHub</Trans>
+            </button>
 
-          {github.error !== null && (
-            <div role="alert" style={errorStyle}>
-              {github.error}
-            </div>
-          )}
-          {google.error !== null && (
-            <div role="alert" style={errorStyle}>
-              {google.error}
-            </div>
-          )}
-        </div>
+            <button
+              type="button"
+              style={googleProviderButtonStyle}
+              onClick={() => {
+                void google.connect();
+                // connect() redirects; no need to close
+              }}
+            >
+              <GoogleMark />
+              <Trans id="account.signIn.google">Sign in with Google</Trans>
+            </button>
+
+            {github.error !== null && (
+              <div role="alert" style={errorStyle}>
+                {github.error}
+              </div>
+            )}
+            {google.error !== null && (
+              <div role="alert" style={errorStyle}>
+                {google.error}
+              </div>
+            )}
+          </div>
+        </>
       )}
     </div>
   );
