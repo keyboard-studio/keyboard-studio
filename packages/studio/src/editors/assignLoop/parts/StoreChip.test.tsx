@@ -103,6 +103,17 @@ describe('StoreChip — toggleable action (drop)', () => {
     expect(info).toMatchObject({ kind: 'text', title: 'a', body: 'U+0061' });
   });
 
+  it('hovering a multi-code-point store item (base+mark, no precomposed form) names every code point', () => {
+    // Ə + combining acute (U+018F U+0301) — a store literal can be exactly this
+    // kind of un-precomposed sequence; the codepoint body must not silently
+    // drop every code point past the first (PR #1625 pattern audit).
+    const chip = makeChip({ ch: 'Ə́', action: 'drop' });
+    const { container } = render(<StoreChip chip={chip} off={false} onToggle={vi.fn()} />);
+    fireEvent.mouseEnter(container.querySelector('button')!);
+    const info = useHoverInfoStore.getState().info;
+    expect(info).toMatchObject({ kind: 'text', body: 'U+018F U+0301' });
+  });
+
   it('mouse-leaving an enabled chip clears hover info', () => {
     const chip = makeChip({ ch: 'a' });
     const { container } = render(<StoreChip chip={chip} off={false} onToggle={vi.fn()} />);
