@@ -1244,6 +1244,7 @@
   "profile.myKeyboards.loading": "Loading your keyboards…",
   "profile.myKeyboards.resumeAriaLabel": "Resume {name}",
   "profile.myKeyboards.resumeButton": "Resume",
+  "profile.myKeyboards.resumeFailed": "Couldn't resume this keyboard — its saved data looks corrupted.",
   "profile.myKeyboards.sectionAriaLabel": "My keyboards",
   "profile.myKeyboards.status.draft": "Draft",
   "profile.myKeyboards.status.submitted": "Submitted",

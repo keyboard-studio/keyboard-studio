@@ -337,6 +337,56 @@ describe("MyKeyboardsList — Resume", () => {
     expect(mockedResumeProject).toHaveBeenCalledWith("kbd_bad");
     expect(mockedNavigateTo).not.toHaveBeenCalled();
   });
+
+  // #1577: previously the card was a plain <li> with no onClick on the name
+  // or anywhere but the small Resume button — clicking the name did nothing.
+  it("clicking the keyboard's name on a draft card also resumes it (#1577)", async () => {
+    seedRealDraft("kbd_a", "Alpha");
+    clearActiveProjectKey();
+
+    render(<MyKeyboardsList />);
+
+    // The name button's accessible name is the bare name, deliberately
+    // distinct from the explicit "Resume Alpha" action button alongside it.
+    const nameButton = await screen.findByRole("button", { name: "Alpha" });
+    fireEvent.click(nameButton);
+
+    expect(mockedResumeProject).toHaveBeenCalledWith("kbd_a");
+    expect(resolveActiveProjectKey()).toBe("kbd_a");
+    expect(mockedNavigateTo).toHaveBeenCalledWith("survey");
+  });
+
+  it("a submitted card's name is inert text, not a button — nothing to resume into", async () => {
+    seedLocalIndex([
+      {
+        projectKey: "kbd_sub",
+        savedAt: Date.now(),
+        label: "Submitted One",
+        status: "submitted",
+        prUrl: "https://github.com/example/pr/1",
+      },
+    ]);
+
+    render(<MyKeyboardsList />);
+
+    await screen.findByText("Submitted One");
+    expect(screen.queryByRole("button", { name: "Submitted One" })).toBeNull();
+  });
+
+  // #1577's second defect: switchActiveProject's return value used to be
+  // discarded, so a failed resume was indistinguishable from the inert-card
+  // defect above — the author clicked and nothing visibly happened either way.
+  it("surfaces a visible message when resume fails, instead of silently doing nothing", async () => {
+    seedLocalIndex([{ projectKey: "kbd_bad", savedAt: Date.now(), label: "Bad", status: "draft" }]);
+    localStorage.setItem(draftKey("kbd_bad"), "not json");
+
+    render(<MyKeyboardsList />);
+    expect(screen.queryByText(/Couldn.t resume this keyboard/)).toBeNull();
+
+    fireEvent.click(await screen.findByRole("button", { name: /Resume Bad/i }));
+
+    expect(await screen.findByText(/Couldn.t resume this keyboard/)).toBeTruthy();
+  });
 });
 
 describe("MyKeyboardsList — Delete", () => {
