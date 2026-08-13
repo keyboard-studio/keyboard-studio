@@ -2,6 +2,7 @@ import { memo } from 'react';
 import { useLingui } from "@lingui/react/macro";
 import type { StoreCharChip } from '../../../lib/irToCarveNodes.ts';
 import { displayChar, invisibleCharLabel } from '../../../lib/irToCarveNodes.ts';
+import { codepointLabel } from '../../../survey/codepointLabel.ts';
 import { KIND_COLOR } from './KindBadge.tsx';
 import { useHoverInfoStore } from '../../../stores/hoverInfoStore.ts';
 
@@ -25,7 +26,11 @@ export const StoreChip = memo(function StoreChip({ chip, off, onToggle }: StoreC
   const clearInfo = useHoverInfoStore((s) => s.clearInfo);
   const label = invisibleCharLabel(chip.ch);
   const disabled = chip.action === 'disabled';
-  const codepoint = `U+${chip.ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`;
+  // Store items are raw literal Unicode strings straight from the .kmn source
+  // — a base+combining-mark sequence with no precomposed form (Indic matras,
+  // Arabic harakat, Hebrew points) stays multi-code-point, so this must name
+  // every code point rather than just the first (see PR #1625 pattern audit).
+  const codepoint = codepointLabel(chip.ch).title;
 
   const showDisabledInfo = () => {
     if (chip.disabledReason === undefined) return;

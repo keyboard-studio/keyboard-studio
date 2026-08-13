@@ -466,7 +466,7 @@ describe('CarveGalleryV2 — optional Latin group', () => {
 
     renderGalleryV2(ir);
 
-    expect(screen.queryByRole('region', { name: 'Removal recommendation' })).toBeNull();
+    expect(screen.queryByTestId('carve-v2-suggested-group')).toBeNull();
 
     // instantiateFromExisting (inside renderGalleryV2) resets the session, so
     // the worklist is seeded AFTER render — same ordering CarveGallery.test.tsx
@@ -478,10 +478,109 @@ describe('CarveGalleryV2 — optional Latin group', () => {
     };
     useWorkingCopyStore.setState((s) => ({ session: { ...s.session, marksWorklist: worklist } }));
 
-    await screen.findByText(/We recommend removing 1 character(?!s)/);
-    expect(screen.getByRole('region', { name: 'Removal recommendation' })).not.toBeNull();
+    // The suggested-to-discard card (CarveGalleryV2's post-#533 replacement
+    // for the old standing RemovalBanner — see recommendedRowIds's sibling
+    // tests above) surfaces 'ç', even though it's never a member of
+    // irToCharacterView's cellsByCh (it is a block-CANDIDATE, never actually
+    // produced — that's what "blocked" means). Confirms the fix below the
+    // component synthesizes a fallback cell for exactly this case rather
+    // than silently dropping the row.
+    const suggestedGroup = await screen.findByTestId('carve-v2-suggested-group');
+    expect(screen.getByRole('region', { name: 'Suggested to discard' })).not.toBeNull();
+    const candidateCell = within(suggestedGroup).getByRole('button', { name: 'ç — U+00E7' });
+    expect(candidateCell).not.toBeNull();
 
-    fireEvent.click(screen.getByRole('button', { expanded: false, name: /We recommend removing/ }));
-    expect(screen.getByRole('checkbox', { name: 'Remove U+00E7' })).not.toBeNull();
+    fireEvent.click(candidateCell);
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-generic')).toBe(true);
+  });
+
+  // -------------------------------------------------------------------------
+  // The cedilla fixture above is the ONE case that fully composes: 'c' + U+0327
+  // has a precomposed form (U+00E7), so reading only codePointAt(0) still
+  // happens to name the right character. Base-plus-mark combinations with no
+  // precomposed form — the norm for Indic matras, Arabic harakat and Hebrew
+  // points — stay multi-code-point through composeCombo's NFC, and a
+  // first-code-point-only label would name the bare base instead, rendering a
+  // blocked consonant-plus-matra indistinguishable from the consonant's own
+  // cell. This fixture locks the full stack into the accessible name.
+  // -------------------------------------------------------------------------
+  const KA = 'क';        // DEVANAGARI LETTER KA
+  const VOWEL_SIGN_I = 'ि'; // DEVANAGARI VOWEL SIGN I — no precomposed form with KA
+
+  it('names every code point of a blocked combination that has no precomposed form', async () => {
+    const combo = (KA + VOWEL_SIGN_I).normalize('NFC');
+    // Guard the fixture's own premise: if a future Unicode version ever gave
+    // this pair a precomposed form, the test would silently stop covering the
+    // multi-code-point path it exists for.
+    expect([...combo].length).toBe(2);
+
+    const ir = makeIR([makeGroup('g-main', 'main', [
+      makeSimpleRule('r-a', 'K_A', 'a'),
+      makeSimpleRule('r-generic', 'K_X', 'x'),
+    ])]);
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => {
+      if (ch === 'a') return { ...emptyContributors(ch), ruleNodeIds: ['r-a'] };
+      if (ch === 'x') return { ...emptyContributors(ch), ruleNodeIds: ['r-generic'] };
+      if (ch === combo) return { ...emptyContributors(ch), ruleNodeIds: ['r-generic'] };
+      return emptyContributors(ch);
+    });
+    neededCharsResult.set(new Set(['a', 'x']));
+
+    renderGalleryV2(ir);
+
+    const worklist: PlacementWorklist = {
+      ownLetterUnits: [],
+      markUnits: [],
+      blockedCombinations: [{ base: KA, mark: VOWEL_SIGN_I }],
+    };
+    useWorkingCopyStore.setState((s) => ({ session: { ...s.session, marksWorklist: worklist } }));
+
+    const suggestedGroup = await screen.findByTestId('carve-v2-suggested-group');
+    // Both code points, not just U+0915. Before the sequence-aware label this
+    // read "U+0915" alone — the bare KA — for a row describing KA + matra.
+    const candidateCell = within(suggestedGroup).getByRole('button', {
+      name: /U\+0915 U\+093F/,
+    });
+    expect(candidateCell).not.toBeNull();
+
+    fireEvent.click(candidateCell);
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-generic')).toBe(true);
+  });
+
+  it('does not claim a blocked combination is produced by an advanced rule', async () => {
+    const ir = makeIR([makeGroup('g-main', 'main', [
+      makeSimpleRule('r-a', 'K_A', 'a'),
+      makeSimpleRule('r-generic', 'K_X', 'x'),
+    ])]);
+    collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => {
+      if (ch === 'a') return { ...emptyContributors(ch), ruleNodeIds: ['r-a'] };
+      if (ch === 'x') return { ...emptyContributors(ch), ruleNodeIds: ['r-generic'] };
+      if (ch === 'ç') return { ...emptyContributors(ch), ruleNodeIds: ['r-generic'] };
+      return emptyContributors(ch);
+    });
+    neededCharsResult.set(new Set(['a', 'x']));
+
+    renderGalleryV2(ir);
+
+    const worklist: PlacementWorklist = {
+      ownLetterUnits: [],
+      markUnits: [],
+      blockedCombinations: [{ base: 'c', mark: CEDILLA }],
+    };
+    useWorkingCopyStore.setState((s) => ({ session: { ...s.session, marksWorklist: worklist } }));
+
+    const suggestedGroup = await screen.findByTestId('carve-v2-suggested-group');
+    const candidateCell = within(suggestedGroup).getByRole('button', { name: 'ç — U+00E7' });
+
+    // Selecting the row opens the details rail. A synthesized block-candidate
+    // cell borrowed `source: 'advanced-rule'` purely to reach the rail's
+    // zero-producer branch, which told the author the character was "Produced
+    // by an advanced rule kept verbatim" — false for a combination the
+    // keyboard specifically blocks.
+    fireEvent.mouseEnter(candidateCell);
+
+    expect(screen.queryByText(/Produced by an advanced rule/)).toBeNull();
+    expect(screen.queryByText(/Advanced rule/)).toBeNull();
+    expect(screen.getByText(/blocks this combination/)).not.toBeNull();
   });
 });
