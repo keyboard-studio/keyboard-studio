@@ -432,16 +432,16 @@ describe('CarveGalleryV2 — optional Latin group', () => {
   // v1/v2 flag) must forward useCarveNeededSet's blockCandidateChars through
   // to recommendedRemovalChars, exactly as CarveGallery.tsx (v1) already did.
   // The existing tests above only exercise the plain CLDR-surplus path; this
-  // one is built so 'ç' can NEVER reach the banner via that path — it is not
-  // a member of buildProducedSet(ir) at all (no rule in this fixture literally
-  // outputs it), so `candidateChars` only ever contains it when the
-  // blockCandidateChars argument unions it in. If the component's call site
-  // ever drops that argument (the #1558 bug, reintroduced), 'ç' has zero path
-  // to the banner and this test fails.
+  // one is built so 'ç' can NEVER reach the suggested-to-discard group via
+  // that path — it is not a member of buildProducedSet(ir) at all (no rule in
+  // this fixture literally outputs it), so `candidateChars` only ever
+  // contains it when the blockCandidateChars argument unions it in. If the
+  // component's call site ever drops that argument (the #1558 bug,
+  // reintroduced), 'ç' has zero path to the group and this test fails.
   // -------------------------------------------------------------------------
   const CEDILLA = '̧'; // combining cedilla — composeCombo('c', [CEDILLA]) -> 'ç' (U+00E7)
 
-  it('surfaces a blocked-combination candidate on the banner via blockCandidateChars — not reachable through the plain needed-set-surplus path alone', async () => {
+  it('surfaces a blocked-combination candidate in the suggested group via blockCandidateChars — not reachable through the plain needed-set-surplus path alone', async () => {
     // 'a' -> literal 'a' (kept: unioned into `needed` below).
     // 'r-generic' -> literal 'x' (kept: also unioned into `needed`), standing
     // in for whatever real rule the compiled keyboard resolves the 'c'+cedilla
@@ -461,12 +461,12 @@ describe('CarveGalleryV2 — optional Latin group', () => {
       return emptyContributors(ch);
     });
     // Both of this fixture's REAL produced characters are needed, so nothing
-    // is surplus yet — confirms the "before" state has no banner at all.
+    // is surplus yet — confirms the "before" state has no suggested group at all.
     neededCharsResult.set(new Set(['a', 'x']));
 
     renderGalleryV2(ir);
 
-    expect(screen.queryByRole('region', { name: 'Removal recommendation' })).toBeNull();
+    expect(screen.queryByTestId('carve-v2-suggested-group')).toBeNull();
 
     // instantiateFromExisting (inside renderGalleryV2) resets the session, so
     // the worklist is seeded AFTER render — same ordering CarveGallery.test.tsx
@@ -478,10 +478,17 @@ describe('CarveGalleryV2 — optional Latin group', () => {
     };
     useWorkingCopyStore.setState((s) => ({ session: { ...s.session, marksWorklist: worklist } }));
 
-    await screen.findByText(/We recommend removing 1 character(?!s)/);
-    expect(screen.getByRole('region', { name: 'Removal recommendation' })).not.toBeNull();
-
-    fireEvent.click(screen.getByRole('button', { expanded: false, name: /We recommend removing/ }));
-    expect(screen.getByRole('checkbox', { name: 'Remove U+00E7' })).not.toBeNull();
+    // 'ç' has no producing rule in this deliberately-minimal fixture (see the
+    // comment above), so — unlike the other suggested-group tests above,
+    // which use makeFixtureIR()'s real glyph rules — irToCharacterView never
+    // builds a CharacterCell for it and CarveGalleryV2 silently omits its row
+    // from the grid (cellsByCh.get(ch) === undefined). The toggle-all
+    // button's count is still driven straight off `rows.length`, independent
+    // of cellsByCh, so it's what actually proves blockCandidateChars reached
+    // recommendedRemovalChars as a real, counted candidate — the same
+    // mutation this test guards against (strip the argument and this drops
+    // to "Discard all 0" / the group disappears entirely).
+    const suggestedGroup = await screen.findByTestId('carve-v2-suggested-group');
+    expect(within(suggestedGroup).getByTestId('carve-v2-suggested-toggle-all').textContent).toBe('Discard all 1');
   });
 });
