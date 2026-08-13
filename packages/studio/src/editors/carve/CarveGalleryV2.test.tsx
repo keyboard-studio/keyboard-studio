@@ -381,6 +381,35 @@ describe('CarveGalleryV2 — suggested-to-discard group', () => {
     expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(false);
     expect(screen.getByTestId('carve-v2-suggested-toggle-all').textContent).toMatch(/Discard all/);
   });
+
+  // -------------------------------------------------------------------------
+  // The cellsByCh backfill inserts a synthesized fallback ONLY for a
+  // recommended row absent from `cells` (`if (!map.has(key))`). A recommended
+  // row for a character the keyboard genuinely produces must keep its REAL
+  // cell — keys, waysToType and source intact. Nothing above pins that: every
+  // other assertion in this file reads the cell BUTTON's accessible name
+  // (glyph + code point), which a synthesized cell reproduces exactly, so
+  // dropping the guard would blank the details rail for every recommended
+  // real character while leaving this suite green.
+  // -------------------------------------------------------------------------
+  it('keeps the real cell for a recommended character that IS produced, rather than shadowing it with a fallback', async () => {
+    mockFixtureContributors();
+    neededCharsResult.set(new Set(['a']));
+
+    renderGalleryV2(makeFixtureIR());
+
+    const suggestedGroup = await screen.findByTestId('carve-v2-suggested-group');
+    const realCell = within(suggestedGroup).getByRole('button', { name: 'C — U+0043' });
+
+    // Open the details rail on the recommended-but-produced character.
+    fireEvent.mouseEnter(realCell);
+
+    // The rail shows its genuine producer. A synthesized fallback carries
+    // waysToType: [] and source 'blocked-candidate', so it would render the
+    // blocked-combination line and no "How it's typed" section at all.
+    expect(screen.getByText(/How it's typed/)).not.toBeNull();
+    expect(screen.queryByText(/blocks this combination/)).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------
