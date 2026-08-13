@@ -83,6 +83,19 @@ describe('RemovalBanner — expand / checklist', () => {
     fireEvent.click(strip);
     expect(screen.queryAllByRole('checkbox')).toHaveLength(0);
   });
+
+  it('names every code point of a multi-code-point recommended char, not just the first', () => {
+    // Ə + combining acute (U+018F U+0301) has no precomposed form — this is
+    // exactly the block-candidate grapheme shape recommendedRemovalChars can
+    // surface via blockCandidateChars (composeCombo's NFC output). Regression
+    // for PR #1625's pattern audit: the row must not silently collapse to
+    // only the base code point.
+    render(<RemovalBanner recommended={[makeRecommended('Ə́')]} languageLabel="fr" onRemoveSelected={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /We recommend removing/ }));
+
+    expect(screen.getByLabelText('Remove U+018F U+0301')).not.toBeNull();
+    expect(screen.getByText('U+018F U+0301')).not.toBeNull();
+  });
 });
 
 describe('RemovalBanner — unchecking and "Remove all selected"', () => {
