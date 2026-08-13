@@ -15,6 +15,7 @@ import { collectCharContributors, isParallelIndexFanOut, isPlusSeparator } from 
 import type { CharContributors } from '@keyboard-studio/engine';
 import { toRailNodes, invisibleCharLabel, keySequenceLabel, desktopVkeyLabel, displayChar, charProducers, isNotAForwardTypingPath, ASCII_LETTER_RE } from './irToCarveNodes.ts';
 import type { CharProducer } from './irToCarveNodes.ts';
+import { codepointLabel } from '../survey/codepointLabel.ts';
 
 // ---------------------------------------------------------------------------
 // Category / source classification
@@ -31,8 +32,22 @@ export type CharacterCategory =
   | 'digit'
   | 'punctuation-symbol';
 
-/** Secondary ("by source") grouping attribute. */
-export type CharacterSource = 'direct-key' | 'deadkey-sequence' | 'store' | 'advanced-rule';
+/**
+ * Secondary ("by source") grouping attribute.
+ *
+ * `blocked-candidate` is the odd one out: it does not describe a way the
+ * keyboard produces a character, it marks a character the keyboard
+ * deliberately *cannot* produce (a blocked base-plus-mark combination) which
+ * is surfaced as a removal recommendation. It exists so such a row can be
+ * shown without borrowing another source's user-facing copy and claiming the
+ * character is produced when it is not.
+ */
+export type CharacterSource =
+  | 'direct-key'
+  | 'deadkey-sequence'
+  | 'store'
+  | 'advanced-rule'
+  | 'blocked-candidate';
 
 export const CATEGORY_ORDER: readonly CharacterCategory[] = [
   'basic-letter', 'special-letter', 'accented-letter', 'digit', 'punctuation-symbol',
@@ -47,7 +62,9 @@ export const CATEGORY_LABELS: Record<CharacterCategory, string> = {
   'punctuation-symbol': 'Punctuation & symbols',
 };
 
-export const SOURCE_ORDER: readonly CharacterSource[] = ['direct-key', 'deadkey-sequence', 'store', 'advanced-rule'];
+export const SOURCE_ORDER: readonly CharacterSource[] = [
+  'direct-key', 'deadkey-sequence', 'store', 'advanced-rule', 'blocked-candidate',
+];
 
 /** Plural group-header labels for the (nice-to-have) "by source" grouping. */
 export const SOURCE_LABELS: Record<CharacterSource, string> = {
@@ -55,6 +72,7 @@ export const SOURCE_LABELS: Record<CharacterSource, string> = {
   'deadkey-sequence': 'Deadkey sequences',
   store: 'From stores',
   'advanced-rule': 'From advanced rules',
+  'blocked-candidate': 'Blocked combinations',
 };
 
 /** Singular labels for the left "Character details" panel's "Comes from" row. */
@@ -63,6 +81,7 @@ export const SOURCE_DETAIL_LABEL: Record<CharacterSource, string> = {
   'deadkey-sequence': 'Deadkey sequence',
   store: 'Store',
   'advanced-rule': 'Advanced rule',
+  'blocked-candidate': 'Blocked combination',
 };
 
 /**
@@ -385,5 +404,11 @@ export function groupCharacterCells(cells: readonly CharacterCell[], by: 'catego
 export function characterDisplayName(ch: string): string {
   const invisible = invisibleCharLabel(ch);
   if (invisible !== null) return invisible;
-  return `Character U+${ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`;
+  // Every code point, not just the first. A base-plus-mark combination with no
+  // precomposed form stays multi-code-point through NFC (the norm for Indic
+  // matras, Arabic harakat and Hebrew points), and naming only the base would
+  // describe a different character than the one on screen — exactly the
+  // fabricated name this function's contract promises to avoid.
+  const notation = codepointLabel(ch).title;
+  return [...ch].length > 1 ? `Character sequence ${notation}` : `Character ${notation}`;
 }
