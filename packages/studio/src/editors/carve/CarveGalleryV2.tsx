@@ -20,6 +20,7 @@ import {
   characterDisplayName, SOURCE_DETAIL_LABEL, classifyCharacterCategory,
 } from '../../lib/irToCharacterView.ts';
 import type { CharacterCell, CharacterGroup } from '../../lib/irToCharacterView.ts';
+import { codepointLabel } from '../../survey/codepointLabel.ts';
 import type { CharContributors } from '@keyboard-studio/engine';
 import { KeySeq } from '../assignLoop/parts/KeySeq.tsx';
 import { UndoIcon, DiscardIcon, ChevronIcon } from '../assignLoop/parts/carveShared.tsx';
@@ -57,11 +58,15 @@ const GROUP_DOT: Record<string, string> = {
   'deadkey-sequence': 'var(--sil-violet)',
   store: 'var(--sil-orange)',
   'advanced-rule': 'var(--app-text-subtle)',
+  'blocked-candidate': 'var(--app-text-subtle)',
 };
 
-function codepointLabel(ch: string): string {
-  return `U+${ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`;
-}
+// Code-point notation comes from the sanctioned `survey/codepointLabel.ts`
+// helper rather than a local `codePointAt(0)` read: a base-plus-mark character
+// that has no precomposed form stays multi-code-point through NFC, and naming
+// only the first would label a blocked Devanagari consonant-plus-matra
+// identically to the bare consonant. `.title` is the full space-separated
+// stack; `base`/`extras` are the compact chip split.
 
 // A block-candidate row (reason: 'blocked-combination') names a character
 // that is, by definition, never actually produced — that's what "blocked"
@@ -79,7 +84,11 @@ function synthesizeFallbackCell(ch: string, contributors: CharContributors): Cha
     keys: [],
     waysToType: [],
     category: classifyCharacterCategory(normalized),
-    source: 'advanced-rule',
+    // Not 'advanced-rule'. This character is never produced at all, so
+    // borrowing that source would tell the author "Produced by an advanced
+    // rule kept verbatim" about a combination the keyboard specifically
+    // blocks — a false statement on the one row this fallback exists to show.
+    source: 'blocked-candidate',
     inAlpha: false,
     reco: true,
     contributors,
@@ -147,7 +156,7 @@ function CharacterCellButton({ cell, discarded, isSelected, flag, onSelect, onTo
       onFocus={onSelect}
       onClick={onToggle}
       aria-pressed={discarded}
-      aria-label={`${displayChar(cell.ch)} — ${codepointLabel(cell.ch)}${discarded ? ', discarded' : ''}`}
+      aria-label={`${displayChar(cell.ch)} — ${codepointLabel(cell.ch).title}${discarded ? ', discarded' : ''}`}
       style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
         padding: '10px 4px 8px', borderRadius: 8, cursor: 'pointer',
@@ -178,8 +187,20 @@ function CharacterCellButton({ cell, discarded, isSelected, flag, onSelect, onTo
           theme/background combination this cell can render. No opacity here:
           per the comment above, this text must stay legible in the discarded
           state, not fade with the glyph. */}
-      <span style={{ fontSize: 9.5, fontFamily: 'var(--app-font-mono)', color: 'var(--app-text-muted)' }}>
-        {codepointLabel(cell.ch)}
+      {/* base + "[+marks]" rather than the full stack: a multi-code-point
+          character would otherwise widen this 9.5px chip past its grid cell.
+          The complete notation stays reachable on hover (title) and in the
+          button's aria-label above. Mirrors PhaseB's CpLabel. */}
+      <span
+        style={{ fontSize: 9.5, fontFamily: 'var(--app-font-mono)', color: 'var(--app-text-muted)' }}
+        title={codepointLabel(cell.ch).title}
+      >
+        {codepointLabel(cell.ch).base}
+        {codepointLabel(cell.ch).extras !== '' && (
+          <span style={{ color: 'var(--app-accent-text)', fontWeight: 700 }}>
+            {`[+${codepointLabel(cell.ch).extras}]`}
+          </span>
+        )}
       </span>
       {/* No keystroke sequence here on purpose. The details rail already shows
           "How it's typed" for the hovered/selected cell, so repeating it under
@@ -586,7 +607,9 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     if (q.length === 0) return base;
     return base.filter((cell) => {
       if (cell.ch.toLowerCase().includes(q)) return true;
-      if (codepointLabel(cell.ch).toLowerCase().includes(q)) return true;
+      // `.title` (every code point), so searching a combining mark's own
+      // notation finds the sequences that contain it, not just the base.
+      if (codepointLabel(cell.ch).title.toLowerCase().includes(q)) return true;
       return cell.keys.some((k) => k.toLowerCase().includes(q));
     });
   }, [cells, search]);
@@ -756,7 +779,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                   </span>
                 </div>
                 <div style={{ fontSize: 12, fontFamily: 'var(--app-font-mono)', color: 'var(--app-text-subtle)', marginBottom: 4 }}>
-                  {codepointLabel(cell.ch)}
+                  {codepointLabel(cell.ch).title}
                 </div>
                 <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--app-text)', marginBottom: 14 }}>
                   {characterDisplayName(cell.ch)}
@@ -784,10 +807,20 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                     );
 
                     if (ways.length === 0) {
-                      // No renderable producer at all. `advanced-rule` gets
-                      // its own honest codec-limit message (not a banned
-                      // phrase); every other zero-producer character shows
-                      // no "way" line whatsoever.
+                      // No renderable producer at all. Two sources get their
+                      // own honest message (neither a banned phrase); every
+                      // other zero-producer character shows no "way" line
+                      // whatsoever.
+                      if (cell.source === 'blocked-candidate') {
+                        return (
+                          <>
+                            {label}
+                            <span style={{ fontSize: 12.5, color: 'var(--app-text-subtle)' }}>
+                              This keyboard blocks this combination — nothing types it
+                            </span>
+                          </>
+                        );
+                      }
                       if (cell.source !== 'advanced-rule') return null;
                       return (
                         <>
