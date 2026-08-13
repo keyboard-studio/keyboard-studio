@@ -15,6 +15,7 @@ import { collectCharContributors, isParallelIndexFanOut, isPlusSeparator } from 
 import type { CharContributors } from '@keyboard-studio/engine';
 import { toRailNodes, invisibleCharLabel, keySequenceLabel, desktopVkeyLabel, displayChar, charProducers, isNotAForwardTypingPath, ASCII_LETTER_RE } from './irToCarveNodes.ts';
 import type { CharProducer } from './irToCarveNodes.ts';
+import { codepointLabel } from '../survey/codepointLabel.ts';
 
 // ---------------------------------------------------------------------------
 // Category / source classification
@@ -408,8 +409,6 @@ export function characterDisplayName(ch: string): string {
   // matras, Arabic harakat and Hebrew points), and naming only the base would
   // describe a different character than the one on screen — exactly the
   // fabricated name this function's contract promises to avoid.
-  const notation = [...ch]
-    .map((cp) => `U+${cp.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`)
-    .join(' ');
+  const notation = codepointLabel(ch).title;
   return [...ch].length > 1 ? `Character sequence ${notation}` : `Character ${notation}`;
 }
