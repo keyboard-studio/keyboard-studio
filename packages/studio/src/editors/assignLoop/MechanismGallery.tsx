@@ -103,6 +103,7 @@ import {
   comboToKeySpec,
   collectModifierTokensInUse,
   collectCharContributors,
+  sliceContributorDescriptors,
   collectCompositionMethod,
   type ModifierToken,
   type CharContributors,
@@ -3428,20 +3429,8 @@ export function MechanismGallery({
     // doc comment on `descriptors`) — slice it back into three per-array
     // views rather than re-deriving a lookup, so each loop below can zip its
     // own array against the matching descriptor by position.
-    const { descriptors } = existingMethodContributors;
-    const ruleDescriptors = descriptors.slice(
-      0,
-      existingMethodContributors.ruleNodeIds.length,
-    );
-    const storeSlotDescriptors = descriptors.slice(
-      existingMethodContributors.ruleNodeIds.length,
-      existingMethodContributors.ruleNodeIds.length +
-        existingMethodContributors.storeSlots.length,
-    );
-    const blockedDescriptors = descriptors.slice(
-      existingMethodContributors.ruleNodeIds.length +
-        existingMethodContributors.storeSlots.length,
-    );
+    const { ruleDescriptors, storeSlotDescriptors, blockedDescriptors } =
+      sliceContributorDescriptors(existingMethodContributors);
 
     const rows: ExistingMethodRow[] = [];
 
