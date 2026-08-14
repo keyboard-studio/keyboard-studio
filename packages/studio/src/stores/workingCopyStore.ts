@@ -593,8 +593,10 @@ export interface WorkingCopyState {
    * as a single grouped cascade, pushing ONE batch undo entry so a single
    * undoDelete() call reverses the entire cascade.
    *
-   * - `ruleNodeIds`:  nodeIds to add to deletedNodeIds (whole-rule deletes).
-   * - `storeSlotIds`: itemIds (format "<storeNodeId>#<index>") to add to deletedItemIds.
+   * Both `ruleNodeIds` (whole-rule deletes) and `storeSlotIds` (format
+   * "<storeNodeId>#<index>") are added to `deletedItemIds` — cascadeDelete
+   * routes everything through this single item channel, never `deletedNodeIds`
+   * (see e2eHook.ts's `getDeletedItemIds` doc for the corroborating detail).
    *
    * Either array may be empty; at least one must be non-empty for the action to push
    * an undo entry. If both are empty this is a no-op.

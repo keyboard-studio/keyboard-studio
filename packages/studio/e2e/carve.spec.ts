@@ -149,7 +149,6 @@ const KNOWN_CONTRAST_DEBT_OUTPUT: readonly string[] = [
 
 interface KsE2EHook {
   getWorkingIr(): KeyboardIR | null;
-  getDeletedNodeIds(): string[];
   getDeletedItemIds(): string[];
 }
 
