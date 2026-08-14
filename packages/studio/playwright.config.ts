@@ -22,11 +22,21 @@ import { defineConfig } from "playwright/test";
 
 export default defineConfig({
   testDir: "e2e",
-  // Full authoring walks are long: the first test also pays a cold ../keyboards
-  // catalog enumeration (BaseResolution's listAll over the whole local clone) plus
-  // a kmcmplib WASM compile before download. 240s gives headroom; the dev server
-  // caches the catalog after the first request so later tests are much faster.
+  // Full authoring walks are long: a test also pays a cold ../keyboards catalog
+  // enumeration (BaseResolution's listAll over the whole local clone) plus a
+  // kmcmplib WASM compile before download. 240s gives headroom.
   timeout: 240_000,
+  // global-setup.ts warms the catalog cache with one request before any
+  // worker starts (see its header), but that only holds the "one payer"
+  // model if workers stay serial — with the default (half of CPU cores) as
+  // many concurrent full-authoring-walk specs (each its own heavy WASM
+  // compile + Vite transform pass) contend for the same machine regardless
+  // of the cache. #1438: on a 12-core box the default 6 workers turned a
+  // trivial boot-smoke spec into a 3.8-minute run. This suite is a manual/CD
+  // step, never the blocking unit-CI lane (see the file header), so trading
+  // wall-clock for reliability here is the right call.
+  workers: 1,
+  globalSetup: "./e2e/global-setup.ts",
   use: {
     baseURL: "http://localhost:5273",
   },

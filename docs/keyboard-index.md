@@ -27,6 +27,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Anii | `anii` | `blo-Latn` | Martin Zaske | `../keyboards/release/a/anii` |
 | Arabic Izza | `arabic_izza` | `ar-DZ` | Prof. Abdelmalek Bouhadjera | `../keyboards/release/a/arabic_izza` |
 | Arbore | `arbore` | `arv-Latn`, `amf` | Sophia Ku | `../keyboards/release/a/arbore` |
+| Armenian Eastern Basic | `basic_kbdarme` | `hy` | (c) 2009-2019 SIL International | `../keyboards/release/basic/basic_kbdarme` |
 | Armenian Mnemonic R | `armenian_mnemonic_r` | `hy` | Tigran Sarukhanyan | `../keyboards/release/a/armenian_mnemonic_r` |
 | Vai (Athinkra) | `athinkra_vai` | `vai` | Jason Glavy | `../keyboards/release/athinkra/athinkra_vai` |
 | Vai Typewriter (Athinkra) | `athinkra_vai_typewriter` | `vai` | Jason Glavy | `../keyboards/release/athinkra/athinkra_vai_typewriter` |
@@ -79,6 +80,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Pak Urdu Phonetic | `pak_urdu_phonetic` | `ur` | Nashit Ahmed Barq | `../keyboards/release/p/pak_urdu_phonetic` |
 | Piaroa | `pid_piaroa` | `pid-Latn` | Eddie Antonio Santos | `../keyboards/release/p/pid_piaroa` |
 | Remington GAIL (SIL) | `remington_gail` | `hi` | © SIL Global | `../keyboards/release/r/remington_gail` |
+| Russian Basic | `basic_kbdru` | `ru` | (c) 2009-2019 SIL International | `../keyboards/release/basic/basic_kbdru` |
 | Russian Mnemonic R | `russian_mnemonic_r` | `ru` | Tigran Sarukhanyan | `../keyboards/release/r/russian_mnemonic_r` |
 | Umatilla Sahaptin/Ičiškíin | `sahaptin_umatilla` | `uma` | Jonathan A. Geary | `../keyboards/release/s/sahaptin_umatilla` |
 | Saraiki | `saraiki` | `skr` | Parvez Qadir | `../keyboards/release/s/saraiki` |
