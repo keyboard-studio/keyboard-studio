@@ -293,7 +293,15 @@ function RecommendedGroupCard({
   const bulkButtonStyle = destructiveBulkButton === true && !allDiscarded
     ? {
         font: '600 12.5px var(--app-font)', cursor: 'pointer',
-        color: 'var(--app-text-on-accent)', background: 'var(--sil-red-dark)',
+        // NOT --app-text-on-accent: that token flips per theme to pair with
+        // --app-accent (dark text on navy's light-blue accent, white text on
+        // light's dark-blue accent) — --sil-red-dark is a fixed dark red in
+        // BOTH themes (brand.css has no navy override for it), so pairing it
+        // with the flipping token gives navy theme dark-on-dark (#18243f on
+        // #a6121f, 2:1) while looking fine in light theme, which is exactly
+        // how this shipped unnoticed. White is correct against this fixed
+        // dark fill in either theme.
+        color: 'var(--sil-white)', background: 'var(--sil-red-dark)',
         border: 'none', borderRadius: 8, padding: '9px 16px',
       }
     : destructiveBulkButton === true
@@ -711,7 +719,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
             border: '1px solid var(--app-border-strong)', borderRadius: 8, background: 'var(--app-surface-2)',
           }}
         >
-          <legend style={{ font: '600 10.5px var(--app-font)', letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--app-text-subtle)', padding: '0 6px 0 0' }}>
+          <legend style={{ font: '600 10.5px var(--app-font)', letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--app-text-muted)', padding: '0 6px 0 0' }}>
             Group by
           </legend>
           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, font: '600 12px var(--app-font)', color: groupBy === 'category' ? 'var(--app-accent-text)' : 'var(--app-text-muted)', cursor: 'pointer' }}>
@@ -900,7 +908,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                   <span style={{
                     display: 'inline-flex', alignItems: 'center', font: '600 11.5px var(--app-font)',
                     padding: '3px 9px', borderRadius: 999,
-                    color: cell.inAlpha ? 'var(--app-text-on-accent)' : 'var(--app-text-subtle)',
+                    color: cell.inAlpha ? 'var(--app-text-on-accent)' : 'var(--app-text-muted)',
                     background: cell.inAlpha ? 'var(--sil-green)' : 'var(--app-surface-2)',
                     border: cell.inAlpha ? 'none' : '1px solid var(--app-border-strong)',
                   }}>
@@ -915,9 +923,9 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                   style={{
                     width: '100%', font: '600 13px var(--app-font)', cursor: toggleable ? 'pointer' : 'default',
                     padding: '9px 14px', borderRadius: 8, opacity: toggleable ? 1 : 0.5,
-                    color: discarded ? 'var(--app-text-on-accent)' : 'var(--app-danger)',
+                    color: discarded ? 'var(--app-text-on-accent)' : 'var(--app-danger-text)',
                     background: discarded ? 'var(--sil-green)' : 'transparent',
-                    border: discarded ? 'none' : '1px solid var(--app-danger)',
+                    border: discarded ? 'none' : '1px solid var(--app-danger-text)',
                   }}
                 >
                   {discarded ? 'Restore this character' : 'Discard this character'}
