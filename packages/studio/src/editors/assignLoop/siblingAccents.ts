@@ -169,7 +169,11 @@ export function siblingAccentPlacements(
     // single-codepoint-only, so testing `x` whole silently mis-buckets an
     // NFD-form uppercase sibling as lowercase (#1445). The decomposed base is
     // always a single code point, so it's safe input for that helper.
-    const bucket = isUppercaseLetter(nfdBase ?? "") ? upper : lower;
+    // Non-null assertion: `x` already passed `isDecomposableAccented(x)`
+    // above, so `x.normalize("NFD")` has at least 2 code points and index 0
+    // always exists — TS just can't see that through the spread + array
+    // destructure.
+    const bucket = isUppercaseLetter(nfdBase!) ? upper : lower;
     bucket.push({ char: x, mark });
   }
 
