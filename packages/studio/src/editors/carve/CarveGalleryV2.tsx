@@ -827,10 +827,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                       // whatsoever.
                       //
                       // touch-only-key reaches here for the same reason it
-                      // exists (spec §8, issue 1606 — written without the
-                      // leading hash because token-lint's comment scanner
-                      // desyncs earlier in this block and would read it as a
-                      // hex color): its only producer is a
+                      // exists (spec §8): its only producer is a
                       // T_xxxx-triggered rule, which charProducers drops
                       // rather than leak a touch id as a desktop keystroke —
                       // so ways is empty and, without this branch, the

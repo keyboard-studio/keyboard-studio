@@ -295,6 +295,19 @@ export function irToCharacterView(
   return [...seen.values()];
 }
 
+// Shared set-difference walk behind both `advancedRuleOnlyChars` and
+// `touchOnlyProducedChars` below: run `buildProducedSet` over the full IR and
+// over a filtered variant, then return whatever only the full walk produced.
+function producedSetDifference(full: KeyboardIR, filtered: KeyboardIR): Set<string> {
+  const fullSet = buildProducedSet(full);
+  const filteredSet = buildProducedSet(filtered);
+  const onlyInFull = new Set<string>();
+  for (const ch of fullSet) {
+    if (!filteredSet.has(ch)) onlyInFull.add(ch);
+  }
+  return onlyInFull;
+}
+
 /**
  * Characters producible ONLY through one or more opaque RawKmnFragment
  * blocks' `producedOutput` sketch (#1399) — never reachable via any typed
@@ -336,26 +349,14 @@ export function irToCharacterView(
  * baseline and can never appear there).
  */
 function touchOnlyProducedChars(ir: KeyboardIR): Set<string> {
-  const full = buildProducedSet(ir);
-  const withoutTouch = buildProducedSet({
+  return producedSetDifference(ir, {
     ...ir,
     groups: ir.groups.map((g) => ({ ...g, rules: g.rules.filter((r) => !isTouchOnlyTriggerRule(r)) })),
   });
-  const onlyTouch = new Set<string>();
-  for (const ch of full) {
-    if (!withoutTouch.has(ch)) onlyTouch.add(ch);
-  }
-  return onlyTouch;
 }
 
 function advancedRuleOnlyChars(ir: KeyboardIR): Set<string> {
-  const withRaw = buildProducedSet(ir);
-  const rulesOnly = buildProducedSet({ ...ir, raw: [] });
-  const onlyAdvanced = new Set<string>();
-  for (const ch of withRaw) {
-    if (!rulesOnly.has(ch)) onlyAdvanced.add(ch);
-  }
-  return onlyAdvanced;
+  return producedSetDifference(ir, { ...ir, raw: [] });
 }
 
 // ---------------------------------------------------------------------------
