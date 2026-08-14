@@ -1678,7 +1678,7 @@ export function isNotAForwardTypingPath(rule: IRRule): boolean {
  * a leaked touch id, or floored/banned — the character may still have other,
  * real desktop producers.
  */
-function isTouchOnlyTriggerRule(rule: IRRule): boolean {
+export function isTouchOnlyTriggerRule(rule: IRRule): boolean {
   const triggerEl = ruleTriggerVkey(rule);
   return triggerEl !== undefined && isTouchOnlyVkeyName(triggerEl.name);
 }

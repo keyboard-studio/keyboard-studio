@@ -10,7 +10,11 @@ import {
   characterCellIsToggleable,
   groupCharacterCells,
   characterDisplayName,
+  SOURCE_ORDER,
+  SOURCE_LABELS,
+  SOURCE_DETAIL_LABEL,
 } from './irToCharacterView.ts';
+import type { CharacterSource } from './irToCharacterView.ts';
 
 // ---------------------------------------------------------------------------
 // Fixture helpers (mirror irToCarveNodes.test.ts's minimal-IR convention)
@@ -183,6 +187,76 @@ describe('irToCharacterView — input-only match-table stores are omitted (#533)
 // ---------------------------------------------------------------------------
 // #1399 — surfacing characters produced ONLY by advanced (opaque) blocks
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// Touch-only-produced characters (spec §8 / #1606).
+//
+// The spec clause has two halves — such a character must be "never silently
+// dropped, and never misrepresented as if they lived on a single key." Only
+// the SECOND half was broken: a touch-only-triggered rule is an ordinary typed
+// rule, so the glyph pass already emitted a cell for it, but with no keySteps
+// (desktopVkeyLabel refuses to render a T_xxxx id as a desktop keystroke) and
+// source `direct-key`. The character was present, filed under "typed with a
+// single key press", with no key named. Hence a source OVERRIDE rather than
+// the trailing fallback pass advanced-rule-only characters use — by the time
+// any trailing pass ran, consider() had already seen the character.
+// ---------------------------------------------------------------------------
+
+function touchOnlyRule(nodeId: string, vkey: string, ch: string): IRRule {
+  return { nodeId, context: [{ kind: 'vkey', name: vkey, modifiers: [] }], output: [{ kind: 'char', value: ch }] };
+}
+
+describe('irToCharacterView — touch-only-produced characters (spec §8, #1606)', () => {
+  it('a char whose only producer is a touch-only (T_xxxx) rule is its own source, not a keyless direct-key', () => {
+    const ir = makeIR({ groups: [makeGroup([touchOnlyRule('r-touch', 'T_0057', 'ẅ')])] });
+
+    const cells = irToCharacterView(ir, new Map(), new Set(), new Set());
+
+    const cell = cells.find((c) => c.ch === 'ẅ');
+    expect(cell).toMatchObject({ ch: 'ẅ', keys: [], source: 'touch-only-key' });
+    // The regression this guards: 'direct-key' with an empty key list claims
+    // the character lives on a single key while naming none.
+    expect(cell?.source).not.toBe('direct-key');
+  });
+
+  it('a char produced by BOTH a desktop rule and a touch-only rule keeps its real desktop entry', () => {
+    const ir = makeIR({
+      groups: [makeGroup([directRule('r1', 'K_W', 'w'), touchOnlyRule('r-touch', 'T_0057', 'w')])],
+    });
+
+    const cells = irToCharacterView(ir, new Map(), new Set(), new Set());
+
+    const cell = cells.find((c) => c.ch === 'w');
+    // Excluded from the touch-only set by construction — it has a desktop path.
+    expect(cell?.source).toBe('direct-key');
+    expect(cell?.keys.length).toBeGreaterThan(0);
+  });
+
+  it('stays discardable — unlike advanced-rule, a touch-only rule is safe to delete', () => {
+    // Deliberate divergence from #1606's "non-toggleable" wording: these are
+    // ordinary typed rules, and irToCarveNodes.test.ts already documents
+    // deleting a touch-only-triggered rule as "a valid, capability-agnostic
+    // removal". Making the set non-toggleable would remove an ability authors
+    // have today. The label changes; the capability does not.
+    const ir = makeIR({ groups: [makeGroup([touchOnlyRule('r-touch', 'T_0057', 'ẅ')])] });
+
+    const cells = irToCharacterView(ir, new Map(), new Set(), new Set());
+
+    const cell = cells.find((c) => c.ch === 'ẅ')!;
+    expect(characterCellIsToggleable(cell)).toBe(true);
+    expect(characterCellIds(cell)).toContain('r-touch');
+  });
+
+  it('every CharacterSource has a display order slot and both labels', () => {
+    // SOURCE_ORDER is an array, so unlike the two Record label maps it is not
+    // exhaustiveness-checked by the compiler — a new source added without a
+    // slot here would silently group under nothing.
+    for (const source of Object.keys(SOURCE_LABELS) as CharacterSource[]) {
+      expect(SOURCE_ORDER).toContain(source);
+      expect(SOURCE_DETAIL_LABEL[source]).toBeTruthy();
+    }
+  });
+});
 
 describe('irToCharacterView — advanced-rule-only characters (#1399)', () => {
   it('a char produced ONLY by a raw fragment with producedOutput appears as an advanced-rule cell', () => {
