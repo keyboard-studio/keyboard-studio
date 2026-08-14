@@ -11,7 +11,7 @@
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
-import { render } from "../../test/renderWithI18n.tsx";
+import { render, i18n } from "../../test/renderWithI18n.tsx";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { PunctuationStep } from "./PunctuationStep.tsx";
 import { usePhaseBDraftStore, resetPhaseBDraftDecisions } from "../../stores/phaseBDraftStore.ts";
@@ -59,6 +59,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  i18n.activate("en");
 });
 
 describe("PunctuationStep — type-in and Done", () => {
@@ -158,6 +159,42 @@ describe("PunctuationStep — sourced suggestions", () => {
 
     fireEvent.click(screen.getByTestId("punctuation-done"));
     expect(lastResult(onComplete).confirmedInventory).toEqual(["।"]);
+  });
+
+  it("renders the suggestion chip's accessible name as one full catalog sentence, not an assembled fragment (#1589)", async () => {
+    mocks.inventory = {
+      source: "cldr",
+      confidence: "high",
+      characters: [{ char: "।", tier: "punctuation" }],
+      digraphs: [],
+    };
+    render(<PunctuationStep onComplete={vi.fn()} />);
+
+    expect(await screen.findByRole("button", { name: "Add । (U+0964)" })).toBeTruthy();
+  });
+
+  // km-triage finding on #1596: the English-only assertion above proves the
+  // id/macro wiring produces the right English text, but not that a
+  // translator can actually REORDER "Add X (Y)" — the real fr catalog is
+  // still an untranslated stub with nothing to test against. This loads a
+  // test-only locale whose message deliberately reverses the placeholder
+  // order, so a real regression (an assembled fragment ignoring the
+  // catalog's word order) would fail this even if the English text matched.
+  it("a translator's word-order choice actually reaches the rendered name — not locked to English order", async () => {
+    i18n.load("zz", {
+      "survey.punctuation.suggestionChip.addAriaLabel": "({cp}) {char} dda",
+    });
+    i18n.activate("zz");
+
+    mocks.inventory = {
+      source: "cldr",
+      confidence: "high",
+      characters: [{ char: "।", tier: "punctuation" }],
+      digraphs: [],
+    };
+    render(<PunctuationStep onComplete={vi.fn()} />);
+
+    expect(await screen.findByRole("button", { name: "(U+0964) । dda" })).toBeTruthy();
   });
 
   it("says so when the source has no punctuation tier for the language", async () => {

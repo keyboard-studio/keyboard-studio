@@ -94,12 +94,14 @@ function SuggestedPunctuationChip({ char, onAdd }: SuggestedChipProps) {
   const { t } = useLingui();
   const glyphFontStack = useGlyphFontStack();
   const cp = toUPlusNotation(char);
-  const actionLabel = t({ id: "survey.punctuation.suggestionChip.addAction", message: "Add" });
   return (
     <button
       type="button"
       onClick={() => onAdd(char)}
-      aria-label={`${actionLabel} ${char} (${cp})`}
+      aria-label={t({
+        id: "survey.punctuation.suggestionChip.addAriaLabel",
+        message: `Add ${{ char }} (${{ cp }})`,
+      })}
       aria-pressed={false}
       style={charChip(false)}
     >
