@@ -843,9 +843,9 @@
       "decisions": [],
       "notes": ""
     },
-    "specs/061-help-docs-generation": {
-      "title": "Feature Specification: Help documentation generation from Phase F answers",
-      "hash": "sha256:dd3e4384355ed0d7",
+    "specs/062-canonical-context-tolerance": {
+      "title": "Feature Specification: Canonical-equivalence context tolerance",
+      "hash": "sha256:2dcbb535f9285319",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
