@@ -908,7 +908,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                   <span style={{
                     display: 'inline-flex', alignItems: 'center', font: '600 11.5px var(--app-font)',
                     padding: '3px 9px', borderRadius: 999,
-                    color: cell.inAlpha ? 'var(--app-text-on-accent)' : 'var(--app-text-muted)',
+                    color: cell.inAlpha ? 'var(--sil-black)' : 'var(--app-text-muted)',
                     background: cell.inAlpha ? 'var(--sil-green)' : 'var(--app-surface-2)',
                     border: cell.inAlpha ? 'none' : '1px solid var(--app-border-strong)',
                   }}>
@@ -923,7 +923,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                   style={{
                     width: '100%', font: '600 13px var(--app-font)', cursor: toggleable ? 'pointer' : 'default',
                     padding: '9px 14px', borderRadius: 8, opacity: toggleable ? 1 : 0.5,
-                    color: discarded ? 'var(--app-text-on-accent)' : 'var(--app-danger-text)',
+                    color: discarded ? 'var(--sil-black)' : 'var(--app-danger-text)',
                     background: discarded ? 'var(--sil-green)' : 'transparent',
                     border: discarded ? 'none' : '1px solid var(--app-danger-text)',
                   }}
@@ -955,7 +955,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                 regionAriaLabel={t({ id: "carve.suggested.regionAriaLabel", message: "Suggested to discard" })}
                 topBorderColor="var(--sil-red)"
                 chipBackground="color-mix(in srgb, var(--sil-red) 14%, var(--app-surface-2))"
-                chipColor="var(--app-danger-text)"
+                chipColor="var(--app-danger-text-on-surface-2)"
                 heading={<Trans id="carve.suggested.heading">Suggested to discard</Trans>}
                 body={<Trans id="carve.suggested.body">Your base keyboard can type these characters, but nothing in your confirmed alphabet uses them. Click any character below to keep it instead — nothing is removed until you continue.</Trans>}
                 rows={primaryRows}
