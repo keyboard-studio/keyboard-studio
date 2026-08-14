@@ -1,50 +1,34 @@
 // Known pre-existing WCAG 1.4.3 (Contrast Minimum) offenders shared by
 // several walk specs, excluded per-node at axe call sites per FR-003's
 // scoping rule (spec 056 — no blanket disables, every selector names its
-// component). All of it is the SAME open debt: the 1.4.3 `unknown` row in
-// specs/056-ada-accessibility/wcag-2.2-aa-tracker.md, tracked for a real fix
-// by the issue filed from
-// specs/057-bulletproof-navigation/reviews/056-contrast-issue-draft.md.
-// None of these components are touched by spec 057.
+// component).
 //
-// Selector groups are composed per screen family at the call site, so each
-// scan still excludes only what its own screen actually renders. Spec-local
-// KNOWN_CONTRAST_DEBT lists remain for offenders unique to one spec's walk
-// (e.g. carve.spec.ts's carve-card spans).
+// #1477 ground-truth sweep: every entry this file used to carry — OskModeToggle,
+// SignUpPanel's GitHub button, the per-key glyph chips (GLYPH_KEY_CHIP_DEBT),
+// and LintChip's code badge (LINT_CHIP_DEBT) — was re-scanned live with its
+// exclusion emptied. OskModeToggle/SignUpPanel/glyph-chips came back clean (no
+// serious/critical violation survives on current `main`; the debt was already
+// fixed by an earlier contrast pass and these entries were stale). LintChip's
+// code badge was a REAL, reproducible failure (navy theme's
+// --app-danger-text at 4.22:1 against --app-surface-2, below the 4.5:1
+// minimum) and is fixed at the source (lint/colors.ts's SEVERITY_COLORS
+// consumers now use the new --app-danger-text-on-surface-2 token for
+// fatal/error text on that specific surface) rather than carried here as
+// permanent debt.
+//
+// Only the OSK iframe remains: it renders KeymanWeb's own markup
+// (.kmw-spacebar-caption), which this repo does not author and cannot
+// restyle from here — see wcag-2.2-aa-tracker.md's 1.4.3 row for the
+// recorded n/a-with-justification decision.
 
 /** 1.4.3 — the KeymanWeb OSK iframe renders KeymanWeb's own markup
  * (.kmw-spacebar-caption), not authored in this repo. */
 export const OSK_IFRAME_DEBT: readonly string[] = ["iframe"];
 
-/** 1.4.3 — chrome shared across several tabs. */
-export const SHARED_CHROME_DEBT: readonly string[] = [
-  // SignUpPanel's "Sign up with GitHub" button.
-  'button[aria-label="Sign up with GitHub"]',
-];
-
-/** 1.4.3 — the Output screen: OskModeToggle's grouped Desktop-OSK/Mobile-KB
- * button pair, plus the shared chrome and the OSK iframe it embeds. */
-export const OUTPUT_SCREEN_DEBT: readonly string[] = [
-  'div[role="group"] > button',
-  ...SHARED_CHROME_DEBT,
-  ...OSK_IFRAME_DEBT,
-];
-
-/** 1.4.3 — the per-key glyph chips labelled "<char> — K_<key>" (GlyphCell /
- * inventory keycap rows): the small key-name span inside each chip fails
- * contrast against the chip background. */
-export const GLYPH_KEY_CHIP_DEBT: readonly string[] = [
-  'button[aria-label*="— K_"] > span',
-];
-
-/** 1.4.3 — LintChip's code badge (lint/LintChip.tsx renders the finding's
- * code in a <code> element coloured from lint/colors.ts's severity palette,
- * against the chip's #1c2128 background).
- *
- * This is survey-pane chrome, not one screen's furniture: LintSummary sits
- * above the question column for the whole walk, so any base whose .kmn carries
- * a lint finding surfaces it on EVERY survey screen the walk scans. Scoped to
- * the findings list rather than excluding every <code> on the page. */
-export const LINT_CHIP_DEBT: readonly string[] = [
-  '[aria-label="Lint findings"] code',
-];
+/** 1.4.3 — the Output screen's only remaining known offender is the OSK
+ * iframe it embeds (OskModeToggle and SignUpPanel were re-verified clean by
+ * the #1477 sweep — see header comment). Kept as its own named export,
+ * rather than inlining OSK_IFRAME_DEBT at each call site, so a future
+ * Output-screen-specific offender has a single place to land without
+ * touching every call site again. */
+export const OUTPUT_SCREEN_DEBT: readonly string[] = [...OSK_IFRAME_DEBT];
