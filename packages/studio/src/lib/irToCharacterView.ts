@@ -13,7 +13,7 @@ import type { KeyboardIR, RemovalCapability, StoreItem } from '@keyboard-studio/
 import { buildProducedSet } from '@keyboard-studio/contracts';
 import { collectCharContributors, isParallelIndexFanOut, isPlusSeparator } from '@keyboard-studio/engine';
 import type { CharContributors } from '@keyboard-studio/engine';
-import { toRailNodes, invisibleCharLabel, keySequenceLabel, desktopVkeyLabel, displayChar, charProducers, isNotAForwardTypingPath, ASCII_LETTER_RE } from './irToCarveNodes.ts';
+import { toRailNodes, invisibleCharLabel, keySequenceLabel, desktopVkeyLabel, displayChar, charProducers, isNotAForwardTypingPath, isTouchOnlyTriggerRule, ASCII_LETTER_RE } from './irToCarveNodes.ts';
 import type { CharProducer } from './irToCarveNodes.ts';
 import { codepointLabel } from '../survey/codepointLabel.ts';
 
@@ -47,6 +47,7 @@ export type CharacterSource =
   | 'deadkey-sequence'
   | 'store'
   | 'advanced-rule'
+  | 'touch-only-key'
   | 'blocked-candidate';
 
 export const CATEGORY_ORDER: readonly CharacterCategory[] = [
@@ -63,7 +64,7 @@ export const CATEGORY_LABELS: Record<CharacterCategory, string> = {
 };
 
 export const SOURCE_ORDER: readonly CharacterSource[] = [
-  'direct-key', 'deadkey-sequence', 'store', 'advanced-rule', 'blocked-candidate',
+  'direct-key', 'deadkey-sequence', 'store', 'advanced-rule', 'touch-only-key', 'blocked-candidate',
 ];
 
 /** Plural group-header labels for the (nice-to-have) "by source" grouping. */
@@ -72,6 +73,7 @@ export const SOURCE_LABELS: Record<CharacterSource, string> = {
   'deadkey-sequence': 'Deadkey sequences',
   store: 'From stores',
   'advanced-rule': 'From advanced rules',
+  'touch-only-key': 'Touch keyboard only',
   'blocked-candidate': 'Blocked combinations',
 };
 
@@ -81,6 +83,7 @@ export const SOURCE_DETAIL_LABEL: Record<CharacterSource, string> = {
   'deadkey-sequence': 'Deadkey sequence',
   store: 'Store',
   'advanced-rule': 'Advanced rule',
+  'touch-only-key': 'Touch keyboard only',
   'blocked-candidate': 'Blocked combination',
 };
 
@@ -207,11 +210,30 @@ export function irToCharacterView(
   const nodes = toRailNodes(ir, removalCapabilities);
   const seen = new Map<string, CharacterCell>();
 
+  // spec §8: touch-only-produced characters are "surfaced separately as a
+  // clearly-labeled set — never silently dropped, and never misrepresented as
+  // if they lived on a single key." Computed ONCE, up front, and applied as an
+  // override inside consider() rather than as a final fallback pass like
+  // advancedRuleOnlyChars: these characters are NOT missing from the passes
+  // below. A touch-only-triggered rule is an ordinary typed rule, so the
+  // pattern/group glyph pass already yields a glyph for it — with no keySteps,
+  // because desktopVkeyLabel correctly refuses to render a T_xxxx id as a
+  // desktop keystroke. First-seen-wins therefore registered it as a
+  // `direct-key` cell with an EMPTY key list: present, but claiming to live on
+  // a single key nobody can name. That is the second half of the clause, and a
+  // trailing pass could never fix it (the char is already `seen`).
+  const touchOnly = touchOnlyProducedChars(ir);
+
   const consider = (rawCh: string, keys: string[], source: CharacterSource, strategy: string | undefined) => {
     const stripped = rawCh.startsWith('◌') ? rawCh.slice(1) : rawCh;
     const ch = stripped.normalize('NFC');
     if (ch.length === 0 || PLACEHOLDER_CHARS.has(ch)) return;
     if (seen.has(ch)) return;
+    // Override, not a branch on the caller: whichever pass sees the character
+    // first, a character with no non-touch producer is a touch-only character.
+    // Characters that ALSO have a real desktop producer are excluded by
+    // construction (see touchOnlyProducedChars) and keep their richer source.
+    if (touchOnly.has(ch)) source = 'touch-only-key';
 
     const contributors = collectCharContributors(ir, ch);
     // Full producer enumeration (#1399) — every rule that produces `ch`, as a
@@ -273,6 +295,19 @@ export function irToCharacterView(
   return [...seen.values()];
 }
 
+// Shared set-difference walk behind both `advancedRuleOnlyChars` and
+// `touchOnlyProducedChars` below: run `buildProducedSet` over the full IR and
+// over a filtered variant, then return whatever only the full walk produced.
+function producedSetDifference(full: KeyboardIR, filtered: KeyboardIR): Set<string> {
+  const fullSet = buildProducedSet(full);
+  const filteredSet = buildProducedSet(filtered);
+  const onlyInFull = new Set<string>();
+  for (const ch of fullSet) {
+    if (!filteredSet.has(ch)) onlyInFull.add(ch);
+  }
+  return onlyInFull;
+}
+
 /**
  * Characters producible ONLY through one or more opaque RawKmnFragment
  * blocks' `producedOutput` sketch (#1399) — never reachable via any typed
@@ -288,14 +323,40 @@ export function irToCharacterView(
  * Any character also reachable via a typed rule is in `rulesOnly` and so is
  * excluded here by construction — the caller's readable entry always wins.
  */
+/**
+ * Characters whose ONLY producer is a touch-only (`T_xxxx`) triggered rule —
+ * Keyman's on-screen-layout-only VK namespace, with no physical desktop key
+ * behind it (see `isTouchOnlyTriggerRule` / `isTouchOnlyVkeyName`).
+ *
+ * Same set-difference shape as `advancedRuleOnlyChars` above, over the SAME
+ * canonical `buildProducedSet` walk (run-merge NFC, store resolution and the
+ * exclusion rules all apply identically) rather than a second, divergent
+ * decoder:
+ *   full        = buildProducedSet(ir)                    // every rule
+ *   withoutTouch = buildProducedSet(ir minus touch-only rules)
+ *   touchOnly   = full \ withoutTouch
+ *
+ * A character reachable by ANY other route — a desktop rule, a store, a raw
+ * fragment — is in `withoutTouch` and so excluded here by construction. That
+ * is the important half: a character that happens to ALSO be on a touch key
+ * keeps its real desktop entry and is never relabeled. Only a character with
+ * no desktop path at all lands in this set.
+ *
+ * Rules are filtered per group; `raw` fragments are left untouched, since an
+ * opaque fragment has no parsed trigger to classify and is `advanced-rule`'s
+ * concern (the two sets are disjoint by construction — a touch-only char comes
+ * from a TYPED rule, so it is present in `advancedRuleOnlyChars`'s `rulesOnly`
+ * baseline and can never appear there).
+ */
+function touchOnlyProducedChars(ir: KeyboardIR): Set<string> {
+  return producedSetDifference(ir, {
+    ...ir,
+    groups: ir.groups.map((g) => ({ ...g, rules: g.rules.filter((r) => !isTouchOnlyTriggerRule(r)) })),
+  });
+}
+
 function advancedRuleOnlyChars(ir: KeyboardIR): Set<string> {
-  const withRaw = buildProducedSet(ir);
-  const rulesOnly = buildProducedSet({ ...ir, raw: [] });
-  const onlyAdvanced = new Set<string>();
-  for (const ch of withRaw) {
-    if (!rulesOnly.has(ch)) onlyAdvanced.add(ch);
-  }
-  return onlyAdvanced;
+  return producedSetDifference(ir, { ...ir, raw: [] });
 }
 
 // ---------------------------------------------------------------------------
