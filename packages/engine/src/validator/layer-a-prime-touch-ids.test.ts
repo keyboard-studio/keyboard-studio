@@ -1,5 +1,5 @@
 /**
- * 0x05A routing tests (spec 058 T043 / FR-040).
+ * 0x05A routing tests (spec 063 T043 / FR-040).
  *
  * The point of this suite is as much about WHERE the finding lives as what it
  * says: 0x05A is a validity concern, so it is a Layer A′ import-fidelity finding

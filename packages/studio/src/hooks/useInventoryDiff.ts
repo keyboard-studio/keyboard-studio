@@ -121,7 +121,7 @@ export interface InventoryDiff {
   alreadyProduced: string[];
   /**
    * Inventory characters the base's RULES produce but that no reachable key can
-   * actually type (spec 058 FR-011) — the honest delta between the two
+   * actually type (spec 063 FR-011) — the honest delta between the two
    * producibility views.
    *
    * A strict SUBSET of `alreadyProduced`: these characters still count as

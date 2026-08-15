@@ -1,4 +1,4 @@
-// E2E: spec 058 (touch key editor) — T112, SC-006.
+// E2E: spec 063 (touch key editor) — T112, SC-006.
 //
 // Proves the IMPORT-ADAPT walk's add / assign / remove round trip and, the
 // actual point of SC-006, that editing a few keys does not rewrite everything
@@ -39,11 +39,11 @@
 // STANDING: exploration evidence, NOT a PR-lane gate
 // ---------------------------------------------------------------------------
 //
-// This walk is un-skipped as of spec 061 (FR-008), whose T013-T015 land the
+// This walk is un-skipped as of spec 065 (FR-008), whose T013-T015 land the
 // `TouchGallery.tsx` add/remove wiring the old blocker note named.
 //
 // Two of its assertions were AMENDED at the un-skip, deliberately and on the
-// record (spec 061 FR-008 amendment note, T016): (a) counts keys in the edited
+// record (spec 065 FR-008 amendment note, T016): (a) counts keys in the edited
 // layer rather than across the whole file, and (d) excuses `.kvks` alongside
 // `.kmn`. Both changes state what the assertions always meant; neither weakens
 // the gate. The reason is measured, not inferred — see RALT_PROPAGATION below.
@@ -55,18 +55,18 @@
 // spec-trace) and a non-blocking spec-drift check — and nothing else. So an
 // assertion that lives only here is something someone once observed, not a
 // regression guard, which is exactly how a complete-but-unmounted key editor
-// shipped green (spec 061's "Why no test caught it").
+// shipped green (spec 065's "Why no test caught it").
 //
 // The durable guarantee for key-mode editing is therefore the vitest key-mode
 // integration block in
-// `packages/studio/src/editors/assignLoop/TouchGallery.test.tsx` (spec 061
+// `packages/studio/src/editors/assignLoop/TouchGallery.test.tsx` (spec 065
 // T009, FR-009), which mounts the real component in the lane a pull request
 // runs. This walk corroborates it in a real browser and covers the emitted-
 // artifact fidelity claim a second, independent time (SC-005 keeps a vitest
 // twin for the same reason).
 //
 // That division of labour is research decision D2 in
-// `specs/061-touch-editor-parity/research.md` — "Playwright explores; vitest is
+// `specs/065-touch-editor-parity/research.md` — "Playwright explores; vitest is
 // the repeatable gate". Adding a Playwright job to `ci.yml` was considered and
 // deferred there as separate CI-infrastructure work, not because e2e is
 // unwanted.
@@ -101,7 +101,7 @@ const ASSIGNED_NOTATION = "U+025B";
 const ASSIGNED_KEY_ID = "U_025B";
 
 /**
- * The remove route this walk drives. Both pane-level triggers spec 061 T015
+ * The remove route this walk drives. Both pane-level triggers spec 065 T015
  * originally pinned (`touch-key-mode-add-key`, `touch-key-mode-remove-key`)
  * were removed as duplicates of the key-anchored routes: adding is the `(+)`
  * wedge / `Insert` / the command menu's "Add key after", and removing is the
@@ -110,7 +110,7 @@ const ASSIGNED_KEY_ID = "U_025B";
  */
 const DELETE_KEY_TESTID = "key-property-panel-delete";
 
-/** The key property panel's disclosure for the character-assignment surface (spec 061 T028-T039). */
+/** The key property panel's disclosure for the character-assignment surface (spec 065 T028-T039). */
 const ASSIGN_DISCLOSURE_TESTID = "key-property-panel-assign-disclosure";
 
 const TOUCH_LAYOUT_PATH = `source/${BASE_KEYBOARD_ID}.keyman-touch-layout`;
@@ -120,7 +120,7 @@ const TOUCH_LAYOUT_PATH = `source/${BASE_KEYBOARD_ID}.keyman-touch-layout`;
  * add in step 1 and the suppress in step 3 both land here.
  *
  * Scoping the add assertion to this layer (rather than counting keys across the
- * whole file) is spec 061's amendment to SC-006, and it states the assertion's
+ * whole file) is spec 065's amendment to SC-006, and it states the assertion's
  * real intent: *the add introduced one key into the layer it edited*. The
  * whole-file count cannot say that, because two deltas that have nothing to do
  * with key mode sit upstream of it — see `RALT_PROPAGATION` below.
@@ -148,7 +148,7 @@ const EDITED_LAYER = "default";
  *
  * This spec was `test.skip`ped from birth, so neither premise was ever executed.
  * Amending the two assertions to say what they meant is deliberate and recorded
- * — it is not a weakened gate. See spec 061 FR-008 and its T016 note.
+ * — it is not a weakened gate. See spec 065 FR-008 and its T016 note.
  */
 
 // ---------------------------------------------------------------------------
@@ -372,7 +372,7 @@ async function snapshotOutputFiles(page: Page): Promise<KsE2EFileSnapshot> {
 // Spec
 // ---------------------------------------------------------------------------
 
-test.describe("Touch key add/remove — import-adapt fidelity (spec 058 SC-006)", () => {
+test.describe("Touch key add/remove — import-adapt fidelity (spec 063 SC-006)", () => {
   test("adding a key, assigning it a character, and removing a different key leaves every untouched key, platform field, and file intact", async ({
     page,
   }) => {
@@ -423,15 +423,15 @@ test.describe("Touch key add/remove — import-adapt fidelity (spec 058 SC-006)"
     // 1. Add a key after the selected anchor.
     // -----------------------------------------------------------------------
     // Put focus on the grid's single tab stop. `KeyGridCell` renders
-    // `tabIndex={isTabbable ? 0 : -1}` under spec 058 FR-020a's roving-tabindex
+    // `tabIndex={isTabbable ? 0 : -1}` under spec 063 FR-020a's roving-tabindex
     // model, so `[role="gridcell"][tabindex="0"]` addresses exactly the one cell
     // a Tab into the grid would land on — deterministic, where a count of Tab
     // presses is not.
     //
     // The original `page.keyboard.press("Tab")` here was never satisfiable, and
-    // not because of anything spec 061 added: "Back to mechanisms" and "Continue"
+    // not because of anything spec 065 added: "Back to mechanisms" and "Continue"
     // are spec-058 controls that already sat between the mode tab and the grid
-    // (spec 061 adds the layer selector, FR-004, and the add/remove triggers on
+    // (spec 065 adds the layer selector, FR-004, and the add/remove triggers on
     // top). This spec was `test.skip`ped from birth, so the assumption was never
     // executed. Tab ORDER is asserted by `touch-key-grid-a11y.spec.ts`, which is
     // where it belongs; this spec's subject is emitted-artifact fidelity (SC-006).
@@ -457,7 +457,7 @@ test.describe("Touch key add/remove — import-adapt fidelity (spec 058 SC-006)"
     // 2. Assign a character to the key just added.
     // -----------------------------------------------------------------------
     // The assign surface moved behind a disclosure on the key property panel's
-    // id field (spec 061 T028-T039, research D3): assigning a character is how
+    // id field (spec 065 T028-T039, research D3): assigning a character is how
     // most authors reach an id, but it is bigger than a text box and does not
     // belong permanently open. Open it before reaching for the field.
     // Navigation only — the assertions below are unchanged.

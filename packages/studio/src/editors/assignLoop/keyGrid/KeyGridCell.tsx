@@ -1,4 +1,4 @@
-// KeyGridCell — one gridcell in the touch key grid (spec 058 T064; FR-020,
+// KeyGridCell — one gridcell in the touch key grid (spec 063 T064; FR-020,
 // FR-020a, FR-022). Purely presentational: renders one
 // `KeyGridCellViewModel` (./keyGridViewModel.ts, T063 — a pure projection
 // holding no state) as an ARIA APG `gridcell`
@@ -30,10 +30,10 @@
 // re-implements the other — the cell reports pointer INTENT through the three
 // callbacks below, and the caller routes both halves into the same handlers.
 //
-// ## Required callbacks, cell-state gating (spec 061 T003, FR-001, FR-003)
+// ## Required callbacks, cell-state gating (spec 065 T003, FR-001, FR-003)
 //
 // All three callbacks below are **required** props, not optional ones — see
-// the defect of record in specs/061-touch-editor-parity/spec.md: an omitted
+// the defect of record in specs/065-touch-editor-parity/spec.md: an omitted
 // handler used to mean "no wedge renders", which let a caller ship this
 // component unwired without `tsc` ever noticing. Now a missing handler is a
 // build error, and each affordance's visibility is gated on **what the cell
@@ -110,7 +110,7 @@ export interface KeyGridCellProps {
   registerRef: (address: string, el: HTMLButtonElement | null) => void;
   /**
    * T111 — the `(+)` hover wedge. Keyboard equivalent: Insert
-   * (`useKeyCommands.ts`). **Required** (spec 061 T003/FR-001, FR-003): the
+   * (`useKeyCommands.ts`). **Required** (spec 065 T003/FR-001, FR-003): the
    * wedge's presence is now gated on `cell` state alone (`showAddWedge =
    * !isBlank`), never on whether this callback exists — see `handleClick`
    * below, which calls it unconditionally in the add-wedge branch.
@@ -314,7 +314,7 @@ export function KeyGridCell({
   const ariaLabel = buildCellAriaLabel();
 
   // T111 (FR-021) — the pointer surface. Both callbacks are required props
-  // now (spec 061 T003), so gating is on CELL STATE alone: a blank/spacer key
+  // now (spec 065 T003), so gating is on CELL STATE alone: a blank/spacer key
   // gets no wedges because it is not an authorable key, not because a handler
   // might be missing — `isBlank` already suppresses its label and border
   // above.
@@ -448,7 +448,7 @@ export function KeyGridCell({
           {displayLabel}
         </span>
       )}
-      {/* The key's own id, always (spec 061 T034, FR-023). Developer shows it;
+      {/* The key's own id, always (spec 065 T034, FR-023). Developer shows it;
       without it an author looking at a grid of glyphs cannot tell which key a
       rule is keyed on, which is the single most common thing they need to know
       while editing.

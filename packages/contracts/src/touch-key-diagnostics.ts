@@ -1,7 +1,7 @@
 /**
  * touch-key-diagnostics — the `TouchKeyFinding` / `TouchKeyFix` shape for the
- * edit-time touch-key diagnostics (spec 058 T113; FR-040, FR-041, FR-044;
- * [data-model.md](../../../specs/058-touch-key-editor/data-model.md) §10).
+ * edit-time touch-key diagnostics (spec 063 T113; FR-040, FR-041, FR-044;
+ * [data-model.md](../../../specs/063-touch-key-editor/data-model.md) §10).
  *
  * ## Why this lives in contracts and not in engine
  *
@@ -67,9 +67,9 @@
  * - `TOUCH_KEY_MIXED_SUPPRESS_REMOVE` — FR-029h / US4 AS8, shipped in Phase 8
  *   (T103). Retained verbatim; its detector stays in engine because it reads
  *   the overlay rather than a layout.
- * - `TOUCH_KEY_ROW_CROWDED` — spec 061 FR-014, the edit-time face of Layer C's
+ * - `TOUCH_KEY_ROW_CROWDED` — spec 065 FR-014, the edit-time face of Layer C's
  *   check 18.3. Unlike every code above it, its Layer C sibling was already
- *   shipped and calibrated; what spec 061 adds is the edit-time report and,
+ *   shipped and calibrated; what spec 065 adds is the edit-time report and,
  *   more importantly, a single shared threshold table ([row-metrics.ts](./row-metrics.ts))
  *   so the two surfaces cannot disagree about what "too many" means.
  *
@@ -336,7 +336,7 @@ export interface ReviewKeyFix {
 }
 
 /**
- * Bring a crowded row back under its platform maximum (spec 061 FR-014).
+ * Bring a crowded row back under its platform maximum (spec 065 FR-014).
  *
  * A descriptor, not a mutation: WHICH `overBy` keys to drop is a question only
  * the author can answer — the same reasoning {@link ReviewKeyFix} rests on —
@@ -352,7 +352,7 @@ export interface TrimRowFix {
 }
 
 /**
- * Relabel a key with the proposed keycap (spec 061 FR-036, FR-037).
+ * Relabel a key with the proposed keycap (spec 065 FR-036, FR-037).
  *
  * Unlike {@link TrimRowFix} and {@link ReviewKeyFix}, this one IS a concrete
  * mutation: `proposeKeycap` already computed the right label, so there is a
@@ -424,7 +424,7 @@ export function touchKeyFindingScope(
 }
 
 // ===========================================================================
-// The detectors (spec 058 T114)
+// The detectors (spec 063 T114)
 //
 // One implementation per code, called by BOTH surfaces:
 //
@@ -1487,7 +1487,7 @@ export function findLayerSwitchActiveMismatches(
 }
 
 // ---------------------------------------------------------------------------
-// TOUCH_KEY_ROW_CROWDED — spec 061 FR-014. Layer C sibling: check 18.3.
+// TOUCH_KEY_ROW_CROWDED — spec 065 FR-014. Layer C sibling: check 18.3.
 // ---------------------------------------------------------------------------
 
 /**
@@ -1497,7 +1497,7 @@ export function findLayerSwitchActiveMismatches(
  * predicate and the geometry totals all come from
  * [row-metrics.ts](./row-metrics.ts), which is also what
  * `keyboard-lint`'s `check-18-3-keys-per-row.ts` and the studio's remove-key
- * proposal now read. That is the whole point of research D6: before spec 061 the
+ * proposal now read. That is the whole point of research D6: before spec 065 the
  * phone-10 / tablet-13 pair was written out in two places with a comment asking
  * a future reader to keep them in sync, and this would have been the third.
  *

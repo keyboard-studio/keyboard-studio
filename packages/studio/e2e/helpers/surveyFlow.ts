@@ -136,7 +136,7 @@ async function waitVisible(locator: Locator, timeout: number): Promise<boolean> 
 /**
  * Drive the identity-lite step to completion (spec 036 language-identify flow).
  *
- * Question order (spec 030 US3, spec 036, spec 059 US1):
+ * Question order (spec 030 US3, spec 036, spec 064 US1):
  *   1. il_language_english (autocomplete) — free text
  *   2. il_language_region (CONDITIONAL datalist) — only inserted by
  *      IdentityLite's getNextOverride when the resolved langtags entry for
@@ -158,7 +158,7 @@ async function waitVisible(locator: Locator, timeout: number): Promise<boolean> 
  *      from useGitHubAuth(), which returns no name/email for a guest), so
  *      this helper must type a value or the walk parks here forever.
  *   8. il_author_email (text) — optional (required: false; a private GitHub
- *      email must never block emission per spec 059).
+ *      email must never block emission per spec 064).
  *   9. il_copyright_holder (text) — optional and TERMINAL (`next: null`);
  *      blank defaults to the author name (D1).
  *
@@ -194,7 +194,7 @@ export async function driveIdentityLite(
      */
     languageCode?: string;
     /**
-     * Author name for il_author_name (spec 059 US1) — REQUIRED, unlike every
+     * Author name for il_author_name (spec 064 US1) — REQUIRED, unlike every
      * other option here. OMIT to use the default; every existing walk relies
      * on that default rather than passing this explicitly.
      */
@@ -261,7 +261,7 @@ export async function driveIdentityLite(
 
   // Q7: Author email (plain text field) — always rendered, but optional
   // (required: false; a private GitHub profile email must never block
-  // emission per spec 059). Left blank (private-email authors are a real,
+  // emission per spec 064). Left blank (private-email authors are a real,
   // supported case per D7).
   await page.waitForSelector("#il_author_email", { timeout: 15_000 });
   await surveyAdvance(page).click();

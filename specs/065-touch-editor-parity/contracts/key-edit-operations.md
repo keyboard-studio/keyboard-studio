@@ -1,7 +1,7 @@
 # Contract: key-edit operations — the `move` addition and the widened field set
 
-**Feature**: 061-touch-editor-parity · **Extends**
-[specs/058-touch-key-editor/contracts/key-edit-overlay.md](../../058-touch-key-editor/contracts/key-edit-overlay.md),
+**Feature**: 065-touch-editor-parity · **Extends**
+[specs/063-touch-key-editor/contracts/key-edit-overlay.md](../../063-touch-key-editor/contracts/key-edit-overlay.md),
 which stays authoritative for everything this file does not restate.
 
 Owner: `packages/engine/src/pattern-apply/keyEditOps.ts` (the union and the field set),

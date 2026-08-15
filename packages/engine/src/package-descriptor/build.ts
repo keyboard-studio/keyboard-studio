@@ -57,7 +57,7 @@ export interface PackageDescriptorIdentity {
   /** Display text for `<Language>` — the language's English name (FR-002). */
   languageName?: string;
   /**
-   * The single-line copyright notice for `<Info><Copyright>` (spec 059 FR-003).
+   * The single-line copyright notice for `<Info><Copyright>` (spec 064 FR-003).
    *
    * Supplied by the caller from the SAME accumulated copyright block that wrote
    * `LICENSE.md` and `store(&COPYRIGHT)` — never composed here, for the reason
@@ -69,7 +69,7 @@ export interface PackageDescriptorIdentity {
    * own rights holder before this feature.
    */
   copyrightLine?: string;
-  /** Author name for `<Info><Author>` (spec 059 FR-003). Omitted when blank. */
+  /** Author name for `<Info><Author>` (spec 064 FR-003). Omitted when blank. */
   authorName?: string;
   /** Author email, emitted as the `<Author URL="mailto:…">` attribute. Optional. */
   authorEmail?: string;
@@ -161,7 +161,7 @@ export function buildKpsContent(
 
 /**
  * The `<Copyright>` / `<Author>` lines for `<Info>`, indented and newline-terminated
- * (spec 059 FR-003), or `""` when there is nothing to state.
+ * (spec 064 FR-003), or `""` when there is nothing to state.
  *
  * Both elements are OMITTED rather than emitted empty when their source is absent.
  * An empty `<Copyright/>` asserts "this work has no copyright holder", which is a

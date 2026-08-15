@@ -1,4 +1,4 @@
-// Unit tests for RenameDialog (spec 058 T090; FR-028; key-id-policy.md §4).
+// Unit tests for RenameDialog (spec 063 T090; FR-028; key-id-policy.md §4).
 // Harness copied from AssignPanel.test.tsx / KeyInspector.test.tsx
 // (renderWithI18n + a hand-built TouchLayoutIR fixture — no
 // @testing-library/jest-dom, raw DOM assertions, matching this package's

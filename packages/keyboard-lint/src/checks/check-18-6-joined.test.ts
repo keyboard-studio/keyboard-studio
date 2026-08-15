@@ -1,5 +1,5 @@
 /**
- * Tests for the three joined 18.6 codes (spec 058 T041).
+ * Tests for the three joined 18.6 codes (spec 063 T041).
  *
  * ONE TEST PER EXEMPTION, individually. The exemptions ARE the design of the
  * dead-key check — each corresponds to a real attested idiom for a rule-less key,

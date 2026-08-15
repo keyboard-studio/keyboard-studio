@@ -15,7 +15,7 @@
 //      touchLayoutJson is null (no Phase E edits yet).
 //   1. Carve deletions — re-emit the filtered IR into the VFS .kmn, replacing
 //      the fetched source. baseIr is never mutated; a filtered copy is used.
-//   1.7/1.7b. Key edit overlay (spec 058) — applyKeyEditsToVfs splices the
+//   1.7/1.7b. Key edit overlay (spec 063) — applyKeyEditsToVfs splices the
 //      committed KeyEditOperation[] overlay onto .keyman-touch-layout (layout
 //      half), and a `rename` op's vkey-binding fix-up is re-emitted into the
 //      .kmn (rule half) — see projectWorkingCopyVfs.ts's own step comments.
@@ -45,7 +45,7 @@
 //     UseWorkingCopyTransformOptions.liveLayoutOverride below. Either way it
 //     is already a primitive (string | null), so it drops straight into the
 //     dep array.
-//   - keyEditOps (spec 058): NOT primitive on its own (an array), so it is
+//   - keyEditOps (spec 063): NOT primitive on its own (an array), so it is
 //     never put in the dep array directly — a JSON-serialized string key
 //     derived from it is used instead (keyEditOpsKey), exactly mirroring how
 //     deletedNodeIds/deletedItemIds (Sets) are reduced to `deletedKey` and
@@ -139,7 +139,7 @@ export interface UseWorkingCopyTransformOptions {
   previewedBaseId?: string | null;
 
   /**
-   * Live-layout override (spec 058) — the touch key editor's IN-PROGRESS
+   * Live-layout override (spec 063) — the touch key editor's IN-PROGRESS
    * projection inputs, distinct from the store's own (post-Phase-E-commit)
    * `touchLayoutJson` field. Both pieces travel together in one option
    * because they both originate from the touch step's in-authoring state:
@@ -150,7 +150,7 @@ export interface UseWorkingCopyTransformOptions {
    *     when the R11 emission matrix decided not to emit yet — this is NOT
    *     the same as omitting the whole override (which falls back to the
    *     store's field instead).
-   *   - `keyEditOps`: the committed `KeyEditOperation[]` overlay (spec 058
+   *   - `keyEditOps`: the committed `KeyEditOperation[]` overlay (spec 063
    *     FR-031…FR-034) to project at `projectWorkingCopyVfs`'s step
    *     1.7/1.7b. Read straight from `workingCopyStore.keyEditOverlay.ops`
    *     by the caller — this hook does not read the store's overlay field
@@ -249,7 +249,7 @@ export function useWorkingCopyTransform(
       ? liveLayoutOverride.touchLayoutJson
       : storeTouchLayoutJson;
 
-  // Key edit overlay ops (spec 058) — sourced ONLY from the live-layout
+  // Key edit overlay ops (spec 063) — sourced ONLY from the live-layout
   // override (this hook does not read workingCopyStore.keyEditOverlay
   // itself; see the option's doc comment). Empty array when no override is
   // supplied, matching projectWorkingCopyVfs's own "omit or pass an empty
@@ -289,7 +289,7 @@ export function useWorkingCopyTransform(
     [sessionAssignments],
   );
 
-  // Key edit overlay key (spec 058, T053) — a JSON-serialized string derived
+  // Key edit overlay key (spec 063, T053) — a JSON-serialized string derived
   // from `keyEditOps`, the ONLY thing that goes into the outer transform's
   // dependency array below (never the raw array — see the module docstring's
   // "keyEditOps" bullet and the option's own doc comment for why). Committed

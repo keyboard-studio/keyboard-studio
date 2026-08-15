@@ -1,4 +1,4 @@
-// Per-question module: il_author_name (identity-lite, spec 059 US1)
+// Per-question module: il_author_name (identity-lite, spec 064 US1)
 //
 // WHY A NEW ID RATHER THAN REVIVING author_display_name
 // -----------------------------------------------------

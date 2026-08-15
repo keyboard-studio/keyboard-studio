@@ -391,7 +391,7 @@ export function checkOwnershipConsistency(ir: KeyboardIR): LintFinding[] {
 }
 
 // ---------------------------------------------------------------------------
-// 0x05A — ERROR_TouchLayoutInvalidIdentifier, as a VALIDITY concern (spec 058
+// 0x05A — ERROR_TouchLayoutInvalidIdentifier, as a VALIDITY concern (spec 063
 // FR-040 / T043).
 //
 // WHY THIS IS NOT A LAYER C CHECK. An id the compiler rejects is a validity
@@ -417,7 +417,7 @@ export const TOUCH_LAYOUT_INVALID_IDENTIFIER_CODE = "KM_ERROR_TOUCH_LAYOUT_INVAL
 
 // The identifier grammar itself is `isValidTouchKeyIdentifier`
 // (`@keyboard-studio/contracts`, `touch-key-rule-join.ts`). It moved there at
-// spec 058 T118 so this import-fidelity check and the edit-time REJECTION path
+// spec 063 T118 so this import-fidelity check and the edit-time REJECTION path
 // (`checkKeyEditRejections`, `keyEditOps.ts`) cannot disagree about what 0x05A
 // rejects — FR-040 requires the two paths to share one definition, and a private
 // regex here was the second copy waiting to happen.

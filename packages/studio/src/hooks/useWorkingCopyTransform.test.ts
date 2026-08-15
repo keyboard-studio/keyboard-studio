@@ -489,7 +489,7 @@ describe("useWorkingCopyTransform — assignment-warning when patternMap is null
 });
 
 // ---------------------------------------------------------------------------
-// T053/T055 — liveLayoutOverride (spec 058): preview-identity coverage.
+// T053/T055 — liveLayoutOverride (spec 063): preview-identity coverage.
 //
 // R10.2 (contracts/key-edit-overlay.md §6.2) is exactly the class of gap
 // where the emitted artifact and the live preview disagree — one surface

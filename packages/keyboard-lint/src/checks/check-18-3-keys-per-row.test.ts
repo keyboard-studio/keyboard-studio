@@ -26,7 +26,7 @@ function makeIR(platform: "phone" | "tablet" | "desktop", keyCount: number): Tou
  * Build an IR with a mix of normal keys and NON-INTERACTIVE keys (sp:9 blank or
  * sp:10 spacer).
  *
- * RECOUNT (spec 058 FR-012): the default was `8`, which the corrected
+ * RECOUNT (spec 063 FR-012): the default was `8`, which the corrected
  * `isSpacerKeyClass` set `{9, 10}` no longer treats as non-interactive — sp:8 is
  * deadkey-STYLED and interactive. The default is now `9` (blank), and the sp:8
  * case has its own test below asserting it is COUNTED.
@@ -123,7 +123,7 @@ describe("checkKeysPerRow (18.3 KM_WARN_TOUCH_KEYS_PER_ROW)", () => {
   });
 
   // -------------------------------------------------------------------------
-  // The RECOUNT itself (spec 058 FR-012). These two tests are the deliberate
+  // The RECOUNT itself (spec 063 FR-012). These two tests are the deliberate
   // record of which rows changed verdict when `isSpacerKeyClass` was corrected
   // from `{8, 10}` to `{9, 10}`.
   // -------------------------------------------------------------------------

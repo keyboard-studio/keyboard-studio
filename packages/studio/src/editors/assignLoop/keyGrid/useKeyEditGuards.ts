@@ -1,5 +1,5 @@
 // useKeyEditGuards — the "at the moment of the edit" invalidation warning for
-// the touch key grid (spec 058 T088; FR-036f).
+// the touch key grid (spec 063 T088; FR-036f).
 //
 // FR-036f: "A key-level edit that invalidates a by-character assignment MUST
 // warn at the moment of the edit, naming the affected character — e.g.

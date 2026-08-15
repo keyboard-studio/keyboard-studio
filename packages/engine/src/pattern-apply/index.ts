@@ -104,7 +104,7 @@ export {
 } from "./touchKeyAddress.js";
 export type { TouchKeyAddressParts } from "./touchKeyAddress.js";
 
-// Row geometry + the one keys-per-row threshold table (spec 061 T019). A shim
+// Row geometry + the one keys-per-row threshold table (spec 065 T019). A shim
 // over contracts — see rowMetrics.ts for why the definitions cannot live in
 // engine.
 export {
@@ -162,7 +162,7 @@ export type {
   SuppressSemanticsResult,
 } from "./keyEditOps.js";
 
-// spec 058 T118 — edit-time REJECTION (FR-045), the counterpart to the
+// spec 063 T118 — edit-time REJECTION (FR-045), the counterpart to the
 // reporting path in touchKeyDiagnostics.
 export { checkKeyEditRejections } from "./keyEditOps.js";
 export type {
@@ -299,7 +299,7 @@ export type {
 } from "./keycapRelatedness.js";
 
 // The finding/fix shape and every layout/rule detector live in contracts as of
-// spec 058 T113/T114 (FR-040's one-implementation rule — Layer C cannot import
+// spec 063 T113/T114 (FR-040's one-implementation rule — Layer C cannot import
 // engine); `touchKeyDiagnostics.ts` re-exports them, so this barrel and its
 // consumers are unchanged. See that module's doc for the move's rationale.
 export {

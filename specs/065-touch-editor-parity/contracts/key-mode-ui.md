@@ -1,6 +1,6 @@
 # Contract: the key-mode UI surface
 
-**Feature**: 061-touch-editor-parity · consumers: `TouchGallery.test.tsx` (vitest — the repeatable
+**Feature**: 065-touch-editor-parity · consumers: `TouchGallery.test.tsx` (vitest — the repeatable
 gate, PR lane) and `e2e/touch-key-add-remove.spec.ts` (Playwright — exploration, run ad hoc from
 the CLI). Both code against the identifiers below, so a rename breaks both.
 
@@ -183,7 +183,7 @@ arrives under the new `key-property-panel-field-${field}` ids.
 | `key-grid-row-slack-${rowIndex}` | FR-012 — the hatch is withdrawn; replaced by `key-grid-row-metrics-${rowIndex}` |
 
 `key-grid-row-actions-${rowIndex}` **stays**: it is the row-actions container whose accessibility
-fix spec 058 SC-009 landed and FR-038 forbids regressing. It hosts the metrics readout instead of
+fix spec 063 SC-009 landed and FR-038 forbids regressing. It hosts the metrics readout instead of
 the two removed buttons.
 
 ---

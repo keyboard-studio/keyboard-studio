@@ -433,7 +433,7 @@ describe("extractHelpDocs — US4 opt-in additional-detail battery", () => {
 });
 
 // ---------------------------------------------------------------------------
-// phaseFOptions.seeds — pf_contact_info pre-fill (spec 059 FR-016)
+// phaseFOptions.seeds — pf_contact_info pre-fill (spec 064 FR-016)
 //
 // The contact is captured once during attribution and published into
 // SurveyContext as `author_contact`; Phase F pre-fills from it instead of asking
@@ -458,7 +458,7 @@ describe("phaseFOptions.seeds — pf_contact_info pre-fill", () => {
     );
   });
 
-  // Inert-today guarantee: nothing writes author_contact until spec 059 lands.
+  // Inert-today guarantee: nothing writes author_contact until spec 064 lands.
   it("returns undefined when author_contact is absent (today's behaviour, unchanged)", () => {
     expect(seed("pf_contact_info", {})).toBeUndefined();
   });

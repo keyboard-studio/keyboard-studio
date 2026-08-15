@@ -1,12 +1,12 @@
 # Feature Specification: Touch key editor — Developer-parity remodel
 
-**Feature Branch**: `061-touch-editor-parity`
+**Feature Branch**: `065-touch-editor-parity`
 
 **Created**: 2026-08-06
 
 **Status**: Draft
 
-**Governing docs**: [spec.md](../../spec.md) §3c ("Defaults are the product" — propose-then-confirm, "no default is a defect"), §8 (the touch layout is derived from the locked desktop), §14 Decision 6 (desktop-first authoring), decision D3 (single 300 ms validation debounce). Extends [specs/058-touch-key-editor](../058-touch-key-editor/spec.md) and **withdraws its FR-039** — see [docs/adr/0002-touch-grid-renders-the-last-key-stretched.md](../../docs/adr/0002-touch-grid-renders-the-last-key-stretched.md). Vocabulary: [docs/design-notes/touch-editor-glossary.md](../../docs/design-notes/touch-editor-glossary.md).
+**Governing docs**: [spec.md](../../spec.md) §3c ("Defaults are the product" — propose-then-confirm, "no default is a defect"), §8 (the touch layout is derived from the locked desktop), §14 Decision 6 (desktop-first authoring), decision D3 (single 300 ms validation debounce). Extends [specs/063-touch-key-editor](../063-touch-key-editor/spec.md) and **withdraws its FR-039** — see [docs/adr/0002-touch-grid-renders-the-last-key-stretched.md](../../docs/adr/0002-touch-grid-renders-the-last-key-stretched.md). Vocabulary: [docs/design-notes/touch-editor-glossary.md](../../docs/design-notes/touch-editor-glossary.md).
 
 **Tracked issue**: #1530 — *Touch editor follow-up*.
 
@@ -49,7 +49,7 @@ Unit tests render each component **directly**, supplying the handlers, so they p
 
 - **No layer selector at all.** `activeKeyLayerId` is `useState<string>("default")` with a repair effect and no control. Issue complaint #5, exactly.
 - **No per-row width feedback** that survives the geometry change this spec makes (see below).
-- **Four editable fields the contract already carries and nothing surfaces**: `width`, `pad`, `hint`, and `layer` — the per-key modifier override, added to the locked key type by spec 058 *because 11,593 corpus keys use it*, then omitted from the editable field set.
+- **Four editable fields the contract already carries and nothing surfaces**: `width`, `pad`, `hint`, and `layer` — the per-key modifier override, added to the locked key type by spec 063 *because 11,593 corpus keys use it*, then omitted from the editable field set.
 - **No `move` operation.** Reordering cannot be composed from `remove` + `add`: the new-key spec carries only `{ id, text, output?, sp, nextlayer? }`, so a re-add discards the key's longpresses, multitaps, flicks, geometry and provenance, and mints a fresh node id — the identity that key addressing, the decision trail, and spec 035's Case B byte-preservation all key off.
 
 ### Complaint #6 was already working
@@ -76,7 +76,7 @@ This feature adopts that control set. It declines Developer's device-photo choos
 - Q: Should the grid mirror the OSK's sizing? → A: **No.** *"We're editing the touch layer with different sizing."* The grid renders the touch layer's own geometry; the number of *physical* keys is fixed, the number of touch keys is not.
 - Q: Where do the per-key controls live? → A: *"The key options can be configured in a panel when you select the key like in Developer."* Add stays on the grid; **everything else — including remove — moves into the panel.**
 - Q: Should slack be drawn? → A: **No.** *"Last key must stretch if the row is shorter. This is how it works in the keyboard."* This withdraws FR-039's hatch and both row buttons.
-- Q: Then how does the author see row width? → A: Developer's **per-row metrics readout**, which spec 058's own research already listed as a thing to adopt.
+- Q: Then how does the author see row width? → A: Developer's **per-row metrics readout**, which spec 063's own research already listed as a thing to adopt.
 - Q: Is width author-editable? → A: Keys are always added at the standard width. *"The user will primarily balance row width by moving keys."* Width stays editable for the cases that need it — *"modifier keys are often larger… space bar is big."*
 - Q: Given the stretch, what does width mean? → A: *"Because of the last key stretching rule, it is handled more like a CSS min-width."* Confirmed against the shipping renderer. Developer's "Width" label is kept and the semantics stated in help text.
 - Q: How do move controls behave at a row's edge? → A: *"Hide a move key that would push it off the row."* **No wrapping**, and *"we need a move up/down when appropriate"* — four self-hiding buttons.
@@ -271,7 +271,7 @@ Assigning a character proposes an id without being asked: the inherited physical
 ### Cross-cutting requirements
 
 - **FR-037**: All author-facing copy MUST be studio-composed and localized. The engine MUST return structured fields, never English prose.
-- **FR-038**: The grid MUST remain a conformant ARIA grid, keyboard-operable throughout. The row-actions accessibility fix from spec 058 SC-009 MUST NOT regress.
+- **FR-038**: The grid MUST remain a conformant ARIA grid, keyboard-operable throughout. The row-actions accessibility fix from spec 063 SC-009 MUST NOT regress.
 - **FR-039**: New diagnostics MUST ride the existing single validation debounce cycle. No second timer may be introduced.
 - **FR-040**: Every edit MUST remain undoable, and the undo affordance MUST continue to name what it will undo.
 
@@ -304,7 +304,7 @@ Assigning a character proposes an id without being asked: the inherited physical
 - **A raw source view** of the touch layout (Developer's Design/Code tabs).
 - **Device-photo presentation chooser**, `Template…`, and `Import from On Screen` — replaced by the live OSK and by steps upstream of the touch stage.
 - **Touch-first authoring and reverse touch → physical derivation.** Decision 6 is not engaged: this deepens editing of a layout still derived from the locked desktop.
-- **Byte-level patch minimization** of a touched layout file — unchanged from spec 058.
+- **Byte-level patch minimization** of a touched layout file — unchanged from spec 063.
 
 ## Assumptions
 

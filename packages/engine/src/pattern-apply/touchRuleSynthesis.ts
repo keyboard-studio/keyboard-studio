@@ -1,7 +1,7 @@
 /**
  * touchRuleSynthesis — `ensure` / `remove` / `rename` operations that keep a
  * touch key's `.kmn` rules in sync with the studio's key-level editing surface
- * (spec 058 FR-026, FR-027, FR-027a; contracts/touch-key-rule-join.md §6.1,
+ * (spec 063 FR-026, FR-027, FR-027a; contracts/touch-key-rule-join.md §6.1,
  * which is the normative spec for everything in this module).
  *
  * Four invariants are load-bearing here and MUST NOT be "tidied away" by a
@@ -189,7 +189,7 @@ function buildProducingRule(nodeId: string, keyId: string, combo: readonly Modif
     nodeId,
     context: [{ kind: "vkey", name: keyId, modifiers: [...combo] }],
     output: outputElementsFor(outputText),
-    trailingComment: "generated: touch key rule synthesis (spec 058)",
+    trailingComment: "generated: touch key rule synthesis (spec 063)",
   };
 }
 
@@ -202,7 +202,7 @@ function buildGuardRule(nodeId: string, keyId: string, combo: readonly ModifierT
       { kind: "vkey", name: keyId, modifiers: [...combo] },
     ],
     output: [{ kind: "raw", text: "context" }],
-    trailingComment: "generated: touch key rule guard (spec 058)",
+    trailingComment: "generated: touch key rule guard (spec 063)",
   };
 }
 
@@ -1105,7 +1105,7 @@ export interface RenameTouchKeyResult {
    * indexes). The caller (workingCopyStore.ts's `commitTouchKeyRename`) uses
    * this to remap any matching `deletedTouchKeyIds` address, and it is also
    * exactly what an address-matched provenance promotion
-   * (`promoteKeyAtAddressToHandSet`, spec 058 T059) needs — never an
+   * (`promoteKeyAtAddressToHandSet`, spec 063 T059) needs — never an
    * id-matched path (key-id-policy.md §4's second named failure mode).
    */
   readonly renamedAddresses: readonly { readonly oldAddress: string; readonly newAddress: string }[];
@@ -1251,7 +1251,7 @@ function renameNodeIdEntries(
 }
 
 /**
- * The complete rename operation (spec 058 T091). One call rewrites every
+ * The complete rename operation (spec 063 T091). One call rewrites every
  * `.kmn` binding for `fromKeyId` (guard and producing alike, via
  * {@link renameTouchKeyRule}), the layout key id itself on every layer and
  * platform (including `sk`/`multitap`/`flick`), and the `touchLayout.nodeIds`

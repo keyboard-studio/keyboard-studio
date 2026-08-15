@@ -1,7 +1,7 @@
 /**
  * keyGridViewModel — the key grid's view model as a PURE PROJECTION from a
  * touch layout + the touch key <-> rule join, holding no state of its own
- * (spec 058 T063; [data-model.md](../../../../../specs/058-touch-key-editor/data-model.md)
+ * (spec 063 T063; [data-model.md](../../../../../specs/063-touch-key-editor/data-model.md)
  * §8; FR-020, FR-022, FR-030).
  *
  * `buildKeyGridViewModel` is a plain function: same (layout, ruleIndex,
@@ -166,7 +166,7 @@ import {
  * The 100-unit model's geometry defaults.
  *
  * Declared here originally; the definitions moved to contracts' `row-metrics.ts`
- * at spec 061 T019 so the engine-side appliers could write the same numbers a
+ * at spec 065 T019 so the engine-side appliers could write the same numbers a
  * newly added key is measured against (T021 — an applier cannot import the
  * studio). Re-exported under the same names, so every existing import site of
  * this module is unchanged.
@@ -220,7 +220,7 @@ export interface KeyGridCellViewModel {
   /** The keycap label (`TouchKeyIR.text`), defaulted to `""` when absent. */
   readonly keycap: string;
   /**
-   * `TouchKeyIR.hint` — the small secondary label (spec 061 T035).
+   * `TouchKeyIR.hint` — the small secondary label (spec 065 T035).
    *
    * Carried on the cell because the property panel edits it and the panel is
    * driven by the selected CELL, not by the layout. It is deliberately not
@@ -229,7 +229,7 @@ export interface KeyGridCellViewModel {
    */
   readonly hint?: string;
   /**
-   * `TouchKeyIR.layer` — the per-key modifier override (spec 061 T035).
+   * `TouchKeyIR.layer` — the per-key modifier override (spec 065 T035).
    *
    * Named `layerOverride` rather than `layer` because `KeyGridViewModel`
    * already has a `layerId` meaning the CONTAINING layer, and two fields called
@@ -252,7 +252,7 @@ export interface KeyGridCellViewModel {
   /** Looked up from `findingsByAddress`; `[]` when the map has no entry. */
   readonly findings: readonly TouchKeyFinding[];
   /**
-   * True for the last key of its row (spec 061 T024, FR-012).
+   * True for the last key of its row (spec 065 T024, FR-012).
    *
    * The renderer stretches exactly this key to the layer maximum, matching
    * KeymanWeb's own last-key-fills-the-row rule. It is on the CELL rather than
@@ -276,8 +276,8 @@ export interface KeyGridRowViewModel {
    * only because it — by definition — IS the layer max; it never goes negative
    * for the max row, and no other row can exceed the max by construction.
    *
-   * **Repointed at spec 061 T024 (FR-012, research D5, ADR 0002).** This used
-   * to be a RENDERING input: spec 058's grid drew the gap as a visible diagonal
+   * **Repointed at spec 065 T024 (FR-012, research D5, ADR 0002).** This used
+   * to be a RENDERING input: spec 063's grid drew the gap as a visible diagonal
    * hatch, deliberately declining to absorb it. FR-012 withdraws that reading —
    * the last key of every row now stretches by exactly this much, which is what
    * KeymanWeb does and therefore what the author's keyboard will actually look
@@ -288,7 +288,7 @@ export interface KeyGridRowViewModel {
    */
   readonly slackPct: number;
   /**
-   * What this row measures, from DECLARED widths (spec 061 T024, FR-013,
+   * What this row measures, from DECLARED widths (spec 065 T024, FR-013,
    * FR-015) — computed by the shared `computeRowMetrics`, so the figures the
    * readout prints are the same ones `TOUCH_KEY_ROW_CROWDED` fires on and the
    * same ones Layer C's check 18.3 counts. `overMaximumBy` present means this

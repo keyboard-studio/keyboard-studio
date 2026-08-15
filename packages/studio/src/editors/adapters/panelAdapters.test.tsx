@@ -222,7 +222,7 @@ const IDENTITY_PHASE_RESULT = {
     { questionId: "il_language_english", answerType: "text" as const, value: "Hausa" },
     { questionId: "il_language_code", answerType: "text" as const, value: "ha" },
     { questionId: "il_target_script", answerType: "select" as const, value: "Latn" },
-    // spec 059 US1: identity-lite continues into attribution, so a genuinely
+    // spec 064 US1: identity-lite continues into attribution, so a genuinely
     // COMPLETED result includes these. Without them, resume correctly lands on
     // the first unanswered attribution question rather than the flow's end.
     { questionId: "il_author_name", answerType: "text" as const, value: "Alice Example" },
@@ -246,7 +246,7 @@ describe("IdentityLiteAdapter — resume from identityPhaseResult", () => {
 
     render(<IdentityLiteAdapter onComplete={() => {}} />);
 
-    // spec 059 US1: the flow's last question is now the copyright holder.
+    // spec 064 US1: the flow's last question is now the copyright holder.
     expect(screen.getByText("Who holds the copyright for this keyboard?")).toBeDefined();
     expect(
       screen.queryByText("What is your language called in your own language?"),
@@ -277,9 +277,9 @@ describe("IdentityLiteAdapter — resume from identityPhaseResult", () => {
     // Every write below must have landed BEFORE onComplete fired.
     expect(s.identityResult?.bcp47).toBe("ha-Latn");
     expect(s.surveyContext.language_name).toBe("Hausa");
-    // 4 -> 7: spec 059 US1 appends the three attribution answers.
+    // 4 -> 7: spec 064 US1 appends the three attribution answers.
     expect(s.identityPhaseResult?.answers.length).toBe(7);
-    // spec 059 FR-016: publishing the contact here is what activates the Phase F
+    // spec 064 FR-016: publishing the contact here is what activates the Phase F
     // pf_contact_info pre-fill.
     expect(s.surveyContext.author_contact).toBe("alice@example.org");
   });

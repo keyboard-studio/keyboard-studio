@@ -58,7 +58,7 @@ function contextFromIdentity(identity: IdentityLiteResult): SurveyContext {
     routing_group: identity.prefill.routingGroup,
     script_family: identity.prefill.script,
     ...(identity.bcp47 !== "" ? { bcp47_tag: identity.bcp47 } : {}),
-    // spec 059 FR-016: publishing the contact here activates the Phase F
+    // spec 064 FR-016: publishing the contact here activates the Phase F
     // pre-fill seam (see CTX_AUTHOR_CONTACT in flowStepOptions.tsx), so
     // pf_contact_info is confirmed rather than asked a second time.
     ...(identity.attribution?.authorEmail !== undefined &&
@@ -103,7 +103,7 @@ export function IdentityLiteAdapter({ onComplete }: EditorStepProps) {
     // R7: identity-specific writes fire here, before onComplete → host → advance.
     setIdentityResult(identity);
     setSurveyContext(contextFromIdentity(identity));
-    // spec 059 US1: the working copy is the single source the scaffolder reads
+    // spec 064 US1: the working copy is the single source the scaffolder reads
     // for LICENSE.md / store(&COPYRIGHT) / .kps <Copyright>, and it rides the
     // existing draft so attribution survives a reload for free.
     setAttribution(identity.attribution);
@@ -115,7 +115,7 @@ export function IdentityLiteAdapter({ onComplete }: EditorStepProps) {
 
   return (
     <IdentityLite
-      // spec 059 D7: pre-fill attribution from the authenticated profile so the
+      // spec 064 D7: pre-fill attribution from the authenticated profile so the
       // author confirms rather than types. Absent fields fall through to asking.
       authorSeed={{ name: authorName, email: authorEmail }}
       context={surveyContext}

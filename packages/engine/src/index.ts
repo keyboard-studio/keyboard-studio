@@ -129,7 +129,7 @@ export type {
   ApplyIdentityToKpsResult,
 } from "./package-descriptor/index.js";
 
-// spec 061 — help-docs rendering. The one implementation both the output
+// spec 065 — help-docs rendering. The one implementation both the output
 // projection and the in-studio preview (Story 2) render from (FR-005/FR-010).
 export {
   buildDocSections,
@@ -283,7 +283,7 @@ export type { CarveNeededSet, DeriveCarveNeededSetArgs } from "./marks/carve-nee
 export { applyMarkGuards, MARKS_GUARD_GROUP, MARKS_UNWRAP_FROM_STORE, MARKS_UNWRAP_TO_STORE } from "./pattern-apply/mark-guards.js";
 export type { MarkGuardsResult } from "./pattern-apply/mark-guards.js";
 
-// spec 061 US5 — id and keycap proposals (FR-029…FR-037). The studio's only
+// spec 065 US5 — id and keycap proposals (FR-029…FR-037). The studio's only
 // sanctioned door to the inherit-first proposer and the keycap judgement.
 export {
   proposeTouchKeyId,
@@ -302,13 +302,13 @@ export type {
   KeycapRelatednessOptions,
 } from "./pattern-apply/index.js";
 
-// spec 058 — key-level touch layout edit overlay: step 1.7 of
+// spec 063 — key-level touch layout edit overlay: step 1.7 of
 // projectWorkingCopyVfs (the layout half, Case B) plus the shared address
 // parser its rule-half sibling pass reuses (contracts/key-edit-overlay.md).
 // `applyKeyEditsToRawJson` is the Case B applier step 1.7 wraps. It is exported
 // here too because the STUDIO needs it directly: `TouchGallery`'s Case B commit
 // branch keeps `touchLayoutJson` current for the live grid, and doing that by
-// re-emitting the IR is exactly the round-trip spec 035 R9 forbids (spec 061
+// re-emitting the IR is exactly the round-trip spec 035 R9 forbids (spec 065
 // T016 — it stamped provenance onto every key of an imported layout).
 export {
   applyKeyEditsToVfs,
@@ -325,14 +325,14 @@ export type {
   RowMetrics,
 } from "./pattern-apply/index.js";
 
-// spec 058 T059 — the studio-side address-matched provenance promotion path
+// spec 063 T059 — the studio-side address-matched provenance promotion path
 // (touchBehavior.ts's promoteKeyAtAddressToHandSet) reuses this SAME resolver
 // rather than re-deriving platform/layer/row traversal a third time
 // (contracts/key-edit-overlay.md §5).
 export { resolveKeyAddress } from "./pattern-apply/index.js";
 export type { AddressableLayoutLike, ResolvedKeyLocation } from "./pattern-apply/index.js";
 
-// spec 058 T060 — re-derivation resilience (FR-033b): `resolveSubKeyEntry`
+// spec 063 T060 — re-derivation resilience (FR-033b): `resolveSubKeyEntry`
 // lets a studio-side correlation pass (keyEditOrphanReport.ts) resolve an
 // orphaned setSubKey/removeSubKey's sub-entry against the layout the
 // overlay was originally authored against, the same way `resolveKeyAddress`
@@ -341,7 +341,7 @@ export type { AddressableLayoutLike, ResolvedKeyLocation } from "./pattern-apply
 // three op kinds that author `output` directly.
 export { resolveSubKeyEntry, declaredOperationOutput } from "./pattern-apply/index.js";
 
-// spec 058 T095/T097 — the `suppress` compound derivation (FR-029b). The
+// spec 063 T095/T097 — the `suppress` compound derivation (FR-029b). The
 // studio must never hand-build a `{ sp, id }` suppression: `sp` governs
 // rendering and interactivity while the id governs output, and only the two
 // halves committed together are impossible to desynchronize. The removal
@@ -360,7 +360,7 @@ export type {
   SuppressSemanticsResult,
 } from "./pattern-apply/index.js";
 
-// spec 058 T048/T063 — overlay replay is how a studio-side surface folds the
+// spec 063 T048/T063 — overlay replay is how a studio-side surface folds the
 // overlay into an *effective* layout to project from (the key grid's view
 // model, the preview's live-layout override). Case A's applier is exported
 // beside it because replay is a thin wrapper over that loop.
@@ -370,7 +370,7 @@ export type {
   ReplayKeyEditOverlayResult,
 } from "./pattern-apply/index.js";
 
-// spec 058 T113/T114 — the edit-time touch-key diagnostics (FR-040…FR-045).
+// spec 063 T113/T114 — the edit-time touch-key diagnostics (FR-040…FR-045).
 // Studio-facing because `useValidatorFindings` computes them inside the existing
 // 300 ms cycle (FR-042 / Decision D3) and the key grid renders them per cell.
 // Only the aggregators are exported: an individual detector is an internal of
@@ -385,7 +385,7 @@ export {
   findMixedSuppressRemove,
 } from "./pattern-apply/index.js";
 
-// spec 058 T118 — edit-time rejection (FR-045). Studio-facing because the guard
+// spec 063 T118 — edit-time rejection (FR-045). Studio-facing because the guard
 // runs at the moment of the edit, in `useKeyEditGuards`, before `commitKeyEdit`.
 export { checkKeyEditRejections } from "./pattern-apply/index.js";
 export type {
@@ -394,7 +394,7 @@ export type {
   KeyEditRejectionVerdict,
 } from "./pattern-apply/index.js";
 
-// spec 058 T061 — layer-family decomposition and grouping (FR-063/FR-067).
+// spec 063 T061 — layer-family decomposition and grouping (FR-063/FR-067).
 // Studio-facing because "family order" is what orders layers in the key grid's
 // context-carry (T074) and in the parallelism complaints (T107-T110). Without
 // this export those surfaces duplicate the decomposition grammar, which is
@@ -416,7 +416,7 @@ export type {
   LayerFamilyGrouping,
 } from "./pattern-apply/index.js";
 
-// spec 058 T107-T110 — the family-parallelism check itself (FR-064/FR-066/
+// spec 063 T107-T110 — the family-parallelism check itself (FR-064/FR-066/
 // FR-068). Studio-facing because the complaint and its family-wide-apply
 // resolution (FamilyApplyDialog.tsx, T108) are UI surfaces: the studio needs
 // the findings to render, and `severityForPlane`/`classifyPlane` so its copy
@@ -444,7 +444,7 @@ export type {
   PlaneClass,
 } from "./pattern-apply/index.js";
 
-// spec 058 T104/T105 — the pre-commit collateral report (FR-060/FR-061). The
+// spec 063 T104/T105 — the pre-commit collateral report (FR-060/FR-061). The
 // removal dialog must name every linked output a suppress/remove would
 // discard — the key's own plus every `sk`/flick/multitap sub-key it hosts —
 // and separate the genuinely unreachable from the still-available-elsewhere,
@@ -465,7 +465,7 @@ export type {
   KeyEditCollateralReport,
 } from "./pattern-apply/index.js";
 
-// spec 058 T079/T080/T081 — key id minting proposal (FR-024/FR-025) and touch
+// spec 063 T079/T080/T081 — key id minting proposal (FR-024/FR-025) and touch
 // rule/guard synthesis (FR-026/FR-027/FR-027a). Studio-facing because
 // AssignPanel.tsx (T085-T087) computes and confirms a minting proposal, and
 // previews the literal guard-then-producing rule pair, before anything is

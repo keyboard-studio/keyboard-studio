@@ -728,11 +728,11 @@ describe("touch-key provenance round-trip (spec-014 T028)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Per-key `layer` override + subkey `default` preselect (spec 058 FR-030,
+// Per-key `layer` override + subkey `default` preselect (spec 063 FR-030,
 // T012). Both fields were dropped unconditionally before the §18 contract
 // change, so these are the codec's half of that change.
 // ---------------------------------------------------------------------------
-describe("per-key layer override and subkey default preselect (spec 058 FR-030)", () => {
+describe("per-key layer override and subkey default preselect (spec 063 FR-030)", () => {
   it("survives parse → emit unchanged for a key carrying layer:\"shift\"", () => {
     const json = JSON.stringify({
       phone: {

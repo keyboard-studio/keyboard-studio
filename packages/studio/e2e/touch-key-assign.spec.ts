@@ -1,4 +1,4 @@
-// E2E: spec 058 (touch key editor) — T089, SC-004.
+// E2E: spec 063 (touch key editor) — T089, SC-004.
 //
 // Proves the keyboard-only "assign a character to an existing touch key" walk
 // through the By-key mode's grid + AssignPanel (T085-T089 composition):
@@ -223,7 +223,7 @@ async function clickOskKeyById(oskFrame: FrameLocator, keyId: string): Promise<v
 // Spec
 // ---------------------------------------------------------------------------
 
-test.describe("Touch key AssignPanel — keyboard-only assign (spec 058 SC-004)", () => {
+test.describe("Touch key AssignPanel — keyboard-only assign (spec 063 SC-004)", () => {
   test("Tab, arrows, Enter, type U+025B, Enter assigns ɛ within 12 keyboard actions, with no pointer event, no modal, and the live preview types it", async ({
     page,
   }) => {
@@ -248,7 +248,7 @@ test.describe("Touch key AssignPanel — keyboard-only assign (spec 058 SC-004)"
     // the keyboard-only measurement below, not a discrete action of its own and
     // not a pointer event to be measured against.
     //
-    // That element is the "Find a key" toggle, not "Continue": spec 061
+    // That element is the "Find a key" toggle, not "Continue": spec 065
     // T013-T015 inserted the layer selector and the add / remove / find key
     // commands between Continue and the grid. Setup only — the 12-action budget
     // counts `press()` calls, and this is not one of them.

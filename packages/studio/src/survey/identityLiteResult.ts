@@ -55,7 +55,7 @@ export interface IdentityLiteResult {
   /** Whether the chosen target script is supported in v1. */
   supported: boolean;
   /**
-   * Who to attribute the keyboard to (spec 059 US1), or null when the flow
+   * Who to attribute the keyboard to (spec 064 US1), or null when the flow
    * terminated before attribution — which is what a gated script does, since an
    * author who cannot make a keyboard is never asked who holds its copyright.
    */

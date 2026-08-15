@@ -111,7 +111,7 @@ export interface TouchKeyIR {
    */
   provenance?: TouchKeyProvenance;
   /**
-   * The author typed this key's keycap themselves (spec 061 FR-035).
+   * The author typed this key's keycap themselves (spec 065 FR-035).
    *
    * Additive and optional on purpose: an ABSENT flag reads as
    * "proposal-managed", which is the right default for every key in every
@@ -136,7 +136,7 @@ export interface TouchKeyIR {
   output?: string;
   nextlayer?: string;
   /**
-   * Per-key modifier override from .keyman-touch-layout `layer` (spec 058
+   * Per-key modifier override from .keyman-touch-layout `layer` (spec 063
    * FR-030). Names the modifier state this ONE key emits under, superseding the
    * containing layer's id for that key alone — so a key sitting on the
    * `default` layer can legitimately send its `shift` output.
@@ -157,7 +157,7 @@ export interface TouchKeyIR {
    */
   layer?: string;
   /**
-   * Longpress preselect from .keyman-touch-layout `default` (spec 058 FR-030).
+   * Longpress preselect from .keyman-touch-layout `default` (spec 063 FR-030).
    * Meaningful only on a sub-key: marks which entry of the parent's `sk[]` menu
    * is preselected when the longpress menu opens.
    */

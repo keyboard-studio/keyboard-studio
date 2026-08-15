@@ -1,5 +1,5 @@
 /**
- * Unit tests for useModeContextCarry (spec 058 T074, FR-036c).
+ * Unit tests for useModeContextCarry (spec 063 T074, FR-036c).
  *
  * Grouped:
  *   1. `orderLayerIdsByFamily` — proves FAMILY order, not raw array order

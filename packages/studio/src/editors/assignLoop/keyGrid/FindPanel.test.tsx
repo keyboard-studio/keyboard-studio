@@ -1,4 +1,4 @@
-// Unit tests for FindPanel (spec 058 T071; FR-020e, FR-020i).
+// Unit tests for FindPanel (spec 063 T071; FR-020e, FR-020i).
 //
 // Grouped:
 //   1. The three find-by-value paths: by id, by character (reusing

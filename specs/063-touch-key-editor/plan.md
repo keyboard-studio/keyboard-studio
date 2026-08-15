@@ -1,6 +1,6 @@
 # Implementation plan: key-level touch layout editing
 
-**Feature**: [specs/058-touch-key-editor](spec.md) · **Branch**: `058-touch-key-editor` · **Planned**: 2026-08-04
+**Feature**: [specs/063-touch-key-editor](spec.md) · **Branch**: `063-touch-key-editor` · **Planned**: 2026-08-04
 
 **Inputs**: [spec.md](spec.md) · [research.md](research.md) (R1–R9 from specify, **R10 from this plan**) · [.specify/memory/constitution.md](../../.specify/memory/constitution.md)
 

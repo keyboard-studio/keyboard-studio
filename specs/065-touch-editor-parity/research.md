@@ -1,9 +1,9 @@
 # Research: Touch key editor — Developer-parity remodel
 
-**Feature**: 061-touch-editor-parity · **Phase 0** (precedes design)
+**Feature**: 065-touch-editor-parity · **Phase 0** (precedes design)
 
-Every decision below was taken against the code as it stands on `061-touch-editor-parity`,
-not against spec 058's prose. Where the two disagree the code is cited.
+Every decision below was taken against the code as it stands on `065-touch-editor-parity`,
+not against spec 063's prose. Where the two disagree the code is cited.
 
 ---
 

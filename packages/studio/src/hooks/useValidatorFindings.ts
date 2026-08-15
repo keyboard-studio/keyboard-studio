@@ -13,7 +13,7 @@
 // source of truth — the hook never sources findings from a second store field
 // or a second debounce timer.
 //
-// spec 058 T114: this file additionally hosts `useTouchKeyDiagnostics`, the
+// spec 063 T114: this file additionally hosts `useTouchKeyDiagnostics`, the
 // edit-time touch-key findings surface (FR-040/FR-042). It is here, beside
 // `useValidatorFindings`, because FR-042 names *this module's own rule* — "no
 // second store field and no second timer" — as the discipline the touch
@@ -56,7 +56,7 @@ export function useValidatorFindings(): Record<string, LintFinding[]> {
 }
 
 // ---------------------------------------------------------------------------
-// Edit-time touch-key diagnostics (spec 058 T114; FR-040, FR-042, Decision D3)
+// Edit-time touch-key diagnostics (spec 063 T114; FR-040, FR-042, Decision D3)
 // ---------------------------------------------------------------------------
 
 /**

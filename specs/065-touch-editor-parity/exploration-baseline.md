@@ -1,6 +1,6 @@
-# Exploration baseline — the touch key editor before spec 061
+# Exploration baseline — the touch key editor before spec 065
 
-**Feature**: 061-touch-editor-parity · **Task**: T001 (Phase 1, Setup) · **Captured**: 2026-08-06
+**Feature**: 065-touch-editor-parity · **Task**: T001 (Phase 1, Setup) · **Captured**: 2026-08-06
 
 **Purpose**: [SC-001](spec.md) requires that "every one of issue #1530's six complaints is
 demonstrably resolved by clicking through the touch stage". A claim that something was *resolved*
@@ -9,10 +9,10 @@ implementation and diffs its findings against the "How to re-probe after the cha
 each complaint below.
 
 **Baseline commit**: `b79586fa` — *docs(spec): touch key editor Developer-parity remodel (spec
-061)*, i.e. the tip of `061-touch-editor-parity` before any implementation task landed.
+061)*, i.e. the tip of `065-touch-editor-parity` before any implementation task landed.
 
 > [WARN] **Every line number below is stated against `HEAD` = `b79586fa`, read via
-> `git show HEAD:<path>`, not against the working tree.** Other agents are landing spec 061's
+> `git show HEAD:<path>`, not against the working tree.** Other agents are landing spec 065's
 > implementation waves into
 > [packages/studio/src/editors/assignLoop/keyGrid/](../../packages/studio/src/editors/assignLoop/keyGrid/)
 > concurrently with this capture, so working-tree line numbers were already drifting while this
@@ -72,7 +72,7 @@ e2e walk that passes through `driveIdentityLite` stalls before the base picker.
 
 Three things follow, and they matter to later tasks:
 
-- `[OBSERVED]` This is **pre-existing helper drift, unrelated to spec 061's subject matter** — it
+- `[OBSERVED]` This is **pre-existing helper drift, unrelated to spec 065's subject matter** — it
   fails identically on an untouched touch-stage. Nothing was modified to make it run, per T001.
 - `[OBSERVED]` The Playwright *toolchain* works here (browsers under
   `~/AppData/Local/ms-playwright`, dev server, headless Chromium). Only the walk's survey helper is
@@ -187,7 +187,7 @@ the geometry half also by **SC-006**.
 - *Structural*: `git grep -n "repeating-linear-gradient" packages/studio/src/editors/assignLoop/keyGrid/`
   must return nothing, and `key-grid-fill-row-` / `key-grid-even-out-row-` must be gone from both
   `KeyGrid.tsx` and `KeyGrid.test.tsx` (T012). `key-grid-row-actions-${rowIndex}` **must survive** —
-  FR-038 forbids regressing spec 058 SC-009.
+  FR-038 forbids regressing spec 063 SC-009.
 
 ---
 
@@ -430,7 +430,7 @@ the engine side is ready; only the control is absent.
 **Complaint**: Per-platform (phone / tablet / desktop) variants of the touch layout are not visible.
 
 **Requirement it maps to**: **no functional requirement of its own.** [spec.md](spec.md):55-57
-records this complaint as **already working** before spec 061 — "Platform tabs render and function…
+records this complaint as **already working** before spec 065 — "Platform tabs render and function…
 `onPlatformChange` is the one wired handler. The tabs are simply too quiet to find inside a pane that
 is otherwise inert." It remains in scope only through **SC-001** ("every one of the six complaints is
 demonstrably resolved"), so post-change it is a **confirmation of no regression**, with **FR-038** (the
@@ -462,7 +462,7 @@ else inert would reasonably conclude these were inert too.
 - *No-regression*: run
   `cd packages/studio && npx playwright test touch-key-grid-a11y.spec.ts` (once the survey helper is
   fixed) and confirm no accessibility violation at or above *serious* impact (SC-004, FR-038). The
-  spec 058 SC-009 row-actions fix must survive T012's removal of the two row buttons — FR-038 names
+  spec 063 SC-009 row-actions fix must survive T012's removal of the two row buttons — FR-038 names
   it explicitly.
 
 ---

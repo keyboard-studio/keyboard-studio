@@ -65,7 +65,7 @@ export * from "./validator";
 export * from "./ir/backspaceContext";
 export * from "./ir/composable";
 export * from "./ir/producedSet";
-// The reachability-aware sibling view (spec 058). Deliberately a separate
+// The reachability-aware sibling view (spec 063). Deliberately a separate
 // function, not an option on buildProducedSet - see both module headers.
 export * from "./ir/reachableProducedSet";
 export * from "./keyboardIRRoundTrip";
@@ -74,21 +74,21 @@ export * from "./keyboardIRRoundTrip";
 // and keyboard-lint (which cannot import engine) consume them directly.
 export * from "./rule-shape";
 export * from "./touch-coverage";
-// The canonical touch key <-> rule join (spec 058). Lives here because
+// The canonical touch key <-> rule join (spec 063). Lives here because
 // keyboard-lint must consume it and cannot import engine — the same forced
 // placement as buildProducedSet and computeTouchCoverage.
 export * from "./touch-key-rule-join";
-// The touch-node address scheme (spec 058 T114). Defined in engine originally;
+// The touch-node address scheme (spec 063 T114). Defined in engine originally;
 // moved here because the diagnostics detectors below build addresses and are
 // pinned to contracts. `engine/src/pattern-apply/touchKeyAddress.ts` is now a
 // re-export shim over this module, so no call site moved.
 export * from "./touch-key-address";
-// The edit-time touch-key diagnostics (spec 058 Phase 9). Same forced placement
+// The edit-time touch-key diagnostics (spec 063 Phase 9). Same forced placement
 // as the join above, for the same reason: FR-040 requires the edit-time surface
 // and its Layer C siblings to share ONE implementation, and contracts is the
 // only package both can import.
 export * from "./touch-key-diagnostics";
-// Row geometry and the ONE keys-per-row threshold table (spec 061). Pinned here
+// Row geometry and the ONE keys-per-row threshold table (spec 065). Pinned here
 // for the same reason as the join and the diagnostics above: Layer C's check
 // 18.3 reads the thresholds and cannot import engine.
 export * from "./row-metrics";

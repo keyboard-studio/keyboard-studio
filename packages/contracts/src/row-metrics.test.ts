@@ -1,4 +1,4 @@
-// row-metrics — spec 061 T019 (FR-013, FR-014, research D6).
+// row-metrics — spec 065 T019 (FR-013, FR-014, research D6).
 //
 // The suite's real subject is that the phone-10 / tablet-13 pair has ONE
 // statement. The threshold assertions below are deliberately written against

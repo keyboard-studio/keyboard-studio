@@ -1,4 +1,4 @@
-// Unit tests for LayerSelector (spec 061-touch-editor-parity T011; FR-004,
+// Unit tests for LayerSelector (spec 065-touch-editor-parity T011; FR-004,
 // FR-005). See LayerSelector.tsx's own module doc for the full contract this
 // exercises: the layer list is never derived from a key's `nextlayer`
 // (trivially true here, since this component never sees a key at all — only

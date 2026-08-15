@@ -1,5 +1,5 @@
 /**
- * Unit tests for the shared touch-key diagnostic detectors (spec 058 T114).
+ * Unit tests for the shared touch-key diagnostic detectors (spec 063 T114).
  *
  * ## Scope: the NET-NEW detectors and the aggregator, not the migrated six
  *

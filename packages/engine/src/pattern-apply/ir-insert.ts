@@ -3,7 +3,7 @@
  * must obey, in one place.
  *
  * Both started life private to [mark-guards.ts](./mark-guards.ts). Touch-rule
- * synthesis (spec 058) needs the identical semantics — same entry-group choice,
+ * synthesis (spec 063) needs the identical semantics — same entry-group choice,
  * same terminal-rule constraint — and two synthesizers picking their own
  * insertion point is how one of them ends up emitting a group that kmcmplib
  * rejects, or a rule the compiler silently never reaches. Lifting them here

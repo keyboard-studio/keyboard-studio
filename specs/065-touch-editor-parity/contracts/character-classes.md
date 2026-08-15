@@ -1,6 +1,6 @@
 # Reachable character classes — the SC-007 gap analysis
 
-**Status**: contract · spec 061 US5 T044 · prerequisite for FR-032, T045
+**Status**: contract · spec 065 US5 T044 · prerequisite for FR-032, T045
 
 FR-032 says the editor proposes an id **or states why it cannot** — never silence. That is only
 meaningful once "every character class an author can reach" is written down. This table is that

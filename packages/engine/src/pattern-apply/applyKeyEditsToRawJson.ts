@@ -1,6 +1,6 @@
 /**
  * applyKeyEditsToRawJson — Case B applier for the key-level touch layout
- * edit overlay (spec 058 FR-031…FR-034, FR-036a…FR-036g): applies a
+ * edit overlay (spec 063 FR-031…FR-034, FR-036a…FR-036g): applies a
  * {@link KeyEditOperation} list directly onto a copy of the raw
  * `.keyman-touch-layout` JSON, splicing in place and never round-tripping
  * through `TouchLayoutIR`.
@@ -196,7 +196,7 @@ interface ResolvedMainKey {
   readonly key: RawKey;
   /**
    * The containing layer's rows, and this row's index within them — needed by
-   * `move` (spec 061 T032), which is the only operation that reaches beyond the
+   * `move` (spec 065 T032), which is the only operation that reaches beyond the
    * row it resolved into.
    *
    * These are VIEW rows: `buildLayoutView` skips any wire row whose `key` is not
@@ -299,7 +299,7 @@ function writeEditableFields(target: EditableRawTarget, fields: EditableKeyField
 function newRawKeyFromSpec(spec: EditableKeyFields): RawKey {
   const key: RawKey = { id: spec.id, text: spec.text };
   key["sp"] = spec.sp;
-  // The standard default geometry, written EXPLICITLY (spec 061 T021, FR-016).
+  // The standard default geometry, written EXPLICITLY (spec 065 T021, FR-016).
   //
   // `NewKeySpec` is `EditableKeyFields`, which carries no width or pad, so
   // there is nothing to inherit and nothing to honour — "regardless of what the
@@ -336,7 +336,7 @@ function applyAdd(resolved: ResolvedMainKey, op: AddKeyOp): void {
 }
 
 /**
- * Case B's `move` (spec 061 T032) — the twin of `applyKeyEditsToLayout.ts`'s
+ * Case B's `move` (spec 065 T032) — the twin of `applyKeyEditsToLayout.ts`'s
  * `moveKeyWithinLayer`, and held to the same rules by
  * `applyKeyEdits.twin.test.ts`: swap within the row for `left`/`right`,
  * transfer to the adjacent row clamped to `min(keyIndex, targetRow.keys.length)`
@@ -387,7 +387,7 @@ function applyRemove(resolved: ResolvedMainKey, op: RemoveKeyOp): void {
 }
 
 /**
- * Case B's create half of `setSubKey`'s upsert (spec 061 T042, FR-026) — the
+ * Case B's create half of `setSubKey`'s upsert (spec 065 T042, FR-026) — the
  * twin of `applyKeyEditsToLayout.ts`'s `appendSubKey`.
  *
  * `sk`/`multitap` append; `flick` sets its direction. The new entry is built
@@ -526,7 +526,7 @@ export function applyKeyEditsToRawJson(
       case "setSubKey": {
         const subLoc = resolveSubKeyEntry(resolved.key as unknown as AddressableRawKey, op.sub);
         if (!subLoc) {
-          // UPSERT (spec 061 T042, FR-026) — see the IR twin's own comment for
+          // UPSERT (spec 065 T042, FR-026) — see the IR twin's own comment for
           // why the spec-058 warn-and-skip behaviour this replaced no longer
           // holds: key mode must be able to ADD a longpress, multitap or flick,
           // through the existing operations on the one overlay.

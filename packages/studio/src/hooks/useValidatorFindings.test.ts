@@ -124,7 +124,7 @@ describe("useValidatorFindings", () => {
 });
 
 // ---------------------------------------------------------------------------
-// SC-010 (spec 058 T122) — the edit-time touch diagnostics resolve within the
+// SC-010 (spec 063 T122) — the edit-time touch diagnostics resolve within the
 // EXISTING 300 ms cycle, adding no timer of their own (FR-042, Decision D3).
 //
 // Behavioral, in the `useKeyboardArtifact.test.ts` fake-timer mold, rather than

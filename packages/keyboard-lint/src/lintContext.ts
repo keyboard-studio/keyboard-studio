@@ -100,7 +100,7 @@ export async function lintWithContext(
   const joined = resolveJoinedCheckInputs(ctx.keyboardIR, ctx.touchLayout, ir ?? undefined);
 
   // 18.6 touch: coverage guard (spec 035 FR-008) — only when both inputs are
-  // present. The rule index is threaded when available (spec 058 FR-007), so a
+  // present. The rule index is threaded when available (spec 063 FR-007), so a
   // `T_*` key whose output lives in a rule is credited here too.
   if (ctx.touchLayout && ctx.touchInventory) {
     findings.push(

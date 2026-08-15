@@ -1,4 +1,4 @@
-// useKeyCommands — the touch key grid's COMMAND layer (spec 058 T094;
+// useKeyCommands — the touch key grid's COMMAND layer (spec 063 T094;
 // FR-029, US4 AS1), distinct from `useGridNav.ts`'s NAVIGATION layer in the
 // same directory. Where `useGridNav` answers "which cell comes next",
 // this hook answers "what can the author DO to the selected key, and how do

@@ -1,5 +1,5 @@
 /**
- * Unit tests for touchKeyDiagnostics (spec 058 Phase 8 / US4, T101-T103).
+ * Unit tests for touchKeyDiagnostics (spec 063 Phase 8 / US4, T101-T103).
  *
  * Grouped to match the three exported checks:
  *   1. findHalfDoneSuppressions   - both branches, plus the FR-029e carve-out
@@ -377,7 +377,7 @@ describe("findMixedSuppressRemove", () => {
 });
 
 // ---------------------------------------------------------------------------
-// findCrowdedTouchRows (spec 061 T017, FR-014)
+// findCrowdedTouchRows (spec 065 T017, FR-014)
 //
 // `makeLayout` above gives every layer exactly one row, which is all this
 // detector needs; the multi-row case is covered by the row-index assertion,

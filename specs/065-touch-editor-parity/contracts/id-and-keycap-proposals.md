@@ -1,7 +1,7 @@
 # Contract: id and keycap proposals
 
-**Feature**: 061-touch-editor-parity (US5) · **Extends**
-[specs/058-touch-key-editor/contracts/key-id-policy.md](../../058-touch-key-editor/contracts/key-id-policy.md),
+**Feature**: 065-touch-editor-parity (US5) · **Extends**
+[specs/063-touch-key-editor/contracts/key-id-policy.md](../../063-touch-key-editor/contracts/key-id-policy.md),
 which stays authoritative for the four existing minting rows.
 
 Owner: `packages/engine/src/pattern-apply/proposeTouchKeyId.ts` (new) and

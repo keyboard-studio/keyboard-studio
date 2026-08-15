@@ -1,6 +1,6 @@
 /**
  * applyKeyEdits.twin.test — the §5/§10 applier-twin equivalence test
- * (spec 058 T047).
+ * (spec 063 T047).
  *
  * The contract (contracts/key-edit-overlay.md §5): "The defence is a test,
  * not discipline." Apply the SAME `KeyEditOperation[]` list — covering every
@@ -296,7 +296,7 @@ describe("applyKeyEdits twin equivalence (T047)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// `move` — spec 061 T028 (FR-020, FR-021)
+// `move` — spec 065 T028 (FR-020, FR-021)
 //
 // Its own describe block rather than an eighth entry in `buildOps()`: a move
 // changes key POSITIONS, and folding it into the shared list would silently
@@ -304,7 +304,7 @@ describe("applyKeyEdits twin equivalence (T047)", () => {
 // the same though — both appliers, one operation list, structural comparison.
 // ---------------------------------------------------------------------------
 
-describe("applyKeyEdits twin equivalence — move (spec 061 T028)", () => {
+describe("applyKeyEdits twin equivalence — move (spec 065 T028)", () => {
   /** Both appliers' results for one op list, ready to compare. */
   function runBoth(ops: readonly KeyEditOperation[]) {
     const rawJson = emitTouchLayout(makeTouchKeyRuleJoinLayout());
@@ -526,7 +526,7 @@ describe("applyKeyEdits twin equivalence — move (spec 061 T028)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// `setSubKey` as an UPSERT — spec 061 T042 (FR-026)
+// `setSubKey` as an UPSERT — spec 065 T042 (FR-026)
 //
 // Spec 058 warned-and-skipped when a `setSubKey` named a sub-entry that did not
 // exist, and both appliers' docstrings said why: increment 1's sub-key editing
@@ -537,7 +537,7 @@ describe("applyKeyEdits twin equivalence — move (spec 061 T028)", () => {
 // the edit half has.
 // ---------------------------------------------------------------------------
 
-describe("applyKeyEdits twin equivalence — setSubKey upsert (spec 061 T042)", () => {
+describe("applyKeyEdits twin equivalence — setSubKey upsert (spec 065 T042)", () => {
   function runBoth(ops: readonly KeyEditOperation[]) {
     const rawJson = emitTouchLayout(makeTouchKeyRuleJoinLayout());
     const before = parseTouchLayout(rawJson);

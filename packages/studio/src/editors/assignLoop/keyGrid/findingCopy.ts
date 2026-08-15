@@ -1,5 +1,5 @@
 // findingCopy — the ONE place a `TouchKeyFinding` or `TouchKeyFix` becomes
-// author-facing English (spec 058 T116; FR-044, FR-051).
+// author-facing English (spec 063 T116; FR-044, FR-051).
 //
 // The engine returns STRUCTURED findings and fix descriptors — a code, a
 // severity, an address, and a `fields` bag of key ids / layer ids / `sp` numbers

@@ -227,7 +227,7 @@ describe('StepHost terminal: "unsupported"', () => {
           bcp47: "te-Ethi",
           supported: false,
           prefill: { script: "Ethi", scriptClass: "abugida", routingGroup: "non-roman" },
-          // spec 059: a gated script terminates at il_script_not_supported, before
+          // spec 064: a gated script terminates at il_script_not_supported, before
           // the attribution questions — so there is nothing to attribute.
           attribution: null,
         },

@@ -916,7 +916,7 @@ function makeGenericModifierLayerJson(): string {
                 // sp:9 (blank) — a canonical non-interactive class per
                 // isSpacerKeyClass, deliberately NOT "T_BLANK", to prove the
                 // predicate generalizes beyond the well-known sentinel id.
-                // (Was sp:8 before spec 058 FR-012 corrected the class set from
+                // (Was sp:8 before spec 063 FR-012 corrected the class set from
                 // `{8,10}` to `{9,10}`; sp:8 is deadkey-STYLED and interactive,
                 // so it is no longer a promotable free slot — see the
                 // isBlankPlaceholder canary below. The fixture's intent is
@@ -1183,7 +1183,7 @@ describe("isBlankPlaceholder", () => {
   });
 
   // -------------------------------------------------------------------------
-  // THE PLACEMENT-PROMOTION CANARY (spec 058 FR-012 / T019).
+  // THE PLACEMENT-PROMOTION CANARY (spec 063 FR-012 / T019).
   //
   // `isBlankPlaceholder` is `isEmptyText(text) && isSpacerKeyClass(sp)`, so
   // correcting `isSpacerKeyClass` from `{8, 10}` to `{9, 10}` moved WHICH SLOTS

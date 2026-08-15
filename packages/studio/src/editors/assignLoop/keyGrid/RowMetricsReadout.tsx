@@ -1,5 +1,5 @@
 // RowMetricsReadout — what one row of the key grid measures, stated in the
-// author's own numbers (spec 061 T025; FR-013, FR-014, FR-015, FR-037).
+// author's own numbers (spec 065 T025; FR-013, FR-014, FR-015, FR-037).
 //
 // ## What replaced what
 //
@@ -13,7 +13,7 @@
 //
 // This component occupies the row-actions strip
 // (`key-grid-row-actions-<rowIndex>`) that "Fill row" / "Even out row" used to
-// share. That container is retained rather than rebuilt because spec 058 SC-009
+// share. That container is retained rather than rebuilt because spec 063 SC-009
 // made it a `role="row"` with an inner `role="gridcell"` — a bare `<div>` there
 // fails axe's `aria-required-children` at CRITICAL impact on the grid itself.
 // FR-038 forbids regressing that fix, so this readout renders INSIDE the

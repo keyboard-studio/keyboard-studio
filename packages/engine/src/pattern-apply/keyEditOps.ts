@@ -1,6 +1,6 @@
 /**
  * keyEditOps — the operation union for key-level touch layout editing
- * (spec 058 FR-031…FR-034, FR-036a…FR-036g), plus the machinery both
+ * (spec 063 FR-031…FR-034, FR-036a…FR-036g), plus the machinery both
  * appliers share so they cannot independently drift on what an address
  * means or what a `set` does to a stale `output`:
  *
@@ -9,7 +9,7 @@
  *   required because spec 035's R9 forbids the import-adapt path from
  *   round-tripping through the IR.
  *
- * Normative source: specs/058-touch-key-editor/contracts/key-edit-overlay.md
+ * Normative source: specs/063-touch-key-editor/contracts/key-edit-overlay.md
  * §3 (operations) and §5 (resolver). This module holds ONLY the operation
  * union, the editable-field shape, and the pieces of machinery the
  * contract's §5 table marks "shared, exactly once" — the address resolver,
@@ -90,7 +90,7 @@ export type EditableKeySp = 0 | 1 | 2 | 8 | 9 | 10;
  * drift guard is not engaged and this is an additive, non-breaking widening:
  *
  * - **`hint`** — the small secondary label a key can carry.
- * - **`width` / `pad`** — geometry, read-only for spec 058's Increment 1 and
+ * - **`width` / `pad`** — geometry, read-only for spec 063's Increment 1 and
  *   opened here. FR-015 makes the declared width a *minimum*: the last key of a
  *   row renders stretched past it, which is why editing the declared figure is
  *   safe — it can never make a row unrenderable, only narrower than its
@@ -112,7 +112,7 @@ export interface EditableKeyFields {
   readonly output?: string;
   readonly sp: EditableKeySp;
   readonly nextlayer?: string;
-  /** Secondary label (spec 061 T030). */
+  /** Secondary label (spec 065 T030). */
   readonly hint?: string;
   /** Declared width in the 100-unit model — a MINIMUM, not the rendered width (FR-015). */
   readonly width?: number;
@@ -185,7 +185,7 @@ export interface RemoveKeyOp extends KeyEditOperationBase {
 }
 
 /**
- * Move a key one position in a direction (spec 061 T030, FR-020, FR-021).
+ * Move a key one position in a direction (spec 065 T030, FR-020, FR-021).
  *
  * ## Why a DIRECTION, and no key spec
  *
@@ -279,7 +279,7 @@ export function rejectsFamilyScope(op: KeyEditOperation): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Declared output (spec 058 T060 / FR-033b)
+// Declared output (spec 063 T060 / FR-033b)
 // ---------------------------------------------------------------------------
 
 /**
@@ -471,7 +471,7 @@ export function applyFieldSemantics(
 
   const output = clearOutput ? undefined : (patch.output ?? current.output);
   const nextlayer = patch.nextlayer ?? current.nextlayer;
-  // The four fields spec 061 T030 admitted. Plain override-if-present, exactly
+  // The four fields spec 065 T030 admitted. Plain override-if-present, exactly
   // like `nextlayer`: none of them participates in the id/output coupling
   // above, so none of them is cleared by an id change.
   const hint = patch.hint ?? current.hint;
@@ -591,7 +591,7 @@ export interface KeyEditOverlay {
 // cycle, which `pnpm depcruise`'s `no-circular` rule blocks.
 
 // ---------------------------------------------------------------------------
-// Edit-time rejection (spec 058 T118; FR-045, FR-040)
+// Edit-time rejection (spec 063 T118; FR-045, FR-040)
 // ---------------------------------------------------------------------------
 
 /**

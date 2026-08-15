@@ -57,7 +57,7 @@ export type { TouchCoverageResult } from "@keyboard-studio/contracts";
  *
  * Pure: no mutation of `layout`/`inventory`/`additionalProduced`, no I/O.
  *
- * @param options - The spec 058 coverage options, threaded straight through to
+ * @param options - The spec 063 coverage options, threaded straight through to
  *   `computeTouchCoverage`. Note WHERE in this function they take effect: the
  *   rule-index credit is applied by the inner call, **before**
  *   `augmentWithComposable` runs. That order is the point, not an accident — a

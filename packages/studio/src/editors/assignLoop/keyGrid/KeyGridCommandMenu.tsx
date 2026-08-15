@@ -1,5 +1,5 @@
 // KeyGridCommandMenu — the per-key command menu the `⋯` wedge, right-click,
-// and `ContextMenu`/`Shift+F10` all open (spec 058 T111; FR-021, FR-020b).
+// and `ContextMenu`/`Shift+F10` all open (spec 063 T111; FR-021, FR-020b).
 //
 // Renders a `useKeyCommands.ts` `KeyGridCommandDescriptor[]` and nothing else:
 // it computes no command, knows no key-edit semantics, and owns no selection.

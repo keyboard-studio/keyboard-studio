@@ -1,6 +1,6 @@
 /**
  * proposeTouchKeyId — the inherit-first key-id proposer for the touch key
- * editor (spec 061 US5; FR-029…FR-032,
+ * editor (spec 065 US5; FR-029…FR-032,
  * contracts/id-and-keycap-proposals.md §1).
  *
  * A thin wrapper around the untouched {@link proposeKeyId}: it asks two cheaper
@@ -51,7 +51,7 @@ export type TouchKeyIdProposalReason =
  * studio composes and localizes each into `key-property-panel-no-proposal-reason`.
  *
  * The enumeration of what reaches each arm is
- * [character-classes.md](../../../../specs/061-touch-editor-parity/contracts/character-classes.md),
+ * [character-classes.md](../../../../specs/065-touch-editor-parity/contracts/character-classes.md),
  * and T045 is a table-driven test over it.
  *
  * **`titlecase-self-third-form` is carried, but this module never sets it.**

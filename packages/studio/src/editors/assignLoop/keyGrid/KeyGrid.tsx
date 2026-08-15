@@ -1,5 +1,5 @@
 // KeyGrid — the touch layout key grid, built directly from the ARIA APG grid
-// pattern (spec 058 T064; FR-020, FR-020a, FR-022). No local precedent exists
+// pattern (spec 063 T064; FR-020, FR-020a, FR-022). No local precedent exists
 // for `role="grid"`/`"row"`/`"gridcell"` anywhere under packages/ (research.md
 // R10.4 — zero occurrences) — this is the first, so it follows
 // https://www.w3.org/WAI/ARIA/apg/patterns/grid/ directly rather than
@@ -13,7 +13,7 @@
 // "What the union deliberately does NOT admit, and why": `width`/`pad` are
 // absent from `EditableKeyFields`, so nothing this component can emit today
 // actually COMMITS a width change to the overlay. The "Fill row"/"Even out
-// row" controls that used to live here were withdrawn by spec 061 (FR-007,
+// row" controls that used to live here were withdrawn by spec 065 (FR-007,
 // ADR 0002 — the grid renders the last key of an under-full row stretched,
 // so there is no slack left for either control to act on) — see "Row slack,
 // and the row-actions strip" below for what remains.
@@ -28,7 +28,7 @@
 // A layout of several hundred keys therefore still produces exactly one Tab
 // stop, not several hundred.
 //
-// ## Row slack, and the row-actions strip (spec 061 T012/T026, FR-007, FR-012,
+// ## Row slack, and the row-actions strip (spec 065 T012/T026, FR-007, FR-012,
 // FR-013, ADR 0002)
 //
 // `KeyGridRowViewModel.slackPct` (keyGridViewModel.ts) is the gap between a row
@@ -52,7 +52,7 @@
 // there is no slack left for either control to redistribute). What remains
 // is the **row-actions strip** itself
 // (`key-grid-row-actions-<rowIndex>`) — kept, per FR-038, because removing it
-// would regress spec 058 SC-009's accessibility fix (see "Why this strip
+// would regress spec 063 SC-009's accessibility fix (see "Why this strip
 // carries `role=\"row\"` + an inner `role=\"gridcell\"`" below). It renders
 // **unconditionally**, once per layout row, and its `role="gridcell"` now holds
 // `RowMetricsReadout` (T026): the four printed per-row figures and the
@@ -248,7 +248,7 @@ export interface KeyGridProps {
   /** Selection change — from a click here, or (once T065 lands) from `useGridNav`'s arrow/Home/End handling calling this same callback. */
   onSelectCell: (cell: KeyGridCellViewModel) => void;
   /**
-   * Grid-level keydown handling — **required** (spec 061 T002/D1, FR-001).
+   * Grid-level keydown handling — **required** (spec 065 T002/D1, FR-001).
    * Composing `useGridNav`'s arrow/Home/End navigation with
    * `useKeyCommands`'s Insert/`ContextMenu`/`Ctrl+Enter` handling into one
    * function is the caller's job, not this component's: this component only
@@ -267,7 +267,7 @@ export interface KeyGridProps {
    * layout (the common case) never shows a choice that isn't real. The
    * caller owns which `viewModel` corresponds to which platform; this
    * component only renders the switcher and reports the click/keypress back.
-   * Data, not an editing affordance, so it stays optional (spec 061 contract
+   * Data, not an editing affordance, so it stays optional (spec 065 contract
    * key-mode-ui.md §1).
    */
   platforms?: readonly KeyGridPlatformTab[];
@@ -275,7 +275,7 @@ export interface KeyGridProps {
   activePlatformId?: string;
   /**
    * Fired when the author picks a different platform tab (click, or
-   * Left/Right/Home/End inside the tablist). **Required** (spec 061 T002):
+   * Left/Right/Home/End inside the tablist). **Required** (spec 065 T002):
    * with no tablist rendered for fewer than 2 platforms, this simply never
    * fires in that case — but a mount that CAN show a tablist must be able to
    * act on it.
@@ -285,7 +285,7 @@ export interface KeyGridProps {
   provenance?: KeyGridProvenance;
   /**
    * T111 (FR-021) — the per-key pointer commands, forwarded verbatim to every
-   * `KeyGridCell`. **Required** (spec 061 T002/T003, FR-001, FR-003): each
+   * `KeyGridCell`. **Required** (spec 065 T002/T003, FR-001, FR-003): each
    * affordance's visibility is gated on the CELL's own state in
    * `KeyGridCell.tsx` (blank/spacer, `nextlayer` presence), never on whether
    * a handler happens to exist — see that file's own prop docs. This
@@ -758,12 +758,12 @@ export function KeyGrid({
                   );
                 })}
               </div>
-              {/* The row-actions strip (spec 061 T012, FR-007, FR-038) — a
+              {/* The row-actions strip (spec 065 T012, FR-007, FR-038) — a
               retained container, not a new one: it used to hold "Fill row" /
               "Even out row", both withdrawn by ADR 0002 (the last key now
               stretches to fill a row, so there is nothing left for either
               button to redistribute). It renders UNCONDITIONALLY now, once
-              per layout row, and as of spec 061 T026 its `role="gridcell"`
+              per layout row, and as of spec 065 T026 its `role="gridcell"`
               holds the per-row metrics readout (FR-013, FR-014) — the printed
               numbers that replaced the withdrawn slack hatch. The readout goes
               INSIDE the existing gridcell rather than beside it: the roles

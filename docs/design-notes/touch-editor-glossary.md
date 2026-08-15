@@ -5,7 +5,7 @@ review. This is a glossary, not a spec: it fixes what each word *means* so that 
 follow-up spec, the code, and the UI copy can all use them the same way.
 
 Governing specs: [spec.md](../../spec.md) §8, §14 Decision 6,
-[specs/058-touch-key-editor](../../specs/058-touch-key-editor/spec.md).
+[specs/063-touch-key-editor](../../specs/063-touch-key-editor/spec.md).
 
 ---
 
@@ -108,14 +108,14 @@ share of the layer max, so the layer max sets the scale for the whole board.
 ignoring its own declared width for its own rendering. This is KeymanWeb's behaviour
 and the editor reproduces it.
 
-> **This replaced the hatch.** [specs/058-touch-key-editor](../../specs/058-touch-key-editor/spec.md)
+> **This replaced the hatch.** [specs/063-touch-key-editor](../../specs/063-touch-key-editor/spec.md)
 > FR-039 drew row slack as a visible hatch rather than absorbing it — the reasoning being
 > that slack should be *seen*. In practice it made every short row look broken, and it
 > disagreed with what the keyboard actually does on a phone. Spec 061 **withdraws that
 > FR-039**: slack is absorbed by the stretch and reported as numbers in the row's metrics
 > readout instead, so the board reads like the keyboard while the measurements stay
 > available. The why is [ADR 0002](../adr/0002-touch-grid-renders-the-last-key-stretched.md);
-> [specs/061-touch-editor-parity](../../specs/061-touch-editor-parity/spec.md) is the
+> [specs/065-touch-editor-parity](../../specs/065-touch-editor-parity/spec.md) is the
 > authoritative execution.
 
 **Declared width is therefore a floor, not a size** — a `min-width`, in CSS terms. A

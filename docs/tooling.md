@@ -245,7 +245,7 @@ Live and passing:
 Skipped, each with an un-skip recipe at the top of its file:
 
 - `import-improve.spec.ts` — Track 2
-- [touch-key-add-remove.spec.ts](../packages/studio/e2e/touch-key-add-remove.spec.ts) — spec 058
+- [touch-key-add-remove.spec.ts](../packages/studio/e2e/touch-key-add-remove.spec.ts) — spec 063
   T112 / SC-006. Written in full against the real test ids, but blocked until `TouchGallery.tsx`
   actually mounts the Phase 8 add/remove surfaces — it calls neither `useKeyCommands` nor
   `RemoveKeyDialog` today.
@@ -325,7 +325,7 @@ one requirement costs ~3k tokens; a budgeted search costs ~300.
 ```
 pnpm run spec-search "remove key confirmation dialog"
 pnpm run spec-search "kmp package output" --limit 8 --budget 3000
-pnpm run spec-search "touch layout" --scope specs/058-touch-key-editor
+pnpm run spec-search "touch layout" --scope specs/063-touch-key-editor
 pnpm run spec-search "layer A validity" --json
 ```
 

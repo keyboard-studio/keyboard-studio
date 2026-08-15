@@ -597,7 +597,7 @@ describe("persistWorkingCopy", () => {
   });
 
   // -------------------------------------------------------------------------
-  // keyEditOverlay / touchEditorMode — spec 058 T058.
+  // keyEditOverlay / touchEditorMode — spec 063 T058.
   //
   // Both fields join WorkingCopySnapshot as OPTIONAL with a tolerant fallback
   // read in prepareWorkingCopySnapshot, per data-model.md §9 / R10.3: DRAFT_VERSION
@@ -681,7 +681,7 @@ describe("persistWorkingCopy", () => {
         validatorFindings: [],
         axisFills: [],
         // keyEditOverlay / touchEditorMode intentionally OMITTED — this is
-        // exactly the shape a snapshot written before spec 058 has.
+        // exactly the shape a snapshot written before spec 063 has.
       } as unknown as WorkingCopySnapshot;
 
       const patch = prepareWorkingCopySnapshot(legacySnapshot);

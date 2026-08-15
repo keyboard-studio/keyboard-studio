@@ -1,7 +1,7 @@
 {
   "workflow": "speckit",
   "specName": "Touch key editor — Developer-parity remodel",
-  "branch": "061-touch-editor-parity",
+  "branch": "065-touch-editor-parity",
   "currentStep": "implement",
   "status": "implementing",
   "history": [
@@ -252,13 +252,13 @@
       "rejected": "One copy only -- either in vitest (losing the full-walk realism the e2e provides) or in Playwright alone (ungated)."
     },
     {
-      "decision": "Fix the Case B IR-round-trip defect inside spec 061, in its own commit (out-of-scope-but-unblocking, per the cadence rule)",
+      "decision": "Fix the Case B IR-round-trip defect inside spec 065, in its own commit (out-of-scope-but-unblocking, per the cadence rule)",
       "why": "SC-006 assertion (c) is correctly catching a real spec-035 R9 violation; amending the assertion would mask a defect that destroys the touch provenance model after a single edit",
       "rejected": "Normalizing (c) to ignore the p stamp and filing the defect separately; or leaving (c) failing with FR-008 unmet"
     },
     {
       "decision": "Split Enter and F2 at the grid: Enter opens the key-property-panel region (FR-020b unchanged), F2 lands directly in the character field, opening the assign disclosure on the way",
-      "why": "Restores spec 058 SC-004 keyboard-only assign inside its 12-action budget without reopening the property-panel remodel or weakening FR-020b; F2-edits-the-value is the grid convention and the key was already claimed",
+      "why": "Restores spec 063 SC-004 keyboard-only assign inside its 12-action budget without reopening the property-panel remodel or weakening FR-020b; F2-edits-the-value is the grid convention and the key was already claimed",
       "rejected": "Amending SC-004 budget; or opening the assign disclosure by default (partly reopens research D3)"
     }
   ],
@@ -542,7 +542,7 @@
       ]
     },
     "FR-038": {
-      "title": "The grid MUST remain a conformant ARIA grid, keyboard-operable throughout; the spec 058 SC-009 row-actions accessibility fix MUST NOT regress.",
+      "title": "The grid MUST remain a conformant ARIA grid, keyboard-operable throughout; the spec 063 SC-009 row-actions accessibility fix MUST NOT regress.",
       "tasks": [
         "T012",
         "T027",
@@ -590,7 +590,7 @@
   ],
   "concerns": [
     {
-      "note": "PRE-EXISTING spec-058 defect surfaced by un-skipping the SC-006 walk (blame: ef19aa2b, not spec 061). TouchGallery.tsx:2527 - for Case B (imported/import-adapt) every key edit does store.setTouchLayoutJson(emitTouchLayout(promotedLayout)), a full IR round-trip. Measured effect: all 112 keys gain p=hand-set and sp/width/pad normalize to strings. This contradicts spec 035 R9, which applyKeyEditsToRawJson + projection step 1.7 (applyKeyEditsToVfs) exist to honour. Consequence: after one touch key edit an imported layout is entirely hand-set, so re-propagation can never update any key, and per-key layer/default plus platform displayUnderlying/fontsize that the IR does not model are dropped. Blocks SC-006 assertion (c). Complication for any fix: layoutForLintAndGate parses touchLayoutJson for the live grid, so the write cannot simply be deleted; and step 1.7 already re-applies the same overlay, so a naive Case B applier swap risks double-apply.",
+      "note": "PRE-EXISTING spec-058 defect surfaced by un-skipping the SC-006 walk (blame: ef19aa2b, not spec 065). TouchGallery.tsx:2527 - for Case B (imported/import-adapt) every key edit does store.setTouchLayoutJson(emitTouchLayout(promotedLayout)), a full IR round-trip. Measured effect: all 112 keys gain p=hand-set and sp/width/pad normalize to strings. This contradicts spec 035 R9, which applyKeyEditsToRawJson + projection step 1.7 (applyKeyEditsToVfs) exist to honour. Consequence: after one touch key edit an imported layout is entirely hand-set, so re-propagation can never update any key, and per-key layer/default plus platform displayUnderlying/fontsize that the IR does not model are dropped. Blocks SC-006 assertion (c). Complication for any fix: layoutForLintAndGate parses touchLayoutJson for the live grid, so the write cannot simply be deleted; and step 1.7 already re-applies the same overlay, so a naive Case B applier swap risks double-apply.",
       "step": "implement"
     },
     {
@@ -613,7 +613,7 @@
       "status": "DONE",
       "did": "Enumerated the 10 reachable character classes into a contract table (4 existing minting paths + titlecase, modifier symbols, emoji sequences, variation selectors, unassigned codepoints, empty output), each resolving to a proposal or a stated NoProposalReason",
       "files": [
-        "specs/061-touch-editor-parity/contracts/character-classes.md"
+        "specs/065-touch-editor-parity/contracts/character-classes.md"
       ]
     },
     "T045": {
@@ -695,14 +695,14 @@
     },
     "T056": {
       "status": "DONE",
-      "did": "Grid a11y suite green: axe clean in resting and roving-tabindex states, keyboard-only operation intact. Updated two stale setup premises spec 061 invalidated (tab-order anchor, and the editing surface Enter reaches)",
+      "did": "Grid a11y suite green: axe clean in resting and roving-tabindex states, keyboard-only operation intact. Updated two stale setup premises spec 065 invalidated (tab-order anchor, and the editing surface Enter reaches)",
       "files": [
         "packages/studio/e2e/touch-key-grid-a11y.spec.ts"
       ]
     },
     "T058": {
       "status": "DONE",
-      "did": "Recorded spec 058 FR-039's withdrawal in the glossary with the reasoning, cross-linked to ADR 0002 and the 061 spec",
+      "did": "Recorded spec 063 FR-039's withdrawal in the glossary with the reasoning, cross-linked to ADR 0002 and the 061 spec",
       "files": [
         "docs/design-notes/touch-editor-glossary.md"
       ]
@@ -716,7 +716,7 @@
     },
     "T061": {
       "status": "DONE",
-      "did": "Acknowledged specs/061-touch-editor-parity only; the other 9 drifting units are pre-existing on main and not this feature's to acknowledge",
+      "did": "Acknowledged specs/065-touch-editor-parity only; the other 9 drifting units are pre-existing on main and not this feature's to acknowledge",
       "files": [
         "docs/spec-trace.json"
       ]

@@ -30,7 +30,7 @@ import type {
 } from "@keyboard-studio/contracts";
 
 // The entry-group choice and the terminal-rule constraint are shared with
-// touch-rule synthesis (spec 058) — see ir-insert.ts's module doc for why they
+// touch-rule synthesis (spec 063) — see ir-insert.ts's module doc for why they
 // are not private to this module any more.
 import { entryGroupOf, insertBeforeTerminalRules } from "./ir-insert.js";
 

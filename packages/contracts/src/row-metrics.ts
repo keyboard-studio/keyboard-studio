@@ -1,7 +1,7 @@
 /**
  * row-metrics — the ONE statement of what a touch-layout row measures, and the
  * ONE table of how many interactive keys a platform's row may carry
- * (spec 061 T019; FR-013, FR-014, research D6).
+ * (spec 065 T019; FR-013, FR-014, research D6).
  *
  * ## Why this lives in contracts and not in engine
  *
@@ -62,7 +62,7 @@ import { isSpacerKeyClass } from "./touch-coverage";
  *
  * The studio's `keyGridViewModel.ts` originated these two constants and still
  * re-exports them under the same names, so no existing import site moved. They
- * live here now because the engine-side appliers (spec 061 T021) must write the
+ * live here now because the engine-side appliers (spec 065 T021) must write the
  * same defaults a newly added key is measured against, and an applier cannot
  * import the studio.
  */

@@ -1,4 +1,4 @@
-// RowMetricsReadout — spec 061 T025 (FR-013, FR-014, FR-015).
+// RowMetricsReadout — spec 065 T025 (FR-013, FR-014, FR-015).
 //
 // No @testing-library/jest-dom — raw DOM assertions, matching this package's
 // established convention (RemoveKeyDialog.test.tsx, Field.test.tsx).
