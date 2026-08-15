@@ -91,12 +91,12 @@ function RemovedMenu({ list, onRestore, onRestoreAll, onClose }: RemovedMenuProp
               )}
               {/* NOT --app-text-on-accent: that token flips per theme to pair
                   with --app-accent, but --sil-green is a fixed fill in both
-                  themes (brand.css has no navy override for it) -- light
-                  theme's on-accent value (white) only reaches 3.35:1 against
-                  this green, below the 4.5:1 AA minimum (1.4.3, #1477; same
-                  bug CarveGalleryV2.tsx fixed for this exact fill).
-                  --sil-black passes at 6.27:1 in both themes since the fill
-                  itself never changes. */}
+                  themes (brand.css has no navy override for it). White (light
+                  theme's on-accent value) reaches only 3.35:1 against this
+                  green, below the 4.5:1 AA minimum for this normal-size bold
+                  text; --sil-black passes at 6.27:1 in both themes because the
+                  fill itself never changes. Same pairing bug as
+                  CarveGalleryV2's "In your alphabet" pill. */}
               <button onClick={() => onRestore(it)} style={{ flex: '0 0 auto', display: 'inline-flex', alignItems: 'center', gap: 5, padding: '6px 11px', background: 'var(--sil-green)', border: '1px solid var(--sil-green-dark)', borderRadius: 7, color: 'var(--sil-black)', font: '600 12.5px var(--app-font)', cursor: 'pointer' }}>
                 <CheckIcon size={12} /> <Trans id="editor.assignLoop.statusBar.keepButton">Keep</Trans>
               </button>

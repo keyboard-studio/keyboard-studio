@@ -43,6 +43,11 @@ const GROUP_HINTS: Record<string, string> = {
   'deadkey-sequence': 'Typed by pressing a dead key, then a base letter.',
   store: 'Lives in an internal list rather than a single key.',
   'advanced-rule': 'Produced by an advanced rule kept verbatim — the keystroke can\'t be shown.',
+  // spec §8 / #1606. These characters ARE produced, and are still discardable
+  // like any other rule-backed character — the set exists so they are not
+  // filed under "typed with a single key press" when no desktop key types
+  // them at all.
+  'touch-only-key': 'Typed only from the on-screen touch keyboard — no desktop key produces it.',
 };
 
 // Decorative category-distinguishing dots — no --app-* semantic token exists
@@ -58,6 +63,7 @@ const GROUP_DOT: Record<string, string> = {
   'deadkey-sequence': 'var(--sil-violet)',
   store: 'var(--sil-orange)',
   'advanced-rule': 'var(--app-text-subtle)',
+  'touch-only-key': 'var(--sil-light-blue)',
   'blocked-candidate': 'var(--app-text-subtle)',
 };
 
@@ -815,10 +821,28 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                     );
 
                     if (ways.length === 0) {
-                      // No renderable producer at all. Two sources get their
-                      // own honest message (neither a banned phrase); every
+                      // No renderable producer at all. Three sources get their
+                      // own honest message (none a banned phrase); every
                       // other zero-producer character shows no "way" line
                       // whatsoever.
+                      //
+                      // touch-only-key reaches here for the same reason it
+                      // exists (spec §8): its only producer is a
+                      // T_xxxx-triggered rule, which charProducers drops
+                      // rather than leak a touch id as a desktop keystroke —
+                      // so ways is empty and, without this branch, the
+                      // character would render with no explanation of why no
+                      // keys are shown.
+                      if (cell.source === 'touch-only-key') {
+                        return (
+                          <>
+                            {label}
+                            <span style={{ fontSize: 12.5, color: 'var(--app-text-subtle)' }}>
+                              Only on the touch keyboard — no desktop key types it
+                            </span>
+                          </>
+                        );
+                      }
                       if (cell.source === 'blocked-candidate') {
                         return (
                           <>
@@ -908,6 +932,14 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                   <span style={{
                     display: 'inline-flex', alignItems: 'center', font: '600 11.5px var(--app-font)',
                     padding: '3px 9px', borderRadius: 999,
+                    // NOT --app-text-on-accent: that token flips per theme to pair
+                    // with --app-accent, but --sil-green is a fixed fill in both
+                    // themes (brand.css has no navy override for it) — the same
+                    // shape as --sil-red-dark above. White (light theme's
+                    // on-accent value) only reaches 3.35:1 against this green,
+                    // below the 4.5:1 AA minimum for this normal-size bold text.
+                    // --sil-black passes at 6.27:1 in both themes since the fill
+                    // itself never changes.
                     color: cell.inAlpha ? 'var(--sil-black)' : 'var(--app-text-muted)',
                     background: cell.inAlpha ? 'var(--sil-green)' : 'var(--app-surface-2)',
                     border: cell.inAlpha ? 'none' : '1px solid var(--app-border-strong)',
@@ -923,6 +955,8 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                   style={{
                     width: '100%', font: '600 13px var(--app-font)', cursor: toggleable ? 'pointer' : 'default',
                     padding: '9px 14px', borderRadius: 8, opacity: toggleable ? 1 : 0.5,
+                    // See the "In your alphabet" pill above: --sil-black instead
+                    // of --app-text-on-accent for the same fixed-fill reason.
                     color: discarded ? 'var(--sil-black)' : 'var(--app-danger-text)',
                     background: discarded ? 'var(--sil-green)' : 'transparent',
                     border: discarded ? 'none' : '1px solid var(--app-danger-text)',

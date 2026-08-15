@@ -48,6 +48,23 @@ describe("siblingAccentPlacements", () => {
     expect(placements).toEqual([{ char: "È", hostKey: "K_E", layer: "shift" }]);
   });
 
+  it("places an NFD-form uppercase sibling on the shift layer, not the default layer (#1445)", () => {
+    // "A" + COMBINING ACUTE ACCENT (U+0301), still decomposed -- the same
+    // character as precomposed U+00C1, but two code points. Built from an
+    // explicit \u escape (this module's own DIACRITIC_PRIORITY convention)
+    // rather than a literal combining character, so the source can't get
+    // silently NFC-normalized back to one code point, which would defeat
+    // the point of this test. isUppercaseLetter is deliberately
+    // single-codepoint-only, so bucketing must case-test the decomposed
+    // base letter, not this NFD string as a whole.
+    const nfdUpperAAcute = "A" + "\u0301";
+    const nfdLowerAGrave = "a" + "\u0300";
+    const placements = siblingAccentPlacements(nfdLowerAGrave, "K_A", [nfdLowerAGrave, nfdUpperAAcute]);
+    expect(placements).toEqual([
+      { char: nfdUpperAAcute, hostKey: "K_A", layer: "shift" },
+    ]);
+  });
+
   it("excludes the accepted char itself", () => {
     const chars = siblingAccentPlacements("à", "K_A", ["à", "á"]).map((p) => p.char);
     expect(chars).not.toContain("à");
