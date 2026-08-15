@@ -19,43 +19,18 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import https from "node:https";
+import { httpGet } from "./lib/http-get.cjs";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const CLDR_PIN = join(HERE, "cldr-version.json");
 const SLDR_PIN = join(HERE, "sldr-version.json");
 
-function getJson(url) {
-  return new Promise((res, rej) => {
-    const req = https.get(
-      url,
-      { headers: { "User-Agent": "keyboard-studio/check-exemplar-staleness", Accept: "application/json" } },
-      (resp) => {
-        if (resp.statusCode >= 300 && resp.statusCode < 400 && resp.headers.location) {
-          res(getJson(resp.headers.location));
-          resp.resume();
-          return;
-        }
-        if (resp.statusCode !== 200) {
-          rej(new Error(`HTTP ${resp.statusCode} from ${url}`));
-          resp.resume();
-          return;
-        }
-        let body = "";
-        resp.setEncoding("utf8");
-        resp.on("data", (c) => (body += c));
-        resp.on("end", () => {
-          try {
-            res(JSON.parse(body));
-          } catch (err) {
-            rej(err);
-          }
-        });
-        resp.on("error", rej);
-      },
-    );
-    req.on("error", rej);
+async function getJson(url) {
+  const buf = await httpGet(url, {
+    redirects: true,
+    headers: { "User-Agent": "keyboard-studio/check-exemplar-staleness", Accept: "application/json" },
   });
+  return JSON.parse(buf.toString("utf8"));
 }
 
 let stale = 0;

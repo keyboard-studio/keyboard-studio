@@ -15,7 +15,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import https from 'node:https';
+import { httpGet } from './lib/http-get.cjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
@@ -40,7 +40,10 @@ console.log(`     ${url}`);
 
 let buf;
 try {
-  buf = await download(url);
+  buf = await httpGet(url, {
+    redirects: true,
+    headers: { 'User-Agent': 'keyboard-studio/fetch-langtags' },
+  });
 } catch (err) {
   console.error(`[ERROR] Download failed: ${err.message}`);
   process.exit(1);
@@ -86,30 +89,3 @@ const sources = {
 writeFileSync(SOURCES_FILE, JSON.stringify(sources, null, 2) + '\n', 'utf8');
 console.log(`[OK] ${SOURCES_FILE}`);
 console.log(`[OK] ${recordCount} records, ${buf.length} bytes`);
-
-// --- helpers ----------------------------------------------------------------
-
-function download(url, redirects = 0) {
-  if (redirects > 5) {
-    return Promise.reject(new Error('Too many redirects'));
-  }
-  return new Promise((res, rej) => {
-    const req = https.get(url, { headers: { 'User-Agent': 'keyboard-studio/fetch-langtags' } }, resp => {
-      if (resp.statusCode >= 300 && resp.statusCode < 400 && resp.headers.location) {
-        res(download(resp.headers.location, redirects + 1));
-        resp.resume();
-        return;
-      }
-      if (resp.statusCode !== 200) {
-        rej(new Error(`HTTP ${resp.statusCode} from ${url}`));
-        resp.resume();
-        return;
-      }
-      const chunks = [];
-      resp.on('data', c => chunks.push(c));
-      resp.on('end', () => res(Buffer.concat(chunks)));
-      resp.on('error', rej);
-    });
-    req.on('error', rej);
-  });
-}
