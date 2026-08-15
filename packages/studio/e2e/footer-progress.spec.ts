@@ -49,10 +49,10 @@ const KNOWN_CONTRAST_DEBT: readonly string[] = [
   'div[aria-label="Keyboard source mode"]',
   // 1.4.3 — PhaseB's intro "Continue" button, on the characters step.
   'button[data-testid="phase-b-intro-next"]',
-  // 1.4.3 — the OSK iframe renders KeymanWeb's own markup
-  // (.kmw-spacebar-caption), which this repo does not author and cannot
-  // restyle from here.
-  "iframe",
+  // The OSK iframe's `.kmw-spacebar-caption` contrast debt is now fixed at
+  // the source (packages/studio/public/osk-frame.html overrides its color);
+  // the whole-iframe exclusion is gone, so this scan now covers everything
+  // the frame renders.
 ];
 
 test.describe("footer progress row (spec 057 US4/US6)", () => {

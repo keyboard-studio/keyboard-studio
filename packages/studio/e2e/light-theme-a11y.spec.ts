@@ -92,18 +92,11 @@ for (const { name, url } of LIGHT_SCREENS) {
 
 const BASE_KEYBOARD_ID = "bj_cree_woods";
 
-/**
- * WCAG 1.4.3 (contrast) — Keyman Web paints its own spacebar caption inside the
- * OSK iframe with its own stylesheet. It is third-party framed content: the
- * studio supplies the keyboard, not that element's colours, and no `--app-*`
- * token reaches it.
- *
- * Excluded as a FRAME CHAIN (the ["iframe", …] form axe's own targets come back
- * in) rather than excluding the whole iframe, so the parts of the preview the
- * studio does control stay in scope. Same treatment, and same reason, as
- * carve.spec.ts's KNOWN_CONTRAST_DEBT.
- */
-const KMW_FRAME_CONTRAST_DEBT: readonly (readonly string[])[] = [["iframe", ".kmw-spacebar-caption"]];
+// WCAG 1.4.3 (contrast) on the OSK iframe's `.kmw-spacebar-caption`
+// (KeymanWeb's own spacebar-caption element) is now fixed at the source —
+// packages/studio/public/osk-frame.html carries a scoped `#osk-host
+// .kmw-spacebar-caption` color override. No exclusion needed here anymore;
+// the three scans below now cover the OSK frame's contents too.
 
 test("dense wizard screens have no serious axe violations on light", async ({ page }) => {
   test.slow(); // full survey walk plus four scans; the base picker alone enumerates ../keyboards
@@ -125,14 +118,10 @@ test("dense wizard screens have no serious axe violations on light", async ({ pa
 
   // "Confirm the basics" — the densest read-only surface in the flow, and the
   // one whose label/value colour pairs were most at risk from the token swap.
-  await expectNoSeriousAxeViolations(page, "confirm the basics (light)", {
-    exclude: KMW_FRAME_CONTRAST_DEBT,
-  });
+  await expectNoSeriousAxeViolations(page, "confirm the basics (light)");
 
   await confirmPrefill(page);
-  await expectNoSeriousAxeViolations(page, "characters (light)", {
-    exclude: KMW_FRAME_CONTRAST_DEBT,
-  });
+  await expectNoSeriousAxeViolations(page, "characters (light)");
 
   await buildOneCharacterList(page, "᙮");
 
@@ -148,9 +137,7 @@ test("dense wizard screens have no serious axe violations on light", async ({ pa
   // its red top rule and red bulk button, and the details rail. The single
   // largest concentration of colour decisions in the app.
   await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
-  await expectNoSeriousAxeViolations(page, "discard gallery (light)", {
-    exclude: KMW_FRAME_CONTRAST_DEBT,
-  });
+  await expectNoSeriousAxeViolations(page, "discard gallery (light)");
 
   expect(pageErrors).toEqual([]);
 });

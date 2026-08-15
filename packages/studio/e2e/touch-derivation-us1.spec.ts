@@ -162,9 +162,10 @@ const KNOWN_CONTRAST_DEBT: readonly string[] = [
   // this is the same open 1.4.3 `unknown` tracker row as every entry above.
   // See specs/057-bulletproof-navigation/reviews/F2-reload-phaseresults-loss.md.
   'button[aria-label="Dismiss removal recommendation"]',
-  // 1.4.3 — the OSK iframe renders KeymanWeb's own markup
-  // (.kmw-spacebar-caption), not authored in this repo.
-  "iframe",
+  // The OSK iframe's `.kmw-spacebar-caption` contrast debt is now fixed at
+  // the source (packages/studio/public/osk-frame.html overrides its color);
+  // the whole-iframe exclusion is gone, so this scan now covers everything
+  // the frame renders.
 ];
 
 // ---------------------------------------------------------------------------
@@ -308,8 +309,10 @@ test.describe("Touch derivation US1 — import & adapt (spec 035 Scenario A)", (
 
     // Accessibility gate (spec 056 FR-003): scan the post-touch-gallery screen.
     // 1.4.3 -- the "<char> -- K_<key>" glyph chips this screen lists, plus the
-    // shared chrome and OSK iframe (documented pre-existing contrast debt;
-    // see helpers/contrastDebt.ts).
+    // shared chrome (documented pre-existing contrast debt; see
+    // helpers/contrastDebt.ts). The OSK iframe's own debt is now fixed at
+    // the source; OSK_IFRAME_DEBT is now an empty spread, kept only so this
+    // call site doesn't need a rename.
     await expectNoSeriousAxeViolations(page, "after touch gallery (US1 bambara walk)", {
       exclude: [...GLYPH_KEY_CHIP_DEBT, ...SHARED_CHROME_DEBT, ...OSK_IFRAME_DEBT],
     });

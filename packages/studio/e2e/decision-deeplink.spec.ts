@@ -68,8 +68,10 @@ const TRACK_QUESTION_LABEL = /Authoring approach/i;
  * anything this feature introduces or touches.
  */
 const KNOWN_CONTRAST_DEBT: readonly string[] = [
-  // 1.4.3 — the OSK iframe renders KeymanWeb's own markup, not authored here.
-  "iframe",
+  // The OSK iframe's `.kmw-spacebar-caption` contrast debt is now fixed at
+  // the source (packages/studio/public/osk-frame.html overrides its color);
+  // the whole-iframe exclusion is gone, so this scan now covers everything
+  // the frame renders.
   // 1.4.3 — SignUpPanel's GitHub button, present in shared chrome on several tabs.
   'button[aria-label="Sign up with GitHub"]',
   // 1.4.3 — the survey's own Continue/advance button (StepHost chrome); flagged

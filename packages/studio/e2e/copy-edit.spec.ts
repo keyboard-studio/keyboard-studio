@@ -147,10 +147,10 @@ const PROVEN_SCRIPT_BASES: ReadonlyArray<ProvenScriptFixture> = [
  * specs/057-bulletproof-navigation/reviews/classB-diagnosis.md addendum).
  */
 const KNOWN_CONTRAST_DEBT: readonly string[] = [
-  // 1.4.3 — the OSK iframe renders KeymanWeb's own markup
-  // (.kmw-spacebar-caption), which this repo does not author and cannot
-  // restyle from here.
-  "iframe",
+  // The OSK iframe's `.kmw-spacebar-caption` contrast debt is now fixed at
+  // the source (packages/studio/public/osk-frame.html overrides its color);
+  // the whole-iframe exclusion is gone, so this scan now covers everything
+  // the frame renders.
   // 1.4.3 — ConvenienceCharsStep's "Continue" button.
   'button[data-testid="convenience-continue"]',
   // 1.4.3 — CarveGallery's info-panel toggle button.
@@ -294,7 +294,8 @@ test.describe("Track 1 (copy-edit) E2E", () => {
 
     // Accessibility gate (spec 056 FR-003): scan the output screen.
     // 1.4.3 — the Output screen's documented pre-existing contrast debt
-    // (OskModeToggle, SignUpPanel, OSK iframe); see helpers/contrastDebt.ts.
+    // (OskModeToggle, SignUpPanel); see helpers/contrastDebt.ts. The OSK
+    // iframe's own debt is now fixed at the source.
     await expectNoSeriousAxeViolations(page, "output screen (copy-edit walk)", {
       exclude: OUTPUT_SCREEN_DEBT,
     });

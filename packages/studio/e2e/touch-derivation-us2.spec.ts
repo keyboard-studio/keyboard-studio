@@ -525,11 +525,13 @@ test.describe("Touch derivation US2 — reseed from desktop (spec 035 Scenario B
     await driveTouchGallery(page);
 
     // Accessibility gate (spec 056 FR-003): scan the post-touch-gallery screen.
-    // 1.4.3 -- glyph chips + LintChip's code badge + shared chrome + OSK
-    // iframe (documented pre-existing contrast debt; see
-    // helpers/contrastDebt.ts). The lint badge is here for the same reason it
-    // is on the build-list scan above: LintSummary is survey-pane chrome, and
-    // pid_piaroa's .kmn keeps a finding in the list for the whole walk.
+    // 1.4.3 -- glyph chips + LintChip's code badge + shared chrome
+    // (documented pre-existing contrast debt; see helpers/contrastDebt.ts).
+    // The lint badge is here for the same reason it is on the build-list
+    // scan above: LintSummary is survey-pane chrome, and pid_piaroa's .kmn
+    // keeps a finding in the list for the whole walk. The OSK iframe's own
+    // debt is now fixed at the source; OSK_IFRAME_DEBT is now an empty
+    // spread, kept only so this call site doesn't need a rename.
     await expectNoSeriousAxeViolations(page, "after touch gallery (US2 piaroa walk)", {
       exclude: [
         ...GLYPH_KEY_CHIP_DEBT,
