@@ -669,6 +669,7 @@ Source-of-truth for the band assignments is `packages/contracts/data/criteria.js
 
 *Revised 2026-06-08 (v1.1.0 KeyboardIR import). See [docs/spec-amendment-2026-06-08-keyboardir.md](docs/spec-amendment-2026-06-08-keyboardir.md).*
 *Revised 2026-06-14 (v1.3.0 working-copy spine). Extends Decision 9.*
+*Revised 2026-08-15 (conditional `<id>.ico`, matching PR #1551's behavior). See [docs/spec-signoff.md](docs/spec-signoff.md) Post-Sign-Off Amendments.*
 
 **Working copy as the live edit target.** The `VirtualFS` is instantiated at keyboard selection (Track 1: `instantiateFromBase`; Track 2: `instantiateFromExisting` — see §8 "Two authoring tracks") and is the session's sole live edit target from that point forward. Every subsequent mutation — carve deletions, survey answers, gallery pattern insertions, OSK edits — is applied to this working copy. Assignments and carve deletions are applied as **re-projected layers on top of the IR**: they do not destructively rewrite IR nodes; instead, the emitter projects the current assignment map and carve state over the base IR at render time, so the original IR structure is always recoverable by unwinding the layers. The working copy is serialized to a `.zip` archive or committed as a fork+PR only at output (step 15) — the studio does not write to disk during authoring, and there is no intermediate persistence step between instantiation and output.
 
@@ -683,7 +684,7 @@ release/<letter-or-org>/<id>/
     <id>.kps                  -- package descriptor (XML)
     <id>.kvks                 -- on-screen keyboard source (XML)
     <id>.keyman-touch-layout  -- touch layout JSON
-    <id>.ico                  -- keyboard icon
+    <id>.ico                  -- keyboard icon (conditional -- see below)
     welcome.htm               -- in-package welcome page
     readme.htm                -- short install description
     help/
@@ -696,6 +697,8 @@ release/<letter-or-org>/<id>/
   tests/
     <id>_tests.kmn            -- round-trip test vectors (from pattern test cases)
 ```
+
+**`<id>.ico` is conditional, not unconditional.** A base keyboard that supplies no icon emits neither the `.ico` file nor its `&BITMAP` store reference in the shipped `.kmn` (`dropUnbackedBitmapStore`, `packages/engine/src/shared/siblingAssetStores.ts`). This is a deliberate honest-omission choice, not an oversight: a zero-byte stub icon (the prior behavior) is not readable by kmcmplib, and a `&BITMAP` store pointing at one causes kmcmplib to emit zero artifacts — no `.kmx`, `.kvk`, or `.js` at all — for the whole keyboard, rather than a harmless placeholder. A zero-byte file also defeats `stripDanglingAssetStores`'s guard, which deliberately spares any reference whose target file exists. No file plus no reference beats a fake stub that silently breaks compilation.
 
 Compiled artifacts (`.kmx`, `.kvk`, `.js`) are produced by the in-browser compiler service and included in the `.zip` output under `build/`; they are not committed to source in the PR (criteria SS1).
 
