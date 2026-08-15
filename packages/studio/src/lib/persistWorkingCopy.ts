@@ -331,41 +331,6 @@ export function prepareWorkingCopySnapshot(snapshot: WorkingCopySnapshot): Parti
   };
 }
 
-/**
- * Patch a `WorkingCopySnapshot` directly into the ONE working-copy store
- * (Article III — restore never constructs a second working copy). Composes
- * `prepareWorkingCopySnapshot` (fallible) with a single `setState` (pure), so a
- * throw during preparation never mutates the store.
- *
- * Returns true when applied, false when the snapshot is not a real working
- * copy (instantiationMode null) — the guard the localStorage draft resume
- * (lib/draftAutosave.ts) relies on.
- */
-export function applyWorkingCopySnapshot(snapshot: WorkingCopySnapshot): boolean {
-  if (snapshot.instantiationMode === null) {
-    return false;
-  }
-  useWorkingCopyStore.setState(prepareWorkingCopySnapshot(snapshot));
-  return true;
-}
-
-/**
- * Build a serializable snapshot of the current working copy, or null when there
- * is no real working copy yet (instantiationMode/ir still null — e.g. a survey
- * still on the identity step before a base is picked).
- *
- * Guarded convenience over `snapshotWorkingCopyData` for callers that want the
- * null-on-no-working-copy contract (lib/draftAutosave.ts); callers that guard
- * themselves use `snapshotWorkingCopyData` directly.
- */
-export function captureWorkingCopySnapshot(): WorkingCopySnapshot | null {
-  const s = useWorkingCopyStore.getState();
-  if (s.instantiationMode === null || s.ir === null) {
-    return null;
-  }
-  return snapshotWorkingCopyData();
-}
-
 // ---------------------------------------------------------------------------
 // Public API
 // ---------------------------------------------------------------------------
@@ -442,7 +407,10 @@ export function rehydrateWorkingCopyFromSession(): boolean {
       return false;
     }
 
-    applyWorkingCopySnapshot(snapshot);
+    // instantiationMode was already checked non-null above — patch directly
+    // into the ONE working-copy store (Article III — restore never
+    // constructs a second working copy).
+    useWorkingCopyStore.setState(prepareWorkingCopySnapshot(snapshot));
 
     return true;
   } catch {

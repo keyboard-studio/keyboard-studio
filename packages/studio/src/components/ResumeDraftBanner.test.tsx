@@ -6,7 +6,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, fireEvent } from "@testing-library/react";
 import { ResumeDraftBanner } from "./ResumeDraftBanner.tsx";
-import type { DraftMeta } from "../lib/draftAutosave.ts";
+import type { DraftMeta } from "../lib/draftPersistence.ts";
 
 afterEach(cleanup);
 

@@ -16,17 +16,16 @@
 //     No-op when history is empty (back disabled at the first step).
 //   - `reset()` clears every slot to initial (start-over).
 //   - `hydrate(snapshot)` bulk-sets every value slot from a serialized draft.
-//     This store holds no persistence logic of its own; the draft layer
-//     (lib/draftAutosave.ts) reads the slots and calls hydrate() to restore them.
+//     This store holds no persistence logic of its own.
 //   - Plain setters for the five value slots.
 //   - No host-disk writes. No persistence OF ITS OWN — this store never calls
 //     localStorage/sessionStorage directly. Spec 034 US3 adds a serialize/
 //     restore SEAM (`TraversalSnapshot`, `snapshotTraversal`,
 //     `applyTraversalSnapshot` below) that the durable-draft module
-//     (../lib/draftPersistence.ts) drives; the localStorage draft layer
-//     (../lib/draftAutosave.ts) likewise drives the `SurveySessionSnapshot`/
-//     `hydrate()` seam. The actual read/write of storage lives entirely in
-//     those modules, not here.
+//     (../lib/draftPersistence.ts) drives via that seam, not `hydrate()` — the
+//     `SurveySessionSnapshot`/`hydrate()` seam below is exercised directly by
+//     this store's own tests. The actual read/write of storage lives entirely
+//     in draftPersistence.ts, not here.
 //   - Worker boundary upheld: WASM is not imported here.
 //   - All survey/hooks imports are type-only (depcruise / bundle hygiene, D-R2).
 
@@ -502,9 +501,9 @@ export interface SurveySessionState {
   reset: () => void;
 
   /**
-   * Bulk-restore every value slot from a serialized draft (lib/draftAutosave.ts).
-   * Used to resume an in-progress survey after a page reload. Does not touch the
-   * action functions; only the data slots enumerated in SurveySessionSnapshot.
+   * Bulk-restore every value slot from a serialized snapshot. Does not touch
+   * the action functions; only the data slots enumerated in
+   * SurveySessionSnapshot.
    */
   hydrate: (snapshot: SurveySessionSnapshot) => void;
 
@@ -625,9 +624,8 @@ type SurveySessionData = Omit<
 export type TraversalSnapshot = SurveySessionData;
 
 /**
- * Alias kept for the localStorage draft layer (lib/draftAutosave.ts), which
- * serializes these slots and restores them via `hydrate()` on resume — the
- * same data-field shape as `TraversalSnapshot`.
+ * Alias for the `hydrate()` seam's parameter type — the same data-field shape
+ * as `TraversalSnapshot`.
  */
 export type SurveySessionSnapshot = SurveySessionData;
 
@@ -877,7 +875,7 @@ export const useSurveySessionStore = create<SurveySessionState>((set) => ({
 // ---------------------------------------------------------------------------
 // TraversalSnapshot serialize/restore (T017, spec 034 US3)
 //
-// Mirrors the snapshotWorkingCopyData/applyWorkingCopySnapshot idiom in
+// Mirrors the snapshotWorkingCopyData/prepareWorkingCopySnapshot idiom in
 // ../lib/persistWorkingCopy.ts. The return type on `snapshotTraversal` is the
 // enforcement point: a new non-action field added to SurveySessionState (and
 // therefore SurveySessionData/TraversalSnapshot via the Omit above) makes the

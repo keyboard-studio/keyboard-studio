@@ -29,11 +29,7 @@
 // goes through the shared `switchActiveProject()` helper (lib/
 // switchActiveProject.ts), which calls `resumeProject()` directly (applying
 // the draft to both stores via `loadDraft` AND setting the active-project
-// flag `loadDraft` already sets on success — `wasDraftRestoredThisBoot()` —
-// so SurveyView's mount effect does not reset the just-resumed session out
-// from under it), ALSO re-pins draftAutosave.ts's separate active-project
-// pointer (see that helper's own header), then navigates only on a
-// successful apply.
+// pointer on success), then navigates only on a successful apply.
 //
 // Ported from the dev reference implementation's MyKeyboardsList.tsx
 // (specs/047-my-keyboards) with its draft-engine imports rewired onto main's

@@ -1,11 +1,17 @@
-// ResumeDraftBanner — offered on a page (re)load when a saved in-progress survey
-// draft exists in localStorage (lib/draftAutosave.ts). The author explicitly
-// chooses Resume (restore both stores from the draft) or Discard (clear it and
-// start fresh). We never auto-apply a draft, so a stale draft can't silently
-// clobber a new session.
+// ResumeDraftBanner — offered when a server-backed draft is found for a
+// signed-in author with no local trace of it on this browser (a new tab / a
+// different device; lib/draftPersistence.ts's cloud-restore check). The
+// author explicitly chooses Resume (restore both stores from the draft) or
+// Discard (drop the server-side draft and continue fresh). We never
+// auto-apply a draft, so a stale draft can't silently clobber a new session.
+//
+// #1451: this banner used to ALSO offer a same-browser local draft (from the
+// since-retired draftAutosave.ts engine) — draftPersistence's own silent
+// boot-time restore is the one local-resume path now, so that offer is gone;
+// the cloud case above is the only one left.
 
 import type { CSSProperties } from "react";
-import type { DraftMeta } from "../lib/draftAutosave.ts";
+import type { DraftMeta } from "../lib/draftPersistence.ts";
 import { relativeTime, type RelativeTimeValue } from "../lib/relativeTime.ts";
 import { BG_CARD, BORDER, TEXT_MAIN, TEXT_DIM, BLUE_ACTION, FONT } from "../survey/surveyStyles.ts";
 

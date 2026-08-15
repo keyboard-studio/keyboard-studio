@@ -19,22 +19,19 @@
 // keyboards…"). A `submitted` project has no resume path, so it is reached
 // via the profile page rather than shown as a dead option here.
 //
-// TWO RIVAL ACTIVE-PROJECT POINTERS (OUT OF SCOPE TO UNIFY).
+// ONE ACTIVE-PROJECT POINTER.
 //
-// This codebase has TWO active-project pointers that can disagree:
-// `ks.draft.active` (lib/draftPersistence.ts) and `ks.studio.activeProject`
-// (lib/draftAutosave.ts, the one StudioShell.tsx imports). This component
-// never reads either pointer to decide "what is current" — it derives the
-// current project's KEY the same way draftPersistence.ts's own `saveDraft`
-// caller does, straight off the live working-copy store
-// (`deriveProjectKeyFromWorkingCopy({ identity, baseKeyboard })`), so it can
-// never disagree with its own displayed name. WHEN THE AUTHOR SWITCHES
-// PROJECTS via this control's dropdown, `handleChange` goes through the
-// shared `switchActiveProject()` helper (lib/switchActiveProject.ts), which
-// re-pins BOTH pointers to the newly-resumed project (FINDING 4 fix) — but
-// this component still never READS either pointer itself, and the two
-// engines otherwise remain genuinely un-unified; that unification stays
-// explicitly out of scope (see the report this component shipped with).
+// `ks.draft.active` (lib/draftPersistence.ts) is the only active-project
+// pointer in this codebase (#1451 retired the second, rival one that used to
+// live in lib/draftAutosave.ts). This component doesn't read it to decide
+// "what is current" regardless — it derives the current project's KEY the
+// same way draftPersistence.ts's own `saveDraft` caller does, straight off the
+// live working-copy store (`deriveProjectKeyFromWorkingCopy({ identity,
+// baseKeyboard })`), so it can never disagree with its own displayed name.
+// WHEN THE AUTHOR SWITCHES PROJECTS via this control's dropdown, `handleChange`
+// goes through the shared `switchActiveProject()` helper
+// (lib/switchActiveProject.ts), which re-pins the pointer to the
+// newly-resumed project via `resumeProject()`.
 //
 // STALENESS.
 //

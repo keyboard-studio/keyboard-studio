@@ -25,28 +25,24 @@
 // shape) lands in the server's reserved single-slot default, unchanged from
 // today.
 //
-// Ported from dev's reference implementation (specs/047-my-keyboards) with the
-// HTTP contract kept identical; the only change is the local `draft` parameter
-// type, which is main's `DurableDraft` rather than dev's separate `StudioDraft`
-// shape. `DurableDraft` is imported from draftTypes.ts (NOT draftPersistence.ts)
+// `DurableDraft` is imported from draftTypes.ts (NOT draftPersistence.ts)
 // deliberately — draftPersistence.ts has a real runtime dependency on THIS
 // module (recordProjectSubmission/deleteProject/startCloudSync call the fetch
 // functions below), so this module must not import anything, even a type,
 // back from draftPersistence.ts — depcruise flags type-only cycles too. See
 // draftTypes.ts's header comment.
+//
+// #1451: this module used to type the local `draft` parameter as
+// `DurableDraft | StudioDraft` — the union of the two draft engines that
+// pushed through this one transport before their consolidation. Only
+// draftPersistence.ts's `DurableDraft` engine remains, so the payload type is
+// just `DurableDraft` now.
 
 import { getBackendUrl } from "./githubOAuth.ts";
-import type { DurableDraft, StudioDraft, DraftMeta } from "./draftTypes.ts";
+import type { DurableDraft, DraftMeta } from "./draftTypes.ts";
 
-/**
- * Post-merge, BOTH draft engines push through this one transport: main's
- * draftPersistence.ts stores `DurableDraft` records and dev's draftAutosave.ts
- * stores `StudioDraft` records (each under its own draftId namespace). The
- * server treats the blob opaquely — `JSON.stringify({ meta, draft })` both
- * ways — so the payload type is the union of the two envelopes; readers pick
- * the envelope they wrote via `loadServerDraftContent`'s type parameter.
- */
-export type ServerDraftPayload = DurableDraft | StudioDraft;
+/** The one draft envelope shape ever pushed through this transport. */
+export type ServerDraftPayload = DurableDraft;
 
 /** Metadata row the server keeps alongside the opaque draft blob. */
 export interface ServerDraftMeta {
@@ -165,17 +161,17 @@ export async function listServerDrafts(token: string): Promise<ServerDraftMeta[]
 }
 
 /** Fetch one project's full server draft payload (for Restore), or null. */
-export async function loadServerDraftContent<D extends ServerDraftPayload = DurableDraft>(
+export async function loadServerDraftContent(
   token: string,
   draftId: string,
-): Promise<D | null> {
+): Promise<ServerDraftPayload | null> {
   try {
     const res = await fetch(draftsUrl("/content", draftId), {
       method: "GET",
       headers: authHeaders(token),
     });
     if (!res.ok) return null;
-    const body = (await res.json()) as { draft: D | null };
+    const body = (await res.json()) as { draft: ServerDraftPayload | null };
     return body.draft ?? null;
   } catch {
     return null;

@@ -355,7 +355,7 @@ function buildServerMeta(
  * - `workingCopy` not really instantiated (VR-2) — `loadDraft` refuses these,
  *   so a card for one would render a Resume button that does nothing.
  *   `saveDraft` CAN now write such a record (the F6 pending-slot relaxation,
- *   `PENDING_PROJECT_KEY` + `hasPendingProgress()`), but that write never
+ *   `PENDING_PROJECT_KEY` + `hasMeaningfulProgress()`), but that write never
  *   reaches the index in the first place — `saveDraft` gates its
  *   `upsertIndexEntry` call to real project keys.
  * - the reserved `PENDING_PROJECT_KEY` slot, EXPLICITLY by name (not merely
@@ -670,16 +670,22 @@ export function listDrafts(): ProjectIndexEntry[] {
  * F6 fix: whether the CURRENT survey-session state has meaningful
  * pre-instantiation progress worth persisting under the reserved
  * `PENDING_PROJECT_KEY` slot (identity answers, an in-progress base preview,
- * or any forward movement off the very first step). Mirrors
- * `draftAutosave.ts`'s `hasMeaningfulProgress` gate for the same reason that
- * module has one: a pristine, untouched survey must not leave behind a
- * resumable-but-empty draft record.
+ * or any forward movement off the very first step) — a pristine, untouched
+ * survey must not leave behind a resumable-but-empty draft record.
  *
- * Deliberately does NOT consult the working-copy store — by construction this
- * is only ever consulted from `saveDraft`'s pending-key branch, which already
- * runs only when the working copy is NOT instantiated.
+ * The single, exported "has meaningful progress" predicate (#1451
+ * consolidation): the former draftAutosave.ts engine restated this same check
+ * as its own `hasMeaningfulProgress(survey, workingCopy)` — near-identical
+ * except it also consulted `workingCopy !== null` directly, since that
+ * engine's callers could run either before or after instantiation. This one
+ * deliberately does NOT consult the working-copy store: every internal caller
+ * (`saveDraft`'s pending-key branch) already runs only when the working copy
+ * is NOT instantiated. An external caller that needs to cover BOTH cases
+ * (e.g. StudioShell's cloud-restore check) combines this with its own
+ * `instantiationMode !== null` read rather than this function growing a
+ * second, differently-scoped parameter list.
  */
-function hasPendingProgress(): boolean {
+export function hasMeaningfulProgress(): boolean {
   const session = useSurveySessionStore.getState();
   return (
     session.identityResult !== null ||
@@ -697,7 +703,7 @@ function hasPendingProgress(): boolean {
  * (`instantiationMode === null`) or has no working IR yet (`ir === null`) — a
  * guest who has not picked a keyboard has nothing worth persisting — UNLESS
  * `projectKey` is the reserved `PENDING_PROJECT_KEY` slot AND there is
- * meaningful pre-instantiation progress (`hasPendingProgress`) — F6 fix
+ * meaningful pre-instantiation progress (`hasMeaningfulProgress`) — F6 fix
  * (docs/design-notes/switch-base-popup-behavior-log.md): identity answers and
  * an un-confirmed base preview (wizard levels L1/L2) are real authoring
  * progress that would otherwise never reach `main.tsx`'s silent boot-restore,
@@ -722,7 +728,7 @@ export function saveDraft(projectKey: string): void {
   // "My keyboards" index — see the `projectKey !== PENDING_PROJECT_KEY` gate
   // around the `upsertIndexEntry` call below — so this relaxation is scoped
   // to the record + active pointer only, deliberately.
-  if (!isInstantiated && (projectKey !== PENDING_PROJECT_KEY || !hasPendingProgress())) {
+  if (!isInstantiated && (projectKey !== PENDING_PROJECT_KEY || !hasMeaningfulProgress())) {
     return; // VR-2 (relaxed for the pending slot per the F6 doc comment above)
   }
 
@@ -975,6 +981,61 @@ export function loadDraft(projectKey: string): boolean {
     // prepareWorkingCopySnapshot BEFORE any store was touched) — remove and
     // treat as absent so it doesn't loop or crash boot.
     discardCorruptDraft(projectKey);
+    return false;
+  }
+}
+
+/**
+ * Restore both stores from an explicit `DurableDraft` envelope fetched from
+ * the server (the cloud-restore banner's Resume), rather than reading
+ * localStorage by key. Validates the record shape/version first — a stale or
+ * malformed cloud envelope is rejected (returns false) rather than hydrating
+ * the stores at the wrong shape.
+ *
+ * Mirrors `loadDraft`'s VR-1/VR-2/VR-3 shape checks (version, workingCopy,
+ * traversal) but never discards or mutates localStorage — there is no LOCAL
+ * record to discard for a remote payload, and this is an explicit, mid-session
+ * user action, not the pre-mount boot restore, so it never touches the
+ * `wasDraftRestoredThisBoot()` / `restoredDraftSavedAt()` flags either.
+ */
+export function applyRemoteDraft(envelope: DurableDraft | null): boolean {
+  if (envelope === null || typeof envelope !== "object") return false;
+  if (envelope.version !== DRAFT_VERSION) return false;
+  if (
+    envelope.workingCopy === null ||
+    typeof envelope.workingCopy !== "object" ||
+    (envelope.workingCopy.instantiationMode === null && envelope.projectKey !== PENDING_PROJECT_KEY)
+  ) {
+    return false;
+  }
+  if (envelope.traversal === null || typeof envelope.traversal !== "object") return false;
+
+  try {
+    const workingCopyState = prepareWorkingCopySnapshot(envelope.workingCopy);
+    useWorkingCopyStore.setState(workingCopyState);
+    applyTraversalSnapshot(envelope.traversal);
+
+    const restoredChars = Array.isArray(envelope.phaseBDraft?.chars) ? envelope.phaseBDraft.chars : [];
+    const restoredFont = isPhaseBFontValue(envelope.phaseBDraft?.selectedFont)
+      ? envelope.phaseBDraft.selectedFont
+      : DEFAULT_PHASE_B_FONT;
+    const restoredDigraphs = Array.isArray(envelope.phaseBDraft?.exemplarDigraphs)
+      ? envelope.phaseBDraft.exemplarDigraphs.filter((d): d is string => typeof d === "string")
+      : [];
+    applyPhaseBDraftSnapshot({
+      chars: restoredChars,
+      exemplarDigraphs: restoredDigraphs,
+      selectedFont: restoredFont,
+    });
+
+    if (envelope.decisionRecord !== undefined) {
+      const decisions = parseDecisionRecord(JSON.stringify(envelope.decisionRecord));
+      if (!decisions.unreadable) {
+        applyDecisionRecordSnapshot(decisions.record, decisions.droppedCount);
+      }
+    }
+    return true;
+  } catch {
     return false;
   }
 }
@@ -1390,9 +1451,18 @@ export async function recordProjectSubmission(prUrl: string, token: string | nul
 
 /**
  * Peek at the ACTIVE project's stored draft WITHOUT applying it — a
- * lightweight summary for a future resume affordance. Returns null when
- * there is no active project, or its record is missing/wrong-shaped. Unlike
- * `loadDraft`, never mutates storage or the stores — a pure read.
+ * lightweight summary for a future resume affordance, and (#1451) what
+ * `defaultLandingRoute()` (StudioShell.tsx) checks to decide whether a
+ * resumable draft should lift the first-visit newcomer gate. Returns null
+ * when there is no active project, or its record is missing/wrong-shaped.
+ * Unlike `loadDraft`, never mutates storage or the stores — a pure read.
+ *
+ * Mirrors `loadDraft`'s VR-2 tolerance for the reserved `PENDING_PROJECT_KEY`
+ * slot: a workingCopy of `{ instantiationMode: null }` is normally "no real
+ * work" (rejected), but is exactly what a pending-slot record's pre-
+ * instantiation progress looks like (F6 fix) — rejecting it here would make a
+ * genuinely resumable identity-only draft invisible to both the landing gate
+ * and a future resume-affordance reader.
  */
 export function loadDraftMeta(): DraftMeta | null {
   const projectKey = resolveActiveProjectKey();
@@ -1411,7 +1481,8 @@ export function loadDraftMeta(): DraftMeta | null {
     if (
       envelope.version !== DRAFT_VERSION ||
       envelope.workingCopy === null ||
-      typeof envelope.workingCopy !== "object"
+      typeof envelope.workingCopy !== "object" ||
+      (envelope.workingCopy.instantiationMode === null && projectKey !== PENDING_PROJECT_KEY)
     ) {
       return null;
     }
@@ -1538,7 +1609,7 @@ export function startCloudSync(getToken: () => string | null): () => void {
     const projectKey = resolveActiveProjectKey();
     if (projectKey === null || isProjectFrozen(projectKey)) return;
     // The reserved pending slot is a LOCAL-ONLY holding pen for
-    // pre-instantiation progress (see PENDING_PROJECT_KEY / hasPendingProgress
+    // pre-instantiation progress (see PENDING_PROJECT_KEY / hasMeaningfulProgress
     // above). It is deliberately excluded from the local project index, and it
     // must be excluded from the cloud push for the same reason: a pushed
     // pending record comes back through listServerDrafts() and merges into "My

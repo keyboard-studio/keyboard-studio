@@ -27,14 +27,16 @@ import {
   deriveProjectKeyFromWorkingCopy,
   discardActiveDraft,
   installDraftAutosave,
-  clearDraft as clearPersistenceDraft,
-  // Aliased: dev's draftAutosave engine (below) also exports a startCloudSync
-  // AND a PENDING_PROJECT_KEY; both engines coexist post-merge, so every
-  // shared name runs under a distinct alias on this side.
-  startCloudSync as startPersistenceCloudSync,
-  PENDING_PROJECT_KEY as DRAFT_PERSISTENCE_PENDING_KEY,
-  wasDraftRestoredThisBoot,
+  clearDraft,
+  startCloudSync,
+  PENDING_PROJECT_KEY,
+  hasMeaningfulProgress,
+  resolveActiveProjectKey,
+  setActiveProjectKey,
+  applyRemoteDraft,
+  loadDraftMeta,
   restoredDraftSavedAt,
+  type DraftMeta,
 } from "./lib/draftPersistence.ts";
 import { useGitHubAuth } from "./hooks/useGitHubAuth.ts";
 import { navigateTo, type RouteId } from "./lib/navigate.ts";
@@ -87,22 +89,6 @@ import { StepHost } from "./components/StepHost.tsx";
 import { ResumeDraftBanner } from "./components/ResumeDraftBanner.tsx";
 import { SurveyResetButton } from "./components/SurveyResetButton.tsx";
 import {
-  loadDraftMeta,
-  applyDraft,
-  applyStudioDraft,
-  buildStudioDraft,
-  clearDraft,
-  startDraftAutosave,
-  startCloudSync,
-  migrateLegacyDraft,
-  getActiveProjectKey,
-  setActiveProject,
-  pinActiveProject,
-  PENDING_PROJECT_KEY,
-  type DraftMeta,
-  type StudioDraft,
-} from "./lib/draftAutosave.ts";
-import {
   loadServerDraftMeta,
   loadServerDraftContent,
   clearServerDraft,
@@ -116,32 +102,10 @@ import { useInventoryCoverageGate } from "./hooks/useInventoryCoverageGate.ts";
 import { useAccountedForGate } from "./hooks/useAccountedForGate.ts";
 import { useSurveyBrowserHistorySync } from "./hooks/useSurveyBrowserHistorySync.ts";
 
-// Offer the resume banner only once per page load — on the first SurveyView
-// mount in this JS context, not on same-session route remounts. A page reload
-// resets this flag by starting a new JS context.
-//
-// Spec 057: this flag is now the ONLY thing a route remount changes. The
-// traversal itself survives (FR-002), so a remount is not a fresh wizard and
-// there is nothing to offer to resume — re-offering the banner mid-session
-// would invite the author to "resume" the session they are already in.
-let resumeOfferConsumed = false;
-
 // Bind the manifest into the store's staleness actions.
 // Called once at module load; avoids a circular static import in the store
 // (stores/ → steps/manifest.ts → steps/registerEditorSteps.ts → editors/ → stores/).
 bindManifest(manifest);
-
-// One-shot, idempotent adoption of the legacy single-slot `ks.studio.draft`
-// into the per-project "My keyboards" scheme (specs/037-my-keyboards/spec.md
-// "Migration"). Called at module load (this file's existing idiom for
-// one-time setup, alongside bindManifest/validateManifestShape above/below) —
-// module evaluation runs strictly before any component mounts, so this always
-// completes before SurveyView's useEffect starts autosave/cloud-sync, exactly
-// as the spec requires ("Run once ... before autosave/cloud-sync start").
-// migrateLegacyDraft() self-guards on ks.studio.projects.index already
-// existing, so re-importing this module (e.g. tests using vi.resetModules())
-// re-runs it safely against whatever localStorage state is present then.
-migrateLegacyDraft();
 
 // The Flow Map is a developer aid. It shows automatically in `vite dev`; in
 // hosted builds (Vercel previews, future production) it is gated by
@@ -516,9 +480,10 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // steps/ importing stores/ directly.
   const setTouchSeedSource = useSurveySessionStore((s) => s.setTouchSeedSource);
 
-  // githubTokenRef lets dev's draftAutosave cloud-sync loop read the current
-  // token lazily (from the single useGitHubAuth() call above), so signing in
-  // mid-session starts syncing without restarting the subscription.
+  // githubTokenRef lets the cloud-draft-sync loop (draftPersistence.ts's
+  // startCloudSync) read the current token lazily (from the single
+  // useGitHubAuth() call above), so signing in mid-session starts syncing
+  // without restarting the subscription.
   const githubTokenRef = useRef(githubToken);
   useEffect(() => {
     githubTokenRef.current = githubToken;
@@ -598,103 +563,64 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   useSurveyBrowserHistorySync(draftRestoreSettledRef);
 
   // ---------------------------------------------------------------------------
-  // Resume-draft banner + autosave (localStorage draft; lib/draftAutosave.ts).
+  // Cloud-restore banner + autosave (lib/draftPersistence.ts — the ONE draft
+  // engine; see #1451's consolidation of the former draftAutosave.ts).
   //
-  // On the first SurveyView mount of a page load, peek at any saved draft and
-  // offer to resume it. Autosave does not start until the author decides, so a
-  // pending decision can't overwrite the very draft being offered. When there is
-  // no draft, autosave starts immediately.
+  // draftPersistence's own silent boot-time restore (main.tsx's pre-mount
+  // `loadDraft()`) is the ONLY local-draft resume path now — there is no
+  // second, independently-debounced local engine that could hold a staler
+  // snapshot, so the F5 bug (a competing "Resume" offering a snapshot staler
+  // than the one already silently restored) is structurally impossible: one
+  // engine, one write path, one local record per project. The only offer
+  // surface left is the CLOUD-restore banner below, for the genuinely
+  // different case of a server-backed draft with no local trace on THIS
+  // browser (a new tab / a different device).
   // ---------------------------------------------------------------------------
-  // The initializer must be PURE: <StrictMode> (main.tsx) double-invokes lazy
-  // useState initializers in dev, and only the *second* return value is kept.
-  // A flag flipped inside the initializer would make invocation 1 consume the
-  // offer and invocation 2 (the kept value) see it already consumed → the banner
-  // would silently never appear in `pnpm dev` / e2e. So read the flag here and
-  // mark it consumed in the mount effect below instead.
-  //
-  // F5 fix (docs/design-notes/switch-base-popup-behavior-log.md): also
-  // suppressed once `wasDraftRestoredThisBoot()` is true. That flag means
-  // `main.tsx`'s pre-mount `draftPersistence.loadDraft()` has ALREADY
-  // silently restored the freshest working-copy + traversal snapshot into
-  // these SAME stores this boot. `loadDraftMeta()` here reads the OTHER,
-  // independent draft engine (`lib/draftAutosave.ts`, coarser 1000ms debounce,
-  // installed earlier at first mount) — its record can legitimately be
-  // STALER than the one already applied. Offering a second "Resume" for an
-  // already-resumed session invites clicking it and silently regressing the
-  // wizard to that staler step (F5's exact symptom); a session that was NOT
-  // silently restored (a real "resume this later" localStorage-only session
-  // predating draftPersistence's pending-slot support, or one on another
-  // device/browser) is unaffected — `wasDraftRestoredThisBoot()` is false
-  // there, so this banner still offers normally.
-  const [resumeMeta, setResumeMeta] = useState<DraftMeta | null>(() =>
-    resumeOfferConsumed || wasDraftRestoredThisBoot() ? null : loadDraftMeta(),
-  );
-
-  // Cloud-restore offer (signed-in only): a server-backed draft found on load —
-  // e.g. a new tab or a different device. Kept separate from the local
-  // resumeMeta so the local draft always wins when both exist; the cloud offer
-  // is only surfaced when there is no local draft to resume. Set at most once
-  // per mount (cloudRestoreCheckedRef).
   const [cloudResume, setCloudResume] = useState<DraftMeta | null>(null);
   const cloudRestoreCheckedRef = useRef(false);
 
-  // Mark the one-per-page-load resume offer as consumed after commit (idempotent
-  // under StrictMode's mount/cleanup/mount). Subsequent same-session SurveyView
-  // remounts (route away + back = a fresh wizard) then read the flag and skip the
-  // banner; a real page reload resets the module flag by starting a new JS context.
-  useEffect(() => {
-    // Runs once on mount; touches only the module-level flag, so no deps.
-    resumeOfferConsumed = true;
-  }, []);
-
-  useEffect(() => {
-    // Wait for the author's Resume/Discard choice on either banner before
-    // autosaving, so a pending decision can't overwrite the draft being offered.
-    if (resumeMeta !== null || cloudResume !== null) return;
-    const stopLocal = startDraftAutosave();
-    // Cloud sync runs alongside localStorage autosave; it self-gates on the
-    // token (guests never push) and on meaningful progress, so starting it here
-    // for everyone is safe — a guest or pristine session pushes nothing.
-    const stopCloud = startCloudSync(currentAccessToken);
-    return () => {
-      stopLocal();
-      stopCloud();
-    };
-  }, [resumeMeta, cloudResume]);
+  // Note: there is no separate autosave/cloud-sync effect gated on
+  // `cloudResume` here — `installDraftAutosave` (local) and `startCloudSync`
+  // (below, US3a) are the ONE write path for this engine and already run
+  // unconditionally on mount, independent of whether a cloud-restore offer is
+  // pending; adding a second gated subscription to the SAME engine here would
+  // reintroduce exactly the "two debounce timers over the same state" shape
+  // this consolidation removes.
 
   // Cloud-restore check (signed-in only). On the first render where a GitHub
-  // token is present, look for a server-backed draft. Offer it only when there
-  // is no local draft already being offered (local wins) and the author hasn't
-  // started meaningful work — otherwise a fresh session's cloud backup would
-  // pop an unexpected restore. Runs at most once per mount.
+  // token is present, look for a server-backed draft. Offer it only when the
+  // author hasn't already started meaningful work in this session — otherwise
+  // a fresh session's cloud backup would pop an unexpected restore. Runs at
+  // most once per mount.
   useEffect(() => {
     if (cloudRestoreCheckedRef.current) return;
     const accessToken = githubToken?.accessToken ?? null;
     if (accessToken === null) return; // guest, or token not yet verified — wait
     cloudRestoreCheckedRef.current = true;
-    if (resumeMeta !== null) return; // a local draft is offered — prefer it
     let cancelled = false;
     // Multi-project note: this one-shot check only looks at the caller's
     // currently-pinned active project (or the pending pre-instantiation slot
     // on a genuinely fresh browser) — discovering OTHER cloud-backed projects
     // from a browser with no local trace of them is the "My keyboards" list
     // screen's job (next cycle, specs/037-my-keyboards), not this banner's.
-    const draftId = getActiveProjectKey() ?? PENDING_PROJECT_KEY;
+    const draftId = resolveActiveProjectKey() ?? PENDING_PROJECT_KEY;
     void loadServerDraftMeta(accessToken, draftId).then((serverMeta) => {
       if (cancelled || serverMeta === null) return;
-      // Don't surprise an author who began working while the fetch was in flight.
-      if (buildStudioDraft() !== null) return;
-      // F5 fix (freshness comparison, not blanket suppression):
-      // `wasDraftRestoredThisBoot()` means draftPersistence's boot-time
-      // `loadDraft()` already silently restored a local draft into these
-      // SAME stores this boot. That local restore can be STALER than a
-      // genuinely newer cloud draft (a cross-device save discovered on this
-      // boot) — so this offer is suppressed only when the just-restored
-      // local draft is AT LEAST AS FRESH as the cloud one; a strictly newer
-      // cloud draft is still offered. `restoredDraftSavedAt()` reads the
-      // envelope draftPersistence already parsed (no local restore this
-      // boot → null → the comparison never suppresses, same as before this
-      // fix for a fresh session).
+      // Don't surprise an author who began working while the fetch was in
+      // flight — the single, exported "has this session made any progress"
+      // predicate, combined with an explicit instantiation check (the
+      // predicate itself is scoped to pre-instantiation progress only; see
+      // its doc comment in draftPersistence.ts).
+      const wc = useWorkingCopyStore.getState();
+      if ((wc.instantiationMode !== null && wc.ir !== null) || hasMeaningfulProgress()) return;
+      // Freshness comparison (F5), not blanket suppression: a local restore
+      // this boot can be STALER than a genuinely newer cloud draft (a
+      // cross-device save discovered on this boot) — so this offer is
+      // suppressed only when the just-restored local draft is AT LEAST AS
+      // FRESH as the cloud one; a strictly newer cloud draft is still
+      // offered. `restoredDraftSavedAt()` reads the envelope draftPersistence
+      // already parsed (no local restore this boot → null → the comparison
+      // never suppresses).
       const localSavedAt = restoredDraftSavedAt();
       if (localSavedAt !== null && localSavedAt >= serverMeta.savedAt) return;
       setCloudResume(serverMetaToDraftMeta(serverMeta));
@@ -702,7 +628,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     return () => {
       cancelled = true;
     };
-  }, [githubToken, resumeMeta]);
+  }, [githubToken]);
 
   // Spec 057 US5 (FR-050): the OSK mode and the pane split are VIEW state, not
   // authoring state — they had been component `useState`, which the route
@@ -795,7 +721,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // F6 fix (docs/design-notes/switch-base-popup-behavior-log.md): install the
   // SAME durable-draft autosave for PRE-instantiation progress — wizard levels
   // L1 (identity-lite) / L2 (an un-confirmed base preview) — under the
-  // reserved `DRAFT_PERSISTENCE_PENDING_KEY` slot. Before this, the autosave
+  // reserved `PENDING_PROJECT_KEY` slot. Before this, the autosave
   // installer ran only from `doCommit` (i.e. only once a base was CONFIRMED),
   // so a refresh before that point had nothing for `main.tsx`'s silent
   // boot-time restore (`draftPersistence.loadDraft`, resolved via THIS
@@ -861,7 +787,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       autosaveTeardownRef.current = installDraftAutosave(restoredProjectKey);
       return;
     }
-    autosaveTeardownRef.current = installDraftAutosave(DRAFT_PERSISTENCE_PENDING_KEY);
+    autosaveTeardownRef.current = installDraftAutosave(PENDING_PROJECT_KEY);
     // Runs once on mount; deriveProjectKeyFromWorkingCopy/installDraftAutosave
     // are stable module-level imports, and the refs are stable by construction.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -876,7 +802,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
    * that handler's own call site below for why it needs this too: résumé
    * pre-seeds `instantiatedForBaseIdRef` specifically so `doCommit` never
    * fires for the restored base, so nothing else would ever promote the
-   * pending subscription away from `DRAFT_PERSISTENCE_PENDING_KEY` for that
+   * pending subscription away from `PENDING_PROJECT_KEY` for that
    * path without this). No-ops when no real project key is derivable yet
    * (nothing to promote to).
    *
@@ -896,8 +822,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     if (projectKey === null) return;
     autosaveTeardownRef.current?.();
     autosaveTeardownRef.current = installDraftAutosave(projectKey);
-    if (projectKey !== DRAFT_PERSISTENCE_PENDING_KEY) {
-      clearPersistenceDraft(DRAFT_PERSISTENCE_PENDING_KEY);
+    if (projectKey !== PENDING_PROJECT_KEY) {
+      clearDraft(PENDING_PROJECT_KEY);
     }
   }, []);
 
@@ -920,7 +846,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     if (cloudSyncAccessToken === null) {
       return undefined;
     }
-    const teardown = startPersistenceCloudSync(() => cloudSyncAccessToken);
+    const teardown = startCloudSync(() => cloudSyncAccessToken);
     return teardown;
   }, [cloudSyncAccessToken]);
 
@@ -1107,16 +1033,12 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // navigation. See specs/047-my-keyboards/spec.md ("Superseded: spec
       // 034 VR-5").
 
-      // Pin the active-project pointer to this base's id the moment a working
-      // copy is instantiated (specs/047-my-keyboards spec — projectKey =
-      // identity.keyboardId ?? baseKeyboard.id; the identity keyboardId, when
-      // Track 1 later sets one, isn't chosen yet at this point, so base.id is
-      // the correct starting key for both tracks). This ONLY repoints THIS
-      // session's active-project pointer — it does not touch any other
-      // project's stored record or index row, so starting a new keyboard
-      // never overwrites/wipes an already-in-flight project.
-      pinActiveProject(base.id);
-
+      // The active-project pointer used to need an eager pin here (to a SECOND,
+      // independent pointer the now-retired draftAutosave.ts engine owned —
+      // #1451's consolidation). There is only one pointer now
+      // (draftPersistence.ts's `ks.draft.active`), and `promotePendingAutosave()`
+      // below already pins it (via `installDraftAutosave`) moments later in
+      // this same callback — so nothing needs pinning here.
 
       // Reads via getState() escape hatch (not a selector) to avoid a stale closure — the callback is memoised with empty deps.
       const track = useSurveySessionStore.getState().selectedTrack;
@@ -1298,6 +1220,10 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   // the guard is clear before any re-instantiation can fire (research D-R5).
   // ---------------------------------------------------------------------------
   function handleStartOver() {
+    // Captured BEFORE discardActiveDraft() clears the pointer below — needed
+    // for the server-side clear further down, once the active project's own
+    // local record is gone.
+    const startOverProjectKey = resolveActiveProjectKey();
     // T024 (spec 034 US3, research D5, G-3): clear the durable draft (and the
     // active-project pointer) BEFORE resetting the in-memory stores, so the
     // NEXT boot does not immediately re-rehydrate the just-abandoned session.
@@ -1336,23 +1262,18 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     // base-confirm. Installed against the freshly-reset stores above, so its
     // synchronous initial save is a correct no-op (hasPendingProgress() is
     // false immediately after reset).
-    autosaveTeardownRef.current = installDraftAutosave(DRAFT_PERSISTENCE_PENDING_KEY);
+    autosaveTeardownRef.current = installDraftAutosave(PENDING_PROJECT_KEY);
     // sessionReset() calls reset() which already clears charactersSubStage to
     // "prefill" (spec 027 Stage 4 — the store slot is the authoritative owner).
     // sessionReset() also clears baseConfirmed back to false via INITIAL_STATE.
-    // Discard any saved draft — start-over is an explicit "throw it away".
-    // Read the project key BEFORE clearDraft() (which clears the active
-    // pointer as part of removing the project) so the server call still knows
-    // which project to delete. clearDraft() only removes THIS ONE project's
-    // record + index row — every other in-flight "My keyboards" project is
-    // untouched (spec: start-over must not wipe the whole project index).
-    const projectKey = getActiveProjectKey();
-    clearDraft();
-    if (projectKey !== null) {
+    // Discard any saved draft — start-over is an explicit "throw it away". The
+    // local record + index row were already removed by discardActiveDraft()
+    // above (captured `startOverProjectKey` before it cleared the pointer);
+    // this is the server-side counterpart.
+    if (startOverProjectKey !== null) {
       const accessToken = currentAccessToken();
-      if (accessToken !== null) void clearServerDraft(accessToken, projectKey);
+      if (accessToken !== null) void clearServerDraft(accessToken, startOverProjectKey);
     }
-    setResumeMeta(null);
     setCloudResume(null);
   }
 
@@ -1375,67 +1296,55 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
   }, [setStartOverHandler]);
 
   // ---------------------------------------------------------------------------
-  // Resume banner handlers.
+  // Cloud-restore banner handlers. There is no local-draft banner any more
+  // (#1451) — draftPersistence's own silent boot restore is the only local
+  // resume path — so `cloudResume` is the only source a banner offer can ever
+  // come from here.
   //
-  // Resume: restore both stores from the saved draft, then mark the working copy
-  // as already instantiated FOR THE RESTORED BASE so the compile pipeline's
-  // onInstantiate does not re-run instantiateFromBase over the restored copy
-  // (which would pop the rebase-confirm dialog / risk discarding restored
-  // survey answers — F1/F2). Reads the restored base id back from the
-  // just-patched workingCopyStore rather than hardcoding `true`, so a LATER
-  // genuine switch to a DIFFERENT base (in the same session, after resume)
-  // still re-instantiates normally (F1 fix — see instantiatedForBaseIdRef).
-  // Discard: drop the draft and continue fresh.
-  // Either way, clearing resumeMeta hides the banner and starts autosave.
+  // Resume: fetch the full envelope from the server and apply it, then mark
+  // the working copy as already instantiated FOR THE RESTORED BASE so the
+  // compile pipeline's onInstantiate does not re-run instantiateFromBase over
+  // the restored copy (which would pop the rebase-confirm dialog / risk
+  // discarding restored survey answers — F1/F2). Reads the restored base id
+  // back from the just-patched workingCopyStore rather than hardcoding
+  // `true`, so a LATER genuine switch to a DIFFERENT base (in the same
+  // session, after resume) still re-instantiates normally (F1 fix — see
+  // instantiatedForBaseIdRef).
+  // Discard: drop the server-side draft and continue fresh.
   // ---------------------------------------------------------------------------
   function handleResumeDraft() {
-    const active = resumeMeta ?? cloudResume;
-    if (active?.source === "cloud") {
-      // Fetch the full payload from the server, then apply it. applyStudioDraft
-      // validates the record shape/version before hydrating the stores.
-      const accessToken = currentAccessToken();
-      if (accessToken !== null) {
-        // Same draftId resolution as the cloud-restore check above — the
-        // window between that check and this click doesn't run autosave
-        // (gated on resumeMeta/cloudResume being null), so the active-project
-        // pointer can't have moved in between.
-        const draftId = getActiveProjectKey() ?? PENDING_PROJECT_KEY;
-        // Dev's engine stores StudioDraft envelopes; pick that envelope off
-        // the shared transport (see serverDraftStore.ts's ServerDraftPayload).
-        void loadServerDraftContent<StudioDraft>(accessToken, draftId).then((draft) => {
-          if (applyStudioDraft(draft)) {
-            instantiatedForBaseIdRef.current = useWorkingCopyStore.getState().baseKeyboard?.id ?? null;
-            setActiveProject(draftId);
-            // F6 fix: promote the pending durable-draft autosave (draftPersistence
-            // engine) to this now-restored real project — instantiatedForBaseIdRef
-            // above is set specifically so doCommit never fires for this base, so
-            // nothing else would ever perform this promotion for a résumé via
-            // THIS (the other, draftAutosave) engine's banner otherwise.
-            promotePendingAutosave();
-          }
-          setResumeMeta(null);
-          setCloudResume(null);
-        });
-        return;
+    if (cloudResume === null) return;
+    const accessToken = currentAccessToken();
+    if (accessToken === null) {
+      setCloudResume(null);
+      return;
+    }
+    // Same draftId resolution as the cloud-restore check above — the window
+    // between that check and this click doesn't run any write that could move
+    // the active-project pointer.
+    const draftId = resolveActiveProjectKey() ?? PENDING_PROJECT_KEY;
+    void loadServerDraftContent(accessToken, draftId).then((draft) => {
+      if (draft !== null && applyRemoteDraft(draft)) {
+        instantiatedForBaseIdRef.current = useWorkingCopyStore.getState().baseKeyboard?.id ?? null;
+        setActiveProjectKey(draftId);
+        // F6 fix: promote the pending durable-draft autosave to this
+        // now-restored real project — instantiatedForBaseIdRef above is set
+        // specifically so doCommit never fires for this base, so nothing else
+        // would ever perform this promotion for a résumé via this banner
+        // otherwise.
+        promotePendingAutosave();
       }
-    }
-    if (applyDraft()) {
-      instantiatedForBaseIdRef.current = useWorkingCopyStore.getState().baseKeyboard?.id ?? null;
-      // F6 fix: same promotion as the cloud branch above.
-      promotePendingAutosave();
-    }
-    setResumeMeta(null);
-    setCloudResume(null);
+      setCloudResume(null);
+    });
   }
 
   function handleDiscardDraft() {
-    const projectKey = getActiveProjectKey();
-    clearDraft();
-    if (projectKey !== null) {
-      const accessToken = currentAccessToken();
-      if (accessToken !== null) void clearServerDraft(accessToken, projectKey);
+    if (cloudResume === null) return;
+    const accessToken = currentAccessToken();
+    if (accessToken !== null) {
+      const draftId = resolveActiveProjectKey() ?? PENDING_PROJECT_KEY;
+      void clearServerDraft(accessToken, draftId);
     }
-    setResumeMeta(null);
     setCloudResume(null);
   }
 
@@ -1535,9 +1444,9 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     >
       {/* Left pane: survey questions (StepHost renders pane content) */}
       <section aria-label="Survey questions" style={questionsPaneStyle}>
-        {(resumeMeta ?? cloudResume) !== null && (
+        {cloudResume !== null && (
           <ResumeDraftBanner
-            meta={(resumeMeta ?? cloudResume)!}
+            meta={cloudResume}
             onResume={handleResumeDraft}
             onDiscard={handleDiscardDraft}
           />
