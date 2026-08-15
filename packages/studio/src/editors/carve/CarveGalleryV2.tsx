@@ -989,7 +989,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                 regionAriaLabel={t({ id: "carve.suggested.regionAriaLabel", message: "Suggested to discard" })}
                 topBorderColor="var(--sil-red)"
                 chipBackground="color-mix(in srgb, var(--sil-red) 14%, var(--app-surface-2))"
-                chipColor="var(--app-danger-text)"
+                chipColor="var(--app-danger-text-on-surface-2)"
                 heading={<Trans id="carve.suggested.heading">Suggested to discard</Trans>}
                 body={<Trans id="carve.suggested.body">Your base keyboard can type these characters, but nothing in your confirmed alphabet uses them. Click any character below to keep it instead — nothing is removed until you continue.</Trans>}
                 rows={primaryRows}

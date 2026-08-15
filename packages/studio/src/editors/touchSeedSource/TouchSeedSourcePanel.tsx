@@ -217,7 +217,11 @@ const confirmBtnStyle = (warn: boolean): CSSProperties => ({
   background: warn ? "var(--app-danger)" : BLUE_ACTION,
   border: "none",
   borderRadius: 6,
-  color: "var(--app-text-on-accent)",
+  // --app-text-on-accent only pairs safely with BLUE_ACTION (--app-accent);
+  // for the warn branch, --app-danger needs --app-text-on-danger instead --
+  // navy's on-accent value falls to 4.35:1 against --app-danger's fill
+  // (1.4.3, #1477). See colors.css for why the two danger tokens differ.
+  color: warn ? "var(--app-text-on-danger)" : "var(--app-text-on-accent)",
   fontSize: 14,
   fontWeight: 600,
   cursor: "pointer",

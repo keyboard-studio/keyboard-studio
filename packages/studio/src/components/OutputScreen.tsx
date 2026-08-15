@@ -376,7 +376,13 @@ export function OutputScreen() {
                 fontWeight: 600,
                 cursor: kmpActionable ? "pointer" : "not-allowed",
                 fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-                transition: "background 0.15s",
+                // NOT transitioned: `color` switches with `background` on the
+                // SAME kmpActionable flip, but with no matching transition of
+                // its own it snaps instantly while background fades over
+                // 150ms, so the disabled bg briefly pairs with the actionable
+                // text color mid-fade -- a real (if brief) 1.4.3 contrast
+                // violation axe caught during the disabled->actionable
+                // transition (#1477).
               }}
             >
               {buildingKmp ? (

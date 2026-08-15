@@ -37,6 +37,14 @@ export function LintChip({ finding }: LintChipProps) {
 
   const isWarning = finding.severity === "warning";
   const severityColor = isWarning ? TEXT_MAIN : SEVERITY_COLORS[finding.severity];
+  // The code badge's text sits on --app-surface-2 (the chip background,
+  // below), which is LIGHTER than the --app-bg/--app-surface most other
+  // --app-danger-text consumers pair it against — fine in light theme, but
+  // navy's --sil-red-60 falls to 4.22:1 there (1.4.3, #1477). This token
+  // ONLY overrides the fatal/error case for THIS pairing; the severity bar's
+  // background and every other severity's text keep using severityColor.
+  const isDangerSeverity = finding.severity === "fatal" || finding.severity === "error";
+  const codeColor = isDangerSeverity ? "var(--app-danger-text-on-surface-2)" : severityColor;
   const isUpstream = finding.origin === "upstream";
 
   function handleChipClick() {
@@ -108,7 +116,7 @@ export function LintChip({ finding }: LintChipProps) {
             flexShrink: 0,
             fontSize: 11,
             fontFamily: "ui-monospace, 'Cascadia Code', Consolas, monospace",
-            color: severityColor,
+            color: codeColor,
             whiteSpace: "nowrap",
           }}
         >

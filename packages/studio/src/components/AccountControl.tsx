@@ -112,7 +112,13 @@ const githubProviderButtonStyle: React.CSSProperties = {
   margin: "4px 16px",
   padding: "8px 12px",
   background: "#238636", // GitHub brand green
-  color: "var(--app-text-on-accent)",
+  // NOT --app-text-on-accent: that token flips per theme to pair with
+  // --app-accent, but GitHub's brand green is a fixed fill in both themes --
+  // navy theme's dark on-accent value only reaches 3.31:1 here, below the
+  // 4.5:1 AA minimum (1.4.3, #1477; same bug as WelcomeScreen's and
+  // SignUpPanel's identical buttons). --sil-white passes in both themes
+  // since the fill never changes.
+  color: "var(--sil-white)",
   border: "1px solid #2ea043", // GitHub brand green (border)
   borderRadius: 6,
   fontSize: 13,
@@ -129,7 +135,9 @@ const googleProviderButtonStyle: React.CSSProperties = {
   margin: "4px 16px",
   padding: "8px 12px",
   background: "#1a73e8", // Google brand blue
-  color: "var(--app-text-on-accent)",
+  // See the GitHub button above: --sil-white instead of --app-text-on-accent
+  // for the same fixed-fill reason (navy's on-accent value reaches 3.42:1).
+  color: "var(--sil-white)",
   border: "1px solid #1a73e8", // Google brand blue (border)
   borderRadius: 6,
   fontSize: 13,

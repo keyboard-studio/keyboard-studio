@@ -63,6 +63,19 @@
   --app-danger-text:      var(--sil-red-dark);
   --app-danger-border:    var(--sil-red-20);
   --app-danger-bg:        var(--sil-red-10);
+  /* --app-danger-text already clears 4.5:1 against --app-bg/--app-surface in
+     both themes, but LintChip's code badge sits on the LIGHTER
+     --app-surface-2 (1.4.3, #1477) -- fine here since light's --sil-red-dark
+     is dark regardless of which of the three light-theme surfaces it sits
+     on. See the navy block below for the value that actually differs. */
+  --app-danger-text-on-surface-2: var(--app-danger-text);
+  /* Text painted on a SOLID --app-danger fill (e.g. a destructive confirm
+     button), as distinct from --app-danger-text (danger-colored text on a
+     neutral surface). Light's --app-danger (--sil-red, #D52227) is dark
+     enough that white clears 5.14:1 -- --sil-black would FAIL here (4.09:1).
+     See the navy block below, where the fill is different and so is the
+     answer (1.4.3, #1477). */
+  --app-text-on-danger:   var(--sil-white);
 
   --app-warning:          var(--sil-yellow);
   /* ORANGE-dark, not yellow-dark. Warning TEXT has to be readable, and yellow
@@ -81,6 +94,14 @@
   --app-success-text:     var(--sil-green-dark);
   --app-success-border:   var(--sil-green-20);
   --app-success-bg:       var(--sil-green-10);
+  /* NOT --app-text-on-accent for text painted on a solid --app-success fill:
+     that token flips per theme to pair with --app-accent, but light theme's
+     --app-success (--sil-green) only reaches 3.35:1 with white -- the same
+     shape as --app-danger-text-on-surface-2 above, just for the success
+     fill (1.4.3, #1477). --sil-black clears 6.27:1 against --sil-green and
+     8.27:1 against navy's brighter --app-success override below, so one
+     value covers both themes. */
+  --app-text-on-success:  var(--sil-black);
 }
 
 /* Navy theme override. Selector matches the static class+attribute the
@@ -129,6 +150,21 @@
   --app-danger-text:      var(--sil-red-60);
   --app-danger-border:    rgba(242, 78, 60, 0.42);
   --app-danger-bg:        rgba(242, 78, 60, 0.12);
+  /* --sil-red-60 clears 4.5:1 against --app-bg (5.46:1) and --app-surface
+     (4.92:1), but NOT against the lighter --app-surface-2 (4.22:1) --
+     LintChip's code badge sits on that surface (1.4.3, #1477). --sil-red-20
+     clears 8.6:1 there; kept as its own token rather than widening
+     --app-danger-text itself, since 21 other consumers already pass against
+     the darker surfaces and re-verifying all of them is out of scope here. */
+  --app-danger-text-on-surface-2: var(--sil-red-20);
+  /* Text painted on a SOLID --app-danger fill. Navy's --app-danger (#F24E3C)
+     is bright enough that neither theme-invariant choice clears 4.5:1 on its
+     own: --app-text-on-accent's navy value (#18243F) only reaches 4.35:1
+     here (this fill is brighter than --app-accent), and white reaches only
+     3.54:1. --sil-black clears 5.93:1 -- the opposite answer from light's
+     block above, because the two --app-danger fills differ enough to need
+     different text (1.4.3, #1477). */
+  --app-text-on-danger:   var(--sil-black);
 
   --app-warning:          #D9A441;
   --app-warning-text:     #ECC26A;
