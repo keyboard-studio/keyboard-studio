@@ -908,7 +908,15 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                   <span style={{
                     display: 'inline-flex', alignItems: 'center', font: '600 11.5px var(--app-font)',
                     padding: '3px 9px', borderRadius: 999,
-                    color: cell.inAlpha ? 'var(--app-text-on-accent)' : 'var(--app-text-muted)',
+                    // NOT --app-text-on-accent: that token flips per theme to pair
+                    // with --app-accent, but --sil-green is a fixed fill in both
+                    // themes (brand.css has no navy override for it) — the same
+                    // shape as --sil-red-dark above. White (light theme's
+                    // on-accent value) only reaches 3.35:1 against this green,
+                    // below the 4.5:1 AA minimum for this normal-size bold text.
+                    // --sil-black passes at 6.27:1 in both themes since the fill
+                    // itself never changes.
+                    color: cell.inAlpha ? 'var(--sil-black)' : 'var(--app-text-muted)',
                     background: cell.inAlpha ? 'var(--sil-green)' : 'var(--app-surface-2)',
                     border: cell.inAlpha ? 'none' : '1px solid var(--app-border-strong)',
                   }}>
@@ -923,7 +931,9 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                   style={{
                     width: '100%', font: '600 13px var(--app-font)', cursor: toggleable ? 'pointer' : 'default',
                     padding: '9px 14px', borderRadius: 8, opacity: toggleable ? 1 : 0.5,
-                    color: discarded ? 'var(--app-text-on-accent)' : 'var(--app-danger-text)',
+                    // See the "In your alphabet" pill above: --sil-black instead
+                    // of --app-text-on-accent for the same fixed-fill reason.
+                    color: discarded ? 'var(--sil-black)' : 'var(--app-danger-text)',
                     background: discarded ? 'var(--sil-green)' : 'transparent',
                     border: discarded ? 'none' : '1px solid var(--app-danger-text)',
                   }}

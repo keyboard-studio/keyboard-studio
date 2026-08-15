@@ -260,7 +260,18 @@ export function RemovalBanner({ recommended, languageLabel, languageDisplayName,
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: 6,
                     font: '600 12.5px var(--app-font)', cursor: selected.length === 0 ? 'default' : 'pointer',
-                    color: 'var(--app-text-on-accent)', background: selected.length === 0 ? 'var(--app-text-subtle)' : 'var(--sil-green)',
+                    // Colour tracks the fill, because only ONE of the two fills
+                    // is a fixed brand token. On --sil-green (a fixed fill in
+                    // both themes — brand.css has no navy override),
+                    // --app-text-on-accent flips to white in light theme and
+                    // reaches only 3.35:1, below the 4.5:1 AA minimum for this
+                    // normal-size bold text; --sil-black passes at 6.27:1 in
+                    // both. The disabled --app-text-subtle fill is a THEME
+                    // token that moves with the theme, so the flipping token is
+                    // correct there and is deliberately kept. Same pairing bug
+                    // as CarveGalleryV2's "In your alphabet" pill (issue 1627).
+                    color: selected.length === 0 ? 'var(--app-text-on-accent)' : 'var(--sil-black)',
+                    background: selected.length === 0 ? 'var(--app-text-subtle)' : 'var(--sil-green)',
                     border: 'none', borderRadius: 8, padding: '8px 16px', opacity: selected.length === 0 ? 0.6 : 1,
                   }}
                 >
