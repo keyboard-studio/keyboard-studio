@@ -1260,7 +1260,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     // without this would leave the second attempt's L1/L2 progress
     // unpersisted until doCommit's own install fires again at that attempt's
     // base-confirm. Installed against the freshly-reset stores above, so its
-    // synchronous initial save is a correct no-op (hasPendingProgress() is
+    // synchronous initial save is a correct no-op (hasMeaningfulProgress() is
     // false immediately after reset).
     autosaveTeardownRef.current = installDraftAutosave(PENDING_PROJECT_KEY);
     // sessionReset() calls reset() which already clears charactersSubStage to

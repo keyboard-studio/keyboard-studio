@@ -46,6 +46,7 @@ import {
   draftKey,
   saveDraft,
   loadDraft,
+  applyRemoteDraft,
   clearDraft,
   resolveActiveProjectKey,
   setActiveProjectKey,
@@ -744,6 +745,130 @@ describe("draftPersistence", () => {
       expect(session.touchSeedSource).toBe("import-adapt");
 
       expect(wasDraftRestoredThisBoot()).toBe(true);
+    });
+  });
+
+  // km-triage (PR #1642): applyRemoteDraft drives the cloud-restore banner's
+  // Resume button with untrusted server data, but had no dedicated coverage of
+  // its VR-1/VR-2/VR-3-mirroring validation branches or its catch path.
+  describe("applyRemoteDraft: cloud-restore banner Resume validation + apply", () => {
+    it("applies a valid remote envelope, restoring both stores without touching the boot-restore flags", () => {
+      const base: BaseKeyboard = {
+        id: "remote_valid_project",
+        displayName: "Remote Valid",
+        languages: ["en"],
+      } as BaseKeyboard;
+      const ir = makeIrWithRemovableRule();
+      useWorkingCopyStore.getState().instantiateFromBase(base, { vfs: createVirtualFS([]), ir });
+      useWorkingCopyStore.getState().deleteNode("rule-s01-1");
+      useSurveySessionStore.getState().advance("choose_base");
+
+      saveDraft("remote_valid_project");
+      const stored = localStorage.getItem(draftKey("remote_valid_project"));
+      expect(stored).not.toBeNull();
+      const envelope = JSON.parse(stored!) as DurableDraft;
+
+      // Cold reset — nothing left to inherit from, and this is a REMOTE apply,
+      // not a local loadDraft(), so localStorage is cleared first to prove the
+      // restore came from the passed-in envelope, not a local record.
+      useWorkingCopyStore.getState().reset();
+      useSurveySessionStore.getState().reset();
+      localStorage.clear();
+      const wasRestoredBefore = wasDraftRestoredThisBoot();
+      const savedAtBefore = restoredDraftSavedAt();
+
+      expect(applyRemoteDraft(envelope)).toBe(true);
+
+      const wc = useWorkingCopyStore.getState();
+      expect(wc.instantiationMode).toBe("new-from-base");
+      expect(wc.baseKeyboard?.id).toBe("remote_valid_project");
+      expect(wc.deletedNodeIds.has("rule-s01-1")).toBe(true);
+      expect(useSurveySessionStore.getState().activeStepId).toBe("choose_base");
+
+      // Per the function's own doc comment: never touches the local-boot flags.
+      expect(wasDraftRestoredThisBoot()).toBe(wasRestoredBefore);
+      expect(restoredDraftSavedAt()).toBe(savedAtBefore);
+    });
+
+    it("rejects a version-mismatched envelope without applying it", () => {
+      const mismatched = { version: DRAFT_VERSION + 1, workingCopy: { instantiationMode: "new-from-base" }, traversal: {} } as unknown as DurableDraft;
+
+      expect(applyRemoteDraft(mismatched)).toBe(false);
+      expect(useWorkingCopyStore.getState().instantiationMode).toBeNull();
+    });
+
+    it("rejects an envelope with a missing/malformed workingCopy without applying it", () => {
+      const missingWorkingCopy = {
+        version: DRAFT_VERSION,
+        workingCopy: null,
+        traversal: {},
+      } as unknown as DurableDraft;
+      expect(applyRemoteDraft(missingWorkingCopy)).toBe(false);
+
+      const nonObjectWorkingCopy = {
+        version: DRAFT_VERSION,
+        workingCopy: "not-an-object",
+        traversal: {},
+      } as unknown as DurableDraft;
+      expect(applyRemoteDraft(nonObjectWorkingCopy)).toBe(false);
+
+      // Uninstantiated AND not the pending slot: rejected the same way loadDraft's
+      // VR-2 guard rejects it.
+      const uninstantiatedNonPending = {
+        version: DRAFT_VERSION,
+        projectKey: "some_other_key",
+        workingCopy: { instantiationMode: null },
+        traversal: {},
+      } as unknown as DurableDraft;
+      expect(applyRemoteDraft(uninstantiatedNonPending)).toBe(false);
+      expect(useWorkingCopyStore.getState().instantiationMode).toBeNull();
+    });
+
+    it("rejects an envelope with a missing/malformed traversal without applying it", () => {
+      const missingTraversal = {
+        version: DRAFT_VERSION,
+        workingCopy: { instantiationMode: "new-from-base" },
+        traversal: null,
+      } as unknown as DurableDraft;
+
+      expect(applyRemoteDraft(missingTraversal)).toBe(false);
+      expect(useWorkingCopyStore.getState().instantiationMode).toBeNull();
+    });
+
+    it("returns false and leaves the stores untouched when null is passed (no cloud draft found)", () => {
+      expect(applyRemoteDraft(null)).toBe(false);
+      expect(useWorkingCopyStore.getState().instantiationMode).toBeNull();
+    });
+
+    it("catch path: an envelope that parses the shape checks but throws while applying (corrupt Base64 VFS entry) returns false and never partially restores", () => {
+      const base: BaseKeyboard = {
+        id: "remote_corrupt_project",
+        displayName: "Remote Corrupt",
+        languages: [],
+      } as unknown as BaseKeyboard;
+      const vfs = createVirtualFS([
+        { path: "source/welcome/welcome.htm", content: new Uint8Array([1, 2, 3, 4]), isBinary: true },
+      ]);
+      useWorkingCopyStore.getState().instantiateFromBase(base, { vfs, ir: makeMinimalIr() });
+      saveDraft("remote_corrupt_project");
+      const stored = localStorage.getItem(draftKey("remote_corrupt_project"));
+      expect(stored).not.toBeNull();
+      const envelope = JSON.parse(stored!) as DurableDraft;
+
+      const entries = (envelope.workingCopy as unknown as { baseVfsEntries: Array<{ isBinary: boolean; content: string }> })
+        .baseVfsEntries;
+      expect(entries.length).toBeGreaterThan(0);
+      expect(entries[0]!.isBinary).toBe(true);
+      entries[0]!.content = "!!!not-valid-base64!!!";
+
+      useWorkingCopyStore.getState().reset();
+
+      let result: boolean | undefined;
+      expect(() => {
+        result = applyRemoteDraft(envelope);
+      }).not.toThrow();
+      expect(result).toBe(false);
+      expect(useWorkingCopyStore.getState().instantiationMode).toBeNull();
     });
   });
 

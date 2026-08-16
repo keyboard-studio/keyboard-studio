@@ -103,8 +103,10 @@ async function mountApp(): Promise<void> {
   // `resolveActiveProjectKey()` reads the `ks.draft.active` pointer (absent on
   // a fresh install / after start-over); `loadDraft()` patches the working-copy
   // and survey-session stores directly if a valid draft is found (setting the
-  // `wasDraftRestoredThisBoot()` flag StudioShell's mount effect reads to skip
-  // its own reset — see StudioShell.tsx).
+  // `wasDraftRestoredThisBoot()` flag). This PR retired the local resume-banner
+  // path that used to gate StudioShell's mount-effect reset on that flag — the
+  // flag is now read only by draftPersistence.ts itself, for its own
+  // freshness bookkeeping (`restoredDraftSavedAt()`), and by test assertions.
   const activeProjectKey = resolveActiveProjectKey();
   if (activeProjectKey !== null) {
     loadDraft(activeProjectKey);
