@@ -1,9 +1,9 @@
 # Implementation Plan: Touch key editor — Developer-parity remodel
 
-**Feature**: 061-touch-editor-parity · **Branch**: `061-touch-editor-parity` · **Spec**: [spec.md](spec.md)
+**Feature**: 065-touch-editor-parity · **Branch**: `065-touch-editor-parity` · **Spec**: [spec.md](spec.md)
 
 **Governing**: [spec.md](../../spec.md) §3c, §8, §14 Decision 6, decision D3 · extends
-[specs/058-touch-key-editor](../058-touch-key-editor/spec.md) and withdraws its FR-039 per
+[specs/063-touch-key-editor](../063-touch-key-editor/spec.md) and withdraws its FR-039 per
 [ADR 0002](../../docs/adr/0002-touch-grid-renders-the-last-key-stretched.md).
 
 **Design record**: [research.md](research.md) (D1–D11) · [data-model.md](data-model.md) ·
@@ -13,7 +13,7 @@
 
 ## Summary
 
-Spec 058's engine work is sound and is kept; what shipped broken is the seam between it and the
+Spec 063's engine work is sound and is kept; what shipped broken is the seam between it and the
 screen. This plan fixes that seam by inverting one idiom — the eight editing callbacks on the
 key-grid surfaces become **required** props, so a surface that cannot act fails `tsc` instead of
 rendering inert — and then reaches Developer parity on top: a layer selector, the KeymanWeb
@@ -140,7 +140,7 @@ Playwright lane alone.
 | **SC-006** crowding fires, edit still succeeds | engine unit test on `TOUCH_KEY_ROW_CROWDED`, asserting phone-11-warns / tablet-11-does-not directly | see the readout on a real Cameroon row |
 | **SC-007** proposal or stated reason per character class | table-driven engine test over the enumerated classes | — |
 | **SC-008** localized number row raises no mismatch | engine unit test on `isKeycapRelated` (NFKD test) | — |
-| **SC-004** keyboard-only, no serious a11y violations | existing grid a11y suite + axe over the touch stage; spec 058 SC-009's row-actions fix must not regress (FR-038) | tab through the whole stage |
+| **SC-004** keyboard-only, no serious a11y violations | existing grid a11y suite + axe over the touch stage; spec 063 SC-009's row-actions fix must not regress (FR-038) | tab through the whole stage |
 | **SC-001** all six complaints resolved | — (a judgement, not an assertion) | click-through at PR review |
 | **SC-009** the skipped walk passes; key mode covered on every PR | the integration block above | un-skip `e2e/touch-key-add-remove.spec.ts` |
 

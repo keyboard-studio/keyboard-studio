@@ -2,7 +2,7 @@
 //   - toResumeAnswers(): exhaustive per-answerType flattening of a completed
 //     SurveyPhaseResult into SurveyRunner's resumeAnswers shape.
 //   - DOM: rendering IdentityLite with a `resume` payload mounts the flow on
-//     its LAST question (il_copyright_holder since spec 059) with the recorded
+//     its LAST question (il_copyright_holder since spec 064) with the recorded
 //     answer restored,
 //     Back walks to the prior question with its value, and Finish re-completes
 //     with the same extracted identity.
@@ -31,7 +31,7 @@ const COMPLETED: SurveyPhaseResult = {
     { questionId: "il_language_english", answerType: "text", value: "Hausa" },
     { questionId: "il_language_code", answerType: "text", value: "ha" },
     { questionId: "il_target_script", answerType: "select", value: "Latn" },
-    // spec 059 US1: the identity flow now continues into attribution, so a
+    // spec 064 US1: the identity flow now continues into attribution, so a
     // genuinely COMPLETED run includes these. Without them, resume correctly
     // lands on the first unanswered attribution question instead of the end.
     { questionId: "il_author_name", answerType: "text", value: "Alice Example" },
@@ -53,7 +53,7 @@ const COMPLETED_AMBIGUOUS: SurveyPhaseResult = {
     { questionId: "il_language_english", answerType: "text", value: "Afar" },
     { questionId: "il_language_autonym", answerType: "text", value: "Qafar" },
     { questionId: "il_target_script", answerType: "select", value: "Latn" },
-    // spec 059 US1: the identity flow now continues into attribution, so a
+    // spec 064 US1: the identity flow now continues into attribution, so a
     // genuinely COMPLETED run includes these. Without them, resume correctly
     // lands on the first unanswered attribution question instead of the end.
     { questionId: "il_author_name", answerType: "text", value: "Alice Example" },
@@ -73,7 +73,7 @@ describe("toResumeAnswers", () => {
       il_language_english: "Hausa",
       il_language_code: "ha",
       il_target_script: "Latn",
-      // spec 059 US1 — attribution is part of a completed identity run.
+      // spec 064 US1 — attribution is part of a completed identity run.
       il_author_name: "Alice Example",
       il_author_email: "alice@example.org",
       il_copyright_holder: "Hausa Language Committee",
@@ -122,7 +122,7 @@ describe("toResumeAnswers", () => {
 // ---------------------------------------------------------------------------
 
 describe("IdentityLite — resume", () => {
-  // spec 059 US1: the last question is now the copyright holder, not the script.
+  // spec 064 US1: the last question is now the copyright holder, not the script.
   it("mounts on the LAST question (copyright holder) with the answer restored", () => {
     render(<IdentityLite onComplete={vi.fn()} resume={COMPLETED} />);
     expect(screen.getByText("Who holds the copyright for this keyboard?")).toBeTruthy();
@@ -139,7 +139,7 @@ describe("IdentityLite — resume", () => {
     render(<IdentityLite onComplete={vi.fn()} resume={COMPLETED} />);
     fireEvent.click(screen.getByTestId("survey-back"));
     // Flow order: english → autonym → code → target_script → author name →
-    // author email → copyright holder (spec 059 US1). Back from the last
+    // author email → copyright holder (spec 064 US1). Back from the last
     // question (copyright holder) lands on il_author_email with its restored
     // value; assert on the display value rather than the input role.
     expect(screen.getByDisplayValue("alice@example.org")).toBeTruthy();
@@ -155,7 +155,7 @@ describe("IdentityLite — resume", () => {
     expect(identity.bcp47).toBe("ha-Latn");
     expect(identity.autonym).toBe("Hausa");
     expect(identity.supported).toBe(true);
-    // spec 059 US1: attribution survives the resume round-trip.
+    // spec 064 US1: attribution survives the resume round-trip.
     expect(identity.attribution).toEqual({
       authorName: "Alice Example",
       authorEmail: "alice@example.org",

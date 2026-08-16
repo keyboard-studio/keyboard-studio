@@ -1,4 +1,4 @@
-// Unit tests for KeyGrid + KeyGridCell (spec 058 T064; FR-020, FR-020a,
+// Unit tests for KeyGrid + KeyGridCell (spec 063 T064; FR-020, FR-020a,
 // FR-022). Builds `KeyGridViewModel` fixtures directly (rather than going
 // through `buildKeyGridViewModel`) so these tests exercise the RENDERING
 // contract in isolation from the T063 projection — a regression in the
@@ -27,7 +27,7 @@ afterEach(() => {
 });
 
 /**
- * Every `on*` callback `KeyGridProps` requires (spec 061 T002/D1) — supplied
+ * Every `on*` callback `KeyGridProps` requires (spec 065 T002/D1) — supplied
  * as `vi.fn()` stand-ins so a test that only cares about one or two handlers
  * doesn't have to restate the rest just to satisfy `tsc`. Spread FIRST in a
  * render call: a test's own explicit prop, written after this spread, wins
@@ -89,7 +89,7 @@ function makeCell(
     annotations: overrides.annotations ?? EMPTY_ANNOTATIONS,
     findings: overrides.findings ?? [],
     // Defaults false; `makeRow` stamps the real value on the row's last cell,
-    // so a test never has to hand-maintain it (spec 061 T024).
+    // so a test never has to hand-maintain it (spec 065 T024).
     isLastInRow: overrides.isLastInRow ?? false,
     ...(overrides.nextlayer !== undefined
       ? { nextlayer: overrides.nextlayer }
@@ -102,7 +102,7 @@ function makeCell(
 
 /**
  * A row view model, with `isLastInRow` and `metrics` derived rather than passed
- * (spec 061 T024) — so every existing call site keeps its two-argument shape and
+ * (spec 065 T024) — so every existing call site keeps its two-argument shape and
  * the derived fields cannot go stale against the cells they describe.
  */
 function makeRow(
@@ -172,7 +172,7 @@ describe("KeyGrid — ARIA grid structure", () => {
     const vm = makeViewModel([
       // Slack on one row and two keys on it — not load-bearing for what this
       // test asserts (the row-actions strip renders unconditionally now,
-      // spec 061 T012), but keeps the fixture exercising the decorative
+      // spec 065 T012), but keeps the fixture exercising the decorative
       // pad/slack spacers too.
       makeRow([makeCell({ id: "K1" }), makeCell({ id: "K2" })], 40),
       makeRow([makeCell({ id: "K3" })]),
@@ -453,7 +453,7 @@ describe("KeyGrid — proportional geometry from padPct/widthPct (FR-022)", () =
     expect(parseFloat(cell2.style.flexBasis)).toBeCloseTo((50 / 165) * 100, 5);
   });
 
-  it("stretches the LAST key of an under-full row to the layer maximum, and renders no slack spacer at all (spec 061 T026, FR-012)", () => {
+  it("stretches the LAST key of an under-full row to the layer maximum, and renders no slack spacer at all (spec 065 T026, FR-012)", () => {
     // Row A: (15+100) = 115 total. Row B: (15+35) = 50 total -> slack 65.
     // Layer max = 115 (row A, which has slackPct 0 itself).
     const rowA = makeRow([makeCell({ id: "A1", padPct: 15, widthPct: 100 })], 0);
@@ -520,8 +520,8 @@ describe("KeyGrid — proportional geometry from padPct/widthPct (FR-022)", () =
   });
 });
 
-describe("KeyGrid — row slack (FR-039) and the retained row-actions strip (spec 061 T012, FR-007, FR-038, ADR 0002)", () => {
-  it("prints the row's measurements plainly, where the hatch used to gesture at them (spec 061 T026, FR-013)", () => {
+describe("KeyGrid — row slack (FR-039) and the retained row-actions strip (spec 065 T012, FR-007, FR-038, ADR 0002)", () => {
+  it("prints the row's measurements plainly, where the hatch used to gesture at them (spec 065 T026, FR-013)", () => {
     const rowA = makeRow([makeCell({ id: "A1", padPct: 15, widthPct: 100 })], 0);
     const rowB = makeRow([makeCell({ id: "B1", padPct: 15, widthPct: 35 })], 65);
     const vm = makeViewModel([rowA, rowB]);
@@ -544,9 +544,9 @@ describe("KeyGrid — row slack (FR-039) and the retained row-actions strip (spe
   // "Fill row" / "Even out row" were withdrawn by FR-007/ADR 0002 — once the
   // last key of an under-full row stretches to fill it (US2/T026, out of this
   // task's scope), there is no slack left for either control to act on. The
-  // container that held them stays (FR-038 forbids regressing spec 058
+  // container that held them stays (FR-038 forbids regressing spec 063
   // SC-009's accessibility fix), now rendering unconditionally for every row
-  // with an empty gridcell — spec 061 T026 mounts a metrics readout there.
+  // with an empty gridcell — spec 065 T026 mounts a metrics readout there.
   it("renders the row-actions container for every row, unconditionally, regardless of slack or key count", () => {
     const noSlackSingleKey = makeRow(
       [makeCell({ id: "R0K1", padPct: 15, widthPct: 100 })],

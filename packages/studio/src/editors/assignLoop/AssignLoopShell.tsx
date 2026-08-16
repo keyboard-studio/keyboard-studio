@@ -55,7 +55,7 @@ export interface AssignLoopShellProps {
    * RIGHT pane content (flexGrow 1, padded, scrollable). Caller owns any
    * loading/error conditional rendering before passing this in.
    *
-   * **Optional as of spec 061 T033 (FR-024).** When omitted the right pane is
+   * **Optional as of spec 065 T033 (FR-024).** When omitted the right pane is
    * not rendered at all and the left pane grows to the full width, rather than
    * leaving 55% of the surface blank. Key mode uses this: it has no live OSK
    * preview to show, and the grid genuinely needs the room. Character mode

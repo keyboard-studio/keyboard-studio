@@ -1,4 +1,4 @@
-// Unit tests for KeyInspector (spec 058 T070; FR-020b, FR-030).
+// Unit tests for KeyInspector (spec 063 T070; FR-020b, FR-030).
 //
 // Grouped:
 //   1. Selection-vs-editing focus contract: Enter/F2 into the inspector,
@@ -45,7 +45,7 @@ afterEach(() => {
 const EMPTY_ANNOTATIONS: KeyGridAnnotationCounts = { longpress: 0, multitap: 0, flick: 0 };
 
 /**
- * `onSpChange` and `onApplyFix` are required props as of spec 061's D1
+ * `onSpChange` and `onApplyFix` are required props as of spec 065's D1
  * (`packages/studio/src/editors/assignLoop/keyGrid/KeyInspector.tsx`) — every
  * mount in this file must now supply both, even where a test asserts on
  * neither. Spread this at a mount site to satisfy the type without pasting
@@ -406,7 +406,7 @@ describe("KeyInspector — display fields", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 5. SC-007 (spec 058 T121) — EVERY edit-time diagnostic is reachable in the
+// 5. SC-007 (spec 063 T121) — EVERY edit-time diagnostic is reachable in the
 //    UI with a working fix, and none of them needs a compile to discover.
 //
 // Three claims, kept apart on purpose:
@@ -749,7 +749,7 @@ describe("SC-007 — every diagnostic is reachable in the UI with a working fix 
 
 // ---------------------------------------------------------------------------
 // 4. `sp` (key type) control — full legal set, a proposal, never removed
-//    (spec 058 T096; FR-029a, FR-029d)
+//    (spec 063 T096; FR-029a, FR-029d)
 // ---------------------------------------------------------------------------
 
 describe("proposeSpValue — the derivable half of FR-029d, everything else is 'keep current'", () => {

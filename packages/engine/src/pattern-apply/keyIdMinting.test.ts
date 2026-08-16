@@ -1,6 +1,6 @@
 /**
- * Unit tests for keyIdMinting (spec 058 T079; contract:
- * specs/058-touch-key-editor/contracts/key-id-policy.md).
+ * Unit tests for keyIdMinting (spec 063 T079; contract:
+ * specs/063-touch-key-editor/contracts/key-id-policy.md).
  *
  * Grouped:
  *   1. proposeKeyId - every row of section 2's minting table.

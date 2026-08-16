@@ -14,7 +14,7 @@ export { checkControlKeyDrift } from "./checks/check-18-4-control-key-drift.js";
 export { checkLayerSwitchReturn } from "./checks/check-18-5-layer-switch-return.js";
 export { checkInventoryCoverage } from "./checks/check-18-6-inventory-coverage.js";
 export { checkTouchCoverage } from "./checks/check-18-6-touch-coverage.js";
-// Spec 058 — the six joined/structural touch-layout codes. Each is hosted by an
+// Spec 063 — the six joined/structural touch-layout codes. Each is hosted by an
 // existing 18.x check module (no new criteria.json rows); see each module's header.
 export {
   checkTouchDuplicateKeyId,

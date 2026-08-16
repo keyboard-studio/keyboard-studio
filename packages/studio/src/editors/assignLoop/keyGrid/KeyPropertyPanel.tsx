@@ -1,5 +1,5 @@
 // KeyPropertyPanel — the ONE panel that holds everything about the selected
-// key (spec 061 T035; FR-003, FR-015, FR-018, FR-019, FR-020).
+// key (spec 065 T035; FR-003, FR-015, FR-018, FR-019, FR-020).
 //
 // ## What this replaces, and why the old shape was a defect
 //
@@ -39,7 +39,7 @@
 //
 // ## Every callback is REQUIRED (FR-001, FR-003, research D1)
 //
-// The defect class spec 061 exists to close is an optional `on*` prop with
+// The defect class spec 065 exists to close is an optional `on*` prop with
 // exactly one caller: eight compile-time errors became eight silent runtime
 // nothings. Nothing here is optional. A mount that cannot act fails `tsc`.
 //
@@ -156,7 +156,7 @@ export interface KeyPropertyPanelProps {
    */
   assignSlot?: ReactNode;
   /**
-   * The id proposal for the selected key (spec 061 FR-029…FR-032), or
+   * The id proposal for the selected key (spec 065 FR-029…FR-032), or
    * `undefined` when none has been computed.
    *
    * A PROP, not a hook: this panel stays store-free and unit-testable without

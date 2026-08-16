@@ -1,8 +1,8 @@
 # Data Model: Touch key editor — Developer-parity remodel
 
-**Feature**: 061-touch-editor-parity · **Phase 1**
+**Feature**: 065-touch-editor-parity · **Phase 1**
 
-Every entity below is either an **extension** of a type spec 058 already shipped or a **new**
+Every entity below is either an **extension** of a type spec 063 already shipped or a **new**
 derived shape. Nothing here renames or removes an existing field, and nothing here touches
 `Pattern` / `Criterion` (Constitution Article I — see [plan.md](plan.md)'s Constitution Check).
 
@@ -166,7 +166,7 @@ keycapAuthored?: boolean;
 ```
 
 - Additive and optional: an absent flag means "proposal-managed", which is the correct reading for
-  every existing corpus key and every key spec 058 already wrote.
+  every existing corpus key and every key spec 063 already wrote.
 - Set by the property panel's keycap field on author edit; **never** by a proposal.
 - Read by `proposeKeycap`'s caller (to skip) and by the mismatch detector (to suppress).
 - Round-trips like `provenance` does: it is studio state on the IR, not a `.keyman-touch-layout`

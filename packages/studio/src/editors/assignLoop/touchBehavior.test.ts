@@ -149,7 +149,7 @@ describe("promoteKeyToHandSet", () => {
 
 // ---------------------------------------------------------------------------
 // promoteKeyAtAddressToHandSet — the address-matched by-key-edit counterpart
-// (spec 058 T059 / FR-031). `promoteKeyToHandSet` stays id-matched/
+// (spec 063 T059 / FR-031). `promoteKeyToHandSet` stays id-matched/
 // all-platforms/all-layers; this path matches ONE address only.
 // ---------------------------------------------------------------------------
 

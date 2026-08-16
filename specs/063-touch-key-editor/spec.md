@@ -1,6 +1,6 @@
 # Feature Specification: Key-level touch layout editing
 
-**Feature Branch**: `058-touch-key-editor`
+**Feature Branch**: `063-touch-key-editor`
 
 **Created**: 2026-08-03
 
@@ -98,7 +98,7 @@ Developer hosts a jQuery editor (`developer/src/tike/xml/layoutbuilder/`) in a C
 - Q: Any exception to family parallelism? → A: Yes — *"sometimes the modifier keys will change appropriately on the bottom row."* For frame and layer-switch keys, `sp`, `nextlayer`, `id`, and keycap may all legitimately differ; **position and width must not**. The exemption is property-scoped, not key-scoped.
 - Q: Do authors toggle between the character walk and the key grid? → A: **Yes, freely.** *"I don't think the user will know what they want to do until they play with it a bit."* So the selector is a **view toggle, not a fork** — lossless in both directions, with context carrying across and one shared set of progress figures. Mode choice is never a commitment.
 - Q: So is suppression always preferable to deletion? → A: **No.** *"My method of blank keys is a solution to improve predictability across layers, but does not give more touchable space"* — and *"some users will want to remove keys to make touch layers simpler."* Predictability and touchable area are **opposed goals**; the studio offers three outcomes with their trade-offs and proposes from the layer's kind rather than hard-coding one. (This softens the previous answer, which made suppression the universal default.)
-- Q: The §18 locked-type change — take `TouchKeyIR.layer?: string`, and does the subkey `default` field (longpress preselect, silently dropped by [parseTouchLayout.ts](../../packages/contracts/src/parseTouchLayout.ts) exactly like `layer`) join it or ride raw preservation? → A: **Take both fields in one locked-type change.** Ratified 2026-08-03 and recorded in [docs/spec-signoff.md](../../docs/spec-signoff.md) (entry "§18 contract change — `TouchKeyIR.layer` + subkey `default`, spec 058"). The raw-preservation fallback in [contracts/touch-key-rule-join.md](contracts/touch-key-rule-join.md) remains documented but is not taken.
+- Q: The §18 locked-type change — take `TouchKeyIR.layer?: string`, and does the subkey `default` field (longpress preselect, silently dropped by [parseTouchLayout.ts](../../packages/contracts/src/parseTouchLayout.ts) exactly like `layer`) join it or ride raw preservation? → A: **Take both fields in one locked-type change.** Ratified 2026-08-03 and recorded in [docs/spec-signoff.md](../../docs/spec-signoff.md) (entry "§18 contract change — `TouchKeyIR.layer` + subkey `default`, spec 063"). The raw-preservation fallback in [contracts/touch-key-rule-join.md](contracts/touch-key-rule-join.md) remains documented but is not taken.
 
 ---
 

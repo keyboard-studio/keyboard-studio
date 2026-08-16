@@ -49,12 +49,12 @@ interface RawKey {
   /**
    * The wire `layer` property. A standard `.keyman-touch-layout` field this
    * parser previously dropped; now read into both `TouchKeyIR.layer` (the
-   * authoritative per-key modifier override, spec 058 FR-030) and
+   * authoritative per-key modifier override, spec 063 FR-030) and
    * `TouchKeyIR.layerAnnotation` (the engine's free-text best-effort surface).
    */
   layer?: string;
   /**
-   * Longpress preselect on a sub-key (spec 058 FR-030). The wire format writes a
+   * Longpress preselect on a sub-key (spec 063 FR-030). The wire format writes a
    * real JSON boolean here (unlike `sp`/`width`/`pad`, which are strings), but a
    * `"true"`/`"1"` string is accepted defensively — the parser's job at this
    * boundary is to read what corpus files actually contain.
@@ -196,7 +196,7 @@ function convertKey(raw: RawKey, nextId: () => string): TouchKeyIR {
   // kept `""`); blast radius is nil today — no Layer C check reads `hint`.
   if (typeof raw.hint === "string" && raw.hint.length > 0) key.hint = raw.hint;
 
-  // Per-key modifier override and longpress preselect (spec 058 FR-030). Both
+  // Per-key modifier override and longpress preselect (spec 063 FR-030). Both
   // were dropped unconditionally before this feature; `layer` is load-bearing
   // beyond display, since it is what makes a duplicate key id within one layer
   // two distinct keys rather than a collision.

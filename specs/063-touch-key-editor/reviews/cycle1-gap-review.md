@@ -1,4 +1,4 @@
-# Spec 058 gap review — cycle 1 (KM crew, 2026-08-03)
+# Spec 063 gap review — cycle 1 (KM crew, 2026-08-03)
 
 **Scope reviewed:** [spec.md](../spec.md), [research.md](../research.md), [contracts/touch-key-rule-join.md](../contracts/touch-key-rule-join.md), [contracts/key-id-policy.md](../contracts/key-id-policy.md), at draft/specify stage.
 

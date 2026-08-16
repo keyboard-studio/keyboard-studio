@@ -1,5 +1,5 @@
 /**
- * reachableProducedSet — the REACHABILITY-AWARE producibility view (spec 058
+ * reachableProducedSet — the REACHABILITY-AWARE producibility view (spec 063
  * FR-008…FR-010).
  *
  * `buildProducedSet` answers "what do this keyboard's rules emit?". That is the

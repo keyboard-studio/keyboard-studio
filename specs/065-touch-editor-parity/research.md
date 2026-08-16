@@ -1,9 +1,9 @@
 # Research: Touch key editor — Developer-parity remodel
 
-**Feature**: 061-touch-editor-parity · **Phase 0** (precedes design)
+**Feature**: 065-touch-editor-parity · **Phase 0** (precedes design)
 
-Every decision below was taken against the code as it stands on `061-touch-editor-parity`,
-not against spec 058's prose. Where the two disagree the code is cited.
+Every decision below was taken against the code as it stands on `065-touch-editor-parity`,
+not against spec 063's prose. Where the two disagree the code is cited.
 
 ---
 
@@ -125,7 +125,7 @@ without waiting on the merge); the merge lands in US3.
 `layer?`, and add a seventh-plus-one `MoveKeyOp` to `KeyEditOperation`.
 
 **Rationale**: All four fields already exist on `TouchKeyIR` (`keyboard-ir.ts:105–137`) —
-`layer` is documented there as "the authoritative, editable view the spec-058 key editor reads
+`layer` is documented there as "the authoritative, editable view the spec-063 key editor reads
 and writes", then was left out of the editable set. `keyEditOps.ts:84` says outright "no
 `width`/`pad` (geometry stays read-only)". Admitting them is engine-internal: `EditableKeyFields`
 is not a `Pattern`/`Criterion` type, so Constitution Article I is not engaged (confirmed —

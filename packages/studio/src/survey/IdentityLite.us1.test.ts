@@ -34,7 +34,7 @@ describe("spec 030 US1 — identity flow order (English name first)", () => {
     expect(ids.indexOf("il_language_code")).toBeGreaterThan(ids.indexOf("il_language_autonym"));
     expect(ids.indexOf("il_target_script")).toBeGreaterThan(ids.indexOf("il_language_code"));
     expect(ids.indexOf("il_script_not_supported")).toBeGreaterThan(ids.indexOf("il_target_script"));
-    // spec 059 US1 — attribution capture, ordered name -> email -> holder. Anchored
+    // spec 064 US1 — attribution capture, ordered name -> email -> holder. Anchored
     // to il_target_script rather than to il_script_not_supported: these are reached
     // from il_target_script's DEFAULT branch, while a gated script terminates at the
     // not-supported notice and never arrives here.

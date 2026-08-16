@@ -1,5 +1,5 @@
 /**
- * Unit tests for touchKeyCollateral (spec 058 T104/T105, FR-060/FR-061).
+ * Unit tests for touchKeyCollateral (spec 063 T104/T105, FR-060/FR-061).
  *
  * Reuses the shared `touchKeyRuleJoin` fixture (`@keyboard-studio/contracts/fixtures`)
  * rather than forking a second one — see that fixture's own module doc ("do not

@@ -81,7 +81,7 @@ export async function lintWithContext(
     findings.push(...checkKeysPerRow(ir, tlPath));
     findings.push(...checkControlKeyDrift(ir, tlPath));
     findings.push(...checkLayerSwitchReturn(ir, tlPath));
-    // Spec 058: layout-only structural checks — no join needed, so they run
+    // Spec 063: layout-only structural checks — no join needed, so they run
     // wherever 18.1-18.5 run.
     findings.push(...checkTouchDuplicateKeyId(ir, tlPath));
     findings.push(...checkTouchMissingRequiredKey(ir, tlPath));
@@ -93,14 +93,14 @@ export async function lintWithContext(
     findings.push(...checkInventoryCoverage(ctx.keyboardIR, ctx.inventory, kmnPath));
   }
 
-  // Spec 058: the JOINED checks need rules AND layout together. One resolver
+  // Spec 063: the JOINED checks need rules AND layout together. One resolver
   // states the layout precedence once (IR first, then context, then a VFS parse)
   // and gates on a keyboard IR being present, exactly as the desktop inventory
   // check above is gated. No new LintContext field is required.
   const joined = resolveJoinedCheckInputs(ctx.keyboardIR, ctx.touchLayout, ir ?? undefined);
 
   // 18.6 touch: coverage guard (spec 035 FR-008) — only when both inputs are
-  // present. The rule index is threaded when available (spec 058 FR-007), so a
+  // present. The rule index is threaded when available (spec 063 FR-007), so a
   // `T_*` key whose output lives in a rule is credited here too.
   if (ctx.touchLayout && ctx.touchInventory) {
     findings.push(

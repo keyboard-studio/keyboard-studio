@@ -109,7 +109,7 @@ export function bindManifest(m: readonly Step[]): void {
  * 'batch' — grouped cascade-delete (multiple nodes + items in one undo step).
  *            A single undoDelete() call reverses the entire cascade atomically.
  * 'k'     — single key-level touch layout edit committed via commitKeyEdit
- *           (spec 058 FR-032), addressed by the committed op's `seq` — its
+ *           (spec 063 FR-032), addressed by the committed op's `seq` — its
  *           position in `keyEditOverlay.ops`, since ops are append-only and
  *           this entry is always pushed in the same commit that appends the
  *           op. `undoDelete`'s branch pops the tail of `keyEditOverlay.ops`
@@ -131,7 +131,7 @@ export type UndoEntry =
   | { k: 'k'; seq: number };
 
 // ---------------------------------------------------------------------------
-// Key edit overlay (spec 058) — the ordered op log for the touch key grid,
+// Key edit overlay (spec 063) — the ordered op log for the touch key grid,
 // plus the touch step's mode-selector state (contract key-edit-overlay.md §9).
 // ---------------------------------------------------------------------------
 
@@ -154,7 +154,7 @@ type DistributiveOmit<T, K extends PropertyKey> = T extends unknown ? Omit<T, K>
 export type PendingKeyEditOperation = DistributiveOmit<KeyEditOperation, "seq">;
 
 /**
- * Result of {@link WorkingCopyState.commitTouchKeyRename} (spec 058 T091).
+ * Result of {@link WorkingCopyState.commitTouchKeyRename} (spec 063 T091).
  * `renamedAddresses` echoes the engine's own old -> new address pairs
  * (`RenameTouchKeyResult.renamedAddresses`) so a caller that wants to react
  * further (e.g. re-selecting the renamed key in the grid) does not need to
@@ -261,7 +261,7 @@ export interface WorkingCopyState {
    */
   identity: IdentityPatch | null;
 
-  // -- Attribution (spec 059) --------------------------------------------------
+  // -- Attribution (spec 064) --------------------------------------------------
   /**
    * Who made this keyboard and who holds its copyright.
    *
@@ -281,7 +281,7 @@ export interface WorkingCopyState {
 
   /**
    * Set when the chosen base has a copyright notice this tool cannot read
-   * (spec 059 D5) — an unfilled template, or a year with no holder.
+   * (spec 064 D5) — an unfilled template, or a year with no holder.
    *
    * Blocks download: emitting a LICENSE.md whose only holder is the current user
    * would strip a real notice. Cleared by supplying `baseHolderOverride`.
@@ -290,7 +290,7 @@ export interface WorkingCopyState {
 
   /**
    * The original copyright holder as typed by the author, when the base's notice
-   * could not be read (spec 059 D5 escape hatch).
+   * could not be read (spec 064 D5 escape hatch).
    *
    * Passed to the scaffolder on the next run, where it becomes the inherited
    * holder — so the remedy PRESERVES the notice rather than dropping it.
@@ -299,7 +299,7 @@ export interface WorkingCopyState {
 
   /**
    * The base keyboard's `LICENSE.md` VERBATIM, or null when it has none
-   * (spec 059 FR-011).
+   * (spec 064 FR-011).
    *
    * Kept on the working copy because the base's license is deliberately never
    * written into the VFS (fetchKeyboardSourceToVfs FR-011), so it cannot be read
@@ -377,7 +377,7 @@ export interface WorkingCopyState {
   deletedTouchKeyIds: Set<string>;
   /** Ordered list of undo entries (latest last). Each entry is either a whole-node
    * deletion, a single-item removal, a single touch-method deletion, a grouped
-   * cascade-delete batch, or (spec 058 FR-032) a single committed key-level
+   * cascade-delete batch, or (spec 063 FR-032) a single committed key-level
    * touch layout edit. */
   undoStack: UndoEntry[];
 
@@ -453,7 +453,7 @@ export interface WorkingCopyState {
    */
   galleryIntrosSeen: { mechanism: boolean; touch: boolean };
 
-  // -- Key edit overlay + touch editor mode (spec 058) -------------------------
+  // -- Key edit overlay + touch editor mode (spec 063) -------------------------
   /**
    * The ordered log of committed key-level touch layout edits (contract
    * key-edit-overlay.md §2). Order is semantic (FR-033a): replay resolves
@@ -580,7 +580,7 @@ export interface WorkingCopyState {
    * undo stack, without touching the IR. Also clears `deletedTouchKeyIds` so
    * no 't' deletion is left applied with its only undo path (the entry this
    * just wiped from `undoStack`) gone — see the implementation comment.
-   * Also clears `keyEditOverlay` back to an empty log (spec 058 FR-032):
+   * Also clears `keyEditOverlay` back to an empty log (spec 063 FR-032):
    * the same reasoning applies — a 'k' undo entry is the only path back for
    * its committed op, so wiping `undoStack` without wiping the overlay would
    * strand that op permanently applied with no way to undo it.
@@ -668,12 +668,12 @@ export interface WorkingCopyState {
   /** Mark a gallery's one-time intro splash as seen for this working-copy session. */
   markGalleryIntroSeen: (gallery: "mechanism" | "touch") => void;
 
-  // -- Key edit overlay + touch editor mode actions (spec 058) -----------------
+  // -- Key edit overlay + touch editor mode actions (spec 063) -----------------
   /**
    * Commit a key-level touch layout edit: appends `op` to `keyEditOverlay.ops`
    * with the next `seq` (the current op count — also the commit order), and
    * pushes a matching `'k'` {@link UndoEntry} (`{ k: 'k', seq }`) onto the
-   * shared chronological `undoStack` (spec 058 FR-032) — one entry per
+   * shared chronological `undoStack` (spec 063 FR-032) — one entry per
    * committed edit.
    */
   commitKeyEdit: (op: PendingKeyEditOperation) => void;
@@ -689,7 +689,7 @@ export interface WorkingCopyState {
    */
   undoKeyEdit: () => void;
   /**
-   * The complete key-rename reference fix-up (spec 058 T091;
+   * The complete key-rename reference fix-up (spec 063 T091;
    * key-id-policy.md §4; touch-key-rule-join.md §6.1's final bullet). ONE
    * call:
    *
@@ -787,14 +787,14 @@ export interface WorkingCopyState {
   setIdentity: (patch: IdentityPatch) => void;
 
   /**
-   * Record who to attribute the keyboard to (spec 059 US1). Pass null to clear.
+   * Record who to attribute the keyboard to (spec 064 US1). Pass null to clear.
    */
   setAttribution: (attribution: Attribution | null) => void;
 
-  /** Record (or clear) an unreadable base notice — spec 059 D5. */
+  /** Record (or clear) an unreadable base notice — spec 064 D5. */
   setLicenseUnparseable: (v: { reason: string; line: string } | null) => void;
 
-  /** Record the author-supplied original holder — spec 059 D5 escape hatch. */
+  /** Record the author-supplied original holder — spec 064 D5 escape hatch. */
   setBaseHolderOverride: (holder: string | null) => void;
 
   /** Retain the base's verbatim LICENSE.md so both emission paths can read it. */
@@ -1046,7 +1046,7 @@ const INITIAL_STATE: WorkingCopyData = {
   touchLayoutJson: null,
   touchDraft: null,
   galleryIntrosSeen: { mechanism: false, touch: false },
-  // key edit overlay + touch editor mode (spec 058) — empty log, character
+  // key edit overlay + touch editor mode (spec 063) — empty log, character
   // walk default (FR-036)
   keyEditOverlay: { ops: [] },
   touchEditorMode: "character",
@@ -1115,7 +1115,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         next.delete(last.id);
         return { deletedTouchKeyIds: next, undoStack: s.undoStack.slice(0, -1) };
       } else if (last.k === 'k') {
-        // Key-edit entry (spec 058 FR-032): pop the tail of keyEditOverlay.ops.
+        // Key-edit entry (spec 063 FR-032): pop the tail of keyEditOverlay.ops.
         // Safe because this entry is always pushed in the same commit that
         // appended the op (commitKeyEdit), and no other action ever inserts
         // into or removes from the MIDDLE of that array — so the last 'k'
@@ -1205,7 +1205,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   // are empty too — no applied deletion can outlive the undo history that
   // was its only path back.
   //
-  // spec 058 FR-032 extends the same invariant to keyEditOverlay: a 'k' undo
+  // spec 063 FR-032 extends the same invariant to keyEditOverlay: a 'k' undo
   // entry is the only path back for its committed op, so keepAll/restoreAll
   // must also reset keyEditOverlay to an empty log alongside wiping
   // undoStack — otherwise a committed key edit would be left applied with no
@@ -1307,7 +1307,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       galleryIntrosSeen: { ...s.galleryIntrosSeen, [gallery]: true },
     })),
 
-  // -- Key edit overlay + touch editor mode actions (spec 058) ----------------
+  // -- Key edit overlay + touch editor mode actions (spec 063) ----------------
 
   commitKeyEdit: (op) =>
     set((s) => {
@@ -1352,7 +1352,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       return { changed: false, renamedRuleNodeIds: result.renamedRuleNodeIds, renamedAddresses: [] };
     }
 
-    // Address-matched provenance promotion (spec 058 T059) for every renamed
+    // Address-matched provenance promotion (spec 063 T059) for every renamed
     // occurrence, at its NEW address — never id-matched (key-id-policy.md
     // §4's second named failure mode).
     let nextIr = result.ir;

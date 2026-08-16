@@ -1,6 +1,6 @@
 # Tasks: Touch key editor — Developer-parity remodel
 
-**Feature**: 061-touch-editor-parity · **Branch**: `061-touch-editor-parity`
+**Feature**: 065-touch-editor-parity · **Branch**: `065-touch-editor-parity`
 
 **Inputs**: [spec.md](spec.md) · [plan.md](plan.md) · [research.md](research.md) (D1–D11) ·
 [data-model.md](data-model.md) · [contracts/](contracts/)
@@ -28,7 +28,7 @@ pass unmodified, but its standing is evidence, not a gate.
   (`npx playwright test --headed`) against `sil_cameroon_qwerty` and record the current behaviour of
   each of issue #1530's six complaints, so SC-001's "demonstrably resolved" has a before to compare
   against ·
-  `specs/061-touch-editor-parity/exploration-baseline.md`
+  `specs/065-touch-editor-parity/exploration-baseline.md`
 
 ---
 
@@ -112,7 +112,7 @@ assign it, remove a different key, switch to the `shift` layer, and confirm each
 - [x] **T012** [P] [US1] Remove the "Fill row" and "Even out row" controls, their props
   (`onFillRow`, `onEvenOutRow`) and their test ids `key-grid-fill-row-${rowIndex}` /
   `key-grid-even-out-row-${rowIndex}`; drop the matching assertions. `key-grid-row-actions-${rowIndex}`
-  **stays** — FR-038 forbids regressing spec 058 SC-009's accessibility fix (FR-007, ADR 0002) ·
+  **stays** — FR-038 forbids regressing spec 063 SC-009's accessibility fix (FR-007, ADR 0002) ·
   `packages/studio/src/editors/assignLoop/keyGrid/KeyGrid.tsx`,
   `packages/studio/src/editors/assignLoop/keyGrid/KeyGrid.test.tsx`
 
@@ -193,8 +193,8 @@ assign it, remove a different key, switch to the `shift` layer, and confirm each
   re-propagation**. The IR also drops what it does not model (per-key `layer`/`default`, platform
   `displayUnderlying`/`fontsize`).
 
-  This is a direct spec 035 R9 violation, and it is **pre-existing spec-058 code** (blame
-  `ef19aa2b`; spec 061's T009-T015 commit only renamed a variable on that line). It was invisible
+  This is a direct spec 035 R9 violation, and it is **pre-existing spec-063 code** (blame
+  `ef19aa2b`; spec 065's T009-T015 commit only renamed a variable on that line). It was invisible
   because the walk that would have caught it was skipped. The fix routes the Case B branch
   through `applyKeyEditsToRawJson` — the Case B applier written for exactly this and until now
   reachable only via projection step 1.7 — seeding from the base's shipped raw JSON on the first
@@ -477,7 +477,7 @@ remove one, and confirm all of it in the emitted artifact.
 
   **`setSubKey` had to become an upsert, in both appliers.** Using the existing
   operations was T042's own constraint, and adding a gesture was not expressible through
-  them: spec 058 made `setSubKey` warn-and-skip on a missing sub-entry, and both appliers'
+  them: spec 063 made `setSubKey` warn-and-skip on a missing sub-entry, and both appliers'
   docstrings reasoned that "the seven operation kinds admit no eighth 'add sub-key' kind, and
   increment 1's sub-key editing is display/deletion-only". FR-026 is exactly what retires that
   premise. So a `setSubKey` naming a sub-entry that does not exist now CREATES it (`sk`/
@@ -510,7 +510,7 @@ never required for any of them.
   modifier symbols, emoji sequences, variation selectors, unassigned codepoints, empty output, plus
   the four already-handled minting rows — into a class table. FR-032 is only meaningful once this
   exists, and it is what makes SC-007 checkable rather than aspirational ·
-  `specs/061-touch-editor-parity/contracts/character-classes.md`
+  `specs/065-touch-editor-parity/contracts/character-classes.md`
 
 ### Tests *(write first)*
 
@@ -612,7 +612,7 @@ defect, and where no default is possible the editor says why.
   what it will undo (FR-040) ·
   `packages/studio/src/editors/assignLoop/TouchGallery.test.tsx`
 - [x] **T058** [P] Update the touch-editor glossary for `move`, row metrics, declared-vs-rendered
-  width, and the inherited id path; cross-link ADR 0002 and record spec 058 FR-039's withdrawal ·
+  width, and the inherited id path; cross-link ADR 0002 and record spec 063 FR-039's withdrawal ·
   `docs/design-notes/touch-editor-glossary.md`
 - [x] **T059** [P] Add a phonebook row for any keyboard this feature's tests newly reference
   (`sil_cameroon_qwerty` and any fixture added for the crowding or localized-number-row cases),
@@ -633,7 +633,7 @@ defect, and where no default is possible the editor says why.
 - [ ] **T062** Exploration pass (Playwright, ad hoc): run the un-skipped walk headed and click
   through all six of issue #1530's complaints against T001's baseline, confirming each is
   demonstrably resolved (SC-001) ·
-  `specs/061-touch-editor-parity/exploration-baseline.md`
+  `specs/065-touch-editor-parity/exploration-baseline.md`
 
 ---
 

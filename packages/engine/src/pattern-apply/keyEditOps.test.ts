@@ -1,5 +1,5 @@
 /**
- * Unit tests for keyEditOps (spec 058 T049).
+ * Unit tests for keyEditOps (spec 063 T049).
  *
  * Two halves:
  *   1. The shared machinery this module owns directly — `resolveKeyAddress`,

@@ -1,5 +1,5 @@
 // FindPanel — a find-BY-VALUE path to selection for the touch key grid
-// (spec 058 T071; FR-020e, FR-020i). "Not spatial navigation alone": an
+// (spec 063 T071; FR-020e, FR-020i). "Not spatial navigation alone": an
 // author who knows *"the key that types `ɛ`"* or *"`T_0300`"* should not
 // have to arrow to it across a layout that can run to several hundred keys
 // over dozens of layers (FR-020e's own worked numbers).

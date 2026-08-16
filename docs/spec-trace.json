@@ -317,7 +317,7 @@
     },
     "docs/architecture.md": {
       "title": "Keyboard Studio — architecture & meta-flow",
-      "hash": "sha256:73a4cf2ef32f5d19",
+      "hash": "sha256:7a71ec94411621ea",
       "status": "reference",
       "implements": [],
       "decisions": [],
@@ -707,9 +707,9 @@
       "decisions": [],
       "notes": ""
     },
-    "specs/058-touch-key-editor": {
+    "specs/063-touch-key-editor": {
       "title": "Feature Specification: Key-level touch layout editing",
-      "hash": "sha256:f1b1f635d6695f0c",
+      "hash": "sha256:223d33eb2b80ee1c",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -726,14 +726,6 @@
     "specs/061-help-docs-generation": {
       "title": "Feature Specification: Help documentation generation from Phase F answers",
       "hash": "sha256:dd3e4384355ed0d7",
-      "status": "unreviewed",
-      "implements": [],
-      "decisions": [],
-      "notes": ""
-    },
-    "specs/061-touch-editor-parity": {
-      "title": "Feature Specification: Touch key editor — Developer-parity remodel",
-      "hash": "sha256:0988c764cf351c03",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -763,17 +755,25 @@
       "decisions": [],
       "notes": ""
     },
-    "specs/059-keyboard-attribution": {
-      "title": "Feature Specification: Keyboard attribution and license provenance",
-      "hash": "sha256:9b1c0b486746afde",
+    "specs/062-canonical-context-tolerance": {
+      "title": "Feature Specification: Canonical-equivalence context tolerance",
+      "hash": "sha256:2dcbb535f9285319",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
       "notes": ""
     },
-    "specs/062-canonical-context-tolerance": {
-      "title": "Feature Specification: Canonical-equivalence context tolerance",
-      "hash": "sha256:2dcbb535f9285319",
+    "specs/064-keyboard-attribution": {
+      "title": "Feature Specification: Keyboard attribution and license provenance",
+      "hash": "sha256:62234650d80a801f",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/065-touch-editor-parity": {
+      "title": "Feature Specification: Touch key editor — Developer-parity remodel",
+      "hash": "sha256:66616374bb15da85",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

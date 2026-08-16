@@ -1,7 +1,7 @@
 {
   "workflow": "speckit",
-  "specName": "058-touch-key-editor",
-  "branch": "058-touch-key-editor",
+  "specName": "063-touch-key-editor",
+  "branch": "063-touch-key-editor",
   "selectedAt": "2026-08-04T01:11:58.804Z",
   "currentStep": "implement",
   "status": "implemented",

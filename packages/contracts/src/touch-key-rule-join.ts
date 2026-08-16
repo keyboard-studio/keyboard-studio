@@ -1,7 +1,7 @@
 /**
  * touch-key-rule-join — the canonical join between a touch layout's keys and the
- * `.kmn` rules keyed on them (spec 058 FR-001…FR-004,
- * [contracts/touch-key-rule-join.md](../../../specs/058-touch-key-editor/contracts/touch-key-rule-join.md)).
+ * `.kmn` rules keyed on them (spec 063 FR-001…FR-004,
+ * [contracts/touch-key-rule-join.md](../../../specs/063-touch-key-editor/contracts/touch-key-rule-join.md)).
  *
  * ## Why this primitive exists
  *
@@ -116,7 +116,7 @@ export function isCustomTouchKeyId(id: string): boolean {
 const VALID_TOUCH_KEY_ID_RE = /^[A-Za-z_][A-Za-z0-9_]*$/;
 
 /**
- * True when `id` is an identifier the compiler will accept (spec 058 FR-040's
+ * True when `id` is an identifier the compiler will accept (spec 063 FR-040's
  * `0x05A`).
  *
  * ONE grammar, two very different consumers, which is why it lives here rather

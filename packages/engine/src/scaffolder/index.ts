@@ -29,7 +29,7 @@ import { assetFileExtensions } from "../shared/siblingAssetStores.js";
 // here as dead once the stubs move out.
 // No licenseMd here: Track 1's LICENSE.md comes from the accumulated copyright
 // block (attributionText -> renderLicense), because a derived keyboard must
-// RETAIN the base's holders rather than state a single one (spec 059 US2).
+// RETAIN the base's holders rather than state a single one (spec 064 US2).
 import { welcomeHtm, readmeHtm } from "../shared/packageDocs.js";
 import { phpCommentEscape } from "../shared/escapeHtml.js";
 import {
@@ -329,7 +329,7 @@ function applyTouchLayoutCleanup(vfs: VirtualFS, keyboardId: string): void {
  */
 /**
  * Collapse a multi-holder block onto ONE line for `store(&COPYRIGHT)` and the
- * `.kps <Copyright>`, which are single-valued (spec 059 T038).
+ * `.kps <Copyright>`, which are single-valued (spec 064 T038).
  *
  * Uses the convention the corpus already established. 33 shipped keyboards
  * express exactly this, identically in both files — e.g.
@@ -379,7 +379,7 @@ function singleLineNotice(
 
 /**
  * Resolve the copyright holders a derived keyboard INHERITS from its base
- * (spec 059 US2), plus the D5 refusal when the base's notice cannot be read.
+ * (spec 064 US2), plus the D5 refusal when the base's notice cannot be read.
  *
  * D4 precedence: `LICENSE.md` is authoritative. It is the notice MIT's own text
  * refers to ("the above copyright notice"), and it is the better-formed source —
@@ -437,13 +437,13 @@ export function resolveInheritedHolders(
 }
 
 /**
- * The single source of truth for this keyboard's attribution (spec 059 FR-003).
+ * The single source of truth for this keyboard's attribution (spec 064 FR-003).
  *
  * LICENSE.md, store(&COPYRIGHT) and .kps <Copyright> all read from HERE, so they
  * cannot drift — 22 shipped keyboards disagree between their LICENSE.md and .kmn
  * precisely because those strings were built independently.
  *
- * ACCUMULATES rather than replaces (spec 059 US2 / FR-007 / FR-008). MIT requires
+ * ACCUMULATES rather than replaces (spec 064 US2 / FR-007 / FR-008). MIT requires
  * the original copyright notice be retained in a derivative, so a keyboard derived
  * from a base carries the base's holders VERBATIM and appends the new author:
  *
@@ -485,7 +485,7 @@ export function generateStubs(
   languages: string[],
   version: string,
   /**
-   * Attribution for the notices this writes (spec 059). Optional so a caller that
+   * Attribution for the notices this writes (spec 064). Optional so a caller that
    * genuinely has no attribution to state can omit it — the LICENSE.md is then the
    * MIT body with NO copyright line, never one naming the keyboard itself.
    *
@@ -510,14 +510,14 @@ export function generateStubs(
   const yyyy = emitYear;
   const mm = String(now.getMonth() + 1).padStart(2, "0");
   const dd = String(now.getDate()).padStart(2, "0");
-  // spec 059 US2: the merged block — inherited holders retained verbatim with the
+  // spec 064 US2: the merged block — inherited holders retained verbatim with the
   // new author appended, NOT replaced.
   const { line: copyrightLine, license } = attributionText(attribution, emitYear, inherited);
 
   const stubs: Array<{ path: string; content: string | Uint8Array; isBinary?: boolean }> = [
     {
       path: `source/${keyboardId}.kmn`,
-      // spec 059 FR-003: the stub gains a COPYRIGHT store when attribution is
+      // spec 064 FR-003: the stub gains a COPYRIGHT store when attribution is
       // known (922 of 924 shipped keyboards carry one). Same source as
       // LICENSE.md and the .kps, so the three cannot drift.
       content:
@@ -568,7 +568,7 @@ export function generateStubs(
     },
     {
       path: `LICENSE.md`,
-      // spec 059 FR-004: previously `licenseMd(displayName, yyyy)`, which named
+      // spec 064 FR-004: previously `licenseMd(displayName, yyyy)`, which named
       // the KEYBOARD as its own rights holder. Now rendered from the accumulated
       // copyright block; with no attribution the notice is omitted rather than
       // invented, and attributionMissing surfaces that.
@@ -611,7 +611,7 @@ export function generateStubs(
     const kmnEntry = vfs.get(`source/${keyboardId}.kmn`);
     const kmnText =
       kmnEntry !== undefined && typeof kmnEntry.content === "string" ? kmnEntry.content : "";
-    // spec 059 FR-003: the copyright line and author ride the SAME identity the
+    // spec 064 FR-003: the copyright line and author ride the SAME identity the
     // descriptor already carries, and come from the accumulated block that wrote
     // LICENSE.md and store(&COPYRIGHT) — one source, so the three cannot drift.
     // Each is omitted when absent rather than emitted with a fabricated holder.
@@ -665,7 +665,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
       const warnings: string[] = [];
       let baseLicenseText: string | undefined;
       const attribution = scaffoldOpts?.attribution;
-      // spec 059 D2: the year records when the work was PUBLISHED, and is
+      // spec 064 D2: the year records when the work was PUBLISHED, and is
       // injectable so tests never read the clock.
       const emitYear = scaffoldOpts?.emitYear ?? new Date().getFullYear();
       // Shared IR-apply path for both the base-fetched .kmn and the caller-supplied
@@ -677,7 +677,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
           identity: {
             keyboardId,
             displayName,
-            // spec 059 T010: WITHOUT this, resetIdentity fabricates
+            // spec 064 T010: WITHOUT this, resetIdentity fabricates
             // `Copyright © <year> <displayName>` and OVERWRITES the copyright
             // parse() read from the base — stripping the original author's notice
             // from the emitted .kmn. Passing the confirmed line is the fix, and
@@ -710,7 +710,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         );
       }
 
-      // spec 059 US2: resolve the INHERITED copyright holders now that the base
+      // spec 064 US2: resolve the INHERITED copyright holders now that the base
       // has been fetched, then merge the new author on top. See
       // resolveInheritedHolders for the D4/D5 policy.
       const { inherited: inheritedHolders, licenseUnparseable } = resolveInheritedHolders(

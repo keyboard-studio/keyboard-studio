@@ -11,7 +11,7 @@
 //   8. Assignments skipped when there are no physical assignments.
 //   9. VFS is mutated in-place (same object reference before/after).
 //  10. Caller-supplied `getPattern` resolver is forwarded to applyAssignmentsToVfs.
-//  11. (spec 058 T052) Key edit overlay projection: step 1.7 (layout half) and
+//  11. (spec 063 T052) Key edit overlay projection: step 1.7 (layout half) and
 //      its rule-half sibling run after step 1.6 and before step 2; an empty
 //      overlay leaves both `.keyman-touch-layout` and `.kmn` byte-identical;
 //      a pass failure in either half is reported as a warning and does not
@@ -711,7 +711,7 @@ group(main) using keys
 });
 
 // ---------------------------------------------------------------------------
-// spec 058 T052 — key edit overlay projection (step 1.7 layout half + the
+// spec 063 T052 — key edit overlay projection (step 1.7 layout half + the
 // rule-half sibling). Uses the REAL applyKeyEditsToVfs / parseKmn / emitKmn
 // (the mock above passes them through by default), not canned mocks, so
 // these tests exercise genuine Case B splicing and genuine .kmn re-emit.
@@ -1048,7 +1048,7 @@ describe("projectWorkingCopyVfs — key edit overlay: Case B fidelity (SC-006)",
 });
 
 // ---------------------------------------------------------------------------
-// SC-008 (spec 058 T125) — it is IMPOSSIBLE to reach the artifact with a `T_*`
+// SC-008 (spec 063 T125) — it is IMPOSSIBLE to reach the artifact with a `T_*`
 // key that has no rule, no `nextlayer`, and a producing `sp` class.
 //
 // "Impossible" is a claim about two things at once, and a test that checks only
@@ -1226,7 +1226,7 @@ describe("projectWorkingCopyVfs — SC-008: a dead T_ key cannot reach the artif
 });
 
 // ---------------------------------------------------------------------------
-// Declared-writes containment for the studio seam (spec 058 T126).
+// Declared-writes containment for the studio seam (spec 063 T126).
 //
 // Two separate obligations, and research R9 is explicit that the prose alone
 // misleads on the second:

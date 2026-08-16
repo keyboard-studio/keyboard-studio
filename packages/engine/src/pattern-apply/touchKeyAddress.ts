@@ -1,6 +1,6 @@
 /**
  * touchKeyAddress — re-export shim over the canonical address scheme, which now
- * lives in [contracts](../../../contracts/src/touch-key-address.ts) (spec 058
+ * lives in [contracts](../../../contracts/src/touch-key-address.ts) (spec 063
  * T114).
  *
  * The four functions and the `TouchKeyAddressParts` type were defined here

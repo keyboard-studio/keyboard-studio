@@ -1,6 +1,6 @@
 /**
  * touchKeyRuleJoin — the single reduced, deliberately DEFECTIVE
- * Cameroon-derived fixture behind the touch key↔rule join (spec 058).
+ * Cameroon-derived fixture behind the touch key↔rule join (spec 063).
  *
  * ## Why it is built inline rather than read from disk
  *

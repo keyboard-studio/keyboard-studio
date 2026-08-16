@@ -1,4 +1,4 @@
-// resolveOutputKeyboardId — the single output-id resolution (spec 058 D4).
+// resolveOutputKeyboardId — the single output-id resolution (spec 063 D4).
 //
 // The defect these lock down was a DIVERGENCE, not a wrong value: the download
 // button's accessible name and the emitted zip filename each resolved the

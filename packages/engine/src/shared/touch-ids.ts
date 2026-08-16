@@ -15,7 +15,7 @@ import { decodeUnicodeKeyId, toHex4 } from "@keyboard-studio/contracts";
  * `char` after NFC normalization (5 digits for astral planes, e.g. 1F600) -
  * the shared "hex of a character" primitive behind charToUnicodeKeyId's `U_`
  * prefix below AND pattern-apply/keyIdMinting.ts's `T_<UPPERHEX>` minting
- * (spec 058 key-id-policy.md section 2), so the two id forms cannot drift
+ * (spec 063 key-id-policy.md section 2), so the two id forms cannot drift
  * apart from each other.
  *
  * The input is normalized to NFC before extracting the code point so that

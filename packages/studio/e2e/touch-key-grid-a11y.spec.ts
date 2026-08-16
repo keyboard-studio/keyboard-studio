@@ -1,4 +1,4 @@
-// E2E: spec 058 (touch key editor) — T123, SC-009.
+// E2E: spec 063 (touch key editor) — T123, SC-009.
 //
 // The key grid is the first ARIA `role="grid"` in this repo (research R10.4:
 // `role="grid"`, `gridcell`, `aria-colindex`, `aria-rowindex`, and
@@ -70,7 +70,7 @@ async function pointerEventCount(page: Page): Promise<number> {
 // to beat KMW's own kmwosk.css — so both scans below now cover the frame's
 // contents with no exclusion needed.
 
-test.describe("Touch key grid — accessibility (spec 058 SC-009)", () => {
+test.describe("Touch key grid — accessibility (spec 063 SC-009)", () => {
   test("passes axe in both its resting and roving-tabindex states, and is fully operable with no pointer events", async ({
     page,
   }) => {
@@ -87,7 +87,7 @@ test.describe("Touch key grid — accessibility (spec 058 SC-009)", () => {
     // measured action. The counter goes in after it.
     //
     // That control is `touch-key-mode-find-toggle`, not `touch-key-mode-continue`:
-    // spec 061 T013-T015 added the layer selector and the add / remove / find
+    // spec 065 T013-T015 added the layer selector and the add / remove / find
     // key commands BETWEEN Continue and the grid, so Continue is no longer
     // adjacent to it. Setup only — assertion (3a) below is unchanged, and it is
     // the one that matters: one Tab, several hundred keys, a single stop.
@@ -125,7 +125,7 @@ test.describe("Touch key grid — accessibility (spec 058 SC-009)", () => {
     // --- (3c) Enter reaches the editing surface, Escape returns to the cell.
     //          Both keyboard-only, per FR-020b's selection-vs-editing contract. ---
     //
-    // That surface is `key-property-panel` as of spec 061 T028-T039: the one
+    // That surface is `key-property-panel` as of spec 065 T028-T039: the one
     // panel absorbed the inspector AND the assign panel, which now sits behind
     // a disclosure inside it. FR-020b's contract is unchanged and is still what
     // this asserts — Enter leaves selection for editing, Escape comes back.

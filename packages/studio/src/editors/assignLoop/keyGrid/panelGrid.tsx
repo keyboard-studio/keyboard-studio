@@ -1,5 +1,5 @@
 // panelGrid — the compact label/control geometry the key-mode detail column is
-// built from (spec 061; issue #1530 complaint "the key panel is not visible
+// built from (spec 065; issue #1530 complaint "the key panel is not visible
 // alongside the keyboard").
 //
 // ## Why this exists

@@ -675,7 +675,7 @@ function main() {
       console.log('search options:');
       console.log('  --limit N        max hits (default 5)');
       console.log('  --budget BYTES   hard cap on printed output (default 2048, min 256)');
-      console.log('  --scope PREFIX   restrict to paths under PREFIX, e.g. specs/058-touch-key-editor');
+      console.log('  --scope PREFIX   restrict to paths under PREFIX, e.g. specs/063-touch-key-editor');
       console.log('  --json           machine-readable output, same byte cap');
   }
 }

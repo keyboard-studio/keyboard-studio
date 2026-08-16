@@ -207,7 +207,7 @@ describe("flow-parity: identity_lite — routing shape", () => {
     expect(Array.isArray(q?.next)).toBe(true);
   });
 
-  // spec 059 US1: the supported path must reach attribution, and the gated path
+  // spec 064 US1: the supported path must reach attribution, and the gated path
   // must NOT — an author who cannot make a keyboard is never asked who owns it.
   it("il_target_script's default branch continues into attribution", () => {
     const q = modular.questions.find((q) => q.id === "il_target_script");

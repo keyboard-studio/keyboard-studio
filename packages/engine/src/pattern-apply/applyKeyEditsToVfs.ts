@@ -1,6 +1,6 @@
 /**
  * applyKeyEditsToVfs — VFS projection step for the key-level touch-layout
- * edit overlay (spec 058 FR-031…FR-034, FR-036a…FR-036g; step 1.7 of
+ * edit overlay (spec 063 FR-031…FR-034, FR-036a…FR-036g; step 1.7 of
  * `projectWorkingCopyVfs`; contracts/key-edit-overlay.md §6.1 "The layout
  * pass — new step 1.7").
  *

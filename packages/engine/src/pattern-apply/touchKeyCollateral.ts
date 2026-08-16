@@ -1,6 +1,6 @@
 /**
  * touchKeyCollateral — the pending-edit collateral warning for touch key
- * removal/suppression (spec 058 T104/T105, FR-060/FR-061).
+ * removal/suppression (spec 063 T104/T105, FR-060/FR-061).
  *
  * FR-060: disabling or removing a key must enumerate its LINKED OUTPUTS —
  * its own output plus every `sk` (longpress), `flick`, and `multitap`

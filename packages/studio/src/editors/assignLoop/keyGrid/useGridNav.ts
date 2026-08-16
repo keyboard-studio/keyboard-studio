@@ -1,5 +1,5 @@
 // useGridNav — keyboard navigation + focus restoration for the touch key
-// grid (spec 058 T065, T068; FR-020b, FR-020c, FR-020d, FR-020k).
+// grid (spec 063 T065, T068; FR-020b, FR-020c, FR-020d, FR-020k).
 //
 // This hook (and the pure helpers it's built from) is deliberately the ONLY
 // place that computes "which cell comes next" for the grid. KeyGrid.tsx

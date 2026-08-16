@@ -412,7 +412,7 @@ export async function projectWorkingCopyForOutput(
   //     fidelity is its own concern — a freshly generated stub .kps would
   //     silently mask the original package's metadata there.
   if (instantiationMode === "new-from-base") {
-    // spec 059 FR-007: the stub LICENSE.md this may write must RETAIN the base's
+    // spec 064 FR-007: the stub LICENSE.md this may write must RETAIN the base's
     // holders, not name only the new author. The base's own LICENSE.md is never in
     // the VFS (loader FR-011), so the holders come from the text kept on the working
     // copy, resolved by the SAME engine helper scaffold() uses — one D4/D5 policy,

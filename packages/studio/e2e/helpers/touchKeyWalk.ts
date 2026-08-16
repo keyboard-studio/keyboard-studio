@@ -1,4 +1,4 @@
-// Shared prelude for the spec 058 touch-key-editor walk specs — the survey
+// Shared prelude for the spec 063 touch-key-editor walk specs — the survey
 // navigation that has to happen before the By-key grid exists at all.
 //
 // Extracted for the Phase 10 conformance specs (T123 grid a11y, T124 mode

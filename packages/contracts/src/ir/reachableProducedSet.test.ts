@@ -1,5 +1,5 @@
 /**
- * Reachability-view tests (spec 058 T024, contract §8).
+ * Reachability-view tests (spec 063 T024, contract §8).
  *
  * The no-touch-layout case is the most important test in this file: it is what
  * guarantees a desktop-only keyboard is never penalized, and it is asserted as a

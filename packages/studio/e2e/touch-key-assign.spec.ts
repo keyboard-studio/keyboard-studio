@@ -1,4 +1,4 @@
-// E2E: spec 058 (touch key editor) — T089, SC-004.
+// E2E: spec 063 (touch key editor) — T089, SC-004.
 //
 // Proves the keyboard-only "assign a character to an existing touch key" walk
 // through the By-key mode's grid + AssignPanel (T085-T089 composition):
@@ -223,7 +223,7 @@ async function clickOskKeyById(oskFrame: FrameLocator, keyId: string): Promise<v
 // Spec
 // ---------------------------------------------------------------------------
 
-test.describe("Touch key AssignPanel — keyboard-only assign (spec 058 SC-004)", () => {
+test.describe("Touch key AssignPanel — keyboard-only assign (spec 063 SC-004)", () => {
   test("Tab, arrows, Enter, type U+025B, Enter assigns ɛ within 12 keyboard actions, with no pointer event, no modal, and the live preview types it", async ({
     page,
   }) => {
@@ -248,7 +248,7 @@ test.describe("Touch key AssignPanel — keyboard-only assign (spec 058 SC-004)"
     // the keyboard-only measurement below, not a discrete action of its own and
     // not a pointer event to be measured against.
     //
-    // That element is the "Find a key" toggle, not "Continue": spec 061
+    // That element is the "Find a key" toggle, not "Continue": spec 065
     // T013-T015 inserted the layer selector and the add / remove / find key
     // commands between Continue and the grid. Setup only — the 12-action budget
     // counts `press()` calls, and this is not one of them.
@@ -290,7 +290,7 @@ test.describe("Touch key AssignPanel — keyboard-only assign (spec 058 SC-004)"
     await press("ArrowRight");
 
     // 3. F2 — jump straight into AssignPanel's character field.
-    //    Spec 061 split the two keys: Enter opens the property panel (FR-020b),
+    //    Spec 065 split the two keys: Enter opens the property panel (FR-020b),
     //    F2 edits the value, which is the grid convention and what keeps this
     //    walk's action budget honest now that the assign surface sits behind a
     //    disclosure. Still ONE action, so the count below is unchanged.

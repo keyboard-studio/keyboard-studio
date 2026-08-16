@@ -1,7 +1,7 @@
 # Contract: key-edit operations — the `move` addition and the widened field set
 
-**Feature**: 061-touch-editor-parity · **Extends**
-[specs/058-touch-key-editor/contracts/key-edit-overlay.md](../../058-touch-key-editor/contracts/key-edit-overlay.md),
+**Feature**: 065-touch-editor-parity · **Extends**
+[specs/063-touch-key-editor/contracts/key-edit-overlay.md](../../063-touch-key-editor/contracts/key-edit-overlay.md),
 which stays authoritative for everything this file does not restate.
 
 Owner: `packages/engine/src/pattern-apply/keyEditOps.ts` (the union and the field set),
@@ -25,7 +25,7 @@ overlay-replay guarantee is unchanged.
 neither appears in `packages/contracts/src/schemas.ts`, neither has a zod mirror, and neither is a
 `Pattern` or `Criterion` type. Constitution Article I is not engaged. All four admitted fields
 already exist on `TouchKeyIR`, where `layer` is documented as "the authoritative, editable view the
-spec-058 key editor reads and writes".
+spec-063 key editor reads and writes".
 
 ## 2. `MoveKeyOp`
 

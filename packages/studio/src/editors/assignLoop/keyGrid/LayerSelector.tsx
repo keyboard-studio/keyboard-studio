@@ -1,4 +1,4 @@
-// LayerSelector — the key-mode layer switcher (spec 061-touch-editor-parity
+// LayerSelector — the key-mode layer switcher (spec 065-touch-editor-parity
 // T011; FR-004, FR-005; research.md D11; contracts/key-mode-ui.md §1/§4).
 //
 // ## Why FR-004 is met "by construction", not by a special case

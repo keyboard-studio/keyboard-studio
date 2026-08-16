@@ -1,4 +1,4 @@
-// Unit tests for useKeyCommands (spec 058 T094; FR-029, US4 AS1).
+// Unit tests for useKeyCommands (spec 063 T094; FR-029, US4 AS1).
 //
 // Coverage:
 //   1. `buildAddKeyAfterOutcome` (the pure decision both invocation routes

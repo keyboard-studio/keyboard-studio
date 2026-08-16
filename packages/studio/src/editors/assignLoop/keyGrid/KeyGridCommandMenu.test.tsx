@@ -1,4 +1,4 @@
-// Unit tests for KeyGridCommandMenu (spec 058 T111; FR-021, FR-020b).
+// Unit tests for KeyGridCommandMenu (spec 063 T111; FR-021, FR-020b).
 //
 // Coverage:
 //   1. APG menu structure — role="menu" with one role="menuitem" per command,

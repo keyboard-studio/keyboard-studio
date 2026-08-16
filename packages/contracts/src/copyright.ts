@@ -1,4 +1,4 @@
-// Copyright block parsing and license rendering (spec 059).
+// Copyright block parsing and license rendering (spec 064).
 //
 // The license BODY is a constant: all 920 release/ LICENSE.md files in
 // keymanapp/keyboards are MIT, and after stripping copyright lines there are
@@ -10,7 +10,7 @@
 // passed IN (see renderLicense), never read from Date here — otherwise the
 // round-trip test would be time-dependent and unrunnable at a year boundary.
 //
-// Contract: specs/059-keyboard-attribution/contracts/copyright.md (P1..P9)
+// Contract: specs/064-keyboard-attribution/contracts/copyright.md (P1..P9)
 // Fixtures: fixtures/copyrightLines.ts — harvested from the real corpus (FR-014)
 
 // ---------------------------------------------------------------------------

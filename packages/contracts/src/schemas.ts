@@ -215,7 +215,7 @@ export const TouchKeyIRSchema: z.ZodType<LooseOptional<TouchKeyIR>> = z.lazy(() 
     hint: z.string().optional(),
     output: z.string().optional(),
     nextlayer: z.string().optional(),
-    // Per-key modifier override and longpress preselect (spec 058 FR-030).
+    // Per-key modifier override and longpress preselect (spec 063 FR-030).
     // Both are plain wire fields the parser previously dropped; `layer` is
     // additionally what disambiguates a duplicate key id within one layer.
     layer: z.string().optional(),
@@ -822,7 +822,7 @@ type _KeyBudgetBandGuard = Expect<AssignableTo<z.infer<typeof KeyBudgetBandSchem
 type _KeyBudgetGuard = Expect<AssignableTo<z.infer<typeof KeyBudgetSchema>, KeyBudget>>;
 type _TouchKeyIRGuard = Expect<AssignableTo<z.infer<typeof TouchKeyIRSchema>, TouchKeyIR>>;
 // LIMIT OF THE COMPILE-TIME GUARD, stated because it is not obvious and was
-// verified empirically (spec 058 T008): for `TouchKeyIRSchema` specifically,
+// verified empirically (spec 063 T008): for `TouchKeyIRSchema` specifically,
 // NO compile-time alias here can catch an ADDITIVE optional field the schema
 // omits. Two effects compound —
 //   1. the explicit `z.ZodType<LooseOptional<TouchKeyIR>>` annotation the

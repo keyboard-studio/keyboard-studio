@@ -66,7 +66,7 @@
  * strings, so no parser can separate them, and the occurrence reading is the
  * one every builder here intends.
  *
- * ## Why this module sits in contracts (spec 058 T114)
+ * ## Why this module sits in contracts (spec 063 T114)
  *
  * It was written in `packages/engine/src/pattern-apply/touchKeyAddress.ts`, and
  * that path still works — it is now a re-export shim over this module, so every

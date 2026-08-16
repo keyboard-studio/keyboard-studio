@@ -80,7 +80,7 @@ export function checkTouchCoverage(
   touchLayoutPath: string,
   ruleIndex?: TouchKeyRuleIndex
 ): LintFinding[] {
-  // Spec 058 FR-007: the Layer C leg of the four-caller migration. With the
+  // Spec 063 FR-007: the Layer C leg of the four-caller migration. With the
   // index, a `T_*` key whose output lives in a `.kmn` rule is credited, so this
   // check stops reporting characters the keyboard genuinely types. Absent it,
   // behaviour is unchanged.

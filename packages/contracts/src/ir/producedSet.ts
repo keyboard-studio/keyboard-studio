@@ -43,7 +43,7 @@
  * filtering all apply identically. Fragments without the field (non-rule
  * fragments, older parses) are skipped, preserving the prior behavior.
  *
- * THIS VIEW IS FROZEN (spec 058 FR-008/FR-010)
+ * THIS VIEW IS FROZEN (spec 063 FR-008/FR-010)
  * -------------------------------------------
  * `buildProducedSet` answers "what do this keyboard's rules emit?" — including a
  * rule keyed on a touch key id that no key anywhere carries. That is not a bug

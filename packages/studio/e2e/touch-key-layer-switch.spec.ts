@@ -1,6 +1,6 @@
 // E2E: switching layers must not multiply the grid's keys.
 //
-// The defect this guards, reported against the spec 061 remodel: "switch to
+// The defect this guards, reported against the spec 065 remodel: "switch to
 // shift and then back to default a few times, the spacing and keys at the
 // front of the columns multiply."
 //

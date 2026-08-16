@@ -169,7 +169,7 @@ describe("KeyboardIRSchema round-trip (P3/SC-007/FR-010)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// THE DRIFT GUARD FOR ADDITIVE OPTIONAL TouchKeyIR FIELDS (spec 058 FR-030).
+// THE DRIFT GUARD FOR ADDITIVE OPTIONAL TouchKeyIR FIELDS (spec 063 FR-030).
 //
 // This suite is not redundant with the compile-time aliases in schemas.ts — it
 // is the ONLY thing that catches a `TouchKeyIR` field the zod mirror omits.

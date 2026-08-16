@@ -25,7 +25,7 @@
 //                         neutralized by that step resolves to nothing here,
 //                         never a double-blank)
 //   1.7 Key edit overlay (layout half) — applyKeyEditsToVfs splices the
-//                         committed KeyEditOperation[] overlay (spec 058)
+//                         committed KeyEditOperation[] overlay (spec 063)
 //                         directly onto .keyman-touch-layout (Case B, never
 //                         round-tripped through the IR — spec 035 R9). Runs
 //                         AFTER step 1.6 so an id it already neutralized
@@ -156,7 +156,7 @@ export interface ProjectWorkingCopyVfsInput {
    */
   deletedTouchKeyIds?: ReadonlySet<string>;
   /**
-   * The committed key-level touch layout edit overlay (spec 058
+   * The committed key-level touch layout edit overlay (spec 063
    * FR-031…FR-034), in commit order (`seq` ascending; this projection sorts
    * defensively, so an out-of-commit-order array is not required). Applied
    * at step 1.7 (layout half, via `applyKeyEditsToVfs` — Case B, never
@@ -416,7 +416,7 @@ export function projectWorkingCopyVfs(
     }
   }
 
-  // Step 1.7: Key edit overlay projection — layout half (spec 058
+  // Step 1.7: Key edit overlay projection — layout half (spec 063
   // FR-031…FR-034, contracts/key-edit-overlay.md §6.1 "new step 1.7").
   // Splices the committed KeyEditOperation[] overlay directly onto
   // `.keyman-touch-layout` (Case B, never round-tripped through the IR —

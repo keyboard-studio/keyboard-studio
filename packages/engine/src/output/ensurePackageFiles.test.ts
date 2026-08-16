@@ -53,7 +53,7 @@ describe("ensurePackageFiles", () => {
     );
   });
 
-  // spec 059 FR-004. The holder used to fall back to a display name, which
+  // spec 064 FR-004. The holder used to fall back to a display name, which
   // emitted "Copyright © <year> <name>" — naming the KEYBOARD as its own
   // rights holder. That is a false statement of fact in a legal notice, and
   // worse than silence because a wrong notice reads as authoritative. The

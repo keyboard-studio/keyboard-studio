@@ -1,7 +1,7 @@
 /**
  * keyIdMinting - the touch key id minting/proposal and validation policy
- * (spec 058 FR-024/FR-025/FR-045; contract:
- * specs/058-touch-key-editor/contracts/key-id-policy.md).
+ * (spec 063 FR-024/FR-025/FR-045; contract:
+ * specs/063-touch-key-editor/contracts/key-id-policy.md).
  *
  * The premise this whole module rests on (key-id-policy.md section 1a):
  * `T_<HEX>` does NOT self-output. Only a `U_<HEX>` id is interpreted by
@@ -24,7 +24,7 @@
  *   - Write or synthesize the actual `.kmn` rule/guard-store text beyond a
  *     short human-readable preview line. Full rule synthesis (group choice,
  *     insertion ordering, semantic idempotence, guard-store reuse) is
- *     touchRuleSynthesis.ts's job (spec 058 T080/T081), a distinct module.
+ *     touchRuleSynthesis.ts's job (spec 063 T080/T081), a distinct module.
  */
 
 import { toUPlusNotation } from "@keyboard-studio/contracts";
@@ -196,7 +196,7 @@ export function checkReservedKeyId(
 /** An existing key id already occupying some scope, for the uniqueness/case checks. */
 export interface ExistingKeyIdInScope {
   readonly id: string;
-  /** The key's per-key `TouchKeyIR.layer` override, if any (spec 058 T008). */
+  /** The key's per-key `TouchKeyIR.layer` override, if any (spec 063 T008). */
   readonly layer?: string;
 }
 
@@ -288,7 +288,7 @@ export type KeyIdMintingPath =
   | "combining-mark-guard"
   | "multi-codepoint-string"
   | "case-triple"
-  // Spec 061 FR-029/FR-030: the id was not minted at all — it was kept from the
+  // Spec 065 FR-029/FR-030: the id was not minted at all — it was kept from the
   // physical key at this position, or taken from a key that already produces the
   // character. `proposeKeyId` never returns it; only `proposeTouchKeyId` does.
   // It lives in this union so a proposal has ONE path vocabulary to render.

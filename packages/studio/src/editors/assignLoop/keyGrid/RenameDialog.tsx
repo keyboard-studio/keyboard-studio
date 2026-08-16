@@ -1,4 +1,4 @@
-// RenameDialog — redefine a touch key's id (spec 058 T090; FR-028;
+// RenameDialog — redefine a touch key's id (spec 063 T090; FR-028;
 // key-id-policy.md §4). US3: "The author renames a key id, most often a
 // `T_*` id, and the studio validates it live, shows what else the rename
 // touches, and fixes up every reference it owns."

@@ -1,6 +1,6 @@
 /**
  * touchKeyDiagnostics — the engine-side face of the edit-time touch-key
- * diagnostics (spec 058 Phase 8 / US4, T101-T103; Phase 9 / US5, T113-T114;
+ * diagnostics (spec 063 Phase 8 / US4, T101-T103; Phase 9 / US5, T113-T114;
  * FR-029c, FR-029d, FR-029e, FR-029h, FR-040, FR-041, FR-044).
  *
  * ## The shape and the detectors moved to contracts at T113/T114
@@ -200,7 +200,7 @@ function bucketOp(
 
 
 // ---------------------------------------------------------------------------
-// TOUCH_KEY_KEYCAP_MISMATCH — spec 061 FR-036: the label does not match the key
+// TOUCH_KEY_KEYCAP_MISMATCH — spec 065 FR-036: the label does not match the key
 // ---------------------------------------------------------------------------
 
 /**

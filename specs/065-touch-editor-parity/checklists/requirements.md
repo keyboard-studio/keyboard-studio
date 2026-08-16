@@ -38,7 +38,7 @@ table is the evidence that the defect is one idiom rather than eight oversights.
 it is what makes FR-001 and FR-003 testable. The **Requirements** and **Success
 Criteria** sections carry no component names, no file paths, and no framework
 vocabulary. This matches the house style set by
-[specs/058-touch-key-editor/spec.md](../../058-touch-key-editor/spec.md), which grounds
+[specs/063-touch-key-editor/spec.md](../../063-touch-key-editor/spec.md), which grounds
 its context in corpus counts and source references while keeping its FRs abstract.
 
 **Iterations run**: 1. Two issues were found and fixed before this checklist was marked

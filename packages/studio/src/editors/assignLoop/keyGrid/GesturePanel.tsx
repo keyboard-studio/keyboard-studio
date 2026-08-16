@@ -1,9 +1,9 @@
 // GesturePanel — longpresses, multitaps and flicks, edited where the key is
-// (spec 061 T041; FR-026, FR-027).
+// (spec 065 T041; FR-026, FR-027).
 //
 // ## Why this exists
 //
-// Before spec 061 the only way to add a longpress or a flick was the CHARACTER
+// Before spec 065 the only way to add a longpress or a flick was the CHARACTER
 // walk: find the character you want, find the method card that offers it as a
 // gesture, apply it. That is the right flow when you are thinking "this language
 // needs ɛ"; it is the wrong flow, and a genuinely hard one, when you are looking
@@ -30,7 +30,7 @@
 // ## Every callback is REQUIRED (FR-001, FR-003)
 //
 // Same rule as `KeyPropertyPanel` and for the same reason: an optional `on*`
-// prop with one caller is how spec 058 shipped a complete, unmounted key
+// prop with one caller is how spec 063 shipped a complete, unmounted key
 // editor. A mount that cannot act fails `tsc`.
 
 import { useCallback, useId, useState, type ReactNode } from "react";

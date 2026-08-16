@@ -1,6 +1,6 @@
 # Tasks: key-level touch layout editing
 
-**Feature**: [specs/058-touch-key-editor](spec.md) · **Branch**: `058-touch-key-editor` · **Generated**: 2026-08-04
+**Feature**: [specs/063-touch-key-editor](spec.md) · **Branch**: `063-touch-key-editor` · **Generated**: 2026-08-04
 
 **Inputs**: [spec.md](spec.md) · [plan.md](plan.md) · [data-model.md](data-model.md) · [research.md](research.md) (R1–R10) · [contracts/touch-key-rule-join.md](contracts/touch-key-rule-join.md) · [contracts/key-id-policy.md](contracts/key-id-policy.md) · [contracts/layer-families.md](contracts/layer-families.md) · [contracts/key-edit-overlay.md](contracts/key-edit-overlay.md)
 

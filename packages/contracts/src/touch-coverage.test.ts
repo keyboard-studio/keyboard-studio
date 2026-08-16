@@ -256,7 +256,7 @@ describe("decodeUnicodeKeyId", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Spec 058 T025 — the coverage regression locks.
+// Spec 063 T025 — the coverage regression locks.
 //
 // Every existing test above calls the TWO-ARGUMENT form, and they all still
 // pass. That is the point: the options argument is additive, so the whole suite

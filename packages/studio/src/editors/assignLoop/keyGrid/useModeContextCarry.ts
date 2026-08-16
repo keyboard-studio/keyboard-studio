@@ -1,5 +1,5 @@
-// useModeContextCarry — the touch step's mode-toggle CONTEXT CARRY (spec 058
-// T074; FR-036c; specs/058-touch-key-editor/contracts/layer-families.md).
+// useModeContextCarry — the touch step's mode-toggle CONTEXT CARRY (spec 063
+// T074; FR-036c; specs/063-touch-key-editor/contracts/layer-families.md).
 //
 // The touch step has two lenses on ONE layout — the by-character walk and the
 // by-key grid (`touchEditorMode` in workingCopyStore) — and FR-036c requires
@@ -58,7 +58,7 @@
 // `groupLayerFamilies` (plus their types) from layerFamilies.ts, so
 // `orderLayerIdsByFamily` below imports the real decomposition instead of
 // carrying its own copy of the grammar (segment parsing, fragment
-// vocabulary, plane-sentinel table) — see specs/058-touch-key-editor/
+// vocabulary, plane-sentinel table) — see specs/063-touch-key-editor/
 // contracts/layer-families.md for the contract those functions implement.
 //
 // Ranking a family's members by ascending modifier-combo complexity needs a
