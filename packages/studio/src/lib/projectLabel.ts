@@ -5,9 +5,9 @@
 //
 //   - `draftPersistence.saveDraft` (the engine behind the "My keyboards"
 //     cards) — scaffoldSpec -> identity patch -> base keyboard -> null.
-//   - `draftAutosave.deriveLabel` (read only by the resume banner) —
-//     identityResult.english -> identityResult.autonym -> scaffoldSpec ->
-//     base keyboard -> null.
+//   - `draftAutosave.deriveLabel` (since-retired; read only by the resume
+//     banner) — identityResult.english -> identityResult.autonym ->
+//     scaffoldSpec -> base keyboard -> null.
 //
 // FR-041 states the FIRST order, and `draftPersistence` already implements it
 // verbatim. Research D-8 originally concluded the opposite by examining
@@ -16,7 +16,7 @@
 // `workingCopy.identity` (the identity PATCH), not `survey.identityResult`.
 //
 // Adding a third derivation for the footer is precisely what FR-041 forbids,
-// so both shipped engines and the footer call this one function.
+// so the draft engine and the footer call this one function.
 
 /** The four inputs the precedence reads, each optional. */
 export interface ProjectLabelInput {

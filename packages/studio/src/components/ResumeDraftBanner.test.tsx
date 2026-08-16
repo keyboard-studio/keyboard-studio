@@ -6,7 +6,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, fireEvent } from "@testing-library/react";
 import { ResumeDraftBanner } from "./ResumeDraftBanner.tsx";
-import type { DraftMeta } from "../lib/draftAutosave.ts";
+import type { DraftMeta } from "../lib/draftPersistence.ts";
 
 afterEach(cleanup);
 
@@ -50,7 +50,7 @@ describe("ResumeDraftBanner", () => {
 
   it("shows the derived keyboard label and the step it was left on", () => {
     render(<ResumeDraftBanner meta={makeMeta()} onResume={vi.fn()} onDiscard={vi.fn()} />);
-    expect(screen.getByText(/Resume "Hausa"\?/)).toBeTruthy();
+    expect(screen.getByText(/Restore "Hausa" from your account\?/)).toBeTruthy();
     expect(screen.getByText(/carve step/)).toBeTruthy();
   });
 
@@ -58,6 +58,6 @@ describe("ResumeDraftBanner", () => {
     render(
       <ResumeDraftBanner meta={makeMeta({ label: null })} onResume={vi.fn()} onDiscard={vi.fn()} />,
     );
-    expect(screen.getByText(/Resume your keyboard\?/)).toBeTruthy();
+    expect(screen.getByText(/Restore your keyboard from your account\?/)).toBeTruthy();
   });
 });
