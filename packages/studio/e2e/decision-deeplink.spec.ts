@@ -64,13 +64,13 @@ const TRACK_QUESTION_LABEL = /Authoring approach/i;
 /**
  * #1477's ground-truth sweep (live axe run with this list emptied) found
  * SignUpPanel's GitHub button and the survey's own Continue/advance button —
- * the two entries this list used to carry — already clean. Only the OSK
- * iframe remains.
+ * the two entries this list used to carry — already clean. The remaining OSK
+ * iframe entry is now also fixed at the source
+ * (packages/studio/public/osk-frame.html overrides `.kmw-spacebar-caption`'s
+ * color), so this scan now covers everything the frame renders. Kept as an
+ * empty array so `exclude: KNOWN_CONTRAST_DEBT` below keeps compiling.
  */
-const KNOWN_CONTRAST_DEBT: readonly string[] = [
-  // 1.4.3 — the OSK iframe renders KeymanWeb's own markup, not authored here.
-  "iframe",
-];
+const KNOWN_CONTRAST_DEBT: readonly string[] = [];
 
 test.describe("decision-trail deep link -> revise -> supersede (spec 057 US3)", () => {
   test.beforeEach(async ({ page }) => {

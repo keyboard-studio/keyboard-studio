@@ -160,7 +160,7 @@
     },
     "§12": {
       "title": "12. Output artifacts",
-      "hash": "sha256:95fe6999d96c3492",
+      "hash": "sha256:31a375c758ee3c1f",
       "status": "partial",
       "implements": [
         "packages/contracts/src/virtualFS.ts",

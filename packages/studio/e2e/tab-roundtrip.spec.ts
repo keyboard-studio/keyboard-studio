@@ -51,13 +51,13 @@ const OTHER_TABS: readonly TabRoute[] = ["preview", "output", "trail", "flowmap"
  * #1477's ground-truth sweep (live axe run with this list emptied, across
  * the preview/output/trail tabs) found PickerPane's source-mode toggle and
  * SignUpPanel's GitHub button — the two entries this list used to carry —
- * already clean. Only the OSK iframe remains.
+ * already clean. The remaining OSK iframe entry is now also fixed at the
+ * source (packages/studio/public/osk-frame.html overrides
+ * `.kmw-spacebar-caption`'s color), so this scan now covers everything the
+ * frame renders. Kept as an empty array so `exclude: KNOWN_CONTRAST_DEBT`
+ * below keeps compiling.
  */
-const KNOWN_CONTRAST_DEBT: readonly string[] = [
-  // 1.4.3 — the OSK iframe renders KeymanWeb's own markup (.kmw-spacebar-caption),
-  // which this repo does not author and cannot restyle from here.
-  "iframe",
-];
+const KNOWN_CONTRAST_DEBT: readonly string[] = [];
 
 /**
  * Tabs the axe scan runs on.

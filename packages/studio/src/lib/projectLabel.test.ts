@@ -73,13 +73,14 @@ describe("blank-string skips", () => {
   });
 });
 
-describe("the case that distinguished the two shipped engines", () => {
-  // `draftAutosave.deriveLabel` read `survey.identityResult.english` FIRST,
-  // so it disagreed with `draftPersistence.saveDraft` exactly here: an
-  // identity answer that differs from the name the author typed at
-  // project_name. FR-041 (and spec 072) say the project's NAME wins; the
-  // identity answer is a fact about the language, not a name for the project.
-  // This case had zero coverage before this spec.
+describe("the case that used to distinguish the two engines", () => {
+  // `draftAutosave.deriveLabel` (since-retired) read
+  // `survey.identityResult.english` FIRST, so it disagreed with
+  // `draftPersistence.saveDraft` exactly here: an identity answer that
+  // differs from the name the author typed at project_name. FR-041 (and
+  // spec 072) say the project's NAME wins; the identity answer is a fact
+  // about the language, not a name for the project. This case had zero
+  // coverage before this spec.
   it("prefers the scaffold spec over an identity answer that disagrees with it", () => {
     expect(
       deriveProjectLabel({
