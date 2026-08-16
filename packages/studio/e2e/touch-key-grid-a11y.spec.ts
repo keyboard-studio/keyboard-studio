@@ -63,24 +63,12 @@ async function pointerEventCount(page: Page): Promise<number> {
   );
 }
 
-/**
- * The one exclusion this spec takes, named per spec 056 FR-003.
- *
- * WCAG 1.4.3 Contrast (Minimum) — `.kmw-spacebar-caption` inside the OSK
- * preview iframe. That caption is rendered by KeymanWeb's own on-screen
- * keyboard (`kmw-*` is KMW's class namespace), from KMW's own stylesheet inside
- * an iframe this studio does not author. It is a real contrast finding and it
- * belongs upstream; restyling it from here would mean overriding a vendored
- * stylesheet inside a frame we deliberately isolate.
- *
- * Expressed as a FRAME CHAIN (`["iframe", …]`, the form axe itself reports
- * cross-frame targets in) and scoped to that one class — NOT a blanket
- * exclusion of the whole OSK frame, so a violation in what the studio itself
- * puts in that frame (e.g. `#osk-target`) still fails this scan.
- */
-const AXE_EXCLUSIONS: readonly (string | readonly string[])[] = [
-  ["iframe", ".kmw-spacebar-caption"],
-];
+// This spec used to carry a WCAG 1.4.3 exclusion for `.kmw-spacebar-caption`
+// inside the OSK preview iframe. Now fixed at the source —
+// packages/studio/public/osk-frame.html carries a scoped
+// `#osk-host .kmw-spacebar-caption` color override with enough specificity
+// to beat KMW's own kmwosk.css — so both scans below now cover the frame's
+// contents with no exclusion needed.
 
 test.describe("Touch key grid — accessibility (spec 058 SC-009)", () => {
   test("passes axe in both its resting and roving-tabindex states, and is fully operable with no pointer events", async ({
@@ -92,9 +80,7 @@ test.describe("Touch key grid — accessibility (spec 058 SC-009)", () => {
     await expect(grid).toBeVisible();
 
     // --- (1) Resting state. ---
-    await expectNoSeriousAxeViolations(page, "touch key grid (resting)", {
-      exclude: [...AXE_EXCLUSIONS],
-    });
+    await expectNoSeriousAxeViolations(page, "touch key grid (resting)");
 
     // Focus the header control immediately before the grid in DOM order via the
     // DOM API — `.focus()` dispatches no pointer event, so this is setup, not a
@@ -129,9 +115,7 @@ test.describe("Touch key grid — accessibility (spec 058 SC-009)", () => {
     // --- (2) Roving-tabindex state: tabindex has moved, aria-selected has
     //         moved, the inspector has re-rendered. A distinct DOM, scanned
     //         on its own. ---
-    await expectNoSeriousAxeViolations(page, "touch key grid (roving-tabindex state)", {
-      exclude: [...AXE_EXCLUSIONS],
-    });
+    await expectNoSeriousAxeViolations(page, "touch key grid (roving-tabindex state)");
 
     // Exactly one cell is in the Tab order at a time — the invariant the
     // roving pattern exists to maintain, and the one a later "just make every

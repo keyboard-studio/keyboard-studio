@@ -39,15 +39,13 @@ const currentDot = (page: Page) => footer(page).locator('[data-progress-dot-kind
 /**
  * #1477's ground-truth sweep (live axe run with this list emptied) found
  * PhaseB's intro Continue button and PickerPane's source-mode toggle — the
- * two entries this list used to carry — already clean. Only the OSK iframe
- * remains.
+ * two entries this list used to carry — already clean. The remaining OSK
+ * iframe entry is now also fixed at the source
+ * (packages/studio/public/osk-frame.html overrides `.kmw-spacebar-caption`'s
+ * color), so this scan now covers everything the frame renders. Kept as an
+ * empty array so `exclude: KNOWN_CONTRAST_DEBT` below keeps compiling.
  */
-const KNOWN_CONTRAST_DEBT: readonly string[] = [
-  // 1.4.3 — the OSK iframe renders KeymanWeb's own markup
-  // (.kmw-spacebar-caption), which this repo does not author and cannot
-  // restyle from here.
-  "iframe",
-];
+const KNOWN_CONTRAST_DEBT: readonly string[] = [];
 
 test.describe("footer progress row (spec 057 US4/US6)", () => {
   test.beforeEach(async ({ page }) => {

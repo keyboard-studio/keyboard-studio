@@ -123,21 +123,21 @@ const PROVEN_SCRIPT_BASES: ReadonlyArray<ProvenScriptFixture> = [
 ];
 
 /**
- * Pre-existing 1.4.3 (Contrast Minimum) offender on the screen this scan
- * actually lands on (per the manifest spine, legitimately the Carve gallery
- * — see the retained history in git blame if the "phase B complete" label
- * seems mismatched). #1477's ground-truth sweep (live axe run with this list
- * emptied) found every OTHER entry it used to carry — ConvenienceCharsStep's
- * Continue, CarveGallery v1's info-panel toggle (dead code; CarveGalleryV2 is
- * unconditional), carve-continue, RemovalBanner's dismiss control, Rail's/
- * GlyphCell's v1-only surfaces — already clean. Only the OSK iframe remains.
+ * FORMERLY the pre-existing 1.4.3 (Contrast Minimum) offender on the screen
+ * this scan actually lands on (per the manifest spine, legitimately the
+ * Carve gallery — see the retained history in git blame if the "phase B
+ * complete" label seems mismatched). #1477's ground-truth sweep (live axe run
+ * with this list emptied) found every entry it used to carry —
+ * ConvenienceCharsStep's Continue, CarveGallery v1's info-panel toggle (dead
+ * code; CarveGalleryV2 is unconditional), carve-continue, RemovalBanner's
+ * dismiss control, Rail's/GlyphCell's v1-only surfaces — already clean. The
+ * remaining OSK iframe entry is now also fixed at the source
+ * (packages/studio/public/osk-frame.html overrides `.kmw-spacebar-caption`'s
+ * color), so this scan now covers everything the frame renders. Kept as an
+ * empty array — not deleted — so `exclude: KNOWN_CONTRAST_DEBT` below keeps
+ * compiling without a call-site change.
  */
-const KNOWN_CONTRAST_DEBT: readonly string[] = [
-  // 1.4.3 — the OSK iframe renders KeymanWeb's own markup
-  // (.kmw-spacebar-caption), which this repo does not author and cannot
-  // restyle from here.
-  "iframe",
-];
+const KNOWN_CONTRAST_DEBT: readonly string[] = [];
 
 /** Everything the walk helpers need for one script. FIXTURE (Latin) conforms. */
 interface WalkFixture {
@@ -256,7 +256,8 @@ test.describe("Track 1 (copy-edit) E2E", () => {
 
     // Accessibility gate (spec 056 FR-003): scan the output screen.
     // 1.4.3 — the Output screen's documented pre-existing contrast debt
-    // (OskModeToggle, SignUpPanel, OSK iframe); see helpers/contrastDebt.ts.
+    // (OskModeToggle, SignUpPanel); see helpers/contrastDebt.ts. The OSK
+    // iframe's own debt is now fixed at the source.
     await expectNoSeriousAxeViolations(page, "output screen (copy-edit walk)", {
       exclude: OUTPUT_SCREEN_DEBT,
     });

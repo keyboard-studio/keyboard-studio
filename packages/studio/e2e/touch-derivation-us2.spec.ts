@@ -455,7 +455,8 @@ test.describe("Touch derivation US2 — reseed from desktop (spec 035 Scenario B
     // chrome already clean, and fixed LintChip's code badge at the source
     // (lint/colors.ts's SEVERITY_COLORS consumers; LintSummary is survey-pane
     // chrome, and pid_piaroa's .kmn keeps a finding in the list for the whole
-    // walk, so this screen exercised the live bug directly). Nothing left to
+    // walk, so this screen exercised the live bug directly). The OSK
+    // iframe's own debt is now also fixed at the source. Nothing left to
     // exclude here.
     await expectNoSeriousAxeViolations(page, "after touch gallery (US2 piaroa walk)", {
       exclude: [],

@@ -100,21 +100,20 @@ const KMN_ZIP_PATH = `source/${BASE_KEYBOARD_ID}.kmn`;
 const TOUCH_ZIP_PATH = `source/${BASE_KEYBOARD_ID}.keyman-touch-layout`;
 
 /**
- * Pre-existing 1.4.3 (Contrast Minimum) offender on the Phase B build-list
- * screen. #1477's ground-truth sweep (live axe run with this list emptied)
- * found every OTHER entry this list used to carry — CarveGallery's/Rail's/
+ * FORMERLY the pre-existing 1.4.3 (Contrast Minimum) offender on the Phase B
+ * build-list screen. #1477's ground-truth sweep (live axe run with this list
+ * emptied) found every entry this list used to carry — CarveGallery's/Rail's/
  * GlyphCell's v1-only surfaces, ConvenienceCharsStep's Continue button,
  * RemovalBanner's dismiss control — already clean: the v1 gallery components
  * are dead code (CarveGalleryV2 is unconditional; v1 is commented out in
  * carveAdapter.tsx) and the rest were stale exclusions from an earlier
- * contrast pass that already fixed them. Only the OSK iframe remains,
- * per the same n/a-with-justification decision as every other spec here.
+ * contrast pass that already fixed them. The remaining OSK iframe entry is
+ * now also fixed at the source (packages/studio/public/osk-frame.html
+ * overrides `.kmw-spacebar-caption`'s color), so this scan now covers
+ * everything the frame renders. Kept as an empty array so
+ * `exclude: KNOWN_CONTRAST_DEBT` below keeps compiling.
  */
-const KNOWN_CONTRAST_DEBT: readonly string[] = [
-  // 1.4.3 — the OSK iframe renders KeymanWeb's own markup
-  // (.kmw-spacebar-caption), not authored in this repo.
-  "iframe",
-];
+const KNOWN_CONTRAST_DEBT: readonly string[] = [];
 
 // ---------------------------------------------------------------------------
 // Page-object helpers (touch-derivation-specific)
@@ -260,7 +259,10 @@ test.describe("Touch derivation US1 — import & adapt (spec 035 Scenario A)", (
     // helpers/contrastDebt.ts). The per-key glyph chips and shared chrome
     // this list used to also exclude were re-verified clean by #1477's
     // ground-truth sweep (and this fixture never renders the glyph chips
-    // anyway — see touch-derivation-us2.spec.ts's own note on that).
+    // anyway — see touch-derivation-us2.spec.ts's own note on that). The OSK
+    // iframe's own debt is now fixed at the source too; OSK_IFRAME_DEBT is
+    // now an empty spread, kept only so this call site doesn't need a
+    // rename.
     await expectNoSeriousAxeViolations(page, "after touch gallery (US1 bambara walk)", {
       exclude: OSK_IFRAME_DEBT,
     });
