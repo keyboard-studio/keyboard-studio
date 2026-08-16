@@ -58,7 +58,11 @@ export function ProposalBanner({
             background: "var(--app-success)",
             border: "none",
             borderRadius: 5,
-            color: "var(--app-text-on-accent)",
+            // NOT --app-text-on-accent: that pairs with --app-accent, not
+            // --app-success -- light theme's --app-success only reaches
+            // 3.35:1 with white (1.4.3, #1477). --app-text-on-success covers
+            // both themes; see colors.css.
+            color: "var(--app-text-on-success)",
             fontSize: 12,
             fontWeight: 600,
             cursor: "pointer",

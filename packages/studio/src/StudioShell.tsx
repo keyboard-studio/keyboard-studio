@@ -1021,7 +1021,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // draft, because the studio could hold only one draft at a time and a
       // project switch was therefore indistinguishable from abandonment.
       //
-      // "My keyboards" (spec 047 US3a) is precisely the feature that makes
+      // "My keyboards" (spec 072 US3a) is precisely the feature that makes
       // several drafts co-exist, so that implicit delete is now the direct
       // negation of SC-001 — it would let an author start keyboard B and find
       // keyboard A silently gone from their list. The clear-on-switch is
@@ -1030,7 +1030,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // from. Abandonment stays explicit, via `discardActiveDraft` on the
       // start-over paths (WelcomeScreen's "start over" and this shell's own
       // reset below) — the author's own instruction, not an inference from
-      // navigation. See specs/047-my-keyboards/spec.md ("Superseded: spec
+      // navigation. See specs/072-my-keyboards/spec.md ("Superseded: spec
       // 034 VR-5").
 
       // The active-project pointer used to need an eager pin here (to a SECOND,

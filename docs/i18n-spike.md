@@ -122,7 +122,7 @@ Crowdin dry-run). Summary:
   runs on a schedule and opens a translations PR through the km-triage merge
   gate when Crowdin has new/updated approved strings.
 - **Tier B (content strings) — shipped (spec 046 US2, T027–T031); extended to a
-  fourth catalog by [spec 050](../specs/050-flow-question-i18n/spec.md).** Crowdin's
+  fourth catalog by [spec 073](../specs/073-flow-question-i18n/spec.md).** Crowdin's
   generic JSON/YAML parser translates every string value, so pointing it at the
   raw content records would hand control fields (`id`, `answerType`, `default`,
   `firingCondition`, BCP47 tags, `criteria.json` ids …) to translators. Instead
@@ -130,18 +130,18 @@ Crowdin dry-run). Summary:
   `{id: text}` sidecar catalogs (Tier A shape) under `content/i18n/en/*.json`.
   There are now **four** such catalogs — `patterns`, `adaptationQuestions`,
   `criteria`, and `flowQuestions` (the modular flow-engine's survey-question
-  prompt/help text, added by spec 050). Freshness is gated by the extractor
+  prompt/help text, added by spec 073). Freshness is gated by the extractor
   CLI's `--check` (wired into `pnpm lint`) and target-locale key-set parity by
   `utilities/content-i18n-lint`; `criteria.json` is further gated by its zod
   schema + the criteria-count test. Seam decisions live in
   [specs/046-i18n-localization/research.md](../specs/046-i18n-localization/research.md)
-  (D8) and spec 050's research.md (D7 — why `flowQuestions` freshness is
+  (D8) and spec 073's research.md (D7 — why `flowQuestions` freshness is
   delegated to the extractor CLI rather than mirrored in the plain-JS lint tool).
   `flowQuestions` gained a fifth, optional field — `audit_label`, the
   decision-trail headline override — from
   [spec 055](../specs/055-legible-decision-trail/spec.md); content owns the
   values (sparse by design), engine owns the extractor/lint/resolution
-  plumbing (see [specs/050-flow-question-i18n/contracts/flow-question-catalog-format.md](../specs/050-flow-question-i18n/contracts/flow-question-catalog-format.md)
+  plumbing (see [specs/073-flow-question-i18n/contracts/flow-question-catalog-format.md](../specs/073-flow-question-i18n/contracts/flow-question-catalog-format.md)
   and [specs/055-legible-decision-trail/contracts/catalog-audit-label.contract.md](../specs/055-legible-decision-trail/contracts/catalog-audit-label.contract.md)
   for the full contract).
 

@@ -10,7 +10,7 @@
 
 ## Context & governing spec
 
-The governing spec is [specs/046-marks-question-series/spec.md](../046-marks-question-series/spec.md). This feature **amends** its FR-010, FR-011, FR-012, SC-006, and SC-007; it does not re-derive their scope. US4 additionally amends the strategy framework in [specs/007-strategy-selection/spec.md](../007-strategy-selection/spec.md) — its decision tree and its self-consistency table. (That spec's number is shared with [specs/046-i18n-localization/](../046-i18n-localization/), which is unrelated.) It also interacts with [specs/049-lowercase-diacritic-questions/](../049-lowercase-diacritic-questions/), whose case-counterpart expansion runs on the answer this station produces, and with spec §7 strategy selection.
+The governing spec is [specs/071-marks-question-series/spec.md](../071-marks-question-series/spec.md). This feature **amends** its FR-010, FR-011, FR-012, SC-006, and SC-007; it does not re-derive their scope. US4 additionally amends the strategy framework in [specs/007-strategy-selection/spec.md](../007-strategy-selection/spec.md) — its decision tree and its self-consistency table. It also interacts with [specs/049-lowercase-diacritic-questions/](../049-lowercase-diacritic-questions/), whose case-counterpart expansion runs on the answer this station produces, and with spec §7 strategy selection.
 
 Station S2 currently asks, once per mark-class, whether marked letters are "its own letter of the alphabet" or a letter the mark "is added to as you type", and takes one answer. Three things are wrong:
 

@@ -32,7 +32,7 @@
 // pointer on success), then navigates only on a successful apply.
 //
 // Ported from the dev reference implementation's MyKeyboardsList.tsx
-// (specs/047-my-keyboards) with its draft-engine imports rewired onto main's
+// (specs/072-my-keyboards) with its draft-engine imports rewired onto main's
 // draftPersistence.ts and its user-facing strings converted to main's
 // @lingui convention.
 

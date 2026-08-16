@@ -1,5 +1,5 @@
 /**
- * Build-time record validation (spec 036 T025; FR-008; contract X1/X2/X4).
+ * Build-time record validation (spec 070 T025; FR-008; contract X1/X2/X4).
  *
  * Invoked inside `build-index.ts` for every categorization BEFORE the artifact
  * is written. Any violation is a loud build failure (the caller throws / exits

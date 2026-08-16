@@ -1,4 +1,4 @@
-// Private-use role prompt (spec 046 FR-004): no linguistic data exists for
+// Private-use role prompt (spec 071 FR-004): no linguistic data exists for
 // PUA characters, so the designer says letter-or-mark AT the point of
 // picking — the character is not added to any list until answered. Pure/
 // controlled: CharacterMapPane owns the pendingPuaChar state and only renders

@@ -8,7 +8,7 @@
 
 **Input**: User description: "Facet transform engine. A capability that switches a keyboard base from one source-facet value to another with the implications explained (e.g. convert all touch longpress mechanisms to flicks; normalize source encoding to house style; migrate NFD->NFC and rewrite matching backspace rules)."
 
-**Governing sections**: [spec.md](../../spec.md) §3c ("Defaults are the product" — propose-then-confirm, explain implications), the working-copy spine (§v1.3.0; constitution Article III). **Authoritative design brief**: [docs/source-facets-design.md](../../docs/source-facets-design.md). Sibling/input features: [specs/037-facet-classifiers](../037-facet-classifiers/spec.md) (measures the `source.*` construction facets this engine transforms), [specs/036-keyboard-facet-index](../036-keyboard-facet-index/spec.md) (stores the measurements). Consumer-adjacent: [specs/038-adaptation-questions](../038-adaptation-questions/spec.md) (how ambiguous choices are confirmed with users).
+**Governing sections**: [spec.md](../../spec.md) §3c ("Defaults are the product" — propose-then-confirm, explain implications), the working-copy spine (§v1.3.0; constitution Article III). **Authoritative design brief**: [docs/source-facets-design.md](../../docs/source-facets-design.md). Sibling/input features: [specs/037-facet-classifiers](../037-facet-classifiers/spec.md) (measures the `source.*` construction facets this engine transforms), [specs/070-keyboard-facet-index](../070-keyboard-facet-index/spec.md) (stores the measurements). Consumer-adjacent: [specs/038-adaptation-questions](../038-adaptation-questions/spec.md) (how ambiguous choices are confirmed with users).
 
 ## Problem
 
@@ -112,7 +112,7 @@ The user's base emits NFD but the user wants NFC output. The studio proposes the
 
 ## Assumptions
 
-- **Depends on spec 037 measurements.** The source-facet classifiers (spec 037) and the facet-index storage (spec 036) exist and provide dominant value + consistency + exception sites + cause tags. This engine does not re-derive them; if a measurement is missing/undetermined it declines rather than guessing (edge case).
+- **Depends on spec 037 measurements.** The source-facet classifiers (spec 037) and the facet-index storage (spec 070) exist and provide dominant value + consistency + exception sites + cause tags. This engine does not re-derive them; if a measurement is missing/undetermined it declines rather than guessing (edge case).
 - **The design brief is authoritative for the model.** Facet inventory, transform-impact taxonomy, cause taxonomy (predicate-fit), and the house-target policy shape are fixed by [docs/source-facets-design.md](../../docs/source-facets-design.md); this spec adds only the transition matrix + migration rules.
 - **Engine team owns this feature** (it mutates KeyboardIR / working copy — constitution Article VI); content owns the facet definitions and the implications prose consumed here.
 - **Starter transition coverage is a subset, honestly bounded.** v1 need not implement every `from → to` pair; unsupported pairs are declined with an explanation (FR-004) rather than silently unavailable. The initial covered set is decided in planning against the fixtures.
@@ -120,7 +120,7 @@ The user's base emits NFD but the user wants NFC output. The studio proposes the
 
 ## Out of Scope
 
-- The classifiers and measurements themselves (spec 037) and the facet-index storage (spec 036).
+- The classifiers and measurements themselves (spec 037) and the facet-index storage (spec 070).
 - The source-facet catalog and schema (design brief items 1–3) — authored as content data, not here.
 - The user-facing confirmation *question* design ([spec 038](../038-adaptation-questions/spec.md)) beyond this engine's propose-then-confirm obligation.
 - Gate facets (`source.mnemonic-vs-positional`, `source.casing`) — measured and surfaced (mnemonic filters base eligibility; casing gates the `source.caps-handling` classifier's applicability), never transformed.

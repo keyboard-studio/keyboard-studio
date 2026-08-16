@@ -1,5 +1,5 @@
 /**
- * UCD fetch-guard test (spec 036 T029; FR-005; research D2).
+ * UCD fetch-guard test (spec 070 T029; FR-005; research D2).
  *
  * `codegen-ucd.mjs` SHA-256-verifies every pinned UCD file BEFORE deriving the
  * lookup: a PLACEHOLDER or mismatched hash must exit non-zero and write NOTHING

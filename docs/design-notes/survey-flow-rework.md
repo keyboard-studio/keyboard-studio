@@ -176,7 +176,7 @@ session was a 24-facet catalog. The live count is **23** —
 ## (c) Small / medium / big triage
 
 The dividing line running through everything below is the **corpus
-keyboard-facet-index**. Verified this session: `specs/036-keyboard-facet-index`
+keyboard-facet-index**. Verified this session: `specs/070-keyboard-facet-index`
 and `specs/037-facet-classifiers` do not exist on disk — there is no
 `specs/03x` folder at all yet, no `docs/keyboard-facet-index.json`, no
 `utilities/facet-index` generator, and no `content/keyboard-facets/`

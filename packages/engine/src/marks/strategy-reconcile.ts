@@ -1,5 +1,5 @@
 // Strategy reconciliation (spec 052 US4, FR-024/FR-025/FR-027; closes the
-// silent-disagreement defect the marks station has carried since spec 046).
+// silent-disagreement defect the marks station has carried since spec 071).
 //
 // The marks series produces the richest statement the survey has about how marks
 // behave — and until this module it went nowhere near strategy selection. The

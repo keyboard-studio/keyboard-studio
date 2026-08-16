@@ -1,4 +1,4 @@
-// Mark-class grouping (spec 046, FR-010): group marks that behave alike so the
+// Mark-class grouping (spec 071, FR-010): group marks that behave alike so the
 // mental-model confirmation is asked once per CLASS, not once per mark. Two
 // signals, per the spec's Key Entities: how similarly the marks attach across
 // base letters (attachment-set similarity over the attested stacks) and their

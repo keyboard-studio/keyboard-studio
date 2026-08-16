@@ -2,7 +2,7 @@
 
 A third piece of prose per flow question, in the catalog that already holds `prompt` and `help_text`. Content-owned values; engine-owned plumbing.
 
-Governed by [specs/050-flow-question-i18n](../../050-flow-question-i18n/spec.md) and [specs/046-i18n-localization/contracts/catalog-format.md](../../046-i18n-localization/contracts/catalog-format.md). Nothing here overrides either.
+Governed by [specs/073-flow-question-i18n](../../073-flow-question-i18n/spec.md) and [specs/046-i18n-localization/contracts/catalog-format.md](../../046-i18n-localization/contracts/catalog-format.md). Nothing here overrides either.
 
 ## §1 The field
 

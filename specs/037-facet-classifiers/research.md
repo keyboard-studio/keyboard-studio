@@ -1,6 +1,6 @@
 # Phase 0 Research: Deterministic Facet Classifiers
 
-037 owns the **classifier algorithms**; [spec 036](../036-keyboard-facet-index/spec.md) owns the record
+037 owns the **classifier algorithms**; [spec 070](../070-keyboard-facet-index/spec.md) owns the record
 shape, freshness, and artifact those classifiers populate. This file resolves every classifier-specific
 unknown, each grounded in the real `lib/ucd/` files and current engine source. Research was gathered
 read-only by the KM crew (km-domain — script; km-keyman — engine analysis surface; km-strategy — strategy

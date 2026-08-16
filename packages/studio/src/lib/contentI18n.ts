@@ -20,8 +20,8 @@ const DEFAULT_LOCALE = "en";
 
 /**
  * The four sidecar catalogs extracted by utilities/i18n-content-extract (T027;
- * `flowQuestions` added by spec 050 US1 for the modular flow-engine's
- * survey-question prose — see specs/050-flow-question-i18n/research.md D5).
+ * `flowQuestions` added by spec 073 US1 for the modular flow-engine's
+ * survey-question prose — see specs/073-flow-question-i18n/research.md D5).
  */
 export type ContentCatalogType = "patterns" | "adaptationQuestions" | "criteria" | "flowQuestions";
 
@@ -52,7 +52,7 @@ type ContentCatalog = Record<string, string>;
  * the shipped browser bundle.
  *
  * Exported so render sites that compose a catalog-key segment themselves
- * (e.g. `QuestionField.tsx`'s `option.<value>.label` keys, spec 050 US1) apply
+ * (e.g. `QuestionField.tsx`'s `option.<value>.label` keys, spec 073 US1) apply
  * the identical transform the extractor used when generating the key on the
  * other end — some FlowOption values contain literal dots (e.g. "0.6").
  */

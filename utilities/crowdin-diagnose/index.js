@@ -69,6 +69,7 @@
 const http = require("node:http");
 const https = require("node:https");
 const { URL } = require("node:url");
+const { httpGetRaw } = require("../../scripts/lib/http-get.cjs");
 
 const BASE_URL = process.env.CROWDIN_BASE_URL || "https://api.crowdin.com";
 const PROJECT_ID = process.env.CROWDIN_PROJECT_ID;
@@ -94,7 +95,10 @@ const EXPECTED_FILES = [
 
 /**
  * The only request primitive. GET is hardcoded: this script must not be able to
- * mutate the project even by a later editing mistake.
+ * mutate the project even by a later editing mistake. It goes through
+ * httpGetRaw (scripts/lib/http-get.cjs), whose signature has no `method`
+ * field at all -- there is no argument through which a call site here could
+ * smuggle a non-GET verb, by accident or otherwise.
  *
  * Uses node:http(s) rather than global fetch deliberately. fetch (undici) holds
  * its sockets open with keep-alive after the response, and on Windows exiting
@@ -104,53 +108,39 @@ const EXPECTED_FILES = [
  * agent with keepAlive:false has no lingering handle and exits cleanly. Caught
  * by selftest.js, which is why it exists.
  */
-function get(pathAndQuery) {
+async function get(pathAndQuery) {
   const url = new URL(`${BASE_URL}/api/v2${pathAndQuery}`);
   const mod = url.protocol === "http:" ? http : https;
   const agent = new mod.Agent({ keepAlive: false });
 
-  return new Promise((resolve, reject) => {
-    const req = mod.request(
-      url,
-      {
-        method: "GET", // never anything else
-        agent,
-        headers: {
-          Authorization: `Bearer ${TOKEN}`,
-          Accept: "application/json",
-          Connection: "close",
-        },
+  let res;
+  try {
+    res = await httpGetRaw(url.toString(), {
+      agent,
+      headers: {
+        Authorization: `Bearer ${TOKEN}`,
+        Accept: "application/json",
+        Connection: "close",
       },
-      (res) => {
-        let body = "";
-        res.setEncoding("utf8");
-        res.on("data", (chunk) => (body += chunk));
-        res.on("end", () => {
-          agent.destroy();
-          if (res.statusCode < 200 || res.statusCode >= 300) {
-            // Never echo the token; the path and status are enough to diagnose.
-            reject(
-              new Error(
-                `GET ${pathAndQuery} -> ${res.statusCode} ${res.statusMessage || ""}` +
-                  (body ? ` :: ${body.slice(0, 300)}` : ""),
-              ),
-            );
-            return;
-          }
-          try {
-            resolve(JSON.parse(body));
-          } catch {
-            reject(new Error(`GET ${pathAndQuery} -> unparseable JSON response`));
-          }
-        });
-      },
-    );
-    req.on("error", (err) => {
-      agent.destroy();
-      reject(new Error(`GET ${pathAndQuery} -> ${err.message}`));
     });
-    req.end();
-  });
+  } catch (err) {
+    agent.destroy();
+    throw new Error(`GET ${pathAndQuery} -> ${err.message}`);
+  }
+  agent.destroy();
+
+  if (res.statusCode < 200 || res.statusCode >= 300) {
+    // Never echo the token; the path and status are enough to diagnose.
+    throw new Error(
+      `GET ${pathAndQuery} -> ${res.statusCode} ${res.statusMessage || ""}` +
+        (res.body ? ` :: ${res.body.slice(0, 300)}` : ""),
+    );
+  }
+  try {
+    return JSON.parse(res.body);
+  } catch {
+    throw new Error(`GET ${pathAndQuery} -> unparseable JSON response`);
+  }
 }
 
 /** Crowdin wraps every resource as { data: ... }, and collections as

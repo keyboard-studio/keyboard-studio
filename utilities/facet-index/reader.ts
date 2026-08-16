@@ -1,5 +1,5 @@
 /**
- * Consumer-facing read surface over a built `FacetIndex` (spec 036 T019).
+ * Consumer-facing read surface over a built `FacetIndex` (spec 070 T019).
  * The offline lookup any downstream consumer (base-browser, gallery, the
  * glottolog bridge) uses instead of scanning the corpus live.
  */

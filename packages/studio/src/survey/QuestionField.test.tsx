@@ -1,8 +1,8 @@
-// Tests for QuestionField's Tier B content-i18n wiring (spec 050 US1).
+// Tests for QuestionField's Tier B content-i18n wiring (spec 073 US1).
 //
 // FlowQuestion prose (prompt/label/body/help_text/options[].label) is
 // resolved through resolveContentString against the "flowQuestions" catalog
-// (specs/050-flow-question-i18n/contracts/flow-question-catalog-format.md),
+// (specs/073-flow-question-i18n/contracts/flow-question-catalog-format.md),
 // falling back to the English value already on the question definition.
 // These tests seed the catalog directly via _setContentCatalogForTesting
 // (the same seam contentI18n.test.ts uses) rather than mocking the dynamic
@@ -148,7 +148,7 @@ describe("QuestionField content-i18n wiring — option labels (radio)", () => {
 describe("QuestionField content-i18n wiring — option notes (radio)", () => {
   // The per-option helper line (RadioOption.note) is rendered prose and must
   // resolve through the same flowQuestions catalog path as the label —
-  // extracted as option.<slug>.note. Before spec 050 it rendered raw English.
+  // extracted as option.<slug>.note. Before spec 073 it rendered raw English.
   const notedRadio: FlowQuestion = {
     id: "track_choice",
     type: "radio",

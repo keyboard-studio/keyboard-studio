@@ -112,7 +112,7 @@ async function mountApp(): Promise<void> {
     loadDraft(activeProjectKey);
   }
 
-  // One-time "My keyboards" rename-duplicate merge (spec 047 US3a, FINDING 3
+  // One-time "My keyboards" rename-duplicate merge (spec 072 US3a, FINDING 3
   // fix) — a DESTRUCTIVE pass (it `clearDraft`s the losing side of a merge),
   // so it belongs here, at boot, gated by a persisted flag, and NOT in any
   // render path. See `runBootRenameReconciliation`'s doc comment in

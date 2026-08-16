@@ -1,4 +1,4 @@
-// Output-form proposal (spec 046, FR-013..FR-016): ONE whole-keyboard decision
+// Output-form proposal (spec 071, FR-013..FR-016): ONE whole-keyboard decision
 // — ready-made single characters vs base-plus-mark sequences — computed from
 // the shared posture table (nfc-posture-of-inventory.ts) as an ordered,
 // first-match-wins decision table with authored explanation text and a

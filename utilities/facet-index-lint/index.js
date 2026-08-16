@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // facet-index-lint — validates the committed per-keyboard facet index
 // (docs/keyboard-facet-index.json) against the content-owned facet definitions
-// (content/keyboard-facets/*.yaml) and the pinned reference data (spec 036 T032).
+// (content/keyboard-facets/*.yaml) and the pinned reference data (spec 070 T032).
 //
 // This is the SECOND gate: the build tool (utilities/facet-index) validates every
 // record at production; this re-checks the committed artifact so a hand-edit or a
