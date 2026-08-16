@@ -883,7 +883,7 @@
   "context": [
     "governing spec: 053-decision-audit (FR-001..FR-028 stand unchanged; this closes the gap to the shipped build)",
     "governing spec: 032-journey-corpus (gallery_edit / mechanism_edit / touch_edit vocabulary, not to be forked)",
-    "governing spec: 050-flow-question-i18n + 046 catalog-format (content.flowQuestion.<id>.<field>; ids are permanent handles)",
+    "governing spec: 073-flow-question-i18n + 046 catalog-format (content.flowQuestion.<id>.<field>; ids are permanent handles)",
     "area: packages/studio/src/decisions (recordEditorStep.ts, headline.ts, impact.ts, recordSurveyAnswers.ts)",
     "area: packages/contracts/src/decisionRecord.ts + schemas.ts (EditorActionSummary, DecisionImpact; drift-guarded pair)",
     "area: packages/engine/src/decision-audit/prSummary.ts (the already-correct reviewer surface to agree with, not reuse)",
@@ -1295,7 +1295,7 @@
       "did": "Documented 053 FR-001..FR-028 as delivered by 055; recorded audit_label content/engine ownership split in the 050 catalog contract and docs/i18n-spike.md",
       "files": [
         "specs/053-decision-audit/spec.md",
-        "specs/050-flow-question-i18n/contracts/flow-question-catalog-format.md",
+        "specs/073-flow-question-i18n/contracts/flow-question-catalog-format.md",
         "docs/i18n-spike.md"
       ]
     },

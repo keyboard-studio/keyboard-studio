@@ -26,12 +26,12 @@ derivations:
     sourceStatus: available
     notes: >
       Implemented as nfcPostureOfInventory() in
-      packages/engine/src/marks/nfc-posture-of-inventory.ts (spec 046): per-pair
+      packages/engine/src/marks/nfc-posture-of-inventory.ts (spec 071): per-pair
       NFC existence check over the confirmed alphabet's attested stacks,
       aggregated by aggregateInventoryPosture().
 
 consumers:
-  # pb_mark_style is retired (spec 046) — the S4 output-form station consumes
+  # pb_mark_style is retired (spec 071) — the S4 output-form station consumes
   # this facet's computed posture directly.
   prefills: []
   proposes:

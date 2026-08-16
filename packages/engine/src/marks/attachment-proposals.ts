@@ -1,4 +1,4 @@
-// Attachment proposals (spec 046, FR-006/FR-007/FR-008/FR-009): the prefilled
+// Attachment proposals (spec 071, FR-006/FR-007/FR-008/FR-009): the prefilled
 // tri-state each S1 attachment row starts from. Attested pairs (observed in
 // the confirmed alphabet) come pre-checked; bases judged plausible by
 // mark-class heuristics come proposed-but-unchecked; every other base is

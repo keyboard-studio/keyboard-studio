@@ -5,8 +5,8 @@
  * from silnrsi/langtags.  No I/O, no network access, no host-disk writes.
  *
  * Generated index: packages/engine/src/langtags/generated/index.ts
- * Data model: specs/023-langtags-defaults/data-model.md
- * Contract:   specs/023-langtags-defaults/contracts/engine-langtags-api.md
+ * Data model: specs/068-langtags-defaults/data-model.md
+ * Contract:   specs/068-langtags-defaults/contracts/engine-langtags-api.md
  */
 
 import type { LanguageDefaults, LanguageSummary } from "@keyboard-studio/contracts";

@@ -1,4 +1,4 @@
-// Mark-treatment prefill (spec 052, FR-009/FR-015; amends spec 046 FR-011):
+// Mark-treatment prefill (spec 052, FR-009/FR-015; amends spec 071 FR-011):
 // the recommended answer each mark-class's S2 confirmation starts from. FR-009
 // forbids an unanswered open choice, so every class arrives with a
 // recommendation already selected and its signals shown.

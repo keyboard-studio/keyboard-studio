@@ -1,8 +1,8 @@
-// Placement-worklist builder (spec 046 FR-020, amended by spec 052): series
+// Placement-worklist builder (spec 071 FR-020, amended by spec 052): series
 // answers → the typed classification the mechanism gallery consumes.
 //
 // Every relevant unit lands in AT LEAST one group, with nothing unclassified
-// (spec 052 SC-009, amending spec 046's SC-007 "exactly once"). Uniqueness was
+// (spec 052 SC-009, amending spec 071's SC-007 "exactly once"). Uniqueness was
 // never what downstream placement needed; totality is. Dual reachability — a
 // mark with its own key whose composed characters ALSO sit on dedicated keys —
 // is an intended outcome of spec 052 FR-003/FR-006, so the old "classified
@@ -97,7 +97,7 @@ export function buildPlacementWorklist(inputs: WorklistInputs): PlacementWorklis
 }
 
 /**
- * The SC-009 coverage invariant (amending spec 046 SC-007): every base and every
+ * The SC-009 coverage invariant (amending spec 071 SC-007): every base and every
  * mark of the confirmed alphabet is accounted for by AT LEAST ONE placement
  * unit, with nothing unclassified — bases as keyed units, marks either as a
  * productive mark unit or through their composed units / blocked pairs.

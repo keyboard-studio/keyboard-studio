@@ -1,5 +1,5 @@
 /**
- * Freshness plumbing for the per-keyboard facet index (spec 036 T010; FR-005).
+ * Freshness plumbing for the per-keyboard facet index (spec 070 T010; FR-005).
  *
  * Two rescan gates:
  *   1. Per-keyboard content hash — incremental (`--incremental`, T030) re-analyzes

@@ -15,7 +15,7 @@
 // external consumers (draftPersistence.test.ts, etc.) are unaffected.
 //
 // Ported from dev's reference implementation (draftAutosave.ts /
-// draftTypes.ts, specs/047-my-keyboards) onto main's existing single-project
+// draftTypes.ts, specs/072-my-keyboards) onto main's existing single-project
 // draft engine (draftPersistence.ts). Adapted:
 //   - `activeStepId` is typed against main's `ActiveStepId`
 //     (stores/surveySessionStore.ts) rather than dev's ad hoc
@@ -31,7 +31,7 @@ import type { DecisionRecordSnapshot } from "../decisions/decisionLogStore.ts";
 
 /**
  * Dev-engine draft envelope (draftAutosave.ts / serverDraftStore callers).
- * The merge of main's "My keyboards" port (spec 047) onto dev left BOTH draft
+ * The merge of main's "My keyboards" port (spec 072) onto dev left BOTH draft
  * engines in place — main's draftPersistence.ts persists `DurableDraft`
  * (below); dev's draftAutosave.ts persists this envelope. Each engine keeps
  * its own record shape; neither is a rename of the other (this one carries a

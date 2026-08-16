@@ -236,7 +236,7 @@ describe("orphan-input lint — every manifested input has a prior producer", ()
     // A module absent from all of them is a genuine fault — an unfinished
     // addition, or an accidental drop from a flow.
     //
-    // spec 046 RELOCATED_EXEMPT: pb_mark_input_order is intentionally
+    // spec 071 RELOCATED_EXEMPT: pb_mark_input_order is intentionally
     // NON-manifested — its content is RELOCATED into the marks series' S3
     // station (survey/marks/InputOrderStation.tsx reads the module's
     // definition), so the module stays registered/on disk but off every manifest.

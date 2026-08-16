@@ -1,4 +1,4 @@
-// AttachmentStation — S1 of the marks series (spec 046, FR-006/007/008/009).
+// AttachmentStation — S1 of the marks series (spec 071, FR-006/007/008/009).
 //
 // One row per mark, asking which of the confirmed base letters may carry it:
 // attested bases come PRE-CHECKED, plausible bases (mark-class heuristics)

@@ -233,11 +233,11 @@ describe("phaseBDraftStore — snapshotPhaseBDraft/applyPhaseBDraftSnapshot roun
 });
 
 // ---------------------------------------------------------------------------
-// Three-store split (spec 046): bases / marks / attestedStacks / declaredRoles
+// Three-store split (spec 071): bases / marks / attestedStacks / declaredRoles
 // derive from the picks; removing a pick never leaves an orphaned mark.
 // ---------------------------------------------------------------------------
 
-describe("phaseBDraftStore — three-store split (spec 046)", () => {
+describe("phaseBDraftStore — three-store split (spec 071)", () => {
   const ACUTE = "́";
 
   beforeEach(() => {

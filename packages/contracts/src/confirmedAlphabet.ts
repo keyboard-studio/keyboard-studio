@@ -66,7 +66,7 @@ export interface BlockedCombination {
 }
 
 /**
- * The S4 whole-keyboard output-form decision (spec 046, FR-013..FR-016):
+ * The S4 whole-keyboard output-form decision (spec 071, FR-013..FR-016):
  * ready-made single (precomposed) characters vs base-plus-mark sequences.
  * Canonical home for the union — the engine's `output-form-policy.ts` (which
  * owns the decision LOGIC, not the type) re-exports this rather than

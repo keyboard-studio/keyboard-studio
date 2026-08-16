@@ -136,7 +136,7 @@ That is FR-041's stated order **verbatim, already shipped**, down to the source 
 Two consequences:
 
 - **The blast-radius argument was backwards.** Conforming `deriveLabel` to FR-041's order renames *nothing* on the "My keyboards" cards — they are already correct. Its only reader is the resume banner's quoted name ([ResumeDraftBanner.tsx:90](../../packages/studio/src/components/ResumeDraftBanner.tsx#L90)), and only in the narrow case where `identityResult` disagrees with `scaffoldSpec` — a case with zero existing test coverage.
-- **Spec 047 settles it independently.** [specs/047-my-keyboards/spec.md](../047-my-keyboards/spec.md) describes the label as derived from `workingCopy.identity` — the identity *patch*, per `workingCopyStore.ts:182` — not `survey.identityResult`, which is the language-identify answer `deriveLabel` reads. 047's account is true of `draftPersistence` and false of `draftAutosave`.
+- **Spec 072 settles it independently.** [specs/072-my-keyboards/spec.md](../072-my-keyboards/spec.md) describes the label as derived from `workingCopy.identity` — the identity *patch*, per `workingCopyStore.ts:182` — not `survey.identityResult`, which is the language-identify answer `deriveLabel` reads. 072's account is true of `draftPersistence` and false of `draftAutosave`.
 
 **Decision as corrected**: `lib/projectLabel.ts` implements FR-041's order, and **both** engines converge on it (tasks T009, T014, T015). The `draftPersistence` side is a pure substitution; the `draftAutosave` side is a real, small behaviour change confined to the resume banner.
 

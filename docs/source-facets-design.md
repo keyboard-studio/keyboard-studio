@@ -188,7 +188,7 @@ toward `U+` values. Hence a policy, not a constant.
    exactly the keyboards that failed to block it.
 2. **Construction classifiers are further rule-structure classifiers** following the
    standard 037 already sets -- no new *classifier* spec is needed (per 037's own
-   out-of-scope note); they are content/engine work under spec 036 extensibility.
+   out-of-scope note); they are content/engine work under spec 070 extensibility.
 
 ## 8. Deliverable packaging
 

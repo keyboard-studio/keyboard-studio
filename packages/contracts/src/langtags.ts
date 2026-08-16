@@ -2,7 +2,7 @@
 //
 // These types are additive: they are NOT part of the locked Pattern/Criterion
 // contract and do not require a joint session to extend.  They supply the data
-// source for specs/002-defaults-engine and specs/023-langtags-defaults.
+// source for specs/002-defaults-engine and specs/068-langtags-defaults.
 //
 // No zod schemas are provided — these are not data-file boundary types; they
 // are produced only by the checked-in codegen artifact and the engine lookup
@@ -19,7 +19,7 @@
  * never fabricated.  Callers must guard each optional before using it as a
  * proposal.
  *
- * @see specs/023-langtags-defaults/data-model.md
+ * @see specs/068-langtags-defaults/data-model.md
  */
 export interface LanguageDefaults {
   /** Canonical bare language subtag (lowercased), e.g. `"ha"`, `"hi"`. */
@@ -86,7 +86,7 @@ export interface RegionVariant {
  * Returned by `listLanguages()` and `lookupByName()` in
  * `@keyboard-studio/engine/langtags`.
  *
- * @see specs/023-langtags-defaults/data-model.md
+ * @see specs/068-langtags-defaults/data-model.md
  */
 export interface LanguageSummary {
   /** Canonical bare language subtag (lowercased) — the value written into the answer/BCP47. */
@@ -117,7 +117,7 @@ export interface LanguageSummary {
  * Shared primitive between specs/023 and specs/002-defaults-engine; this is
  * NOT the full `axisFills` record (which is deferred to specs/002 US5).
  *
- * @see specs/023-langtags-defaults/data-model.md
+ * @see specs/068-langtags-defaults/data-model.md
  */
 export interface LangtagsProvenance {
   /** Literal discriminator in specs/002's provenance vocabulary. */

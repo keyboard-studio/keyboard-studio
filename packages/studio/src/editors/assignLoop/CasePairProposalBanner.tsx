@@ -23,7 +23,7 @@
 // only in message content and button labels/handlers. Markup, styling, and
 // every i18n id below are unchanged by that extraction.
 //
-// @see specs/051-uppercase-counterpart-suggestion/contracts/case-pair-proposal.md
+// @see specs/074-uppercase-counterpart-suggestion/contracts/case-pair-proposal.md
 
 import { Trans, useLingui } from "@lingui/react/macro";
 import { canonicalizeCombo } from "@keyboard-studio/engine";

@@ -231,7 +231,7 @@ test.describe("Touch derivation US1 — import & adapt (spec 035 Scenario A)", (
     // mechanisms -> touch_seed_source -> touch -> help.
     await carveCharacters(page, CARVED_CHARS);
     // The mechanism gallery's worklist may hold more than just PLACED_CHAR —
-    // an accepted marks-series proposal (spec 046) and the case-pair
+    // an accepted marks-series proposal (spec 071) and the case-pair
     // uppercase companion (#1411) can both widen it (see
     // driveMechanismsGallery's doc comment in helpers/surveyFlow.ts) — the
     // shared driver walks whatever is actually there; PLACED_CHAR's own

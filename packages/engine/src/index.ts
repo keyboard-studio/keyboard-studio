@@ -157,7 +157,7 @@ export type { ScaffoldTouchLayoutResult } from "./scaffolder/index.js";
 // spec 035 — touch coverage guard (FR-008/SC-003).
 export { touchCoverage } from "./pattern-apply/touchCoverage.js";
 export type { TouchCoverageResult } from "./pattern-apply/touchCoverage.js";
-// spec 051 — shared "absent touch `layer` slot === default" rule, plus the
+// spec 074 — shared "absent touch `layer` slot === default" rule, plus the
 // shared case->layer placement rule the studio's touch gallery consumes (it
 // used to keep a hand-synced copy — see touchLayer.ts).
 export {
@@ -247,7 +247,7 @@ export type { ConvenienceCandidate, SurplusBasicLatinArgs } from "./character-di
 // SEPARATE, multi-block-per-script table from cldr.ts's calibrated SCRIPT_BLOCKS.
 export { buildCharacterMap, CHARACTER_MAP_BLOCKS, isCombiningMarkChar, isPrivateUseCodePoint } from "./character-discovery/characterMap.js";
 export type { CharacterMapTier, CharacterMapCell, CharacterMapGroup } from "./character-discovery/characterMap.js";
-// Whole-grapheme decomposition for the three-store confirmed alphabet (spec 046):
+// Whole-grapheme decomposition for the three-store confirmed alphabet (spec 071):
 // one base + ordered combining marks; null for PUA / plain letters / digraphs.
 export { decomposeGrapheme } from "./character-discovery/decompose.js";
 export type { GraphemeDecomposition } from "./character-discovery/decompose.js";
@@ -255,7 +255,7 @@ export type { GraphemeDecomposition } from "./character-discovery/decompose.js";
 export { glyphCategory } from "./character-discovery/glyphCategory.js";
 export type { GlyphCategory } from "./character-discovery/glyphCategory.js";
 
-// Marks question series (spec 046): pure engine functions behind the S0-S5
+// Marks question series (spec 071): pure engine functions behind the S0-S5
 // stations — the shared posture table is the single source the facet, the S4
 // proposal, the unwrap stores, and the blocking rules all read.
 export { nfcPostureOfInventory, aggregateInventoryPosture } from "./marks/nfc-posture-of-inventory.js";

@@ -6,7 +6,7 @@
 
 ## Summary
 
-Phase 3b of the Survey Modularity + CYOA plan. The survey **runtime** already resolves Phase A / F / identity-lite through `loadModularFlow` (Phase 3a, spec 012). The legacy `parseFlow` loader and its four full-flow YAMLs now survive only because the **flow-map / dashboard** still reads them for those three sections (Phase B already uses the modular path). 
+Phase 3b of the Survey Modularity + CYOA plan. The survey **runtime** already resolves Phase A / F / identity-lite through `loadModularFlow` (Phase 3a, spec 067). The legacy `parseFlow` loader and its four full-flow YAMLs now survive only because the **flow-map / dashboard** still reads them for those three sections (Phase B already uses the modular path). 
 
 Technical approach, in three independently revertible commits:
 1. **Repoint** the flow map's Phase A / F / identity-lite sections (and the script-routing view) from the legacy `parseFlow` + `*.yaml` to `loadModularFlow` + `*.modular.yaml` + the phase registries — generalizing `buildModularFlowGraph` to accept the registry it should compute reserve nodes against. This is the gating work (US1, P1).

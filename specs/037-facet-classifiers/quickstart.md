@@ -1,7 +1,7 @@
 # Quickstart: Deterministic Facet Classifiers
 
-Validation guide proving the three classifiers work end-to-end and produce the [spec 036](../036-keyboard-facet-index/spec.md)
-index record correctly. The classifiers live inside the `utilities/facet-index/` build tool (036 D1); this
+Validation guide proving the three classifiers work end-to-end and produce the [spec 070](../070-keyboard-facet-index/spec.md)
+index record correctly. The classifiers live inside the `utilities/facet-index/` build tool (070 D1); this
 guide exercises them through the tool's fixtures and a full corpus run. Implementation detail lives in
 [contracts/](contracts/) and [data-model.md](data-model.md).
 

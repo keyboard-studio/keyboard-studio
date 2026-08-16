@@ -81,7 +81,7 @@ export const phaseBRegistry: Readonly<Record<string, QuestionModule>> = {
   pb_punctuation_gate: pbPunctuationGateMod,
   pb_punctuation_list: pbPunctuationListMod,
   pb_digit_set: pbDigitSetMod,
-  // spec 046: pb_accent_marks_gate, pb_diacritic_select, pb_stacking_marks,
+  // spec 071: pb_accent_marks_gate, pb_diacritic_select, pb_stacking_marks,
   // pb_mark_style, pb_capitals_marks are RETIRED from active use (superseded by
   // the marks question series); pb_mark_input_order is relocated as its S3
   // station. Modules stay on disk (demotion, not deletion — spec 022 precedent).

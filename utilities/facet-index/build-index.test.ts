@@ -1,5 +1,5 @@
 /**
- * Full-build smoke test (spec 036 T013; SC-001, X3, X5).
+ * Full-build smoke test (spec 070 T013; SC-001, X3, X5).
  *
  * Written tests-first against the pinned interface:
  *   buildIndex(opts?: BuildOptions): FacetIndex

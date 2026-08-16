@@ -320,7 +320,7 @@ export function ManagedPRSubmitPanel({
       setSubmitState({ kind: "success", prUrl: result.prUrl });
 
       // Transition the active "My keyboards" project to status:"submitted"
-      // (per specs/047-my-keyboards) rather than leaving it as an
+      // (per specs/072-my-keyboards) rather than leaving it as an
       // in-progress draft — see draftPersistence.ts's recordProjectSubmission
       // docstring. Fire-and-forget: this is bookkeeping for the "My
       // keyboards" list, not load-bearing for the success state already

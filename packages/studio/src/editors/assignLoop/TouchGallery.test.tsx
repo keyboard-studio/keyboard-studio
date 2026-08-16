@@ -3139,7 +3139,7 @@ describe("buildTouchMechanismRef — resolved-vkey invariant", () => {
 
   it("builds the expected mechanism ref for each method when resolvedHostKey is a real vkey", () => {
     // Every ref now carries an explicit `layer` derived from the placed
-    // character's case (spec 051 FR-006). "中" is caseless, so it lands on
+    // character's case (spec 074 FR-006). "中" is caseless, so it lands on
     // "default" — the same layer these refs have always targeted, since both
     // appliers treat an absent `layer` as "default".
     expect(buildTouchMechanismRef("longpress_alternates", "K_B", "", "中")).toEqual({
@@ -3162,7 +3162,7 @@ describe("buildTouchMechanismRef — resolved-vkey invariant", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Spec 051 US3 — case-aware touch placement (FR-006) and the shift-layer
+// Spec 074 US3 — case-aware touch placement (FR-006) and the shift-layer
 // case-pair proposal (FR-005).
 //
 // Before the `layer` slot existed, case was UNREPRESENTABLE in a touch
@@ -3171,7 +3171,7 @@ describe("buildTouchMechanismRef — resolved-vkey invariant", () => {
 // derives the layer from the placed character's case.
 // ---------------------------------------------------------------------------
 
-describe("buildTouchMechanismRef — case-derived layer (spec 051 FR-006)", () => {
+describe("buildTouchMechanismRef — case-derived layer (spec 074 FR-006)", () => {
   it("emits layer 'default' for a lowercase letter and 'shift' for its capital", () => {
     expect(
       buildTouchMechanismRef("longpress_alternates", "K_A", "", "a")
@@ -3224,7 +3224,7 @@ describe("buildTouchMechanismRef — case-derived layer (spec 051 FR-006)", () =
   });
 });
 
-describe("TouchGallery — shift-layer case-pair proposal (spec 051 US3)", () => {
+describe("TouchGallery — shift-layer case-pair proposal (spec 074 US3)", () => {
   /** Apply the default long-press method on `hostKey` for the current char. */
   async function applyLongpressOn(hostKey: string) {
     const select = screen.queryByRole("button", { name: /host key/i });
@@ -4154,7 +4154,7 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
 
 // ---------------------------------------------------------------------------
 // Uppercase current char — touchLayerForChar's pre-existing case-derived
-// default (spec 051 FR-006) must survive the layer picker: the picker's
+// default (spec 074 FR-006) must survive the layer picker: the picker's
 // initial value for an uppercase current char is "shift", not "default", and
 // applying on that default layer must not raise a redundant case-pair
 // proposal (casePairTouchTarget(["SHIFT"], …) === null — there is no "more
@@ -4163,7 +4163,7 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
 // current char ("ä"/"θ"/"中").
 // ---------------------------------------------------------------------------
 
-describe("TouchGallery — uppercase current char (spec 051 FR-006 layer-picker regression)", () => {
+describe("TouchGallery — uppercase current char (spec 074 FR-006 layer-picker regression)", () => {
   it("layer builder seeds a SHIFT slot, and applying raises no case-pair proposal", async () => {
     // "Á" is both uppercase (touchLayerForChar -> "shift") and decomposable
     // accented (isDecomposableAccented -> true, so the auto-detected
@@ -4511,14 +4511,14 @@ describe("TouchGallery — case-pair proposal on a non-default touch layer", () 
     expect(acceptBtn()).toBeNull();
   });
 });
-// Spec 051 Phase 7 (T049/T050) — FR-012: the suggestion-Accept path
+// Spec 074 Phase 7 (T049/T050) — FR-012: the suggestion-Accept path
 // (handleUseSuggestion) must carry an explicit `layer`, derived the same way
 // every other placement path derives it (buildTouchMechanismRef /
 // touchLayerForChar) — not a bare literal that silently resolves to
 // "default" for every accepted suggestion, uppercase included.
 // ---------------------------------------------------------------------------
 
-describe("TouchGallery — suggestion Accept carries an explicit layer (spec 051 FR-012)", () => {
+describe("TouchGallery — suggestion Accept carries an explicit layer (spec 074 FR-012)", () => {
   function touchMechanismsFor(char: string) {
     const draft = useWorkingCopyStore.getState().touchDraft;
     return (
@@ -5170,7 +5170,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Spec 051 Phase 7 (T051/T052) — FR-013: case-correct host-key labels.
+// Spec 074 Phase 7 (T051/T052) — FR-013: case-correct host-key labels.
 //
 // A Keyman vkey name carries no case of its own (`K_A` names the A key);
 // case is a property of the layer a placement targets. `hostKeyShortLabel`
@@ -5185,7 +5185,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
 // `layer.includes("caps")` fails HERE (isCasingBearingTouchLayer("ncaps")
 // would flip from false to true) even though hostKeyShortLabel's own output
 // would stay byte-identical for every real key id.
-describe("isCasingBearingTouchLayer — component match, not substring (spec 051 FR-013)", () => {
+describe("isCasingBearingTouchLayer — component match, not substring (spec 074 FR-013)", () => {
   it("is true for shift, caps, and casing-bearing compounds", () => {
     expect(isCasingBearingTouchLayer("shift")).toBe(true);
     expect(isCasingBearingTouchLayer("caps")).toBe(true);
@@ -5204,7 +5204,7 @@ describe("isCasingBearingTouchLayer — component match, not substring (spec 051
   });
 });
 
-describe("hostKeyShortLabel — case-correct labels by layer (spec 051 FR-013)", () => {
+describe("hostKeyShortLabel — case-correct labels by layer (spec 074 FR-013)", () => {
   it("reads lowercase on the default layer and uppercase on the shift layer", () => {
     expect(hostKeyShortLabel("K_A", "default")).toBe("a");
     expect(hostKeyShortLabel("K_A", "shift")).toBe("A");
@@ -5227,7 +5227,7 @@ describe("hostKeyShortLabel — case-correct labels by layer (spec 051 FR-013)",
   });
 });
 
-describe("TouchGallery — host-key label casing in the UI (spec 051 FR-013)", () => {
+describe("TouchGallery — host-key label casing in the UI (spec 074 FR-013)", () => {
   it("renders the configured-mechanism chip in lowercase for a default-layer mechanism", async () => {
     seedStore({ withInventory: ["中"] });
     await act(async () => {

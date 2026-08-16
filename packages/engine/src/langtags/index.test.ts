@@ -1,7 +1,7 @@
 /**
  * Contract tests C1–C9 for the engine langtags lookup API.
  *
- * Source: specs/023-langtags-defaults/contracts/engine-langtags-api.md
+ * Source: specs/068-langtags-defaults/contracts/engine-langtags-api.md
  *
  * C1  ha → Latn/NG
  * C2  hi → Deva/IN

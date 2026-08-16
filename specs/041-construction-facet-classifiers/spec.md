@@ -8,7 +8,7 @@
 
 **Input**: User description: "Implement the classifiers for the 13 currently-planned construction keyboard-facet definitions plus the new `orth.display-difficulty` input facet, so the 'implied' construction decisions a base keyboard carries become visible per base in the shipped facet index."
 
-**Governing sections**: Authoritative design brief [docs/source-facets-design.md](../../docs/source-facets-design.md) (esp. §4 measurement model, §5 facet inventory, §7 spec-037 findings). Predecessor features: [specs/036-keyboard-facet-index](../036-keyboard-facet-index/spec.md) (index shape + storage — exception-site enumeration is deterministically recomputable, not stored) and [specs/037-facet-classifiers](../037-facet-classifiers/spec.md) (the classifier framework + the archetype standard these follow). Downstream consumer (do **not** re-spec here): [specs/039-facet-transform](../039-facet-transform/spec.md), which *switches* facet values — this feature only *measures* them.
+**Governing sections**: Authoritative design brief [docs/source-facets-design.md](../../docs/source-facets-design.md) (esp. §4 measurement model, §5 facet inventory, §7 spec-037 findings). Predecessor features: [specs/070-keyboard-facet-index](../070-keyboard-facet-index/spec.md) (index shape + storage — exception-site enumeration is deterministically recomputable, not stored) and [specs/037-facet-classifiers](../037-facet-classifiers/spec.md) (the classifier framework + the archetype standard these follow). Downstream consumer (do **not** re-spec here): [specs/039-facet-transform](../039-facet-transform/spec.md), which *switches* facet values — this feature only *measures* them.
 
 ## Overview
 
@@ -100,7 +100,7 @@ The `source.encoding` house-target policy needs to know whether a script renders
 - **FR-002**: Each exception site MUST carry a **cause tag** assigned by **predicate-fit**: try a small library of cause predicates and tag the site with whichever fits; when none fits, tag `gap-omission` (the residue).
 - **FR-003**: The cause-predicate library MUST include the two starter predicates — **`character-class`** ("all deviations are combining marks" → `principled-split`) and **`layer-capacity`** ("deviations begin exactly after the primary layer filled" → `capacity-forced`) — and MUST be extensible for content-team-authored predicates.
 - **FR-004**: The `character-class` predicate MUST carry a **script-family applicability guard**: applied only to alphabetic-with-diacritics corpora (Latin/Cyrillic/Greek-family) and **not applied** to abugida/abjad corpora until family-specific predicates exist.
-- **FR-005**: Exception-site enumeration MUST be **deterministically recomputable** from the corpus at build time (spec 037 determinism rule); the committed index stores the **summary** (value + consistency + cause-tag counts), not the per-site enumeration (spec 036 storage rule).
+- **FR-005**: Exception-site enumeration MUST be **deterministically recomputable** from the corpus at build time (spec 037 determinism rule); the committed index stores the **summary** (value + consistency + cause-tag counts), not the per-site enumeration (spec 070 storage rule).
 - **FR-006**: Classification MUST be deterministic — the same corpus commit produces byte-identical index output across runs (no wall-clock or random ordering).
 - **FR-007**: Each classifier MUST attach the correct **provenance tier** (`content-derived` when read from source; the definition's `fallbackChain` tier otherwise) and an **`analyzedCoverage`** reflecting the opaque share of the keyboard's rules.
 
@@ -155,7 +155,7 @@ The `source.encoding` house-target policy needs to know whether a script renders
 - The 13 facet YAML definitions authored by spec 039 are the authoritative value sets; this feature implements classifiers *to* those definitions and does not redefine them (any value-set change is a spec-039/brief-§5 edit, surfaced separately).
 - The transform engine that switches facet values is owned by spec 039; this feature is its measurement input only, cited as the downstream consumer.
 - Classifiers follow the spec-037 archetype standard; no new *classifier-framework* spec is required (design brief §7.2) — the work is content/engine implementation under spec-036 extensibility.
-- Exception-site enumeration is recomputed at build time rather than stored, consistent with spec 036's storage rule and spec 037's determinism rule.
+- Exception-site enumeration is recomputed at build time rather than stored, consistent with spec 070's storage rule and spec 037's determinism rule.
 - Script-family classification (needed for the `character-class` guard and the `normalization-posture` / `casing` not-applicable rules) is available from the existing `script` facet / langtags data; this feature reuses it rather than deriving a new script taxonomy.
 - The `.keyman-touch-layout` files are present in the sibling `keymanapp/keyboards` corpus for keyboards that ship touch layouts; keyboards without them are desktop-only and correctly yield not-applicable touch facets.
 - `orth.display-difficulty` uses Unicode block age + PUA observation only; font-coverage databases are explicitly deferred (brief §10).

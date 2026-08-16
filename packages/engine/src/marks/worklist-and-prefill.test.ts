@@ -1,6 +1,6 @@
-// Worklist + treatment-prefill behaviour (spec 052 US1; amends spec 046 SC-007).
+// Worklist + treatment-prefill behaviour (spec 052 US1; amends spec 071 SC-007).
 //
-// The load-bearing change over spec 046: DUAL REACHABILITY is intended, not an
+// The load-bearing change over spec 071: DUAL REACHABILITY is intended, not an
 // error. A mark may earn its own key AND have promoted composed characters on
 // dedicated keys at the same time (FR-005/FR-006), so the coverage invariant is
 // "at least one unit, nothing unclassified" — the old "classified twice" problem
