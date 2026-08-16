@@ -1,8 +1,8 @@
 # Implementation Plan: Per-Keyboard Facet Index
 
-**Branch**: `036-keyboard-facet-index` | **Date**: 2026-07-14 | **Spec**: [spec.md](spec.md)
+**Branch**: `070-keyboard-facet-index` | **Date**: 2026-07-14 | **Spec**: [spec.md](spec.md)
 
-**Input**: Feature specification from [specs/036-keyboard-facet-index/spec.md](spec.md)
+**Input**: Feature specification from [specs/070-keyboard-facet-index/spec.md](spec.md)
 
 ## Summary
 
@@ -98,7 +98,7 @@ spec 037's classifiers populating the same shape). Corpus scope = `../keyboards/
 ### Documentation (this feature)
 
 ```text
-specs/036-keyboard-facet-index/
+specs/070-keyboard-facet-index/
 ├── plan.md              # This file
 ├── research.md          # Phase 0 — decisions + rationale (generated)
 ├── data-model.md        # Phase 1 — entities + JSON shape (generated)

@@ -2,7 +2,7 @@
 
 **Branch**: `km/langtags-defaults` | **Date**: 2026-06-30 | **Spec**: [spec.md](spec.md)
 
-**Input**: Feature specification from `specs/023-langtags-defaults/spec.md`
+**Input**: Feature specification from `specs/068-langtags-defaults/spec.md`
 
 ## Summary
 
@@ -66,7 +66,7 @@ one compact record + one summary per language subtag (2- and 3-letter keys).
 ### Documentation (this feature)
 
 ```text
-specs/023-langtags-defaults/
+specs/068-langtags-defaults/
 ├── plan.md              # This file
 ├── research.md          # Phase 0 output
 ├── data-model.md        # Phase 1 output

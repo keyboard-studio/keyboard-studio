@@ -3041,7 +3041,7 @@ describe('coordinatedCollateralForSlots', () => {
 // ---------------------------------------------------------------------------
 // isCombining / prefixCombiningMark / displayChar — General_Category M
 // (Mn/Mc/Me) dotted-circle rendering, incl. the Sk exclusion and the
-// double-span (U+0360-0362) two-circle form (spec 046 follow-up, km-domain
+// double-span (U+0360-0362) two-circle form (spec 071 follow-up, km-domain
 // guidance: General_Category is the correct test, NOT canonical combining
 // class — several Mc marks have ccc=0 and would be missed by a ccc test).
 // ---------------------------------------------------------------------------

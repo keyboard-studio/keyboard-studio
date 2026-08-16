@@ -37,7 +37,7 @@ export const definition = {
     },
   ],
   next: [
-    // spec 046: pb_mark_input_order relocated into the marks series (S3);
+    // spec 071: pb_mark_input_order relocated into the marks series (S3);
     // the phonetic branch no longer detours through it here.
     { default: true, goto: "pb_special_letters" },
   ],

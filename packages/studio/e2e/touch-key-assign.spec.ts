@@ -58,7 +58,7 @@ const BASE_KEYBOARD_ID = "bambara";
  *
  * Deliberately NOT a decomposable accented letter (e.g. "é" = e + U+0301):
  * bambara's own alphabet already covers plain a-z, so a decomposable letter
- * would trigger the marks series (spec 046) and its own combining-mark
+ * would trigger the marks series (spec 071) and its own combining-mark
  * placement, which is unrelated to this spec's own focus. "ø" has no NFD
  * decomposition (an atomic letter — `isDecomposableAccented("ø")` is false),
  * so Phase B's marks-series gate skips entirely and Mechanisms sees exactly

@@ -7,7 +7,7 @@ export const definition = {
   id: "pb_latin_digraphs_gate",
   prompt:
     "Does your language treat any combination of letters (two or more) as a single sound -- one that you might want on its own dedicated key?",
-  // FR-026 (spec 046): this question keeps its own home OUTSIDE the marks
+  // FR-026 (spec 071): this question keeps its own home OUTSIDE the marks
   // series — a digraph is a two-LETTER sequence, not a letter+mark pair — but
   // its "is this its own letter of the alphabet, or a sequence?" framing is
   // deliberately PARALLEL to the marks series' mental-model station

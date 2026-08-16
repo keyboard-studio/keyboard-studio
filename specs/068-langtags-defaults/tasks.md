@@ -4,7 +4,7 @@ description: "Task list for SIL langtags defaults at the front of the survey"
 
 # Tasks: SIL langtags defaults at the front of the survey
 
-**Input**: Design documents from `specs/023-langtags-defaults/`
+**Input**: Design documents from `specs/068-langtags-defaults/`
 
 **Prerequisites**: [plan.md](plan.md), [spec.md](spec.md), [research.md](research.md),
 [data-model.md](data-model.md), [contracts/engine-langtags-api.md](contracts/engine-langtags-api.md),

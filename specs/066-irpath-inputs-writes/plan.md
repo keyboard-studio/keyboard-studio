@@ -2,7 +2,7 @@
 
 **Branch**: `claude/survey-modularity-cyoa-plan-pcpg9a` | **Date**: 2026-06-26 | **Spec**: [spec.md](spec.md)
 
-**Input**: Feature specification from `specs/010-irpath-inputs-writes/spec.md`
+**Input**: Feature specification from `specs/066-irpath-inputs-writes/spec.md`
 
 **Governing source**: P2 of [docs/survey-modularity-cyoa-plan.md](../../docs/survey-modularity-cyoa-plan.md) (§3.3, §3.8, §6 P2); contract versioning per spec §18 (joint engine+content session, 2026-06-26) and Constitution Article I.
 
@@ -73,7 +73,7 @@ and write-surface checks are CI gates; per-question tests move to a mirrored tre
 ### Documentation (this feature)
 
 ```text
-specs/010-irpath-inputs-writes/
+specs/066-irpath-inputs-writes/
 ├── plan.md              # This file
 ├── research.md          # Phase 0 output
 ├── data-model.md        # Phase 1 output

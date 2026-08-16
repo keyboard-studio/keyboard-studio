@@ -595,7 +595,7 @@ describe("CharacterMapPane — raw code point entry", () => {
     expect(usePhaseBDraftStore.getState().chars).toEqual([]);
   });
 
-  it("allows a PUA code point after the role prompt (the escape hatch's whole point, spec 046 FR-004)", async () => {
+  it("allows a PUA code point after the role prompt (the escape hatch's whole point, spec 071 FR-004)", async () => {
     seedBaseAndLanguage();
     render(<CharacterMapPane />);
     await waitFor(() => {

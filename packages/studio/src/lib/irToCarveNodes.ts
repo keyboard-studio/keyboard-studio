@@ -134,7 +134,7 @@ export function modifierLabel(rule: IRRule): string {
 
 // ---------------------------------------------------------------------------
 // isCombining — true for the full Unicode Mark category (Mn/Mc/Me, all
-// scripts). General_Category M is the correct test (km-domain, spec 046
+// scripts). General_Category M is the correct test (km-domain, spec 071
 // follow-up): many Mc marks (e.g. Devanagari vowel signs) have canonical
 // combining class (ccc) 0, so a ccc-based test under-detects — General_Category
 // is required, not ccc. Sk "modifier symbol" characters (U+00B4 ACUTE ACCENT,

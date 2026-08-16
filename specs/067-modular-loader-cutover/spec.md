@@ -1,6 +1,6 @@
 # Feature Specification: Modular-loader cutover + legacy YAML retirement
 
-**Feature Branch**: `012-modular-loader-cutover`
+**Feature Branch**: `067-modular-loader-cutover`
 
 **Created**: 2026-06-27
 

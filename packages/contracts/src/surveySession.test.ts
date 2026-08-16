@@ -350,10 +350,10 @@ describe("updateIrAxes()", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Three-store alphabet + marks worklist merge (spec 046)
+// Three-store alphabet + marks worklist merge (spec 071)
 // ---------------------------------------------------------------------------
 
-describe("mergePhaseResults() — alphabet + marksWorklist (spec 046)", () => {
+describe("mergePhaseResults() — alphabet + marksWorklist (spec 071)", () => {
   const ACUTE = "́";
   const GRAVE = "̀";
 

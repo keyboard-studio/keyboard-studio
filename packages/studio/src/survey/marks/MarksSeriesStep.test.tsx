@@ -1,4 +1,4 @@
-// MarksSeriesStep — S0 gate behavior (spec 046 US1).
+// MarksSeriesStep — S0 gate behavior (spec 071 US1).
 //
 // The gate never renders: a marks-free alphabet completes the step immediately
 // with an EMPTY worklist on forward entry, and keeps popping backward on a
@@ -437,7 +437,7 @@ describe("MarksSeriesStep — worklist handoff (US7)", () => {
       render(<MarksSeriesStep onComplete={onComplete} />);
     });
     // S1 renders first; the series completes within the four-station budget
-    // (spec 052 SC-003 supersedes spec 046's five-screen SC-006).
+    // (spec 052 SC-003 supersedes spec 071's five-screen SC-006).
     expect(screen.getByTestId("marks-attachment")).toBeTruthy();
     const screens = continueUntilComplete(onComplete);
     expect(screens).toBeLessThanOrEqual(4);

@@ -1,7 +1,7 @@
 {
   "workflow": "speckit",
   "specName": "Flow-Question Content i18n (Tier B coverage for the modular flow engine)",
-  "branch": "050-flow-question-i18n",
+  "branch": "073-flow-question-i18n",
   "currentStep": "implement",
   "status": "completed",
   "history": [

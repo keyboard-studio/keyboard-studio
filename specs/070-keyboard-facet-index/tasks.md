@@ -4,7 +4,7 @@ description: "Task list for Per-Keyboard Facet Index"
 
 # Tasks: Per-Keyboard Facet Index
 
-**Input**: Design documents from `specs/036-keyboard-facet-index/`
+**Input**: Design documents from `specs/070-keyboard-facet-index/`
 
 **Prerequisites**: [plan.md](plan.md), [spec.md](spec.md), [research.md](research.md), [data-model.md](data-model.md), [contracts/](contracts/), [quickstart.md](quickstart.md)
 

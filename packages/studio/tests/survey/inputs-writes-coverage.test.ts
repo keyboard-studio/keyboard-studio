@@ -19,7 +19,7 @@ describe("inputs/writes coverage gate — every registered module declares both 
   it("registry has at least 97 modules (floor guard — accidental deletions fail here)", () => {
     // Floor guard, not an exact count: the registry grows as questions are
     // added, so a literal `=== N` went red on every legitimate addition.
-    // 102 at spec-034 lock, minus the five marks questions RETIRED by spec 046
+    // 102 at spec-034 lock, minus the five marks questions RETIRED by spec 071
     // (pb_accent_marks_gate, pb_diacritic_select, pb_stacking_marks,
     // pb_mark_style, pb_capitals_marks — superseded by the marks series) = 97.
     expect(Object.keys(questionRegistry).length).toBeGreaterThanOrEqual(97);

@@ -1,6 +1,6 @@
 #!/usr/bin/env -S npx tsx
 /**
- * facet-index CLI (spec 036 T020) — build the per-keyboard facet index.
+ * facet-index CLI (spec 070 T020) — build the per-keyboard facet index.
  *
  * Usage:
  *   npx tsx utilities/facet-index/cli.ts [options]

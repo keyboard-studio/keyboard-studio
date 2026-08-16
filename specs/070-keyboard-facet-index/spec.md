@@ -1,6 +1,6 @@
 # Feature Specification: Per-Keyboard Facet Index
 
-**Feature Branch**: `036-keyboard-facet-index`
+**Feature Branch**: `070-keyboard-facet-index`
 
 **Created**: 2026-07-14
 

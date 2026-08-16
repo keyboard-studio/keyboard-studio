@@ -117,7 +117,7 @@ export const manifest: readonly Step[] = [
   // --- Character inventory (Phase A / Phase B question battery) ---
   charactersStep,
 
-  // --- Marks series (spec 046: S0-S5 accent/mark question series) ---
+  // --- Marks series (spec 071: S0-S5 accent/mark question series) ---
   // Runs immediately after alphabet confirmation, BEFORE carve: how the author
   // thinks of the combined letters must be known before any key work begins.
   // S0 is a computed gate INSIDE the step component: a marks-free alphabet

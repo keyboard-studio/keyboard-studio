@@ -1,4 +1,4 @@
-// StackingStation — S5 of the marks series (spec 046, FR-018/FR-019).
+// StackingStation — S5 of the marks series (spec 071, FR-018/FR-019).
 //
 // Rendered ONLY on stacking evidence: the confirmed alphabet contains an
 // attested combination with two or more marks on one base, or two marks'

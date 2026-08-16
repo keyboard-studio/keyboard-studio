@@ -1,6 +1,6 @@
 # Phase 1 Data Model: Deterministic Facet Classifiers
 
-037 populates the record shape [spec 036](../036-keyboard-facet-index/data-model.md) already defined
+037 populates the record shape [spec 070](../070-keyboard-facet-index/data-model.md) already defined
 (Entity 2 — Keyboard categorization). This file models the entities that are **037's own**: the classifier
 contract every archetype follows, the pinned reference-data lookups the classifiers read, and the
 three concrete classifiers' internal outputs. Field names are the contract 037 ships; per spec Assumption
@@ -181,4 +181,4 @@ feedsSessionFacets: [env.device-mix]
 schemaVersion: 1
 ```
 
-(The `script.yaml` definition is illustrated in [036 data-model](../036-keyboard-facet-index/data-model.md).)
+(The `script.yaml` definition is illustrated in [070 data-model](../070-keyboard-facet-index/data-model.md).)

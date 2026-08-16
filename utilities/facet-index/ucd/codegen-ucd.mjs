@@ -2,7 +2,7 @@
 /**
  * Derives a slim, deterministic per-codepoint script lookup from the pinned
  * Unicode Character Database (UCD) files, for the facet-index script classifier
- * (spec 036 T005; FR-005).
+ * (spec 070 T005; FR-005).
  *
  * Inputs (read from lib/ucd/, pinned in scripts/ucd-version.json):
  *   Scripts.txt              codepoint → Script (long names, incl. Common/Inherited)
@@ -310,9 +310,9 @@ const generated = `\
 // unicode: ${pin.unicodeVersion}
 //
 // Slim per-codepoint script lookup for the facet-index script classifier
-// (spec 036). Ranges are sorted by start and coalesced; binary-search accessors
+// (spec 070). Ranges are sorted by start and coalesced; binary-search accessors
 // below. Common (Zyyy) / Inherited (Zinh) are returned as-is — the classifier
-// treats them as neutral (never dilutes a distribution). See spec 036 research D2.
+// treats them as neutral (never dilutes a distribution). See spec 070 research D2.
 
 /** Pinned Unicode release this lookup was derived from. */
 export const unicodeVersion = ${JSON.stringify(pin.unicodeVersion)};

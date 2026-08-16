@@ -1,6 +1,6 @@
 # Tasks: IRPath + declared `inputs`/`writes` + folder-per-question opt-in
 
-**Input**: Design documents from `specs/010-irpath-inputs-writes/`
+**Input**: Design documents from `specs/066-irpath-inputs-writes/`
 **Prerequisites**: plan.md, spec.md (+ research.md, data-model.md, contracts/, quickstart.md)
 
 **Governing source**: P2 of [docs/survey-modularity-cyoa-plan.md](../../docs/survey-modularity-cyoa-plan.md) (§3.3, §3.8, §6 P2); spec §18 + Constitution Article I.
@@ -133,7 +133,7 @@
 ## Phase 8: Polish & Cross-Cutting Concerns
 
 - [x] T025 [P] Run the full gate: `pnpm typecheck && pnpm -r test && pnpm lint && pnpm depcruise` — all green; confirm `mutate()` is still a stub (Constitution II / FR-005)
-- [x] T026 [P] Execute the 7 validation scenarios in `specs/010-irpath-inputs-writes/quickstart.md`
+- [x] T026 [P] Execute the 7 validation scenarios in `specs/066-irpath-inputs-writes/quickstart.md`
 - [x] T027 Update the P2 status note in `docs/survey-modularity-cyoa-plan.md` and confirm the `IRPath`/`inputs`/`writes` contract is locked & exported for P0 consumption (FR-012)
 - [x] T028 [P] Finalize the CHANGELOG entry for the `@keyboard-studio/contracts` breaking bump (area `contracts`); reconcile the chosen version (T002) once the user confirms 0.11.0 vs 1.0.0
 

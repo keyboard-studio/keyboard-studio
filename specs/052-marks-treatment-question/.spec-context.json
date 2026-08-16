@@ -1008,9 +1008,9 @@
     },
     "T012": {
       "status": "DONE",
-      "did": "Amended spec 046 in the same change: FR-010 (three-part answer), FR-011 (key budget signal), FR-012 (order no longer its own station), SC-006 (five->four, superseded by 052 SC-003), SC-007 (exactly once -> at least once)",
+      "did": "Amended spec 071 in the same change: FR-010 (three-part answer), FR-011 (key budget signal), FR-012 (order no longer its own station), SC-006 (five->four, superseded by 052 SC-003), SC-007 (exactly once -> at least once)",
       "files": [
-        "specs/046-marks-question-series/spec.md"
+        "specs/071-marks-question-series/spec.md"
       ]
     },
     "T013": {

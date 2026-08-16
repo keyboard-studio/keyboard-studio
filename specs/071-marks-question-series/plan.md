@@ -1,8 +1,8 @@
 # Implementation Plan: Mark Composition Model and the Marks Question Series
 
-**Branch**: `046-marks-question-series` | **Date**: 2026-07-21 | **Spec**: [spec.md](spec.md)
+**Branch**: `071-marks-question-series` | **Date**: 2026-07-21 | **Spec**: [spec.md](spec.md)
 
-**Input**: Feature specification from `specs/046-marks-question-series/spec.md`, implementing the design in [docs/design-notes/mark-composition-model.md](../../docs/design-notes/mark-composition-model.md).
+**Input**: Feature specification from `specs/071-marks-question-series/spec.md`, implementing the design in [docs/design-notes/mark-composition-model.md](../../docs/design-notes/mark-composition-model.md).
 
 ## Summary
 
@@ -15,7 +15,7 @@ Stack is the existing one throughout (TypeScript monorepo; React + Vite studio, 
 ### Documentation (this feature)
 
 ```text
-specs/046-marks-question-series/
+specs/071-marks-question-series/
 ├── plan.md              # This file
 ├── research.md          # Phase 0 decisions
 ├── data-model.md        # Phase 1 entities

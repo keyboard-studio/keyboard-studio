@@ -1,6 +1,6 @@
 # Feature Specification: Flow-Question Content i18n (Tier B coverage for the modular flow engine)
 
-**Feature Branch**: `050-flow-question-i18n`
+**Feature Branch**: `073-flow-question-i18n`
 
 **Created**: 2026-07-27
 

@@ -271,7 +271,7 @@ export interface SurveySessionState {
 
   /**
    * Direction of the last traversal move: "advance" (forward) or "pop"
-   * (back-navigation). Lets a computed-gate step (spec 046 "marks": S0 skips
+   * (back-navigation). Lets a computed-gate step (spec 071 "marks": S0 skips
    * the whole series when the alphabet has no marks) stay TRANSPARENT in both
    * directions — on a forward entry the skip advances onward, on a back-pop
    * entry it keeps popping backward instead of bouncing the user forward.
@@ -279,11 +279,11 @@ export interface SurveySessionState {
   lastNavigation: "advance" | "pop";
 
   /**
-   * Spec 046 R10 (recorded consequence, not acted on): the designer picked the
+   * spec 071 R10 (recorded consequence, not acted on): the designer picked the
    * base-plus-mark output form while adapting a base whose own content uses
    * ready-made forms — the base's existing content needs a follow-on
    * conversion. This flag only RECORDS that the need exists; building the
-   * conversion is out of scope for spec 046.
+   * conversion is out of scope for spec 071.
    *
    * Unrelated to the `markedForLaterDesktop` / `markedForLaterTouch` fields
    * below despite the shared "mark" vocabulary — those are the
@@ -378,7 +378,7 @@ export interface SurveySessionState {
    */
   advance: (stepId: ActiveStepId) => void;
 
-  /** Record the spec 046 R10 migration-need consequence (see marksMigrationNeeded). */
+  /** Record the spec 071 R10 migration-need consequence (see marksMigrationNeeded). */
   setMarksMigrationNeeded: (needed: boolean) => void;
 
   /**

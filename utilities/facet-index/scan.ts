@@ -1,5 +1,5 @@
 /**
- * Corpus scanner for the per-keyboard facet index (spec 036 T009).
+ * Corpus scanner for the per-keyboard facet index (spec 070 T009).
  *
  * Enumerates every keyboard in a `keymanapp/keyboards` `release/` checkout and
  * reads the source bytes each classifier + the freshness plumbing need. Scope

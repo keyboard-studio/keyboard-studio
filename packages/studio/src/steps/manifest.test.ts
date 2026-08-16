@@ -118,7 +118,7 @@ describe("M2 — spine order matches FR-012", () => {
     assertStepOrder(spineSteps(manifest), "characters", "carve");
   });
 
-  it("'marks' sits between 'characters' and 'carve' on the spine (spec 046 reorder — combined-letter answers precede all key work)", () => {
+  it("'marks' sits between 'characters' and 'carve' on the spine (spec 071 reorder — combined-letter answers precede all key work)", () => {
     const spine = spineSteps(manifest);
     assertStepOrder(spine, "characters", "marks");
     assertStepOrder(spine, "marks", "punctuation");

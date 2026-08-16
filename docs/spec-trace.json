@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-08-11",
+  "lastUpdated": "2026-08-16",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -270,7 +270,7 @@
     },
     "specs/002-defaults-engine": {
       "title": "Feature Specification: Defaults engine (propose-then-confirm proposers)",
-      "hash": "sha256:297cf8deef75246c",
+      "hash": "sha256:f89242b98574e472",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -325,7 +325,7 @@
     },
     "specs/014-mutate-seam-touch-propagation": {
       "title": "Feature Specification: KeyboardIR `mutate` seam + touch propagation",
-      "hash": "sha256:517e6db32b3b3c0d",
+      "hash": "sha256:7913503b5c8e43b6",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -347,14 +347,6 @@
       "decisions": [],
       "notes": ""
     },
-    "specs/010-irpath-inputs-writes": {
-      "title": "Feature Specification: IRPath + declared `inputs`/`writes` + folder-per-question opt-in",
-      "hash": "sha256:0ae9ee0a8dd28f68",
-      "status": "unreviewed",
-      "implements": [],
-      "decisions": [],
-      "notes": ""
-    },
     "specs/011-ui-primitives": {
       "title": "Feature Specification: Shared `ui/` Primitive Library Extraction",
       "hash": "sha256:46212ea1a4401440",
@@ -363,17 +355,9 @@
       "decisions": [],
       "notes": ""
     },
-    "specs/012-modular-loader-cutover": {
-      "title": "Feature Specification: Modular-loader cutover + legacy YAML retirement",
-      "hash": "sha256:76346b548f3861fa",
-      "status": "unreviewed",
-      "implements": [],
-      "decisions": [],
-      "notes": ""
-    },
     "specs/012-step-model-manifest": {
       "title": "Feature Specification: Unified Step Model + Manifest-Driven Survey Ordering",
-      "hash": "sha256:7374bc00d7fb183e",
+      "hash": "sha256:33b7f0e6674b32fd",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -381,7 +365,7 @@
     },
     "specs/013-retire-legacy-flow-loader": {
       "title": "Feature Specification: Retire the legacy full-YAML survey flow loader",
-      "hash": "sha256:eb743da66e1741c8",
+      "hash": "sha256:c421d4afcff11164",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -459,14 +443,6 @@
       "decisions": [],
       "notes": ""
     },
-    "specs/023-langtags-defaults": {
-      "title": "Feature Specification: SIL langtags defaults at the front of the survey",
-      "hash": "sha256:7b1284585f5a120d",
-      "status": "unreviewed",
-      "implements": [],
-      "decisions": [],
-      "notes": ""
-    },
     "specs/025-qu-proposed-flows-library": {
       "title": "Feature Specification: Proposed-flow Library section on the Flow Map",
       "hash": "sha256:caa5f5b8b899ec7c",
@@ -522,14 +498,6 @@
       "implements": [],
       "decisions": [],
       "notes": "Merged km/codebase-cleanup <- main (#1074): hash conflicted between branches (HEAD sha256:099e0805f6251fc7 vs main sha256:30e820a16c8bfd88); kept main's per the merge-resolution policy of preferring main's data on irreconcilable same-key/different-hash entries."
-    },
-    "specs/030-step-model-gates": {
-      "title": "Feature Specification: Step-model constitutional gates — machine-enforced survey integrity checks",
-      "hash": "sha256:65328b4f26369a55",
-      "status": "unreviewed",
-      "implements": [],
-      "decisions": [],
-      "notes": ""
     },
     "specs/031-specref-trace-join": {
       "title": "Feature Specification: specRef anchors + spec-trace impacted-steps join — automated code-to-spec traceability",
@@ -595,17 +563,9 @@
       "decisions": [],
       "notes": ""
     },
-    "specs/036-keyboard-facet-index": {
-      "title": "Feature Specification: Per-Keyboard Facet Index",
-      "hash": "sha256:8f09b07eb90c6422",
-      "status": "unreviewed",
-      "implements": [],
-      "decisions": [],
-      "notes": ""
-    },
     "specs/037-facet-classifiers": {
       "title": "Feature Specification: Deterministic Facet Classifiers (Script + Two Representative Facets)",
-      "hash": "sha256:a6b4cc496de4e182",
+      "hash": "sha256:78f57e6bc58a64a5",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -613,7 +573,7 @@
     },
     "specs/038-adaptation-questions": {
       "title": "Feature Specification: En-Masse Adaptation Preference Questions",
-      "hash": "sha256:3538f1ba62f789a4",
+      "hash": "sha256:0a824fd16190cfd4",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -621,7 +581,7 @@
     },
     "specs/039-facet-transform": {
       "title": "Feature Specification: Facet Transform Engine",
-      "hash": "sha256:4e1de5eafeddd550",
+      "hash": "sha256:6430bfbccf228894",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -629,7 +589,7 @@
     },
     "specs/041-construction-facet-classifiers": {
       "title": "Feature Specification: Construction Facet Classifiers",
-      "hash": "sha256:7974b0e191dbbd26",
+      "hash": "sha256:73885e38a7998180",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -651,25 +611,9 @@
       "decisions": [],
       "notes": ""
     },
-    "specs/046-marks-question-series": {
-      "title": "Feature Specification: Mark Composition Model and the Marks Question Series",
-      "hash": "sha256:1fd45ce21e849469",
-      "status": "unreviewed",
-      "implements": [],
-      "decisions": [],
-      "notes": ""
-    },
     "specs/044-cldr-sldr-exemplars": {
       "title": "Feature Specification: CLDR/SLDR exemplars",
-      "hash": "sha256:efb413d2330a32fc",
-      "status": "unreviewed",
-      "implements": [],
-      "decisions": [],
-      "notes": ""
-    },
-    "specs/050-flow-question-i18n": {
-      "title": "Feature Specification: Flow-Question Content i18n (Tier B coverage for the modular flow engine)",
-      "hash": "sha256:a4a726a55cc4a74a",
+      "hash": "sha256:b91993926213d0c6",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -685,7 +629,7 @@
     },
     "specs/043-base-selection-facets": {
       "title": "Feature Specification: Base-Selection & Strategy Facet Classifiers",
-      "hash": "sha256:cdf3150978b2deb8",
+      "hash": "sha256:f2d928c02a1bff89",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -709,15 +653,7 @@
     },
     "specs/049-lowercase-diacritic-questions": {
       "title": "Feature Specification: Show only lowercase base letters in the diacritic (marks) survey questions",
-      "hash": "sha256:57a01dcdb5c6b91a",
-      "status": "unreviewed",
-      "implements": [],
-      "decisions": [],
-      "notes": ""
-    },
-    "specs/047-my-keyboards": {
-      "title": "Feature Specification: My Keyboards — per-user multi-project draft + submission list",
-      "hash": "sha256:ac67a00804861135",
+      "hash": "sha256:ef0236dcf93ded9a",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -739,17 +675,9 @@
       "decisions": [],
       "notes": ""
     },
-    "specs/051-uppercase-counterpart-suggestion": {
-      "title": "Feature Specification: Suggest the uppercase counterpart when a lowercase cased letter is placed",
-      "hash": "sha256:f09f4bced33a0614",
-      "status": "unreviewed",
-      "implements": [],
-      "decisions": [],
-      "notes": ""
-    },
     "specs/052-marks-treatment-question": {
       "title": "Feature Specification: Marks treatment question",
-      "hash": "sha256:c67294a07baf3ef8",
+      "hash": "sha256:76ca2e8defab340a",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -773,7 +701,7 @@
     },
     "specs/055-legible-decision-trail": {
       "title": "Feature Specification: Legible decision trail — every stage reports what it did",
-      "hash": "sha256:584aac4859b80265",
+      "hash": "sha256:021331657d52147d",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -813,7 +741,7 @@
     },
     "specs/057-bulletproof-navigation": {
       "title": "Feature Specification: Bulletproof navigation — return where you were, compare without consequence, and jump back to any decision",
-      "hash": "sha256:acd0344ca4aeb0ea",
+      "hash": "sha256:d88aceb7bf36cac7",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -846,6 +774,78 @@
     "specs/062-canonical-context-tolerance": {
       "title": "Feature Specification: Canonical-equivalence context tolerance",
       "hash": "sha256:2dcbb535f9285319",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/066-irpath-inputs-writes": {
+      "title": "Feature Specification: IRPath + declared `inputs`/`writes` + folder-per-question opt-in",
+      "hash": "sha256:0ae9ee0a8dd28f68",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/067-modular-loader-cutover": {
+      "title": "Feature Specification: Modular-loader cutover + legacy YAML retirement",
+      "hash": "sha256:ec522a08c5668057",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/068-langtags-defaults": {
+      "title": "Feature Specification: SIL langtags defaults at the front of the survey",
+      "hash": "sha256:7b1284585f5a120d",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/069-step-model-gates": {
+      "title": "Feature Specification: Step-model constitutional gates — machine-enforced survey integrity checks",
+      "hash": "sha256:65328b4f26369a55",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/070-keyboard-facet-index": {
+      "title": "Feature Specification: Per-Keyboard Facet Index",
+      "hash": "sha256:cb5b4fc33276039f",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/071-marks-question-series": {
+      "title": "Feature Specification: Mark Composition Model and the Marks Question Series",
+      "hash": "sha256:efb61d3106e332ea",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/072-my-keyboards": {
+      "title": "Feature Specification: My Keyboards — per-user multi-project draft + submission list",
+      "hash": "sha256:ac67a00804861135",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/073-flow-question-i18n": {
+      "title": "Feature Specification: Flow-Question Content i18n (Tier B coverage for the modular flow engine)",
+      "hash": "sha256:197852d9b54b3180",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/074-uppercase-counterpart-suggestion": {
+      "title": "Feature Specification: Suggest the uppercase counterpart when a lowercase cased letter is placed",
+      "hash": "sha256:ca92be519a1e69aa",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

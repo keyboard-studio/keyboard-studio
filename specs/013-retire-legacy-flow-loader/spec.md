@@ -10,7 +10,7 @@
 
 ## Context & Governing Source
 
-This feature implements **Phase 3b (P3 part b)** of the Survey Modularity + CYOA plan. Phase 3a (shipped as [`specs/012-modular-loader-cutover`](../012-modular-loader-cutover/spec.md)) cut the survey **runtime** for Phase A, Phase F, and identity-lite from the legacy `parseFlow` loader to `loadModularFlow`, and created `content/flows/identity_lite.modular.yaml`. With that done, the legacy full-YAML loader and its four full-flow YAMLs are now redundant **delivery forms** of questions that already exist as modular question modules.
+This feature implements **Phase 3b (P3 part b)** of the Survey Modularity + CYOA plan. Phase 3a (shipped as [`specs/067-modular-loader-cutover`](../067-modular-loader-cutover/spec.md)) cut the survey **runtime** for Phase A, Phase F, and identity-lite from the legacy `parseFlow` loader to `loadModularFlow`, and created `content/flows/identity_lite.modular.yaml`. With that done, the legacy full-YAML loader and its four full-flow YAMLs are now redundant **delivery forms** of questions that already exist as modular question modules.
 
 Per plan §3.8 ("Question library / reserve — preserve, don't delete"), this deletion removes **only redundant delivery forms**. The question *research content* — especially non-Roman-script questions — already lives in the modular `survey/questions/` modules and MUST NOT be touched.
 

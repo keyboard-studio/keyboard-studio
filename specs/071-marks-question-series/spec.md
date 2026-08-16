@@ -1,6 +1,6 @@
 # Feature Specification: Mark Composition Model and the Marks Question Series
 
-**Feature Branch**: `046-marks-question-series`
+**Feature Branch**: `071-marks-question-series`
 
 **Created**: 2026-07-21
 

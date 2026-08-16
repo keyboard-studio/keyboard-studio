@@ -4,7 +4,7 @@ description: "Task list for feature 051 — suggest the uppercase counterpart wh
 
 # Tasks: Suggest the uppercase counterpart when a lowercase cased letter is placed
 
-**Input**: Design documents from `/specs/051-uppercase-counterpart-suggestion/`
+**Input**: Design documents from `/specs/074-uppercase-counterpart-suggestion/`
 
 **Prerequisites**: [plan.md](plan.md), [spec.md](spec.md), [research.md](research.md),
 [data-model.md](data-model.md), [contracts/case-pair-proposal.md](contracts/case-pair-proposal.md),

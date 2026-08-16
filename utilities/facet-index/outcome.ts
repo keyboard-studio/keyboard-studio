@@ -1,5 +1,5 @@
 /**
- * Analysis-outcome + coverage mapping (spec 036 T016; FR-010). Reused by every
+ * Analysis-outcome + coverage mapping (spec 070 T016; FR-010). Reused by every
  * classifier so "how much of the keyboard did the analysis actually see" is
  * computed one way, not forked per facet.
  */

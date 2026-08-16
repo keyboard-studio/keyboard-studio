@@ -1,5 +1,5 @@
 /**
- * Incremental-rescan test (spec 036 T028; SC-004; US3 acceptance 1-3).
+ * Incremental-rescan test (spec 070 T028; SC-004; US3 acceptance 1-3).
  *
  * Two layers:
  *   1. `planRescan` unit checks — a changed source hash marks only that keyboard

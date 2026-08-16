@@ -1,6 +1,6 @@
 # Feature Specification: Suggest the uppercase counterpart when a lowercase cased letter is placed
 
-**Feature Branch**: `051-uppercase-counterpart-suggestion`
+**Feature Branch**: `074-uppercase-counterpart-suggestion`
 
 **Created**: 2026-07-28
 

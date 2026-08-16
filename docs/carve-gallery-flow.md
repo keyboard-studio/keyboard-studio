@@ -36,7 +36,7 @@ flowchart LR
   track["track<br/>copy vs adapt"]
   pname["project_name<br/>(off-spine · copy only)"]
   chars["characters<br/>Phase A/B questions"]
-  marks["marks<br/>spec 046 series<br/>(S0 auto-skip)"]
+  marks["marks<br/>spec 071 series<br/>(S0 auto-skip)"]
   conv["convenience<br/>keep surplus A-Z?<br/>(auto-skip)"]
   carve["carve ◆<br/>Phase D · remove"]:::here
   mech["mechanisms<br/>Phase C · +physical<br/>lock: physical"]
@@ -68,7 +68,7 @@ orthography actually requires. Two immediately-preceding spine steps shape it,
 and both have a computed gate that skips without rendering when they have
 nothing to ask, so the common path is invisible.
 
-- **`marks`** ([spec 046](../specs/046-marks-question-series/)) produces
+- **`marks`** ([spec 071](../specs/071-marks-question-series/)) produces
   `session.marksWorklist` + `session.marksOutputForm`. The output form decides
   whether the produced-vs-needed comparison normalizes to NFC or NFD, so it
   changes what counts as a match.

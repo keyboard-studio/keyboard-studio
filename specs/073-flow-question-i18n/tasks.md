@@ -4,7 +4,7 @@ description: "Task list — Flow-Question Content i18n (Tier B coverage for the 
 
 # Tasks: Flow-Question Content i18n (Tier B coverage for the modular flow engine)
 
-**Input**: Design documents from `/specs/050-flow-question-i18n/`
+**Input**: Design documents from `/specs/073-flow-question-i18n/`
 
 **Prerequisites**: [plan.md](plan.md), [spec.md](spec.md), [research.md](research.md), [data-model.md](data-model.md), [contracts/flow-question-catalog-format.md](contracts/flow-question-catalog-format.md), [quickstart.md](quickstart.md)
 

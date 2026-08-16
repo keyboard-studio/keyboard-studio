@@ -1,8 +1,8 @@
 # Implementation Plan: Flow-Question Content i18n (Tier B coverage for the modular flow engine)
 
-**Branch**: `050-flow-question-i18n` | **Date**: 2026-07-27 | **Spec**: [spec.md](spec.md)
+**Branch**: `073-flow-question-i18n` | **Date**: 2026-07-27 | **Spec**: [spec.md](spec.md)
 
-**Input**: Feature specification from `/specs/050-flow-question-i18n/spec.md`
+**Input**: Feature specification from `/specs/073-flow-question-i18n/spec.md`
 
 **Note**: This template is filled in by the `/speckit-plan` command. See `.specify/templates/plan-template.md` for the execution workflow.
 
@@ -52,7 +52,7 @@ Every modular flow-engine question's `prompt`/`label`/`body`/`help_text` (and `o
 ### Documentation (this feature)
 
 ```text
-specs/050-flow-question-i18n/
+specs/073-flow-question-i18n/
 ├── plan.md              # This file (/speckit-plan command output)
 ├── research.md          # Phase 0 output (/speckit-plan command)
 ├── data-model.md        # Phase 1 output (/speckit-plan command)

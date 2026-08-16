@@ -6191,13 +6191,13 @@ describe("MechanismGallery — sequence builder accepts real click+type (user-ev
 });
 
 // ---------------------------------------------------------------------------
-// Spec 051 — the case-pair proposal now comes from the SHARED hook + banner
+// spec 074 — the case-pair proposal now comes from the SHARED hook + banner
 // (useCasePairCompanion / CasePairProposalBanner). The existing companion
 // cases above are the behaviour-preservation gate (SC-005); these two pin the
 // contract's identity surface that the extraction makes load-bearing.
 // ---------------------------------------------------------------------------
 
-describe("MechanismGallery — shared case-pair affordance (spec 051)", () => {
+describe("MechanismGallery — shared case-pair affordance (spec 074)", () => {
   it("renders the proposal through the shared banner's role/aria-label contract (FR-011)", async () => {
     instantiateWorkingCopy();
     seedInventory(["θ"]);
@@ -6264,14 +6264,14 @@ describe("MechanismGallery — shared case-pair affordance (spec 051)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Spec 051 US2 — S-02 parallel combo (uppercase base letter -> uppercase output)
+// spec 074 US2 — S-02 parallel combo (uppercase base letter -> uppercase output)
 //
 // The case-shifted elements are the BASE LETTER and the OUTPUT. The trigger
 // key, its deadkey name, and the accent character are carried across
 // unchanged: a dead key is an accent selector, not a letter.
 // ---------------------------------------------------------------------------
 
-describe("MechanismGallery — S-02 parallel-combo proposal (spec 051 US2)", () => {
+describe("MechanismGallery — S-02 parallel-combo proposal (spec 074 US2)", () => {
   it("a dead-key apply producing a lowercase accented letter raises a proposal", async () => {
     instantiateWorkingCopy();
     seedInventory(["á"]);
@@ -6395,12 +6395,12 @@ describe("MechanismGallery — S-02 parallel-combo proposal (spec 051 US2)", () 
 });
 
 // ---------------------------------------------------------------------------
-// Spec 051 US2 — S-03 parallel combo. The proposal is raised in the gallery
+// spec 074 US2 — S-03 parallel combo. The proposal is raised in the gallery
 // (which owns the one hook and the one banner) from the sequence panel's
 // onApplied seam; the panel renders no banner of its own.
 // ---------------------------------------------------------------------------
 
-describe("MechanismGallery — S-03 parallel-combo proposal (spec 051 US2)", () => {
+describe("MechanismGallery — S-03 parallel-combo proposal (spec 074 US2)", () => {
   async function applySequence(content: string, indicator: string) {
     fireEvent.click(screen.getByText(/Type a sequence/i));
     fireEvent.change(screen.getByTestId("sequences-content"), {
@@ -6497,12 +6497,12 @@ describe("MechanismGallery — S-03 parallel-combo proposal (spec 051 US2)", () 
 });
 
 // ---------------------------------------------------------------------------
-// Spec 051 P1 fix — "counterpart already placed" (spec §Edge Cases), wired to
+// spec 074 P1 fix — "counterpart already placed" (spec §Edge Cases), wired to
 // the physical (S-01) and combo (S-02/S-03) mechanisms. The touch mechanism
 // already had this wired (TouchGallery.tsx); these lock the other two.
 // ---------------------------------------------------------------------------
 
-describe("MechanismGallery — 'counterpart already placed' suppression (spec 051 P1 fix)", () => {
+describe("MechanismGallery — 'counterpart already placed' suppression (spec 074 P1 fix)", () => {
   it("physical (S-01): no companion prompt when the counterpart is already on the shift layer of the same key", async () => {
     instantiateWorkingCopy();
     seedInventory(["θ"]);

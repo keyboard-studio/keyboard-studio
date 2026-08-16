@@ -1,7 +1,7 @@
 {
   "workflow": "speckit",
-  "specName": "036-keyboard-facet-index",
-  "branch": "036-keyboard-facet-index",
+  "specName": "070-keyboard-facet-index",
+  "branch": "070-keyboard-facet-index",
   "selectedAt": "2026-07-14T21:21:55.307Z",
   "currentStep": "implement",
   "status": "completed",

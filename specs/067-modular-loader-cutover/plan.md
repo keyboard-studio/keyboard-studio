@@ -1,8 +1,8 @@
 # Implementation Plan: Modular-loader cutover + legacy YAML retirement
 
-**Branch**: `012-modular-loader-cutover` | **Date**: 2026-06-27 | **Spec**: [spec.md](spec.md)
+**Branch**: `067-modular-loader-cutover` | **Date**: 2026-06-27 | **Spec**: [spec.md](spec.md)
 
-**Input**: Feature specification from `specs/012-modular-loader-cutover/spec.md`
+**Input**: Feature specification from `specs/067-modular-loader-cutover/spec.md`
 
 ## Summary
 
@@ -54,7 +54,7 @@ Finish the #410 tail by cutting Phase A, Phase F, and identity-lite from the leg
 ### Documentation (this feature)
 
 ```text
-specs/012-modular-loader-cutover/
+specs/067-modular-loader-cutover/
 ├── plan.md              # This file
 ├── research.md          # Phase 0 output
 ├── data-model.md        # Phase 1 output

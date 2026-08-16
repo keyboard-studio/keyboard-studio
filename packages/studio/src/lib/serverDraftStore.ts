@@ -25,7 +25,7 @@
 // shape) lands in the server's reserved single-slot default, unchanged from
 // today.
 //
-// Ported from dev's reference implementation (specs/047-my-keyboards) with the
+// Ported from dev's reference implementation (specs/072-my-keyboards) with the
 // HTTP contract kept identical; the only change is the local `draft` parameter
 // type, which is main's `DurableDraft` rather than dev's separate `StudioDraft`
 // shape. `DurableDraft` is imported from draftTypes.ts (NOT draftPersistence.ts)

@@ -10,7 +10,7 @@
 // list.
 //
 // Ported from the dev reference implementation's MyKeyboardsList.test.tsx
-// (specs/047-my-keyboards) with the draft-engine mocks/fixtures rewired onto
+// (specs/072-my-keyboards) with the draft-engine mocks/fixtures rewired onto
 // main's `ks.draft*` key scheme (draftPersistence.ts) and its Resume
 // assertion changed to reflect main's "resumeProject applies the draft"
 // architecture (see MyKeyboardsList.tsx's module docstring) rather than

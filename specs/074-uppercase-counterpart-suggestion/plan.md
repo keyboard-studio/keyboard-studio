@@ -6,9 +6,9 @@
 > target layer. Closed as FR-012/FR-013/US4; see [spec.md](spec.md) for the full requirement text
 > and [tasks.md](tasks.md) Phase 7 (T049–T055) for the implementation tasks. Not restated here.
 
-**Branch**: `051-uppercase-counterpart-suggestion` | **Date**: 2026-07-27 | **Spec**: [spec.md](spec.md)
+**Branch**: `074-uppercase-counterpart-suggestion` | **Date**: 2026-07-27 | **Spec**: [spec.md](spec.md)
 
-**Input**: Feature specification from [specs/051-uppercase-counterpart-suggestion/spec.md](spec.md)
+**Input**: Feature specification from [specs/074-uppercase-counterpart-suggestion/spec.md](spec.md)
 
 ## Summary
 
@@ -103,7 +103,7 @@ no new timer (Article IV / D3); studio-only, Engine-team-owned change with no `c
 ### Documentation (this feature)
 
 ```text
-specs/051-uppercase-counterpart-suggestion/
+specs/074-uppercase-counterpart-suggestion/
 ├── spec.md                         # Feature spec (input)
 ├── plan.md                         # This file
 ├── research.md                     # Phase 0 — R1..R10, three spec corrections

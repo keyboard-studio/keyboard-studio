@@ -5,7 +5,7 @@ description: "Task list for Modular-loader cutover + legacy YAML retirement"
 
 # Tasks: Modular-loader cutover + legacy YAML retirement
 
-**Input**: Design documents from `specs/012-modular-loader-cutover/`
+**Input**: Design documents from `specs/067-modular-loader-cutover/`
 
 **Prerequisites**: [plan.md](plan.md), [spec.md](spec.md), [research.md](research.md), [data-model.md](data-model.md), [contracts/flow-output-parity.md](contracts/flow-output-parity.md), [quickstart.md](quickstart.md)
 

@@ -418,7 +418,7 @@ export async function buildOneCharacterList(
   });
   await page.click('[data-testid="phase-b-done"]');
 
-  // The marks series (spec 046) sits immediately after alphabet confirmation,
+  // The marks series (spec 071) sits immediately after alphabet confirmation,
   // BEFORE carve — a mark-bearing charToAdd (e.g. "é") makes it render here.
   // A marks-free alphabet auto-skips it (S0 gate) and this is a no-op.
   await driveMarksSeries(page);
@@ -489,7 +489,7 @@ export async function driveConvenienceStep(page: Page): Promise<void> {
 }
 
 /**
- * Marks series step (spec 046) — sits between characters and carve (the
+ * Marks series step (spec 071) — sits between characters and carve (the
  * combined-letter answers must be known before any key work begins).
  *
  * Its S0 gate is computed, never rendered: an alphabet with NO marks skips
@@ -537,7 +537,7 @@ export async function driveMarksSeries(page: Page): Promise<void> {
  * to add." message appears with a "mechanisms-continue" button.
  */
 export async function confirmMechanismsEmpty(page: Page): Promise<void> {
-  // The marks series (spec 046) now runs before carve and is driven inside
+  // The marks series (spec 071) now runs before carve and is driven inside
   // buildOneCharacterList — nothing marks-related can render here.
   const startButton = page.getByRole("button", { name: "Start the mechanism gallery" });
   if (await startButton.isVisible().catch(() => false)) {
@@ -552,12 +552,12 @@ export async function confirmMechanismsEmpty(page: Page): Promise<void> {
  * Mechanism Gallery (Phase C) — walks EVERY character in the gallery's
  * lettersToAdd worklist to completion, however many it holds.
  *
- * Before spec 046/#1411 landed, a Phase B build-list walk placing ONE new
+ * Before spec 071/#1411 landed, a Phase B build-list walk placing ONE new
  * letter (e.g. "é") meant exactly one character to configure here, and the
  * per-spec `driveMechanismsPlaceLetter` helpers (now retired — see
  * specs/057-bulletproof-navigation/reviews/classB-diagnosis.md) could name it
  * directly and click its "Apply method for é" button. That assumption no
- * longer holds: an accepted marks-series proposal (spec 046) puts the
+ * longer holds: an accepted marks-series proposal (spec 071) puts the
  * DECOMPOSED combining mark into this same worklist alongside the letter, and
  * the case-pair uppercase companion (#1411) adds the uppercase counterpart
  * too — a one-character placement can now widen to a 3-character walk here,

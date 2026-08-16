@@ -1,8 +1,8 @@
 # Tasks: Mark Composition Model and the Marks Question Series
 
-**Input**: Design documents from `specs/046-marks-question-series/` — [plan.md](plan.md), [spec.md](spec.md), [research.md](research.md), [data-model.md](data-model.md), [contracts/marks-series-contract.md](contracts/marks-series-contract.md)
+**Input**: Design documents from `specs/071-marks-question-series/` — [plan.md](plan.md), [spec.md](spec.md), [research.md](research.md), [data-model.md](data-model.md), [contracts/marks-series-contract.md](contracts/marks-series-contract.md)
 
-**Branch**: `046-marks-question-series`
+**Branch**: `071-marks-question-series`
 
 **Line format**: `- [ ] **T###** [P?] [US#] Description · exact/file/path` — `[P]` = independent of the other tasks in its wave (different file, no incomplete dependency); `[US#]` = the user story the task serves.
 
