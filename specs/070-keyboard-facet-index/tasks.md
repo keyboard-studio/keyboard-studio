@@ -18,7 +18,7 @@ description: "Task list for Per-Keyboard Facet Index"
 - **[Story]**: US1 / US2 / US3 (maps to spec.md user stories)
 - Paths are repo-root-relative.
 
-**Scope note (036 vs 037/038)**: This feature owns the artifact **shape**, its **extensibility**, its **schema validation**, and its **freshness/rescan** model, and lands exactly **one** facet — `script` — as the worked example that proves the shape (plan Summary; research D5/D8). The strategy-fingerprint and target/device-mix classifiers, and any refinement of the script classifier's internal algorithm, are [spec 037](../037-facet-classifiers/spec.md); user-facing confirmation is [spec 038](../038-adaptation-questions/spec.md). The `script` classifier here is the minimum needed to populate + validate the shape and satisfy SC-002 — it composes the already-public engine primitives inventoried in research D5.
+**Scope note (070 vs 037/038)**: This feature owns the artifact **shape**, its **extensibility**, its **schema validation**, and its **freshness/rescan** model, and lands exactly **one** facet — `script` — as the worked example that proves the shape (plan Summary; research D5/D8). The strategy-fingerprint and target/device-mix classifiers, and any refinement of the script classifier's internal algorithm, are [spec 037](../037-facet-classifiers/spec.md); user-facing confirmation is [spec 038](../038-adaptation-questions/spec.md). The `script` classifier here is the minimum needed to populate + validate the shape and satisfy SC-002 — it composes the already-public engine primitives inventoried in research D5.
 
 ---
 

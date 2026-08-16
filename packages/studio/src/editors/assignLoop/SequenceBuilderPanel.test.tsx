@@ -201,7 +201,7 @@ describe("SequenceBuilderPanel — index-stable removal", () => {
 });
 
 // ---------------------------------------------------------------------------
-// spec 074 US2 — the onApplied seam the shared case-pair proposal rides on.
+// Spec 074 US2 — the onApplied seam the shared case-pair proposal rides on.
 //
 // The panel renders NO banner of its own: MechanismGallery owns the single
 // hook and the single banner (FR-011), so all this component owes is a

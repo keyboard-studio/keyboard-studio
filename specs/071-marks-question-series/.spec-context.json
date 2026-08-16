@@ -414,7 +414,7 @@
       "rejected": "Implementing the reverse transform now"
     },
     {
-      "decision": "Keep 046 CharacterMapPane edits localized to handleToggle/handleRawSubmit + additive exports so open PR #1291 (km/charmap-jump-to-script) merges cleanly",
+      "decision": "Keep 071 CharacterMapPane edits localized to handleToggle/handleRawSubmit + additive exports so open PR #1291 (km/charmap-jump-to-script) merges cleanly",
       "why": "User flagged PR #1291 must land against this branch; its diff rewrites the pane fetch/filter/scripts-checkbox areas and characterMap.ts script tagging but leaves handleToggle/handleRawSubmit bodies and both predicates (isCombiningMarkChar/isPrivateUseCodePoint) intact",
       "rejected": "Restructuring the pane search path for the decomposition narration (would collide with 1291 matchesQuery/characterSearch.ts)"
     },
@@ -688,11 +688,11 @@
   },
   "concerns": [
     {
-      "note": "Baseline not fully green: 19 pre-existing studio test failures (useKeyboardArtifact.test.ts, browserPatternLibrary.test.ts, projectWorkingCopyVfs*.test.ts, articleIVProbe.test.ts) present before any 046 edit; new-failure attribution is by diff against this set",
+      "note": "Baseline not fully green: 19 pre-existing studio test failures (useKeyboardArtifact.test.ts, browserPatternLibrary.test.ts, projectWorkingCopyVfs*.test.ts, articleIVProbe.test.ts) present before any 071 edit; new-failure attribution is by diff against this set",
       "step": "implement"
     },
     {
-      "note": "Merge with PR #1291 will produce small adjacent-hunk conflicts in CharacterMapPane.tsx (filteredGroups memo sits directly above the 046 describeContribution insert) and characterMap.ts (export keyword on isCombiningMarkChar sits in 1291 hunk context); both are trivial semantic no-ops to resolve",
+      "note": "Merge with PR #1291 will produce small adjacent-hunk conflicts in CharacterMapPane.tsx (filteredGroups memo sits directly above the 071 describeContribution insert) and characterMap.ts (export keyword on isCombiningMarkChar sits in 1291 hunk context); both are trivial semantic no-ops to resolve",
       "step": "implement"
     },
     {
@@ -1036,13 +1036,13 @@
       "command": "pnpm lint",
       "result": "all GREEN; pre-existing no-console warnings only",
       "warnings": [
-        "no-console warnings in files not touched by 046"
+        "no-console warnings in files not touched by 071"
       ]
     },
     {
       "what": "full recursive test run",
       "command": "pnpm -r test",
-      "result": "contracts 437, engine all green incl. 45+ new 046 tests, studio 4104/4122 - the 16 failures are the PRE-EXISTING baseline set (useKeyboardArtifact, browserPatternLibrary, projectWorkingCopyVfs.flagParity, articleIVProbe) documented at T001; zero new failing files",
+      "result": "contracts 437, engine all green incl. 45+ new 071 tests, studio 4104/4122 - the 16 failures are the PRE-EXISTING baseline set (useKeyboardArtifact, browserPatternLibrary, projectWorkingCopyVfs.flagParity, articleIVProbe) documented at T001; zero new failing files",
       "warnings": [
         "baseline failures pre-date this feature - see T001 concern"
       ]
@@ -1073,7 +1073,7 @@
     },
     {
       "what": "km-qc code-quality review",
-      "command": "review of 046 diff",
+      "command": "review of 071 diff",
       "result": "PASS 91/100 - 2 P1 (mark-guards idempotency, in-place rule mutation) sent to fix cycle, 3 P2",
       "warnings": []
     },

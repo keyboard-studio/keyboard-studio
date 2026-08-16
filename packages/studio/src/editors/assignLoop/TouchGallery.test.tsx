@@ -3162,7 +3162,7 @@ describe("buildTouchMechanismRef — resolved-vkey invariant", () => {
 });
 
 // ---------------------------------------------------------------------------
-// spec 074 US3 — case-aware touch placement (FR-006) and the shift-layer
+// Spec 074 US3 — case-aware touch placement (FR-006) and the shift-layer
 // case-pair proposal (FR-005).
 //
 // Before the `layer` slot existed, case was UNREPRESENTABLE in a touch
@@ -4511,7 +4511,7 @@ describe("TouchGallery — case-pair proposal on a non-default touch layer", () 
     expect(acceptBtn()).toBeNull();
   });
 });
-// spec 074 Phase 7 (T049/T050) — FR-012: the suggestion-Accept path
+// Spec 074 Phase 7 (T049/T050) — FR-012: the suggestion-Accept path
 // (handleUseSuggestion) must carry an explicit `layer`, derived the same way
 // every other placement path derives it (buildTouchMechanismRef /
 // touchLayerForChar) — not a bare literal that silently resolves to
@@ -5170,7 +5170,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// spec 074 Phase 7 (T051/T052) — FR-013: case-correct host-key labels.
+// Spec 074 Phase 7 (T051/T052) — FR-013: case-correct host-key labels.
 //
 // A Keyman vkey name carries no case of its own (`K_A` names the A key);
 // case is a property of the layer a placement targets. `hostKeyShortLabel`

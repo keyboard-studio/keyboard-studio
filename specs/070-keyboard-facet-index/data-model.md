@@ -52,7 +52,7 @@ The load-bearing record. Lives inside the index under `keyboards[<id>].facets[<f
 | `analysisOutcome` | `fully \| partially \| fallback-only` | yes | FR-010. Maps from `ImportStatus` (Clean / CleanWithOpaque / ParseFailure) — see research D5. |
 | `notes` | string | optional | e.g. declaration/artifact mismatch flag (target facet). |
 | `residue` | number | optional | **(037)** for facets whose `distribution` is over a **closed recognized-value keyspace** that may not cover all analyzable content (e.g. strategy-fingerprint): the share of analyzable content matching no recognized value. Absent for facets whose distribution is exhaustive over the value space (e.g. script). |
-| `subProfile` | `Record<string, unknown>` | optional | **(037)** per-record, facet-specific within-value sub-classification hint (e.g. script's Latin plain/extended/IPA profile). Opaque to 036's generic validation — the owning classifier defines its shape. Counterpart to Entity 1's definition-level `subProfiles` field (§ above): `subProfiles` declares the *possible* sub-dimensions a facet may report; `subProfile` is the *actual* per-keyboard value. |
+| `subProfile` | `Record<string, unknown>` | optional | **(037)** per-record, facet-specific within-value sub-classification hint (e.g. script's Latin plain/extended/IPA profile). Opaque to 070's generic validation — the owning classifier defines its shape. Counterpart to Entity 1's definition-level `subProfiles` field (§ above): `subProfiles` declares the *possible* sub-dimensions a facet may report; `subProfile` is the *actual* per-keyboard value. |
 
 **Per-keyboard freshness** (shared across that keyboard's facets, stored once at
 `keyboards[<id>].freshness`, not per facet):

@@ -340,7 +340,7 @@ export function applyStepCompletion(
   }
 
   switch (stepId) {
-    // spec 071 — marks-series completion: apply the generated mark guards
+    // Spec 071 — marks-series completion: apply the generated mark guards
     // (blocking swallow group + stepwise backspace-unwrap stores) to the
     // working IR, and record the R10 migration-need flag when base-plus-mark
     // was chosen over a ready-made-form base. All engine-pure; no raw .kmn.

@@ -6191,7 +6191,7 @@ describe("MechanismGallery — sequence builder accepts real click+type (user-ev
 });
 
 // ---------------------------------------------------------------------------
-// spec 074 — the case-pair proposal now comes from the SHARED hook + banner
+// Spec 074 — the case-pair proposal now comes from the SHARED hook + banner
 // (useCasePairCompanion / CasePairProposalBanner). The existing companion
 // cases above are the behaviour-preservation gate (SC-005); these two pin the
 // contract's identity surface that the extraction makes load-bearing.
@@ -6264,7 +6264,7 @@ describe("MechanismGallery — shared case-pair affordance (spec 074)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// spec 074 US2 — S-02 parallel combo (uppercase base letter -> uppercase output)
+// Spec 074 US2 — S-02 parallel combo (uppercase base letter -> uppercase output)
 //
 // The case-shifted elements are the BASE LETTER and the OUTPUT. The trigger
 // key, its deadkey name, and the accent character are carried across
@@ -6395,7 +6395,7 @@ describe("MechanismGallery — S-02 parallel-combo proposal (spec 074 US2)", () 
 });
 
 // ---------------------------------------------------------------------------
-// spec 074 US2 — S-03 parallel combo. The proposal is raised in the gallery
+// Spec 074 US2 — S-03 parallel combo. The proposal is raised in the gallery
 // (which owns the one hook and the one banner) from the sequence panel's
 // onApplied seam; the panel renders no banner of its own.
 // ---------------------------------------------------------------------------
@@ -6497,7 +6497,7 @@ describe("MechanismGallery — S-03 parallel-combo proposal (spec 074 US2)", () 
 });
 
 // ---------------------------------------------------------------------------
-// spec 074 P1 fix — "counterpart already placed" (spec §Edge Cases), wired to
+// Spec 074 P1 fix — "counterpart already placed" (spec §Edge Cases), wired to
 // the physical (S-01) and combo (S-02/S-03) mechanisms. The touch mechanism
 // already had this wired (TouchGallery.tsx); these lock the other two.
 // ---------------------------------------------------------------------------

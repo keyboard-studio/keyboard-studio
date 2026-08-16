@@ -279,7 +279,7 @@ export interface SurveySessionState {
   lastNavigation: "advance" | "pop";
 
   /**
-   * spec 071 R10 (recorded consequence, not acted on): the designer picked the
+   * Spec 071 R10 (recorded consequence, not acted on): the designer picked the
    * base-plus-mark output form while adapting a base whose own content uses
    * ready-made forms — the base's existing content needs a follow-on
    * conversion. This flag only RECORDS that the need exists; building the

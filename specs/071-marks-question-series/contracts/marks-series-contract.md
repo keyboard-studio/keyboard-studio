@@ -1,4 +1,4 @@
-# Contract: Marks Question Series (046)
+# Contract: Marks Question Series (071)
 
 The identifiers and shapes consumers and tests code against. These strings are pinned —
 implementations must use them exactly as written here.

@@ -568,7 +568,7 @@ describe("spec 034 T006 — choose_base yields a live working copy via the real 
 });
 
 // ---------------------------------------------------------------------------
-// spec 071 — marks-series completion applies the mark guards
+// Spec 071 — marks-series completion applies the mark guards
 // ---------------------------------------------------------------------------
 
 describe("applyStepCompletion — marks (spec 071, US8)", () => {

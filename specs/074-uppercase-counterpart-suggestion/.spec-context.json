@@ -812,7 +812,7 @@
     },
     {
       "decision": "Georgian/Cherokee unicameral-script gap documented as an accepted v1 limitation rather than code-fixed",
-      "why": "Spec 051 explicitly places any change to the caseCounterpart primitive out of scope, and propose-then-confirm means nothing is auto-inserted. Recorded in spec Edge Cases, Assumptions, Out of scope, and the casePair.ts docstring so it is a known gap rather than a surprise.",
+      "why": "Spec 074 explicitly places any change to the caseCounterpart primitive out of scope, and propose-then-confirm means nothing is auto-inserted. Recorded in spec Edge Cases, Assumptions, Out of scope, and the casePair.ts docstring so it is a known gap rather than a surprise.",
       "rejected": "Adding a script-aware suppression list, which would have meant changing the frozen primitive"
     },
     {
@@ -906,7 +906,7 @@
     },
     "FR-011": {
       "tests": [
-        "MechanismGallery.test.tsx::shared case-pair affordance (spec 051)"
+        "MechanismGallery.test.tsx::shared case-pair affordance (spec 074)"
       ]
     }
   },

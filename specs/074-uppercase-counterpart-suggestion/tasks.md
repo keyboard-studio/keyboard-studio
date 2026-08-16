@@ -1,5 +1,5 @@
 ---
-description: "Task list for feature 051 — suggest the uppercase counterpart when a lowercase cased letter is placed"
+description: "Task list for feature 074 — suggest the uppercase counterpart when a lowercase cased letter is placed"
 ---
 
 # Tasks: Suggest the uppercase counterpart when a lowercase cased letter is placed

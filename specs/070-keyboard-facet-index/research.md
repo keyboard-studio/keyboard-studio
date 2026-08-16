@@ -217,4 +217,4 @@ field are tabulated above.
   out of scope (later feature); recorded as the concrete US1 consumer.
 - **The literal defect** this unblocks: `script: "Latn"` hardcode at
   [localKeyboards.ts:111-113](../../packages/studio/vite-plugins/localKeyboards.ts). Fixing the consumer is
-  out of scope for 036; the index is the substrate that makes the fix possible.
+  out of scope for 070; the index is the substrate that makes the fix possible.
