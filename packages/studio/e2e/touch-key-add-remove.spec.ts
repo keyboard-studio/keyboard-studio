@@ -430,7 +430,7 @@ test.describe("Touch key add/remove — import-adapt fidelity (spec 063 SC-006)"
     //
     // The original `page.keyboard.press("Tab")` here was never satisfiable, and
     // not because of anything spec 065 added: "Back to mechanisms" and "Continue"
-    // are spec-058 controls that already sat between the mode tab and the grid
+    // are spec-063 controls that already sat between the mode tab and the grid
     // (spec 065 adds the layer selector, FR-004, and the add/remove triggers on
     // top). This spec was `test.skip`ped from birth, so the assumption was never
     // executed. Tab ORDER is asserted by `touch-key-grid-a11y.spec.ts`, which is

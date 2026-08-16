@@ -282,7 +282,7 @@ export type {
   KeyIdMintingRequest,
 } from "./keyIdMinting.js";
 
-// Spec 061 US5 — the inherit-first wrapper and the keycap judgement.
+// Spec 065 US5 — the inherit-first wrapper and the keycap judgement.
 export { proposeTouchKeyId } from "./proposeTouchKeyId.js";
 export type {
   TouchKeyIdProposalRequest,

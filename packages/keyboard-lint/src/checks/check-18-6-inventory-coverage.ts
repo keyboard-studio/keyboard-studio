@@ -80,7 +80,7 @@ export function checkInventoryCoverage(
   // where a keyboard emitting [base, combining] as two char elements now correctly
   // produces the NFC-precomposed form in the set instead of the two raw codepoints.
   //
-  // Spec 058: the REACHABLE half of the reachability-aware view. A rule keyed on
+  // Spec 063: the REACHABLE half of the reachability-aware view. A rule keyed on
   // a touch key id no key carries produces nothing an author can type, so it does
   // not count as coverage here. See the note at the top of this file for why this
   // check — and only this check — can safely adopt that view.

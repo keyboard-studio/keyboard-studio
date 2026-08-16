@@ -193,7 +193,7 @@ assign it, remove a different key, switch to the `shift` layer, and confirm each
   re-propagation**. The IR also drops what it does not model (per-key `layer`/`default`, platform
   `displayUnderlying`/`fontsize`).
 
-  This is a direct spec 035 R9 violation, and it is **pre-existing spec-058 code** (blame
+  This is a direct spec 035 R9 violation, and it is **pre-existing spec-063 code** (blame
   `ef19aa2b`; spec 065's T009-T015 commit only renamed a variable on that line). It was invisible
   because the walk that would have caught it was skipped. The fix routes the Case B branch
   through `applyKeyEditsToRawJson` — the Case B applier written for exactly this and until now

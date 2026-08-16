@@ -81,7 +81,7 @@ export async function lintWithContext(
     findings.push(...checkKeysPerRow(ir, tlPath));
     findings.push(...checkControlKeyDrift(ir, tlPath));
     findings.push(...checkLayerSwitchReturn(ir, tlPath));
-    // Spec 058: layout-only structural checks — no join needed, so they run
+    // Spec 063: layout-only structural checks — no join needed, so they run
     // wherever 18.1-18.5 run.
     findings.push(...checkTouchDuplicateKeyId(ir, tlPath));
     findings.push(...checkTouchMissingRequiredKey(ir, tlPath));
@@ -93,7 +93,7 @@ export async function lintWithContext(
     findings.push(...checkInventoryCoverage(ctx.keyboardIR, ctx.inventory, kmnPath));
   }
 
-  // Spec 058: the JOINED checks need rules AND layout together. One resolver
+  // Spec 063: the JOINED checks need rules AND layout together. One resolver
   // states the layout precedence once (IR first, then context, then a VFS parse)
   // and gates on a keyboard IR being present, exactly as the desktop inventory
   // check above is gated. No new LintContext field is required.

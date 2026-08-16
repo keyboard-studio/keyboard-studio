@@ -16,7 +16,7 @@
 
 ## Context: what actually went wrong *(read first)*
 
-Spec 058 shipped its **engine** work complete — all seven key-edit operations, the key-id ↔ rule join, eleven edit-time diagnostics each carrying a concrete fix, and a key-grid view model already parameterized by `(platform, layer)` and already proportional to the 100-unit grid. That work is sound, and this feature keeps essentially all of it.
+Spec 063 shipped its **engine** work complete — all seven key-edit operations, the key-id ↔ rule join, eleven edit-time diagnostics each carrying a concrete fix, and a key-grid view model already parameterized by `(platform, layer)` and already proportional to the 100-unit grid. That work is sound, and this feature keeps essentially all of it.
 
 What shipped broken is the **seam between that engine and the screen**.
 
@@ -223,7 +223,7 @@ Assigning a character proposes an id without being asked: the inherited physical
   [tasks.md](tasks.md) under T016.
 
   With the premises corrected the walk still failed, and that failure was real: it caught a
-  pre-existing spec-035 R9 violation in spec-058 code (every Case B key edit round-tripped the
+  pre-existing spec-035 R9 violation in spec-063 code (every Case B key edit round-tripped the
   whole touch layout through the IR, stamping `p: "hand-set"` on every key and making an imported
   layout immune to re-propagation after a single edit). That defect is fixed under this feature in
   its own commit. **The walk earned its un-skip by finding a shipped bug on its first real run.**

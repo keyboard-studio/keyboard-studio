@@ -207,7 +207,7 @@ export function applyKeyEditsToLayout(
 
       // `setSubKey` is an UPSERT as of spec 065 T042 (FR-026).
       //
-      // Spec 058 warned-and-skipped here instead, and said so in both appliers'
+      // Spec 063 warned-and-skipped here instead, and said so in both appliers'
       // docstrings: "the seven operation kinds admit no eighth 'add sub-key'
       // kind, and increment 1's sub-key editing is display/deletion-only". That
       // premise is what changed — FR-026 requires key mode to ADD longpresses,
@@ -391,7 +391,7 @@ function toEditableFields(key: TouchKeyIR): EditableKeyFields {
     sp: (key.sp ?? 0) as EditableKeyFields["sp"],
     ...(key.output !== undefined ? { output: key.output } : {}),
     ...(key.nextlayer !== undefined ? { nextlayer: key.nextlayer } : {}),
-    // Spec 061 T030 — the four newly editable fields, read from the same key
+    // Spec 065 T030 — the four newly editable fields, read from the same key
     // they are written back onto below.
     ...(key.hint !== undefined ? { hint: key.hint } : {}),
     ...(key.width !== undefined ? { width: key.width } : {}),

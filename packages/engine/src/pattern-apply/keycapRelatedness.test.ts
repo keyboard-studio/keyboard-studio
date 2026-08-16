@@ -1,4 +1,4 @@
-// Spec 061 US5 T046 — the five relatedness tests, and SC-008's number row.
+// Spec 065 US5 T046 — the five relatedness tests, and SC-008's number row.
 //
 // `isKeycapRelated` gates a HINT, so its failure modes are asymmetric: a false
 // "related" costs a hint nobody needed; a false "mismatch" nags an author who

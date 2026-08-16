@@ -84,7 +84,7 @@ export type EditableKeySp = 0 | 1 | 2 | 8 | 9 | 10;
  * no `default`, and no `sk`/`multitap`/`flick` — those last are structural, not
  * per-field editable, and are authored through `setSubKey`/`removeSubKey`.
  *
- * **Spec 061 T030 admitted four more** (FR-018's "all eight editable fields").
+ * **Spec 065 T030 admitted four more** (FR-018's "all eight editable fields").
  * All four already exist on `TouchKeyIR`, so nothing about the IR changed, and
  * `EditableKeyFields` has no zod mirror in `schemas.ts` — so contracts' Article I
  * drift guard is not engaged and this is an additive, non-breaking widening:

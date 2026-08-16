@@ -290,7 +290,7 @@ test.describe("Touch key AssignPanel — keyboard-only assign (spec 063 SC-004)"
     await press("ArrowRight");
 
     // 3. F2 — jump straight into AssignPanel's character field.
-    //    Spec 061 split the two keys: Enter opens the property panel (FR-020b),
+    //    Spec 065 split the two keys: Enter opens the property panel (FR-020b),
     //    F2 edits the value, which is the grid convention and what keeps this
     //    walk's action budget honest now that the assign surface sits behind a
     //    disclosure. Still ONE action, so the count below is unchanged.

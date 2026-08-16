@@ -32,7 +32,7 @@
 // FR-013, ADR 0002)
 //
 // `KeyGridRowViewModel.slackPct` (keyGridViewModel.ts) is the gap between a row
-// and the widest row in its layer. Spec 058 drew that gap as a decorative
+// and the widest row in its layer. Spec 063 drew that gap as a decorative
 // trailing hatch (`key-grid-row-slack-<rowIndex>`), deliberately declining to
 // absorb it. **FR-012 withdrew that reading.** The hatch and its test id are
 // gone; the slack is now added to the LAST key of the row, which is what

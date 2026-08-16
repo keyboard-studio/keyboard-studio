@@ -149,7 +149,7 @@ export interface TouchKeyIR {
    *
    * Populated from the same wire `layer` property as {@link layerAnnotation};
    * they carry the same source string but serve different consumers. This
-   * `layer` is the authoritative, editable view the spec-058 key editor reads
+   * `layer` is the authoritative, editable view the spec-063 key editor reads
    * and writes; `layerAnnotation` is the read-only best-effort surface the
    * engine's `layerClass`/mining consumers read (see its doc). The emitter
    * round-trips this edited `layer` when present, falling back to

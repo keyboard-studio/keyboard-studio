@@ -264,11 +264,11 @@
   ],
   "step_summaries": {
     "specify": {
-      "summary": "Planned 061 as five sequential slices (US1-US5) over a kept spec-058 engine: required-callback inversion, layer selector, last-key stretch plus row metrics, one merged property panel with move, gesture editing, and inherit-first id/keycap proposals. Constitution Check passes with no violations.",
+      "summary": "Planned 065 as five sequential slices (US1-US5) over a kept spec-063 engine: required-callback inversion, layer selector, last-key stretch plus row metrics, one merged property panel with move, gesture editing, and inherit-first id/keycap proposals. Constitution Check passes with no violations.",
       "key_finding": "FR-009 cannot be met by Playwright: ci.yml runs typecheck/pnpm -r test/lint plus three standalone vitest configs and has NO Playwright step, so the PR-lane guarantee has to be a vitest integration test in the existing 5756-line TouchGallery.test.tsx harness -- while tsc, after the required-prop inversion, becomes the real structural gate for SC-002."
     },
     "plan": {
-      "summary": "Planned 061 as five sequential slices (US1-US5) over a kept spec-058 engine: required-callback inversion, layer selector, last-key stretch plus row metrics, one merged property panel with move, gesture editing, and inherit-first id/keycap proposals. Constitution Check passes with no violations.",
+      "summary": "Planned 065 as five sequential slices (US1-US5) over a kept spec-063 engine: required-callback inversion, layer selector, last-key stretch plus row metrics, one merged property panel with move, gesture editing, and inherit-first id/keycap proposals. Constitution Check passes with no violations.",
       "key_finding": "FR-009 cannot be met by Playwright: ci.yml runs typecheck/pnpm -r test/lint plus three standalone vitest configs and has NO Playwright step, so the PR-lane guarantee has to be a vitest integration test in the existing 5756-line TouchGallery.test.tsx harness -- while tsc, after the required-prop inversion, becomes the real structural gate for SC-002."
     },
     "tasks": {
@@ -590,11 +590,11 @@
   ],
   "concerns": [
     {
-      "note": "PRE-EXISTING spec-058 defect surfaced by un-skipping the SC-006 walk (blame: ef19aa2b, not spec 065). TouchGallery.tsx:2527 - for Case B (imported/import-adapt) every key edit does store.setTouchLayoutJson(emitTouchLayout(promotedLayout)), a full IR round-trip. Measured effect: all 112 keys gain p=hand-set and sp/width/pad normalize to strings. This contradicts spec 035 R9, which applyKeyEditsToRawJson + projection step 1.7 (applyKeyEditsToVfs) exist to honour. Consequence: after one touch key edit an imported layout is entirely hand-set, so re-propagation can never update any key, and per-key layer/default plus platform displayUnderlying/fontsize that the IR does not model are dropped. Blocks SC-006 assertion (c). Complication for any fix: layoutForLintAndGate parses touchLayoutJson for the live grid, so the write cannot simply be deleted; and step 1.7 already re-applies the same overlay, so a naive Case B applier swap risks double-apply.",
+      "note": "PRE-EXISTING spec-063 defect surfaced by un-skipping the SC-006 walk (blame: ef19aa2b, not spec 065). TouchGallery.tsx:2527 - for Case B (imported/import-adapt) every key edit does store.setTouchLayoutJson(emitTouchLayout(promotedLayout)), a full IR round-trip. Measured effect: all 112 keys gain p=hand-set and sp/width/pad normalize to strings. This contradicts spec 035 R9, which applyKeyEditsToRawJson + projection step 1.7 (applyKeyEditsToVfs) exist to honour. Consequence: after one touch key edit an imported layout is entirely hand-set, so re-propagation can never update any key, and per-key layer/default plus platform displayUnderlying/fontsize that the IR does not model are dropped. Blocks SC-006 assertion (c). Complication for any fix: layoutForLintAndGate parses touchLayoutJson for the live grid, so the write cannot simply be deleted; and step 1.7 already re-applies the same overlay, so a naive Case B applier swap risks double-apply.",
       "step": "implement"
     },
     {
-      "note": "SC-004 REGRESSION, needs a decision (same class as the T016 one). Spec 058 SC-004 measures a keyboard-only assign in <=12 actions with Enter from the grid landing straight in AssignPanel character field. Spec 061 T028-T039 made Enter focus the key-property-panel REGION instead (correct per the new FR-020b, and asserted by touch-key-grid-a11y), and put the assign surface behind a disclosure inside it. So the author now needs Enter + tab-to-disclosure + Enter + tab-to-field, which likely blows the 12-action budget. This is a design consequence, not a stale test premise: either the panel needs a keyboard shortcut back to the character field, or SC-004 is amended. e2e touch-key-assign fails at the Enter step until decided. Separately: focusAssignPanelCharacterField was silently dead (querySelector for an input the closed disclosure keeps out of the DOM) - repaired to open the disclosure first, which fixes the fix-driven assign path, but that repair is not covered by a test.",
+      "note": "SC-004 REGRESSION, needs a decision (same class as the T016 one). Spec 063 SC-004 measures a keyboard-only assign in <=12 actions with Enter from the grid landing straight in AssignPanel character field. Spec 065 T028-T039 made Enter focus the key-property-panel REGION instead (correct per the new FR-020b, and asserted by touch-key-grid-a11y), and put the assign surface behind a disclosure inside it. So the author now needs Enter + tab-to-disclosure + Enter + tab-to-field, which likely blows the 12-action budget. This is a design consequence, not a stale test premise: either the panel needs a keyboard shortcut back to the character field, or SC-004 is amended. e2e touch-key-assign fails at the Enter step until decided. Separately: focusAssignPanelCharacterField was silently dead (querySelector for an input the closed disclosure keeps out of the DOM) - repaired to open the disclosure first, which fixes the fix-driven assign path, but that repair is not covered by a test.",
       "step": "implement"
     }
   ],
@@ -702,14 +702,14 @@
     },
     "T058": {
       "status": "DONE",
-      "did": "Recorded spec 063 FR-039's withdrawal in the glossary with the reasoning, cross-linked to ADR 0002 and the 061 spec",
+      "did": "Recorded spec 063 FR-039's withdrawal in the glossary with the reasoning, cross-linked to ADR 0002 and the 065 spec",
       "files": [
         "docs/design-notes/touch-editor-glossary.md"
       ]
     },
     "T059": {
       "status": "DONE",
-      "did": "Verified: bambara, basic_kbdfr and bj_cree_woods are the only keyboards 061's tests reference and all three already have phonebook rows - no new rows needed",
+      "did": "Verified: bambara, basic_kbdfr and bj_cree_woods are the only keyboards 065's tests reference and all three already have phonebook rows - no new rows needed",
       "files": [
         "docs/keyboard-index.md"
       ]

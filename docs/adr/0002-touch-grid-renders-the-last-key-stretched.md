@@ -24,7 +24,7 @@ whatever remains of the row
 const keyPercent = 1 - (totalPercent + padPercent + rightMargin);
 ```
 
-Spec 058 judged that absorption to be information loss for an *editor*: an author who
+Spec 063 judged that absorption to be information loss for an *editor*: an author who
 cannot see slack cannot reclaim it. FR-039 therefore rendered the remainder as a
 decorative diagonal hatch, and added per-row "Fill row" and "Even out row" actions to
 act on it.

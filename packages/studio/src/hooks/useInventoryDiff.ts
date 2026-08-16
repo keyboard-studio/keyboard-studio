@@ -82,7 +82,7 @@
 // lettersToAdd === inventory (full alphabet) and alreadyProduced === [] — the
 // gallery behaves exactly as it did before the diff was wired.
 
-// Spec 058 FR-011 — the third array, and why this hook is EXTENDED rather than
+// Spec 063 FR-011 — the third array, and why this hook is EXTENDED rather than
 // switched to the reachability-aware view.
 //
 // `buildReachableProducedSet` would move a character produced only by an

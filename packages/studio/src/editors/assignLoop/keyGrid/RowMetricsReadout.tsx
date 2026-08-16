@@ -3,7 +3,7 @@
 //
 // ## What replaced what
 //
-// Spec 058 drew a row's unused width as a diagonal HATCH at the end of the row
+// Spec 063 drew a row's unused width as a diagonal HATCH at the end of the row
 // (`key-grid-row-slack-<rowIndex>`) — decorative, deliberately never a printed
 // number. ADR 0002 withdrew that: the last key of a row now stretches to fill
 // the remainder, exactly as KeymanWeb renders it, so there is no hatch left to

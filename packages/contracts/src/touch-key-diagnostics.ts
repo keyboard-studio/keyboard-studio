@@ -158,7 +158,7 @@ export type TouchKeyFindingCode =
   /** FR-029h / US4 AS8: one layer's committed edits mix `suppress` and `remove`. */
   | "TOUCH_KEY_MIXED_SUPPRESS_REMOVE"
   /**
-   * Spec 061 FR-014: a row carrying more interactive keys than its platform's
+   * Spec 065 FR-014: a row carrying more interactive keys than its platform's
    * maximum. A third rider, and the first code here whose Layer C sibling
    * (`KM_WARN_TOUCH_KEYS_PER_ROW`, check 18.3) predates it — the two now read
    * their thresholds from one table (`row-metrics.ts`).
@@ -170,7 +170,7 @@ export type TouchKeyFindingCode =
    */
   | "TOUCH_KEY_ROW_CROWDED"
   /**
-   * Spec 061 FR-036: a key's keycap is not recognisably related to what the key
+   * Spec 065 FR-036: a key's keycap is not recognisably related to what the key
    * types — most often a label left over from whatever the key produced before.
    *
    * `hint` severity and never blocking, because a keycap that "does not match"

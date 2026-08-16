@@ -528,7 +528,7 @@ describe("applyKeyEdits twin equivalence — move (spec 065 T028)", () => {
 // ---------------------------------------------------------------------------
 // `setSubKey` as an UPSERT — spec 065 T042 (FR-026)
 //
-// Spec 058 warned-and-skipped when a `setSubKey` named a sub-entry that did not
+// Spec 063 warned-and-skipped when a `setSubKey` named a sub-entry that did not
 // exist, and both appliers' docstrings said why: increment 1's sub-key editing
 // was display/deletion-only. FR-026 changed that premise — key mode must be able
 // to ADD a longpress, multitap or flick — and T042 requires it go through the

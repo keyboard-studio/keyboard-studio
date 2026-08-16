@@ -46,7 +46,7 @@ function emitKey(key: TouchKeyIR): EmittedKey {
   // are standard wire properties; `default` is emitted as a real JSON boolean,
   // not a string, matching the file format (unlike `sp`/`width`/`pad`).
   // `layer` and `layerAnnotation` carry the same wire `layer` value: the
-  // editable spec-058 `layer` wins when present (so a key edit round-trips),
+  // editable spec-063 `layer` wins when present (so a key edit round-trips),
   // falling back to the engine's best-effort `layerAnnotation` for keys the
   // key editor never touched.
   if (key.layer !== undefined) out["layer"] = key.layer;

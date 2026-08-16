@@ -111,7 +111,7 @@ and the editor reproduces it.
 > **This replaced the hatch.** [specs/063-touch-key-editor](../../specs/063-touch-key-editor/spec.md)
 > FR-039 drew row slack as a visible hatch rather than absorbing it — the reasoning being
 > that slack should be *seen*. In practice it made every short row look broken, and it
-> disagreed with what the keyboard actually does on a phone. Spec 061 **withdraws that
+> disagreed with what the keyboard actually does on a phone. Spec 065 **withdraws that
 > FR-039**: slack is absorbed by the stretch and reported as numbers in the row's metrics
 > readout instead, so the board reads like the keyboard while the measurements stay
 > available. The why is [ADR 0002](../adr/0002-touch-grid-renders-the-last-key-stretched.md);

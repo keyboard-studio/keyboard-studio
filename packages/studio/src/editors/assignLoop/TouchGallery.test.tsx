@@ -5366,7 +5366,7 @@ describe("TouchGallery — mode selector as an APG tabs pattern (T072, FR-035)",
 
     // But the "for testing" OSK preview is GONE, not merely relabelled —
     // spec 065 FR-024/T037: key mode uses the full pane width and does not
-    // render the live preview. Spec 058's version of this test asserted the
+    // render the live preview. Spec 063's version of this test asserted the
     // preview was still there beside the grid, headed "for testing"; that
     // pairing was the point then and is withdrawn now. The two-distinct-verbs
     // concern it protected does not survive the change either, since there is

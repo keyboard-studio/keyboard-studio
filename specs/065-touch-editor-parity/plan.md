@@ -13,7 +13,7 @@
 
 ## Summary
 
-Spec 058's engine work is sound and is kept; what shipped broken is the seam between it and the
+Spec 063's engine work is sound and is kept; what shipped broken is the seam between it and the
 screen. This plan fixes that seam by inverting one idiom — the eight editing callbacks on the
 key-grid surfaces become **required** props, so a surface that cannot act fails `tsc` instead of
 rendering inert — and then reaches Developer parity on top: a layer selector, the KeymanWeb

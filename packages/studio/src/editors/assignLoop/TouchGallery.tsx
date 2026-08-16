@@ -2408,7 +2408,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     );
   }, [keyModeViewModel, selectedKeyAddress]);
 
-  // Spec 061 T042 — the selected key's own IR node, for `GesturePanel`.
+  // Spec 065 T042 — the selected key's own IR node, for `GesturePanel`.
   // `KeyGridCellViewModel` summarizes sub-keys as COUNTS (keyGridViewModel.ts),
   // so the gesture panel needs the node itself. Resolved against the EFFECTIVE
   // (overlay-folded) layout, so a gesture the author added a moment ago is
@@ -2422,7 +2422,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     return resolved?.key ?? null;
   }, [effectiveKeyModeLayout, selectedKeyAddress]);
 
-  // Spec 061 T036 — where the selected key sits, so `KeyPropertyPanel` can
+  // Spec 065 T036 — where the selected key sits, so `KeyPropertyPanel` can
   // decide which move buttons can act (FR-020: absent, never disabled). Derived
   // here rather than in the panel because the panel sees one cell and the
   // answer depends on the whole layer.
@@ -3106,7 +3106,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
    * The grid's Enter -> character-field bridge (spec 063 SC-004: assign a
    * character in 12 keyboard actions, no pointer, no modal).
    *
-   * Spec 061 T028-T039 moved the assign surface behind a disclosure on the key
+   * Spec 065 T028-T039 moved the assign surface behind a disclosure on the key
    * property panel, which took the input OUT of the DOM until the disclosure is
    * open — so the original one-line querySelector silently focused nothing and
    * the whole keyboard-only path died. Opening the disclosure first restores it.
@@ -3152,7 +3152,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     [selectedKeyCell, commitKeyEditOp],
   );
 
-  // Spec 061 T036 — `onFieldChange`: any of the seven text/number fields the
+  // Spec 065 T036 — `onFieldChange`: any of the seven text/number fields the
   // property panel edits, committed through the SAME `commitKeyEditOp` chain
   // every other key edit uses, so each one is a single undo entry and rides
   // the existing validation cycle (FR-039, FR-040).
@@ -3180,7 +3180,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     [selectedKeyCell, commitKeyEditOp],
   );
 
-  // Spec 061 T036 — `onMove`. The panel only renders a direction whose move can
+  // Spec 065 T036 — `onMove`. The panel only renders a direction whose move can
   // act, so this never emits a boundary no-op (FR-020).
   const handleKeyMove = useCallback(
     (direction: "left" | "right" | "up" | "down") => {
@@ -3191,7 +3191,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   );
 
   // ---------------------------------------------------------------------
-  // Spec 061 T042 — gestures (FR-026, FR-028)
+  // Spec 065 T042 — gestures (FR-026, FR-028)
   //
   // Every one of the three handlers below commits through the SAME
   // `commitKeyEditOp` chain and the SAME `setSubKey`/`removeSubKey` operations
@@ -3345,7 +3345,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           return;
         }
         case "setKeycap": {
-          // Spec 061 FR-036: a real mutation, unlike `trimRow`/`reviewKey` —
+          // Spec 065 FR-036: a real mutation, unlike `trimRow`/`reviewKey` —
           // `proposeKeycap` already computed the one right label, so there is
           // nothing for the author to decide. Deliberately does NOT set
           // `keycapAuthored`: accepting a proposal is not authoring one, and
@@ -3542,7 +3542,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         return;
       }
       e.preventDefault();
-      // Spec 061: Enter and F2 diverge, because the property panel absorbed the
+      // Spec 065: Enter and F2 diverge, because the property panel absorbed the
       // assign surface and put it behind a disclosure (T028-T039).
       //
       //   Enter -> the panel REGION. FR-020b's "selection versus editing"
@@ -7487,7 +7487,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         modalityLabelPlacement="inline"
         headerExtras={headerExtras}
         leftContent={leftContent}
-        // Spec 061 T037 (FR-024): key mode passes NO right pane, so the grid
+        // Spec 065 T037 (FR-024): key mode passes NO right pane, so the grid
         // takes the full width instead of sitting in 45% beside a preview it
         // does not use. Character mode is unchanged — the live OSK preview is
         // the whole point of that mode, and its heading id

@@ -121,7 +121,7 @@ function computeTouchState(
   try {
     const layout = parseTouchLayout(touchLayoutJson);
     return {
-      // Spec 058 FR-005/FR-007: with the rule index, a `T_*` key whose output
+      // Spec 063 FR-005/FR-007: with the rule index, a `T_*` key whose output
       // lives in a `.kmn` rule is credited, so the gate stops blocking on
       // characters the keyboard genuinely types. Absent the index, behaviour is
       // unchanged — including still failing closed on a corrupted layout below,

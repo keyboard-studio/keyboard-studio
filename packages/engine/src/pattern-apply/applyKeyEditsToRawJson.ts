@@ -258,7 +258,7 @@ function readEditableFields(target: EditableRawTarget): EditableKeyFields {
   // An sp value outside the legal {0,1,2,8,9,10} set is malformed input, not
   // a case this applier defends against — validity is a Layer A concern.
   const sp = (toWireNumber(target["sp"]) ?? 0) as EditableKeyFields["sp"];
-  // Spec 061 T030 — the four newly editable fields. `width`/`pad` go through
+  // Spec 065 T030 — the four newly editable fields. `width`/`pad` go through
   // `toWireNumber` because the wire format admits either a number or a numeric
   // string, the same tolerance `applyRemove` already relies on.
   const width = toWireNumber(target["width"]);
@@ -284,7 +284,7 @@ function writeEditableFields(target: EditableRawTarget, fields: EditableKeyField
   else delete target.output;
   if (fields.nextlayer !== undefined) target.nextlayer = fields.nextlayer;
   else delete target.nextlayer;
-  // Spec 061 T030 — same present-or-deleted discipline as the two above, so a
+  // Spec 065 T030 — same present-or-deleted discipline as the two above, so a
   // field the merged set omits leaves no stale wire property behind.
   if (fields.hint !== undefined) target["hint"] = fields.hint;
   else delete target["hint"];
@@ -527,7 +527,7 @@ export function applyKeyEditsToRawJson(
         const subLoc = resolveSubKeyEntry(resolved.key as unknown as AddressableRawKey, op.sub);
         if (!subLoc) {
           // UPSERT (spec 065 T042, FR-026) — see the IR twin's own comment for
-          // why the spec-058 warn-and-skip behaviour this replaced no longer
+          // why the spec-063 warn-and-skip behaviour this replaced no longer
           // holds: key mode must be able to ADD a longpress, multitap or flick,
           // through the existing operations on the one overlay.
           appendRawSubKey(resolved.key, op.sub, op.fields);

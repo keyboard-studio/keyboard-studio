@@ -288,7 +288,7 @@ export type KeyIdMintingPath =
   | "combining-mark-guard"
   | "multi-codepoint-string"
   | "case-triple"
-  // Spec 061 FR-029/FR-030: the id was not minted at all — it was kept from the
+  // Spec 065 FR-029/FR-030: the id was not minted at all — it was kept from the
   // physical key at this position, or taken from a key that already produces the
   // character. `proposeKeyId` never returns it; only `proposeTouchKeyId` does.
   // It lives in this union so a proposal has ONE path vocabulary to render.

@@ -347,7 +347,7 @@ export function useKeyInspectorFocusBridge({
       const target = event.target;
       if (!(target instanceof Element) || target.closest('[role="gridcell"]') === null) return;
       event.preventDefault();
-      // Spec 061: the two keys diverge, because the panel absorbed the assign
+      // Spec 065: the two keys diverge, because the panel absorbed the assign
       // surface and put it behind a disclosure. Enter opens the DETAIL (the
       // panel region — FR-020b, unchanged). F2 edits the VALUE, landing
       // straight in the character field, which is the grid convention and what
