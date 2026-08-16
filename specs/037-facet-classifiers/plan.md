@@ -7,8 +7,8 @@
 ## Summary
 
 Specify and implement the **classification system** and its first three classifiers — one per derivation
-archetype — that compute the values [spec 036](../036-keyboard-facet-index/spec.md)'s facet index records.
-036 owns the artifact shape, freshness, and lint; 037 owns the **algorithms**: a `script` classifier
+archetype — that compute the values [spec 070](../070-keyboard-facet-index/spec.md)'s facet index records.
+070 owns the artifact shape, freshness, and lint; 037 owns the **algorithms**: a `script` classifier
 (character-content archetype, the hardest — sets the evidentiary standard), a `strategy-fingerprint`
 classifier (rule-structure archetype), and a `target-mix` classifier (declared-metadata archetype). Every
 classifier is a pure, versioned, deterministic function `(analysis inputs, pinned reference data) →

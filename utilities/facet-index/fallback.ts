@@ -1,5 +1,5 @@
 /**
- * Script fallback chain (spec 036 T017; FR-004) — used when content analysis
+ * Script fallback chain (spec 070 T017; FR-004) — used when content analysis
  * is unavailable: `classifyScript` returned null (no concretely-scripted
  * output) or `parse()` threw entirely.
  *

@@ -8,7 +8,7 @@
 // same array without prop drilling across the pane-swap boundary (StudioShell's
 // SurveyView renders CharacterMapPane independently of BuildListView).
 //
-// Three-store model (spec 046): the designer's PICKS are canonical — each pick
+// Three-store model (spec 071): the designer's PICKS are canonical — each pick
 // is one whole grapheme (plus a declared role for private-use characters).
 // Everything else is derived from the picks on every mutation:
 //   - `bases` / `marks` / `attestedStacks` / `declaredRoles` — the three-store
@@ -79,7 +79,7 @@ export interface LastPickContribution {
 export interface PhaseBDraftState {
   /** Legacy flat NFC alphabet (derived from the picks; kept for every pre-046 consumer). */
   chars: string[];
-  /** Three-store split derived from the picks (spec 046). */
+  /** Three-store split derived from the picks (spec 071). */
   bases: string[];
   marks: string[];
   attestedStacks: AttestedStack[];
@@ -566,7 +566,7 @@ export function resetPhaseBDraftDecisions(): void {
   usePhaseBDraftStore.setState({ rejected: [], exemplarMethodDeclined: false });
 }
 
-/** The three-store ConfirmedAlphabet the current draft resolves to (spec 046). */
+/** The three-store ConfirmedAlphabet the current draft resolves to (spec 071). */
 export function draftConfirmedAlphabet(): ConfirmedAlphabet {
   const s = usePhaseBDraftStore.getState();
   return makeConfirmedAlphabet({
@@ -583,7 +583,7 @@ export function draftConfirmedAlphabet(): ConfirmedAlphabet {
 // Mirrors the snapshotTraversal/applyTraversalSnapshot idiom in
 // ../stores/surveySessionStore.ts. `chars` is already a plain string array (no
 // Set/binary), so no encoding is needed beyond JSON.stringify/JSON.parse.
-// `declaredRoles` rides along additively (spec 046) so a restored draft keeps
+// `declaredRoles` rides along additively (spec 071) so a restored draft keeps
 // its PUA classifications; old snapshots without the field restore fine.
 // ---------------------------------------------------------------------------
 

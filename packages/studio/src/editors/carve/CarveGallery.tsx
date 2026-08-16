@@ -361,7 +361,7 @@ export function CarveGallery({ onComplete, onBack }: CarveGalleryProps) {
   // recommendations.
   //
   // #1357 data-derivation prerequisite — carve's needed-set is DERIVED from
-  // the marks series' final answers (spec 046 marksWorklist/marksOutputForm),
+  // the marks series' final answers (spec 071 marksWorklist/marksOutputForm),
   // not just the flat confirmedInventory (which unconditionally folds in
   // EVERY attested stack/lone mark regardless of the marks series' own
   // reachability decisions — see deriveConfirmedInventory). The 3-tier

@@ -501,7 +501,7 @@ function CharChipEditor({ chars, onChange, autoFocus = false, bcp47, onRemove }:
 }
 
 // ---------------------------------------------------------------------------
-// AlphabetBreakdown — the visible three-store decomposition (spec 046, US5)
+// AlphabetBreakdown — the visible three-store decomposition (spec 071, US5)
 //
 // Renders only once the draft alphabet implies at least one mark or attested
 // combination: picking a whole accented character (one action, one unit of
@@ -840,7 +840,7 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
       <ExemplarApplyAffordance context={context} />
       <TextSamplePlaceholder />
 
-      {/* Section 3: visible three-store decomposition (spec 046 US5) + the
+      {/* Section 3: visible three-store decomposition (spec 071 US5) + the
           spec-047 category sections — renders once the alphabet implies marks,
           accented letters, or any non-letter category. */}
       <AlphabetBreakdown bcp47={context.bcp47_tag} />

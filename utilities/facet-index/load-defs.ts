@@ -1,5 +1,5 @@
 /**
- * Facet-definition loader + validator (spec 036 T024; US2 acceptance 3).
+ * Facet-definition loader + validator (spec 070 T024; US2 acceptance 3).
  *
  * Reads every `content/keyboard-facets/*.yaml` definition and validates each
  * against contracts/facet-definition.schema.md before the build reads it, so a

@@ -1,5 +1,5 @@
 /**
- * Build orchestrator for the per-keyboard facet index (spec 036 T018).
+ * Build orchestrator for the per-keyboard facet index (spec 070 T018).
  *
  * load facet defs -> scanCorpus -> per keyboard: classify (content-derived) or
  * fall back (declared-metadata / default-fallback / undetermined) -> assemble

@@ -202,7 +202,7 @@ async function completePhaseB(page: Page, fx: WalkFixture = FIXTURE): Promise<vo
  * (useInventoryCoverageGate) is satisfied before navigateToOutput is called.
  *
  * Every fixture in this file adds a character the base ALREADY produces (é on
- * basic_kbdfr, я on russian_mnemonic_r, etc.) — before the spec 046 marks
+ * basic_kbdfr, я on russian_mnemonic_r, etc.) — before the spec 071 marks
  * series existed, that made lettersToAdd empty and the Output nav link
  * unconditionally reachable straight off Phase B. It no longer is: an
  * accepted marks-series proposal for a decomposable charToAdd promotes its
@@ -603,7 +603,7 @@ test.describe("spec 034 US3 (T028): durable draft survives reload, Back stays co
     await page.getByRole("button", { name: "Back", exact: true }).click();
 
     // ...and the entry before convenience is not Phase B either: the marks
-    // series (`fc2ee650`, spec 046/052) inserted a step between `characters`
+    // series (`fc2ee650`, spec 071/052) inserted a step between `characters`
     // and `convenience`, so the locked spine is
     // `characters -> marks -> convenience -> carve`. FIXTURE.charToAdd ("é")
     // is decomposable-accented, so the marks step genuinely renders on the

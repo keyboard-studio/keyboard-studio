@@ -1,4 +1,4 @@
-// Mark guards (spec 046, US8): the two generated behaviors that make the
+// Mark guards (spec 071, US8): the two generated behaviors that make the
 // attachment matrix LOAD-BEARING on the produced keyboard, both derived from
 // the marks-series worklist (the same tables as everything else — R5):
 //

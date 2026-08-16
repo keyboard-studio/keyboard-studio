@@ -2,7 +2,7 @@
 
 **Feature**: [spec.md](spec.md) · **Branch**: `052-marks-treatment-question` · **Created**: 2026-07-29
 
-**Governing specs**: [specs/046-marks-question-series/spec.md](../046-marks-question-series/spec.md) (amended: FR-010, FR-011, FR-012, SC-006, SC-007) · [specs/007-strategy-selection/spec.md](../007-strategy-selection/spec.md) (amended: §7.2 precedence, §7.5 table) · interacts with [specs/049-lowercase-diacritic-questions/](../049-lowercase-diacritic-questions/)
+**Governing specs**: [specs/071-marks-question-series/spec.md](../071-marks-question-series/spec.md) (amended: FR-010, FR-011, FR-012, SC-006, SC-007) · [specs/007-strategy-selection/spec.md](../007-strategy-selection/spec.md) (amended: §7.2 precedence, §7.5 table) · interacts with [specs/049-lowercase-diacritic-questions/](../049-lowercase-diacritic-questions/)
 
 ## Summary
 
@@ -38,7 +38,7 @@ packages/studio/src/locales/{en,fr}/messages.json   EDIT (lingui extract)
 utilities/facet-index/
   spare-key-budget-classifier.ts           EDIT delegates to contracts/keyBudget.ts
   base-layout.ts                           EDIT reads the relocated table from contracts
-specs/046-marks-question-series/spec.md    EDIT FR-010/011/012, SC-006, SC-007 amendments
+specs/071-marks-question-series/spec.md    EDIT FR-010/011/012, SC-006, SC-007 amendments
 specs/007-strategy-selection/spec.md       EDIT §7.2 precedence rule, §7.5 table + gap restatement
 docs/design-notes/mark-composition-model.md EDIT S2/S3 sections (the stale note)
 ```

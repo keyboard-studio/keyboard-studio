@@ -36,7 +36,7 @@ export const definition = {
   ],
   next: [
     { condition: "value == 'other-alphabet'", goto: "pb_non_roman_branch" },
-    // spec 046: the accent-marks chain (gate → picker → stacking → style →
+    // spec 071: the accent-marks chain (gate → picker → stacking → style →
     // capitals) is superseded by the marks question series. The typing-approach
     // probe (A3) stays live for accent-likely alphabets; plain a-z skips it.
     { condition: "value == 'extended-latin'", goto: "pb_typing_approach" },

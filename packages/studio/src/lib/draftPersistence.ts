@@ -342,7 +342,7 @@ function buildServerMeta(
  * unreachable from the UI — until the author happened to re-save that exact
  * project. This is the real shape of the legacy-draft gap; there is no
  * separate legacy single-slot key to migrate (main never had one — see the
- * key-scheme note in specs/047-my-keyboards/spec.md).
+ * key-scheme note in specs/072-my-keyboards/spec.md).
  *
  * Read-only with respect to draft records: unlike `loadDraft`, a record this
  * pass cannot adopt is SKIPPED, never deleted. Enumeration is not the place to
@@ -1034,7 +1034,7 @@ export function clearDraft(projectKey: string): void {
   removeIndexEntry(projectKey);
 }
 
-// REMOVED (spec 047 US3a supersedes spec 034 VR-5):
+// REMOVED (spec 072 US3a supersedes spec 034 VR-5):
 // `replaceActiveDraftIfDifferentProject(newProjectKey)` used to clear the
 // previously-active project's draft whenever a working copy was instantiated
 // under a different projectKey — the single-project MVP's answer to "two
@@ -1076,7 +1076,7 @@ export function discardActiveDraft(): void {
  * content has been re-filed under `toProjectKey`, so the record left behind
  * under the old key is a stale duplicate of the SAME project, not a second
  * project. No-op when either key is null or the two are equal: nothing to
- * migrate (spec 047 US3a's SC-001 — "start keyboard B, keyboard A survives"
+ * migrate (spec 072 US3a's SC-001 — "start keyboard B, keyboard A survives"
  * — is about two genuinely DISTINCT projects; this function never touches
  * that case, because every caller only ever supplies two keys for the SAME
  * project — see `installDraftAutosave`'s doc comment for why that holds).

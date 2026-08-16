@@ -68,7 +68,7 @@ export interface MarkTreatmentStationProps {
   orderPrefilledFromImport: boolean;
 }
 
-// Content read from the RELOCATED question module (spec 046 FR-025: relocated,
+// Content read from the RELOCATED question module (spec 071 FR-025: relocated,
 // not duplicated). pb_mark_input_order stays on disk as the content source; this
 // station is its new home now that the standalone S3 screen is retired.
 const ORDER_PROMPT = markInputOrderDefinition.prompt;

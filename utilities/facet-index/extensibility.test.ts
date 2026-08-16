@@ -1,5 +1,5 @@
 /**
- * Extensibility byte-diff test (spec 036 T022; SC-003; data-model "extensibility
+ * Extensibility byte-diff test (spec 070 T022; SC-003; data-model "extensibility
  * invariant"). Adding a facet definition and rebuilding must (a) leave every
  * prior facet's record byte-identical, and (b) add exactly one new key under
  * each keyboard's `facets` — a pure addition, because each categorization is

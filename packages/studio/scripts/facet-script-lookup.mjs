@@ -1,7 +1,7 @@
 // Shared script-facet join for the keyboard catalog producers (the dev-server
 // localKeyboards Vite plugin and the postbuild build-keyboards-index script).
 //
-// The committed facet index (docs/keyboard-facet-index.json, spec 036) carries
+// The committed facet index (docs/keyboard-facet-index.json, spec 070) carries
 // a content-derived `script` facet per keyboard — the authoritative answer to
 // "which script does this base type?". The catalog producers join it here so
 // BaseKeyboard.script is real data instead of a hardcoded "Latn", which made

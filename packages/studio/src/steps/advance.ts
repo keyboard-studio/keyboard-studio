@@ -211,7 +211,7 @@ export function advance(
       return { next: "characters", setCharactersSubStage: "prefill" };
 
     case "characters":
-      return { next: nextSpineStepAfter("characters") }; // marks (spec 046)
+      return { next: nextSpineStepAfter("characters") }; // marks (spec 071)
 
     case "marks":
       return { next: nextSpineStepAfter("marks") }; // punctuation

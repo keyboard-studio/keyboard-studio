@@ -58,13 +58,13 @@ ESLint over `packages/*/src`, then in order:
 - `pnpm run content-i18n-freshness` — tsx-run `utilities/i18n-content-extract/cli.ts --check`;
   freshness of `content/i18n/en/*.json` against a fresh extraction. Single-sources the
   `flowQuestions.json` freshness the plain-JS `content-i18n-lint` can't re-derive from TS-module
-  question definitions (spec 050 T015).
+  question definitions (spec 073 T015).
 - `pnpm run content-i18n-lint` —
   [utilities/content-i18n-lint/index.js](../utilities/content-i18n-lint/index.js), Tier B's
   counterpart to `i18n-catalog-lint`: checks `content/i18n/en/*.json` against a fresh extraction
   from the content records, plus target-locale key-set parity for any locale that has started
   translating a given catalog — including `flowQuestions.json` as a parity-only catalog
-  (spec 046 T031, spec 050 T014).
+  (spec 046 T031, spec 073 T014).
 - `pnpm run test-antipattern-lint` —
   [utilities/test-antipattern-lint/index.js](../utilities/test-antipattern-lint/index.js), bans
   `expect(true).toBe(true)`-style tautologies across all `packages/*/**/*.test.ts` and hardcoded
@@ -273,7 +273,7 @@ Two halves over the same corpus:
 
 ### facet-index
 
-[spec 036](../specs/036-keyboard-facet-index/) scans the sibling `../keyboards` corpus (the
+[spec 070](../specs/070-keyboard-facet-index/) scans the sibling `../keyboards` corpus (the
 `keyboard-studio/keyboards` fork) and emits the offline, deterministic
 `docs/keyboard-facet-index.json` (+ `.md` companion) — a per-keyboard facet index.
 

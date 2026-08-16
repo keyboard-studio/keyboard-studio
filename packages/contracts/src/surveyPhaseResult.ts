@@ -93,7 +93,7 @@ export interface SurveyPhaseResult {
    */
   attestedDigraphs?: string[];
   /**
-   * Three-store confirmed alphabet (bases / marks / attested stacks, spec 046).
+   * Three-store confirmed alphabet (bases / marks / attested stacks, spec 071).
    * **Additive** — the canonical model behind `confirmedInventory`, which is
    * derived from it via `deriveConfirmedInventory` (confirmedAlphabet.ts) and
    * never edited independently. Merge across phases with
@@ -103,14 +103,14 @@ export interface SurveyPhaseResult {
    */
   alphabet?: ConfirmedAlphabet;
   /**
-   * Marks-series exit state (spec 046): the placement classification the
+   * Marks-series exit state (spec 071): the placement classification the
    * mechanism gallery consumes. **Additive** — produced by the marks series
    * step (empty worklist on a skipped series); last phase carrying one wins in
    * {@link mergePhaseResults}. `undefined` for phases that do not run the series.
    */
   marksWorklist?: PlacementWorklist;
   /**
-   * The S4 whole-keyboard output-form decision (spec 046): "ready-made" or
+   * The S4 whole-keyboard output-form decision (spec 071): "ready-made" or
    * "base-plus-mark". **Additive** — previously a studio-local payload
    * extension (`MarksCompleteResult.marksOutputForm` in steps/reducer.ts);
    * promoted to the contract so carve's needed-set derivation

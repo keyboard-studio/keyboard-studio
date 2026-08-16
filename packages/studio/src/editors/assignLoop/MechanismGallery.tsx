@@ -1442,7 +1442,7 @@ export interface MechanismGalleryProps {
    */
   placementMap?: PlacementMap;
   /**
-   * Optional marks-series placement worklist (spec 046, FR-020 — the
+   * Optional marks-series placement worklist (spec 071, FR-020 — the
    * placementMap seam pattern). When supplied, composed units covered by a
    * PRODUCTIVE mark key (a `markUnits` entry: base key + mark key reach them)
    * are dropped from the walk — the mark itself is walked instead (it is in
@@ -1629,7 +1629,7 @@ export function MechanismGallery({
   // second time per render.
   const baseProducedSet = sharedRawProducedSet;
 
-  // Spec 046 worklist filter (FR-020): a composed unit whose marks are ALL
+  // Spec 071 worklist filter (FR-020): a composed unit whose marks are ALL
   // productive mark keys is reachable via base key + mark key — it needs no
   // whole-unit placement of its own, so it leaves the walk. Everything else
   // (plain bases, own-letter units, the productive marks themselves) keeps its

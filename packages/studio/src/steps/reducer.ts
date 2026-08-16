@@ -53,7 +53,7 @@ export const MECHANISMS_STEP_ID = "mechanisms" as const;
 export const TOUCH_STEP_ID = "touch" as const;
 
 /**
- * Step id for the marks series (spec 046) — applies the generated mark guards
+ * Step id for the marks series (spec 071) — applies the generated mark guards
  * (blocking swallow rules + stepwise backspace-unwrap stores) to the working
  * IR and records the R10 migration-need flag on complete.
  */
@@ -121,7 +121,7 @@ export interface TouchCompleteResult {
 }
 
 // ---------------------------------------------------------------------------
-// Marks-series completion payload (spec 046) — the SurveyPhaseResult the
+// Marks-series completion payload (spec 071) — the SurveyPhaseResult the
 // series step reports, extended with the chosen output form (studio-local
 // payload extension, like TouchCompleteResult; the locked contract types are
 // untouched).
@@ -340,7 +340,7 @@ export function applyStepCompletion(
   }
 
   switch (stepId) {
-    // Spec 046 — marks-series completion: apply the generated mark guards
+    // Spec 071 — marks-series completion: apply the generated mark guards
     // (blocking swallow group + stepwise backspace-unwrap stores) to the
     // working IR, and record the R10 migration-need flag when base-plus-mark
     // was chosen over a ready-made-form base. All engine-pure; no raw .kmn.

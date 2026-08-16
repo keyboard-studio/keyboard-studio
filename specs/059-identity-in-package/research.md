@@ -190,7 +190,7 @@ non-empty `writes`.
 
 **Rationale.** The declarations live in TypeScript modules, and the repo has already settled this
 question once: `content-i18n-lint` is plain JS and *cannot* re-derive `flowQuestions.json` from
-TS-module question definitions, which is precisely why spec 050 T015 added the tsx-run
+TS-module question definitions, which is precisely why spec 073 T015 added the tsx-run
 `content-i18n-freshness` check alongside it (see CLAUDE.md's commands table). A new plain-node
 linter over `packages/studio/src/survey/questions/**` would have to re-implement a TypeScript
 parser to read `writes: []`. Vitest imports the registry directly, and `registry.test.ts` is

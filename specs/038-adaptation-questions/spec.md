@@ -8,7 +8,7 @@
 
 **Input**: User description: "We will want to use these facets to make 'en masse' decisions or prescriptions as we adapt keyboards. I need to know what questions should exist to tease out these preferences."
 
-**Governing sections**: spec.md §3c (defaults are the product — propose-then-confirm, provenance chips, "no default is a defect"), §7.1 (axes the answers feed), §8 Phase A/B (where in the flow the questions live), [content/facets/README.md](../../content/facets/README.md) (consumers convention: every facet must name what it prefills and proposes). Sibling features: [specs/036-keyboard-facet-index](../036-keyboard-facet-index/spec.md) (the evidence), [specs/037-facet-classifiers](../037-facet-classifiers/spec.md) (how it is computed).
+**Governing sections**: spec.md §3c (defaults are the product — propose-then-confirm, provenance chips, "no default is a defect"), §7.1 (axes the answers feed), §8 Phase A/B (where in the flow the questions live), [content/facets/README.md](../../content/facets/README.md) (consumers convention: every facet must name what it prefills and proposes). Sibling features: [specs/070-keyboard-facet-index](../070-keyboard-facet-index/spec.md) (the evidence), [specs/037-facet-classifiers](../037-facet-classifiers/spec.md) (how it is computed).
 
 ## Problem
 

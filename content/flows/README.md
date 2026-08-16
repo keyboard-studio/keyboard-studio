@@ -266,7 +266,7 @@ the consolidated `questionRegistry`. The Flow Map's **Leftover questions** secti
 subtracting live-flow ids from `questionRegistry` — so it always reflects physical
 reality: a module is Leftover if and only if it lives in `reserve/`. Nodes are labelled
 *kept for reference / possible reuse, never run by the live survey*. This is where the
-demoted Phase A battery (and `pb_mark_input_order`, relocated by spec 046) live — never
+demoted Phase A battery (and `pb_mark_input_order`, relocated by spec 071) live — never
 rendered as reserve clog inside a live drill-down.
 
 Concretely, the live `identity_lite` drill-down keys off `phaseARegistry`, which now

@@ -3,7 +3,7 @@
 // URL, draftId threading), the multi-project list op, and fail-soft behavior
 // (network/HTTP errors resolve benignly).
 //
-// Ported from dev's reference implementation (specs/047-my-keyboards) with
+// Ported from dev's reference implementation (specs/072-my-keyboards) with
 // the `StudioDraft` stand-in swapped for main's `DurableDraft` — the
 // transport treats the draft payload opaquely either way, so the minimal
 // stand-in object below is unchanged in shape.

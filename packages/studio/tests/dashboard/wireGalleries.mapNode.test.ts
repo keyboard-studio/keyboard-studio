@@ -91,7 +91,7 @@ describe("spec 021 T013 — carve resolves as a first-class map node carrying CA
 
   it("the carve node is a spine step (carries a spine edge in the step graph)", () => {
     // Modular: assert carve is on the spine, not its exact position — the marks
-    // series (spec 046) and future steps may be inserted around it freely.
+    // series (spec 071) and future steps may be inserted around it freely.
     const ids = manifest.filter((s) => s.spine === true).map((s) => s.id);
     expect(ids).toContain(CARVE_ID);
     expect(stepGraph.edges.some((e) => e.kind === "spine" && e.from === CARVE_ID)).toBe(true);

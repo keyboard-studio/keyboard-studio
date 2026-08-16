@@ -1,9 +1,9 @@
 # facet-index — per-keyboard facet index build tool
 
-Standalone Node tool (spec [036](../../specs/036-keyboard-facet-index/)) that scans the sibling
+Standalone Node tool (spec [070](../../specs/070-keyboard-facet-index/)) that scans the sibling
 `keymanapp/keyboards` corpus and emits a committed, offline, deterministic **per-keyboard facet index**:
 for every corpus keyboard, a categorization of each defined facet (dominant value, likelihood
-distribution, provenance tier, analysis outcome, and freshness). 036 landed exactly one facet — `script` —
+distribution, provenance tier, analysis outcome, and freshness). 070 landed exactly one facet — `script` —
 as the worked example that proves the artifact shape; [037](../../specs/037-facet-classifiers/) adds two
 more classifiers — `strategy-fingerprint` (rule-structure) and `target-mix` (declared-metadata) —,
 [038](../../specs/038-adaptation-questions/) surfaces them to users. [040](../../specs/040-desktop-base-layout-fallthrough/)

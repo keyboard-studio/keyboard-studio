@@ -1,5 +1,5 @@
-# script — the v1 keyboard-level facet (spec 036, worked example that proves
-# the artifact shape). See specs/036-keyboard-facet-index/data-model.md Entity 1
+# script — the v1 keyboard-level facet (spec 070, worked example that proves
+# the artifact shape). See specs/070-keyboard-facet-index/data-model.md Entity 1
 # (sample) and contracts/facet-definition.schema.md for the authoritative shape.
 #
 # limits.values note: this is the full set of CONCRETE (histogram-eligible)

@@ -98,7 +98,7 @@ description: "Task list — Studio UI & Content Localization (i18n)"
 
 **Checkpoint**: Author sees survey + guidance text translated, not just chrome.
 
-> **Follow-on (spec 050, 2026-07-27):** The Tier B pipeline built here (T027 extractor, T028 loader, T030 Crowdin mapping, T031 drift gate) grew a **fourth** catalog — `flowQuestions`, covering the modular flow-engine's survey-question prompt/help text (the identity-lite language questions and every other live-registry flow question). It rides the same machinery: the extractor walks the live phase registries (A/B/F/G), the loader gained a `flowQuestions` catalog type, `crowdin.yml`'s inclusive `/content/i18n/en/*.json` glob already carried it, and freshness/parity are gated the same way (freshness via the extractor CLI `--check` step, parity via `content-i18n-lint`). T029's deferred flow-question text is what spec 050 closed. See [specs/050-flow-question-i18n/](../050-flow-question-i18n/).
+> **Follow-on (spec 073, 2026-07-27):** The Tier B pipeline built here (T027 extractor, T028 loader, T030 Crowdin mapping, T031 drift gate) grew a **fourth** catalog — `flowQuestions`, covering the modular flow-engine's survey-question prompt/help text (the identity-lite language questions and every other live-registry flow question). It rides the same machinery: the extractor walks the live phase registries (A/B/F/G), the loader gained a `flowQuestions` catalog type, `crowdin.yml`'s inclusive `/content/i18n/en/*.json` glob already carried it, and freshness/parity are gated the same way (freshness via the extractor CLI `--check` step, parity via `content-i18n-lint`). T029's deferred flow-question text is what spec 073 closed. See [specs/073-flow-question-i18n/](../073-flow-question-i18n/).
 
 ---
 

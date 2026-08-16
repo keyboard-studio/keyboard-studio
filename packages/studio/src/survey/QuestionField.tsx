@@ -49,7 +49,7 @@ interface FieldProps {
    */
   onSelectAdvance?: (value: string) => void;
   /**
-   * Survey answer context (spec 050 US1 fix) — carries `{{token}}` values
+   * Survey answer context (spec 073 US1 fix) — carries `{{token}}` values
    * (e.g. `base_name`, `language_name`) so a resolved Tier B content-i18n
    * string can be interpolated AFTER catalog resolution, not before. Optional
    * and defaults to `{}` at the QuestionField boundary so existing/test

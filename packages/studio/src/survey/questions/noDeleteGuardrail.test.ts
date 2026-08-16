@@ -1,7 +1,7 @@
 // Spec 022 — no-delete library guardrail (FR-004 / FR-005, SC-003).
 //
 // "Demotion is NOT deletion." The orphaned full non-identity Phase A (plus
-// pb_mark_input_order, relocated by spec 046) is physically relocated to the
+// pb_mark_input_order, relocated by spec 071) is physically relocated to the
 // dedicated reserve/ folder and reserveRegistry (rendered as Leftover nodes via
 // buildLeftoverSection — see phaseADemoteReserve.test.ts / driftGuardrail.test.ts).
 // The no-delete guardrail (migration-plan §4) requires every demoted module to
@@ -24,7 +24,7 @@
 // The `pb_*` step-by-step battery is NOT library content — it stays a live,
 // reachable, non-default branch off the IntroChooser gate — so it is deliberately
 // NOT in the demoted set here. (pb_mark_input_order is the one exception, already
-// relocated by spec 046, and is covered separately — see the coverage note below.)
+// relocated by spec 071, and is covered separately — see the coverage note below.)
 //
 // Test-only: no contracts bump, no write routing, no flag flip (FR-010/FR-011).
 
@@ -48,7 +48,7 @@ import {
 // disk + test-covered. NOTE: the il_* identity-lite head is the CANONICAL identity
 // experience and stays LIVE — it is NOT in the demoted set.
 
-// pb_mark_input_order (spec 046) is relocated to reserve/ too, but is NOT part of
+// pb_mark_input_order (spec 071) is relocated to reserve/ too, but is NOT part of
 // DEMOTED_PHASE_A (it is not derived from phase_a_identity.modular.yaml) — cover it
 // separately so the reserve folder's full 31-module coverage is genuinely detected.
 const PB_MARK_INPUT_ORDER = "pb_mark_input_order";
@@ -87,7 +87,7 @@ describe("spec 022 — no-delete library guardrail (demoted Phase A)", () => {
     }
   });
 
-  it("pb_mark_input_order (spec 046) is REGISTERED in reserveRegistry + merged questionRegistry", () => {
+  it("pb_mark_input_order (spec 071) is REGISTERED in reserveRegistry + merged questionRegistry", () => {
     expect(
       Object.prototype.hasOwnProperty.call(reserveRegistry, PB_MARK_INPUT_ORDER),
       "pb_mark_input_order missing from reserveRegistry — silent unregistration",

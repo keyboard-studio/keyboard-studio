@@ -8,7 +8,7 @@
 
 **Input**: User description: "Spec out a deterministic system for determining where each keyboard fits in each facet. Start with script, and do two other representative facets, setting the standard for later facets."
 
-**Governing sections**: spec.md §7.1 (discovery axes — script class), §8 (data flow / inventory), §9 (three-group routing by script), [content/facets/README.md](../../content/facets/README.md) (`corpus:` derivation convention). Sibling features: [specs/036-keyboard-facet-index](../036-keyboard-facet-index/spec.md) (the artifact these classifiers populate), [specs/038-adaptation-questions](../038-adaptation-questions/spec.md) (how ambiguous classifications are confirmed with users).
+**Governing sections**: spec.md §7.1 (discovery axes — script class), §8 (data flow / inventory), §9 (three-group routing by script), [content/facets/README.md](../../content/facets/README.md) (`corpus:` derivation convention). Sibling features: [specs/070-keyboard-facet-index](../070-keyboard-facet-index/spec.md) (the artifact these classifiers populate), [specs/038-adaptation-questions](../038-adaptation-questions/spec.md) (how ambiguous classifications are confirmed with users).
 
 ## Problem
 

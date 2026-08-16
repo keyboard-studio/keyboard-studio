@@ -110,7 +110,7 @@ make it true, not make it quieter).
 ## 4. Why a vitest and not a plain-node linter
 
 The declarations are TypeScript module exports. `content-i18n-lint` is plain JS and cannot
-re-derive `flowQuestions.json` from TS-module question definitions, which is exactly why spec 050
+re-derive `flowQuestions.json` from TS-module question definitions, which is exactly why spec 073
 added the tsx-run `content-i18n-freshness` check beside it rather than extending it. A plain-node
 checker here would need its own TypeScript parser. Vitest imports `questionRegistry` directly, and
 `registry.test.ts` is the established home for registry-wide invariants. Research D-07.

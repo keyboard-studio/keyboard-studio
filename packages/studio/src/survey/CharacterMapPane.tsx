@@ -129,7 +129,7 @@ export function CharacterMapPane({
   // same stable identity the list key uses. Transient view state, like
   // `blocksOnly` — reset on language change below, never persisted.
   const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set());
-  // Private-use pick awaiting its role answer (spec 046 FR-004): no linguistic
+  // Private-use pick awaiting its role answer (spec 071 FR-004): no linguistic
   // data exists for PUA characters, so the designer says letter-or-mark AT the
   // point of picking — the character is not added to any list until answered.
   const [pendingPuaChar, setPendingPuaChar] = useState<string | null>(null);
@@ -276,7 +276,7 @@ export function CharacterMapPane({
     return cased;
   }, [loadState, query, searchFilters, blocksOnly, hasKnownBlocks, chars, bcp47, scope]);
 
-  // Visible decomposition at the point of picking (spec 046 US5/FR-003): a
+  // Visible decomposition at the point of picking (spec 071 US5/FR-003): a
   // whole-grapheme pick contributes its base to Letters and its mark(s) to
   // Marks; the announcement narrates that three-way update so the pick itself
   // is the teaching moment — no interrupting question.

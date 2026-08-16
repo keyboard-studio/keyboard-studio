@@ -14,7 +14,7 @@ The spec-047 work established a casing convention on the "Add your whole alphabe
 a cased base keyboard shows only the **lowercase** of each case pair (uppercase hidden in
 the character map, letter lists collapsed to lowercase), while both cases are still recorded
 because the derivative keyboard is assumed to be cased too. The **diacritic-based survey
-questions** that follow — the marks/attachment series ([spec 046](../046-marks-question-series/spec.md):
+questions** that follow — the marks/attachment series ([spec 071](../071-marks-question-series/spec.md):
 which base letters each combining mark attaches to, and the related composition questions —
 should follow the same convention: when the script is cased, present the author with only the
 **lowercase** base letters, and derive the uppercase attachments automatically rather than
@@ -157,7 +157,7 @@ counterparts of every cased base that was selected.
 
 - Issue #1347 — base-keyboard casing facet gate + lowercase-only diacritic questions (this is
   item 2).
-- [spec 046](../046-marks-question-series/spec.md) — the marks/attachment question series this
+- [spec 071](../071-marks-question-series/spec.md) — the marks/attachment question series this
   refines (`AttachmentStation`, `deriveCaseCounterparts`).
 - [spec 047](../047-alphabet-inventory-categories/spec.md) — the character-step casing convention
   this continues.

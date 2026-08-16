@@ -4,7 +4,7 @@
 //   T028 — manifest-driven SurveyView: forward and back transitions driven by the
 //           manifest step order (identity → choose_base → track → [project_name] →
 //           characters → marks → carve → mechanisms → touch →
-//           help → done). No SurveyStage union. The marks step (spec 046) is
+//           help → done). No SurveyStage union. The marks step (spec 071) is
 //           NOT mocked — the marks-free test alphabet makes its S0 gate
 //           auto-complete without rendering, so walks hop it invisibly.
 //   T029 — no SurveyStage symbol; runtime step order matches manifest; applyStepCompletion
@@ -657,7 +657,7 @@ function advanceToB() {
 /**
  * Drive from "identity" to "carve".
  * New order (issue #508): prefill → B → punctuation → carve — phaseB-complete
- * lands on the punctuation page via the marks step's S0 auto-skip (spec 046;
+ * lands on the punctuation page via the marks step's S0 auto-skip (spec 071;
  * marks-free test alphabet); punctuation has no skip gate (zero punctuation is
  * a valid answer), so the walk accepts it empty; convenience then auto-skips.
  *
@@ -2078,7 +2078,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
     expect(exports).not.toContain("SurveyStage");
   });
 
-  it("manifest spine order is: identity → choose_base → track → characters → marks → punctuation → convenience → carve → mechanisms → touch → help → package (M2, spec 046)", () => {
+  it("manifest spine order is: identity → choose_base → track → characters → marks → punctuation → convenience → carve → mechanisms → touch → help → package (M2, spec 071)", () => {
     // track is now a real manifest step (P0 fix); project_name is spine:false.
     const spineIds = manifest
       .filter((s) => s.spine !== false)
@@ -2163,7 +2163,7 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     fireEvent.click(screen.getByTestId("prefill-confirm"));
     expect(screen.getByTestId("stage-B")).toBeTruthy();
 
-    // → marks (next spine step after characters, spec 046) → punctuation.
+    // → marks (next spine step after characters, spec 071) → punctuation.
     // The test alphabet has no marks, so the S0 gate auto-completes the marks
     // step without rendering; the punctuation page has no gate and renders.
     fireEvent.click(screen.getByTestId("phaseB-complete"));
