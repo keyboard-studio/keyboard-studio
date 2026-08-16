@@ -845,82 +845,69 @@ function discardCorruptDraft(projectKey: string): void {
 }
 
 /**
- * Load `projectKey`'s durable draft (if any) and rehydrate both stores.
- *
- * - Returns false if no draft is stored under this key.
- * - VR-3: a malformed/unparseable draft is removed and treated as absent.
- * - VR-1: a version mismatch is removed and treated as absent (discard, not
- *   migrate).
- * - VR-2: a draft with no real instantiation is treated as absent (left in
- *   place — not removed; nothing to migrate away from) — UNLESS `projectKey`
- *   is the reserved `PENDING_PROJECT_KEY` slot, whose whole point (F6 fix) is
- *   a resumable record with no working copy yet; that case restores the
- *   working-copy store to its (already-empty) snapshot shape and the
- *   survey-session traversal normally.
- * - G-1/G-5: on success, patches the SAME single working-copy store and the
- *   SAME single survey-session store — never constructs a second working
- *   copy — then returns true so the caller can resume at
- *   `traversal.activeStepId`.
+ * Outcome of {@link applyEnvelopeToStores}. `"no-real-work"` (VR-2) is
+ * distinguished from `"corrupt"` (VR-1 version mismatch, VR-3 bad traversal
+ * shape, or a throw during the store-apply itself) because `loadDraft`
+ * discards the stored record for one but not the other — see its doc
+ * comment.
  */
-export function loadDraft(projectKey: string): boolean {
-  let raw: string | null;
-  try {
-    raw = localStorage.getItem(draftKey(projectKey));
-  } catch {
-    return false;
+type ApplyEnvelopeOutcome =
+  | { readonly ok: true }
+  | { readonly ok: false; readonly reason: "no-real-work" | "corrupt" };
+
+/**
+ * The VR-1/VR-2/VR-3 shape validation and store-apply core shared by
+ * `loadDraft` (a local record, keyed by `projectKey`) and `applyRemoteDraft`
+ * (a server-fetched envelope, keyed by `envelope.projectKey`) — both restore
+ * the SAME two stores from the SAME envelope shape and must reject the same
+ * malformed shapes the same way. `pendingSlotKey` is whichever project key
+ * the caller is restoring INTO, so the `PENDING_PROJECT_KEY` VR-2 exception
+ * (F6 fix) reads the right key for each caller.
+ *
+ * Deliberately never touches localStorage, the active-project pointer, or
+ * the `wasDraftRestoredThisBoot()` / `restoredDraftSavedAt()` boot flags —
+ * those are `loadDraft`-only side effects layered on top by its caller.
+ */
+function applyEnvelopeToStores(envelope: DurableDraft, pendingSlotKey: string): ApplyEnvelopeOutcome {
+  if (envelope.version !== DRAFT_VERSION) {
+    // VR-1: version mismatch — discard, do not attempt to migrate.
+    return { ok: false, reason: "corrupt" };
   }
-  if (raw === null) return false;
 
-  // VR-3 (P0 fix): the ENTIRE parse-through-apply body is one try/catch, not
-  // just the JSON.parse call. A record can be valid JSON but wrong-shaped
-  // (e.g. `{"version":1}` with `workingCopy` missing/null, or a non-object
-  // value), or `applyWorkingCopySnapshot` can throw deep inside
-  // `deserializeEntry`'s `atob()` on a corrupt Base64 VFS entry. Any of these
-  // must be treated exactly like an unparseable draft — clear + treat as
-  // absent — never thrown into `main.tsx`'s pre-mount, unguarded call.
+  if (
+    envelope.workingCopy === null ||
+    typeof envelope.workingCopy !== "object" ||
+    (envelope.workingCopy.instantiationMode === null && pendingSlotKey !== PENDING_PROJECT_KEY)
+  ) {
+    // VR-2: "no real work" (or the field is missing/wrong-shaped) — ignored
+    // (not removed; mirrors the sessionStorage snapshot guard's semantics
+    // of "nothing worth restoring"). The pending slot is the one deliberate
+    // exception (F6 fix) — see `loadDraft`'s doc comment.
+    return { ok: false, reason: "no-real-work" };
+  }
+
+  // VR-3 (traversal shape): a version-matched record with a valid working
+  // copy but a missing/malformed `traversal` is genuinely corrupt — but
+  // `applyTraversalSnapshot`'s object-spread never THROWS on a non-object
+  // (`{...null}`/`{...undefined}` = `{}`), so without this guard it would
+  // slip past the catch below, restore the working copy, and leave the walk
+  // position silently defaulted to the initial "identity" step — an
+  // inconsistent resume. Validate the traversal shape symmetrically with the
+  // workingCopy guard above and, since it can't self-heal, treat as corrupt
+  // rather than resume broken. Placed BEFORE the first
+  // `applyWorkingCopySnapshot` so a bad record never partially patches the
+  // stores.
+  if (envelope.traversal === null || typeof envelope.traversal !== "object") {
+    return { ok: false, reason: "corrupt" };
+  }
+
   try {
-    const envelope = JSON.parse(raw) as DurableDraft;
-
-    if (envelope.version !== DRAFT_VERSION) {
-      // VR-1: version mismatch — discard, do not attempt to migrate.
-      discardCorruptDraft(projectKey);
-      return false;
-    }
-
-    if (
-      envelope.workingCopy === null ||
-      typeof envelope.workingCopy !== "object" ||
-      (envelope.workingCopy.instantiationMode === null && projectKey !== PENDING_PROJECT_KEY)
-    ) {
-      // VR-2: "no real work" (or the field is missing/wrong-shaped) — ignored
-      // (not removed; mirrors the sessionStorage snapshot guard's semantics
-      // of "nothing worth restoring"). The pending slot is the one deliberate
-      // exception (F6 fix) — see the doc comment above.
-      return false;
-    }
-
-    // VR-3 (traversal shape): a version-matched record with a valid working
-    // copy but a missing/malformed `traversal` is genuinely corrupt — but
-    // `applyTraversalSnapshot`'s object-spread never THROWS on a non-object
-    // (`{...null}`/`{...undefined}` = `{}`), so without this guard it would
-    // slip past the catch below, restore the working copy, and leave the walk
-    // position silently defaulted to the initial "identity" step — an
-    // inconsistent resume. Validate the traversal shape symmetrically with the
-    // workingCopy guard above and, since it can't self-heal, remove + treat as
-    // absent (VR-3), rather than resume broken. Placed BEFORE the first
-    // `applyWorkingCopySnapshot` so a bad record never partially patches the
-    // stores.
-    if (envelope.traversal === null || typeof envelope.traversal !== "object") {
-      discardCorruptDraft(projectKey);
-      return false;
-    }
-
     // Atomic multi-store restore: do ALL fallible work FIRST —
     // `prepareWorkingCopySnapshot` is the only step that can throw (e.g.
     // `atob()` on a corrupt Base64 VFS entry) — before mutating either store.
     // The two commits below are pure (`setState` / object-spread) and cannot
     // throw, so a failure can never leave the working-copy store patched while
-    // the survey-session store is not (or the boot flag half-set).
+    // the survey-session store is not.
     const workingCopyState = prepareWorkingCopySnapshot(envelope.workingCopy);
     useWorkingCopyStore.setState(workingCopyState);
     applyTraversalSnapshot(envelope.traversal);
@@ -973,13 +960,70 @@ export function loadDraft(projectKey: string): boolean {
       }
     }
 
+    return { ok: true };
+  } catch {
+    // VR-3: malformed/wrong-shaped/corrupt (a throw from
+    // `prepareWorkingCopySnapshot` BEFORE any store was touched).
+    return { ok: false, reason: "corrupt" };
+  }
+}
+
+/**
+ * Load `projectKey`'s durable draft (if any) and rehydrate both stores.
+ *
+ * - Returns false if no draft is stored under this key.
+ * - VR-3: a malformed/unparseable draft is removed and treated as absent.
+ * - VR-1: a version mismatch is removed and treated as absent (discard, not
+ *   migrate).
+ * - VR-2: a draft with no real instantiation is treated as absent (left in
+ *   place — not removed; nothing to migrate away from) — UNLESS `projectKey`
+ *   is the reserved `PENDING_PROJECT_KEY` slot, whose whole point (F6 fix) is
+ *   a resumable record with no working copy yet; that case restores the
+ *   working-copy store to its (already-empty) snapshot shape and the
+ *   survey-session traversal normally.
+ * - G-1/G-5: on success, patches the SAME single working-copy store and the
+ *   SAME single survey-session store — never constructs a second working
+ *   copy — then returns true so the caller can resume at
+ *   `traversal.activeStepId`.
+ *
+ * The VR-1/VR-2/VR-3 shape checks and the store-apply itself live in
+ * {@link applyEnvelopeToStores}, shared with `applyRemoteDraft`; this
+ * function adds the localStorage read, the VR-1/VR-3 discard side effect,
+ * and the boot-restore flags on top.
+ */
+export function loadDraft(projectKey: string): boolean {
+  let raw: string | null;
+  try {
+    raw = localStorage.getItem(draftKey(projectKey));
+  } catch {
+    return false;
+  }
+  if (raw === null) return false;
+
+  // VR-3 (P0 fix): the ENTIRE parse-through-apply body is one try/catch, not
+  // just the JSON.parse call. A record can be valid JSON but wrong-shaped
+  // (e.g. `{"version":1}` with `workingCopy` missing/null), which
+  // `applyEnvelopeToStores` reports as `"corrupt"` rather than throwing, but
+  // `JSON.parse` itself can still throw on unparseable JSON — that must be
+  // treated exactly like a corrupt draft — clear + treat as absent — never
+  // thrown into `main.tsx`'s pre-mount, unguarded call.
+  try {
+    const envelope = JSON.parse(raw) as DurableDraft;
+    const outcome = applyEnvelopeToStores(envelope, projectKey);
+
+    if (!outcome.ok) {
+      if (outcome.reason === "corrupt") {
+        discardCorruptDraft(projectKey);
+      }
+      return false;
+    }
+
     _draftRestoredThisBoot = true;
     _restoredDraftSavedAt = envelope.savedAt;
     return true;
   } catch {
-    // VR-3: malformed/wrong-shaped/corrupt (or a throw from
-    // prepareWorkingCopySnapshot BEFORE any store was touched) — remove and
-    // treat as absent so it doesn't loop or crash boot.
+    // Unparseable JSON — remove and treat as absent so it doesn't loop or
+    // crash boot.
     discardCorruptDraft(projectKey);
     return false;
   }
@@ -992,52 +1036,16 @@ export function loadDraft(projectKey: string): boolean {
  * malformed cloud envelope is rejected (returns false) rather than hydrating
  * the stores at the wrong shape.
  *
- * Mirrors `loadDraft`'s VR-1/VR-2/VR-3 shape checks (version, workingCopy,
- * traversal) but never discards or mutates localStorage — there is no LOCAL
- * record to discard for a remote payload, and this is an explicit, mid-session
- * user action, not the pre-mount boot restore, so it never touches the
- * `wasDraftRestoredThisBoot()` / `restoredDraftSavedAt()` flags either.
+ * Shares `loadDraft`'s VR-1/VR-2/VR-3 shape checks and store-apply core via
+ * `applyEnvelopeToStores`, but never discards or mutates localStorage — there
+ * is no LOCAL record to discard for a remote payload, and this is an
+ * explicit, mid-session user action, not the pre-mount boot restore, so it
+ * never touches the `wasDraftRestoredThisBoot()` / `restoredDraftSavedAt()`
+ * flags either.
  */
 export function applyRemoteDraft(envelope: DurableDraft | null): boolean {
   if (envelope === null || typeof envelope !== "object") return false;
-  if (envelope.version !== DRAFT_VERSION) return false;
-  if (
-    envelope.workingCopy === null ||
-    typeof envelope.workingCopy !== "object" ||
-    (envelope.workingCopy.instantiationMode === null && envelope.projectKey !== PENDING_PROJECT_KEY)
-  ) {
-    return false;
-  }
-  if (envelope.traversal === null || typeof envelope.traversal !== "object") return false;
-
-  try {
-    const workingCopyState = prepareWorkingCopySnapshot(envelope.workingCopy);
-    useWorkingCopyStore.setState(workingCopyState);
-    applyTraversalSnapshot(envelope.traversal);
-
-    const restoredChars = Array.isArray(envelope.phaseBDraft?.chars) ? envelope.phaseBDraft.chars : [];
-    const restoredFont = isPhaseBFontValue(envelope.phaseBDraft?.selectedFont)
-      ? envelope.phaseBDraft.selectedFont
-      : DEFAULT_PHASE_B_FONT;
-    const restoredDigraphs = Array.isArray(envelope.phaseBDraft?.exemplarDigraphs)
-      ? envelope.phaseBDraft.exemplarDigraphs.filter((d): d is string => typeof d === "string")
-      : [];
-    applyPhaseBDraftSnapshot({
-      chars: restoredChars,
-      exemplarDigraphs: restoredDigraphs,
-      selectedFont: restoredFont,
-    });
-
-    if (envelope.decisionRecord !== undefined) {
-      const decisions = parseDecisionRecord(JSON.stringify(envelope.decisionRecord));
-      if (!decisions.unreadable) {
-        applyDecisionRecordSnapshot(decisions.record, decisions.droppedCount);
-      }
-    }
-    return true;
-  } catch {
-    return false;
-  }
+  return applyEnvelopeToStores(envelope, envelope.projectKey).ok;
 }
 
 /**

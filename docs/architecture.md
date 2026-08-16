@@ -133,11 +133,12 @@ Three layers gate the working copy (spec [§10](../spec.md#10-validator-and-lint
     oracle. It does not forbid every debounce in the studio. Non-validation
     debounced side effects that produce no preview feedback are permitted: the
     full-corpus import-fidelity round-trip (I2) already runs *outside* the cycle
-    (spec [§10](../spec.md#10-validator-and-lint-engine)), and the ~1 s
-    localStorage survey-draft autosave
-    ([`packages/studio/src/lib/draftAutosave.ts`](../packages/studio/src/lib/draftAutosave.ts))
-    debounces persistence only. Neither touches the validation path, so neither
-    is a "second debounce timer" in the D3 sense.
+    (spec [§10](../spec.md#10-validator-and-lint-engine)), and the persistence
+    and network-sync timers in
+    [`packages/studio/src/lib/draftPersistence.ts`](../packages/studio/src/lib/draftPersistence.ts)
+    (`AUTOSAVE_DEBOUNCE_MS` and `CLOUD_SYNC_DEBOUNCE_MS`) debounce persistence
+    only. Neither races the validation path, so neither is a "second debounce
+    timer" in the D3 sense.
 
 ## Exemplar sourcing — one offline path
 

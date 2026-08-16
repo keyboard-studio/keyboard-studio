@@ -8,7 +8,12 @@
 // #1451: this banner used to ALSO offer a same-browser local draft (from the
 // since-retired draftAutosave.ts engine) — draftPersistence's own silent
 // boot-time restore is the one local-resume path now, so that offer is gone;
-// the cloud case above is the only one left.
+// the cloud case above is the only one left. Cloud-only per #1451's own
+// consolidation: the sole caller (StudioShell.tsx's `cloudResume` state) only
+// ever constructs `meta` via `serverMetaToDraftMeta`, which hardcodes
+// `source: "cloud"` — so the local-copy branch this component used to carry
+// alongside the cloud copy was unreachable dead code, removed here rather
+// than left to drift from a caller that can never invoke it.
 
 import type { CSSProperties } from "react";
 import type { DraftMeta } from "../lib/draftPersistence.ts";
@@ -95,36 +100,24 @@ const discardButton: CSSProperties = {
 export function ResumeDraftBanner({ meta, onResume, onDiscard }: ResumeDraftBannerProps) {
   const stepLabel = STEP_LABELS[meta.activeStepId] ?? meta.activeStepId;
   const name = meta.label !== null ? `"${meta.label}"` : "your keyboard";
-  const isCloud = meta.source === "cloud";
 
   return (
     <div
       role="region"
-      aria-label={isCloud ? "Restore keyboard from your account" : "Resume unfinished survey"}
+      aria-label="Restore keyboard from your account"
       data-testid="resume-draft-banner"
-      data-source={meta.source ?? "local"}
+      data-source="cloud"
       style={bannerStyle}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 600, marginBottom: 2 }}>
-          {isCloud ? `Restore ${name} from your account?` : `Resume ${name}?`}
-        </div>
+        <div style={{ fontWeight: 600, marginBottom: 2 }}>{`Restore ${name} from your account?`}</div>
         <div style={{ color: TEXT_DIM, fontSize: 13 }}>
-          {isCloud ? (
-            <>
-              You have an in-progress keyboard saved to your account (last saved{" "}
-              {relativeTimeLabel(relativeTime(meta.savedAt))}, on the {stepLabel} step).
-            </>
-          ) : (
-            <>
-              You have an unfinished survey (last saved {relativeTimeLabel(relativeTime(meta.savedAt))}, on the{" "}
-              {stepLabel} step).
-            </>
-          )}
+          You have an in-progress keyboard saved to your account (last saved{" "}
+          {relativeTimeLabel(relativeTime(meta.savedAt))}, on the {stepLabel} step).
         </div>
       </div>
       <button type="button" data-testid="resume-draft" style={primaryButton} onClick={onResume}>
-        {isCloud ? "Restore" : "Resume"}
+        Restore
       </button>
       <button type="button" data-testid="discard-draft" style={discardButton} onClick={onDiscard}>
         Discard

@@ -1441,7 +1441,7 @@ describe("F6 wiring: promotePendingAutosave", () => {
       render(<SurveyView baseKeyboard={null} />);
     });
 
-    // L1 progress: identity-complete gives hasPendingProgress() a true reading
+    // L1 progress: identity-complete gives hasMeaningfulProgress() a true reading
     // (identityResult !== null / activeStepId !== "identity").
     fireEvent.click(screen.getByTestId("identity-complete"));
 
