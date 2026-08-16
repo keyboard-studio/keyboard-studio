@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-08-15",
+  "lastUpdated": "2026-08-16",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -160,7 +160,7 @@
     },
     "§12": {
       "title": "12. Output artifacts",
-      "hash": "sha256:56c468587fd9670c",
+      "hash": "sha256:31a375c758ee3c1f",
       "status": "partial",
       "implements": [
         "packages/contracts/src/virtualFS.ts",
