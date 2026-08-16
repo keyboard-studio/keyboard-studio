@@ -35,10 +35,9 @@
  */
 export const OSK_IFRAME_DEBT: readonly string[] = [];
 
-/** 1.4.3 — the Output screen's only remaining known offender is the OSK
- * iframe it embeds (OskModeToggle and SignUpPanel were re-verified clean by
- * the #1477 sweep — see header comment). Kept as its own named export,
- * rather than inlining OSK_IFRAME_DEBT at each call site, so a future
- * Output-screen-specific offender has a single place to land without
- * touching every call site again. */
+/** FORMERLY 1.4.3 debt: the Output screen's only known offender was the OSK
+ * iframe it embeds — now fixed at the source (see OSK_IFRAME_DEBT above).
+ * Kept as its own named export in case a future Output-screen-specific
+ * offender needs one, rather than inlining OSK_IFRAME_DEBT at each call
+ * site. */
 export const OUTPUT_SCREEN_DEBT: readonly string[] = [...OSK_IFRAME_DEBT];
