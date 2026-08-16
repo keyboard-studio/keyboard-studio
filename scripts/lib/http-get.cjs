@@ -6,7 +6,12 @@
  * Six call sites in this repo (four scripts/*.mjs fetchers, plus
  * utilities/spec-trace and utilities/crowdin-diagnose) each hand-rolled a
  * "GET a URL, buffer the response, fail loudly on a bad status" helper.
- * This module is the one shared implementation of that shape.
+ * This module is the shared implementation for those six.
+ *
+ * A 7th similar-shaped helper -- utilities/kbgen/fetch-data.ts's get() --
+ * was deliberately left unmigrated: it resolves on status instead of
+ * rejecting, so callers can branch on a 404 without a try/catch. Folding it
+ * in was out of scope for this pass.
  *
  * Two things this file will NOT do, on purpose:
  *
