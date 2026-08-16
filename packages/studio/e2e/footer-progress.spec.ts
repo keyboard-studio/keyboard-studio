@@ -37,23 +37,15 @@ const upcomingDots = (page: Page) => footer(page).locator('[data-progress-dot-ki
 const currentDot = (page: Page) => footer(page).locator('[data-progress-dot-kind="current"]');
 
 /**
- * Known-pre-existing 1.4.3 (Contrast Minimum) offenders on the survey screen,
- * excluded exactly as tab-roundtrip.spec.ts does — this feature does not
- * touch them, and 1.4.3 is an open `unknown` row in
- * [specs/056-ada-accessibility/wcag-2.2-aa-tracker.md]. PhaseB.tsx is
- * byte-identical to `main` (see
- * specs/057-bulletproof-navigation/evidence/gating-red.md §"Two corrections
- * made to reach a *valid* red").
+ * #1477's ground-truth sweep (live axe run with this list emptied) found
+ * PhaseB's intro Continue button and PickerPane's source-mode toggle — the
+ * two entries this list used to carry — already clean. The remaining OSK
+ * iframe entry is now also fixed at the source
+ * (packages/studio/public/osk-frame.html overrides `.kmw-spacebar-caption`'s
+ * color), so this scan now covers everything the frame renders. Kept as an
+ * empty array so `exclude: KNOWN_CONTRAST_DEBT` below keeps compiling.
  */
-const KNOWN_CONTRAST_DEBT: readonly string[] = [
-  'div[aria-label="Keyboard source mode"]',
-  // 1.4.3 — PhaseB's intro "Continue" button, on the characters step.
-  'button[data-testid="phase-b-intro-next"]',
-  // The OSK iframe's `.kmw-spacebar-caption` contrast debt is now fixed at
-  // the source (packages/studio/public/osk-frame.html overrides its color);
-  // the whole-iframe exclusion is gone, so this scan now covers everything
-  // the frame renders.
-];
+const KNOWN_CONTRAST_DEBT: readonly string[] = [];
 
 test.describe("footer progress row (spec 057 US4/US6)", () => {
   test.beforeEach(async ({ page }) => {

@@ -269,7 +269,7 @@ export function RemovalBanner({ recommended, languageLabel, languageDisplayName,
                     // both. The disabled --app-text-subtle fill is a THEME
                     // token that moves with the theme, so the flipping token is
                     // correct there and is deliberately kept. Same pairing bug
-                    // as CarveGalleryV2's "In your alphabet" pill (issue 1627).
+                    // as CarveGalleryV2's "In your alphabet" pill.
                     color: selected.length === 0 ? 'var(--app-text-on-accent)' : 'var(--sil-black)',
                     background: selected.length === 0 ? 'var(--app-text-subtle)' : 'var(--sil-green)',
                     border: 'none', borderRadius: 8, padding: '8px 16px', opacity: selected.length === 0 ? 0.6 : 1,
