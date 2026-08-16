@@ -320,6 +320,14 @@ function report() {
 
 // ---------------------------------------------------------------------------
 // GitHub API helpers
+//
+// Not migrated onto scripts/lib/http-get.cjs (issue #1490): that helper is
+// GET-only and rejects on a non-2xx status. apiRequest below is a generic
+// GET/POST/PATCH client that must resolve (not reject) on a 404 -- ensureLabel
+// reads `res.status === 404` to decide whether to create the label, so a
+// helper that throws on non-2xx would break that check. It is a different
+// shape from the download-and-buffer duplication the other five call sites
+// shared, not an instance of it.
 // ---------------------------------------------------------------------------
 
 function apiRequest(options, body) {
