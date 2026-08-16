@@ -773,7 +773,7 @@
     },
     "specs/065-touch-editor-parity": {
       "title": "Feature Specification: Touch key editor — Developer-parity remodel",
-      "hash": "sha256:019872f3a6d46ad6",
+      "hash": "sha256:66616374bb15da85",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
