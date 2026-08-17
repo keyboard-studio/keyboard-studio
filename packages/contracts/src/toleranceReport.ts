@@ -87,4 +87,20 @@ export interface ContextVariant {
    * generator must honor so the tolerant rule wins over the fallback.
    */
   precedesFallbackRuleId?: string;
+  /**
+   * The exact output the keyboard's own (untouched) rule already produces
+   * for the precomposed form of this context — the "keyboard's own form"
+   * FR-007's `"own-form"` write-back setting normalizes to. The generated
+   * rule itself defaults to this value's canonical-equivalence-preserving
+   * NFD form (`"echo"`, FR-007's default); a write-back policy switch
+   * (spec 062 US3) rewrites it back to this value without recompiling.
+   *
+   * Absent for a variant with no per-candidate output string in this sense
+   * — spec 062 US4's backspace-unwrap variants (`kind: "added-rule"`, but a
+   * store-`index()` or per-unit literal output, never a single candidate's
+   * echo/own-form choice) have no write-back setting of their own. Producers
+   * and consumers must check for `undefined` rather than treat a missing
+   * value as an empty string.
+   */
+  precomposedOutput?: string;
 }

@@ -6,6 +6,22 @@
 // Single source of truth: this one computed table feeds all four consumers —
 // the posture facet, the S4 output-form proposal, the stepwise backspace-unwrap
 // store generation, and the blocking rules — so they can never disagree.
+//
+// Named fifth consumer, NOT actually called (spec 062 exception): spec.md's
+// Key Entities section (§ Per-pair table) names canonical-equivalence context
+// tolerance as this table's fifth consumer — each composed form's own
+// decomposition being exactly the context variant to add is the same
+// relationship this function already computes. In practice
+// `pattern-apply/context-variants.ts` computes that per-candidate
+// decomposability itself via plain `.normalize("NFD"/"NFC")` (research.md's
+// own second Phase 0 decision, also used everywhere else in this codebase for
+// decomposition) rather than calling `nfcPostureOfInventory` here, because
+// this function's `alphabet: ConfirmedAlphabet` parameter is a
+// survey-confirmed, studio-side structure spec 062's generator does not
+// require — it runs over an arbitrary `KeyboardIR` (importantly including an
+// IMPORTED keyboard with no confirmed alphabet at all, e.g. `sil_yoruba8`).
+// See `context-variants.ts`'s own module doc for the same substitution
+// spelled out at its two call sites.
 
 import type { AttestedStack, ConfirmedAlphabet } from "@keyboard-studio/contracts";
 import { composeStack, stackKey } from "@keyboard-studio/contracts";

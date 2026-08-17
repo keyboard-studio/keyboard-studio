@@ -236,6 +236,22 @@ and tested) and is out of this feature's stated scope.
 was considered and rejected as scope creep — flagged here so a future cleanup
 pass has the pointer, not silently dropped.
 
+**Amendment (implementation time, km-lead review cycle)**: this decision's
+premise did not survive contact with the actual generator. `nfcPostureOfInventory`
+takes a `ConfirmedAlphabet`, a survey-confirmed, studio-side structure — neither
+`proposeContextVariants` nor `addBackspaceUnwrap` (spec 062's actual call sites,
+which must run over an ARBITRARY `KeyboardIR`, including an imported keyboard
+with no confirmed alphabet at all — `sil_yoruba8` itself) has one available.
+Both instead compute the same NFD/NFC relationship directly via the very
+`String.prototype.normalize` mechanism the NEXT decision below already
+endorses for a different reason. Spec 062 is therefore NOT the "fifth
+consumer" this decision predicted — see `nfc-posture-of-inventory.ts`'s own
+module doc and `context-variants.ts`'s module doc for the as-shipped account,
+and `mark-guards.ts`'s `buildUnwrap()` vs. `context-variants.ts`'s
+`addBackspaceUnwrap()` for the resulting (now three-way, not two-way)
+duplication this decision explicitly declined to consolidate. That duplication
+is tracked as a follow-up in tasks.md's Notes section, not silently dropped.
+
 ### Decision: canonical ordering and decomposability via `String.prototype.normalize`, no CCC table
 
 **Decision**: FR-005 (canonical mark ordering) and FR-006 (decomposability

@@ -6,7 +6,7 @@ import { emit } from "../codec/emit.js";
 import { compile } from "../compiler/index.js";
 import { simulate } from "../simulator/index.js";
 import { computeContextTolerance } from "../validator/context-tolerance.js";
-import { proposeContextVariants, GENERATED_MARKER_PREFIX } from "./context-variants.js";
+import { proposeContextVariants, GENERATED_MARKER_PREFIX, BACKSPACE_UNWRAP_RULE_PREFIX } from "./context-variants.js";
 
 const HEADER = [
   "store(&NAME) 'ContextVariants'",
@@ -146,7 +146,13 @@ describe("proposeContextVariants (spec 062, US1)", () => {
     const report = await computeContextTolerance(ir);
     const { variants } = await proposeContextVariants(ir, report);
 
-    expect(variants).toHaveLength(0);
+    // No DIACRITIC fix variant — the store-pairing safety check must skip
+    // it. `store(mystore) U+00E2` is itself a composed unit, so Story 4's
+    // unconditional backspace-unwrap variant (spec 062 US4, added after this
+    // test) is expected here too; it is independent of the store-pairing gap
+    // this test exists to check.
+    const diacriticVariants = variants.filter((v) => !v.sourceRuleId.startsWith(BACKSPACE_UNWRAP_RULE_PREFIX));
+    expect(diacriticVariants).toHaveLength(0);
   }, 30_000);
 
   it("returns the IR unchanged (no variants) when the report has no gaps", async () => {
