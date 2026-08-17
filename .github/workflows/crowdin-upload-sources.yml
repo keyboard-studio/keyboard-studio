@@ -1,29 +1,46 @@
-# Crowdin Tier A `upload sources` (spec 046 T023 + T037). Pushes the English
-# source catalog (packages/studio/src/locales/en/messages.json) to the live
-# Crowdin project per crowdin.yml. Runs automatically on every merge to main
-# that touches the source catalog or the Crowdin config, plus workflow_dispatch
-# for a manual one-off run. Credentials only exist as CI secrets.
+# Crowdin Tier A `upload sources + translations` (spec 046 T023 + T037).
+# Pushes the English source catalog AND every target-locale catalog
+# (packages/studio/src/locales/*/messages.json) to the live Crowdin project
+# per crowdin.yml. Runs automatically on every merge to main that touches any
+# locale's messages.json or the Crowdin config, plus workflow_dispatch for a
+# manual one-off run. Credentials only exist as CI secrets.
 #
 # The download half of the round-trip (scheduled `download` -> translations PR)
 # is the sibling workflow crowdin-download-translations.yml (T038).
 #
-# seed_translations (manual-trigger only): also uploads the repo's existing
-# target-locale catalogs (fr/messages.json etc.) to Crowdin as translations.
-# One-off seeding tool, not part of the normal round-trip -- but a LOAD-BEARING
-# prerequisite for ever enabling the download half. Without it Crowdin has no
-# record of the translations already committed to the repo, and the download
-# then overwrites them with whatever Crowdin does hold: nothing.
+# WHY TRANSLATIONS UPLOAD ON EVERY MERGE (not sources-only): feature PRs here
+# routinely hand-write a target-locale value (e.g. fr) for a new message id in
+# the same PR that introduces the id. Before this change, this workflow
+# uploaded only the English source on merge -- the hand-written French never
+# reached Crowdin, so Crowdin kept that key untranslated forever, and every
+# scheduled download correctly (per Crowdin's own state) reverted the
+# hand-written value back to English. That happened twice with an identical
+# 13-key shape (#1638, #1647); the per-key revert guard in
+# utilities/content-i18n-lint caught both as a byproduct, not as the fix.
+# Uploading translations on every merge keeps Crowdin's copy current with
+# whatever lands in the repo, so the scheduled download has nothing left to
+# revert in the common case.
 #
-# Read that failure mode carefully, because it changed shape in 2026-08 when
-# crowdin.yml moved to skip_untranslated_strings: true. Under `false` an
-# unseeded download came back 100% ENGLISH, which utilities/i18n-collapse-guard
-# is built to catch and did. Under `true` it comes back 100% EMPTY -- and the
-# guard deliberately treats all-empty as a legitimately-bootstrapped locale, so
-# it PASSES. The corruption is quieter now, not less total.
+# TRADEOFF: the repo becomes authoritative for a target locale's value at
+# merge time, overwriting whatever a human translator has in progress on
+# Crowdin at that instant. Accepted as the same shape of risk seed_translations
+# below already carried; a live-edit collision here is rare, and Crowdin keeps
+# its own version history so it isn't destructive.
 #
-# Practical consequence: verify the seed actually landed (utilities/crowdin-
-# diagnose reports translated counts per locale) BEFORE enabling scheduled
-# downloads. The guard is no longer the backstop for this particular mistake.
+# seed_translations (workflow_dispatch input): forces a translations upload on
+# a MANUAL run even though the push trigger below now does this automatically
+# on every qualifying merge. Useful for an on-demand re-sync -- e.g. recovering
+# after an incident, or backfilling a locale added before this workflow existed
+# -- without waiting for a qualifying push.
+#
+# Unrelated to the above but still live: crowdin.yml's skip_untranslated_strings
+# must stay `false` (see its own comment). Under `false`, a locale Crowdin
+# under-holds comes back with ENGLISH for whatever it doesn't have, which
+# utilities/i18n-collapse-guard is built to catch. Under `true` it comes back
+# EMPTY instead -- and the guard treats all-empty as a legitimately-
+# bootstrapped locale, so it PASSES. The corruption is quieter, not less total.
+# Practical consequence: verify a locale's translated count
+# (utilities/crowdin-diagnose) after any change here, don't just trust green CI.
 
 name: Crowdin upload sources
 
@@ -31,12 +48,12 @@ on:
   push:
     branches: [main]
     paths:
-      - "packages/studio/src/locales/en/messages.json"
+      - "packages/studio/src/locales/*/messages.json"
       - "crowdin.yml"
   workflow_dispatch:
     inputs:
       seed_translations:
-        description: "Also upload existing target-locale catalogs (e.g. fr) as translations (one-off seeding)"
+        description: "Force a translations upload on this manual run (the push trigger below always does this on merge; use this for an on-demand re-sync)"
         type: boolean
         default: false
 
@@ -50,12 +67,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Upload sources (and optionally seed translations) to Crowdin
+      - name: Upload sources and translations to Crowdin
         uses: crowdin/github-action@v2
         with:
           config: crowdin.yml
           upload_sources: true
-          upload_translations: ${{ inputs.seed_translations == true }}
+          # true on every push (merge to main) -- see the WHY note above.
+          # On a manual workflow_dispatch run, still gated by the input so a
+          # plain manual run defaults to sources-only, matching prior behavior.
+          upload_translations: ${{ github.event_name == 'push' || inputs.seed_translations == true }}
           download_translations: false
         env:
           CROWDIN_PROJECT_ID: ${{ secrets.CROWDIN_PROJECT_ID }}
