@@ -1,4 +1,4 @@
-// OutputFormStation — S4 of the marks series (spec 046, FR-013..FR-017).
+// OutputFormStation — S4 of the marks series (spec 071, FR-013..FR-017).
 //
 // ONE whole-keyboard decision: ready-made single characters vs base-plus-mark
 // sequences, computed by the engine's ordered decision table

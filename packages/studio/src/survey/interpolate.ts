@@ -1,4 +1,4 @@
-// Template-token interpolation for flow-question prose (spec 050 US1 fix).
+// Template-token interpolation for flow-question prose (spec 073 US1 fix).
 //
 // A leaf module deliberately: SurveyRunner.tsx already imports QuestionField.tsx,
 // so QuestionField cannot import from SurveyRunner without creating a cycle.

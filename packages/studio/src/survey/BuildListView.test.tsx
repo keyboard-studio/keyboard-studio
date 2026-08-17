@@ -342,10 +342,10 @@ describe("BuildListView — Back navigation", () => {
 });
 
 // ---------------------------------------------------------------------------
-// AlphabetBreakdown — visible three-store decomposition (spec 046, US5)
+// AlphabetBreakdown — visible three-store decomposition (spec 071, US5)
 // ---------------------------------------------------------------------------
 
-describe("AlphabetBreakdown — visible decomposition (spec 046)", () => {
+describe("AlphabetBreakdown — visible decomposition (spec 071)", () => {
   const ACUTE = "́";
 
   it("does not render while the alphabet has no marks and no accented letters", async () => {

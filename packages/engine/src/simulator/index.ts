@@ -15,6 +15,7 @@ import type {
   SimulationResult,
   SimulationStep,
   DeadkeySnapshot,
+  SimulatorContextSeed,
   TestVectorResult,
   PatternTestResult,
 } from '@keyboard-studio/contracts';
@@ -148,6 +149,9 @@ function extractJsSource(compiled: CompileResult): string {
  *
  * @param compiled  A `CompileResult` whose `.js` artifact has `data` bytes set.
  * @param keys      The key sequence to simulate.
+ * @param initialContext  Optional seed for the starting buffer (text, caret
+ *   position, and pending deadkeys). Omitting this parameter entirely
+ *   reproduces today's empty-buffer behaviour byte-for-byte.
  * @returns         `SimulationResult` with final text output and per-step trace.
  *
  * @throws {Error} If `compiled` contains no `.js` artifact or the artifact has
@@ -163,7 +167,11 @@ function extractJsSource(compiled: CompileResult): string {
  *   across calls or test runs (blueprint §7).
  * - The function is synchronous; the Keyman JS processor is fully synchronous.
  */
-export function simulate(compiled: CompileResult, keys: SimKeyInput[]): SimulationResult {
+export function simulate(
+  compiled: CompileResult,
+  keys: SimKeyInput[],
+  initialContext?: SimulatorContextSeed,
+): SimulationResult {
   const scriptSrc = extractJsSource(compiled);
 
   // Load the keyboard via the Node vm sandbox. The returned JSKeyboardInterface
@@ -178,8 +186,14 @@ export function simulate(compiled: CompileResult, keys: SimKeyInput[]): Simulati
     defaultOutputRules: new DefaultOutputRules(),
   });
 
-  // Prepare the text store.
-  const textStore = new SyntheticTextStore();
+  // Prepare the text store, seeded from initialContext when provided.
+  // Omitting initialContext reproduces today's empty-buffer behaviour
+  // byte-for-byte (spec 062 FR-004 / SC-002). The caret is set at
+  // construction (not restored later) so no rule ever observes a transient,
+  // wrong caret position.
+  const seedText = initialContext?.text ?? '';
+  const caretPos = initialContext?.caretPos ?? seedText.length;
+  const textStore = new SyntheticTextStore(seedText, caretPos);
 
   // Initial context reset (no CAPS state set yet — each keystroke sets its own).
   processor.resetContext(textStore);
@@ -189,6 +203,11 @@ export function simulate(compiled: CompileResult, keys: SimKeyInput[]): Simulati
   // Track the caps state from the previous iteration so we can call
   // resetContext only when it changes (avoids flushing context on every key).
   let prevCaps: boolean | undefined = undefined;
+  // The first keystroke always triggers a caps-sync resetContext above (since
+  // prevCaps starts undefined), which unconditionally clears deadkeys — so
+  // seeded deadkeys must be inserted AFTER that first sync, not before the
+  // loop. This flag defers seeding to right after the first iteration's sync.
+  let seeded = false;
 
   for (const input of keys) {
     // Per-keystroke CAPS: honor each key's own caps flag so that a mid-sequence
@@ -198,6 +217,17 @@ export function simulate(compiled: CompileResult, keys: SimKeyInput[]): Simulati
       processor.stateKeys['K_CAPS'] = caps;
       processor.resetContext(textStore);
       prevCaps = caps;
+    }
+
+    if (!seeded) {
+      seeded = true;
+      if (initialContext?.pendingDeadkeys) {
+        for (const snapshot of initialContext.pendingDeadkeys) {
+          textStore.setSelection(snapshot.position);
+          textStore.insertDeadkeyBeforeCaret(snapshot.id);
+        }
+        textStore.setSelection(caretPos);
+      }
     }
 
     const keyEvent = buildKeyEvent(input);

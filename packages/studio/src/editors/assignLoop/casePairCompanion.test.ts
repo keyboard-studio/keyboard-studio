@@ -9,7 +9,7 @@
  * which `caseCounterpart` declines must raise nothing, and the locale used
  * must be the working copy's identity tag (FR-009).
  *
- * @see specs/051-uppercase-counterpart-suggestion/contracts/case-pair-proposal.md
+ * @see specs/074-uppercase-counterpart-suggestion/contracts/case-pair-proposal.md
  */
 
 import { describe, it, expect, beforeEach } from "vitest";

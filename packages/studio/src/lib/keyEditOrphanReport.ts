@@ -1,5 +1,5 @@
 // keyEditOrphanReport — re-derivation resilience for the key edit overlay
-// (spec 058 FR-033b; contracts/key-edit-overlay.md §8).
+// (spec 063 FR-033b; contracts/key-edit-overlay.md §8).
 //
 // ## The problem
 //

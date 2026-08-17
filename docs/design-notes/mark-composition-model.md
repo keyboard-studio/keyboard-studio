@@ -206,7 +206,7 @@ then confirmed.**
   categories, not letters or combining marks), so the store model needs a
   fourth slot for them — otherwise harvest silently drops exactly the
   characters a picker can never re-discover. Recorded as a follow-on;
-  spec 046 scopes the three-store model. Picker/suggested-list picks are whole
+  spec 071 scopes the three-store model. Picker/suggested-list picks are whole
   graphemes (the user picks é as é); the UI shows the consequence — picking
   é lights up **e** in Letters and **◌́** in Marks. That visible
   decomposition is the option-2 teaching moment without the modal

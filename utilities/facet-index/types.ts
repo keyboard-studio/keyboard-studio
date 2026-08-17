@@ -1,5 +1,5 @@
 /**
- * Shared types for the per-keyboard facet index (spec 036).
+ * Shared types for the per-keyboard facet index (spec 070).
  *
  * These mirror data-model.md Entities 1–3 and contracts/facet-index.schema.md.
  * Per the spec Assumption the facet schema is content-owned DATA, not a locked

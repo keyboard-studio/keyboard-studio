@@ -12,23 +12,32 @@ import { seedReturningVisitor } from "./helpers/surveyFlow";
 import { expectNoSeriousAxeViolations } from "./helpers/axe";
 
 const ROOT_RENDERS = [
-  { name: "app", url: "/", axe: true },
+  // seed: false — WelcomeScreen is what a FIRST-time visitor sees;
+  // seedReturningVisitor's whole purpose (every other entry below) is to
+  // skip past it, so this is the one entry that must NOT seed.
+  { name: "welcome screen", url: "/", axe: true, seed: false },
+  { name: "app", url: "/", axe: true, seed: true },
   // Bogus code/state: the exchange fails, which is fine — we only care that
   // the screen renders (it shows its error state) instead of throwing.
-  { name: "github oauth callback", url: "/oauth/callback?code=bogus&state=bogus", axe: true },
-  { name: "google oauth callback", url: "/oauth/google/callback?code=bogus&state=bogus", axe: true },
+  { name: "github oauth callback", url: "/oauth/callback?code=bogus&state=bogus", axe: true, seed: true },
+  { name: "google oauth callback", url: "/oauth/google/callback?code=bogus&state=bogus", axe: true, seed: true },
+  // Dashboard/profile tab (#1477 FR-009 audit — unscanned by any walk spec,
+  // which all stay on the survey/preview/output/trail tabs).
+  { name: "profile tab", url: "/#profile", axe: true, seed: true },
   // Dev-only demo route (/?demo=lint) — not production UI (same scoping as
   // the lingui unlocalized-string scan in eslint.config.mjs); the spec 056
   // accessibility gate covers shipped screens only.
-  { name: "lint demo", url: "/?demo=lint", axe: false },
+  { name: "lint demo", url: "/?demo=lint", axe: false, seed: true },
 ];
 
-for (const { name, url, axe } of ROOT_RENDERS) {
+for (const { name, url, axe, seed } of ROOT_RENDERS) {
   test(`${name} boots without an uncaught error`, async ({ page }) => {
     const pageErrors: string[] = [];
     page.on("pageerror", (error) => pageErrors.push(error.message));
 
-    await seedReturningVisitor(page);
+    if (seed) {
+      await seedReturningVisitor(page);
+    }
     await page.goto(url);
 
     await expect(page.locator("#root")).not.toBeEmpty();

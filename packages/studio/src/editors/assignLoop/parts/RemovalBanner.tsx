@@ -22,6 +22,10 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import type { RecommendedRemovalChar } from '../../../lib/irToCarveNodes.ts';
 import { displayChar, invisibleCharLabel } from '../../../lib/irToCarveNodes.ts';
+// Aliased: `Checklist` below already has a local `codepointLabel` string
+// (the rendered/aria-label text) whose name feeds an i18n placeholder — see
+// its own comment. Importing under a different name avoids shadowing it.
+import { codepointLabel as computeCodepointLabel } from '../../../survey/codepointLabel.ts';
 import { ChevronIcon, CheckIcon } from './carveShared.tsx';
 
 interface RemovalBannerProps {
@@ -41,11 +45,17 @@ interface RemovalBannerProps {
   onRemoveSelected: (selected: RecommendedRemovalChar[]) => void;
 }
 
-/** Author-facing label for a checklist row: an invisible/combining-mark name, else its codepoint. */
+/**
+ * Author-facing label for a checklist row: an invisible/combining-mark name,
+ * else its codepoint(s). `ch` here can be a block-candidate grapheme
+ * (recommendedRemovalChars' blockCandidateChars, composed via composeCombo),
+ * which stays multi-code-point for a base+mark pair with no precomposed form
+ * — so this names every code point, not just the first (PR #1625 pattern audit).
+ */
 function charCodepointLabel(ch: string): string {
   const inv = invisibleCharLabel(ch);
   if (inv !== null) return inv;
-  return `U+${ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`;
+  return computeCodepointLabel(ch).title;
 }
 
 interface ChecklistProps {
@@ -250,7 +260,18 @@ export function RemovalBanner({ recommended, languageLabel, languageDisplayName,
                   style={{
                     display: 'inline-flex', alignItems: 'center', gap: 6,
                     font: '600 12.5px var(--app-font)', cursor: selected.length === 0 ? 'default' : 'pointer',
-                    color: 'var(--app-text-on-accent)', background: selected.length === 0 ? 'var(--app-text-subtle)' : 'var(--sil-green)',
+                    // Colour tracks the fill, because only ONE of the two fills
+                    // is a fixed brand token. On --sil-green (a fixed fill in
+                    // both themes — brand.css has no navy override),
+                    // --app-text-on-accent flips to white in light theme and
+                    // reaches only 3.35:1, below the 4.5:1 AA minimum for this
+                    // normal-size bold text; --sil-black passes at 6.27:1 in
+                    // both. The disabled --app-text-subtle fill is a THEME
+                    // token that moves with the theme, so the flipping token is
+                    // correct there and is deliberately kept. Same pairing bug
+                    // as CarveGalleryV2's "In your alphabet" pill.
+                    color: selected.length === 0 ? 'var(--app-text-on-accent)' : 'var(--sil-black)',
+                    background: selected.length === 0 ? 'var(--app-text-subtle)' : 'var(--sil-green)',
                     border: 'none', borderRadius: 8, padding: '8px 16px', opacity: selected.length === 0 ? 0.6 : 1,
                   }}
                 >

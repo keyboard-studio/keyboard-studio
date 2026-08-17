@@ -1,5 +1,5 @@
 /**
- * The role matrix for the touch key <-> rule join (spec 058 T016, contract §8).
+ * The role matrix for the touch key <-> rule join (spec 063 T016, contract §8).
  *
  * Role classification IS the design here — every consumer's correctness rests on
  * a guard rule contributing nothing while still counting as "wired" — so each

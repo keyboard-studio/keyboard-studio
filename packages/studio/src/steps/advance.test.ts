@@ -87,7 +87,7 @@ describe("nextSpineStepAfter", () => {
     expect(nextSpineStepAfter("track")).toBe("characters");
   });
 
-  it("characters → marks (spec 046)", () => {
+  it("characters → marks (spec 071)", () => {
     expect(nextSpineStepAfter("characters")).toBe("marks");
   });
 
@@ -296,7 +296,7 @@ describe("advance: project_name", () => {
 // ---------------------------------------------------------------------------
 
 describe("advance: spine hops", () => {
-  it("characters → marks (spec 046)", () => {
+  it("characters → marks (spec 071)", () => {
     expect(advance("characters", undefined, copyCtx).next).toBe("marks");
   });
 

@@ -1,4 +1,4 @@
-// Tests for the copyright parse/render pair (spec 059, contracts/copyright.md).
+// Tests for the copyright parse/render pair (spec 064, contracts/copyright.md).
 //
 // The fixture table is HARVESTED from keymanapp/keyboards (FR-014), not invented:
 // every input in COPYRIGHT_LINE_FIXTURES / COPYRIGHT_REJECT_FIXTURES is a real

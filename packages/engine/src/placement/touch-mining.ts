@@ -75,7 +75,7 @@ export function mineLongpressHosts(layout: TouchLayoutIR): TouchHostObservation[
       for (const row of layer.rows) {
         for (const key of row.keys) {
           // Skip non-interactive (sp:9/10) AND deadkey-styled (sp:8) hosts.
-          // spec 058 FR-012 split sp:8 out of `isSpacerKeyClass` (it counts for
+          // spec 063 FR-012 split sp:8 out of `isSpacerKeyClass` (it counts for
           // coverage because it is interactive), but a deadkey-styled key is
           // still not a suggestable longpress mining host — so this call site
           // excludes both classes explicitly.

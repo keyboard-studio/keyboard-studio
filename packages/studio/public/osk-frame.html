@@ -115,6 +115,37 @@
         min-height: 320px;
       }
       .kmw-osk-frame { box-shadow: none !important; }
+      /*
+        WCAG 1.4.3 (Contrast Minimum) fix: KMW's own vendored
+        kmwosk.css sets `.kmw-spacebar-caption`'s color to a translucent
+        wash — rgba(0,0,0,0.25) by default (desktop/ios key faces, ~#eee /
+        ~#fdfdfe), rgba(255,255,255,0.35) under `prefers-color-scheme:
+        dark`, and #aaa on android (~#777 key face). Measured against the
+        actual key-face backgrounds this frame ever renders, those give
+        ~1.8:1 (desktop/ios) and ~1.9:1 (android) — both far under the
+        4.5:1 minimum.
+
+        This is a single-property override of a class KeymanWeb itself
+        defines, not a fork/vendor of kmwosk.css — none of its other rules,
+        the key faces, or anything else in the OSK is touched. It lives in
+        this document (which the studio already authors and already
+        injects CSS/@font-face into for the same iframe — see
+        injectFontFace/injectKeyboardCss in osk-frame.js) rather than in
+        KeymanWeb's own stylesheet.
+
+        #osk-host anchors this to a single ID selector (specificity 1,1,0),
+        which outranks every kmwosk.css selector for this class (all
+        class-only, at most 0,3,0) regardless of stylesheet load order or
+        `prefers-color-scheme` — so it wins whether KMW's link loads before
+        or after this inline block, and whether the media query matches or
+        not. #000 clears 4.5:1 against every background this frame renders
+        behind the caption: ~18:1 on the desktop/ios ~#eee/#fdfdfe key
+        face, ~4.68:1 on android's #777 key face (the tightest case — a
+        #777 mid-gray face can't clear much more than that with either
+        pure black or pure white text; white computes to ~4.49:1, just
+        under the threshold, so black is the only color that passes here).
+      */
+      #osk-host .kmw-spacebar-caption { color: #000 !important; }
     </style>
   </head>
   <body class="osk-always-visible">

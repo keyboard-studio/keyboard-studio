@@ -48,28 +48,16 @@ const FIXTURE = {
 const OTHER_TABS: readonly TabRoute[] = ["preview", "output", "trail", "flowmap"];
 
 /**
- * Known-pre-existing 1.4.3 (Contrast Minimum) offenders, excluded per the
- * axe helper's per-node exclusion rule (each needs the criterion and the
- * reason named at the call site).
- *
- * Neither is introduced or touched by spec 057, and 1.4.3 is an open
- * `unknown` row in
- * [specs/056-ada-accessibility/wcag-2.2-aa-tracker.md]. Gating THIS feature's
- * red→green evidence on unrelated a11y debt would make the gate assert
- * something it does not mean. Everything else on every tab is still scanned.
+ * #1477's ground-truth sweep (live axe run with this list emptied, across
+ * the preview/output/trail tabs) found PickerPane's source-mode toggle and
+ * SignUpPanel's GitHub button — the two entries this list used to carry —
+ * already clean. The remaining OSK iframe entry is now also fixed at the
+ * source (packages/studio/public/osk-frame.html overrides
+ * `.kmw-spacebar-caption`'s color), so this scan now covers everything the
+ * frame renders. Kept as an empty array so `exclude: KNOWN_CONTRAST_DEBT`
+ * below keeps compiling.
  */
-const KNOWN_CONTRAST_DEBT: readonly string[] = [
-  // 1.4.3 — the OSK iframe renders KeymanWeb's own markup (.kmw-spacebar-caption),
-  // which this repo does not author and cannot restyle from here.
-  "iframe",
-  // 1.4.3 — PickerPane's open/scaffold mode toggle: the UNSELECTED button's
-  // #9aa7b8-on-#161b22 falls short. Pre-existing on the Preview/Output pane,
-  // owned by spec 056's token-level pass.
-  'div[aria-label="Keyboard source mode"]',
-  // 1.4.3 — SignUpPanel's GitHub button on the Output tab. Pre-existing,
-  // same tracker row.
-  'button[aria-label="Sign up with GitHub"]',
-];
+const KNOWN_CONTRAST_DEBT: readonly string[] = [];
 
 /**
  * Tabs the axe scan runs on.

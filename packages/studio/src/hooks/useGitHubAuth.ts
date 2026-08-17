@@ -90,14 +90,14 @@ export interface UseGitHubAuthResult {
   /** GitHub login from verifyToken (the fork owner), or null. */
   login: string | null;
   /**
-   * The account's display name from verifyToken, or null (spec 059 D7).
+   * The account's display name from verifyToken, or null (spec 064 D7).
    *
    * Pre-fills keyboard attribution so the author confirms rather than types.
    * Null when the GitHub profile has no name set — ASK in that case; never fall
    * back to `login`, because a handle is not a copyright holder.
    */
   authorName: string | null;
-  /** The account's public email from verifyToken, or null when private (spec 059 D7). */
+  /** The account's public email from verifyToken, or null when private (spec 064 D7). */
   authorEmail: string | null;
   /**
    * True when a valid `oauth_app` token with `public_repo` is present (gates

@@ -70,7 +70,7 @@ export interface PreviewArtifact {
   canDownload: boolean;
   /**
    * True when the working copy has no attribution, so the package would ship
-   * with NO copyright notice (spec 059 D5/D6/FR-015).
+   * with NO copyright notice (spec 064 D5/D6/FR-015).
    *
    * Blocks BOTH downloads rather than warning: a redistributable package with no
    * rights holder is incomplete, and the pre-059 alternative — naming the
@@ -81,7 +81,7 @@ export interface PreviewArtifact {
   attributionMissing: boolean;
   /**
    * Set when the chosen base has a copyright notice this tool could not read
-   * (spec 059 D5). Blocks download: emitting a LICENSE.md whose only holder is
+   * (spec 064 D5). Blocks download: emitting a LICENSE.md whose only holder is
    * the current user would strip a real notice.
    */
   licenseUnparseable: { reason: string; line: string } | null;
@@ -307,16 +307,16 @@ export function usePreviewArtifact(): PreviewArtifact {
   // instantiated (baseVfs + baseIr available in the store) AND every
   // inventory character implemented in every modality actually engaged this
   // session (the Phase F hard-gate truth — see the module comment above) AND
-  // the package's attribution is emittable (spec 059).
+  // the package's attribution is emittable (spec 064).
   // The serializer builds the zip from the store's baseVfs, not from
   // stage.vfs, so the download contains the full projected working copy
   // including assignments.
 
-  // spec 059 D5/D6: never emit a package whose only "holder" is invented, and
+  // spec 064 D5/D6: never emit a package whose only "holder" is invented, and
   // never emit one with no notice at all. Gate rather than warn.
   const attributionMissing = useWorkingCopyStore((s) => s.attribution === null);
 
-  // spec 059 D5: refuse to emit while the base's own notice is unreadable — a
+  // spec 064 D5: refuse to emit while the base's own notice is unreadable — a
   // LICENSE.md naming only the current user would strip it.
   const licenseUnparseable = useWorkingCopyStore((s) => s.licenseUnparseable);
   const setBaseHolderOverride = useWorkingCopyStore((s) => s.setBaseHolderOverride);
@@ -374,7 +374,7 @@ export function usePreviewArtifact(): PreviewArtifact {
       setDownloadError("Finish every inventory character before downloading.");
       return;
     }
-    // Same defense-in-depth for the spec 059 attribution gates: emitting a
+    // Same defense-in-depth for the spec 064 attribution gates: emitting a
     // package whose copyright notice is absent or would silently drop the base
     // author's is the failure this feature exists to prevent, so the refusal
     // lives on the emission path and not only on the button.
@@ -422,7 +422,7 @@ export function usePreviewArtifact(): PreviewArtifact {
       setKmpError("Finish every inventory character before downloading.");
       return;
     }
-    // spec 059: the attribution refusals apply to the PRIMARY artifact as much as
+    // spec 064: the attribution refusals apply to the PRIMARY artifact as much as
     // the zip — a .kmp is the one people actually install and redistribute.
     if (emissionBlockReason !== null) {
       setKmpError(emissionBlockReason);

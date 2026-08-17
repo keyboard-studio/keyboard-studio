@@ -215,7 +215,7 @@ export const TouchKeyIRSchema: z.ZodType<LooseOptional<TouchKeyIR>> = z.lazy(() 
     hint: z.string().optional(),
     output: z.string().optional(),
     nextlayer: z.string().optional(),
-    // Per-key modifier override and longpress preselect (spec 058 FR-030).
+    // Per-key modifier override and longpress preselect (spec 063 FR-030).
     // Both are plain wire fields the parser previously dropped; `layer` is
     // additionally what disambiguates a duplicate key id within one layer.
     layer: z.string().optional(),
@@ -510,7 +510,7 @@ export function toPattern(data: RawPattern): Pattern {
 }
 
 // ---------------------------------------------------------------------------
-// ConfirmedAlphabet + PlacementWorklist (spec 046 marks question series).
+// ConfirmedAlphabet + PlacementWorklist (spec 071 marks question series).
 // Mirrors of the additive contract types in confirmedAlphabet.ts — the
 // three-store alphabet model and the mechanism-gallery handoff. Validated at
 // the session/phase-result boundaries where the stores are persisted.
@@ -551,7 +551,7 @@ export const PlacementWorklistSchema = z.object({
   blockedCombinations: z.array(BlockedCombinationSchema),
 });
 
-// The S4 whole-keyboard output-form decision (spec 046). Carried on
+// The S4 whole-keyboard output-form decision (spec 071). Carried on
 // SurveyPhaseResult/SurveySession as `marksOutputForm`.
 export const OutputFormSchema = z.enum(["ready-made", "base-plus-mark"]);
 
@@ -795,7 +795,7 @@ type _TouchKeyProvenanceGuard = Expect<
 // (you cannot widen the annotation without also widening `LooseOptional<TouchKeyIR>`,
 // which is pinned to the contract). These aliases pin the inferred OUTPUT back
 // to the contract as belt-and-braces.
-// ConfirmedAlphabet + PlacementWorklist (spec 046) — the three-store alphabet
+// ConfirmedAlphabet + PlacementWorklist (spec 071) — the three-store alphabet
 // model and the gallery handoff must stay in lockstep with confirmedAlphabet.ts.
 type _DeclaredRoleGuard = Expect<AssignableTo<z.infer<typeof DeclaredRoleSchema>, DeclaredRole>>;
 type _AttestedStackGuard = Expect<AssignableTo<z.infer<typeof AttestedStackSchema>, AttestedStack>>;
@@ -822,7 +822,7 @@ type _KeyBudgetBandGuard = Expect<AssignableTo<z.infer<typeof KeyBudgetBandSchem
 type _KeyBudgetGuard = Expect<AssignableTo<z.infer<typeof KeyBudgetSchema>, KeyBudget>>;
 type _TouchKeyIRGuard = Expect<AssignableTo<z.infer<typeof TouchKeyIRSchema>, TouchKeyIR>>;
 // LIMIT OF THE COMPILE-TIME GUARD, stated because it is not obvious and was
-// verified empirically (spec 058 T008): for `TouchKeyIRSchema` specifically,
+// verified empirically (spec 063 T008): for `TouchKeyIRSchema` specifically,
 // NO compile-time alias here can catch an ADDITIVE optional field the schema
 // omits. Two effects compound —
 //   1. the explicit `z.ZodType<LooseOptional<TouchKeyIR>>` annotation the

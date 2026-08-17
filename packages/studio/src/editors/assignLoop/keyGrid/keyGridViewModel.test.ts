@@ -1,5 +1,5 @@
 /**
- * Unit tests for keyGridViewModel (spec 058 T063).
+ * Unit tests for keyGridViewModel (spec 063 T063).
  *
  * All cases run against the ONE shared, deliberately defective fixture
  * (`makeTouchKeyRuleJoinFixture` / `makeTouchKeyRuleJoinLayout`, T013) — per
@@ -325,7 +325,7 @@ describe("unresolvable selectors", () => {
 });
 
 // ---------------------------------------------------------------------------
-// 7. Row metrics and the last-key stretch (spec 061 T018/T024; FR-013, FR-015,
+// 7. Row metrics and the last-key stretch (spec 065 T018/T024; FR-013, FR-015,
 //    FR-017, US2 AS2/AS4)
 // ---------------------------------------------------------------------------
 

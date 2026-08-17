@@ -129,7 +129,7 @@ export function CharacterMapPane({
   // same stable identity the list key uses. Transient view state, like
   // `blocksOnly` — reset on language change below, never persisted.
   const [hiddenGroups, setHiddenGroups] = useState<Set<string>>(new Set());
-  // Private-use pick awaiting its role answer (spec 046 FR-004): no linguistic
+  // Private-use pick awaiting its role answer (spec 071 FR-004): no linguistic
   // data exists for PUA characters, so the designer says letter-or-mark AT the
   // point of picking — the character is not added to any list until answered.
   const [pendingPuaChar, setPendingPuaChar] = useState<string | null>(null);
@@ -276,7 +276,7 @@ export function CharacterMapPane({
     return cased;
   }, [loadState, query, searchFilters, blocksOnly, hasKnownBlocks, chars, bcp47, scope]);
 
-  // Visible decomposition at the point of picking (spec 046 US5/FR-003): a
+  // Visible decomposition at the point of picking (spec 071 US5/FR-003): a
   // whole-grapheme pick contributes its base to Letters and its mark(s) to
   // Marks; the announcement narrates that three-way update so the pick itself
   // is the teaching moment — no interrupting question.
@@ -285,15 +285,28 @@ export function CharacterMapPane({
     if (lastPick === null || lastPick.grapheme !== char.normalize("NFC")) return "";
     const parts: string[] = [];
     if (lastPick.addedBases.length > 0) {
-      parts.push(`${lastPick.addedBases.join(", ")} added to Letters`);
+      parts.push(
+        t({
+          id: "survey.characterMapPane.contribution.addedToLetters",
+          message: `${{ bases: lastPick.addedBases.join(", ") }} added to Letters`,
+        }),
+      );
     }
     if (lastPick.addedMarks.length > 0) {
       parts.push(
-        `${lastPick.addedMarks.map((m) => prefixCombiningMark(m, true)).join(", ")} added to Marks`,
+        t({
+          id: "survey.characterMapPane.contribution.addedToMarks",
+          message: `${{ marks: lastPick.addedMarks.map((m) => prefixCombiningMark(m, true)).join(", ") }} added to Marks`,
+        }),
       );
     }
     if (lastPick.addedStack !== null && parts.length > 0) {
-      parts.push("combination recorded");
+      parts.push(
+        t({
+          id: "survey.characterMapPane.contribution.combinationRecorded",
+          message: "combination recorded",
+        }),
+      );
     }
     return parts.length > 0 ? ` — ${parts.join(", ")}` : "";
   }
@@ -313,18 +326,25 @@ export function CharacterMapPane({
       for (const p of pair.slice(1)) addChar(p);
       addChar(cell.char);
     }
-    const actionWord = wasSelected
-      ? t({ id: "survey.characterMapPane.announce.removed", message: "Removed" })
-      : t({ id: "survey.characterMapPane.announce.added", message: "Added" });
     // A bare combining mark in this aria-live string has nothing to attach
     // to (unlike the visible grid cell, which is prefixed via `display`) —
     // dotted-circle it here too so the screen-reader announcement isn't a
     // silently-dropped or garbled zero-width character.
     const announcedChar = prefixCombiningMark(cell.char, cell.isCombiningMark);
+    const cp = toUPlusNotation(cell.char);
+    // One catalog sentence per action, both variables interpolated by the
+    // translator — not a translated action word spliced with raw char/
+    // codepoint data via template literal (#1589/#1596 sibling).
     setAnnouncement(
-      `${actionWord} ${announcedChar} (${toUPlusNotation(cell.char)})${
-        wasSelected ? "" : describeContribution(cell.char)
-      }`,
+      wasSelected
+        ? t({
+            id: "survey.characterMapPane.announce.removedFull",
+            message: `Removed ${{ char: announcedChar }} (${{ cp }})`,
+          })
+        : t({
+            id: "survey.characterMapPane.announce.addedFull",
+            message: `Added ${{ char: announcedChar }} (${{ cp }})${{ contribution: describeContribution(cell.char) }}`,
+          }),
     );
   }
 
@@ -361,11 +381,16 @@ export function CharacterMapPane({
     // "Type your alphabet" box), so an author can still reach a specific scalar
     // value here when they mean it.
     addChar(char);
-    const addedLabel = t({ id: "survey.characterMapPane.announce.added", message: "Added" });
     // Same bare-combining-mark concern as handleToggle's announcement — the
     // U+XXXX escape hatch can add a standalone mark directly.
     const announcedChar = prefixCombiningMark(char, isCombining(char));
-    setAnnouncement(`${addedLabel} ${announcedChar} (${toUPlusNotation(char)})${describeContribution(char)}`);
+    // Same catalog id as handleToggle's add branch — identical sentence shape.
+    setAnnouncement(
+      t({
+        id: "survey.characterMapPane.announce.addedFull",
+        message: `Added ${{ char: announcedChar }} (${{ cp: toUPlusNotation(char) }})${{ contribution: describeContribution(char) }}`,
+      }),
+    );
     setRawInput("");
     setRawError(null);
   }
@@ -375,10 +400,22 @@ export function CharacterMapPane({
   function handlePuaRole(role: "letter" | "mark"): void {
     if (pendingPuaChar === null) return;
     addChar(pendingPuaChar, { role });
+    const cp = toUPlusNotation(pendingPuaChar);
+    // Two full sentences (not one with the role name as a raw placeholder
+    // value) — "letter"/"mark" is a translatable category noun, and folding
+    // it in as an untranslated interpolated value (as this string previously
+    // wasn't even passed through t() at all) would leave it English-only
+    // regardless of locale.
     setAnnouncement(
-      `Added ${pendingPuaChar} (${toUPlusNotation(pendingPuaChar)}) as a ${
-        role === "mark" ? "mark" : "letter"
-      }`,
+      role === "mark"
+        ? t({
+            id: "survey.characterMapPane.announce.puaAddedAsMark",
+            message: `Added ${{ char: pendingPuaChar }} (${{ cp }}) as a mark`,
+          })
+        : t({
+            id: "survey.characterMapPane.announce.puaAddedAsLetter",
+            message: `Added ${{ char: pendingPuaChar }} (${{ cp }}) as a letter`,
+          }),
     );
     setPendingPuaChar(null);
   }

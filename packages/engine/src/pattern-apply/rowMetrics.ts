@@ -1,7 +1,7 @@
 /**
  * rowMetrics — re-export shim over the canonical row-geometry and keys-per-row
  * threshold module, which lives in
- * [contracts](../../../contracts/src/row-metrics.ts) (spec 061 T019).
+ * [contracts](../../../contracts/src/row-metrics.ts) (spec 065 T019).
  *
  * tasks.md T019 names this path as the module's home and T022 asks Layer C's
  * check 18.3 to read the threshold table from it. Both cannot hold with the

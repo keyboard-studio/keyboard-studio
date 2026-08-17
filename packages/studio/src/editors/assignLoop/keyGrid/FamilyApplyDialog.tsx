@@ -1,5 +1,5 @@
 // FamilyApplyDialog — the resolution surface for a broken layer family
-// (spec 058 T108; FR-065). `layerFamilies.ts`'s `findFamilyParallelismBreaks`
+// (spec 063 T108; FR-065). `layerFamilies.ts`'s `findFamilyParallelismBreaks`
 // (T107) NAMES the break and stops there, by its own design: "no single
 // mutation resolves a broken family on its own" (that module's
 // `ReviewFamilyMemberFix` doc). This dialog is the mutation surface it defers

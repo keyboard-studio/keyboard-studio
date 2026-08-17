@@ -1,4 +1,4 @@
-// Unit tests for AssignPanel (spec 058 T085, T086, T087; FR-024, FR-025,
+// Unit tests for AssignPanel (spec 063 T085, T086, T087; FR-024, FR-025,
 // FR-026). Harness copied from KeyInspector.test.tsx / FindPanel.test.tsx
 // (renderWithI18n + the shared touch-key-rule-join fixture). No
 // @testing-library/jest-dom — raw DOM assertions, matching this package's

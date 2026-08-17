@@ -17,9 +17,11 @@ import { recommendedRemovalChars, displayChar } from '../../lib/irToCarveNodes.t
 import type { RecommendedRemovalChar } from '../../lib/irToCarveNodes.ts';
 import {
   irToCharacterView, groupCharacterCells, characterCellIds, characterCellIsToggleable,
-  characterDisplayName, SOURCE_DETAIL_LABEL,
+  characterDisplayName, SOURCE_DETAIL_LABEL, classifyCharacterCategory,
 } from '../../lib/irToCharacterView.ts';
 import type { CharacterCell, CharacterGroup } from '../../lib/irToCharacterView.ts';
+import { codepointLabel } from '../../survey/codepointLabel.ts';
+import type { CharContributors } from '@keyboard-studio/engine';
 import { KeySeq } from '../assignLoop/parts/KeySeq.tsx';
 import { UndoIcon, DiscardIcon, ChevronIcon } from '../assignLoop/parts/carveShared.tsx';
 import { useCarveNeededSet } from '../../hooks/useCarveNeededSet.ts';
@@ -41,6 +43,11 @@ const GROUP_HINTS: Record<string, string> = {
   'deadkey-sequence': 'Typed by pressing a dead key, then a base letter.',
   store: 'Lives in an internal list rather than a single key.',
   'advanced-rule': 'Produced by an advanced rule kept verbatim — the keystroke can\'t be shown.',
+  // spec §8 / #1606. These characters ARE produced, and are still discardable
+  // like any other rule-backed character — the set exists so they are not
+  // filed under "typed with a single key press" when no desktop key types
+  // them at all.
+  'touch-only-key': 'Typed only from the on-screen touch keyboard — no desktop key produces it.',
 };
 
 // Decorative category-distinguishing dots — no --app-* semantic token exists
@@ -56,10 +63,42 @@ const GROUP_DOT: Record<string, string> = {
   'deadkey-sequence': 'var(--sil-violet)',
   store: 'var(--sil-orange)',
   'advanced-rule': 'var(--app-text-subtle)',
+  'touch-only-key': 'var(--sil-light-blue)',
+  'blocked-candidate': 'var(--app-text-subtle)',
 };
 
-function codepointLabel(ch: string): string {
-  return `U+${ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, '0')}`;
+// Code-point notation comes from the sanctioned `survey/codepointLabel.ts`
+// helper rather than a local `codePointAt(0)` read: a base-plus-mark character
+// that has no precomposed form stays multi-code-point through NFC, and naming
+// only the first would label a blocked Devanagari consonant-plus-matra
+// identically to the bare consonant. `.title` is the full space-separated
+// stack; `base`/`extras` are the compact chip split.
+
+// A block-candidate row (reason: 'blocked-combination') names a character
+// that is, by definition, never actually produced — that's what "blocked"
+// means — so it has no entry in cellsByCh (built from the IR's REAL
+// producers, irToCharacterView.ts). Synthesizing a minimal cell from the
+// row itself is what makes such a recommendation visible, hoverable, and
+// actionable at all; `ch` is re-normalized to NFC here to match every other
+// CharacterCell.ch producer's contract (irToCharacterView.ts), since a row's
+// `ch` may still be in `carveNormalizationForm` (NFD on base-plus-mark
+// keyboards).
+function synthesizeFallbackCell(ch: string, contributors: CharContributors): CharacterCell {
+  const normalized = ch.normalize('NFC');
+  return {
+    ch: normalized,
+    keys: [],
+    waysToType: [],
+    category: classifyCharacterCategory(normalized),
+    // Not 'advanced-rule'. This character is never produced at all, so
+    // borrowing that source would tell the author "Produced by an advanced
+    // rule kept verbatim" about a combination the keyboard specifically
+    // blocks — a false statement on the one row this fallback exists to show.
+    source: 'blocked-candidate',
+    inAlpha: false,
+    reco: true,
+    contributors,
+  };
 }
 
 /** True when every contributor id for this cell is currently deleted (or the cell has no toggleable ids at all — never "discarded", always kept). */
@@ -123,7 +162,7 @@ function CharacterCellButton({ cell, discarded, isSelected, flag, onSelect, onTo
       onFocus={onSelect}
       onClick={onToggle}
       aria-pressed={discarded}
-      aria-label={`${displayChar(cell.ch)} — ${codepointLabel(cell.ch)}${discarded ? ', discarded' : ''}`}
+      aria-label={`${displayChar(cell.ch)} — ${codepointLabel(cell.ch).title}${discarded ? ', discarded' : ''}`}
       style={{
         display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
         padding: '10px 4px 8px', borderRadius: 8, cursor: 'pointer',
@@ -154,8 +193,20 @@ function CharacterCellButton({ cell, discarded, isSelected, flag, onSelect, onTo
           theme/background combination this cell can render. No opacity here:
           per the comment above, this text must stay legible in the discarded
           state, not fade with the glyph. */}
-      <span style={{ fontSize: 9.5, fontFamily: 'var(--app-font-mono)', color: 'var(--app-text-muted)' }}>
-        {codepointLabel(cell.ch)}
+      {/* base + "[+marks]" rather than the full stack: a multi-code-point
+          character would otherwise widen this 9.5px chip past its grid cell.
+          The complete notation stays reachable on hover (title) and in the
+          button's aria-label above. Mirrors PhaseB's CpLabel. */}
+      <span
+        style={{ fontSize: 9.5, fontFamily: 'var(--app-font-mono)', color: 'var(--app-text-muted)' }}
+        title={codepointLabel(cell.ch).title}
+      >
+        {codepointLabel(cell.ch).base}
+        {codepointLabel(cell.ch).extras !== '' && (
+          <span style={{ color: 'var(--app-accent-text)', fontWeight: 700 }}>
+            {`[+${codepointLabel(cell.ch).extras}]`}
+          </span>
+        )}
       </span>
       {/* No keystroke sequence here on purpose. The details rail already shows
           "How it's typed" for the hovered/selected cell, so repeating it under
@@ -248,7 +299,15 @@ function RecommendedGroupCard({
   const bulkButtonStyle = destructiveBulkButton === true && !allDiscarded
     ? {
         font: '600 12.5px var(--app-font)', cursor: 'pointer',
-        color: 'var(--app-text-on-accent)', background: 'var(--sil-red-dark)',
+        // NOT --app-text-on-accent: that token flips per theme to pair with
+        // --app-accent (dark text on navy's light-blue accent, white text on
+        // light's dark-blue accent) — --sil-red-dark is a fixed dark red in
+        // BOTH themes (brand.css has no navy override for it), so pairing it
+        // with the flipping token gives navy theme dark-on-dark (#18243f on
+        // #a6121f, 2:1) while looking fine in light theme, which is exactly
+        // how this shipped unnoticed. White is correct against this fixed
+        // dark fill in either theme.
+        color: 'var(--sil-white)', background: 'var(--sil-red-dark)',
         border: 'none', borderRadius: 8, padding: '9px 16px',
       }
     : destructiveBulkButton === true
@@ -338,8 +397,11 @@ function RecommendedGroupCard({
           </p>
           <div id={`${testId}-body`} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(76px, 1fr))', gap: 8 }}>
             {rows.map((row) => {
-              const cell = cellsByCh.get(row.ch.normalize('NFC'));
-              if (cell === undefined) return null;
+              // cellsByCh is pre-augmented (see its useMemo below) with a
+              // synthesizeFallbackCell entry for every recommended row absent
+              // from the IR's real producers, so this get() always resolves —
+              // the ?? fallback here is belt-and-suspenders, not the fix.
+              const cell = cellsByCh.get(row.ch.normalize('NFC')) ?? synthesizeFallbackCell(row.ch, row.contributors);
               const discarded = isRowDiscarded(row, isItemDeleted);
               return (
                 <CharacterCellButton
@@ -448,8 +510,20 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   // groups render THE SAME cell shape (glyph + codepoint) the groups below
   // render, keyed by the recommendation row's own `ch` (which is normalized
   // to `carveNormalizationForm`, hence the NFC re-normalize here, mirroring
-  // recommendedCharSet above).
-  const cellsByCh = useMemo(() => new Map(cells.map((c) => [c.ch, c])), [cells]);
+  // recommendedCharSet above). Also backfilled with a synthesizeFallbackCell
+  // entry for every recommended row absent from `cells` (block-candidate
+  // characters, never actually produced) — this map is the SAME map
+  // RecommendedGroupCard and selectedCell below both read, so hovering or
+  // selecting a candidate cell resolves its own details rather than
+  // silently falling back to an unrelated character.
+  const cellsByCh = useMemo(() => {
+    const map = new Map(cells.map((c) => [c.ch, c]));
+    for (const row of recommended) {
+      const key = row.ch.normalize('NFC');
+      if (!map.has(key)) map.set(key, synthesizeFallbackCell(row.ch, row.contributors));
+    }
+    return map;
+  }, [cells, recommended]);
 
   // Post-#526 split (RemovalBanner's prior home): cross-script-Latin rows
   // never drive the primary "Suggested to discard" group — they get their
@@ -547,7 +621,9 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     if (q.length === 0) return base;
     return base.filter((cell) => {
       if (cell.ch.toLowerCase().includes(q)) return true;
-      if (codepointLabel(cell.ch).toLowerCase().includes(q)) return true;
+      // `.title` (every code point), so searching a combining mark's own
+      // notation finds the sequences that contain it, not just the base.
+      if (codepointLabel(cell.ch).title.toLowerCase().includes(q)) return true;
       return cell.keys.some((k) => k.toLowerCase().includes(q));
     });
   }, [cells, search]);
@@ -557,9 +633,12 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     [filteredCells, groupBy],
   );
 
+  // cellsByCh (not cells) is the lookup here: selectedCh may be a
+  // block-candidate character that's absent from cells but present in
+  // cellsByCh via synthesizeFallbackCell — see that memo's comment above.
   const selectedCell = useMemo<CharacterCell | undefined>(
-    () => cells.find((c) => c.ch === selectedCh) ?? cells[0],
-    [cells, selectedCh],
+    () => (selectedCh !== null ? cellsByCh.get(selectedCh) : undefined) ?? cells[0],
+    [cellsByCh, cells, selectedCh],
   );
 
   if (!ir) {
@@ -646,7 +725,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
             border: '1px solid var(--app-border-strong)', borderRadius: 8, background: 'var(--app-surface-2)',
           }}
         >
-          <legend style={{ font: '600 10.5px var(--app-font)', letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--app-text-subtle)', padding: '0 6px 0 0' }}>
+          <legend style={{ font: '600 10.5px var(--app-font)', letterSpacing: '.04em', textTransform: 'uppercase', color: 'var(--app-text-muted)', padding: '0 6px 0 0' }}>
             Group by
           </legend>
           <label style={{ display: 'inline-flex', alignItems: 'center', gap: 4, font: '600 12px var(--app-font)', color: groupBy === 'category' ? 'var(--app-accent-text)' : 'var(--app-text-muted)', cursor: 'pointer' }}>
@@ -714,7 +793,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                   </span>
                 </div>
                 <div style={{ fontSize: 12, fontFamily: 'var(--app-font-mono)', color: 'var(--app-text-subtle)', marginBottom: 4 }}>
-                  {codepointLabel(cell.ch)}
+                  {codepointLabel(cell.ch).title}
                 </div>
                 <div style={{ fontSize: 13.5, fontWeight: 600, color: 'var(--app-text)', marginBottom: 14 }}>
                   {characterDisplayName(cell.ch)}
@@ -742,10 +821,38 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                     );
 
                     if (ways.length === 0) {
-                      // No renderable producer at all. `advanced-rule` gets
-                      // its own honest codec-limit message (not a banned
-                      // phrase); every other zero-producer character shows
-                      // no "way" line whatsoever.
+                      // No renderable producer at all. Three sources get their
+                      // own honest message (none a banned phrase); every
+                      // other zero-producer character shows no "way" line
+                      // whatsoever.
+                      //
+                      // touch-only-key reaches here for the same reason it
+                      // exists (spec §8): its only producer is a
+                      // T_xxxx-triggered rule, which charProducers drops
+                      // rather than leak a touch id as a desktop keystroke —
+                      // so ways is empty and, without this branch, the
+                      // character would render with no explanation of why no
+                      // keys are shown.
+                      if (cell.source === 'touch-only-key') {
+                        return (
+                          <>
+                            {label}
+                            <span style={{ fontSize: 12.5, color: 'var(--app-text-subtle)' }}>
+                              Only on the touch keyboard — no desktop key types it
+                            </span>
+                          </>
+                        );
+                      }
+                      if (cell.source === 'blocked-candidate') {
+                        return (
+                          <>
+                            {label}
+                            <span style={{ fontSize: 12.5, color: 'var(--app-text-subtle)' }}>
+                              This keyboard blocks this combination — nothing types it
+                            </span>
+                          </>
+                        );
+                      }
                       if (cell.source !== 'advanced-rule') return null;
                       return (
                         <>
@@ -825,7 +932,15 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                   <span style={{
                     display: 'inline-flex', alignItems: 'center', font: '600 11.5px var(--app-font)',
                     padding: '3px 9px', borderRadius: 999,
-                    color: cell.inAlpha ? 'var(--app-text-on-accent)' : 'var(--app-text-subtle)',
+                    // NOT --app-text-on-accent: that token flips per theme to pair
+                    // with --app-accent, but --sil-green is a fixed fill in both
+                    // themes (brand.css has no navy override for it) — the same
+                    // shape as --sil-red-dark above. White (light theme's
+                    // on-accent value) only reaches 3.35:1 against this green,
+                    // below the 4.5:1 AA minimum for this normal-size bold text.
+                    // --sil-black passes at 6.27:1 in both themes since the fill
+                    // itself never changes.
+                    color: cell.inAlpha ? 'var(--sil-black)' : 'var(--app-text-muted)',
                     background: cell.inAlpha ? 'var(--sil-green)' : 'var(--app-surface-2)',
                     border: cell.inAlpha ? 'none' : '1px solid var(--app-border-strong)',
                   }}>
@@ -840,9 +955,11 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                   style={{
                     width: '100%', font: '600 13px var(--app-font)', cursor: toggleable ? 'pointer' : 'default',
                     padding: '9px 14px', borderRadius: 8, opacity: toggleable ? 1 : 0.5,
-                    color: discarded ? 'var(--app-text-on-accent)' : 'var(--app-danger)',
+                    // See the "In your alphabet" pill above: --sil-black instead
+                    // of --app-text-on-accent for the same fixed-fill reason.
+                    color: discarded ? 'var(--sil-black)' : 'var(--app-danger-text)',
                     background: discarded ? 'var(--sil-green)' : 'transparent',
-                    border: discarded ? 'none' : '1px solid var(--app-danger)',
+                    border: discarded ? 'none' : '1px solid var(--app-danger-text)',
                   }}
                 >
                   {discarded ? 'Restore this character' : 'Discard this character'}
@@ -872,7 +989,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                 regionAriaLabel={t({ id: "carve.suggested.regionAriaLabel", message: "Suggested to discard" })}
                 topBorderColor="var(--sil-red)"
                 chipBackground="color-mix(in srgb, var(--sil-red) 14%, var(--app-surface-2))"
-                chipColor="var(--app-danger-text)"
+                chipColor="var(--app-danger-text-on-surface-2)"
                 heading={<Trans id="carve.suggested.heading">Suggested to discard</Trans>}
                 body={<Trans id="carve.suggested.body">Your base keyboard can type these characters, but nothing in your confirmed alphabet uses them. Click any character below to keep it instead — nothing is removed until you continue.</Trans>}
                 rows={primaryRows}

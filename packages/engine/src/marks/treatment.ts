@@ -74,7 +74,7 @@ export interface MarkTreatmentPrefill {
   recommended: MarkTreatment;
   /** Composed characters proposed for promotion, already budget-filtered. */
   promotionProposal: PromotedComposedCharacter[];
-  /** The proposal signals (shown to the designer, amended spec 046 FR-011). */
+  /** The proposal signals (shown to the designer, amended spec 071 FR-011). */
   signals: {
     /** Widest attested base count among the class's marks. */
     productivitySpread: number;

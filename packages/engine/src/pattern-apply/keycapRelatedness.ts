@@ -1,6 +1,6 @@
 /**
  * keycapRelatedness — what a key should be LABELLED, and whether an existing
- * label still matches what the key types (spec 061 US5; FR-033, FR-034, FR-036).
+ * label still matches what the key types (spec 065 US5; FR-033, FR-034, FR-036).
  *
  * Two exports, deliberately paired in one module because they are two halves of
  * one judgement:

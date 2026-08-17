@@ -98,11 +98,11 @@ describe("resolveContentString", () => {
   });
 });
 
-// spec 050 US1: flowQuestions is the fourth Tier B catalog, feeding the
+// spec 073 US1: flowQuestions is the fourth Tier B catalog, feeding the
 // modular flow-engine's survey-question prose (prompt/label/body/help_text/
-// options[].label). See specs/050-flow-question-i18n/research.md D5 and
+// options[].label). See specs/073-flow-question-i18n/research.md D5 and
 // contracts/flow-question-catalog-format.md for the key-namespace contract.
-describe("resolveContentString — flowQuestions catalog (spec 050 US1)", () => {
+describe("resolveContentString — flowQuestions catalog (spec 073 US1)", () => {
   it("resolves a flowQuestions prompt under the singular flowQuestion namespace segment", () => {
     _setContentCatalogForTesting("fr", {
       flowQuestions: {

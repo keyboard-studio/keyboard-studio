@@ -1,4 +1,4 @@
-// E2E: spec 058 (touch key editor) — T124, SC-011's Playwright half.
+// E2E: spec 063 (touch key editor) — T124, SC-011's Playwright half.
 //
 // SC-011 has two halves and they are not redundant:
 //
@@ -109,7 +109,7 @@ async function assignCharacterToAKey(page: Page): Promise<void> {
   await expect(charField).toHaveValue("");
 }
 
-test.describe("Touch editor mode toggle — no state is lost (spec 058 SC-011)", () => {
+test.describe("Touch editor mode toggle — no state is lost (spec 063 SC-011)", () => {
   test("five switches in mixed order preserve the by-key work, and the shared figures agree in both views at every stop", async ({
     page,
   }) => {

@@ -54,12 +54,7 @@
 
 import { test, expect, type Page } from "playwright/test";
 import { expectNoSeriousAxeViolations } from "./helpers/axe";
-import {
-  GLYPH_KEY_CHIP_DEBT,
-  OSK_IFRAME_DEBT,
-  OUTPUT_SCREEN_DEBT,
-  SHARED_CHROME_DEBT,
-} from "./helpers/contrastDebt";
+import { OSK_IFRAME_DEBT, OUTPUT_SCREEN_DEBT } from "./helpers/contrastDebt";
 import { unzipSync, strFromU8 } from "fflate";
 import { readFile } from "node:fs/promises";
 import {
@@ -105,67 +100,20 @@ const KMN_ZIP_PATH = `source/${BASE_KEYBOARD_ID}.kmn`;
 const TOUCH_ZIP_PATH = `source/${BASE_KEYBOARD_ID}.keyman-touch-layout`;
 
 /**
- * Pre-existing 1.4.3 (Contrast Minimum) offenders on the Phase B build-list
- * screen, excluded by selector with the criterion and reason named inline —
- * the same idiom e2e/tab-roundtrip.spec.ts and e2e/decision-deeplink.spec.ts
- * use (KNOWN_CONTRAST_DEBT). This is spec 056's open tracker debt
- * (specs/056-ada-accessibility/wcag-2.2-aa-tracker.md, 1.4.3 is an open
- * `unknown` row), not anything introduced or touched by spec 057 —
- * CarveGallery.tsx and Rail.tsx are byte-identical to `main` (see
- * specs/057-bulletproof-navigation/evidence/gating-red.md §"Two corrections
- * made to reach a *valid* red"). Same offenders as carve.spec.ts's own
- * KNOWN_CONTRAST_DEBT (this screen renders the same carve-card affordance
- * mid Phase B, before the standalone carve gallery step).
+ * FORMERLY the pre-existing 1.4.3 (Contrast Minimum) offender on the Phase B
+ * build-list screen. #1477's ground-truth sweep (live axe run with this list
+ * emptied) found every entry this list used to carry — CarveGallery's/Rail's/
+ * GlyphCell's v1-only surfaces, ConvenienceCharsStep's Continue button,
+ * RemovalBanner's dismiss control — already clean: the v1 gallery components
+ * are dead code (CarveGalleryV2 is unconditional; v1 is commented out in
+ * carveAdapter.tsx) and the rest were stale exclusions from an earlier
+ * contrast pass that already fixed them. The remaining OSK iframe entry is
+ * now also fixed at the source (packages/studio/public/osk-frame.html
+ * overrides `.kmw-spacebar-caption`'s color), so this scan now covers
+ * everything the frame renders. Kept as an empty array so
+ * `exclude: KNOWN_CONTRAST_DEBT` below keeps compiling.
  */
-const KNOWN_CONTRAST_DEBT: readonly string[] = [
-  // 1.4.3 — CarveGallery's info-panel toggle button.
-  'button[aria-label="Hide info panel"]',
-  // 1.4.3 — CarveGallery's footer "Continue" button.
-  'button[data-testid="carve-continue"]',
-  // 1.4.3 — Rail's per-node carve-card buttons: the "kept/total" and
-  // per-modifier breakdown spans inside them (Rail.tsx) fall short.
-  // Excluded by the testid PREFIX (carve-card-<nodeId> varies per fixture,
-  // e.g. "carve-card-group#0") rather than the brittle nth-child span chain
-  // axe reports for the same reason.
-  'button[data-testid^="carve-card-"]',
-  // 1.4.3 — GlyphCell's cross-reference tag chips (assignLoop/parts/
-  // GlyphCell.tsx): "<kind> — go to" / "<kind> — N places". Keyed on the
-  // aria-label SUFFIX because the kind prefix varies ("store", "group", ...)
-  // and the chips carry no testid.
-  'button[aria-label$="go to"]',
-  'button[aria-label$="places"]',
-  // 1.4.3 — Rail's sticky SectionHeader (assignLoop/parts/Rail.tsx): the
-  // tone-colored uppercase section label. The header is an anonymous div
-  // with no testid/aria hook, so it is keyed on its one distinguishing
-  // attribute — the inline-style signature only this header uses. Adding a
-  // programmatic landmark to Rail is 056's call, not this spec's.
-  'div[style*="letter-spacing: 0.13em"]',
-  // 1.4.3 — ConvenienceCharsStep's "Continue" button; the same debt
-  // copy-edit.spec.ts and touch-derivation-us2.spec.ts already exclude.
-  // Which subset of this screen's debt axe reports varies with load timing
-  // (the scan fires on whatever has rendered), so the list carries every
-  // known offender for the screen even when one run flags only some.
-  'button[data-testid="convenience-continue"]',
-  // 1.4.3 — RemovalBanner's "Dismiss" button (assignLoop/parts/
-  // RemovalBanner.tsx): `var(--app-text-subtle)` on the banner's
-  // `--sil-green`-tinted background falls short of 4.5:1.
-  //
-  // This offender only became reachable here once the mid-walk tab round trip
-  // above stopped discarding the working copy. The banner renders on
-  // `recommended.length > 0`, which is derived from working-copy state that
-  // the pre-fix restoring-boot/remount path was clearing: measured directly,
-  // `phaseResults` went 2 -> 0 across `switchTab(preview) -> switchTab(survey)`
-  // on the adapt track before the fix, and 2 -> 2 after it. So the banner's
-  // absence was the defect and its presence is the corrected behaviour — the
-  // scan is seeing more of the screen, not a new violation. RemovalBanner.tsx
-  // is byte-identical to `main` (`git diff main...HEAD` is empty for it), and
-  // this is the same open 1.4.3 `unknown` tracker row as every entry above.
-  // See specs/057-bulletproof-navigation/reviews/F2-reload-phaseresults-loss.md.
-  'button[aria-label="Dismiss removal recommendation"]',
-  // 1.4.3 — the OSK iframe renders KeymanWeb's own markup
-  // (.kmw-spacebar-caption), not authored in this repo.
-  "iframe",
-];
+const KNOWN_CONTRAST_DEBT: readonly string[] = [];
 
 // ---------------------------------------------------------------------------
 // Page-object helpers (touch-derivation-specific)
@@ -282,7 +230,7 @@ test.describe("Touch derivation US1 — import & adapt (spec 035 Scenario A)", (
     // mechanisms -> touch_seed_source -> touch -> help.
     await carveCharacters(page, CARVED_CHARS);
     // The mechanism gallery's worklist may hold more than just PLACED_CHAR —
-    // an accepted marks-series proposal (spec 046) and the case-pair
+    // an accepted marks-series proposal (spec 071) and the case-pair
     // uppercase companion (#1411) can both widen it (see
     // driveMechanismsGallery's doc comment in helpers/surveyFlow.ts) — the
     // shared driver walks whatever is actually there; PLACED_CHAR's own
@@ -307,11 +255,16 @@ test.describe("Touch derivation US1 — import & adapt (spec 035 Scenario A)", (
     await driveTouchGallery(page);
 
     // Accessibility gate (spec 056 FR-003): scan the post-touch-gallery screen.
-    // 1.4.3 -- the "<char> -- K_<key>" glyph chips this screen lists, plus the
-    // shared chrome and OSK iframe (documented pre-existing contrast debt;
-    // see helpers/contrastDebt.ts).
+    // 1.4.3 -- the OSK iframe (documented pre-existing contrast debt; see
+    // helpers/contrastDebt.ts). The per-key glyph chips and shared chrome
+    // this list used to also exclude were re-verified clean by #1477's
+    // ground-truth sweep (and this fixture never renders the glyph chips
+    // anyway — see touch-derivation-us2.spec.ts's own note on that). The OSK
+    // iframe's own debt is now fixed at the source too; OSK_IFRAME_DEBT is
+    // now an empty spread, kept only so this call site doesn't need a
+    // rename.
     await expectNoSeriousAxeViolations(page, "after touch gallery (US1 bambara walk)", {
-      exclude: [...GLYPH_KEY_CHIP_DEBT, ...SHARED_CHROME_DEBT, ...OSK_IFRAME_DEBT],
+      exclude: OSK_IFRAME_DEBT,
     });
 
     await driveHelpPhase(

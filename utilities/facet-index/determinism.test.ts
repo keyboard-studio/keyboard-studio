@@ -1,5 +1,5 @@
 /**
- * Determinism test (spec 036 T027; FR-006, SC-004). Building twice over the same
+ * Determinism test (spec 070 T027; FR-006, SC-004). Building twice over the same
  * corpus produces a byte-identical `keyboard-facet-index.json` — no timestamps,
  * recursively key-sorted, write-only-if-changed. Mirrors the langtags codegen
  * determinism discipline.

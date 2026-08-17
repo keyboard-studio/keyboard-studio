@@ -22,8 +22,8 @@
 // confirm handler; this module only decides whether a pairing exists and
 // holds the pending proposal.
 //
-// @see specs/051-uppercase-counterpart-suggestion/contracts/case-pair-proposal.md
-// @see specs/051-uppercase-counterpart-suggestion/data-model.md
+// @see specs/074-uppercase-counterpart-suggestion/contracts/case-pair-proposal.md
+// @see specs/074-uppercase-counterpart-suggestion/data-model.md
 
 import { useCallback, useState } from "react";
 import type {

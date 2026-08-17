@@ -35,13 +35,13 @@ export function readmeHtm(displayName: string): string {
  * Called by `output/ensurePackageFiles` (the adapt/`.kmp` track). Track 1 goes
  * through the scaffolder's accumulated copyright block instead
  * (`attributionText` -> `renderLicense`), because a keyboard derived from a base
- * must RETAIN the base's holders and not merely state one (spec 059 US2).
+ * must RETAIN the base's holders and not merely state one (spec 064 US2).
  *
  * `holder` is nullable, and null omits the copyright line entirely. It used to
  * fall back to the keyboard's display name, which produced notices like
  * "Copyright © 2026 Dagbanli Keyboard" — naming the work as its own rights
  * holder. That is a false attribution, and worse than saying nothing, because a
- * wrong notice reads as authoritative (spec 059 FR-004).
+ * wrong notice reads as authoritative (spec 064 FR-004).
  *
  * Not HTML-escaped: LICENSE.md is Markdown/plain text, not markup.
  */

@@ -1,6 +1,6 @@
 /**
- * Unit tests for touchRuleSynthesis (spec 058 T084; contract:
- * specs/058-touch-key-editor/contracts/touch-key-rule-join.md §6.1/§8).
+ * Unit tests for touchRuleSynthesis (spec 063 T084; contract:
+ * specs/063-touch-key-editor/contracts/touch-key-rule-join.md §6.1/§8).
  *
  * Fixture: reuses the SINGLE reduced, deliberately-defective Cameroon-derived
  * fixture from `@keyboard-studio/contracts/fixtures` (`makeTouchKeyRuleJoinFixture`

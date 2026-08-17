@@ -5,7 +5,7 @@ date: 2026-08-06
 
 # The touch key grid renders row slack the way KeymanWeb does — by stretching the last key
 
-> **This decision reverses part of a shipped one.** [specs/058-touch-key-editor](../../specs/058-touch-key-editor/spec.md)
+> **This decision reverses part of a shipped one.** [specs/063-touch-key-editor](../../specs/063-touch-key-editor/spec.md)
 > FR-039 chose to draw row slack as a hatch rather than absorb it. This ADR records why
 > the follow-up (issue #1530) takes the opposite path, and what replaces the hatch. The
 > follow-up spec is the authoritative execution; this records the *why*.
@@ -24,7 +24,7 @@ whatever remains of the row
 const keyPercent = 1 - (totalPercent + padPercent + rightMargin);
 ```
 
-Spec 058 judged that absorption to be information loss for an *editor*: an author who
+Spec 063 judged that absorption to be information loss for an *editor*: an author who
 cannot see slack cannot reclaim it. FR-039 therefore rendered the remainder as a
 decorative diagonal hatch, and added per-row "Fill row" and "Even out row" actions to
 act on it.
@@ -47,7 +47,7 @@ KeymanWeb does.** The hatch is removed. "Fill row" and "Even out row" are remove
 
 Slack does not stop being visible — it stops being drawn as *texture* and becomes
 **numbers**, via a per-row metrics readout (`11 keys · 1150 width · 165 pad · 1315
-total`), which is what Keyman Developer does and what spec 058's own research listed as
+total`), which is what Keyman Developer does and what spec 063's own research listed as
 a thing to adopt. The readout is also where the crowding complaint belongs
 (`KM_WARN_TOUCH_KEYS_PER_ROW`: over 10 keys on phone, 13 on tablet).
 

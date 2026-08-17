@@ -1,4 +1,4 @@
-// Unit tests for RemoveKeyDialog (spec 058 T097/T098/T099;
+// Unit tests for RemoveKeyDialog (spec 063 T097/T098/T099;
 // FR-029f/FR-029g, US4 AS2).
 // Harness copied from RenameDialog.test.tsx (renderWithI18n + a hand-built
 // KeyGridCellViewModel fixture — no @testing-library/jest-dom, raw DOM

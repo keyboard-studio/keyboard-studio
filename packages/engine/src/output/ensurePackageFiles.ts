@@ -27,7 +27,7 @@ export interface EnsurePackageFilesInput {
   vfs: VirtualFS;
   /** Copyright holder for a generated LICENSE.md. When absent (or blank), the
    *  copyright line is omitted rather than falling back to a display name
-   *  (spec 059 FR-004) — see the `holder` derivation below. */
+   *  (spec 064 FR-004) — see the `holder` derivation below. */
   copyright?: string;
   /** Year for a generated LICENSE.md. Defaults to the current year. */
   year?: number;
@@ -58,7 +58,7 @@ export function ensurePackageFiles({
     created.push(path);
   };
 
-  // spec 059 FR-004: an absent copyright falls back to NOTHING, not to a
+  // spec 064 FR-004: an absent copyright falls back to NOTHING, not to a
   // display name. The MIT body still ships (so the package stays
   // redistributable) but with no copyright line, rather than one naming the
   // keyboard as its own rights holder. What stops an unattributed package

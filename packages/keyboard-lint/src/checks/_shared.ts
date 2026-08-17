@@ -18,7 +18,7 @@ export function makeLocation(touchLayoutPath: string): NonNullable<LintFinding["
 }
 
 // The two layout walks and the exemption vocabulary below moved to
-// `@keyboard-studio/contracts`'s `touch-key-diagnostics.ts` at spec 058 T114,
+// `@keyboard-studio/contracts`'s `touch-key-diagnostics.ts` at spec 063 T114,
 // where the shared detectors that use them live (FR-040's one-implementation
 // rule). Re-exported from here so every check module's import line is
 // unchanged — and, for `TOUCH_SENTINEL_IDS`, so the copy this file used to keep
@@ -36,7 +36,7 @@ export {
 export type { TouchKeyContext } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
-// The joined-check input resolver (spec 058 T033 / contract §5.4)
+// The joined-check input resolver (spec 063 T033 / contract §5.4)
 // ---------------------------------------------------------------------------
 
 /**

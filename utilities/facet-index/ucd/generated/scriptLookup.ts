@@ -4,9 +4,9 @@
 // unicode: 17.0.0
 //
 // Slim per-codepoint script lookup for the facet-index script classifier
-// (spec 036). Ranges are sorted by start and coalesced; binary-search accessors
+// (spec 070). Ranges are sorted by start and coalesced; binary-search accessors
 // below. Common (Zyyy) / Inherited (Zinh) are returned as-is — the classifier
-// treats them as neutral (never dilutes a distribution). See spec 036 research D2.
+// treats them as neutral (never dilutes a distribution). See spec 070 research D2.
 
 /** Pinned Unicode release this lookup was derived from. */
 export const unicodeVersion = "17.0.0";

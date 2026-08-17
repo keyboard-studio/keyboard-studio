@@ -16,7 +16,7 @@ it; don't read it.**
 
 ```
 pnpm run spec-search "remove key confirmation dialog"
-pnpm run spec-search "touch layout" --scope specs/058-touch-key-editor --limit 8
+pnpm run spec-search "touch layout" --scope specs/063-touch-key-editor --limit 8
 ```
 
 Every hit returns `path:line` plus its heading breadcrumb, annotated with the spec-trace review

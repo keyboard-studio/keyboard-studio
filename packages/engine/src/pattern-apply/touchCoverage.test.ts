@@ -220,7 +220,7 @@ describe("touchCoverage", () => {
 });
 
 // ---------------------------------------------------------------------------
-// SC-001 CANARY — the real sil_cameroon_qwerty keyboard (spec 058 T032).
+// SC-001 CANARY — the real sil_cameroon_qwerty keyboard (spec 063 T032).
 //
 // Skip-if-absent, following the established `KEYBOARDS_ROOT` + `fs.existsSync`
 // pattern (see applyTouchAssignmentsToRawJson.test.ts): the sibling

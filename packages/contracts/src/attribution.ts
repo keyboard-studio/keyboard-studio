@@ -1,4 +1,4 @@
-// Attribution captured during authoring (spec 059, data-model.md).
+// Attribution captured during authoring (spec 064, data-model.md).
 
 /**
  * Who made a keyboard and who holds its copyright.

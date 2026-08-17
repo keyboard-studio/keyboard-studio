@@ -1,4 +1,4 @@
-// RemoveKeyDialog — the three-way "remove this key" choice (spec 058 T097;
+// RemoveKeyDialog — the three-way "remove this key" choice (spec 063 T097;
 // FR-029f/FR-029g). US4: "Remove this key" is never a confirm/cancel — it is
 // a genuine three-way decision, because predictability across layers and
 // touchable area are opposed goals that cannot both be maximized, and the
@@ -233,7 +233,7 @@ export function buildRemoveKeyDialogConfirmResult(
  * Platform key-count limits a touch row must stay under before it counts as
  * "crowded" (FR-029g's third bullet).
  *
- * **No longer a restatement (spec 061 T022, research D6).** This used to be a
+ * **No longer a restatement (spec 065 T022, research D6).** This used to be a
  * hand-copied twin of `check-18-3-keys-per-row.ts`'s `MAX_KEYS`, carrying a
  * comment asking a future reader to keep the two in sync — the copy the shared
  * table was created to retire. It is now an alias for

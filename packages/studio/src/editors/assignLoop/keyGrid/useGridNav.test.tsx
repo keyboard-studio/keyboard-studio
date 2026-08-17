@@ -1,4 +1,4 @@
-// Unit tests for useGridNav (spec 058 T065, T068; FR-020b, FR-020c, FR-020d,
+// Unit tests for useGridNav (spec 063 T065, T068; FR-020b, FR-020c, FR-020d,
 // FR-020k). Builds `KeyGridViewModel` fixtures directly (the same pattern
 // KeyGrid.test.tsx uses) so these tests exercise the NAVIGATION contract in
 // isolation from the T063 projection and the T064 rendering, except for the
@@ -43,7 +43,7 @@ afterEach(() => {
 const EMPTY_ANNOTATIONS: KeyGridAnnotationCounts = { longpress: 0, multitap: 0, flick: 0 };
 
 /**
- * The editing callbacks `KeyGridProps` requires (spec 061 T002/FR-001), as
+ * The editing callbacks `KeyGridProps` requires (spec 065 T002/FR-001), as
  * `vi.fn()` stubs. Mirrors `KeyGrid.test.tsx`'s own helper of the same name
  * rather than being imported from it — a test file exporting fixtures to
  * another test file couples two suites that are deliberately independent.
@@ -52,7 +52,7 @@ const EMPTY_ANNOTATIONS: KeyGridAnnotationCounts = { longpress: 0, multitap: 0, 
  * five props are required, so a mount that omits them is a type error. It is
  * only a *latent* one today, because `packages/studio/tsconfig.json` excludes
  * this package's test files from `pnpm typecheck` — which is precisely why
- * spec 061 T008 sweeps for mount sites by hand rather than trusting `tsc` to
+ * spec 065 T008 sweeps for mount sites by hand rather than trusting `tsc` to
  * have found them all. `tsc` is the real gate for PRODUCTION mounts, where the
  * defect of record actually lived; test mounts need the sweep.
  *
@@ -81,7 +81,7 @@ function makeCell(overrides: Partial<KeyGridCellViewModel> & { id: string }): Ke
     annotations: overrides.annotations ?? EMPTY_ANNOTATIONS,
     findings: overrides.findings ?? [],
     // Defaults false; `makeRow` stamps the real value on the row's last cell
-    // (spec 061 T024), so a test never hand-maintains it.
+    // (spec 065 T024), so a test never hand-maintains it.
     isLastInRow: overrides.isLastInRow ?? false,
     ...(overrides.nextlayer !== undefined ? { nextlayer: overrides.nextlayer } : {}),
     ...(overrides.provenance !== undefined ? { provenance: overrides.provenance } : {}),
@@ -90,7 +90,7 @@ function makeCell(overrides: Partial<KeyGridCellViewModel> & { id: string }): Ke
 
 /**
  * A row view model with `isLastInRow` and `metrics` derived rather than passed
- * (spec 061 T024). Stamped in place, matching KeyGrid.test.tsx's own helper —
+ * (spec 065 T024). Stamped in place, matching KeyGrid.test.tsx's own helper —
  * these are freshly-built local fixtures, and copying would hand the component
  * a different object than the test holds.
  */

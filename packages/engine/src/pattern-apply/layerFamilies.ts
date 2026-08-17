@@ -1,8 +1,8 @@
 /**
  * layerFamilies — decomposition of a `.keyman-touch-layout` layer id into its
  * `{ plane, tokens }` shape, and grouping of a keyboard's layer ids into
- * families (spec 058 FR-063/FR-067; contract:
- * specs/058-touch-key-editor/contracts/layer-families.md).
+ * families (spec 063 FR-063/FR-067; contract:
+ * specs/063-touch-key-editor/contracts/layer-families.md).
  *
  * `comboToTouchLayerId` (modifierCombos.ts) is FORWARD-ONLY: it maps a
  * canonicalized `ModifierToken[]` to a layer id string, and has no inverse.

@@ -1,0 +1,919 @@
+{
+  "workflow": "speckit",
+  "specName": "074-uppercase-counterpart-suggestion",
+  "branch": "074-uppercase-counterpart-suggestion",
+  "selectedAt": "2026-07-28T02:28:15.439Z",
+  "currentStep": "implement",
+  "status": "implementing",
+  "history": [
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-07-28T03:03:43.668Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:08:29.908Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:10:56.654Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:10:56.893Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:10:57.145Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:14:49.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:14:49.982Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:14:50.244Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:14:50.486Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:19:39.878Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:19:40.142Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:19:40.393Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:19:40.645Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:19:40.884Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:33:27.807Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:33:28.092Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:33:28.400Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:33:28.768Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:33:29.044Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:33:29.307Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:33:29.553Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:33:29.785Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:33:30.024Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:33:30.255Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:44:43.845Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:44:44.102Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:44:44.363Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:44:44.604Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:44:44.851Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:44:45.099Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:44:45.347Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:44:45.662Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T03:44:45.953Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:06:44.831Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:06:45.167Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:06:45.476Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:06:45.834Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:06:46.119Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T038",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:06:46.378Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T039",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:06:46.626Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:06:46.883Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T041",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:06:47.141Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T042",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:38:48.191Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T043",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:38:48.536Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T044",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:38:48.844Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T045",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:38:49.127Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T046",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:38:49.404Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T048",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-07-28T04:38:49.703Z"
+    }
+  ],
+  "currentTask": "T047",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Verified toolchain (switched nvm to node 24.11.0 to clear the >=22.19.0 engines floor, corepack-activated pnpm 9.12.0), pnpm install and full pnpm build both green",
+      "files": [
+        "(none - verification only)"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Captured engine touch-applier baseline: 77/77 tests pass across both applier suites (absent-layer regression floor)",
+      "files": [
+        "(baseline capture)"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Captured studio MechanismGallery baseline: 145/145 pass; recorded the 11 existing pendingCompanion cases that must pass unedited (SC-005)",
+      "files": [
+        "(baseline capture)"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Recorded the six shipped editor.assignLoop.companion.* ids and their exact English messages for verbatim reuse",
+      "files": [
+        "packages/studio/src/locales/en/messages.json (read-only)"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Generalized layer resolution to per-mechanism 'slotValues.layer ?? default' resolved against phonePlatform.layers by id, replacing the hardcoded default lookup",
+      "files": [
+        "packages/engine/src/pattern-apply/applyTouchAssignments.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Added the missing-target-layer path - warns and skips that mechanism only, never throws, never falls back to default",
+      "files": [
+        "packages/engine/src/pattern-apply/applyTouchAssignments.ts"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Host-key-missing warning now names the resolved layer ('not found in phone layer \"<id>\"')",
+      "files": [
+        "packages/engine/src/pattern-apply/applyTouchAssignments.ts"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Converted the single-defaultLayerIndex rebuild to a lazy per-touched-layer rebuild; untouched layers/platforms returned by reference and no input mutated",
+      "files": [
+        "packages/engine/src/pattern-apply/applyTouchAssignments.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Re-keyed the raw-JSON lookup from platformName->keyId to platformName->layerId->keyId across every layer present, resolving slotValues.layer ?? default per mechanism",
+      "files": [
+        "packages/engine/src/pattern-apply/applyTouchAssignmentsToRawJson.ts"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Raw-JSON warning now names the target layer; an unknown layer matches no platform so it warns+skips without throwing or defaulting; defaultHint dot promotion and splice-in-place fidelity unchanged",
+      "files": [
+        "packages/engine/src/pattern-apply/applyTouchAssignmentsToRawJson.ts"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Added 6 IR-path layer cases: default==absent, shift placement, two layers on one char, unknown layer warn+skip, host key absent from target layer, structural sharing",
+      "files": [
+        "packages/engine/src/pattern-apply/applyTouchAssignments.test.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Added 6 raw-JSON layer cases: default==absent, shift splice, unknown layer, host key on another layer, unknown-field/key-order preservation, defaultHint promotion",
+      "files": [
+        "packages/engine/src/pattern-apply/applyTouchAssignmentsToRawJson.test.ts"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Regression floor verified: both applier test diffs are pure appends (137/0 and 155/0, zero deleted lines); 36->42 and 41->47 cases; full engine suite 2110 passed",
+      "files": [
+        "(verification only)"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Created casePairCompanion.test.ts: 14 cases pinning suppression (caseless, self-mapping, multi-char expansion, uppercase input), tr locale, empty/malformed bcp47, and the one-pending-proposal lifecycle",
+      "files": [
+        "packages/studio/src/editors/assignLoop/casePairCompanion.test.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Defined the CasePairProposal discriminated union (physical|combo|touch), CasePairProposalInput (union minus counterpart), and the DeadkeyCombo/SequenceCombo shapes; added TouchLayerId to touchBehavior.ts as its canonical home",
+      "files": [
+        "packages/studio/src/editors/assignLoop/casePairCompanion.ts",
+        "packages/studio/src/editors/assignLoop/touchBehavior.ts"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "Implemented useCasePairCompanion: propose is the sole caseCounterpart caller, reads identity bcp47 itself (empty-string normalized to undefined), returns false on null/toLower, keeps at most one pending proposal",
+      "files": [
+        "packages/studio/src/editors/assignLoop/casePairCompanion.ts"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Created CasePairProposalBanner.tsx with the inline banner lifted verbatim (markup, styling, all six shipped companion i18n ids); no third button",
+      "files": [
+        "packages/studio/src/editors/assignLoop/CasePairProposalBanner.tsx"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "Removed local pendingCompanion state and the 80-line inline banner from MechanismGallery; adopted the hook + shared banner and cleared the proposal from the existing current-character reset effect",
+      "files": [
+        "packages/studio/src/editors/assignLoop/MechanismGallery.tsx"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "Physical proposal now raised via proposeCompanion from the swap branch, preserving the base-layer and shiftLayerAllowed gates and carrying vkey/capsHandling/baseAssignment by identity; dropped the gallery's now-unused caseCounterpart import and identityBcp47 selector",
+      "files": [
+        "packages/studio/src/editors/assignLoop/MechanismGallery.tsx"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Moved the physical confirm verbatim onto the banner onConfirm, CAPS-quad replace vs non-CAPS append branches unchanged (Layer-A Check #10)",
+      "files": [
+        "packages/studio/src/editors/assignLoop/MechanismGallery.tsx"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Stale-base guard kept on the confirm path plus both proactive-dismissal sites, now narrowed through pendingCompanionBase (touch proposals carry a ref, not an assignment)",
+      "files": [
+        "packages/studio/src/editors/assignLoop/MechanismGallery.tsx"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Added 2 new MechanismGallery cases: shared banner role/aria-label + exactly-two-controls (FR-011), and confirm targeting the raising swap when one char carries two swaps (FR-008). The contract's stale-base case already exists in the shipping suite - noted rather than duplicated",
+      "files": [
+        "packages/studio/src/editors/assignLoop/MechanismGallery.test.tsx"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "SC-005 gate PASS: 145 pre-existing MechanismGallery cases pass with a zero-deletion diff (pure append), 147+14=161 total green",
+      "files": [
+        "(verification only)"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "Added 4 S-02 cases: dead-key apply raises a proposal, confirm keeps trigger/deadkeyName/accentChar and case-shifts baseLetters/accentedForms, dismiss records nothing, caseless output raises nothing",
+      "files": [
+        "packages/studio/src/editors/assignLoop/MechanismGallery.test.tsx"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Added 3 onApplied-seam cases in SequenceBuilderPanel.test.tsx (payload by identity, no payload on dedup no-op, multi-char content passed verbatim) plus 4 end-to-end S-03 cases in MechanismGallery.test.tsx where the banner actually lives",
+      "files": [
+        "packages/studio/src/editors/assignLoop/SequenceBuilderPanel.test.tsx",
+        "packages/studio/src/editors/assignLoop/MechanismGallery.test.tsx"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "DeadkeyCombo/SequenceCombo shapes mirror the existing slot vocabulary; propose's combo branch resolves the INPUT side through caseCounterpart too and raises nothing if either side returns null, exposing the shifted parallelCombo on the proposal",
+      "files": [
+        "packages/studio/src/editors/assignLoop/casePairCompanion.ts"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "S-02 proposal raised from the deadkey branch of handleApply with the combo slots and baseAssignment by object identity",
+      "files": [
+        "packages/studio/src/editors/assignLoop/MechanismGallery.tsx"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "S-02 confirm appends a parallel PATTERN_DEADKEY assignment targeting the counterpart, trigger/deadkeyName/accentChar carried across unchanged, behind the same stale-base guard",
+      "files": [
+        "packages/studio/src/editors/assignLoop/MechanismGallery.tsx"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "S-03 proposal raised through the existing onApplied seam: the panel now returns a SequenceApplied payload (absent on a dedup no-op) and the gallery raises the proposal - no second banner in the panel",
+      "files": [
+        "packages/studio/src/editors/assignLoop/SequenceBuilderPanel.tsx",
+        "packages/studio/src/editors/assignLoop/MechanismGallery.tsx"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "S-03 confirm appends a PATTERN_SEQUENCE ref to the counterpart's bucket via partitionSequenceAssignment, secondLetter unchanged, reusing the (firstLetterOut, secondLetter) dedup",
+      "files": [
+        "packages/studio/src/editors/assignLoop/MechanismGallery.tsx"
+      ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "Added the additive id editor.assignLoop.companion.prompt.combo to the shared banner; the physical .prompt id and message are untouched",
+      "files": [
+        "packages/studio/src/editors/assignLoop/CasePairProposalBanner.tsx"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "Both suites green: 162 passed (155 MechanismGallery + 7 SequenceBuilderPanel); zero deleted lines in MechanismGallery.test.tsx, one import line rewritten in SequenceBuilderPanel.test.tsx to add the SequenceApplied type",
+      "files": [
+        "(verification only)"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "Added 5 buildTouchMechanismRef layer cases: default for lowercase, shift for uppercase (including decomposable a-acute/A-acute), caseless to default, layer on all four methods with hostKey unchanged, and lower/upper refs distinct",
+      "files": [
+        "packages/studio/src/editors/assignLoop/TouchGallery.test.tsx"
+      ]
+    },
+    "T034": {
+      "status": "DONE",
+      "did": "Added 4 proposal cases: confirm records the capital with layer shift via appendMechanismToChar, dismiss records nothing, caseless raises nothing, and suggestionResolved is neither consulted nor written",
+      "files": [
+        "packages/studio/src/editors/assignLoop/TouchGallery.test.tsx"
+      ]
+    },
+    "T035": {
+      "status": "DONE",
+      "did": "Added casePairTouchLayer to touchBehavior.ts (default->shift, shift/caps/other->null) alongside the TouchLayerId alias",
+      "files": [
+        "packages/studio/src/editors/assignLoop/touchBehavior.ts"
+      ]
+    },
+    "T036": {
+      "status": "DONE",
+      "did": "Introduced the explicit editingLayer value in TouchGallery, fixed to default for v1 and named so a future layer selector widens the mapping instead of rewriting the proposal site",
+      "files": [
+        "packages/studio/src/editors/assignLoop/TouchGallery.tsx"
+      ]
+    },
+    "T037": {
+      "status": "DONE",
+      "did": "buildTouchMechanismRef now derives the layer slot from the placed character's case on all four methods; hostKey semantics and the K_ vkey-name toUpperCase left untouched",
+      "files": [
+        "packages/studio/src/editors/assignLoop/TouchGallery.tsx"
+      ]
+    },
+    "T038": {
+      "status": "DONE",
+      "did": "Touch proposal raised from handleApply via casePairTouchLayer(editingLayer), suppressed when that returns null or no host key resolved, carrying baseRef by object identity",
+      "files": [
+        "packages/studio/src/editors/assignLoop/TouchGallery.tsx"
+      ]
+    },
+    "T039": {
+      "status": "DONE",
+      "did": "Rendered the shared banner in TouchGallery and implemented confirm: appends the counterpart's ref with the same hostKey and layer targetLayer, behind an identity stale-baseRef guard",
+      "files": [
+        "packages/studio/src/editors/assignLoop/TouchGallery.tsx"
+      ]
+    },
+    "T040": {
+      "status": "DONE",
+      "did": "Added the additive id editor.assignLoop.companion.prompt.touch to the shared banner",
+      "files": [
+        "packages/studio/src/editors/assignLoop/CasePairProposalBanner.tsx"
+      ]
+    },
+    "T041": {
+      "status": "DONE",
+      "did": "TouchGallery 63/63 and the engine pattern-apply suites 441/441 green; full studio suite 4348/4348 confirms a confirmed proposal reaches the shift layer end-to-end",
+      "files": [
+        "(verification only)"
+      ]
+    },
+    "T042": {
+      "status": "DONE",
+      "did": "lingui extract on node 24.11: en gained exactly the two additive ids (.prompt.combo, .prompt.touch) and nothing else; all six reused companion ids keep their exact T004-recorded messages",
+      "files": [
+        "packages/studio/src/locales/en/messages.json"
+      ]
+    },
+    "T043": {
+      "status": "DONE",
+      "did": "fr key-set parity verified: 945 keys both sides, zero orphans and zero missing; i18n-catalog-lint reports catalogs in sync",
+      "files": [
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T044": {
+      "status": "DONE",
+      "did": "Single-casing-source audit: the feature diff adds ZERO toUpperCase/toLocaleUpperCase calls (the only two matches are prose in comments); the surviving TouchGallery call builds the K_ vkey name, not a letter",
+      "files": [
+        "(audit only)"
+      ]
+    },
+    "T045": {
+      "status": "DONE",
+      "did": "Deliberately-unchanged audit: casePair.ts, shiftRules.ts, packages/contracts/** and content/patterns/** all show 0 changed files against main",
+      "files": [
+        "(audit only)"
+      ]
+    },
+    "T046": {
+      "status": "DONE",
+      "did": "Repo gates green: pnpm typecheck clean across all packages, pnpm -r test 6858 passed / 2 skipped, pnpm lint all checkers GREEN",
+      "files": [
+        "(verification only)"
+      ]
+    },
+    "T048": {
+      "status": "DONE",
+      "did": "Phonebook no-op: the only keyboard referenced is basicKbdus (and the pre-existing sil_cameroon_qwerty fixture), both already indexed in docs/keyboard-index.md",
+      "files": [
+        "(audit only)"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "SC-005 regression gate - the shipping physical-key companion is behaviour-preserved by the extraction",
+      "command": "pnpm --filter @keyboard-studio/studio test src/editors/assignLoop/MechanismGallery.test.tsx",
+      "result": "PASS - all 145 pre-existing cases pass with a zero-deletion diff (pure append); no existing companion case was edited",
+      "warnings": []
+    },
+    {
+      "what": "Absent-layer regression floor for both touch appliers",
+      "command": "pnpm --filter @keyboard-studio/engine test src/pattern-apply/",
+      "result": "PASS - 441/441; the two applier test diffs are 137/0 and 155/0 (zero deleted lines), so no existing fixture was edited to make the change pass",
+      "warnings": []
+    },
+    {
+      "what": "Repo gates",
+      "command": "pnpm typecheck; pnpm -r test; pnpm lint",
+      "result": "PASS - typecheck clean, 6858 tests passed / 2 skipped, every lint checker GREEN including i18n-catalog-lint",
+      "warnings": [
+        "jsdom HTMLCanvasElement.getContext not-implemented noise from the pre-existing fontSupport tests - unrelated and non-failing"
+      ]
+    },
+    {
+      "what": "Single-casing-source invariant (FR-002)",
+      "command": "git diff main...HEAD -- packages/ | grep + | grep -E toUpperCase|toLocaleUpperCase",
+      "result": "PASS - zero new casing calls on the proposal path; the only two matches are prose inside comments, and the surviving TouchGallery call builds the K_ vkey NAME, not a letter",
+      "warnings": []
+    },
+    {
+      "what": "i18n additive-only catalog change",
+      "command": "pnpm --filter @keyboard-studio/studio messages:extract; git diff packages/studio/src/locales",
+      "result": "PASS - en/fr each gained exactly 2 keys (.prompt.combo, .prompt.touch); all six reused editor.assignLoop.companion.* ids keep their exact pre-change English messages, so no translation is orphaned",
+      "warnings": [
+        "required switching node 22.16.0 -> 24.11.0; below the repo 22.19 floor lingui exits 0 having written nothing"
+      ]
+    },
+    {
+      "what": "km-lead review cycle 1 - six specialists (verification, qc, synthesis, frontend, keyman, domain)",
+      "command": "Agent x6 parallel",
+      "result": "No P0. Verdicts: verification APPROVE, keyman APPROVE, qc PASS WITH NOTES 88/100, synthesis/frontend/domain APPROVE WITH NOTES",
+      "warnings": [
+        "km-frontend corrected my briefing: handleApply already lists charTouch/editingLayer/proposeCompanion in its deps, so the suspected stale-closure bug does not exist"
+      ]
+    },
+    {
+      "what": "Georgian unicameral-script finding, verified by execution rather than UCD inference",
+      "command": "npx tsx probe against caseCounterpart",
+      "result": "CONFIRMED - Georgian Mkhedruli U+10D0 returns Mtavruli U+1C90; Cherokee maps both directions. Titlecase U+01C5 returns null, so km-domain overstated that P2 - no proposal is raised for titlecase at all",
+      "warnings": []
+    },
+    {
+      "what": "Post-review gates after cycle-2 fixes",
+      "command": "pnpm typecheck; pnpm -r test; pnpm lint",
+      "result": "PASS - typecheck clean, 6870 passed / 2 skipped (up from 6858), lint exit 0 with zero NEW warnings (assignLoop dir has the same 3 pre-existing warnings before and after)",
+      "warnings": []
+    },
+    {
+      "what": "{\"what\":\"Georgian suppression decision - corpus and script-detection evidence\",\"command\":\"npx tsx probe against caseCounterpart + \\p{Script=Georgian}; km-author read of ../keyboards/release/basic/basic_kbdgeo/source/basic_kbdgeo.kmn\",\"result\":\"CONFIRMED - all four Georgian ranges match one regex and nothing else does; basic_kbdgeo shift rules output identical codepoints to base. Also corrected km-domains unverified table: it predicted Warang Citi and Old Hungarian return null, but both actually return a counterpart\",\"warnings\":[\"km-domain and km-doc both ran without a Bash tool, so their factual claims were re-verified by me before being acted on\"]}"
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "mechanismRefEquals normalizes an absent layer to default before comparing slot key sets",
+      "why": "Not in the task list, but required: a ref stored in a draft before the layer slot existed carries {hostKey,char} while a freshly built one carries {hostKey,char,layer:default}, so raw key-set comparison called them distinct and duplicated the chip on every revisit. Two shipping dedupe/revisit tests caught it. This extends the absent-layer===default compatibility guarantee from the appliers to the studio dedup, keeping {K_A,a-acute,default} and {K_A,A-acute,shift} correctly distinct.",
+      "rejected": "Editing the two failing dedupe tests, which would have shipped a real backward-compatibility defect for every stored touch draft"
+    },
+    {
+      "decision": "The proposal carries a hook-derived parallelCombo alongside the source combo",
+      "why": "The data model gives the combo variant only the source combo, but the confirm handler needs the case-shifted base/content letter. Deriving it at confirm time would have made a second caseCounterpart caller and broken FR-002s structural guarantee. Deriving it inside propose keeps the hook the sole casing source.",
+      "rejected": "Re-deriving the uppercase base letter in the gallery confirm handler"
+    },
+    {
+      "decision": "S-03 proposals ride the existing onApplied callback rather than a second banner in SequenceBuilderPanel",
+      "why": "FR-011 requires one affordance across all three mechanisms; MechanismGallery owns the single hook and banner. The panel returns a SequenceApplied payload (absent on a dedup no-op) and the gallery raises the proposal.",
+      "rejected": "Giving SequenceBuilderPanel its own useCasePairCompanion instance and banner"
+    },
+    {
+      "decision": "The parallel sequence ref lands in the counterparts own sequence bucket",
+      "why": "collapsedChar is the counterpart, and a bucket is keyed by the assignment target, so partitionSequenceAssignment is called with the counterpart. This matches how the physical non-CAPS path appends an assignment targeting the counterpart, and inherits the existing (firstLetterOut, secondLetter) dedup.",
+      "rejected": "Appending the parallel ref to the source characters bucket, which would have made collapsedChar disagree with the assignment target"
+    },
+    {
+      "decision": "Hoisted the absent-layer-means-default rule into packages/engine/src/pattern-apply/touchLayer.ts",
+      "why": "The invariant was encoded three times (both appliers plus TouchGallery normalizeTouchSlots) and now gates case-pair ref equality, so independent drift would silently break dedup. Engine is the right home since studio already depends on it.",
+      "rejected": "Leaving three copies, or moving it to contracts (wrong dependency direction)"
+    },
+    {
+      "decision": "Georgian/Cherokee unicameral-script gap documented as an accepted v1 limitation rather than code-fixed",
+      "why": "Spec 074 explicitly places any change to the caseCounterpart primitive out of scope, and propose-then-confirm means nothing is auto-inserted. Recorded in spec Edge Cases, Assumptions, Out of scope, and the casePair.ts docstring so it is a known gap rather than a surprise.",
+      "rejected": "Adding a script-aware suppression list, which would have meant changing the frozen primitive"
+    },
+    {
+      "decision": "{\"decision\":\"Suppress the case-pair proposal for Georgian only, in the studio hook\",\"why\":\"Three independent lines of evidence agreed: km-domain ruled Mtavruli a stylistic all-caps register rather than a Shift companion; km-author verified in-file that the corpus keyboard basic_kbdgeo maps every [SHIFT K_x] to the IDENTICAL codepoint as its base rule, so Shift is not a case layer there at all; and this projects own facet classifier already labels that keyboard casing:caseless / caps-handling:notApplicable. I verified by probe that a single native /\\p{Script=Georgian}/u covers all four Georgian scripts (Mkhedruli, Nuskhuri, Asomtavruli, Mtavruli), so this needs no table, no dependency, and no change to the frozen caseCounterpart primitive.\",\"rejected\":\"Accepting the noise (documented-only); a locale/BCP47 gate (a working copy may carry no tag, and it would wrongly suppress borrowed-Latin proposals on a Georgian keyboard); and widening the suppression to Cherokee, which has only absence-of-evidence behind it\"}"
+    }
+  ],
+  "concerns": [
+    {
+      "note": "T047 (the manual quickstart §5 walkthrough under pnpm dev) was NOT performed - it needs a human at a browser. Every one of its six steps has automated coverage (physical confirm/dismiss, dead key with trigger unchanged and base capitalized, a-acute on default vs A-acute on shift, the inverse case, caseless raising nothing), and the engine applier tests prove layer:shift reaches the shift layer in both the IR and raw-JSON emit paths - but the end-to-end UI walk itself is unverified.",
+      "step": "implement"
+    },
+    {
+      "note": "The studio vitest suite is intermittently flaky under parallel pnpm -r load, unrelated to this feature: one run failed useValidator.test.ts (a 300ms-debounce running===false assertion) and another failed 2 unidentified tests. Three subsequent full runs passed 4350/4350 and the final pnpm -r test was fully green. The same flakiness class is visible on a clean main checkout.",
+      "step": "implement"
+    },
+    {
+      "note": "The machine default node was 22.16.0, below the repos >=22.19.0 engines floor. Switched to 24.11.0 via nvm and corepack-activated pnpm 9.12.0. This is a persistent change to the users global node selection; without it lingui messages:extract silently no-ops and i18n-catalog-lint misreports catalogs.",
+      "step": "implement"
+    },
+    {
+      "note": "km-qc P2 (not addressed): MechanismGallery.tsx is ~3500 lines and keeps accreting per-mechanism confirm branches rather than a dispatch table. A km-simplify pass is warranted eventually; deliberately out of scope for this feature.",
+      "step": "implement"
+    },
+    {
+      "note": "The physical alreadyProduced predicate builds a RegExp from the resolved vkey and matches it anywhere in kmnRules. Vkeys are constrained to K_[A-Z0-9_]+ so there is no metacharacter hazard today, but it over-suppresses in one edge case: if the counterpart is already assigned to the SAME key on a different layer (e.g. base rather than shift), the shift proposal is suppressed even though the parallel slot is empty. P2, benign under propose-then-confirm.",
+      "step": "implement"
+    },
+    {
+      "note": "Cherokee (U+AB70 lowercase block <-> U+13A0) is Unicode-bicameral in the same technical sense as Georgian and still proposes. The only evidence against it is that no shipped corpus keyboard uses the lowercase block - absence of evidence, not evidence of absence. Deliberately left proposing; revisit if a Cherokee author reports the prompt as noise.",
+      "step": "implement"
+    }
+  ],
+  "coverage": {
+    "FR-001": {
+      "tests": [
+        "casePairCompanion.test.ts",
+        "MechanismGallery.test.tsx::case-pair companion proposal",
+        "TouchGallery.test.tsx::shift-layer case-pair proposal"
+      ]
+    },
+    "FR-002": {
+      "tests": [
+        "casePairCompanion.test.ts::suppression (FR-002)"
+      ]
+    },
+    "FR-003": {
+      "tests": [
+        "MechanismGallery.test.tsx::case-pair companion proposal"
+      ]
+    },
+    "FR-004": {
+      "tests": [
+        "MechanismGallery.test.tsx::S-02 parallel-combo proposal",
+        "MechanismGallery.test.tsx::S-03 parallel-combo proposal",
+        "SequenceBuilderPanel.test.tsx::onApplied case-pair seam"
+      ]
+    },
+    "FR-005": {
+      "tests": [
+        "TouchGallery.test.tsx::shift-layer case-pair proposal",
+        "applyTouchAssignments.test.ts::layer targeting"
+      ]
+    },
+    "FR-006": {
+      "tests": [
+        "TouchGallery.test.tsx::buildTouchMechanismRef - case-derived layer"
+      ]
+    },
+    "FR-007": {
+      "tests": [
+        "MechanismGallery.test.tsx::records nothing additional when the companion prompt is declined",
+        "TouchGallery.test.tsx::dismissing records nothing"
+      ]
+    },
+    "FR-008": {
+      "tests": [
+        "MechanismGallery.test.tsx::companion proposal identity tracking (P1/P2 regression)",
+        "MechanismGallery.test.tsx::confirming applies to the RAISING swap"
+      ]
+    },
+    "FR-009": {
+      "tests": [
+        "casePairCompanion.test.ts::locale (FR-009)",
+        "MechanismGallery.test.tsx::companion proposal bcp47 plumbing"
+      ]
+    },
+    "FR-010": {
+      "tests": [
+        "MechanismGallery.test.tsx::does not show the companion prompt when the keyboard is mnemonic"
+      ]
+    },
+    "FR-011": {
+      "tests": [
+        "MechanismGallery.test.tsx::shared case-pair affordance (spec 074)"
+      ]
+    }
+  },
+  "step_summaries": {
+    "implement": {
+      "summary": "One shared useCasePairCompanion hook + CasePairProposalBanner now serve all three placement mechanisms, and touch placements can finally name their layer - the engine appliers target slotValues.layer (absent === default) and touch refs derive it from the placed letter case."
+    }
+  },
+  "last_action": "47/48 tasks done - gates green (typecheck, 6858 tests, lint); T047 manual browser walkthrough left for a human"
+}

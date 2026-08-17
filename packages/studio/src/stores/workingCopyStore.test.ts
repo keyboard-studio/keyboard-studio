@@ -957,7 +957,7 @@ describe("workingCopyStore — keepAll/restoreAll clear deletedTouchKeyIds", () 
 });
 
 // ---------------------------------------------------------------------------
-// spec 058 T056/T057 — keyEditOverlay: commitKeyEdit/undoKeyEdit, plus (T057)
+// spec 063 T056/T057 — keyEditOverlay: commitKeyEdit/undoKeyEdit, plus (T057)
 // their integration with the shared chronological undoStack: commitKeyEdit
 // pushes a 'k' UndoEntry, undoDelete has a 'k' branch, undoKeyEdit filters the
 // matching entry out of undoStack (the restore-side filter), and keepAll
@@ -1063,7 +1063,7 @@ describe("workingCopyStore — keyEditOverlay", () => {
 });
 
 // ---------------------------------------------------------------------------
-// spec 058 T057 — key edits on the shared chronological undoStack.
+// spec 063 T057 — key edits on the shared chronological undoStack.
 // ---------------------------------------------------------------------------
 
 describe("workingCopyStore — key edit undo integration (T057, FR-032)", () => {
@@ -1193,7 +1193,7 @@ describe("workingCopyStore — key edit undo integration (T057, FR-032)", () => 
 });
 
 // ---------------------------------------------------------------------------
-// spec 058 T056 — touchEditorMode: setTouchEditorMode.
+// spec 063 T056 — touchEditorMode: setTouchEditorMode.
 // ---------------------------------------------------------------------------
 
 describe("workingCopyStore — touchEditorMode", () => {
@@ -1233,7 +1233,7 @@ describe("workingCopyStore — touchEditorMode", () => {
 });
 
 // ---------------------------------------------------------------------------
-// spec 058 T078 (SC-011) — mode-toggle regression suite.
+// spec 063 T078 (SC-011) — mode-toggle regression suite.
 //
 // The point of this block is narrower than "toggling works": a mode switch
 // clearing touchDraft or keyEditOverlay "to tidy up" is EXACTLY the kind of
@@ -2054,14 +2054,14 @@ describe("workingCopyStore — Phase B proposal decisions are per-working-copy",
 });
 
 // ---------------------------------------------------------------------------
-// commitTouchKeyRename — the T091 complete reference fix-up (spec 058;
+// commitTouchKeyRename — the T091 complete reference fix-up (spec 063;
 // key-id-policy.md §4; touch-key-rule-join.md §6.1's final bullet). Reuses
 // the shared touch-key<->rule-join fixture (contract §8, "no second
 // fixture") rather than a bespoke one, mirroring AssignPanel.test.tsx's own
 // precedent for the same fixture in this package.
 // ---------------------------------------------------------------------------
 
-describe("workingCopyStore — commitTouchKeyRename (spec 058 T091)", () => {
+describe("workingCopyStore — commitTouchKeyRename (spec 063 T091)", () => {
   it("returns changed:false and touches nothing when there is no working IR yet", () => {
     const result = useWorkingCopyStore
       .getState()

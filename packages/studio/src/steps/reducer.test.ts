@@ -568,10 +568,10 @@ describe("spec 034 T006 — choose_base yields a live working copy via the real 
 });
 
 // ---------------------------------------------------------------------------
-// Spec 046 — marks-series completion applies the mark guards
+// Spec 071 — marks-series completion applies the mark guards
 // ---------------------------------------------------------------------------
 
-describe("applyStepCompletion — marks (spec 046, US8)", () => {
+describe("applyStepCompletion — marks (spec 071, US8)", () => {
   const ACUTE = "́";
 
   function marksDeps() {

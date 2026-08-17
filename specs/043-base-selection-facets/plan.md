@@ -60,7 +60,7 @@ docs/keyboard-facet-index.json (+ .md)     # regenerated (--classified-only) —
 | III. Single working copy | **PASS** — not applicable; this is a build-time corpus scanner, not the studio authoring spine. No serialization introduced. |
 | IV. Validator layering / one debounce | **PASS** — not applicable; no validator or studio-debounce code touched. |
 | V. VirtualFS only during authoring | **PASS** — the facet-index tool reads the sibling corpus at build time and writes a committed artifact; it is not studio authoring and writes no host disk during authoring. |
-| VI. Team boundaries | **PASS** — content owns the pattern/facet library and criteria; engine owns the tooling. This feature is content/engine facet-index work (spec 036 extensibility), squarely within FR-043's stated ownership. |
+| VI. Team boundaries | **PASS** — content owns the pattern/facet library and criteria; engine owns the tooling. This feature is content/engine facet-index work (spec 070 extensibility), squarely within FR-043's stated ownership. |
 | VII. Out of scope for v1 | **PASS** — no CJK/Ethiopic reorder, LDML, mobile-app, hosting, touch-first authoring. Measurement only; NG-001…NG-006 keep the rejected signals out. |
 | VIII. House conventions | **PASS** — no emoji in console output; markdown links in docs; no GitHub issue numbers in shipped code; `feat(tools):`-style commit titles. |
 

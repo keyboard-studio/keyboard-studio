@@ -26,6 +26,7 @@ import { MIGRATION_RULES } from "./migrations/index.js";
 import type {
   CommitFailure,
   CommitResult,
+  MigrationRule,
   ProducedSetDelta,
   TransformProposal,
 } from "./types.js";
@@ -59,6 +60,19 @@ export interface ApplyFacetTransformOptions {
    * commit (SC-001 compile/round-trip parity).
    */
   simulate?: InjectedSimulate;
+  /**
+   * Use this `MigrationRule` instance instead of looking `proposal.migrationRuleId`
+   * up in the static `MIGRATION_RULES` registry. Every v1 migration is a static
+   * singleton because its `apply()` derives everything synchronously from
+   * `workingCopyIr` alone; context tolerance (spec 062) is the one exception —
+   * its proposal step is async (it compiles the keyboard to run the both-forms
+   * simulator comparison), so its rule is built from an already-computed result
+   * via `createContextToleranceMigrationRule` and passed in here rather than
+   * looked up by id. See `migrations/context-tolerance.ts`'s module doc. The
+   * rest of the gate (opaque-integrity, compile/oracle verification, produced-set
+   * delta) runs exactly as it does for any registry-resolved rule.
+   */
+  ruleOverride?: MigrationRule;
 }
 
 // ---------------------------------------------------------------------------
@@ -287,7 +301,7 @@ export async function applyFacetTransform(
   proposal: TransformProposal,
   options: ApplyFacetTransformOptions = {},
 ): Promise<CommitResult> {
-  const rule = MIGRATION_RULES[proposal.migrationRuleId];
+  const rule = options.ruleOverride ?? MIGRATION_RULES[proposal.migrationRuleId];
   if (rule === undefined) {
     return {
       status: "commit-failed",

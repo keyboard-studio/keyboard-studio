@@ -13,10 +13,10 @@ import { makeLocation } from "./_shared.js";
 /**
  * Check that each row does not exceed the platform key-count maximum.
  *
- * **The thresholds moved, the behaviour did not (spec 061 T022, research D6).**
+ * **The thresholds moved, the behaviour did not (spec 065 T022, research D6).**
  * This check's own `MAX_KEYS` table was the original and the calibrated one, and
  * it had since been copied into the studio's remove-key dialog with a comment
- * asking a future reader to keep the two in sync by hand. Spec 061 adds a third
+ * asking a future reader to keep the two in sync by hand. Spec 065 adds a third
  * consumer — the edit-time `TOUCH_KEY_ROW_CROWDED` finding — so the table now
  * lives once, in [contracts' row-metrics.ts](../../../contracts/src/row-metrics.ts),
  * and all three read it from there. Contracts rather than engine because

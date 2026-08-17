@@ -19,7 +19,7 @@
 // between the two would be circular; the shared rule sits below both instead.
 //
 // TouchGallery's `hostKeyShortLabel` is a DIFFERENT, already-correct casing
-// convention (spec 051): a touch key's displayed case reflects the touch
+// convention (spec 074): a touch key's displayed case reflects the touch
 // LAYER it targets (uppercase on a shift/caps layer), because a touch
 // keycap visually shows that layer's own glyph — it is not the same
 // question this module answers, so it is left as-is. `stripVkeyPrefix`

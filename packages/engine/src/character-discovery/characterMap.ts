@@ -41,7 +41,7 @@
  */
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
-import { isNoncharacterCodePoint, scriptSubtagOf } from "@keyboard-studio/contracts";
+import { isNoncharacterCodePoint, resolveEffectiveScript } from "@keyboard-studio/contracts";
 import type { CldrFullLoader } from "./cldr.js";
 import { loadExemplarsFromFull } from "./cldr.js";
 import { loadExemplarSource, sourceExemplars } from "./exemplarSource.js";
@@ -345,21 +345,19 @@ export function isCombiningMarkChar(ch: string): boolean {
 // Script resolution
 // ---------------------------------------------------------------------------
 
-function primarySubtagOf(bcp47: string): string {
-  const idx = bcp47.indexOf("-");
-  return idx === -1 ? bcp47 : bcp47.slice(0, idx);
-}
-
 /**
  * Resolves the ISO 15924 script code driving the "block" tier: an explicit
  * script subtag on the tag wins; otherwise falls back to the langtags default
  * script for the primary language subtag. Returns undefined when no script
  * can be determined (main/auxiliary tiers can still populate from CLDR in
  * that case — only the block tier needs a script).
+ *
+ * Thin wrapper over the shared `resolveEffectiveScript` (contracts) —
+ * see that function's doc for why the langtags lookup is passed in rather
+ * than imported by the shared helper itself.
  */
 function resolveScript(bcp47: string | undefined): string | undefined {
-  if (bcp47 === undefined) return undefined;
-  return scriptSubtagOf(bcp47) ?? getLanguageDefaults(primarySubtagOf(bcp47))?.defaultScript;
+  return resolveEffectiveScript(bcp47, getLanguageDefaults);
 }
 
 // ---------------------------------------------------------------------------

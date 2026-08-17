@@ -68,7 +68,7 @@ function seedInstantiatedWorkingCopy(inventory: string[]) {
     { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
   ]);
   useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir: makeTestIR([]) });
-  // spec 059: canDownload folds in the attribution gates alongside coverage, so a
+  // spec 064: canDownload folds in the attribution gates alongside coverage, so a
   // fixture meant to isolate COVERAGE has to satisfy attribution — otherwise the
   // "becomes emittable" assertion would fail on an unrelated gate.
   useWorkingCopyStore.getState().setAttribution({

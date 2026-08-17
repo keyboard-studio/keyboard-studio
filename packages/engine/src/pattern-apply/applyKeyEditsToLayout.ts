@@ -1,6 +1,6 @@
 /**
  * applyKeyEditsToLayout — Case A: the IR applier for key-level touch layout
- * edits (spec 058 FR-031…FR-034, FR-036a…FR-036g).
+ * edits (spec 063 FR-031…FR-034, FR-036a…FR-036g).
  *
  * Applies an ordered `KeyEditOperation[]` list to a parsed `TouchLayoutIR`
  * with structural sharing: only the platform/layer whose rows an operation
@@ -43,7 +43,7 @@
  *
  * `provenance` PROMOTION (re-tagging an EXISTING edited key, e.g.
  * `"base-derived"` → `"hand-set"`) is deliberately NOT done here — that is a
- * separate, address-matched studio-side path (spec 058 T059) that runs
+ * separate, address-matched studio-side path (spec 063 T059) that runs
  * beside this applier, not inside it. This is distinct from `add`, which
  * DOES set `provenance: DEFAULT_TOUCH_PROVENANCE` on the brand-new key it
  * creates (T047 fix): a freshly minted key has no prior wire value to
@@ -68,7 +68,7 @@
  *
  * ## `scope: "family"` is not fanned out here
  *
- * Layer-family fan-out (spec 058 FR-065, layerFamilies.ts, Phase 5d) is a
+ * Layer-family fan-out (spec 063 FR-065, layerFamilies.ts, Phase 5d) is a
  * separate, independent piece of machinery. This applier treats every
  * operation as scoped to the single key its `address` names, regardless of
  * `scope`; fanning one authored edit into one operation per family member is
@@ -205,9 +205,9 @@ export function applyKeyEditsToLayout(
     if (op.kind === "setSubKey" || op.kind === "removeSubKey") {
       const subLoc = resolveSubKeyEntry(key, op.sub);
 
-      // `setSubKey` is an UPSERT as of spec 061 T042 (FR-026).
+      // `setSubKey` is an UPSERT as of spec 065 T042 (FR-026).
       //
-      // Spec 058 warned-and-skipped here instead, and said so in both appliers'
+      // Spec 063 warned-and-skipped here instead, and said so in both appliers'
       // docstrings: "the seven operation kinds admit no eighth 'add sub-key'
       // kind, and increment 1's sub-key editing is display/deletion-only". That
       // premise is what changed — FR-026 requires key mode to ADD longpresses,
@@ -280,7 +280,7 @@ export function applyKeyEditsToLayout(
           provenance: DEFAULT_TOUCH_PROVENANCE,
           text: op.key.text,
           sp: op.key.sp,
-          // The standard default geometry, written explicitly (spec 061 T021,
+          // The standard default geometry, written explicitly (spec 065 T021,
           // FR-016) — see the Case B twin's own comment in
           // applyKeyEditsToRawJson.ts's `newRawKeyFromSpec` for why "regardless
           // of what the spec carries" is a constraint on what this must NOT do
@@ -391,7 +391,7 @@ function toEditableFields(key: TouchKeyIR): EditableKeyFields {
     sp: (key.sp ?? 0) as EditableKeyFields["sp"],
     ...(key.output !== undefined ? { output: key.output } : {}),
     ...(key.nextlayer !== undefined ? { nextlayer: key.nextlayer } : {}),
-    // Spec 061 T030 — the four newly editable fields, read from the same key
+    // Spec 065 T030 — the four newly editable fields, read from the same key
     // they are written back onto below.
     ...(key.hint !== undefined ? { hint: key.hint } : {}),
     ...(key.width !== undefined ? { width: key.width } : {}),
@@ -511,7 +511,7 @@ function writeSubKeyBack(
 }
 
 /**
- * Add a NEW sub-entry to a key (spec 061 T042, FR-026) — the create half of
+ * Add a NEW sub-entry to a key (spec 065 T042, FR-026) — the create half of
  * `setSubKey`'s upsert.
  *
  * `sk` and `multitap` append, so a new longpress lands at the end of the menu
@@ -537,7 +537,7 @@ function appendSubKey(
 }
 
 // ---------------------------------------------------------------------------
-// `move` — spec 061 T031 (FR-020, FR-021)
+// `move` — spec 065 T031 (FR-020, FR-021)
 // ---------------------------------------------------------------------------
 
 /**

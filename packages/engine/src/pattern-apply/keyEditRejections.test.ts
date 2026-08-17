@@ -1,5 +1,5 @@
 /**
- * Unit tests for `checkKeyEditRejections` (spec 058 T118; FR-045, FR-040).
+ * Unit tests for `checkKeyEditRejections` (spec 063 T118; FR-045, FR-040).
  *
  * Organised by the three reasons, because each rests on a different fact and
  * therefore has a different downgrade behaviour — which is the substance of the

@@ -82,7 +82,7 @@
 // lettersToAdd === inventory (full alphabet) and alreadyProduced === [] — the
 // gallery behaves exactly as it did before the diff was wired.
 
-// Spec 058 FR-011 — the third array, and why this hook is EXTENDED rather than
+// Spec 063 FR-011 — the third array, and why this hook is EXTENDED rather than
 // switched to the reachability-aware view.
 //
 // `buildReachableProducedSet` would move a character produced only by an
@@ -121,7 +121,7 @@ export interface InventoryDiff {
   alreadyProduced: string[];
   /**
    * Inventory characters the base's RULES produce but that no reachable key can
-   * actually type (spec 058 FR-011) — the honest delta between the two
+   * actually type (spec 063 FR-011) — the honest delta between the two
    * producibility views.
    *
    * A strict SUBSET of `alreadyProduced`: these characters still count as

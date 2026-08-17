@@ -80,13 +80,7 @@
 
 import { test, expect, type Page } from "playwright/test";
 import { expectNoSeriousAxeViolations } from "./helpers/axe";
-import {
-  GLYPH_KEY_CHIP_DEBT,
-  LINT_CHIP_DEBT,
-  OSK_IFRAME_DEBT,
-  OUTPUT_SCREEN_DEBT,
-  SHARED_CHROME_DEBT,
-} from "./helpers/contrastDebt";
+import { OUTPUT_SCREEN_DEBT } from "./helpers/contrastDebt";
 import { unzipSync, strFromU8 } from "fflate";
 import { readFile } from "node:fs/promises";
 import {
@@ -174,83 +168,15 @@ const PIAROA_KMN_ZIP_PATH = `source/${PIAROA_BASE_ID}.kmn`;
 const PIAROA_TOUCH_ZIP_PATH = `source/${PIAROA_BASE_ID}.keyman-touch-layout`;
 
 /**
- * Pre-existing 1.4.3 (Contrast Minimum) offenders on the screen this scan
- * actually lands on, excluded by selector with the criterion and reason named
- * inline — the same idiom e2e/tab-roundtrip.spec.ts and
- * e2e/decision-deeplink.spec.ts use (KNOWN_CONTRAST_DEBT). This is spec 056's
- * open tracker debt (specs/056-ada-accessibility/wcag-2.2-aa-tracker.md, 1.4.3
- * is an open `unknown` row), not anything introduced or touched by spec 057 —
- * this fixture's marks/build-list/carve screens are unchanged (see
- * specs/057-bulletproof-navigation/evidence/gating-red.md §"Two corrections
- * made to reach a *valid* red").
- *
- * The scan label ("phase B build list") names the INTENT — scan whatever the
- * survey is showing right after `addPlacedCharacterToInventory` finishes —
- * not a literal Phase-B-only screen: per the manifest spine (characters ->
- * marks -> convenience -> carve -> ...), that is legitimately the Carve
- * gallery once the marks/convenience race fix (spec 057 Class-B diagnosis)
- * lets those steps advance properly instead of stalling on Convenience. The
- * transition into Carve already happens inside `addPlacedCharacterToInventory`
- * itself (via `buildOneCharacterList` -> `driveConvenienceStep`), before this
- * call site is even reached, so extending the exclusion list with the SAME
- * carve-gallery debt carve.spec.ts's own KNOWN_CONTRAST_DEBT documents is the
- * honest fix (see specs/057-bulletproof-navigation/reviews/classB-diagnosis.md
- * addendum) — pid_piaroa's recognized S-01 "Simple swap" carve-card is the
- * `data-testid="carve-card-simple-swap#main"` instance of the same shared
- * Rail.tsx button the prefix selector below already covers.
+ * #1477's ground-truth sweep (live axe run with this list emptied) found
+ * every entry this list used to carry already clean: CarveGallery's/Rail's/
+ * GlyphCell's v1-only surfaces are dead code (CarveGalleryV2 is
+ * unconditional; v1 is commented out in carveAdapter.tsx), and
+ * ConvenienceCharsStep's Continue button plus RemovalBanner's dismiss
+ * control and region were stale exclusions from an earlier contrast pass
+ * that already fixed them. Nothing left to exclude on this screen.
  */
-const KNOWN_CONTRAST_DEBT: readonly string[] = [
-  // 1.4.3 — LintChip's code badge. pid_piaroa's own .kmn trips
-  // KM_ERROR_DEPRECATED_STORE (&ETHNOLOGUECODE, illegal since Keyman v10), so
-  // the findings list is populated for the whole walk. Named once in
-  // helpers/contrastDebt.ts, and scoped to the findings list there rather than
-  // excluding every <code> on the page as this entry previously did.
-  ...LINT_CHIP_DEBT,
-  // 1.4.3 — ConvenienceCharsStep's "Continue" button.
-  'button[data-testid="convenience-continue"]',
-  // 1.4.3 — CarveGallery's info-panel toggle button.
-  'button[aria-label="Hide info panel"]',
-  // 1.4.3 — CarveGallery's footer "Continue" button.
-  'button[data-testid="carve-continue"]',
-  // 1.4.3 — RemovalBanner's dismiss control (assignLoop/parts/RemovalBanner.tsx).
-  'button[aria-label="Dismiss removal recommendation"]',
-  // 1.4.3 — RemovalBanner's own region (its collapsed-strip text sits on the
-  // green-tinted background at a ratio axe flags).
-  'div[aria-label="Removal recommendation"]',
-  // 1.4.3 — Rail's per-node carve-card buttons (assignLoop/parts/Rail.tsx):
-  // the "kept/total"/per-modifier-breakdown spans inside them. Excluded by the
-  // stable testid PREFIX (carve-card-<nodeId> — here "carve-card-simple-swap#main",
-  // the recognized S-01 pattern this fixture's carve targets group into) rather
-  // than the brittle nth-child span chain axe reports for the same button.
-  'button[data-testid^="carve-card-"]',
-  // 1.4.3 — GlyphCell's cross-reference tag chips (assignLoop/parts/
-  // GlyphCell.tsx): "<kind> — go to" / "<kind> — N places".
-  'button[aria-label$="go to"]',
-  'button[aria-label$="places"]',
-  // 1.4.3 — Rail's sticky SectionHeader (assignLoop/parts/Rail.tsx).
-  'div[style*="letter-spacing: 0.13em"]',
-  // 1.4.3 — the per-key glyph chips ("<char> — K_<key>"): the small key-name
-  // span inside each chip. pid_piaroa's base inventory surfaces four of them
-  // on this screen (ä/ö/ü/ñ — K_A/K_O/K_U/K_N) that the bambara walk in
-  // touch-derivation-us1.spec.ts never renders, which is why only this spec
-  // needs the shared group. Same open 1.4.3 tracker debt, already named once
-  // in helpers/contrastDebt.ts rather than re-spelled here.
-  ...GLYPH_KEY_CHIP_DEBT,
-  // 1.4.3 — Rail's SUB-section header (assignLoop/parts/Rail.tsx:226), the
-  // smaller sibling of the sticky SectionHeader excluded just above: the
-  // store-subgroup label ("Unused", from Rail.tsx's storeSub list) rendered at
-  // 9.5px in --app-text-subtle with opacity 0.8. It is a SEPARATE inline-style
-  // signature — letter-spacing .1em, not the .13em the entry above keys on —
-  // so the existing selector never covered it. pid_piaroa's rail renders an
-  // "Unused" subgroup that the bambara walk in touch-derivation-us1.spec.ts
-  // does not, which is why only this spec needs the entry. Rail.tsx is
-  // untouched by spec 057 (verified against `git diff main...HEAD`) and the
-  // token is the open 1.4.3 `unknown` row in
-  // specs/056-ada-accessibility/wcag-2.2-aa-tracker.md. Identified from the
-  // node's own outerHTML, not inferred: ".13em" is not a substring match for
-  // ".1em", so the two entries do not overlap.
-  'div[style*="letter-spacing: 0.1em"]',
-];
+const KNOWN_CONTRAST_DEBT: readonly string[] = [];
 
 // ---------------------------------------------------------------------------
 // Fixture constants — Test 2 (US2-AS4): bambara, identical to
@@ -525,18 +451,15 @@ test.describe("Touch derivation US2 — reseed from desktop (spec 035 Scenario B
     await driveTouchGallery(page);
 
     // Accessibility gate (spec 056 FR-003): scan the post-touch-gallery screen.
-    // 1.4.3 -- glyph chips + LintChip's code badge + shared chrome + OSK
-    // iframe (documented pre-existing contrast debt; see
-    // helpers/contrastDebt.ts). The lint badge is here for the same reason it
-    // is on the build-list scan above: LintSummary is survey-pane chrome, and
-    // pid_piaroa's .kmn keeps a finding in the list for the whole walk.
+    // #1477's ground-truth sweep found this screen's glyph chips and shared
+    // chrome already clean, and fixed LintChip's code badge at the source
+    // (lint/colors.ts's SEVERITY_COLORS consumers; LintSummary is survey-pane
+    // chrome, and pid_piaroa's .kmn keeps a finding in the list for the whole
+    // walk, so this screen exercised the live bug directly). The OSK
+    // iframe's own debt is now also fixed at the source. Nothing left to
+    // exclude here.
     await expectNoSeriousAxeViolations(page, "after touch gallery (US2 piaroa walk)", {
-      exclude: [
-        ...GLYPH_KEY_CHIP_DEBT,
-        ...LINT_CHIP_DEBT,
-        ...SHARED_CHROME_DEBT,
-        ...OSK_IFRAME_DEBT,
-      ],
+      exclude: [],
     });
 
     await driveHelpPhase(

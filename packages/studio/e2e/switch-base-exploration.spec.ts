@@ -317,6 +317,16 @@ async function buildToLevel(page: Page, level: Level, h: Harness): Promise<void>
   h.note("Phase B done (added ᙮); at carve gallery");
   if (level === "L6-phaseB-done") return;
 
+  // STALE since v2 went live: carve-card-<id>, raw-remove-anyway, and
+  // raw-confirm-remove are v1-only test-ids (Rail.tsx / Inspector.tsx),
+  // which CarveGalleryV2's adoption commented out in carveAdapter.tsx — v2 is
+  // now unconditionally rendered instead. None of these elements exist in the
+  // live app, so L7-carve-deleted will time out on `targetCard` below rather
+  // than reach the carve step this level is meant to probe. L1 through L6
+  // above remain reachable (carve-gallery's own test-id is shared by both
+  // v1 and v2). Reaching L7 would need porting this to v2's own discard flow
+  // (irToCharacterView cells + getDeletedItemIds()) — out of scope for this
+  // pass, which only confirms the finding per #1628 item 3.
   const targetCard = page.getByTestId(`carve-card-${CARVE_NODE_ID}`);
   await expect(targetCard).toBeVisible({ timeout: 30_000 });
   await targetCard.click();

@@ -6,7 +6,7 @@
  *   runImportFidelityParseChecks  — runs immediately after parse(), before emit()
  *     I1: parse completeness
  *     I4: opaque feature inventory (informational)
- *     0x05A: touch-layout key-id validity (spec 058 FR-040) — an imported
+ *     0x05A: touch-layout key-id validity (spec 063 FR-040) — an imported
  *            keyboard's existing ids. Author-typed ids are handled by edit-time
  *            rejection instead, with no finding at all. Deliberately NOT a Layer C
  *            check: see checkTouchLayoutIdentifiers' header.

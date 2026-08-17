@@ -1,4 +1,4 @@
-// KeyPropertyPanel — spec 061 T035 (FR-003, FR-015, FR-018, FR-019, FR-020).
+// KeyPropertyPanel — spec 065 T035 (FR-003, FR-015, FR-018, FR-019, FR-020).
 //
 // No @testing-library/jest-dom — raw DOM assertions, matching this package's
 // convention (RemoveKeyDialog.test.tsx, Field.test.tsx).

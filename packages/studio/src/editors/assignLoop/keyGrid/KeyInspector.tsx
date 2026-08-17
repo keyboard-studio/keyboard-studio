@@ -1,5 +1,5 @@
 // KeyInspector — the read-only detail surface for whichever cell is currently
-// selected in the touch key grid (spec 058 T070; FR-020b, FR-030). This
+// selected in the touch key grid (spec 063 T070; FR-020b, FR-030). This
 // component is deliberately NOT part of KeyGrid.tsx (see that file's own
 // module doc, "Seams for T065-T071" — "T070 KeyInspector / T071 FindPanel:
 // separate components... FR-020b's 'selection is separate from editing' is
@@ -64,7 +64,7 @@
 //
 // Acting on a fix is still NOT this component's job: `onApplyFix` reports the
 // author's choice and this file commits nothing, exactly as `onSpChange` does
-// below. See that prop's own doc for the required-prop contract (spec 061
+// below. See that prop's own doc for the required-prop contract (spec 065
 // FR-001, FR-003, research D1).
 //
 // ## Editing is NOT this component's job — except the `sp` control (T096)
@@ -81,16 +81,16 @@
 // control below IS an editing affordance, but this file still does not
 // COMMIT anything. `onSpChange` fires with the author's chosen value and does
 // nothing else; there is no store import, no engine mutation call, here —
-// that discipline is unchanged by spec 061's required-prop inversion (D1).
-// What changed is who is allowed to leave it disconnected: spec 061 makes
+// that discipline is unchanged by spec 065's required-prop inversion (D1).
+// What changed is who is allowed to leave it disconnected: spec 065 makes
 // `onSpChange` and `onApplyFix` **required** props (FR-001, FR-003), so a
 // mount that cannot act is a compile-time error caught by `tsc`, not a
 // degraded surface a caller could ship silently — the reverting `sp` control
 // and the permanently-disabled fix buttons were exactly that degraded
-// surface (see issue #1530 complaint #2, spec 061's "Context: what actually
+// surface (see issue #1530 complaint #2, spec 065's "Context: what actually
 // went wrong"). Wiring `onSpChange` into the actual key-edit overlay commit
 // (a `SetKeyOp`) alongside T094's add-key and T095's suppress operation is
-// still the composing caller's job (`TouchGallery.tsx`, spec 061 T013), not
+// still the composing caller's job (`TouchGallery.tsx`, spec 065 T013), not
 // something this component pre-empts.
 //
 // ## The key-type control is a DROPDOWN, not six radios
@@ -278,7 +278,7 @@ export interface UseKeyInspectorFocusBridgeOptions {
    */
   selectedAddress: string | null;
   /**
-   * Edit this cell's VALUE — F2's target (spec 061).
+   * Edit this cell's VALUE — F2's target (spec 065).
    *
    * Optional: with no handler, F2 keeps its original meaning and focuses the
    * panel exactly as Enter does, so a caller that has no assign surface is
@@ -347,11 +347,11 @@ export function useKeyInspectorFocusBridge({
       const target = event.target;
       if (!(target instanceof Element) || target.closest('[role="gridcell"]') === null) return;
       event.preventDefault();
-      // Spec 061: the two keys diverge, because the panel absorbed the assign
+      // Spec 065: the two keys diverge, because the panel absorbed the assign
       // surface and put it behind a disclosure. Enter opens the DETAIL (the
       // panel region — FR-020b, unchanged). F2 edits the VALUE, landing
       // straight in the character field, which is the grid convention and what
-      // spec 058 SC-004 measures: assigning a character must stay one keypress
+      // spec 063 SC-004 measures: assigning a character must stay one keypress
       // away from the cell, not Enter-then-tab-to-a-disclosure.
       if (event.key === "F2" && onEditValue !== undefined) {
         onEditValue();
@@ -404,7 +404,7 @@ export interface KeyInspectorProps {
    * non-proposed value is a legitimate authoring act, not something this
    * callback screens out.
    *
-   * REQUIRED (spec 061 FR-001, FR-003, research D1): `TouchGallery.tsx` is
+   * REQUIRED (spec 065 FR-001, FR-003, research D1): `TouchGallery.tsx` is
    * this component's one caller, and this control used to be `value`-driven
    * from `currentSp` with the change handler a no-op `?.()` when unwired —
    * the DOM snapped back to `currentSp` on every click, which is the
@@ -422,7 +422,7 @@ export interface KeyInspectorProps {
    * decides what that means (a `KeyEditOperation`, opening AssignPanel to pick a
    * character, or scrolling the offending key into view).
    *
-   * REQUIRED (spec 061 FR-001, FR-003, research D1). This prop used to be
+   * REQUIRED (spec 065 FR-001, FR-003, research D1). This prop used to be
    * optional, and every fix button rendered `disabled` when it was omitted —
    * the only caller, `TouchGallery.tsx`, never supplied it, so every fix
    * button in the shipped app was permanently inert. That reasoning traded on
@@ -437,7 +437,7 @@ export interface KeyInspectorProps {
   label?: string;
   /**
    * Render as a plain section inside another panel rather than as a
-   * `role="region"` card of its own (spec 061 T035).
+   * `role="region"` card of its own (spec 065 T035).
    *
    * `KeyPropertyPanel` is the single panel FR-018 asks for, and it composes
    * this component for the display, findings and key-type sections rather than

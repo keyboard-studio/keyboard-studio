@@ -1,5 +1,5 @@
 /**
- * Human-readable companion renderer (spec 036 T034; FR-007). Emits an audit-trail
+ * Human-readable companion renderer (spec 070 T034; FR-007). Emits an audit-trail
  * markdown view of the machine-readable index — build inputs, per-facet coverage,
  * and a deterministic sample of records — so a human can eyeball what the build
  * produced without parsing the JSON.

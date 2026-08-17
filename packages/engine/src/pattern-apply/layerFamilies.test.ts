@@ -1,6 +1,6 @@
 /**
- * Unit tests for layerFamilies (spec 058 T062, T107; contract:
- * specs/058-touch-key-editor/contracts/layer-families.md).
+ * Unit tests for layerFamilies (spec 063 T062, T107; contract:
+ * specs/063-touch-key-editor/contracts/layer-families.md).
  *
  * Grouped:
  *   1. Decomposition over the standard combo vocabulary (contract §6 bullet

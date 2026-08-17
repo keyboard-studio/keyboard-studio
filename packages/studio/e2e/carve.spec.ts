@@ -92,54 +92,24 @@ const KEPT_ONLY_TOKEN = "U+14EC";
 const KMN_ZIP_PATH = `source/${BASE_KEYBOARD_ID}.kmn`;
 
 /**
- * Pre-existing 1.4.3 (Contrast Minimum) offenders on the carve gallery,
- * excluded by selector with the criterion and reason named inline — the same
- * idiom e2e/tab-roundtrip.spec.ts and e2e/decision-deeplink.spec.ts use
- * (KNOWN_CONTRAST_DEBT). This is spec 056's open tracker debt
- * (specs/056-ada-accessibility/wcag-2.2-aa-tracker.md, 1.4.3 is an open
- * `unknown` row).
- *
- * PORT NOTE (v1 -> v2): this list previously named v1's Rail-only surfaces
- * (Rail.tsx's carve-card buttons and sticky SectionHeader, GlyphCell.tsx's
- * cross-reference chips, and CarveGallery.tsx's "Hide info panel" toggle) —
- * none of those components render anymore now that CarveGalleryV2 is the
- * live gallery (v1 is commented out in carveAdapter.tsx), so those entries
- * are retired rather than left as no-op selectors. The RemovalBanner
- * entries stay: v2 reuses RemovalBanner.tsx unchanged ("reused as-is" per
- * CarveGalleryV2.tsx's own comment), so its pre-existing debt still applies.
- * The Continue-button entry is kept conservatively (v2's button reuses the
- * same var(--app-accent)-background/white-text combo v1's carried) but is
- * UNVERIFIED against v2's actual render — flagged for a fresh axe pass
- * rather than assumed.
+ * #1477's ground-truth sweep (live axe run with this list emptied) found
+ * every entry it used to carry already clean: the carve-continue button's
+ * var(--app-accent)/var(--app-text-on-accent) pairing (previously flagged
+ * "UNVERIFIED against v2's actual render") and RemovalBanner's dismiss
+ * control + region both pass. v1's Rail-only surfaces (carve-card buttons,
+ * sticky SectionHeader, GlyphCell's cross-reference chips, "Hide info panel")
+ * were already retired from this list as dead code (CarveGalleryV2 is
+ * unconditional; v1 is commented out in carveAdapter.tsx). Nothing left to
+ * exclude on this screen.
  */
-const KNOWN_CONTRAST_DEBT: readonly string[] = [
-  // 1.4.3 — CarveGalleryV2's footer "Continue" button — see the port note
-  // above; unverified against v2's own render, kept conservative.
-  'button[data-testid="carve-continue"]',
-  // 1.4.3 — RemovalBanner's dismiss control (assignLoop/parts/RemovalBanner.tsx),
-  // reused unchanged by v2.
-  'button[aria-label="Dismiss removal recommendation"]',
-  // 1.4.3 — RemovalBanner's own region (its collapsed-strip text sits on the
-  // green-tinted background at a ratio axe flags). Excluded by the banner's
-  // stable aria-label rather than the anonymous div chain axe reports (the
-  // chain has no data-testid/aria hook of its own to key on).
-  'div[aria-label="Removal recommendation"]',
-];
+const KNOWN_CONTRAST_DEBT: readonly string[] = [];
 
 /**
- * Pre-existing 1.4.3 offenders on the OUTPUT screen (same rules and evidence
- * trail as KNOWN_CONTRAST_DEBT above — spec 056's open tracker debt; both
- * components predate and are untouched by spec 057). Kept as a separate list
- * because the two screens share no offending component.
+ * #1477's ground-truth sweep found OskModeToggle's inactive button and
+ * SignUpPanel's GitHub button — the two entries this list used to carry —
+ * already clean. Nothing left to exclude on the Output screen for this walk.
  */
-const KNOWN_CONTRAST_DEBT_OUTPUT: readonly string[] = [
-  // 1.4.3 — OskModeToggle's inactive mode button (components/OskModeToggle.tsx):
-  // the unselected toggle half's text on the group background falls short.
-  'div[role="group"] > button',
-  // 1.4.3 — SignUpPanel's GitHub button; the same exclusion
-  // decision-deeplink.spec.ts already carries for shared chrome.
-  'button[aria-label="Sign up with GitHub"]',
-];
+const KNOWN_CONTRAST_DEBT_OUTPUT: readonly string[] = [];
 
 // ---------------------------------------------------------------------------
 // window.__ksE2E__ typing — mirrors packages/studio/src/lib/e2eHook.ts.
@@ -149,7 +119,7 @@ const KNOWN_CONTRAST_DEBT_OUTPUT: readonly string[] = [
 
 interface KsE2EHook {
   getWorkingIr(): KeyboardIR | null;
-  getDeletedNodeIds(): string[];
+  getDeletedItemIds(): string[];
 }
 
 declare global {
@@ -180,7 +150,7 @@ declare global {
 // ---------------------------------------------------------------------------
 
 test.describe("Carve gallery (v2) — discard one character, verify IR + emitted .kmn", () => {
-  test("discarding U+14EC in the carve gallery removes both producing rules from the deleted-node IR state and from the emitted .kmn", async ({ page }) => {
+  test("discarding U+14EC in the carve gallery removes both producing rules from the deleted-item IR state and from the emitted .kmn", async ({ page }) => {
     // ?e2e=1 is the runtime override for installE2eHook() (src/lib/e2eHook.ts)
     // — no VITE_E2E build flag needed. Seed the returning-visitor flag first
     // so the fresh browser context skips WelcomeScreen (see seedReturningVisitor).
@@ -233,13 +203,15 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
     //
     // getWorkingIr() still LISTS rule#18/rule#20 in their group — the rules
     // array is filtered at emit time by carveFilterIr, not mutated in place.
-    // The deletion is recorded in the deletedNodeIds overlay, which is what
-    // this asserts (mirrors the v1 spec's identical rule/raw-array-vs-overlay
-    // contract, just over ir.groups[].rules instead of ir.raw).
+    // The deletion is recorded in the deletedItemIds overlay (asserted via
+    // getDeletedItemIds(), NOT getDeletedNodeIds() — CarveGalleryV2's
+    // cascadeDelete routes whole-rule deletes through the item channel by
+    // design; getDeletedNodeIds() only reflects v1 CarveGallery's deleteNode
+    // path and stays empty here — see e2eHook.ts's getDeletedItemIds doc).
     // ---------------------------------------------------------------------
     await expect
       .poll(
-        () => page.evaluate(() => window.__ksE2E__?.getDeletedNodeIds() ?? []),
+        () => page.evaluate(() => window.__ksE2E__?.getDeletedItemIds() ?? []),
         { timeout: 5_000 },
       )
       .toEqual(expect.arrayContaining(TARGET_RULE_IDS));
@@ -377,7 +349,7 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
 
     await expect
       .poll(
-        () => page.evaluate(() => window.__ksE2E__?.getDeletedNodeIds() ?? []),
+        () => page.evaluate(() => window.__ksE2E__?.getDeletedItemIds() ?? []),
         { timeout: 5_000 },
       )
       .not.toEqual(expect.arrayContaining(TARGET_RULE_IDS));

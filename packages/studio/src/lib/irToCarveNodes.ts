@@ -11,14 +11,13 @@ import type {
   RemovalCapability,
   StoreItem,
 } from '@keyboard-studio/contracts';
-import { buildProducedSet, scriptSubtagOf } from '@keyboard-studio/contracts';
-import { isParallelIndexFanOut, classifyStoreSlotEdit, describeStorePairing, analyzeStores, buildProducerIndex, isCharCoveredForLocale, collectCharContributors, isPlusSeparator, parseSlotId, isCombiningMarkChar } from '@keyboard-studio/engine';
+import { buildProducedSet, resolveEffectiveScript } from '@keyboard-studio/contracts';
+import { isParallelIndexFanOut, classifyStoreSlotEdit, describeStorePairing, analyzeStores, buildProducerIndex, isCharCoveredForLocale, collectCharContributors, sliceContributorDescriptors, isPlusSeparator, parseSlotId, isCombiningMarkChar } from '@keyboard-studio/engine';
 import type { ProducerIndex } from '@keyboard-studio/engine';
 import type { StoreSlotBlockReason, StoreSlotEditMode, StoreAnalysis, CharContributors, ContributorDescriptor, CharNormalizationForm } from '@keyboard-studio/engine';
 import type { I18n } from '@lingui/core';
 import { resolveContentString } from './contentI18n.ts';
 import { caseGroupFor, caseTrimSet } from './carveCasePairs.ts';
-import { primarySubtag } from './suggestBase.ts';
 import { getLoadedLangtags } from './langtagsDefaults.ts';
 import { lowerBareLetter } from './keyCasing.ts';
 export type CardKind = 'pattern' | 'group' | 'store' | 'raw';
@@ -135,7 +134,7 @@ export function modifierLabel(rule: IRRule): string {
 
 // ---------------------------------------------------------------------------
 // isCombining — true for the full Unicode Mark category (Mn/Mc/Me, all
-// scripts). General_Category M is the correct test (km-domain, spec 046
+// scripts). General_Category M is the correct test (km-domain, spec 071
 // follow-up): many Mc marks (e.g. Devanagari vowel signs) have canonical
 // combining class (ccc) 0, so a ccc-based test under-detects — General_Category
 // is required, not ccc. Sk "modifier symbol" characters (U+00B4 ACUTE ACCENT,
@@ -1679,7 +1678,7 @@ export function isNotAForwardTypingPath(rule: IRRule): boolean {
  * a leaked touch id, or floored/banned — the character may still have other,
  * real desktop producers.
  */
-function isTouchOnlyTriggerRule(rule: IRRule): boolean {
+export function isTouchOnlyTriggerRule(rule: IRRule): boolean {
   const triggerEl = ruleTriggerVkey(rule);
   return triggerEl !== undefined && isTouchOnlyVkeyName(triggerEl.name);
 }
@@ -2071,27 +2070,33 @@ function isAsciiLatinLetter(ch: string): boolean {
 }
 
 /**
- * True when the target BCP47 tag's effective script is Latin: an explicit
- * script subtag wins (`scriptSubtagOf`, contracts); otherwise falls back to
- * the langtags default script for the tag's primary language subtag, read
+ * True when the target BCP47 tag's effective script is Latin.
+ *
+ * Delegates the "explicit script subtag wins, else langtags default" lookup
+ * to the shared `resolveEffectiveScript` (contracts) — same algorithm engine's
+ * characterMap.ts uses for its `resolveScript`. The langtags accessor reads
  * via `getLoadedLangtags()` (lib/langtagsDefaults.ts) rather than a static
- * import of `@keyboard-studio/engine/langtags` — that module's generated
- * data file is large, and the studio deliberately keeps it out of static
- * bundles (FR-011/SC-005), lazy-loading it once during the survey's language
- * step instead. By the time an author reaches Carve they have necessarily
- * already picked a target language (IdentityLite), which has already
- * resolved this same module, so `getLoadedLangtags()` is synchronously
- * non-null in the overwhelming common case; the `null` fallback (module not
- * yet loaded) folds into the same "assume Latin" fail-open below as an
- * absent/unknown `bcp47` — conservative, never a spurious shield.
+ * import of `@keyboard-studio/engine/langtags` — that module's generated data
+ * file is large, and the studio deliberately keeps it out of static bundles
+ * (FR-011/SC-005), lazy-loading it once during the survey's language step
+ * instead. By the time an author reaches Carve they have necessarily already
+ * picked a target language (IdentityLite), which has already resolved this
+ * same module, so `getLoadedLangtags()` is synchronously non-null in the
+ * overwhelming common case.
+ *
+ * Unlike engine's `resolveScript` (which returns `undefined` when no script
+ * resolves), this fails open to Latin — on an absent/empty `bcp47`, an
+ * unrecognized language, OR the module not yet loaded — since assuming
+ * non-Latin here would spuriously flag ordinary ASCII as a cross-script
+ * fallthrough (see `isBasicLatinCrossScriptFallthrough` below) rather than
+ * just missing a real one; conservative, never a spurious shield.
  */
 function targetScriptIsLatin(bcp47: string | null | undefined): boolean {
-  if (!bcp47) return true;
-  const explicit = scriptSubtagOf(bcp47);
-  if (explicit !== undefined) return explicit.toLowerCase() === 'latn';
-  const primary = primarySubtag(bcp47);
-  const defaultScript = getLoadedLangtags()?.getLanguageDefaults(primary)?.defaultScript ?? 'Latn';
-  return defaultScript.toLowerCase() === 'latn';
+  const script = resolveEffectiveScript(
+    bcp47,
+    (subtag) => getLoadedLangtags()?.getLanguageDefaults(subtag) ?? null,
+  );
+  return (script ?? 'Latn').toLowerCase() === 'latn';
 }
 
 /**
@@ -2677,17 +2682,15 @@ function mergeCharContributors(records: readonly CharContributors[]): CharContri
 
   for (const rec of records) {
     // Re-slice this record's own descriptors back into its three per-array
-    // views (mirrors MechanismGallery.tsx's existing slicing convention for
-    // the same index-parallel contract) so each descriptor can travel with
-    // the id/slot/blocked-entry it describes through the dedup below.
-    // `descriptors` defensively defaults to `[]` — real `collectCharContributors`
-    // output always includes it, but this function also runs over test-double
-    // CharContributors fixtures (e.g. CarveGallery.test.tsx's emptyContributors)
-    // that omit it since those tests never assert on descriptors.
-    const recDescriptors = rec.descriptors ?? [];
-    const ruleDescs = recDescriptors.slice(0, rec.ruleNodeIds.length);
-    const slotDescs = recDescriptors.slice(rec.ruleNodeIds.length, rec.ruleNodeIds.length + rec.storeSlots.length);
-    const blockedDescs = recDescriptors.slice(rec.ruleNodeIds.length + rec.storeSlots.length);
+    // views (the shared `sliceContributorDescriptors`, engine — also used by
+    // MechanismGallery.tsx for the same index-parallel contract) so each
+    // descriptor can travel with the id/slot/blocked-entry it describes
+    // through the dedup below.
+    const {
+      ruleDescriptors: ruleDescs,
+      storeSlotDescriptors: slotDescs,
+      blockedDescriptors: blockedDescs,
+    } = sliceContributorDescriptors(rec);
 
     rec.ruleNodeIds.forEach((id, i) => {
       if (seenRules.has(id)) return;

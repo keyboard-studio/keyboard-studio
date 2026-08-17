@@ -143,7 +143,7 @@ export function promoteKeyToHandSet(
 
 /**
  * Return a structural clone of `layout` with the ONE key named by `address`
- * promoted to `hand-set`. Address-matched, NOT id-matched (spec 058 FR-031) —
+ * promoted to `hand-set`. Address-matched, NOT id-matched (spec 063 FR-031) —
  * this is the by-key-edit counterpart to {@link promoteKeyToHandSet}, which
  * stays id-matched/all-platforms/all-layers for the by-character flow and is
  * never changed by this addition.

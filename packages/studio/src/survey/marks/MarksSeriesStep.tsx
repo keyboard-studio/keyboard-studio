@@ -1,4 +1,4 @@
-// MarksSeriesStep — the S0-S5 marks question series host (spec 046).
+// MarksSeriesStep — the S0-S5 marks question series host (spec 071).
 //
 // One spine EditorStep between "characters" and "carve" — the series runs
 // immediately after alphabet confirmation so how the author thinks of the
@@ -7,7 +7,7 @@
 // alphabet's marks store is empty, the step completes immediately with an
 // EMPTY placement worklist and the designer proceeds with no marks screen
 // ever shown. When marks exist, stations S1-S5 are sequenced internally
-// (skip logic stays local to this host, spec 046 R1); every station's content
+// (skip logic stays local to this host, spec 071 R1); every station's content
 // is derived from the alphabet already confirmed at this point (FR-024). Each
 // station that has nothing to decide is skipped, so the simple fully-attested
 // orthography confirms in at most two rendered screens (SC-002/SC-006).
@@ -154,7 +154,7 @@ export function classNeedsTreatmentScreen(
 /**
  * The series' phase result: reported on completion (or on the S0 skip). The
  * chosen output form is now a real contract field (SurveyPhaseResult.marksOutputForm,
- * spec 046) — the reducer (steps/reducer.ts MarksCompleteResult) still reads
+ * spec 071) — the reducer (steps/reducer.ts MarksCompleteResult) still reads
  * it off this result to decide whether to generate stepwise backspace-unwrap
  * stores; carve's needed-set derivation reads it off the merged session.
  */

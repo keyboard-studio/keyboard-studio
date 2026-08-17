@@ -103,6 +103,7 @@ import {
   comboToKeySpec,
   collectModifierTokensInUse,
   collectCharContributors,
+  sliceContributorDescriptors,
   collectCompositionMethod,
   type ModifierToken,
   type CharContributors,
@@ -1441,7 +1442,7 @@ export interface MechanismGalleryProps {
    */
   placementMap?: PlacementMap;
   /**
-   * Optional marks-series placement worklist (spec 046, FR-020 — the
+   * Optional marks-series placement worklist (spec 071, FR-020 — the
    * placementMap seam pattern). When supplied, composed units covered by a
    * PRODUCTIVE mark key (a `markUnits` entry: base key + mark key reach them)
    * are dropped from the walk — the mark itself is walked instead (it is in
@@ -1628,7 +1629,7 @@ export function MechanismGallery({
   // second time per render.
   const baseProducedSet = sharedRawProducedSet;
 
-  // Spec 046 worklist filter (FR-020): a composed unit whose marks are ALL
+  // Spec 071 worklist filter (FR-020): a composed unit whose marks are ALL
   // productive mark keys is reachable via base key + mark key — it needs no
   // whole-unit placement of its own, so it leaves the walk. Everything else
   // (plain bases, own-letter units, the productive marks themselves) keeps its
@@ -3428,20 +3429,8 @@ export function MechanismGallery({
     // doc comment on `descriptors`) — slice it back into three per-array
     // views rather than re-deriving a lookup, so each loop below can zip its
     // own array against the matching descriptor by position.
-    const { descriptors } = existingMethodContributors;
-    const ruleDescriptors = descriptors.slice(
-      0,
-      existingMethodContributors.ruleNodeIds.length,
-    );
-    const storeSlotDescriptors = descriptors.slice(
-      existingMethodContributors.ruleNodeIds.length,
-      existingMethodContributors.ruleNodeIds.length +
-        existingMethodContributors.storeSlots.length,
-    );
-    const blockedDescriptors = descriptors.slice(
-      existingMethodContributors.ruleNodeIds.length +
-        existingMethodContributors.storeSlots.length,
-    );
+    const { ruleDescriptors, storeSlotDescriptors, blockedDescriptors } =
+      sliceContributorDescriptors(existingMethodContributors);
 
     const rows: ExistingMethodRow[] = [];
 
@@ -3938,7 +3927,11 @@ export function MechanismGallery({
                   background: !nextDisabled ? "var(--app-success)" : "var(--app-surface-2)",
                   border: "none",
                   borderRadius: 6,
-                  color: !nextDisabled ? "var(--app-text-on-accent)" : TEXT_DIM,
+                  // NOT --app-text-on-accent: that pairs with --app-accent,
+                  // not --app-success -- light theme's --app-success only
+                  // reaches 3.35:1 with white (1.4.3, #1477).
+                  // --app-text-on-success covers both themes; see colors.css.
+                  color: !nextDisabled ? "var(--app-text-on-success)" : TEXT_DIM,
                   fontSize: 13,
                   fontWeight: 600,
                   cursor: !nextDisabled ? "pointer" : "not-allowed",
@@ -4397,7 +4390,12 @@ export function MechanismGallery({
                             background: "var(--app-success)",
                             border: "none",
                             borderRadius: 5,
-                            color: "var(--app-text-on-accent)",
+                            // NOT --app-text-on-accent: that pairs with
+                            // --app-accent, not --app-success -- light
+                            // theme's --app-success only reaches 3.35:1 with
+                            // white (1.4.3, #1477). --app-text-on-success
+                            // covers both themes; see colors.css.
+                            color: "var(--app-text-on-success)",
                             fontSize: 12,
                             fontWeight: 600,
                             cursor: "pointer",

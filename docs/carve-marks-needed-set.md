@@ -2,7 +2,7 @@
 
 > Status: ratified by domain/keyman/strategy review, 2026-07-23. Captures the data
 > contract that issue #1357 (carve-gallery selection UI) builds its interaction on
-> top of. Not itself an implementation plan — see [specs/046-marks-question-series/](../specs/046-marks-question-series/)
+> top of. Not itself an implementation plan — see [specs/071-marks-question-series/](../specs/071-marks-question-series/)
 > and [specs/049-lowercase-diacritic-questions/](../specs/049-lowercase-diacritic-questions/)
 > for the series that produces the inputs this note consumes.
 
@@ -13,7 +13,7 @@ The carve gallery's keep/remove recommendations are driven off the flat
 `neededCharsForLanguage`/`confirmedInventory` union around line 1650). That set
 unconditionally contains the bases, *all* composed base+mark combos, and *all*
 lone marks the character-discovery step surfaced — regardless of how the author
-answered the marks-question series (spec 046: attachment, mental model, input
+answered the marks-question series (spec 071: attachment, mental model, input
 order, output form, stacking). Carve therefore cannot tell a combo the author
 actually needs from one that exists only because the base keyboard happened to
 carry it, and it cannot use the marks-series "own-letter" vs. "letter-plus-mark"
@@ -26,7 +26,7 @@ dangerously wrong — see Guards, §4.
 Carve's needed-set is no longer a flat union; it is partitioned into three tiers
 per base+mark pair (or bare mark), keyed off the marks-series mental-model answer
 (`"own-letter" | "letter-plus-mark" | "mixed"` — see
-[specs/046-marks-question-series/data-model.md](../specs/046-marks-question-series/data-model.md)):
+[specs/071-marks-question-series/data-model.md](../specs/071-marks-question-series/data-model.md)):
 
 | Tier | Own-letter class | Letter-plus-mark class | Removal candidate? |
 |---|---|---|---|
@@ -46,14 +46,14 @@ per base+mark pair (or bare mark), keyed off the marks-series mental-model answe
   round-trip through legacy NFC, or Devanagari nukta forms that belong to more
   than one conjunct family. Auto-removing the secondary tier would silently
   break those routes.
-- **BLOCK-CANDIDATE.** `blockedCombinations` (spec 046 FR-021 — "must never be
+- **BLOCK-CANDIDATE.** `blockedCombinations` (spec 071 FR-021 — "must never be
   reachable by any ordinary key sequence") is the *only* tier carve treats as an
   active removal candidate. Even here, carve removes only the specific
   base×mark mapping the author blocked — never the shared rule machinery, the
   deadkey trigger, or any fan-out rule the mapping shares with a kept
   combination (see Guards, §4).
 - **Multi-mark stacks.** For `attestedStacks` with two or more marks
-  (spec 046's `AttestedStack` shape), the fully composed form is
+  (spec 071's `AttestedStack` shape), the fully composed form is
   required-primary whenever the author is in the own-letter class for that
   stack, and the marks-series' confirmed stacking order is preserved in the
   produced worklist — carve does not re-derive or re-order it.
@@ -62,7 +62,7 @@ per base+mark pair (or bare mark), keyed off the marks-series mental-model answe
 
 `marksOutputForm` (`"ready-made" | "base-plus-mark"` — the per-keyboard output-form
 decision already modeled in
-[specs/046-marks-question-series/data-model.md](../specs/046-marks-question-series/data-model.md)
+[specs/071-marks-question-series/data-model.md](../specs/071-marks-question-series/data-model.md)
 §`OutputFormDecision`) becomes an **additive, optional** field threaded from the
 marks question series onto the survey session, so carve can resolve which
 concrete grapheme — NFC precomposed vs. NFD/decomposed base+mark — is "the

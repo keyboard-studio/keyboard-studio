@@ -1,5 +1,5 @@
 /**
- * SC-002 corpus canaries for the joined touch-layout diagnostics (spec 058 T042).
+ * SC-002 corpus canaries for the joined touch-layout diagnostics (spec 063 T042).
  *
  * ## Why this test lives in `packages/studio` and not in `packages/keyboard-lint`
  *

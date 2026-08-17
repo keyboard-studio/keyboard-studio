@@ -23,7 +23,7 @@ import type { KeyboardIR, VirtualFS } from "@keyboard-studio/contracts";
 
 /**
  * A whole VFS reduced to `path -> exact content`, for the byte-identity half of
- * spec 058 SC-006 (T112). Text entries map to their string content verbatim;
+ * spec 063 SC-006 (T112). Text entries map to their string content verbatim;
  * BINARY entries map to a `"bin:"`-prefixed byte list, which is byte-exact
  * rather than a digest so an equality comparison needs no hashing (and no
  * async `crypto.subtle`) inside a Playwright `evaluate`. The keyboard corpus's
@@ -48,6 +48,15 @@ export interface KsE2EHook {
   /** nodeIds currently marked deleted via the carve gallery. */
   getDeletedNodeIds: () => string[];
   /**
+   * itemIds (rule nodeIds + store-slot ids, "<storeNodeId>#<index>") marked
+   * deleted via cascadeDelete — CarveGalleryV2's discard path. cascadeDelete
+   * routes BOTH whole-rule deletes and store-slot drops through this ITEM
+   * channel (deletedItemIds), never deletedNodeIds (see workingCopyStore.ts's
+   * cascadeDelete doc comment) — so a V2 discard is asserted here, not via
+   * getDeletedNodeIds(), which only reflects v1 CarveGallery's deleteNode path.
+   */
+  getDeletedItemIds: () => string[];
+  /**
    * The instantiated working copy's base keyboard id, or null before
    * instantiation. Added for the F1 (switch-base rebase) regression spec —
    * lets a test assert which base the WORKING COPY is on, independent of
@@ -64,7 +73,7 @@ export interface KsE2EHook {
   getPhaseResultsCount: () => number;
   /**
    * The SHIPPED SOURCE as instantiated — a snapshot of the store's `baseVfs`,
-   * before any projection layer. Null before instantiation. Added for spec 058
+   * before any projection layer. Null before instantiation. Added for spec 063
    * SC-006 (T112), which has to compare "what the base shipped" against "what
    * we emit" for every file the author never touched.
    */
@@ -115,6 +124,7 @@ export function installE2eHook(): void {
   window.__ksE2E__ = {
     getWorkingIr: () => useWorkingCopyStore.getState().ir,
     getDeletedNodeIds: () => [...useWorkingCopyStore.getState().deletedNodeIds],
+    getDeletedItemIds: () => [...useWorkingCopyStore.getState().deletedItemIds],
     getBaseKeyboardId: () => useWorkingCopyStore.getState().baseKeyboard?.id ?? null,
     getPhaseResultsCount: () => useWorkingCopyStore.getState().phaseResults.length,
     snapshotBaseFiles: () => {

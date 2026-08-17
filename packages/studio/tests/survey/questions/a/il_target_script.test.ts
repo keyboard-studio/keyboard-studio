@@ -71,7 +71,7 @@ describe("il_target_script — definition", () => {
     expect(fallthrough?.condition).toBeUndefined();
   });
 
-  // spec 059 US1: the supported path is no longer terminal — it continues into
+  // spec 064 US1: the supported path is no longer terminal — it continues into
   // attribution capture. The GATED path still terminates (see the branch above).
   it("default branch continues to attribution capture", () => {
     const rules = definition.next as Array<{

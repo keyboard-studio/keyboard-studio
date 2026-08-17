@@ -1,4 +1,4 @@
-// Spec 061 US5 T045 — the SC-007 gate.
+// Spec 065 US5 T045 — the SC-007 gate.
 //
 // Table-driven over contracts/character-classes.md: EVERY reachable character
 // class must yield either a proposal or a stated `noProposalReason`. Never

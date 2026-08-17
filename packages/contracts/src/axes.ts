@@ -136,4 +136,20 @@ export interface DiscoveryAxisVector {
    * @see spec.md §7.1 A7a
    */
   remapPosture?: RemapPosture;
+  /**
+   * Author's context-tolerance write-back choice (spec 062 FR-007): whether a
+   * generated context-tolerance rule echoes back whatever canonical form the
+   * host buffer held (`"echo"`), or rewrites the touched cluster to the
+   * keyboard's own output form (`"own-form"`).
+   *
+   * - `undefined` — not yet chosen; behaves as `"echo"` (the required default).
+   * - `"echo"` — elicited; emit the form found in context, no backspace over
+   *   pre-typed characters.
+   * - `"own-form"` — elicited; rewrite the touched cluster to the keyboard's
+   *   own normalization form (consequence disclosed via the facet-transform
+   *   preview before commit — FR-008).
+   *
+   * @see spec.md §7 (spec 062 context tolerance)
+   */
+  contextToleranceWriteBack?: "echo" | "own-form";
 }

@@ -1,11 +1,22 @@
-// ResumeDraftBanner — offered on a page (re)load when a saved in-progress survey
-// draft exists in localStorage (lib/draftAutosave.ts). The author explicitly
-// chooses Resume (restore both stores from the draft) or Discard (clear it and
-// start fresh). We never auto-apply a draft, so a stale draft can't silently
-// clobber a new session.
+// ResumeDraftBanner — offered when a server-backed draft is found for a
+// signed-in author with no local trace of it on this browser (a new tab / a
+// different device; lib/draftPersistence.ts's cloud-restore check). The
+// author explicitly chooses Resume (restore both stores from the draft) or
+// Discard (drop the server-side draft and continue fresh). We never
+// auto-apply a draft, so a stale draft can't silently clobber a new session.
+//
+// #1451: this banner used to ALSO offer a same-browser local draft (from the
+// since-retired draftAutosave.ts engine) — draftPersistence's own silent
+// boot-time restore is the one local-resume path now, so that offer is gone;
+// the cloud case above is the only one left. Cloud-only per #1451's own
+// consolidation: the sole caller (StudioShell.tsx's `cloudResume` state) only
+// ever constructs `meta` via `serverMetaToDraftMeta`, which hardcodes
+// `source: "cloud"` — so the local-copy branch this component used to carry
+// alongside the cloud copy was unreachable dead code, removed here rather
+// than left to drift from a caller that can never invoke it.
 
 import type { CSSProperties } from "react";
-import type { DraftMeta } from "../lib/draftAutosave.ts";
+import type { DraftMeta } from "../lib/draftPersistence.ts";
 import { relativeTime, type RelativeTimeValue } from "../lib/relativeTime.ts";
 import { BG_CARD, BORDER, TEXT_MAIN, TEXT_DIM, BLUE_ACTION, FONT } from "../survey/surveyStyles.ts";
 
@@ -89,36 +100,24 @@ const discardButton: CSSProperties = {
 export function ResumeDraftBanner({ meta, onResume, onDiscard }: ResumeDraftBannerProps) {
   const stepLabel = STEP_LABELS[meta.activeStepId] ?? meta.activeStepId;
   const name = meta.label !== null ? `"${meta.label}"` : "your keyboard";
-  const isCloud = meta.source === "cloud";
 
   return (
     <div
       role="region"
-      aria-label={isCloud ? "Restore keyboard from your account" : "Resume unfinished survey"}
+      aria-label="Restore keyboard from your account"
       data-testid="resume-draft-banner"
-      data-source={meta.source ?? "local"}
+      data-source="cloud"
       style={bannerStyle}
     >
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 600, marginBottom: 2 }}>
-          {isCloud ? `Restore ${name} from your account?` : `Resume ${name}?`}
-        </div>
+        <div style={{ fontWeight: 600, marginBottom: 2 }}>{`Restore ${name} from your account?`}</div>
         <div style={{ color: TEXT_DIM, fontSize: 13 }}>
-          {isCloud ? (
-            <>
-              You have an in-progress keyboard saved to your account (last saved{" "}
-              {relativeTimeLabel(relativeTime(meta.savedAt))}, on the {stepLabel} step).
-            </>
-          ) : (
-            <>
-              You have an unfinished survey (last saved {relativeTimeLabel(relativeTime(meta.savedAt))}, on the{" "}
-              {stepLabel} step).
-            </>
-          )}
+          You have an in-progress keyboard saved to your account (last saved{" "}
+          {relativeTimeLabel(relativeTime(meta.savedAt))}, on the {stepLabel} step).
         </div>
       </div>
       <button type="button" data-testid="resume-draft" style={primaryButton} onClick={onResume}>
-        {isCloud ? "Restore" : "Resume"}
+        Restore
       </button>
       <button type="button" data-testid="discard-draft" style={discardButton} onClick={onDiscard}>
         Discard

@@ -1,5 +1,5 @@
 /**
- * Script-classifier unit tests (spec 036 T011, US1 acceptance 1-2; FR-003/004/010).
+ * Script-classifier unit tests (spec 070 T011, US1 acceptance 1-2; FR-003/004/010).
  *
  * Written tests-first against the pinned interface:
  *   classifyScript(ir: KeyboardIR, def: FacetDefinition): Categorization | null
@@ -101,7 +101,7 @@ const UNPARSEABLE_KMN = "group(main using keys\n+ [K_A] > ???\n";
  * shared character (U+0301 COMBINING ACUTE ACCENT — Script_Extensions names
  * 8 scripts including Latn, but not exclusively Latin) that pass 2 must
  * apportion to Latn because Latn is the only one of those 8 already
- * attested. Locks the two-pass apportionment fix (spec 036 linguist
+ * attested. Locks the two-pass apportionment fix (spec 070 linguist
  * correction): a shared character is no longer dropped just because its
  * extension set names more than one script — it strengthens whichever
  * attested script(s) it intersects.

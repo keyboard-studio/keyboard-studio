@@ -38,7 +38,7 @@ existing corpus review checklist (docs/keyboard-documentation-plan.md's "final c
 names exactly this defect class as the #1 recurring reviewer finding. A single section-builder
 function that both files render from is a structural guarantee of parity, not a style preference —
 two independently-written template strings drift the same way two independently-written LICENSE.md
-copies already did (spec 059's motivating incident, same doc).
+copies already did (spec 064's motivating incident, same doc).
 
 **Alternatives considered**: One render function per file with duplicated section logic — rejected,
 reintroduces the exact drift risk FR-005 exists to prevent.

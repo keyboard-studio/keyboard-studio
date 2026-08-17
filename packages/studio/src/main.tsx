@@ -103,14 +103,16 @@ async function mountApp(): Promise<void> {
   // `resolveActiveProjectKey()` reads the `ks.draft.active` pointer (absent on
   // a fresh install / after start-over); `loadDraft()` patches the working-copy
   // and survey-session stores directly if a valid draft is found (setting the
-  // `wasDraftRestoredThisBoot()` flag StudioShell's mount effect reads to skip
-  // its own reset — see StudioShell.tsx).
+  // `wasDraftRestoredThisBoot()` flag). This PR retired the local resume-banner
+  // path that used to gate StudioShell's mount-effect reset on that flag — the
+  // flag is now read only by draftPersistence.ts itself, for its own
+  // freshness bookkeeping (`restoredDraftSavedAt()`), and by test assertions.
   const activeProjectKey = resolveActiveProjectKey();
   if (activeProjectKey !== null) {
     loadDraft(activeProjectKey);
   }
 
-  // One-time "My keyboards" rename-duplicate merge (spec 047 US3a, FINDING 3
+  // One-time "My keyboards" rename-duplicate merge (spec 072 US3a, FINDING 3
   // fix) — a DESTRUCTIVE pass (it `clearDraft`s the losing side of a merge),
   // so it belongs here, at boot, gated by a persisted flag, and NOT in any
   // render path. See `runBootRenameReconciliation`'s doc comment in

@@ -317,7 +317,7 @@ function shiftEntryForUppercase(
  * evidence already encoded in the entry's candidate order (best-first).
  *
  * **Case-pair inheritance.** When `char` is the UPPERCASE half of a case pair
- * (via `caseCounterpart` — the ONLY casing source, spec 051 FR-002) and has
+ * (via `caseCounterpart` — the ONLY casing source, spec 074 FR-002) and has
  * no qualifying entries of its own, this inherits the LOWERCASE sibling's
  * ranked entries verbatim (never re-deriving an independent uppercase
  * ranking) — see {@link shiftEntryForUppercase} for the per-mechanism shift.

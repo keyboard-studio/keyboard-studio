@@ -14,7 +14,7 @@ session-facet vocabulary is forked here — see that README for the session-face
 lifecycle.
 
 The build reads these definitions to populate the committed per-keyboard facet index
-(`docs/keyboard-facet-index.json`, [specs/036-keyboard-facet-index/data-model.md](../../specs/036-keyboard-facet-index/data-model.md)
+(`docs/keyboard-facet-index.json`, [specs/070-keyboard-facet-index/data-model.md](../../specs/070-keyboard-facet-index/data-model.md)
 Entity 3); the classification algorithms themselves belong to
 [specs/037-facet-classifiers](../../specs/037-facet-classifiers/spec.md).
 
@@ -35,9 +35,9 @@ sub-dimensions, opaque to the index shell), and `schemaVersion` (bump forces a r
 facet's records).
 
 The authoritative field-by-field shape, required/optional status, and JSON Schema live in
-[specs/036-keyboard-facet-index/contracts/facet-definition.schema.md](../../specs/036-keyboard-facet-index/contracts/facet-definition.schema.md);
+[specs/070-keyboard-facet-index/contracts/facet-definition.schema.md](../../specs/070-keyboard-facet-index/contracts/facet-definition.schema.md);
 the illustrative full example lives in
-[specs/036-keyboard-facet-index/data-model.md](../../specs/036-keyboard-facet-index/data-model.md) (Entity 1).
+[specs/070-keyboard-facet-index/data-model.md](../../specs/070-keyboard-facet-index/data-model.md) (Entity 1).
 
 ## Discipline
 
@@ -73,8 +73,8 @@ are invisible to the KMN recognizer.
 
 ## Status
 
-The `script` facet (`script.yaml`, spec 036) and the `source.*` construction facets described above
+The `script` facet (`script.yaml`, spec 070) and the `source.*` construction facets described above
 (encoding, casing, combo-mechanism, normalization, reordering, caps-handling, fall-through posture,
 rule/store compaction, mnemonic-vs-positional, and the touch-specific variants) now exist in this
-directory as candidate/planned classifiers — see [specs/036-keyboard-facet-index/](../../specs/036-keyboard-facet-index/)
+directory as candidate/planned classifiers — see [specs/070-keyboard-facet-index/](../../specs/070-keyboard-facet-index/)
 and [specs/037-facet-classifiers](../../specs/037-facet-classifiers/spec.md).

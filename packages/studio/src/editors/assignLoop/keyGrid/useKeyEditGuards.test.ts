@@ -1,4 +1,4 @@
-// Unit tests for useKeyEditGuards (spec 058 T088/T106; FR-036f/FR-061/FR-062).
+// Unit tests for useKeyEditGuards (spec 063 T088/T106; FR-036f/FR-061/FR-062).
 //
 // Coverage:
 //   1. The FR-036f canonical case — suppressing a key that carries a
@@ -242,7 +242,7 @@ describe("findInvalidatedAssignedCharacters", () => {
 });
 
 // ---------------------------------------------------------------------------
-// findCharactersLostForGood (spec 058 T106; FR-061/FR-062) — of the invalidated
+// findCharactersLostForGood (spec 063 T106; FR-061/FR-062) — of the invalidated
 // characters, which ones lose their LAST mechanism anywhere in the layout
 // (must return to the unplaced worklist) versus which remain reachable via a
 // completely different key (must NOT be treated as lost).

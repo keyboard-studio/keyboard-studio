@@ -354,7 +354,7 @@ describe("toZip — scaffolded VFS round-trip (issue #32)", () => {
 // rights holder", and that is decided by scaffold -> toZip, not by the UI.
 // ---------------------------------------------------------------------------
 
-describe("attribution reaches the delivered zip (spec 059 T027)", () => {
+describe("attribution reaches the delivered zip (spec 064 T027)", () => {
   const ATTRIBUTION = {
     authorName: "Alice Example",
     authorEmail: "alice@example.org",

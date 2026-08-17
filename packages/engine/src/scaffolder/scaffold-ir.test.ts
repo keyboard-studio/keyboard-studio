@@ -34,7 +34,7 @@ describe("scaffoldIR — IR-native scaffolder operations", () => {
     expect(ir.header.name).toBe("My New Keyboard");
     expect(ir.header.bcp47).toEqual(["fr-FR"]);
     expect(ir.header.version).toBe("1.0");
-    // spec 059 SC-001: this previously asserted the fabricated
+    // spec 064 SC-001: this previously asserted the fabricated
     // `Copyright © <year> My New Keyboard` — naming the KEYBOARD as its own
     // rights holder. With no copyright supplied, the base's notice is now
     // preserved instead of being overwritten.

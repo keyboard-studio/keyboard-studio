@@ -1,5 +1,5 @@
 /**
- * Build-time schema-violation tests (spec 036 T023; FR-008; US2 acceptance 2/3;
+ * Build-time schema-violation tests (spec 070 T023; FR-008; US2 acceptance 2/3;
  * contract X1/X2/X4 + C3).
  *
  * Two layers:

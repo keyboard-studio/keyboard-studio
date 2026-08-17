@@ -1,4 +1,4 @@
-// Unit tests for keyEditOrphanReport (spec 058 T060, FR-033b).
+// Unit tests for keyEditOrphanReport (spec 063 T060, FR-033b).
 //
 // The REQUIRED case (contracts/key-edit-overlay.md §10's last bullet): an
 // overlay authored against seed A, replayed against a re-derived seed B that

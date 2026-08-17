@@ -103,7 +103,7 @@ export function OutputScreen() {
     handleDownloadKmp,
     coverageGate,
     showIdentityWarn,
-    // spec 059: the two attribution hard-blocks and the D5 escape hatch.
+    // spec 064: the two attribution hard-blocks and the D5 escape hatch.
     attributionMissing,
     licenseUnparseable,
     resolveBaseHolder,
@@ -235,7 +235,7 @@ export function OutputScreen() {
           message:
             "Download unavailable — finish every inventory character before downloading. See the banner below for details.",
         })
-      : // spec 059 D5 before D6: an unreadable base notice is the more specific
+      : // spec 064 D5 before D6: an unreadable base notice is the more specific
         // problem, and its banner is the one carrying the control that fixes it.
         licenseUnparseable !== null
         ? t({
@@ -376,7 +376,13 @@ export function OutputScreen() {
                 fontWeight: 600,
                 cursor: kmpActionable ? "pointer" : "not-allowed",
                 fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
-                transition: "background 0.15s",
+                // NOT transitioned: `color` switches with `background` on the
+                // SAME kmpActionable flip, but with no matching transition of
+                // its own it snaps instantly while background fades over
+                // 150ms, so the disabled bg briefly pairs with the actionable
+                // text color mid-fade -- a real (if brief) 1.4.3 contrast
+                // violation axe caught during the disabled->actionable
+                // transition (#1477).
               }}
             >
               {buildingKmp ? (
@@ -527,7 +533,7 @@ export function OutputScreen() {
                 </button>
               </div>
             )}
-            {/* spec 059 D5 — the base's own copyright notice could not be read.
+            {/* spec 064 D5 — the base's own copyright notice could not be read.
                 This is an [ERROR] rather than a warning: emitting anyway would
                 publish a LICENSE.md naming only this author, silently dropping
                 the notice MIT requires a derivative to retain. Carries the one
@@ -611,7 +617,7 @@ export function OutputScreen() {
                 </form>
               </div>
             )}
-            {/* spec 059 D6 — no attribution captured at all. Not an error the
+            {/* spec 064 D6 — no attribution captured at all. Not an error the
                 author caused, so [WARN] styling and a pointer back to where it
                 is answered. */}
             {attributionMissing && (

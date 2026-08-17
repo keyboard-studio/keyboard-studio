@@ -1,5 +1,5 @@
 /**
- * Reader/lookup unit tests (spec 036 T012, US1 acceptance 3).
+ * Reader/lookup unit tests (spec 070 T012, US1 acceptance 3).
  *
  * Written tests-first against the pinned interface:
  *   readFacet(index: FacetIndex, keyboardId: string, facetId: string): Categorization

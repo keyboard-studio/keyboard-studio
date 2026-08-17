@@ -1,4 +1,4 @@
-// AssignPanel — assign a character to an existing touch key (spec 058 T085,
+// AssignPanel — assign a character to an existing touch key (spec 063 T085,
 // T086, T087; FR-024, FR-025, FR-026; key-id-policy.md §2.1, §5).
 //
 // Propose-then-confirm (spec.md §3c): everything below the character field

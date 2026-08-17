@@ -1,5 +1,5 @@
 /**
- * Script classifier (spec 036 T015) — content-derived script categorization
+ * Script classifier (spec 070 T015) — content-derived script categorization
  * from a keyboard's produced-character set.
  *
  * Maps every concretely-scripted character in `buildProducedSet(ir)` to its
@@ -27,7 +27,7 @@
  * weight of exactly 1, whether wholly in pass 1 or apportioned in pass 2).
  *
  * Internal weighting/thresholds here are an MVP that proves the artifact
- * shape (spec 036 scope note); finer apportionment tuning is spec 037's job.
+ * shape (spec 070 scope note); finer apportionment tuning is spec 037's job.
  *
  * Not wired here: `script.yaml`'s `subProfiles.latin` and the generated
  * `latinProfileOf()` lookup (ucd/generated/scriptLookup.ts) exist so a future

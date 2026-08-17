@@ -74,7 +74,7 @@ const CharactersStep: ComponentType<EditorStepProps> = ({
       context={surveyContext}
       onComplete={(result) => {
         // Commit the three-store ConfirmedAlphabet alongside the flat
-        // confirmedInventory (spec 046 US5): the build-list draft store is
+        // confirmedInventory (spec 071 US5): the build-list draft store is
         // canonical for it; a manual-flow completion leaves the draft empty,
         // so the field stays absent there (additive optional).
         const phaseResult = result as SurveyPhaseResult;

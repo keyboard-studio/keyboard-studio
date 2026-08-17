@@ -73,12 +73,31 @@ const FIXTURE = {
 // (T011). Keep in sync with docs/keyboard-index.md.
 //
 //   Latin     — basic_kbdfr          (fr, Latn)  — also the primary FIXTURE above
-//   Cyrillic  — russian_mnemonic_r   (ru, Cyrl)
+//   Cyrillic  — basic_kbdru          (ru, Cyrl)  — Windows "Russian Basic"
 //   Greek     — basic_kbdhe          (el, Grek)  — Windows Greek "Hellenic" basic
 //   Georgian  — basic_kbdgeo         (ka, Geor)
-//   Armenian  — armenian_mnemonic_r  (hy, Armn)
+//   Armenian  — basic_kbdarme        (hy, Armn)  — Windows "Armenian Eastern Basic"
 //
 // NB: `basic_kbdgr` is GERMAN (Windows "GR" = German), NOT Greek — do not use it.
+//
+// #1439: russian_mnemonic_r/armenian_mnemonic_r previously covered Cyrl/Armn
+// here — both are mnemonic keyboards (phonetic QWERTY remap by design/name,
+// not the &MNEMONICLAYOUT store flag, so no lint can catch this; see the
+// issue's precision note), a style this project doesn't support. Worse, they
+// were the suite's most reliable passes while both `basic_*` rows (the styles
+// this project DOES support) timed out, so the matrix's green signal was
+// carried substantially by keyboards we don't support. Swapped for
+// basic_kbdru/basic_kbdarme (both codec-clean: verified via a direct parse()
+// call — 0 opaque fragments/features, ~164/173 rules each).
+//
+// A sixth, bonus Latn row is added below for Cameroon AZERTY
+// (sil_cameroon_azerty) — a real SIL production keyboard (278 BCP47
+// languages), squarely the kind of keyboard this tool targets, unlike the
+// synthetic basic_kbdfr walk. It also exercises touch-derivation (it ships a
+// .keyman-touch-layout) and gives specs/051-carve-orthography-trim an
+// end-to-end walk: `ɨ` is that spec's own worked example of the `ɨ`/`i`
+// surplus interaction, and is in this keyboard's .kmn for `agq` (Aghem), one
+// of its declared languages.
 // ---------------------------------------------------------------------------
 
 interface ProvenScriptFixture {
@@ -93,67 +112,32 @@ interface ProvenScriptFixture {
 }
 
 const PROVEN_SCRIPT_BASES: ReadonlyArray<ProvenScriptFixture> = [
-  { script: "Latn", baseKeyboardId: "basic_kbdfr",         languageCode: "fr", targetScript: "Latn", charToAdd: "é" },
-  { script: "Cyrl", baseKeyboardId: "russian_mnemonic_r",  languageCode: "ru", targetScript: "Cyrl", charToAdd: "я" },
-  { script: "Grek", baseKeyboardId: "basic_kbdhe",         languageCode: "el", targetScript: "Grek", charToAdd: "ω" },
-  { script: "Geor", baseKeyboardId: "basic_kbdgeo",        languageCode: "ka", targetScript: "Geor", charToAdd: "ქ" },
-  { script: "Armn", baseKeyboardId: "armenian_mnemonic_r", languageCode: "hy", targetScript: "Armn", charToAdd: "ա" },
+  { script: "Latn", baseKeyboardId: "basic_kbdfr",         languageCode: "fr",  targetScript: "Latn", charToAdd: "é" },
+  { script: "Cyrl", baseKeyboardId: "basic_kbdru",         languageCode: "ru",  targetScript: "Cyrl", charToAdd: "я" },
+  { script: "Grek", baseKeyboardId: "basic_kbdhe",         languageCode: "el",  targetScript: "Grek", charToAdd: "ω" },
+  { script: "Geor", baseKeyboardId: "basic_kbdgeo",        languageCode: "ka",  targetScript: "Geor", charToAdd: "ქ" },
+  { script: "Armn", baseKeyboardId: "basic_kbdarme",       languageCode: "hy",  targetScript: "Armn", charToAdd: "ա" },
+  // Bonus row (#1439) — see the header comment above for why this is here
+  // alongside, not instead of, basic_kbdfr's Latn row.
+  { script: "Latn", baseKeyboardId: "sil_cameroon_azerty", languageCode: "agq", targetScript: "Latn", charToAdd: "ɨ" },
 ];
 
 /**
- * Pre-existing 1.4.3 (Contrast Minimum) offenders on the screen this scan
- * actually lands on, excluded by selector with the criterion and reason named
- * inline — the same idiom e2e/tab-roundtrip.spec.ts and
- * e2e/decision-deeplink.spec.ts use (KNOWN_CONTRAST_DEBT). This is spec 056's
- * open tracker debt (specs/056-ada-accessibility/wcag-2.2-aa-tracker.md, 1.4.3
- * is an open `unknown` row), not anything introduced or touched by spec 057 —
- * PhaseB.tsx/CarveGallery.tsx/Rail.tsx are byte-identical to `main` (see
- * specs/057-bulletproof-navigation/evidence/gating-red.md §"Two corrections
- * made to reach a *valid* red").
- *
- * The scan label ("phase B complete") names the INTENT — scan whatever the
- * survey is showing right after Phase B's build-list step finishes — not a
- * literal Phase-B-only screen: per the manifest spine
- * (characters -> marks -> convenience -> carve -> ...), that is legitimately
- * the Carve gallery once the marks/convenience race fix (spec 057 Class-B
- * diagnosis) lets those steps advance properly instead of stalling on
- * Convenience. Moving the scan earlier would not change what's captured — the
- * transition into Carve already happens inside `completePhaseB` itself (via
- * `driveConvenienceStep`), before this call site is even reached — so
- * extending the exclusion list with the SAME carve-gallery debt
- * carve.spec.ts's own KNOWN_CONTRAST_DEBT documents is the honest fix (see
- * specs/057-bulletproof-navigation/reviews/classB-diagnosis.md addendum).
+ * FORMERLY the pre-existing 1.4.3 (Contrast Minimum) offender on the screen
+ * this scan actually lands on (per the manifest spine, legitimately the
+ * Carve gallery — see the retained history in git blame if the "phase B
+ * complete" label seems mismatched). #1477's ground-truth sweep (live axe run
+ * with this list emptied) found every entry it used to carry —
+ * ConvenienceCharsStep's Continue, CarveGallery v1's info-panel toggle (dead
+ * code; CarveGalleryV2 is unconditional), carve-continue, RemovalBanner's
+ * dismiss control, Rail's/GlyphCell's v1-only surfaces — already clean. The
+ * remaining OSK iframe entry is now also fixed at the source
+ * (packages/studio/public/osk-frame.html overrides `.kmw-spacebar-caption`'s
+ * color), so this scan now covers everything the frame renders. Kept as an
+ * empty array — not deleted — so `exclude: KNOWN_CONTRAST_DEBT` below keeps
+ * compiling without a call-site change.
  */
-const KNOWN_CONTRAST_DEBT: readonly string[] = [
-  // 1.4.3 — the OSK iframe renders KeymanWeb's own markup
-  // (.kmw-spacebar-caption), which this repo does not author and cannot
-  // restyle from here.
-  "iframe",
-  // 1.4.3 — ConvenienceCharsStep's "Continue" button.
-  'button[data-testid="convenience-continue"]',
-  // 1.4.3 — CarveGallery's info-panel toggle button.
-  'button[aria-label="Hide info panel"]',
-  // 1.4.3 — CarveGallery's footer "Continue" button.
-  'button[data-testid="carve-continue"]',
-  // 1.4.3 — RemovalBanner's dismiss control (assignLoop/parts/RemovalBanner.tsx).
-  'button[aria-label="Dismiss removal recommendation"]',
-  // 1.4.3 — RemovalBanner's own region (its collapsed-strip text sits on the
-  // green-tinted background at a ratio axe flags).
-  'div[aria-label="Removal recommendation"]',
-  // 1.4.3 — Rail's per-node carve-card buttons (assignLoop/parts/Rail.tsx):
-  // the "kept/total"/per-modifier-breakdown spans, and (for a node the
-  // recognizer grouped into a pattern, e.g. a simple_swap card) the
-  // data-kind="pattern" variant axe sometimes keys its own reported selector
-  // on instead of data-testid — both are the SAME button, excluded here by
-  // the stable testid PREFIX rather than either brittle nth-child span chain.
-  'button[data-testid^="carve-card-"]',
-  // 1.4.3 — GlyphCell's cross-reference tag chips (assignLoop/parts/
-  // GlyphCell.tsx): "<kind> — go to" / "<kind> — N places".
-  'button[aria-label$="go to"]',
-  'button[aria-label$="places"]',
-  // 1.4.3 — Rail's sticky SectionHeader (assignLoop/parts/Rail.tsx).
-  'div[style*="letter-spacing: 0.13em"]',
-];
+const KNOWN_CONTRAST_DEBT: readonly string[] = [];
 
 /** Everything the walk helpers need for one script. FIXTURE (Latin) conforms. */
 interface WalkFixture {
@@ -218,7 +202,7 @@ async function completePhaseB(page: Page, fx: WalkFixture = FIXTURE): Promise<vo
  * (useInventoryCoverageGate) is satisfied before navigateToOutput is called.
  *
  * Every fixture in this file adds a character the base ALREADY produces (é on
- * basic_kbdfr, я on russian_mnemonic_r, etc.) — before the spec 046 marks
+ * basic_kbdfr, я on russian_mnemonic_r, etc.) — before the spec 071 marks
  * series existed, that made lettersToAdd empty and the Output nav link
  * unconditionally reachable straight off Phase B. It no longer is: an
  * accepted marks-series proposal for a decomposable charToAdd promotes its
@@ -272,7 +256,8 @@ test.describe("Track 1 (copy-edit) E2E", () => {
 
     // Accessibility gate (spec 056 FR-003): scan the output screen.
     // 1.4.3 — the Output screen's documented pre-existing contrast debt
-    // (OskModeToggle, SignUpPanel, OSK iframe); see helpers/contrastDebt.ts.
+    // (OskModeToggle, SignUpPanel); see helpers/contrastDebt.ts. The OSK
+    // iframe's own debt is now fixed at the source.
     await expectNoSeriousAxeViolations(page, "output screen (copy-edit walk)", {
       exclude: OUTPUT_SCREEN_DEBT,
     });
@@ -444,7 +429,7 @@ test.describe("spec 034 proven-script walks + publish paths", () => {
   });
 
   // --- T010: Cyrillic end-to-end walk (identity → ZIP), asserting the ZIP compiles.
-  test("T010 [US1]: Cyrillic (russian_mnemonic_r) walks identity → downloadable, compilable ZIP", async ({
+  test("T010 [US1]: Cyrillic (basic_kbdru) walks identity → downloadable, compilable ZIP", async ({
     page,
   }) => {
     const cyrl = PROVEN_SCRIPT_BASES.find((f) => f.script === "Cyrl")!;
@@ -463,7 +448,8 @@ test.describe("spec 034 proven-script walks + publish paths", () => {
     expect(kmn![1].length, ".kmn must be non-empty").toBeGreaterThan(0);
   });
 
-  // --- T011: all five proven scripts reach a downloadable ZIP (FR-011, SC-004).
+  // --- T011: all five proven scripts (FR-011, SC-004), plus a bonus Cameroon
+  // AZERTY Latn case (#1439), reach a downloadable ZIP.
   for (const fx of PROVEN_SCRIPT_BASES) {
     test(`T011 [US1]: ${fx.script} (${fx.baseKeyboardId}) reaches a downloadable ZIP`, async ({
       page,
@@ -618,7 +604,7 @@ test.describe("spec 034 US3 (T028): durable draft survives reload, Back stays co
     await page.getByRole("button", { name: "Back", exact: true }).click();
 
     // ...and the entry before convenience is not Phase B either: the marks
-    // series (`fc2ee650`, spec 046/052) inserted a step between `characters`
+    // series (`fc2ee650`, spec 071/052) inserted a step between `characters`
     // and `convenience`, so the locked spine is
     // `characters -> marks -> convenience -> carve`. FIXTURE.charToAdd ("é")
     // is decomposable-accented, so the marks step genuinely renders on the

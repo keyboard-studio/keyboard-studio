@@ -34,7 +34,7 @@
 //
 // NOT this module's concern — FR-033b re-derivation resilience: `keyEditOverlay`
 // itself round-trips here verbatim (tolerant-read fallback per T058, below), but
-// naming an orphaned operation's LOST CHARACTER (spec 058 FR-033b; contracts/
+// naming an orphaned operation's LOST CHARACTER (spec 063 FR-033b; contracts/
 // key-edit-overlay.md §8) needs the PRIOR touch layout the overlay was authored
 // against — a live, in-session value this snapshot does not retain (a snapshot's
 // `ir`/`baseIr`/`touchLayoutJson`/`keyEditOverlay` are always saved and restored
@@ -120,7 +120,7 @@ export type WorkingCopySnapshot = Omit<
   deletedTouchKeyIds: string[];
   staleSteps: string[];
   /**
-   * Optional (spec 058 T058 / R10.3): a snapshot written before this field
+   * Optional (spec 063 T058 / R10.3): a snapshot written before this field
    * existed has no `keyEditOverlay` key at all. `prepareWorkingCopySnapshot`
    * falls back to an empty log rather than clobbering the store default with
    * `undefined` — same tolerant-read idiom as `deletedTouchKeyIds` above.
@@ -223,11 +223,11 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     baseVfsEntries: serializeBaseVfsEntries(s.baseVfs),
     baseIr: s.baseIr,
     identity: s.identity,
-    // spec 059: plain JSON, so it round-trips with no custom handling. Present
+    // spec 064: plain JSON, so it round-trips with no custom handling. Present
     // here because WorkingCopySnapshot is Omit-derived from WorkingCopyData —
     // the compiler required this line, which is the point of that derivation.
     attribution: s.attribution,
-    // spec 059 D5: both are plain JSON. The override in particular MUST persist —
+    // spec 064 D5: both are plain JSON. The override in particular MUST persist —
     // an author who supplied the original holder should not have to re-enter it
     // after a reload, or the download block would reappear on resume.
     licenseUnparseable: s.licenseUnparseable,
@@ -253,7 +253,7 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     staleSteps: [...s.staleSteps],
     validatorFindings: s.validatorFindings,
     axisFills: s.axisFills,
-    // Both fields are plain JSON-safe data (spec 058 T058) — straight
+    // Both fields are plain JSON-safe data (spec 063 T058) — straight
     // passthrough on write. The read side (prepareWorkingCopySnapshot, below)
     // is the tolerant half: it falls back when a pre-058 snapshot has neither
     // key at all (R10.3).
@@ -289,7 +289,7 @@ export function prepareWorkingCopySnapshot(snapshot: WorkingCopySnapshot): Parti
     baseVfs,
     baseIr: snapshot.baseIr,
     identity: snapshot.identity,
-    // Tolerate snapshots saved before these fields existed (spec 059 landed
+    // Tolerate snapshots saved before these fields existed (spec 064 landed
     // after the durable draft): an absent value must not clobber the store's
     // null default with undefined. `baseHolderOverride` in particular decides
     // whether the download block reappears, so it has to restore as a real null.
@@ -323,47 +323,12 @@ export function prepareWorkingCopySnapshot(snapshot: WorkingCopySnapshot): Parti
     staleSteps: new Set(snapshot.staleSteps),
     validatorFindings: snapshot.validatorFindings,
     axisFills: snapshot.axisFills,
-    // Tolerate snapshots saved before these fields existed (spec 058 T058 /
+    // Tolerate snapshots saved before these fields existed (spec 063 T058 /
     // R10.3): an absent value must not clobber the store defaults with
     // undefined — same idiom as deletedTouchKeyIds/sequenceFlaggedChars above.
     keyEditOverlay: snapshot.keyEditOverlay ?? { ops: [] },
     touchEditorMode: snapshot.touchEditorMode ?? "character",
   };
-}
-
-/**
- * Patch a `WorkingCopySnapshot` directly into the ONE working-copy store
- * (Article III — restore never constructs a second working copy). Composes
- * `prepareWorkingCopySnapshot` (fallible) with a single `setState` (pure), so a
- * throw during preparation never mutates the store.
- *
- * Returns true when applied, false when the snapshot is not a real working
- * copy (instantiationMode null) — the guard the localStorage draft resume
- * (lib/draftAutosave.ts) relies on.
- */
-export function applyWorkingCopySnapshot(snapshot: WorkingCopySnapshot): boolean {
-  if (snapshot.instantiationMode === null) {
-    return false;
-  }
-  useWorkingCopyStore.setState(prepareWorkingCopySnapshot(snapshot));
-  return true;
-}
-
-/**
- * Build a serializable snapshot of the current working copy, or null when there
- * is no real working copy yet (instantiationMode/ir still null — e.g. a survey
- * still on the identity step before a base is picked).
- *
- * Guarded convenience over `snapshotWorkingCopyData` for callers that want the
- * null-on-no-working-copy contract (lib/draftAutosave.ts); callers that guard
- * themselves use `snapshotWorkingCopyData` directly.
- */
-export function captureWorkingCopySnapshot(): WorkingCopySnapshot | null {
-  const s = useWorkingCopyStore.getState();
-  if (s.instantiationMode === null || s.ir === null) {
-    return null;
-  }
-  return snapshotWorkingCopyData();
 }
 
 // ---------------------------------------------------------------------------
@@ -442,7 +407,10 @@ export function rehydrateWorkingCopyFromSession(): boolean {
       return false;
     }
 
-    applyWorkingCopySnapshot(snapshot);
+    // instantiationMode was already checked non-null above — patch directly
+    // into the ONE working-copy store (Article III — restore never
+    // constructs a second working copy).
+    useWorkingCopyStore.setState(prepareWorkingCopySnapshot(snapshot));
 
     return true;
   } catch {

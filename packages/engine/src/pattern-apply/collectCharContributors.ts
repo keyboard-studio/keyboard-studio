@@ -251,6 +251,51 @@ export interface ContributorDescriptor {
   output?: string;
 }
 
+/** The three per-array views {@link sliceContributorDescriptors} slices `descriptors` back into. */
+export interface SlicedContributorDescriptors {
+  ruleDescriptors: ContributorDescriptor[];
+  storeSlotDescriptors: ContributorDescriptor[];
+  blockedDescriptors: ContributorDescriptor[];
+}
+
+/**
+ * Slice a `CharContributors`-shaped record's index-parallel `descriptors`
+ * array back into its three per-array views — one descriptor per
+ * `ruleNodeIds` entry, then one per `storeSlots` entry, then one per
+ * `blocked` entry, in that order (the invariant `descriptors` documents
+ * above). The inverse of the concatenation {@link collectCharContributors}
+ * performs when it builds `descriptors`.
+ *
+ * Single canonical implementation — was previously duplicated (identical
+ * slicing math) in the studio's irToCarveNodes.ts (`mergeCharContributors`,
+ * folding case-pair records) and MechanismGallery.tsx (rendering "existing
+ * methods" rows).
+ *
+ * `descriptors` defensively defaults to `[]` — real `collectCharContributors`
+ * output always includes it, but this also runs over test-double
+ * `CharContributors` fixtures that omit it since those tests never assert on
+ * descriptors.
+ *
+ * @param contributors An object with `ruleNodeIds`/`storeSlots` (only their
+ *   `.length` is used) and the `descriptors` array to slice.
+ */
+export function sliceContributorDescriptors(contributors: {
+  ruleNodeIds: readonly unknown[];
+  storeSlots: readonly unknown[];
+  descriptors?: readonly ContributorDescriptor[];
+}): SlicedContributorDescriptors {
+  const descriptors = contributors.descriptors ?? [];
+  const { ruleNodeIds, storeSlots } = contributors;
+  return {
+    ruleDescriptors: descriptors.slice(0, ruleNodeIds.length),
+    storeSlotDescriptors: descriptors.slice(
+      ruleNodeIds.length,
+      ruleNodeIds.length + storeSlots.length,
+    ),
+    blockedDescriptors: descriptors.slice(ruleNodeIds.length + storeSlots.length),
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers — friendly-name derivation
 // ---------------------------------------------------------------------------

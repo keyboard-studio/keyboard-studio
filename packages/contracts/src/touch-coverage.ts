@@ -33,7 +33,7 @@ export interface TouchCoverageResult {
 }
 
 /**
- * Options for {@link computeTouchCoverage} (spec 058 FR-005/FR-006).
+ * Options for {@link computeTouchCoverage} (spec 063 FR-005/FR-006).
  *
  * Passed as an optional THIRD POSITIONAL argument rather than replacing the
  * signature: this function is public from contracts with four call sites plus its
@@ -64,7 +64,7 @@ export interface TouchCoverageOptions {
  * Key classes from .keyman-touch-layout `sp` that are non-interactive: sp:9
  * (blank) and sp:10 (spacer).
  *
- * CORRECTED from `{8, 10}` (spec 058 FR-012). The upstream `TouchLayoutKeySp`
+ * CORRECTED from `{8, 10}` (spec 063 FR-012). The upstream `TouchLayoutKeySp`
  * enum's tail is `deadkey = 8, blank = 9, spacer = 10` — 8 is a deadkey-STYLED
  * key, which is interactive and can produce output. The old set therefore
  * mishandled both ends of the blank/spacer idiom at once: it treated genuinely
@@ -188,7 +188,7 @@ const ALL_COMBINING_RE = /^[\p{Mn}\p{Mc}\p{Me}]+$/u;
 
 /**
  * The U+25CC-stripped form of a keycap label, or `undefined` when the strip does
- * not apply (spec 058 FR-006).
+ * not apply (spec 063 FR-006).
  *
  * Strips only when, after removing EVERY U+25CC, the remainder is **non-empty**
  * and consists **solely** of combining marks. Each condition is load-bearing:
@@ -310,7 +310,7 @@ export function formatUncoveredTouchMessage(char: string): string {
  *
  * Pure: no mutation of `layout`/`inventory`, no I/O.
  *
- * @param options - Optional and ADDITIVE (spec 058 FR-005). Omitted, the result is
+ * @param options - Optional and ADDITIVE (spec 063 FR-005). Omitted, the result is
  *   byte-identical to the pre-058 two-argument behaviour — that equivalence is
  *   pinned by a regression test, and it is what allowed the four call sites to be
  *   migrated one visible line at a time. All four DID migrate in the same change:

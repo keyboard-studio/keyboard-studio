@@ -1,4 +1,4 @@
-// GesturePanel — spec 061 T041 (FR-026, FR-027).
+// GesturePanel — spec 065 T041 (FR-026, FR-027).
 //
 // No @testing-library/jest-dom — raw DOM assertions, matching this package's
 // convention.

@@ -4,7 +4,7 @@
 //   T028 — manifest-driven SurveyView: forward and back transitions driven by the
 //           manifest step order (identity → choose_base → track → [project_name] →
 //           characters → marks → carve → mechanisms → touch →
-//           help → done). No SurveyStage union. The marks step (spec 046) is
+//           help → done). No SurveyStage union. The marks step (spec 071) is
 //           NOT mocked — the marks-free test alphabet makes its S0 gate
 //           auto-complete without rendering, so walks hop it invisibly.
 //   T029 — no SurveyStage symbol; runtime step order matches manifest; applyStepCompletion
@@ -26,11 +26,10 @@ import { useState, useEffect } from "react";
 import { screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { render } from "./test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
-import { useSurveySessionStore, snapshotTraversal } from "./stores/surveySessionStore.ts";
+import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
 import { useStartOverStore } from "./stores/startOverStore.ts";
 import { useStepWalkStore } from "./stores/stepWalkStore.ts";
 import { consumePendingWelcomeLocation, jumpToLocation } from "./lib/jumpToLocation.ts";
-import { snapshotWorkingCopyData } from "./lib/persistWorkingCopy.ts";
 import type { OnInstantiateCallback, Stage } from "./hooks/useKeyboardArtifact.ts";
 
 // ---------------------------------------------------------------------------
@@ -606,6 +605,8 @@ import {
   draftKey,
   PENDING_PROJECT_KEY,
   AUTOSAVE_DEBOUNCE_MS,
+  setActiveProjectKey,
+  resolveActiveProjectKey,
   type DurableDraft,
 } from "./lib/draftPersistence.ts";
 
@@ -657,7 +658,7 @@ function advanceToB() {
 /**
  * Drive from "identity" to "carve".
  * New order (issue #508): prefill → B → punctuation → carve — phaseB-complete
- * lands on the punctuation page via the marks step's S0 auto-skip (spec 046;
+ * lands on the punctuation page via the marks step's S0 auto-skip (spec 071;
  * marks-free test alphabet); punctuation has no skip gate (zero punctuation is
  * a valid answer), so the walk accepts it empty; convenience then auto-skips.
  *
@@ -1070,32 +1071,30 @@ describe("StudioShell — first-visit gate forces newcomers to welcome", () => {
 // ---------------------------------------------------------------------------
 
 describe("StudioShell — first-visit landing gate", () => {
-  // Seeds the NEW per-project scheme directly (specs/037-my-keyboards), rather
-  // than the legacy `ks.studio.draft` key: this describe block renders the
-  // statically-imported StudioShell (no vi.resetModules()), so the module-init
-  // migrateLegacyDraft() call already ran once for the whole file and will not
-  // re-run per test — a legacy-key seed here would never be adopted. The
-  // "resume draft banner" describe block below (which DOES re-import the
-  // module per test) is what exercises the legacy-key migration path itself.
+  // Seeds the ONE draft engine's scheme (lib/draftPersistence.ts, #1451) —
+  // a `ks.draft.<key>.v1` record plus the `ks.draft.active` pointer —
+  // directly, bypassing saveDraft()'s VR-2 "no real work" guard the same way
+  // the inner describe blocks below do.
   function seedResumableDraft() {
-    const projectKey = "__pending__";
+    const projectKey = PENDING_PROJECT_KEY;
     const savedAt = Date.now();
     localStorage.setItem(
-      `ks.studio.project.${projectKey}`,
+      draftKey(projectKey),
       JSON.stringify({
         version: 1,
         savedAt,
-        survey: { activeStepId: "identity", identityResult: null, scaffoldSpec: null, history: [] },
-        workingCopy: null,
+        projectKey,
+        displayName: null,
+        languageTag: null,
+        // A pending-slot (pre-instantiation) record's workingCopy is always a
+        // full snapshot object with `instantiationMode: null` — never a bare
+        // `null` — mirroring what `snapshotWorkingCopyData()` actually
+        // produces (see loadDraftMeta's/loadDraft's shared VR-2 tolerance).
+        workingCopy: { instantiationMode: null },
+        traversal: { activeStepId: "identity", history: [] },
       }),
     );
-    localStorage.setItem(
-      "ks.studio.projects.index",
-      JSON.stringify([
-        { projectKey, savedAt, activeStepId: "identity", label: null, langTag: null, status: "draft", prUrl: null },
-      ]),
-    );
-    localStorage.setItem("ks.studio.activeProject", projectKey);
+    setActiveProjectKey(projectKey);
   }
 
   it("mounts WelcomeScreen (not the survey) on a first visit with no hash", async () => {
@@ -1224,138 +1223,56 @@ describe("StudioShell — first-visit landing gate", () => {
 });
 
 // ---------------------------------------------------------------------------
-// StudioShell — resume draft banner (ResumeDraftBanner.tsx, lib/draftAutosave.ts).
+// StudioShell — silent boot restore, no local resume banner (#1451).
 //
-// The gap closed here: the "first-visit landing gate" tests above only assert
-// ROUTING (stage-identity present) when a resumable draft exists — none of them
-// assert that the banner itself renders, or that Resume/Discard actually
-// hydrate/clear state. This block does.
+// #1451 consolidated the two draft engines: lib/draftPersistence.ts (silent
+// boot-time restore, `ks.draft.*`) is now the ONE engine, and the second,
+// independently-debounced local engine (lib/draftAutosave.ts, `ks.studio.*`,
+// with its own "Resume?" banner) is retired. `ResumeDraftBanner.tsx` is now
+// offered ONLY for a signed-in author's server-backed cloud draft (a
+// genuinely different browser/device with no local trace) — see the
+// "cloud-restore" tests colocated with that flow; there is nothing left here
+// to seed a LOCAL banner from, because the local resume path never renders
+// one any more, structurally, not just by a suppression guard.
 //
-// Order-dependence hazard (StudioShell.tsx): the resume offer is gated by a
-// MODULE-LEVEL `resumeOfferConsumed` flag that flips to true on the first
-// SurveyView mount of the JS context (StrictMode-safe: read in the lazy
-// useState initializer, flipped in the mount effect so it survives double-
-// invocation). Many tests earlier in this file already mount SurveyView/
-// StudioShell, so by the time this block runs the flag is already true and a
-// plain `render(<StudioShell />)` would never show the banner regardless of
-// whether a draft exists. Each test below uses vi.resetModules() + a fresh
-// dynamic import of StudioShell.tsx to get a pristine module instance (flag
-// unconsumed), exactly like a real page load starting a new JS context. Same
-// technique already used for a different module-level singleton in
-// survey/SurveyRunner.pinChip.test.tsx (see importSurveyRunner() there).
+// Pattern audit (sweep-pattern, invoked before this rewrite): the shape here
+// is "layer-confusion (Layer A emitting style, Layer B blocking compile)" —
+// no, not applicable; the actual class matched is closest to "a second 300ms
+// debounce timer" (two independent engines racing over the same authoring
+// state) per CLAUDE.md's shaped-bug list. Sibling sites swept and fixed in
+// this same change: StudioShell.tsx (banner + both autosave/cloud-sync
+// effects), ResumeDraftBanner.tsx (local-vs-cloud offer), switchActiveProject.ts
+// + CurrentKeyboardIndicator.tsx (the second active-project pointer),
+// serverDraftStore.ts + draftTypes.ts (the second server payload shape),
+// surveySessionStore.ts + persistWorkingCopy.ts (comments/dead exports whose
+// sole caller was the retired engine). One regression test per sibling site
+// was not applicable here (deleting a whole engine removes the site rather
+// than leaving a fixed one behind); the tests below instead lock the
+// resulting invariant — silent restore, no local banner, ever — as a class.
 // ---------------------------------------------------------------------------
 
-describe("StudioShell — resume draft banner", () => {
+describe("StudioShell — silent boot restore (no local resume banner)", () => {
   /**
-   * Seed a well-formed resumable draft. activeStepId defaults to "choose_base"
-   * (not "identity") so a post-Resume hydration is independently observable:
-   * the wizard should show the BaseResolution stage ("stage-base") instead of
-   * staying on the "identity" stage the pre-Resume reset() puts it on.
+   * Mirrors main.tsx's pre-mount silent restore exactly (main.tsx itself
+   * isn't imported by this test file): resolve the active project, then
+   * `loadDraft()` it into the stores, BEFORE StudioShell ever renders.
    */
-  function seedResumableDraft(activeStepId: string = "choose_base") {
-    localStorage.setItem(
-      "ks.studio.draft",
-      JSON.stringify({
-        version: 1,
-        savedAt: Date.now(),
-        survey: { activeStepId, identityResult: null, scaffoldSpec: null, history: [] },
-        // Explicit null (not omitted): applyDraft() only skips
-        // applyWorkingCopySnapshot when this is === null, so an omitted key
-        // (undefined after JSON.parse) would crash it on Resume.
-        workingCopy: null,
-      }),
-    );
+  function seedAndSilentlyRestore(projectKey: string) {
+    const activeKey = resolveActiveProjectKey();
+    expect(activeKey).toBe(projectKey);
+    expect(loadDraft(activeKey!)).toBe(true);
   }
 
-  /** Fresh StudioShell module instance (see order-dependence note above). */
-  async function renderFreshStudioShell() {
-    vi.resetModules();
-    const mod = await import("./StudioShell.tsx");
-    await act(async () => {
-      render(<mod.StudioShell />);
-    });
-  }
-
-  it("renders resume-draft-banner on the survey route when a resumable draft exists", async () => {
-    window.location.hash = "";
-    localStorage.clear();
-    seedResumableDraft();
-
-    await renderFreshStudioShell();
-
-    expect(screen.getByTestId("resume-draft-banner")).toBeTruthy();
-    // Confirms the landing gate (already covered above) and the banner agree.
-    expect(screen.queryByTestId("welcome-screen-root")).toBeNull();
-  });
-
-  it("Resume dismisses the banner and hydrates the survey to the draft's activeStepId", async () => {
-    window.location.hash = "";
-    localStorage.clear();
-    seedResumableDraft(); // draft.survey.activeStepId === "choose_base"
-
-    await renderFreshStudioShell();
-
-    // Pre-Resume: the mount-effect reset() has put the store back on
-    // "identity" (spec: reset does not touch the localStorage draft), and the
-    // banner is offered independently of that reset.
-    expect(screen.getByTestId("stage-identity")).toBeTruthy();
-    expect(screen.getByTestId("resume-draft-banner")).toBeTruthy();
-
-    fireEvent.click(screen.getByTestId("resume-draft"));
-
-    // Banner dismissed.
-    expect(screen.queryByTestId("resume-draft-banner")).toBeNull();
-    // Observable hydration outcome: the wizard now reflects the draft's
-    // activeStepId ("choose_base" -> the BaseResolution stage), not "identity".
-    expect(screen.getByTestId("stage-base")).toBeTruthy();
-    expect(screen.queryByTestId("stage-identity")).toBeNull();
-  });
-
-  it("Discard dismisses the banner and clears the draft from localStorage", async () => {
-    window.location.hash = "";
-    localStorage.clear();
-    seedResumableDraft();
-
-    await renderFreshStudioShell();
-
-    expect(screen.getByTestId("resume-draft-banner")).toBeTruthy();
-    // Migration (module-init migrateLegacyDraft(), re-run fresh here via
-    // vi.resetModules()) has already adopted the legacy draft into the new
-    // per-project scheme by the time StudioShell mounts — the legacy key is
-    // gone, and the project lives under its derived key ("__pending__", since
-    // this seeded draft has no working copy) with the active-project pointer
-    // set to it.
-    expect(localStorage.getItem("ks.studio.draft")).toBeNull();
-    expect(localStorage.getItem("ks.studio.activeProject")).toBe("__pending__");
-    expect(localStorage.getItem("ks.studio.project.__pending__")).not.toBeNull();
-
-    fireEvent.click(screen.getByTestId("discard-draft"));
-
-    // Banner dismissed and the draft is gone: the active project's per-project
-    // record + index row are removed, and the active-project pointer is cleared.
-    expect(screen.queryByTestId("resume-draft-banner")).toBeNull();
-    expect(localStorage.getItem("ks.studio.project.__pending__")).toBeNull();
-    expect(localStorage.getItem("ks.studio.activeProject")).toBeNull();
-    expect(JSON.parse(localStorage.getItem("ks.studio.projects.index") ?? "[]")).toEqual([]);
-    // Discard does not hydrate — the wizard stays on "identity" (untouched).
-    expect(screen.getByTestId("stage-identity")).toBeTruthy();
-  });
-
-  // F1/P1 regression: résumé pre-seeds instantiatedForBaseIdRef with the
-  // restored base id (see StudioShell.tsx handleResumeDraft) so a compile
-  // settle that fires AFTER résumé — for that SAME base — does not re-run
-  // doCommit (no second instantiateFromBaseIfConfirmed call) and, since it
-  // never reaches BaseResolutionAdapter.onConfirm, never pops the rebase
-  // confirm dialog either.
-  it("a pipeline settle for the restored base AFTER résumé does not re-instantiate or confirm", async () => {
+  // F1/P1 regression (was "résumé pre-seeds instantiatedForBaseIdRef"):
+  // the SAME invariant now holds structurally off the silent boot-restore
+  // effect (StudioShell.tsx, the `restoredProjectKey !== null` branch) rather
+  // than off a banner click — a compile-pipeline settle for the
+  // already-restored base must not re-run doCommit (no second
+  // instantiateFromBaseIfConfirmed call) or pop the rebase-confirm dialog.
+  it("a pipeline settle for the silently-restored base does not re-instantiate or confirm", async () => {
     window.location.hash = "";
     localStorage.clear();
 
-    // Build a REAL working-copy + traversal snapshot (base confirmed, exactly
-    // as a session that reached choose_base's commit before the reload) using
-    // the top-level (pre-resetModules) stores, then hand it to the legacy
-    // draft key the same way seedResumableDraft() does above — migrateLegacyDraft()
-    // adopts it into the per-project scheme when the FRESH module loads.
     useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
       vfs: createVirtualFS([]),
       ir: makeTestIR([]),
@@ -1364,27 +1281,23 @@ describe("StudioShell — resume draft banner", () => {
     useSurveySessionStore.getState().setBaseConfirmed(true);
     useSurveySessionStore.getState().advance("choose_base");
 
-    localStorage.setItem(
-      "ks.studio.draft",
-      JSON.stringify({
-        version: 1,
-        savedAt: Date.now(),
-        survey: snapshotTraversal(),
-        workingCopy: snapshotWorkingCopyData(),
-      }),
-    );
+    const projectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
+    expect(projectKey).not.toBeNull();
+    saveDraft(projectKey!);
 
-    // The snapshot is captured — the top-level stores are no longer needed for
-    // this test and must not leak into later tests in this file.
+    // The top-level stores are no longer needed for this test and must not
+    // leak into later tests in this file.
     useWorkingCopyStore.getState().reset();
     useSurveySessionStore.getState().reset();
 
-    await renderFreshStudioShell();
+    seedAndSilentlyRestore(projectKey!);
 
-    expect(screen.getByTestId("resume-draft-banner")).toBeTruthy();
-    fireEvent.click(screen.getByTestId("resume-draft"));
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    // No banner — restored silently. Sanity: the restored base is on screen.
     expect(screen.queryByTestId("resume-draft-banner")).toBeNull();
-    // Sanity: résumé actually restored the base into the fresh store/UI.
     expect(screen.getByTestId("stage-base")).toBeTruthy();
 
     // Simulate the compile pipeline settling AGAIN for the restored base
@@ -1413,29 +1326,25 @@ describe("StudioShell — resume draft banner", () => {
     expect(confirmRebaseToSpy).not.toHaveBeenCalled();
   });
 
-  // F5 regression (docs/design-notes/switch-base-popup-behavior-log.md):
-  // draftPersistence's silent, boot-time restore (main.tsx's loadDraft(),
-  // mirrored explicitly below since main.tsx itself isn't imported by this
-  // test file) must not be followed by a SECOND, competing "Resume" offer
-  // from the OTHER draft engine (lib/draftAutosave.ts, `ks.studio.*`) whose
-  // coarser 1000ms debounce can legitimately lag behind and hold a STALER
-  // step. Before the fix, that second banner rendered unconditionally and,
-  // if resumed, silently regressed the wizard from the freshly-restored
-  // "characters" step back to the OTHER engine's stale "track" snapshot —
-  // exactly the observed F5 symptom (refresh lands 1-2 steps earlier).
-  it("F5: no competing resume-draft-banner — and no step regression — when draftPersistence already silently restored this boot", async () => {
+  // F5-shaped-bug regression, now a structural-impossibility test rather than
+  // a guard test: the retired engine's storage keyspace (`ks.studio.*`) is
+  // simply never read by anything any more. Seeding STALE data there
+  // (mirroring the pre-#1451 "coarser debounce lagging one step behind"
+  // symptom exactly) must have ZERO effect — not "suppressed by a freshness
+  // check", but inert, because there is only one engine and one keyspace left
+  // to read from.
+  it("stale data left behind under the retired engine's storage keyspace has no effect on the silently-restored session", async () => {
     window.location.hash = "";
     localStorage.clear();
 
     // Reach an L4-equivalent position (base confirmed, track chosen, on the
-    // characters/prefill step) via the top-level (pre-resetModules) stores.
+    // characters/prefill step) via the top-level stores.
     useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
       vfs: createVirtualFS([]),
       ir: makeTestIR([]),
     });
     // identityResult must be non-null in the snapshot: the restored
-    // CharactersStep renders null (its prefill guard) without it, which would
-    // fail this test for a reason unrelated to F5.
+    // CharactersStep renders null (its prefill guard) without it.
     useSurveySessionStore.getState().setIdentityResult({
       autonym: "English",
       english: "English",
@@ -1453,14 +1362,13 @@ describe("StudioShell — resume draft banner", () => {
 
     const projectKey = deriveProjectKeyFromWorkingCopy(useWorkingCopyStore.getState());
     expect(projectKey).not.toBeNull();
-    // The FRESH snapshot, via draftPersistence — this is what main.tsx's
+    // The FRESH snapshot, via the ONE engine — this is what main.tsx's
     // silent boot restore will apply.
     saveDraft(projectKey!);
 
-    // Seed a STALER record under the OTHER (draftAutosave) engine's OWN
-    // storage scheme, simulating its coarser debounce never having caught up
-    // past "track" (the exact "stuck one step behind" symptom from the
-    // exploration log).
+    // Stale data under the RETIRED engine's own (now nonexistent-as-code)
+    // storage scheme — nothing reads these keys any more; this is orphaned
+    // data a pre-#1451 build could have left behind, not a live keyspace.
     localStorage.setItem("ks.studio.activeProject", projectKey!);
     localStorage.setItem(
       `ks.studio.project.${projectKey}`,
@@ -1496,23 +1404,16 @@ describe("StudioShell — resume draft banner", () => {
     useWorkingCopyStore.getState().reset();
     useSurveySessionStore.getState().reset();
 
-    vi.resetModules();
-    const mod = await import("./StudioShell.tsx");
-    const draftPersistence = await import("./lib/draftPersistence.ts");
-
-    // Mirror main.tsx's pre-mount silent restore EXACTLY.
-    const activeKey = draftPersistence.resolveActiveProjectKey();
-    expect(activeKey).toBe(projectKey);
-    expect(draftPersistence.loadDraft(activeKey!)).toBe(true);
+    seedAndSilentlyRestore(projectKey!);
 
     await act(async () => {
-      render(<mod.StudioShell />);
+      render(<StudioShell />);
     });
 
-    // No competing banner — the state was already silently restored.
+    // No banner, ever — there is no local-draft offer surface any more.
     expect(screen.queryByTestId("resume-draft-banner")).toBeNull();
     // The correctly-restored step (characters/prefill) is on screen, NOT the
-    // other engine's stale "track" step.
+    // stale "track" step the retired engine's orphaned data names.
     expect(screen.getByTestId("stage-prefill")).toBeTruthy();
     expect(screen.queryByTestId("stage-track")).toBeNull();
   });
@@ -1540,7 +1441,7 @@ describe("F6 wiring: promotePendingAutosave", () => {
       render(<SurveyView baseKeyboard={null} />);
     });
 
-    // L1 progress: identity-complete gives hasPendingProgress() a true reading
+    // L1 progress: identity-complete gives hasMeaningfulProgress() a true reading
     // (identityResult !== null / activeStepId !== "identity").
     fireEvent.click(screen.getByTestId("identity-complete"));
 
@@ -2078,7 +1979,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
     expect(exports).not.toContain("SurveyStage");
   });
 
-  it("manifest spine order is: identity → choose_base → track → characters → marks → punctuation → convenience → carve → mechanisms → touch → help → package (M2, spec 046)", () => {
+  it("manifest spine order is: identity → choose_base → track → characters → marks → punctuation → convenience → carve → mechanisms → touch → help → package (M2, spec 071)", () => {
     // track is now a real manifest step (P0 fix); project_name is spine:false.
     const spineIds = manifest
       .filter((s) => s.spine !== false)
@@ -2163,7 +2064,7 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     fireEvent.click(screen.getByTestId("prefill-confirm"));
     expect(screen.getByTestId("stage-B")).toBeTruthy();
 
-    // → marks (next spine step after characters, spec 046) → punctuation.
+    // → marks (next spine step after characters, spec 071) → punctuation.
     // The test alphabet has no marks, so the S0 gate auto-completes the marks
     // step without rendering; the punctuation page has no gate and renders.
     fireEvent.click(screen.getByTestId("phaseB-complete"));

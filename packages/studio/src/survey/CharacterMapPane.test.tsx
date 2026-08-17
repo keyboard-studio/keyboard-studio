@@ -282,6 +282,28 @@ describe("CharacterMapPane — data path", () => {
     expect(aButtonFinal.getAttribute("aria-pressed")).toBe("false");
   });
 
+  // #1589/#1596 sibling: the screen-reader announcement must be one full
+  // catalog sentence, not a translated action word spliced with raw char/
+  // codepoint data via template literal outside any t()/Trans call.
+  it("announces toggling a cell as one full catalog sentence, not an assembled fragment", async () => {
+    seedBaseAndLanguage();
+    render(<CharacterMapPane />);
+
+    await waitFor(() => {
+      expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
+    });
+    const latinGroup = screen.getByLabelText("Latin characters (main)");
+    const aButton = within(latinGroup).getByRole("button", { name: /Add a \(U\+0061\)/ });
+
+    fireEvent.click(aButton);
+    // Includes describeContribution's suffix — "a" is a plain base letter,
+    // so this pick registers as an addedBases contribution.
+    expect(screen.getByText("Added a (U+0061) — a added to Letters")).toBeTruthy();
+
+    fireEvent.click(within(latinGroup).getByRole("button", { name: /Remove a \(U\+0061\)/ }));
+    expect(screen.getByText("Removed a (U+0061)")).toBeTruthy();
+  });
+
   it("hides uppercase letters of a cased script, showing only the lowercase (spec 047)", async () => {
     seedBaseAndLanguage();
     getGroupsResult.set([
@@ -496,6 +518,10 @@ describe("CharacterMapPane — raw code point entry", () => {
 
     expect(usePhaseBDraftStore.getState().chars).toContain("A");
     expect((input as HTMLInputElement).value).toBe("");
+    // #1589/#1596 sibling: one full catalog sentence, not a translated
+    // "Added" word spliced with raw char/codepoint data. Includes
+    // describeContribution's suffix — "A" is a plain base letter.
+    expect(screen.getByText("Added A (U+0041) — A added to Letters")).toBeTruthy();
   });
 
   it("accepts liberal hex forms (bare hex, lowercase u+) — canonical parser drops the 0x form", async () => {
@@ -569,7 +595,7 @@ describe("CharacterMapPane — raw code point entry", () => {
     expect(usePhaseBDraftStore.getState().chars).toEqual([]);
   });
 
-  it("allows a PUA code point after the role prompt (the escape hatch's whole point, spec 046 FR-004)", async () => {
+  it("allows a PUA code point after the role prompt (the escape hatch's whole point, spec 071 FR-004)", async () => {
     seedBaseAndLanguage();
     render(<CharacterMapPane />);
     await waitFor(() => {
@@ -586,6 +612,9 @@ describe("CharacterMapPane — raw code point entry", () => {
     fireEvent.click(screen.getByTestId("pua-role-letter"));
 
     expect(usePhaseBDraftStore.getState().chars).toContain("\u{E000}");
+    // #1589/#1596 sibling: this announcement was previously hardcoded
+    // English with no t() call at all — now a real catalog sentence.
+    expect(screen.getByText("Added \u{E000} (U+E000) as a letter")).toBeTruthy();
   });
 
   it("PUA answered 'mark' lands in the Marks store with a permanent declared role (US6 AC2)", async () => {
@@ -604,6 +633,7 @@ describe("CharacterMapPane — raw code point entry", () => {
     expect(state.marks).toContain("\u{E001}");
     expect(state.bases).not.toContain("\u{E001}");
     expect(state.declaredRoles["\u{E001}"]).toBe("mark");
+    expect(screen.getByText("Added \u{E001} (U+E001) as a mark")).toBeTruthy();
   });
 
   it("PUA answered 'letter' lands in the Letters store and never in Marks (US6 AC3)", async () => {
