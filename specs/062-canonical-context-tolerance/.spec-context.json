@@ -1,0 +1,318 @@
+{
+  "workflow": "speckit",
+  "specName": "Canonical Context Tolerance",
+  "branch": "",
+  "currentStep": "implement",
+  "status": "implementing",
+  "history": [
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-17T14:47:15.145Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T15:40:47.746Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T15:40:48.189Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T15:40:49.093Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-17T15:48:59.311Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T16:23:33.468Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-17T16:35:07.474Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T16:37:26.818Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T16:37:53.521Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T16:37:53.950Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T16:48:42.224Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T16:48:42.674Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T17:17:00.367Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T17:17:01.104Z"
+    }
+  ],
+  "telemetryInstanceId": "283c710c-c3db-42f5-b0ca-886172c2fb80",
+  "approach": "Diagnose via a simulator-seeded both-forms comparison (new SimulatorContextSeed param), generate context variants from the already-built nfcPostureOfInventory per-pair table following the mark-guards.ts idempotent-generator pattern, and route the diagnostic through Layer C as a precomputed ToleranceReport so keyboard-lint never imports the engine. Propose/preview/confirm reuses the existing facet-transform seam; write-back policy is a new field on DiscoveryAxisVector.",
+  "decisions": [
+    {
+      "decision": "Simulator gains an optional third SimulatorContextSeed parameter (text/caretPos/pendingDeadkeys) rather than a parallel entry point",
+      "why": "Smallest change that unblocks every Story 1/2/4 acceptance test; existing callers pass undefined and are byte-for-byte unaffected",
+      "rejected": "A separate simulateFromSeed() entry point"
+    },
+    {
+      "decision": "Context-tolerance diagnostic computed engine-side, threaded into keyboard-lint Layer C as a precomputed ToleranceReport input",
+      "why": "FR-002 requires simulator-based behavioural comparison, but keyboard-lint is dependency-cruiser-forbidden from importing packages/engine; the existing lintContext.ts pattern already gates checks on precomputed inputs like inventory/touchLayout",
+      "rejected": "Relaxing the lint-not-to-engine rule, or moving the whole diagnostic into the unimplemented Layer B style layer"
+    },
+    {
+      "decision": "Reuse nfcPostureOfInventory as-is for the per-pair table; do not consolidate mark-guards.ts buildUnwrap or the blocking-rule generator onto it",
+      "why": "Those are shipped, tested spec-071 code with their own blast radius; spec 062 only needs to be a well-behaved fifth caller",
+      "rejected": "Consolidating all four/five consumers onto one call site in this feature"
+    },
+    {
+      "decision": "Store-pairing safety reuses analyzeStores/pairSets from applyStoreSlotRemovals.ts before adding decomposed store members",
+      "why": "Identical hazard to the one that module already solves (mutating one half of an index()-paired store); reimplementing the pairing graph risks drift",
+      "rejected": "A fresh, narrower pairing check scoped only to decomposed-member insertion"
+    },
+    {
+      "decision": "IR mutation follows the mark-guards.ts idempotent-generator pattern (name-prefix markers, ir-insert.ts placement helpers)",
+      "why": "Only existing precedent for generating rules/store-members into an IR idempotently without a byte-identical round-trip test to lean on",
+      "rejected": "Splicing generated variants into raw .kmn text (forbidden by Constitution Article II)"
+    },
+    {
+      "decision": "Propose/preview/confirm reuses the facet-transform seam (propose.ts/verify.ts, useFacetTransform.ts, FacetTransformPanel output-diff branch); write-back policy stored as a new optional field on DiscoveryAxisVector",
+      "why": "output-diff branch already implements FR-008 consequence disclosure; DiscoveryAxisVector is the existing mechanism for a per-keyboard binary author choice, picked up automatically by draftPersistence.ts generic snapshot",
+      "rejected": "A new standalone settings bag; a bespoke preview UI"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Plan complete: simulator seeding + engine-computed tolerance report threaded into Layer C + facet-transform-seam propose/confirm for context variants",
+      "key_finding": "keyboard-lint cannot import packages/engine (dependency-cruiser lint-not-to-engine), so the FR-002 simulator comparison must be computed engine-side and threaded into Layer C as precomputed data, not invoked live from keyboard-lint"
+    },
+    "tasks": {
+      "summary": "25 tasks across 7 phases (3 setup + 4 foundational + 4 US1 + 4 US2 + 4 US3 + 2 US4 + 4 polish); US1 is MVP scope"
+    }
+  },
+  "coverage": {
+    "FR-001": {
+      "tasks": [
+        "T006",
+        "T007"
+      ],
+      "tests": [
+        "packages/engine/src/simulator/simulate.test.ts"
+      ]
+    },
+    "FR-002": {
+      "tasks": [
+        "T006",
+        "T007"
+      ],
+      "tests": [
+        "packages/engine/src/validator/context-tolerance.test.ts"
+      ]
+    },
+    "FR-003": {
+      "tasks": [
+        "T008",
+        "T009"
+      ]
+    },
+    "FR-004": {
+      "tasks": [
+        "T004",
+        "T005",
+        "T008",
+        "T010"
+      ]
+    },
+    "FR-005": {
+      "tasks": [
+        "T008"
+      ]
+    },
+    "FR-006": {
+      "tasks": [
+        "T008"
+      ]
+    },
+    "FR-007": {
+      "tasks": [
+        "T003",
+        "T016",
+        "T017",
+        "T018"
+      ]
+    },
+    "FR-008": {
+      "tasks": [
+        "T017",
+        "T018"
+      ]
+    },
+    "FR-009": {
+      "tasks": [
+        "T008",
+        "T009"
+      ]
+    },
+    "FR-010": {
+      "tasks": [
+        "T006",
+        "T008"
+      ]
+    },
+    "FR-011": {
+      "tasks": [
+        "T008",
+        "T022"
+      ]
+    },
+    "FR-012": {
+      "tasks": [
+        "T012",
+        "T013"
+      ]
+    },
+    "FR-013": {
+      "tasks": [
+        "T002",
+        "T006",
+        "T012"
+      ]
+    },
+    "FR-014": {
+      "tasks": [
+        "T020",
+        "T021"
+      ]
+    }
+  },
+  "currentTask": "T007",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Added SimulatorContextSeed (text/caretPos/pendingDeadkeys) to contracts, reusing DeadkeySnapshot",
+      "files": [
+        "packages/contracts/src/simulation.ts"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Created toleranceReport.ts (ToleranceStatus/RuleToleranceFinding/ToleranceReport) and exported from index.ts",
+      "files": [
+        "packages/contracts/src/toleranceReport.ts",
+        "packages/contracts/src/index.ts"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Added optional contextToleranceWriteBack field to DiscoveryAxisVector; confirmed no full-shape zod mirror exists to update",
+      "files": [
+        "packages/contracts/src/axes.ts"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Added optional SimulatorContextSeed third parameter to simulate(); fixed a caps-sync resetContext ordering bug so seeded deadkeys survive the first keystroke",
+      "files": [
+        "packages/engine/src/simulator/index.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Added seeding tests (text/caretPos/pendingDeadkeys) plus a no-seed regression case; all 7 simulate.test.ts tests pass",
+      "files": [
+        "packages/engine/src/simulator/simulate.test.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Implemented computeContextTolerance: static per-rule resolution (plus-split, store-pairing safety, candidate/key resolution) plus a lazy behavioural simulate() comparison only for rules that need it; added reverseUsLayoutKey built live from the vendored engine's own mnemonic mapping",
+      "files": [
+        "packages/engine/src/validator/context-tolerance.ts",
+        "packages/engine/src/simulator/reverseUsLayout.ts"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Added 5 tests covering diagnosed gap, already-tolerant, opaque fragment, unresolved index() pairing, and the SC-006 invariant; all pass",
+      "files": [
+        "packages/engine/src/validator/context-tolerance.test.ts"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "simulator context seeding",
+      "command": "npx vitest run src/simulator/simulate.test.ts",
+      "result": "7 passed"
+    },
+    {
+      "what": "context-tolerance diagnostic + full simulator/validator/pattern-apply suite",
+      "command": "npx vitest run src/simulator src/validator src/pattern-apply",
+      "result": "56 files / 1305 tests passed"
+    }
+  ]
+}
