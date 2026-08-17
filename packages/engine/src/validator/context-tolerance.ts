@@ -18,7 +18,6 @@ import type {
   CompileResult,
   ContextElement,
   IRRule,
-  IRStore,
   KeyboardIR,
   RuleToleranceFinding,
   SimKeyInput,
@@ -32,7 +31,7 @@ import { analyzeStores } from '../pattern-apply/applyStoreSlotRemovals.js';
 import { simulate } from '../simulator/index.js';
 import { reverseUsLayoutKey } from '../simulator/reverseUsLayout.js';
 
-type KeyResolution = { key: SimKeyInput } | { reason: string };
+export type KeyResolution = { key: SimKeyInput } | { reason: string };
 
 const VKEY_MODIFIER_MAP: Record<string, SimKeyInput['modifiers'][number] | undefined> = {
   SHIFT: 'shift',
@@ -65,8 +64,13 @@ function resolveVkeyModifiers(modifiers: string[]): { modifiers: SimKeyInput['mo
   return caps === undefined ? { modifiers: out } : { modifiers: out, caps };
 }
 
-/** Resolve the single element after a rule's `+` separator into a pressable key. */
-function resolveKeyPart(keyPart: ContextElement[], stores: Map<string, IRStore>): KeyResolution {
+/**
+ * Resolve the single element after a rule's `+` separator into a pressable
+ * key. Exported so `pattern-apply/context-variants.ts` (T008) can resolve the
+ * same rule the same way when generating a fix — the diagnosis and the
+ * generator must never disagree about what "this rule's key" means.
+ */
+export function resolveKeyPart(keyPart: ContextElement[], storeChars: Map<string, string[]>): KeyResolution {
   if (keyPart.length !== 1) {
     return { reason: 'compound key part (more than one element after "+") not analysed' };
   }
@@ -82,33 +86,169 @@ function resolveKeyPart(keyPart: ContextElement[], stores: Map<string, IRStore>)
     return { key };
   }
   if (el.kind === 'any') {
-    const store = stores.get(el.storeRef);
-    const first = store?.items.find((i) => i.kind === 'char');
-    if (!first || first.kind !== 'char') return { reason: `key store "${el.storeRef}" has no character items` };
-    const key = reverseUsLayoutKey(first.value);
-    if (!key) return { reason: `no US-layout key produces character "${first.value}"` };
+    const first = storeChars.get(el.storeRef)?.[0];
+    if (first === undefined) return { reason: `key store "${el.storeRef}" has no character items` };
+    const key = reverseUsLayoutKey(first);
+    if (!key) return { reason: `no US-layout key produces character "${first}"` };
     return { key };
   }
   return { reason: `key element kind "${el.kind}" not analysed` };
 }
 
-type CandidatesResolution = { chars: string[] } | { reason: string };
+export type CandidatesResolution = { chars: string[] } | { reason: string };
 
-/** Resolve the single preceding-context element (before `+`) into candidate literal characters. */
-function resolveContextCandidates(el: ContextElement, stores: Map<string, IRStore>): CandidatesResolution {
+/**
+ * Resolve the single preceding-context element (before `+`) into candidate
+ * literal characters. Exported for the same reason as {@link resolveKeyPart}.
+ */
+export function resolveContextCandidates(
+  el: ContextElement,
+  storeChars: Map<string, string[]>,
+): CandidatesResolution {
   if (el.kind === 'char') return { chars: [el.value] };
   if (el.kind === 'any') {
-    const store = stores.get(el.storeRef);
-    if (!store) return { reason: `store "${el.storeRef}" not found` };
-    const chars = store.items.filter((i) => i.kind === 'char').map((i) => i.value);
+    const chars = storeChars.get(el.storeRef);
+    if (chars === undefined) return { reason: `store "${el.storeRef}" not found` };
     if (chars.length === 0) return { reason: `store "${el.storeRef}" has no character items` };
     return { chars };
   }
   return { reason: `preceding-context element kind "${el.kind}" not analysed` };
 }
 
+/**
+ * Extract the ordered `outs(name)` references from a raw store-declaration
+ * line (`store(name) outs(a) outs(b) ...`), or `null` if the value contains
+ * anything other than a pure sequence of `outs()` references (a mixed
+ * outs()+literal store is left unresolved rather than guessed at).
+ */
+function extractPureOutsRefs(sourceText: string): string[] | null {
+  const afterName = sourceText.trim().replace(/^store\s*\([^)]*\)\s*/i, '');
+  if (afterName.length === 0) return null;
+  const tokens = afterName.split(/\s+/).filter((t) => t.length > 0);
+  const refs: string[] = [];
+  for (const tok of tokens) {
+    const m = /^outs\(\s*([^)]+?)\s*\)$/i.exec(tok);
+    if (!m) return null;
+    refs.push(m[1]!);
+  }
+  return refs;
+}
+
+/**
+ * Build a name -> character-list index covering every store the codec
+ * modelled directly, PLUS every store whose only reason for being an opaque
+ * `RawKmnFragment` is that its declaration is a pure `outs(a) outs(b) ...`
+ * sequence (a very common compaction in real keyboards — e.g. `sil_yoruba8`'s
+ * `not.act`/`act.all` tables) — resolved by textually re-parsing that one
+ * fragment's source line and recursively resolving each referenced store, in
+ * declaration order (order preservation matters: `index(store, N)` and the
+ * uniform-position pairing between two `outs()`-built stores both depend on
+ * it). A store this cannot resolve (mixed content, unresolvable reference, a
+ * cycle) is simply absent from the returned map — callers already treat an
+ * absent store as "not found", the same conservative fallback as any other
+ * unresolvable reference.
+ */
+export function buildStoreCharIndex(ir: KeyboardIR): Map<string, string[]> {
+  const index = new Map<string, string[]>();
+  for (const store of ir.stores) {
+    index.set(
+      store.name,
+      store.items.filter((i) => i.kind === 'char').map((i) => i.value),
+    );
+  }
+
+  const outsFragmentByName = new Map<string, string>();
+  for (const frag of ir.raw) {
+    if (frag.reason !== 'outs-expansion') continue;
+    const m = /^store\s*\(\s*([^)]+?)\s*\)/i.exec(frag.sourceText.trim());
+    if (m) outsFragmentByName.set(m[1]!, frag.sourceText);
+  }
+
+  const resolving = new Set<string>();
+  function resolve(name: string): string[] | undefined {
+    const already = index.get(name);
+    if (already !== undefined) return already;
+    if (resolving.has(name)) return undefined; // cycle guard
+    const src = outsFragmentByName.get(name);
+    if (src === undefined) return undefined;
+    const refs = extractPureOutsRefs(src);
+    if (refs === null) return undefined;
+    resolving.add(name);
+    const parts: string[] = [];
+    for (const ref of refs) {
+      const sub = resolve(ref);
+      if (sub === undefined) {
+        resolving.delete(name);
+        return undefined;
+      }
+      parts.push(...sub);
+    }
+    resolving.delete(name);
+    index.set(name, parts);
+    return parts;
+  }
+  for (const name of outsFragmentByName.keys()) resolve(name);
+
+  return index;
+}
+
 function locationFor(ir: KeyboardIR, rule: IRRule) {
   return { file: ir.header.keyboardId, line: rule.sourceLine ?? 0 };
+}
+
+/**
+ * Adjust an IR's header-only stores before compiling purely for behavioural
+ * simulation, never for any output the caller keeps:
+ *
+ * - Drops `&BITMAP` / `&VISUALKEYBOARD` directives (e.g. `sil_yoruba8.ico`,
+ *   `sil_yoruba8.kvks`). This module never has the referenced binary asset
+ *   available, and kmc-kmn validates the referenced file's actual content (a
+ *   placeholder empty file still fails as "cannot open ... for reading").
+ * - Forces `&TARGETS` to include `any` so kmc-kmn always emits a `.js`
+ *   (KeymanWeb) artifact — `simulate()`'s only input. A real keyboard
+ *   declaring `&TARGETS 'desktop'` (e.g. `sil_yoruba8`, predating
+ *   KeymanWeb-first authoring) would otherwise compile with no `.js` at all,
+ *   and the behavioural comparison this whole feature depends on cannot run
+ *   without one.
+ *
+ * Neither the diagnostic nor the generator ever returns this adjusted copy
+ * to its caller; it exists only to produce a `CompileResult` for
+ * `simulate()`.
+ */
+export function stripAssetStoresForCompile(ir: KeyboardIR): KeyboardIR {
+  const stores = ir.stores
+    .filter((s) => s.name.toUpperCase() !== 'BITMAP' && s.name.toUpperCase() !== 'VISUALKEYBOARD')
+    .map((s) =>
+      s.name.toUpperCase() === 'TARGETS'
+        ? { ...s, items: [...'any'].map((ch) => ({ kind: 'char' as const, value: ch })) }
+        : s,
+    );
+  return { ...ir, stores };
+}
+
+/**
+ * Split a rule's context at its `+` separator into preceding context and key
+ * part. Returns `undefined` for match/nomatch rules (no textual context at
+ * all). A bare rule with no preceding context at all (e.g. `+ ']' > ...`) is
+ * parsed with no `+` element and a single-element `context` — mirrored here
+ * exactly as `applyStoreSlotRemovals.ts`'s `isEditOnlyTriggerRule` already
+ * treats it, so the two modules never disagree about what "this rule's key"
+ * means. Exported for the same reason as {@link resolveKeyPart}.
+ */
+export function splitRuleAtPlus(
+  rule: IRRule,
+): { before: ContextElement[]; keyPart: ContextElement[] } | undefined {
+  if (rule.matchKind !== undefined) return undefined;
+  const plusIdx = rule.context.findIndex(isPlusSeparator);
+  if (plusIdx !== -1) {
+    return { before: rule.context.slice(0, plusIdx), keyPart: rule.context.slice(plusIdx + 1) };
+  }
+  // No `+` at all: a bare single-element rule has no preceding context and
+  // its sole element IS the key. Anything else with no `+` cannot be split.
+  if (rule.context.length === 1) {
+    return { before: [], keyPart: rule.context };
+  }
+  return undefined;
 }
 
 /** A rule that needs the behavioural simulate() comparison to reach a verdict. */
@@ -130,23 +270,17 @@ type StaticResolution = { finding: RuleToleranceFinding } | { pending: PendingSi
 function resolveRuleStatically(
   ir: KeyboardIR,
   rule: IRRule,
-  stores: Map<string, IRStore>,
+  storeChars: Map<string, string[]>,
   storeAnalysis: ReturnType<typeof analyzeStores>,
 ): StaticResolution {
   const base = { ruleId: rule.nodeId, location: locationFor(ir, rule) };
 
-  // match/nomatch group-transition rules have no textual context at all.
-  if (rule.matchKind !== undefined) {
+  const split = splitRuleAtPlus(rule);
+  if (split === undefined) {
+    // match/nomatch group-transition rules have no textual context at all.
     return { finding: { ...base, status: 'tolerant' } };
   }
-
-  const plusIdx = rule.context.findIndex(isPlusSeparator);
-  if (plusIdx === -1) {
-    return { finding: { ...base, status: 'tolerant' } };
-  }
-
-  const before = rule.context.slice(0, plusIdx);
-  const keyPart = rule.context.slice(plusIdx + 1);
+  const { before, keyPart } = split;
 
   if (before.length === 0) {
     // No preceding context — nothing for normalization to disagree about.
@@ -197,12 +331,12 @@ function resolveRuleStatically(
     }
   }
 
-  const candidateResolution = resolveContextCandidates(beforeEl, stores);
+  const candidateResolution = resolveContextCandidates(beforeEl, storeChars);
   if ('reason' in candidateResolution) {
     return { finding: { ...base, status: 'not-analysed', notAnalysedReason: candidateResolution.reason } };
   }
 
-  const keyResolution = resolveKeyPart(keyPart, stores);
+  const keyResolution = resolveKeyPart(keyPart, storeChars);
   if ('reason' in keyResolution) {
     return { finding: { ...base, status: 'not-analysed', notAnalysedReason: keyResolution.reason } };
   }
@@ -248,19 +382,19 @@ function simulatePending(compiled: CompileResult, pending: PendingSimulation): R
  * success. Asserts the SC-006 invariant itself before returning.
  */
 export async function computeContextTolerance(ir: KeyboardIR): Promise<ToleranceReport> {
-  const stores = new Map(ir.stores.map((s) => [s.name, s]));
+  const storeChars = buildStoreCharIndex(ir);
   const storeAnalysis = analyzeStores(ir);
   const totalRuleCount = ir.groups.reduce((n, g) => n + g.rules.length, 0) + ir.raw.length;
 
   const resolutions = ir.groups.flatMap((group) =>
-    group.rules.map((rule) => resolveRuleStatically(ir, rule, stores, storeAnalysis)),
+    group.rules.map((rule) => resolveRuleStatically(ir, rule, storeChars, storeAnalysis)),
   );
   const anyPending = resolutions.some((r) => 'pending' in r);
 
   let compiled: CompileResult | undefined;
   if (anyPending) {
     const vfs = createVirtualFS([
-      { path: `source/${ir.header.keyboardId}.kmn`, content: emit(ir), isBinary: false },
+      { path: `source/${ir.header.keyboardId}.kmn`, content: emit(stripAssetStoresForCompile(ir)), isBinary: false },
     ]);
     compiled = await compile(vfs, ir.header.keyboardId);
   }

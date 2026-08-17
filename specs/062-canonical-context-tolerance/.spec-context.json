@@ -109,6 +109,30 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-17T17:17:01.104Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T17:48:59.158Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T17:48:59.559Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-17T17:48:59.986Z"
     }
   ],
   "telemetryInstanceId": "283c710c-c3db-42f5-b0ca-886172c2fb80",
@@ -177,6 +201,9 @@
       "tasks": [
         "T008",
         "T009"
+      ],
+      "tests": [
+        "packages/engine/src/pattern-apply/context-variants.test.ts"
       ]
     },
     "FR-004": {
@@ -185,16 +212,26 @@
         "T005",
         "T008",
         "T010"
+      ],
+      "tests": [
+        "packages/engine/src/pattern-apply/context-variants.test.ts"
       ]
     },
     "FR-005": {
       "tasks": [
         "T008"
+      ],
+      "tests": [
+        "packages/engine/src/pattern-apply/context-variants.ts (normalize NFD/NFC)"
       ]
     },
     "FR-006": {
       "tasks": [
         "T008"
+      ],
+      "tests": [
+        "packages/engine/src/pattern-apply/context-variants.ts (decomposition-based",
+        "no Unicode property)"
       ]
     },
     "FR-007": {
@@ -215,18 +252,28 @@
       "tasks": [
         "T008",
         "T009"
+      ],
+      "tests": [
+        "packages/engine/src/pattern-apply/context-variants.test.ts (pure IR->IR",
+        "no silent write)"
       ]
     },
     "FR-010": {
       "tasks": [
         "T006",
         "T008"
+      ],
+      "tests": [
+        "packages/engine/src/pattern-apply/context-variants.test.ts"
       ]
     },
     "FR-011": {
       "tasks": [
         "T008",
         "T022"
+      ],
+      "tests": [
+        "packages/engine/src/pattern-apply/context-variants.test.ts"
       ]
     },
     "FR-012": {
@@ -240,6 +287,9 @@
         "T002",
         "T006",
         "T012"
+      ],
+      "tests": [
+        "packages/engine/src/pattern-apply/context-variants.sil-yoruba8.test.ts"
       ]
     },
     "FR-014": {
@@ -249,7 +299,7 @@
       ]
     }
   },
-  "currentTask": "T007",
+  "currentTask": "T011",
   "task_summaries": {
     "T001": {
       "status": "DONE",
@@ -301,6 +351,29 @@
       "files": [
         "packages/engine/src/validator/context-tolerance.test.ts"
       ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Implemented proposeContextVariants: added-rule generator with idempotent naming, fallback-preemption placement, and a buildStoreCharIndex that resolves outs()-compacted stores + a stripAssetStoresForCompile helper for BITMAP/VISUALKEYBOARD/TARGETS",
+      "files": [
+        "packages/engine/src/pattern-apply/context-variants.ts",
+        "packages/engine/src/validator/context-tolerance.ts",
+        "packages/contracts/src/toleranceReport.ts"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Added 7 tests: gap fix + decomposed parity, precomposed byte-identity, fallback preemption, idempotency, opaque-rule and pairing-unsafe non-mutation, no-op on clean report",
+      "files": [
+        "packages/engine/src/pattern-apply/context-variants.test.ts"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Corpus canary against the real sil_yoruba8.kmn proves SC-004 directly: decomposed a+grave + acute key produces the acute, never the bare fallback mark",
+      "files": [
+        "packages/engine/src/pattern-apply/context-variants.sil-yoruba8.test.ts"
+      ]
     }
   },
   "verified": [
@@ -313,6 +386,11 @@
       "what": "context-tolerance diagnostic + full simulator/validator/pattern-apply suite",
       "command": "npx vitest run src/simulator src/validator src/pattern-apply",
       "result": "56 files / 1305 tests passed"
+    },
+    {
+      "what": "full engine suite after US1 (context-variants generator)",
+      "command": "pnpm --filter @keyboard-studio/engine test",
+      "result": "3114 passed, 2 pre-existing unrelated failures (sldr-fetch + recognizer flake), 2 skipped"
     }
   ]
 }

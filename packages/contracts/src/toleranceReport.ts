@@ -64,3 +64,27 @@ export interface ToleranceReport {
    */
   notAnalysedCount: number;
 }
+
+/**
+ * A proposed IR mutation that makes one rule canonically-equivalence
+ * tolerant — never applied without confirmation (FR-009).
+ *
+ * Producer: `packages/engine/src/pattern-apply/context-variants.ts`.
+ */
+export interface ContextVariant {
+  /** The rule this variant makes tolerant. */
+  sourceRuleId: string;
+  /** Which mutation shape was used. Only `"added-rule"` is generated today — see the producer's module doc. */
+  kind: "added-rule" | "added-store-members";
+  /**
+   * The idempotency name-prefix checked before insertion — a re-run
+   * recognizes and replaces rather than duplicates (FR-011).
+   */
+  generatedMarker: string;
+  /**
+   * Set when the source rule has an existing unaccompanied-key fallback
+   * (spec Story 1 Acceptance Scenario 3) — the placement invariant the
+   * generator must honor so the tolerant rule wins over the fallback.
+   */
+  precedesFallbackRuleId?: string;
+}
