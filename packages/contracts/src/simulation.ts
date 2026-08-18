@@ -27,6 +27,24 @@ export interface DeadkeySnapshot {
 }
 
 /**
+ * Optional seed for `simulate()`'s starting context — lets a keystroke
+ * sequence begin from a non-empty buffer instead of today's implicit empty
+ * one. Omitting this parameter entirely reproduces today's behaviour
+ * byte-for-byte.
+ */
+export interface SimulatorContextSeed {
+  /** Initial buffer contents. Default `""` (today's behaviour, unchanged). */
+  text?: string;
+  /** Default: end of `text`. */
+  caretPos?: number;
+  /**
+   * Reuses {@link DeadkeySnapshot} rather than a new shape. Inserted after
+   * the context reset clears deadkey state, at each snapshot's `position`.
+   */
+  pendingDeadkeys?: DeadkeySnapshot[];
+}
+
+/**
  * Trace entry produced after processing one key event.
  *
  * `outputAfter` is the full text-store contents after this keystroke (not

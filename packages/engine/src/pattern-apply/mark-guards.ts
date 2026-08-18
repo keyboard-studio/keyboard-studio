@@ -33,6 +33,9 @@ import type {
 // touch-rule synthesis (spec 063) — see ir-insert.ts's module doc for why they
 // are not private to this module any more.
 import { entryGroupOf, insertBeforeTerminalRules } from "./ir-insert.js";
+// The composed-unit -> one-mark-shorter pairing is shared with spec 062 US4's
+// backspace-unwrap generator — see mark-decomposition.ts's module doc.
+import { oneMarkShorterPair, type OneMarkShorterPair } from "./mark-decomposition.js";
 
 export const MARKS_GUARD_GROUP = "generated_marks_guard";
 export const MARKS_UNWRAP_FROM_STORE = "generated_marks_unwrap_from";
@@ -99,21 +102,17 @@ function buildUnwrap(
 ): { stores: IRStore[]; rule: IRRule } | null {
   if (outputForm !== "ready-made") return null;
   // Composed units: single code point with a canonical mark decomposition.
-  const pairs: { from: string; to: string }[] = [];
-  for (const unit of worklist.ownLetterUnits) {
-    if ([...unit].length !== 1) continue;
-    const nfd = [...unit.normalize("NFD")];
-    if (nfd.length < 2) continue;
-    // One-mark-shorter predecessor, re-composed (é̂ -> é -> e).
-    const to = nfd.slice(0, -1).join("").normalize("NFC");
-    pairs.push({ from: unit, to });
-  }
+  // One-mark-shorter predecessor, re-composed (é̂ -> é -> e) — shared with
+  // context-variants.ts's addBackspaceUnwrap (spec 062 US4).
+  const pairs = [...worklist.ownLetterUnits]
+    .map((unit) => oneMarkShorterPair(unit))
+    .filter((p): p is OneMarkShorterPair => p !== undefined);
   if (pairs.length === 0) return null;
   const stores: IRStore[] = [
     {
       nodeId: "gen-marks-unwrap-from",
       name: MARKS_UNWRAP_FROM_STORE,
-      items: pairs.map((p) => ({ kind: "char" as const, value: p.from })),
+      items: pairs.map((p) => ({ kind: "char" as const, value: p.unit })),
       isSystem: false,
     },
     {

@@ -771,6 +771,14 @@
       "decisions": [],
       "notes": ""
     },
+    "specs/062-canonical-context-tolerance": {
+      "title": "Feature Specification: Canonical-equivalence context tolerance",
+      "hash": "sha256:2dcbb535f9285319",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
     "specs/065-touch-editor-parity": {
       "title": "Feature Specification: Touch key editor — Developer-parity remodel",
       "hash": "sha256:66616374bb15da85",

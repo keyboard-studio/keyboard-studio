@@ -204,3 +204,207 @@ Three further blockers, which are the honest reason this has sat since 2020:
   is taken to cover their rule processors, since they embed it.
 - The Keyman checkout is recent but is not necessarily today's `master`. Issue
   data was queried live and is current as of this document's date.
+
+---
+
+## Phase 0 — Design research (this plan)
+
+Everything above is the campaign-facing analysis of the engine-side
+alternative and is **not** what this plan implements. This section is the
+[plan.md](plan.md) Phase 0 record for the source-level feature that *is*
+being built — kept in this file rather than a second `research.md` because
+this filename is already the one [spec.md](spec.md) links to for "research."
+
+### Decision: reuse `nfcPostureOfInventory` as-is; do not consolidate its siblings
+
+**Decision**: The context-variant generator calls the already-built
+`nfcPostureOfInventory` / `aggregateInventoryPosture`
+(`packages/engine/src/marks/nfc-posture-of-inventory.ts`, shipped by spec 071)
+directly for its per-pair table. It does not refactor `mark-guards.ts`'s
+`buildUnwrap()` or the blocking-rule generator to route through the same
+function, even though both currently reimplement equivalent
+`.normalize("NFD"/"NFC")` logic independently.
+
+**Rationale**: The mark-composition model's "fifth consumer" framing already
+treats the function as shared infrastructure other consumers *should* use;
+spec 062 only needs to be a well-behaved fifth caller, not the change that
+finally consolidates the other four. Touching `buildUnwrap()`'s independent
+normalize logic is a refactor with its own blast radius (spec 071 is shipped
+and tested) and is out of this feature's stated scope.
+
+**Alternatives considered**: Consolidating all consumers onto one call site
+was considered and rejected as scope creep — flagged here so a future cleanup
+pass has the pointer, not silently dropped.
+
+**Amendment (implementation time, km-lead review cycle)**: this decision's
+premise did not survive contact with the actual generator. `nfcPostureOfInventory`
+takes a `ConfirmedAlphabet`, a survey-confirmed, studio-side structure — neither
+`proposeContextVariants` nor `addBackspaceUnwrap` (spec 062's actual call sites,
+which must run over an ARBITRARY `KeyboardIR`, including an imported keyboard
+with no confirmed alphabet at all — `sil_yoruba8` itself) has one available.
+Both instead compute the same NFD/NFC relationship directly via the very
+`String.prototype.normalize` mechanism the NEXT decision below already
+endorses for a different reason. Spec 062 is therefore NOT the "fifth
+consumer" this decision predicted — see `nfc-posture-of-inventory.ts`'s own
+module doc and `context-variants.ts`'s module doc for the as-shipped account,
+and `mark-guards.ts`'s `buildUnwrap()` vs. `context-variants.ts`'s
+`addBackspaceUnwrap()` for the resulting (now three-way, not two-way)
+duplication this decision explicitly declined to consolidate. That duplication
+is tracked as a follow-up in tasks.md's Notes section, not silently dropped.
+
+### Decision: canonical ordering and decomposability via `String.prototype.normalize`, no CCC table
+
+**Decision**: FR-005 (canonical mark ordering) and FR-006 (decomposability
+decided by decomposition, not Unicode property, for PUA correctness) are both
+satisfied by the JS runtime's built-in `normalize("NFD")` / `normalize("NFC")`
+— already the only mechanism used anywhere in this codebase for
+decomposition (`confirmedAlphabet.ts`, `character-discovery/decompose.ts`,
+`mark-guards.ts`). No combining-class data table is introduced.
+
+**Rationale**: `normalize()` resolves canonical ordering and decomposability
+internally per the Unicode canonical decomposition algorithm, independent of
+general-category or script properties, which is exactly what makes it
+PUA-safe (a PUA mark has no `\p{M}` property but still decomposes correctly
+if it has a canonical decomposition — and if it has none, `normalize()` is a
+no-op, which is the correct "not decomposable" answer). This matches the
+codebase's known, previously-flagged gap (no CCC table) and closes it the
+same way existing code already does, rather than opening a new gap.
+
+**Alternatives considered**: Hand-rolling a combining-class table was
+rejected — it's the gap this repo has flagged twice already and `normalize()`
+already does the job without it.
+
+### Decision: simulator context seeding — additive third parameter
+
+**Decision**: `simulate(compiled: CompileResult, keys: SimKeyInput[])` in
+`packages/engine/src/simulator/index.ts` gains an optional third parameter:
+
+```ts
+export interface SimulatorContextSeed {
+  text?: string;
+  caretPos?: number;
+  pendingDeadkeys?: DeadkeySnapshot[]; // reuses contracts/simulation.ts DeadkeySnapshot
+}
+
+export function simulate(
+  compiled: CompileResult,
+  keys: SimKeyInput[],
+  initialContext?: SimulatorContextSeed,
+): SimulationResult
+```
+
+Implementation is localized to `index.ts:182-185`, where context is
+constructed today via `new SyntheticTextStore()` (empty) and
+`processor.resetContext(textStore)`. The vendored `SyntheticTextStore`
+constructor already accepts `(text?, selStart?, selEnd?)`, and
+`TextStore.insertDeadkeyBeforeCaret(id)` already exists — but
+`resetContext()` unconditionally clears deadkeys, so seeded deadkeys must be
+inserted *after* `resetContext()`, positioning the caret at each seed
+position via `setSelection` before each insert, then restoring the caret to
+`initialContext?.caretPos ?? text.length`.
+
+**Rationale**: This is the smallest change that unblocks every Story 1/2/4
+acceptance test (per the spec's own Dependencies note that this must be the
+first task). Reusing the existing `DeadkeySnapshot` contract type instead of
+inventing a new deadkey shape keeps the simulator's public surface
+consistent with what callers already produce elsewhere. `runPatternTests`
+(the existing `Pattern.tests` runner) passes `undefined` and is byte-for-byte
+unaffected — satisfying FR-004/SC-002 by construction, not by a follow-up
+regression check.
+
+**Alternatives considered**: A separate `simulateFromSeed()` entry point was
+considered and rejected — it would duplicate the whole function body for one
+optional parameter, and every existing caller would need to choose between
+two near-identical APIs.
+
+### Decision: diagnostic computed in-engine, threaded into Layer C as precomputed data
+
+See the Constitution Check Complexity Tracking table in [plan.md](plan.md)
+for the full rationale. Summary: `packages/engine/src/validator/context-tolerance.ts`
+runs the both-forms simulator comparison and produces a contracts-only
+`ToleranceReport`; `keyboard-lint`'s new check receives that report as a new
+precomputed input (alongside the existing `inventory`/`touchLayout` inputs
+in `lintContext.ts`) and only classifies it into `LintFinding[]`. `keyboard-lint`
+never imports `packages/engine`, so the `lint-not-to-engine` dependency-cruiser
+rule is untouched.
+
+### Decision: store-pairing safety reuses `analyzeStores`, does not reimplement it
+
+**Decision**: Before adding decomposed members to a store, the generator
+calls `analyzeStores(ir)` (`packages/engine/src/pattern-apply/applyStoreSlotRemovals.ts`)
+and checks the target store's membership in `StoreAnalysis.pairSets` /
+`unresolvedIndexOutputNames`. A store paired via `index()` with a *different*
+store, or one with an unresolved pairing, is treated the same way that module
+already treats it for slot removal: conservative, fail-closed, reported as
+not-analysed rather than silently mutated.
+
+**Rationale**: This is exactly the detection the spec's "Stores used with
+paired `index()`" edge case calls for, and the mechanism already exists,
+tested, for a structurally identical hazard (mutating one half of a paired
+store). Reimplementing the pairing graph a second time would be pure
+duplication of tested logic.
+
+**Alternatives considered**: A fresh, narrower pairing check scoped only to
+decomposed-member-insertion was considered and rejected — the existing
+`pairSets`/`unresolvedIndexOutputNames` shape already generalizes correctly
+to "would this addition break the pairing," and a second implementation is
+one more place the two could silently drift apart.
+
+### Decision: IR mutation follows the `mark-guards.ts` idempotent-generator pattern
+
+**Decision**: The context-variant generator (`pattern-apply/context-variants.ts`)
+mirrors `mark-guards.ts`'s `applyMarkGuards`: pure IR→IR, rebuilds groups via
+spread rather than mutating shared rule objects, names every generated
+rule/store with a recognizable prefix (e.g. `generated_tolerance_*`) so a
+re-run recognizes and replaces rather than duplicates (FR-011 idempotency),
+and uses the existing `ir-insert.ts` helpers (`entryGroupOf`,
+`insertBeforeTerminalRules`) to place generated rules before any terminal
+`match`/`nomatch` rule in a group **and** before the existing fallback rule a
+variant is meant to preempt (e.g. `sil_yoruba8`'s `+ ']' > '´'`) — ordering is
+what makes Acceptance Scenario 3 of Story 1 hold (the accent rule fires, the
+fallback does not).
+
+**Rationale**: This is the only precedent in the codebase for "generate new
+rules/store-members into an IR, idempotently, without a hand-authored
+byte-identical round-trip test to lean on" — `roundtrip.test.ts` only covers
+parse→emit fidelity with no mutation in between, so the mutate-then-emit test
+shape must follow the `pattern-apply` suites' convention (build IR in memory,
+run the mutator, assert on the result, then separately emit+reparse to
+confirm the compiled `.kmn` is well-formed), not `roundtrip.test.ts` itself.
+
+**Alternatives considered**: Generating variants as raw `.kmn` text spliced
+into the emitted output was rejected outright — Article II of the
+constitution forbids mutating anything but the typed IR.
+
+### Decision: propose/preview/confirm follows the facet-transform seam; write-back policy lives on `DiscoveryAxisVector`
+
+**Decision**: Applying generated context variants, and disclosing FR-008's
+consequence when the write-back policy would rewrite untyped characters,
+reuses the existing `packages/engine/src/facet-transform` propose/verify
+pipeline and the studio's `useFacetTransform.ts` hook / `FacetTransformPanel.tsx`
+UI — specifically its `output-diff` preview branch, which already renders an
+explicit "output will change — review before confirming" warning. The
+write-back policy itself (FR-007: echo vs. own-form, default echo) is stored
+as a new optional field on `DiscoveryAxisVector`
+(`packages/contracts/src/axes.ts`), set via the existing `setIrAxes`/
+`setAxisFills` actions — not a new settings bag.
+
+**Rationale**: `FacetTransformPanel`'s per-site `UserDisposition` (partial
+accept) shape matches this feature's need to report rules as tolerant / made
+tolerant / not-analysed without an all-or-nothing commit, and its `output-diff`
+branch already implements the exact disclosure FR-008 requires, so this is
+reuse rather than new UI. `DiscoveryAxisVector` is the existing mechanism for
+a per-keyboard binary author choice that steers generation, and because
+`WorkingCopyData` is derived generically from `WorkingCopyState`,
+`draftPersistence.ts`'s snapshot/restore needs no new wiring for the new
+field.
+
+**Alternatives considered**: The lighter single-shot `ProposalBanner` pattern
+(`SiblingAccentProposalBanner.tsx`) was considered for the context-variant
+proposal itself, since it's simpler than a full facet transform. Rejected for
+the *initial* proposal step (FR-010 requires per-rule not-analysed reporting,
+which needs the heavier per-site disposition shape) but left as the candidate
+shape if Phase 1 design finds the write-back-policy toggle alone (independent
+of the variant proposal) is simple enough to warrant its own lighter banner
+— a call deferred to [data-model.md](data-model.md) / task breakdown, not
+decided here.
