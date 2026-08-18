@@ -1,0 +1,347 @@
+{
+  "workflow": "companion",
+  "specName": "069-step-model-gates",
+  "branch": "069-step-model-gates",
+  "selectedAt": "2026-08-17T18:21:48.078Z",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-17T23:53:55.942Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-17T23:54:01.546Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T00:00:19.264Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T00:01:06.821Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T00:03:06.404Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-18T00:22:59.860Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T00:25:22.369Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-18T00:38:52.967Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T00:40:06.739Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T00:40:07.162Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T00:40:30.883Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T00:40:31.198Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T00:40:50.777Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T00:51:50.035Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T00:51:50.402Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T00:51:50.772Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T00:52:08.663Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-18T00:52:09.103Z"
+    }
+  ],
+  "telemetryInstanceId": "30abfd2d-3da3-43f6-8d21-902b7d9d7289",
+  "approach": "Gate three already-mostly-true invariants: add Constitution Principle IX (verbatim FR-001 text), upgrade registry.test.ts to an exact-count assertion re-verified at 114 (not the spec's stale 101), and add a manifest-resolution test plus a scoped depcruiser rule (StudioShell.tsx + StepHost.tsx only) guarding against direct editors/ imports. No production code changes — StepHost.tsx already mediates all editor rendering.",
+  "decisions": [
+    {
+      "decision": "Gate FR-002 at the re-verified count of 114, not the spec's stale 101",
+      "why": "registry.reserve.ts (31 modules) did not exist when spec.md was written 2026-07-06; gating on 101 would fail CI on the first run for an unrelated reason",
+      "rejected": "keep 101 as literally specified and let CI discover the drift"
+    },
+    {
+      "decision": "Scope the new depcruiser rule to StudioShell.tsx + components/StepHost.tsx only",
+      "why": "a blanket components/ -> editors/ ban breaks OutputScreen.tsx's legitimate import of ScaffoldForm/TrackOneIdentityPanel from editors/panels/",
+      "rejected": "a folder-level rule on components/, or scoping to StudioShell.tsx alone (leaves StepHost.tsx, the actual mount point, unguarded)"
+    },
+    {
+      "decision": "Source-guard test matches the editors/ import path, not a Gallery|Panel name grep",
+      "why": "the spec's literal grep false-positives on the legitimate UnfinishedGalleryIndicator import in StudioShell.tsx",
+      "rejected": "the spec's literal grep -n import.*Gallery|import.*Panel command"
+    },
+    {
+      "decision": "Reuse existing StepHost.tsx as FR-006's mediating layer; build no new registry/step-host runtime",
+      "why": "StepHost.tsx (spec 028 Stage 5) already resolves manifest step to component; FR-006 explicitly forbids building a second one",
+      "rejected": "a standalone resolveStepComponent() function per FR-003's literal example"
+    },
+    {
+      "decision": "Wrote FR-002 gate against the re-verified 114-module count (9+49+22+3+31), not the specs stale 2026-07-06 count of 101",
+      "why": "A fifth sub-registry (registry.reserve.ts, 31 modules) was added to the codebase after the spec was written; plan.md and research.md already flagged this and directed implementation to gate the current true count rather than the stale spec figure, consistent with the Assumptions sections re-verification clause",
+      "rejected": "Gating at the spec-literal 101 count, which would have made the new test fail immediately on a correct, unrelated codebase"
+    },
+    {
+      "decision": "Added a sibling describe block for StepHost.tsx source-guard (FR-004) rather than folding it into the existing SC-004 StudioShell.tsx block",
+      "why": "The existing SC-004 block already declares src via a single readFileSync at describe-scope for StudioShell.tsx only; introducing a second file read of a different path into the same block would conflate two distinct source strings under one src variable name, which is confusing rather than reusing structure cleanly",
+      "rejected": "Renaming the existing blocks variable and threading two sources through one describe body"
+    },
+    {
+      "decision": "FR-003 resolution test iterates manifest and emits one it() per step (parameterized by step.id/kind) rather than a single it() looping all steps",
+      "why": "A per-step it() gives a distinct failing test name naming the orphaned step id, which is faster to diagnose than one aggregate assertion failing on the first bad entry in a loop",
+      "rejected": "A single it() with a for-loop and one expect per iteration, matching the literal data-model.md phrasing more directly"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Plan complete: constitution Principle IX + exact-count registry gate (114) + manifest-resolution test + scoped depcruiser rule, all as regression guards over an already-compliant codebase",
+      "key_finding": "StudioShell.tsx and StepHost.tsx already have zero direct editors/ imports (spec 028 Stage 5 pre-built the mediating layer); this feature only needs to gate that fact, not build new plumbing"
+    },
+    "tasks": {
+      "summary": "9 tasks across 3 independent user-story phases (constitution, registry count, manifest+depcruiser) + Polish; no Setup/Foundational phase needed"
+    },
+    "implement": {
+      "summary": "Landed all three step-model gates as a pure regression guard: Constitution Principle IX, registry.test.ts exact-count (114) gate, and manifest resolution + renderer no-editor-import guards (vitest + depcruise) — zero production code touched, per plan.md"
+    }
+  },
+  "coverage": {
+    "FR-001": {
+      "title": "Add Core Principle IX to constitution.md prohibiting user-facing survey surfaces outside the step manifest",
+      "tasks": [
+        "T001"
+      ],
+      "tests": [
+        "N/A (prose constitution amendment — no automated test; enforced procedurally by /speckit-plan Constitution Check per data-model.md)"
+      ]
+    },
+    "FR-002": {
+      "title": "registry.test.ts must assert exact questionRegistry count (re-verified 114), failing on drift",
+      "tasks": [
+        "T002"
+      ],
+      "tests": [
+        "packages/studio/src/survey/questions/registry.test.ts::has exactly the verified inventory of 114 entries"
+      ]
+    },
+    "FR-003": {
+      "title": "Every manifest step id must resolve to a registered renderer component or fail the build",
+      "tasks": [
+        "T003"
+      ],
+      "tests": [
+        "packages/studio/src/steps/manifest.test.ts::FR-003 — every manifest step id resolves to a registered component"
+      ]
+    },
+    "FR-004": {
+      "title": "Depcruiser must enforce that the renderer (StudioShell/StepHost) never imports editors/ directly",
+      "tasks": [
+        "T004",
+        "T005"
+      ],
+      "tests": [
+        "packages/studio/src/steps/manifest.test.ts::StudioShell.tsx has no import from an editors/ path",
+        "packages/studio/src/steps/manifest.test.ts::StepHost.tsx has no import from an editors/ path",
+        ".dependency-cruiser.cjs::renderer-no-direct-editor-import"
+      ]
+    },
+    "FR-005": {
+      "title": "Non-goal: no gallery-step decomposition or modular flow migration in this feature"
+    },
+    "FR-006": {
+      "title": "Non-goal: no new step-host/registry runtime built; only the seam is enforced (StepHost.tsx already fills it)",
+      "tasks": [
+        "T003",
+        "T004"
+      ]
+    },
+    "FR-007": {
+      "title": "Non-goal: manifest.ts, steps/types.ts, and the keyboardIR contract structure are unchanged"
+    },
+    "FR-008": {
+      "title": "Non-goal: no contracts bump, no zod schema changes; Step type stays internal to studio"
+    }
+  },
+  "currentTask": "T009",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Added Core Principle IX to constitution.md; bumped Articles I-VIII to I-IX cross-ref; bumped Last Amended date",
+      "files": [
+        ".specify/memory/constitution.md"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Replaced > 0 assertion with exact-count 114 assertion + breakdown comment",
+      "files": [
+        "packages/studio/src/survey/questions/registry.test.ts"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Added FR-003 describe block asserting every manifest step resolves to a registered component/questionRegistry entry",
+      "files": [
+        "packages/studio/src/steps/manifest.test.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Added renderer-no-direct-editor-import forbidden rule to depcruiser config",
+      "files": [
+        ".dependency-cruiser.cjs"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Extended SC-004 block with editors/ import source-guard for StudioShell.tsx; added sibling FR-004 block for StepHost.tsx",
+      "files": [
+        "packages/studio/src/steps/manifest.test.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Ran pnpm typecheck repo-wide: all 7 packages Done, zero errors"
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Ran studio test suite: registry.test.ts + manifest.test.ts both pass (73/73); full suite has 26 pre-existing failures in i18n.test.ts/theme.test.ts (Node 26 jsdom localStorage shadow, unrelated to this feature)",
+      "files": [
+        "packages/studio/src/survey/questions/registry.test.ts",
+        "packages/studio/src/steps/manifest.test.ts"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Ran pnpm depcruise: no dependency violations found (1100 modules, 3931 dependencies cruised), renderer-no-direct-editor-import rule enforced",
+      "files": [
+        ".dependency-cruiser.cjs"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Cross-checked SC-001..SC-007: constitution Principle IX verbatim (SC-001), registry exact-count 114 gate (SC-002), FR-003 resolution test passing (SC-003), zero direct editors/ imports in StudioShell.tsx/StepHost.tsx confirmed by grep (SC-004), depcruise green with new rule (SC-005), typecheck+studio suite green modulo 2 pre-existing unrelated failures (SC-006), 114-module inventory documented inline in registry.test.ts comment (SC-007)"
+    }
+  },
+  "verified": [
+    {
+      "what": "repo-wide typecheck",
+      "command": "pnpm typecheck",
+      "result": "all 7 workspace packages Done, zero errors",
+      "warnings": []
+    },
+    {
+      "what": "gated test files pass in isolation",
+      "command": "pnpm --filter @keyboard-studio/studio test src/survey/questions/registry.test.ts src/steps/manifest.test.ts",
+      "result": "2 files, 73/73 tests passed",
+      "warnings": []
+    },
+    {
+      "what": "full studio suite regression check",
+      "command": "pnpm --filter @keyboard-studio/studio test",
+      "result": "414/440 files passed; 26 failing files are all in src/lib/i18n.test.ts and src/lib/theme.test.ts",
+      "warnings": [
+        "i18n.test.ts and theme.test.ts fail locally due to a known pre-existing Node 26 / jsdom localStorage shadowing issue unrelated to this feature (memory: node26-localstorage-jsdom-shadow); CI runs Node 22 and is green"
+      ]
+    },
+    {
+      "what": "depcruise boundary check",
+      "command": "pnpm depcruise",
+      "result": "no dependency violations found (1100 modules, 3931 dependencies cruised); renderer-no-direct-editor-import rule active"
+    },
+    {
+      "what": "zero direct editors/ imports confirmed by direct grep (independent of the new vitest guard)",
+      "command": "grep -n \"from .*editors/\" packages/studio/src/StudioShell.tsx packages/studio/src/components/StepHost.tsx",
+      "result": "no matches (exit 1) — SC-004 satisfied"
+    }
+  ],
+  "last_action": "All 9 tasks done — typecheck clean, gated tests 73/73 pass, depcruise green; full suite has 2 pre-existing unrelated local failures (Node26/jsdom localStorage)"
+}

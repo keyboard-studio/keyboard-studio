@@ -11,8 +11,11 @@ import { describe, it, expect } from "vitest";
 import { questionRegistry } from "./registry.ts";
 
 describe("questionRegistry", () => {
-  it("has at least one entry", () => {
-    expect(Object.keys(questionRegistry).length).toBeGreaterThan(0);
+  // 9 Phase A + 49 Phase B + 22 Phase F + 3 Phase G + 31 Reserve = 114 total
+  // (re-verified 2026-08-17; spec 069 FR-002 — update this count in the same
+  // change that adds or removes a questionRegistry entry).
+  it("has exactly the verified inventory of 114 entries", () => {
+    expect(Object.keys(questionRegistry).length).toBe(114);
   });
 
   it("no entry has a 'default' key (namespace-import leak guard)", () => {

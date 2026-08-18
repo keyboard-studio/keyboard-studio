@@ -15,6 +15,7 @@ import { describe, it, expect } from "vitest";
 import { manifest } from "./manifest.ts";
 import type { Step } from "./types.ts";
 import { assertUniqueIds } from "./types.test.ts";
+import { questionRegistry } from "../survey/questions/registry.ts";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -45,6 +46,28 @@ function assertStepOrder(
   expect(idxB).toBeGreaterThanOrEqual(0);
   expect(idxA).toBeLessThan(idxB);
 }
+
+// ---------------------------------------------------------------------------
+// FR-003 — every manifest step id resolves to a registered component
+//
+// editor-step -> step.component must be a resolved function (not undefined).
+// question-step -> step.questionId must resolve in questionRegistry. No
+// question-step entries exist in the manifest today, but the union type
+// supports it (steps/types.ts); this guard covers the branch TypeScript's
+// structural typing cannot: a runtime registry lookup.
+// ---------------------------------------------------------------------------
+
+describe("FR-003 — every manifest step id resolves to a registered component", () => {
+  for (const step of manifest) {
+    it(`"${step.id}" (${step.kind}) resolves to a registered component`, () => {
+      if (step.kind === "editor-step") {
+        expect(typeof step.component).toBe("function");
+      } else if (step.kind === "question-step") {
+        expect(questionRegistry[step.questionId]).toBeDefined();
+      }
+    });
+  }
+});
 
 // ---------------------------------------------------------------------------
 // M5 — unique ids (precondition for all other assertions)
@@ -397,6 +420,7 @@ import { fileURLToPath } from "node:url";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const STUDIO_SHELL_PATH = join(__dirname, "..", "StudioShell.tsx");
+const STEP_HOST_PATH = join(__dirname, "..", "components", "StepHost.tsx");
 
 describe("SC-004 — StudioShell.tsx has no per-step render branches or completion handlers", () => {
   let src: string;
@@ -420,5 +444,17 @@ describe("SC-004 — StudioShell.tsx has no per-step render branches or completi
 
   it('"handleProjectNameNext" is absent from StudioShell.tsx (deleted by Stage 5)', () => {
     expect(src).not.toContain("handleProjectNameNext");
+  });
+
+  it("StudioShell.tsx has no import from an editors/ path (FR-004)", () => {
+    expect(src).not.toMatch(/from ["'][^"']*\/editors\//);
+  });
+});
+
+describe("FR-004 — components/StepHost.tsx has no direct editors/ import", () => {
+  const stepHostSrc = readFileSync(STEP_HOST_PATH, "utf-8");
+
+  it("StepHost.tsx has no import from an editors/ path", () => {
+    expect(stepHostSrc).not.toMatch(/from ["'][^"']*\/editors\//);
   });
 });
