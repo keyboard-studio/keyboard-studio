@@ -1,0 +1,577 @@
+{
+  "workflow": "companion",
+  "specName": "068-langtags-defaults",
+  "branch": "068-langtags-defaults",
+  "selectedAt": "2026-08-17T18:21:51.581Z",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-18T01:17:58.880Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-18T01:17:58.892Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:24:54.442Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:25:00.991Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:25:05.256Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:25:09.511Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:25:13.769Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:25:17.684Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:25:21.235Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:25:40.689Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:25:43.563Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:25:46.178Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:25:48.752Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:25:51.575Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:25:53.372Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:25:54.580Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:37:27.897Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:37:29.533Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:37:32.321Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:37:35.363Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:37:38.918Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:37:40.710Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:37:44.527Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:37:48.726Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:38:26.656Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:38:33.174Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:38:35.856Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:56:39.059Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:56:39.595Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:56:40.176Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T01:56:40.757Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-18T01:56:46.660Z"
+    }
+  ],
+  "telemetryInstanceId": "376de734-0a7a-4ae0-9cb2-4d88346420a7",
+  "currentTask": "T029",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Verified scripts/langtags-version.json pins commit 99b856b + real SHA-256 (already shipped in PR #913)",
+      "files": [
+        "scripts/langtags-version.json"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Verified packages/engine/data/langtags/ has LICENSE (MIT+SIL notice) and .gitignore excluding the raw JSON",
+      "files": [
+        "packages/engine/data/langtags/LICENSE",
+        "packages/engine/data/langtags/.gitignore"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Verified scripts/fetch-langtags.mjs downloads+SHA256-verifies+writes SOURCES.json, mirroring fetch-kmcmplib.mjs",
+      "files": [
+        "scripts/fetch-langtags.mjs"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Verified scripts/langtags-version.json carries the real computed SHA-256 (not a placeholder)",
+      "files": [
+        "scripts/langtags-version.json"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Verified scripts/codegen-langtags.mjs derives the slim index per research.md D4 (bare-subtag full-tag defaults, dual-keying, deterministic output)",
+      "files": [
+        "scripts/codegen-langtags.mjs"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Verified fetch-langtags/codegen-langtags npm scripts exist and are chained into root prebuild before other codegen steps",
+      "files": [
+        "package.json"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Verified LanguageDefaults/LanguageSummary/LangtagsProvenance (+ RegionVariant) types in packages/contracts/src/langtags.ts, exported from the contracts barrel",
+      "files": [
+        "packages/contracts/src/langtags.ts",
+        "packages/contracts/src/index.ts"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Verified packages/engine/src/langtags/index.ts implements getLanguageDefaults/listLanguages/lookupByName per the contract",
+      "files": [
+        "packages/engine/src/langtags/index.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Verified engine package.json exposes ./langtags subpath export (mirrors ./placement); tsc -b emits dist/langtags/",
+      "files": [
+        "packages/engine/package.json"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Ran pnpm --filter @keyboard-studio/engine test src/langtags -- C1-C9 contract tests all pass (24/24 tests, 2 files)",
+      "files": [
+        "packages/engine/src/langtags/index.test.ts"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Verified codegen-determinism.test.ts asserts byte-identical repeat codegen output; included in the 24 passing tests",
+      "files": [
+        "packages/engine/src/langtags/codegen-determinism.test.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Verified packages/studio/src/lib/langtagsDefaults.ts lazily imports the engine slim index (separate chunk) with searchLanguages/defaultsFor/scriptToTargetOption",
+      "files": [
+        "packages/studio/src/lib/langtagsDefaults.ts"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Verified QuestionField.tsx resolves @langtags_iso639 (and the extended @langtags_names) via the shared LangtagsComboboxField, replacing the not-loaded stub, with free-text escape",
+      "files": [
+        "packages/studio/src/survey/QuestionField.tsx"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Verified il_language_code.ts is an autocomplete with options_source @langtags_iso639, required:false, free-text fallback, fixtures present",
+      "files": [
+        "packages/studio/src/survey/questions/a/il_language_code.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Verified IdentityLite.tsx captures the resolved langtags entry (onEntryResolved) and seeds il_target_script via scriptToTargetOption(defaultScript)",
+      "files": [
+        "packages/studio/src/survey/IdentityLite.tsx"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "Verified getSeedProvenance flows through SurveyRunner.tsx and renders the langtags caption; author edits are never overwritten (seed only fires for unset fields)",
+      "files": [
+        "packages/studio/src/survey/SurveyRunner.tsx",
+        "packages/studio/src/survey/IdentityLite.tsx"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Verified script/region seeding is proposal-only: buildTargetBcp47/normalizeTargetScript still read the author's confirmed answer, romanization/IPA/other overrides unaffected",
+      "files": [
+        "packages/studio/src/survey/IdentityLite.tsx"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "Verified question-module fixtures + SurveyRunner tests cover seed + provenance caption rendering and override-wins behavior (extended further by specs/030)",
+      "files": [
+        "packages/studio/src/survey/questions/a/il_language_code.ts",
+        "packages/studio/src/survey/SurveyRunner.test.tsx"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "Verified autonym/English-name seeding from defaultsFor(code).localNames/englishNames in IdentityLite.tsx, editable with langtags caption, author precedence preserved",
+      "files": [
+        "packages/studio/src/survey/IdentityLite.tsx"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Verified il_language_region.ts (region question) seeds from resolved regionVariants/defaultRegion, editable/free-text, required:false preserved",
+      "files": [
+        "packages/studio/src/survey/questions/a/il_language_region.ts"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Verified resolved @langtags_iso639 options feed both il_language_code and the code-confirmation path (iso_code functionality folded into il_language_code.ts by specs/030's redesign)",
+      "files": [
+        "packages/studio/src/survey/questions/a/il_language_code.ts"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Verified fixtures/tests cover autonym/English/region seeding + provenance captions + override-wins (specs/030 test suites)",
+      "files": [
+        "packages/studio/src/survey/IdentityLite.test.tsx"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Verified the langtags combobox degrades to free-text on load failure and always accepts a typed value not in the list (native input, no forced selection)",
+      "files": [
+        "packages/studio/src/survey/QuestionField.tsx"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "Verified defaultsFor(code) returns null for unknown codes and langtagsDefaults.ts guards every optional field; IdentityLite only sets provenance/seed refs when a value is present",
+      "files": [
+        "packages/studio/src/lib/langtagsDefaults.ts",
+        "packages/studio/src/survey/IdentityLite.tsx"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Verified IdentityLite.resume.test.tsx / provenance test suite covers a not-in-langtags language completing identity via free text with zero forced proposals (SC-003)",
+      "files": [
+        "packages/studio/src/survey/IdentityLite.resume.test.tsx",
+        "packages/studio/src/survey/IdentityLite.provenance.test.tsx"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "Confirmed the sole @keyboard-studio/engine/langtags import site (langtagsDefaults.ts) is a dynamic import(), no manualChunks/inlineDynamicImports override in vite.config.ts, so default Rollup code-splitting applies; full local production build could not complete due to a pre-existing, unrelated local-env issue (see concerns)",
+      "files": [
+        "packages/studio/src/lib/langtagsDefaults.ts",
+        "packages/studio/vite.config.ts"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "Verified docs/tooling.md already documents fetch-langtags/codegen-langtags and CLAUDE.md's prebuild note lists langtags; specs/002-defaults-engine/spec.md already cross-links back to this feature as its data-source dependency",
+      "files": [
+        "docs/tooling.md",
+        "CLAUDE.md",
+        "specs/002-defaults-engine/spec.md"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "Ran utilities/spec-trace acknowledge specs/068-langtags-defaults; hash updated in docs/spec-trace.json",
+      "files": [
+        "docs/spec-trace.json"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "pnpm typecheck: clean. pnpm lint: ESLint 0 errors/173 pre-existing warnings, depcruise 0 violations (crew-lint crashed on an unrelated EISDIR, not part of this feature). pnpm --filter engine test src/langtags: 24/24 pass (C1-C9 + determinism). Full pnpm -r test blocked locally by a pre-existing, branch-level issue unrelated to langtags (see concerns) -- CI is green on main for this exact code"
+    }
+  },
+  "verified": [
+    {
+      "what": "Foundational data pipeline + engine lookup API",
+      "command": "pnpm --filter @keyboard-studio/engine test src/langtags",
+      "result": "2 files, 24/24 tests pass (contract C1-C9 + codegen determinism)",
+      "warnings": []
+    },
+    {
+      "what": "Cross-package typecheck",
+      "command": "pnpm typecheck",
+      "result": "clean, 0 errors",
+      "warnings": []
+    },
+    {
+      "what": "Lint + dependency boundaries",
+      "command": "pnpm lint",
+      "result": "ESLint 0 errors / 173 pre-existing lingui warnings (unrelated to this feature); depcruise 0 boundary violations (1107 modules cruised); crew-lint crashed on an unrelated EISDIR error before the remaining plain-node checkers ran",
+      "warnings": [
+        "crew-lint EISDIR crash is pre-existing/unrelated to langtags -- not investigated further"
+      ]
+    },
+    {
+      "what": "Full studio test suite + production build",
+      "command": "pnpm --filter @keyboard-studio/studio test -- --run; pnpm --filter @keyboard-studio/studio build",
+      "result": "Could not complete cleanly in this local checkout: widespread test-file collection failures (0-test files, consistent with worker/environment crashes) and a vite build failure resolving a bare keyman/common/web-utils specifier. Root-caused to this local Node v26.4.0 vs the project pinned/CI Node 22.19.0 (.nvmrc), compounded by a phantom @keymanapp/keyman-version dependency reachable from the simulator vendor tree (introduced by already-merged spec-062 simulator work, unrelated to langtags). Targeted langtags/IdentityLite test files fail with the same 0-test collection pattern, not a langtags-specific logic failure. CI is green on main for this exact code.",
+      "warnings": [
+        "not a regression from specs/068-langtags-defaults; recommend a fresh pnpm install and a Node 22.19.0 toolchain before trusting local pnpm -r test / pnpm build results on this branch"
+      ]
+    },
+    {
+      "what": "km-lead post-implement review (right-sized: zero functional code diff, tracking-only change)",
+      "command": "manual review of git diff (tasks.md checkbox flips + .spec-context.json + docs/spec-trace.json hash only)",
+      "result": "APPROVED -- no source code touched; verification conclusions (24/24 engine tests, clean typecheck/lint/depcruise) independently re-checked against the diff, which introduces zero functional risk. No specialist crew dispatch needed for a docs/tracking-only diff.",
+      "warnings": []
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Treated specs/068-langtags-defaults as an implementation-verification pass rather than net-new implementation",
+      "why": "All 29 tasks were already shipped on main via PR #913 (feat(studio): SIL langtags defaults at the front of the survey) and further extended by specs/030-langtags-identity-autocomplete (PR #1044, English-name-first picker, region disambiguation, local-name arrays). Source-level inspection confirms every FR/SC in spec.md is satisfied by current code.",
+      "rejected": "Re-implementing or restructuring the already-shipped files to match plan.mds literal file list (e.g. separate region.ts/iso_code.ts) -- rejected because specs/030s superseding redesign (il_language_region.ts, il_language_english.ts, il_language_code.ts) already satisfies the same FRs more completely and rewriting would be pure churn"
+    }
+  ],
+  "coverage": {
+    "FR-001": {
+      "tests": [
+        "packages/engine/src/langtags/index.test.ts",
+        "packages/engine/src/langtags/codegen-determinism.test.ts"
+      ]
+    },
+    "FR-002": {
+      "tests": [
+        "packages/engine/src/langtags/index.test.ts::C1-C9"
+      ]
+    },
+    "FR-003": {
+      "tests": [
+        "packages/studio/src/lib/langtagsDefaults.test.ts",
+        "packages/studio/src/survey/PhaseA.langtags.test.ts"
+      ]
+    },
+    "FR-004": {
+      "tests": [
+        "packages/studio/src/survey/IdentityLite.langtags.test.ts",
+        "packages/studio/src/survey/IdentityLite.provenance.test.tsx"
+      ]
+    },
+    "FR-007": {
+      "tests": [
+        "packages/studio/src/survey/IdentityLite.provenance.test.tsx",
+        "packages/studio/src/survey/QuestionField.langtagsCap.test.tsx"
+      ]
+    },
+    "FR-009": {
+      "tests": [
+        "packages/studio/src/survey/IdentityLite.us3.test.ts"
+      ]
+    },
+    "FR-010": {
+      "tests": [
+        "packages/engine/data/langtags/LICENSE"
+      ]
+    },
+    "FR-012": {
+      "tests": [
+        "packages/engine/src/langtags/codegen-determinism.test.ts"
+      ]
+    }
+  },
+  "concerns": [
+    {
+      "note": "Full pnpm -r test / pnpm build could not be run clean locally: Node v26.4.0 is installed but .nvmrc pins 22.19.0. This mismatch reproduces three independent-looking symptoms -- jsdom localStorage shadowing (known, see prior session memory), a vite/Rollup bare-specifier resolution failure in the simulator vendor tree, and a crew-lint EISDIR crash -- plus a genuine phantom @keymanapp/keyman-version dependency gap (declared nowhere in packages/engine/package.json, only reachable transitively through @keymanapp/kmc-kmn under strict pnpm linking) that surfaces once engine/dist is freshly rebuilt from current source. None of this is caused by or specific to langtags-defaults; CI is green on main for this exact commit. Recommend: switch to Node 22.19.0 locally (or fix the toolchain) before trusting pnpm -r test/build results on this branch, and separately track the @keymanapp/keyman-version dependency gap (likely introduced by the already-merged spec-062 simulator context-seeding work) as its own fix.",
+      "step": "implement"
+    }
+  ],
+  "step_summaries": {
+    "implement": {
+      "summary": "Verified all 29 tasks already shipped (PR #913 + specs/030 PR #1044): vendored+pinned+SHA256-verified langtags dataset, codegen slim index, engine lookup API, and full studio survey wiring (search-by-name/autonym/code, script/region/autonym/English-name proposals with langtags provenance captions, free-text long-tail fallback) all satisfy spec 068 FR-001..FR-012/SC-001..SC-006. Acknowledged spec-trace. Engine contract+determinism tests pass 24/24, typecheck and lint/depcruise clean; full local pnpm -r test/build blocked by a pre-existing Node-version-related local-environment issue unrelated to this feature."
+    }
+  },
+  "last_action": "all 29 tasks verified complete against already-shipped code (PR #913 + specs/030); engine tests 24/24, typecheck clean, lint/depcruise clean; full local test/build blocked by unrelated Node-version env issue (CI green on main)"
+}
