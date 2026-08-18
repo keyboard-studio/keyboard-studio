@@ -483,3 +483,44 @@ by *clicking and seeing it hold*; rows 3 and 5 are additionally verified by *som
 in the DOM that did not before*; row 6 is verified by *nothing having broken*. Row 1 is a judgement
 call against [spec.md](spec.md):61-67's description of Developer's four regions, and should be
 recorded as such rather than as a pass/fail.
+
+---
+
+## T062 — post-change exploration pass, `[OBSERVED]`
+
+**Captured**: 2026-08-18, against the tip of `origin/main` with spec 065's implementation fully
+landed (T002-T059 all done). Run in a Windows environment with an actual interactive display —
+unlike T001's capture environment, `npx playwright test --headed` renders a real Chromium window
+here, so this pass is a genuine click-through, not a source trace.
+
+**Fixture substitution, stated up front.** T001 named `sil_cameroon_qwerty`; this pass uses
+**bambara** instead, for one concrete reason: bambara is the fixture `touch-key-add-remove.spec.ts`
+(T010/T016) already drives end-to-end through the full survey → mechanisms → touch stage, so its
+setup sequence (`driveIdentityLite` → `pickBaseKeyboard` → `chooseAdaptTrack` → `confirmPrefill` →
+`buildOneCharacterList` → `skipCarve` → `driveMechanisms` → `confirmImportAdapt` →
+`enterTouchKeyMode`) is proven rather than freshly authored against an unexercised fixture. Every
+complaint below is fixture-agnostic (none depend on `sil_cameroon_qwerty`'s specific row lengths)
+except complaint #6, noted separately.
+
+**Method**: an ad hoc Playwright script (not committed — deleted after this capture, per T062's own
+framing as exploration evidence, not a gate) drove the proven setup to the touch stage in "By key"
+mode, then probed each complaint's "How to re-probe after the change" recipe above via test ids and
+an accessibility-tree snapshot, headed. Findings:
+
+| # | Complaint | `[OBSERVED]` result |
+|---|---|---|
+| 1 | Doesn't look like Developer | **Resolved.** Zero hatch elements (`repeating-linear-gradient` count: 0). 4 row-metrics readouts rendered, each showing count/width/padding/total, and the crowded rows show the literal text "Crowded — 1 over the 10 that fit comfortably." 38 keycap-id labels rendered (one per key). Exactly one `key-property-panel` region ("Key properties") — no second stacked panel. Key mode renders no "Touch preview" heading (0); switching to character mode brings it back (1) — FR-024's no-regression clause holds. |
+| 2 | No fields editable, even `sp` | **Resolved.** The key-type control (`key-inspector-sp`, embedded in the merged panel) is present and visible; the a11y snapshot shows it as `button "Key type": Character Proposed`, not a dead radio. Functional persistence (does it hold across re-render) is the PR-lane vitest guarantee (T009); this pass corroborates the control exists and is not disabled. |
+| 3 | No add/remove commands | **Resolved.** `key-property-panel-delete` ("Delete this key") is visible and reachable from the selected key's own panel — the add/remove walk itself (`touch-key-add-remove.spec.ts`) was independently re-run headed for this capture and **passed** (1 passed, 1.7m), exercising add → assign → suppress-remove end to end against the real emitted artifact. |
+| 4 | No text editable (`K_1` → `U_0300`) | **Resolved.** All eight panel fields are visible in one place: the a11y snapshot shows Keycap, Hint, Key id, Modifier override (the `layer` field), Goes to layer (`nextlayer`), Width (minimum), Left padding textboxes, plus the key-type control. `key-property-panel-field-id`, `-hint`, `-width`, `-pad` all visible = true. The gesture panel (`gesture-panel`) is visible with Long press / Multi-tap / Flick (all 8 directions), each with an Add control — gesture editing (US4) is reachable from the same panel. |
+| 5 | Only the `default` layer | **Resolved.** `key-layer-selector` visible = true, rendered as a `tablist` ("Layers") with 3 options (`default` — 3 findings, `shift` — 36 findings, `numeric`), grouped under "Base" / "Other layers" text labels — matching FR-005's grouping and rolled-up counts. |
+| 6 | Can't see phone/tablet | **Not exercised on this fixture — expected, not a regression.** bambara's shipped touch layout has exactly one platform (`phone`); `key-grid-platform-tabs` is not rendered (visible = false, count = 0). This is consistent with the spec's own framing of complaint #6 as "already working" pre-065 and unrelated to any FR this feature adds — a platform tablist has nothing to disclose when only one platform exists, the same reasoning FR-004 already applies to the layer selector. Re-confirming with a genuinely multi-platform fixture is future work, not a gap this capture leaves open on anything spec 065 changed. |
+
+**Self-hiding move buttons (FR-020), a bonus confirmation**: for the selected key `K_W` (top-left
+row of `phone:default`), `key-property-panel-move-left`, `-right` and `-down` are present;
+`-up` is **absent** (count 0), matching the boundary rule exactly — a top-row key has no "up" to
+move to, and the control does not render disabled, it does not render at all.
+
+**Conclusion**: all six of issue #1530's complaints are demonstrably resolved by this pass. SC-001
+is satisfied. The one fixture-driven gap (#6 on this specific fixture) is explained above and is not
+a defect of the feature.
