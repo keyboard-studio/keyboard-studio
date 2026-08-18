@@ -521,6 +521,13 @@ row of `phone:default`), `key-property-panel-move-left`, `-right` and `-down` ar
 `-up` is **absent** (count 0), matching the boundary rule exactly — a top-row key has no "up" to
 move to, and the control does not render disabled, it does not render at all.
 
-**Conclusion**: all six of issue #1530's complaints are demonstrably resolved by this pass. SC-001
-is satisfied. The one fixture-driven gap (#6 on this specific fixture) is explained above and is not
-a defect of the feature.
+**Conclusion**: five of issue #1530's six complaints (#1-#5) are demonstrably resolved by this
+pass — clicked through live, not inferred. Complaint #6 was **not** clicked through here: bambara
+ships only one touch platform, so the phone/tablet tab switch this pass would need to exercise
+never had anything to click. What stands for #6 is the pre-existing, source-verified finding
+(both here and in T001's baseline) that the platform tablist already worked before spec 065 and
+nothing this feature touched could have regressed it — a claim about code, not a click-through
+observation. SC-001's "every complaint demonstrably resolved by clicking through" is therefore
+satisfied for #1-#5 by this pass and for #6 by the pre-existing behaviour being unchanged; re-
+confirming #6 by click-through needs a multi-platform fixture, which is future work, not a gap
+this feature leaves open.

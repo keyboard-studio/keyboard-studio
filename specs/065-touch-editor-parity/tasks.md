@@ -677,10 +677,11 @@ defect, and where no default is possible the editor says why.
   **Done — see the "T062 — post-change exploration pass" section appended to
   [exploration-baseline.md](exploration-baseline.md).** Ran headed (this environment has a real
   display, unlike T001's capture environment). `touch-key-add-remove.spec.ts` re-run headed and
-  passes (1 passed, 1.7m). All six complaints confirmed resolved by a live click-through/DOM probe
-  against the bambara fixture (substituted for `sil_cameroon_qwerty` — reasoning recorded there);
-  complaint #6 is a fixture limitation (bambara ships one touch platform) rather than a gap in the
-  feature.
+  passes (1 passed, 1.7m). Complaints #1-#5 confirmed resolved by a live click-through/DOM probe
+  against the bambara fixture (substituted for `sil_cameroon_qwerty` — reasoning recorded there).
+  Complaint #6 was **not** click-through-exercised — bambara ships only one touch platform, so
+  there was no tab to switch — and stands instead on the pre-existing, source-verified finding
+  (unchanged by this feature) that the platform tablist already worked before spec 065.
 
 ---
 
