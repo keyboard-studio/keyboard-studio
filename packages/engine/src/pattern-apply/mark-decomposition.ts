@@ -36,5 +36,6 @@ export function oneMarkShorterPair(unit: string): OneMarkShorterPair | undefined
   const nfd = [...unit.normalize("NFD")];
   if (nfd.length < 2) return undefined;
   const to = nfd.slice(0, -1).join("").normalize("NFC");
+  if ([...to].length !== 1) return undefined;
   return { unit, nfd, to };
 }

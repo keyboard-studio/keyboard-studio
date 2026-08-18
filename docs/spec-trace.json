@@ -787,11 +787,6 @@
       "decisions": [],
       "notes": ""
     },
-      "status": "unreviewed",
-      "implements": [],
-      "decisions": [],
-      "notes": ""
-    },
     "specs/066-irpath-inputs-writes": {
       "title": "Feature Specification: IRPath + declared `inputs`/`writes` + folder-per-question opt-in",
       "hash": "sha256:0ae9ee0a8dd28f68",

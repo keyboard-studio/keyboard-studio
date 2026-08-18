@@ -27,4 +27,14 @@ describe("oneMarkShorterPair", () => {
   it("returns undefined for a multi-codepoint string (not a single composed unit)", () => {
     expect(oneMarkShorterPair("ab")).toBeUndefined();
   });
+
+  it("returns undefined when the one-mark-shorter predecessor has no single-codepoint precomposed form", () => {
+    // U+FB2C "HEBREW LETTER SHIN WITH DAGESH AND SHIN DOT" -> NFD is
+    // [shin (05E9), dagesh (05BC, cc 21), shin dot (05C1, cc 24)]. Dropping the
+    // canonically-last mark (shin dot) leaves shin + dagesh, which has no
+    // assigned precomposed codepoint of its own (Hebrew presentation forms
+    // only precompose shin+dot or shin+dagesh+dot, never dagesh alone) —
+    // recomposing to NFC stays 2 codepoints.
+    expect(oneMarkShorterPair("שּׁ")).toBeUndefined();
+  });
 });

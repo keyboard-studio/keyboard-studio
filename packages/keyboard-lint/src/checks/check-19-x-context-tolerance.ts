@@ -29,15 +29,10 @@
 // is a genuine, open follow-up, not a completed deferral.
 
 import type { KeyboardIR, LintFinding, RuleToleranceFinding, ToleranceReport } from "@keyboard-studio/contracts";
-
-function toCodepointNotation(text: string): string {
-  return [...text]
-    .map((ch) => "U+" + (ch.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, "0"))
-    .join(" ");
-}
+import { toUPlusNotation } from "@keyboard-studio/contracts";
 
 function describeOutput(text: string): string {
-  return `"${text}" (${toCodepointNotation(text)})`;
+  return `"${text}" (${[...text].map(toUPlusNotation).join(" ")})`;
 }
 
 /** A diagnosed behavioural gap — the pre-fix "gap found" state (both outputs populated). */

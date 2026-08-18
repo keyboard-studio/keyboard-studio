@@ -37,7 +37,7 @@ import { ModifierKeyConstants } from './vendor/keyman/common/types/main.js';
 // ---------------------------------------------------------------------------
 
 /** Fixed DeviceSpec used for all simulated keystrokes (blueprint §4). */
-const DEVICE = new DeviceSpec('chrome', 'desktop', 'windows', false);
+export const DEVICE = new DeviceSpec('chrome', 'desktop', 'windows', false);
 
 /** No-op variable store serializer — required by JSKeyboardInterface ctor (blueprint §7). */
 const NO_OP_STORE_SERIALIZER = {

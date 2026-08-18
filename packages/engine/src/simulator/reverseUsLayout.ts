@@ -15,13 +15,11 @@ import type { SimKeyInput } from '@keyboard-studio/contracts';
 import { Codes } from './vendor/keyman/engine/keyboard/codes.js';
 import { KeyEvent } from './vendor/keyman/engine/keyboard/keyEvent.js';
 import { DefaultOutputRules } from './vendor/keyman/engine/keyboard/defaultOutputRules.js';
-import { DeviceSpec } from './vendor/keyman/common/web-utils/deviceSpec.js';
 // Imported for its side effect of establishing the vendor module init order
 // the vendored code requires (mirrors ./index.ts's own import ordering) —
 // loading defaultOutputRules.js in isolation otherwise throws at module init.
 import './nodeKeyboardLoader.js';
-
-const DEVICE = new DeviceSpec('chrome', 'desktop', 'windows', false);
+import { DEVICE } from './index.js';
 
 let cache: Map<string, { vkey: string; shift: boolean }> | null = null;
 
