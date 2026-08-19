@@ -121,6 +121,17 @@ module.exports = {
       from: { path: '^packages/studio/src/survey/questions/' },
       to:   { path: '^packages/studio/src/(stores|editors|lib)/' },
     },
+    {
+      name: 'renderer-no-direct-editor-import',
+      comment:
+        'The SPA renderer (StudioShell.tsx) and its step-host mediating layer ' +
+        '(components/StepHost.tsx) must not import editor components directly ' +
+        '(spec 069 FR-004). All editor rendering flows through step.component ' +
+        'resolved off the manifest, not a static import.',
+      severity: 'error',
+      from: { path: '^packages/studio/src/(StudioShell\\.tsx|components/StepHost\\.tsx)$' },
+      to:   { path: '^packages/studio/src/editors/' },
+    },
   ],
   options: {
     doNotFollow: { path: 'node_modules' },

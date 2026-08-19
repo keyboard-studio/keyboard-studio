@@ -70,6 +70,13 @@ commit messages and PR bodies. Commit and issue titles follow
 (`bug`/`fix`/`feat`/`docs`/`chore`/`maint`/`refactor`/`epic`/`auto`) and the
 area vocabulary in [CLAUDE.md](../../CLAUDE.md).
 
+### IX. No user-facing survey surface outside the manifest
+No user-facing survey surface may exist outside the step manifest. Every step declares typed
+IRPath inputs and writes via Step.inputs and Step.writes (steps/types.ts). Every IR write routes
+through the mutate() seam (specs/014-mutate-seam-touch-propagation). The manifest
+(steps/manifest.ts) is the single source of survey ordering (specs/012-step-model-manifest). A
+plan proposing new survey content MUST include the manifest entry as a functional requirement.
+
 ## Authoring workflow (spec-kit ↔ KM crew)
 
 New feature work funnels through spec-kit and is executed by the KM crew:
@@ -77,7 +84,7 @@ New feature work funnels through spec-kit and is executed by the KM crew:
 1. `/speckit-specify` (+ `/speckit-clarify`) → the feature `spec.md`, which
    **cites the governing `spec.md §X`** it implements rather than re-deriving
    scope.
-2. `/speckit-plan` → plan + Constitution Check against Articles I–VIII.
+2. `/speckit-plan` → plan + Constitution Check against Articles I–IX.
 3. `/speckit-tasks` → `tasks.md`; `/speckit-taskstoissues` creates the GitHub
    issues.
 4. `/km-lead` dispatches `km-programmer` / `km-frontend` / `km-validator` / etc.
@@ -134,4 +141,4 @@ Amendments to this file follow the change that prompted them: when a spec
 amendment lands (e.g. a new vX.Y.0 recorded in spec-signoff), the relevant
 Article is updated in the same change and the version footer below is bumped.
 
-**Version**: 1.1.0 | **Ratified**: 2026-06-15 | **Last Amended**: 2026-07-17
+**Version**: 1.1.0 | **Ratified**: 2026-06-15 | **Last Amended**: 2026-08-17
