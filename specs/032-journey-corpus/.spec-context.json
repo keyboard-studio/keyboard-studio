@@ -3,7 +3,72 @@
   "specName": "032-journey-corpus",
   "branch": "032-journey-corpus",
   "selectedAt": "2026-07-15T21:02:41.181Z",
-  "currentStep": "specify",
-  "status": "draft",
-  "history": []
+  "currentStep": "plan",
+  "status": "planned",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:14:19.482Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "ai",
+      "at": "2026-08-19T23:14:19.883Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:14:20.668Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:14:21.271Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:14:22.973Z"
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Drive cross-manifest-step transitions through steps/advance.ts and reducer.ts rather than through SurveyRunner.tsx alone",
+      "why": "SurveyRunner functions only operate at the intra-flow level; steps/advance.ts shipped after this spec was written as the real manifest-level step-advance policy - using it avoids re-deriving that routing logic a second time",
+      "rejected": "Flattening the whole manifest into one SurveyRunner-driven flow sequence"
+    },
+    {
+      "decision": "Ship the coverage gate as report-only for this increment, defer the ratchet mode",
+      "why": "A ratchet needs a committed baseline to compare against; report-only first produces that baseline honestly rather than fabricating one",
+      "rejected": "Shipping the ratchet immediately with a hand-authored zero-baseline"
+    },
+    {
+      "decision": "Harness drives both SurveyRunner intra-flow routing and steps/advance.ts+reducer.ts cross-manifest-step transitions, not SurveyRunner alone",
+      "why": "The spec predates the Unified Survey Architecture migration; a full identity-to-package replay crosses manifest step boundaries SurveyRunners functions alone cannot resolve",
+      "rejected": "Flattening the manifest into one giant flow to keep using only SurveyRunner functions, which would duplicate steps/advance.ts own routing logic"
+    },
+    {
+      "decision": "Land the coverage gate as report-only, defer ratchet mode to a follow-up",
+      "why": "A ratchet needs a committed baseline to diff against; generating that baseline honestly is what report-onlys first run produces",
+      "rejected": "Shipping ratchet immediately with a fabricated zero-baseline"
+    }
+  ],
+  "approach": "Headless vitest replay harness driving SurveyRunner routing primitives for intra-step navigation and steps/advance.ts + reducer.ts for cross-manifest-step transitions (a layer the spec predates), plus a report-only coverage gate comparing buildManifestStepGraph() against per-fixture collectRenderedNodeIds(buildFlowSources()).",
+  "step_summaries": {
+    "plan": {
+      "summary": "New headless journey-replay harness + report-only coverage gate; corrected two function-name drifts and one real architectural gap (manifest-level transitions) from the spec pre-migration text",
+      "key_finding": "The spec predates specs 026/028/029s Unified Survey Architecture migration - its core routing-primitive citations are still accurate but incomplete for a full-spine replay"
+    }
+  }
 }
