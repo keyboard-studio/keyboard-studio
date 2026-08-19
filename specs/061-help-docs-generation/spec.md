@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-07
 
-**Status**: Draft
+**Status**: Implemented (US1–US4, all FRs/SCs) — shipped via PR #1585 (3bc73b7b), with post-review fixups (7e3c89a5, 51f96b11, e8534738). Retroactively verified 2026-08-19.
 
 **Input**: User description: "Wire Phase F's help-docs survey answers (pf_welcome_paragraph, pf_usage_tip_1..5, pf_credits, pf_contact_info, pf_project_url, and the opt-in battery: pf_font_guidance, pf_design_rationale, pf_canonical_order, pf_script_glossary, pf_troubleshooting, pf_related_keyboards, pf_known_limitations, pf_further_reading, pf_scope_variety, pf_provenance_basis, pf_example_words, pf_doc_language) into the actual documentation artifacts a keyboard package ships: README.md, source/readme.htm, source/welcome.htm, source/help/<id>.php, combined with information already derivable from the keyboard's design (display name, primary BCP47 tag, Attribution copyright holder/author, store(&TARGETS) platform list, keyboard id). Every Phase F question module currently declares writes: [] and no outputs, so the survey collects real author content but nothing consumes it — the scaffolder/ensurePackageFiles ship placeholder text regardless of what the author answered."
 

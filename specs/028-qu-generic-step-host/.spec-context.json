@@ -3,7 +3,42 @@
   "specName": "028-qu-generic-step-host",
   "branch": "028-qu-generic-step-host",
   "selectedAt": "2026-07-13T19:13:23.603Z",
-  "currentStep": "specify",
-  "status": "draft",
-  "history": []
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:14:30.796Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:14:31.318Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:14:32.012Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:14:32.614Z"
+    }
+  ],
+  "verified": [
+    {
+      "what": "retroactive verification 2026-08-19: all 24 tasks checked against live code",
+      "result": "shipped via PR 981 (commit d4f787b2), tasks.md already carries a landing note citing PR 1186 crew-verification; StepHost.tsx, steps/advance.ts, registerEditorSteps.ts, stepHost.goldenWalk.test.tsx all confirmed present; T009 correctly superseded by spec 029 makeFlowStepComponent factory (already confirmed during spec 067 work this session); spec.md Status field corrected"
+    }
+  ]
 }

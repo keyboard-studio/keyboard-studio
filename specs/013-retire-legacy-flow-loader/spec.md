@@ -4,7 +4,7 @@
 
 **Created**: 2026-06-27
 
-**Status**: Draft
+**Status**: Implemented (Phase 3b: repoint + delete legacy loader + delete legacy YAMLs) — shipped via PR #781 (commit 01a6da23). Retroactively verified 2026-08-19 (see also specs/067-modular-loader-cutover, which independently confirmed this work).
 
 **Input**: Phase 3b of [docs/survey-modularity-cyoa-plan.md](../../docs/survey-modularity-cyoa-plan.md) — the "beyond #410" follow-up that deletes the legacy full-YAML survey loader and its four full-flow YAMLs now that Phase 3a cut Phase A / F / identity-lite over to `loadModularFlow`.
 

@@ -6,7 +6,7 @@
 — one source of truth per concern; no parallel hand-threaded copies to drift.
 **Prerequisite:** [specs/027-qu-characters-step/spec.md](../027-qu-characters-step/spec.md)
 (Stage 4) — this spec generalises the `step.component` seam that stage introduced for a single step to *every* step.
-**Status:** Draft
+**Status:** Implemented (all tasks landed via spec 028 + the spec 029 FlowStepHost convergence) — shipped via PR #981 (commit d4f787b2). Retroactively verified 2026-08-19.
 **Created:** 2026-07-03
 
 > ## Relationship to the surrounding stages
