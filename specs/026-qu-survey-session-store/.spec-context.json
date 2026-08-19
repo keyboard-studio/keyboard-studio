@@ -3,7 +3,250 @@
   "specName": "026-qu-survey-session-store",
   "branch": "026-qu-survey-session-store",
   "selectedAt": "2026-07-27T17:30:25.417Z",
-  "currentStep": "specify",
-  "status": "draft",
-  "history": []
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:22:46.646Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:22:47.096Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:22:47.570Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "ai",
+      "at": "2026-08-19T20:22:48.063Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:23:04.814Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:23:05.167Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:23:05.639Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:23:06.090Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:23:06.526Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:23:06.945Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:23:07.378Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:23:07.844Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:23:08.291Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:23:08.697Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:23:09.127Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:23:09.670Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:23:10.104Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-19T20:23:10.649Z"
+    }
+  ],
+  "currentTask": "T013",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Setup/branch-hygiene task, moot after merge (PR 976)",
+      "files": [
+        "N/A"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Pre-change baseline capture, moot after merge",
+      "files": [
+        "N/A"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Confirmed ActiveStepId type lives in stores/surveySessionStore.ts, exported",
+      "files": [
+        "packages/studio/src/stores/surveySessionStore.ts"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Confirmed surveySessionStore.ts implements activeStepId/history/identityResult/surveyContext/selectedTrack/scaffoldSpec/localBase plus advance/popHistory/reset actions, matching the D4 shape; store has grown further from later stages (visited/lastNavigation/charactersSub/sanitizeHistory), expected evolution",
+      "files": [
+        "packages/studio/src/stores/surveySessionStore.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Confirmed surveySessionStore.test.ts exists colocated with the store; ran live 2026-08-19, 49/49 tests pass (bundled with trackRouting/prefillRouting)",
+      "files": [
+        "packages/studio/src/stores/surveySessionStore.test.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Ran live 2026-08-19: pnpm --filter @keyboard-studio/studio exec vitest run src/stores/surveySessionStore.test.ts - passes as part of the 49/49 green run",
+      "files": [
+        "N/A"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Confirmed zero setActiveStepId matches in StudioShell.tsx - the local useState for migrated slots is gone",
+      "files": [
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Confirmed zero selectedTrackRef matches in StudioShell.tsx - the ref-mirroring dance is deleted",
+      "files": [
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Confirmed useSurveySessionStore called 17 times in StudioShell.tsx, consistent with advance/popHistory wiring for all named back handlers",
+      "files": [
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "handleStartOver / instantiatedRef ordering consistent with shipped code; no contradicting evidence found",
+      "files": [
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Ran live 2026-08-19: trackRouting.test.ts and prefillRouting.test.ts both pass unmodified (bundled in the 49/49 green run); StudioShell.test.tsx fails locally only on the pre-existing Node26/jsdom localStorage-shadow issue documented earlier this session for specs 072 and others, not a regression - CI on Node 22 is unaffected",
+      "files": [
+        "packages/studio/src/dashboard/trackRouting.test.ts",
+        "packages/studio/src/dashboard/prefillRouting.test.ts",
+        "packages/studio/src/StudioShell.test.tsx"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Ran live 2026-08-19: pnpm --filter @keyboard-studio/studio typecheck clean (exit 0)",
+      "files": [
+        "N/A"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Confirmed via T007/T008: no leftover setActiveStepId/selectedTrackRef references anywhere in StudioShell.tsx",
+      "files": [
+        "N/A"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "retroactive verification 2026-08-19: all 13 tasks checked against live code plus a live gate re-run",
+      "command": "pnpm --filter @keyboard-studio/studio typecheck; pnpm --filter @keyboard-studio/studio exec vitest run src/dashboard/trackRouting.test.ts src/dashboard/prefillRouting.test.ts src/stores/surveySessionStore.test.ts",
+      "result": "shipped via PR 976 (commit 22feabff); typecheck clean; 49/49 relevant tests pass. StudioShell.test.tsx fails locally only on the pre-existing Node26/jsdom localStorage-shadow issue documented earlier this session, not re-run to full green - not a regression, CI on Node 22 unaffected"
+    }
+  ]
 }
