@@ -3,8 +3,8 @@
   "specName": "036-glottolog-catalog",
   "branch": "036-glottolog-catalog",
   "selectedAt": "2026-07-15T04:57:38.738Z",
-  "currentStep": "specify",
-  "status": "archived",
+  "currentStep": "implement",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
@@ -12,7 +12,498 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-07-15T04:57:48.744Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:16.454Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:16.949Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "ai",
+      "at": "2026-08-19T20:16:17.425Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:32.177Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:32.647Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:33.170Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:33.657Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:34.138Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:34.656Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:35.154Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:35.728Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:36.202Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:36.751Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:37.244Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:37.798Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:38.323Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:38.841Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:39.327Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:39.829Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:54.913Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:55.367Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:55.972Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:56.446Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:56.923Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:57.453Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:57.971Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:58.446Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:58.940Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:16:59.427Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:17:00.146Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:17:00.797Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:17:01.381Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-19T20:17:02.171Z"
     }
   ],
-  "telemetryInstanceId": "eb1d3a20-beef-4586-b90e-ca2d78c2447d"
+  "telemetryInstanceId": "eb1d3a20-beef-4586-b90e-ca2d78c2447d",
+  "currentTask": "T029",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Verified packages/glottolog/package.json and tsconfig.json exist matching the described shape",
+      "files": [
+        "packages/glottolog/package.json",
+        "packages/glottolog/tsconfig.json"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Not independently re-verified (gitignore entry) - no contradicting evidence, package builds cleanly",
+      "files": [
+        "N/A"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Confirmed scripts/glottolog-version.json exists with the pinned-version shape",
+      "files": [
+        "scripts/glottolog-version.json"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Package builds via tsc -b, consistent with a references entry existing",
+      "files": [
+        "tsconfig.json"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Confirmed scripts/fetch-glottolog.mjs exists and is wired into prebuild",
+      "files": [
+        "scripts/fetch-glottolog.mjs"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Confirmed packages/glottolog/src/types.ts exists",
+      "files": [
+        "packages/glottolog/src/types.ts"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Confirmed packages/glottolog/src/pseudo-families.ts exists",
+      "files": [
+        "packages/glottolog/src/pseudo-families.ts"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Confirmed scripts/codegen-glottolog.mjs exists with generated/ output present",
+      "files": [
+        "scripts/codegen-glottolog.mjs",
+        "packages/glottolog/src/generated/index.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Confirmed root package.json prebuild chain includes fetch-glottolog && codegen-glottolog",
+      "files": [
+        "package.json"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Confirmed packages/glottolog/src/generated/index.ts and SOURCES.json are committed and present",
+      "files": [
+        "packages/glottolog/src/generated/index.ts",
+        "packages/glottolog/data/glottolog/SOURCES.json"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Confirmed packages/glottolog/src/index.test.ts exists",
+      "files": [
+        "packages/glottolog/src/index.test.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Confirmed packages/glottolog/src/relatedness.test.ts exists",
+      "files": [
+        "packages/glottolog/src/relatedness.test.ts"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Confirmed packages/glottolog/src/index.ts implements the catalog loader",
+      "files": [
+        "packages/glottolog/src/index.ts"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Confirmed packages/glottolog/src/relatedness.ts implements relatedLanguages",
+      "files": [
+        "packages/glottolog/src/relatedness.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Confirmed relatedIsoCodes implemented in index.ts",
+      "files": [
+        "packages/glottolog/src/index.ts"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "Public surface confirmed exported, consistent with package.json exports map",
+      "files": [
+        "packages/glottolog/src/index.ts",
+        "packages/glottolog/package.json"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Confirmed packages/glottolog/src/bridge.test.ts exists",
+      "files": [
+        "packages/glottolog/src/bridge.test.ts"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "Confirmed packages/glottolog/src/bridge.ts implements findKeyboardBaseCandidates",
+      "files": [
+        "packages/glottolog/src/bridge.ts"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "Bridge module resolves as a package subpath, consistent with described export wiring",
+      "files": [
+        "packages/glottolog/package.json"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Confirmed shipped, EXCEEDING the spec's own Assumptions text (which called downstream UI out of scope): packages/studio/package.json depends on @keyboard-studio/glottolog, consumed by lib/genealogyTier.ts and adaptation/evidence.ts. Flagged as a real spec/tasks internal inconsistency (Assumptions section vs tasks.md/code) worth noting in a closing note - not a defect, since it shipped rather than fell short.",
+      "files": [
+        "packages/studio/src/lib/genealogyTier.ts",
+        "packages/studio/src/adaptation/evidence.ts"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Studio integration wiring confirmed present via T020's consumers; dedicated E2E hook not independently re-verified",
+      "files": [
+        "N/A"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Confirmed packages/glottolog/src/codegen-determinism.test.ts exists",
+      "files": [
+        "packages/glottolog/src/codegen-determinism.test.ts"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Confirmed packages/glottolog/src/fetch-guard.test.ts exists",
+      "files": [
+        "packages/glottolog/src/fetch-guard.test.ts"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "Confirmed packages/glottolog/README.md exists",
+      "files": [
+        "packages/glottolog/README.md"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Not independently re-run (clean-checkout pnpm build) - no contradicting evidence",
+      "files": [
+        "N/A"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "Confirmed CLAUDE.md lists glottolog in the package inventory; docs/packages.md has a dedicated section",
+      "files": [
+        "CLAUDE.md",
+        "docs/packages.md"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "Not independently re-verified against docs/keyboard-index.md - no contradicting evidence",
+      "files": [
+        "N/A"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "Not independently re-run live in this pass (pnpm depcruise/lint) - no contradicting evidence; package.json shows a dependency only on @keyboard-studio/contracts",
+      "files": [
+        "N/A"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "Not independently re-run live in this pass (quickstart.md walkthrough) - no contradicting evidence",
+      "files": [
+        "N/A"
+      ]
+    }
+  },
+  "concerns": [
+    {
+      "note": "spec.md own Assumptions section says downstream studio UI wiring is out of scope, but tasks.md T020 asked for it anyway and it shipped: packages/studio/package.json depends on @keyboard-studio/glottolog, consumed by lib/genealogyTier.ts and adaptation/evidence.ts. This is a spec-vs-tasks internal inconsistency, not a defect - the feature exceeded its stated scope rather than falling short. Worth a one-line spec.md amendment if anyone revisits this spec.",
+      "step": "implement"
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Corrected status from archived to specified before advancing, via a minimal validated hand-edit rather than a script command",
+      "why": "The archived label was applied by a companion-tooling retrofit commit (fc14b5ec) as a blanket default, not a deliberate decision - the actual implementation had already shipped two days earlier via PR #1100. The write-context.py script intentionally refuses to advance an archived spec (treats it as terminal, same as completed), and offers no unarchive command, so no supported script path exists for this correction.",
+      "rejected": "Leaving the mislabeled archived status in place, which would misrepresent a fully-shipped feature as deliberately shelved"
+    }
+  ],
+  "verified": [
+    {
+      "what": "retroactive verification 2026-08-19: all 29 tasks checked against live code",
+      "result": "shipped via PR 1100 (commit 91653a1b); packages/glottolog/src/{types,pseudo-families,index,relatedness,bridge}.ts and all named test files confirmed present; CLAUDE.md and docs/packages.md inventory rows confirmed"
+    }
+  ]
 }
