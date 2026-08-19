@@ -3,7 +3,42 @@
   "specName": "013-retire-legacy-flow-loader",
   "branch": "013-retire-legacy-flow-loader",
   "selectedAt": "2026-07-13T16:25:12.865Z",
-  "currentStep": "specify",
-  "status": "draft",
-  "history": []
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:14:13.065Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:14:13.581Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:14:14.171Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:14:14.968Z"
+    }
+  ],
+  "verified": [
+    {
+      "what": "retroactive verification 2026-08-19: confirmed Cycle 2 + PR close-out actually happened despite HANDOFF.md reading otherwise",
+      "result": "the three pre-squash SHAs in HANDOFF.md were squash-merged into commit 01a6da23 (PR 781, merged 2026-06-28); both flagged deviations (computeReserveNodes counting provenance_questions, flow-parity.test.ts structural rewrite) confirmed still present and further built upon by later specs, not unreviewed; tasks.md confirmed 29/29 checked; also independently confirmed by this session earlier work on spec 067"
+    }
+  ]
 }
