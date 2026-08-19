@@ -383,7 +383,7 @@ export function GesturePanel({
                 and presenting it as a field would imply otherwise. */}
             {t({
               id: "editor.assignLoop.keyGrid.gesture.selectedType",
-              message: `Editing: ${kindLabels[selection.kind]}`,
+              message: `Editing: ${{ kind: kindLabels[selection.kind] }}`,
             })}
             {selection.kind === "flick" ? ` (${selection.id})` : ""}
           </span>
