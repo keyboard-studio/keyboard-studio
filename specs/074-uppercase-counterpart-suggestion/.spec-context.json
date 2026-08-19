@@ -849,6 +849,7 @@
       "decision": "{\"decision\":\"Suppress the case-pair proposal for Georgian only, in the studio hook\",\"why\":\"Three independent lines of evidence agreed: km-domain ruled Mtavruli a stylistic all-caps register rather than a Shift companion; km-author verified in-file that the corpus keyboard basic_kbdgeo maps every [SHIFT K_x] to the IDENTICAL codepoint as its base rule, so Shift is not a case layer there at all; and this projects own facet classifier already labels that keyboard casing:caseless / caps-handling:notApplicable. I verified by probe that a single native /\\p{Script=Georgian}/u covers all four Georgian scripts (Mkhedruli, Nuskhuri, Asomtavruli, Mtavruli), so this needs no table, no dependency, and no change to the frozen caseCounterpart primitive.\",\"rejected\":\"Accepting the noise (documented-only); a locale/BCP47 gate (a working copy may carry no tag, and it would wrongly suppress borrowed-Latin proposals on a Georgian keyboard); and widening the suppression to Cherokee, which has only absence-of-evidence behind it\"}"
     }
   ],
+  "concerns": [
     {
       "note": "RESOLVED 2026-08-18: T047/T055 completed via a Playwright-driven manual walk against the live pnpm dev server, verified against the real compiled .kmn/.keyman-touch-layout output rather than just automated unit coverage. See task_summaries.T047/T055.",
       "step": "implement"
