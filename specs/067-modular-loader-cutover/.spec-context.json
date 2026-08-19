@@ -1,0 +1,593 @@
+{
+  "workflow": "companion",
+  "specName": "067-modular-loader-cutover",
+  "branch": "067-modular-loader-cutover",
+  "selectedAt": "2026-08-19T15:16:03.868Z",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-19T15:16:12.203Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-19T15:16:12.213Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:12.558Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:12.959Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:13.336Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:13.787Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:14.174Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:14.612Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:15.039Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:15.663Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:16.073Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:16.439Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:16.924Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:17.376Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:17.875Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:18.312Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:18.687Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:19.096Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:19.563Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:19.967Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:43.010Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:43.442Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:43.981Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:44.665Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:45.249Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:45.709Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:46.201Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:46.600Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:47.000Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:47.409Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:47.886Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T15:26:48.301Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-19T15:26:48.988Z"
+    }
+  ],
+  "telemetryInstanceId": "cec13eca-e6a7-4856-bd57-f6d649d1d68d",
+  "currentTask": "T030",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Verified: cutover already landed on branch km/modular-loader-cutover, merged to main via PR #739 (feat(flows): P3(a) modular-loader cutover, refs #410)",
+      "files": [
+        "plan.md"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Superseded: legacy loader is already fully retired on main (PR #781); no pre-cutover baseline needed in this session",
+      "files": [
+        "N/A"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Verified: packages/studio/tests/survey/flow-parity.test.ts exists; passes (structural assertions post-retirement per spec-013 HANDOFF deviation 2, since the legacy loader it originally compared against was deleted by #781)",
+      "files": [
+        "packages/studio/tests/survey/flow-parity.test.ts"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Verified: il_language_autonym.ts exists in questions/a/, registered and covered by mirror-coverage/inputs-writes-coverage gates",
+      "files": [
+        "packages/studio/src/survey/questions/a/il_language_autonym.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Verified: il_language_english.ts exists in questions/a/, autonym-seed stays in IdentityLite.tsx getSeedValue (not in module)",
+      "files": [
+        "packages/studio/src/survey/questions/a/il_language_english.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Verified: il_language_code.ts exists in questions/a/ (later extended to autocomplete by spec 068 langtags-defaults)",
+      "files": [
+        "packages/studio/src/survey/questions/a/il_language_code.ts"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Verified: il_target_script.ts exists in questions/a/ with conditional next routing to il_script_not_supported for Ethi/Hani/Hang",
+      "files": [
+        "packages/studio/src/survey/questions/a/il_target_script.ts"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Verified: il_script_not_supported.ts exists in questions/a/, preserving the Article VII honest stub",
+      "files": [
+        "packages/studio/src/survey/questions/a/il_script_not_supported.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Verified: all il_* modules registered in registry.a.ts; questionRegistry floor guard (>=97) passes",
+      "files": [
+        "packages/studio/src/survey/questions/registry.a.ts"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Verified: content/flows/identity_lite.modular.yaml exists (flow_id identity_lite, phase A, il_* ids in order)",
+      "files": [
+        "content/flows/identity_lite.modular.yaml"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Verified: module-count floor bumped and grown further (now >=97, expressed as a floor guard rather than an exact count) in inputs-writes-coverage.test.ts",
+      "files": [
+        "packages/studio/tests/survey/inputs-writes-coverage.test.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Verified: mirrored il_* unit tests exist; mirror-coverage.test.ts passes (0 unmirrored modules)",
+      "files": [
+        "packages/studio/tests/survey/questions/a/"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Ran the three gates live in this session: inputs-writes-coverage, mirror-coverage, orphan-input-lint — all green (part of 4 files / 316 tests passed)",
+      "files": [
+        "packages/studio/tests/survey/inputs-writes-coverage.test.ts",
+        "packages/studio/tests/survey/mirror-coverage.test.ts",
+        "packages/studio/tests/survey/orphan-input-lint.test.ts"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Verified: PhaseA.tsx imports loadModularFlow (not parseFlow), loads phase_a_identity.modular.yaml via useMemo, no TODO(#410)",
+      "files": [
+        "packages/studio/src/survey/PhaseA.tsx"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Superseded by later refactor (spec 029 Stage 6): Phase F no longer has a standalone PhaseF.tsx — it now renders via the generic FlowStepHost + makeFlowStepComponent factory (steps/flowSources.ts registers phase_f_helpdocs.modular.yaml, loaded via loadModularFlow). Goal (FR-002) is met through the newer architecture.",
+      "files": [
+        "packages/studio/src/editors/adapters/makeFlowStepComponent.tsx",
+        "packages/studio/src/steps/flowSources.ts"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "Verified: IdentityLite.tsx imports loadModularFlow (not parseFlow), loads identity_lite.modular.yaml via useMemo, keeps getSeedValue/autonymRef seam, no TODO(#410)",
+      "files": [
+        "packages/studio/src/survey/IdentityLite.tsx"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Verified: flow-parity.test.ts covers Phase A, Phase F, and identity_lite (rewritten to modular structural-integrity + snapshot assertions once the legacy loader was deleted, per spec-013 HANDOFF deviation 2 — the original cross-loader golden compare is necessarily retired with loadFlow.ts)",
+      "files": [
+        "packages/studio/tests/survey/flow-parity.test.ts"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "Verified: grep -rn TODO(#410) packages/studio/src/ (and content/, packages/) returns no matches",
+      "files": [
+        "N/A"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "Ran pnpm --filter @keyboard-studio/studio typecheck live in this session: clean, no import-extension resolution errors",
+      "files": [
+        "N/A"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Verified: packages/studio/playwright.config.ts exists (testDir e2e, baseURL, webServer running pnpm dev), driven via global Playwright CLI, no @playwright/test devDependency added",
+      "files": [
+        "packages/studio/playwright.config.ts"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Verified: lane 1 (copy-edit.spec.ts) has no .skip; landed and merged via PR #906 (test(studio): activate Track 1 copy-edit E2E lane, refs #410), CI-green per that PR",
+      "files": [
+        "packages/studio/e2e/copy-edit.spec.ts"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Verified: lane 2 (import-improve.spec.ts) remains test.describe.skip with a documented TODO(refs #410) blocked-on-Track-2-import comment, matching FR-007 scenario 2 exactly; #410 closed on lane-1-only basis (refs, not closes, for the Track-2 conditional)",
+      "files": [
+        "packages/studio/e2e/import-improve.spec.ts"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Verified: packages/studio/src/survey/loadFlow.ts and loadFlow.test.ts do not exist — deleted via PR #781 (Retire legacy survey flow loader, Phase 3b), commit b4452b5",
+      "files": [
+        "N/A"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "Verified: content/flows/phase_a_identity.yaml, phase_b_characters.yaml, phase_f_helpdocs.yaml, identity_lite.yaml do not exist — deleted via PR #781 commit 1918d49; *.modular.yaml and _examples/* retained",
+      "files": [
+        "N/A"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Verified: flow-parity.test.ts was rewritten post-deletion (PR #781) to standalone modular structural-integrity + snapshot assertions per id/type/prompt/label/body/options/next, since the legacy parseFlow baseline it compared against no longer exists",
+      "files": [
+        "packages/studio/tests/survey/flow-parity.test.ts"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "Verified: grep -rn loadFlow|parseFlow packages/studio/src/ is clean; ran the four gate test files live (316/316 pass); question-module count did not shrink (136 module .ts files present, including reserve/library modules) — no module deleted, only delivery forms",
+      "files": [
+        "N/A"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "Verified structurally via git history: PR #781 landed as three separate, independently-revertible commits (9c395cc repoint, b4452b5 delete loader, 1918d49 delete YAMLs), documented in specs/013-retire-legacy-flow-loader/HANDOFF.md with an explicit revert order",
+      "files": [
+        "N/A"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "Verified: docs/survey-modularity-cyoa-plan.md already carries the P3(a) MERGED / P3(b)-via-#781 status line and the #410 lane reconciliation notes",
+      "files": [
+        "docs/survey-modularity-cyoa-plan.md"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "Verified: issue #410 is CLOSED (2026-06-30); its AC checkboxes reflect lane 1 shipped via #906 and lane 2 documented as Track-2-conditional, matching the refs-not-closes policy for the Track 2 blocker",
+      "files": [
+        "N/A"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "Ran the part-(a) quickstart checks live in this session (gates 1-4: module count/mirror/orphan-input/parity all green, zero TODO(#410), clean typecheck) and confirmed part-(b) deletion state (loader+YAMLs gone, retention intact) by inspection; did not re-run the full Playwright E2E suite or pnpm build in this session (both already CI-validated on the merged PRs #906/#781) — recorded as a residual/deferred check, not a gap in the shipped feature",
+      "files": [
+        "N/A"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "Four P2/P3 gate test files (inputs-writes-coverage, mirror-coverage, orphan-input-lint, flow-parity)",
+      "command": "pnpm vitest run tests/survey/flow-parity.test.ts tests/survey/inputs-writes-coverage.test.ts tests/survey/mirror-coverage.test.ts tests/survey/orphan-input-lint.test.ts",
+      "result": "4 test files, 316 tests, all passed"
+    },
+    {
+      "what": "No TODO(#410) markers remain in packages/ or content/",
+      "command": "grep -rn \"TODO(#410)\" packages/ content/",
+      "result": "zero matches"
+    },
+    {
+      "what": "Studio package typechecks clean (import extensions intact)",
+      "command": "pnpm --filter @keyboard-studio/studio typecheck",
+      "result": "exit 0, no errors"
+    },
+    {
+      "what": "Legacy loader + legacy YAMLs are gone; only modular manifests + _examples remain",
+      "command": "ls content/flows/; test -f packages/studio/src/survey/loadFlow.ts",
+      "result": "loadFlow.ts absent; identity_lite/phase_a_identity/phase_b_characters/phase_f_helpdocs .yaml absent; *.modular.yaml + _examples present"
+    },
+    {
+      "what": "E2E lane skip status matches FR-007",
+      "command": "grep -n skip packages/studio/e2e/copy-edit.spec.ts packages/studio/e2e/import-improve.spec.ts",
+      "result": "lane 1 copy-edit has no skip and was unblocked via merged PR 906; lane 2 import-improve is test.describe.skip with a documented Track-2-blocker comment"
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Treat spec 067 as already fully delivered by prior work rather than re-implementing",
+      "why": "The feature duplicates scope already shipped under spec 013 retire-legacy-flow-loader and closed issue 410, landed via merged PRs 739, 781, and 906. Every FR/SC in spec.md is independently verifiable against the current main-branch tree.",
+      "rejected": "Re-authoring the il_ modules, manifest, and component edits from scratch, which would duplicate existing code or regress the newer FlowStepHost architecture from spec 029."
+    },
+    {
+      "decision": "Kept the newer FlowStepHost / makeFlowStepComponent factory architecture as the FR-002 Phase F fulfillment instead of restoring a standalone PhaseF.tsx",
+      "why": "Spec 067 plan.md predates the spec 029 step-model refactor. PhaseF.tsx no longer exists on main and reintroducing it would revert later, already-merged architecture for no benefit; the modular-loader goal is met either way.",
+      "rejected": "Recreating PhaseF.tsx per the literal task text T015"
+    }
+  ],
+  "concerns": [
+    {
+      "note": "This spec directory duplicates already-shipped scope (spec 013 retire-legacy-flow-loader plus closed issue 410). Recommend flagging it in the spec-number-collision tracker or archiving specs/067 with a stub pointer to specs/013, matching the docs(spec) retroactive-verify pattern already used for specs 058 and 068.",
+      "step": "implement"
+    },
+    {
+      "note": "Full Playwright E2E suite and pnpm build were not re-run live in this session; relied on merged-PR CI history for the copy-edit lane and the legacy-retirement build. Run cd packages/studio and npx playwright test copy-edit plus pnpm build for a fresh signal if desired.",
+      "step": "implement"
+    }
+  ],
+  "coverage": {
+    "FR-001": {
+      "title": "Phase A resolves through the modular loader against phase_a_identity.modular.yaml",
+      "tests": [
+        "packages/studio/tests/survey/flow-parity.test.ts"
+      ]
+    },
+    "FR-002": {
+      "title": "Phase F resolves through the modular loader against phase_f_helpdocs.modular.yaml",
+      "tests": [
+        "packages/studio/tests/survey/flow-parity.test.ts"
+      ]
+    },
+    "FR-003": {
+      "title": "identity_lite.modular.yaml created and resolves against the registered il_ modules",
+      "tests": [
+        "packages/studio/tests/survey/flow-parity.test.ts",
+        "packages/studio/tests/survey/orphan-input-lint.test.ts"
+      ]
+    },
+    "FR-004": {
+      "title": "All TODO 410 markers removed from cut-over components",
+      "tests": [
+        "N/A grep verified not a unit test"
+      ]
+    },
+    "FR-007": {
+      "title": "E2E lane 1 copy-edit unblocked and passing, lane 2 conditional on Track 2 import liveness",
+      "tests": [
+        "packages/studio/e2e/copy-edit.spec.ts"
+      ]
+    },
+    "FR-008": {
+      "title": "Legacy loadFlow.ts and its test deleted",
+      "tests": [
+        "N/A deletion verified by file absence"
+      ]
+    },
+    "FR-012": {
+      "title": "Unreferenced modules remain compiled and test-covered library reserve modules",
+      "tests": [
+        "packages/studio/tests/survey/inputs-writes-coverage.test.ts",
+        "packages/studio/tests/survey/mirror-coverage.test.ts"
+      ]
+    }
+  },
+  "step_summaries": {
+    "implement": {
+      "summary": "Verified spec 067 is already fully delivered on main via prior work spec 013 plus merged PRs 739, 781, and 906, and closed issue 410. Checked all 30 tasks against the live tree rather than re-implementing.",
+      "key_finding": "Duplicate spec directory re-deriving already-shipped scope. Architecture has since evolved past the plan literal file list (Phase F now runs via FlowStepHost / makeFlowStepComponent, not a standalone PhaseF.tsx) but every FR/SC is independently satisfied.",
+      "risks": [
+        "Spec-number collision / stale duplicate spec folder should be reconciled with the existing tracker"
+      ]
+    }
+  },
+  "last_action": "retroactively verified: all 30 tasks confirmed already shipped via spec 013 and PRs 739/781/906; 316 of 316 gate tests plus clean typecheck"
+}
