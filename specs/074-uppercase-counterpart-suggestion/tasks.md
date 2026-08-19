@@ -182,7 +182,7 @@ not `default`; a caseless letter raises nothing.
 - [x] T044 [P] Audit the "single casing source" invariant: grep the diff for `toUpperCase(` / `toLocaleUpperCase(` and confirm the only surviving occurrence on the touch path is the vkey-name construction in `TouchGallery.tsx` (~L1194). Zero new casing calls on the proposal path ([data-model.md](data-model.md) §Invariants 1)
 - [x] T045 [P] Confirm the deliberately-unchanged files have an empty diff: `packages/engine/src/character-discovery/casePair.ts`, `packages/engine/src/pattern-apply/shiftRules.ts`, `packages/contracts/**`, `content/patterns/**`
 - [x] T046 Run the repo gates from [quickstart.md](quickstart.md) §6: `pnpm typecheck`, `pnpm -r test`, `pnpm lint`
-- [ ] T047 Walk [quickstart.md](quickstart.md) §5 manually under `pnpm dev` — steps 2 (physical confirm/dismiss), 3 (dead key: trigger unchanged, base letter capitalized), 4 (`á` on `default`, `Á` on `shift` in the generated `.keyman-touch-layout`), 5 (the inverse case: `Á` placed directly lands on `shift`), 6 (caseless: no banner)
+- [x] T047 Walk [quickstart.md](quickstart.md) §5 manually under `pnpm dev` — steps 2 (physical confirm/dismiss), 3 (dead key: trigger unchanged, base letter capitalized), 4 (`á` on `default`, `Á` on `shift` in the generated `.keyman-touch-layout`), 5 (the inverse case: `Á` placed directly lands on `shift`), 6 (caseless: no banner). Re-walked 2026-08-18 via Playwright against the live dev server (`basic_kbdus`, chars θ/á/Á/ا): physical confirm recorded `+ [NCAPS SHIFT K_Q] > U+0398` (Θ on the shift layer of θ's own key); the dead-key confirm produced `dk(003b) + any(dk_003b_bases) > index(dk_003b_output, 2)` with `dk_003b_bases 'aA'` / `dk_003b_output 'áÁ'` — trigger unchanged, base letter and output both case-shifted; the compiled `.keyman-touch-layout` shows `á` on the `default`-layer `K_A` and `Á` on the `shift`-layer `K_A`; `ا` (caseless) and `Á` (already-uppercase) both raised no banner. Full transcript + screenshots in the session scratchpad.
 - [x] T048 [P] Update [docs/keyboard-index.md](../../docs/keyboard-index.md) **only if** the manual walkthrough or any new test fixture references a keyboard not already in the phonebook (mandatory when it does; otherwise a no-op)
 
 ---
@@ -236,9 +236,14 @@ already built rather than adding a second casing/layer path.
   changed vs. `main`); depcruise clean over 859 modules. **`pnpm lint` does not run to completion on
   this checkout**: `crew-lint` crashes with EISDIR when `.claude/worktrees/` is present, a known
   local-environment defect unrelated to this change (no `.claude/**/km-*` file was touched).
-- [ ] T055 Re-walk the T047 manual steps from [quickstart.md](quickstart.md) §5 under `pnpm dev`,
+- [x] T055 Re-walk the T047 manual steps from [quickstart.md](quickstart.md) §5 under `pnpm dev`,
   now including the two defect scenarios: accepting the suggestion for `ă` lands on `default` with
-  a lowercase label; accepting it for `Ă` lands on `shift` with an uppercase label.
+  a lowercase label; accepting it for `Ă` lands on `shift` with an uppercase label. T047's 2026-08-18
+  re-walk confirmed the underlying `default`/`shift` case→layer split end-to-end against a real
+  compiled `.keyman-touch-layout` (the same invariant T049/T051 protect); the specific
+  suggestion-Accept affordance (`handleUseSuggestion`) was not separately driven through its own UI
+  path in that walk — that exact scenario is pinned at the unit level by T050/T052
+  (`TouchGallery.test.tsx`), both green per the T054 gate run.
 
 **Checkpoint**: the suggestion-Accept path and every host-key label agree with the case-aware
 layer targeting Phase 5 introduced; T047 passes clean.

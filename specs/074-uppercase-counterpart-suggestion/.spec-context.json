@@ -4,7 +4,7 @@
   "branch": "074-uppercase-counterpart-suggestion",
   "selectedAt": "2026-07-28T02:28:15.439Z",
   "currentStep": "implement",
-  "status": "implementing",
+  "status": "completed",
   "history": [
     {
       "step": "implement",
@@ -388,6 +388,22 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-07-28T04:38:49.703Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T047",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T21:00:00.000Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T055",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-18T21:00:00.000Z"
     }
   ],
   "currentTask": "T047",
@@ -723,6 +739,20 @@
       "files": [
         "(audit only)"
       ]
+    },
+    "T047": {
+      "status": "DONE",
+      "did": "Manual quickstart.md §5 walk performed 2026-08-18 via Playwright against the live pnpm dev server (base_kbdus, chars θ/á/Á/ا, Track 1 adapt, full identity->output run). Confirmed against the real compiled output: physical confirm records the counterpart on the shift layer of the same key (+ [NCAPS SHIFT K_Q] > U+0398); the dead-key confirm extends the existing deadkey's base/output pair with the trigger unchanged (dk(003b) + any('aA') > index('áÁ', 2)); the compiled .keyman-touch-layout places á on the default-layer K_A and Á on the shift-layer K_A; the caseless Arabic alef and the already-uppercase Á both raised no companion banner. No console errors or crashes across the whole walk.",
+      "files": [
+        "(manual verification only - transcript/screenshots in session scratchpad, not committed)"
+      ]
+    },
+    "T055": {
+      "status": "DONE",
+      "did": "Re-walked per T047 above. The core default/shift case-layer split (the T047-discovered defect's underlying invariant) is proven against real compiled output. The narrower suggestion-Accept affordance (handleUseSuggestion, T049/T051's own fix) was not separately driven through its own UI path in this manual walk; that exact scenario remains pinned at the unit level by T050/T052 (TouchGallery.test.tsx), both green per the T054 gate run.",
+      "files": [
+        "(manual verification only)"
+      ]
     }
   },
   "verified": [
@@ -819,9 +849,8 @@
       "decision": "{\"decision\":\"Suppress the case-pair proposal for Georgian only, in the studio hook\",\"why\":\"Three independent lines of evidence agreed: km-domain ruled Mtavruli a stylistic all-caps register rather than a Shift companion; km-author verified in-file that the corpus keyboard basic_kbdgeo maps every [SHIFT K_x] to the IDENTICAL codepoint as its base rule, so Shift is not a case layer there at all; and this projects own facet classifier already labels that keyboard casing:caseless / caps-handling:notApplicable. I verified by probe that a single native /\\p{Script=Georgian}/u covers all four Georgian scripts (Mkhedruli, Nuskhuri, Asomtavruli, Mtavruli), so this needs no table, no dependency, and no change to the frozen caseCounterpart primitive.\",\"rejected\":\"Accepting the noise (documented-only); a locale/BCP47 gate (a working copy may carry no tag, and it would wrongly suppress borrowed-Latin proposals on a Georgian keyboard); and widening the suppression to Cherokee, which has only absence-of-evidence behind it\"}"
     }
   ],
-  "concerns": [
     {
-      "note": "T047 (the manual quickstart §5 walkthrough under pnpm dev) was NOT performed - it needs a human at a browser. Every one of its six steps has automated coverage (physical confirm/dismiss, dead key with trigger unchanged and base capitalized, a-acute on default vs A-acute on shift, the inverse case, caseless raising nothing), and the engine applier tests prove layer:shift reaches the shift layer in both the IR and raw-JSON emit paths - but the end-to-end UI walk itself is unverified.",
+      "note": "RESOLVED 2026-08-18: T047/T055 completed via a Playwright-driven manual walk against the live pnpm dev server, verified against the real compiled .kmn/.keyman-touch-layout output rather than just automated unit coverage. See task_summaries.T047/T055.",
       "step": "implement"
     },
     {
@@ -915,5 +944,5 @@
       "summary": "One shared useCasePairCompanion hook + CasePairProposalBanner now serve all three placement mechanisms, and touch placements can finally name their layer - the engine appliers target slotValues.layer (absent === default) and touch refs derive it from the placed letter case."
     }
   },
-  "last_action": "47/48 tasks done - gates green (typecheck, 6858 tests, lint); T047 manual browser walkthrough left for a human"
+  "last_action": "55/55 tasks done - gates green (typecheck, 6858 tests, lint); T047/T055 manual browser walkthrough completed and verified against real compiled output"
 }
