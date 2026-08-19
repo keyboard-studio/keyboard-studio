@@ -237,49 +237,101 @@ describe('CarveGalleryV2 — toggleGroup', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 4. Search filtering — by character, by codepoint name, and by key label.
+// 4. Removed-characters dropdown (#1619 AC1) — every currently discarded
+// character is individually restorable from a dropdown next to the status
+// text, reusing StatusBar.tsx's extracted RemovedDropdown.
 // ---------------------------------------------------------------------------
 
-describe('CarveGalleryV2 — search filtering', () => {
-  it('narrows to the matching cell by literal character', () => {
+describe('CarveGalleryV2 — removed-characters dropdown', () => {
+  it('lists each discarded character individually and restores just the one clicked', () => {
     mockFixtureContributors();
     renderGalleryV2(makeFixtureIR());
 
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search a character or code point' }), { target: { value: 'q' } });
+    fireEvent.click(screen.getByRole('button', { name: 'a — U+0061' }));
+    fireEvent.click(screen.getByRole('button', { name: '1 — U+0031' }));
 
-    expect(screen.getByRole('button', { name: 'q — U+0071' })).not.toBeNull();
-    expect(screen.queryByRole('button', { name: 'a — U+0061' })).toBeNull();
-    expect(screen.queryByRole('button', { name: '1 — U+0031' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'C — U+0043' })).toBeNull();
+    const trigger = screen.getByRole('button', { name: /removed/i });
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+
+    fireEvent.click(trigger);
+
+    // Both discarded characters are listed, each with its own Keep button.
+    const keepButtons = screen.getAllByRole('button', { name: /keep/i });
+    expect(keepButtons.length).toBe(2);
+
+    fireEvent.click(keepButtons[0]!);
+
+    // Exactly one restored — the other stays discarded.
+    const deletedNow = [
+      useWorkingCopyStore.getState().isItemDeleted('r-a'),
+      useWorkingCopyStore.getState().isItemDeleted('r-1'),
+    ];
+    expect(deletedNow.filter(Boolean).length).toBe(1);
   });
 
-  it('narrows to the matching cell by codepoint name', () => {
+  it('restores every discarded character via the dropdown\'s "Restore all"', () => {
     mockFixtureContributors();
     renderGalleryV2(makeFixtureIR());
 
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search a character or code point' }), { target: { value: 'U+0031' } });
+    // 'a' and 'C' rather than 'a' and '1': both are 'basic-letter', a group
+    // that also contains the untouched 'q' — so this leaves no category
+    // group fully discarded, which would otherwise show its OWN ambiguous
+    // "Restore all" group-toggle button (Digits & numerals has only '1').
+    fireEvent.click(screen.getByRole('button', { name: 'a — U+0061' }));
+    fireEvent.click(screen.getByRole('button', { name: 'C — U+0043' }));
 
-    expect(screen.getByRole('button', { name: '1 — U+0031' })).not.toBeNull();
-    expect(screen.queryByRole('button', { name: 'a — U+0061' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'q — U+0071' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: /removed/i }));
+    fireEvent.click(screen.getByRole('button', { name: /restore all/i }));
+
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(false);
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(false);
   });
 
-  it('narrows to the matching cell by resolved key label', () => {
+  it('disables the trigger when nothing is discarded', () => {
     mockFixtureContributors();
     renderGalleryV2(makeFixtureIR());
 
-    // Only 'C' (Shift+K_C) resolves a key sequence containing "shift".
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search a character or code point' }), { target: { value: 'shift' } });
-
-    expect(screen.getByRole('button', { name: 'C — U+0043' })).not.toBeNull();
-    expect(screen.queryByRole('button', { name: 'a — U+0061' })).toBeNull();
-    expect(screen.queryByRole('button', { name: '1 — U+0031' })).toBeNull();
-    expect(screen.queryByRole('button', { name: 'q — U+0071' })).toBeNull();
+    const trigger = screen.getByRole('button', { name: /nothing removed/i });
+    expect(trigger.hasAttribute('disabled')).toBe(true);
   });
 });
 
 // ---------------------------------------------------------------------------
-// 5. "Group by" toggle — Category vs Source re-groups the grid.
+// 5. Read-only character-details panel (#1619 AC2) — no discard/restore
+// control lives in the panel; toggling happens only via the grid cell, a
+// suggested-group card, or the removed-characters dropdown.
+// ---------------------------------------------------------------------------
+
+describe('CarveGalleryV2 — read-only character-details panel', () => {
+  it('renders no "Discard this character" / "Restore this character" control anywhere', () => {
+    mockFixtureContributors();
+    renderGalleryV2(makeFixtureIR());
+
+    expect(screen.queryByRole('button', { name: /discard this character/i })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'a — U+0061' }));
+
+    expect(screen.queryByRole('button', { name: /discard this character/i })).toBeNull();
+    expect(screen.queryByRole('button', { name: /restore this character/i })).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 6. Search bar removed (#1619 AC4) — no search box, no filtering. Every
+// produced character is always reachable through the grouped grid.
+// ---------------------------------------------------------------------------
+
+describe('CarveGalleryV2 — no search bar', () => {
+  it('renders no search box at all', () => {
+    mockFixtureContributors();
+    renderGalleryV2(makeFixtureIR());
+
+    expect(screen.queryByRole('searchbox')).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 7. "Group by" toggle — Category vs Source re-groups the grid.
 // ---------------------------------------------------------------------------
 
 describe('CarveGalleryV2 — group-by toggle', () => {
@@ -310,7 +362,7 @@ describe('CarveGalleryV2 — group-by toggle', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 6. Suggested-to-discard first group (#533 — design handoff option 1b).
+// 8. Suggested-to-discard first group (#533 — design handoff option 1b).
 // recommendedRemovalChars rows render as the FIRST group of the gallery
 // (RecommendedGroupCard), replacing the old standing RemovalBanner.
 // ---------------------------------------------------------------------------
@@ -347,21 +399,6 @@ describe('CarveGalleryV2 — suggested-to-discard group', () => {
     expect(screen.queryByRole('region', { name: 'Suggested to discard' })).toBeNull();
   });
 
-  it('hides the suggested group entirely once a search query is entered', async () => {
-    mockFixtureContributors();
-    neededCharsResult.set(new Set(['a']));
-    renderGalleryV2(makeFixtureIR());
-
-    await screen.findByTestId('carve-v2-suggested-group');
-
-    fireEvent.change(screen.getByRole('searchbox', { name: 'Search a character or code point' }), { target: { value: 'C' } });
-
-    expect(screen.queryByTestId('carve-v2-suggested-group')).toBeNull();
-    // The grid itself must still be able to answer the query — 'C' is
-    // findable there while the card that would otherwise show it is hidden.
-    expect(screen.getByRole('button', { name: 'C — U+0043' })).not.toBeNull();
-  });
-
   it('bulk-discards every recommended character, then flips to a restore affordance', async () => {
     mockFixtureContributors();
     neededCharsResult.set(new Set(['a']));
@@ -384,7 +421,7 @@ describe('CarveGalleryV2 — suggested-to-discard group', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 7. Optional-Latin group — reason: 'cross-script-latin' rows split into
+// 9. Optional-Latin group — reason: 'cross-script-latin' rows split into
 // their own secondary, collapsible group (preserved from RemovalBanner's
 // post-#526 follow-on split; see RemovalBanner.tsx's header comment).
 // ---------------------------------------------------------------------------
