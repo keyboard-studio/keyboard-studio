@@ -1,0 +1,216 @@
+{
+  "workflow": "companion",
+  "specName": "058-output-screen-picker-scope",
+  "branch": "058-output-screen-picker-scope",
+  "selectedAt": "2026-08-19T02:41:42.451Z",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-19T02:41:55.658Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-19T02:41:56.003Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T02:46:30.865Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T02:46:35.596Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T02:46:40.388Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-19T03:00:59.689Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T03:04:34.815Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-08-19T03:06:23.351Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T03:12:00.530Z"
+    }
+  ],
+  "telemetryInstanceId": "5436b830-c011-4618-8d6d-04243f7469e0",
+  "approach": "Retroactive plan: PickerPane gets a variant prop (full/shipping) picked by a live isInstantiated() subscription; shipping variant shows read-only base provenance plus a Change-base control that only navigates back to choose_base (no in-place mutation); resolveOutputKeyboardId is the single id source for both the download aria-label and the emitted filename.",
+  "decisions": [
+    {
+      "decision": "PickerPaneVariant prop on the existing PickerPane, default full",
+      "why": "identity/KMN slots already shared between cold-arrival and ship-time cases, and FR-005 requires a mid-visit variant flip to reconcile in place without unmounting a half-typed identity form",
+      "rejected": "a second sibling component (ShippingPane) duplicating the shared slots"
+    },
+    {
+      "decision": "variant selection via live useWorkingCopyStore isInstantiated() subscription",
+      "why": "a mount-once read reintroduces the exact D1 bug (pickerMode never re-reading the store) one level up, missing the documented late-instantiation settle race",
+      "rejected": "computing the variant once from a route/navigation event"
+    },
+    {
+      "decision": "Change base keyboard is a pure navigation action (backToChooseBase + navigateTo), never a mutation",
+      "why": "spec Out-of-scope forbids reworking the window.confirm rebase dialog, and a second confirm surface on Output would duplicate confirmRebaseTo at choose_base, reopening the D4-shaped drift-by-prose problem",
+      "rejected": "a richer in-place confirm modal on Output replacing window.confirm for this entry point"
+    },
+    {
+      "decision": "new backToChooseBase store action rewinding history to the pre-choose_base prefix, rather than advance(\"choose_base\")",
+      "why": "the navigation is conceptually a BACK but choose_base is not the immediate predecessor, so single-step popHistory cannot express it; a forward advance would leave stale steps on the stack so a later Back would walk forward through the survey the author just left (FR-007)",
+      "rejected": "generalizing backToUnfinishedGallery target union; that actions docstring documents a different desktop-first jump-past semantics"
+    },
+    {
+      "decision": "single resolveOutputKeyboardId helper in its own module, called by both OutputScreen and serializeWorkingCopy",
+      "why": "D4 was two independent derivations of the same id kept in agreement by prose not code; a standalone module (not exported from serializeWorkingCopy.ts) avoids being read as undefined in the two test files that vi.mock that module wholesale",
+      "rejected": "correcting the aria-label derivation in place, which would just be a second independent expression that happens to currently match"
+    },
+    {
+      "decision": "Treated this implement step as verification-only since tasks.md is a retroactive record of already-shipped work (feature landed on main before this specs/ directory existed, per the 2026-08-18 spec-number-collision cleanup)",
+      "why": "Every task box was already checked with a real file/symbol/FR citation; re-implementing would duplicate shipped code",
+      "rejected": "Re-running /speckit-tasks or re-authoring the changes as if new"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Retroactive plan documenting the already-shipped PickerPane variant + backToChooseBase design; Constitution Check passes on all articles, no contracts change, no violations.",
+      "key_finding": "Feature was fully implemented (PickerPane.tsx, OutputScreen.tsx, outputKeyboardId.ts, surveySessionStore.backToChooseBase) before this .spec-context.json was created during the 2026-08-18 spec-number-collision cleanup; plan/research/data-model/contracts written against the real code, not proposed."
+    },
+    "tasks": {
+      "summary": "17 tasks across Setup(none)/Foundational/3 user-story phases/Polish, all pre-checked as retroactive evidence for already-shipped code (058)."
+    },
+    "implement": {
+      "summary": "Verified the already-shipped output-screen picker-scope fix (PickerPaneVariant, resolveOutputKeyboardId, backToChooseBase) against source and re-ran all four OutputScreen suites — 46/46 pass"
+    }
+  },
+  "coverage": {
+    "FR-001": {
+      "title": "PickerPane MUST accept a variant that suppresses the mode toggle and picker slot, with full behaviour as default",
+      "tasks": [
+        "T001",
+        "T004"
+      ],
+      "tests": [
+        "OutputScreen.pickerScope.test.tsx",
+        "OutputScreen.test.tsx"
+      ]
+    },
+    "FR-002": {
+      "title": "OutputScreen MUST select the reduced variant when the working-copy store reports an instantiated copy",
+      "tasks": [
+        "T005"
+      ]
+    },
+    "FR-003": {
+      "title": "Variant selection MUST be derived from a live store subscription, not a mount-once read",
+      "tasks": [
+        "T005",
+        "T014"
+      ]
+    },
+    "FR-004": {
+      "title": "Reduced variant MUST present the base keyboard as read-only provenance with a programmatically-associated label",
+      "tasks": [
+        "T004"
+      ]
+    },
+    "FR-005": {
+      "title": "Reduced variant MUST keep TrackOneIdentityPanel and KmnEditor rendering and editable across a variant flip",
+      "tasks": [
+        "T004",
+        "T014"
+      ]
+    },
+    "FR-006": {
+      "title": "Reduced variant MUST offer a Change base keyboard control that navigates to choose_base and never mutates the working copy",
+      "tasks": [
+        "T002",
+        "T011"
+      ],
+      "tests": [
+        "OutputScreen.pickerScope.test.tsx"
+      ]
+    },
+    "FR-007": {
+      "title": "choose_base back-navigation MUST leave history free of stale forward entries",
+      "tasks": [
+        "T002",
+        "T012"
+      ]
+    },
+    "FR-008": {
+      "title": "Download aria-label MUST derive the keyboard id from the same source as the emitted filename",
+      "tasks": [
+        "T001",
+        "T006",
+        "T007"
+      ],
+      "tests": [
+        "OutputScreen.pickerScope.test.tsx"
+      ]
+    },
+    "FR-009": {
+      "title": "All new/changed user-visible strings MUST be Lingui-wrapped per the §046 convention",
+      "tasks": [
+        "T009",
+        "T011"
+      ]
+    },
+    "FR-010": {
+      "title": "No new debounce timer, validation cycle, or working-copy mutation path may be introduced",
+      "tasks": [
+        "T005",
+        "T011"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "OutputScreen.pickerScope.test.tsx + 3 sibling suites (US1-US3, D4 regression) all pass",
+      "command": "pnpm exec vitest run src/components/OutputScreen.pickerScope.test.tsx src/components/OutputScreen.test.tsx src/components/OutputScreen.coverageBanner.test.tsx src/components/OutputScreen.kmp.test.tsx",
+      "result": "4 test files, 46 tests passed, exit 0",
+      "warnings": [
+        "jsdom console errors: Not implemented: navigation (except hash changes) — expected noise from navigateTo() calls under jsdom, not a test failure"
+      ]
+    },
+    {
+      "what": "Source tree matches every task/plan claim",
+      "command": "grep for PickerPaneVariant, resolveOutputKeyboardId, backToChooseBase, PANE_SECONDARY_BUTTON, picker.shipping.* i18n ids",
+      "result": "all present exactly as tasks.md/plan.md describe"
+    }
+  ],
+  "last_action": "retroactive verification complete — 17/17 tasks confirmed shipped, 46/46 tests pass"
+}
