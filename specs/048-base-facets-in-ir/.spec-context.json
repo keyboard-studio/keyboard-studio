@@ -3,7 +3,50 @@
   "specName": "048-base-facets-in-ir",
   "branch": "048-base-facets-in-ir",
   "selectedAt": "2026-07-24T01:27:59.685Z",
-  "currentStep": "specify",
-  "status": "draft",
-  "history": []
+  "currentStep": "plan",
+  "status": "planned",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:10:58.534Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "ai",
+      "at": "2026-08-19T23:10:58.937Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:10:59.600Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:11:00.293Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:11:01.515Z"
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Hoist the offline casing-classifiers core determination logic into a shared location rather than writing a second runtime-only derivation",
+      "why": "classifyCasing already operates directly on KeyboardIR - FR-008 single-shared-derivation is achievable structurally via a hoist, not by convention/testing two implementations for agreement",
+      "rejected": "A second, simplified runtime-only casing check verified by a parity test against the offline classifier"
+    }
+  ]
 }
