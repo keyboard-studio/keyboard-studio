@@ -4,7 +4,7 @@
 
 **Created**: 2026-07-15
 
-**Status**: Draft
+**Status**: Implemented (US1–US5, all Success Criteria SC-001…SC-006) — originally authored as `specs/037-my-keyboards`, shipped via PR #1139 (2026-07-15), ported to `main` via #1334, refined by #1556 and #1603; renumbered to `072` after `037` was reused by an unrelated spec during a collision cleanup. Retroactively verified 2026-08-19.
 
 **Input**: A per-user list of the keyboards an author has worked on — in-progress drafts and submitted keyboards — surfaced on the profile page. Replaces the disabled "My keyboards" placeholder in [packages/studio/src/components/ProfileScreen.tsx](../../packages/studio/src/components/ProfileScreen.tsx).
 
@@ -163,7 +163,7 @@ interface ProjectIndexEntry {
 
 `ProjectIndexEntry` is the client mirror of the server's `DraftMeta` (see below) plus `projectKey` and `langTag` — the two are kept structurally close on purpose so `saveProjectDraft()` can build one from the other with a single mapping function, not two divergent shapes.
 
-Autosave (`startDraftAutosave` / `startCloudSync` in [draftAutosave.ts](../../packages/studio/src/lib/draftAutosave.ts)) is retargeted to: capture the draft as today, resolve its `projectKey`, write `ks.studio.project.<projectKey>`, and upsert the matching row in `ks.studio.projects.index`. The debounce constants (1 s local, 20 s cloud) and the "no meaningful progress → no write" guard (`hasMeaningfulProgress`) are unchanged.
+Autosave (`installDraftAutosave` / `startCloudSync`, both now in [draftPersistence.ts](../../packages/studio/src/lib/draftPersistence.ts) — `draftAutosave.ts` was retired and merged into `draftPersistence.ts` by a later consolidation, commit `215ede33`, after this spec was written; `startDraftAutosave` was renamed `installDraftAutosave` in the merge) is retargeted to: capture the draft as today, resolve its `projectKey`, write `ks.studio.project.<projectKey>`, and upsert the matching row in `ks.studio.projects.index`. The debounce constants are `AUTOSAVE_DEBOUNCE_MS = 500` (local) and `CLOUD_SYNC_DEBOUNCE_MS = 20_000` (cloud) — corrected here from this spec's original "1 s local" claim, which was accurate for the now-retired `draftAutosave.ts` module (per its own consolidation commit message) but not for the surviving engine. The "no meaningful progress → no write" guard (`hasMeaningfulProgress`) is unchanged.
 
 ### Server data model
 
@@ -191,7 +191,7 @@ export interface DraftStore {
   listMeta(userId: number): Promise<DraftMeta[]>;                              // NEW
   getMeta(userId: number, draftId: string): Promise<DraftMeta | null>;
   getDraft(userId: number, draftId: string): Promise<StoredDraft | null>;
-  putDraft(userId: number, login: string, draftId: string, meta: DraftMeta, draft: unknown): Promise<void>;
+  putDraft(userId: number, login: string, meta: DraftMeta, draft: unknown): Promise<void>;  // draftId is carried on meta.draftId, not a separate parameter (corrected from this spec's original sketch)
   deleteDraft(userId: number, draftId: string): Promise<void>;
 }
 ```
