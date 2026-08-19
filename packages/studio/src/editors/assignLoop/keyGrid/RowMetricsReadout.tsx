@@ -92,7 +92,7 @@ export function RowMetricsReadout({ rowIndex, metrics }: RowMetricsReadoutProps)
       <span>
         {t({
           id: "editor.assignLoop.keyGrid.rowMetrics.keys",
-          message: `${metrics.interactiveKeyCount} keys`,
+          message: `${{ count: metrics.interactiveKeyCount }} keys`,
         })}
       </span>
       <span
@@ -106,19 +106,19 @@ export function RowMetricsReadout({ rowIndex, metrics }: RowMetricsReadoutProps)
       >
         {t({
           id: "editor.assignLoop.keyGrid.rowMetrics.width",
-          message: `${formatUnits(metrics.keyWidthTotal)} declared width`,
+          message: `${{ width: formatUnits(metrics.keyWidthTotal) }} declared width`,
         })}
       </span>
       <span>
         {t({
           id: "editor.assignLoop.keyGrid.rowMetrics.padding",
-          message: `${formatUnits(metrics.padTotal)} padding`,
+          message: `${{ padding: formatUnits(metrics.padTotal) }} padding`,
         })}
       </span>
       <span>
         {t({
           id: "editor.assignLoop.keyGrid.rowMetrics.total",
-          message: `${formatUnits(metrics.rowTotal)} total`,
+          message: `${{ total: formatUnits(metrics.rowTotal) }} total`,
         })}
       </span>
       {isCrowded && (
@@ -135,7 +135,7 @@ export function RowMetricsReadout({ rowIndex, metrics }: RowMetricsReadoutProps)
               only, so colour is never the sole carrier (accessibility rule 7). */}
           {t({
             id: "editor.assignLoop.keyGrid.rowMetrics.crowded",
-            message: `Crowded — ${metrics.overMaximumBy} over the ${metrics.platformMaxKeys} that fit comfortably. You can leave it.`,
+            message: `Crowded — ${{ over: metrics.overMaximumBy }} over the ${{ max: metrics.platformMaxKeys }} that fit comfortably. You can leave it.`,
           })}
         </span>
       )}

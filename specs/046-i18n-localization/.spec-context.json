@@ -4,7 +4,7 @@
   "branch": "046-i18n-localization",
   "selectedAt": "2026-07-20T22:29:02.647Z",
   "currentStep": "implement",
-  "status": "implementing",
+  "status": "implemented",
   "history": [
     {
       "step": "plan",
@@ -216,8 +216,21 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-07-22T15:42:06.850Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:48:50.180Z"
     }
   ],
   "telemetryInstanceId": "ed6efe4a-581e-4076-8160-54e8424a8249",
-  "currentTask": "T023"
+  "currentTask": "T023",
+  "concerns": [
+    {
+      "note": "T029 (criteria-description localization render-site wiring) remains genuinely open, not a paperwork gap: content/i18n/fr/criteria.json is authored and parity-checked (158/158 keys), but a repo-wide grep confirms zero code anywhere reads Criterion.description or preSubmitChecklistText for end-user display - there is no criteria-review/checklist UI to wire resolveContentString into yet. Verified independently 2026-08-19 (grep across packages/studio/src and packages/ for preSubmitChecklistText hits only contracts type defs and tests). Building that UI would be a new feature, not finishing this task. Leave T029 open until such a UI exists; this is a real, structural blocker, not neglect.",
+      "step": "implement"
+    }
+  ]
 }

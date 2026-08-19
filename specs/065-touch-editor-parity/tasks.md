@@ -597,7 +597,7 @@ defect, and where no default is possible the editor says why.
 
 **Wave 1 — independent (different files):**
 
-- [ ] **T055** [P] Localize every new author-facing string added across US1–US5 under ids matching
+- [x] **T055** [P] Localize every new author-facing string added across US1–US5 under ids matching
   `area ( "." segment )+`; confirm the engine returns only structured fields and no English prose
   crosses the boundary (FR-037) ·
   `packages/studio/src/locales/`
@@ -607,7 +607,7 @@ defect, and where no default is possible the editor says why.
   ≥2 options and a label at 1; the grid's arrow keys stay **navigation**, never movement; every
   editing path completes by keyboard alone (SC-004, FR-038) ·
   `packages/studio/src/editors/assignLoop/keyGrid/KeyGrid.test.tsx`
-- [ ] **T057** [P] Confirm every new edit — `move`, the four newly editable fields, and every gesture
+- [x] **T057** [P] Confirm every new edit — `move`, the four newly editable fields, and every gesture
   edit — is undoable through the shared chronological `'k'` stack and that the undo affordance names
   what it will undo (FR-040) ·
   `packages/studio/src/editors/assignLoop/TouchGallery.test.tsx`
@@ -621,7 +621,7 @@ defect, and where no default is possible the editor says why.
 
 **⟶ Wait for Wave 1 to finish, then (independent):**
 
-- [ ] **T060** [P] Full repeatable gate: `pnpm typecheck`, `pnpm -r test`, `pnpm lint`, plus the three
+- [x] **T060** [P] Full repeatable gate: `pnpm typecheck`, `pnpm -r test`, `pnpm lint`, plus the three
   standalone vitest configs and `pnpm crew-lint` if any `.claude/**/km-*` file was touched ·
   *(repo root)*
 - [x] **T061** [P] Run `node utilities/spec-trace check`, then acknowledge the spec units this feature
@@ -630,7 +630,7 @@ defect, and where no default is possible the editor says why.
 
 **⟶ Wait for T060 to finish, then:**
 
-- [ ] **T062** Exploration pass (Playwright, ad hoc): run the un-skipped walk headed and click
+- [x] **T062** Exploration pass (Playwright, ad hoc): run the un-skipped walk headed and click
   through all six of issue #1530's complaints against T001's baseline, confirming each is
   demonstrably resolved (SC-001) ·
   `specs/065-touch-editor-parity/exploration-baseline.md`
