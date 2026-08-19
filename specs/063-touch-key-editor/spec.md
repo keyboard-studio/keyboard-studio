@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-03
 
-**Status**: Ready for planning (crew gap-review cycle 1 resolved; §18 sign-off recorded 2026-08-03)
+**Status**: Implemented (US1–US5, all 130 tasks, all FRs/SCs) — originally authored as specs/058-touch-key-editor, renumbered to 063 after 058 was reused by an unrelated spec during a collision cleanup. §18 sign-off recorded 2026-08-03. Retroactively verified 2026-08-19.
 
 **Governing docs**: [spec.md](../../spec.md) §8 (data flow — the touch layout is derived from the locked desktop), §3c ("Defaults are the product" — propose-then-confirm, "no default is a defect"), §14 Decision 6 (desktop-first authoring; no reverse touch→physical derivation), §16 (out of scope), and [.specify/memory/constitution.md](../../.specify/memory/constitution.md) Art. VII. This feature **extends the scope boundary** set by [specs/035-mobile-touch-derivation](../035-mobile-touch-derivation/spec.md) — see [Relationship to spec 035](#relationship-to-spec-035) below.
 
