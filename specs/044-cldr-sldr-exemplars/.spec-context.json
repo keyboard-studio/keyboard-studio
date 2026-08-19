@@ -3,7 +3,7 @@
   "specName": "CLDR/SLDR exemplars",
   "branch": "044-cldr-sldr-exemplars",
   "currentStep": "implement",
-  "status": "implemented",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
@@ -362,6 +362,17 @@
       "what": "full gate after the prefill UI landed",
       "command": "pnpm typecheck && pnpm -r test && eslint",
       "result": "pass — typecheck clean, 6976 tests green (studio 4188/306 files, engine 2077), 0 eslint errors"
+    },
+    {
+      "what": "retroactive verification 2026-08-19: spot-checked all 3 phases (61 tasks)",
+      "result": "shipped via merge commit 41a41a25; scripts/{fetch-sldr,codegen-exemplars}.mjs, exemplarSource/exemplarIndex/exemplarTypes.ts, phaseBDraftStore.ts provenance/rejected/seedFromProposal all confirmed present"
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Amended spec.md with a Superseded section documenting that FR-017 per-character tickable/removable chip UI was removed by PR 1552, rather than closing the spec as originally written",
+      "why": "PR 1552 (2026-08-07, after this feature shipped) deliberately removed SuggestionChip/SuggestionPanel in favor of the simpler one-shot accept-or-decline model FR-016/FR-016a already describe; closing without noting this would misstate current reality on FR-017",
+      "rejected": "Closing the spec silently as fully-as-written, which would leave FR-017 describing UI that no longer exists"
     }
   ]
 }
