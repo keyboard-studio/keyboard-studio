@@ -3,8 +3,8 @@
   "specName": "048-base-facets-in-ir",
   "branch": "048-base-facets-in-ir",
   "selectedAt": "2026-07-24T01:27:59.685Z",
-  "currentStep": "plan",
-  "status": "planned",
+  "currentStep": "tasks",
+  "status": "ready-to-implement",
   "history": [
     {
       "step": "specify",
@@ -40,6 +40,27 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-19T23:11:01.515Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "ai",
+      "at": "2026-08-19T23:38:23.993Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:38:24.847Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:38:26.088Z"
     }
   ],
   "decisions": [
@@ -48,5 +69,10 @@
       "why": "classifyCasing already operates directly on KeyboardIR - FR-008 single-shared-derivation is achievable structurally via a hoist, not by convention/testing two implementations for agreement",
       "rejected": "A second, simplified runtime-only casing check verified by a parity test against the offline classifier"
     }
-  ]
+  ],
+  "step_summaries": {
+    "tasks": {
+      "summary": "23 tasks across 6 phases (Setup, Foundational hoist, US1 available, US2 overridable, US3 provenance, Polish); casing-only first increment"
+    }
+  }
 }

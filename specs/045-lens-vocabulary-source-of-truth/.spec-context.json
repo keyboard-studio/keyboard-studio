@@ -3,8 +3,8 @@
   "specName": "045-lens-vocabulary-source-of-truth",
   "branch": "045-lens-vocabulary-source-of-truth",
   "selectedAt": "2026-07-27T17:30:25.416Z",
-  "currentStep": "plan",
-  "status": "planned",
+  "currentStep": "tasks",
+  "status": "ready-to-implement",
   "history": [
     {
       "step": "specify",
@@ -40,6 +40,27 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-19T23:05:13.463Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "ai",
+      "at": "2026-08-19T23:37:24.495Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:37:25.233Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:37:26.376Z"
     }
   ],
   "approach": "Re-home the two genuine straggler classifiers (A1 added-char-count, A4 diacritic-mechanism) onto type aliases of the existing contracts enums (Scale, DiacriticBehavior), mirroring the pattern A7 spare-key-budget already uses correctly against KeyBudgetBand. Add two Expect-AssignableTo compile-time guards and one new runtime lockstep test. A7 needs no change - research found it already properly sourced.",
@@ -59,6 +80,9 @@
     "plan": {
       "summary": "Type-alias two straggler facet-index classifiers onto existing contracts enums, add compile-time + runtime drift guards; no new enumeration, no runtime-behavior change",
       "key_finding": "The spec named three axis-valued facets as stragglers; only two (A1, A4) actually are - A7 is already correctly sourced via a bijective projection from KeyBudgetBand"
+    },
+    "tasks": {
+      "summary": "13 tasks across 5 phases (Setup, Foundational Constitution re-check, US1 A1/A4 sourcing, US2 drift guards, Polish); scope narrowed to A1/A4 only per research R1"
     }
   }
 }

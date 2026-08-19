@@ -3,8 +3,8 @@
   "specName": "031-specref-trace-join",
   "branch": "031-specref-trace-join",
   "selectedAt": "2026-07-28T04:43:42.014Z",
-  "currentStep": "plan",
-  "status": "planned",
+  "currentStep": "tasks",
+  "status": "ready-to-implement",
   "history": [
     {
       "step": "specify",
@@ -40,6 +40,27 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-19T23:11:46.701Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "ai",
+      "at": "2026-08-19T23:35:38.285Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:35:38.989Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:35:40.190Z"
     }
   ],
   "approach": "Add optional specRef to StepBase/QuestionModule, populate manifest + a sample of question modules, add a pure checkSpecRef completeness check, export manifest.specref.json via a pnpm-test-time script, extend spec-traces buildDriftIssueBody/report to read it. Every extension point mirrors an existing pattern in the codebase.",
@@ -47,6 +68,9 @@
     "plan": {
       "summary": "Annotate steps/question-modules with specRef, add a completeness check, bridge to spec-trace via a generated JSON artifact (never a direct import)",
       "key_finding": "Every piece of this feature mirrors an existing pattern already in the codebase - flowRefs field shape, checkInputsSatisfiableFromManifest pure-check shape, buildDriftIssueBody/report hook points - no new architecture needed"
+    },
+    "tasks": {
+      "summary": "22 tasks across 8 phases (Setup, Foundational type additions, US1 manifest annotation, US2 question-module sample, Foundational completeness+artifact, US3 spec-trace issue join, US4 spec-trace report, Polish)"
     }
   },
   "decisions": [

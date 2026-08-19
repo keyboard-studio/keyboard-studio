@@ -2,8 +2,8 @@
   "workflow": "speckit",
   "specName": "Text-sample prefill (paste or upload)",
   "branch": "050-text-sample-prefill",
-  "currentStep": "plan",
-  "status": "planned",
+  "currentStep": "tasks",
+  "status": "ready-to-implement",
   "history": [
     {
       "step": "specify",
@@ -46,6 +46,27 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-19T23:08:55.210Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "ai",
+      "at": "2026-08-19T23:42:13.951Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:42:19.680Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:42:32.887Z"
     }
   ],
   "decisions": [
@@ -81,6 +102,10 @@
     "plan": {
       "summary": "Wire the reserved TextSamplePlaceholder to harvestFromText + addProposed(source:text); no store/engine changes needed, both already anticipate this feature",
       "key_finding": "DraftProvenance already has a text member and addProposed already documents the exact union/attribution contract FR-005/006/007 need - this is a UI task, not a state-design task"
+    },
+    "tasks": {
+      "summary": "17 tasks across 5 phases: paste (US1/P1 MVP), upload (US2/P2), exemplar+text union (US3/P3), polish",
+      "key_finding": "Zero store/engine changes needed - addProposed/DraftProvenance(text)/harvestFromText all pre-exist; scope is PhaseB.tsx + its test file only"
     }
   }
 }

@@ -3,8 +3,8 @@
   "specName": "032-journey-corpus",
   "branch": "032-journey-corpus",
   "selectedAt": "2026-07-15T21:02:41.181Z",
-  "currentStep": "plan",
-  "status": "planned",
+  "currentStep": "tasks",
+  "status": "ready-to-implement",
   "history": [
     {
       "step": "specify",
@@ -40,6 +40,27 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-19T23:14:22.973Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "ai",
+      "at": "2026-08-19T23:36:37.981Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:36:38.561Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:36:39.644Z"
     }
   ],
   "decisions": [
@@ -69,6 +90,9 @@
     "plan": {
       "summary": "New headless journey-replay harness + report-only coverage gate; corrected two function-name drifts and one real architectural gap (manifest-level transitions) from the spec pre-migration text",
       "key_finding": "The spec predates specs 026/028/029s Unified Survey Architecture migration - its core routing-primitive citations are still accurate but incomplete for a full-spine replay"
+    },
+    "tasks": {
+      "summary": "21 tasks across 6 phases (Setup, Foundational schema, US1 harness+4 fixtures, US2 coverage gate, US3 persona metadata, Polish)"
     }
   }
 }
