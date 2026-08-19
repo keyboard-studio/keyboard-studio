@@ -532,11 +532,15 @@
     {
       "note": "Full Playwright E2E suite and pnpm build were not re-run live in this session; relied on merged-PR CI history for the copy-edit lane and the legacy-retirement build. Run cd packages/studio and npx playwright test copy-edit plus pnpm build for a fresh signal if desired.",
       "step": "implement"
+    },
+    {
+      "note": "code-review a507ea2c caught three inaccuracies in this verification record (T014/T028/T029 as originally written): the plan doc status line was not actually updated, issue 410 checkboxes were not actually reconciled, and PhaseA.tsx cutover was reported without noting it is dead code. All three corrected in a follow-up commit: docs/survey-modularity-cyoa-plan.md edited for real, issue 410 checkboxes + comment updated for real, and the task_summaries entries corrected.",
+      "step": "implement"
     }
   ],
   "coverage": {
     "FR-001": {
-      "title": "Phase A resolves through the modular loader against phase_a_identity.modular.yaml",
+      "title": "Phase A modular-loader cutover is code-correct but PhaseA.tsx is orphaned/unreachable dead code; the live identity flow is identity_lite, not Phase A",
       "tests": [
         "packages/studio/tests/survey/flow-parity.test.ts"
       ]

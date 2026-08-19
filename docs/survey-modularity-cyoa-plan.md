@@ -1,6 +1,6 @@
 # Survey Modularity + CYOA Refactor — Plan / RFC
 
-> **Status: PLAN / RFC — P2 implemented (branch `claude/survey-modularity-cyoa-plan-pcpg9a`); P3(a) MERGED (branch `km/modular-loader-cutover`) — E2E lane 1 (copy-edit) unblocked via #906, lane 2 (import-improve) conditional on Track 2 import liveness; P4a and P4b implemented (branch `claude/survey-modularity-cyoa-phase-4-q9ey3o`, P4a merged via #778, P4b via #780); P0–P1, P3(b), P5 remain proposals.**
+> **Status: PLAN / RFC — P2 implemented (branch `claude/survey-modularity-cyoa-plan-pcpg9a`); P3(a) MERGED (branch `km/modular-loader-cutover`) — E2E lane 1 (copy-edit) unblocked via #906, lane 2 (import-improve) conditional on Track 2 import liveness; P3(b) MERGED via #781 (`km/retire-legacy-flow-loader`) — legacy `loadFlow.ts` + the four legacy full-flow YAMLs deleted, `flow-parity.test.ts` converted to standalone modular structural-integrity assertions; P4a and P4b implemented (branch `claude/survey-modularity-cyoa-phase-4-q9ey3o`, P4a merged via #778, P4b via #780); P0–P1, P5 remain proposals.**
 > P2 shipped: `IRPath` typed key-path algebra exported from `@keyboard-studio/contracts`
 > 0.11.0 (breaking bump, §18-ratified); `QuestionModule.inputs`/`writes` declared across
 > all 93 modules (current ground truth: 5 non-empty `writes` — the identity/header writers — with the remaining modules declaring explicit empty `writes`; the original "8 non-empty" was the P2 snapshot, superseded by the P3 loader cutover + #781 legacy retirement); three CI gates (coverage, orphan-input
@@ -10,8 +10,15 @@
 > 5 new `il_*` question modules authored and registered; `content/flows/identity_lite.modular.yaml`
 > created; module-count gate bumped 93->98; `flow-parity.test.ts` golden harness (21 tests,
 > 3 phases) added; 5 mirrored module tests added; all TODO(#410) markers removed;
-> `playwright.config.ts` added; E2E lane 1 (copy-edit) un-skipped. Part (b) deletion of
-> `loadFlow.ts` + 4 legacy YAMLs is a separate follow-up PR.
+> `playwright.config.ts` added; E2E lane 1 (copy-edit) un-skipped.
+> P3(b) shipped (merged to main via #781, branch `km/retire-legacy-flow-loader`): flow map
+> repointed to modular manifests (`buildModularFlowGraph` takes a registry argument);
+> `survey/loadFlow.ts` + `loadFlow.test.ts` deleted; the four legacy full-flow YAMLs
+> (`identity_lite`, `phase_a_identity`, `phase_b_characters`, `phase_f_helpdocs` `.yaml`)
+> deleted; `*.modular.yaml` manifests + `content/flows/_examples/*` retained; no question
+> module deleted (§3.8 no-delete holds). `flow-parity.test.ts`'s legacy-vs-modular golden
+> compare was necessarily retired with `loadFlow.ts` and replaced with standalone modular
+> structural-integrity + snapshot assertions.
 > P4a shipped (merged to main via #778): `steps/` types (`Step`, `EditorStep`, `QuestionStep`,
 > `EditorStepProps`); galleries + 5 wizard panels moved into `editors/` tree behind
 > `EditorStep` adapters; `editors/`/`steps/`/`dashboard/` layer boundary rules added to
@@ -25,7 +32,7 @@
 > proxy, orphan inputs, unreachable); staleness slice (`staleSteps`, `markStale`, `clearStale`)
 > in `workingCopyStore`; `CompletenessReport` surfaced in `DashboardView` via props. Deferred:
 > `AssignLoopShell` (#777, separate issue). P5 (mutate seam) remains out of scope.
-> P0–P1, P3(b), P5 are still proposals; file inventories and target tree below remain
+> P0–P1, P5 are still proposals; file inventories and target tree below remain
 > unimplemented for those phases. File inventories were verified against the live tree on the
 > branch base (`origin/main`); the *target* tree and migration table are proposals.
 
