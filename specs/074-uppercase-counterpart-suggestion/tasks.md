@@ -240,10 +240,22 @@ already built rather than adding a second casing/layer path.
   now including the two defect scenarios: accepting the suggestion for `ă` lands on `default` with
   a lowercase label; accepting it for `Ă` lands on `shift` with an uppercase label. T047's 2026-08-18
   re-walk confirmed the underlying `default`/`shift` case→layer split end-to-end against a real
-  compiled `.keyman-touch-layout` (the same invariant T049/T051 protect); the specific
-  suggestion-Accept affordance (`handleUseSuggestion`) was not separately driven through its own UI
-  path in that walk — that exact scenario is pinned at the unit level by T050/T052
-  (`TouchGallery.test.tsx`), both green per the T054 gate run.
+  compiled `.keyman-touch-layout` (the same invariant T049/T051 protect). A follow-up re-walk the
+  same day, specifically fixturing `ă`/`Ă` (T050/T052's own pair) with both the default and an
+  explicit "Reseed from desktop" touch-seed choice, found the dismissable suggestion **card**
+  (`handleUseSuggestion`'s `ProposalCard`, Accept/Deny) never rendered for either walk — reaching it
+  live needs a character with NO prior desktop/physical assignment when Touch is reached (the
+  isolated precondition T050/T052's `seedStore` fixtures construct directly), which a full
+  identity→output walk that configures every character in Mechanisms first does not naturally
+  produce. What the live walk DID confirm: the Apply panel pre-filled a `"physical-suggested"`
+  host key (`K_A`) for `ă` with no manual selection needed, and applying it emitted the identical
+  correct split in the compiled `.keyman-touch-layout` — `ă` on the `default`-layer `K_A`
+  (`sk:[{id:"U_0103", p:"physical-suggested", text:"ă"}]`) and, after confirming its companion
+  banner, `Ă` on the `shift`-layer `K_A` (`sk:[{id:"U_0102", p:"physical-suggested", text:"Ă"}]`) —
+  i.e. the same `touchLayerForChar` derivation the suggestion-Accept path also calls, exercised via
+  its other live entry point. The literal Accept-button click on the dismissable card itself
+  remains unverified outside the unit suite (`TouchGallery.test.tsx` T050/T052, both green per the
+  T054 gate run).
 
 **Checkpoint**: the suggestion-Accept path and every host-key label agree with the case-aware
 layer targeting Phase 5 introduced; T047 passes clean.

@@ -749,7 +749,7 @@
     },
     "T055": {
       "status": "DONE",
-      "did": "Re-walked per T047 above. The core default/shift case-layer split (the T047-discovered defect's underlying invariant) is proven against real compiled output. The narrower suggestion-Accept affordance (handleUseSuggestion, T049/T051's own fix) was not separately driven through its own UI path in this manual walk; that exact scenario remains pinned at the unit level by T050/T052 (TouchGallery.test.tsx), both green per the T054 gate run.",
+      "did": "Re-walked per T047 above, plus a follow-up walk fixturing a/A specifically (T050/T052's own pair) under both the default and an explicit Reseed-from-desktop touch seed choice. The dismissable suggestion card (handleUseSuggestion's ProposalCard) never rendered in a full walk - it needs a character with NO prior desktop assignment when Touch is reached, which T050/T052's isolated seedStore fixture constructs directly but a full identity->output walk does not naturally produce (every character gets configured in Mechanisms first). What WAS confirmed live: the Apply panel pre-filled a physical-suggested host key (K_A) with no manual selection, and applying + confirming its companion produced the identical correct split in the compiled .keyman-touch-layout - a on default-layer K_A (sk id U_0103, p:physical-suggested), A on shift-layer K_A (sk id U_0102, p:physical-suggested) - the same touchLayerForChar derivation the suggestion-Accept path also calls, exercised via its other live entry point. The literal Accept-button click remains unverified outside TouchGallery.test.tsx's T050/T052, both green per the T054 gate run.",
       "files": [
         "(manual verification only)"
       ]
