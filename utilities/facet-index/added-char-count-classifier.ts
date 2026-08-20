@@ -19,7 +19,7 @@
  * logographic-IME territory the hint describes). Deterministic and auditable.
  */
 
-import type { KeyboardIR } from "@keyboard-studio/contracts";
+import type { KeyboardIR, Scale } from "@keyboard-studio/contracts";
 import { buildProducedSet } from "@keyboard-studio/contracts";
 
 import { loadBaseLayoutTable, leakedChars, hasBaseLayerRuleSurface, DEFAULT_BASELAYOUT } from "./base-layout.js";
@@ -28,8 +28,18 @@ import { undeterminedFallback } from "./measurement.js";
 import type { Categorization, ConfidenceClass, FacetDefinition } from "./types.js";
 import type { ScannedKeyboard } from "./scan.js";
 
-/** Axis-A1 band labels, low → high (the facet's enum value set). */
-export type A1Band = "tiny" | "small" | "medium" | "large" | "massive";
+/**
+ * Axis-A1 band labels, low → high (the facet's enum value set). Aliased to the
+ * canonical `Scale` (spec 045) rather than independently redeclared, so this
+ * classifier's value set cannot drift from the shared discovery-axis vocabulary.
+ */
+export type A1Band = Scale;
+
+type Expect<T extends true> = T;
+type AssignableTo<S, T> = [S] extends [T] ? true : false;
+// This alias is intentionally unused at the value level — its declaration is
+// the assertion. A failure surfaces here as a constraint error on `Expect`.
+type _A1BandGuard = Expect<AssignableTo<A1Band, Scale>>;
 
 /** Contiguous axis-A1 band for a non-negative added-char count (spec §7 A1). */
 export function a1Band(count: number): A1Band {

@@ -206,28 +206,34 @@ The engine's §7.2 decision tree imports **both** of those directly —
 takes `DiscoveryAxisVector` and `StrategyId` from `@keyboard-studio/contracts`
 rather than restating them — so the axis→tree path is already referenced, not copied.
 
-The remaining, **narrower** hazard is the straggler consumers that still declare
-the same value sets *independently* of those contracts types instead of deriving
-from them:
+**Resolved (2026-08-19) by
+[specs/045-lens-vocabulary-source-of-truth](../specs/045-lens-vocabulary-source-of-truth/spec.md).**
+The narrower hazard was the straggler consumers that declared the same value sets
+*independently* of those contracts types instead of deriving from them:
 
 1. the **facet-index classifiers** under
-   [utilities/facet-index](../utilities/facet-index) — e.g.
-   `diacritic-mechanism-classifier.ts` emits its A4 value as a bare `string` and
-   hardcodes the `"stacking-combining" | "replacing-cycling" | "multi-family" |
-   "none"` literals rather than typing against `DiacriticBehavior`; and
+   [utilities/facet-index](../utilities/facet-index) — `diacritic-mechanism-classifier.ts`
+   emitted its A4 value as a bare `string` hardcoding the `"stacking-combining" |
+   "replacing-cycling" | "multi-family" | "none"` literals, and
+   `added-char-count-classifier.ts` independently redeclared the A1 band union,
+   rather than typing against `DiacriticBehavior`/`Scale`; and
 2. the axis-valued **keyboard-facet definitions** —
    [content/keyboard-facets](../content/keyboard-facets) `*.yaml` (added-char-count
    = **A1**, diacritic-mechanism = **A4**, spare-key-budget = **A7**) — whose
-   `limits.values` re-list the same enum by hand (e.g.
-   `diacritic-mechanism.yaml` restates the four A4 states).
+   `limits.values` re-list the same enum by hand.
 
-The drift is worst at **A4 (diacritic-mechanism)**, where the classifier literals
-and the facet `limits.values` restate the `DiacriticBehavior` distinctions in two
-further places with nothing binding them to the contracts type. The fix is tracked in
-[specs/045-lens-vocabulary-source-of-truth](../specs/045-lens-vocabulary-source-of-truth/spec.md):
-wire those straggler classifiers and facet YAMLs to derive from the **existing**
-contracts enumerations, protected by the compile-time drift-guard pattern that
-already binds `Pattern` to its zod schema plus a runtime lockstep test.
+A7 (`spare-key-budget`) turned out to already be correctly sourced —
+`SpareKeyBudget` was already aliased to the canonical `KeyBudgetBand` (spec 052) —
+so spec 045's fix touched only A1/A4: both classifiers now alias their value type
+to the contracts enum (`A1Band = Scale`, a local `A4Value = DiacriticBehavior`),
+each protected by a compile-time
+`Expect<AssignableTo<...>>` drift guard (the same idiom that already binds `Pattern`
+to its zod schema) plus a runtime lockstep test
+([utilities/facet-index/lens-vocabulary-lockstep.test.ts](../utilities/facet-index/lens-vocabulary-lockstep.test.ts))
+asserting the two facet YAMLs' `limits.values` equal the contracts types' member
+sets. The `*.yaml` files themselves are unchanged — the fix binds the TS
+classifiers and adds a test that would fail if a YAML edit ever silently diverged
+from them.
 
 ## Tracking
 
