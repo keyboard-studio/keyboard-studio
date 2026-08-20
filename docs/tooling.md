@@ -150,7 +150,13 @@ build artifacts you should regenerate rather than hand-edit:
 Not in the prebuild chain: `pnpm run check-exemplar-staleness` **reports** — never applies —
 when either pin has fallen behind upstream, so a stale pin can't silently change the index under
 a review. `node scripts/gen-exemplar-baseline.mjs` regenerates the pre-feature regression-floor
-fixture; do that only alongside a CLDR pin bump, and review the diff.
+fixture; do that only alongside a CLDR pin bump, and review the diff. Also outside this chain:
+`node utilities/facet-index/ucd/codegen-ucd.mjs` (the standalone facet-index tool's own UCD
+codegen) additionally writes `packages/engine/src/facets/generated/scriptLookup.ts` from the same
+parse as its primary output — a cross-workspace-boundary write (a `utilities/*` tool emitting
+into a `packages/engine` package) done so the engine's casing facet
+(`packages/engine/src/facets/casing.ts`, spec 048 FR-008) can never drift from the offline tool's
+own script-identity data.
 
 ## Keyman compiler dependencies
 

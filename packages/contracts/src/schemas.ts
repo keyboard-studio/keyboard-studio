@@ -21,7 +21,14 @@ import type { Pattern, PatternCategory, PatternQuestion, TestVector, DemoObject 
 import { makePattern } from "./pattern";
 import type { Criterion } from "./criteria";
 import type { RemovalCapability } from "./removalCapability";
-import type { TouchKeyProvenance, TouchKeyIR, TouchLayoutIR } from "./keyboard-ir";
+import type {
+  TouchKeyProvenance,
+  TouchKeyIR,
+  TouchLayoutIR,
+  FacetProvenance,
+  FacetValue,
+  KeyboardIR,
+} from "./keyboard-ir";
 import type { AxisFill, AxisFillSource } from "./axisFill";
 import type {
   AttachmentState,
@@ -344,10 +351,23 @@ export const PatternSchema = z.object({
 // `hand-set` default if absent (FR-009).
 // ---------------------------------------------------------------------------
 
+// Facets (spec 048) — machine-derived base-keyboard classification baked into
+// the working-copy IR. `value` is optional so an "undetermined" entry can be
+// present (provenance recorded) without a fabricated value (spec 048 Edge
+// Case / SC-004).
+export const FacetProvenanceSchema = z.enum(["derived", "overridden", "undetermined"]);
+
+export const FacetValueSchema = z.object({
+  value: z.string().optional(),
+  provenance: FacetProvenanceSchema,
+});
+
 export const KeyboardIRSchema = z
   .object({
     origin: z.enum(["scaffolded", "imported", "synthesized"]),
     touchLayout: TouchLayoutIRSchema.optional(),
+    facets: z.record(z.string(), FacetValueSchema).optional(),
+    facetOverrides: z.record(z.string(), z.string()).optional(),
   })
   .passthrough();
 
@@ -855,6 +875,25 @@ type _KeyboardIRTouchGuard = Expect<
   AssignableTo<
     NonNullable<z.infer<typeof KeyboardIRSchema>["touchLayout"]>["platforms"],
     TouchLayoutIR["platforms"]
+  >
+>;
+// Facets (spec 048 FR-003/FR-004). `FacetValueSchema`'s inferred output must
+// stay assignable to the `FacetValue` contract, and `KeyboardIRSchema`'s
+// `facets`/`facetOverrides` fields must stay assignable to `KeyboardIR`'s.
+type _FacetProvenanceGuard = Expect<
+  AssignableTo<z.infer<typeof FacetProvenanceSchema>, FacetProvenance>
+>;
+type _FacetValueGuard = Expect<AssignableTo<z.infer<typeof FacetValueSchema>, FacetValue>>;
+type _KeyboardIRFacetsGuard = Expect<
+  AssignableTo<
+    NonNullable<z.infer<typeof KeyboardIRSchema>["facets"]>,
+    NonNullable<KeyboardIR["facets"]>
+  >
+>;
+type _KeyboardIRFacetOverridesGuard = Expect<
+  AssignableTo<
+    NonNullable<z.infer<typeof KeyboardIRSchema>["facetOverrides"]>,
+    NonNullable<KeyboardIR["facetOverrides"]>
   >
 >;
 // Decision record (specs/053-decision-audit). The record is BOTH persisted in a

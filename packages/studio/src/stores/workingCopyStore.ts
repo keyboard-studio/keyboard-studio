@@ -23,7 +23,7 @@
 import { create } from "zustand";
 import type {
   Attribution, AxisFill, BaseKeyboard, HelpDocsAnswers, KeyboardIR, LintFinding, RemovalCapability, VirtualFS } from "@keyboard-studio/contracts";
-import { detectMarkInputOrderFromImport, renameTouchKey } from "@keyboard-studio/engine";
+import { detectMarkInputOrderFromImport, renameTouchKey, deriveFacets } from "@keyboard-studio/engine";
 import type { KeyEditOperation, KeyEditOverlay } from "@keyboard-studio/engine";
 import {
   mergePhaseResults,
@@ -1469,6 +1469,13 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       return;
     }
 
+    // Bake the base keyboard's facets (spec 048 FR-001) — casing, for now —
+    // onto the working-copy IR before it is seeded onto both `baseIr` and
+    // `ir` below, so every downstream step can read it via one accessor with
+    // no offline-artifact access. Track 2 (instantiateFromExisting) does the
+    // identical derivation so both tracks populate facets the same way.
+    ir = deriveFacets(ir);
+
     // Track 1: new keyboard from base — identity RESET, edit layers cleared.
     _reopenedRoots = new Set(); // reset staleness roots for the new session
     // Phase B proposal decisions are per-working-copy (spec 044 FR-016a), not
@@ -1530,6 +1537,11 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     if (shouldNoop) {
       return;
     }
+
+    // Bake the loaded keyboard's facets (spec 048 FR-001) onto the working-copy
+    // IR — the identical derivation instantiateFromBase applies, so both
+    // tracks populate facets the same way (spec 048 Edge Case).
+    ir = deriveFacets(ir);
 
     _reopenedRoots = new Set(); // reset staleness roots for the new session
     // Per-working-copy Phase B proposal decisions — see the identical call in

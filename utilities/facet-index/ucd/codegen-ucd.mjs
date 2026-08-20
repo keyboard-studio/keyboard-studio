@@ -14,8 +14,14 @@
  * PLACEHOLDER or mismatched hash fails loud and writes nothing partial (FR-005).
  *
  * Outputs (write-only-if-changed, sorted → deterministic):
- *   utilities/facet-index/ucd/generated/scriptLookup.ts  slim lookup (data + accessors)
- *   utilities/facet-index/data/SOURCES.json              per-file sha256 + unicodeVersion
+ *   utilities/facet-index/ucd/generated/scriptLookup.ts     slim lookup (data + accessors)
+ *   utilities/facet-index/data/SOURCES.json                 per-file sha256 + unicodeVersion
+ *   packages/engine/src/facets/generated/scriptLookup.ts    SLIMMER script-identity-only
+ *     subset (scriptOf/scriptExtensionsOf, no latinProfileOf/firstVersionOfScript), emitted
+ *     from the SAME parsed scriptRanges/scriptExtensionRanges in this same run so the
+ *     facet-index copy and the engine's runtime casing-facet derivation
+ *     (packages/engine/src/facets/casing.ts, spec 048 FR-008) can never drift apart —
+ *     there is exactly one place that reads Scripts.txt/ScriptExtensions.txt.
  *
  * Usage:
  *   node utilities/facet-index/ucd/codegen-ucd.mjs                 verify + generate
@@ -37,6 +43,10 @@ const PIN_FILE = join(REPO_ROOT, "scripts", "ucd-version.json");
 const GENERATED_DIR = join(TOOL_DIR, "ucd", "generated");
 const GENERATED_FILE = join(GENERATED_DIR, "scriptLookup.ts");
 const SOURCES_FILE = join(TOOL_DIR, "data", "SOURCES.json");
+// spec 048 FR-008 — the engine's shared casing-facet derivation reads the same
+// parsed script data, emitted as its own slim artifact in this same run.
+const ENGINE_GENERATED_DIR = join(REPO_ROOT, "packages", "engine", "src", "facets", "generated");
+const ENGINE_GENERATED_FILE = join(ENGINE_GENERATED_DIR, "scriptLookup.ts");
 
 const computeSha = process.argv.slice(2).includes("--compute-sha");
 
@@ -389,6 +399,74 @@ export function firstVersionOfScript(script: string): readonly [number, number] 
 `;
 
 writeIfChanged(GENERATED_FILE, generated, GENERATED_DIR);
+
+// ---------------------------------------------------------------------------
+// Emit packages/engine/src/facets/generated/scriptLookup.ts (spec 048 FR-008)
+// ---------------------------------------------------------------------------
+// Script-identity-only subset of the artifact above: `scriptOf`/`scriptExtensionsOf`
+// plus `unicodeVersion`, no `latinProfileOf`/`firstVersionOfScript` (facet-index-only
+// concerns the runtime casing facet never reads). Built from the identical
+// `scriptRanges`/`scriptExtensionRanges` arrays parsed above, so the two artifacts
+// cannot disagree on what script a codepoint belongs to.
+
+const engineGenerated = `\
+// generated — do not edit
+// source:  utilities/facet-index/ucd/codegen-ucd.mjs (packages/engine output)
+// data:    lib/ucd/{Scripts,ScriptExtensions,PropertyValueAliases}.txt
+// unicode: ${pin.unicodeVersion}
+//
+// Script-identity lookup shared by the engine's casing-facet derivation
+// (spec 048 FR-008, see ../casing.ts) and, via the sibling artifact at
+// utilities/facet-index/ucd/generated/scriptLookup.ts, the offline facet-index
+// build tool — both emitted from one parse of the pinned UCD files so they
+// cannot drift apart. See that sibling file for the full script/Latin-profile
+// lookup used by the offline script classifier.
+
+/** Pinned Unicode release this lookup was derived from. */
+export const unicodeVersion = ${JSON.stringify(pin.unicodeVersion)};
+
+// [startCodepoint, endCodepoint, canonicalScriptShortCode] — Scripts.txt.
+const scriptRanges: ReadonlyArray<readonly [number, number, string]> = [
+${scriptRangeLines}
+];
+
+// [startCodepoint, endCodepoint, sortedScriptShortCodes] — ScriptExtensions.txt.
+const scriptExtensionRanges: ReadonlyArray<readonly [number, number, readonly string[]]> = [
+${scriptExtLines}
+];
+
+/** Binary-search the value of the range covering \`cp\`, or undefined. */
+function lookup<T>(ranges: ReadonlyArray<readonly [number, number, T]>, cp: number): T | undefined {
+  let lo = 0;
+  let hi = ranges.length - 1;
+  while (lo <= hi) {
+    const mid = (lo + hi) >> 1;
+    const [start, end, value] = ranges[mid]!;
+    if (cp < start) hi = mid - 1;
+    else if (cp > end) lo = mid + 1;
+    else return value;
+  }
+  return undefined;
+}
+
+/**
+ * Canonical ISO-15924 script short code for a codepoint. Codepoints with no
+ * explicit Script value default to \`Zzzz\` (Unknown), matching the UCD @missing.
+ */
+export function scriptOf(cp: number): string {
+  return lookup(scriptRanges, cp) ?? "Zzzz";
+}
+
+/**
+ * Script_Extensions set for a codepoint (canonical short codes), or undefined
+ * when the codepoint has no explicit extensions (its Script value stands alone).
+ */
+export function scriptExtensionsOf(cp: number): readonly string[] | undefined {
+  return lookup(scriptExtensionRanges, cp);
+}
+`;
+
+writeIfChanged(ENGINE_GENERATED_FILE, engineGenerated, ENGINE_GENERATED_DIR);
 
 // ---------------------------------------------------------------------------
 // Emit data/SOURCES.json (mirrors manifest.referencePins shape)
