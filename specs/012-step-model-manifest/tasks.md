@@ -28,8 +28,8 @@ This is also the dependency order: P4b's union replacement **cannot** begin unti
 
 **Purpose**: baseline + directory skeleton. Folder names are **decided** (Clarifications: `editors/`, `steps/`, `dashboard/`).
 
-- [ ] T001 Create the Phase-4 directory skeleton under `packages/studio/src/`: `steps/`, `editors/assignLoop/parts/`, `editors/carve/`, `editors/panels/`, `editors/touchSuggest/`, `editors/adapters/`, and a placeholder note that `flowmap/` → `dashboard/` rename happens in PR2 (T030). Use `.gitkeep` where no file lands yet.
-- [ ] T002 [P] Capture the green baseline: run `pnpm typecheck`, `pnpm --filter @keyboard-studio/studio test`, and `pnpm depcruise`; record the pre-refactor pass counts in the PR description (the parity reference for SC-002 / SC-009).
+- [x] T001 Create the Phase-4 directory skeleton under `packages/studio/src/`: `steps/`, `editors/assignLoop/parts/`, `editors/carve/`, `editors/panels/`, `editors/touchSuggest/`, `editors/adapters/`, and a placeholder note that `flowmap/` → `dashboard/` rename happens in PR2 (T030). Use `.gitkeep` where no file lands yet.
+- [x] T002 [P] Capture the green baseline: run `pnpm typecheck`, `pnpm --filter @keyboard-studio/studio test`, and `pnpm depcruise`; record the pre-refactor pass counts in the PR description (the parity reference for SC-002 / SC-009).
 
 ---
 
@@ -39,8 +39,8 @@ This is also the dependency order: P4b's union replacement **cannot** begin unti
 
 **⚠️ CRITICAL**: No user-story work can begin until `steps/types.ts` exists.
 
-- [ ] T003 Create `packages/studio/src/steps/types.ts` per [contracts/step-model.contract.md](contracts/step-model.contract.md): `StepKind`, `StepBase` (id/kind/title/spine/lock/joinTarget/inputs/writes), `QuestionStep` (questionId), `EditorStep` (component/surface), `Step` union, `EditorStepProps` (onComplete/onBack/ctx). Reuse `IRPath` from `@keyboard-studio/contracts` (G5).
-- [ ] T004 [P] Create `packages/studio/src/steps/types.test.ts`: assert G1 (kind narrows to exactly two), a reusable `assertUniqueIds` helper for G4, and a compile-fixture that a bogus `IRPath` in `inputs`/`writes` fails typecheck (G5).
+- [x] T003 Create `packages/studio/src/steps/types.ts` per [contracts/step-model.contract.md](contracts/step-model.contract.md): `StepKind`, `StepBase` (id/kind/title/spine/lock/joinTarget/inputs/writes), `QuestionStep` (questionId), `EditorStep` (component/surface), `Step` union, `EditorStepProps` (onComplete/onBack/ctx). Reuse `IRPath` from `@keyboard-studio/contracts` (G5).
+- [x] T004 [P] Create `packages/studio/src/steps/types.test.ts`: assert G1 (kind narrows to exactly two), a reusable `assertUniqueIds` helper for G4, and a compile-fixture that a bogus `IRPath` in `inputs`/`writes` fails typecheck (G5).
 
 **Checkpoint**: step model compiles; stories can begin.
 
@@ -54,28 +54,28 @@ This is also the dependency order: P4b's union replacement **cannot** begin unti
 
 ### Moves (preserve explicit `.ts`/`.tsx` import extensions — §8 / boundaries C-constraint)
 
-- [ ] T005 [US1] Move `packages/studio/src/components/CarveGallery.tsx` → `packages/studio/src/editors/carve/CarveGallery.tsx` (+ colocated test if any); carve stays its **own** remove-mode component sharing only `ui/` (FR-004). Update all importers' specifiers incl. extension.
-- [ ] T006 [US1] Move `packages/studio/src/components/carve/*` (DepBanner, GlyphCell, InfoView+test, Inspector, KeyCap, KeySeq, KindBadge, Rail, StatusBar, ToggleBox, carveShared) → `packages/studio/src/editors/assignLoop/parts/*` (shared chrome used by shell + carve).
-- [ ] T007 [US1] Move + refactor `components/MechanismGallery.tsx` and `components/TouchGallery.tsx` into `editors/assignLoop/`: extract the shared add **shell** `AssignLoopShell.tsx` (surface-parameterized) with **separate** `physicalBehavior.ts` (keys/AltGr/dead keys) and `touchBehavior.ts` (layers/long-press/flick/multitap). **Not** a 3-into-1 merge (FR-004). Keep behavior identical.
-- [ ] T008 [P] [US1] Move `components/GalleryIntroSplash.tsx` → `editors/assignLoop/IntroSplash.tsx` and `components/GalleryPreviewPane.tsx` → `editors/assignLoop/PreviewPane.tsx` (+ tests).
-- [ ] T009 [US1] Move the five wizard panels → `editors/panels/`: `TrackStep.tsx`, `ProjectNameStep.tsx`, `ScaffoldForm.tsx`, `TrackOneIdentityPanel.tsx` (+test), `BaseResolution.tsx` (+test). Keep their current props/behavior (FR-005).
+- [x] T005 [US1] Move `packages/studio/src/components/CarveGallery.tsx` → `packages/studio/src/editors/carve/CarveGallery.tsx` (+ colocated test if any); carve stays its **own** remove-mode component sharing only `ui/` (FR-004). Update all importers' specifiers incl. extension.
+- [x] T006 [US1] Move `packages/studio/src/components/carve/*` (DepBanner, GlyphCell, InfoView+test, Inspector, KeyCap, KeySeq, KindBadge, Rail, StatusBar, ToggleBox, carveShared) → `packages/studio/src/editors/assignLoop/parts/*` (shared chrome used by shell + carve).
+- [x] T007 [US1] Move + refactor `components/MechanismGallery.tsx` and `components/TouchGallery.tsx` into `editors/assignLoop/`: extract the shared add **shell** `AssignLoopShell.tsx` (surface-parameterized) with **separate** `physicalBehavior.ts` (keys/AltGr/dead keys) and `touchBehavior.ts` (layers/long-press/flick/multitap). **Not** a 3-into-1 merge (FR-004). Keep behavior identical.
+- [x] T008 [P] [US1] Move `components/GalleryIntroSplash.tsx` → `editors/assignLoop/IntroSplash.tsx` and `components/GalleryPreviewPane.tsx` → `editors/assignLoop/PreviewPane.tsx` (+ tests).
+- [x] T009 [US1] Move the five wizard panels → `editors/panels/`: `TrackStep.tsx`, `ProjectNameStep.tsx`, `ScaffoldForm.tsx`, `TrackOneIdentityPanel.tsx` (+test), `BaseResolution.tsx` (+test). Keep their current props/behavior (FR-005).
 
 ### Adapters → `EditorStepProps` (FR-003, G3)
 
-- [ ] T010 [P] [US1] `editors/adapters/carveAdapter.tsx` — wrap carve (`onComplete`/`onBack` already) to `EditorStepProps`.
-- [ ] T011 [P] [US1] `editors/adapters/addPhysicalAdapter.tsx` — wrap the physical add shell to `EditorStepProps` (surface `"physical"`).
-- [ ] T012 [P] [US1] `editors/adapters/addTouchAdapter.tsx` — wrap the touch add shell to `EditorStepProps` (surface `"touch"`).
-- [ ] T013 [P] [US1] `editors/adapters/panelAdapters.tsx` — normalize the non-uniform panel callbacks (`onNext(track)`, `onNext(displayName,keyboardId)`, `onResolved(base)`, `onSubmit(spec)`, store-reading identity panel) to one `onComplete(result)` each (D1).
+- [x] T010 [P] [US1] `editors/adapters/carveAdapter.tsx` — wrap carve (`onComplete`/`onBack` already) to `EditorStepProps`.
+- [x] T011 [P] [US1] `editors/adapters/addPhysicalAdapter.tsx` — wrap the physical add shell to `EditorStepProps` (surface `"physical"`).
+- [x] T012 [P] [US1] `editors/adapters/addTouchAdapter.tsx` — wrap the touch add shell to `EditorStepProps` (surface `"touch"`).
+- [x] T013 [P] [US1] `editors/adapters/panelAdapters.tsx` — normalize the non-uniform panel callbacks (`onNext(track)`, `onNext(displayName,keyboardId)`, `onResolved(base)`, `onSubmit(spec)`, store-reading identity panel) to one `onComplete(result)` each (D1).
 
 ### Wire behind the existing `SurveyStage` machine (no ordering change)
 
-- [ ] T014 [US1] In `packages/studio/src/StudioShell.tsx`, repoint each `SurveyStage` stage to render the moved/adapted components via their adapters. **Imports only — the `SurveyStage` union and stage order stay exactly as-is** (FR-006). Side effects remain inline in `SurveyView` for now (moved in PR2/T026).
+- [x] T014 [US1] In `packages/studio/src/StudioShell.tsx`, repoint each `SurveyStage` stage to render the moved/adapted components via their adapters. **Imports only — the `SurveyStage` union and stage order stay exactly as-is** (FR-006). Side effects remain inline in `SurveyView` for now (moved in PR2/T026).
 
 ### Boundaries + verification
 
-- [ ] T015 [US1] Add the editor boundary rule to `.dependency-cruiser.cjs` per [contracts/boundaries.contract.md](contracts/boundaries.contract.md): **allow** `editors/ → stores/` and `editors/ → lib/`; **forbid** `editors/ → dashboard/`. Keep `ui-is-a-leaf` green (B1, B2).
-- [ ] T016 [P] [US1] Run the existing gallery/panel suites against the moved+adapted components **unchanged** — `CarveGallery`, `MechanismGallery.test`, `TouchGallery.test`, `BaseResolution.test`, `TrackOneIdentityPanel.test`, `GalleryIntroSplash.test`. All must pass with no edits to assertions (SC-002).
-- [ ] T017 [US1] depcruise probe test (B3): temporarily add an `editors/ → dashboard/` import, confirm `pnpm depcruise` goes red, remove it, confirm green. Document in PR.
+- [x] T015 [US1] Add the editor boundary rule to `.dependency-cruiser.cjs` per [contracts/boundaries.contract.md](contracts/boundaries.contract.md): **allow** `editors/ → stores/` and `editors/ → lib/`; **forbid** `editors/ → dashboard/`. Keep `ui-is-a-leaf` green (B1, B2).
+- [x] T016 [P] [US1] Run the existing gallery/panel suites against the moved+adapted components **unchanged** — `CarveGallery`, `MechanismGallery.test`, `TouchGallery.test`, `BaseResolution.test`, `TrackOneIdentityPanel.test`, `GalleryIntroSplash.test`. All must pass with no edits to assertions (SC-002).
+- [x] T017 [US1] depcruise probe test (B3): temporarily add an `editors/ → dashboard/` import, confirm `pnpm depcruise` goes red, remove it, confirm green. Document in PR.
 
 **Checkpoint**: galleries + panels are enumerable editor-steps, behavior byte-identical, `SurveyStage` still drives ordering. US1 independently shippable.
 
@@ -87,10 +87,10 @@ This is also the dependency order: P4b's union replacement **cannot** begin unti
 
 **Independent Test**: a touch key can carry a provenance tag (default `hand-set`); the `touchSuggest` policy is overridable declarative data; **no** propagation logic runs.
 
-- [ ] T018 [P] [US4] `editors/assignLoop/provenance.ts` — `TouchKeyProvenance` = `"base-derived" | "physical-suggested" | "hand-set"`; helper that defaults a key with no tag to `hand-set` (FR-020, D6).
-- [ ] T019 [P] [US4] `editors/touchSuggest/defaults.ts` — `TouchSuggestPolicy` declarative data (widthBudget, numberRowTarget, modifierPolicy, deadKeyHost `"base"`, defaultGesture `"long-press"`); overridable per-key and policy-level (FR-021, data-model).
-- [ ] T020 [US4] `editors/touchSuggest/touchSuggest.ts` — generator scaffold that reads the policy and could carry provenance + producing-default on output, but performs **no propagation/merge** this phase (FR-021/FR-022).
-- [ ] T021 [P] [US4] `editors/assignLoop/provenance.test.ts` + `editors/touchSuggest/touchSuggest.test.ts` — assert default `hand-set`, policy override at both levels, and that no propagation code path executes (SC-010).
+- [x] T018 [P] [US4] `editors/assignLoop/provenance.ts` — `TouchKeyProvenance` = `"base-derived" | "physical-suggested" | "hand-set"`; helper that defaults a key with no tag to `hand-set` (FR-020, D6).
+- [x] T019 [P] [US4] `editors/touchSuggest/defaults.ts` — `TouchSuggestPolicy` declarative data (widthBudget, numberRowTarget, modifierPolicy, deadKeyHost `"base"`, defaultGesture `"long-press"`); overridable per-key and policy-level (FR-021, data-model).
+- [x] T020 [US4] `editors/touchSuggest/touchSuggest.ts` — generator scaffold that reads the policy and could carry provenance + producing-default on output, but performs **no propagation/merge** this phase (FR-021/FR-022).
+- [x] T021 [P] [US4] `editors/assignLoop/provenance.test.ts` + `editors/touchSuggest/touchSuggest.test.ts` — assert default `hand-set`, policy override at both levels, and that no propagation code path executes (SC-010).
 
 **Checkpoint**: seams reserved and inert. **End of PR1 (P4a).** Run [quickstart.md](quickstart.md) "P4a validation"; merge.
 
@@ -104,27 +104,27 @@ This is also the dependency order: P4b's union replacement **cannot** begin unti
 
 ### Register adapters + manifest
 
-- [ ] T022 [US2] `steps/registerQuestionSteps.ts` — adapt `QuestionModule`s to `question-step` resolved by `definition.id` through the existing registry; carry their P2 `inputs`/`writes`.
-- [ ] T023 [US2] `steps/registerEditorSteps.ts` — adapt the US1 editor adapters to `editor-step` (with `surface`), supplying `id`/`title`/`inputs`/`writes`.
-- [ ] T024 [US2] `steps/manifest.ts` — the ordered `Step[]`: spine order Identity → choose base → Characters → Carve → Mechanisms → (lock physical) → touch carve+add → (lock touch) → Help → Package(reserved); add the `touch_seed_source` `spine:false` fork with `joinTarget` to the touch carve/add spine step (FR-012, FR-013, M2–M4).
-- [ ] T025 [P] [US2] `steps/manifest.test.ts` — M2 (spine order), M3 (exactly two locks in order), M4 (fork + resolving joinTarget), M5 (unique ids), M6 (no A–G vocabulary).
+- [x] T022 [US2] `steps/registerQuestionSteps.ts` — adapt `QuestionModule`s to `question-step` resolved by `definition.id` through the existing registry; carry their P2 `inputs`/`writes`.
+- [x] T023 [US2] `steps/registerEditorSteps.ts` — adapt the US1 editor adapters to `editor-step` (with `surface`), supplying `id`/`title`/`inputs`/`writes`.
+- [x] T024 [US2] `steps/manifest.ts` — the ordered `Step[]`: spine order Identity → choose base → Characters → Carve → Mechanisms → (lock physical) → touch carve+add → (lock touch) → Help → Package(reserved); add the `touch_seed_source` `spine:false` fork with `joinTarget` to the touch carve/add spine step (FR-012, FR-013, M2–M4).
+- [x] T025 [P] [US2] `steps/manifest.test.ts` — M2 (spine order), M3 (exactly two locks in order), M4 (fork + resolving joinTarget), M5 (unique ids), M6 (no A–G vocabulary).
 
 ### Reducer (moves the three inline side effects)
 
-- [ ] T026 [US2] `steps/reducer.ts` — `applyStepCompletion(stepId, result, store)` keyed by step id: Mechanisms→`lockDesktop()` (today `StudioShell.tsx:377`); touch→`buildTouchLayoutJson` block + `setTouchLayoutJson` (today `:388–410`, same Case-A/B + graceful degradation); instantiate→Track2 `instantiateFromExisting` / Track1 `instantiateFromBaseIfConfirmed` (today `:240–253`). (FR-011, R1–R3)
-- [ ] T027 [P] [US2] `steps/reducer.test.ts` — R1–R6: lock fires once at Mechanisms; touch build parity incl. error→null→advance; copy/adapt routing parity; unknown id is a no-op; editor purity (no editor calls these); store-state parity vs the pre-refactor inline path.
+- [x] T026 [US2] `steps/reducer.ts` — `applyStepCompletion(stepId, result, store)` keyed by step id: Mechanisms→`lockDesktop()` (today `StudioShell.tsx:377`); touch→`buildTouchLayoutJson` block + `setTouchLayoutJson` (today `:388–410`, same Case-A/B + graceful degradation); instantiate→Track2 `instantiateFromExisting` / Track1 `instantiateFromBaseIfConfirmed` (today `:240–253`). (FR-011, R1–R3)
+- [x] T027 [P] [US2] `steps/reducer.test.ts` — R1–R6: lock fires once at Mechanisms; touch build parity incl. error→null→advance; copy/adapt routing parity; unknown id is a no-op; editor purity (no editor calls these); store-state parity vs the pre-refactor inline path.
 
 ### SurveyView rewrite (remove the union)
 
-- [ ] T028 [US2] Rewrite `SurveyView` in `packages/studio/src/StudioShell.tsx` (~517 LOC): read step order from `steps/manifest.ts`, drive transitions via the manifest + `applyStepCompletion`, and **delete the `SurveyStage` union** (FR-009, M1). Editors stay pure (FR-003).
-- [ ] T029 [P] [US2] Update `packages/studio/src/StudioShell.test.tsx` — assert no `SurveyStage` symbol remains; runtime order equals manifest order; reordering two manifest steps changes runtime order (US2 independent test, SC-003).
+- [x] T028 [US2] Rewrite `SurveyView` in `packages/studio/src/StudioShell.tsx` (~517 LOC): read step order from `steps/manifest.ts`, drive transitions via the manifest + `applyStepCompletion`, and **delete the `SurveyStage` union** (FR-009, M1). Editors stay pure (FR-003).
+- [x] T029 [P] [US2] Update `packages/studio/src/StudioShell.test.tsx` — assert no `SurveyStage` symbol remains; runtime order equals manifest order; reordering two manifest steps changes runtime order (US2 independent test, SC-003).
 
 ### Dashboard rename + manifest source
 
-- [ ] T030 [US2] Rename `packages/studio/src/flowmap/` → `dashboard/`: `FlowMapView.tsx`→`DashboardView.tsx`, `buildFlowGraph.ts`→`buildStepGraph.ts`; move `FlowGraphView/ScriptRoutingView/StrategyTreeView/buildScriptRouting/flowUtils/layout/model/tokens` + tests/snapshots. Preserve explicit import extensions (boundaries constraint).
-- [ ] T031 [US2] Point `dashboard/buildStepGraph.ts` at `steps/manifest.ts` so every manifest step (galleries + panels included) yields exactly one node; keep the existing modular-registry resolution for question bodies (D7, C8).
-- [ ] T032 [P] [US2] `dashboard/buildStepGraph.test.ts` — C8 (one node per step, node/edge set == runtime step set, zero ghost/missing) and C9 (same manifest as runtime; no second source). Update flow-map snapshots.
-- [ ] T033 [US2] Add `steps-layer` and `dashboard-layer` rules to `.dependency-cruiser.cjs` per [contracts/boundaries.contract.md](contracts/boundaries.contract.md) (`steps/`→survey/editors/contracts/ui only; `dashboard/`→steps/contracts/ui only). Confirm `pnpm depcruise` green (B3, B4).
+- [x] T030 [US2] Rename `packages/studio/src/flowmap/` → `dashboard/`: `FlowMapView.tsx`→`DashboardView.tsx`, `buildFlowGraph.ts`→`buildStepGraph.ts`; move `FlowGraphView/ScriptRoutingView/StrategyTreeView/buildScriptRouting/flowUtils/layout/model/tokens` + tests/snapshots. Preserve explicit import extensions (boundaries constraint).
+- [x] T031 [US2] Point `dashboard/buildStepGraph.ts` at `steps/manifest.ts` so every manifest step (galleries + panels included) yields exactly one node; keep the existing modular-registry resolution for question bodies (D7, C8).
+- [x] T032 [P] [US2] `dashboard/buildStepGraph.test.ts` — C8 (one node per step, node/edge set == runtime step set, zero ghost/missing) and C9 (same manifest as runtime; no second source). Update flow-map snapshots.
+- [x] T033 [US2] Add `steps-layer` and `dashboard-layer` rules to `.dependency-cruiser.cjs` per [contracts/boundaries.contract.md](contracts/boundaries.contract.md) (`steps/`→survey/editors/contracts/ui only; `dashboard/`→steps/contracts/ui only). Confirm `pnpm depcruise` green (B3, B4).
 
 **Checkpoint**: ordering comes only from the manifest; map == runtime; side effects in the reducer. US2 testable.
 
@@ -136,15 +136,15 @@ This is also the dependency order: P4b's union replacement **cannot** begin unti
 
 **Independent Test**: a crafted-violation manifest fixture trips each invariant in turn; a clean manifest passes all five.
 
-- [ ] T034 [US3] `dashboard/completeness.ts` — `computeStaleness(graph, reopened)`: transitive closure to a **fixpoint** over `writes → inputs` (C1, FR-014).
-- [ ] T035 [US3] Add `findCycles(graph)` to `dashboard/completeness.ts` — detect cycles in `writes → inputs`; non-empty ⇒ hard error (C2, FR-015).
-- [ ] T036 [US3] Add `checkRejoin(manifest)` — every `spine:false` chain has a `joinTarget` whose terminal `next` reaches a `spine:true` step (C3, FR-016).
-- [ ] T037 [US3] Add `checkSpinePrefixShippability(manifest, wc)` — **structural proxy**: each spine prefix leaves a complete, lock-consistent working copy; **no validator invocation** (C4, FR-017, Clarifications 2026-06-27).
-- [ ] T038 [US3] Add `checkInputsSatisfiable(graph)` (orphan inputs, C5/FR-018), `runCompleteness(...)` aggregate, and `unreachable` detection (C7). Returns `CompletenessReport` (data-model).
-- [ ] T039 [P] [US3] `dashboard/completeness.test.ts` — C1 (2-edge-distant dependent included), C2 (A→B→A is a cycle), C3 (off-spine dead-end flagged, rejoining one not), C4 (stranded-lock prefix flagged, clean not, no validator), C5 (orphan input, distinct from C4 both directions), C6 (real manifest passes all five), C7 (unreachable surfaced). (SC-006)
-- [ ] T040 [US3] Add the `staleness` slice to `packages/studio/src/stores/workingCopyStore.ts`: `staleSteps: Set<string>` default empty ("fresh"), `markStale(reopenedId)` (recompute closure), `clearStale(stepId)` (FR-019, D5).
-- [ ] T041 [P] [US3] `stores/workingCopyStore.test.ts` — default fresh; breaking a lock populates `staleSteps` with the closure; re-answering clears it and recomputes dependents.
-- [ ] T042 [US3] Wire `dashboard/DashboardView.tsx` to surface the `CompletenessReport` read-only (stale/cycles/rejoin/unshippable/orphans/unreachable). Reuse existing UI; no new authoring UI (FR-023).
+- [x] T034 [US3] `dashboard/completeness.ts` — `computeStaleness(graph, reopened)`: transitive closure to a **fixpoint** over `writes → inputs` (C1, FR-014).
+- [x] T035 [US3] Add `findCycles(graph)` to `dashboard/completeness.ts` — detect cycles in `writes → inputs`; non-empty ⇒ hard error (C2, FR-015).
+- [x] T036 [US3] Add `checkRejoin(manifest)` — every `spine:false` chain has a `joinTarget` whose terminal `next` reaches a `spine:true` step (C3, FR-016).
+- [x] T037 [US3] Add `checkSpinePrefixShippability(manifest, wc)` — **structural proxy**: each spine prefix leaves a complete, lock-consistent working copy; **no validator invocation** (C4, FR-017, Clarifications 2026-06-27).
+- [x] T038 [US3] Add `checkInputsSatisfiable(graph)` (orphan inputs, C5/FR-018), `runCompleteness(...)` aggregate, and `unreachable` detection (C7). Returns `CompletenessReport` (data-model).
+- [x] T039 [P] [US3] `dashboard/completeness.test.ts` — C1 (2-edge-distant dependent included), C2 (A→B→A is a cycle), C3 (off-spine dead-end flagged, rejoining one not), C4 (stranded-lock prefix flagged, clean not, no validator), C5 (orphan input, distinct from C4 both directions), C6 (real manifest passes all five), C7 (unreachable surfaced). (SC-006)
+- [x] T040 [US3] Add the `staleness` slice to `packages/studio/src/stores/workingCopyStore.ts`: `staleSteps: Set<string>` default empty ("fresh"), `markStale(reopenedId)` (recompute closure), `clearStale(stepId)` (FR-019, D5).
+- [x] T041 [P] [US3] `stores/workingCopyStore.test.ts` — default fresh; breaking a lock populates `staleSteps` with the closure; re-answering clears it and recomputes dependents.
+- [x] T042 [US3] Wire `dashboard/DashboardView.tsx` to surface the `CompletenessReport` read-only (stale/cycles/rejoin/unshippable/orphans/unreachable). Reuse existing UI; no new authoring UI (FR-023).
 
 **Checkpoint**: completeness checks ship; staleness tracked. US3 testable.
 
@@ -152,9 +152,9 @@ This is also the dependency order: P4b's union replacement **cannot** begin unti
 
 ## Phase 7: Polish & Cross-Cutting Concerns — PR2 / P4b
 
-- [ ] T043 [P] Run [quickstart.md](quickstart.md) full P4a + P4b validation recipes; confirm `pnpm typecheck`, studio tests, and `pnpm depcruise` all green; spot-check end-to-end spine run + spine-prefix shippability (SC-007).
-- [ ] T044 [P] Update [docs/survey-modularity-cyoa-plan.md](../../docs/survey-modularity-cyoa-plan.md) status banner/§6 to mark P4a + P4b shipped; cross-link the PRs (no issue numbers in code — Constitution VIII).
-- [ ] T045 Verify SC-009 revert-safety: confirm reverting the PR2 SurveyView/manifest commit restores the union-driven flow without touching `editors/` (document the check; do not actually revert).
+- [x] T043 [P] Run [quickstart.md](quickstart.md) full P4a + P4b validation recipes; confirm `pnpm typecheck`, studio tests, and `pnpm depcruise` all green; spot-check end-to-end spine run + spine-prefix shippability (SC-007).
+- [x] T044 [P] Update [docs/survey-modularity-cyoa-plan.md](../../docs/survey-modularity-cyoa-plan.md) status banner/§6 to mark P4a + P4b shipped; cross-link the PRs (no issue numbers in code — Constitution VIII).
+- [x] T045 Verify SC-009 revert-safety: confirm reverting the PR2 SurveyView/manifest commit restores the union-driven flow without touching `editors/` (document the check; do not actually revert).
 
 ---
 

@@ -4,7 +4,7 @@
 
 **Created**: 2026-06-26
 
-**Status**: Draft
+**Status**: Implemented (US1–US3, all FRs/SCs) — shipped via PR #706, with the wizard panels later relocated to `editors/panels/` by spec 012 and `Autocomplete`/`Dropdown` later superseded by spec 030's langtags widgets and `ui/SelectMenu.tsx` respectively. Retroactively verified 2026-08-20; T031/T032/T033 (point-in-time diff-empty / bundle-size / manual-smoke checks) not retroactively verifiable and left unchecked in tasks.md.
 
 **Input**: User description: Extract a shared `ui/` primitive library for the studio SPA — P1 of [docs/survey-modularity-cyoa-plan.md](../../docs/survey-modularity-cyoa-plan.md) (§3.2 / §5 / §8). Create `ui/` with `Button`, `Dropdown`, `TextField`, `RadioGroup`, `MultiSelect`, `Notice`, `Card`, and `theme`. Refactor `QuestionField.tsx` and the five wizard-step components onto these primitives, and fold `lib/galleryTheme.ts` into `ui/theme.ts`. Architectural constraint, enforced by a new dependency-cruiser leaf rule: `ui/` imports nothing from `survey/`, `steps/`, or `stores/`. Pure refactor — success is zero behavioral/visual diff (existing component tests pass unchanged) and depcruise green. Out of scope: any step-model / manifest restructuring (that is P4).
 

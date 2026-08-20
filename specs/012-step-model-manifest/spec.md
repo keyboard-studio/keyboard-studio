@@ -4,7 +4,7 @@
 
 **Created**: 2026-06-27
 
-**Status**: Draft
+**Status**: Implemented (US1–US4, all FRs/SCs) — P4a merged via PR #778, P4b via PR #780 (per [docs/survey-modularity-cyoa-plan.md](../../docs/survey-modularity-cyoa-plan.md) §6). Foundational for later specs (011's wizard panels relocated here into `editors/panels/`; 021/029 build directly on `steps/registerEditorSteps.ts` and the dashboard). Retroactively verified 2026-08-20.
 
 **Input**: User description: Unified step model + manifest-driven ordering for the studio survey — **Phase 4 (P4a + P4b)** of [docs/survey-modularity-cyoa-plan.md](../../docs/survey-modularity-cyoa-plan.md) (§3.1, §3.4, §3.5, §3.6, §3.7, §4, §5, §6 P4a/P4b, §8). P4a builds the `steps/` types and per-step editor adapters for the galleries and the five hand-built wizard panels, landed **behind the existing `SurveyStage` machine**. P4b replaces the hardcoded `SurveyStage` union with a single `steps/manifest.ts`, routes side effects through a manifest-level `onComplete` reducer, repoints the dashboard at the manifest (map == runtime by construction), and ships the completeness/staleness checks for the §3.5 CYOA invariants.
 
