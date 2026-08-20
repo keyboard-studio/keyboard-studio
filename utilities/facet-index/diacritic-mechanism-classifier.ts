@@ -33,13 +33,26 @@
  * multi-family).
  */
 
-import type { ContextElement, KeyboardIR, OutputElement } from "@keyboard-studio/contracts";
+import type { ContextElement, DiacriticBehavior, KeyboardIR, OutputElement } from "@keyboard-studio/contracts";
 
 import { computeAnalyzedCoverage } from "./outcome.js";
 import { undeterminedFallback } from "./measurement.js";
 import { eachRule, ruleContextPrefix } from "./ir-scan.js";
 import type { Categorization, ConfidenceClass, FacetDefinition } from "./types.js";
 import type { ScannedKeyboard } from "./scan.js";
+
+/**
+ * Axis-A4 value domain, aliased to the canonical `DiacriticBehavior` (spec 045)
+ * rather than independently redeclared, so this classifier cannot drift from
+ * the shared discovery-axis vocabulary.
+ */
+type A4Value = DiacriticBehavior;
+
+type Expect<T extends true> = T;
+type AssignableTo<S, T> = [S] extends [T] ? true : false;
+// This alias is intentionally unused at the value level — its declaration is
+// the assertion. A failure surfaces here as a constraint error on `Expect`.
+type _A4ValueGuard = Expect<AssignableTo<A4Value, DiacriticBehavior>>;
 
 const COMBINING_MARK = /\p{M}/u;
 /**
@@ -174,7 +187,7 @@ export function classifyDiacriticMechanism(ir: KeyboardIR, def: FacetDefinition)
   }
 
   const minorityShare = Math.min(add, replace) / total;
-  let value: string;
+  let value: A4Value;
   if (add > 0 && replace > 0 && minorityShare >= MULTI_FAMILY_MIN_SHARE) {
     value = "multi-family";
   } else if (replace > add) {

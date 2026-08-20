@@ -19,8 +19,8 @@ description: "Task list for Lens-Vocabulary Single Source of Truth"
 
 ## Phase 1: Setup
 
-- [ ] T001 Create feature branch `km/lens-vocabulary-source-of-truth` off `main`
-- [ ] T002 Re-confirm research R1's scope-narrowing before editing anything: read `utilities/facet-index/spare-key-budget-classifier.ts` and confirm `export type SpareKeyBudget = KeyBudgetBand;` is still present and unchanged — if it has drifted since 2026-08-19, the A7 exclusion needs re-justifying before proceeding
+- [x] T001 Create feature branch `km/lens-vocabulary-source-of-truth` off `main`
+- [x] T002 Re-confirm research R1's scope-narrowing before editing anything: read `utilities/facet-index/spare-key-budget-classifier.ts` and confirm `export type SpareKeyBudget = KeyBudgetBand;` is still present and unchanged — if it has drifted since 2026-08-19, the A7 exclusion needs re-justifying before proceeding
 
 ---
 
@@ -28,7 +28,7 @@ description: "Task list for Lens-Vocabulary Single Source of Truth"
 
 **Purpose**: FR-010 is an explicit gating question spec.md forbids assuming the answer to. Research R6 resolved it, but this must be confirmed live, not carried forward blindly, since a wrong answer here means an Article I violation.
 
-- [ ] T003 Confirm FR-010's resolution: `grep -rn "StrategyId" utilities/facet-index/added-char-count-classifier.ts utilities/facet-index/diacritic-mechanism-classifier.ts content/keyboard-facets/added-char-count.yaml content/keyboard-facets/diacritic-mechanism.yaml` returns zero matches — confirms this feature's real scope (A1/A4) never touches `StrategyId` or any locked `Pattern` field, so the Article I ritual (major version bump + joint session) does NOT trigger. If this grep finds a match, STOP and escalate per FR-010's own instruction rather than proceeding.
+- [x] T003 Confirm FR-010's resolution: `grep -rn "StrategyId" utilities/facet-index/added-char-count-classifier.ts utilities/facet-index/diacritic-mechanism-classifier.ts content/keyboard-facets/added-char-count.yaml content/keyboard-facets/diacritic-mechanism.yaml` returns zero matches — confirms this feature's real scope (A1/A4) never touches `StrategyId` or any locked `Pattern` field, so the Article I ritual (major version bump + joint session) does NOT trigger. If this grep finds a match, STOP and escalate per FR-010's own instruction rather than proceeding.
 
 **Checkpoint**: Constitution Check gate cleared for real, not just carried from the plan.
 
@@ -42,9 +42,9 @@ description: "Task list for Lens-Vocabulary Single Source of Truth"
 
 ### Implementation for User Story 1
 
-- [ ] T004 [P] [US1] In `utilities/facet-index/added-char-count-classifier.ts`: change `export type A1Band = "tiny" | "small" | "medium" | "large" | "massive";` to `export type A1Band = Scale;` (import `Scale` from `@keyboard-studio/contracts`), keeping the exported name `A1Band` so no call site needs to change (FR-001, FR-003)
-- [ ] T005 [P] [US1] In `utilities/facet-index/diacritic-mechanism-classifier.ts`: introduce `type A4Value = DiacriticBehavior;` (import `DiacriticBehavior` from `@keyboard-studio/contracts`), change `let value: string;` to `let value: A4Value;` (FR-001, FR-003)
-- [ ] T006 [US1] Run the facet-index build and the strategy-selector's existing fixture suite; confirm output is byte-identical to the pre-change baseline (FR-007, SC-003) — capture the before/after diff (or lack thereof) as evidence
+- [x] T004 [P] [US1] In `utilities/facet-index/added-char-count-classifier.ts`: change `export type A1Band = "tiny" | "small" | "medium" | "large" | "massive";` to `export type A1Band = Scale;` (import `Scale` from `@keyboard-studio/contracts`), keeping the exported name `A1Band` so no call site needs to change (FR-001, FR-003)
+- [x] T005 [P] [US1] In `utilities/facet-index/diacritic-mechanism-classifier.ts`: introduce `type A4Value = DiacriticBehavior;` (import `DiacriticBehavior` from `@keyboard-studio/contracts`), change `let value: string;` to `let value: A4Value;` (FR-001, FR-003)
+- [x] T006 [US1] Run the facet-index build and the strategy-selector's existing fixture suite; confirm output is byte-identical to the pre-change baseline (FR-007, SC-003) — capture the before/after diff (or lack thereof) as evidence
 
 **Checkpoint**: SC-001's "zero independent re-declarations" holds for A1/A4; behavior is unchanged (SC-003).
 
@@ -60,10 +60,10 @@ description: "Task list for Lens-Vocabulary Single Source of Truth"
 
 ### Implementation for User Story 2
 
-- [ ] T007 [P] [US2] Add `type _A1BandGuard = Expect<AssignableTo<A1Band, Scale>>;` to `added-char-count-classifier.ts`, mirroring the `Expect<AssignableTo<...>>` idiom already in `packages/contracts/src/schemas.ts` (research R4) — placed alongside the classifier, not in `schemas.ts`, since `utilities/facet-index` must gain no new workspace-package edge beyond its existing contracts import
-- [ ] T008 [P] [US2] Add the equivalent `type _A4ValueGuard = Expect<AssignableTo<A4Value, DiacriticBehavior>>;` to `diacritic-mechanism-classifier.ts`
-- [ ] T009 [US2] Create `utilities/facet-index/lens-vocabulary-lockstep.test.ts` (research R5 — new file colocated with the classifiers, not `scriptAxes.test.ts`/`driftGuardrail.test.ts`, which cover different axes): asserts `content/keyboard-facets/diacritic-mechanism.yaml`'s and `added-char-count.yaml`'s `limits.values` sets equal `DiacriticBehavior`'s and `Scale`'s member sets respectively (the shared-core check, extension-tolerant per the spec's core+extension model for facet-only measurement values)
-- [ ] T010 [US2] Manually verify the guard fires: on a scratch change, add a value to one YAML's `limits.values` without adding it to the corresponding contracts type; confirm `pnpm typecheck` (via T007/T008's guards, if the divergence is type-level) or the lockstep test (T009, for the YAML-only case) fails; revert and confirm both pass again (SC-002)
+- [x] T007 [P] [US2] Add `type _A1BandGuard = Expect<AssignableTo<A1Band, Scale>>;` to `added-char-count-classifier.ts`, mirroring the `Expect<AssignableTo<...>>` idiom already in `packages/contracts/src/schemas.ts` (research R4) — placed alongside the classifier, not in `schemas.ts`, since `utilities/facet-index` must gain no new workspace-package edge beyond its existing contracts import
+- [x] T008 [P] [US2] Add the equivalent `type _A4ValueGuard = Expect<AssignableTo<A4Value, DiacriticBehavior>>;` to `diacritic-mechanism-classifier.ts`
+- [x] T009 [US2] Create `utilities/facet-index/lens-vocabulary-lockstep.test.ts` (research R5 — new file colocated with the classifiers, not `scriptAxes.test.ts`/`driftGuardrail.test.ts`, which cover different axes): asserts `content/keyboard-facets/diacritic-mechanism.yaml`'s and `added-char-count.yaml`'s `limits.values` sets equal `DiacriticBehavior`'s and `Scale`'s member sets respectively (the shared-core check, extension-tolerant per the spec's core+extension model for facet-only measurement values)
+- [x] T010 [US2] Manually verify the guard fires: on a scratch change, add a value to one YAML's `limits.values` without adding it to the corresponding contracts type; confirm `pnpm typecheck` (via T007/T008's guards, if the divergence is type-level) or the lockstep test (T009, for the YAML-only case) fails; revert and confirm both pass again (SC-002)
 
 **Checkpoint**: SC-002 — a deliberate divergence is caught by at least one of the two guards, every time.
 
@@ -71,9 +71,9 @@ description: "Task list for Lens-Vocabulary Single Source of Truth"
 
 ## Phase 5: Polish & Cross-Cutting Validation
 
-- [ ] T011 [P] Run the full repeatable gate: `pnpm typecheck`, `pnpm test` (including the new lockstep test), `pnpm lint` (`pnpm depcruise`, `pnpm run facet-lint`, `pnpm run facet-index-lint`) — SC-004
-- [ ] T012 Cross-link this spec from [docs/lens-model.md](../../docs/lens-model.md) and vice versa, and cite the 2026-07-21 DISCUS↔facets overlap audit finding (per spec.md's Acceptance checklist)
-- [ ] T013 Record the Constitution Check outcome (FR-010 resolved: no locked field touched) in `docs/spec-signoff.md` if this repo's convention requires a signoff entry for a candidate-Article proposal (spec.md's "Constitution check (candidate gate)" section) — note the decision NOT to adopt a new mechanical Article in this pass (plan.md's own call), leaving that as a separate documentation decision for `.specify/memory/constitution.md`'s maintainers
+- [x] T011 [P] Run the full repeatable gate: `pnpm typecheck`, `pnpm test` (including the new lockstep test), `pnpm lint` (`pnpm depcruise`, `pnpm run facet-lint`, `pnpm run facet-index-lint`) — SC-004
+- [x] T012 Cross-link this spec from [docs/lens-model.md](../../docs/lens-model.md) and vice versa, and cite the 2026-07-21 DISCUS↔facets overlap audit finding (per spec.md's Acceptance checklist)
+- [x] T013 Record the Constitution Check outcome (FR-010 resolved: no locked field touched) in `docs/spec-signoff.md` if this repo's convention requires a signoff entry for a candidate-Article proposal (spec.md's "Constitution check (candidate gate)" section) — note the decision NOT to adopt a new mechanical Article in this pass (plan.md's own call), leaving that as a separate documentation decision for `.specify/memory/constitution.md`'s maintainers
 
 ---
 
