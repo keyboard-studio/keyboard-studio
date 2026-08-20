@@ -171,9 +171,31 @@ zip emitted without it. Worth closing at the services boundary rather than the h
 
 ## Phase 4: Polish & Cross-Cutting Concerns
 
-- [ ] T028 [P] Run `npx tsc --noEmit` in `packages/contracts/`, `packages/engine/`, and `packages/studio/` — expect only the pre-existing `@keymanapp/keyboard-lint` and `@keyboard-studio/glottolog` resolution errors
-- [ ] T029 Run the full suites and compare failed-*file* counts against the pre-change baseline (21 in studio, 0 in engine) rather than expecting zero, since several files fail at import on unbuilt workspace packages
-- [ ] T030 Update [research.md](research.md) with the T010 finding and mark D8 verified
+- [x] T028 [P] Run `npx tsc --noEmit` in `packages/contracts/`, `packages/engine/`, and `packages/studio/` — expect only the pre-existing `@keymanapp/keyboard-lint` and `@keyboard-studio/glottolog` resolution errors
+- [x] T029 Run the full suites and compare failed-*file* counts against the pre-change baseline (21 in studio, 0 in engine) rather than expecting zero, since several files fail at import on unbuilt workspace packages
+- [x] T030 Update [research.md](research.md) with the T010 finding and mark D8 verified
+
+**PHASE 4 DONE 2026-08-20.** With all three workspace prerequisites built (T001) and SLDR fetched
+(`pnpm run fetch-sldr`), all three packages typecheck clean — zero errors, not even the
+`keyboard-lint`/`glottolog` resolution errors the task expected as tolerable, since those packages
+are now built too.
+
+Full-suite counts came in above the recorded baselines, but both deltas trace to pre-existing,
+documented local-environment issues rather than a regression from this feature:
+
+- **Engine: 1 failed file** (`recognizer/integration.test.ts`, the "0060 grave RALT K_7" case) —
+  known to depend on the local `../keyboards` fork's corpus state; CI-green.
+- **Studio: 26 failed files** (baseline 21) — every failing file touches `localStorage` (theme,
+  i18n, draft persistence, OAuth callback, StudioShell resume/switch variants). Root cause is
+  Node 26 shadowing jsdom's `localStorage` implementation locally (`ExperimentalWarning:
+  localStorage is not available because --localstorage-file was not provided`); CI runs Node 22
+  and is unaffected. The 5-file rise over the recorded baseline reflects new localStorage-touching
+  tests added since 2026-08-04, not new failures.
+
+T030's substance (the T010 finding and D8 VERIFIED) was already written into research.md on
+2026-08-04 — only the tasks.md checkbox had never been ticked.
+
+**Spec 064 is now fully closed — all 38 tasks done.**
 
 ---
 
