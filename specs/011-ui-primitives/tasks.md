@@ -25,8 +25,8 @@ description: "Task list for Shared ui/ Primitive Library Extraction (feature 011
 
 **Purpose**: Establish the `ui/` directory and freeze the primitive set before any code lands.
 
-- [ ] T001 Create the `packages/studio/src/ui/` directory with an empty public entry point `packages/studio/src/ui/index.ts` (placeholder `export {}` to keep typecheck green until primitives land).
-- [ ] T002 Confirm the FR-007 audit set (14 primitives + 8 divergent-token rows) against the six call sites by reading `packages/studio/src/survey/QuestionField.tsx` and `packages/studio/src/components/{TrackStep,ProjectNameStep,ScaffoldForm,TrackOneIdentityPanel,BaseResolution}.tsx`; record any deviation from research.md Decision 1 / data-model.md before proceeding (no code change).
+- [x] T001 Create the `packages/studio/src/ui/` directory with an empty public entry point `packages/studio/src/ui/index.ts` (placeholder `export {}` to keep typecheck green until primitives land).
+- [x] T002 Confirm the FR-007 audit set (14 primitives + 8 divergent-token rows) against the six call sites by reading `packages/studio/src/survey/QuestionField.tsx` and `packages/studio/src/components/{TrackStep,ProjectNameStep,ScaffoldForm,TrackOneIdentityPanel,BaseResolution}.tsx`; record any deviation from research.md Decision 1 / data-model.md before proceeding (no code change).
 
 ---
 
@@ -36,7 +36,7 @@ description: "Task list for Shared ui/ Primitive Library Extraction (feature 011
 
 **⚠️ CRITICAL**: No primitive (Phase 3+) can be built until T003 is complete.
 
-- [ ] T003 Create `packages/studio/src/ui/theme.ts` as the single token module (research Decision 2 / data-model.md theme table): typed accessors/names for the canonical `var(--app-*)` CSS custom properties already defined in `index.css`, **plus** the legacy hex constants `BG_PAGE`, `BG_CARD`, `BORDER`, `ACCENT`, `TEXT_DIM`, `TEXT_MAIN`, `FONT`, `BLUE_ACTION` (for the `galleryTheme` shim in T026), **plus** named tokens for the preserved divergent values (`error-border` `#7a2a2a`, `error-text` `#f0a0a0`, `warning` `#d29922`, `success-accent` `#7ee787`/`--sil-green`). Do NOT normalize any color (FR-005).
+- [x] T003 Create `packages/studio/src/ui/theme.ts` as the single token module (research Decision 2 / data-model.md theme table): typed accessors/names for the canonical `var(--app-*)` CSS custom properties already defined in `index.css`, **plus** the legacy hex constants `BG_PAGE`, `BG_CARD`, `BORDER`, `ACCENT`, `TEXT_DIM`, `TEXT_MAIN`, `FONT`, `BLUE_ACTION` (for the `galleryTheme` shim in T026), **plus** named tokens for the preserved divergent values (`error-border` `#7a2a2a`, `error-text` `#f0a0a0`, `warning` `#d29922`, `success-accent` `#7ee787`/`--sil-green`). Do NOT normalize any color (FR-005).
 
 **Checkpoint**: Theme source exists — primitive construction can begin.
 
@@ -52,35 +52,35 @@ description: "Task list for Shared ui/ Primitive Library Extraction (feature 011
 
 > All primitive tasks are parallel — distinct `.tsx` + `.test.tsx` files, each consuming only `ui/theme.ts`. Each test (Testing Library) asserts the primitive renders the same element + `role` + resolved style values as the inline control it replaces (FR-005), in isolation, before any call site adopts it.
 
-- [ ] T004 [P] [US1] `packages/studio/src/ui/Button.tsx` (+ `Button.test.tsx`): `variant: "primary" | "secondary" | "back"` (default `secondary`), extends `React.ButtonHTMLAttributes`, enabled/disabled states — replaces `NEXT_BTN_ENABLED/DISABLED`, `BACK_BTN`, submit buttons.
-- [ ] T005 [P] [US1] `packages/studio/src/ui/Card.tsx` (+ `Card.test.tsx`): `selected: boolean`, clickable container — replaces `CARD_BASE`/`CARD_SELECTED`.
-- [ ] T006 [P] [US1] `packages/studio/src/ui/TextField.tsx` (+ `TextField.test.tsx`): extends `React.InputHTMLAttributes`, `error?: boolean`, `mono?: boolean` — replaces `<input type=text>` + `INPUT_STYLE`.
-- [ ] T007 [P] [US1] `packages/studio/src/ui/Textarea.tsx` (+ `Textarea.test.tsx`): `error?: boolean`, `rows`, `resize:vertical` — replaces `<textarea>` + `INPUT_STYLE`.
-- [ ] T008 [P] [US1] `packages/studio/src/ui/Autocomplete.tsx` (+ `Autocomplete.test.tsx`): `options: string[]` rendering an `<input list>` + `<datalist>` composite — replaces the QuestionField autocomplete.
-- [ ] T009 [P] [US1] `packages/studio/src/ui/Dropdown.tsx` (+ `Dropdown.test.tsx`): `options: {value,label}[]` rendering `<select>` — replaces QuestionField `<select>`.
-- [ ] T010 [P] [US1] `packages/studio/src/ui/RadioGroup.tsx` (+ `RadioGroup.test.tsx`): `mode: "list" | "bool"` (default `list`), `name`, `value`, `options`, `accent?`, `onChange` — bool mode synthesizes yes/no and preserves the green accent `#3fb950`; replaces `RadioField` + `BoolField`.
-- [ ] T011 [P] [US1] `packages/studio/src/ui/MultiSelect.tsx` (+ `MultiSelect.test.tsx`): `options`, `selected` checkbox-row group — replaces `MultiSelectField`.
-- [ ] T012 [P] [US1] `packages/studio/src/ui/Checkbox.tsx` (+ `Checkbox.test.tsx`): standalone `checked` checkbox — replaces standalone `<input type=checkbox>`.
-- [ ] T013 [P] [US1] `packages/studio/src/ui/Label.tsx` (+ `Label.test.tsx`): extends `React.LabelHTMLAttributes`, `required?: boolean` rendering the existing `#e74c3c` asterisk marker — replaces `LABEL_STYLE`/`OPTION_LABEL_STYLE`.
-- [ ] T014 [P] [US1] `packages/studio/src/ui/ErrorText.tsx` (+ `ErrorText.test.tsx`): `tone: "error" | "warning" | "hint"` → `error`/`warning` render `role=alert`, `hint` renders `role=status` — replaces conditional error/warning/hint `<div>`s.
-- [ ] T015 [P] [US1] `packages/studio/src/ui/Notice.tsx` (+ `Notice.test.tsx`): `tone: "info" | "warn" | "error"` read-only banner — replaces `NoticeField`.
-- [ ] T016 [P] [US1] `packages/studio/src/ui/Field.tsx` (+ `Field.test.tsx`): composes `Label` + control slot + `ErrorText`/help row — replaces the implicit field-row wrappers.
-- [ ] T017 [P] [US1] `packages/studio/src/ui/Badge.tsx` (+ `Badge.test.tsx`): `tone` small status tag — replaces `REASON_COLOR`/`ImportBadge` status tags.
+- [x] T004 [P] [US1] `packages/studio/src/ui/Button.tsx` (+ `Button.test.tsx`): `variant: "primary" | "secondary" | "back"` (default `secondary`), extends `React.ButtonHTMLAttributes`, enabled/disabled states — replaces `NEXT_BTN_ENABLED/DISABLED`, `BACK_BTN`, submit buttons.
+- [x] T005 [P] [US1] `packages/studio/src/ui/Card.tsx` (+ `Card.test.tsx`): `selected: boolean`, clickable container — replaces `CARD_BASE`/`CARD_SELECTED`.
+- [x] T006 [P] [US1] `packages/studio/src/ui/TextField.tsx` (+ `TextField.test.tsx`): extends `React.InputHTMLAttributes`, `error?: boolean`, `mono?: boolean` — replaces `<input type=text>` + `INPUT_STYLE`.
+- [x] T007 [P] [US1] `packages/studio/src/ui/Textarea.tsx` (+ `Textarea.test.tsx`): `error?: boolean`, `rows`, `resize:vertical` — replaces `<textarea>` + `INPUT_STYLE`.
+- [x] T008 [P] [US1] `packages/studio/src/ui/Autocomplete.tsx` (+ `Autocomplete.test.tsx`): `options: string[]` rendering an `<input list>` + `<datalist>` composite — replaces the QuestionField autocomplete. (Landed in #706; later superseded by spec 030's dedicated `LangtagsComboboxField`/`StyledCombobox` in `survey/QuestionField.tsx` — `ui/Autocomplete.tsx` no longer exists on disk. Not a gap in this spec's delivery.)
+- [x] T009 [P] [US1] `packages/studio/src/ui/Dropdown.tsx` (+ `Dropdown.test.tsx`): `options: {value,label}[]` rendering `<select>` — replaces QuestionField `<select>`. (Landed in #706; later replaced by `ui/SelectMenu.tsx` — a webview-safe custom dropdown, per its own header comment referencing "the now-removed ui/Dropdown.tsx". Not a gap in this spec's delivery.)
+- [x] T010 [P] [US1] `packages/studio/src/ui/RadioGroup.tsx` (+ `RadioGroup.test.tsx`): `mode: "list" | "bool"` (default `list`), `name`, `value`, `options`, `accent?`, `onChange` — bool mode synthesizes yes/no and preserves the green accent `#3fb950`; replaces `RadioField` + `BoolField`.
+- [x] T011 [P] [US1] `packages/studio/src/ui/MultiSelect.tsx` (+ `MultiSelect.test.tsx`): `options`, `selected` checkbox-row group — replaces `MultiSelectField`.
+- [x] T012 [P] [US1] `packages/studio/src/ui/Checkbox.tsx` (+ `Checkbox.test.tsx`): standalone `checked` checkbox — replaces standalone `<input type=checkbox>`.
+- [x] T013 [P] [US1] `packages/studio/src/ui/Label.tsx` (+ `Label.test.tsx`): extends `React.LabelHTMLAttributes`, `required?: boolean` rendering the existing `#e74c3c` asterisk marker — replaces `LABEL_STYLE`/`OPTION_LABEL_STYLE`.
+- [x] T014 [P] [US1] `packages/studio/src/ui/ErrorText.tsx` (+ `ErrorText.test.tsx`): `tone: "error" | "warning" | "hint"` → `error`/`warning` render `role=alert`, `hint` renders `role=status` — replaces conditional error/warning/hint `<div>`s.
+- [x] T015 [P] [US1] `packages/studio/src/ui/Notice.tsx` (+ `Notice.test.tsx`): `tone: "info" | "warn" | "error"` read-only banner — replaces `NoticeField`.
+- [x] T016 [P] [US1] `packages/studio/src/ui/Field.tsx` (+ `Field.test.tsx`): composes `Label` + control slot + `ErrorText`/help row — replaces the implicit field-row wrappers.
+- [x] T017 [P] [US1] `packages/studio/src/ui/Badge.tsx` (+ `Badge.test.tsx`): `tone` small status tag — replaces `REASON_COLOR`/`ImportBadge` status tags.
 
 ### Wire the public surface
 
-- [ ] T018 [US1] Populate `packages/studio/src/ui/index.ts` with the full re-export block from contracts/ui-primitives.contract.md §1 (all 14 primitives via explicit `.tsx` paths + `export * as theme from "./theme.ts"`). Depends on T004–T017.
+- [x] T018 [US1] Populate `packages/studio/src/ui/index.ts` with the full re-export block from contracts/ui-primitives.contract.md §1 (all 14 primitives via explicit `.tsx` paths + `export * as theme from "./theme.ts"`). Depends on T004–T017.
 
 ### Adopt the kit at the six call sites (zero-diff refactor, one file each)
 
 > Each refactor swaps inline controls for `ui/` primitives while keeping that file's pre-existing tests green **unchanged** (SC-002). Divergent call-site colors are passed through as `style`/`className` overrides, never normalized (Decision 2). Different files → parallelizable, but each must independently leave its tests untouched.
 
-- [ ] T019 [P] [US1] Refactor `packages/studio/src/survey/QuestionField.tsx` onto `ui/` primitives (TextField, Textarea, Autocomplete, Dropdown, RadioGroup, MultiSelect, Checkbox, Label, ErrorText, Notice, Field); remove its inline `INPUT_STYLE`/`LABEL_STYLE`/control definitions. Survey/`QuestionField`-driven tests must pass unchanged.
-- [ ] T020 [P] [US1] Refactor `packages/studio/src/components/TrackStep.tsx` onto `ui/` (Card, Button, Label as applicable); remove inline `CARD_BASE`/`CARD_SELECTED`/button markup.
-- [ ] T021 [P] [US1] Refactor `packages/studio/src/components/ProjectNameStep.tsx` onto `ui/` (TextField, Button, Label, ErrorText); keep the slug-validation display (`#f85149`) as the documented local one-off (research Decision 1).
-- [ ] T022 [P] [US1] Refactor `packages/studio/src/components/ScaffoldForm.tsx` onto `ui/` (TextField, Button, Label, ErrorText, Field); preserve the divergent `#283040`/`#9aa7b8`/`#7a2a2a`/`#f0a0a0` values exactly and keep the success-green `#238636` submit as the documented local one-off.
-- [ ] T023 [P] [US1] Refactor `packages/studio/src/components/TrackOneIdentityPanel.tsx` onto `ui/` (TextField, Button, Label, ErrorText, Notice/Badge); preserve `#283040`/`#9aa7b8`/`#d29922`/`#7ee787` exactly. Its `TrackOneIdentityPanel.test.tsx` must pass unchanged.
-- [ ] T024 [P] [US1] Refactor `packages/studio/src/components/BaseResolution.tsx` onto `ui/` (Badge, Button, Card as applicable); it is already CSS-var themed so adoption should be literally token-identical. Its `BaseResolution.test.tsx` must pass unchanged.
+- [x] T019 [P] [US1] Refactor `packages/studio/src/survey/QuestionField.tsx` onto `ui/` primitives (TextField, Textarea, Autocomplete, Dropdown, RadioGroup, MultiSelect, Checkbox, Label, ErrorText, Notice, Field); remove its inline `INPUT_STYLE`/`LABEL_STYLE`/control definitions. Survey/`QuestionField`-driven tests must pass unchanged.
+- [x] T020 [P] [US1] Refactor `packages/studio/src/components/TrackStep.tsx` onto `ui/` (Card, Button, Label as applicable); remove inline `CARD_BASE`/`CARD_SELECTED`/button markup.
+- [x] T021 [P] [US1] Refactor `packages/studio/src/components/ProjectNameStep.tsx` onto `ui/` (TextField, Button, Label, ErrorText); keep the slug-validation display (`#f85149`) as the documented local one-off (research Decision 1).
+- [x] T022 [P] [US1] Refactor `packages/studio/src/components/ScaffoldForm.tsx` onto `ui/` (TextField, Button, Label, ErrorText, Field); preserve the divergent `#283040`/`#9aa7b8`/`#7a2a2a`/`#f0a0a0` values exactly and keep the success-green `#238636` submit as the documented local one-off.
+- [x] T023 [P] [US1] Refactor `packages/studio/src/components/TrackOneIdentityPanel.tsx` onto `ui/` (TextField, Button, Label, ErrorText, Notice/Badge); preserve `#283040`/`#9aa7b8`/`#d29922`/`#7ee787` exactly. Its `TrackOneIdentityPanel.test.tsx` must pass unchanged.
+- [x] T024 [P] [US1] Refactor `packages/studio/src/components/BaseResolution.tsx` onto `ui/` (Badge, Button, Card as applicable); it is already CSS-var themed so adoption should be literally token-identical. Its `BaseResolution.test.tsx` must pass unchanged.
 
 **Checkpoint**: The kit exists and is adopted everywhere; `pnpm --filter @keyboard-studio/studio test` is green with no pre-existing-test edits. SC-001 + SC-002 satisfied — MVP complete and independently testable.
 
@@ -92,8 +92,8 @@ description: "Task list for Shared ui/ Primitive Library Extraction (feature 011
 
 **Independent Test**: `ui/` exposes the agreed public exports under stable names, and form/gallery chrome tokens resolve from `ui/theme.ts` with no duplicate definitions left in the former `lib/galleryTheme.ts`.
 
-- [ ] T025 [US2] Reduce `packages/studio/src/lib/galleryTheme.ts` to a thin re-export shim (`export { BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION } from "../ui/theme.ts";`) so there is one token definition (FR-003); leave the Form-4 galleries' `galleryTheme` imports untouched (P4 territory). Depends on T003.
-- [ ] T026 [US2] Verify single theme source (SC-004): confirm no canonical hex token (`#0d1117`, `#30363d`, `#6ea8fe`, etc.) is *defined* outside `packages/studio/src/ui/theme.ts`, and that the public surface in `packages/studio/src/ui/index.ts` matches contracts/ui-primitives.contract.md §1 verbatim. Depends on T018, T025.
+- [x] T025 [US2] Reduce `packages/studio/src/lib/galleryTheme.ts` to a thin re-export shim (`export { BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION } from "../ui/theme.ts";`) so there is one token definition (FR-003); leave the Form-4 galleries' `galleryTheme` imports untouched (P4 territory). Depends on T003.
+- [x] T026 [US2] Verify single theme source (SC-004): confirm no canonical hex token (`#0d1117`, `#30363d`, `#6ea8fe`, etc.) is *defined* outside `packages/studio/src/ui/theme.ts`, and that the public surface in `packages/studio/src/ui/index.ts` matches contracts/ui-primitives.contract.md §1 verbatim. Depends on T018, T025. (True at P1/P2 merge; the contract's §1 listing is now stale — later specs renamed `Autocomplete`→ superseded and `Dropdown`→`SelectMenu`, and added `KeyCap`/`DiffHunkList` — but `theme.ts` remains the single token source, so SC-004 itself still holds.)
 
 **Checkpoint**: One theme source; stable, documented surface. SC-004 satisfied.
 
@@ -105,8 +105,8 @@ description: "Task list for Shared ui/ Primitive Library Extraction (feature 011
 
 **Independent Test**: A probe import from `ui/` into `survey/`/`steps/`/`stores/` fails the boundary check; the clean tree passes.
 
-- [ ] T027 [US3] Add the `ui-is-a-leaf` forbidden rule to `.dependency-cruiser.cjs` `forbidden[]` exactly as in contracts/ui-primitives.contract.md §3 (`from: ^packages/studio/src/ui/`, `to: ^packages/studio/src/(survey|steps|stores)/`, `severity: error`) — the first intra-`studio/src` layering rule. `ui/ → lib/` stays permitted.
-- [ ] T028 [US3] Prove the rule fires (SC-003): temporarily add `import { useWorkingCopy } from "../stores/workingCopyStore.ts";` to a `ui/` file, run `pnpm depcruise` and confirm it FAILS on `ui-is-a-leaf`, then revert and confirm `pnpm depcruise` PASSES. Depends on T027.
+- [x] T027 [US3] Add the `ui-is-a-leaf` forbidden rule to `.dependency-cruiser.cjs` `forbidden[]` exactly as in contracts/ui-primitives.contract.md §3 (`from: ^packages/studio/src/ui/`, `to: ^packages/studio/src/(survey|steps|stores)/`, `severity: error`) — the first intra-`studio/src` layering rule. `ui/ → lib/` stays permitted.
+- [x] T028 [US3] Prove the rule fires (SC-003): temporarily add `import { useWorkingCopy } from "../stores/workingCopyStore.ts";` to a `ui/` file, run `pnpm depcruise` and confirm it FAILS on `ui-is-a-leaf`, then revert and confirm `pnpm depcruise` PASSES. Depends on T027.
 
 **Checkpoint**: Leaf boundary genuinely enforced. SC-003 satisfied. All user stories complete.
 
@@ -116,11 +116,11 @@ description: "Task list for Shared ui/ Primitive Library Extraction (feature 011
 
 **Purpose**: Final validation against all Success Criteria (quickstart.md).
 
-- [ ] T029 [P] SC-005 — run `pnpm --filter @keyboard-studio/studio typecheck` and `pnpm --filter @keyboard-studio/studio build`; confirm clean with all explicit `.ts`/`.tsx` import extensions preserved.
-- [ ] T030 [P] SC-001 — run the quickstart greps over the six files to confirm zero remaining inline control style-constants (`INPUT_STYLE|NEXT_BTN_|BACK_BTN|CARD_BASE|OPTION_ROW_STYLE`) and that each imports from `ui/`.
-- [ ] T031 SC-002 — run `git diff` on the pre-existing test files (`StudioShell.test.tsx`, `BaseResolution.test.tsx`, `TrackOneIdentityPanel.test.tsx`, survey/`QuestionField` tests) across the refactor and confirm it is empty (no test edited to accommodate behavior/markup).
-- [ ] T032 Bundle-size spot check — confirm `pnpm --filter @keyboard-studio/studio build` output is neutral-to-smaller vs. baseline (primitives replace duplicated inline code; no material regression).
-- [ ] T033 [P] Optional manual smoke (`pnpm dev`): walk the survey, Track step, Project-name step, Scaffold form, identity panel, and base-resolution picker; each looks and behaves exactly as before.
+- [x] T029 [P] SC-005 — run `pnpm --filter @keyboard-studio/studio typecheck` and `pnpm --filter @keyboard-studio/studio build`; confirm clean with all explicit `.ts`/`.tsx` import extensions preserved. (Re-verified 2026-08-20: `pnpm --filter @keyboard-studio/studio typecheck` is clean on current `main`.)
+- [x] T030 [P] SC-001 — run the quickstart greps over the six files to confirm zero remaining inline control style-constants (`INPUT_STYLE|NEXT_BTN_|BACK_BTN|CARD_BASE|OPTION_ROW_STYLE`) and that each imports from `ui/`. (Re-verified 2026-08-20: no matches in any of the six call sites; each imports its controls from `ui/index.ts`.)
+- [ ] T031 SC-002 — run `git diff` on the pre-existing test files (`StudioShell.test.tsx`, `BaseResolution.test.tsx`, `TrackOneIdentityPanel.test.tsx`, survey/`QuestionField` tests) across the refactor and confirm it is empty (no test edited to accommodate behavior/markup). (Not re-verifiable retroactively — dozens of unrelated specs have touched these test files since; the point-in-time diff-empty check was only meaningful at the original PR #706. Left unchecked rather than claimed.)
+- [ ] T032 Bundle-size spot check — confirm `pnpm --filter @keyboard-studio/studio build` output is neutral-to-smaller vs. baseline (primitives replace duplicated inline code; no material regression). (Not re-verifiable retroactively — no baseline bundle-size measurement was preserved from before #706. Left unchecked.)
+- [ ] T033 [P] Optional manual smoke (`pnpm dev`): walk the survey, Track step, Project-name step, Scaffold form, identity panel, and base-resolution picker; each looks and behaves exactly as before. (Explicitly optional; not performed in this retroactive pass. Left unchecked.)
 
 ---
 
