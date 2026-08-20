@@ -4,7 +4,7 @@
 
 **Created**: 2026-07-03
 
-**Status**: Draft
+**Status**: Implemented (US1–US3, all FRs/SCs) — `survey/FlowStepHost.tsx`, `editors/adapters/makeFlowStepComponent.tsx`, and `editors/adapters/flowStepOptions.tsx` all shipped; `registerEditorSteps.ts` points `trackStep`/`projectNameStep`/`helpStep` at the factory output; `survey/PhaseTrack.tsx`/`PhaseProjectName.tsx`/`PhaseF.tsx` are deleted (confirmed absent from disk); `tests/steps/stepHost.goldenWalk.test.tsx` replays the copy/adapt fixtures unmodified and green; `tests/steps/makeFlowStepComponent.test.tsx` covers SC-006 (paths drifted from the spec's `src/__tests__/` to `tests/steps/`, content matches). Retroactively verified 2026-08-20 (`pnpm depcruise` and the golden-walk suite re-run clean).
 
 **Input**: User description: "FlowStepHost convergence (Unified Survey Architecture Stage 6, follow-up to spec 028). Generalize the three bespoke survey wrappers PhaseTrack, PhaseProjectName, PhaseF into one option-driven `FlowStepHost` mounted via a `makeFlowStepComponent(flowRef, options)` factory, with byte-identical behaviour proven by the existing golden-walk parity oracle."
 

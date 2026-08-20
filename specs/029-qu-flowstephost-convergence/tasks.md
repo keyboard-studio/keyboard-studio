@@ -15,7 +15,7 @@ All paths are under `packages/studio/`.
 
 ## Phase 1: Setup
 
-- [ ] T001 Confirm branch `km/qu-029-flowstephost-convergence` is forked from `main` (spec 028 /
+- [x] T001 Confirm branch `km/qu-029-flowstephost-convergence` is forked from `main` (spec 028 /
       Stage 5 merged — `StepHost.tsx`, `steps/advance.ts`, and `__tests__/stepHost.goldenWalk.test.tsx`
       all present). Run `pnpm install` and `pnpm --filter @keyboard-studio/studio test` for a green
       baseline. Confirm the golden-walk copy + adapt fixtures exist and pass BEFORE any change.
@@ -27,14 +27,14 @@ All paths are under `packages/studio/`.
 **No fixture re-recording**: the parity oracle already exists on `main`. This phase builds the
 store-agnostic host that the factory and all three flows depend on.
 
-- [ ] T002 Create `src/survey/FlowStepHost.tsx` per contract §1: a pure component with
+- [x] T002 Create `src/survey/FlowStepHost.tsx` per contract §1: a pure component with
       `FlowStepHostProps` ([data-model.md](./data-model.md)) that renders the shared shell (dark
       container + blue `<h2>{title}</h2>`) and `<SurveyRunner key={flow.flow_id} flow={flow}
       context={context} onComplete={onComplete} …/>`, forwarding `onBack`/`getSeedValue`/
       `onAnswerCommit`/`findingsByQuestionId` ONLY when defined (C1.2). MUST NOT import
       `stores/`/`steps/flowSources`(runtime)/`dashboard/`/`lib/` (C1.3). Copy the exact markup from
       the current `PhaseTrack`/`PhaseProjectName`/`PhaseF` shell so no visual diff appears.
-- [ ] T003 Export `FlowStepHost` (+ its props type) from `src/survey/index.ts` (C1.4 — preserves the
+- [x] T003 Export `FlowStepHost` (+ its props type) from `src/survey/index.ts` (C1.4 — preserves the
       golden-walk `vi.mock("../survey/index.ts")` seam).
 
 **Checkpoint**: the pure host compiles and is exported; no behaviour wired yet.
@@ -53,13 +53,13 @@ zero diff, fixtures unmodified.
 
 ### Factory + options records
 
-- [ ] T004 [US1] Create `src/editors/adapters/makeFlowStepComponent.tsx` per contract §2: factory
+- [x] T004 [US1] Create `src/editors/adapters/makeFlowStepComponent.tsx` per contract §2: factory
       taking `FlowStepOptions`, resolving `flowSources[options.flowRef]` (throw loudly if absent —
       C2.2/FR-010), `loadModularFlow(source.raw)` memoised (C2.3), reading store/hook `deps`, and
       rendering `<FlowStepHost>`. Completion wrapper (C2.4): `extract` → if `undefined` stay on step
       → `onCommit?.(extracted, deps)` → `props.onComplete(payload)`, in that order. ALL store access
       confined here (C2.5). Returns `React.ComponentType<EditorStepProps>` (C2.1).
-- [ ] T005 [US1] Create `src/editors/adapters/flowStepOptions.tsx` with the three options records per
+- [x] T005 [US1] Create `src/editors/adapters/flowStepOptions.tsx` with the three options records per
       contract §3 + [data-model.md](./data-model.md) table: `track` (base_name context, track_choice
       extract, setSelectedTrack[+setScaffoldSpec(null) on adapt] onCommit, localBase-null guard),
       `project_name` (empty context, display+id extract, setScaffoldSpec+setIdentity onCommit,
@@ -69,23 +69,23 @@ zero diff, fixtures unmodified.
 
 ### Wire the manifest + delete the wrappers
 
-- [ ] T006 [US1] Update `src/steps/registerEditorSteps.ts` (C4.1/C4.2): point `trackStep.component`,
+- [x] T006 [US1] Update `src/steps/registerEditorSteps.ts` (C4.1/C4.2): point `trackStep.component`,
       `projectNameStep.component`, `helpStep.component` at the factory output for `track`/
       `project_name`/`phase_f_helpdocs`. Keep declared `inputs`/`writes`/`flowRefs` unchanged. Do NOT
       touch `identityStep` (IdentityLiteAdapter) or any gallery step (C4.3/R8).
-- [ ] T007 [US1] In `src/editors/adapters/panelAdapters.tsx`, remove the bespoke bodies of
+- [x] T007 [US1] In `src/editors/adapters/panelAdapters.tsx`, remove the bespoke bodies of
       `TrackStepAdapter`/`ProjectNameStepAdapter`/`PhaseFAdapter` (now expressed as factory output /
       options records). Keep `IdentityLiteAdapter`, `BaseResolutionAdapter`, `ScaffoldFormAdapter`,
       `TrackOneIdentityPanelAdapter` untouched. Update any re-exports referenced by the manifest.
-- [ ] T008 [US1] Delete `src/survey/PhaseTrack.tsx`, `src/survey/PhaseProjectName.tsx`,
+- [x] T008 [US1] Delete `src/survey/PhaseTrack.tsx`, `src/survey/PhaseProjectName.tsx`,
       `src/survey/PhaseF.tsx` and their exports from `src/survey/index.ts` (SC-003, C5.5).
 
 ### Parity + smoke
 
-- [ ] T009 [US1] Run `stepHost.goldenWalk` (unmodified) — copy fixture zero diff (SC-001, C5.1).
-- [ ] T010 [US2] Confirm `stepHost.goldenWalk` adapt fixture zero diff and `project_name` skipped
+- [x] T009 [US1] Run `stepHost.goldenWalk` (unmodified) — copy fixture zero diff (SC-001, C5.1).
+- [x] T010 [US2] Confirm `stepHost.goldenWalk` adapt fixture zero diff and `project_name` skipped
       (SC-001, C5.1).
-- [ ] T011 [P] [US1] Re-point existing behaviour tests at the factory output with assertions
+- [x] T011 [P] [US1] Re-point existing behaviour tests at the factory output with assertions
       UNCHANGED: `src/survey/PhaseProjectName.integration.test.tsx` (slug seeding, Back→forward
       re-derivation) and any `PhaseTrack`/`PhaseF` behaviour specs. Update ONLY the mount/import
       plumbing; weaken NO assertion (SC-002, C5.2).
@@ -102,7 +102,7 @@ one options record) with no bespoke component.
 **Independent test**: the factory unit test proves resolve→run→extract→complete and a loud failure
 for an unknown ref.
 
-- [ ] T012 [US3] Create `src/__tests__/makeFlowStepComponent.test.tsx` (SC-006, C5.3): mount
+- [x] T012 [US3] Create `src/__tests__/makeFlowStepComponent.test.tsx` (SC-006, C5.3): mount
       `makeFlowStepComponent({ flowRef: "track", … })`, drive the runner to a "copy" completion, and
       assert `setSelectedTrack("copy")` fires before `onComplete({track:"copy"})`; assert the
       stay-on-step path when `extract` returns `undefined`; assert mounting with an unknown `flowRef`
@@ -112,15 +112,15 @@ for an unknown ref.
 
 ## Phase 5: Polish & cross-cutting
 
-- [ ] T013 [P] Run full gates (SC-005, C5.4): `pnpm typecheck`, `pnpm --filter
+- [x] T013 [P] Run full gates (SC-005, C5.4): `pnpm typecheck`, `pnpm --filter
       @keyboard-studio/studio test`, and `pnpm depcruise` — explicitly confirm the new
       `editors/adapters → steps/flowSources` runtime edge is acyclic and introduces no forbidden
       edge (R1). Confirm the Flow Map drift guardrail test is UNCHANGED and green.
-- [ ] T014 [P] Update `docs/workflow-model.md` (and `docs/architecture.md` if it describes survey
+- [x] T014 [P] Update `docs/workflow-model.md` (and `docs/architecture.md` if it describes survey
       rendering) to record that `track`/`project_name`/`help` render via the generic `FlowStepHost`
       factory; mark master-plan Stage 6 complete and note the "generated-from-flow" source is now
       fully realized (adding a YAML flow = flowSources entry + flowRefs + options record).
-- [ ] T015 Final review pass (km-qc / km-synthesis): confirm no dead code left in `survey/` or
+- [x] T015 Final review pass (km-qc / km-synthesis): confirm no dead code left in `survey/` or
       `panelAdapters.tsx`, the options records are DRY, and the completion/effect ordering matches the
       pre-refactor per-wrapper behaviour one-to-one (C2.4). Confirm SC-003 (zero bespoke wrappers) and
       SC-004 (3-artifact capability) hold.
