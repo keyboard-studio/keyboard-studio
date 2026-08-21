@@ -71,6 +71,7 @@ export const identityStep: EditorStep = step({
   title: "Keyboard Identity",
   component: IdentityLiteAdapter,
   flowRefs: ["identity_lite"],
+  specRef: ["§8", "specs/030-langtags-identity-autocomplete"],
 });
 
 /**
@@ -81,6 +82,7 @@ export const chooseBaseStep: EditorStep = step({
   id: "choose_base",
   title: "Choose Base Keyboard",
   component: BaseResolutionAdapter,
+  specRef: "§8",
 });
 
 /**
@@ -95,6 +97,7 @@ export const trackStep: EditorStep = step({
   component: TrackStepFactoryComponent,
   inputs: [irPath("header", "bcp47"), irPath("header", "name")],
   flowRefs: ["track"],
+  specRef: ["§8", "specs/018-qu-wire-track"],
 });
 
 /**
@@ -111,6 +114,7 @@ export const projectNameStep: EditorStep = step({
   inputs: [irPath("header", "bcp47")],
   writes: [irPath("header", "name"), irPath("header", "keyboardId")],
   flowRefs: ["project_name"],
+  specRef: "§8",
 });
 
 // ---------------------------------------------------------------------------
@@ -129,6 +133,7 @@ export const carveStep: EditorStep = step({
   layout: "full",
   component: CarveAdapter,
   writes: [...CARVE_WRITES],
+  specRef: ["§8", "specs/051-carve-orthography-trim"],
 });
 
 /**
@@ -149,6 +154,7 @@ export const mechanismsStep: EditorStep = step({
   component: AddPhysicalAdapter,
   surface: "physical",
   writes: [...ADD_GALLERY_WRITES],
+  specRef: ["§8", "specs/007-strategy-selection"],
 });
 
 /**
@@ -176,6 +182,7 @@ export const touchSeedSourceStep: EditorStep = step({
   spine: false,
   joinTarget: "touch",
   component: TouchSeedSourcePanel,
+  specRef: "specs/035-mobile-touch-derivation",
 });
 
 /**
@@ -191,6 +198,7 @@ export const touchStep: EditorStep = step({
   component: AddTouchAdapter,
   surface: "touch",
   writes: [...TOUCH_WRITES],
+  specRef: ["§8", "specs/035-mobile-touch-derivation"],
 });
 
 // ---------------------------------------------------------------------------
@@ -209,6 +217,7 @@ export const helpStep: EditorStep = step({
   title: "Help & Tips",
   component: PhaseFGate,
   flowRefs: ["phase_f_helpdocs"],
+  specRef: ["§8", "specs/061-help-docs-generation"],
 });
 
 /**
@@ -219,6 +228,7 @@ export const packageStep: EditorStep = step({
   id: "package",
   title: "Package (reserved)",
   component: PhaseFStepFactoryComponent,
+  specRef: "§16",
 });
 
 // ---------------------------------------------------------------------------

@@ -61,5 +61,13 @@ export const fixtures: QuestionModule["fixtures"] = {
 // display-name seed and for the author's own recognition of their language, not as
 // the descriptor's `<Language>` display text (spec 059 Assumptions). The explicit
 // `[]` says so on the record rather than leaving the field absent.
-const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [], outputs: [] };
+const mod: QuestionModule = {
+  definition,
+  validate,
+  fixtures,
+  inputs: [],
+  writes: [],
+  outputs: [],
+  specRef: "specs/030-langtags-identity-autocomplete",
+};
 export default mod;

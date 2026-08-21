@@ -63,6 +63,14 @@ export interface StepBase {
    * a separate FLOW_SOURCES array (spec 024, ADR-0001).
    */
   flowRefs?: readonly string[];
+  /**
+   * Which spec unit(s) govern this step (spec 031 FR-001). Vocabulary:
+   * `§N` / `§Na` (spec.md monolith section), or `specs/<slug>` (extracted
+   * feature folder) — each MUST resolve against docs/spec-trace.json's
+   * unit ids. Required on every manifest step (enforced by
+   * dashboard/completeness.ts's checkSpecRef, not by this type).
+   */
+  specRef?: string | readonly string[];
   // Reserved seam (spec §9 loop primitive, not built): iterates?: string
 }
 

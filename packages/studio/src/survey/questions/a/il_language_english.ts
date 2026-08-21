@@ -82,5 +82,13 @@ export const fixtures: QuestionModule["fixtures"] = {
 // KeyboardIR — while `outputs` states that the answer nevertheless reaches an
 // emitted artifact. Here, the English name is the `<Language>` element's display
 // text.
-const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [], outputs: [{ target: "package-descriptor", field: "languageName" }] };
+const mod: QuestionModule = {
+  definition,
+  validate,
+  fixtures,
+  inputs: [],
+  writes: [],
+  outputs: [{ target: "package-descriptor", field: "languageName" }],
+  specRef: "specs/030-langtags-identity-autocomplete",
+};
 export default mod;

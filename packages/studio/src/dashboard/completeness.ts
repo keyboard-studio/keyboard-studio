@@ -500,6 +500,86 @@ export function findUnreachable(manifest: readonly Step[]): string[] {
 }
 
 // ---------------------------------------------------------------------------
+// checkSpecRef — spec 031 FR-005: every manifest step must carry >=1 specRef,
+// and every specRef (manifest step OR question module) must resolve against a
+// real docs/spec-trace.json unit id.
+//
+// Deliberately NOT part of runCompleteness/CompletenessReport, unlike C1-C7
+// above. Those five check whether a KEYBOARD AUTHOR's working copy is
+// shippable (staleness, cycles, rejoin, spine-prefix lock, satisfiable
+// inputs) and surface in the live DashboardView the author sees. checkSpecRef
+// checks a different thing entirely — whether an ENGINEER's manifest/registry
+// change documents its own governing spec section — which has no meaning to
+// a keyboard author and would be actively confusing if it ever appeared in
+// their dashboard. FR-005's own text is explicit that this "MUST run as part
+// of `pnpm test`" with "no new build tool or CI stage introduced" — i.e. this
+// vitest suite (see checkSpecRef's tests below) IS the enforcement surface,
+// not a live UI wiring. Call it directly from a test, not from
+// runCompleteness.
+// ---------------------------------------------------------------------------
+
+export interface SpecRefViolation {
+  /** The manifest step id, or the question-module id, that failed the check. */
+  id: string;
+  reason: string;
+}
+
+/**
+ * Flags:
+ *   - a manifest step with no `specRef` (required on every manifest entry,
+ *     spec 031 FR-003 — unlike question modules, where it is optional).
+ *   - any `specRef` value (from a manifest step OR a question module) that
+ *     does not resolve against `validUnitIds` (the live `docs/spec-trace.json`
+ *     `sections` keys).
+ *
+ * `questionSpecRefs` is a flat `{ [questionId]: specRef }` map. An ABSENT
+ * entry is never flagged (question-module specRef is optional, FR-002); a
+ * PRESENT-but-unresolvable one is.
+ *
+ * Mirrors `checkInputsSatisfiableFromManifest`'s pure-function shape: no
+ * stores/ import, manifest (+ the caller-supplied unit-id set) passed in as
+ * parameters.
+ */
+export function checkSpecRef(
+  manifest: readonly Step[],
+  validUnitIds: ReadonlySet<string>,
+  questionSpecRefs: Readonly<Record<string, string | readonly string[] | undefined>> = {},
+): SpecRefViolation[] {
+  const violations: SpecRefViolation[] = [];
+
+  for (const step of manifest) {
+    if (step.specRef === undefined) {
+      violations.push({ id: step.id, reason: `manifest step "${step.id}" has no specRef` });
+      continue;
+    }
+    const refs = Array.isArray(step.specRef) ? step.specRef : [step.specRef];
+    for (const ref of refs) {
+      if (!validUnitIds.has(ref)) {
+        violations.push({
+          id: step.id,
+          reason: `manifest step "${step.id}" specRef "${ref}" does not resolve against docs/spec-trace.json`,
+        });
+      }
+    }
+  }
+
+  for (const [questionId, specRef] of Object.entries(questionSpecRefs)) {
+    if (specRef === undefined) continue;
+    const refs = Array.isArray(specRef) ? specRef : [specRef];
+    for (const ref of refs) {
+      if (!validUnitIds.has(ref)) {
+        violations.push({
+          id: questionId,
+          reason: `question module "${questionId}" specRef "${ref}" does not resolve against docs/spec-trace.json`,
+        });
+      }
+    }
+  }
+
+  return violations;
+}
+
+// ---------------------------------------------------------------------------
 // CompletenessReport
 // ---------------------------------------------------------------------------
 

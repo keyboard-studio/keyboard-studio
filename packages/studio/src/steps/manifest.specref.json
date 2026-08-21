@@ -1,0 +1,83 @@
+{
+  "identity": [
+    "§8",
+    "specs/030-langtags-identity-autocomplete"
+  ],
+  "choose_base": [
+    "§8"
+  ],
+  "track": [
+    "§8",
+    "specs/018-qu-wire-track"
+  ],
+  "project_name": [
+    "§8"
+  ],
+  "characters": [
+    "§8",
+    "specs/027-qu-characters-step"
+  ],
+  "marks": [
+    "specs/071-marks-question-series",
+    "specs/052-marks-treatment-question"
+  ],
+  "punctuation": [
+    "§8",
+    "specs/020-qu-wire-buildlist"
+  ],
+  "convenience": [
+    "specs/051-carve-orthography-trim"
+  ],
+  "carve": [
+    "§8",
+    "specs/051-carve-orthography-trim"
+  ],
+  "mechanisms": [
+    "§8",
+    "specs/007-strategy-selection"
+  ],
+  "touch_seed_source": [
+    "specs/035-mobile-touch-derivation"
+  ],
+  "touch": [
+    "§8",
+    "specs/035-mobile-touch-derivation"
+  ],
+  "help": [
+    "§8",
+    "specs/061-help-docs-generation"
+  ],
+  "package": [
+    "§16"
+  ],
+  "il_language_autonym": [
+    "specs/030-langtags-identity-autocomplete"
+  ],
+  "il_language_english": [
+    "specs/030-langtags-identity-autocomplete"
+  ],
+  "il_language_code": [
+    "specs/030-langtags-identity-autocomplete"
+  ],
+  "il_language_region": [
+    "specs/030-langtags-identity-autocomplete"
+  ],
+  "pb_text_sample": [
+    "specs/050-text-sample-prefill"
+  ],
+  "pb_indic_conjuncts": [
+    "§8"
+  ],
+  "pb_rtl_direction_confirm": [
+    "§8"
+  ],
+  "pb_use_case": [
+    "§8"
+  ],
+  "pf_doc_language": [
+    "specs/061-help-docs-generation"
+  ],
+  "pf_contact_info": [
+    "specs/064-keyboard-attribution"
+  ]
+}

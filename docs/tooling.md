@@ -267,6 +267,15 @@ Two halves over the same corpus:
 - **Drift** — `node utilities/spec-trace check | report | acknowledge <id>` hashes each tracked
   unit (`spec.md` sections, `specs/NNN/spec.md`, `docs/architecture.md`, `docs/lens-model.md`)
   and flags un-acknowledged changes. `check` never exits non-zero; drift is a backlog item.
+  Both `check` (auto-filed issue bodies) and `report` (a "Steps covered" coverage summary) join
+  a drifted/tracked unit to the manifest steps and question modules that declare it as a
+  `specRef` (spec 031) — read from `packages/studio/src/steps/manifest.specref.json`, a flat
+  `{ [stepId | questionId]: string[] }` artifact regenerated on every `pnpm test` run by
+  `packages/studio/src/steps/generateManifestSpecRef.test.ts` (a vitest hook, not a bare
+  `tsx` script — `manifest.ts` pulls in editor components that use Lingui `<Trans>` macros,
+  which only resolve through Vite's transform pipeline). Missing or stale, spec-trace logs a
+  `[WARN]` and continues — the artifact is optional for backward compatibility (FR-010);
+  spec-trace never imports `packages/studio` TS directly (FR-007).
 - **Search** — `pnpm run spec-search "<query>"` runs BM25 retrieval over `specs/**` + `docs/**` +
   root `spec.md`/`README.md`, returning heading-level chunks with a `file:line` anchor. See
   [Searching the corpus](#searching-the-corpus) below.
