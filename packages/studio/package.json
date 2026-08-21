@@ -15,7 +15,8 @@
     "messages:compile": "lingui compile",
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "coverage:report": "vitest run src/dashboard/journeyCoverage.report.test.ts"
   },
   "dependencies": {
     "@keyboard-studio/contracts": "workspace:*",

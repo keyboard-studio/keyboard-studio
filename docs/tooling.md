@@ -186,6 +186,38 @@ Suites outside the pnpm workspace need their own invocation, and CI runs each ex
 - i18n utilities: `pnpm run test:i18n-utilities`
 - spec-trace: `pnpm run test:spec-trace`
 
+## Journey corpus (spec 032)
+
+Hand-authored, replayable end-to-end user-workflow fixtures — a headless (no DOM, no
+Playwright) alternative to the E2E specs below, for exercising the survey routing engine and
+its manifest edge coverage.
+
+- Fixtures: `content/journeys/*.yaml` — `bafut-end-to-end.yaml` (Track 1 copy, full spine),
+  `bj-cree-woods-track2.yaml` (Track 2 adapt, the real `bj_cree_woods` keyboard), `minimal-defaults.yaml`
+  (shortest supported spine pass, defaults only), `backtrack-journey.yaml` (a routing-group
+  backtrack, qwerty → azerty).
+- Harness: `packages/studio/src/survey/journeyFixture.ts` (schema + parser) and
+  `packages/studio/src/survey/journey-runner.ts` (`replayJourney()` — drives
+  `steps/advance.ts`/`steps/reducer.ts` for cross-manifest-step transitions and
+  `survey/SurveyRunner.tsx`'s exported `evalCondition`/`resolveNext`/`advanceThrough` for
+  intra-step question routing). Run via `pnpm --filter @keyboard-studio/studio test`
+  (`src/survey/journey-runner.test.ts`).
+- Coverage gate: `packages/studio/src/dashboard/journeyCoverage.ts`'s `computeCoverageReport()`
+  compares the fixtures' declared step ids against `buildManifestStepGraph()`'s full manifest
+  step/edge set — report-only (always exits 0; a ratchet/hard-fail mode is a deferred
+  follow-up). Generate `docs/journey-coverage.json`:
+
+  ```
+  pnpm --filter @keyboard-studio/studio run coverage:report
+  ```
+
+  This runs as a `vitest run` invocation of one spec
+  (`src/dashboard/journeyCoverage.report.test.ts`), not a bare `tsx` script — the manifest's
+  editor-step components transitively import `content/flows/*.modular.yaml?raw`, a Vite asset
+  transform `tsx`/Node cannot resolve; Vitest already runs on Vite's own transform pipeline, so
+  reusing it avoids a second, Vite-unaware code path onto the same manifest. See that file's
+  header comment for the empirically-confirmed failure mode this sidesteps.
+
 ## E2E
 
 Playwright specs live under `packages/studio/e2e/`, run against the `playwright`

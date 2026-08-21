@@ -252,6 +252,15 @@ describe("R2 — touch-layout build at the touch step", () => {
     applyStepCompletion(TOUCH_STEP_ID, result, deps);
     expect(deps.clearStale).toHaveBeenCalledExactlyOnceWith(TOUCH_STEP_ID);
   });
+
+  // A `result` of literally `undefined` previously threw on destructuring
+  // (`const { assignments = [], ... } = payload` off an `undefined`-cast
+  // value) — surfaced by the journey-corpus harness (spec 032). Behaves
+  // identically to the empty-assignments/no-baseIr short-circuit above.
+  it("does not throw and still clears stale when result is undefined", () => {
+    expect(() => applyStepCompletion(TOUCH_STEP_ID, undefined, deps)).not.toThrow();
+    expect(deps.clearStale).toHaveBeenCalledExactlyOnceWith(TOUCH_STEP_ID);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -344,6 +353,15 @@ describe("R3 — copy/adapt instantiation routing at choose_base", () => {
   it("skips instantiation and warns when base is absent from result", () => {
     // result with no base field
     applyStepCompletion(CHOOSE_BASE_STEP_ID, {}, deps);
+    expect(deps.instantiateFromExisting).not.toHaveBeenCalled();
+    expect(deps.instantiateFromBaseIfConfirmed).not.toHaveBeenCalled();
+  });
+
+  // A `result` of literally `undefined` (not `{}`) previously threw
+  // (`payload.base` read off an `undefined`-cast value) — surfaced by the
+  // journey-corpus harness (spec 032) driving a step with nothing to report.
+  it("does not throw and skips instantiation when result is undefined", () => {
+    expect(() => applyStepCompletion(CHOOSE_BASE_STEP_ID, undefined, deps)).not.toThrow();
     expect(deps.instantiateFromExisting).not.toHaveBeenCalled();
     expect(deps.instantiateFromBaseIfConfirmed).not.toHaveBeenCalled();
   });
@@ -658,6 +676,16 @@ describe("applyStepCompletion — marks (spec 071, US8)", () => {
       { phase: "C", answers: [], marksWorklist: { ownLetterUnits: [], markUnits: [], blockedCombinations: [] } },
       deps,
     );
+    expect(deps.setMarksMigrationNeeded).not.toHaveBeenCalled();
+  });
+
+  // A `result` of literally `undefined` previously threw
+  // (`payload.marksWorklist` read off an `undefined`-cast value) — surfaced
+  // by the journey-corpus harness (spec 032) driving a marks-free alphabet's
+  // real auto-skip.
+  it("does nothing and does not throw when result is undefined", () => {
+    const { deps } = marksDeps();
+    expect(() => applyStepCompletion("marks", undefined, deps)).not.toThrow();
     expect(deps.setMarksMigrationNeeded).not.toHaveBeenCalled();
   });
 });

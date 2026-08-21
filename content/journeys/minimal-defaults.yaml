@@ -1,0 +1,79 @@
+# Journey fixture — the shortest supported spine pass: accept every required
+# question with a plain default-shaped answer, add nothing beyond it.
+#
+# spec 032 FR-009(d) / spec.md §3c "Defaults are the product". This fixture
+# supplies ONLY the questions each flow's `next` routing (verified against
+# the live question modules, same as the other three fixtures) cannot skip —
+# every optional/advisory question along this path is simply absent, exactly
+# matching the completed-instance convention's own rule (Edge Cases: "a
+# journey that adds nothing beyond base prefill... branch-skipped questions
+# are simply absent from the events array"). Track 2 (adapt) is chosen over
+# Track 1 specifically because it skips the project_name side-trail, one
+# fewer required question than the copy path.
+#
+# No carve/mechanisms/touch action-summary events are supplied either — the
+# harness's replay handlers for those three steps tolerate an absent group
+# (journey-runner.ts's collectEditorActionEvents returns [] rather than
+# erroring), so "zero custom answers" extends to the gallery steps too: this
+# fixture asserts the spine reaches "done" on required answers alone.
+
+journey_id: minimal-defaults
+
+persona:
+  language: English (US)
+  script: Latn
+  routing_group: qwerty-qwertz
+
+events:
+  # --- identity: only the 4 required identity_lite questions ---
+  # (il_language_code, il_author_email, il_copyright_holder are all
+  # required: false — omitted.)
+  - { stepId: identity, questionId: il_language_english, value: "English" }
+  - { stepId: identity, questionId: il_language_autonym, value: "English" }
+  - { stepId: identity, questionId: il_target_script, value: "Latn" }
+  - { stepId: identity, questionId: il_author_name, value: "Studio Author" }
+
+  # --- choose_base (Track 2: adapt basic_kbdus — skips project_name) ---
+  - { stepId: choose_base, questionId: base_keyboard_id, value: "basic_kbdus" }
+
+  # --- track (adapt) ---
+  - { stepId: track, questionId: track_choice, value: "adapt" }
+
+  # --- characters: only the 6 required phase_b_characters questions on this
+  #     branch (pb_existing_keyboards/pb_co_installed_keyboards are
+  #     required: false and route unconditionally regardless of value, so
+  #     they are omitted too) ---
+  - { stepId: characters, questionId: pb_discovery_intro, value: "manual" }
+  - { stepId: characters, questionId: pb_standard_letters, value: "basic-az" }
+  - { stepId: characters, questionId: pb_special_letters, value: "false" }
+  - { stepId: characters, questionId: pb_punctuation_gate, value: "false" }
+  - { stepId: characters, questionId: pb_digit_set, value: "western" }
+  - { stepId: characters, questionId: pb_char_count, value: "tiny" }
+  # pb_latin_qwerty_branch / pb_spare_keys_qwerty / pb_contact_language /
+  # pb_legacy_encoding / pb_use_case / pb_additional_methods are all
+  # required: false on this branch — omitted.
+
+  # --- marks / punctuation / convenience / carve / mechanisms / touch:
+  #     no fixture events at all — see the header note above ---
+
+  # --- touch_seed_source: no event -> harness defaults to "import-adapt" ---
+
+  # --- help: only the 2 required phase_f_helpdocs questions on the default
+  #     (No) path ---
+  - { stepId: help, questionId: pf_welcome_paragraph, value: "A minimal-defaults US English keyboard." }
+  - { stepId: help, questionId: pf_more_detail_gate, value: "false" }
+
+expected_outcomes:
+  routing_group: qwerty-qwertz
+  # §7.2 rule 11 (A1=tiny AND A3=strong) -> S-01 (simple swap), no
+  # secondaries — the simplest strategy the decision tree can select, fitting
+  # a "defaults are the product" fixture with the smallest possible A1.
+  strategy: S-01
+  axes:
+    scale: tiny
+    scriptClass: alphabetic
+    phoneticIntuition: strong
+    diacriticBehavior: none
+    multiMode: single
+    constraintEnforcement: none
+    spareKeyAvailability: many

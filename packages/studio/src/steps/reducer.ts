@@ -345,12 +345,21 @@ export function applyStepCompletion(
     // working IR, and record the R10 migration-need flag when base-plus-mark
     // was chosen over a ready-made-form base. All engine-pure; no raw .kmn.
     case MARKS_STEP_ID: {
-      const payload = result as Partial<MarksCompleteResult>;
-      const worklist = payload.marksWorklist;
+      // `result` may genuinely be absent (a step completed with nothing to
+      // report, e.g. spec 032's journey-corpus harness driving a step the
+      // real UI would auto-skip) — read through optional chaining rather
+      // than destructuring/property-accessing an `undefined` cast directly.
+      // CHOOSE_BASE_STEP_ID below shares this same "result may be absent"
+      // reasoning, though its RESPONSE differs (warns before skipping,
+      // since a missing base there is a foreseen caller error rather than
+      // an expected no-op) — the two cases guard for the same reason, not
+      // in the same way.
+      const payload = result as Partial<MarksCompleteResult> | undefined;
+      const worklist = payload?.marksWorklist;
       if (worklist === undefined) break;
       const ir = deps.getWorkingIR?.() ?? null;
       if (ir === null) break;
-      const outputForm = payload.marksOutputForm ?? "base-plus-mark";
+      const outputForm = payload?.marksOutputForm ?? "base-plus-mark";
       if (outputForm === "base-plus-mark" && detectBaseMarkMechanism(ir) === "precomposed") {
         deps.setMarksMigrationNeeded?.(true);
       }
@@ -391,7 +400,9 @@ export function applyStepCompletion(
     // which may import lib/touchEmission.ts; this reducer may not). The one
     // gate this reducer still owns is baseIr === null (nothing to build from).
     case TOUCH_STEP_ID: {
-      const payload = result as Partial<TouchCompleteResult>;
+      // Same "result may genuinely be absent" reasoning as MARKS_STEP_ID
+      // above — destructuring an `undefined` cast directly throws.
+      const payload = (result as Partial<TouchCompleteResult> | undefined) ?? {};
       const {
         assignments = [],
         baseIr = null,
@@ -438,13 +449,15 @@ export function applyStepCompletion(
     // R3 — copy/adapt instantiation: mirrors StudioShell.tsx onInstantiate (lines 240-253).
     // Routes Track 2 → instantiateFromExisting, Track 1/default → instantiateFromBaseIfConfirmed.
     case CHOOSE_BASE_STEP_ID: {
-      const payload = result as Partial<InstantiateResult>;
-      const base = payload.base;
-      if (base === undefined) {
-        // Guard: result must carry a base keyboard. Without it, instantiation cannot proceed.
+      const payload = result as Partial<InstantiateResult> | undefined;
+      // Guard: result must carry a base keyboard. Without it, instantiation
+      // cannot proceed. Checking `payload` itself first (not just
+      // `payload?.base`) narrows it for every read below.
+      if (payload === undefined || payload.base === undefined) {
         devLog.warn("[applyStepCompletion:choose_base] no base in result — skipping instantiation");
         break;
       }
+      const base = payload.base;
 
       const track = payload.track ?? null;
       const vfs = payload.vfs ?? null;
