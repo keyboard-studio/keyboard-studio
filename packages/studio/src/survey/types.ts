@@ -260,6 +260,14 @@ export interface QuestionModule {
    */
   mutate?: (value: string | string[] | undefined, ctx: MutateContext) => Partial<KeyboardIR>;
 
+  /**
+   * Which spec unit(s) govern this question module (spec 031 FR-002). Same
+   * vocabulary and shape as Step.specRef (steps/types.ts): `§N` / `§Na` or
+   * `specs/<slug>`, each resolvable against docs/spec-trace.json. Optional —
+   * unlike the manifest requirement, question modules may omit it.
+   */
+  specRef?: string | readonly string[];
+
   /** Test vectors exercised by the colocated vitest spec. */
   fixtures: {
     valid: Array<{ value: string | string[] | undefined; note?: string }>;

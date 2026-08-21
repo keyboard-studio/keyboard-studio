@@ -30,6 +30,7 @@ import {
   checkRejoin,
   checkSpinePrefixShippability,
   checkInputsSatisfiableFromManifest,
+  checkSpecRef,
   findUnreachable,
   runCompleteness,
 } from "./completeness.ts";
@@ -37,9 +38,11 @@ import type { WcForCompleteness } from "./completeness.ts";
 import { buildManifestStepGraph } from "./buildStepGraph.ts";
 import type { StepGraph } from "./model.ts";
 import { manifest } from "../steps/manifest.ts";
+import { questionRegistry } from "../survey/questions/registry.ts";
 import type { Step, EditorStep } from "../steps/types.ts";
 import { irPath, ARRAY_INDEX, formatIRPath } from "@keyboard-studio/contracts";
 import type { LintFinding, LintSeverity } from "@keyboard-studio/contracts";
+import specTrace from "@docs/spec-trace.json";
 
 // ---------------------------------------------------------------------------
 // Validator-finding fixtures (spec-014 US5/T034) — real Layer-A LintFindings.
@@ -628,6 +631,74 @@ describe("C7 — findUnreachable: step not reachable from spine entry is surface
     ];
     const report = runCompleteness(mfest, WC_CLEAN);
     expect(report.unreachable).toContain("ghost");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// checkSpecRef — spec 031 FR-005: every manifest step must carry >=1 specRef;
+// every specRef (manifest step OR question module) must resolve against a
+// real docs/spec-trace.json unit id.
+// ---------------------------------------------------------------------------
+
+describe("checkSpecRef — manifest completeness + resolution (spec 031)", () => {
+  const VALID_IDS: ReadonlySet<string> = new Set(["§8", "specs/027-qu-characters-step"]);
+
+  it("flags a manifest step with no specRef", () => {
+    const mfest: readonly Step[] = [makeSpineStep("no_ref")];
+    const violations = checkSpecRef(mfest, VALID_IDS);
+    expect(violations).toEqual([
+      { id: "no_ref", reason: expect.stringContaining("no specRef") },
+    ]);
+  });
+
+  it("flags a specRef that does not resolve against validUnitIds", () => {
+    const mfest: readonly Step[] = [
+      { ...makeSpineStep("bad_ref"), specRef: "specs/999-does-not-exist" },
+    ];
+    const violations = checkSpecRef(mfest, VALID_IDS);
+    expect(violations).toEqual([
+      { id: "bad_ref", reason: expect.stringContaining("does not resolve") },
+    ]);
+  });
+
+  it("a fully-annotated manifest (string and array specRef) passes clean", () => {
+    const mfest: readonly Step[] = [
+      { ...makeSpineStep("single_ref"), specRef: "§8" },
+      { ...makeSpineStep("array_ref"), specRef: ["§8", "specs/027-qu-characters-step"] },
+    ];
+    expect(checkSpecRef(mfest, VALID_IDS)).toEqual([]);
+  });
+
+  it("question-module specRef is optional — an absent entry is never flagged", () => {
+    const mfest: readonly Step[] = [{ ...makeSpineStep("s"), specRef: "§8" }];
+    const violations = checkSpecRef(mfest, VALID_IDS, { some_question: undefined });
+    expect(violations).toEqual([]);
+  });
+
+  it("flags a question-module specRef that does not resolve", () => {
+    const mfest: readonly Step[] = [{ ...makeSpineStep("s"), specRef: "§8" }];
+    const violations = checkSpecRef(mfest, VALID_IDS, {
+      some_question: "specs/999-does-not-exist",
+    });
+    expect(violations).toEqual([
+      { id: "some_question", reason: expect.stringContaining("does not resolve") },
+    ]);
+  });
+
+  it("SC-001: the real manifest carries specRef on every step, all resolving against docs/spec-trace.json", () => {
+    const validUnitIds = new Set(Object.keys(specTrace.sections));
+    expect(checkSpecRef(manifest, validUnitIds)).toEqual([]);
+  });
+
+  it("SC-002: every populated question-module specRef in the real registry resolves against docs/spec-trace.json", () => {
+    const validUnitIds = new Set(Object.keys(specTrace.sections));
+    const questionSpecRefs: Record<string, string | readonly string[] | undefined> = {};
+    for (const [id, mod] of Object.entries(questionRegistry)) {
+      questionSpecRefs[id] = mod.specRef;
+    }
+    // Only question-module violations matter here — pass an empty manifest so
+    // this assertion is isolated to the registry half of the check.
+    expect(checkSpecRef([], validUnitIds, questionSpecRefs)).toEqual([]);
   });
 });
 

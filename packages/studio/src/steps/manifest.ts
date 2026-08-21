@@ -81,6 +81,7 @@ const charactersStep: Step = {
   // on discoveryMethod === "build-list" — the manual step-by-step path and the
   // IntroChooser keep the OSK preview).
   rightPane: "character-map",
+  specRef: ["§8", "specs/027-qu-characters-step"],
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -132,6 +133,7 @@ export const manifest: readonly Step[] = [
     inputs: [],
     writes: [],
     component: MarksSeriesStep,
+    specRef: ["specs/071-marks-question-series", "specs/052-marks-treatment-question"],
   } satisfies Step,
 
   // --- Punctuation (clone of the Phase B build-list, scoped to punctuation) ---
@@ -155,6 +157,7 @@ export const manifest: readonly Step[] = [
     // build-list screen — but unconditionally: this step has no
     // discoveryMethod fork (SurveyView's gate special-cases "characters" only).
     rightPane: "character-map",
+    specRef: ["§8", "specs/020-qu-wire-buildlist"],
   } satisfies Step,
 
   // --- Convenience characters (pre-carve keep question) ---
@@ -174,6 +177,7 @@ export const manifest: readonly Step[] = [
     inputs: [],
     writes: [],
     component: ConvenienceCharsStep,
+    specRef: "specs/051-carve-orthography-trim",
   } satisfies Step,
 
   // --- Carve (Phase D: remove unwanted base keys) ---
