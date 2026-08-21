@@ -1,0 +1,89 @@
+# Journey fixture — backtrack: qwerty routing flips to azerty after the
+# "characters" step has already completed once.
+#
+# spec 032 FR-009(c) / T007. The spec's own scenario prose ("start with a
+# qwerty layout_family answer... revisit and flip to azerty") describes the
+# OLD phase_a_identity `layout_family` question, which is no longer live
+# (demoted — see steps/flowSources.ts's phase_a_identity: status "proposed").
+# The equivalent LIVE lever is the routing_group axis §7's Phase B routing
+# actually branches on (phase_b_characters.modular.yaml's pb_char_count),
+# so this fixture's backtrack event uses journey-runner.ts's documented
+# "routing_group" sentinel questionId to flip that axis directly, then
+# re-derives the "characters" flow from pb_char_count onward — the exact
+# question whose routing depends on it. Every question unique to the azerty
+# branch (pb_latin_azerty_branch, pb_azerty_qz_swap, pb_spare_keys_azerty) is
+# `required: false`, so the re-route completes validly without new answers
+# for them (verified against each module's own `next`/`required` fields).
+#
+# expected_outcomes.routing_group asserts the POST-backtrack value: the
+# harness checks it after backtrack_events run.
+
+journey_id: backtrack-journey
+
+persona:
+  language: Hausa
+  script: Latn
+  routing_group: qwerty-qwertz
+
+events:
+  # --- identity (identity_lite.modular.yaml) ---
+  - { stepId: identity, questionId: il_language_english, value: "Hausa" }
+  - { stepId: identity, questionId: il_language_autonym, value: "Hausa" }
+  - { stepId: identity, questionId: il_target_script, value: "Latn" }
+  - { stepId: identity, questionId: il_author_name, value: "Studio Author" }
+
+  # --- choose_base (Track 1: copy from basic_kbdus) ---
+  - { stepId: choose_base, questionId: base_keyboard_id, value: "basic_kbdus" }
+
+  # --- track (copy) ---
+  - { stepId: track, questionId: track_choice, value: "copy" }
+
+  # --- project_name (copy-track only) ---
+  - { stepId: project_name, questionId: project_display_name, value: "Hausa (QWERTY)" }
+  - { stepId: project_name, questionId: project_keyboard_id, value: "hausa_qwerty" }
+
+  # --- characters (phase_b_characters.modular.yaml, qwerty branch) ---
+  - { stepId: characters, questionId: pb_discovery_intro, value: "manual" }
+  - { stepId: characters, questionId: pb_standard_letters, value: "extended-latin" }
+  - { stepId: characters, questionId: pb_typing_approach, value: "lookalike" }
+  - { stepId: characters, questionId: pb_special_letters, value: "true" }
+  - { stepId: characters, questionId: pb_special_letters_list, value: "ɓ Ɓ ɗ Ɗ ƴ Ƴ" }
+  - { stepId: characters, questionId: pb_special_letters_notes, value: "" }
+  - { stepId: characters, questionId: pb_latin_digraphs_gate, value: "false" }
+  - { stepId: characters, questionId: pb_punctuation_gate, value: "false" }
+  - { stepId: characters, questionId: pb_digit_set, value: "western" }
+  - { stepId: characters, questionId: pb_char_count, value: "small" }
+  # ctx.routing_group == 'qwerty-qwertz' (initial persona value) -> the
+  # qwerty branch, on THIS first pass through "characters".
+  - { stepId: characters, questionId: pb_latin_qwerty_branch, value: "many-bases" }
+  - { stepId: characters, questionId: pb_spare_keys_qwerty, value: "" }
+  - { stepId: characters, questionId: pb_contact_language, value: "" }
+  - { stepId: characters, questionId: pb_legacy_encoding, value: "not-sure" }
+  - { stepId: characters, questionId: pb_use_case, value: "general" }
+  - { stepId: characters, questionId: pb_additional_methods, value: "done" }
+
+  # --- marks / punctuation / convenience: no fixture events (auto-skip) ---
+
+  - { stepId: carve, action_type: gallery_edit, summary: "reviewed carve gallery; kept every base character" }
+  - { stepId: mechanisms, action_type: mechanism_edit, summary: "assigned ɓ Ɓ ɗ Ɗ ƴ Ƴ via deadkey composition" }
+  - { stepId: touch_seed_source, questionId: touch_seed_source, value: "import-adapt" }
+  - { stepId: touch, action_type: touch_edit, summary: "touch layout carried over from the desktop assignments" }
+
+  - { stepId: help, questionId: pf_welcome_paragraph, value: "A QWERTY Hausa keyboard." }
+  - { stepId: help, questionId: pf_more_detail_gate, value: "false" }
+
+backtrack_events:
+  - revisit_step: characters
+    new_answer:
+      questionId: routing_group
+      value: azerty
+
+expected_outcomes:
+  # The value AFTER the backtrack's re-route — asserted by the harness once
+  # backtrack_events have run.
+  routing_group: azerty
+  # Strategy is unaffected by the qwerty/azerty physical-layout axis (it is
+  # not one of the §7.1 A1-A7 discovery axes) — declared descriptively; the
+  # bafut-end-to-end fixture already exercises the real selectStrategy()
+  # check for this same A1/A4 combination (small + stacking-combining -> S-02).
+  strategy: S-02

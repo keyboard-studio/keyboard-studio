@@ -1,0 +1,145 @@
+{
+  "generatedAt": "2026-08-21T01:21:34.685Z",
+  "totalSteps": 14,
+  "coveredSteps": 10,
+  "uncovered": [
+    {
+      "stepId": "marks",
+      "edgeType": "spine",
+      "covered_by": []
+    },
+    {
+      "stepId": "punctuation",
+      "edgeType": "spine",
+      "covered_by": []
+    },
+    {
+      "stepId": "convenience",
+      "edgeType": "spine",
+      "covered_by": []
+    },
+    {
+      "stepId": "package",
+      "edgeType": "spine",
+      "covered_by": []
+    }
+  ],
+  "entries": [
+    {
+      "stepId": "identity",
+      "edgeType": "spine",
+      "covered_by": [
+        "bafut-end-to-end",
+        "bj-cree-woods-track2",
+        "minimal-defaults",
+        "backtrack-journey"
+      ]
+    },
+    {
+      "stepId": "choose_base",
+      "edgeType": "spine",
+      "covered_by": [
+        "bafut-end-to-end",
+        "bj-cree-woods-track2",
+        "minimal-defaults",
+        "backtrack-journey"
+      ]
+    },
+    {
+      "stepId": "track",
+      "edgeType": "spine",
+      "covered_by": [
+        "bafut-end-to-end",
+        "bj-cree-woods-track2",
+        "minimal-defaults",
+        "backtrack-journey"
+      ]
+    },
+    {
+      "stepId": "project_name",
+      "edgeType": "fork",
+      "covered_by": [
+        "bafut-end-to-end",
+        "backtrack-journey"
+      ]
+    },
+    {
+      "stepId": "characters",
+      "edgeType": "join",
+      "covered_by": [
+        "bafut-end-to-end",
+        "bj-cree-woods-track2",
+        "minimal-defaults",
+        "backtrack-journey"
+      ]
+    },
+    {
+      "stepId": "marks",
+      "edgeType": "spine",
+      "covered_by": []
+    },
+    {
+      "stepId": "punctuation",
+      "edgeType": "spine",
+      "covered_by": []
+    },
+    {
+      "stepId": "convenience",
+      "edgeType": "spine",
+      "covered_by": []
+    },
+    {
+      "stepId": "carve",
+      "edgeType": "spine",
+      "covered_by": [
+        "bafut-end-to-end",
+        "bj-cree-woods-track2",
+        "backtrack-journey"
+      ]
+    },
+    {
+      "stepId": "mechanisms",
+      "edgeType": "spine",
+      "covered_by": [
+        "bafut-end-to-end",
+        "bj-cree-woods-track2",
+        "backtrack-journey"
+      ]
+    },
+    {
+      "stepId": "touch_seed_source",
+      "edgeType": "fork",
+      "covered_by": [
+        "bafut-end-to-end",
+        "bj-cree-woods-track2",
+        "backtrack-journey"
+      ]
+    },
+    {
+      "stepId": "touch",
+      "edgeType": "join",
+      "covered_by": [
+        "bafut-end-to-end",
+        "bj-cree-woods-track2",
+        "backtrack-journey"
+      ]
+    },
+    {
+      "stepId": "help",
+      "edgeType": "spine",
+      "covered_by": [
+        "bafut-end-to-end",
+        "bj-cree-woods-track2",
+        "minimal-defaults",
+        "backtrack-journey"
+      ]
+    },
+    {
+      "stepId": "package",
+      "edgeType": "spine",
+      "covered_by": []
+    }
+  ],
+  "renderedNodeUniverseSize": 94,
+  "coveragePercent": 71
+}

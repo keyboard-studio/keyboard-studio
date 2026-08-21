@@ -1,0 +1,104 @@
+# Journey fixture — Bafut, Track 1 (copy), full spine identity -> package.
+#
+# spec 032 FR-009(a). Assembled from the hypothetical-Bafut completed-instance
+# examples in content/flows/_examples/phase_{a,b,f}_bafut.yaml, re-expressed
+# against the CURRENT live question registry (identity_lite.modular.yaml,
+# phase_b_characters.modular.yaml, phase_f_helpdocs.modular.yaml) — the
+# _examples files predate the identity-lite / marks-series migrations (spec
+# 030/064/071) and use question ids (layout_family, pb_accent_marks_gate, ...)
+# that are no longer live; see journey-runner.ts's module header and research
+# R1 in specs/032-journey-corpus/research.md for why.
+#
+# Every survey-answer event's {stepId, questionId, value} was verified against
+# the live question module's `next` routing (packages/studio/src/survey/questions/{a,b,f}/*.ts)
+# before being authored here — this fixture is a real, routable walk, not
+# just plausible-looking data.
+
+journey_id: bafut-end-to-end
+
+persona:
+  language: Bafut
+  script: Latn
+  routing_group: qwerty-qwertz
+
+events:
+  # --- identity (identity_lite.modular.yaml) ---
+  - { stepId: identity, questionId: il_language_english, value: "Bafut" }
+  - { stepId: identity, questionId: il_language_autonym, value: "Faʼ" }
+  - { stepId: identity, questionId: il_language_code, value: "bfd" }
+  - { stepId: identity, questionId: il_target_script, value: "Latn" }
+  - { stepId: identity, questionId: il_author_name, value: "Bafut Language Committee" }
+  - { stepId: identity, questionId: il_author_email, value: "bafut.keyboard@example.org" }
+  - { stepId: identity, questionId: il_copyright_holder, value: "" }
+
+  # --- choose_base (Track 1: copy from basic_kbdus) ---
+  - { stepId: choose_base, questionId: base_keyboard_id, value: "basic_kbdus" }
+
+  # --- track (track.modular.yaml) ---
+  - { stepId: track, questionId: track_choice, value: "copy" }
+
+  # --- project_name (project_name.modular.yaml, copy-track only) ---
+  - { stepId: project_name, questionId: project_display_name, value: "Bafut" }
+  - { stepId: project_name, questionId: project_keyboard_id, value: "bafut" }
+
+  # --- characters (phase_b_characters.modular.yaml) ---
+  - { stepId: characters, questionId: pb_existing_keyboards, value: "" }
+  - { stepId: characters, questionId: pb_co_installed_keyboards, value: "" }
+  - { stepId: characters, questionId: pb_discovery_intro, value: "manual" }
+  # pb_routing_branch is engine-resolved (ctx.routing_group != 'non-roman') --
+  # never rendered, so no event for it (mirrors the completed-instance convention).
+  - { stepId: characters, questionId: pb_standard_letters, value: "extended-latin" }
+  - { stepId: characters, questionId: pb_typing_approach, value: "lookalike" }
+  - { stepId: characters, questionId: pb_special_letters, value: "true" }
+  - { stepId: characters, questionId: pb_special_letters_list, value: "ŋ Ŋ ɨ Ɨ ə Ə ɔ Ɔ ɛ Ɛ" }
+  - { stepId: characters, questionId: pb_special_letters_notes, value: "ŋ represents the ng sound" }
+  - { stepId: characters, questionId: pb_latin_digraphs_gate, value: "false" }
+  - { stepId: characters, questionId: pb_punctuation_gate, value: "false" }
+  - { stepId: characters, questionId: pb_digit_set, value: "western" }
+  - { stepId: characters, questionId: pb_char_count, value: "small" }
+  - { stepId: characters, questionId: pb_latin_qwerty_branch, value: "many-bases" }
+  - { stepId: characters, questionId: pb_spare_keys_qwerty, value: "X Q" }
+  - { stepId: characters, questionId: pb_contact_language, value: "" }
+  - { stepId: characters, questionId: pb_legacy_encoding, value: "not-sure" }
+  - { stepId: characters, questionId: pb_use_case, value: "literacy" }
+  - { stepId: characters, questionId: pb_additional_methods, value: "done" }
+
+  # --- marks / punctuation / convenience: no fixture events (auto-skip; see
+  #     journey-runner.ts's module header) ---
+
+  # --- carve (Phase D — gallery loop, recorded verbatim, FR-002b/FR-015) ---
+  - { stepId: carve, action_type: gallery_edit, summary: "reviewed carve gallery; kept every base character (no removals — Bafut needs the full basic_kbdus inventory as a convenience/loanword set)" }
+
+  # --- mechanisms (Phase C — gallery loop, recorded verbatim) ---
+  - { stepId: mechanisms, action_type: mechanism_edit, summary: "assigned ŋ Ŋ ɨ Ɨ ə Ə ɔ Ɔ ɛ Ɛ via deadkey composition (S-02); combining tone marks (acute, grave, macron, circumflex) chained per S-04" }
+
+  # --- touch_seed_source (off-spine fork) ---
+  - { stepId: touch_seed_source, questionId: touch_seed_source, value: "import-adapt" }
+
+  # --- touch (Phase E — gallery loop, recorded verbatim) ---
+  - { stepId: touch, action_type: touch_edit, summary: "seeded touch layout from the desktop assignments; no manual touch-only edits" }
+
+  # --- help (phase_f_helpdocs.modular.yaml, default 5-screen path) ---
+  - { stepId: help, questionId: pf_welcome_paragraph, value: "This keyboard lets you type Bafut (Fa') on any computer. It includes all the tone marks and special letters used in the Bafut alphabet." }
+  - { stepId: help, questionId: pf_usage_tip_1, value: "Press the backtick key (`) followed by a vowel to add a grave accent." }
+  - { stepId: help, questionId: pf_more_detail_gate, value: "false" }
+  - { stepId: help, questionId: pf_credits, value: "Bafut Language Committee, Northwest Region, Cameroon. Keyboard layout by the Bafut Literacy Project." }
+  - { stepId: help, questionId: pf_contact_info, value: "bafut.keyboard@example.org" }
+
+expected_outcomes:
+  routing_group: qwerty-qwertz
+  # §7.2 rule 7 (A4=stacking-combining AND A1 ∈ {small,medium}) -> S-02 + [S-04],
+  # per content/flows/_examples/phase_b_bafut.yaml's own worked strategy
+  # resolution. `axes` lets the harness verify this for real via
+  # @keyboard-studio/engine's selectStrategy() rather than asserting a
+  # hand-typed string nothing re-derives.
+  strategy: S-02
+  secondary_strategies: [S-04]
+  axes:
+    scale: small
+    scriptClass: alphabetic
+    phoneticIntuition: weak
+    diacriticBehavior: stacking-combining
+    multiMode: single
+    constraintEnforcement: none
+    spareKeyAvailability: many

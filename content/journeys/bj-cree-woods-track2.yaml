@@ -1,0 +1,103 @@
+# Journey fixture — Western Cree (TH-Woods), Track 2 (adapt) using the real
+# bj_cree_woods keyboard (docs/keyboard-index.md row 41).
+#
+# spec 032 FR-009(b). Mirrors the walk in packages/studio/e2e/carve.spec.ts
+# (identity-lite -> pick bj_cree_woods -> adapt -> prefill -> one-character
+# Phase B list -> carve discard of U+14EC/rule#18+rule#20 -> empty mechanisms
+# diff -> touch -> help -> output), replayed headlessly instead of through
+# Playwright. journey-runner.ts's BASE_FIXTURES entry for bj_cree_woods
+# carries the real keyboard identity (id/path/languages) with a representative
+# SYNTHETIC IR — see that file's module header for why this fixture does not
+# invoke the engine codec against the ../keyboards checkout.
+#
+# Phase B routes through the syllabic (Canadian Aboriginal Syllabics) branch
+# of phase_b_characters.modular.yaml (pb_non_roman_branch -> pb_syllabic_* ->
+# the shared universal tail) — a genuinely different branch than
+# bafut-end-to-end's qwerty-qwertz walk, verified against each question
+# module's `next` routing the same way.
+
+journey_id: bj-cree-woods-track2
+
+persona:
+  language: Western Cree (TH-Woods)
+  script: Cans
+  routing_group: non-roman
+  source_keyboard: bj_cree_woods
+
+events:
+  # --- identity (identity_lite.modular.yaml) ---
+  - { stepId: identity, questionId: il_language_english, value: "Cree" }
+  - { stepId: identity, questionId: il_language_autonym, value: "Nehiyawewin" }
+  - { stepId: identity, questionId: il_language_code, value: "cr" }
+  - { stepId: identity, questionId: il_target_script, value: "other" }
+  - { stepId: identity, questionId: il_author_name, value: "Bill Jancewicz" }
+  - { stepId: identity, questionId: il_author_email, value: "" }
+  - { stepId: identity, questionId: il_copyright_holder, value: "" }
+
+  # --- choose_base (Track 2: adapt bj_cree_woods) ---
+  - { stepId: choose_base, questionId: base_keyboard_id, value: "bj_cree_woods" }
+
+  # --- track (adapt — project_name is skipped, spine:false CYOA fork) ---
+  - { stepId: track, questionId: track_choice, value: "adapt" }
+
+  # --- characters (phase_b_characters.modular.yaml, syllabic branch) ---
+  - { stepId: characters, questionId: pb_existing_keyboards, value: "Legacy font-encoded Cree typewriter layout" }
+  - { stepId: characters, questionId: pb_co_installed_keyboards, value: "" }
+  - { stepId: characters, questionId: pb_discovery_intro, value: "manual" }
+  # pb_routing_branch is engine-resolved (ctx.routing_group == 'non-roman') --
+  # routes to pb_non_roman_branch, never rendered, so no event for it.
+  - { stepId: characters, questionId: pb_non_roman_branch, value: "syllabic" }
+  - { stepId: characters, questionId: pb_syllabic_note, value: "combine-parts" }
+  - { stepId: characters, questionId: pb_syllabic_grid, value: "true" }
+  - { stepId: characters, questionId: pb_syllabic_finals_gate, value: "true" }
+  - { stepId: characters, questionId: pb_syllabic_finals_detail, value: "ᐦ ᑊ ᐟ (small raised finals)" }
+  - { stepId: characters, questionId: pb_special_letters, value: "true" }
+  - { stepId: characters, questionId: pb_special_letters_list, value: "᙮" }
+  - { stepId: characters, questionId: pb_special_letters_notes, value: "Traditional Canadian syllabics full-stop punctuation (U+166E)" }
+  - { stepId: characters, questionId: pb_latin_digraphs_gate, value: "false" }
+  - { stepId: characters, questionId: pb_punctuation_gate, value: "false" }
+  - { stepId: characters, questionId: pb_digit_set, value: "western" }
+  - { stepId: characters, questionId: pb_char_count, value: "medium" }
+  # ctx.routing_group == 'non-roman' -> pb_char_count's default branch (not the
+  # qwerty/azerty branches) goes straight to the shared tail.
+  - { stepId: characters, questionId: pb_contact_language, value: "" }
+  - { stepId: characters, questionId: pb_legacy_encoding, value: "yes-legacy" }
+  - { stepId: characters, questionId: pb_use_case, value: "literacy" }
+  - { stepId: characters, questionId: pb_additional_methods, value: "done" }
+
+  # --- marks / punctuation / convenience: no fixture events (auto-skip) ---
+
+  # --- carve (Phase D — the real carve.spec.ts scenario, recorded verbatim) ---
+  - { stepId: carve, action_type: gallery_edit, summary: "discarded character U+14EC (ᓬ); cascaded to rule#18 and rule#20, its sole producers in bj_cree_woods" }
+
+  # --- mechanisms (Phase C — carve.spec.ts's confirmMechanismsEmpty walk) ---
+  - { stepId: mechanisms, action_type: mechanism_edit, summary: "no new characters to add — empty mechanisms diff (all discovered characters already on the adapted base)" }
+
+  # --- touch_seed_source (off-spine fork) ---
+  - { stepId: touch_seed_source, questionId: touch_seed_source, value: "import-adapt" }
+
+  # --- touch (Phase E — carve.spec.ts's driveTouchGallery walk) ---
+  - { stepId: touch, action_type: touch_edit, summary: "touch layout carried over from the adapted desktop assignments; no additional touch-only characters" }
+
+  # --- help (phase_f_helpdocs.modular.yaml, default 5-screen path) ---
+  - { stepId: help, questionId: pf_welcome_paragraph, value: "This keyboard lets you type Woods Cree (Nehiyawewin) in Canadian Aboriginal Syllabics on any computer." }
+  - { stepId: help, questionId: pf_usage_tip_1, value: "" }
+  - { stepId: help, questionId: pf_more_detail_gate, value: "false" }
+  - { stepId: help, questionId: pf_credits, value: "Bill Jancewicz" }
+  - { stepId: help, questionId: pf_contact_info, value: "" }
+
+expected_outcomes:
+  routing_group: non-roman
+  # No earlier §7.2 primary rule matches a syllabary/combine-parts profile
+  # with no diacritics -> rule 12's always-true fallback -> S-03 (sequence
+  # replace), a natural fit for combining a consonant symbol + vowel symbol
+  # into one syllable grapheme.
+  strategy: S-03
+  axes:
+    scale: medium
+    scriptClass: syllabary
+    phoneticIntuition: weak
+    diacriticBehavior: none
+    multiMode: single
+    constraintEnforcement: none
+    spareKeyAvailability: many
