@@ -3,7 +3,42 @@
   "specName": "020-qu-wire-buildlist",
   "branch": "020-qu-wire-buildlist",
   "selectedAt": "2026-07-28T04:44:11.472Z",
-  "currentStep": "specify",
-  "status": "draft",
-  "history": []
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:12:36.278Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:12:36.947Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:12:37.961Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:12:39.778Z"
+    }
+  ],
+  "verified": [
+    {
+      "what": "retroactive verification 2026-08-19: all 23 tasks checked against live code",
+      "result": "shipped via commit cb8a86d0 (PR #873); BuildListView/IntroChooser/pb_build_list oracle/drillDownDeclarations all confirmed present and matching; spec.md line-number citations are stale (file grew from later features) but functionally accurate - cosmetic only"
+    }
+  ]
 }

@@ -72,6 +72,13 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-07-24T03:38:42.000Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T20:12:05.405Z"
     }
   ],
   "approach": "Fold the marks attachment question's base-letter choices to lowercase-only using the same caseCounterpart primitive the character step uses (shared helper in charNormUtils.ts), and add a pure engine helper expandCaseCounterpartAttachments that reproduces the uppercase attachments from the lowercase answers before buildPlacementWorklist. Derivation-only; no locked-contract change.",
@@ -103,7 +110,7 @@
     }
   },
   "currentStep": "implement",
-  "status": "implementing",
+  "status": "completed",
   "telemetryInstanceId": "6a782ddf-25e8-439f-83d7-9418434906a8",
   "coverage": {
     "FR-001": {
@@ -170,6 +177,10 @@
       "what": "typecheck + lint",
       "command": "pnpm typecheck && pnpm lint",
       "result": "both exit 0"
+    },
+    {
+      "what": "retroactive re-verification (2026-08-19): spot-checked charNormUtils.ts (hiddenUppercaseBases/lowercaseBaseView/casedBaseCount), case-fold.ts (expandCaseCounterpartAttachments), PhaseB.tsx and MarksSeriesStep.tsx wiring, case-fold.test.ts and MarksSeriesStep.test.tsx coverage",
+      "result": "all file paths, function names, and line-level wiring confirmed unchanged and matching tasks.md exactly; no drift since the 2026-07-24 implementation"
     }
   ]
 }

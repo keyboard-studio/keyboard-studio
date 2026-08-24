@@ -3,7 +3,7 @@
   "specName": "Marks treatment question",
   "branch": "052-marks-treatment-question",
   "currentStep": "implement",
-  "status": "implemented",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
@@ -615,6 +615,10 @@
       "command": "pnpm --filter @keyboard-studio/engine build && pnpm run depcruise",
       "result": "PASS - no dependency violations (869 modules, 2832 dependencies cruised)",
       "warnings": []
+    },
+    {
+      "what": "retroactive verification 2026-08-19: sampled ~20 of 43 tasks across all phases",
+      "result": "shipped via commit 897831ed (PR #1440); all sampled files/functions confirmed present or confirmed deleted where the task calls for deletion (MentalModelStation.tsx, InputOrderStation.tsx); no interaction with spec 071 pb_* retirement (different, unrelated battery); no doc drift found"
     }
   ],
   "telemetryInstanceId": "a28a87a4-2fbe-4296-a91b-6e1e6a97c053",
@@ -1008,9 +1012,9 @@
     },
     "T012": {
       "status": "DONE",
-      "did": "Amended spec 071 in the same change: FR-010 (three-part answer), FR-011 (key budget signal), FR-012 (order no longer its own station), SC-006 (five->four, superseded by 052 SC-003), SC-007 (exactly once -> at least once)",
+      "did": "Amended spec 046 in the same change: FR-010 (three-part answer), FR-011 (key budget signal), FR-012 (order no longer its own station), SC-006 (five->four, superseded by 052 SC-003), SC-007 (exactly once -> at least once)",
       "files": [
-        "specs/071-marks-question-series/spec.md"
+        "specs/046-marks-question-series/spec.md"
       ]
     },
     "T013": {

@@ -4,7 +4,7 @@
   "branch": "061-help-docs-generation",
   "selectedAt": "2026-08-07T19:25:11.688Z",
   "currentStep": "implement",
-  "status": "implemented",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
@@ -527,6 +527,10 @@
     {
       "what": "km-synthesis: integration fit across contracts/engine/studio",
       "result": "PARTIAL FIT, 0 P0, 1 P1 (stale comment)"
+    },
+    {
+      "what": "retroactive verification 2026-08-19: all 35 tasks checked against live code",
+      "result": "shipped via PR 1585 (3bc73b7b) with post-review fixups; HelpDocsAnswers/helpDocsRender.ts/extractHelpDocs/useDocsPreview/websiteUrl emission all confirmed; capital-[X] checkbox format already recognized by write-context.py COMPLETED_TASK_RE; spec.md Status field corrected"
     }
   ],
   "concerns": [

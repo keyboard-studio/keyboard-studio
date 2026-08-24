@@ -4,7 +4,7 @@
   "branch": "051-carve-orthography-trim",
   "selectedAt": "2026-07-28T02:44:54.713Z",
   "currentStep": "implement",
-  "status": "implemented",
+  "status": "completed",
   "history": [
     {
       "step": "tasks",
@@ -481,5 +481,11 @@
       "decision": "US3 (T020) reproduction outcome: the 'trim does nothing visible' symptom WAS the US1 collateral over-shield, fixed by the FR-003 conjunction. The buildPendingCascade plain-toggle fast path is not a second cause -- a second producer always lands in removableCount, blocked, or collateral, each of which opens the dialog. FR-007/FR-008 pass with no production change; pinned as regression tests instead of inventing a fix. T022 = comment only, T023 = no new message ids."
     }
   ],
-  "currentTask": "T034"
+  "currentTask": "T034",
+  "verified": [
+    {
+      "what": "retroactive verification 2026-08-19: spot-checked engine/lib symbols across phases",
+      "result": "shipped via PR 1412 (commits 77c50c55/cd725493); StoreUsageFlags, buildProducerIndex, CharContributors.storeSlots, coordinatedDropHitsNeededChar, caseGroupFor/caseTrimSet all confirmed present; NFR-004 wording fix confirmed landed; spec.md Status field corrected"
+    }
+  ]
 }
