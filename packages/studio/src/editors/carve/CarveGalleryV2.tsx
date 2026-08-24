@@ -23,7 +23,9 @@ import type { CharacterCell, CharacterGroup } from '../../lib/irToCharacterView.
 import { codepointLabel } from '../../survey/codepointLabel.ts';
 import type { CharContributors } from '@keyboard-studio/engine';
 import { KeySeq } from '../assignLoop/parts/KeySeq.tsx';
-import { UndoIcon, DiscardIcon, ChevronIcon } from '../assignLoop/parts/carveShared.tsx';
+import { DiscardIcon, ChevronIcon } from '../assignLoop/parts/carveShared.tsx';
+import { RemovedDropdown } from '../assignLoop/parts/StatusBar.tsx';
+import type { RemovedItem } from '../assignLoop/parts/StatusBar.tsx';
 import { useCarveNeededSet } from '../../hooks/useCarveNeededSet.ts';
 
 interface CarveGalleryV2Props {
@@ -566,7 +568,6 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   }, [cascadeDelete, cascadeRestore]);
 
   const [selectedCh, setSelectedCh] = useState<string | null>(null);
-  const [search, setSearch] = useState('');
   const [groupBy, setGroupBy] = useState<GroupBy>('category');
   // Optional-Latin card starts collapsed — same default RemovalBanner used
   // for this section, since it is deliberately lower-priority than the
@@ -599,7 +600,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     else cascadeRestore(restoreIds);
   }, [cascadeDelete, cascadeRestore]);
 
-  // Kept / total / removed counts over EVERY cell (unfiltered by search).
+  // Kept / total / removed counts over EVERY cell.
   const { kept, total } = useMemo(() => {
     let k = 0;
     for (const cell of cells) {
@@ -610,28 +611,31 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   const removedCount = total - kept;
 
   // Recommended characters (cell.reco) live in the suggested groups above the
-  // grid, not here too — no character should appear twice. The exclusion
-  // lifts entirely while searching: the pinned suggested cards hide during
-  // search (see the render below) so the grid becomes the ONLY answer to the
-  // query, and it must be able to answer with every character, recommended
-  // or not.
-  const filteredCells = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    const base = q.length > 0 ? cells : cells.filter((cell) => !cell.reco);
-    if (q.length === 0) return base;
-    return base.filter((cell) => {
-      if (cell.ch.toLowerCase().includes(q)) return true;
-      // `.title` (every code point), so searching a combining mark's own
-      // notation finds the sequences that contain it, not just the base.
-      if (codepointLabel(cell.ch).title.toLowerCase().includes(q)) return true;
-      return cell.keys.some((k) => k.toLowerCase().includes(q));
-    });
-  }, [cells, search]);
+  // grid, not here too — no character should appear twice.
+  const filteredCells = useMemo(() => cells.filter((cell) => !cell.reco), [cells]);
 
   const groups: CharacterGroup[] = useMemo(
     () => groupCharacterCells(filteredCells, groupBy),
     [filteredCells, groupBy],
   );
+
+  // Removed-characters dropdown (#1619 AC1) — every currently discarded
+  // character, individually restorable, mirroring the rule/node Rail view's
+  // RemovedDropdown (StatusBar.tsx). Built from `cells` (the IR's real
+  // producers), the SAME source kept/total above counts over, so this list
+  // and the "N discarded" text never disagree.
+  const removedList = useMemo<RemovedItem[]>(
+    () => cells
+      .filter((cell) => isCellDiscarded(cell, isItemDeleted))
+      .map((cell) => ({ type: 'item', id: cell.ch, ch: cell.ch, keys: cell.keys })),
+    [cells, isItemDeleted, deletedItemIds],
+  );
+  const restoreRemovedItem = useCallback((item: RemovedItem) => {
+    if (item.type !== 'item') return;
+    const cell = cellsByCh.get(item.ch);
+    if (cell === undefined) return;
+    cascadeRestore(characterCellIds(cell));
+  }, [cellsByCh, cascadeRestore]);
 
   // cellsByCh (not cells) is the lookup here: selectedCh may be a
   // block-candidate character that's absent from cells but present in
@@ -697,18 +701,6 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
             {removedCount} discarded · reversible until you continue
           </div>
         </div>
-        <input
-          type="search"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          placeholder="Search a character or code point…"
-          aria-label="Search a character or code point"
-          style={{
-            marginLeft: 'auto', minWidth: 240, font: '13px var(--app-font)', color: 'var(--app-text)',
-            background: 'var(--app-surface-2)', border: '1px solid var(--app-border-strong)', borderRadius: 8,
-            padding: '7px 11px',
-          }}
-        />
         {/* Grouping toggle — native fieldset/radio group so "Group by" is a
             real programmatic label and the two options are keyboard-operable
             and screen-reader-announced without any custom ARIA state.
@@ -716,12 +708,12 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
             primitive: RadioGroup's OPTION_ROW_STYLE stacks options vertically
             with a 44px touch hit-target and per-row margin, which would blow
             out this compact inline status-strip layout (radios sit inline,
-            side by side, next to the search box and Restore-all button).
+            side by side, next to the removed-characters dropdown below).
             The two radios still carry ks-focus-ring below, so this call site
             matches the app-wide focus treatment without the primitive. */}
         <fieldset
           style={{
-            display: 'inline-flex', alignItems: 'center', gap: 10, margin: 0, padding: '5px 10px',
+            display: 'inline-flex', alignItems: 'center', gap: 10, margin: '0 0 0 auto', padding: '5px 10px',
             border: '1px solid var(--app-border-strong)', borderRadius: 8, background: 'var(--app-surface-2)',
           }}
         >
@@ -753,19 +745,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
             Source
           </label>
         </fieldset>
-        <button
-          onClick={restoreAll}
-          disabled={removedCount === 0}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 6, font: '600 12.5px var(--app-font)',
-            cursor: removedCount === 0 ? 'default' : 'pointer', color: removedCount === 0 ? 'var(--app-text-subtle)' : 'var(--app-accent-text)',
-            background: 'transparent', border: '1px solid var(--app-border-strong)', borderRadius: 8, padding: '7px 13px',
-            opacity: removedCount === 0 ? 0.6 : 1,
-          }}
-        >
-          <UndoIcon size={13} />
-          Restore all
-        </button>
+        <RemovedDropdown list={removedList} onRestore={restoreRemovedItem} onRestoreAll={restoreAll} />
       </div>
 
       {/* Two-panel body */}
@@ -780,7 +760,6 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
           ) : (() => {
             const cell = selectedCell;
             const discarded = isCellDiscarded(cell, isItemDeleted);
-            const toggleable = characterCellIsToggleable(cell);
             return (
               <div>
                 <div style={{
@@ -948,23 +927,11 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                   </span>
                 </div>
 
-                <button
-                  onClick={() => toggleCell(cell)}
-                  disabled={!toggleable}
-                  aria-pressed={discarded}
-                  style={{
-                    width: '100%', font: '600 13px var(--app-font)', cursor: toggleable ? 'pointer' : 'default',
-                    padding: '9px 14px', borderRadius: 8, opacity: toggleable ? 1 : 0.5,
-                    // See the "In your alphabet" pill above: --sil-black instead
-                    // of --app-text-on-accent for the same fixed-fill reason.
-                    color: discarded ? 'var(--sil-black)' : 'var(--app-danger-text)',
-                    background: discarded ? 'var(--sil-green)' : 'transparent',
-                    border: discarded ? 'none' : '1px solid var(--app-danger-text)',
-                  }}
-                >
-                  {discarded ? 'Restore this character' : 'Discard this character'}
-                </button>
-                <p style={{ margin: '10px 0 0', fontSize: 11.5, lineHeight: 1.5, color: 'var(--app-text-subtle)' }}>
+                {/* Read-only from here down (#1619 AC2) — no discard/restore
+                    control in this panel. Toggling a character happens only
+                    by clicking its grid cell, a suggested-group card, or the
+                    removed-characters dropdown above. */}
+                <p style={{ margin: 0, fontSize: 11.5, lineHeight: 1.5, color: 'var(--app-text-subtle)' }}>
                   Discarding a character removes the rules that produce it. If a rule also produces a character you kept, that rule stays.
                 </p>
               </div>
@@ -976,13 +943,10 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
         <div style={{ flex: 1, overflowY: 'auto', padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 24 }}>
           {/* Suggested-to-discard groups (design handoff option 1b) — the
               FIRST thing in this scrolling panel, ahead of every normal
-              category/source group. Hidden entirely while a search query is
-              active: the grid below is the only surface answering the query
-              then, so a pinned card competing for the same characters would
-              be confusing (and filteredCells stops excluding reco cells for
-              exactly this reason — see that memo's comment). */}
-          {search.trim().length === 0 && (
-            <>
+              category/source group. filteredCells excludes reco cells (see
+              that memo's comment) so a character never appears here AND in a
+              normal group below. */}
+          <>
               <RecommendedGroupCard
                 testId="carve-v2-suggested-group"
                 toggleAllTestId="carve-v2-suggested-toggle-all"
@@ -1026,11 +990,10 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                 onSelectCh={setSelectedCh}
                 collapsible={{ open: latinOpen, onToggleOpen: () => setLatinOpen((v) => !v) }}
               />
-            </>
-          )}
+          </>
 
           {groups.length === 0 && (
-            <p style={{ fontSize: 13, color: 'var(--app-text-muted)' }}>No characters match your search.</p>
+            <p style={{ fontSize: 13, color: 'var(--app-text-muted)' }}>No characters to show.</p>
           )}
           {groups.map((group) => {
             const allDiscarded = group.cells.every((c) => isCellDiscarded(c, isItemDeleted));
