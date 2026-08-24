@@ -4,7 +4,9 @@
 
 **Created**: 2026-07-06
 
-**Status**: **Draft** — GATED on the spec #9 loop-primitive resolution. This spec assumes **DEFER** (per [docs/design-notes/question-unification-migration-plan.md](../../docs/design-notes/question-unification-migration-plan.md) §6 — open decision Q-new). If **BUILD** is chosen instead, this spec needs re-planning only if the fork is re-modeled; that is unlikely since spec 023 already changed presentation and the manifest model (Option A, the modular gate question per Decision 6, 2026-06-29, Matt) is locked.
+**Status**: Implemented (FR-001 through FR-008) — folded into the Unified Survey Architecture migration (specs 026/028/029) rather than landing as an isolated PR; shipped across commits `7ba08030`, `6baa4ad6`, and `d4f787b2`. Retroactively verified 2026-08-19.
+
+**Gate correction (2026-08-19)**: this spec's header previously read "GATED on the spec #9 loop-primitive resolution." That framing does not survive inspection — [docs/design-notes/question-unification-migration-plan.md](../../docs/design-notes/question-unification-migration-plan.md) §3.2's own status note states the loop-primitive decision gates only the *later* gallery-decomposition specs (`pb_build_list`, `carve`, `mechanisms`, `touch`), never `track`/`project_name`, which "remains at the manifest level" independent of that decision. This spec's own Assumptions section already conceded as much ("if BUILD is chosen instead, no major fork re-modeling is expected"). The gate never actually applied to this spec's real scope.
 
 ---
 

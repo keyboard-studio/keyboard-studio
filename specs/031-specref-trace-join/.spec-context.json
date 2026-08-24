@@ -3,7 +3,81 @@
   "specName": "031-specref-trace-join",
   "branch": "031-specref-trace-join",
   "selectedAt": "2026-07-28T04:43:42.014Z",
-  "currentStep": "specify",
-  "status": "draft",
-  "history": []
+  "currentStep": "tasks",
+  "status": "ready-to-implement",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:11:36.959Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "ai",
+      "at": "2026-08-19T23:11:37.968Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:11:40.118Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:11:42.030Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:11:46.701Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "ai",
+      "at": "2026-08-19T23:35:38.285Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:35:38.989Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:35:40.190Z"
+    }
+  ],
+  "approach": "Add optional specRef to StepBase/QuestionModule, populate manifest + a sample of question modules, add a pure checkSpecRef completeness check, export manifest.specref.json via a pnpm-test-time script, extend spec-traces buildDriftIssueBody/report to read it. Every extension point mirrors an existing pattern in the codebase.",
+  "step_summaries": {
+    "plan": {
+      "summary": "Annotate steps/question-modules with specRef, add a completeness check, bridge to spec-trace via a generated JSON artifact (never a direct import)",
+      "key_finding": "Every piece of this feature mirrors an existing pattern already in the codebase - flowRefs field shape, checkInputsSatisfiableFromManifest pure-check shape, buildDriftIssueBody/report hook points - no new architecture needed"
+    },
+    "tasks": {
+      "summary": "22 tasks across 8 phases (Setup, Foundational type additions, US1 manifest annotation, US2 question-module sample, Foundational completeness+artifact, US3 spec-trace issue join, US4 spec-trace report, Polish)"
+    }
+  },
+  "decisions": [
+    {
+      "decision": "Generate manifest.specref.json via a pnpm-test-time script rather than a build plugin",
+      "why": "Ties artifact freshness to the command CI already runs on every PR (pnpm test) rather than the heavier, less-frequent pnpm build; satisfies FR-007s module-boundary constraint since it is pure data generation via tsx, no bundler needed",
+      "rejected": "A Vite build plugin emitting the artifact during pnpm build"
+    }
+  ]
 }

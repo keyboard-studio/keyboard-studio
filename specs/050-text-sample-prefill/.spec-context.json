@@ -2,8 +2,8 @@
   "workflow": "speckit",
   "specName": "Text-sample prefill (paste or upload)",
   "branch": "050-text-sample-prefill",
-  "currentStep": "specify",
-  "status": "specified",
+  "currentStep": "tasks",
+  "status": "ready-to-implement",
   "history": [
     {
       "step": "specify",
@@ -18,6 +18,94 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-07-27T03:44:00.000Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "ai",
+      "at": "2026-08-19T23:08:50.724Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:08:51.337Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:08:51.907Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:08:55.210Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "ai",
+      "at": "2026-08-19T23:42:13.951Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:42:19.680Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:42:32.887Z"
     }
-  ]
+  ],
+  "decisions": [
+    {
+      "decision": "Corrected spec 050 Context/Assumptions sections rather than treating the spec as accurate before planning",
+      "why": "The spec Context claim (no multiline text entry point exists) was already false when written 2026-07-27 - pb_text_sample/pb_text_sample_review already existed since commit 7b262941, predating this spec by weeks. On closer inspection the review step is a plain bool yes/no gate, not the per-character attributed proposal UI spec 044 introduced, so the real remaining gap is larger than the original US2-only (file upload) framing implied",
+      "rejected": "Planning the spec as originally written, which would have re-derived already-shipped US1 mechanics and understated the real scope of US1s propose-then-confirm acceptance criteria (FR-005/FR-006)"
+    },
+    {
+      "decision": "Target TextSamplePlaceholder on the build-list page, not the older pb_text_sample/pb_text_sample_review chain",
+      "why": "TextSamplePlaceholders own code comment names spec 050 as its owner and cites spec 044 FR-016b as reserving the slot; the older chain predates the build-list unification and is reachable only via a non-default manual path",
+      "rejected": "Retrofitting pb_text_sample_review with attribution/union logic, which would leave the actually-reserved, default-path placeholder unbuilt"
+    },
+    {
+      "decision": "Integrate via addProposed(char, source:text) per character, not seedFromProposal",
+      "why": "SourcedInventory.source is typed ExemplarSource (cldr|sldr only), structurally excluding text; DraftProvenance already includes text specifically for addProposed callers",
+      "rejected": "Widening ExemplarSource to include text and routing through seedFromProposal, which would touch exemplar-sourcing engine code for no benefit"
+    },
+    {
+      "decision": "Route text-sample proposals through the existing addProposed per-character action instead of building a new seedFromText batch action",
+      "why": "addProposed already exists, is already provenance-aware and union-safe, and DraftProvenance already has a text member anticipating this exact feature - verified directly against phaseBDraftStore.ts",
+      "rejected": "A new seedFromText(chars) batch action mirroring seedFromProposals shape, which would have duplicated logic addProposed already provides"
+    }
+  ],
+  "concerns": [
+    {
+      "note": "FR-001/002/004 (multiline paste + harvestChars extraction) are already shipped via pb_text_sample, predating this spec. FR-003 (file upload) and FR-005/006/007 (044-contract propose-then-confirm, per-character attribution, union with exemplar coverage) remain genuinely unbuilt - the review step needs to be rebuilt against 044s actual mechanism, not just wired to it. This is closer to net-new work than the original spec framing implied.",
+      "step": "specify"
+    }
+  ],
+  "approach": "Wire the existing, reserved TextSamplePlaceholder to a real paste/upload affordance using harvestFromText (extraction) and addProposed with source:text (union/attribution) - both already exist, DraftProvenance already anticipates text. UI + thin adapter only, no store/engine changes.",
+  "step_summaries": {
+    "plan": {
+      "summary": "Wire the reserved TextSamplePlaceholder to harvestFromText + addProposed(source:text); no store/engine changes needed, both already anticipate this feature",
+      "key_finding": "DraftProvenance already has a text member and addProposed already documents the exact union/attribution contract FR-005/006/007 need - this is a UI task, not a state-design task"
+    },
+    "tasks": {
+      "summary": "17 tasks across 5 phases: paste (US1/P1 MVP), upload (US2/P2), exemplar+text union (US3/P3), polish",
+      "key_finding": "Zero store/engine changes needed - addProposed/DraftProvenance(text)/harvestFromText all pre-exist; scope is PhaseB.tsx + its test file only"
+    }
+  }
 }
