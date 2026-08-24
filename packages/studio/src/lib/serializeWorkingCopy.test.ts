@@ -169,8 +169,17 @@ describe("serializeWorkingCopy — happy path", () => {
     const callArg = projectWorkingCopyVfsSpy.mock.calls[0]?.[0] as Record<string, unknown>;
     expect(callArg).toBeDefined();
     expect(callArg["keyboardId"]).toBe(basicKbdus.id);
-    // baseIr is forwarded to the helper.
-    expect(callArg["baseIr"]).toBe(ir);
+    // baseIr is forwarded to the helper — but instantiation now derives facets
+    // (spec 048) via an immutable top-level spread (see
+    // engine/src/facets/accessors.ts deriveFacets), so the stored baseIr is a
+    // NEW object, never reference-equal to the `ir` passed into
+    // instantiateFromBase. Assert structural equality against the derived
+    // shape instead of identity. This fixture has no output content, so
+    // casing derives to "undetermined".
+    expect(callArg["baseIr"]).toEqual({
+      ...ir,
+      facets: { casing: { provenance: "undetermined" } },
+    });
     // Identity from the store is forwarded.
     expect(callArg["identity"]).toMatchObject({ displayName: "Hausa KB" });
     // deletedNodeIds contains the deletion.
