@@ -2,7 +2,7 @@
 //
 // Every output surface must name the same keyboard: the emitted
 // `<id>-<version>.zip` filename, the projected VFS paths inside it, and the
-// download button's accessible name. They did not (spec 063 D4). OutputScreen's
+// download button's accessible name. They did not (spec 058 D4). OutputScreen's
 // aria-label derived the id from `pickerMode`/`scaffoldSpec` — per-screen local
 // state that always initializes to "open" on that screen — while the filename
 // came from `identity.keyboardId` via serializeWorkingCopy. A screen-reader user
