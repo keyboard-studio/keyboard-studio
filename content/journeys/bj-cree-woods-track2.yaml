@@ -27,7 +27,7 @@ persona:
 events:
   # --- identity (identity_lite.modular.yaml) ---
   - { stepId: identity, questionId: il_language_english, value: "Cree" }
-  - { stepId: identity, questionId: il_language_autonym, value: "Nehiyawewin" }
+  - { stepId: identity, questionId: il_language_autonym, value: "Nîhithawîwin" }
   - { stepId: identity, questionId: il_language_code, value: "cr" }
   - { stepId: identity, questionId: il_target_script, value: "other" }
   - { stepId: identity, questionId: il_author_name, value: "Bill Jancewicz" }
@@ -80,7 +80,7 @@ events:
   - { stepId: touch, action_type: touch_edit, summary: "touch layout carried over from the adapted desktop assignments; no additional touch-only characters" }
 
   # --- help (phase_f_helpdocs.modular.yaml, default 5-screen path) ---
-  - { stepId: help, questionId: pf_welcome_paragraph, value: "This keyboard lets you type Woods Cree (Nehiyawewin) in Canadian Aboriginal Syllabics on any computer." }
+  - { stepId: help, questionId: pf_welcome_paragraph, value: "This keyboard lets you type Woods Cree (Nîhithawîwin) in Canadian Aboriginal Syllabics on any computer." }
   - { stepId: help, questionId: pf_usage_tip_1, value: "" }
   - { stepId: help, questionId: pf_more_detail_gate, value: "false" }
   - { stepId: help, questionId: pf_credits, value: "Bill Jancewicz" }
