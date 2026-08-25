@@ -437,6 +437,26 @@ export interface KvksIR {
 }
 
 // ---------------------------------------------------------------------------
+// Facets (spec 048) — machine-derived base-keyboard classification, baked into
+// the working-copy IR at instantiation and overridable thereafter.
+// ---------------------------------------------------------------------------
+
+/** Where a facet's effective value came from. */
+export type FacetProvenance = "derived" | "overridden" | "undetermined";
+
+/**
+ * One facet's value + provenance, as read through the single effective-value
+ * accessor (`getEffectiveFacet`, `@keyboard-studio/engine`'s facets module,
+ * spec 048 FR-005). `value` is absent exactly when `provenance` is
+ * "undetermined" — the derivation found no evidence (spec 048 Edge Case) —
+ * never a silently-missing entry.
+ */
+export interface FacetValue {
+  value?: string;
+  provenance: FacetProvenance;
+}
+
+// ---------------------------------------------------------------------------
 // Top-level IR and import report
 // ---------------------------------------------------------------------------
 
@@ -458,6 +478,22 @@ export interface KeyboardIR {
   visualKeyboard?: KvksIR;
   /** Patterns lifted from the IR by the pattern recognizer (origin: 'recognized'). */
   recognizedPatterns: Pattern[];
+  /**
+   * Base-keyboard facets derived once at working-copy instantiation (spec 048
+   * FR-001/FR-003), keyed by facet id (e.g. `"casing"`). Additive/optional —
+   * an IR with no facets baked in is unaffected (FR-009). Read the EFFECTIVE
+   * value (override-aware) via `getEffectiveFacet` in
+   * `@keyboard-studio/engine`'s facets module, not this field directly.
+   */
+  facets?: Record<string, FacetValue>;
+  /**
+   * Per-facet author/engine override, keyed by facet id (spec 048 FR-004).
+   * Kept separate from `facets` (rather than overwriting the derived entry in
+   * place) so clearing an override can restore the original derived value
+   * without re-deriving it (FR-006) — see `setFacetOverride`/
+   * `clearFacetOverride` in `@keyboard-studio/engine`'s facets module.
+   */
+  facetOverrides?: Record<string, string>;
 }
 
 /** Status returned by the codec after parsing a source keyboard. */

@@ -52,6 +52,8 @@ import {
   prunePromotions,
   pruneMarkOverrides,
   treatmentFor,
+  getEffectiveFacet,
+  CASING_FACET_ID,
   type AttachmentProposal,
   type MarkClass,
   type MarksComputedAxes,
@@ -203,17 +205,29 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
     [gate.alphabet, classes],
   );
   const bcp47 = surveyContext.bcp47_tag;
+  // The GATE for "is this base cased at all" (spec 048 FR-006): reads the
+  // working-copy IR's `casing` facet, effective-value accessor, rather than
+  // inferring it per-character from `caseCounterpart`'s Unicode general-category
+  // test. The two can disagree — Georgian is Unicode-bicameral (Mkhedruli/
+  // Mtavruli both carry a case) but the facet's script-identity derivation
+  // reads it as caseless (see casePair.ts's Georgian note) — so the facet,
+  // not the per-character test, is what decides whether the case-expansion
+  // machinery below runs at all. `caseCounterpart` itself is unchanged and
+  // still does the actual uppercase/lowercase PAIR derivation once the gate
+  // is open (spec 049's follow-up note).
+  const isCasedBase =
+    baseIr != null && getEffectiveFacet(baseIr, CASING_FACET_ID).value === "cased";
   // Marks questions offer only lowercase/caseless bases (spec 049, US1); the
   // uppercase counterpart's attachment is derived, not asked. The affordance
   // count is pinned to the folded lowercase view (SC-004), and the shared fold
   // is the same one the character step uses (FR-006).
   const attachmentBases = useMemo(
-    () => lowercaseBaseView(gate.alphabet.bases, bcp47),
-    [gate.alphabet, bcp47],
+    () => (isCasedBase ? lowercaseBaseView(gate.alphabet.bases, bcp47) : gate.alphabet.bases),
+    [gate.alphabet, bcp47, isCasedBase],
   );
   const casePairCount = useMemo(
-    () => casedBaseCount(gate.alphabet.bases, bcp47),
-    [gate.alphabet, bcp47],
+    () => (isCasedBase ? casedBaseCount(gate.alphabet.bases, bcp47) : 0),
+    [gate.alphabet, bcp47, isCasedBase],
   );
   const posture = useMemo(() => nfcPostureOfInventory(gate.alphabet), [gate.alphabet]);
 
@@ -230,8 +244,11 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
   // asked only about lowercase bases, so every checked cased base additively
   // checks its uppercase counterpart (spec 049 US2 / FR-002).
   const expandedAttachments = useMemo(
-    () => expandCaseCounterpartAttachments(gate.alphabet, attachmentChecked, bcp47),
-    [gate.alphabet, attachmentChecked, bcp47],
+    () =>
+      isCasedBase
+        ? expandCaseCounterpartAttachments(gate.alphabet, attachmentChecked, bcp47)
+        : attachmentChecked,
+    [gate.alphabet, attachmentChecked, bcp47, isCasedBase],
   );
 
   // The single authoritative key-budget determination (spec 052 FR-016). Null
@@ -409,7 +426,9 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
       prefills: treatmentPrefills,
       treatment: {
         ...treatment,
-        promoted: expandCaseCounterpartPromotions(gate.alphabet, treatment.promoted, bcp47),
+        promoted: isCasedBase
+          ? expandCaseCounterpartPromotions(gate.alphabet, treatment.promoted, bcp47)
+          : treatment.promoted,
       },
     });
     // US4: project the recorded treatment onto A4/A3a so strategy selection can

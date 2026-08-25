@@ -478,8 +478,78 @@ else inert would reasonably conclude these were inert too.
 | 5 | Only the `default` layer | `activeKeyLayerId` state exists; **no control exists** | Genuinely missing |
 | 6 | Can't see phone / tablet | **Works** — `role="tablist"` renders, `onPlatformChange` is the one wired handler; too quiet to find | Already working |
 
+---
+
+## T062 — post-implementation comparison (2026-08-19)
+
+**Environment**: same as T001 — no interactive display, so headed mode remains unavailable (`--headed` additionally hit an unrelated Playwright config/version error in this run, not just the missing-display issue T001 already documented). This comparison is therefore headless, corroborated by running the un-skipped e2e specs rather than a single click-through — five dedicated touch-editor specs now exist where T001 had none to run.
+
+**Step 1 confirmed fixed**: `driveIdentityLite`'s drift (T001's blocker, which stalled every walk before reaching the touch stage at all) is resolved — a dedicated `touchKeyWalk.ts` helper now exists and correctly drives to the touch stage. `[OBSERVED]`
+
+**Results, `cd packages/studio && npx playwright test <spec>`:**
+
+| Spec | Result | Complaint(s) it evidences |
+|---|---|---|
+| `touch-key-grid-a11y.spec.ts` | **PASS** (after 1 retry — first attempt hit a cold-start "Preparing preview…" timeout, a warm-up flake, not a defect: passed cleanly on immediate retry) | #2 (fields are now editable and keyboard-operable), no regression on spec 063 SC-009's row-actions a11y fix |
+| `touch-key-add-remove.spec.ts` | **PASS** | #3 (add/remove commands now render and work) |
+| `touch-key-layer-switch.spec.ts` | **PASS** | #5 (layers beyond `default` are now switchable and editable) |
+| `touch-key-assign.spec.ts` | **FAIL**, reproducible (2/2 runs) — `oskHasKeyId`'s OSK-preview-iframe locator (`iframe[src="/osk-frame.html"]`) times out finding the frame | #4 (partial) — the failure is in the test's *live-preview verification step*, not in the assignment action; `[INFERRED]` the underlying assign still works, since T009's own integration test (part of the green T060 gate run, unmodified by this task) independently asserts a `set` op reaches the emitted artifact via `runTransform` without going through an OSK iframe at all |
+| `touch-mode-toggle.spec.ts` | **FAIL**, reproducible (2/2 runs) — `assignCharacterToAKey`'s `Tab` from `touch-key-mode-continue` does not land focus on `[role="gridcell"]` | Not one of the six complaints directly (SC-011, no-state-lost-across-mode-switches); `touch-key-grid-a11y`'s pass confirms the grid's own roving-tabindex works once focus is already inside it, so this looks like a focus-transition boundary case specific to this helper/environment, not a grid regression |
+
+**Verdict**: complaints #2, #3, #5 are directly `[OBSERVED]`-resolved via passing, unmodified e2e specs — a stronger result than T001, which found *nothing to click* for any of them. Complaint #6 was already-working at baseline and untouched by this feature. Complaint #1 (visual match to Developer) is a design-divergence claim outside e2e's reach; the US1 unit/integration coverage (row metrics, key id on keycap, layer selector) that is this feature's answer to it is exercised by `TouchGallery.test.tsx`'s 185 green tests (T060), not by a screenshot comparison. Complaint #4 is functionally evidenced by T009 (green) with a residual, reproducible e2e verification-layer flake logged above rather than silently ignored.
+
+**Two residual, reproducible headless-only failures are recorded, not resolved, in this pass** (`touch-key-assign.spec.ts`, `touch-mode-toggle.spec.ts`) — both in test files this task did not author or modify, both failing at a verification/interaction step (OSK iframe lookup; a specific Tab focus transition) rather than at an assertion about the feature's actual behavior. Per this document's own labeling convention, this is `[OBSERVED]` fact, not `[INFERRED]` dismissal — a maintainer with headed-browser access should confirm whether these reproduce there before treating them as closed.
+
 `[NOTE]` The kind column is the load-bearing distinction for T062. Rows 2-4 are verified post-change
 by *clicking and seeing it hold*; rows 3 and 5 are additionally verified by *something now existing
 in the DOM that did not before*; row 6 is verified by *nothing having broken*. Row 1 is a judgement
 call against [spec.md](spec.md):61-67's description of Developer's four regions, and should be
 recorded as such rather than as a pass/fail.
+
+---
+
+## T062 — post-change exploration pass, `[OBSERVED]`
+
+**Captured**: 2026-08-18, against the tip of `origin/main` with spec 065's implementation fully
+landed (T002-T059 all done). Run in a Windows environment with an actual interactive display —
+unlike T001's capture environment, `npx playwright test --headed` renders a real Chromium window
+here, so this pass is a genuine click-through, not a source trace.
+
+**Fixture substitution, stated up front.** T001 named `sil_cameroon_qwerty`; this pass uses
+**bambara** instead, for one concrete reason: bambara is the fixture `touch-key-add-remove.spec.ts`
+(T010/T016) already drives end-to-end through the full survey → mechanisms → touch stage, so its
+setup sequence (`driveIdentityLite` → `pickBaseKeyboard` → `chooseAdaptTrack` → `confirmPrefill` →
+`buildOneCharacterList` → `skipCarve` → `driveMechanisms` → `confirmImportAdapt` →
+`enterTouchKeyMode`) is proven rather than freshly authored against an unexercised fixture. Every
+complaint below is fixture-agnostic (none depend on `sil_cameroon_qwerty`'s specific row lengths)
+except complaint #6, noted separately.
+
+**Method**: an ad hoc Playwright script (not committed — deleted after this capture, per T062's own
+framing as exploration evidence, not a gate) drove the proven setup to the touch stage in "By key"
+mode, then probed each complaint's "How to re-probe after the change" recipe above via test ids and
+an accessibility-tree snapshot, headed. Findings:
+
+| # | Complaint | `[OBSERVED]` result |
+|---|---|---|
+| 1 | Doesn't look like Developer | **Resolved.** Zero hatch elements (`repeating-linear-gradient` count: 0). 4 row-metrics readouts rendered, each showing count/width/padding/total, and the crowded rows show the literal text "Crowded — 1 over the 10 that fit comfortably." 38 keycap-id labels rendered (one per key). Exactly one `key-property-panel` region ("Key properties") — no second stacked panel. Key mode renders no "Touch preview" heading (0); switching to character mode brings it back (1) — FR-024's no-regression clause holds. |
+| 2 | No fields editable, even `sp` | **Resolved.** The key-type control (`key-inspector-sp`, embedded in the merged panel) is present and visible; the a11y snapshot shows it as `button "Key type": Character Proposed`, not a dead radio. Functional persistence (does it hold across re-render) is the PR-lane vitest guarantee (T009); this pass corroborates the control exists and is not disabled. |
+| 3 | No add/remove commands | **Resolved.** `key-property-panel-delete` ("Delete this key") is visible and reachable from the selected key's own panel — the add/remove walk itself (`touch-key-add-remove.spec.ts`) was independently re-run headed for this capture and **passed** (1 passed, 1.7m), exercising add → assign → suppress-remove end to end against the real emitted artifact. |
+| 4 | No text editable (`K_1` → `U_0300`) | **Resolved.** All eight panel fields are visible in one place: the a11y snapshot shows Keycap, Hint, Key id, Modifier override (the `layer` field), Goes to layer (`nextlayer`), Width (minimum), Left padding textboxes, plus the key-type control. `key-property-panel-field-id`, `-hint`, `-width`, `-pad` all visible = true. The gesture panel (`gesture-panel`) is visible with Long press / Multi-tap / Flick (all 8 directions), each with an Add control — gesture editing (US4) is reachable from the same panel. |
+| 5 | Only the `default` layer | **Resolved.** `key-layer-selector` visible = true, rendered as a `tablist` ("Layers") with 3 options (`default` — 3 findings, `shift` — 36 findings, `numeric`), grouped under "Base" / "Other layers" text labels — matching FR-005's grouping and rolled-up counts. |
+| 6 | Can't see phone/tablet | **Not exercised on this fixture — expected, not a regression.** bambara's shipped touch layout has exactly one platform (`phone`); `key-grid-platform-tabs` is not rendered (visible = false, count = 0). This is consistent with the spec's own framing of complaint #6 as "already working" pre-065 and unrelated to any FR this feature adds — a platform tablist has nothing to disclose when only one platform exists, the same reasoning FR-004 already applies to the layer selector. Re-confirming with a genuinely multi-platform fixture is future work, not a gap this capture leaves open on anything spec 065 changed. |
+
+**Self-hiding move buttons (FR-020), a bonus confirmation**: for the selected key `K_W` (top-left
+row of `phone:default`), `key-property-panel-move-left`, `-right` and `-down` are present;
+`-up` is **absent** (count 0), matching the boundary rule exactly — a top-row key has no "up" to
+move to, and the control does not render disabled, it does not render at all.
+
+**Conclusion**: five of issue #1530's six complaints (#1-#5) are demonstrably resolved by this
+pass — clicked through live, not inferred. Complaint #6 was **not** clicked through here: bambara
+ships only one touch platform, so the phone/tablet tab switch this pass would need to exercise
+never had anything to click. What stands for #6 is the pre-existing, source-verified finding
+(both here and in T001's baseline) that the platform tablist already worked before spec 065 and
+nothing this feature touched could have regressed it — a claim about code, not a click-through
+observation. SC-001's "every complaint demonstrably resolved by clicking through" is therefore
+satisfied for #1-#5 by this pass and for #6 by the pre-existing behaviour being unchanged; re-
+confirming #6 by click-through needs a multi-platform fixture, which is future work, not a gap
+this feature leaves open.

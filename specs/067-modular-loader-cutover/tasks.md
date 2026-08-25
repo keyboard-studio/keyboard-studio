@@ -25,8 +25,8 @@ description: "Task list for Modular-loader cutover + legacy YAML retirement"
 
 **Purpose**: Branch and baseline capture before any edit.
 
-- [ ] T001 Create feature branch `km/modular-loader-cutover` off `main` (one branch for part (a); part (b) deletion lands as a separate commit/PR on the same or a follow-up branch per FR-013)
-- [ ] T002 [P] Confirm pre-cutover baseline is green: run `pnpm --filter @keyboard-studio/studio test` and record that Phase A/F/identity-lite currently render via `parseFlow` (the legacy baseline the parity harness will compare against)
+- [x] T001 Create feature branch `km/modular-loader-cutover` off `main` (one branch for part (a); part (b) deletion lands as a separate commit/PR on the same or a follow-up branch per FR-013)
+- [x] T002 [P] Confirm pre-cutover baseline is green: run `pnpm --filter @keyboard-studio/studio test` and record that Phase A/F/identity-lite currently render via `parseFlow` (the legacy baseline the parity harness will compare against)
 
 ---
 
@@ -36,7 +36,7 @@ description: "Task list for Modular-loader cutover + legacy YAML retirement"
 
 **⚠️ CRITICAL**: No cutover (US1) task should be considered done without this harness asserting parity.
 
-- [ ] T003 Create the parity harness `packages/studio/tests/survey/flow-parity.test.ts`: a helper that projects a `FlowDef` to author-visible fields (`id`, `prompt`, `help_text`, `type`, `options`, `required`, `next`) for `questions` and `provenance_questions`, plus per-phase `parseFlow` vs `loadModularFlow` deep-equality assertions for **phase_a_identity** and **phase_f_helpdocs** (the identity-lite assertion is added in T017 once its modules exist). Import the existing `phase_*.yaml?raw` and `phase_*.modular.yaml?raw`.
+- [x] T003 Create the parity harness `packages/studio/tests/survey/flow-parity.test.ts`: a helper that projects a `FlowDef` to author-visible fields (`id`, `prompt`, `help_text`, `type`, `options`, `required`, `next`) for `questions` and `provenance_questions`, plus per-phase `parseFlow` vs `loadModularFlow` deep-equality assertions for **phase_a_identity** and **phase_f_helpdocs** (the identity-lite assertion is added in T017 once its modules exist). Import the existing `phase_*.yaml?raw` and `phase_*.modular.yaml?raw`.
 
 **Checkpoint**: Harness proves A and F modular manifests already match their legacy YAML — the A/F cutover is then a verified swap.
 
@@ -52,16 +52,16 @@ description: "Task list for Modular-loader cutover + legacy YAML retirement"
 
 ### Implementation for User Story 2
 
-- [ ] T004 [P] [US2] Author `packages/studio/src/survey/questions/a/il_language_autonym.ts` — `QuestionModule` ported verbatim from `identity_lite.yaml` (text, required, `next: "il_language_english"`); declare `inputs: []`, `writes: []`; `mutate` omitted (stub); include `fixtures`
-- [ ] T005 [P] [US2] Author `packages/studio/src/survey/questions/a/il_language_english.ts` (text, required, `next: "il_language_code"`); empty `inputs`/`writes`; fixtures. (The autonym→English seed stays in `IdentityLite.tsx` `getSeedValue` — do NOT add it to the module)
-- [ ] T006 [P] [US2] Author `packages/studio/src/survey/questions/a/il_language_code.ts` (text, optional, `next: "il_target_script"`); empty `inputs`/`writes`; fixtures
-- [ ] T007 [P] [US2] Author `packages/studio/src/survey/questions/a/il_target_script.ts` (select, required; **conditional `next` as `FlowGotoRule[]`**: `value ∈ {Ethi,Hani,Hang} → il_script_not_supported`, else `default: null`); options list (14 values incl. `other`) ported verbatim; empty `inputs`/`writes`; fixtures
-- [ ] T008 [P] [US2] Author `packages/studio/src/survey/questions/a/il_script_not_supported.ts` (notice, optional, `next: null`) — preserves the Article VII "not yet supported" honest stub; empty `inputs`/`writes`; fixtures
-- [ ] T009 [US2] Register all 5 modules in `packages/studio/src/survey/questions/registry.a.ts` (one import + one entry each; key === `definition.id`; preserve explicit `.ts` extensions) — sequential, single shared file (depends on T004–T008)
-- [ ] T010 [US2] Create `content/flows/identity_lite.modular.yaml` (`flow_id: identity_lite`, `phase: "A"`, `questions:` the 5 `il_*` ids in legacy order; no `provenance_questions`)
-- [ ] T011 [US2] Bump the module-count floor `93` → `98` in `packages/studio/tests/survey/inputs-writes-coverage.test.ts`
-- [ ] T012 [P] [US2] Add 5 mirrored unit tests `packages/studio/tests/survey/questions/a/il_*.test.ts` (one per module): `validate` accepts each `fixtures` entry / rejects malformed; declared `inputs`/`writes` parse under `IRPath` (empty)
-- [ ] T013 [US2] Run the three gates green: `inputs-writes-coverage` (98), `mirror-coverage`, `orphan-input-lint` (now scopes `identity_lite.modular.yaml`; passes via empty `inputs`)
+- [x] T004 [P] [US2] Author `packages/studio/src/survey/questions/a/il_language_autonym.ts` — `QuestionModule` ported verbatim from `identity_lite.yaml` (text, required, `next: "il_language_english"`); declare `inputs: []`, `writes: []`; `mutate` omitted (stub); include `fixtures`
+- [x] T005 [P] [US2] Author `packages/studio/src/survey/questions/a/il_language_english.ts` (text, required, `next: "il_language_code"`); empty `inputs`/`writes`; fixtures. (The autonym→English seed stays in `IdentityLite.tsx` `getSeedValue` — do NOT add it to the module)
+- [x] T006 [P] [US2] Author `packages/studio/src/survey/questions/a/il_language_code.ts` (text, optional, `next: "il_target_script"`); empty `inputs`/`writes`; fixtures
+- [x] T007 [P] [US2] Author `packages/studio/src/survey/questions/a/il_target_script.ts` (select, required; **conditional `next` as `FlowGotoRule[]`**: `value ∈ {Ethi,Hani,Hang} → il_script_not_supported`, else `default: null`); options list (14 values incl. `other`) ported verbatim; empty `inputs`/`writes`; fixtures
+- [x] T008 [P] [US2] Author `packages/studio/src/survey/questions/a/il_script_not_supported.ts` (notice, optional, `next: null`) — preserves the Article VII "not yet supported" honest stub; empty `inputs`/`writes`; fixtures
+- [x] T009 [US2] Register all 5 modules in `packages/studio/src/survey/questions/registry.a.ts` (one import + one entry each; key === `definition.id`; preserve explicit `.ts` extensions) — sequential, single shared file (depends on T004–T008)
+- [x] T010 [US2] Create `content/flows/identity_lite.modular.yaml` (`flow_id: identity_lite`, `phase: "A"`, `questions:` the 5 `il_*` ids in legacy order; no `provenance_questions`)
+- [x] T011 [US2] Bump the module-count floor `93` → `98` in `packages/studio/tests/survey/inputs-writes-coverage.test.ts`
+- [x] T012 [P] [US2] Add 5 mirrored unit tests `packages/studio/tests/survey/questions/a/il_*.test.ts` (one per module): `validate` accepts each `fixtures` entry / rejects malformed; declared `inputs`/`writes` parse under `IRPath` (empty)
+- [x] T013 [US2] Run the three gates green: `inputs-writes-coverage` (98), `mirror-coverage`, `orphan-input-lint` (now scopes `identity_lite.modular.yaml`; passes via empty `inputs`)
 
 **Checkpoint**: identity-lite resolves modularly; registry at 98; all P2 gates green.
 
@@ -75,12 +75,12 @@ description: "Task list for Modular-loader cutover + legacy YAML retirement"
 
 ### Implementation for User Story 1
 
-- [ ] T014 [P] [US1] `packages/studio/src/survey/PhaseA.tsx`: replace `import { parseFlow } from "./loadFlow.ts"` with `import { loadModularFlow } from "./loadModularFlow.ts"`; swap `?raw` import to `../../../../content/flows/phase_a_identity.modular.yaml?raw`; `useMemo(() => loadModularFlow(raw))`; remove the `TODO(#410)` line (preserve `.ts`/`.tsx` extensions)
-- [ ] T015 [P] [US1] `packages/studio/src/survey/PhaseF.tsx`: same cutover against `phase_f_helpdocs.modular.yaml?raw`; remove `TODO(#410)`
-- [ ] T016 [US1] `packages/studio/src/survey/IdentityLite.tsx`: same cutover against `identity_lite.modular.yaml?raw`; remove `TODO(#410)`; **keep `getSeedValue` / `autonymRef` autonym→English seam unchanged** (depends on US2: T009, T010)
-- [ ] T017 [US1] Extend `flow-parity.test.ts` (T003) with the **identity_lite** `parseFlow` vs `loadModularFlow` deep-equality assertion; run the full parity suite green for A, F, identity-lite (this is the deletion baseline for US4 — FR-006)
-- [ ] T018 [US1] Assert no markers remain: `grep -rn "TODO(#410)" packages/studio/src/` returns nothing
-- [ ] T019 [US1] `pnpm --filter @keyboard-studio/studio typecheck` and `pnpm build` clean (catches any dropped import extension)
+- [x] T014 [P] [US1] `packages/studio/src/survey/PhaseA.tsx`: replace `import { parseFlow } from "./loadFlow.ts"` with `import { loadModularFlow } from "./loadModularFlow.ts"`; swap `?raw` import to `../../../../content/flows/phase_a_identity.modular.yaml?raw`; `useMemo(() => loadModularFlow(raw))`; remove the `TODO(#410)` line (preserve `.ts`/`.tsx` extensions)
+- [x] T015 [P] [US1] `packages/studio/src/survey/PhaseF.tsx`: same cutover against `phase_f_helpdocs.modular.yaml?raw`; remove `TODO(#410)`
+- [x] T016 [US1] `packages/studio/src/survey/IdentityLite.tsx`: same cutover against `identity_lite.modular.yaml?raw`; remove `TODO(#410)`; **keep `getSeedValue` / `autonymRef` autonym→English seam unchanged** (depends on US2: T009, T010)
+- [x] T017 [US1] Extend `flow-parity.test.ts` (T003) with the **identity_lite** `parseFlow` vs `loadModularFlow` deep-equality assertion; run the full parity suite green for A, F, identity-lite (this is the deletion baseline for US4 — FR-006)
+- [x] T018 [US1] Assert no markers remain: `grep -rn "TODO(#410)" packages/studio/src/` returns nothing
+- [x] T019 [US1] `pnpm --filter @keyboard-studio/studio typecheck` and `pnpm build` clean (catches any dropped import extension)
 
 **Checkpoint**: All four survey flows run on the single modular loader; parity proven; #410 ACs 1–2 of AC#3 substantively satisfied (E2E in US3). **This is the shippable MVP for part (a).**
 
@@ -94,9 +94,9 @@ description: "Task list for Modular-loader cutover + legacy YAML retirement"
 
 ### Implementation for User Story 3
 
-- [ ] T020 [US3] Create `packages/studio/playwright.config.ts`: `testDir: "e2e"`, `use.baseURL: "http://localhost:5273"`, a `webServer` entry running `pnpm dev` (reuse existing server); driven by the global Playwright CLI (`npx playwright`, v1.61.1) — do NOT add `@playwright/test` as a devDependency (research R5). Run `npx playwright install` once for browser binaries
-- [ ] T021 [US3] Unblock **lane 1** — remove `.skip` in `packages/studio/e2e/copy-edit.spec.ts`; run `cd packages/studio && npx playwright test copy-edit`; confirm green (identity-lite → base picker → project-name → Phase A/B → emit)
-- [ ] T022 [US3] **Lane 2 (Track 2)** — confirm with km-frontend whether Track 2 import is live (`packages/studio/e2e/import-improve.spec.ts` header blocker). If live: remove inner `.skip`, run green. If not: leave `.skip`, document in the PR that lane 2 is blocked on Track 2 import and close #410 AC#3 as `refs #410` (lane 1 only), NOT by stubbing lane 2 green (FR-007 scenario 2)
+- [x] T020 [US3] Create `packages/studio/playwright.config.ts`: `testDir: "e2e"`, `use.baseURL: "http://localhost:5273"`, a `webServer` entry running `pnpm dev` (reuse existing server); driven by the global Playwright CLI (`npx playwright`, v1.61.1) — do NOT add `@playwright/test` as a devDependency (research R5). Run `npx playwright install` once for browser binaries
+- [x] T021 [US3] Unblock **lane 1** — remove `.skip` in `packages/studio/e2e/copy-edit.spec.ts`; run `cd packages/studio && npx playwright test copy-edit`; confirm green (identity-lite → base picker → project-name → Phase A/B → emit)
+- [x] T022 [US3] **Lane 2 (Track 2)** — confirm with km-frontend whether Track 2 import is live (`packages/studio/e2e/import-improve.spec.ts` header blocker). If live: remove inner `.skip`, run green. If not: leave `.skip`, document in the PR that lane 2 is blocked on Track 2 import and close #410 AC#3 as `refs #410` (lane 1 only), NOT by stubbing lane 2 green (FR-007 scenario 2)
 
 **Checkpoint**: Lane 1 green; lane 2 green-or-documented-blocked. Part (a) / #410 closure decision made (`closes` if both green, else `refs`).
 
@@ -112,11 +112,11 @@ description: "Task list for Modular-loader cutover + legacy YAML retirement"
 
 ### Implementation for User Story 4
 
-- [ ] T023 [US4] Delete `packages/studio/src/survey/loadFlow.ts` and `packages/studio/src/survey/loadFlow.test.ts`
-- [ ] T024 [P] [US4] Delete the four legacy full-flow YAMLs: `content/flows/phase_a_identity.yaml`, `phase_b_characters.yaml`, `phase_f_helpdocs.yaml`, `identity_lite.yaml` (retain all `*.modular.yaml` and `_examples/*`)
-- [ ] T025 [US4] In `flow-parity.test.ts`, remove the now-baseline-less `parseFlow`-vs-`loadModularFlow` assertions (the legacy side no longer exists) and replace with a **snapshot** pin of each surviving modular `FlowDef` (contracts/flow-output-parity.md "Post-deletion")
-- [ ] T026 [US4] Verify retirement: `grep -rn "loadFlow\|parseFlow" packages/studio/src/` is clean; `pnpm --filter @keyboard-studio/studio test` full suite green; confirm **no question module file was deleted** (§3.8 no-delete) — spot-check that non-Roman-script research modules still exist and their tests pass
-- [ ] T027 [US4] Confirm independent revertability: reverting only the part-(b) commit restores `loadFlow.ts` + the four YAMLs and leaves PhaseA/F/IdentityLite on `loadModularFlow` (the cutover stays intact)
+- [x] T023 [US4] Delete `packages/studio/src/survey/loadFlow.ts` and `packages/studio/src/survey/loadFlow.test.ts`
+- [x] T024 [P] [US4] Delete the four legacy full-flow YAMLs: `content/flows/phase_a_identity.yaml`, `phase_b_characters.yaml`, `phase_f_helpdocs.yaml`, `identity_lite.yaml` (retain all `*.modular.yaml` and `_examples/*`)
+- [x] T025 [US4] In `flow-parity.test.ts`, remove the now-baseline-less `parseFlow`-vs-`loadModularFlow` assertions (the legacy side no longer exists) and replace with a **snapshot** pin of each surviving modular `FlowDef` (contracts/flow-output-parity.md "Post-deletion")
+- [x] T026 [US4] Verify retirement: `grep -rn "loadFlow\|parseFlow" packages/studio/src/` is clean; `pnpm --filter @keyboard-studio/studio test` full suite green; confirm **no question module file was deleted** (§3.8 no-delete) — spot-check that non-Roman-script research modules still exist and their tests pass
+- [x] T027 [US4] Confirm independent revertability: reverting only the part-(b) commit restores `loadFlow.ts` + the four YAMLs and leaves PhaseA/F/IdentityLite on `loadModularFlow` (the cutover stays intact)
 
 **Checkpoint**: Single loader in the tree; redundant delivery forms gone; research preserved.
 
@@ -124,9 +124,9 @@ description: "Task list for Modular-loader cutover + legacy YAML retirement"
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [ ] T028 [P] Update `docs/survey-modularity-cyoa-plan.md` P3 status line (mark P3 implemented / in-progress with branch) and the #410 AC#3 note
-- [ ] T029 [P] Reconcile issue #410 acceptance-criteria checkboxes against what shipped (AC#1/#2 already done; AC#3 lane status per T021/T022); use `closes #410` only if both lanes green, else `refs #410`
-- [ ] T030 Run the full `quickstart.md` validation (parts a and b) end-to-end as the final acceptance pass
+- [x] T028 [P] Update `docs/survey-modularity-cyoa-plan.md` P3 status line (mark P3 implemented / in-progress with branch) and the #410 AC#3 note
+- [x] T029 [P] Reconcile issue #410 acceptance-criteria checkboxes against what shipped (AC#1/#2 already done; AC#3 lane status per T021/T022); use `closes #410` only if both lanes green, else `refs #410`
+- [x] T030 Run the full `quickstart.md` validation (parts a and b) end-to-end as the final acceptance pass
 
 ---
 

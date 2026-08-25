@@ -4,7 +4,7 @@
 
 **Created**: 2026-07-20
 
-**Status**: Draft
+**Status**: Implemented (US1–US3, FR-001–FR-016c intact; FR-017's per-character chip UI later superseded by PR #1552, see amendment below) — shipped via merge commit 41a41a25. Retroactively verified 2026-08-19.
 
 **Input**: User description: "CLDR/SLDR exemplars"
 
@@ -99,6 +99,14 @@ The tool authors keyboards entirely in-memory with no host-disk writes, and its 
 - **FR-017**: Proposed characters MUST remain distinguishable from author-entered ones and MUST expose their source and confidence. Proposing is not confirming: the author still completes the step, removing a proposed character MUST be sticky (never re-proposed for that working copy), and an author-entered character MUST keep author attribution across any re-seed.
 
 *Assumption-driven decisions are recorded in the Assumptions section rather than left as open clarifications.*
+
+### Superseded: FR-017's per-character tickable/removable chip UI
+
+FR-017 as originally written called for a **per-character** proposed-vs-authored affordance: an author could see which characters were proposed, and remove any single one, stickily. This shipped as `SuggestionChip`/`SuggestionPanel` in the Phase B build-list page.
+
+**PR #1552 (2026-08-07, after this feature's initial ship) removed it**, in favor of the simpler one-shot model FR-016/FR-016a already describe: accept the language's full sourced set in one action, or decline entirely and type your own. The commit's own rationale: the individually-tickable chip UI added a "Suggested characters" section that let an author pick characters one at a time, which turned out to be redundant with — and more fiddly than — just accepting or declining the whole proposed set up front.
+
+**What remains intact**: FR-016/FR-016a/FR-016b/FR-016c (the one-shot accept-or-decline flow) and the separate "Exemplars available for this language" re-apply affordance (`ExemplarApplyAffordance`) are untouched by PR #1552 and still fully implement this feature's core value. Only FR-017's specific per-character tick/remove mechanism was removed, as a deliberate later simplification — not a regression, and not something to re-litigate here.
 
 ### Key Entities *(include if data involved)*
 

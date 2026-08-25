@@ -3,7 +3,198 @@
   "specName": "033-qu-mutate-track",
   "branch": "033-qu-mutate-track",
   "selectedAt": "2026-07-15T04:57:52.746Z",
-  "currentStep": "specify",
-  "status": "draft",
-  "history": []
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T22:55:56.367Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T22:55:59.817Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T22:56:02.108Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "ai",
+      "at": "2026-08-19T22:56:04.230Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T22:56:22.538Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T22:56:23.434Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T22:56:24.377Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T22:56:25.233Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T22:56:26.036Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T22:56:26.874Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T22:56:27.685Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T22:56:28.541Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T22:56:29.472Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-19T22:56:30.418Z"
+    }
+  ],
+  "currentTask": "T009",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Confirmed the GATED framing does not apply to this spec's real scope, per design-notes doc's own §3.2 status note; corrected spec.md Status line",
+      "files": [
+        "specs/033-qu-mutate-track/spec.md"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Confirmed trackStep/projectNameStep are manifest-declared with flowRefs, zero hand-coded handleTrackSelected/handleProjectNameNext references remain in StudioShell.tsx",
+      "files": [
+        "packages/studio/src/steps/registerEditorSteps.ts",
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Confirmed applyStepCompletion's generic isMutateRequest branch routes any steps declared-writes mutate request uniformly, no project_name-specific case needed",
+      "files": [
+        "packages/studio/src/steps/reducer.ts"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Confirmed projectNameStep declares writes: [irPath(header,name), irPath(header,keyboardId)] verbatim, reducer applies applyMutatePatch scoped to result.writes",
+      "files": [
+        "packages/studio/src/steps/registerEditorSteps.ts",
+        "packages/studio/src/steps/reducer.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Confirmed via git history: handleTrackSelected/handleProjectNameNext deleted by commit d4f787b2 (spec 028 Stage 5, PR 981), same commit that closed spec 028 earlier this session",
+      "files": [
+        "N/A"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Confirmed trackRouting.test.ts and prefillRouting.test.ts pass (49/49 combined with surveySessionStore.test.ts), verified live during this sessions spec 026 gate re-run",
+      "files": [
+        "packages/studio/src/dashboard/trackRouting.test.ts",
+        "packages/studio/src/dashboard/prefillRouting.test.ts"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Confirmed manifest.ts's own header comment documents M4b - project_name is spine:false with joinTarget:characters",
+      "files": [
+        "packages/studio/src/steps/manifest.ts"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Confirmed the spec's own FR-007 recommendation was adopted exactly: routing unconditional, only IR writes seam-flag-gated via isMutateSeamEnabled reading VITE_KM_MUTATE_SEAM",
+      "files": [
+        "packages/studio/src/flags/mutateFlag.ts",
+        "packages/studio/src/steps/reducer.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Confirmed via this sessions spec 065 T060 full-gate run: typecheck clean repo-wide, depcruise passed as part of the lint chain",
+      "files": [
+        "N/A"
+      ]
+    }
+  },
+  "decisions": [
+    {
+      "decision": "Corrected the spec header gate framing instead of leaving it blocked",
+      "why": "The design-notes doc this spec cites as its gate explicitly scopes that gate to later gallery-decomposition specs, never track/project_name; the spec own Assumptions section already conceded this",
+      "rejected": "Leaving the spec marked GATED/Draft indefinitely despite its functional requirements being fully satisfied in the live tree"
+    }
+  ],
+  "verified": [
+    {
+      "what": "retroactive verification 2026-08-19: all 9 tasks (FR-001 through FR-008 plus the gate reassessment) checked against live code",
+      "result": "shipped across commits 7ba08030 (P4b foundation), 6baa4ad6 (promote track/project_name to manifest steps), d4f787b2 (spec 028 Stage 5, deletes hand-coded fork); no code changes needed"
+    }
+  ]
 }

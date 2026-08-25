@@ -4,7 +4,7 @@
   "branch": "060-crash-reporting",
   "selectedAt": "2026-08-06T01:21:13.282Z",
   "currentStep": "implement",
-  "status": "implemented",
+  "status": "completed",
   "history": [
     {
       "step": "plan",
@@ -1859,6 +1859,10 @@
       "what": "crew-lint",
       "command": "pnpm crew-lint",
       "result": "all 7 checks GREEN"
+    },
+    {
+      "what": "retroactive verification 2026-08-19: sampled 22 of 58 tasks across all phases",
+      "result": "shipped via PR 1543 (606986f1) with follow-on fix 293ea865; all sampled files/functions confirmed present (crash/ module, oauth-backend crash-report-*, api/report/crash.ts, CrashRecoveryScreen, CrashErrorBoundary); two tasks.md path annotations are stale (callerContext relocated to lib/, window handlers factored into crash/globalHandlers.ts) but functionally match FR-002-004; spec.md Status field corrected"
     }
   ],
   "last_action": "all 58 tasks done — typecheck clean, pnpm -r test + /api green, lint and crew-lint green; 2 Playwright specs authored but not run"

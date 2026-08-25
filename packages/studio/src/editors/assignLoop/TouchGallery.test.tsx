@@ -5731,6 +5731,68 @@ describe("TouchGallery — undo affordance states what it will undo (T076, FR-03
     expect(useWorkingCopyStore.getState().undoStack).toHaveLength(0);
     expect(useWorkingCopyStore.getState().isTouchKeyDeleted("phone:default:K_A")).toBe(false);
   });
+
+  // T057 (FR-040): every new spec-065 edit kind — `move`, the four newly
+  // editable fields (all committed as `kind: "set"`), and every gesture edit
+  // (`setSubKey` / `removeSubKey`) — rides the SAME `commitKeyEdit` seam
+  // `describeUndoTarget` already reads generically by `op.kind`, so each one
+  // both names itself in the affordance and pops via the one undo button.
+  it.each([
+    { opKind: "move" as const, op: { address: "phone:default:K_B", kind: "move" as const, direction: "left" as const } },
+    { opKind: "set" as const, op: { address: "phone:default:K_B", kind: "set" as const, fields: { hint: "alt" } } },
+    { opKind: "set" as const, op: { address: "phone:default:K_B", kind: "set" as const, fields: { width: 120 } } },
+    { opKind: "set" as const, op: { address: "phone:default:K_B", kind: "set" as const, fields: { pad: 5 } } },
+    { opKind: "set" as const, op: { address: "phone:default:K_B", kind: "set" as const, fields: { layer: "shift" } } },
+    {
+      opKind: "setSubKey" as const,
+      op: {
+        address: "phone:default:K_B",
+        kind: "setSubKey" as const,
+        sub: { kind: "flick" as const, id: "ne" },
+        fields: { id: "ne", text: "É" },
+      },
+    },
+    {
+      opKind: "removeSubKey" as const,
+      op: {
+        address: "phone:default:K_B",
+        kind: "removeSubKey" as const,
+        sub: { kind: "sk" as const, id: "T_ks_1" },
+      },
+    },
+  ])(
+    "names and undoes a '$opKind' key edit through the shared stack",
+    async ({ opKind, op }) => {
+      seedStore({ withInventory: ["ä"] });
+      await act(async () => {
+        render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("touch-mode-tab-key"));
+      });
+      await act(async () => {
+        useWorkingCopyStore.getState().commitKeyEdit(op);
+      });
+
+      await waitFor(() => {
+        const undoBtn = screen.getByTestId(
+          "touch-undo-button",
+        ) as HTMLButtonElement;
+        expect(undoBtn.disabled).toBe(false);
+        const label = undoBtn.getAttribute("aria-label") ?? "";
+        expect(label).toContain(opKind);
+        expect(label).toContain("K_B");
+      });
+
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("touch-undo-button"));
+      });
+
+      expect(useWorkingCopyStore.getState().undoStack).toHaveLength(0);
+      expect(useWorkingCopyStore.getState().keyEditOverlay.ops).toHaveLength(0);
+    },
+  );
 });
 
 describe("describeUndoTarget — pure structural description of the undo stack's top entry (T076)", () => {
@@ -5781,6 +5843,67 @@ describe("describeUndoTarget — pure structural description of the undo stack's
 
   it("returns null for a 'k' entry whose op has already been evicted", () => {
     expect(describeUndoTarget({ k: "k", seq: 5 }, [])).toBeNull();
+  });
+
+  // spec 065 T057 (FR-040): the move op, the four newly-editable `set` fields
+  // (hint/width/pad/layer), and the two gesture-edit kinds all commit through
+  // the same choke point as suppress/rename above — these four cases confirm
+  // describeUndoTarget names each of them correctly too, not just the two
+  // kinds spec 063 originally covered.
+
+  it("describes a move edit by its direction and key id", () => {
+    const ops = [
+      { seq: 0, address: "phone:default:K_A", kind: "move", direction: "right" as const },
+    ];
+    expect(describeUndoTarget({ k: "k", seq: 0 }, ops)).toEqual({
+      kind: "keyEdit",
+      keyId: "K_A",
+      opKind: "move",
+    });
+  });
+
+  it("describes a set edit carrying one of the four spec 065 fields (hint/width/pad/layer)", () => {
+    const ops = [
+      { seq: 0, address: "phone:default:K_A", kind: "set", fields: { hint: "alt" } },
+    ];
+    expect(describeUndoTarget({ k: "k", seq: 0 }, ops)).toEqual({
+      kind: "keyEdit",
+      keyId: "K_A",
+      opKind: "set",
+    });
+  });
+
+  it("describes a gesture text edit (setSubKey) by its parent key id", () => {
+    const ops = [
+      {
+        seq: 0,
+        address: "phone:default:K_A",
+        kind: "setSubKey",
+        sub: { kind: "flick" as const, id: "n" },
+        fields: { text: "̀" },
+      },
+    ];
+    expect(describeUndoTarget({ k: "k", seq: 0 }, ops)).toEqual({
+      kind: "keyEdit",
+      keyId: "K_A",
+      opKind: "setSubKey",
+    });
+  });
+
+  it("describes a gesture removal (removeSubKey) by its parent key id", () => {
+    const ops = [
+      {
+        seq: 0,
+        address: "phone:default:K_A",
+        kind: "removeSubKey",
+        sub: { kind: "flick" as const, id: "n" },
+      },
+    ];
+    expect(describeUndoTarget({ k: "k", seq: 0 }, ops)).toEqual({
+      kind: "keyEdit",
+      keyId: "K_A",
+      opKind: "removeSubKey",
+    });
   });
 });
 

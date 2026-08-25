@@ -108,6 +108,54 @@ function RemovedMenu({ list, onRestore, onRestoreAll, onClose }: RemovedMenuProp
   );
 }
 
+interface RemovedDropdownProps {
+  list: RemovedItem[];
+  onRestore: (item: RemovedItem) => void;
+  onRestoreAll: () => void;
+}
+
+/**
+ * Trigger button + dropdown menu over the current removed/discarded list —
+ * extracted so the rule/node Rail view's StatusBar (below) and the
+ * character-first CarveGalleryV2 gallery (#1619) share one "what did I
+ * remove, and can I undo just one" control instead of drifting into two.
+ */
+export function RemovedDropdown({ list, onRestore, onRestoreAll }: RemovedDropdownProps) {
+  const { t } = useLingui();
+  const [open, setOpen] = useState(false);
+  useEffect(() => { if (list.length === 0) setOpen(false); }, [list.length]);
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <button
+        onClick={() => setOpen((o) => !o)}
+        disabled={list.length === 0}
+        aria-expanded={open}
+        aria-haspopup="true"
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 8, padding: '7px 13px', borderRadius: 999,
+          border: '1px solid ' + (list.length > 0 ? 'var(--app-accent)' : 'var(--app-border)'),
+          background: list.length > 0 ? (open ? 'var(--app-accent-subtle)' : 'var(--app-surface-2)') : 'var(--app-surface-2)',
+          cursor: list.length > 0 ? 'pointer' : 'default',
+          boxShadow: list.length > 0 ? '0 0 0 3px color-mix(in srgb, var(--app-accent) 16%, transparent), 0 2px 10px color-mix(in srgb, var(--app-accent) 28%, transparent)' : 'none',
+          font: '600 12.5px var(--app-font)',
+          color: list.length > 0 ? 'var(--app-accent-text)' : 'var(--app-text-subtle)',
+          opacity: list.length > 0 ? 1 : 0.6,
+        }}
+      >
+        <UndoIcon size={13} />
+        {list.length > 0
+          ? <Trans id="editor.assignLoop.statusBar.removedCountButton"><b>{list.length}</b> removed</Trans>
+          : t({ id: "editor.assignLoop.statusBar.nothingRemoved", message: "Nothing removed" })}
+        {list.length > 0 && <ChevronIcon open={open} size={14} />}
+      </button>
+      {open && list.length > 0 && (
+        <RemovedMenu list={list} onRestore={onRestore} onRestoreAll={onRestoreAll} onClose={() => setOpen(false)} />
+      )}
+    </div>
+  );
+}
+
 interface StatusBarProps {
   kept: number;
   total: number;
@@ -118,9 +166,6 @@ interface StatusBarProps {
 
 export function StatusBar({ kept, total, removedList, onRestore, onRestoreAll }: StatusBarProps) {
   const { t } = useLingui();
-  const [open, setOpen] = useState(false);
-  useEffect(() => { if (removedList.length === 0) setOpen(false); }, [removedList.length]);
-
   const setInfo = useHoverInfoStore((s) => s.setInfo);
   const clearInfo = useHoverInfoStore((s) => s.clearInfo);
 
@@ -154,36 +199,14 @@ export function StatusBar({ kept, total, removedList, onRestore, onRestoreAll }:
           </Trans>
         </div>
       </div>
-      <div style={{ marginLeft: 'auto', position: 'relative' }}>
-        <button
-          onClick={() => setOpen((o) => !o)}
-          disabled={removedList.length === 0}
-          aria-expanded={open}
-          aria-haspopup="true"
-          onMouseEnter={() => setInfo(removedInfo)}
-          onFocus={() => setInfo(removedInfo)}
-          onMouseLeave={clearInfo}
-          onBlur={clearInfo}
-          style={{
-            display: 'inline-flex', alignItems: 'center', gap: 8, padding: '7px 13px', borderRadius: 999,
-            border: '1px solid ' + (removedList.length > 0 ? 'var(--app-accent)' : 'var(--app-border)'),
-            background: removedList.length > 0 ? (open ? 'var(--app-accent-subtle)' : 'var(--app-surface-2)') : 'var(--app-surface-2)',
-            cursor: removedList.length > 0 ? 'pointer' : 'default',
-            boxShadow: removedList.length > 0 ? '0 0 0 3px color-mix(in srgb, var(--app-accent) 16%, transparent), 0 2px 10px color-mix(in srgb, var(--app-accent) 28%, transparent)' : 'none',
-            font: '600 12.5px var(--app-font)',
-            color: removedList.length > 0 ? 'var(--app-accent-text)' : 'var(--app-text-subtle)',
-            opacity: removedList.length > 0 ? 1 : 0.6,
-          }}
-        >
-          <UndoIcon size={13} />
-          {removedList.length > 0
-            ? <Trans id="editor.assignLoop.statusBar.removedCountButton"><b>{removedList.length}</b> removed</Trans>
-            : t({ id: "editor.assignLoop.statusBar.nothingRemoved", message: "Nothing removed" })}
-          {removedList.length > 0 && <ChevronIcon open={open} size={14} />}
-        </button>
-        {open && removedList.length > 0 && (
-          <RemovedMenu list={removedList} onRestore={onRestore} onRestoreAll={onRestoreAll} onClose={() => setOpen(false)} />
-        )}
+      <div
+        style={{ marginLeft: 'auto' }}
+        onMouseEnter={() => setInfo(removedInfo)}
+        onFocus={() => setInfo(removedInfo)}
+        onMouseLeave={clearInfo}
+        onBlur={clearInfo}
+      >
+        <RemovedDropdown list={removedList} onRestore={onRestore} onRestoreAll={onRestoreAll} />
       </div>
     </div>
   );

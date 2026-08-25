@@ -4,7 +4,7 @@
 **Stage:** 3 of the Unified Survey Architecture refactor (master plan, decisions D4 + D5).
 **Governing decision:** [docs/adr/0001-flow-map-derived-from-one-source.md](../../docs/adr/0001-flow-map-derived-from-one-source.md)
 — one source of truth per concern; no parallel hand-threaded copies to drift.
-**Status:** Draft
+**Status:** Implemented — shipped via PR #976 (commit 22feabff, "spec 026, Stage 3"). Retroactively verified 2026-08-19.
 **Created:** 2026-07-03
 
 > ## Relationship to the surrounding stages

@@ -82,7 +82,7 @@ const BASE_KEYBOARD_ID = "bj_cree_woods";
 // Both producing rules for the target character (see the PORT NOTE above) —
 // discarding the character cascades to both at once.
 const TARGET_RULE_IDS = ["rule#18", "rule#20"];
-// The codepoint-label text CarveGalleryV2's search box and grid cells key on
+// The codepoint-label text CarveGalleryV2's grid cells key on
 // (irToCharacterView.ts's codepointLabel()/CarveGalleryV2.tsx's aria-label).
 const TARGET_CODEPOINT_LABEL = "U+14EC";
 // Present in the emitted .kmn iff EITHER of rule#18/rule#20 (the sole
@@ -184,13 +184,12 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
       exclude: KNOWN_CONTRAST_DEBT,
     });
 
-    // Narrow the character grid to the target character via the search box
-    // (matches on codepoint-label text, irToCharacterView.ts's
-    // codepointLabel()), then click its cell directly — v2 is single-click
-    // discard ("Click any character to discard it — nothing is deleted
-    // until you continue", CarveGalleryV2.tsx's own header copy), unlike
-    // v1's rule-level two-step raw-remove-anyway/raw-confirm-remove confirm.
-    await page.getByLabel("Search a character or code point").fill(TARGET_CODEPOINT_LABEL);
+    // Locate the target cell directly by its aria-label (codepoint-label
+    // text, irToCharacterView.ts's codepointLabel()), then click it — v2 is
+    // single-click discard ("Click any character to discard it — nothing is
+    // deleted until you continue", CarveGalleryV2.tsx's own header copy),
+    // unlike v1's rule-level two-step raw-remove-anyway/raw-confirm-remove
+    // confirm. No search box to narrow through (#1619 AC4 removed it).
     const targetCell = page.locator(`button[aria-label*="${TARGET_CODEPOINT_LABEL}"]`);
     await expect(targetCell).toBeVisible();
     await expect(targetCell).toHaveAttribute("aria-pressed", "false");
@@ -342,7 +341,6 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
 
     // Confirm the target cell is present and not (yet) discarded, but do NOT
     // click it — this is the "nothing carved" control path.
-    await page.getByLabel("Search a character or code point").fill(TARGET_CODEPOINT_LABEL);
     const targetCell = page.locator(`button[aria-label*="${TARGET_CODEPOINT_LABEL}"]`);
     await expect(targetCell).toBeVisible();
     await expect(targetCell).toHaveAttribute("aria-pressed", "false");
