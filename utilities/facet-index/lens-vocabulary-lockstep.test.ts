@@ -26,12 +26,13 @@ import { dirname, join } from "node:path";
 import { parse as parseYaml } from "yaml";
 import { describe, it, expect } from "vitest";
 
-import type { DiacriticBehavior, Scale } from "@keyboard-studio/contracts";
+import { ScaleSchema } from "@keyboard-studio/contracts";
+import type { DiacriticBehavior } from "@keyboard-studio/contracts";
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const FACETS_DIR = join(HERE, "..", "..", "content", "keyboard-facets");
 
-const SCALE_MEMBERS: readonly Scale[] = ["tiny", "small", "medium", "large", "massive"];
+const SCALE_MEMBERS = ScaleSchema.options;
 const DIACRITIC_BEHAVIOR_MEMBERS: readonly DiacriticBehavior[] = [
   "none",
   "stacking-combining",
