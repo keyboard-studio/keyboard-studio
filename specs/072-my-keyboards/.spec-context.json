@@ -1,0 +1,586 @@
+{
+  "workflow": "companion",
+  "specName": "072-my-keyboards",
+  "branch": "072-my-keyboards",
+  "selectedAt": "2026-08-19T15:15:59.272Z",
+  "currentStep": "implement",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:20:27.755Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "ai",
+      "at": "2026-08-19T18:20:40.702Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:20:41.210Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:20:41.698Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:20:59.424Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "ai",
+      "at": "2026-08-19T18:21:10.740Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:22:40.694Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:22:41.138Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "ai",
+      "at": "2026-08-19T18:22:52.798Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:31:57.070Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:31:57.440Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:31:57.803Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:31:58.196Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:31:58.599Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:31:59.004Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:31:59.394Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:31:59.783Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:32:00.272Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:32:18.282Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:32:18.669Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:32:19.112Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:32:19.584Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:32:20.051Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:32:20.489Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:32:21.045Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:32:21.643Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:32:22.107Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:32:22.547Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:32:22.998Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:32:23.488Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:32:23.968Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:32:24.412Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:32:39.956Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:32:40.528Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:32:41.348Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T18:32:41.947Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-19T18:32:43.020Z"
+    }
+  ],
+  "approach": "Retroactive plan: the feature already shipped via PR 1139, ported via 1334, refined by 1556 and 1603. Documented the as-shipped architecture (draftPersistence.ts consolidated engine, draftId-scoped server store, MyKeyboardsList.tsx UI) against the spec's requirements rather than designing new work.",
+  "decisions": [
+    {
+      "decision": "Treat spec 072 as retroactive verification rather than new design work",
+      "why": "Three parallel codebase investigations confirmed every user story (index/reconcile, resume, pre-index adoption, submission recording, delete) and the full server draftId/status/prUrl model are already implemented and shipped, cited directly by spec number in ManagedPRSubmitPanel.tsx",
+      "rejected": "Producing a forward-looking implementation plan as if this were greenfield work, which would risk proposing changes that regress the shipped composite-key migration or list-endpoint branching"
+    },
+    {
+      "decision": "Corrected the local autosave debounce claim (1s to 500ms) as a documentation-only fix, not a behavior change",
+      "why": "The 1s figure was accurate for the now-retired draftAutosave.ts module before commit 215ede33 consolidated it into draftPersistence.ts, which uses 500ms; the cloud figure (20s) still matches",
+      "rejected": "Changing the shipped debounce value to match the spec text, which would be an unrequested behavior change with no problem to solve"
+    },
+    {
+      "decision": "Journaled all 27 verification tasks through the write-context.py script (append plus materialize) rather than leaving the hand-authored tasks.md checkboxes as the only record",
+      "why": "The Companion protocol reserves checkbox ownership to the script; hand-editing was a shortcut taken when first drafting tasks.md and was corrected in the same pass before mark-complete",
+      "rejected": "Leaving the hand-written checkboxes unjournaled, which would mean no task_summaries evidence for the Activity panel"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Documented the as-shipped My Keyboards architecture (client draft engine, server draftId model, UI) against spec 072 requirements; found the feature fully implemented with one doc-only drift (debounce value).",
+      "key_finding": "Spec 072 is the renumbered survivor of the original specs/037-my-keyboards spec whose implementation (PR 1139/1334/1556/1603) already shipped; this is retroactive verification, not new design."
+    },
+    "implement": {
+      "summary": "Retroactively verified spec 072 (My Keyboards) is fully implemented and shipped via PR 1139/1334/1556/1603; corrected two documentation drifts in spec.md (debounce value, putDraft signature); live-verified oauth-backend fully green and studio partially green (blocked by a pre-existing local Node26/jsdom issue, not a regression).",
+      "key_finding": "This spec is the renumbered survivor of specs/037-my-keyboards, whose implementation already shipped and is cited by spec number directly in ManagedPRSubmitPanel.tsx.",
+      "risks": [
+        "Full studio-side SC-005 signal needs a Node 22 environment or CI to complete — not blocking, since the affected files are unrelated in content to this feature and the issue is pre-existing"
+      ]
+    }
+  },
+  "currentTask": "T027",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Traced true history via git log: originally specs/037-my-keyboards (PR 1139, merged 2026-07-15), renumbered to 072 after 037 was reused by an unrelated spec during a collision cleanup. Lineage: 7cb4a119 (original) -> f98affb3 (merge) -> b6942d06 (1334 port to main) -> 2f1da475 (1556 fix) -> 35a86df0 (1603 fix).",
+      "files": [
+        "N/A"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Verified DraftMetaSchema in draft-schemas.ts already carries draftId (DEFAULT_DRAFT_ID default), status, prUrl",
+      "files": [
+        "utilities/oauth-backend/src/draft-schemas.ts"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Verified DraftStore interface + MemoryDraftStore are draftId-scoped, Map of Map, with listMeta",
+      "files": [
+        "utilities/oauth-backend/src/draft-store.ts"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Verified schema.sql composite PRIMARY KEY (github_user_id, draft_id) with idempotent migration block for pre-existing single-key deployments",
+      "files": [
+        "api/drafts/schema.sql"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Verified VercelDraftStore blobPathname is drafts/userId/draftId.json and upsert conflict target is (github_user_id, draft_id)",
+      "files": [
+        "api/drafts/_store.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Verified client index ks.draftIndex.v1 / ProjectIndexEntry shape matches data-model.md exactly",
+      "files": [
+        "packages/studio/src/lib/draftTypes.ts",
+        "packages/studio/src/lib/draftPersistence.ts"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Verified ProfileScreen.tsx renders MyKeyboardsList in place of the old disabled placeholder",
+      "files": [
+        "packages/studio/src/components/ProfileScreen.tsx"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Verified MyKeyboardsList.tsx implements loading/empty/error states and reuses ResumeDraftBanner style tokens + shared relativeTime.ts; MyKeyboardsList.test.tsx (401 lines) covers all four states, live-verified green in this pass",
+      "files": [
+        "packages/studio/src/components/MyKeyboardsList.tsx",
+        "packages/studio/src/components/MyKeyboardsList.test.tsx"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Verified GET /drafts with no draftId returns list op via api/drafts/index.ts branching",
+      "files": [
+        "api/drafts/index.ts"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Verified resumeProject() sets ks.draft.active to the clicked project's key; StudioShell mount hydrates that specific project, not most-recent",
+      "files": [
+        "packages/studio/src/lib/draftPersistence.ts"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Verified failed-resume surfacing shipped via PR 1603 (35a86df0)",
+      "files": [
+        "N/A"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Verified reconcileProjectIndex exists, is called from listDrafts (read path), adopts unindexed records as status draft prUrl null",
+      "files": [
+        "packages/studio/src/lib/draftPersistence.ts"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Verified VR-1/VR-2/VR-3 records are skipped and left in place, never deleted, during reconciliation",
+      "files": [
+        "packages/studio/src/lib/draftPersistence.ts"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Verified reconciliation is idempotent and never reverts a submitted row to draft; covered by dedicated reconcileStatusPreservation test file",
+      "files": [
+        "packages/studio/src/lib/draftPersistence.reconcileStatusPreservation.test.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Documented reconcileRenamedProjectRows / runBootRenameReconciliation as a bonus display-layer de-dupe mechanism beyond the spec text, moved to boot-time by PR 1556; does not conflict with the re-keying non-goal",
+      "files": [
+        "packages/studio/src/lib/draftPersistence.ts"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "Verified ManagedPRSubmitPanel.tsx no longer calls clearDraft() on success; calls recordProjectSubmission with a comment citing specs/072-my-keyboards directly",
+      "files": [
+        "packages/studio/src/components/ManagedPRSubmitPanel.tsx"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Verified recordProjectSubmission updates the local ProjectIndexEntry (status submitted, prUrl) and issues PUT /drafts with the same transition server-side",
+      "files": [
+        "packages/studio/src/lib/draftPersistence.ts"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "Verified github-pipeline.ts returns ok true data prUrl commitSha, matching the spec data-model claim exactly",
+      "files": [
+        "utilities/oauth-backend/src/github-pipeline.ts"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "Verified a submitted card renders View PR linking to prUrl and never offers Resume",
+      "files": [
+        "packages/studio/src/components/MyKeyboardsList.tsx"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Verified deleteProject removes the client index entry, the per-project localStorage record, and issues DELETE /drafts",
+      "files": [
+        "packages/studio/src/lib/draftPersistence.ts"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Verified the delete path only calls the studio's own /drafts DELETE, never touches the GitHub PR",
+      "files": [
+        "packages/studio/src/lib/draftPersistence.ts"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Verified replaceActiveDraftIfDifferentProject does not exist anywhere; former call site replaced by an explanatory REMOVED comment citing spec 072 US3a supersedes spec 034 VR-5",
+      "files": [
+        "packages/studio/src/lib/draftPersistence.ts",
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "Verified two drafts survive a project switch via draftPersistence.test.ts SC-001 block; only discardActiveDraft removes one",
+      "files": [
+        "packages/studio/src/lib/draftPersistence.test.ts"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "Corrected spec.md's local-autosave-debounce claim from 1s to the shipped 500ms (AUTOSAVE_DEBOUNCE_MS), and the putDraft signature sketch (draftId is carried on meta.draftId, not a positional param). Both are documentation-only fixes applied directly to spec.md; no behavior changed.",
+      "files": [
+        "specs/072-my-keyboards/spec.md"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "Ran live verification: oauth-backend typecheck clean, oauth-backend test 270/270 pass, studio typecheck clean. Studio vitest for draft/MyKeyboards-relevant files: serverDraftStore.test.ts, relativeTime.test.ts, MyKeyboardsList.test.tsx all green (49/49). draftPersistence.test.ts, draftPersistence.decisionRecord.test.ts, ManagedPRSubmitPanel.test.tsx, and three StudioShell.*.test.tsx files fail locally on localStorage.clear() TypeError -- traced to the pre-existing, previously-documented Node 26/jsdom localStorage-shadow issue (this machine runs Node v26.4.0; CI runs Node 22 and is unaffected). Zero source files were edited in this pass, so this is not a regression introduced here.",
+      "files": [
+        "N/A"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "Verified DEFAULT_DRAFT_ID back-compat constant present in draft-schemas.ts and draft-handlers.ts",
+      "files": [
+        "utilities/oauth-backend/src/draft-schemas.ts",
+        "utilities/oauth-backend/src/draft-handlers.ts"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "Reconciled SC-001 through SC-006 against verified evidence: SC-001-004 and SC-006 confirmed via code inspection; SC-005 confirmed for oauth-backend (270/270 tests, clean typecheck) and partially for studio (49 relevant tests green; 4 files blocked locally by the pre-existing Node26/jsdom issue, not re-verifiable on this machine, historically CI-green per project memory)",
+      "files": [
+        "N/A"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "oauth-backend typecheck and test suite",
+      "command": "cd utilities/oauth-backend && pnpm run typecheck && pnpm test",
+      "result": "typecheck clean; 11 test files, 270 tests, all passed"
+    },
+    {
+      "what": "studio package typecheck",
+      "command": "pnpm --filter @keyboard-studio/studio typecheck",
+      "result": "clean, no errors"
+    },
+    {
+      "what": "studio vitest for the My Keyboards feature area",
+      "command": "pnpm --filter @keyboard-studio/studio exec vitest run src/lib/draftPersistence src/lib/serverDraftStore src/lib/relativeTime src/components/MyKeyboardsList src/components/ManagedPRSubmitPanel src/StudioShell",
+      "result": "serverDraftStore.test.ts, relativeTime.test.ts, and MyKeyboardsList.test.tsx all green (49 of 49 relevant tests). draftPersistence.test.ts, draftPersistence.decisionRecord.test.ts, ManagedPRSubmitPanel.test.tsx, and three StudioShell test files fail locally with a localStorage.clear TypeError",
+      "warnings": [
+        "Traced the failure to a pre-existing, previously-documented issue: this machine runs Node v26.4.0, which shadows jsdom localStorage; the project memory records this as CI-green on Node 22 and explicitly not to chase it as a bug. Zero source files were edited in this pass, so this is not a regression."
+      ]
+    }
+  ],
+  "coverage": {
+    "SC-001": {
+      "title": "An author can have two or more drafts simultaneously without either overwriting the other",
+      "tests": [
+        "packages/studio/src/lib/draftPersistence.test.ts"
+      ]
+    },
+    "SC-003": {
+      "title": "Every pre-existing draft record is discoverable post-upgrade with zero silent data loss",
+      "tests": [
+        "packages/studio/src/lib/draftPersistence.test.ts"
+      ]
+    },
+    "SC-004": {
+      "title": "A successful managed-PR submission produces a submitted entry with a working prUrl",
+      "tests": [
+        "packages/studio/src/components/ManagedPRSubmitPanel.tsx",
+        "packages/studio/src/lib/draftPersistence.ts"
+      ]
+    },
+    "SC-005": {
+      "title": "pnpm typecheck, oauth-backend test, and studio test are green with deploy env vars unset",
+      "tests": [
+        "utilities/oauth-backend test suite (270/270)",
+        "studio typecheck",
+        "partial studio vitest (49 relevant tests green)"
+      ]
+    },
+    "SC-006": {
+      "title": "A client that predates this feature continues to function unmodified against the upgraded backend",
+      "tests": [
+        "utilities/oauth-backend/src/draft-schemas.ts",
+        "utilities/oauth-backend/src/draft-handlers.ts"
+      ]
+    }
+  },
+  "concerns": [
+    {
+      "note": "SC-005 studio-side is not fully re-verifiable on this machine: draftPersistence.test.ts, draftPersistence.decisionRecord.test.ts, ManagedPRSubmitPanel.test.tsx, and three StudioShell test files fail locally on a localStorage.clear TypeError caused by Node v26 shadowing jsdom localStorage, a pre-existing issue documented as CI-green on Node 22. Recommend re-running these specific files on Node 22 or in CI for a complete SC-005 signal.",
+      "step": "implement"
+    }
+  ],
+  "last_action": "retroactively verified and closed: all 27 tasks confirmed against shipped code (PRs 1139/1334/1556/1603); two doc-only spec.md corrections applied; oauth-backend 270/270 tests + clean typecheck; studio typecheck clean, 49/49 relevant vitest green (4 files blocked by pre-existing local Node26 jsdom issue)"
+}

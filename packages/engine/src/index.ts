@@ -609,4 +609,17 @@ export type { ProducedGlyphsOptions } from "./inventory/producedGlyphs.js";
 // computeInventoryDelta.test.ts, and the lack of a production caller is the
 // documented state above, not an oversight.
 export { computeInventoryDelta } from "./inventory/computeInventoryDelta.js";
+
+// Base-keyboard facets baked into the working-copy IR (spec 048) — the single
+// shared casing derivation (FR-008) plus the read/override/clear accessors
+// (FR-004/FR-005/FR-006).
+export { deriveCasingFacet } from "./facets/index.js";
+export type { CasingValue } from "./facets/index.js";
+export {
+  CASING_FACET_ID,
+  deriveFacets,
+  getEffectiveFacet,
+  setFacetOverride,
+  clearFacetOverride,
+} from "./facets/index.js";
 export type { InventoryDelta } from "./inventory/computeInventoryDelta.js";

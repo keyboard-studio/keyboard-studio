@@ -3,7 +3,86 @@
   "specName": "045-lens-vocabulary-source-of-truth",
   "branch": "045-lens-vocabulary-source-of-truth",
   "selectedAt": "2026-07-27T17:30:25.416Z",
-  "currentStep": "specify",
-  "status": "draft",
-  "history": []
+  "currentStep": "tasks",
+  "status": "ready-to-implement",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:05:08.367Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "ai",
+      "at": "2026-08-19T23:05:08.794Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:05:09.488Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:05:10.035Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:05:13.463Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "ai",
+      "at": "2026-08-19T23:37:24.495Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:37:25.233Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:37:26.376Z"
+    }
+  ],
+  "approach": "Re-home the two genuine straggler classifiers (A1 added-char-count, A4 diacritic-mechanism) onto type aliases of the existing contracts enums (Scale, DiacriticBehavior), mirroring the pattern A7 spare-key-budget already uses correctly against KeyBudgetBand. Add two Expect-AssignableTo compile-time guards and one new runtime lockstep test. A7 needs no change - research found it already properly sourced.",
+  "decisions": [
+    {
+      "decision": "Scoped this feature to A1 and A4 only, not all three axis-valued facets the spec names",
+      "why": "Research found A7 spare-key-budget already derives from a contracts type (KeyBudgetBand) via a bijective, tested projection function (spec 052 FR-016) - it is not a straggler despite the spec assuming otherwise",
+      "rejected": "Re-plumbing A7 to reference SpareKeyAvailability directly, which would violate FR-007 byte-identical-output for a facet that already satisfies the features intent through a different, already-correct mechanism"
+    },
+    {
+      "decision": "Resolved FR-010s locked-field gating question as NO before task generation",
+      "why": "Grepped both straggler classifiers and their YAMLs - neither references StrategyId or any Pattern field; Article I does not trigger",
+      "rejected": "Leaving the gating question open for a later phase, which the spec explicitly says plan.md must not do"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Type-alias two straggler facet-index classifiers onto existing contracts enums, add compile-time + runtime drift guards; no new enumeration, no runtime-behavior change",
+      "key_finding": "The spec named three axis-valued facets as stragglers; only two (A1, A4) actually are - A7 is already correctly sourced via a bijective projection from KeyBudgetBand"
+    },
+    "tasks": {
+      "summary": "13 tasks across 5 phases (Setup, Foundational Constitution re-check, US1 A1/A4 sourcing, US2 drift guards, Polish); scope narrowed to A1/A4 only per research R1"
+    }
+  }
 }

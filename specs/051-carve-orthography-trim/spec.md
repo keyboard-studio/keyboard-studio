@@ -4,7 +4,7 @@
 
 **Created**: 2026-07-28
 
-**Status**: Draft
+**Status**: Implemented (US1–US4, all FRs/SCs) — shipped via PR #1412 (commits 77c50c55/cd725493). Retroactively verified 2026-08-19.
 
 **Input**: User description (issue #1357 and follow-up): "The goal in the carve gallery is to take
 the alphabet from previous questions and compare it to the base keyboard. Any rule producing a

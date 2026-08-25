@@ -5844,6 +5844,67 @@ describe("describeUndoTarget — pure structural description of the undo stack's
   it("returns null for a 'k' entry whose op has already been evicted", () => {
     expect(describeUndoTarget({ k: "k", seq: 5 }, [])).toBeNull();
   });
+
+  // spec 065 T057 (FR-040): the move op, the four newly-editable `set` fields
+  // (hint/width/pad/layer), and the two gesture-edit kinds all commit through
+  // the same choke point as suppress/rename above — these four cases confirm
+  // describeUndoTarget names each of them correctly too, not just the two
+  // kinds spec 063 originally covered.
+
+  it("describes a move edit by its direction and key id", () => {
+    const ops = [
+      { seq: 0, address: "phone:default:K_A", kind: "move", direction: "right" as const },
+    ];
+    expect(describeUndoTarget({ k: "k", seq: 0 }, ops)).toEqual({
+      kind: "keyEdit",
+      keyId: "K_A",
+      opKind: "move",
+    });
+  });
+
+  it("describes a set edit carrying one of the four spec 065 fields (hint/width/pad/layer)", () => {
+    const ops = [
+      { seq: 0, address: "phone:default:K_A", kind: "set", fields: { hint: "alt" } },
+    ];
+    expect(describeUndoTarget({ k: "k", seq: 0 }, ops)).toEqual({
+      kind: "keyEdit",
+      keyId: "K_A",
+      opKind: "set",
+    });
+  });
+
+  it("describes a gesture text edit (setSubKey) by its parent key id", () => {
+    const ops = [
+      {
+        seq: 0,
+        address: "phone:default:K_A",
+        kind: "setSubKey",
+        sub: { kind: "flick" as const, id: "n" },
+        fields: { text: "̀" },
+      },
+    ];
+    expect(describeUndoTarget({ k: "k", seq: 0 }, ops)).toEqual({
+      kind: "keyEdit",
+      keyId: "K_A",
+      opKind: "setSubKey",
+    });
+  });
+
+  it("describes a gesture removal (removeSubKey) by its parent key id", () => {
+    const ops = [
+      {
+        seq: 0,
+        address: "phone:default:K_A",
+        kind: "removeSubKey",
+        sub: { kind: "flick" as const, id: "n" },
+      },
+    ];
+    expect(describeUndoTarget({ k: "k", seq: 0 }, ops)).toEqual({
+      kind: "keyEdit",
+      keyId: "K_A",
+      opKind: "removeSubKey",
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------

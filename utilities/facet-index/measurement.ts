@@ -20,11 +20,10 @@
  */
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
-import { buildProducedSet } from "@keyboard-studio/contracts";
 import { ImportStatus } from "@keyboard-studio/contracts";
 
+import { deriveCasingFacet } from "../../packages/engine/src/facets/casing.js";
 import { classifyScript } from "./script-classifier.js";
-import { scriptOf, scriptExtensionsOf } from "./ucd/generated/scriptLookup.js";
 import { mapImportStatus, computeAnalyzedCoverage } from "./outcome.js";
 import { tagExceptionSet, type CausePredicate } from "./cause-predicates.js";
 import type {
@@ -201,54 +200,6 @@ export function undeterminedFallback(notes: string): Categorization {
 // ---------------------------------------------------------------------------
 
 /**
- * ISO-15924 codes for the major bicameral (cased) scripts. Latin/Cyrillic/Greek
- * are the families the construction facets centre on; the rest are the other
- * established bicameral scripts so a keyboard for them reads as `cased` too. All
- * other scripts (Arabic, Hebrew — abjad; Devanagari, Bengali — abugida; CJK, …)
- * are caseless.
- */
-const CASED_SCRIPTS = new Set([
-  "Latn", "Cyrl", "Grek", "Armn", "Copt", "Glag", "Dsrt", "Adlm",
-  "Cher", "Osge", "Vith", "Wcho", "Medf", "Gara",
-]);
-
-/** Does the produced set contain any cased letter (Unicode Cased property)? */
-function producesCasedLetter(ir: KeyboardIR): boolean {
-  for (const ch of buildProducedSet(ir)) {
-    if (/^\p{Lu}$/u.test(ch) || /^\p{Ll}$/u.test(ch)) return true;
-  }
-  return false;
-}
-
-/**
- * The set of concrete ISO-15924 scripts the keyboard's produced characters
- * exclusively attest (mirrors the `script` classifier's pass-1 attestation,
- * ignoring shared/neutral characters). Used to decide `cased`/`caseless`/`mixed`
- * from script identity rather than re-scanning per facet.
- */
-function attestedScripts(ir: KeyboardIR): Set<string> {
-  const scripts = new Set<string>();
-  for (const ch of buildProducedSet(ir)) {
-    const cp = ch.codePointAt(0);
-    if (cp === undefined) continue;
-    if (scriptExtensionsOf(cp) !== undefined) continue; // shared → skip (pass-2 territory)
-    const primary = scriptOf(cp);
-    if (primary === "Zyyy" || primary === "Zinh" || primary === "Zzzz" || primary === "Zxxx") continue;
-    scripts.add(primary);
-  }
-  return scripts;
-}
-
-/**
- * Derive the shared `ClassifierContext` (script family + casing + coverage) once
- * from the keyboard's produced set. `scriptFamily` is the `script` classifier's
- * dominant value (reused). `casing`:
- *   - `mixed`   — the keyboard attests both a cased and a caseless script;
- *   - `cased`   — every attested script is bicameral, or (no attested script but
- *     the output carries cased letters) the content is cased;
- *   - `caseless`— otherwise.
- */
-/**
  * A script-agnostic `ClassifierContext` for facets whose cause tagging and gates
  * do not depend on script identity (reordering, rule-store-compaction,
  * fallback-posture, mnemonic-vs-positional). `casing: "caseless"` is the inert
@@ -259,27 +210,17 @@ export function neutralContext(ir: KeyboardIR): ClassifierContext {
   return { scriptFamily: null, casing: "caseless", analyzedCoverage: computeAnalyzedCoverage(ir) };
 }
 
+/**
+ * Derive the shared `ClassifierContext` (script family + casing + coverage)
+ * once from the keyboard's produced set. `scriptFamily` is the `script`
+ * classifier's dominant value (reused). `casing` delegates to the engine's
+ * `deriveCasingFacet` (spec 048 FR-008) — the single shared casing-derivation
+ * implementation also used by the runtime working-copy `casing` facet — so
+ * this classifier and the studio can never disagree on a keyboard's casing.
+ */
 export function deriveScriptContext(ir: KeyboardIR, scriptDef: FacetDefinition): ClassifierContext {
   const scriptResult = classifyScript(ir, scriptDef);
   const scriptFamily = typeof scriptResult?.value === "string" ? scriptResult.value : null;
 
-  const scripts = attestedScripts(ir);
-  const hasCased = [...scripts].some((s) => CASED_SCRIPTS.has(s));
-  const hasCaseless = [...scripts].some((s) => !CASED_SCRIPTS.has(s));
-
-  let casing: ClassifierContext["casing"];
-  if (hasCased && hasCaseless) {
-    casing = "mixed";
-  } else if (hasCased) {
-    casing = "cased";
-  } else if (hasCaseless) {
-    casing = "caseless";
-  } else {
-    // No attested script (e.g. Common/Inherited-only output) — fall back to the
-    // Unicode Cased property of the produced set so a purely-symbolic keyboard
-    // still reads caseless rather than mis-gating downstream facets.
-    casing = producesCasedLetter(ir) ? "cased" : "caseless";
-  }
-
-  return { scriptFamily, casing, analyzedCoverage: computeAnalyzedCoverage(ir) };
+  return { scriptFamily, casing: deriveCasingFacet(ir), analyzedCoverage: computeAnalyzedCoverage(ir) };
 }

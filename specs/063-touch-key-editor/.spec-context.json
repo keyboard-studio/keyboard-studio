@@ -4,7 +4,7 @@
   "branch": "063-touch-key-editor",
   "selectedAt": "2026-08-04T01:11:58.804Z",
   "currentStep": "implement",
-  "status": "implemented",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
@@ -1939,9 +1939,13 @@
     {
       "what": "T125/T126 tests carry real non-vacuity controls (an unguarded add op DOES put a dead T_ key in the projected artifact; the M3 guard DOES reject an undeclared sibling), and T122 is behavioural (findings exist with fake timers installed, vi.getTimerCount()===0, same-reference after advancing 2s).",
       "result": "pass"
+    },
+    {
+      "what": "retroactive verification 2026-08-19: confirmed renumbering history (originally specs/058-touch-key-editor, renumbered after 058 was reused) and spot-checked 13 files across early/mid/late task ranges",
+      "result": "shipped across PRs 1503 + others (2cc88627, 3b1ffcf8) plus a later Developer-parity remodel (PR 1581); all 13 spot-checked files present (KeyGrid, KeyInspector, RenameDialog, 5 E2E specs, touch-key-rule-join.ts, Layer C coverage checks); docs/spec-signoff.md has the exact SS18 entry spec.md cites; spec.md Status field corrected"
     }
   ],
-  "currentTask": "T130",
+  "currentTask": "T112",
   "task_summaries": {
     "T094": {
       "status": "DONE",

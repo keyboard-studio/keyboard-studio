@@ -4,7 +4,7 @@
 
 **Created**: 2026-08-05
 
-**Status**: Draft
+**Status**: Implemented (US1–US5, all FRs/SCs) — shipped via PR #1543 (606986f1), with follow-on fix 293ea865. Retroactively verified 2026-08-19.
 
 **Input**: User description: "When the studio SPA hits an unrecoverable error, capture a redacted crash report and file it as a GitHub issue using the server-side GitHub App installation token — never the user's OAuth token. One issue per fingerprinted bug; repeat occurrences add a comment. Redact author identity only; keyboard structural context is included because keyboard work is public and the report must be actionable. The studio has no ErrorBoundary today, so the client half is greenfield."
 

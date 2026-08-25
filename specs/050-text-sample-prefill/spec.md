@@ -4,29 +4,88 @@
 
 **Created**: 2026-07-27
 
-**Status**: Draft
+**Status**: Draft, scope corrected 2026-08-19 — FR-001/FR-002/FR-004 (multiline paste + extraction) already shipped (predates this spec); FR-003 (file upload), FR-005/FR-006 (044-contract propose-then-confirm + attribution), and FR-007 (union with exemplar) remain unbuilt. Not yet planned (`/speckit-plan` has not run).
 
 **Input**: User description: "add another bullet point for 'Paste or upload a text' that gives a large multiline text box. The logic for the current alphabet textbox already supports raw text, just not multiline. This will also pre-fill the 'Add your whole alphabet', except it will be 'Confirm your alphabet' for both of the new bullet points."
 
 ## Context
 
-Phase B's character-discovery list already names **Text sample** as a method at the
-`CharacterDiscoveryService` contract level ([specs/008-data-flow/](../008-data-flow/spec.md)),
-but the studio has never surfaced it: the only text entry point is a **single-line**
-`<input type="text">` in `CharChipEditor` with the placeholder *"Type your alphabet with a
-space between each character."* An author holding a paragraph of real text in their
-language has nowhere to put it.
+> **Ground-truth correction (2026-08-19).** This section's original claim — "the only text
+> entry point is a single-line `<input type="text">`... an author has nowhere to put [a
+> paragraph]" — is **false against the current tree** and was already false when this spec
+> was authored (2026-07-27). A modular question pair, `pb_text_sample` /
+> `pb_text_sample_review` (`packages/studio/src/survey/questions/b/`), already exists,
+> is registered in `registry.b.ts`, and is live in `content/flows/phase_b_characters.modular.yaml`
+> — the manifest Phase B actually runs. `pb_text_sample` is a `type: "text"` question, which
+> `QuestionField.tsx` renders as a **multiline textarea** (`isMultiLine = question.type ===
+> "text"`), prompting "Paste a paragraph or more of text written in your language," and its
+> `next` routes to `pb_text_sample_review`. Git history traces `pb_text_sample.ts` to commit
+> `7b262941` — one of the earliest modular-question commits, predating this spec by weeks.
+> **What this genuinely narrows the remaining scope to** (verified live, not re-derived):
+> - **FR-001/FR-002/FR-004 (multiline paste + `harvestChars` extraction): DONE.** No work
+>   needed.
+> - **FR-003 (file upload): NOT DONE.** No `type="file"`/`FileReader` exists near this path.
+> - **FR-005/FR-006 (propose-then-confirm per 044's attribution contract) and FR-007 (union
+>   with exemplar coverage): NOT DONE.** `pb_text_sample_review` is a plain `type: "bool"`
+>   yes/no gate ("Do you want to continue with this list?") whose `next` routes to
+>   `pb_routing_branch` **regardless of the answer** — it is not wired to 044's chip-based,
+>   per-character-attributed proposal UI (`SuggestionChip`/`ExemplarApplyAffordance` and
+>   friends) at all. Its own help text describes ticking/unticking individual characters, but
+>   no such per-character UI is rendered for this specific step — that text describes
+>   aspirational behavior that was never built, or refers to editing on a later, unrelated
+>   confirm page. Building FR-005/FR-006/FR-007 for real means replacing this bool gate with
+>   044's actual proposal/attribution mechanism, not "wiring an existing thing" — it is closer
+>   to net-new work than the original US2-only framing implied.
+>
+> **The real integration point is already reserved, not `pb_text_sample`.** `PhaseB.tsx`'s
+> unified "build-list" page (the `IntroChooser`'s DEFAULT discovery method) has a
+> `TextSamplePlaceholder` component, rendered beside `ExemplarApplyAffordance`, whose own
+> code comment reads: *"The paste/upload route is owned by spec 050 and is deliberately NOT
+> built here; 044 only guarantees the affordance is present on page 2 alongside the other
+> two (FR-016b)."* It renders only a "Coming soon" message today. **This is this spec's real
+> target** — not the `pb_text_sample`/`pb_text_sample_review` chain, which is reachable only
+> via `IntroChooser`'s non-default **"manual" (step-by-step)** path, through
+> `pb_discovery_intro`'s own `"text-sample"` radio option. Both paths are live and reachable
+> (`pb_discovery_intro` is registered and present in `content/flows/phase_b_characters.modular.yaml`),
+> but they are two different, non-interoperating mechanisms for the same idea — the
+> `pb_text_sample` chain predates the build-list unification and never received 044's
+> attribution/union treatment. This spec's scope is the build-list page's reserved slot;
+> the manual-path chain is left as-is (out of scope for this spec, not deleted per §3.8 —
+> a future consistency pass could unify them, but that is not required here).
 
-The extraction logic, however, is already there. `harvestChars` captures **every distinct
+> `ExemplarApplyAffordance` (`PhaseB.tsx`) is the concrete mechanism to mirror: it reads
+> `usePhaseBDraftStore((s) => s.provenance)` / `s.seedFromProposal`, and calls
+> `seedFromProposal(inv: SourcedInventory, bcp47?)` to union a proposal's characters into the
+> draft, respecting sticky rejection (`rejected: string[]`) and per-character provenance
+> tagging. Since union/attribution/sticky-rejection are already `phaseBDraftStore`'s generic
+> behavior, wiring a `"text"` provenance source through this same path makes FR-005/FR-006/
+> FR-007 largely a UI + adapter task (build a `SourcedInventory` from `harvestChars`/
+> `harvestFromText`'s output, tagged `"text"`), not new state-management design.
+
+> `harvestFromText(sample: string, base: BaseKeyboard): Promise<InventoryChar[]>`
+> (`packages/engine/src/character-discovery/CharacterDiscoveryServiceImpl.ts`) takes a plain
+> string — the file-upload path (FR-003) is `File.text()`/`FileReader.readAsText()` (100%
+> client-side, satisfying Article V / FR-010 trivially) feeding the same function, no second
+> extraction path.
+
+The remaining prose below (User Scenarios, Requirements, Success Criteria) is left as
+> originally written — it still correctly describes the *target* end state. Read it against
+> the corrected scope above: US1's paste-and-extract mechanics are done (via the OLD,
+> non-default path); the NEW build-list page's text-sample affordance, with its propose-
+> then-confirm/attribution acceptance criteria, is what remains to build. US2 (upload) and
+> US3 (union) are both fully unbuilt, as originally scoped.
+
+Phase B's character-discovery list already names **Text sample** as a method at the
+`CharacterDiscoveryService` contract level ([specs/008-data-flow/](../008-data-flow/spec.md)).
+The extraction logic is already there: `harvestChars` captures **every distinct
 character** in whatever it is given and drops only CR/LF/CRLF/tab/space (spec 047
-FR-001/FR-002), reporting unusual invisibles rather than swallowing them. Pasting a
-paragraph into today's box already works — it is the surface, not the logic, that assumes
-one line.
+FR-001/FR-002), reporting unusual invisibles rather than swallowing them.
 
 This feature is the sibling of [044-cldr-sldr-exemplars](../044-cldr-sldr-exemplars/spec.md):
-044 makes a **reference set** (CLDR/SLDR exemplars) prefill Phase B; this one makes the
-author's **own corpus** do the same, through the same propose-then-confirm contract
-(044 FR-016/FR-016a/FR-017). Neither is a new screen, and neither auto-confirms.
+044 makes a **reference set** (CLDR/SLDR exemplars) prefill Phase B through a propose-then-
+confirm, per-character-attributed contract (FR-016/FR-016a/FR-017, confirmed shipped and
+verified this session). This spec's remaining work is making the author's **own corpus** go
+through that *same* contract, rather than the older plain-confirm gate it goes through today.
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -164,12 +223,13 @@ assert the union is proposed with per-character attribution.
 
 ## Assumptions
 
-- **Surface change, not logic**: `harvestChars` ([packages/studio/src/survey/PhaseB.tsx](../../packages/studio/src/survey/PhaseB.tsx))
-  already handles arbitrary raw text; this feature adds a multiline surface and an upload,
-  and MUST NOT fork the extraction.
+- **Surface change, not logic**: `harvestChars` (consumed via `pb_text_sample`, see the
+  corrected Context section above) already handles arbitrary raw text and already has its
+  multiline surface; this feature adds the upload path and MUST NOT fork the extraction.
 - **Depends on 044's prefill contract**: FR-016/FR-016a/FR-017 and the attribution model
-  live in [044](../044-cldr-sldr-exemplars/spec.md). If 044 has not landed, this feature
-  either waits or lands that contract first — it does not build a parallel one.
+  live in [044](../044-cldr-sldr-exemplars/spec.md) — confirmed shipped and verified this
+  session (2026-08-19), so this dependency is satisfied. The remaining work is replacing
+  `pb_text_sample_review`'s plain bool gate with that actual contract, not waiting on it.
 - **No new screen and no new discovery choice**: the text area lives on the existing
   alphabet page beside the character box and the exemplar affordance. It is surfaced in
   the intro's second option label ("Enter your alphabet, or discover it from text"), which

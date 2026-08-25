@@ -24,7 +24,7 @@ import { makeTestIR, makeCharStore } from "@keyboard-studio/contracts/fixtures";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { makeTouchKeyRuleJoinFixture, TOUCH_JOIN_IDS } from "@keyboard-studio/contracts/fixtures";
 import { createVirtualFS, irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
-import { defaultFillAxes, selectStrategy } from "@keyboard-studio/engine";
+import { defaultFillAxes, selectStrategy, deriveFacets } from "@keyboard-studio/engine";
 import type {
   DiscoveryAxisVector,
   IRGroup,
@@ -107,9 +107,11 @@ describe("workingCopyStore — instantiateFromBase (Track 1)", () => {
     const s = useWorkingCopyStore.getState();
     expect(s.baseKeyboard).toBe(basicKbdus);
     expect(s.baseVfs).toBe(vfs);
-    expect(s.baseIr).toBe(ir);
+    // baseIr/ir are `ir` with base-keyboard facets baked in (spec 048
+    // FR-001), so they are equal but not the same reference.
+    expect(s.baseIr).toEqual(deriveFacets(ir));
     // carve IR seeded from base IR
-    expect(s.ir).toBe(ir);
+    expect(s.ir).toEqual(deriveFacets(ir));
   });
 
   it("resets identity to null (new keyboard starts without an overlay)", () => {
@@ -138,7 +140,7 @@ describe("workingCopyStore — instantiateFromBase (Track 1)", () => {
     const s = useWorkingCopyStore.getState();
     expect(s.deletedNodeIds.size).toBe(0);
     expect(s.undoStack).toHaveLength(0);
-    expect(s.ir).toBe(newIr);
+    expect(s.ir).toEqual(deriveFacets(newIr));
   });
 
   // Was: "clears prior phaseResults so a fresh session starts clean" — that
@@ -315,8 +317,10 @@ describe("workingCopyStore — instantiateFromExisting (Track 2)", () => {
     const s = useWorkingCopyStore.getState();
     expect(s.baseKeyboard).toBe(basicKbdus);
     expect(s.baseVfs).toBe(vfs);
-    expect(s.baseIr).toBe(ir);
-    expect(s.ir).toBe(ir);
+    // baseIr/ir are `ir` with base-keyboard facets baked in (spec 048
+    // FR-001), so they are equal but not the same reference.
+    expect(s.baseIr).toEqual(deriveFacets(ir));
+    expect(s.ir).toEqual(deriveFacets(ir));
   });
 
   it("preserves identity from loaded keyboard displayName", () => {

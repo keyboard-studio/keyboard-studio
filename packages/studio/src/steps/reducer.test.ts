@@ -48,7 +48,7 @@ function makeBaseKeyboard(id = "base_kbd"): BaseKeyboard {
 }
 
 function makeKeyboardIR(): KeyboardIR {
-  return {} as KeyboardIR;
+  return makeTestIR([]);
 }
 
 function makeVirtualFS(): VirtualFS {
@@ -513,8 +513,11 @@ describe("T024 — repropagate() call site no longer injects setTouchLayoutJson"
 describe("spec 034 T006 — choose_base yields a live working copy via the real store", () => {
   // A minimal-but-real IR: instantiate seeds axes via detectMarkInputOrderFromImport,
   // which iterates ir.groups — so `groups` must exist (an empty group list is a
-  // valid codec-clean shape with no mark-order rules).
-  const realIr = { groups: [] } as unknown as KeyboardIR;
+  // valid codec-clean shape with no mark-order rules). Instantiation also now
+  // derives facets (spec 048), which reads `ir.stores`/`ir.raw` — so a
+  // partial cast is no longer sufficient; use the real fixture helper for a
+  // fully-shaped (if empty) KeyboardIR.
+  const realIr = makeTestIR([]);
   const realVfs = new Map() as VirtualFS;
   const base = makeBaseKeyboard("copy_edit_base");
 

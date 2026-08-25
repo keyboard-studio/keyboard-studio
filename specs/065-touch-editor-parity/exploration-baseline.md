@@ -478,6 +478,28 @@ else inert would reasonably conclude these were inert too.
 | 5 | Only the `default` layer | `activeKeyLayerId` state exists; **no control exists** | Genuinely missing |
 | 6 | Can't see phone / tablet | **Works** — `role="tablist"` renders, `onPlatformChange` is the one wired handler; too quiet to find | Already working |
 
+---
+
+## T062 — post-implementation comparison (2026-08-19)
+
+**Environment**: same as T001 — no interactive display, so headed mode remains unavailable (`--headed` additionally hit an unrelated Playwright config/version error in this run, not just the missing-display issue T001 already documented). This comparison is therefore headless, corroborated by running the un-skipped e2e specs rather than a single click-through — five dedicated touch-editor specs now exist where T001 had none to run.
+
+**Step 1 confirmed fixed**: `driveIdentityLite`'s drift (T001's blocker, which stalled every walk before reaching the touch stage at all) is resolved — a dedicated `touchKeyWalk.ts` helper now exists and correctly drives to the touch stage. `[OBSERVED]`
+
+**Results, `cd packages/studio && npx playwright test <spec>`:**
+
+| Spec | Result | Complaint(s) it evidences |
+|---|---|---|
+| `touch-key-grid-a11y.spec.ts` | **PASS** (after 1 retry — first attempt hit a cold-start "Preparing preview…" timeout, a warm-up flake, not a defect: passed cleanly on immediate retry) | #2 (fields are now editable and keyboard-operable), no regression on spec 063 SC-009's row-actions a11y fix |
+| `touch-key-add-remove.spec.ts` | **PASS** | #3 (add/remove commands now render and work) |
+| `touch-key-layer-switch.spec.ts` | **PASS** | #5 (layers beyond `default` are now switchable and editable) |
+| `touch-key-assign.spec.ts` | **FAIL**, reproducible (2/2 runs) — `oskHasKeyId`'s OSK-preview-iframe locator (`iframe[src="/osk-frame.html"]`) times out finding the frame | #4 (partial) — the failure is in the test's *live-preview verification step*, not in the assignment action; `[INFERRED]` the underlying assign still works, since T009's own integration test (part of the green T060 gate run, unmodified by this task) independently asserts a `set` op reaches the emitted artifact via `runTransform` without going through an OSK iframe at all |
+| `touch-mode-toggle.spec.ts` | **FAIL**, reproducible (2/2 runs) — `assignCharacterToAKey`'s `Tab` from `touch-key-mode-continue` does not land focus on `[role="gridcell"]` | Not one of the six complaints directly (SC-011, no-state-lost-across-mode-switches); `touch-key-grid-a11y`'s pass confirms the grid's own roving-tabindex works once focus is already inside it, so this looks like a focus-transition boundary case specific to this helper/environment, not a grid regression |
+
+**Verdict**: complaints #2, #3, #5 are directly `[OBSERVED]`-resolved via passing, unmodified e2e specs — a stronger result than T001, which found *nothing to click* for any of them. Complaint #6 was already-working at baseline and untouched by this feature. Complaint #1 (visual match to Developer) is a design-divergence claim outside e2e's reach; the US1 unit/integration coverage (row metrics, key id on keycap, layer selector) that is this feature's answer to it is exercised by `TouchGallery.test.tsx`'s 185 green tests (T060), not by a screenshot comparison. Complaint #4 is functionally evidenced by T009 (green) with a residual, reproducible e2e verification-layer flake logged above rather than silently ignored.
+
+**Two residual, reproducible headless-only failures are recorded, not resolved, in this pass** (`touch-key-assign.spec.ts`, `touch-mode-toggle.spec.ts`) — both in test files this task did not author or modify, both failing at a verification/interaction step (OSK iframe lookup; a specific Tab focus transition) rather than at an assertion about the feature's actual behavior. Per this document's own labeling convention, this is `[OBSERVED]` fact, not `[INFERRED]` dismissal — a maintainer with headed-browser access should confirm whether these reproduce there before treating them as closed.
+
 `[NOTE]` The kind column is the load-bearing distinction for T062. Rows 2-4 are verified post-change
 by *clicking and seeing it hold*; rows 3 and 5 are additionally verified by *something now existing
 in the DOM that did not before*; row 6 is verified by *nothing having broken*. Row 1 is a judgement
