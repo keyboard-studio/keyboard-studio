@@ -9,11 +9,12 @@ import { irPath } from "@keyboard-studio/contracts";
 
 export const definition = {
   id: "pa_copyright_holder",
-  prompt: "Who holds the copyright for this keyboard?",
+  prompt: "Who holds the copyright, if not you?",
   label: "Copyright holder",
   help_text:
     "Name of the person or organization that holds the copyright for this " +
-    "keyboard. This may be you, your employer, or a language organization. " +
+    "keyboard. This may be you, your employer, or a language organization — " +
+    "leave this blank to credit the author named above. " +
     "Example: 'Bafut Language Committee'",
   type: "short_text" as const,
   required: true,

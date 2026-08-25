@@ -60,7 +60,7 @@ describe("identity-lite attribution capture (spec 064 US1)", () => {
         authorSeed={{ name: "Alice Example", email: "alice@example.org" }}
       />,
     );
-    expect(screen.getByText("Who should be listed as the author of this keyboard?")).toBeTruthy();
+    expect(screen.getByText("Is this the right name to credit for this keyboard?")).toBeTruthy();
     expect((screen.getAllByRole("textbox")[0] as HTMLInputElement).value).toBe("");
   });
 
@@ -141,7 +141,7 @@ describe("identity-lite attribution capture (spec 064 US1)", () => {
         authorSeed={{ name: "Alice Example", email: "alice@example.org" }}
       />,
     );
-    expect(screen.queryByText("Who holds the copyright for this keyboard?")).toBeNull();
+    expect(screen.queryByText("Who holds the copyright, if not you?")).toBeNull();
     expect(screen.queryByDisplayValue("Alice Example")).toBeNull();
   });
 

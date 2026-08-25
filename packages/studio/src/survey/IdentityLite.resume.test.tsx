@@ -125,7 +125,7 @@ describe("IdentityLite — resume", () => {
   // spec 064 US1: the last question is now the copyright holder, not the script.
   it("mounts on the LAST question (copyright holder) with the answer restored", () => {
     render(<IdentityLite onComplete={vi.fn()} resume={COMPLETED} />);
-    expect(screen.getByText("Who holds the copyright for this keyboard?")).toBeTruthy();
+    expect(screen.getByText("Who holds the copyright, if not you?")).toBeTruthy();
     expect(
       screen.queryByText("What is your language called in your own language?"),
     ).toBeNull();

@@ -7,6 +7,11 @@
 // email is often private (D7), and spec 064 states an absent email must never
 // block emission — it is optional metadata that lands in .kps <Author URL="mailto:…">
 // and pre-fills the Phase F contact question (FR-016).
+//
+// prompt/help_text extend the demoted module's rather than replacing it
+// (HANDOFF-CONTENT item 3, route B): only identity-lite makes this field
+// optional, so only here does the prompt need to say so (Phase F "(optional)"
+// convention).
 
 import type { QuestionModule } from "../../types.ts";
 import authorContactEmail from "../reserve/author_contact_email.ts";
@@ -16,6 +21,11 @@ export const definition = {
   id: "il_author_email",
   required: false,
   next: "il_copyright_holder",
+  prompt: authorContactEmail.definition.prompt + " (optional)",
+  help_text:
+    authorContactEmail.definition.help_text +
+    " This is optional — leave it blank if you would rather not share an " +
+    "email address (for example, if your GitHub profile email is private).",
 } satisfies import("../../types.ts").FlowQuestion;
 
 // No validate(): required:false. The demoted module's non-empty check would

@@ -5,11 +5,11 @@ import type { QuestionModule, ValidationResult } from "../../types.ts";
 
 export const definition = {
   id: "author_display_name",
-  prompt: "Who should be listed as the author of this keyboard?",
+  prompt: "Is this the right name to credit for this keyboard?",
   help_text:
     "This name will appear in the keyboard package and in the public " +
-    "keyboard repository. You can use a person's name, an organization " +
-    "name, or a committee name, for example: Bafut Language Committee.",
+    "keyboard repository. Use the person or group who made the keyboard. " +
+    "If an organisation holds the copyright, there is a separate question for that.",
   type: "text" as const,
   required: true,
   next: "author_contact_email",
