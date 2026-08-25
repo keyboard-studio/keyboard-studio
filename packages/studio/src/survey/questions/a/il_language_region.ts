@@ -46,5 +46,12 @@ export const fixtures: QuestionModule["fixtures"] = {
 // KeyboardIR — while `outputs` states that the answer nevertheless reaches an
 // emitted artifact. Here, the answer contributes the region subtag to the
 // composed tag the descriptor declares.
-const mod: QuestionModule = { definition, fixtures, inputs: [], writes: [], outputs: [{ target: "package-descriptor", field: "bcp47" }] };
+const mod: QuestionModule = {
+  definition,
+  fixtures,
+  inputs: [],
+  writes: [],
+  outputs: [{ target: "package-descriptor", field: "bcp47" }],
+  specRef: "specs/030-langtags-identity-autocomplete",
+};
 export default mod;

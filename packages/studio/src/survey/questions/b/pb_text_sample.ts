@@ -53,5 +53,12 @@ export const fixtures: QuestionModule["fixtures"] = {
 };
 
 
-const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [] };
+const mod: QuestionModule = {
+  definition,
+  validate,
+  fixtures,
+  inputs: [],
+  writes: [],
+  specRef: "specs/050-text-sample-prefill",
+};
 export default mod;

@@ -70,5 +70,12 @@ export const fixtures: QuestionModule["fixtures"] = {
 };
 
 
-const mod: QuestionModule = { definition, validate, fixtures, inputs: [], writes: [] };
+const mod: QuestionModule = {
+  definition,
+  validate,
+  fixtures,
+  inputs: [],
+  writes: [],
+  specRef: "specs/061-help-docs-generation",
+};
 export default mod;
