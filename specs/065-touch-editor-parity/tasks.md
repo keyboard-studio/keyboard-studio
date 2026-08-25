@@ -601,6 +601,18 @@ defect, and where no default is possible the editor says why.
   `area ( "." segment )+`; confirm the engine returns only structured fields and no English prose
   crosses the boundary (FR-037) ·
   `packages/studio/src/locales/`
+
+  **Already satisfied — nothing to change.** Each US1–US5 task (T020, T041, T050, etc.) localized
+  its own strings as it landed rather than deferring it here: every author-facing string in
+  `TouchGallery.tsx`, `LayerSelector.tsx`, `KeyGrid.tsx`, `KeyGridCell.tsx`,
+  `RowMetricsReadout.tsx`, `KeyPropertyPanel.tsx`, `GesturePanel.tsx`, `RemoveKeyDialog.tsx` and
+  `findingCopy.ts` is wrapped in `<Trans id="...">`, `t({id, message})` or `msg({id, message})`
+  with ids already matching `area ( "." segment )+` (e.g. `editor.assignLoop.keyGrid.gesture.add`).
+  `TOUCH_KEY_ROW_CROWDED` and `TOUCH_KEY_KEYCAP_MISMATCH` both have `findingCopy.ts` entries and
+  catalog rows. The one raw string found (`AssignPanel.tsx`'s `placeholder="U+025B"`) is an
+  authored codepoint example, not UI prose, matching the project's own documented exemption. The
+  engine boundary holds: `touchKeyDiagnostics.ts`, `keycapRelatedness.ts` and
+  `proposeTouchKeyId.ts` carry no `message:`/`reason:` string field — only structured fields.
 - [x] **T056** [P] Run axe over the touch stage and the existing grid accessibility suite: the grid
   stays a conformant `role="grid"` → `role="row"` → `role="gridcell"` with a roving tabindex and one
   tab stop; `key-grid-live-region` remains the single announcer; the layer selector is a `tablist` at
@@ -611,6 +623,15 @@ defect, and where no default is possible the editor says why.
   edit — is undoable through the shared chronological `'k'` stack and that the undo affordance names
   what it will undo (FR-040) ·
   `packages/studio/src/editors/assignLoop/TouchGallery.test.tsx`
+
+  **Structural guarantee, now pinned by a test.** `commitKeyEdit` pushes a `'k'` undo entry for
+  ANY `PendingKeyEditOperation` unconditionally, and `describeUndoTarget`'s `'k'` branch echoes
+  `op.kind` verbatim into `{ kind: "keyEdit", keyId, opKind }` — neither reads a per-op-kind list,
+  so a new op kind is covered by construction, not by enumeration. Added an `it.each` block to the
+  "undo affordance" describe in `TouchGallery.test.tsx` exercising `move`, `set` (each of `hint`,
+  `width`, `pad`, `layer`), `setSubKey` and `removeSubKey`: each commit updates the undo button's
+  `aria-label` to name that op's kind and key id, and clicking it pops both `undoStack` and
+  `keyEditOverlay.ops`.
 - [x] **T058** [P] Update the touch-editor glossary for `move`, row metrics, declared-vs-rendered
   width, and the inherited id path; cross-link ADR 0002 and record spec 063 FR-039's withdrawal ·
   `docs/design-notes/touch-editor-glossary.md`
@@ -624,6 +645,24 @@ defect, and where no default is possible the editor says why.
 - [x] **T060** [P] Full repeatable gate: `pnpm typecheck`, `pnpm -r test`, `pnpm lint`, plus the three
   standalone vitest configs and `pnpm crew-lint` if any `.claude/**/km-*` file was touched ·
   *(repo root)*
+
+  **Green, with two documented local-only exceptions (both pre-existing, neither in files this
+  feature touches):**
+  - `pnpm typecheck` — clean across all 7 workspace packages.
+  - `pnpm -r test` — clean except (a) 27 studio test files that touch `localStorage` fail under
+    local Node 26 (jsdom's `localStorage` shadow breaks; CI runs Node 22 and is unaffected — a
+    known local-environment artifact, not a code defect) and (b)
+    `engine/src/recognizer/integration.test.ts`'s "0060 grave RALT K_7" assertion, which depends
+    on `../keyboards` tracking the `keyboard-studio/keyboards` fork rather than upstream (also
+    pre-existing, also CI-green). Every package ran clean in isolation otherwise — engine
+    3098/3098 (barring the one), glottolog 42/42, oauth-backend 270/270, studio 6388/6719 (the
+    331 failures are exactly the 27 localStorage files, deterministic across two full runs).
+  - `pnpm lint` — 0 errors, 173 pre-existing warnings (none in a spec-065 file); depcruise,
+    crew-lint and every other sub-checker GREEN.
+  - Standalone configs — `api` (131/131), the five i18n-utilities suites (123/123),
+    `utilities/spec-trace` (24/24) all green.
+  - No `.claude/**/km-*` file touched this task, so `pnpm crew-lint`'s condition doesn't apply
+    (it still ran clean as part of `pnpm lint` above).
 - [x] **T061** [P] Run `node utilities/spec-trace check`, then acknowledge the spec units this feature
   changed ·
   `utilities/spec-trace`
@@ -634,6 +673,15 @@ defect, and where no default is possible the editor says why.
   through all six of issue #1530's complaints against T001's baseline, confirming each is
   demonstrably resolved (SC-001) ·
   `specs/065-touch-editor-parity/exploration-baseline.md`
+
+  **Done — see the "T062 — post-change exploration pass" section appended to
+  [exploration-baseline.md](exploration-baseline.md).** Ran headed (this environment has a real
+  display, unlike T001's capture environment). `touch-key-add-remove.spec.ts` re-run headed and
+  passes (1 passed, 1.7m). Complaints #1-#5 confirmed resolved by a live click-through/DOM probe
+  against the bambara fixture (substituted for `sil_cameroon_qwerty` — reasoning recorded there).
+  Complaint #6 was **not** click-through-exercised — bambara ships only one touch platform, so
+  there was no tab to switch — and stands instead on the pre-existing, source-verified finding
+  (unchanged by this feature) that the platform tablist already worked before spec 065.
 
 ---
 

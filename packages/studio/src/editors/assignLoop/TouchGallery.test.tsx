@@ -5732,77 +5732,67 @@ describe("TouchGallery — undo affordance states what it will undo (T076, FR-03
     expect(useWorkingCopyStore.getState().isTouchKeyDeleted("phone:default:K_A")).toBe(false);
   });
 
-  // spec 065 T057 (FR-040): the move op and a `set` edit on one of the four
-  // newly-editable fields (hint/width/pad/layer) both commit through the same
-  // `commitKeyEdit` choke point as the suppress/rename cases above — these two
-  // confirm the undo affordance names and reverts them too, not just the
-  // kinds spec 063 originally exercised.
-
-  it("names a move edit and clicking Undo reverts it", async () => {
-    seedStore({ withInventory: ["ä"] });
-    await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
-    });
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("touch-mode-tab-key"));
-    });
-    await act(async () => {
-      useWorkingCopyStore.getState().commitKeyEdit({
-        address: "phone:default:K_A",
-        kind: "move",
-        direction: "right",
+  // T057 (FR-040): every new spec-065 edit kind — `move`, the four newly
+  // editable fields (all committed as `kind: "set"`), and every gesture edit
+  // (`setSubKey` / `removeSubKey`) — rides the SAME `commitKeyEdit` seam
+  // `describeUndoTarget` already reads generically by `op.kind`, so each one
+  // both names itself in the affordance and pops via the one undo button.
+  it.each([
+    { opKind: "move" as const, op: { address: "phone:default:K_B", kind: "move" as const, direction: "left" as const } },
+    { opKind: "set" as const, op: { address: "phone:default:K_B", kind: "set" as const, fields: { hint: "alt" } } },
+    { opKind: "set" as const, op: { address: "phone:default:K_B", kind: "set" as const, fields: { width: 120 } } },
+    { opKind: "set" as const, op: { address: "phone:default:K_B", kind: "set" as const, fields: { pad: 5 } } },
+    { opKind: "set" as const, op: { address: "phone:default:K_B", kind: "set" as const, fields: { layer: "shift" } } },
+    {
+      opKind: "setSubKey" as const,
+      op: {
+        address: "phone:default:K_B",
+        kind: "setSubKey" as const,
+        sub: { kind: "flick" as const, id: "ne" },
+        fields: { id: "ne", text: "É" },
+      },
+    },
+    {
+      opKind: "removeSubKey" as const,
+      op: {
+        address: "phone:default:K_B",
+        kind: "removeSubKey" as const,
+        sub: { kind: "sk" as const, id: "T_ks_1" },
+      },
+    },
+  ])(
+    "names and undoes a '$opKind' key edit through the shared stack",
+    async ({ opKind, op }) => {
+      seedStore({ withInventory: ["ä"] });
+      await act(async () => {
+        render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
       });
-    });
 
-    await waitFor(() => {
-      const label = screen
-        .getByTestId("touch-undo-button")
-        .getAttribute("aria-label");
-      expect(label).toContain("K_A");
-      expect(label).toContain("move");
-    });
-    expect(useWorkingCopyStore.getState().undoStack).toHaveLength(1);
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("touch-undo-button"));
-    });
-
-    expect(useWorkingCopyStore.getState().undoStack).toHaveLength(0);
-  });
-
-  it("names a set edit on the spec 065 hint field and clicking Undo reverts it", async () => {
-    seedStore({ withInventory: ["ä"] });
-    await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
-    });
-
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("touch-mode-tab-key"));
-    });
-    await act(async () => {
-      useWorkingCopyStore.getState().commitKeyEdit({
-        address: "phone:default:K_A",
-        kind: "set",
-        fields: { hint: "alt" },
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("touch-mode-tab-key"));
       });
-    });
+      await act(async () => {
+        useWorkingCopyStore.getState().commitKeyEdit(op);
+      });
 
-    await waitFor(() => {
-      const label = screen
-        .getByTestId("touch-undo-button")
-        .getAttribute("aria-label");
-      expect(label).toContain("K_A");
-      expect(label).toContain("set");
-    });
-    expect(useWorkingCopyStore.getState().undoStack).toHaveLength(1);
+      await waitFor(() => {
+        const undoBtn = screen.getByTestId(
+          "touch-undo-button",
+        ) as HTMLButtonElement;
+        expect(undoBtn.disabled).toBe(false);
+        const label = undoBtn.getAttribute("aria-label") ?? "";
+        expect(label).toContain(opKind);
+        expect(label).toContain("K_B");
+      });
 
-    await act(async () => {
-      fireEvent.click(screen.getByTestId("touch-undo-button"));
-    });
+      await act(async () => {
+        fireEvent.click(screen.getByTestId("touch-undo-button"));
+      });
 
-    expect(useWorkingCopyStore.getState().undoStack).toHaveLength(0);
-  });
+      expect(useWorkingCopyStore.getState().undoStack).toHaveLength(0);
+      expect(useWorkingCopyStore.getState().keyEditOverlay.ops).toHaveLength(0);
+    },
+  );
 });
 
 describe("describeUndoTarget — pure structural description of the undo stack's top entry (T076)", () => {
