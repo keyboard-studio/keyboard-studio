@@ -3,8 +3,8 @@
   "specName": "045-lens-vocabulary-source-of-truth",
   "branch": "045-lens-vocabulary-source-of-truth",
   "selectedAt": "2026-07-27T17:30:25.416Z",
-  "currentStep": "tasks",
-  "status": "ready-to-implement",
+  "currentStep": "implement",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
@@ -61,6 +61,124 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-19T23:37:26.376Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "ai",
+      "at": "2026-08-19T23:50:04.733Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:50:20.633Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:50:21.034Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:50:35.536Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:56:07.194Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:56:08.030Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:56:08.591Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:56:09.336Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-19T23:56:10.346Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T00:02:37.072Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T00:02:37.539Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T00:13:15.614Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T00:13:16.019Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-20T00:13:17.089Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-08-20T00:13:17.861Z"
     }
   ],
   "approach": "Re-home the two genuine straggler classifiers (A1 added-char-count, A4 diacritic-mechanism) onto type aliases of the existing contracts enums (Scale, DiacriticBehavior), mirroring the pattern A7 spare-key-budget already uses correctly against KeyBudgetBand. Add two Expect-AssignableTo compile-time guards and one new runtime lockstep test. A7 needs no change - research found it already properly sourced.",
@@ -74,6 +192,11 @@
       "decision": "Resolved FR-010s locked-field gating question as NO before task generation",
       "why": "Grepped both straggler classifiers and their YAMLs - neither references StrategyId or any Pattern field; Article I does not trigger",
       "rejected": "Leaving the gating question open for a later phase, which the spec explicitly says plan.md must not do"
+    },
+    {
+      "decision": "No signoff.md entry added for this feature Constitution Check; no new mechanical Article adopted in this pass",
+      "why": "docs/spec-signoff.md logs spec.md-level formal decisions (D1-D14) and major amendments, not routine per-feature Constitution Check outcomes - the outcome is already durably recorded in this feature's own plan.md Constitution Check table and .spec-context.json decisions/verified fields; whether a new mechanical Article should exist for lens-vocabulary source-of-truth is left as a separate call for .specify/memory/constitution.md's maintainers, per plan.md's own note",
+      "rejected": "adding a spec-signoff.md entry for this routine, non-spec.md-touching feature"
     }
   ],
   "step_summaries": {
@@ -83,6 +206,131 @@
     },
     "tasks": {
       "summary": "13 tasks across 5 phases (Setup, Foundational Constitution re-check, US1 A1/A4 sourcing, US2 drift guards, Polish); scope narrowed to A1/A4 only per research R1"
+    },
+    "implement": {
+      "summary": "A1/A4 facet-index classifiers now alias Scale/DiacriticBehavior from contracts instead of hand-restating them, protected by a compile-time guard plus a new runtime lockstep test against the YAML facet defs; A7 needed no change (already correctly sourced)"
     }
-  }
+  },
+  "currentTask": "T013",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Created km/045-lens-vocabulary-source-of-truth off origin/main (05aa49d0), pulled in spec 045 planning docs from km/group-c-planning-2026-08-19",
+      "files": [
+        "specs/045-lens-vocabulary-source-of-truth/plan.md",
+        "specs/045-lens-vocabulary-source-of-truth/research.md",
+        "specs/045-lens-vocabulary-source-of-truth/data-model.md",
+        "specs/045-lens-vocabulary-source-of-truth/tasks.md"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Re-confirmed research R1 scope-narrowing live: SpareKeyBudget=KeyBudgetBand alias unchanged in spare-key-budget-classifier.ts (A7 stays out of scope); confirmed A1Band literal union and A4's bare 'let value: string' still present exactly as research described",
+      "files": [
+        "utilities/facet-index/spare-key-budget-classifier.ts",
+        "utilities/facet-index/added-char-count-classifier.ts",
+        "utilities/facet-index/diacritic-mechanism-classifier.ts"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Confirmed grep for StrategyId across the two straggler classifiers and their YAML defs returns zero matches - Constitution gate clears, no Article I escalation needed"
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "A1Band aliased to canonical Scale from @keyboard-studio/contracts (export type A1Band = Scale), keeping the exported name so no call site changes",
+      "files": [
+        "utilities/facet-index/added-char-count-classifier.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "A4's bare 'let value: string' replaced with a new local A4Value = DiacriticBehavior alias",
+      "files": [
+        "utilities/facet-index/diacritic-mechanism-classifier.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "tsc --noEmit clean; facet-index vitest suite 283/283 pass (19/19 on the three A1/A4/A7 classifier files directly, confirming byte-identical behavior per SC-003); the 5 failures seen on one run were the known vitest worker-pool 5000ms-timeout flake under session load, reproduced as passing on both pre- and post-change code once the timeout was raised"
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Folded into T004: added local Expect/AssignableTo idiom + _A1BandGuard = Expect<AssignableTo<A1Band, Scale>> directly in added-char-count-classifier.ts (not schemas.ts, per research R4/task instruction) since it introduces no new workspace-package edge",
+      "files": [
+        "utilities/facet-index/added-char-count-classifier.ts"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Folded into T005: same local Expect/AssignableTo idiom + _A4ValueGuard = Expect<AssignableTo<A4Value, DiacriticBehavior>> in diacritic-mechanism-classifier.ts",
+      "files": [
+        "utilities/facet-index/diacritic-mechanism-classifier.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "Created lens-vocabulary-lockstep.test.ts asserting added-char-count.yaml/diacritic-mechanism.yaml limits.values sets equal Scale/DiacriticBehavior member sets; 2/2 pass",
+      "files": [
+        "utilities/facet-index/lens-vocabulary-lockstep.test.ts"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Verified both guards fire on a deliberate divergence and clear on revert: (1) added a YAML-only extra value to added-char-count.yaml - lockstep test failed with a clear diff, reverted, test passed again; (2) widened A1Band to Scale|'gigantic' - tsc failed with TS2344 on the _A1BandGuard, reverted, tsc clean again (SC-002)"
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "Full gate green: pnpm typecheck (7/7 workspace projects, unaffected as expected since diff is utilities-only); facet-index vitest 283/283 (44/44 files, incl. the new lockstep test); node utilities/facet-lint/index.js GREEN; node utilities/facet-index-lint/index.js GREEN (30 defs, 927 keyboards); pnpm run depcruise clean (1092 modules, 3903 deps, zero violations)"
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "Updated docs/lens-model.md's convergence-hazard section: the A1/A4 straggler-classifier hazard it described is now marked Resolved (2026-08-19) by spec 045, with the concrete fix (Scale/DiacriticBehavior aliasing + compile-time guard + lens-vocabulary-lockstep.test.ts) and A7's already-correct status noted; the spec.md cross-link already existed in the other direction",
+      "files": [
+        "docs/lens-model.md"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Determined docs/spec-signoff.md's convention is spec.md-level decisions only; this feature's Constitution Check outcome (FR-010 resolved, no locked field touched, no new Article adopted) is durably recorded via plan.md's own Constitution Check table plus a --decision capture, not a new signoff.md entry"
+    }
+  },
+  "verified": [
+    {
+      "what": "byte-identical classifier behavior after aliasing (SC-003)",
+      "command": "npx vitest run --config vitest.config.ts (utilities/facet-index)",
+      "result": "283/283 pass, incl. 19/19 on the three A1/A4/A7 classifier files directly",
+      "warnings": [
+        "5 timeouts on one run were the known vitest worker-pool 5000ms-timeout flake under session load - confirmed passing on both pre- and post-change code with a raised timeout"
+      ]
+    },
+    {
+      "what": "deliberate divergence is caught by at least one guard (SC-002)",
+      "command": "manual scratch edits to added-char-count.yaml and A1Band, reverted after",
+      "result": "YAML-only divergence caught by the new lockstep test; type-level divergence caught by the compile-time _A1BandGuard (TS2344)"
+    }
+  ],
+  "coverage": {
+    "FR-001": {
+      "tests": [
+        "utilities/facet-index/lens-vocabulary-lockstep.test.ts::added-char-count.yaml equals Scale",
+        "utilities/facet-index/lens-vocabulary-lockstep.test.ts::diacritic-mechanism.yaml equals DiacriticBehavior"
+      ]
+    },
+    "FR-007": {
+      "tests": [
+        "utilities/facet-index/added-char-count-classifier.test.ts",
+        "utilities/facet-index/diacritic-mechanism-classifier.test.ts (pre-existing",
+        "unmodified",
+        "still 100% pass - proves byte-identical output)"
+      ]
+    }
+  },
+  "concerns": [
+    {
+      "note": "none - clean run, no residual friction",
+      "step": "implement"
+    }
+  ],
+  "last_action": "all 13 tasks done - full gate green (typecheck/facet-index tests 283/283/facet-lint/facet-index-lint/depcruise); ready for review before commit"
 }

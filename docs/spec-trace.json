@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-08-18",
+  "lastUpdated": "2026-08-20",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -597,7 +597,7 @@
     },
     "docs/lens-model.md": {
       "title": "How the four analytic lenses compose",
-      "hash": "sha256:71d55e64ebebad72",
+      "hash": "sha256:16df2c92ff925507",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

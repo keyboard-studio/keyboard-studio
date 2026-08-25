@@ -133,6 +133,14 @@ jobs:
       - name: Test (spec-trace — outside the pnpm workspace)
         run: pnpm run test:spec-trace
 
+      # facet-index is likewise outside the workspace (CLAUDE.md "Standalone
+      # utilities"). Its lens-vocabulary-lockstep test is the runtime half of
+      # spec 045's drift guard between content/keyboard-facets YAML and the
+      # canonical Scale/DiacriticBehavior types — unenforced here, it can drift
+      # silently.
+      - name: Test (facet-index — outside the pnpm workspace)
+        run: pnpm run test:facet-index
+
       # Non-blocking: warns in CI log and opens GitHub Issues for any spec
       # sections whose content changed since the last acknowledgement.
       # Never fails the build — drift is a backlog item, not a blocker.

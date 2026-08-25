@@ -40,7 +40,7 @@ import type {
   OutputForm,
   PlacementWorklist,
 } from "./confirmedAlphabet";
-import type { Scale, ScriptClass } from "./axes";
+import type { DiacriticBehavior, Scale, ScriptClass } from "./axes";
 import type { StrategyId } from "./strategy";
 import type { KeyBudget, KeyBudgetBand } from "./keyBudget";
 import type {
@@ -95,6 +95,13 @@ export const RemovalCapabilitySchema = z.enum([
 // ---------------------------------------------------------------------------
 
 export const ScaleSchema = z.enum(["tiny", "small", "medium", "large", "massive"]);
+
+export const DiacriticBehaviorSchema = z.enum([
+  "none",
+  "stacking-combining",
+  "replacing-cycling",
+  "multi-family",
+]);
 
 export const ScriptClassSchema = z.enum([
   "alphabetic",
@@ -800,6 +807,9 @@ type _AxisFillGuard = Expect<
   AssignableTo<Omit<z.infer<typeof AxisFillSchema>, "axis" | "value">, Omit<AxisFill, "axis" | "value">>
 >;
 type _ScaleGuard = Expect<AssignableTo<z.infer<typeof ScaleSchema>, Scale>>;
+type _DiacriticBehaviorGuard = Expect<
+  AssignableTo<z.infer<typeof DiacriticBehaviorSchema>, DiacriticBehavior>
+>;
 type _ScriptClassGuard = Expect<AssignableTo<z.infer<typeof ScriptClassSchema>, ScriptClass>>;
 // The provenance enum schema and the TouchKeyProvenance contract union must
 // stay in lockstep (spec-014 FR-008, Art. I drift guard). NonNullable strips
