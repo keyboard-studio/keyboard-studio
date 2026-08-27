@@ -110,6 +110,31 @@ describe("identity-lite attribution capture (spec 064 US1)", () => {
     expect(identity.attribution?.authorName).toBe("Alice Example");
   });
 
+  // format: "email" (spec 059 follow-up): SurveyRunner's canAdvance blocks a
+  // non-blank, malformed address but still treats blank as fine — required:false
+  // means "no email provided" must stay a legitimate answer, not become blocked
+  // the moment the format check exists.
+  it("blocks Continue on a malformed email but allows blank or a valid address", () => {
+    render(
+      <IdentityLite
+        onComplete={vi.fn()}
+        resume={completedThrough("Latn")}
+        authorSeed={{ name: "Alice Example", email: "alice@example.org" }}
+      />,
+    );
+    type("Alice Example");
+    finish(); // -> il_author_email, blank (resume does not re-seed)
+
+    const advanceButton = () => screen.getByTestId("survey-advance") as HTMLButtonElement;
+    expect(advanceButton().disabled).toBe(false); // optional field — blank passes
+
+    type("not-an-email");
+    expect(advanceButton().disabled).toBe(true);
+
+    type("alice@example.org");
+    expect(advanceButton().disabled).toBe(false);
+  });
+
   // A handle is not a copyright holder. With no profile name the field must be
   // empty so the author supplies one (D7).
   it("does NOT pre-fill anything when the profile has no name", () => {

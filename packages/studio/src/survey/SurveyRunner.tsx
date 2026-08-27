@@ -642,7 +642,9 @@ export function SurveyRunner({
 
   const value = currentValue ?? currentEntry?.value;
   const isNotice = displayQ.type === "notice";
-  const canAdvance = isNotice || !displayQ.required || hasValue(value);
+  const canAdvance =
+    isNotice ||
+    ((!displayQ.required || hasValue(value)) && hasValidFormat(value, displayQ.format));
   // Derive the next question id once so that both the button label and handleNext
   // share the same result — avoids a second advanceThrough call that would cause
   // a brief button-label flicker when value changes mid-render.
@@ -1055,6 +1057,24 @@ function hasValue(v: string | string[] | undefined): boolean {
   if (v === undefined) return false;
   if (Array.isArray(v)) return v.length > 0;
   return v.trim() !== "";
+}
+
+// Basic structural check (local@domain.tld), not RFC 5322 — good enough to
+// catch "forgot the @" / pasted-the-wrong-thing without rejecting anything a
+// real address could look like.
+const EMAIL_FORMAT_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+/**
+ * Does `v` satisfy `format`? Blank always passes here — required/hasValue
+ * already gates blank separately, so an optional format-checked field stays
+ * skippable rather than becoming implicitly required.
+ */
+function hasValidFormat(v: string | string[] | undefined, format: FlowQuestion["format"]): boolean {
+  if (format === undefined) return true;
+  const s = typeof v === "string" ? v.trim() : Array.isArray(v) ? v.join("").trim() : "";
+  if (s === "") return true;
+  if (format === "email") return EMAIL_FORMAT_RE.test(s);
+  return true;
 }
 
 /**

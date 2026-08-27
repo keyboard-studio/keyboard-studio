@@ -68,6 +68,14 @@ export interface FlowQuestion {
    */
   audit_label?: string;
   required?: boolean;
+  /**
+   * Structural shape the answer must match, beyond required/non-blank.
+   * Only "email" exists today (a basic `local@domain.tld` check) — SurveyRunner's
+   * canAdvance applies it when non-blank; blank still passes for an optional
+   * field. Declarative rather than a validate() function so it survives
+   * loadModularFlow's definition-only FlowDef (validate() does not).
+   */
+  format?: "email";
   options?: FlowOption[];
   /** Reference to a dynamic options source (e.g. "@langtags_iso639"). Not resolved in v1. */
   options_source?: string;
