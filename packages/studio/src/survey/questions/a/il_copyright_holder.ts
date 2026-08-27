@@ -16,7 +16,10 @@ import paCopyrightHolder from "../reserve/pa_copyright_holder.ts";
 // help_text extends the demoted module's rather than replacing it (HANDOFF-CONTENT
 // item 5, route B): the base wording is still correct, but only identity-lite has
 // attribution accumulation behind it, so only here does the author need telling
-// that a derived keyboard's original notice is retained for them.
+// that a derived keyboard's original notice is retained for them. Same route for
+// the "leave this blank" clause (spec 059 hand-off): it's only true under this
+// module's own D1 default-to-author override, not the demoted module's
+// required:true, so it belongs in this composition rather than the base string.
 //
 // This is a correctness guard, not polish. An author crediting the base author by
 // hand gets a result that depends on exact spelling — `SIL␣␣International` with a
@@ -66,7 +69,8 @@ export const definition = {
     // The base string ends on an unpunctuated `Example: '...'`, so the join
     // supplies the sentence break.
     paCopyrightHolder.definition.help_text +
-    ". If this keyboard is based on an existing one, the original author's copyright " +
+    ". Leave this blank to credit the author named above. " +
+    "If this keyboard is based on an existing one, the original author's copyright " +
     "is kept automatically and does not need re-entering here.",
 } satisfies import("../../types.ts").FlowQuestion;
 

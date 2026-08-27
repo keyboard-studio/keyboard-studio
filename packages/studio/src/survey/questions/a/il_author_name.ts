@@ -27,8 +27,9 @@ import authorDisplayName from "../reserve/author_display_name.ts";
 export const definition = {
   ...authorDisplayName.definition,
   id: "il_author_name",
-  // Pre-filled from the authenticated GitHub profile (D7), so this is a
-  // confirm-this step rather than a blank form (FR-001).
+  // May arrive pre-filled from the authenticated GitHub profile (D7), or blank
+  // on resume/guest/no-name paths — prompt is neutral (see
+  // reserve/author_display_name.ts) so it reads correctly either way.
   next: "il_author_email",
 } satisfies import("../../types.ts").FlowQuestion;
 

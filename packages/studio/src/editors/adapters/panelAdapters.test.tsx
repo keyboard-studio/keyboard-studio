@@ -247,7 +247,7 @@ describe("IdentityLiteAdapter — resume from identityPhaseResult", () => {
     render(<IdentityLiteAdapter onComplete={() => {}} />);
 
     // spec 064 US1: the flow's last question is now the copyright holder.
-    expect(screen.getByText("Who holds the copyright for this keyboard?")).toBeDefined();
+    expect(screen.getByText("Who holds the copyright, if not you?")).toBeDefined();
     expect(
       screen.queryByText("What is your language called in your own language?"),
     ).toBeNull();
