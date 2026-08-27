@@ -4,7 +4,7 @@
 // package-internal function that accepts optional context so 18.6 can run when
 // the compile gate provides both a KeyboardIR and a LinguistInventory.
 
-import type { VirtualFS, LintFinding, KeyboardIR, LinguistInventory, TouchLayoutIR } from "@keyboard-studio/contracts";
+import type { VirtualFS, LintFinding, KeyboardIR, LinguistInventory, ToleranceReport, TouchLayoutIR } from "@keyboard-studio/contracts";
 import { parseTouchLayout, touchLayoutPath } from "./parsers/parseTouchLayout.js";
 import { checkLongpress } from "./checks/check-18-1-longpress.js";
 import { checkTouchRows } from "./checks/check-18-2-touch-rows.js";
@@ -25,6 +25,7 @@ import {
   checkTouchKeyNoRule,
   checkTouchRuleOrphan,
 } from "./checks/check-18-6-touch-coverage.js";
+import { checkContextTolerance } from "./checks/check-19-x-context-tolerance.js";
 import { resolveJoinedCheckInputs } from "./checks/_shared.js";
 
 /**
@@ -35,6 +36,10 @@ import { resolveJoinedCheckInputs } from "./checks/_shared.js";
  *   Compile gate  -> 18.6 desktop (inventory coverage; needs keyboardIR + inventory)
  *   Touch gallery -> 18.6 touch (KM_LINT_TOUCH_UNCOVERED; needs touchLayout + touchInventory —
  *                    spec 035 FR-008, contracts/simplification.md)
+ *   Compile gate  -> 19.x context tolerance (KM_WARN_CONTEXT_NOT_TOLERANT /
+ *                    KM_HINT_CONTEXT_NOT_ANALYSED; needs a precomputed
+ *                    `toleranceReport` — spec 062 US2. keyboard-lint never
+ *                    computes the report itself, see check-19-x's module doc)
  *   Submit        -> all of the above
  *   18.7 (currency) -> DEFERRED; not implemented
  */
@@ -56,6 +61,13 @@ export interface LintContext {
    * because the touch stage works from an already-flattened char list.
    */
   touchInventory?: readonly string[];
+  /**
+   * Precomputed canonical-equivalence both-forms diagnostic (spec 062 US2),
+   * produced engine-side by `validator/context-tolerance.ts`. Required for
+   * the 19.x context-tolerance check; absent -> silently skipped, same as
+   * `inventory`/`touchLayout` above.
+   */
+  toleranceReport?: ToleranceReport;
 }
 
 /**
@@ -112,6 +124,15 @@ export async function lintWithContext(
     findings.push(...checkTouchKeyNoRule(joined, tlPath));
     findings.push(...checkTouchRuleOrphan(joined, tlPath));
     findings.push(...checkTouchKeyIdCase(joined, tlPath));
+  }
+
+  // 19.x: canonical-equivalence context tolerance (spec 062 US2) — same
+  // both-present gating shape as 18.6 desktop above. keyboard-lint never
+  // computes the report itself; `checkContextTolerance`'s `ir` parameter is
+  // unused today (every finding already carries its own location) but kept
+  // for parity with the other compile-gate checks.
+  if (ctx.keyboardIR && ctx.toleranceReport) {
+    findings.push(...checkContextTolerance(ctx.keyboardIR, ctx.toleranceReport));
   }
 
   return findings;

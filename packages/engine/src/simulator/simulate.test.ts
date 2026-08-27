@@ -143,3 +143,77 @@ describe("runPatternTests() — Pattern.tests runner (criterion 5)", () => {
     expect(result.allPass).toBe(false);            // not all passed
   }, 30_000);
 });
+
+// ---------------------------------------------------------------------------
+// spec 062 T005 — simulator context seeding (SimulatorContextSeed)
+// ---------------------------------------------------------------------------
+
+describe("simulate() — initialContext seeding (spec 062)", () => {
+  it("seeds text with default caret-at-end", async () => {
+    const vfs = createVirtualFS([
+      { path: "source/deadkey_acute.kmn", content: deadkeyKmn, isBinary: false },
+    ]);
+    const compiled = await compile(vfs, "deadkey_acute");
+    expect(compiled.success).toBe(true);
+
+    // No deadkey pending, no rule for bare K_A -> default output inserts 'a'
+    // at the caret, which defaults to the end of the seeded text.
+    const keys: SimKeyInput[] = [{ vkey: "K_A", modifiers: [], caps: false }];
+    const result = simulate(compiled, keys, { text: "x" });
+
+    expect(result.finalOutput).toBe("xa");
+  }, 30_000);
+
+  it("honors an explicit caretPos mid-string", async () => {
+    const vfs = createVirtualFS([
+      { path: "source/deadkey_acute.kmn", content: deadkeyKmn, isBinary: false },
+    ]);
+    const compiled = await compile(vfs, "deadkey_acute");
+    expect(compiled.success).toBe(true);
+
+    const keys: SimKeyInput[] = [{ vkey: "K_A", modifiers: [], caps: false }];
+    const result = simulate(compiled, keys, { text: "xy", caretPos: 1 });
+
+    expect(result.finalOutput).toBe("xay");
+  }, 30_000);
+
+  it("seeds a pending deadkey at a mid-string position and resolves it", async () => {
+    const vfs = createVirtualFS([
+      { path: "source/deadkey_acute.kmn", content: deadkeyKmn, isBinary: false },
+    ]);
+    const compiled = await compile(vfs, "deadkey_acute");
+    expect(compiled.success).toBe(true);
+
+    // Compiled deadkey(1) has internal id 0 (see criterion-4 test above).
+    const keys: SimKeyInput[] = [{ vkey: "K_A", modifiers: [], caps: false }];
+    const result = simulate(compiled, keys, {
+      text: "qy",
+      caretPos: 1,
+      pendingDeadkeys: [{ id: 0, position: 1 }],
+    });
+
+    // deadkey(1) + [K_A] > U+00E1 resolves at the seeded caret position.
+    expect(result.finalOutput).toBe("qáy");
+  }, 30_000);
+
+  it("regression: every existing no-seed call site is byte-identical with and without the third argument", async () => {
+    const vfs = createVirtualFS([
+      { path: "source/deadkey_acute.kmn", content: deadkeyKmn, isBinary: false },
+    ]);
+    const compiled = await compile(vfs, "deadkey_acute");
+    expect(compiled.success).toBe(true);
+
+    const deadkeyKeys: SimKeyInput[] = [
+      { vkey: "K_QUOTE", modifiers: [], caps: false },
+      { vkey: "K_A", modifiers: [], caps: false },
+    ];
+    expect(simulate(compiled, deadkeyKeys, undefined)).toEqual(simulate(compiled, deadkeyKeys));
+    expect(simulate(compiled, deadkeyKeys).finalOutput).toBe("á");
+
+    const defaultOutputKeys: SimKeyInput[] = [{ vkey: "K_Z", modifiers: [], caps: false }];
+    expect(simulate(compiled, defaultOutputKeys, undefined)).toEqual(
+      simulate(compiled, defaultOutputKeys),
+    );
+    expect(simulate(compiled, defaultOutputKeys).finalOutput).toBe("z");
+  }, 30_000);
+});

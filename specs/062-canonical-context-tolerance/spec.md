@@ -199,6 +199,17 @@ every step.
    backspace is pressed against a decomposed accented letter, **Then** exactly one
    mark is removed, not the whole cluster.
 
+**Known limitation**: on a MNEMONIC-layout keyboard — `sil_yoruba8`, this feature's
+own flagship motivating keyboard, included — `any(store) + [K_BKSP] > index(store,1)`
+never matches through this repo's KeymanWeb-model simulator, so Scenario 2 is unmet
+for that case. Root-caused to `setMnemonicCode`'s `Lcode` deletion for non-modifier
+keys with no character mapping (upstream KeymanWeb behaviour,
+[keymanapp/keyman#3744](https://github.com/keymanapp/keyman/issues/3744)); not
+confirmed against Keyman's native Core engine. See `context-variants.ts`'s
+`addBackspaceUnwrap` doc, "KNOWN LIMITATION 1", for the implementation-level detail.
+Story 1's diacritic-tolerance fix is unaffected and is canary-tested against
+`sil_yoruba8` in the real corpus.
+
 ---
 
 ### Edge Cases

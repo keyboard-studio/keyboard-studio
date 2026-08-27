@@ -35,6 +35,7 @@ export * from "./simulation";
 export * from "./strategy";
 export * from "./surveyPhaseResult";
 export * from "./surveySession";
+export * from "./toleranceReport";
 export * from "./virtualFS";
 
 // ---------------------------------------------------------------------------
