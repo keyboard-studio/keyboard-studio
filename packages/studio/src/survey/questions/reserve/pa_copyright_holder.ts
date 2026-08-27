@@ -13,8 +13,7 @@ export const definition = {
   label: "Copyright holder",
   help_text:
     "Name of the person or organization that holds the copyright for this " +
-    "keyboard. This may be you, your employer, or a language organization — " +
-    "leave this blank to credit the author named above. " +
+    "keyboard. This may be you, your employer, or a language organization. " +
     "Example: 'Bafut Language Committee'",
   type: "short_text" as const,
   required: true,
