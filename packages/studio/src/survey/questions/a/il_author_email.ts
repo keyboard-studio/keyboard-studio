@@ -20,6 +20,10 @@ export const definition = {
 
 // No validate(): required:false. The demoted module's non-empty check would
 // reject the blank a private-email author legitimately leaves.
+//
+// `format: "email"` IS inherited from the spread below, though — SurveyRunner's
+// canAdvance applies it only when non-blank, so a private/blank email still
+// passes while a non-blank, malformed one blocks Continue (spec 059 follow-up).
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [

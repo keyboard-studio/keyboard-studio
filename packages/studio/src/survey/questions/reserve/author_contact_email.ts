@@ -2,10 +2,11 @@
 // Ported verbatim from content/flows/phase_a_identity.yaml.
 //
 // Validation note: the YAML marks this required: true and the prompt says "email
-// address", but the YAML does not specify an email format rule — the help text
-// says "Use an address that will remain active." A non-empty check is the minimal
-// correct interpretation. A structural email check (contains @) is defensible but
-// is slightly beyond what the YAML implies; flagged as uncertain in the report.
+// address". `format: "email"` (spec 059 follow-up) asks SurveyRunner's canAdvance
+// for a basic structural check (local@domain.tld) on top of the non-empty check
+// below — the two are independent: this module's own validate() only enforces
+// required, since `format` is what actually reaches the live "Continue" gate
+// (loadModularFlow's FlowDef carries `definition` only, not `validate`).
 
 import type { QuestionModule, ValidationResult } from "../../types.ts";
 
@@ -18,6 +19,7 @@ export const definition = {
     "Use an address that will remain active.",
   type: "text" as const,
   required: true,
+  format: "email",
   next: "pa_copyright_holder",
 } satisfies import("../../types.ts").FlowQuestion;
 
