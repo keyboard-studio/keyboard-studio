@@ -3,7 +3,7 @@
   "specName": "Text-sample prefill (paste or upload)",
   "branch": "050-text-sample-prefill",
   "currentStep": "tasks",
-  "status": "ready-to-implement",
+  "status": "completed",
   "history": [
     {
       "step": "specify",

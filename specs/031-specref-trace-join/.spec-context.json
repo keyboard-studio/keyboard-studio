@@ -4,7 +4,7 @@
   "branch": "031-specref-trace-join",
   "selectedAt": "2026-07-28T04:43:42.014Z",
   "currentStep": "tasks",
-  "status": "ready-to-implement",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
@@ -61,6 +61,13 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-19T23:35:40.190Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-08-25T19:09:11Z"
     }
   ],
   "approach": "Add optional specRef to StepBase/QuestionModule, populate manifest + a sample of question modules, add a pure checkSpecRef completeness check, export manifest.specref.json via a pnpm-test-time script, extend spec-traces buildDriftIssueBody/report to read it. Every extension point mirrors an existing pattern in the codebase.",
@@ -78,6 +85,11 @@
       "decision": "Generate manifest.specref.json via a pnpm-test-time script rather than a build plugin",
       "why": "Ties artifact freshness to the command CI already runs on every PR (pnpm test) rather than the heavier, less-frequent pnpm build; satisfies FR-007s module-boundary constraint since it is pure data generation via tsx, no bundler needed",
       "rejected": "A Vite build plugin emitting the artifact during pnpm build"
+    },
+    {
+      "decision": "Tracking reconciled against PR #1685 (merged 2026-08-25, commit e9a3a190): 21/22 tasks verified done from the diff; T017 (manual scratch-branch drift-and-dry-run walkthrough) left unchecked as not verifiable retroactively — no artifact/evidence of that specific manual step found in the diff, PR body, or commit trailers, though the automated coverage (checkSpecRef tests, missing-artifact degradation path, km-verification review) exercises the same code paths",
+      "why": "Issue-closure discipline: check a box only when the shipped diff genuinely satisfies it, not because the PR merged",
+      "rejected": "Rubber-stamping all 22 tasks as done because the feature shipped"
     }
   ]
 }

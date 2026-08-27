@@ -4,7 +4,7 @@
   "branch": "048-base-facets-in-ir",
   "selectedAt": "2026-07-24T01:27:59.685Z",
   "currentStep": "tasks",
-  "status": "ready-to-implement",
+  "status": "implemented",
   "history": [
     {
       "step": "specify",
