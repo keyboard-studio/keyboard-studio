@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-08-20",
+  "lastUpdated": "2026-08-28",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -304,7 +304,7 @@
     },
     "specs/008-data-flow": {
       "title": "Feature spec — Data flow (spec.md §8)",
-      "hash": "sha256:3c2ed2a28f95f6bb",
+      "hash": "sha256:bf8697ce8a2f981a",
       "status": "partial",
       "implements": [
         "packages/contracts/src/surveySession.ts",
@@ -766,14 +766,6 @@
     "specs/064-keyboard-attribution": {
       "title": "Feature Specification: Keyboard attribution and license provenance",
       "hash": "sha256:62234650d80a801f",
-      "status": "unreviewed",
-      "implements": [],
-      "decisions": [],
-      "notes": ""
-    },
-    "specs/062-canonical-context-tolerance": {
-      "title": "Feature Specification: Canonical-equivalence context tolerance",
-      "hash": "sha256:2dcbb535f9285319",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
