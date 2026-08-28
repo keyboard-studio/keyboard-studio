@@ -287,7 +287,7 @@ describe("MarksSeriesStep — lowercase-only base choices (spec 049)", () => {
     expect(screen.getByLabelText(/^a can carry/)).toBeTruthy();
   });
 
-  it("#1675: a 'mixed' casing facet value gates the fold ON — same as 'cased', not 'caseless'", () => {
+  it("spec 048 FR-006 sibling: a 'mixed' casing facet value gates the fold ON — same as 'cased', not 'caseless'", () => {
     // Same bases/marks as seedCasedAlphabet, but the facet reads "mixed" (the
     // keyboard attests both a cased and a caseless script — e.g. a Greek+Latin
     // transliteration keyboard with a trace caseless script). Every base here

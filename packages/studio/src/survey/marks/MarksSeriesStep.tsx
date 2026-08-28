@@ -216,7 +216,7 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
   // still does the actual uppercase/lowercase PAIR derivation once the gate
   // is open (spec 049's follow-up note).
   //
-  // "mixed" opens the gate too (#1675): the facet's own definition of mixed is
+  // "mixed" opens the gate too: the facet's own definition of mixed is
   // "attests both a cased AND a caseless script" (casing.ts's deriveCasingFacet),
   // not "attests two cased scripts" — and either way, everything below this
   // gate is already per-character via caseCounterpart's Unicode category test,
