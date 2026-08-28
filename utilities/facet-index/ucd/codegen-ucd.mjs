@@ -470,13 +470,28 @@ writeIfChanged(ENGINE_GENERATED_FILE, engineGenerated, ENGINE_GENERATED_DIR);
 
 // ---------------------------------------------------------------------------
 // Emit data/SOURCES.json (mirrors manifest.referencePins shape)
+//
+// SOURCES.json is a SHARED manifest — other tools (e.g. spec 052's
+// base-layouts.json relocation) pin their own reference data in the same
+// file. Merge this run's UCD entries into whatever is already there by
+// `file` key rather than replacing the array outright, or a bare run of
+// this script silently deletes every entry another tool added.
 // ---------------------------------------------------------------------------
 
+let existingSources = { files: [] };
+if (existsSync(SOURCES_FILE)) {
+  try {
+    existingSources = JSON.parse(readFileSync(SOURCES_FILE, "utf8"));
+  } catch (e) {
+    fail(`${rel(SOURCES_FILE)} exists but failed to parse: ${e.message}`);
+  }
+}
+const ucdFiles = new Set(pin.files.map((entry) => entry.path));
+const otherEntries = (existingSources.files ?? []).filter((entry) => !ucdFiles.has(entry.file));
+const ucdEntries = [...pin.files].map((entry) => ({ file: entry.path, sha256: actuals.get(entry.path).sha256 }));
 const sources = {
   unicodeVersion: pin.unicodeVersion,
-  files: [...pin.files]
-    .map((entry) => ({ file: entry.path, sha256: actuals.get(entry.path).sha256 }))
-    .sort((a, b) => a.file.localeCompare(b.file)),
+  files: [...otherEntries, ...ucdEntries].sort((a, b) => a.file.localeCompare(b.file)),
 };
 writeIfChanged(SOURCES_FILE, JSON.stringify(sources, null, 2) + "\n", dirname(SOURCES_FILE));
 
