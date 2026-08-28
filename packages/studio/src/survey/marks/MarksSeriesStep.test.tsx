@@ -287,12 +287,14 @@ describe("MarksSeriesStep — lowercase-only base choices (spec 049)", () => {
     expect(screen.getByLabelText(/^a can carry/)).toBeTruthy();
   });
 
-  it("spec 048 FR-006 sibling: a 'mixed' casing facet value gates OFF the fold — identical to caseless", () => {
-    // Same bases/marks as seedCasedAlphabet, but the facet reads "mixed"
-    // (the keyboard attests both a cased and a caseless script). isCasedBase
-    // is a strict `=== "cased"` check, so "mixed" must behave exactly like
-    // "caseless": no lowercase fold, no case-pair count, no auto-expansion of
-    // the uppercase counterparts into the worklist.
+  it("spec 048 FR-006 sibling: a 'mixed' casing facet value gates the fold ON — same as 'cased', not 'caseless'", () => {
+    // Same bases/marks as seedCasedAlphabet, but the facet reads "mixed" (the
+    // keyboard attests both a cased and a caseless script — e.g. a Greek+Latin
+    // transliteration keyboard with a trace caseless script). Every base here
+    // (e/E, a/A) is still individually Latin and cased — caseCounterpart's
+    // per-character Unicode-category test folds exactly those, unaffected by
+    // whatever OTHER caseless script the keyboard also attests — so "mixed"
+    // must behave identically to "cased", not "caseless".
     useWorkingCopyStore.setState({
       baseIr: { ...makeTestIR([]), facets: { casing: { value: "mixed", provenance: "derived" } } },
     });
@@ -313,32 +315,31 @@ describe("MarksSeriesStep — lowercase-only base choices (spec 049)", () => {
     act(() => {
       render(<MarksSeriesStep onComplete={onComplete} />);
     });
-    // No fold: every base is offered as its own choice.
-    expect(screen.getByLabelText(/^E can carry/)).toBeTruthy();
-    expect(screen.getByLabelText(/^A can carry/)).toBeTruthy();
+    // Folded: uppercase E/A are not offered as their own choice.
+    expect(screen.queryByLabelText(/^E can carry/)).toBeNull();
+    expect(screen.queryByLabelText(/^A can carry/)).toBeNull();
     expect(screen.getByLabelText(/^e can carry/)).toBeTruthy();
     expect(screen.getByLabelText(/^a can carry/)).toBeTruthy();
-    // No case-pair count surfaced (casePairCount === 0).
-    expect(screen.getByTestId("marks-attachment").textContent).not.toContain(
-      "capital/lowercase pair",
+    // Case-pair count surfaced, same as the "cased" happy path.
+    expect(screen.getByTestId("marks-attachment").textContent).toContain(
+      "2 capital/lowercase pairs",
     );
     for (let i = 0; i < 6 && onComplete.mock.calls.length === 0; i++) {
       fireEvent.click(screen.getByTestId("marks-continue"));
     }
     const result = onComplete.mock.calls[0]?.[0] as SurveyPhaseResult;
-    // Uppercase bases were never checked/attested and the gate is OFF, so no
-    // counterpart expansion ran to attach them automatically — they surface
-    // as ordinary blocked combinations, exactly like the "caseless" case.
+    // The gate is ON, so counterpart expansion attached the uppercase bases
+    // automatically — they are NOT blocked combinations.
     const blocked = result.marksWorklist?.blockedCombinations ?? [];
-    expect(blocked).toContainEqual({ base: "E", mark: ACUTE });
-    expect(blocked).toContainEqual({ base: "A", mark: ACUTE });
+    expect(blocked).not.toContainEqual({ base: "E", mark: ACUTE });
+    expect(blocked).not.toContainEqual({ base: "A", mark: ACUTE });
   });
 
   it("spec 048 FR-006 sibling: no 'casing' facet entry at all (undetermined, baseIr present) gates OFF the fold — identical to caseless", () => {
     // baseIr is present but its `facets` map carries no "casing" key at all
     // (e.g. a fresh IR that never ran deriveFacets). getEffectiveFacet falls
     // through override -> derived -> "undetermined", so .value is undefined,
-    // not "cased" — isCasedBase must read false, same as caseless/mixed.
+    // neither "cased" nor "mixed" — isCasedBase must read false, same as caseless.
     useWorkingCopyStore.setState({
       baseIr: { ...makeTestIR([]), facets: {} },
     });
