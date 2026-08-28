@@ -66,6 +66,7 @@
   "content.criteria.19_2-import-attribution-in-history-md.description": "Lorsqu'un clavier a été adapté à partir d'un clavier de release/, HISTORY.md doit contenir une puce « Adapted from <sourcePath> » sous l'entrée 1.0. Appliqué automatiquement par le scaffolder au moment de l'émission (D14, porteur obligatoire).",
   "content.criteria.1_1-no-files-outside-keyboard-folder.description": "Aucun fichier modifié en dehors du propre dossier du clavier",
   "content.criteria.1_10-kpj-current-format.description": "Le fichier `.kpj` utilise le format de fichier de projet actuel/le plus récent (le modèle du scaffolder intègre la version de schéma `.kpj` actuelle, littéralement `version=\"10.0\"` à l'ère Keyman Developer 17/18 ; mettre à jour cette note si le format évolue)",
+  "content.criteria.1_10b-kpj-format-adapted.description": "",
   "content.criteria.1_11-no-kpj-user-committed.description": "Aucun fichier `.kpj.user` committé",
   "content.criteria.1_12-no-build-folder-committed.description": "Aucun contenu du dossier `build/` committé",
   "content.criteria.1_13-no-stray-scratch-files.description": "Aucun fichier de test ou brouillon égaré dans le dossier du clavier",
