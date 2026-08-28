@@ -215,8 +215,17 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
   // machinery below runs at all. `caseCounterpart` itself is unchanged and
   // still does the actual uppercase/lowercase PAIR derivation once the gate
   // is open (spec 049's follow-up note).
-  const isCasedBase =
-    baseIr != null && getEffectiveFacet(baseIr, CASING_FACET_ID).value === "cased";
+  //
+  // "mixed" opens the gate too (#1675): the facet's own definition of mixed is
+  // "attests both a cased AND a caseless script" (casing.ts's deriveCasingFacet),
+  // not "attests two cased scripts" — and either way, everything below this
+  // gate is already per-character via caseCounterpart's Unicode category test,
+  // which returns null for a caseless-script character regardless of what the
+  // keyboard's OTHER attested scripts are. Opening the gate for "mixed" folds
+  // exactly the cased subset and leaves caseless characters alone; it doesn't
+  // require new filtering, because that's what these primitives already do.
+  const casingValue = baseIr != null ? getEffectiveFacet(baseIr, CASING_FACET_ID).value : undefined;
+  const isCasedBase = casingValue === "cased" || casingValue === "mixed";
   // Marks questions offer only lowercase/caseless bases (spec 049, US1); the
   // uppercase counterpart's attachment is derived, not asked. The affordance
   // count is pinned to the folded lowercase view (SC-004), and the shared fold
