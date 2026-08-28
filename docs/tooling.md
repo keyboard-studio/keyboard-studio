@@ -72,6 +72,10 @@ ESLint over `packages/*/src`, then in order:
 - `pnpm run token-lint` — [utilities/token-lint/index.js](../utilities/token-lint/index.js), bans
   hard-coded hex/rgb/hsl color literals in `packages/studio/src/**/*.ts(x)` against a baseline
   ratchet (see utilities/token-lint/README.md).
+- `pnpm run spec-number-lint` —
+  [utilities/spec-number-lint/index.js](../utilities/spec-number-lint/index.js), fails on two
+  `specs/NNN-*` folders claiming the same number (#1505's root-cause fix — a feature number is
+  claimed on a branch and nothing checked it was still free at merge time).
 
 ### Catalog sort order
 
