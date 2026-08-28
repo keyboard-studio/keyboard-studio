@@ -16,7 +16,7 @@ criteria catalog at `packages/contracts/data/criteria.json`, and the runtime **z
 (`src/schemas.ts`) that mirror the locked `Pattern`/`Criterion` types. The dependency root —
 everything else builds to it.
 
-The criteria catalog currently holds 148 rows (133 repo-hygiene + 12 §18 DISCUS design-heuristic
+The criteria catalog currently holds 149 rows (133 repo-hygiene + 12 §18 DISCUS design-heuristic
 at Day-1 lock, plus post-lock adjustments). That is a **descriptive count, not a locked
 constant** — see spec §11 and
 [docs/discus-principles-integration.md](discus-principles-integration.md).
