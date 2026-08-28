@@ -479,10 +479,12 @@ writeIfChanged(ENGINE_GENERATED_FILE, engineGenerated, ENGINE_GENERATED_DIR);
 // ---------------------------------------------------------------------------
 
 let existingSources = { files: [] };
-try {
-  existingSources = JSON.parse(readFileSync(SOURCES_FILE, "utf8"));
-} catch {
-  /* not yet present, or unparsable — start from an empty manifest */
+if (existsSync(SOURCES_FILE)) {
+  try {
+    existingSources = JSON.parse(readFileSync(SOURCES_FILE, "utf8"));
+  } catch (e) {
+    fail(`${rel(SOURCES_FILE)} exists but failed to parse: ${e.message}`);
+  }
 }
 const ucdFiles = new Set(pin.files.map((entry) => entry.path));
 const otherEntries = (existingSources.files ?? []).filter((entry) => !ucdFiles.has(entry.file));
