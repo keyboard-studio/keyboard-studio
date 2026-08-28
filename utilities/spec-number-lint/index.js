@@ -12,7 +12,7 @@
 //
 // CommonJS, plain `node`. No external dependencies (only fs + path).
 
-const { readdirSync, statSync } = require("node:fs");
+const { existsSync, readdirSync, statSync } = require("node:fs");
 const path = require("node:path");
 
 const REPO_ROOT = path.resolve(__dirname, "../..");
@@ -21,12 +21,23 @@ const SPECS_DIR = path.join(REPO_ROOT, "specs");
 const DIR_RE = /^(\d{3})-(.+)$/;
 
 function main() {
-  const entries = readdirSync(SPECS_DIR).filter((name) =>
-    statSync(path.join(SPECS_DIR, name)).isDirectory(),
-  );
+  if (!existsSync(SPECS_DIR)) {
+    console.error("[ERROR] spec-number-lint: specs/ directory not found");
+    process.exit(1);
+  }
 
   const byNumber = new Map(); // "057" -> ["057-bulletproof-navigation", ...]
-  for (const name of entries) {
+  let specFolderCount = 0;
+  for (const name of readdirSync(SPECS_DIR)) {
+    let st;
+    try {
+      st = statSync(path.join(SPECS_DIR, name));
+    } catch (e) {
+      // Skip entries we can't stat (broken symlinks, permission errors, etc.)
+      continue;
+    }
+    if (!st.isDirectory()) continue;
+    specFolderCount++;
     const m = DIR_RE.exec(name);
     if (!m) continue; // non-numbered dirs (if any) aren't this lint's concern
     const number = m[1];
@@ -39,7 +50,7 @@ function main() {
     .sort((a, b) => a[0].localeCompare(b[0]));
 
   if (collisions.length === 0) {
-    console.log(`[OK] spec-number-lint: ${entries.length} spec folder(s), no number collisions`);
+    console.log(`[OK] spec-number-lint: ${specFolderCount} spec folder(s), no number collisions`);
     process.exit(0);
   }
 
