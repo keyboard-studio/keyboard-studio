@@ -20,6 +20,7 @@
 // were deleted (structural sharing), matching applyCarveToVfs's prior behavior.
 
 import type { KeyboardIR } from "@keyboard-studio/contracts";
+import { resolveCarveCascade } from "./carveCascade.js";
 
 /**
  * Produce a deletion-filtered copy of `baseIr`.
@@ -27,6 +28,11 @@ import type { KeyboardIR } from "@keyboard-studio/contracts";
  * Removes whole nodes (`deletedNodeIds`) from `stores`, `groups` (and rules
  * within surviving groups), and `raw`. `header` and `comments` pass through
  * untouched. `baseIr` is never mutated.
+ *
+ * The "what does this deletion set actually touch" resolution (including the
+ * group→rules cascade) is shared with the text-splice carve path via
+ * {@link resolveCarveCascade}, so the two paths can never semantically drift
+ * apart on which nodes a given deletion removes.
  *
  * NOTE: store-slot item rewrites (the `<storeNodeId>#<index>` nul-filler path)
  * are NOT handled here — they are applied by {@link applyStoreSlotRemovals}
@@ -41,22 +47,23 @@ export function carveFilterIr(
   baseIr: KeyboardIR,
   deletedNodeIds: ReadonlySet<string>,
 ): KeyboardIR {
+  const cascade = resolveCarveCascade(baseIr, deletedNodeIds);
   return {
     ...baseIr,
     // Filter deleted stores.
-    stores: baseIr.stores.filter((s) => !deletedNodeIds.has(s.nodeId)),
+    stores: baseIr.stores.filter((s) => !cascade.deletedStoreIds.has(s.nodeId)),
     // Filter deleted groups; within surviving groups, filter deleted rules.
     groups: baseIr.groups
-      .filter((g) => !deletedNodeIds.has(g.nodeId))
+      .filter((g) => !cascade.deletedGroupIds.has(g.nodeId))
       .map((g) => {
-        const filteredRules = g.rules.filter((r) => !deletedNodeIds.has(r.nodeId));
+        const filteredRules = g.rules.filter((r) => !cascade.deletedRuleIds.has(r.nodeId));
         // Only allocate a new group object when rules actually changed.
         if (filteredRules.length === g.rules.length) return g;
         return { ...g, rules: filteredRules };
       }),
     // Raw fragments: filter out any deleted fragment nodes; survivors are
     // preserved so emit()'s position-faithful path can interleave them.
-    raw: baseIr.raw.filter((f) => !deletedNodeIds.has(f.nodeId)),
+    raw: baseIr.raw.filter((f) => !cascade.deletedRawIds.has(f.nodeId)),
     // Comments are not individually deleteable via carve; pass through.
     comments: baseIr.comments,
   };

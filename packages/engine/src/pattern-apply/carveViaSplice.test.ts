@@ -1,0 +1,182 @@
+// Tests for carveViaSplice — the text-splice carve projection (refs #391).
+//
+// Built via real parse() calls on fixture .kmn strings (not hand-built IR):
+// splice's whole premise depends on real sourceLine correspondence to the
+// original text, which only parse() produces.
+
+import { describe, it, expect } from "vitest";
+import { parse } from "../codec/parse.js";
+import { carveViaSplice } from "./carveViaSplice.js";
+
+describe("carveViaSplice", () => {
+  it("removes a single-line rule and preserves every surviving byte verbatim", () => {
+    const kmn =
+      `store(&VERSION) '10.0'\n` +
+      `store(&NAME) 'Test'\n` +
+      `\n` +
+      `begin Unicode > use(main)\n` +
+      `\n` +
+      `group(main) using keys\n` +
+      `\n` +
+      `+ [K_A] > 'a'\n` +
+      `+ [K_B] > 'b' c keep this comment\n` +
+      `+ [K_C] > 'c'\n`;
+    const { ir } = parse(kmn, "test");
+    const ruleB = ir.groups[0]!.rules.find((r) => r.output.some((o) => o.kind === "char" && o.value === "b"))!;
+
+    const result = carveViaSplice(kmn, ir, new Set([ruleB.nodeId]));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.text).not.toContain("keep this comment");
+    expect(result.text).not.toContain("[K_B]");
+    // Every other original line survives byte-for-byte, in original order.
+    expect(result.text).toContain("store(&VERSION) '10.0'");
+    expect(result.text).toContain("+ [K_A] > 'a'");
+    expect(result.text).toContain("+ [K_C] > 'c'");
+    const lines = result.text.split("\n");
+    expect(lines.indexOf("+ [K_A] > 'a'")).toBeLessThan(lines.indexOf("+ [K_C] > 'c'"));
+  });
+
+  it("removes ALL folded physical lines of a backslash-continuation rule, nothing more", () => {
+    const kmn =
+      `store(&VERSION) '10.0'\n` +
+      `store(&NAME) 'Test'\n` +
+      `\n` +
+      `begin Unicode > use(main)\n` +
+      `\n` +
+      `group(main) using keys\n` +
+      `\n` +
+      `+ [K_A] > 'a'\n` +
+      `+ [K_B] > \\\n` +
+      `  'b'\n` +
+      `+ [K_C] > 'c'\n`;
+    const { ir } = parse(kmn, "test");
+    const ruleB = ir.groups[0]!.rules.find((r) => r.output.some((o) => o.kind === "char" && o.value === "b"))!;
+
+    const result = carveViaSplice(kmn, ir, new Set([ruleB.nodeId]));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.text).not.toContain("[K_B]");
+    expect(result.text).not.toContain("'b'");
+    expect(result.text).toContain("+ [K_A] > 'a'");
+    expect(result.text).toContain("+ [K_C] > 'c'");
+  });
+
+  it("hazard case: a store interleaved between a deleted group's rules survives untouched, in place", () => {
+    const kmn =
+      `store(&VERSION) '10.0'\n` +
+      `store(&NAME) 'Test'\n` +
+      `\n` +
+      `begin Unicode > use(other)\n` +
+      `\n` +
+      `group(main) using keys\n` +
+      `\n` +
+      `+ [K_A] > 'a'\n` +
+      `store(interloper) 'still here'\n` +
+      `+ [K_B] > 'b'\n` +
+      `\n` +
+      `group(other) using keys\n` +
+      `\n` +
+      `+ [K_C] > 'c'\n`;
+    const { ir } = parse(kmn, "test");
+    const mainGroup = ir.groups.find((g) => g.name === "main")!;
+
+    const result = carveViaSplice(kmn, ir, new Set([mainGroup.nodeId]));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    // The whole "main" group (header + both its rules) is gone...
+    expect(result.text).not.toContain("group(main)");
+    expect(result.text).not.toContain("[K_A]");
+    expect(result.text).not.toContain("[K_B]");
+    // ...but the interleaved store survives verbatim, since it was never part
+    // of the deletion set — a blanket header-to-last-rule range would have
+    // wrongly swallowed it.
+    expect(result.text).toContain("store(interloper) 'still here'");
+    // The other group (the entry group here) is untouched.
+    expect(result.text).toContain("group(other)");
+    expect(result.text).toContain("[K_C]");
+  });
+
+  it("a freestanding comment before a deleted rule survives; the rule's own trailing comment does not", () => {
+    const kmn =
+      `store(&VERSION) '10.0'\n` +
+      `store(&NAME) 'Test'\n` +
+      `\n` +
+      `begin Unicode > use(main)\n` +
+      `\n` +
+      `group(main) using keys\n` +
+      `\n` +
+      `c a freestanding note about K_B\n` +
+      `+ [K_B] > 'b' c inline note\n` +
+      `+ [K_A] > 'a'\n`;
+    const { ir } = parse(kmn, "test");
+    const ruleB = ir.groups[0]!.rules.find((r) => r.output.some((o) => o.kind === "char" && o.value === "b"))!;
+
+    const result = carveViaSplice(kmn, ir, new Set([ruleB.nodeId]));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.text).toContain("a freestanding note about K_B");
+    expect(result.text).not.toContain("inline note");
+    expect(result.text).not.toContain("[K_B]");
+    expect(result.text).toContain("+ [K_A] > 'a'");
+  });
+
+  it("resolves a multi-line RawKmnFragment's span correctly (sourceText has no embedded newlines)", () => {
+    const kmn =
+      `store(&VERSION) '10.0'\n` +
+      `store(&NAME) 'Test'\n` +
+      `store(myFlag) 'x'\n` +
+      `\n` +
+      `begin Unicode > use(main)\n` +
+      `\n` +
+      `group(main) using keys\n` +
+      `\n` +
+      `+ [K_A] > 'a'\n` +
+      `+ [K_B] > save(myFlag, \\\n` +
+      `  1)\n` +
+      `+ [K_C] > 'c'\n`;
+    const { ir } = parse(kmn, "test");
+    expect(ir.raw.length).toBeGreaterThan(0);
+    const fragment = ir.raw[0]!;
+
+    const result = carveViaSplice(kmn, ir, new Set([fragment.nodeId]));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.text).not.toContain("save(myFlag");
+    expect(result.text).not.toContain("1)");
+    expect(result.text).toContain("+ [K_A] > 'a'");
+    expect(result.text).toContain("+ [K_C] > 'c'");
+  });
+
+  it("returns { ok: false } when a deleted node has no resolvable sourceLine (defensive)", () => {
+    const kmn =
+      `store(&VERSION) '10.0'\n` +
+      `store(&NAME) 'Test'\n` +
+      `\n` +
+      `begin Unicode > use(main)\n` +
+      `\n` +
+      `group(main) using keys\n` +
+      `\n` +
+      `+ [K_A] > 'a'\n`;
+    const { ir } = parse(kmn, "test");
+    // A synthesized rule with no sourceLine, spliced into the parsed IR to
+    // simulate a scaffolded/synthesized node reaching carve.
+    const synthetic = {
+      nodeId: "synthetic-rule",
+      context: [{ kind: "vkey" as const, name: "K_Z", modifiers: [] }],
+      output: [{ kind: "char" as const, value: "z" }],
+    };
+    const irWithSynthetic = {
+      ...ir,
+      groups: [{ ...ir.groups[0]!, rules: [...ir.groups[0]!.rules, synthetic] }],
+    };
+
+    const result = carveViaSplice(kmn, irWithSynthetic, new Set(["synthetic-rule"]));
+    expect(result.ok).toBe(false);
+  });
+});
