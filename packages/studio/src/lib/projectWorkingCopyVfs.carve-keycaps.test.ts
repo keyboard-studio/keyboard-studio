@@ -22,6 +22,7 @@ import { describe, it, expect } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import type { IRGroup, IRRule, IRStore, MechanismAssignment, StoreItem } from "@keyboard-studio/contracts";
+import { parseKmn } from "@keyboard-studio/engine";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.js";
 
 // ---------------------------------------------------------------------------
@@ -98,25 +99,24 @@ function makeVfs(keyboardId: string) {
 }
 
 /**
- * Simple two-key desktop layout IR: a base ('a', kept — in the declared
- * alphabet) and a base ('q', carved — a base character absent from the
- * declared alphabet), each produced by its own whole vkey-context rule (no
+ * Simple two-key desktop layout: a base ('a', kept — in the declared alphabet)
+ * and a base ('q', carved — a base character absent from the declared
+ * alphabet), each produced by its own whole vkey-context rule (no
  * stores/deadkeys involved). Used by AC#3 to prove the desktop `.kmn` rule
  * itself is removed by a whole-rule carve, not just its keycap label.
+ *
+ * A real parsed `.kmn` (not a hand-built IR): source spans resolve, so the
+ * splice-first carve path (refs #391) runs warning-free — the same path
+ * production takes for an imported keyboard.
  */
-function makeSimpleDesktopIr() {
-  const keepRule: IRRule = {
-    nodeId: "rule#keep_a",
-    context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
-    output: [{ kind: "char", value: "a" }],
-  };
-  const carveRule: IRRule = {
-    nodeId: "rule#carve_q",
-    context: [{ kind: "vkey", name: "K_Q", modifiers: [] }],
-    output: [{ kind: "char", value: "q" }],
-  };
-  return makeTestIR([makeGroup("group#main", "main", [keepRule, carveRule])], []);
-}
+const SIMPLE_KMN = [
+  "store(&VERSION) '10.0'",
+  "begin Unicode > use(main)",
+  "group(main) using keys",
+  "+ [K_A] > 'a'",
+  "+ [K_Q] > 'q'",
+  "",
+].join("\n");
 
 const SIMPLE_KVKS = `<visualkeyboard>
 <header><version>10.0</version></header>
@@ -130,7 +130,7 @@ const SIMPLE_KVKS = `<visualkeyboard>
 
 function makeSimpleVfs(keyboardId: string) {
   return createVirtualFS([
-    { path: `source/${keyboardId}.kmn`, content: "c stub\n", isBinary: false },
+    { path: `source/${keyboardId}.kmn`, content: SIMPLE_KMN, isBinary: false },
     { path: `source/${keyboardId}.kvks`, content: SIMPLE_KVKS, isBinary: false },
   ]);
 }
@@ -218,8 +218,12 @@ describe("projectWorkingCopyVfs carve keycaps end-to-end — real engine, no moc
   });
 
   it("AC#3: a whole-rule carve of a base char absent from the declared alphabet removes it from the desktop .kmn AND blanks its .kvks keycap, leaving a declared-alphabet char untouched", () => {
-    const ir = makeSimpleDesktopIr();
+    const { ir } = parseKmn(SIMPLE_KMN, "test_kb");
     const vfs = makeSimpleVfs("test_kb");
+    const carveRule = ir.groups
+      .flatMap((g) => g.rules)
+      .find((r) => r.output.some((o) => o.kind === "char" && o.value === "q"));
+    if (carveRule === undefined) throw new Error("fixture rule producing 'q' not found");
 
     // Author declared an alphabet of just 'a' — 'q' is a base character the
     // base keyboard has but the author doesn't want, so its whole rule is
@@ -229,7 +233,7 @@ describe("projectWorkingCopyVfs carve keycaps end-to-end — real engine, no moc
       vfs,
       keyboardId: "test_kb",
       baseIr: ir,
-      deletedNodeIds: new Set(["rule#carve_q"]),
+      deletedNodeIds: new Set([carveRule.nodeId]),
       deletedItemIds: new Set(),
       assignments: [],
       getPattern: () => undefined,
