@@ -1,90 +1,33 @@
-// Adapter over vendored CLDR exemplar characters (UTS #35 / LDML). The exemplar set is
-// the authoritative answer to "which characters does this language actually write" --
-// it drives BOTH key availability (a base key whose letter isn't an exemplar is free)
-// and, optionally, the special-character inventory itself (the non-ASCII exemplars).
+// Adapter over the engine's canonical exemplar sourcing (spec 044 FR-015: ONE
+// exemplar path repo-wide). kbgen's former local copies of parseUnicodeSet /
+// exemplarString / loadExemplars are retired -- they predated spec 044 and
+// still carried the escape-handling and set-operation defects the engine's
+// parser fixed (see INTEGRATION.md "Retirement note"). Exemplars now come from
+// the engine's pinned CLDR+SLDR index: deterministic, offline, no per-locale
+// data/cldr/*.json snapshots to fetch.
 //
-// Data is per-locale data/cldr/<locale>.json (fetch-data.ts). Returns null if absent.
+// Uppercase augmentation of specials is the engine's own consumer-side
+// derivation (inventoryToExemplarResult); SourcedInventory itself stays a
+// faithful record of what the source attested.
 
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import {
+  loadExemplarSource,
+  sourceExemplars,
+  inventoryToExemplarResult,
+} from '../../../packages/engine/src/character-discovery/exemplarSource.ts';
+import type { ExemplarResult } from '../../../packages/engine/src/character-discovery/cldr.ts';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
+export type { ExemplarResult };
 
-export interface ParsedExemplars {
-  used: Set<string>;
-  digraphs: string[];
-  specials: string[];
-}
-
-export interface LoadedExemplars {
-  raw: string;
-  used: Set<string>;
-  digraphs: string[];
-  specials: string[];
-}
-
-export function exemplarString(locale: string): string | null {
-  const file = path.join(__dirname, '..', 'data', 'cldr', `${locale}.json`);
-  let j: Record<string, unknown>;
-  try { j = JSON.parse(fs.readFileSync(file, 'utf8')); } catch { return null; }
-  const main = (j.main as Record<string, unknown> | undefined)?.[locale];
-  const ch = (main as Record<string, unknown> | undefined)?.characters as Record<string, unknown> | undefined;
-  return (ch?.exemplarCharacters as string) || null;
-}
-
-// Minimal UnicodeSet parser for the "[a b ɓ ... {sh} {ts} ... a-z]" exemplar syntax.
-// Returns { used:Set<char single>, digraphs:[str], specials:[char non-ASCII single] }.
-export function parseUnicodeSet(str: string): ParsedExemplars {
-  const used = new Set<string>();
-  const digraphs: string[] = [];
-  let s = str.trim();
-  if (s.startsWith('[') && s.endsWith(']')) s = s.slice(1, -1);
-  const chars = [...s];
-
-  for (let i = 0; i < chars.length; i++) {
-    const c = chars[i];
-    if (c === ' ') continue;
-
-    if (c === '\\') {
-      const n = chars[++i];
-      if (n) used.add(n);
-      continue;
-    }
-
-    if (c === '{') {
-      let g = '';
-      while (i + 1 < chars.length && chars[i + 1] !== '}') g += chars[++i];
-      i++; // skip '}'
-      digraphs.push(g);
-      for (const gc of g) used.add(gc);
-      continue;
-    }
-
-    // range a-z
-    if (chars[i + 1] === '-' && chars[i + 2] && chars[i + 2] !== ' ') {
-      const start = c.codePointAt(0)!, end = chars[i + 2].codePointAt(0)!;
-      for (let cp = start; cp <= end; cp++) used.add(String.fromCodePoint(cp));
-      i += 2;
-      continue;
-    }
-
-    used.add(c);
-  }
-
-  const specials = [...used].filter((ch) => ch.codePointAt(0)! > 0x7f && /\p{L}/u.test(ch));
-  return { used, digraphs, specials };
-}
-
-// Load exemplars for a locale. specials include uppercase variants where they differ.
-export function loadExemplars(locale: string): LoadedExemplars | null {
-  const str = exemplarString(locale);
-  if (!str) return null;
-  const parsed = parseUnicodeSet(str);
-  const specials = new Set(parsed.specials);
-  for (const ch of parsed.specials) {
-    const up = ch.toUpperCase();
-    if (up !== ch && [...up].length === 1) specials.add(up);
-  }
-  return { raw: str, used: parsed.used, digraphs: parsed.digraphs, specials: [...specials] };
+/**
+ * Exemplars for a BCP47 tag, from the engine's pinned CLDR+SLDR index, adapted
+ * to the ExemplarResult shape (used / digraphs / specials) the CLI consumes.
+ * Returns null when neither source covers the tag or its confidence gate fires
+ * -- the caller falls back to --chars/--used.
+ */
+export async function loadExemplars(locale: string): Promise<ExemplarResult | null> {
+  await loadExemplarSource();
+  const inv = sourceExemplars(locale);
+  if (inv === null) return null;
+  return inventoryToExemplarResult(inv);
 }
