@@ -7,11 +7,13 @@
 // this single function so the filtered IR is byte-identical across both paths.
 //
 // Deletion semantics (spec §8/§12 "re-projected layers"):
-//   - IRGroup nodes: the entire group (header + all rules) is dropped.
+//   - IRGroup nodes: the entire group (header + all rules + its group-owned
+//     RawKmnFragment nodes) is dropped.
 //   - IRRule nodes: the specific rule is dropped from its parent group.
 //   - IRStore nodes: the store is dropped.
 //   - RawKmnFragment nodes: the raw fragment is dropped.
-//   - IRComment nodes: comments are not individually deleteable via carve.
+//   - IRComment nodes: not individually deleteable via carve, but a comment
+//     anchored to a deleted node follows it out (see carveCascade's header).
 //
 // baseIr is NEVER mutated. A shallow copy of the IR is constructed with the
 // filtered arrays. Groups whose rules are all deleted are NOT auto-deleted (the
@@ -26,8 +28,8 @@ import { resolveCarveCascade } from "./carveCascade.js";
  * Produce a deletion-filtered copy of `baseIr`.
  *
  * Removes whole nodes (`deletedNodeIds`) from `stores`, `groups` (and rules
- * within surviving groups), and `raw`. `header` and `comments` pass through
- * untouched. `baseIr` is never mutated.
+ * within surviving groups), and `raw`, plus comments anchored to any removed
+ * node. `header` passes through untouched. `baseIr` is never mutated.
  *
  * The "what does this deletion set actually touch" resolution (including the
  * group→rules cascade) is shared with the text-splice carve path via
@@ -61,10 +63,14 @@ export function carveFilterIr(
         if (filteredRules.length === g.rules.length) return g;
         return { ...g, rules: filteredRules };
       }),
-    // Raw fragments: filter out any deleted fragment nodes; survivors are
-    // preserved so emit()'s position-faithful path can interleave them.
+    // Raw fragments: filter out any deleted fragment nodes (including those
+    // cascaded from their owning group); survivors are preserved so emit()'s
+    // position-faithful path can interleave them.
     raw: baseIr.raw.filter((f) => !cascade.deletedRawIds.has(f.nodeId)),
-    // Comments are not individually deleteable via carve; pass through.
-    comments: baseIr.comments,
+    // Comments anchored to a deleted node are dropped WITH it — previously
+    // emit() dropped them only by accident (it never looks up a filtered-out
+    // rule's nodeId); filtering here makes the drop deliberate and keeps this
+    // path in lockstep with carveViaSplice's comment handling.
+    comments: baseIr.comments.filter((c) => !cascade.deletedCommentIds.has(c.nodeId)),
   };
 }

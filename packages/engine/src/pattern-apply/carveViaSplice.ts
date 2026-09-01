@@ -5,7 +5,15 @@
 // in `deletedNodeIds`, leaving every surviving byte of the source untouched —
 // comments, whitespace, store ordering, everything the IR->emit() round-trip
 // is lossy on (see applyCarveToVfs.ts's header for the corpus-divergence
-// background).
+// background). "Surviving" is decided by resolveCarveCascade: a comment
+// anchored to a deleted node is deleted WITH it (it would otherwise read as
+// documentation of whatever line physically follows), while freestanding
+// comments always survive.
+//
+// One caveat to "untouched": line terminators are normalized to LF for the
+// whole file (split(/\r?\n/) + join("\n")) — the projection pipeline's
+// existing LF-only invariant (see projectWorkingCopyVfs.flagParity.test.ts),
+// not something this path preserves per-line.
 //
 // Precondition (enforced by the caller, applyCarveToVfs.ts, not here): the
 // passed `baseIr`'s node source positions must correspond exactly to
@@ -135,6 +143,18 @@ export function carveViaSplice(
     const span = resolveSpan(logicalLinesByStart, f.sourceLine);
     if (span === undefined) {
       return { ok: false, reason: `raw fragment "${f.nodeId}" has no resolvable source span` };
+    }
+    spans.push(span);
+  }
+
+  // Comments anchored to a deleted node follow it out (see carveCascade's
+  // header). A trailing comment's span is its anchor rule's own line, already
+  // covered above — the defensive mergeSpans below absorbs the overlap.
+  for (const c of baseIr.comments) {
+    if (!cascade.deletedCommentIds.has(c.nodeId)) continue;
+    const span = resolveSpan(logicalLinesByStart, c.sourceLine);
+    if (span === undefined) {
+      return { ok: false, reason: `comment "${c.nodeId}" has no resolvable source span` };
     }
     spans.push(span);
   }

@@ -100,29 +100,80 @@ describe("carveViaSplice", () => {
     expect(result.text).toContain("[K_C]");
   });
 
-  it("a freestanding comment before a deleted rule survives; the rule's own trailing comment does not", () => {
+  it("a LEADING comment anchored to a deleted rule is deleted with it; a freestanding comment survives", () => {
+    // `c leading note...` sits directly above the K_B rule, so the parser
+    // anchors it to that rule (anchor: "leading"). Under the resolved comment
+    // semantics it cascades out with its rule — leaving it standing would
+    // misattribute the author's rationale to whatever line follows. The
+    // comment before the group() header is genuinely freestanding (the parser
+    // flushes pending comments at a group header) and must survive.
     const kmn =
       `store(&VERSION) '10.0'\n` +
       `store(&NAME) 'Test'\n` +
       `\n` +
       `begin Unicode > use(main)\n` +
       `\n` +
+      `c freestanding note about the main group\n` +
       `group(main) using keys\n` +
       `\n` +
-      `c a freestanding note about K_B\n` +
+      `c leading note documenting K_B\n` +
       `+ [K_B] > 'b' c inline note\n` +
       `+ [K_A] > 'a'\n`;
     const { ir } = parse(kmn, "test");
     const ruleB = ir.groups[0]!.rules.find((r) => r.output.some((o) => o.kind === "char" && o.value === "b"))!;
+    // Fixture sanity: the parser anchored the note to ruleB, as this test assumes.
+    const leadingNote = ir.comments.find((c) => c.text.includes("leading note"));
+    expect(leadingNote?.anchor).toBe("leading");
+    expect(leadingNote?.anchorRef?.nodeId).toBe(ruleB.nodeId);
 
     const result = carveViaSplice(kmn, ir, new Set([ruleB.nodeId]));
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    expect(result.text).toContain("a freestanding note about K_B");
+    expect(result.text).not.toContain("leading note documenting K_B");
     expect(result.text).not.toContain("inline note");
     expect(result.text).not.toContain("[K_B]");
+    expect(result.text).toContain("c freestanding note about the main group");
     expect(result.text).toContain("+ [K_A] > 'a'");
+  });
+
+  it("regression: deleting a group also splices out its group-owned RawKmnFragment, never stranding it under an earlier group", () => {
+    // Without the group->fragments cascade the fragment's raw line survives
+    // the deletion of its owning group's header, and kmcmplib would attribute
+    // it to whichever group() header precedes it in the spliced file.
+    const kmn =
+      `store(&VERSION) '10.0'\n` +
+      `store(&NAME) 'Test'\n` +
+      `store(myFlag) 'x'\n` +
+      `\n` +
+      `begin Unicode > use(main)\n` +
+      `\n` +
+      `group(main) using keys\n` +
+      `\n` +
+      `+ [K_A] > 'a'\n` +
+      `\n` +
+      `group(extras) using keys\n` +
+      `\n` +
+      `+ [K_B] > save(myFlag, 1)\n` +
+      `+ [K_C] > 'c'\n`;
+    const { ir } = parse(kmn, "test");
+    const extras = ir.groups.find((g) => g.name === "extras")!;
+    const ownedFragment = ir.raw.find((f) => f.groupNodeId === extras.nodeId);
+    // Fixture sanity: the opaque save() rule parsed as a fragment owned by "extras".
+    expect(ownedFragment).toBeDefined();
+
+    const result = carveViaSplice(kmn, ir, new Set([extras.nodeId]));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    // The whole extras group is gone — header, typed rule, AND the owned fragment.
+    expect(result.text).not.toContain("group(extras)");
+    expect(result.text).not.toContain("[K_C]");
+    expect(result.text).not.toContain("save(myFlag");
+    // The surviving group and the fragment-referenced store are untouched.
+    expect(result.text).toContain("group(main)");
+    expect(result.text).toContain("+ [K_A] > 'a'");
+    expect(result.text).toContain("store(myFlag) 'x'");
   });
 
   it("resolves a multi-line RawKmnFragment's span correctly (sourceText has no embedded newlines)", () => {
