@@ -16,8 +16,9 @@
 // Options:
 //   --id <slug>        keyboard id (filenames). Required.
 //   --name <str>       display name. Defaults to --id.
-//   --locale <bcp47>   CLDR locale; derives used letters (-> free keys) and, if --chars is
-//                      omitted, the special inventory from the locale's exemplar characters.
+//   --locale <bcp47>   BCP47 tag; derives used letters (-> free keys) and, if --chars is
+//                      omitted, the special inventory from the engine's pinned CLDR/SLDR
+//                      exemplar index (offline; no fetch step needed).
 //   --chars <str>      explicit inventory of special output characters (overrides locale).
 //   --chars-file <p>   read --chars from a UTF-8 file.
 //   --used <str>       explicit base letters the orthography uses (overrides locale).
@@ -89,20 +90,21 @@ function sourceVersions(): SourceVersions {
   catch { return {}; }
 }
 
-function main() {
+async function main() {
   const o = parseArgs(process.argv);
   if (!o.id) fail('--id is required');
   o.name = o.name || o.id;
 
   const layout = getLayout(o.base);
 
-  // Resolve inventory + used letters: explicit flags win; otherwise derive from CLDR.
+  // Resolve inventory + used letters: explicit flags win; otherwise derive from
+  // the engine's pinned CLDR/SLDR exemplar index (offline, deterministic).
   let chars: string[] | null = null;
   let used: string[] | null = null;
 
   if (o.locale) {
-    const exemplars = loadExemplars(o.locale);
-    if (!exemplars) return fail(`no CLDR exemplar data for locale "${o.locale}" -- fetch it (npx tsx fetch-data.ts ${o.locale}) or pass --chars/--used`);
+    const exemplars = await loadExemplars(o.locale);
+    if (!exemplars) return fail(`no exemplar data for locale "${o.locale}" in the pinned CLDR/SLDR index -- pass --chars/--used`);
     used = [...exemplars.used];
     chars = exemplars.specials;
   }
@@ -156,4 +158,4 @@ function main() {
   console.log(`\nWrote ${wrote.join(', ')} to ${srcDir}\n`);
 }
 
-main();
+await main();
