@@ -17,7 +17,7 @@
 //     copy of the IR, and emit() regenerates `.kmn` text from it. This is a
 //     reconstruction, not a byte-preserving edit — kept because splice's
 //     precondition doesn't always hold: scaffolded/synthesized IR (and
-//     IR already rewritten upstream — see the `forceEmit` gate below) has no
+//     IR already rewritten upstream — see the `irRewritten` gate below) has no
 //     `sourceLine` correspondence to any real text to splice out of.
 //
 // Deletion semantics (spec §8/§12 "re-projected layers"; identical on both
@@ -50,14 +50,19 @@ import { carveViaSplice } from "./carveViaSplice.js";
 /**
  * Options bag for {@link applyCarveToVfs}.
  *
- * - `forceEmit` — when `true`, the function proceeds to re-emit even when
- *   `deletedNodeIds` is empty. Use this when a preceding transform (e.g.
- *   `applyStoreSlotRemovals`) has already modified `baseIr` and the updated IR
- *   must be written into the VFS regardless of whether any whole-node deletions
- *   are present. The entry-group safety gate still applies.
+ * - `irRewritten` — set to `true` when `baseIr` has already been modified since
+ *   it was parsed from the VFS's `.kmn` text: a preceding transform (e.g.
+ *   `applyStoreSlotRemovals`) rewrote store contents, or the caller is the
+ *   spec-014 mutate() seam handing in an already-filtered IR. One flag carries
+ *   both consequences of that single fact, so they can never be set apart:
+ *     1. the IR must be re-emitted even when `deletedNodeIds` is empty (there
+ *        IS an edit to write into the VFS), and
+ *     2. text-splice is never attempted (the IR's node positions no longer
+ *        correspond to the VFS text, so splicing it would delete the wrong lines).
+ *   The entry-group safety gate still applies.
  */
 export interface ApplyCarveToVfsOpts {
-  forceEmit?: boolean;
+  irRewritten?: boolean;
 }
 
 /**
@@ -89,9 +94,9 @@ export function applyCarveToVfs(
   opts?: ApplyCarveToVfsOpts,
 ): { warnings: string[] } {
   const warnings: string[] = [];
-  const forceEmit = opts?.forceEmit === true;
+  const irRewritten = opts?.irRewritten === true;
 
-  if (deletedNodeIds.size === 0 && !forceEmit) {
+  if (deletedNodeIds.size === 0 && !irRewritten) {
     // Nothing to filter — skip the re-emit. The VFS already holds the base .kmn
     // from the fetch step. This is the common path in the early-survey stages.
     return { warnings };
@@ -115,14 +120,12 @@ export function applyCarveToVfs(
 
   // Text-splice eligibility: baseIr's node positions correspond exactly to
   // the VFS's current .kmn text only when nothing has rewritten either since
-  // the keyboard was parsed. `forceEmit` is the existing signal that this
-  // precondition does NOT hold — it's set when a store-slot content rewrite
-  // (applyStoreSlotRemovals) has already changed baseIr's store items, or when
-  // the caller is the spec-014 mutate() seam handing in an already-filtered
-  // IR — in both cases splicing the ORIGINAL text against baseIr's positions
-  // would be wrong, so those calls must keep using filter+re-emit.
+  // the keyboard was parsed. `irRewritten` is the caller's declaration that
+  // this precondition does NOT hold (see ApplyCarveToVfsOpts) — splicing the
+  // ORIGINAL text against a rewritten IR's positions would delete the wrong
+  // lines, so those calls take filter+re-emit.
   let emitted: string | undefined;
-  if (!forceEmit && deletedNodeIds.size > 0) {
+  if (!irRewritten && deletedNodeIds.size > 0) {
     const currentEntry = vfs.get(kmnPath);
     const currentText = typeof currentEntry?.content === "string" ? currentEntry.content : undefined;
     if (currentText !== undefined) {

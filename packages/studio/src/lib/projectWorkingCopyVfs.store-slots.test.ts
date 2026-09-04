@@ -106,7 +106,7 @@ function makeParallelIr(opts: {
 }
 
 // ---------------------------------------------------------------------------
-// AC#1: Slot-only deletion — forceEmit path
+// AC#1: Slot-only deletion — irRewritten path
 // ---------------------------------------------------------------------------
 
 describe("projectWorkingCopyVfs store-slots end-to-end — real engine, no mock", () => {

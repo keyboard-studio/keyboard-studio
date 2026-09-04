@@ -360,29 +360,29 @@ describe("applyCarveToVfs — reconciles stale sibling asset paths (Track 1 rena
   });
 });
 
-describe("applyCarveToVfs — forceEmit gates splice off (refs #391)", () => {
+describe("applyCarveToVfs — irRewritten gates splice off (refs #391)", () => {
   // Uses a real parsed fixture (resolvable source spans) so these tests prove
-  // forceEmit is what disables splice — not a coincidental missing-span
+  // irRewritten is what disables splice — not a coincidental missing-span
   // fallback like the hand-built-IR test above.
   const kmn =
     "store(&VERSION) '10.0'\nbegin Unicode > use(main)\ngroup(main) using keys\n+ [K_A] > 'a'\n+ [K_B] > 'b'\n";
 
-  it("forceEmit:true with a non-empty deletion set never attempts splice (store-slot-rewrite composition shape)", () => {
+  it("irRewritten:true with a non-empty deletion set never attempts splice (store-slot-rewrite composition shape)", () => {
     const vfs = makeVfs(kmn);
     const { ir } = parse(kmn, "test");
     const ruleB = ir.groups[0]!.rules.find((r) => r.output.some((o) => o.kind === "char" && o.value === "b"))!;
-    const { warnings } = applyCarveToVfs(vfs, "test", ir, new Set([ruleB.nodeId]), { forceEmit: true });
-    // Splice is never attempted under forceEmit, so no splice-unavailable note
+    const { warnings } = applyCarveToVfs(vfs, "test", ir, new Set([ruleB.nodeId]), { irRewritten: true });
+    // Splice is never attempted under irRewritten, so no splice-unavailable note
     // is produced even though this fixture's spans WOULD resolve.
     expect(warnings.every((w) => !w.includes("splice"))).toBe(true);
     const content = vfs.get("source/test.kmn")?.content as string;
     expect(content).not.toContain("K_B");
   });
 
-  it("forceEmit:true with an EMPTY deletion set still re-emits, without attempting splice (mutate-seam shape)", () => {
+  it("irRewritten:true with an EMPTY deletion set still re-emits, without attempting splice (mutate-seam shape)", () => {
     const vfs = makeVfs(kmn);
     const { ir } = parse(kmn, "test");
-    const { warnings } = applyCarveToVfs(vfs, "test", ir, new Set(), { forceEmit: true });
+    const { warnings } = applyCarveToVfs(vfs, "test", ir, new Set(), { irRewritten: true });
     expect(warnings.every((w) => !w.includes("splice"))).toBe(true);
     const content = vfs.get("source/test.kmn")?.content as string;
     // Unedited copy re-emitted via emit(), not left as the original raw text.

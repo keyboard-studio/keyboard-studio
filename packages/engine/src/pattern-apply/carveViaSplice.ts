@@ -19,7 +19,7 @@
 // passed `baseIr`'s node source positions must correspond exactly to
 // `originalKmnText` — i.e. no other edit (store-slot content rewrite, a
 // pre-filtered mutate-seam IR) has happened between parsing this text and
-// calling this function. applyCarveToVfs.ts gates on `!opts.forceEmit` to
+// calling this function. applyCarveToVfs.ts gates on `!opts.irRewritten` to
 // guarantee this.
 //
 // Deletion granularity is LEAF-level, not a blanket range between two nodes:
@@ -67,6 +67,34 @@ function resolveSpan(
   return { start: logicalLine.line, end: logicalLine.line + logicalLine.segments.length - 1 };
 }
 
+/** The shape every spliceable IR node shares (group, rule, store, raw fragment, comment). */
+interface SpanSource {
+  readonly nodeId: string;
+  readonly sourceLine?: number;
+}
+
+/**
+ * Push the span of every `items` entry whose nodeId is in `deletedIds` onto
+ * `spans`. Returns the failure reason for the first node whose span cannot be
+ * resolved (the caller bails to the filter+emit fallback), or `undefined`
+ * when every deleted node of this kind resolved.
+ */
+function collectSpans(
+  kind: string,
+  items: readonly SpanSource[],
+  deletedIds: ReadonlySet<string>,
+  logicalLinesByStart: ReadonlyMap<number, LogicalLine>,
+  spans: LineSpan[],
+): string | undefined {
+  for (const item of items) {
+    if (!deletedIds.has(item.nodeId)) continue;
+    const span = resolveSpan(logicalLinesByStart, item.sourceLine);
+    if (span === undefined) return `${kind} "${item.nodeId}" has no resolvable source span`;
+    spans.push(span);
+  }
+  return undefined;
+}
+
 /**
  * Merge a list of (possibly overlapping/adjacent) line spans into disjoint,
  * sorted ranges. Distinct nodeIds should never legitimately overlap, but a
@@ -107,56 +135,21 @@ export function carveViaSplice(
 
   const spans: LineSpan[] = [];
 
-  for (const g of baseIr.groups) {
-    if (!cascade.deletedGroupIds.has(g.nodeId)) continue;
-    // Only the group's OWN header span — its rules are resolved independently
-    // below via deletedRuleIds, never as part of a header-to-last-rule range.
-    const span = resolveSpan(logicalLinesByStart, g.sourceLine);
-    if (span === undefined) {
-      return { ok: false, reason: `group "${g.nodeId}" has no resolvable source span` };
-    }
-    spans.push(span);
-  }
-
-  for (const g of baseIr.groups) {
-    for (const r of g.rules) {
-      if (!cascade.deletedRuleIds.has(r.nodeId)) continue;
-      const span = resolveSpan(logicalLinesByStart, r.sourceLine);
-      if (span === undefined) {
-        return { ok: false, reason: `rule "${r.nodeId}" has no resolvable source span` };
-      }
-      spans.push(span);
-    }
-  }
-
-  for (const s of baseIr.stores) {
-    if (!cascade.deletedStoreIds.has(s.nodeId)) continue;
-    const span = resolveSpan(logicalLinesByStart, s.sourceLine);
-    if (span === undefined) {
-      return { ok: false, reason: `store "${s.nodeId}" has no resolvable source span` };
-    }
-    spans.push(span);
-  }
-
-  for (const f of baseIr.raw) {
-    if (!cascade.deletedRawIds.has(f.nodeId)) continue;
-    const span = resolveSpan(logicalLinesByStart, f.sourceLine);
-    if (span === undefined) {
-      return { ok: false, reason: `raw fragment "${f.nodeId}" has no resolvable source span` };
-    }
-    spans.push(span);
-  }
-
-  // Comments anchored to a deleted node follow it out (see carveCascade's
-  // header). A trailing comment's span is its anchor rule's own line, already
-  // covered above — the defensive mergeSpans below absorbs the overlap.
-  for (const c of baseIr.comments) {
-    if (!cascade.deletedCommentIds.has(c.nodeId)) continue;
-    const span = resolveSpan(logicalLinesByStart, c.sourceLine);
-    if (span === undefined) {
-      return { ok: false, reason: `comment "${c.nodeId}" has no resolvable source span` };
-    }
-    spans.push(span);
+  // One pass per node kind. Deleting a group contributes only the group's OWN
+  // header span here — its rules (and owned fragments) arrive through their
+  // own cascaded id sets below, never as a header-to-last-rule range. A
+  // deleted comment's span may coincide with its anchor rule's line, already
+  // collected; the defensive mergeSpans below absorbs the overlap.
+  const passes: ReadonlyArray<readonly [kind: string, items: readonly SpanSource[], deletedIds: ReadonlySet<string>]> = [
+    ["group", baseIr.groups, cascade.deletedGroupIds],
+    ["rule", baseIr.groups.flatMap((g) => g.rules), cascade.deletedRuleIds],
+    ["store", baseIr.stores, cascade.deletedStoreIds],
+    ["raw fragment", baseIr.raw, cascade.deletedRawIds],
+    ["comment", baseIr.comments, cascade.deletedCommentIds],
+  ];
+  for (const [kind, items, deletedIds] of passes) {
+    const failure = collectSpans(kind, items, deletedIds, logicalLinesByStart, spans);
+    if (failure !== undefined) return { ok: false, reason: failure };
   }
 
   const merged = mergeSpans(spans);

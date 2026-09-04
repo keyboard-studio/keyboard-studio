@@ -230,4 +230,80 @@ describe("carveViaSplice", () => {
     const result = carveViaSplice(kmn, irWithSynthetic, new Set(["synthetic-rule"]));
     expect(result.ok).toBe(false);
   });
+
+  it("deletes a header-only group (empty rules[]) by removing just its header line", () => {
+    const kmn =
+      `store(&VERSION) '10.0'
+` +
+      `store(&NAME) 'Test'
+` +
+      `
+` +
+      `begin Unicode > use(main)
+` +
+      `
+` +
+      `group(main) using keys
+` +
+      `
+` +
+      `+ [K_A] > 'a'
+` +
+      `
+` +
+      `group(placeholder) using keys
+` +
+      `
+` +
+      `group(other) using keys
+` +
+      `
+` +
+      `+ [K_C] > 'c'
+`;
+    const { ir } = parse(kmn, "test");
+    const placeholder = ir.groups.find((g) => g.name === "placeholder")!;
+    // Fixture sanity: the group really is header-only, so the cascade has no rules to add.
+    expect(placeholder.rules).toHaveLength(0);
+
+    const result = carveViaSplice(kmn, ir, new Set([placeholder.nodeId]));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    expect(result.text).not.toContain("group(placeholder)");
+    // Exactly one physical line is gone; both neighbours survive verbatim, in order.
+    expect(result.text.split("\n")).toHaveLength(kmn.split("\n").length - 1);
+    const lines = result.text.split("\n");
+    expect(lines.indexOf("+ [K_A] > 'a'")).toBeLessThan(lines.indexOf("group(other) using keys"));
+    expect(result.text).toContain("+ [K_C] > 'c'");
+  });
+
+  it("a deletedNodeIds entry matching no IR node is a no-op: ok, text byte-identical", () => {
+    const kmn =
+      `store(&VERSION) '10.0'
+` +
+      `store(&NAME) 'Test'
+` +
+      `
+` +
+      `begin Unicode > use(main)
+` +
+      `
+` +
+      `group(main) using keys
+` +
+      `
+` +
+      `+ [K_A] > 'a'
+`;
+    const { ir } = parse(kmn, "test");
+
+    // An id that exists nowhere in baseIr (stale overlay entry, or a node from
+    // another keyboard) must not fail the splice — the cascade resolves it to
+    // nothing, so there is no span to resolve and nothing to delete.
+    const result = carveViaSplice(kmn, ir, new Set(["nonexistent-node"]));
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.text).toBe(kmn);
+  });
 });

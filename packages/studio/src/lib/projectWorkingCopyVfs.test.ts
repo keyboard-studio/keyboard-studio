@@ -151,7 +151,7 @@ describe("projectWorkingCopyVfs — always calls applyCarveToVfs (step 1)", () =
       getPattern: () => undefined,
       identity: null,
     });
-    expect(applyCarveToVfsSpy).toHaveBeenCalledWith(vfs, "test_kb", ir, new Set(), { forceEmit: false });
+    expect(applyCarveToVfsSpy).toHaveBeenCalledWith(vfs, "test_kb", ir, new Set(), { irRewritten: false });
   });
 
   it("forwards deletedNodeIds to applyCarveToVfs", async () => {
@@ -168,7 +168,7 @@ describe("projectWorkingCopyVfs — always calls applyCarveToVfs (step 1)", () =
       getPattern: () => undefined,
       identity: null,
     });
-    expect(applyCarveToVfsSpy).toHaveBeenCalledWith(vfs, "test_kb", ir, deleted, { forceEmit: false });
+    expect(applyCarveToVfsSpy).toHaveBeenCalledWith(vfs, "test_kb", ir, deleted, { irRewritten: false });
   });
 
   // AC#2 regression: deletedItemIds-only path must merge into the applyCarveToVfs call.
@@ -191,7 +191,7 @@ describe("projectWorkingCopyVfs — always calls applyCarveToVfs (step 1)", () =
       "test_kb",
       ir,
       new Set(["rule#0", "rule#1"]),
-      { forceEmit: false },
+      { irRewritten: false },
     );
   });
 
@@ -215,7 +215,7 @@ describe("projectWorkingCopyVfs — always calls applyCarveToVfs (step 1)", () =
       "test_kb",
       ir,
       new Set(["group#A", "rule#0"]),
-      { forceEmit: false },
+      { irRewritten: false },
     );
   });
 });
