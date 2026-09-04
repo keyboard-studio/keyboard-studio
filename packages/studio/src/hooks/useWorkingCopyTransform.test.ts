@@ -119,7 +119,7 @@ describe("useWorkingCopyTransform — projection steps", () => {
       "basic_kbdus",
       expect.anything(), // baseIr
       expect.anything(), // deletedNodeIds (empty Set)
-      expect.objectContaining({ forceEmit: expect.any(Boolean) }), // opts
+      expect.objectContaining({ irRewritten: expect.any(Boolean) }), // opts
     );
   });
 

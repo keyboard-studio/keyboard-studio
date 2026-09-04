@@ -326,10 +326,11 @@ export function projectWorkingCopyVfs(
   warnings.push(...removalResult.warnings);
 
   // 1b: Whole-node deletions + VFS re-emit.
-  //     forceEmit: true when any slots were targeted — the nul-modified IR must
-  //     be written into the VFS even if no whole-node deletions are present.
-  //     When all slot ids are rejected by the transform's guards, forceEmit still
-  //     triggers a (harmless, idempotent) re-emit of the unmodified IR.
+  //     irRewritten: true when any slots were targeted — the nul-modified IR must
+  //     be written into the VFS even if no whole-node deletions are present, and
+  //     its node positions no longer match the .kmn text, so text-splice is off.
+  //     When all slot ids are rejected by the transform's guards, irRewritten
+  //     still triggers a (harmless, idempotent) re-emit of the unmodified IR.
   const carveIr = removalResult.ir; // equals baseIr when slotIds was empty
   const allWholeNodeIds = new Set([...deletedNodeIds, ...wholeNodeItemIds]);
 
@@ -361,14 +362,15 @@ export function projectWorkingCopyVfs(
   if (isMutateSeamEnabled() && !entryGroupDeleted && hasCarveEdit) {
     const seamIr = applyCarveMutate(baseIr, deletedNodeIds, deletedItemIds);
     // The seam already filtered every node; hand it to emit with an empty
-    // deletion set. forceEmit:true because there IS an edit (matching the
-    // legacy emit-when-edited behavior); an unedited copy never reaches here.
+    // deletion set. irRewritten:true because there IS an edit (matching the
+    // legacy emit-when-edited behavior) and the seam IR is already filtered,
+    // not the parsed original; an unedited copy never reaches here.
     carveResult = applyCarveToVfs(vfs, keyboardId, seamIr, EMPTY_DELETION_SET, {
-      forceEmit: true,
+      irRewritten: true,
     });
   } else {
     carveResult = applyCarveToVfs(vfs, keyboardId, carveIr, allWholeNodeIds, {
-      forceEmit: slotIds.size > 0,
+      irRewritten: slotIds.size > 0,
     });
   }
   warnings.push(...carveResult.warnings);
