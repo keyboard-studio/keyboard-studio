@@ -42,6 +42,7 @@ import { resolveJoinedCheckInputs } from "./checks/_shared.js";
  *                    computes the report itself, see check-19-x's module doc)
  *   Submit        -> all of the above
  *   18.7 (currency) -> DEFERRED; not implemented
+ *   1.10b (adapted .kpj format) -> DEFERRED; not implemented
  */
 export interface LintContext {
   /** Keyboard IR from the compile step; required for 18.6 desktop. */
