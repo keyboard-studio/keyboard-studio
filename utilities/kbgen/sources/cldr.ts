@@ -15,9 +15,26 @@ import {
   sourceExemplars,
   inventoryToExemplarResult,
 } from '../../../packages/engine/src/character-discovery/exemplarSource.ts';
+import { loadExemplarIndex } from '../../../packages/engine/src/character-discovery/exemplarIndex.ts';
 import type { ExemplarResult } from '../../../packages/engine/src/character-discovery/cldr.ts';
 
 export type { ExemplarResult };
+
+/** Provenance of the pinned exemplar index: the CLDR release and SLDR commit it was baked from. */
+export interface ExemplarIndexVersion {
+  cldr: string;
+  sldrCommit: string;
+}
+
+/**
+ * Version pins of the engine's exemplar index, for placement-map provenance.
+ * Replaces the CLDR pin kbgen used to record in data/SOURCES.json when it
+ * fetched per-locale snapshots itself.
+ */
+export async function exemplarIndexVersion(): Promise<ExemplarIndexVersion> {
+  const { version } = await loadExemplarIndex();
+  return { cldr: version.cldr, sldrCommit: version.sldrCommit };
+}
 
 /**
  * Exemplars for a BCP47 tag, from the engine's pinned CLDR+SLDR index, adapted

@@ -36,7 +36,7 @@ import { getLayout } from './layout.ts';
 import { availability } from './analyze.ts';
 import { plan, checkComplete } from './place.ts';
 import { build, format } from './map.ts';
-import { loadExemplars } from './sources/cldr.ts';
+import { loadExemplars, exemplarIndexVersion } from './sources/cldr.ts';
 import { emitKmn, emitTouch, emitKvks } from './emit.ts';
 import { extractCorpus, diff } from './corpus-diff.ts';
 
@@ -80,9 +80,10 @@ function parseArgs(argv: string[]): CliOptions {
 }
 const fail = (m: string): never => { console.error('error: ' + m); process.exit(1); };
 
+// data/SOURCES.json records only the vendored Unicode pin; the CLDR/SLDR pins
+// live in the engine's exemplar index (see exemplarIndexVersion).
 interface SourceVersions {
   unicodeVersion?: string;
-  cldrVersion?: string;
 }
 
 function sourceVersions(): SourceVersions {
@@ -125,9 +126,15 @@ async function main() {
   const completeness = checkComplete(planResult, layout, placedChars);
 
   const src = sourceVersions();
+  const index = await exemplarIndexVersion();
   const map = build(planResult, layout, {
     id: o.id!, name: o.name!, completeness, freeKeys: [...free],
-    source: { locale: o.locale || null, unicodeVersion: src.unicodeVersion || null, cldrVersion: src.cldrVersion || null },
+    source: {
+      locale: o.locale || null,
+      unicodeVersion: src.unicodeVersion || null,
+      cldrVersion: index.cldr,
+      sldrCommit: index.sldrCommit,
+    },
   });
 
   console.log(format(map));
