@@ -4,19 +4,19 @@
   "files": [
     {
       "path": "lib/ucd/Scripts.txt",
-      "sha256": "cc89684338c2afd95668e33b3f813387d4f026e4a1d695cdc06055a35b7682f6"
+      "sha256": "9f5e50d3abaee7d6ce09480f325c706f485ae3240912527e651954d2d6b035bf"
     },
     {
       "path": "lib/ucd/ScriptExtensions.txt",
-      "sha256": "fe879108655e2e8e7ceb7443bdc78064a03d04db3f3373fba823b143da21ee74"
+      "sha256": "ec2107e58825a1586acee8e0911ce18260394ac8b87e535ca325f1ccbeb06bc6"
     },
     {
       "path": "lib/ucd/PropertyValueAliases.txt",
-      "sha256": "8b5a9a40ca3bed11158f810d08922818941561d6bcb0706b43aa492a145b34e7"
+      "sha256": "64e9a5f76f7a1e8b5a47d6a1f9a26522a251208f5276bdfa1559dac7cf2e827a"
     },
     {
       "path": "lib/ucd/Blocks.txt",
-      "sha256": "6881254211622bda136745befc86ce9bdddc2c51b454dd73a7f8ed53d1a0eca2"
+      "sha256": "c0edefaf1a19771e830a82735472716af6bf3c3975f6c2a23ffbe2580fbbcb15"
     },
     {
       "path": "lib/ucd/DerivedAge.txt",
