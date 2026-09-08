@@ -114,12 +114,23 @@ describe("carveFilterIr", () => {
     expect(out.raw.map((f) => f.nodeId)).toEqual(["f1"]);
   });
 
-  it("passes header and comments through untouched", () => {
-    const comments = [makeComment("c0", "; hello")];
+  it("passes the header and unanchored comments through; drops comments anchored to a deleted node", () => {
+    const comments = [
+      makeComment("c0", "; hello"),
+      {
+        nodeId: "c1",
+        text: "; docs r0",
+        anchor: "leading" as const,
+        anchorRef: { kind: "rule" as const, nodeId: "r0" },
+      },
+    ];
     const ir = makeIR({ comments, groups: [makeGroup("g0", "main", [makeRule("r0")])] });
     const out = carveFilterIr(ir, new Set(["g0"]));
     expect(out.header).toEqual(ir.header);
-    expect(out.comments).toBe(ir.comments); // passed by reference
+    // The freestanding comment survives; the one anchored to the deleted
+    // group's rule cascades out with it (deliberately, in lockstep with the
+    // splice path — emit previously dropped it only by accident).
+    expect(out.comments.map((c) => c.nodeId)).toEqual(["c0"]);
   });
 
   it("never mutates baseIr", () => {

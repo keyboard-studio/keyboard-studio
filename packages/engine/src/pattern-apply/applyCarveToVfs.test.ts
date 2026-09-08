@@ -300,11 +300,26 @@ describe("applyCarveToVfs — safety gate: entry-group deletion", () => {
 });
 
 describe("applyCarveToVfs — returns warnings", () => {
-  it("returns empty warnings on a successful projection", () => {
+  it("returns empty warnings on a successful projection with resolvable source spans", () => {
+    const kmn = "store(&VERSION) '10.0'\nbegin Unicode > use(main)\ngroup(main) using keys\n+ [K_A] > 'a'\n+ [K_B] > 'b'\n";
+    const vfs = makeVfs(kmn);
+    const { ir } = parse(kmn, "test");
+    const ruleB = ir.groups[0]!.rules.find((r) => r.output.some((o) => o.kind === "char" && o.value === "b"))!;
+    const { warnings } = applyCarveToVfs(vfs, "test", ir, new Set([ruleB.nodeId]));
+    expect(warnings).toHaveLength(0);
+  });
+
+  it("falls back to filter+emit with an informational warning when nodes have no resolvable source span", () => {
+    // These fixtures (makeIR/makeGroup/makeRule below) hand-build IR with no
+    // sourceLine at all — the scaffolded/synthesized-IR case splice can never
+    // serve. The projection still succeeds via the legacy filter+emit path;
+    // only an informational note is added, not a failure.
     const vfs = makeVfs();
     const ir = makeIR([makeGroup("group#main", "main", [makeRule("rule#0")])]);
     const { warnings } = applyCarveToVfs(vfs, "test", ir, new Set(["rule#0"]));
-    expect(warnings).toHaveLength(0);
+    expect(warnings).toHaveLength(1);
+    expect(warnings[0]).toContain("splice unavailable");
+    expect(warnings[0]).toContain("falling back to filter+emit");
   });
 });
 
@@ -342,5 +357,36 @@ describe("applyCarveToVfs — reconciles stale sibling asset paths (Track 1 rena
     expect(content).toContain("store(&VISUALKEYBOARD) 'new_id.kvks'");
     expect(content).not.toContain("old_id.kvks");
     expect(content).not.toContain("K_B");
+  });
+});
+
+describe("applyCarveToVfs — irRewritten gates splice off (refs #391)", () => {
+  // Uses a real parsed fixture (resolvable source spans) so these tests prove
+  // irRewritten is what disables splice — not a coincidental missing-span
+  // fallback like the hand-built-IR test above.
+  const kmn =
+    "store(&VERSION) '10.0'\nbegin Unicode > use(main)\ngroup(main) using keys\n+ [K_A] > 'a'\n+ [K_B] > 'b'\n";
+
+  it("irRewritten:true with a non-empty deletion set never attempts splice (store-slot-rewrite composition shape)", () => {
+    const vfs = makeVfs(kmn);
+    const { ir } = parse(kmn, "test");
+    const ruleB = ir.groups[0]!.rules.find((r) => r.output.some((o) => o.kind === "char" && o.value === "b"))!;
+    const { warnings } = applyCarveToVfs(vfs, "test", ir, new Set([ruleB.nodeId]), { irRewritten: true });
+    // Splice is never attempted under irRewritten, so no splice-unavailable note
+    // is produced even though this fixture's spans WOULD resolve.
+    expect(warnings.every((w) => !w.includes("splice"))).toBe(true);
+    const content = vfs.get("source/test.kmn")?.content as string;
+    expect(content).not.toContain("K_B");
+  });
+
+  it("irRewritten:true with an EMPTY deletion set still re-emits, without attempting splice (mutate-seam shape)", () => {
+    const vfs = makeVfs(kmn);
+    const { ir } = parse(kmn, "test");
+    const { warnings } = applyCarveToVfs(vfs, "test", ir, new Set(), { irRewritten: true });
+    expect(warnings.every((w) => !w.includes("splice"))).toBe(true);
+    const content = vfs.get("source/test.kmn")?.content as string;
+    // Unedited copy re-emitted via emit(), not left as the original raw text.
+    expect(content).toContain("K_A");
+    expect(content).toContain("K_B");
   });
 });

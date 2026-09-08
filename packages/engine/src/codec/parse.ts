@@ -874,6 +874,7 @@ export function parse(text: string, keyboardId: string): ParseResult {
         nodeId: minter.mint("comment"),
         text: c.text,
         anchor: "freestanding",
+        sourceLine: c.line,
       };
       comments.push(fc);
     }
@@ -934,6 +935,7 @@ export function parse(text: string, keyboardId: string): ParseResult {
             text: c.text,
             anchor: "leading",
             anchorRef: ref,
+            sourceLine: c.line,
           });
         }
         pendingComments = [];
@@ -1042,6 +1044,7 @@ export function parse(text: string, keyboardId: string): ParseResult {
             text: c.text,
             anchor: "leading",
             anchorRef: { kind: "rule", nodeId: ruleNodeId },
+            sourceLine: c.line,
           });
         }
         pendingComments = [];
@@ -1111,6 +1114,7 @@ export function parse(text: string, keyboardId: string): ParseResult {
               text: parsedLine.trailingComment,
               anchor: "trailing",
               anchorRef: { kind: "rule", nodeId: ruleNodeId },
+              sourceLine: tok.line,
             });
           }
         }
