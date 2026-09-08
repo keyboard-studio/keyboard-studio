@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-08-20",
+  "lastUpdated": "2026-08-27",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -349,7 +349,7 @@
     },
     "specs/011-ui-primitives": {
       "title": "Feature Specification: Shared `ui/` Primitive Library Extraction",
-      "hash": "sha256:46212ea1a4401440",
+      "hash": "sha256:ddf5dfb22ebb5053",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -357,7 +357,7 @@
     },
     "specs/012-step-model-manifest": {
       "title": "Feature Specification: Unified Step Model + Manifest-Driven Survey Ordering",
-      "hash": "sha256:33b7f0e6674b32fd",
+      "hash": "sha256:7bee10ea178c3760",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -365,7 +365,7 @@
     },
     "specs/013-retire-legacy-flow-loader": {
       "title": "Feature Specification: Retire the legacy full-YAML survey flow loader",
-      "hash": "sha256:c421d4afcff11164",
+      "hash": "sha256:d1ce3955e9e1d4dd",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -421,7 +421,7 @@
     },
     "specs/021-qu-wire-galleries": {
       "title": "Feature Specification: Wire galleries — carve / mechanisms / touch resolve as first-class map nodes (existing write mechanisms preserved)",
-      "hash": "sha256:c00c4577db82b692",
+      "hash": "sha256:6b84da16e202bd86",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -429,7 +429,7 @@
     },
     "specs/022-qu-library-demote": {
       "title": "Feature Specification: Library demote — demote the orphaned non-identity Phase A to reserve/library under the no-delete guardrail",
-      "hash": "sha256:ac9af55293e53c62",
+      "hash": "sha256:8d205176926eb787",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -453,7 +453,7 @@
     },
     "specs/026-qu-survey-session-store": {
       "title": "Feature Specification: surveySessionStore — wizard-traversal state migration",
-      "hash": "sha256:c16cf1cf5d9580fc",
+      "hash": "sha256:570f913a832d1825",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -469,7 +469,7 @@
     },
     "specs/028-qu-generic-step-host": {
       "title": "Feature Specification: Generic StepHost — SurveyView hand-placement dies",
-      "hash": "sha256:5c7ca283733a5081",
+      "hash": "sha256:85c9d58b87139462",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -477,7 +477,7 @@
     },
     "specs/029-qu-flowstephost-convergence": {
       "title": "Feature Specification: FlowStepHost Convergence",
-      "hash": "sha256:c61f48b7b3fddebd",
+      "hash": "sha256:2000a0856b9559ca",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -517,7 +517,7 @@
     },
     "specs/033-qu-mutate-track": {
       "title": "Feature Specification: Mutate track — route the track fork through the manifest reducer/mutate seam, replacing the hand-coded StudioShell fork",
-      "hash": "sha256:9e0f03bccf2c8d77",
+      "hash": "sha256:e4bcc9f8ded0daef",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -613,7 +613,7 @@
     },
     "specs/044-cldr-sldr-exemplars": {
       "title": "Feature Specification: CLDR/SLDR exemplars",
-      "hash": "sha256:b91993926213d0c6",
+      "hash": "sha256:838c4d798f6e18fd",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -661,7 +661,7 @@
     },
     "specs/050-text-sample-prefill": {
       "title": "Feature Specification: Text-sample prefill (paste or upload)",
-      "hash": "sha256:c1def84ddec203d0",
+      "hash": "sha256:bc0ef88027c448ba",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -669,7 +669,7 @@
     },
     "specs/051-carve-orthography-trim": {
       "title": "Feature Specification: Carve gallery trim proposals compare produced characters to the orthography (with cased-letter pairing)",
-      "hash": "sha256:52f42774ce007317",
+      "hash": "sha256:d2b1e9b6669470b3",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -709,7 +709,7 @@
     },
     "specs/063-touch-key-editor": {
       "title": "Feature Specification: Key-level touch layout editing",
-      "hash": "sha256:223d33eb2b80ee1c",
+      "hash": "sha256:3d5b31a5b12c0882",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -717,7 +717,7 @@
     },
     "specs/060-crash-reporting": {
       "title": "Feature Specification: Crash reporting — an unrecoverable error becomes one actionable, author-anonymous GitHub issue",
-      "hash": "sha256:2b5b1b185a7faf43",
+      "hash": "sha256:7fcd9e55336a3345",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -725,7 +725,7 @@
     },
     "specs/061-help-docs-generation": {
       "title": "Feature Specification: Help documentation generation from Phase F answers",
-      "hash": "sha256:dd3e4384355ed0d7",
+      "hash": "sha256:1f000ec4fddb21b8",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -757,7 +757,7 @@
     },
     "specs/062-canonical-context-tolerance": {
       "title": "Feature Specification: Canonical-equivalence context tolerance",
-      "hash": "sha256:2dcbb535f9285319",
+      "hash": "sha256:7bdada9003c4f7b0",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -766,14 +766,6 @@
     "specs/064-keyboard-attribution": {
       "title": "Feature Specification: Keyboard attribution and license provenance",
       "hash": "sha256:62234650d80a801f",
-      "status": "unreviewed",
-      "implements": [],
-      "decisions": [],
-      "notes": ""
-    },
-    "specs/062-canonical-context-tolerance": {
-      "title": "Feature Specification: Canonical-equivalence context tolerance",
-      "hash": "sha256:2dcbb535f9285319",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -837,7 +829,7 @@
     },
     "specs/072-my-keyboards": {
       "title": "Feature Specification: My Keyboards — per-user multi-project draft + submission list",
-      "hash": "sha256:ac67a00804861135",
+      "hash": "sha256:c6e6617e1b6acd2b",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
