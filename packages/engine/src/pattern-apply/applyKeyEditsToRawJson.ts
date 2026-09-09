@@ -119,6 +119,7 @@ import {
   resolveSubKeyEntry,
 } from "./keyEditOps.js";
 import { parseTouchKeyAddress } from "./touchKeyAddress.js";
+import { TOUCH_LAYOUT_JSON_INDENT } from "../codec/parse-touch.js";
 import { DEFAULT_KEY_PAD_PCT, DEFAULT_KEY_WIDTH_PCT } from "./rowMetrics.js";
 import {
   isRawLayer,
@@ -553,5 +554,5 @@ export function applyKeyEditsToRawJson(
     }
   }
 
-  return { json: JSON.stringify(layout), warnings };
+  return { json: JSON.stringify(layout, null, TOUCH_LAYOUT_JSON_INDENT), warnings };
 }
