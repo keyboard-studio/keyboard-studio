@@ -1461,7 +1461,7 @@
   "survey.prefill.scriptAlignment.noDefault": "(aucun défaut — veuillez choisir)",
   "survey.prefill.scriptAlignment.scriptCommunity": "Communauté d’écriture",
   "survey.punctuation.addButton": "+ Add",
-  "survey.punctuation.autoAddedHint": "",
+  "survey.punctuation.autoAddedHint": "The dashed marks came from CLDR exemplars for {displayName} — they were added for you. Click any mark your language does not use to remove it; it will not come back.",
   "survey.punctuation.backButton": "Back",
   "survey.punctuation.doneButton": "{0, plural, one {Done (# mark)} other {Done (# marks)}}",
   "survey.punctuation.doneButtonNone": "Continue without punctuation",
