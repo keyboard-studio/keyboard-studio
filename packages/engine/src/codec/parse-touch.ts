@@ -26,6 +26,24 @@ export function parseTouchLayout(json: string): TouchLayoutIR {
 // Emitter — inverse of parseTouchLayout
 // ---------------------------------------------------------------------------
 
+/**
+ * Indent width every `.keyman-touch-layout` writer in this repo must use.
+ *
+ * Keyman Developer writes this file type as two-space-indented JSON with LF
+ * newlines, raw (unescaped) UTF-8, insertion-order keys and no trailing
+ * newline — i.e. exactly `JSON.stringify(value, null, 2)`. Confirmed by
+ * round-tripping real shipped keyboards from the keyboards content repo
+ * (`release/g/ghana`, `release/k/khmer_angkor`, `release/s/shan`,
+ * `release/s/sundanese`): each file is byte-identical to
+ * `JSON.stringify(JSON.parse(file), null, 2)`.
+ *
+ * Every writer of this file — the Case A emitter below and the Case B
+ * raw-JSON appliers in `../pattern-apply/` — shares this constant so the two
+ * output paths cannot drift, and so a hand-authored base keyboard keeps its
+ * shape after we edit it.
+ */
+export const TOUCH_LAYOUT_JSON_INDENT = 2;
+
 type EmittedKey = Record<string, unknown>;
 
 function emitKey(key: TouchKeyIR): EmittedKey {
@@ -101,5 +119,12 @@ export function emitTouchLayout(ir: TouchLayoutIR): string {
     if (platform.font !== undefined) platformOut["font"] = platform.font;
     out[platform.id] = platformOut;
   }
-  return JSON.stringify(out);
+  // Two-space indent, LF newlines, no trailing newline: byte-for-byte what
+  // Keyman Developer itself writes. Verified against real shipped keyboards in
+  // keyboard-studio/keyboards (release/g/ghana, release/k/khmer_angkor,
+  // release/s/shan, release/s/sundanese) — each file is identical to
+  // `JSON.stringify(JSON.parse(file), null, 2)`. Emitting compact JSON put the
+  // whole layout on one line, which is valid JSON but unreadable and
+  // undiffable next to every other keyboard in the corpus.
+  return JSON.stringify(out, null, TOUCH_LAYOUT_JSON_INDENT);
 }
