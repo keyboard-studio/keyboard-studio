@@ -4,10 +4,11 @@
 // Phase B build-list ("add your whole alphabet") screen, scoped to
 // PUNCTUATION — this is the dedicated page the character map's
 // letters/numerals/marks fold points at (see CharacterMapPane.tsx's
-// filteredGroups comment). The same affordances as the alphabet screen:
-// sourced suggestions to tick, a type-in box, and the right-pane character
-// map (StudioShell's SurveyView swaps it in via this step's
-// rightPane:"character-map", scope "punctuation"). All three toggle the SAME
+// filteredGroups comment). Affordances: the sourced punctuation tier is added
+// FOR the author on arrival (see autoProposed below — "automatically add CLDR
+// punctuation, don't make the user click each"), plus a type-in box and the
+// right-pane character map (StudioShell's SurveyView swaps it in via this
+// step's rightPane:"character-map", scope "punctuation"). All three toggle the SAME
 // shared phaseBDraftStore draft the alphabet screen used, so punctuation
 // captured during Phase B arrives here pre-selected and map picks land in
 // the same draft (its derived `punctuation` category is this page's list).
@@ -29,11 +30,10 @@
 // the manifest reducer path (StepHost.handleComplete -> recordPhase) owns the
 // session merge.
 
-import { useMemo, useRef, useState, type ComponentType } from "react";
+import { useEffect, useRef, useState, type ComponentType } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
-import { toUPlusNotation } from "@keyboard-studio/contracts";
 import { glyphCategory } from "@keyboard-studio/engine";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
@@ -62,8 +62,6 @@ import {
   chipGlyph,
   chipCodepoint,
   chipIndicator,
-  chipIndicatorColor,
-  chipIndicatorText,
 } from "../surveyStyles.ts";
 
 /**
@@ -82,37 +80,6 @@ function isPunctuationChar(c: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// SuggestedPunctuationChip — tick-to-add chip (mirrors PhaseB's SuggestionChip)
-// ---------------------------------------------------------------------------
-
-interface SuggestedChipProps {
-  char: string;
-  onAdd: (c: string) => void;
-}
-
-function SuggestedPunctuationChip({ char, onAdd }: SuggestedChipProps) {
-  const { t } = useLingui();
-  const glyphFontStack = useGlyphFontStack();
-  const cp = toUPlusNotation(char);
-  return (
-    <button
-      type="button"
-      onClick={() => onAdd(char)}
-      aria-label={t({
-        id: "survey.punctuation.suggestionChip.addAriaLabel",
-        message: `Add ${{ char }} (${{ cp }})`,
-      })}
-      aria-pressed={false}
-      style={charChip(false)}
-    >
-      <span style={chipGlyph(false, glyphFontStack)}>{char}</span>
-      <span style={chipCodepoint()}>{cp}</span>
-      <span style={chipIndicator(chipIndicatorColor(false))}>{chipIndicatorText(false)}</span>
-    </button>
-  );
-}
-
-// ---------------------------------------------------------------------------
 // PunctuationStep
 // ---------------------------------------------------------------------------
 
@@ -125,7 +92,6 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
   const bcp47 = surveyContext.bcp47_tag;
   const languageName = surveyContext.language_name;
 
-  const chars = usePhaseBDraftStore((s) => s.chars);
   const punctuation = usePhaseBDraftStore((s) => s.punctuation);
   const provenance = usePhaseBDraftStore((s) => s.provenance);
   const addChar = usePhaseBDraftStore((s) => s.add);
@@ -146,16 +112,50 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
   const displayName =
     languageName ?? bcp47 ?? t({ id: "survey.punctuation.genericLanguage", message: "this language" });
 
-  // What the exemplar source knows and the draft does not already hold. Like
-  // the alphabet screen's SuggestionPanel, a ticked chip LEAVES this list and
-  // reappears below in "Your punctuation", where removal lives — the panel is
-  // add-only in practice.
-  const offered = useMemo(() => {
-    if (inventory === null) return [];
-    return charactersInTier(inventory, "punctuation")
-      .map((c) => c.normalize("NFC"))
-      .filter((c) => !chars.includes(c));
-  }, [inventory, chars]);
+  // Whether the draft ALREADY held punctuation when this step mounted: a
+  // returning author (Phase-B leftovers, map picks, an earlier visit to this
+  // page) has work here already, and auto-proposing over it would bury their
+  // list under the source's. Read once, at mount, so the auto-add this render
+  // pass is about to perform cannot flip it.
+  const hadPriorPunctuationRef = useRef(punctuation.length > 0);
+  // The resolved tag already auto-proposed for, so re-renders and a hook
+  // re-resolve of the SAME tag do not re-run the seed.
+  const seededTagRef = useRef<string | null>(null);
+
+  // Auto-add the sourced punctuation tier on first arrival for a resolved tag
+  // (Matt: "automatically add CLDR punctuation, don't make the user click
+  // each"). The author's job here is to CONFIRM — press Done — and to remove
+  // whatever their language does not use.
+  //
+  // Removal sticks, and the store is what makes it stick: `remove()` files a
+  // proposed character into `rejected`, and `addProposed` refuses to resurrect
+  // anything listed there (see phaseBDraftStore's addWithProvenance). So this
+  // effect needs no rejection bookkeeping of its own and cannot fight the
+  // author — re-running it is a no-op for every character they took out. That
+  // record outlives the store's reset() by design, so it also survives a
+  // remount of this step.
+  useEffect(() => {
+    if (loading || inventory === null) return;
+    if (hadPriorPunctuationRef.current) return;
+    const tag = bcp47 ?? "";
+    if (seededTagRef.current === tag) return;
+    seededTagRef.current = tag;
+    for (const c of charactersInTier(inventory, "punctuation")) {
+      const nfc = c.normalize("NFC");
+      // One category, same filter the type-in path applies: a tier character
+      // that is not punctuation would land in the shared draft WITHOUT showing
+      // up in the list below (which renders the derived `punctuation`
+      // category), and resurface in the Phase B alphabet — an invisible add,
+      // which is worse now that no click precedes it.
+      if (isPunctuationChar(nfc)) addProposed(nfc, inventory.source);
+    }
+  }, [loading, inventory, bcp47, addProposed]);
+
+  // How much of the current list arrived as a proposal rather than from the
+  // author — drives the "these were added for you" hint.
+  const proposedCount = punctuation.filter(
+    (c) => provenance[c] !== undefined && provenance[c] !== "author",
+  ).length;
 
   function add(): void {
     const { chars: harvested } = harvestChars(inputVal);
@@ -219,9 +219,10 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
       >
         <p style={{ margin: 0 }}>
           <Trans id="survey.punctuation.instructions">
-            Add the <strong>punctuation your language uses</strong> — tick the
-            suggested marks below, type any that are missing, or browse the
-            character map on the right, like this:
+            Check the <strong>punctuation your language uses</strong> — the
+            marks CLDR lists for it are already in your list below. Remove any
+            it does not use, type any that are missing, or browse the character
+            map on the right, like this:
           </Trans>
         </p>
         <p style={{ margin: "8px 0 0 0", fontFamily: "monospace", fontSize: 15 }}>
@@ -229,64 +230,7 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
         </p>
       </div>
 
-      {/* Section 1: suggested punctuation from the sourced exemplars */}
-      <section
-        aria-label={t({
-          id: "survey.punctuation.suggestedSectionAriaLabel",
-          message: "Suggested punctuation",
-        })}
-      >
-        <h3 style={sectionHeading}>
-          <Trans id="survey.punctuation.suggestedHeading">Suggested punctuation</Trans>
-        </h3>
-        {loading ? (
-          <div style={mutedNote}>
-            <Trans id="survey.punctuation.suggestionsLoading">
-              Checking for suggested punctuation…
-            </Trans>
-          </div>
-        ) : inventory === null || charactersInTier(inventory, "punctuation").length === 0 ? (
-          <div style={mutedNote}>
-            <Trans id="survey.punctuation.noSuggestions">
-              No suggested punctuation for {displayName}. Add your own below.
-            </Trans>
-          </div>
-        ) : offered.length === 0 ? (
-          <div style={mutedNote}>
-            <Trans id="survey.punctuation.allSuggestionsAdded">
-              Every suggested punctuation mark is already in your list below.
-            </Trans>
-          </div>
-        ) : (
-          <div>
-            <p style={{ margin: "0 0 10px 0", fontSize: 11, color: TEXT_DIM }}>
-              <Trans id="survey.punctuation.fromExemplars">
-                from CLDR exemplars for {displayName} — tick to add
-              </Trans>
-            </p>
-            <div
-              role="group"
-              aria-label={t({
-                id: "survey.punctuation.suggestedGroupAriaLabel",
-                message: "Suggested punctuation — tick to add",
-              })}
-              style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
-            >
-              {offered.map((c) => (
-                <SuggestedPunctuationChip
-                  key={c}
-                  char={c}
-                  onAdd={(ch) => addProposed(ch, inventory.source)}
-                />
-              ))}
-            </div>
-          </div>
-        )}
-      </section>
-
-      <hr style={divider} />
-
-      {/* Section 2: type-in */}
+      {/* Section 1: type-in */}
       <section
         aria-label={t({
           id: "survey.punctuation.typeSectionAriaLabel",
@@ -353,7 +297,9 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
         )}
       </section>
 
-      {/* Section 3: the accumulated list */}
+      <hr style={divider} />
+
+      {/* Section 2: the accumulated list — auto-proposed marks land here */}
       <section
         aria-label={t({
           id: "survey.punctuation.listSectionAriaLabel",
@@ -363,11 +309,37 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
         <p style={{ margin: "0 0 8px 0", fontSize: 13, fontWeight: 600, color: TEXT_MAIN }}>
           <Trans id="survey.punctuation.listCount">Your punctuation ({punctuation.length})</Trans>
         </p>
+        {/* Where the list came from, and that pruning it is the expected move.
+            Only while a proposal is actually in it — an author who removed the
+            lot, or whose language the sources do not cover, is not told about
+            marks that are not on screen. */}
+        {loading ? (
+          <p style={{ ...mutedNote, margin: "0 0 10px 0" }}>
+            <Trans id="survey.punctuation.suggestionsLoading">
+              Adding the suggested punctuation for {displayName}…
+            </Trans>
+          </p>
+        ) : proposedCount > 0 ? (
+          <p style={{ margin: "0 0 10px 0", fontSize: 11, color: TEXT_DIM }}>
+            <Trans id="survey.punctuation.autoAddedHint">
+              The dashed marks came from CLDR exemplars for {displayName} — they
+              were added for you. Click any mark your language does not use to
+              remove it; it will not come back.
+            </Trans>
+          </p>
+        ) : inventory === null || charactersInTier(inventory, "punctuation").length === 0 ? (
+          <p style={{ ...mutedNote, margin: "0 0 10px 0" }}>
+            <Trans id="survey.punctuation.noSuggestions">
+              No suggested punctuation for {displayName}. Type any marks it uses
+              above, or browse the character map on the right.
+            </Trans>
+          </p>
+        ) : null}
         {punctuation.length === 0 ? (
           <p style={mutedParaFlush}>
             <Trans id="survey.punctuation.emptyList">
-              No punctuation yet — tick a suggestion, type above, or browse the
-              character map on the right.
+              No punctuation yet — type above, or browse the character map on
+              the right.
             </Trans>
           </p>
         ) : (
