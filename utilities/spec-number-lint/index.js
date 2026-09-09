@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 // spec-number-lint — fails on two `specs/NNN-*` folders claiming the same
-// number (issue #1505's own root-cause fix: "a pnpm lint check that fails
-// on a duplicate specs/NNN-* prefix would have caught all three collisions
-// [057, 058 x2] at the moment they were introduced").
+// number. This is the root-cause fix for the recurring spec-number
+// collisions: a pnpm lint check that fails on a duplicate specs/NNN-* prefix
+// would have caught all three (057, 058 x2) the moment they were introduced.
 //
 // Feature numbers are claimed on a branch and only become visible to other
 // branches at merge — nothing checks the number is still free at merge
@@ -60,7 +60,7 @@ function main() {
     for (const name of names.sort()) console.error(`      specs/${name}`);
   }
   console.error("  Renumber one of each colliding pair (git mv + relabel its in-code");
-  console.error("  `spec NNN` comments) before merging — see issue #1505.");
+  console.error("  `spec NNN` comments) before merging.");
   process.exit(1);
 }
 
