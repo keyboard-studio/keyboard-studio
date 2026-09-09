@@ -15,6 +15,7 @@ import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 
 import {
   IdentityLite,
+  buildTargetBcp47,
   toResumeAnswers,
   type IdentityLiteResult,
 } from "./IdentityLite.tsx";
@@ -194,6 +195,11 @@ describe("IdentityLite — resume", () => {
     const [result, identity] = onComplete.mock.calls[0]!;
     expect(result.answers.map((a) => a.questionId)).toContain("il_language_region");
     expect(identity.region).toBe("DJ");
-    expect(identity.bcp47).toBe("aa-Latn-DJ");
+    // Through the composer, not a spelled-out tag: what this guards is that the
+    // region survived the replay, and `Latn` is Afar's default script, so
+    // whether the composed tag carries the script subtag depends on langtags
+    // having resolved — which is not what this test is about.
+    expect(identity.bcp47).toBe(buildTargetBcp47("aa", "Latn", "DJ"));
+    expect(identity.bcp47).toContain("-DJ");
   });
 });

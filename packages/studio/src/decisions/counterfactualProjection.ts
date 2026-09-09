@@ -93,16 +93,36 @@ export function coDecisionEntryIds(
   record: DecisionRecord,
   field: IdentityOverlayField,
 ): string[] {
-  const liveByQuestion = new Map<string, string>();
+  return [...liveFieldAnswers(entry, record, field).values()]
+    .map((live) => live.entryId)
+    .filter((id) => id !== entry.entryId);
+}
+
+/**
+ * The live answer per question feeding `field` in the entry's own step, keyed by
+ * `questionId`.
+ *
+ * The one walk behind both {@link coDecisionEntryIds} and the resolver's
+ * recomposition of a COMPOSED field (see impact.ts), so what the trail attributes
+ * jointly and the value it attributes are read off the same answers. Unlike
+ * `coDecisionEntryIds` this DOES include the entry's own question: recomposing a
+ * tag needs every contribution, not only the siblings.
+ */
+export function liveFieldAnswers(
+  entry: DecisionEntry,
+  record: DecisionRecord,
+  field: IdentityOverlayField,
+): Map<string, DecisionEntry> {
+  const liveByQuestion = new Map<string, DecisionEntry>();
   for (const candidate of record.entries) {
     if (candidate.payload.kind !== "survey-answer") continue;
     if (candidate.stepId !== entry.stepId) continue;
     if (outputFieldForEntry(candidate) !== field) continue;
     // Last write for a given question wins — the live answer, matching the
     // supersede semantics the trail already renders (053 FR-015).
-    liveByQuestion.set(candidate.payload.questionId, candidate.entryId);
+    liveByQuestion.set(candidate.payload.questionId, candidate);
   }
-  return [...liveByQuestion.values()].filter((id) => id !== entry.entryId);
+  return liveByQuestion;
 }
 
 /**
