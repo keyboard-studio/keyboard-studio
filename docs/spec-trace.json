@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-08-28",
+  "lastUpdated": "2026-09-08",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -304,7 +304,7 @@
     },
     "specs/008-data-flow": {
       "title": "Feature spec — Data flow (spec.md §8)",
-      "hash": "sha256:bf8697ce8a2f981a",
+      "hash": "sha256:e8a0ca18eb48794d",
       "status": "partial",
       "implements": [
         "packages/contracts/src/surveySession.ts",
