@@ -32,7 +32,8 @@
 import { describe, it, expect } from "vitest";
 import { DESCRIPTOR_CONSUMED_FIELDS } from "@keyboard-studio/engine";
 import { questionRegistry } from "./registry.ts";
-import type { OutputTargetId } from "../types.ts";
+import { BCP47_SLOTS } from "../../decisions/impact.ts";
+import type { IdentityOverlayField, OutputTargetId } from "../types.ts";
 
 // ---------------------------------------------------------------------------
 // The writer table
@@ -254,5 +255,85 @@ describe("FR-016 (b) — a question that promises the author it ships, does", ()
     // does, and it declares its output reach, which is the state this enforces.
     const matched = registryEntries.filter(([id]) => matchedPhrase(id) !== undefined);
     expect(matched.map(([id]) => id)).toContain("il_language_code");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// (c) Composed-field integrity — the resolver honours what a question declares
+// ---------------------------------------------------------------------------
+//
+// (a) checks a declaration against the WRITER's field set. This checks it against
+// the READER: the decision trail's counterfactual resolver, which has to vary a
+// declared field to attribute the answer.
+//
+// Most overlay fields are a WHOLE value — one answer IS the field — so the
+// resolver substitutes the recorded answer and compares against "left blank".
+// `bcp47` is not: three questions compose one tag, and substituting any one of
+// them as the whole tag diffed the artifact against a tag no projection writes
+// (the `und` -> `Latn` row). The resolver therefore recomposes that field through
+// `buildTargetBcp47`, and it decides which slot an answer fills from a TABLE —
+// `BCP47_SLOTS` — that restates, in a second place, what the question modules
+// already declare.
+//
+// A second place is a drift risk, so these tests close it from both ends and,
+// with (c3), catch the same defect class arriving on a DIFFERENT field.
+
+/** Question ids declaring they reach `field`, straight off the registry. */
+function questionsReaching(field: IdentityOverlayField): string[] {
+  return registryEntries
+    // `.some`, not `outputs[0]`: a declaration anywhere in the list is a claim
+    // that the answer reaches the field, and a claim the resolver quietly ignores
+    // is exactly the drift being guarded — broader here cannot miss a case.
+    .filter(([, mod]) => (mod.outputs ?? []).some((write) => write.field === field))
+    .map(([questionId]) => questionId)
+    .sort();
+}
+
+describe("FR-016 (c) — a composed overlay field is recomposed, never substituted", () => {
+  it("gives every question that composes the BCP47 tag a slot in the resolver's table", () => {
+    const contributors = questionsReaching("bcp47");
+    // The guard must have something to guard: if this ever empties, the assertion
+    // below passes vacuously and the check has quietly stopped meaning anything.
+    expect(contributors.length, "no question declares it reaches bcp47").toBeGreaterThan(0);
+
+    const missing = contributors.filter((questionId) => BCP47_SLOTS[questionId] === undefined);
+    expect(
+      missing,
+      "A question declares it composes the BCP47 tag but has no BCP47_SLOTS entry in " +
+        "decisions/impact.ts, so the decision trail would vary it by SUBSTITUTING its " +
+        "raw answer as the whole tag — reporting a change against a tag the projection " +
+        "never writes (SC-005). Add its slot (language | script | region) to " +
+        "BCP47_SLOTS.",
+    ).toEqual([]);
+  });
+
+  it("keeps no slot for a question that no longer composes the tag", () => {
+    const contributors = new Set(questionsReaching("bcp47"));
+    const stale = Object.keys(BCP47_SLOTS).filter((questionId) => !contributors.has(questionId));
+    expect(
+      stale,
+      "BCP47_SLOTS names a question that declares no bcp47 output reach — a renamed " +
+        "or retired question leaves the table pointing at nothing, which reads as " +
+        "coverage the resolver does not have. Remove the entry.",
+    ).toEqual([]);
+  });
+
+  // (c3) The pattern check. `bcp47` is composed; every other reached field is a
+  // whole value BECAUSE exactly one question feeds it, which is what makes the
+  // resolver's substitution default correct for them. That is a property of the
+  // current declarations, not a law — so assert it, and fail when it changes.
+  it("leaves bcp47 as the only field more than one question composes", () => {
+    const fields = new Set(
+      registryEntries.flatMap(([, mod]) => (mod.outputs ?? []).map((write) => write.field)),
+    );
+    const composed = [...fields].filter((field) => questionsReaching(field).length > 1).sort();
+    expect(
+      composed,
+      "A second overlay field is now fed by more than one answer, so it is COMPOSED " +
+        "and the resolver's substitution default is wrong for it in the same way it " +
+        "was wrong for bcp47: varyEntryContribution in decisions/impact.ts must learn " +
+        "to recompose this field from its contributors, and this list must then name " +
+        "it too.",
+    ).toEqual(["bcp47"]);
   });
 });

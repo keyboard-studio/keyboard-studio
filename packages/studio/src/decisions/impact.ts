@@ -212,8 +212,14 @@ export interface ResolveImpactAsyncDeps extends ResolveImpactDeps, Counterfactua
  * A question that declares `field: "bcp47"` without a slot here reaches the tag
  * in some way this table does not model, so it keeps being varied by
  * substitution rather than being silently dropped from the composition.
+ *
+ * Exported for the drift guard in survey/questions/outputReach.test.ts: this
+ * table restates, in a second place, which questions compose the tag, and a
+ * fourth contributor added without an entry here would silently fall back to
+ * substitution — the very defect this resolver was fixed to stop. The guard
+ * derives the expected key set from the registry's own `outputs` declarations.
  */
-const BCP47_SLOTS: Record<string, "language" | "script" | "region" | undefined> = {
+export const BCP47_SLOTS: Record<string, "language" | "script" | "region" | undefined> = {
   il_language_code: "language",
   il_target_script: "script",
   il_language_region: "region",
