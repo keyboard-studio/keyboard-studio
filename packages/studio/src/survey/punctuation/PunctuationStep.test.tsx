@@ -17,6 +17,7 @@ import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { PunctuationStep } from "./PunctuationStep.tsx";
 import { usePhaseBDraftStore, resetPhaseBDraftDecisions } from "../../stores/phaseBDraftStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { chipIndicatorText } from "../surveyStyles.ts";
 
 // sourcedExemplars does a real (offline-index) lookup when unmocked;
 // charactersInTier is a pure engine re-export, reproduced verbatim so the
@@ -154,8 +155,8 @@ describe("PunctuationStep — automatic CLDR punctuation", () => {
     const onComplete = vi.fn();
     render(<PunctuationStep onComplete={onComplete} />);
 
-    // No tick, no chip to hunt for: the marks are simply in the list, dashed,
-    // waiting to be confirmed or pruned.
+    // No tick, no chip to hunt for: the marks are simply in the list,
+    // presented as chosen, waiting to be confirmed.
     await waitFor(() => {
       expect(screen.getByText("Your punctuation (2)")).toBeTruthy();
     });
@@ -167,16 +168,41 @@ describe("PunctuationStep — automatic CLDR punctuation", () => {
     expect(lastResult(onComplete).confirmedInventory).toEqual(["।", "॥"]);
   });
 
-  it("explains where the marks came from and that removing them is expected", async () => {
+  it("explains where the marks came from and that they are already in the list", async () => {
     withPunctuationTier(["।"]);
     render(<PunctuationStep onComplete={vi.fn()} />);
 
     expect(
-      await screen.findByText(/The dashed marks came from CLDR exemplars for Hindi/),
+      await screen.findByText(
+        /These marks came from CLDR exemplars for Hindi and are already in your list/,
+      ),
     ).toBeTruthy();
+    // "dashed" was the styling word, and it no longer describes anything on
+    // screen — the hint names the list, not a pending deletion (#1760).
+    expect(screen.queryByText(/dashed/i)).toBeNull();
     // The old add-only tray is gone, not left behind as a dead empty region.
     expect(screen.queryByText("Suggested punctuation")).toBeNull();
     expect(screen.queryByRole("button", { name: /^Add / })).toBeNull();
+  });
+
+  it("presents an auto-added mark as chosen, not as a removal candidate", async () => {
+    withPunctuationTier(["।"]);
+    render(<PunctuationStep onComplete={vi.fn()} />);
+
+    const chip = await screen.findByTestId("proposed-punctuation-chip");
+    // The chosen-list chip has to speak the character map's in-list vocabulary
+    // for a selected cell ("[x]"), not the bare "x" that reads as
+    // marked-for-deletion on a list that is already correct (#1760).
+    const indicator = chip.querySelector("span:last-of-type");
+    expect(indicator?.textContent).toBe(chipIndicatorText(true));
+    expect(indicator?.textContent).not.toBe("x");
+    // Presentational only: the chip still removes, still says so, still sticks.
+    expect(chip.getAttribute("aria-label")).toMatch(/^Remove ।/);
+    fireEvent.click(chip);
+    await waitFor(() => {
+      expect(usePhaseBDraftStore.getState().punctuation).toEqual([]);
+    });
+    expect(usePhaseBDraftStore.getState().rejected).toContain("।");
   });
 
   it("only the punctuation tier is proposed — a main-tier letter never lands in the draft", async () => {
@@ -244,7 +270,7 @@ describe("PunctuationStep — automatic CLDR punctuation", () => {
     await waitFor(() => {
       expect(screen.queryByText(/Adding the suggested punctuation/)).toBeNull();
     });
-    expect(screen.queryByText(/The dashed marks came from/)).toBeNull();
+    expect(screen.queryByText(/These marks came from CLDR exemplars/)).toBeNull();
     expect(screen.getByText("Your punctuation (1)")).toBeTruthy();
     expect(screen.getByTestId("authored-punctuation-chip")).toBeTruthy();
     fireEvent.click(screen.getByTestId("punctuation-done"));

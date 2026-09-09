@@ -50,7 +50,6 @@ import {
   TEXT_DIM,
   TEXT_MAIN,
   FONT,
-  ERROR_RED,
   phaseHeadingFlush,
   mutedNote,
   mutedParaFlush,
@@ -62,6 +61,8 @@ import {
   chipGlyph,
   chipCodepoint,
   chipIndicator,
+  chipIndicatorColor,
+  chipIndicatorText,
 } from "../surveyStyles.ts";
 
 /**
@@ -219,10 +220,10 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
       >
         <p style={{ margin: 0 }}>
           <Trans id="survey.punctuation.instructions">
-            Check the <strong>punctuation your language uses</strong> — the
-            marks CLDR lists for it are already in your list below. Remove any
-            it does not use, type any that are missing, or browse the character
-            map on the right, like this:
+            Confirm the <strong>punctuation your language uses</strong> — the
+            marks CLDR lists for it are already in your list below. Type any
+            that are missing, take out any it does not use, and use the
+            character map on the right for one-offs, like this:
           </Trans>
         </p>
         <p style={{ margin: "8px 0 0 0", fontFamily: "monospace", fontSize: 15 }}>
@@ -309,7 +310,7 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
         <p style={{ margin: "0 0 8px 0", fontSize: 13, fontWeight: 600, color: TEXT_MAIN }}>
           <Trans id="survey.punctuation.listCount">Your punctuation ({punctuation.length})</Trans>
         </p>
-        {/* Where the list came from, and that pruning it is the expected move.
+        {/* Where the list came from, and that these marks are already chosen.
             Only while a proposal is actually in it — an author who removed the
             lot, or whose language the sources do not cover, is not told about
             marks that are not on screen. */}
@@ -322,9 +323,9 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
         ) : proposedCount > 0 ? (
           <p style={{ margin: "0 0 10px 0", fontSize: 11, color: TEXT_DIM }}>
             <Trans id="survey.punctuation.autoAddedHint">
-              The dashed marks came from CLDR exemplars for {displayName} — they
-              were added for you. Click any mark your language does not use to
-              remove it; it will not come back.
+              These marks came from CLDR exemplars for {displayName} and are
+              already in your list. Click any your language does not use to take
+              it out; it will not come back.
             </Trans>
           </p>
         ) : inventory === null || charactersInTier(inventory, "punctuation").length === 0 ? (
@@ -353,9 +354,14 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
           >
             {punctuation.map((c) => {
               const { title } = codepointLabel(c);
-              // Proposed-vs-authored, mirroring the alphabet chips (spec 044
-              // P5): a ticked suggestion keeps its dashed attribution so
-              // confirming the list is a real decision.
+              // Provenance drives the testid ONLY — never the styling (#1760).
+              // An auto-added mark IS in the author's list, so it draws the same
+              // selected shell and "[x]" indicator the character map uses for a
+              // chosen cell. The earlier dashed border + red "x" read as "queued
+              // for deletion" on a list that was in fact already correct. The
+              // provenance VALUE is untouched: phaseBDraftStore's remove() files
+              // a non-"author" origin into the sticky `rejected` list, which is
+              // what keeps a removed mark removed.
               const isProposed = provenance[c] !== undefined && provenance[c] !== "author";
               return (
                 <button
@@ -368,15 +374,13 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
                     id: "survey.punctuation.removeAriaLabel",
                     message: `Remove ${{ char: c }} (${{ cp: title }})`,
                   })}
-                  style={
-                    isProposed
-                      ? { ...charChip(false), borderStyle: "dashed", borderColor: ACCENT }
-                      : charChip(false)
-                  }
+                  style={charChip(true)}
                 >
                   <span style={chipGlyph(true, glyphFontStack)}>{c}</span>
                   <span style={chipCodepoint()}>{codepointLabel(c).base}</span>
-                  <span style={chipIndicator(ERROR_RED)}>x</span>
+                  <span style={chipIndicator(chipIndicatorColor(true))}>
+                    {chipIndicatorText(true)}
+                  </span>
                 </button>
               );
             })}
