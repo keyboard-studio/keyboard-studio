@@ -379,7 +379,9 @@ A blank default, a silent resolution, and a write with no observable consequence
   an edge case for that reason.
 - No corpus measurement was taken. SC-008 is phrased as a threshold to set after
   measuring, not as a known rate.
-- The two remaining open questions carried as `[NEEDS CLARIFICATION]` in the spec,
-  plus the convenience step's spec home, are not answerable from the code and were
-  not guessed at here. The all-versus-floor question was settled by the repo owner
-  on 2026-09-09 and is recorded in the spec's Decisions taken.
+- The one remaining open question carried as `[NEEDS CLARIFICATION]` in the spec
+  — the fate of the pane's code-point entry field — plus the convenience step's
+  spec home, are not answerable from the code and were not guessed at here. The
+  all-versus-floor question and the placement of the invisible-character question
+  were both settled by the repo owner on 2026-09-09 and are recorded in the
+  spec's Decisions taken.
