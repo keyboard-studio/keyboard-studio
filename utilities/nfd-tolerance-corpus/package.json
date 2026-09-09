@@ -1,0 +1,17 @@
+{
+  "name": "nfd-tolerance-corpus",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Standalone corpus harness for the NFC/NFD context-tolerance transform (spec 062). Runs the real transform over every keyboard in the sibling keymanapp/keyboards checkout, recompiles and re-simulates the result, and buckets each keyboard by measured OUTCOME - no gap, gap fixed, gap remaining, regressed/corrupted, failed to compile, refused by a named internal gate. Measures input equivalence only; it never proposes a change to what a keyboard outputs. Not a packages/* member and deliberately outside `pnpm -r`.",
+  "scripts": {
+    "scan": "node run.mjs",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run --config vitest.config.ts"
+  },
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vite": "^7.0.0",
+    "vitest": "^4.1.6"
+  }
+}

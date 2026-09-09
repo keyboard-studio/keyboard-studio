@@ -141,6 +141,14 @@ jobs:
       - name: Test (facet-index — outside the pnpm workspace)
         run: pnpm run test:facet-index
 
+      # nfd-tolerance-corpus is likewise outside the workspace. Its suite is
+      # hermetic — the ground-truth fixtures are vendored .kmn, so it needs no
+      # corpus checkout — and it is the regression guard for a harness whose
+      # whole job is catching a transform that silently emits the wrong
+      # character. Unrun here, it rots.
+      - name: Test (nfd-tolerance-corpus — outside the pnpm workspace)
+        run: pnpm run test:nfd-tolerance-corpus
+
       # Non-blocking: warns in CI log and opens GitHub Issues for any spec
       # sections whose content changed since the last acknowledgement.
       # Never fails the build — drift is a backlog item, not a blocker.

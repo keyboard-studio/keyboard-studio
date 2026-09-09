@@ -72,6 +72,11 @@ repo-map*.json
 # hermes report artifacts (hermes-run.mjs + vet.mjs both write under utilities/hermes/reports/)
 utilities/hermes/reports/
 
+# nfd-tolerance-corpus run output (run.mjs --out defaults under reports/).
+# A corpus sweep is a measurement of one checkout at one commit, not a
+# committed artifact — re-run it rather than reading a stale one.
+utilities/nfd-tolerance-corpus/reports/
+
 utilities/hermes/repo-map*.json
 
 # Local secrets for the Hermes harness (Context7 etc.) - never commit
