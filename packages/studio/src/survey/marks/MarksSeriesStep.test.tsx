@@ -525,7 +525,54 @@ describe("MarksSeriesStep — S4 output-form station", () => {
     reachOutputForm();
     fireEvent.click(screen.getByTestId("output-form-change"));
     expect(screen.getByTestId("marks-output-form").textContent).toContain(
-      "Letter plus mark, built as you type",
+      "A letter and a mark, kept separate",
+    );
+  });
+
+  it("after an override, the explanation describes the CHOSEN form, not the proposed one", () => {
+    // Regression: the notice rendered `formLabel[value]` above
+    // `proposal.explanation`, which is computed once from the policy and never
+    // recomputed — so one click left the screen stating base-plus-mark above
+    // the ready-made explanation.
+    seedAlphabet([ACUTE], ["e"]);
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    reachOutputForm();
+    // Before the override: ready-made, with the ready-made explanation.
+    expect(screen.getByTestId("marks-output-form").textContent).toContain(
+      "Backspace removes a whole accented letter in one step",
+    );
+
+    fireEvent.click(screen.getByTestId("output-form-change"));
+    const text = screen.getByTestId("marks-output-form").textContent ?? "";
+    // The chosen form and the paragraph under it agree...
+    expect(text).toContain("A letter and a mark, kept separate");
+    expect(text).toContain("Backspace clears the mark first and the plain letter next");
+    // ...and the explanation of the form we just left is gone.
+    expect(text).not.toContain("Backspace removes a whole accented letter in one step");
+  });
+
+  it("hides the override when no ready-made form exists for some pair (row 1)", () => {
+    seedAlphabet([ACUTE], [SCHWA]);
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    reachOutputForm();
+    expect(screen.queryByTestId("output-form-change")).toBeNull();
+    expect(screen.getByTestId("output-form-change-unavailable").textContent).toContain(
+      "no single-character form",
+    );
+  });
+
+  it("states the S2 outcome as a premise (no own-key mark)", () => {
+    seedAlphabet([ACUTE], ["e"]);
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    reachOutputForm();
+    expect(screen.getByTestId("output-form-premise").textContent).toContain(
+      "no mark has a key of its own",
     );
   });
 
@@ -897,11 +944,22 @@ describe("MarksSeriesStep — S4 open choice (US4)", () => {
     // Recommended (base-plus-mark for a productive class) listed first + tagged.
     expect(station.textContent).toContain("recommended");
     const labels = station.querySelectorAll("label");
-    expect(labels[0]?.textContent).toContain("Letter plus mark");
+    expect(labels[0]?.textContent).toContain("A letter and a mark, kept separate");
     // Both options carry a backspace preview.
     expect(station.querySelectorAll('[data-testid="backspace-preview"]')).toHaveLength(2);
     // SC-005 holds on the open-choice rendering too.
     expect(station.textContent).not.toMatch(/unicode/i);
     expect(station.textContent).not.toMatch(/normali[sz]/i);
+  });
+
+  it("names the own-key marks from S2 as a premise, and keeps the override (row 2)", () => {
+    seedComposableProductiveAlphabet();
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    reachStation("marks-output-form");
+    const premise = screen.getByTestId("output-form-premise").textContent ?? "";
+    expect(premise).toContain("marks with a key of their own");
+    expect(premise).toContain(ACUTE);
   });
 });

@@ -334,13 +334,18 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [treatmentPrefills, gate.alphabet, expandedAttachments]);
 
-  const hasOwnKeyMark = useMemo(
+  // The S2 outcome, kept as the list rather than the bare predicate: the policy
+  // reads only "is it non-empty", but S4 states the premise back to the author
+  // and needs the marks themselves (spec 052 FR-022 keeps S4 a separate
+  // question deriving its proposal from S2 — so S4 should say so on screen).
+  const ownKeyMarks = useMemo(
     () =>
-      gate.alphabet.marks.some(
+      gate.alphabet.marks.filter(
         (mark) => treatmentFor(mark, treatment, classes, treatmentPrefills) === "own-key",
       ),
     [gate.alphabet.marks, treatment, classes, treatmentPrefills],
   );
+  const hasOwnKeyMark = ownKeyMarks.length > 0;
 
   const outputFormProposal = useMemo(
     () => resolveOutputFormProposal(posture, hasOwnKeyMark),
@@ -350,6 +355,16 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
   useEffect(() => {
     setOutputForm(outputFormProposal.form);
   }, [outputFormProposal.form]);
+  // An override SURVIVES a re-proposal — the effect above re-seeds only when the
+  // proposed form itself changed. The one exception is an override that stopped
+  // being realisable: row 1 fires when some pair has no ready-made form at all,
+  // and it proposes the same base-plus-mark that row 2 does, so a "ready-made"
+  // override taken on row 2 would otherwise survive into row 1 unchanged — an
+  // answer the keyboard cannot produce, on a screen that (correctly) no longer
+  // offers the button to undo it.
+  useEffect(() => {
+    if (outputFormProposal.readyMadeUnavailable) setOutputForm("base-plus-mark");
+  }, [outputFormProposal.readyMadeUnavailable]);
 
   // S5 — evidence: an attested >=2-mark stack, or two marks' reachable base
   // sets overlapping (FR-018). Confirmed list defaults to the attested stacks
@@ -547,6 +562,7 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
           proposal={outputFormProposal}
           value={outputForm}
           onChange={setOutputForm}
+          ownKeyMarks={ownKeyMarks}
         />
       )}
 

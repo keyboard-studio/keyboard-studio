@@ -38,6 +38,13 @@ export interface OutputFormProposal {
   presentedAs: "notice" | "open-choice";
   /** Plain-language reason shown with the proposal (consequence-led, no jargon). */
   explanation: string;
+  /**
+   * True when at least one attested/accepted pair has NO ready-made form — i.e.
+   * {@link OutputFormInputs.anyPairLacksReadyMade} fired (row 1). "ready-made"
+   * is then not a selectable answer for this keyboard at all, so the station
+   * must not offer it as an override. False on every other row.
+   */
+  readyMadeUnavailable: boolean;
 }
 
 interface OutputFormPolicyRow {
@@ -79,6 +86,7 @@ const OUTPUT_FORM_POLICY: readonly OutputFormPolicyRow[] = [
         "your keyboard will build every accented letter from its letter plus its " +
         "mark. Doing it the same way for all letters keeps searching and " +
         "backspace behavior consistent across your whole keyboard.",
+      readyMadeUnavailable: true,
     },
     isDefault: false,
   },
@@ -93,6 +101,7 @@ const OUTPUT_FORM_POLICY: readonly OutputFormPolicyRow[] = [
         "mark matches how your marks attach to many letters, and backspace peels " +
         "one mark off at a time. Ready-made characters make each accented letter " +
         "a single unit that backspace removes in one step.",
+      readyMadeUnavailable: false,
     },
     isDefault: false,
   },
@@ -107,6 +116,7 @@ const OUTPUT_FORM_POLICY: readonly OutputFormPolicyRow[] = [
         "character, and no mark on your keyboard gets a key of its own — so " +
         "your keyboard will produce those ready-made characters. Backspace " +
         "removes a whole accented letter in one step.",
+      readyMadeUnavailable: false,
     },
     isDefault: true,
   },
