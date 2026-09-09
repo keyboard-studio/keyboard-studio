@@ -86,7 +86,21 @@ export function readKeyboard(corpusRoot: string, source: KeyboardSource): KmnInp
   return { ...source, text: readFileSync(join(corpusRoot, source.path), "utf8") };
 }
 
-/** `git rev-parse HEAD` of the corpus checkout, or `"unknown"` if it is not a git tree. */
+/**
+ * `git rev-parse HEAD` of the corpus checkout, or `"unknown"` if it is not a
+ * git tree.
+ *
+ * A third, narrower variant of the corpus-provenance resolvers in
+ * utilities/facet-index/scan.ts and utilities/supportability-scanner/scan.ts.
+ * Those two also read `git remote get-url origin` and return the composite
+ * `<org>/<repo>@<sha>` label, because their outputs are committed artifacts
+ * (docs/keyboard-facet-index.json) where which corpus fork was scanned is
+ * part of the record. This run report is not committed, and `corpusCommit` is
+ * typed as the bare SHA (see types.ts) so the value drops straight into a
+ * `git show` — so the remote lookup is deliberately omitted rather than
+ * inherited. Not a shared helper for the same reason as the walker above: the
+ * three tools stay independent.
+ */
 export function resolveCorpusCommit(corpusRoot: string): string {
   try {
     return execFileSync("git", ["rev-parse", "HEAD"], {
