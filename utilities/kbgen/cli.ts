@@ -126,7 +126,10 @@ async function main() {
   const completeness = checkComplete(planResult, layout, placedChars);
 
   const src = sourceVersions();
-  const index = await exemplarIndexVersion();
+  // Provenance only: a --chars/--used run never needs the exemplar index, so an
+  // index that fails to load degrades to null pins here (as sourceVersions()
+  // already does for unicodeVersion) rather than failing the build.
+  const index = await exemplarIndexVersion().catch(() => ({ cldr: null, sldrCommit: null }));
   const map = build(planResult, layout, {
     id: o.id!, name: o.name!, completeness, freeKeys: [...free],
     source: {
@@ -165,4 +168,4 @@ async function main() {
   console.log(`\nWrote ${wrote.join(', ')} to ${srcDir}\n`);
 }
 
-await main();
+main().catch((e: Error) => fail(e.message));
