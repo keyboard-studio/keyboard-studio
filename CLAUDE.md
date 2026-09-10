@@ -107,7 +107,7 @@ order, so edits land in the right place:
   extracted). The Day-1 reference — illustrative, may lag the code's non-breaking optional
   fields; not a second source.
 - **Criteria data + count:** `packages/contracts/data/criteria.json` is the data; the per-band
-  recompute lives in `criteria-summary.md`. The current count (148; 40/66/32/10) is
+  recompute lives in `criteria-summary.md`. The current count (149; 40/67/32/10) is
   **descriptive and expected to grow**. Tests enforce schema-validity of every row and the
   four-band partition invariant (sum of band counts === total, no orphans) — **not** the literal
   cardinality. Prose mentions cross-link rather than re-derive.

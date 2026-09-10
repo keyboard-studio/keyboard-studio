@@ -338,6 +338,14 @@ export interface IRComment {
   text: string;
   anchor: "leading" | "trailing" | "freestanding";
   anchorRef?: IRNodeRef;
+  /**
+   * 1-based source line number from the original .kmn file, set by the parser
+   * (for a trailing comment, the anchor rule's own line). Used by the
+   * text-splice carve path to remove a comment that cascades out with its
+   * deleted anchor node. Absent for in-memory (scaffolded/synthesized)
+   * comments and for IRs parsed before this field existed.
+   */
+  sourceLine?: number;
 }
 
 /**

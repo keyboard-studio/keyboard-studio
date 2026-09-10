@@ -17,6 +17,7 @@ import { isTouchSubKeyDuplicate } from "./touch-mechanism-shared.js";
 import { parseSlotId, makeSlotId } from "./slotId.js";
 import { classifyStoreSlotEdit } from "./applyStoreSlotRemovals.js";
 import { readVfsText, resolveOskAssetPaths, xmlUnescape } from "./oskAssetShared.js";
+import { TOUCH_LAYOUT_JSON_INDENT } from "../codec/parse-touch.js";
 import { isPlusSeparator } from "../shared/rule-shape.js";
 
 // ---------------------------------------------------------------------------
@@ -431,6 +432,6 @@ function clearTouchKeycaps(
   }
 
   if (changed) {
-    vfs.set(touchPath, JSON.stringify(data, null, 2), false);
+    vfs.set(touchPath, JSON.stringify(data, null, TOUCH_LAYOUT_JSON_INDENT), false);
   }
 }

@@ -13,7 +13,8 @@
 import { describe, it, expect } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
-import type { IRGroup, IRRule } from "@keyboard-studio/contracts";
+import type { IRGroup, IRRule, KeyboardIR } from "@keyboard-studio/contracts";
+import { parseKmn } from "@keyboard-studio/engine";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.js";
 
 // ---------------------------------------------------------------------------
@@ -39,6 +40,47 @@ function makeVfs(keyboardId: string) {
   ]);
 }
 
+// Real .kmn fixtures for the warning-free carve assertions: parsing gives every
+// node a resolvable source span, so the splice-first carve path runs (the same
+// path production takes for an imported keyboard) instead of falling back to
+// filter+emit with an informational warning. Hand-built makeTestIR fixtures
+// (no sourceLine) are kept for the tests that don't assert on warnings.
+const SPLICEABLE_KMN = [
+  "store(&VERSION) '10.0'",
+  "begin Unicode > use(main)",
+  "group(main) using keys",
+  "+ [K_A] > 'a'",
+  "+ [K_B] > 'b'",
+  "",
+].join("\n");
+
+const SPLICEABLE_KMN_WITH_EXTRAS = [
+  "store(&VERSION) '10.0'",
+  "begin Unicode > use(main)",
+  "group(main) using keys",
+  "+ [K_A] > 'a'",
+  "+ [K_B] > 'b'",
+  "",
+  "group(extras) using keys",
+  "+ [K_C] > 'c'",
+  "",
+].join("\n");
+
+function makeParsedVfs(keyboardId: string, kmn: string) {
+  return createVirtualFS([
+    { path: `source/${keyboardId}.kmn`, content: kmn, isBinary: false },
+  ]);
+}
+
+/** Find the nodeId of the rule whose output is the given char. */
+function findRuleId(ir: KeyboardIR, char: string): string {
+  const rule = ir.groups
+    .flatMap((g) => g.rules)
+    .find((r) => r.output.some((o) => o.kind === "char" && o.value === char));
+  if (rule === undefined) throw new Error(`fixture rule producing '${char}' not found`);
+  return rule.nodeId;
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -46,21 +88,18 @@ function makeVfs(keyboardId: string) {
 describe("projectWorkingCopyVfs deleted-items end-to-end — real engine, no mock", () => {
   // AC#1: deletedItemIds removes rule#0 (K_A) from the emitted .kmn
   // while leaving rule#1 (K_B) and the group header intact.
-  it("AC#1: removes rule#0 (K_A) via deletedItemIds; K_B and group header survive", () => {
-    const rule0 = makeRule("rule#0", "K_A", "a");
-    const rule1 = makeRule("rule#1", "K_B", "b");
-    // Use a non-entry second group for deletion safety — but deleting a RULE
-    // from the entry group is safe (we're not deleting the group itself).
-    const entryGroup = makeGroup("group#main", "main", [rule0, rule1]);
-    const ir = makeTestIR([entryGroup]);
-    const vfs = makeVfs("test_kb");
+  it("AC#1: removes the K_A rule via deletedItemIds; K_B and group header survive", () => {
+    // Deleting a RULE from the entry group is safe (we're not deleting the
+    // group itself). Parsed fixture: source spans resolve, splice path runs.
+    const { ir } = parseKmn(SPLICEABLE_KMN, "test_kb");
+    const vfs = makeParsedVfs("test_kb", SPLICEABLE_KMN);
 
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
       baseIr: ir,
       deletedNodeIds: new Set(),
-      deletedItemIds: new Set(["rule#0"]),
+      deletedItemIds: new Set([findRuleId(ir, "a")]),
       assignments: [],
       getPattern: () => undefined,
       identity: null,
@@ -75,10 +114,10 @@ describe("projectWorkingCopyVfs deleted-items end-to-end — real engine, no moc
     // Group header must survive.
     expect(content).toContain("group(main)");
 
-    // rule#0 (K_A -> a) must be absent.
+    // The deleted rule (K_A -> a) must be absent.
     expect(content).not.toContain("K_A");
 
-    // rule#1 (K_B -> b) must be present.
+    // The surviving rule (K_B -> b) must be present.
     expect(content).toContain("K_B");
   });
 
@@ -106,21 +145,20 @@ describe("projectWorkingCopyVfs deleted-items end-to-end — real engine, no moc
     expect(content).toBe("c stub\n");
   });
 
-  // deletedItemIds + deletedNodeIds union: rule#0 via itemIds, group#B via nodeIds.
-  it("removes both rule#0 (via deletedItemIds) and group#B (via deletedNodeIds) in one pass", () => {
-    const rule0 = makeRule("rule#0", "K_A", "a");
-    const rule1 = makeRule("rule#1", "K_B", "b");
-    const entryGroup = makeGroup("group#main", "main", [rule0, rule1]);
-    const secondGroup = makeGroup("group#B", "extras", [makeRule("rule#2", "K_C", "c")]);
-    const ir = makeTestIR([entryGroup, secondGroup]);
-    const vfs = makeVfs("test_kb");
+  // deletedItemIds + deletedNodeIds union: the K_A rule via itemIds, the whole
+  // extras group via nodeIds.
+  it("removes both the K_A rule (via deletedItemIds) and group(extras) (via deletedNodeIds) in one pass", () => {
+    const { ir } = parseKmn(SPLICEABLE_KMN_WITH_EXTRAS, "test_kb");
+    const vfs = makeParsedVfs("test_kb", SPLICEABLE_KMN_WITH_EXTRAS);
+    const extrasGroup = ir.groups.find((g) => g.name === "extras");
+    if (extrasGroup === undefined) throw new Error("fixture group 'extras' not found");
 
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",
       baseIr: ir,
-      deletedNodeIds: new Set(["group#B"]),
-      deletedItemIds: new Set(["rule#0"]),
+      deletedNodeIds: new Set([extrasGroup.nodeId]),
+      deletedItemIds: new Set([findRuleId(ir, "a")]),
       assignments: [],
       getPattern: () => undefined,
       identity: null,
@@ -133,13 +171,13 @@ describe("projectWorkingCopyVfs deleted-items end-to-end — real engine, no moc
 
     // Entry group header survives.
     expect(content).toContain("group(main)");
-    // rule#0 (K_A) gone via deletedItemIds.
+    // The K_A rule is gone via deletedItemIds.
     expect(content).not.toContain("K_A");
-    // rule#1 (K_B) still present.
+    // The K_B rule is still present.
     expect(content).toContain("K_B");
-    // group#B (extras) gone via deletedNodeIds.
+    // group(extras) is gone via deletedNodeIds.
     expect(content).not.toContain("group(extras)");
-    // rule#2 (K_C) gone along with group#B.
+    // The K_C rule is gone along with its group.
     expect(content).not.toContain("K_C");
   });
 

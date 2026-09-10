@@ -62,8 +62,9 @@
  * on parseable-but-odd JSON.  It may still throw `SyntaxError` when `rawJson`
  * is not valid JSON; that is the documented caller contract.
  *
- * Output formatting matches `emitTouchLayout` (Case A): `JSON.stringify` with
- * no pretty-print indent, so both Phase-E output paths produce compact JSON.
+ * Output formatting matches `emitTouchLayout` (Case A): two-space-indented
+ * `JSON.stringify`, so both Phase-E output paths produce the same tabulated
+ * JSON Keyman Developer writes.
  *
  * @see applyTouchAssignments.ts — IR-based applier for the generate-from-scratch path.
  * @see scaffoldTouchLayout.ts  — generates a phone layout when no touch layout exists.
@@ -77,6 +78,7 @@ import { charToUnicodeKeyId } from "../shared/touch-ids.js";
 import { isTouchSubKeyDuplicate } from "./touch-mechanism-shared.js";
 import type { RawKey, RawPlatform, RawRow } from "./touch-layout-wire-format.js";
 import { DEFAULT_TOUCH_LAYER, resolveTouchLayerId } from "./touchLayer.js";
+import { TOUCH_LAYOUT_JSON_INDENT } from "../codec/parse-touch.js";
 
 /** The top-level raw .keyman-touch-layout JSON object. */
 type RawTouchLayout = Record<string, unknown>;
@@ -267,8 +269,9 @@ export function applyTouchAssignmentsToRawJson(
     }
   }
 
-  // Compact JSON: matches emitTouchLayout (Case A) — no pretty-print indent.
-  return { json: JSON.stringify(layout), warnings };
+  // Tabulated JSON: matches emitTouchLayout (Case A) — see
+  // TOUCH_LAYOUT_JSON_INDENT for why two spaces.
+  return { json: JSON.stringify(layout, null, TOUCH_LAYOUT_JSON_INDENT), warnings };
 }
 
 // ---------------------------------------------------------------------------

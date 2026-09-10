@@ -59,6 +59,7 @@ import type { TouchKeyIR, TouchLayoutIR, VirtualFS } from "@keyboard-studio/cont
 import { resolveOskAssetPaths, readVfsText } from "./oskAssetShared.js";
 import type { RawKey, RawPlatform, RawSubKey } from "./touch-layout-wire-format.js";
 import { touchFlickAddress, touchKeyAddress, touchSubKeyAddress } from "./touchKeyAddress.js";
+import { TOUCH_LAYOUT_JSON_INDENT } from "../codec/parse-touch.js";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -257,7 +258,10 @@ export function applyTouchKeycapRemovalsToRawJson(
   // (already-resolved-away, e.g. by the desktop cascade) deletion set must
   // not reformat the file (mirrors applyCarveKeycapRemovalsToVfs's own
   // changed-guard).
-  return { json: changed ? JSON.stringify(layout) : rawJson, warnings };
+  return {
+    json: changed ? JSON.stringify(layout, null, TOUCH_LAYOUT_JSON_INDENT) : rawJson,
+    warnings,
+  };
 }
 
 /** Mutates `key` in place; returns true when anything was actually removed/blanked. */

@@ -73,6 +73,7 @@ import {
   type RawLayer,
   type RawPlatform,
 } from "./touch-layout-wire-format.js";
+import { TOUCH_LAYOUT_JSON_INDENT } from "../codec/parse-touch.js";
 
 /**
  * Legacy touch-layer-id aliases, keyed by {@link comboToTouchLayerId}'s
@@ -217,7 +218,7 @@ export function propagateDesktopLayersToTouch(
     }
   }
 
-  return { json: JSON.stringify(layout), warnings };
+  return { json: JSON.stringify(layout, null, TOUCH_LAYOUT_JSON_INDENT), warnings };
 }
 
 // ---------------------------------------------------------------------------
