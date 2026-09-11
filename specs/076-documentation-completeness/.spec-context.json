@@ -2,8 +2,8 @@
   "workflow": "speckit",
   "specName": "Documentation completeness — every package ships its full documentation set",
   "branch": "076-documentation-completeness",
-  "currentStep": "specify",
-  "status": "specified",
+  "currentStep": "tasks",
+  "status": "ready-to-implement",
   "history": [
     {
       "step": "specify",
@@ -11,6 +11,294 @@
       "kind": "start",
       "by": "extension",
       "at": "2026-09-11T02:34:34.182Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-11T02:38:30.554Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-09-11T02:38:30.896Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-11T02:57:13Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-11T02:57:14Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-11T02:58:09.810Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-09-11T03:01:57.455Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-11T03:10:53Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-11T03:10:54.144Z"
     }
-  ]
+  ],
+  "telemetryInstanceId": "1a4e8221-55e8-4182-b12d-ab2f7d0dc808",
+  "approach": "Extend the existing spec-061 render seam rather than building a parallel docs system: help-header injection in renderHelpPhp, welcome-folder migration across the three hard-coded sites (loader/projection/descriptor), a pure deriveDocMemberStates as the single tier source of truth, a HISTORY proposal fed by the existing decision-audit record, a deterministic engine-side SVG chart renderer, and 12 warning-level keyboard-lint checks wired through a memoized studio hook (no new timer).",
+  "decisions": [
+    {
+      "decision": "Layout charts are deterministic SVG text, not PNG",
+      "why": "Byte-identical output (FR-014) is trivial for a pure string emitter, and the managed-PR path submits only text VFS entries - binary PNG charts would be silently dropped from community submissions",
+      "rejected": "Canvas-rasterized PNG (non-deterministic bytes, DOM-dependent) and a pure-TS PNG encoder (requires a glyph rasterizer)"
+    },
+    {
+      "decision": "Doc lint checks take plain string/data input, wired via a memoized studio hook",
+      "why": "keyboard-lint has no runtime invocation today and must stay contracts-only; the useTouchKeyDiagnostics memo precedent satisfies FR-019/D3 with no new timer, and string inputs validate exactly what will ship (members render at projection time, not in the VFS)",
+      "rejected": "VFS-reading checks inside lintWithContext (would validate stale/absent content) and DOMParser for 11.5 (breaks node-testability)"
+    },
+    {
+      "decision": "Source tier (FR-022) is a pure derivation, not a written-through store record",
+      "why": "Tier is deterministically derivable from slices the store already holds; a single deriveDocMemberStates function cannot drift, while N writer-maintained update sites would silently lie to FR-020",
+      "rejected": "A docProvenance map updated by every content-changing action"
+    },
+    {
+      "decision": "Base documentation profile computed lazily from the already-fetched .kps manifest plus one welcome-probe fetch",
+      "why": "The base browser discards the full tree listing and precomputing 1026 profiles is the cost the spec assumption warns about; the .kps answers membership and one probe answers stub-vs-full",
+      "rejected": "A build-time facet-index field (deferred, the pure classifier can feed it later) and full-gallery classification"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Plan complete: 13 resolved research decisions, data model, 4 contract files, quickstart; Constitution Check PASS on all nine articles; 7-phase story-ordered implementation sequence."
+    },
+    "tasks": {
+      "summary": "79 tasks in 10 phases: 1 setup, 3 foundational (contracts types + zod), US1 5, US2 13, US3 8, US4 8, US5 8, US6 8, US7 20, 5 polish; 29 parallelizable; one commit per phase on 076-documentation-completeness; MVP = US1 (help header) alone."
+    }
+  },
+  "coverage": {
+    "FR-001": {
+      "tasks": [
+        "T017",
+        "T044",
+        "T052",
+        "T075"
+      ]
+    },
+    "FR-002": {
+      "tasks": [
+        "T011",
+        "T012",
+        "T013",
+        "T017",
+        "T019",
+        "T020"
+      ]
+    },
+    "FR-003": {
+      "tasks": [
+        "T005",
+        "T006",
+        "T007",
+        "T008"
+      ]
+    },
+    "FR-004": {
+      "tasks": [
+        "T007",
+        "T018",
+        "T051",
+        "T066"
+      ]
+    },
+    "FR-005": {
+      "tasks": [
+        "T023",
+        "T024"
+      ]
+    },
+    "FR-006": {
+      "tasks": [
+        "T010",
+        "T016",
+        "T017",
+        "T044"
+      ]
+    },
+    "FR-007": {
+      "tasks": [
+        "T016",
+        "T018",
+        "T019",
+        "T023",
+        "T036"
+      ]
+    },
+    "FR-008": {
+      "tasks": [
+        "T031",
+        "T032",
+        "T033",
+        "T034",
+        "T035"
+      ]
+    },
+    "FR-009": {
+      "tasks": [
+        "T031",
+        "T036",
+        "T037",
+        "T038"
+      ]
+    },
+    "FR-010": {
+      "tasks": [
+        "T039",
+        "T041",
+        "T042",
+        "T043"
+      ]
+    },
+    "FR-011": {
+      "tasks": [
+        "T043",
+        "T040",
+        "T045"
+      ]
+    },
+    "FR-012": {
+      "tasks": [
+        "T039",
+        "T040",
+        "T041",
+        "T045"
+      ]
+    },
+    "FR-013": {
+      "tasks": [
+        "T049",
+        "T051",
+        "T052",
+        "T054"
+      ]
+    },
+    "FR-014": {
+      "tasks": [
+        "T049",
+        "T050",
+        "T054"
+      ]
+    },
+    "FR-015": {
+      "tasks": [
+        "T047",
+        "T052",
+        "T053",
+        "T054"
+      ]
+    },
+    "FR-016": {
+      "tasks": [
+        "T048",
+        "T050"
+      ]
+    },
+    "FR-017": {
+      "tasks": [
+        "T023",
+        "T026",
+        "T027",
+        "T028",
+        "T029"
+      ]
+    },
+    "FR-018": {
+      "tasks": [
+        "T028",
+        "T029",
+        "T074"
+      ]
+    },
+    "FR-019": {
+      "tasks": [
+        "T055",
+        "T056",
+        "T057",
+        "T058",
+        "T059",
+        "T060",
+        "T061",
+        "T062",
+        "T063",
+        "T064",
+        "T065",
+        "T066",
+        "T067",
+        "T068",
+        "T069",
+        "T071"
+      ]
+    },
+    "FR-020": {
+      "tasks": [
+        "T072",
+        "T073",
+        "T074"
+      ]
+    },
+    "FR-021": {
+      "tasks": [
+        "T028",
+        "T035",
+        "T043",
+        "T053"
+      ]
+    },
+    "FR-022": {
+      "tasks": [
+        "T023",
+        "T025",
+        "T026"
+      ]
+    },
+    "FR-023": {
+      "tasks": [
+        "T017",
+        "T022",
+        "T044",
+        "T052",
+        "T054"
+      ]
+    },
+    "SC-001": {
+      "tasks": [
+        "T022"
+      ]
+    }
+  }
 }

@@ -82,7 +82,7 @@ When the author picks a base, the tool tells them how much documentation that ba
 
 **Acceptance Scenarios**:
 
-1. **Given** the author is choosing a base, **When** bases are shown, **Then** each shows a documentation level of none, minimal, or full derived from which documentation members the base ships and whether they carry more than a stub.
+1. **Given** the author is choosing a base, **When** they focus or select a base, **Then** that base shows a documentation level of none, minimal, or full derived from which documentation members it ships and whether they carry more than a stub; a base not yet classified shows no level rather than "none".
 2. **Given** a base classified full, **When** the author reaches the help-docs step, **Then** the description is proposed from the base's own description and the author can accept it unchanged, edit it, or replace it.
 3. **Given** a base classified none, or a net-new keyboard, **When** the author reaches the help-docs step, **Then** the description is required exactly as today.
 4. **Given** the author copied (Track 1) a base classified full, **When** they reach the help-docs step, **Then** the description is *not* prefilled from the base's prose (copy inherits structure and images only) and is required.
@@ -170,7 +170,7 @@ The documentation rows already in the criteria catalog that describe mechanicall
 - **FR-005**: Each documentation member's content MUST be filled from the highest-priority available source in this order: (1) facts derived from the keyboard itself; (2) content inherited from the base; (3) content authored in the help-docs step. Derived facts MUST always be applied even when tiers 2 and 3 are empty, so a package with no base and no answers is still internally consistent (names, language, platforms, links, holder).
 - **FR-006**: On an adaptation (Track 2), the system MUST inherit from the base its welcome page (found under either the folder or the flat convention), the images beside it, its help page body, its README description, and its HISTORY entries, and MUST append the author's answers to inherited prose rather than replacing it.
 - **FR-007**: On a copy (Track 1), the system MUST inherit only the base's welcome images and page skeleton; none of the base's descriptive prose (welcome body, help body, README description, HISTORY bullets) MAY appear in the produced documentation.
-- **FR-008**: At base selection, the system MUST classify each base's documentation as none, minimal, or full, from which documentation members the base ships and whether the welcome page or help page carries more than a stub, and MUST show that classification to the author before they commit to the base.
+- **FR-008**: At base selection, the system MUST classify the focused or selected base's documentation as none, minimal, or full, from which documentation members the base ships and whether the welcome page or help page carries more than a stub, and MUST show that classification to the author before they commit to the base. A base whose classification has not been computed shows no level (never "none"); classifying the whole gallery is not required.
 - **FR-009**: In the help-docs step, the description question MUST be required only when no usable base description is available under the inheritance rules (net-new, copy, or a base classified none). When a usable base description exists on an adaptation, it MUST be proposed for confirmation and the author MUST be able to accept, edit, or replace it in a single action.
 
 **HISTORY**
@@ -184,19 +184,19 @@ The documentation rows already in the criteria catalog that describe mechanicall
 - **FR-013**: The system MUST generate one layout chart image per layer of the keyboard (desktop layers from the visual keyboard and rule outputs; touch layers from the touch layout) into `source/welcome/`, reference each from a "Keyboard Layout" section of the welcome page, and list each in the package descriptor.
 - **FR-014**: Chart generation MUST be deterministic: producing the same keyboard twice MUST yield byte-identical chart files. Charts MUST be produced from the keyboard model, never by capturing the on-screen keyboard preview.
 - **FR-015**: When a base ships its own layout images, the system MUST keep them and MUST NOT replace them with generated charts unless the author opts to regenerate; generated charts MUST use names that cannot collide with a base's images.
-- **FR-016**: Every key on a chart MUST be drawn legibly: combining marks on a dotted-circle carrier, characters with no available glyph as their code point, and a visibly distinct treatment for keys that produce nothing on that layer.
+- **FR-016**: Every key on a chart MUST be drawn legibly: combining marks on a dotted-circle carrier, characters outside the chart renderer's declared glyph-coverage table as their `U+XXXX` code point, and a visibly distinct treatment for keys that produce nothing on that layer. The coverage table is part of the renderer and is the testable contract; the viewer's installed fonts are not.
 
 **Visibility of gaps**
 
 - **FR-017**: The Output step MUST show a documentation checklist listing each of the six members with its source tier (derived, inherited, authored) and a placeholder marker for any member whose content is still the fallback stub; each placeholder row MUST offer a way to the step that supplies its content.
 - **FR-018**: No documentation gap or documentation finding MAY block download or community submission; the checklist and findings are informational.
-- **FR-019**: The following criteria rows MUST be implemented as Layer C checks producing warning-level findings with plain-language hints: 3.3 (most recent HISTORY entry at top), 3.4 (HISTORY cumulative), 3.5 (HISTORY entry format), 3.6 and 7.1 (top HISTORY version matches the keyboard version), 3.7 (HISTORY bullets reference no deleted files), 4.7 (copyright holder identical across LICENSE, source, descriptor, README, HISTORY), 5.7 (README platforms match targets), 11.5 (welcome and help HTML well-formed), 11.6 (help page layer list matches the keyboard's layers), 11.7 (help page name format), 11.9 (welcome/help body parity), 11.10 (welcome/help style parity). Each MUST run inside the existing validation cycle, not on a new timer.
+- **FR-019**: The following thirteen criteria rows (thirteen lint codes; 3.6 and 7.1 describe one fact and may share one check module) MUST be implemented as Layer C checks producing warning-level findings with plain-language hints: 3.3 (most recent HISTORY entry at top), 3.4 (HISTORY cumulative), 3.5 (HISTORY entry format), 3.6 and 7.1 (top HISTORY version matches the keyboard version), 3.7 (HISTORY bullets reference no deleted files), 4.7 (copyright holder identical across LICENSE, source, descriptor, README, HISTORY), 5.7 (README platforms match targets), 11.5 (welcome and help HTML well-formed), 11.6 (help page layer list matches the keyboard's layers), 11.7 (help page name format), 11.9 (welcome/help body parity), 11.10 (welcome/help style parity). Each MUST run inside the existing validation cycle, not on a new timer.
 - **FR-020**: A documentation finding already present in a base's own files before the author edited them MUST be shown as an upstream finding, using the existing muted treatment for inherited findings.
 
 **Survey surface and provenance**
 
-- **FR-021**: Every new user-facing survey surface this feature adds — the base documentation classification at base selection, the adaptive description proposal in the help-docs step, the HISTORY proposal, and the Output documentation checklist — MUST be declared in the step manifest with its typed inputs and writes, and every write to the working copy MUST route through the existing mutation seam.
-- **FR-022**: Every documentation member MUST carry, in the working copy, a record of which tier supplied its current content, so the Output checklist and the upstream-finding rule (FR-020) read one source of truth rather than re-deriving it.
+- **FR-021**: Every new user-facing survey surface this feature adds — the base documentation classification at base selection, the adaptive description proposal in the help-docs step, the HISTORY proposal, the Output documentation checklist, and the layout-chart preference control (keep base images / regenerate, FR-015) — MUST be declared in the step manifest with its typed inputs and writes. Every write to the keyboard IR MUST route through the existing mutation seam; documentation answers are working-copy store slices rendered at projection time (the spec 061 pattern) and are not IR writes.
+- **FR-022**: There MUST be exactly one authoritative source — stored or derived from working-copy state — of which tier supplied each documentation member's current content, so the Output checklist and the upstream-finding rule (FR-020) read that one source rather than re-deriving tier logic locally.
 - **FR-023**: Regenerating documentation on every production (spec 061 FR-010) MUST continue to hold for all six members, including the welcome folder contents and the help-site header, so an edited answer, a changed version, or a changed layout is reflected in the next package.
 
 ### Key Entities
@@ -219,8 +219,8 @@ The documentation rows already in the criteria catalog that describe mechanicall
 - **SC-004**: Producing the same keyboard twice yields byte-identical documentation members and chart images in 100% of runs.
 - **SC-005**: An author adapting a base classified full can complete the help-docs step in one confirmation action without typing a description.
 - **SC-006**: At the Output step, every member's source tier and placeholder state is visible without scrolling or opening a secondary view, and both download and submission remain available in every checklist state.
-- **SC-007**: All twelve documentation criteria rows named in FR-019 produce a finding on a deliberately broken fixture and no finding on a clean one; none of them blocks output.
-- **SC-008**: Every generated chart draws every key legibly on a fixture containing combining marks, a character with no glyph in the fallback font, and an empty key.
+- **SC-007**: All thirteen documentation criteria rows named in FR-019 produce a finding on a deliberately broken fixture and no finding on a clean one; none of them blocks output.
+- **SC-008**: Every generated chart draws every key legibly on a fixture containing combining marks, a character outside the renderer's declared glyph-coverage table, and an empty key.
 
 ## Assumptions
 
