@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-09-10",
+  "lastUpdated": "2026-09-11",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -821,7 +821,7 @@
     },
     "specs/071-marks-question-series": {
       "title": "Feature Specification: Mark Composition Model and the Marks Question Series",
-      "hash": "sha256:efb61d3106e332ea",
+      "hash": "sha256:700b46c58a161c73",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

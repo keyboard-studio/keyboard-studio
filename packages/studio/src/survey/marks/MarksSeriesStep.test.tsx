@@ -525,7 +525,54 @@ describe("MarksSeriesStep — S4 output-form station", () => {
     reachOutputForm();
     fireEvent.click(screen.getByTestId("output-form-change"));
     expect(screen.getByTestId("marks-output-form").textContent).toContain(
-      "Letter plus mark, built as you type",
+      "A letter and a mark, kept separate",
+    );
+  });
+
+  it("after an override, the explanation describes the CHOSEN form, not the proposed one", () => {
+    // Regression: the notice rendered `formLabel[value]` above
+    // `proposal.explanation`, which is computed once from the policy and never
+    // recomputed — so one click left the screen stating base-plus-mark above
+    // the ready-made explanation.
+    seedAlphabet([ACUTE], ["e"]);
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    reachOutputForm();
+    // Before the override: ready-made, with the ready-made explanation.
+    expect(screen.getByTestId("marks-output-form").textContent).toContain(
+      "Backspace removes a whole accented letter in one step",
+    );
+
+    fireEvent.click(screen.getByTestId("output-form-change"));
+    const text = screen.getByTestId("marks-output-form").textContent ?? "";
+    // The chosen form and the paragraph under it agree...
+    expect(text).toContain("A letter and a mark, kept separate");
+    expect(text).toContain("Backspace clears the mark first and the plain letter next");
+    // ...and the explanation of the form we just left is gone.
+    expect(text).not.toContain("Backspace removes a whole accented letter in one step");
+  });
+
+  it("hides the override when no ready-made form exists for some pair (row 1)", () => {
+    seedAlphabet([ACUTE], [SCHWA]);
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    reachOutputForm();
+    expect(screen.queryByTestId("output-form-change")).toBeNull();
+    expect(screen.getByTestId("output-form-change-unavailable").textContent).toContain(
+      "no single-character form",
+    );
+  });
+
+  it("states the S2 outcome as a premise (no own-key mark)", () => {
+    seedAlphabet([ACUTE], ["e"]);
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    reachOutputForm();
+    expect(screen.getByTestId("output-form-premise").textContent).toContain(
+      "no mark has a key of its own",
     );
   });
 
@@ -856,6 +903,7 @@ describe("MarksSeriesStep — S2 treatment station (spec 052 US1)", () => {
 
 describe("MarksSeriesStep — S4 open choice (US4)", () => {
   const GRAVE = "̀";
+  const SCHWA_BASE = "ə"; // no ready-made accented forms exist
 
   function seedComposableProductiveAlphabet(): void {
     // Every pair composes (a/e/i with acute+grave all have ready-made forms)
@@ -897,11 +945,76 @@ describe("MarksSeriesStep — S4 open choice (US4)", () => {
     // Recommended (base-plus-mark for a productive class) listed first + tagged.
     expect(station.textContent).toContain("recommended");
     const labels = station.querySelectorAll("label");
-    expect(labels[0]?.textContent).toContain("Letter plus mark");
+    expect(labels[0]?.textContent).toContain("A letter and a mark, kept separate");
     // Both options carry a backspace preview.
     expect(station.querySelectorAll('[data-testid="backspace-preview"]')).toHaveLength(2);
     // SC-005 holds on the open-choice rendering too.
     expect(station.textContent).not.toMatch(/unicode/i);
     expect(station.textContent).not.toMatch(/normali[sz]/i);
+  });
+
+  it("names the own-key marks from S2 as a premise, and keeps the override (row 2)", () => {
+    seedComposableProductiveAlphabet();
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    reachStation("marks-output-form");
+    const premise = screen.getByTestId("output-form-premise").textContent ?? "";
+    expect(premise).toContain("marks with a key of their own");
+    expect(premise).toContain(ACUTE);
+  });
+
+  it("drops a ready-made override when an alphabet edit makes it unrealisable (row 2 → row 1)", () => {
+    // The re-seed effect keyed on `outputFormProposal.form` cannot catch this:
+    // row 2 and row 1 BOTH propose base-plus-mark, so the proposed form does
+    // not change and a `ready-made` override taken on the open choice would
+    // survive onto a row-1 notice — an answer the keyboard cannot produce, on
+    // a screen that no longer offers the button to undo it.
+    seedComposableProductiveAlphabet();
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    reachStation("marks-output-form");
+
+    // Override the open choice to ready-made (the non-recommended option).
+    const readyMade = screen.getByLabelText(/One unit per accented letter/) as HTMLInputElement;
+    fireEvent.click(readyMade);
+    expect(
+      (screen.getByLabelText(/One unit per accented letter/) as HTMLInputElement).checked,
+    ).toBe(true);
+
+    // Edit the alphabet: schwa + acute has no ready-made form, so the posture
+    // table now trips row 1 (which still proposes base-plus-mark).
+    act(() => {
+      useWorkingCopyStore.getState().recordPhase({
+        phase: "B",
+        answers: [],
+        alphabet: {
+          bases: ["a", "e", "i", SCHWA_BASE],
+          marks: [ACUTE, GRAVE],
+          attestedStacks: [
+            { base: "a", marks: [ACUTE] },
+            { base: "e", marks: [ACUTE] },
+            { base: "i", marks: [ACUTE] },
+            { base: "a", marks: [GRAVE] },
+            { base: "e", marks: [GRAVE] },
+            { base: "i", marks: [GRAVE] },
+            { base: SCHWA_BASE, marks: [ACUTE] },
+          ],
+          declaredRoles: {},
+        },
+      });
+    });
+    // FR-023 sends the author back to the first station — walk forward again.
+    reachStation("marks-output-form");
+
+    const station = screen.getByTestId("marks-output-form");
+    // A row-1 notice, not the open choice, and the override is gone...
+    expect(station.querySelectorAll('input[type="radio"]')).toHaveLength(0);
+    expect(screen.queryByTestId("output-form-change")).toBeNull();
+    // ...and the answer reset to base-plus-mark rather than keeping the now
+    // unrealisable ready-made.
+    expect(station.textContent).toContain("A letter and a mark, kept separate");
+    expect(station.textContent).not.toContain("One unit per accented letter");
   });
 });

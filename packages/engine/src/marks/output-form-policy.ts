@@ -38,12 +38,38 @@ export interface OutputFormProposal {
   presentedAs: "notice" | "open-choice";
   /** Plain-language reason shown with the proposal (consequence-led, no jargon). */
   explanation: string;
+  /**
+   * True when at least one attested/accepted pair has NO ready-made form — i.e.
+   * {@link OutputFormInputs.anyPairLacksReadyMade} fired. "ready-made" is then
+   * not a selectable answer for this keyboard at all, so the station must not
+   * offer it as an override.
+   *
+   * DERIVED, never authored per row — see {@link readyMadeUnavailableFor}. A
+   * row that set `form`/`presentedAs` correctly but forgot this flag would
+   * silently re-offer an unrealisable override.
+   */
+  readyMadeUnavailable: boolean;
+}
+
+/** A policy row's authored outcome: everything on the proposal that is not derived. */
+type OutputFormOutcome = Omit<OutputFormProposal, "readyMadeUnavailable">;
+
+/**
+ * `ready-made` is unavailable exactly when the table lands on a base-plus-mark
+ * NOTICE. That is the shape of row 1 and of row 1 only: row 2 also proposes
+ * base-plus-mark but as an `open-choice`, which by definition fires only when
+ * every pair HAS a ready-made form (row 1 would have matched first otherwise),
+ * and row 3 proposes `ready-made` itself. Deriving it from the outcome — rather
+ * than restating it on each row — means a new row cannot forget it.
+ */
+function readyMadeUnavailableFor(outcome: OutputFormOutcome): boolean {
+  return outcome.presentedAs === "notice" && outcome.form === "base-plus-mark";
 }
 
 interface OutputFormPolicyRow {
   order: number;
   matches: (inputs: OutputFormInputs) => boolean;
-  result: OutputFormProposal;
+  result: OutputFormOutcome;
   isDefault: boolean;
 }
 
@@ -131,7 +157,9 @@ export function resolveOutputFormProposal(
     hasOwnKeyMark,
   };
   for (const row of OUTPUT_FORM_POLICY) {
-    if (row.matches(inputs)) return row.result;
+    if (row.matches(inputs)) {
+      return { ...row.result, readyMadeUnavailable: readyMadeUnavailableFor(row.result) };
+    }
   }
   // Unreachable: the last row always matches.
   throw new Error("resolveOutputFormProposal: no policy row matched (missing default row)");
