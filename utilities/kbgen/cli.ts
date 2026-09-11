@@ -16,8 +16,9 @@
 // Options:
 //   --id <slug>        keyboard id (filenames). Required.
 //   --name <str>       display name. Defaults to --id.
-//   --locale <bcp47>   CLDR locale; derives used letters (-> free keys) and, if --chars is
-//                      omitted, the special inventory from the locale's exemplar characters.
+//   --locale <bcp47>   BCP47 tag; derives used letters (-> free keys) and, if --chars is
+//                      omitted, the special inventory from the engine's pinned CLDR/SLDR
+//                      exemplar index (offline; no fetch step needed).
 //   --chars <str>      explicit inventory of special output characters (overrides locale).
 //   --chars-file <p>   read --chars from a UTF-8 file.
 //   --used <str>       explicit base letters the orthography uses (overrides locale).
@@ -35,7 +36,7 @@ import { getLayout } from './layout.ts';
 import { availability } from './analyze.ts';
 import { plan, checkComplete } from './place.ts';
 import { build, format } from './map.ts';
-import { loadExemplars } from './sources/cldr.ts';
+import { loadExemplars, exemplarIndexVersion } from './sources/cldr.ts';
 import { emitKmn, emitTouch, emitKvks } from './emit.ts';
 import { extractCorpus, diff } from './corpus-diff.ts';
 
@@ -79,9 +80,10 @@ function parseArgs(argv: string[]): CliOptions {
 }
 const fail = (m: string): never => { console.error('error: ' + m); process.exit(1); };
 
+// data/SOURCES.json records only the vendored Unicode pin; the CLDR/SLDR pins
+// live in the engine's exemplar index (see exemplarIndexVersion).
 interface SourceVersions {
   unicodeVersion?: string;
-  cldrVersion?: string;
 }
 
 function sourceVersions(): SourceVersions {
@@ -89,20 +91,21 @@ function sourceVersions(): SourceVersions {
   catch { return {}; }
 }
 
-function main() {
+async function main() {
   const o = parseArgs(process.argv);
   if (!o.id) fail('--id is required');
   o.name = o.name || o.id;
 
   const layout = getLayout(o.base);
 
-  // Resolve inventory + used letters: explicit flags win; otherwise derive from CLDR.
+  // Resolve inventory + used letters: explicit flags win; otherwise derive from
+  // the engine's pinned CLDR/SLDR exemplar index (offline, deterministic).
   let chars: string[] | null = null;
   let used: string[] | null = null;
 
   if (o.locale) {
-    const exemplars = loadExemplars(o.locale);
-    if (!exemplars) return fail(`no CLDR exemplar data for locale "${o.locale}" -- fetch it (npx tsx fetch-data.ts ${o.locale}) or pass --chars/--used`);
+    const exemplars = await loadExemplars(o.locale);
+    if (!exemplars) return fail(`no exemplar data for locale "${o.locale}" in the pinned CLDR/SLDR index -- pass --chars/--used`);
     used = [...exemplars.used];
     chars = exemplars.specials;
   }
@@ -123,9 +126,18 @@ function main() {
   const completeness = checkComplete(planResult, layout, placedChars);
 
   const src = sourceVersions();
+  // Provenance only: a --chars/--used run never needs the exemplar index, so an
+  // index that fails to load degrades to null pins here (as sourceVersions()
+  // already does for unicodeVersion) rather than failing the build.
+  const index = await exemplarIndexVersion().catch(() => ({ cldr: null, sldrCommit: null }));
   const map = build(planResult, layout, {
     id: o.id!, name: o.name!, completeness, freeKeys: [...free],
-    source: { locale: o.locale || null, unicodeVersion: src.unicodeVersion || null, cldrVersion: src.cldrVersion || null },
+    source: {
+      locale: o.locale || null,
+      unicodeVersion: src.unicodeVersion || null,
+      cldrVersion: index.cldr,
+      sldrCommit: index.sldrCommit,
+    },
   });
 
   console.log(format(map));
@@ -156,4 +168,4 @@ function main() {
   console.log(`\nWrote ${wrote.join(', ')} to ${srcDir}\n`);
 }
 
-main();
+main().catch((e: Error) => fail(e.message));
