@@ -12,13 +12,14 @@ import { SurveyRunner } from "./SurveyRunner.tsx";
 import { loadModularFlow } from "./loadModularFlow.ts";
 import { surveyPageColumn, phaseHeading, leadParagraph } from "./surveyStyles.ts";
 import type { SurveyContext, FlowOption } from "./types.ts";
-import { deriveScriptPrefill, normalizeTargetScript } from "../lib/scriptAxes.ts";
+import { deriveScriptPrefill } from "../lib/scriptAxes.ts";
 import type { IdentityLiteResult } from "./identityLiteResult.ts";
 import {
   loadLangtags,
   getLoadedLangtags,
   scriptToTargetOption,
 } from "../lib/langtagsDefaults.ts";
+import { buildTargetBcp47, normalizeRegionSubtag } from "./targetBcp47.ts";
 import { answerString } from "./answerString.ts";
 import { normalizeForCompare } from "../lib/normalizeForCompare.ts";
 
@@ -42,67 +43,11 @@ const LANGTAGS_CAPTION = msg({
 // is where every existing call site imports it from.
 export type { IdentityLiteResult };
 
-/**
- * Build the full BCP47 target tag from an ISO 639 language subtag and a raw
- * `il_target_script` value.
- *
- * Rules (language + script → BCP47):
- * - `lang` + plain script subtag (Latn/Deva/…) → `${lang}-${script}`
- *   e.g. "ha" + "Latn" → "ha-Latn", "hi" + "Deva" → "hi-Deva"
- * - `lang` + "romanization-Latn" → `${lang}-Latn`
- *   (Latn script implied; the fact it is a romanization is a strategy detail)
- * - `lang` + "fonipa" → `${lang}-fonipa`
- *   (Latin is implied by the variant; BCP47 omits the script subtag for fonipa)
- * - empty `lang` → "" (no BCP47; caller degrades to script-match ranking)
- *
- * Normalize a value from the `il_language_region` field into a shape-valid
- * BCP47 region subtag, or "" when it is not one.
- *
- * A well-formed BCP47 region subtag is either an ISO 3166-1 alpha-2 code (two
- * ASCII letters, canonically upper-case) or a UN M.49 area code (three
- * digits). The region question offers region CODES as datalist options, but
- * the field accepts free text — an author can type a region NAME ("Djibouti")
- * instead of picking the "DJ" code. Folding that verbatim into the tag would
- * produce an invalid BCP47 string ("aa-Latn-Djibouti"), so only a shape-valid
- * subtag is kept; anything else is dropped. This mirrors the script handling
- * in {@link buildTargetBcp47}, which omits a malformed subtag rather than emit
- * one.
- */
-export function normalizeRegionSubtag(region: string): string {
-  const reg = region.trim();
-  if (/^[A-Za-z]{2}$/.test(reg)) return reg.toUpperCase();
-  if (/^[0-9]{3}$/.test(reg)) return reg;
-  return "";
-}
-
-/**
- * An optional `region` subtag (from il_language_region, spec 030 US3) is folded
- * in at the BCP47 region position (language-script-region-variant). Empty region
- * (unambiguous or skipped) leaves the tag exactly as before. The region is
- * normalized to a shape-valid BCP47 region subtag first (see
- * {@link normalizeRegionSubtag}); malformed free text is dropped.
- *
- * @param languageSubtag  ISO 639 subtag from `il_language_code`, may be "".
- * @param targetScriptRaw Raw `il_target_script` value from the survey.
- * @param region          Optional region subtag from il_language_region, may be "".
- */
-export function buildTargetBcp47(
-  languageSubtag: string,
-  targetScriptRaw: string,
-  region = "",
-): string {
-  const lang = languageSubtag.trim();
-  if (lang === "") return "";
-  const reg = normalizeRegionSubtag(region);
-  // BCP47 order: language-script-region-variant.
-  if (targetScriptRaw === "fonipa") return [lang, reg, "fonipa"].filter((p) => p !== "").join("-");
-  if (targetScriptRaw === "romanization-Latn") return [lang, "Latn", reg].filter((p) => p !== "").join("-");
-  const { script } = normalizeTargetScript(targetScriptRaw);
-  // "other" and empty string are not valid ISO-15924 subtags; omit the script
-  // rather than emit the malformed "lang-other".
-  const scriptPart = script === "" || script === "other" ? "" : script;
-  return [lang, scriptPart, reg].filter((p) => p !== "").join("-");
-}
+// The BCP47 composer and its region normalizer live in their own leaf module so
+// the decision trail can recompose the tag it attributes without importing this
+// component (see targetBcp47.ts). Re-exported because this is where every
+// existing call site imports them from.
+export { buildTargetBcp47, normalizeRegionSubtag } from "./targetBcp47.ts";
 
 /** Derive the typed identity-lite result from a completed flow. */
 export function extractIdentityLite(result: SurveyPhaseResult): IdentityLiteResult {

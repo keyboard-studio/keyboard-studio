@@ -40,8 +40,11 @@ import { isMutateSeamEnabled } from "../flags/mutateFlag.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import { applyMutatePatch } from "../steps/mutateApply.ts";
 import { manifest } from "../steps/manifest.ts";
+import { buildTargetBcp47 } from "../survey/targetBcp47.ts";
+import type { IdentityOverlayField } from "../survey/types.ts";
 import {
   coDecisionEntryIds,
+  liveFieldAnswers,
   outputFieldForEntry,
   resolveIdentityCounterfactual,
   type CounterfactualDeps,
@@ -203,6 +206,63 @@ export interface ResolveImpactAsyncDeps extends ResolveImpactDeps, Counterfactua
 }
 
 /**
+ * The identity questions that compose one BCP47 tag, mapped to their slot in
+ * {@link buildTargetBcp47}'s (language, script, region) signature.
+ *
+ * A question that declares `field: "bcp47"` without a slot here reaches the tag
+ * in some way this table does not model, so it keeps being varied by
+ * substitution rather than being silently dropped from the composition.
+ *
+ * Exported for the drift guard in survey/questions/outputReach.test.ts: this
+ * table restates, in a second place, which questions compose the tag, and a
+ * fourth contributor added without an entry here would silently fall back to
+ * substitution — the very defect this resolver was fixed to stop. The guard
+ * derives the expected key set from the registry's own `outputs` declarations.
+ */
+export const BCP47_SLOTS: Record<string, "language" | "script" | "region" | undefined> = {
+  il_language_code: "language",
+  il_target_script: "script",
+  il_language_region: "region",
+};
+
+/**
+ * The two values one entry's counterfactual varies between: what the artifact
+ * carries now, and what it would carry had this one answer been left blank.
+ *
+ * For a WHOLE-VALUE field both sides are the recorded answer and `undefined` —
+ * unchanged. For the COMPOSED `bcp47` tag both sides are recomposed from the live
+ * answers to the three contributing questions, varying only this entry's own
+ * slot, so each side is a tag the projection could actually write. A tag that
+ * composes to nothing becomes `undefined`, which is how
+ * `resolveIdentityCounterfactual` words "left blank".
+ */
+function varyEntryContribution(
+  entry: DecisionEntry,
+  field: IdentityOverlayField,
+  recorded: string,
+  record: DecisionRecord,
+): { recorded: string | undefined; alternative: string | undefined } {
+  const ownSlot =
+    entry.payload.kind === "survey-answer" ? BCP47_SLOTS[entry.payload.questionId] : undefined;
+  if (field !== "bcp47" || ownSlot === undefined) return { recorded, alternative: undefined };
+
+  const slots = { language: "", script: "", region: "" };
+  for (const [questionId, live] of liveFieldAnswers(entry, record, field)) {
+    const slot = BCP47_SLOTS[questionId];
+    if (slot === undefined) continue;
+    const value = live.payload.kind === "survey-answer" ? live.payload.value : undefined;
+    if (typeof value === "string") slots[slot] = value;
+  }
+  const compose = (own: string): string | undefined => {
+    const varied = { ...slots };
+    varied[ownSlot] = own;
+    const tag = buildTargetBcp47(varied.language, varied.script, varied.region);
+    return tag === "" ? undefined : tag;
+  };
+  return { recorded: compose(recorded), alternative: compose("") };
+}
+
+/**
  * Resolve ONE entry's impact, including the counterfactual for a decision made
  * before instantiation.
  *
@@ -245,15 +305,23 @@ export async function resolveImpactAsync(
     // The overlay is a string space; a non-string answer has no value to vary, so
     // it falls through to the sync resolver rather than being coerced into one.
     if (typeof recorded === "string") {
-      const sharedWith = coDecisionEntryIds(entry, deps.getRecord(), field);
+      const record = deps.getRecord();
+      const sharedWith = coDecisionEntryIds(entry, record, field);
       // The alternative is "left blank" — the one alternative that exists for every
       // identity answer without inventing a second value the author never
       // considered. FR-026's explicit-alternative form goes through the flow map,
       // which passes its own `requestedValue`.
+      //
+      // A COMPOSED field varies through its composer, never by substitution: the
+      // `bcp47` tag is built from three answers, so injecting one of them as the
+      // WHOLE tag would diff the artifact against a tag the projection never
+      // writes — the audit-versus-artifact disagreement SC-005 forbids, and what
+      // made the script answer alone read `und` -> `Latn`.
+      const varied = varyEntryContribution(entry, field, recorded, record);
       const impact = await resolveIdentityCounterfactual(
         field,
-        recorded,
-        undefined,
+        varied.recorded,
+        varied.alternative,
         deps,
         sharedWith,
       );
