@@ -1,0 +1,16 @@
+{
+  "workflow": "speckit",
+  "specName": "Documentation completeness — every package ships its full documentation set",
+  "branch": "076-documentation-completeness",
+  "currentStep": "specify",
+  "status": "specified",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-09-11T02:34:34.182Z"
+    }
+  ]
+}
