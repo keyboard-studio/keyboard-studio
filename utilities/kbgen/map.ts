@@ -54,6 +54,7 @@ export interface BuildContext {
     locale: string | null;
     unicodeVersion: string | null;
     cldrVersion: string | null;
+    sldrCommit: string | null;
   };
 }
 
@@ -150,7 +151,7 @@ export function format(map: KbgenOutputMap): string {
   const L: string[] = [];
   L.push(`\n${map.keyboard.name}  (base ${map.base.name}; free keys: ${map.freeKeys.join(' ') || '(none)'})`);
   if (map.source.locale || map.source.unicodeVersion) {
-    L.push(`source: locale=${map.source.locale || '-'}  unicode=${map.source.unicodeVersion || '-'}  cldr=${map.source.cldrVersion || '-'}`);
+    L.push(`source: locale=${map.source.locale || '-'}  unicode=${map.source.unicodeVersion || '-'}  cldr=${map.source.cldrVersion || '-'}  sldr=${map.source.sldrCommit || '-'}`);
   }
   L.push('\nPHYSICAL keyboard');
   L.push('  output  keys                method     anchor');
