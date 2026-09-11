@@ -196,6 +196,7 @@ Suites outside the pnpm workspace need their own invocation, and CI runs each ex
 - i18n utilities: `pnpm run test:i18n-utilities`
 - spec-trace: `pnpm run test:spec-trace`
 - kbgen: `pnpm run test:kbgen` (typecheck + tests; it imports engine `src/` internals by relative path, so this is the only thing that catches an engine rename)
+- nfd-tolerance-corpus: `pnpm run test:nfd-tolerance-corpus`
 
 ## Journey corpus (spec 032)
 
@@ -301,7 +302,8 @@ with `tsx` (see each tool's tsconfig) — except the plain-node ones (`spec-trac
 `node`. Do not treat them as built workspace packages.
 
 Inventory: kbgen, supportability-scanner, smoke-artifact, spec-trace, km-triage-app, hermes,
-Template Cleanup, crowdin-diagnose, content-i18n-normalize, facet-index + facet-index-lint.
+Template Cleanup, crowdin-diagnose, content-i18n-normalize, facet-index + facet-index-lint,
+nfd-tolerance-corpus.
 
 ### spec-trace
 
@@ -322,6 +324,26 @@ Two halves over the same corpus:
 - **Search** — `pnpm run spec-search "<query>"` runs BM25 retrieval over `specs/**` + `docs/**` +
   root `spec.md`/`README.md`, returning heading-level chunks with a `file:line` anchor. See
   [Searching the corpus](#searching-the-corpus) below.
+
+### nfd-tolerance-corpus
+
+`pnpm run nfd-tolerance-corpus` (== `node utilities/nfd-tolerance-corpus/run.mjs`) runs the real
+NFC/NFD context-tolerance transform over every keyboard in the sibling `../keyboards` corpus,
+recompiles and re-simulates each result, and buckets the keyboard by **measured outcome** — no
+gap, gap fixed, gap remaining, regressed/corrupted, failed to compile, or refused by a named
+internal gate. It measures **input** equivalence only; it never scores a change to what a
+keyboard outputs. A whole-corpus sweep takes roughly eight minutes and writes a JSON report to
+the gitignored `utilities/nfd-tolerance-corpus/reports/`; `--keyboard <id>` and `--limit <n>`
+narrow it.
+
+Two things set it apart from its neighbours here. It boots through Vite's SSR module runner
+(`run.mjs`) rather than `tsx`, because the engine's simulator reaches vendored KeymanWeb
+sources that esbuild cannot transpile file-by-file. And it strips `&LAYOUTFILE` itself before
+compiling, working around an engine defect that would otherwise report a compile failure for
+~92% of the corpus. Its test suite (`pnpm run test:nfd-tolerance-corpus`) is hermetic —
+vendored pre-fix/post-fix fixtures for the two keyboards a human hand-fixed for this bug,
+`haroi` and `sil_kcho`, plus pure classification unit tests. The full sweep is the CLI, never a
+test. Detail: [utilities/nfd-tolerance-corpus/README.md](../utilities/nfd-tolerance-corpus/README.md).
 
 ### facet-index
 
