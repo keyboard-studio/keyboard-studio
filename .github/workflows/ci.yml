@@ -141,6 +141,13 @@ jobs:
       - name: Test (facet-index — outside the pnpm workspace)
         run: pnpm run test:facet-index
 
+      # kbgen is a prototype outside the workspace too, and since the
+      # parseUnicodeSet retirement it imports engine character-discovery
+      # internals by relative src path (spec 044 FR-015: one exemplar path).
+      # Nothing else typechecks it, so an engine rename would break it silently.
+      - name: Test (kbgen — outside the pnpm workspace)
+        run: pnpm run test:kbgen
+
       # nfd-tolerance-corpus is likewise outside the workspace. Its suite is
       # hermetic — the ground-truth fixtures are vendored .kmn, so it needs no
       # corpus checkout — and it is the regression guard for a harness whose

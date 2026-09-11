@@ -195,6 +195,7 @@ Suites outside the pnpm workspace need their own invocation, and CI runs each ex
 - `/api` functions: `npx vitest run --config api/vitest.config.ts`
 - i18n utilities: `pnpm run test:i18n-utilities`
 - spec-trace: `pnpm run test:spec-trace`
+- kbgen: `pnpm run test:kbgen` (typecheck + tests; it imports engine `src/` internals by relative path, so this is the only thing that catches an engine rename)
 - nfd-tolerance-corpus: `pnpm run test:nfd-tolerance-corpus`
 
 ## Journey corpus (spec 032)
