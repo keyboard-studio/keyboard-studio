@@ -268,8 +268,9 @@ with that character still selected.
    confirms it, **Then** an unselected offered character is recorded as declined
    rather than simply absent, so a reviewer can tell an author's "no" from a gap.
 7. **Given** a script with no plausible need for any offered invisible character,
-   **When** the question is reached, **Then** the studio proposes none selected
-   and says why, rather than presenting an unexplained blank multi-select.
+   **When** the question is reached, **Then** the step still renders and the
+   studio proposes none selected and says why, rather than presenting an
+   unexplained blank multi-select or skipping the step silently.
 8. **Given** this question exists, **When** an RTL script is being surveyed,
    **Then** the author is asked about direction marks once, not twice — this
    question subsumes the existing RTL-only advisory direction-marks question
@@ -464,13 +465,27 @@ re-resolved and confirm the same two are still absent if they are still proposed
 - **FR-019**: The invisible-character question MUST subsume the existing RTL-only
   advisory direction-marks question rather than duplicate it, so an RTL author is
   asked about a given direction mark once.
-- **FR-020**: Where the invisible-character question sits MUST be resolved:
-  [NEEDS CLARIFICATION: a spine step in the phase-B order alongside marks,
-  punctuation and convenience, which asks every author about invisibles, or a
-  side trail reachable from the punctuation step that rejoins the spine, which
-  asks only authors whose script or typing suggests they are relevant? The
-  convenience question offers a third shape — a spine step with a computed gate
-  that renders nothing when there is nothing to ask.]
+- **FR-020**: The invisible-character question MUST be its own step on the
+  phase-B spine, alongside marks, punctuation and convenience, and MUST be asked
+  of every author — not a side trail off the punctuation step that only some
+  authors reach. It MUST sit immediately after the punctuation step and before
+  the convenience step, because the code-point entry field that reaches invisible
+  characters today lives on the punctuation page and this step is where that
+  page's refused and swallowed characters are routed (FR-016); its position
+  within the spine is easily changed if the owner prefers it elsewhere, since
+  nothing else in this spec depends on the order. The step MUST always render. It
+  MUST NOT adopt the convenience step's computed gate that renders nothing when
+  there is nothing to ask: that silent auto-skip is exactly the failure mode
+  SC-009 exists to prevent — a step that stops rendering while its walk still
+  passes, because the walk only acts when the screen appears. Where a language
+  has no invisible character to offer, the step still renders and says so, the
+  "propose none selected and say why" behaviour Story 3 already requires, rather
+  than disappearing. What the step contains is unchanged by being placed on the
+  spine: the offer list, the plain-language labels taken from the existing
+  invisible-character label helper extended to cover U+2060, the one-line "you
+  need this if…" statement per character, and the absorbed RTL-only advisory
+  direction-marks question all stand exactly as FR-013, FR-015 and FR-019 state
+  them.
 - **FR-021**: The fate of the pane's code-point entry field MUST be resolved:
   [NEEDS CLARIFICATION: does "Add any character by code point" remain available
   on the punctuation scope once the named invisibles question exists — keeping an
@@ -580,6 +595,17 @@ re-resolved and confirm the same two are still absent if they are still proposed
   rule. Basic ASCII is retained only as the fallback floor for the case where
   base coverage cannot be determined (FR-007, FR-009). This question is settled;
   it is not reopened by the proposal list turning out to be long.
+
+- **2026-09-09, repo owner** — "invisibles should be their own step". The
+  invisible-character question is its own step on the phase-B spine: not a side
+  trail off the punctuation step, and not a gated step that can render nothing.
+  It sits immediately after the punctuation step and before the convenience step,
+  because the code-point entry field that reaches invisible characters today
+  lives on the punctuation page; that placement within the spine is easily moved
+  if the owner prefers it elsewhere. The step always renders, including for a
+  language with no invisible character to offer, and does not take the
+  convenience step's computed auto-skip (FR-020). That the question is its own
+  step is settled; it is not reopened by the offer list turning out to be short.
 
 - The offline exemplar index shipped with the engine is the source of the CLDR
   proposal. This feature does not add a network lookup and does not change which

@@ -136,6 +136,13 @@ label, and it appears nowhere in the repository today.
 rather than sitting beside it (FR-019). Its two characters — U+200F and U+200E —
 become candidates here.
 
+**Placement.** This surface is its own step on the phase-B spine, immediately
+after the punctuation step and before the convenience step (FR-020, decided
+2026-09-09), so `invisibleCandidatesFor` is called from that step and the step
+carries a manifest entry of its own. The step always renders; it does not take
+the convenience step's computed gate, so an empty candidate list is rendered as
+"nothing to offer, and here is why" rather than as a skipped step.
+
 **Routing.** The punctuation step's "Skipped" path
 (`PunctuationStep.tsx:166-167`, `:346-353`) is replaced by a route to this
 question with the typed character pre-selected (FR-016). Nothing in the survey
@@ -160,11 +167,10 @@ revisits and language-tag re-resolution (SC-006).
 
 `baseGroup`'s content is **settled**: every punctuation character the base can
 produce, with the floor substituted only where coverage is unknown (FR-009,
-decided 2026-09-09). What remains provisional:
-
-- Whether the invisible-character question is a spine step or a side trail
-  changes where `invisibleCandidatesFor` is called from, and whether a manifest
-  entry exists at all (FR-020).
+decided 2026-09-09). So is the invisible-character question's shape: it is its
+own spine step immediately after the punctuation step, always rendering, so
+`invisibleCandidatesFor` is called from that step and a manifest entry for it
+exists (FR-020, decided 2026-09-09). What remains provisional:
 - Whether the pane's code-point entry field stays on the punctuation scope
   determines whether `RawCodepointEntry` remains a second route into the draft
   store from this page (FR-021).
