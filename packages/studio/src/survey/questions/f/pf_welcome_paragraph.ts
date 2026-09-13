@@ -1,8 +1,6 @@
 // Per-question module: pf_welcome_paragraph (Phase F)
 // Ported verbatim from content/flows/phase_f_helpdocs.yaml.
 
-import type { BaseDocumentationProfile } from "@keyboard-studio/contracts";
-import { extractUsableBaseDescription } from "@keyboard-studio/engine";
 import type { QuestionModule, ValidationResult } from "../../types.ts";
 
 export const definition = {
@@ -46,53 +44,12 @@ export const definition = {
 // Adaptive description proposal (spec 076 FR-009, US4, §3c propose-then-confirm)
 // ---------------------------------------------------------------------------
 
-/**
- * The subset of live working-copy state this question's adaptive prefill
- * needs, named to match workingCopyStore's own slices 1:1 (instantiationMode,
- * baseDocProfile, baseWelcomeHtmText, baseHelpPhpText) so a caller building
- * this from store reads can pass them straight through.
- */
-export interface AdaptiveDescriptionContext {
-  instantiationMode: "new-from-base" | "adapt-existing" | null;
-  baseDocProfile: BaseDocumentationProfile | null;
-  baseWelcomeHtmText: string | null;
-  baseHelpPhpText: string | null;
-}
-
-/**
- * `prefill(ctx)` — the smallest additive hook this module offers beyond the
- * locked `QuestionModule` contract (types.ts has no generic prefill/
- * conditional-required mechanism today; adding one here rather than widening
- * that shared interface keeps the change scoped to this one question). Not a
- * `QuestionModule` field — a plain named export the flow-assembly layer reads
- * directly: `phaseFOptions.seeds.getSeedValue` in
- * editors/adapters/flowStepOptions.tsx calls this (reading the four context
- * fields off `useWorkingCopyStore.getState()`) to seed `pf_welcome_paragraph`
- * when SurveyRunner asks for a value for it.
- *
- * Returns the base's usable description text ONLY on an adaptation
- * (`instantiationMode === "adapt-existing"`) whose profile reports
- * `hasUsableDescription`; `undefined` otherwise (net-new, copy/Track 1, or a
- * base classified none/minimal) — the question then behaves exactly as
- * before: required, unfilled.
- */
-export function prefill(ctx: AdaptiveDescriptionContext): string | undefined {
-  if (ctx.instantiationMode !== "adapt-existing") return undefined;
-  if (ctx.baseDocProfile === null || !ctx.baseDocProfile.hasUsableDescription) return undefined;
-  return extractUsableBaseDescription(ctx.baseWelcomeHtmText, ctx.baseHelpPhpText) ?? undefined;
-}
-
-/**
- * `requiredWhen(ctx)` — companion to `prefill` above: `false` in exactly the
- * case `prefill` proposes a value (so the author's single-action accept/edit/
- * replace is never blocked by a "required" gate on a field that already has
- * something in it), `true` otherwise. Deliberately re-derives from `prefill`
- * rather than caching its result, so the two can never disagree about which
- * case they are in.
- */
-export function requiredWhen(ctx: AdaptiveDescriptionContext): boolean {
-  return prefill(ctx) === undefined;
-}
+// spec 076 FR-009: the adaptive prefill / conditional-required rule
+// (`prefill`, `requiredWhen`, `AdaptiveDescriptionContext`) lives in
+// lib/adaptiveDescription.ts — it needs the engine's
+// extractUsableBaseDescription, and question modules stay engine-free so the
+// standalone content-i18n extractor can load them. flowStepOptions.tsx's
+// phaseFOptions applies it to this question at seed time.
 
 export function validate(
   value: string | string[] | undefined,

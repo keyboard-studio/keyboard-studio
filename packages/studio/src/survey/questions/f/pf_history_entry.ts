@@ -28,13 +28,6 @@
 // and thread into `setHistoryEntryState`. That wiring is NOT done in this
 // file; see this cycle's handoff notes for the exact call sites.
 
-import type {
-  HistoryEntryState,
-  HistoryProposal,
-  HistoryProposalStatus,
-} from "@keyboard-studio/contracts";
-import { buildHistoryProposal } from "@keyboard-studio/engine";
-import type { HistoryProposalSeed } from "@keyboard-studio/engine";
 import type { FlowQuestion, QuestionModule, ValidationResult } from "../../types.ts";
 
 // ---------------------------------------------------------------------------
@@ -180,72 +173,7 @@ export function parseEditedBullets(text: string): string[] {
     .filter((line) => line.length > 0);
 }
 
-/**
- * Build or re-derive the stored `HistoryEntryState` for the current version.
- *
- * - `previous === null` (first render, spec 076 T043): builds a fresh
- *   `"proposed"` state from `seed`/`version`/`dateIso` — `dateIso` is stamped
- *   here, once (research R12 determinism).
- * - `previous !== null` and its `proposal.version` already matches `version`:
- *   returned unchanged (no re-derivation needed).
- * - `previous !== null` and the version has changed (spec edge case): the
- *   heading/version and bullets are re-derived from `seed` at the NEW
- *   version, but `previous.proposal.dateIso` is preserved (R12 — the date is
- *   stamped once, not re-stamped per production) and both `status` and
- *   `editedBullets` are carried forward untouched — a confirmed or edited
- *   decision survives a version bump; only the heading and the tool's own
- *   drafted bullets move.
- */
-export function deriveHistoryEntryState(params: {
-  seed: HistoryProposalSeed;
-  version: string;
-  dateIso: string;
-  previous: HistoryEntryState | null;
-}): HistoryEntryState {
-  const { seed, version, dateIso, previous } = params;
-
-  if (previous === null) {
-    const proposal = buildHistoryProposal(seed, version, dateIso);
-    return { status: "proposed", proposal, editedBullets: null };
-  }
-
-  if (previous.proposal.version === version) return previous;
-
-  const proposal: HistoryProposal = buildHistoryProposal(seed, version, previous.proposal.dateIso);
-  return { status: previous.status, proposal, editedBullets: previous.editedBullets };
-}
-
-/**
- * Apply the author's `pf_history_entry` answer (+ the bullets textarea, when
- * the "edit" branch was taken) onto the current `HistoryEntryState`.
- *
- * - `"confirm"` -> `status: "confirmed"`, `editedBullets: null` (the drafted
- *   bullets ship as-is).
- * - `"dismiss"` -> `status: "dismissed"`, `editedBullets: null` — the
- *   placeholder stays (FR-011); nothing the author has not confirmed or
- *   edited ships.
- * - `"edit"` -> `status: "edited"`, `editedBullets` parsed from
- *   `editedBulletsText` (one bullet per non-blank line). A blank/undefined
- *   textarea (the author picked "edit" but changed nothing before
- *   continuing) falls back to the current proposal's own bullets rather than
- *   shipping an empty entry.
- */
-export function applyHistoryEntryAction(
-  action: HistoryEntryAction,
-  editedBulletsText: string | undefined,
-  current: HistoryEntryState,
-): HistoryEntryState {
-  const status: HistoryProposalStatus =
-    action === "confirm" ? "confirmed" : action === "dismiss" ? "dismissed" : "edited";
-
-  if (action !== "edit") {
-    return { ...current, status, editedBullets: null };
-  }
-
-  const parsed = parseEditedBullets(editedBulletsText ?? "");
-  return {
-    ...current,
-    status,
-    editedBullets: parsed.length > 0 ? parsed : current.proposal.bullets,
-  };
-}
+// `deriveHistoryEntryState` / `applyHistoryEntryAction` live in
+// lib/historyEntryState.ts: they need the engine's buildHistoryProposal, and
+// question modules stay engine-free so the standalone content-i18n extractor
+// can load them.

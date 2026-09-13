@@ -8,13 +8,8 @@
 
 import { describe, it, expect } from "vitest";
 import type { BaseDocumentationProfile } from "@keyboard-studio/contracts";
-import mod, {
-  definition,
-  validate,
-  prefill,
-  requiredWhen,
-  type AdaptiveDescriptionContext,
-} from "./pf_welcome_paragraph.ts";
+import mod, { definition, validate } from "./pf_welcome_paragraph.ts";
+import { prefill, requiredWhen, type AdaptiveDescriptionContext } from "../../../lib/adaptiveDescription.ts";
 
 const FULL_PROFILE: BaseDocumentationProfile = {
   level: "full",

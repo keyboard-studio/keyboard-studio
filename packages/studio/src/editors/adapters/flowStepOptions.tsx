@@ -18,16 +18,16 @@ import { bumpKeyboardVersion, historyEntryHeading } from "@keyboard-studio/engin
 import { makeFlowStepComponent } from "./makeFlowStepComponent.tsx";
 import type { FlowStepOptions, FlowStepDeps } from "./makeFlowStepComponent.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+// spec 076: the engine-backed helpers live in lib/, not in the question
+// modules — those stay pure descriptors the standalone content-i18n
+// extractor can load without the engine.
 import {
   prefill as prefillWelcomeParagraph,
   requiredWhen as requiredWhenWelcomeParagraph,
   type AdaptiveDescriptionContext,
-} from "../../survey/questions/f/pf_welcome_paragraph.ts";
-import {
-  deriveHistoryEntryState,
-  applyHistoryEntryAction,
-  isHistoryEntryAction,
-} from "../../survey/questions/f/pf_history_entry.ts";
+} from "../../lib/adaptiveDescription.ts";
+import { deriveHistoryEntryState, applyHistoryEntryAction } from "../../lib/historyEntryState.ts";
+import { isHistoryEntryAction } from "../../survey/questions/f/pf_history_entry.ts";
 import { buildHistoryProposalSeed } from "../../decisions/historyProposalSeed.ts";
 
 // ---------------------------------------------------------------------------

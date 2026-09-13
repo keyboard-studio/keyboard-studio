@@ -18,10 +18,9 @@ import mod, {
   definition,
   bulletsDefinition,
   validate,
-  applyHistoryEntryAction,
-  deriveHistoryEntryState,
   parseEditedBullets,
 } from "./pf_history_entry.ts";
+import { applyHistoryEntryAction, deriveHistoryEntryState } from "../../../lib/historyEntryState.ts";
 
 const EMPTY_SEED: HistoryProposalSeed = {
   base: null,
