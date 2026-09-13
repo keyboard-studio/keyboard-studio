@@ -576,3 +576,191 @@ describe("serializeWorkingCopy — adapt-existing path (Track 2)", () => {
     expect(hasKpsWarn).toBe(false);
   });
 });
+
+// ---------------------------------------------------------------------------
+// spec 076 US2 (T019): Track 1 copy — images and skeleton inherited, never prose
+// ---------------------------------------------------------------------------
+
+describe("serializeWorkingCopy — Track 1 copy inherits welcome images, never base prose (spec 076 FR-007, R9)", () => {
+  const IMAGES = [
+    { path: "welcome/desktop_default.png", bytes: new Uint8Array([1, 2, 3]) },
+    { path: "welcome/phone_default.png", bytes: new Uint8Array([4, 5, 6]) },
+  ];
+
+  it("writes the carried images beside a FRESH welcome page that references them; help page excluded; no merge boundary anywhere", async () => {
+    const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
+    seedStore();
+    // What the Track 1 instantiation seam (useKeyboardArtifact's scaffold
+    // branch) sets: the images and convention, with every prose slice null.
+    const wc = useWorkingCopyStore.getState();
+    wc.setBaseWelcomeImages(IMAGES);
+    wc.setBaseWelcomeConvention("folder");
+    wc.setHelpDocs({ description: "My own description.", usageTips: [] });
+
+    const projected = await projectWorkingCopyForOutput();
+    expect(projected).not.toBeNull();
+    const vfs = projected!.vfs;
+
+    const welcome = vfs.get("source/welcome/welcome.htm")?.content as string;
+    expect(welcome).toContain("<p>My own description.</p>");
+    expect(welcome).toContain("<h2>Keyboard Layout</h2>");
+    expect(welcome).toContain('<img src="desktop_default.png"');
+    expect(welcome).toContain('<img src="phone_default.png"');
+    // FR-007: nothing merged from a base — the merge boundary only ever appears
+    // when base prose was preserved below new answers.
+    expect(welcome).not.toContain("Keyboard Studio additions");
+    expect(vfs.get("source/welcome.htm")).toBeUndefined();
+
+    const help = vfs.get(`source/help/${basicKbdus.id}.php`)?.content as string;
+    expect(help).toContain("<p>My own description.</p>");
+    expect(help).not.toContain("Keyboard Layout");
+    expect(help).not.toContain("Keyboard Studio additions");
+
+    for (const img of IMAGES) {
+      const entry = vfs.get(`source/${img.path}`);
+      expect(entry?.isBinary).toBe(true);
+      expect([...(entry!.content as Uint8Array)]).toEqual([...img.bytes]);
+    }
+    expect(projected!.missingInheritedImages).toEqual([]);
+  });
+
+  it("names images that were dropped from the saved draft instead of shipping without them silently", async () => {
+    const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
+    seedStore();
+    useWorkingCopyStore.setState({ baseWelcomeImages: null, baseWelcomeImagesDropped: true });
+    const projected = await projectWorkingCopyForOutput();
+    expect(projected!.warnings.some((w) => w.startsWith("[docs]") && w.includes("too large to keep"))).toBe(true);
+  });
+
+  it("hands the image names to the projection as welcomeFolderFiles for the descriptor", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedStore();
+    useWorkingCopyStore.getState().setBaseWelcomeImages(IMAGES);
+    await serializeWorkingCopy();
+    const callArg = projectWorkingCopyVfsSpy.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(callArg["welcomeFolderFiles"]).toEqual(["desktop_default.png", "phone_default.png"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 076 US5 (T044/T045): HISTORY.md is rendered through renderHistoryMd on
+// every production — the author's confirmed/edited entry at the top, the
+// attribution always present on an adaptation, the base's entries preserved.
+// ---------------------------------------------------------------------------
+
+describe("serializeWorkingCopy — HISTORY.md from the proposal decision (spec 076 FR-010..012)", () => {
+  const BASE_HISTORY = "## 1.0 (2020-01-01)\n* Initial release.\n";
+  const PROPOSAL = { version: "1.1", dateIso: "2026-09-12", bullets: ["Added 2 characters: a, b"] };
+
+  it("adapt track, undecided: the attribution stub sits above the base's entries (criteria 19.2 / 3.4)", async () => {
+    const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
+    seedAdaptStore("1.0");
+    useWorkingCopyStore.getState().setBaseHistoryMdText(BASE_HISTORY);
+    const projected = await projectWorkingCopyForOutput();
+    const history = projected!.vfs.get("HISTORY.md")!.content as string;
+    expect(history.startsWith("## 1.1 (")).toBe(true);
+    expect(history).toContain("* Adapted from basic_kbdus v1.0 via keyboard-studio.\n");
+    expect(history.endsWith(`\n${BASE_HISTORY}`)).toBe(true);
+  });
+
+  it("adapt track, edited entry: edited bullets win, the attribution is injected regardless, base entries preserved", async () => {
+    const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
+    seedAdaptStore("1.0");
+    const wc = useWorkingCopyStore.getState();
+    wc.setBaseHistoryMdText(BASE_HISTORY);
+    wc.setHistoryEntryState({ status: "edited", proposal: PROPOSAL, editedBullets: ["Reworked the shift layer."] });
+    const projected = await projectWorkingCopyForOutput();
+    const history = projected!.vfs.get("HISTORY.md")!.content as string;
+    const [heading, ...rest] = history.split("\n");
+    expect(heading).toBe("## 1.1 (2026-09-12)");
+    expect(rest[0]).toBe("* Adapted from basic_kbdus v1.0 via keyboard-studio.");
+    expect(rest[1]).toBe("* Reworked the shift layer.");
+    expect(history.indexOf("## 1.1")).toBeLessThan(history.indexOf("## 1.0 (2020-01-01)"));
+    expect(history).toContain(BASE_HISTORY);
+  });
+
+  it("copy track, confirmed entry: replaces the stub body under the keyboard's own version heading; no base entries", async () => {
+    const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
+    seedStore();
+    const wc = useWorkingCopyStore.getState();
+    wc.setBaseHistoryMdText(BASE_HISTORY); // a stale slice must never leak onto a copy (FR-007)
+    wc.setHistoryEntryState({ status: "confirmed", proposal: { ...PROPOSAL, version: "1.0" }, editedBullets: null });
+    const projected = await projectWorkingCopyForOutput();
+    const history = projected!.vfs.get("HISTORY.md")!.content as string;
+    expect(history).toBe("## 1.0 (2026-09-12)\n* Added 2 characters: a, b\n");
+  });
+
+  it("copy track, dismissed: the plain stub ships", async () => {
+    const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
+    seedStore();
+    useWorkingCopyStore.getState().setHistoryEntryState({ status: "dismissed", proposal: PROPOSAL, editedBullets: null });
+    const projected = await projectWorkingCopyForOutput();
+    const history = projected!.vfs.get("HISTORY.md")!.content as string;
+    expect(history).toMatch(/^## 1\.0 \(\d{4}-\d{2}-\d{2}\)\n\* Initial release\.\n$/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 076 US6 (T052/T054): generated layout charts in source/welcome/.
+// ---------------------------------------------------------------------------
+
+describe("serializeWorkingCopy — layout charts (spec 076 FR-013..FR-015)", () => {
+  const IMAGES = [{ path: "welcome/desktop_default.png", bytes: new Uint8Array([1, 2, 3]) }];
+
+  function chartNames(vfs: { list(prefix: string): string[] }): string[] {
+    return vfs.list("source/welcome/").filter((p) => /\/ks-layout-.*\.svg$/.test(p));
+  }
+
+  it("a keyboard with no base images gets one desktop chart per layer, listed for the descriptor and referenced by the welcome page", async () => {
+    const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
+    seedStore();
+    useWorkingCopyStore.getState().setHelpDocs({ description: "My own description.", usageTips: [] });
+    const projected = await projectWorkingCopyForOutput();
+    const vfs = projected!.vfs;
+    const charts = chartNames(vfs);
+    expect(charts.length).toBeGreaterThan(0);
+    expect(charts.some((p) => p.startsWith("source/welcome/ks-layout-desktop-"))).toBe(true);
+    for (const p of charts) {
+      const entry = vfs.get(p)!;
+      expect(entry.isBinary).toBe(false);
+      expect(entry.content as string).toContain("<svg");
+    }
+    const welcome = vfs.get("source/welcome/welcome.htm")!.content as string;
+    expect(welcome).toContain("<h2>Keyboard Layout</h2>");
+    for (const p of charts) expect(welcome).toContain(`<img src="${p.slice("source/welcome/".length)}"`);
+    const callArg = projectWorkingCopyVfsSpy.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(callArg["welcomeFolderFiles"]).toEqual(charts.map((p) => p.slice("source/welcome/".length)));
+  });
+
+  it("a base that ships images keeps them and gets NO charts by default (FR-015)", async () => {
+    const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
+    seedStore();
+    useWorkingCopyStore.getState().setBaseWelcomeImages(IMAGES);
+    const projected = await projectWorkingCopyForOutput();
+    expect(chartNames(projected!.vfs)).toEqual([]);
+    expect([...(projected!.vfs.get("source/welcome/desktop_default.png")!.content as Uint8Array)]).toEqual([1, 2, 3]);
+  });
+
+  it("opting to regenerate adds charts beside the base images without touching them", async () => {
+    const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
+    seedStore();
+    useWorkingCopyStore.getState().setBaseWelcomeImages(IMAGES);
+    useWorkingCopyStore.getState().setChartPreference("regenerate");
+    const projected = await projectWorkingCopyForOutput();
+    const vfs = projected!.vfs;
+    expect(chartNames(vfs).length).toBeGreaterThan(0);
+    expect([...(vfs.get("source/welcome/desktop_default.png")!.content as Uint8Array)]).toEqual([1, 2, 3]);
+    const callArg = projectWorkingCopyVfsSpy.mock.calls[0]?.[0] as Record<string, unknown>;
+    const listed = callArg["welcomeFolderFiles"] as string[];
+    expect(listed[0]).toBe("desktop_default.png");
+    expect(listed.length).toBe(1 + chartNames(vfs).length);
+  });
+
+  it("a desktop-only keyboard produces no touch charts", async () => {
+    const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
+    seedStore();
+    expect(useWorkingCopyStore.getState().touchLayoutJson).toBeNull();
+    const projected = await projectWorkingCopyForOutput();
+    expect(chartNames(projected!.vfs).some((p) => /ks-layout-(phone|tablet)-/.test(p))).toBe(false);
+  });
+});

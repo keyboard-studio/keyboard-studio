@@ -19,6 +19,19 @@
 // invisible for as long as it was (FR-006, contrast E-6). A failure that names
 // itself is the requirement; an exception that aborts the projection is not the
 // alternative being asked for.
+//
+// THE ONE SANCTIONED `<Options>` / `<Files>` WRITE: THE WELCOME-PATH MIGRATION
+//
+// This module otherwise leaves `<Options>`, `<Files>`, `<System>` and `<Version>`
+// exactly as it finds them. The single exception is spec 076 FR-002: a produced
+// package MUST ship its welcome page at `source/welcome/welcome.htm` and MUST NOT
+// ship a flat `source/welcome.htm`, so a pre-076 descriptor (the copy track's
+// scaffolded stub, or an imported one) that still references the flat name is
+// migrated here — `<WelcomeFile>` and the `<File><Name>` are rewritten to the
+// folder form, and the welcome-folder files the projection writes beside the
+// page (inherited images, generated charts) are appended when missing. Every
+// rewrite is reported through `warnings`, never done silently. Nothing else in
+// those blocks is touched; do not widen this exception without a spec decision.
 
 import type { VirtualFS } from "@keyboard-studio/contracts";
 import {
@@ -26,9 +39,13 @@ import {
   buildLanguageElement,
   buildLanguagesBlock,
   effectiveDisplayName,
+  normaliseWelcomeFolderFiles,
+  welcomeFolderKpsRef,
+  WELCOME_PAGE_KPS_REF,
   type PackageDescriptorIdentity,
 } from "./build.js";
 import { escapeHtml } from "../shared/escapeHtml.js";
+import { kpsRefToPosix } from "../base-browser/kps-parser.js";
 
 export interface ApplyIdentityToKpsResult {
   /**
@@ -60,13 +77,19 @@ const INFO_ELEMENT_RE = /(<Info>)([\s\S]*?)(<\/Info>)/;
  *
  * Mutates `vfs` in place. Writes the identity elements named in the contract
  * (§2) plus `<WebSite>` (spec 061 FR-012) and touches nothing else: `<Files>`,
- * `<System>`, `<Options>`, and `<Version>` are left as they stand. In
- * particular the `<Version>` element stays owned by the adapt path's existing
- * bump patch and by `<FollowKeyboardVersion/>`, so FR-008's agreement between
- * descriptor and source is not disturbed here.
+ * `<System>`, `<Options>`, and `<Version>` are left as they stand — with the
+ * ONE exception of the welcome-path migration (spec 076 FR-002; see the module
+ * header), which rewrites a flat `welcome.htm` reference to the folder form
+ * and appends missing welcome-folder entries, reporting each rewrite. The
+ * `<Version>` element stays owned by the adapt path's existing bump patch and
+ * by `<FollowKeyboardVersion/>`, so FR-008's agreement between descriptor and
+ * source is not disturbed here.
  *
  * @param kmnText the emitted `.kmn`, read only when GENERATING (the `<Files>` list
  *   must mirror what this build produces, so it is derived from the final source).
+ * @param welcomeFolderFiles the files the projection ships in `source/welcome/`
+ *   beside the page, as bare names (see `buildKpsContent`). Listed on generate;
+ *   appended when missing on patch.
  */
 export function applyIdentityToKps(
   vfs: VirtualFS,
@@ -74,6 +97,7 @@ export function applyIdentityToKps(
   identity: PackageDescriptorIdentity,
   kmnText: string,
   version?: string,
+  welcomeFolderFiles: readonly string[] = [],
 ): ApplyIdentityToKpsResult {
   const path = `source/${keyboardId}.kps`;
   const warnings: string[] = [];
@@ -91,7 +115,11 @@ export function applyIdentityToKps(
   // guarantee the copy track has.
   if (entry === undefined) {
     try {
-      vfs.set(path, buildKpsContent(keyboardId, identity, kmnText, version), false);
+      vfs.set(
+        path,
+        buildKpsContent(keyboardId, identity, kmnText, version, welcomeFolderFiles),
+        false,
+      );
     } catch (err: unknown) {
       warnings.push(`[package-descriptor] could not write identity into ${path}: ${reasonOf(err)}`);
       return { warnings, generated: false };
@@ -119,14 +147,117 @@ export function applyIdentityToKps(
       `[package-descriptor] could not write identity into ${path}: ${result.unwritable.join("; ")}`,
     );
   }
-  if (result.text !== entry.content) {
+  // spec 076 FR-002: the welcome-path migration — the module's one sanctioned
+  // write into <Options> / <Files>. Reported rewrite by rewrite.
+  const migrated = migrateWelcomePaths(result.text, welcomeFolderFiles);
+  for (const rewrite of migrated.rewrites) {
+    warnings.push(`[package-descriptor] migrated welcome path in ${path}: ${rewrite}`);
+  }
+  if (migrated.unlisted.length > 0) {
+    warnings.push(
+      `[package-descriptor] could not list welcome-folder files in ${path} (no <Files> block): ${migrated.unlisted.join(", ")}`,
+    );
+  }
+  const text = migrated.text;
+  if (text !== entry.content) {
     try {
-      vfs.set(path, result.text, false);
+      vfs.set(path, text, false);
     } catch (err: unknown) {
       warnings.push(`[package-descriptor] could not write identity into ${path}: ${reasonOf(err)}`);
     }
   }
   return { warnings, generated: false };
+}
+
+/** A `.kps` member reference as a lowercase POSIX path, for comparison only. */
+function memberKey(name: string): string {
+  return kpsRefToPosix(name).toLowerCase();
+}
+
+const WELCOME_PAGE_KEY = memberKey(WELCOME_PAGE_KPS_REF);
+
+/**
+ * The welcome-path migration (spec 076 FR-002). Pure.
+ *
+ *   - `<Options><WelcomeFile>` naming anything outside the `welcome\` folder —
+ *     including a blank element — is rewritten to `welcome\welcome.htm`.
+ *   - A `<Files><File><Name>` of the flat `welcome.htm` is rewritten likewise.
+ *   - Each `welcomeFolderFiles` name not already listed is appended as
+ *     `welcome\<name>` — the projection writes those files, and a `.kmp` only
+ *     carries what the descriptor lists.
+ *
+ * Returns the (possibly unchanged) text, one human-readable line per rewrite,
+ * and the names it could not list because the descriptor has no `<Files>`
+ * block to append to (inventing one would be a bigger guess than reporting).
+ */
+function migrateWelcomePaths(
+  text: string,
+  welcomeFolderFiles: readonly string[],
+): { text: string; rewrites: string[]; unlisted: string[] } {
+  const rewrites: string[] = [];
+  let out = text;
+
+  out = out.replace(
+    /(<WelcomeFile\s*>)([^<]*)(<\/WelcomeFile\s*>)/i,
+    (m, open: string, value: string, close: string) => {
+      const key = memberKey(value);
+      if (key.startsWith("welcome/")) return m;
+      // A BLANK <WelcomeFile></WelcomeFile> is rewritten too: the projection
+      // ships the page unconditionally, so leaving the element empty would
+      // orphan it (declared nowhere, installed nowhere).
+      rewrites.push(`<WelcomeFile> ${value.trim() === "" ? "(blank)" : value.trim()} -> ${WELCOME_PAGE_KPS_REF}`);
+      return `${open}${WELCOME_PAGE_KPS_REF}${close}`;
+    },
+  );
+
+  const wanted = normaliseWelcomeFolderFiles(welcomeFolderFiles);
+  const filesRe = /(<Files\s*>)([\s\S]*?)(<\/Files\s*>)/i;
+  if (!filesRe.test(out)) {
+    return { text: out, rewrites, unlisted: wanted };
+  }
+
+  out = out.replace(filesRe, (_m, open: string, body: string, close: string) => {
+    const listed = new Set<string>();
+    let patched = body.replace(/<File\s*>[\s\S]*?<\/File\s*>/gi, (block) => {
+      const nameMatch = /(<Name\s*>)([^<]*)(<\/Name\s*>)/i.exec(block);
+      if (nameMatch === null) return block;
+      const key = memberKey(nameMatch[2] ?? "");
+      if (key === "welcome.htm") {
+        rewrites.push(`<File> ${(nameMatch[2] ?? "").trim()} -> ${WELCOME_PAGE_KPS_REF}`);
+        listed.add(WELCOME_PAGE_KEY);
+        return block.replace(nameMatch[0], `${nameMatch[1]}${WELCOME_PAGE_KPS_REF}${nameMatch[3]}`);
+      }
+      if (key.startsWith("welcome/")) listed.add(key);
+      return block;
+    });
+
+    // Only the flat page reference is REWRITTEN; a descriptor that lists no
+    // welcome page at all is left that way (its author chose not to package
+    // one, and inventing the entry would be a bigger guess than this module
+    // makes anywhere else). Folder files are appended regardless — they are
+    // written next to the page by the projection, and an unlisted file is
+    // silently dropped from the `.kmp`.
+    const additions: string[] = [];
+    for (const name of wanted) {
+      const ref = welcomeFolderKpsRef(name);
+      if (listed.has(memberKey(ref))) continue;
+      additions.push(ref);
+    }
+    if (additions.length === 0) return `${open}${patched}${close}`;
+
+    const entries = additions.map((ref) => {
+      rewrites.push(`appended <File> ${ref}`);
+      const dot = ref.lastIndexOf(".");
+      const ext = dot >= 0 ? ref.slice(dot).toLowerCase() : "";
+      return `    <File>\n      <Name>${escapeHtml(ref)}</Name>\n      <FileType>${escapeHtml(ext)}</FileType>\n    </File>`;
+    });
+    // Same entry shape and indentation `buildKpsContent` emits, appended after
+    // the last existing entry and before the block's own closing indentation.
+    patched = `${patched.replace(/\s*$/, "\n")}${entries.join("\n")}\n  `;
+    return `${open}${patched}${close}`;
+  });
+
+  return { text: out, rewrites, unlisted: [] };
 }
 
 /**

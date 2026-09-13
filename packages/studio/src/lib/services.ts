@@ -6,6 +6,7 @@
 // packages/studio/src/.
 import type {
   BaseBrowserService,
+  BaseDocumentationProfile,
   CharacterDiscoveryService,
   OutputService,
   Pattern,
@@ -63,6 +64,37 @@ export { LOCAL_PROXY_BASE };
 // touches the GitHub API at runtime.
 export function getBaseBrowserService(): BaseBrowserService {
   return USE_REAL ? localBaseBrowser : mockBaseBrowser;
+}
+
+// getBaseDocProfile: spec 076 FR-008's base-documentation classifier (research
+// R4). Neither `localBaseBrowser` (dev proxy of the static /local-kbd-api/list
+// catalog) nor `mockBaseBrowser` implement the classifier — it needs a live
+// `.kps` + welcome-page probe fetch, which the catalog snapshot does not carry
+// (classifying the WHOLE gallery is explicitly out of scope; see
+// BaseBrowserServiceWithDocProfile's doc comment in the engine). This accessor
+// therefore does not route through getBaseBrowserService(): it lazily builds a
+// SEPARATE `createBaseBrowser()` instance (same lazy-import + cache pattern as
+// every other engine accessor above) whose own per-base-id memoization
+// (research R4) makes a repeated call for the same id free. When USE_REAL is
+// false, resolves to the same "unknown" shape createBaseBrowser() itself
+// returns for an unclassifiable base — deterministic, no network, matching
+// this module's other test-mode contracts.
+const UNKNOWN_DOC_PROFILE: BaseDocumentationProfile = {
+  level: "unknown",
+  members: [],
+  welcomeConvention: "absent",
+  hasUsableDescription: false,
+  welcomeImages: [],
+};
+type DocProfileBrowser = { getDocProfile: (baseId: string) => Promise<BaseDocumentationProfile> };
+let docProfileBrowserCache: DocProfileBrowser | null = null;
+export async function getBaseDocProfile(baseId: string): Promise<BaseDocumentationProfile> {
+  if (!USE_REAL) return UNKNOWN_DOC_PROFILE;
+  if (docProfileBrowserCache === null) {
+    const { createBaseBrowser } = await importEngine();
+    docProfileBrowserCache = createBaseBrowser();
+  }
+  return docProfileBrowserCache.getDocProfile(baseId);
 }
 
 // ScaffolderService: when USE_REAL is false returns the mock scaffolder so
@@ -185,20 +217,10 @@ export async function getCompile(): Promise<CompileFn> {
   return compileCache;
 }
 
-// The doc stubs a package descriptor lists but the adapt track lacks. Sync, so
-// it rides the same lazy engine import as the rest of the output path.
-type EnsurePackageFilesFn = (input: {
-  vfs: VirtualFS;
-  copyright?: string;
-  year?: number;
-}) => { created: string[] };
-let ensurePackageFilesCache: EnsurePackageFilesFn | null = null;
-export async function getEnsurePackageFiles(): Promise<EnsurePackageFilesFn> {
-  if (ensurePackageFilesCache !== null) return ensurePackageFilesCache;
-  const { ensurePackageFiles } = await importEngine();
-  ensurePackageFilesCache = ensurePackageFiles as EnsurePackageFilesFn;
-  return ensurePackageFilesCache;
-}
+// (`getEnsurePackageFiles` used to live here. LICENSE.md completion now runs
+// inside the shared output projection — serializeWorkingCopy step 5d, spec 076
+// FR-001 — which imports the engine statically, so the lazy accessor had no
+// caller left.)
 
 // GitHubOutputService (verifyToken / publishPR — the OAuth fork+PR path,
 // spec §12 "Option A"): when USE_REAL is false returns the mock (which already

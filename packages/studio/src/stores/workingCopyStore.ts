@@ -22,7 +22,9 @@
 
 import { create } from "zustand";
 import type {
-  Attribution, AxisFill, BaseKeyboard, HelpDocsAnswers, KeyboardIR, LintFinding, RemovalCapability, VirtualFS } from "@keyboard-studio/contracts";
+  Attribution, AxisFill, BaseKeyboard, HelpDocsAnswers, KeyboardIR, LintFinding, RemovalCapability, VirtualFS,
+  WelcomeConvention, WelcomeFolderImage, HistoryEntryState, ChartPreference,
+  BaseDocumentationProfile } from "@keyboard-studio/contracts";
 import { detectMarkInputOrderFromImport, renameTouchKey, deriveFacets } from "@keyboard-studio/engine";
 import type { KeyEditOperation, KeyEditOverlay } from "@keyboard-studio/engine";
 import {
@@ -324,8 +326,10 @@ export interface WorkingCopyState {
   helpDocs: HelpDocsAnswers | null;
 
   /**
-   * The base keyboard's own `source/welcome.htm`, verbatim, or null when it
-   * has none (spec 061 FR-013), or on Track 1 (nothing to merge with).
+   * The base keyboard's own welcome page (`source/welcome/welcome.htm`, or the
+   * flat `source/welcome.htm` on a pre-folder-convention base — spec 076 R3),
+   * verbatim, or null when it has none (spec 061 FR-013), or on Track 1
+   * (nothing to merge with).
    *
    * Same fetch-don't-write contract as {@link baseLicenseText}: the loader
    * deliberately never writes this into the VFS, so the output-projection
@@ -338,6 +342,78 @@ export interface WorkingCopyState {
    * fetch-don't-write contract as {@link baseWelcomeHtmText}.
    */
   baseHelpPhpText: string | null;
+
+  // -- Base documentation bundle (spec 076 US2) --------------------------------
+  /**
+   * The base keyboard's own `README.md`, verbatim, or null when it has none
+   * or on Track 1 (a copy inherits no base prose, FR-007). Fetch-don't-write
+   * like {@link baseLicenseText}.
+   */
+  baseReadmeMdText: string | null;
+  /**
+   * The base keyboard's own `HISTORY.md`, verbatim, or null. Same contract as
+   * {@link baseReadmeMdText}; the adapt track's rendered HISTORY preserves
+   * these entries below the new one (criterion 3.4).
+   */
+  baseHistoryMdText: string | null;
+  /**
+   * The base's `source/welcome/` image files (spec 076 FR-006), or null when
+   * the base ships none. Set on BOTH tracks — a Track 1 copy inherits the
+   * images and the welcome page's skeleton, never its prose (research R9).
+   * The projection writes each beside the rendered welcome page and lists it
+   * in the descriptor; nothing else reads the bytes.
+   */
+  baseWelcomeImages: WelcomeFolderImage[] | null;
+  /**
+   * Which welcome-page convention the base used (`folder` / `flat` / `absent`),
+   * or null before instantiation. Metadata for the documentation checklist;
+   * output always uses the folder convention regardless (FR-002).
+   */
+  baseWelcomeConvention: WelcomeConvention | null;
+  /**
+   * True when the base's welcome images were carried at instantiation but
+   * could NOT be kept across a reload — they exceeded the draft's image size
+   * budget (persistWorkingCopy `BASE_WELCOME_IMAGES_BUDGET_BYTES`), so the
+   * resumed working copy has {@link baseWelcomeImages} `null` while the base
+   * really does ship images. The projection names this in its warnings and the
+   * documentation checklist reports it, so the loss is visible rather than
+   * silently absorbed. Cleared by the next `setBaseWelcomeImages` (re-opening
+   * the base re-fetches them).
+   */
+  baseWelcomeImagesDropped: boolean;
+
+  // -- Documentation decisions (spec 076 US3/US5/US6) --------------------------
+  /**
+   * The HISTORY proposal's state (spec 076 FR-010..012): null until the Phase F
+   * `pf_history_entry` screen first proposes an entry; then `proposed`,
+   * `confirmed`, `edited` or `dismissed`. Only a confirmed or edited entry
+   * ships — anything else leaves the stub and marks HISTORY placeholder on the
+   * Output checklist (FR-011). Whole-value replace like {@link helpDocs}.
+   */
+  historyEntryState: HistoryEntryState | null;
+  /**
+   * The author's layout-chart choice (spec 076 FR-015): keep the base's own
+   * welcome images, or regenerate charts from the model. Null means "not
+   * chosen" — the FR-015 default then applies at read time (keep the base's
+   * images when it ships any, generate charts otherwise), so a base picked
+   * AFTER this slice was seeded still gets the right default. Persisted.
+   */
+  chartPreference: ChartPreference | null;
+  /**
+   * The selected base's documentation profile (spec 076 FR-008), computed by
+   * the base browser for the focused base and recorded at selection; null
+   * before a base is chosen or while the profile is still unknown. Drives the
+   * adaptive description question (FR-009). Persisted.
+   */
+  baseDocProfile: BaseDocumentationProfile | null;
+  /**
+   * The Layer C documentation findings the BASE's own files carried at
+   * instantiation (spec 076 FR-020, research R8) — the baseline the studio's
+   * documentation-findings hook compares against to classify a current finding
+   * as `origin: "upstream"`. Null until computed once per instantiation; an
+   * empty array means "computed, nothing found". Persisted.
+   */
+  baselineDocFindings: LintFinding[] | null;
 
   // -- Carve working IR (irStore slots) ----------------------------------------
   /**
@@ -813,6 +889,30 @@ export interface WorkingCopyState {
   /** Retain the base's verbatim help/<id>.php so the output merge can read it. */
   setBaseHelpPhpText: (text: string | null) => void;
 
+  /** Retain the base's verbatim README.md (spec 076 FR-006). */
+  setBaseReadmeMdText: (text: string | null) => void;
+
+  /** Retain the base's verbatim HISTORY.md (spec 076 FR-006 / criterion 3.4). */
+  setBaseHistoryMdText: (text: string | null) => void;
+
+  /** Retain the base's welcome-folder images so the projection can ship them (spec 076 FR-006). */
+  setBaseWelcomeImages: (images: WelcomeFolderImage[] | null) => void;
+
+  /** Record which welcome-page convention the base used (spec 076 data-model §6). */
+  setBaseWelcomeConvention: (convention: WelcomeConvention | null) => void;
+
+  /** Record the HISTORY proposal's state (spec 076 FR-011). Whole-value replace. */
+  setHistoryEntryState: (state: HistoryEntryState | null) => void;
+
+  /** Record the author's keep-base-images / regenerate choice (spec 076 FR-015). */
+  setChartPreference: (preference: ChartPreference | null) => void;
+
+  /** Record the selected base's documentation profile (spec 076 FR-008). */
+  setBaseDocProfile: (profile: BaseDocumentationProfile | null) => void;
+
+  /** Record the base's own documentation findings at instantiation (spec 076 FR-020). */
+  setBaselineDocFindings: (findings: LintFinding[] | null) => void;
+
   /**
    * Returns true once instantiateFromBase or instantiateFromExisting has been
    * called (i.e. baseKeyboard is non-null). Callers that need the full triple
@@ -1011,6 +1111,8 @@ export type WorkingCopyData = Omit<
   | "setAttribution" | "setLicenseUnparseable" | "setBaseHolderOverride"
   | "setBaseLicenseText"
   | "setHelpDocs" | "setBaseWelcomeHtmText" | "setBaseHelpPhpText"
+  | "setBaseReadmeMdText" | "setBaseHistoryMdText" | "setBaseWelcomeImages" | "setBaseWelcomeConvention"
+  | "setHistoryEntryState" | "setChartPreference" | "setBaseDocProfile" | "setBaselineDocFindings"
   | "markStale" | "clearStale"
   | "setValidatorFindings"
   | "setAxisFills"
@@ -1032,6 +1134,15 @@ const INITIAL_STATE: WorkingCopyData = {
   helpDocs: null,
   baseWelcomeHtmText: null,
   baseHelpPhpText: null,
+  baseReadmeMdText: null,
+  baseHistoryMdText: null,
+  baseWelcomeImages: null,
+  baseWelcomeConvention: null,
+  baseWelcomeImagesDropped: false,
+  historyEntryState: null,
+  chartPreference: null,
+  baseDocProfile: null,
+  baselineDocFindings: null,
   // carve IR slots
   ir: null,
   removalCapabilities: new Map(),
@@ -1488,6 +1599,13 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     resetPhaseBDraftDecisions();
     set({
       instantiationMode: "new-from-base",
+      // A new working copy starts with no documentation decisions (spec 076):
+      // the HISTORY proposal is re-proposed for this keyboard and the chart
+      // choice falls back to the FR-015 default.
+      historyEntryState: null,
+      chartPreference: null,
+      // Recomputed by the instantiation effect for the new base (FR-020).
+      baselineDocFindings: null,
       baseKeyboard: base,
       baseVfs: vfs,
       baseIr: ir,
@@ -1551,6 +1669,10 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     // Track 2: adapt existing keyboard — identity PRESERVED from loaded keyboard.
     set({
       instantiationMode: "adapt-existing",
+      // See instantiateFromBase: documentation decisions are per working copy.
+      historyEntryState: null,
+      chartPreference: null,
+      baselineDocFindings: null,
       baseKeyboard: keyboard,
       baseVfs: vfs,
       baseIr: ir,
@@ -1607,6 +1729,24 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   setBaseWelcomeHtmText: (text) => set({ baseWelcomeHtmText: text }),
 
   setBaseHelpPhpText: (text) => set({ baseHelpPhpText: text }),
+
+  setBaseReadmeMdText: (text) => set({ baseReadmeMdText: text }),
+
+  setBaseHistoryMdText: (text) => set({ baseHistoryMdText: text }),
+
+  // A fresh carry supersedes any earlier "dropped on reload" state.
+  setBaseWelcomeImages: (images) => set({ baseWelcomeImages: images, baseWelcomeImagesDropped: false }),
+
+  setBaseWelcomeConvention: (convention) => set({ baseWelcomeConvention: convention }),
+
+  setHistoryEntryState: (state) => set({ historyEntryState: state }),
+
+  setChartPreference: (preference) => set({ chartPreference: preference }),
+
+  setBaseDocProfile: (profile) => set({ baseDocProfile: profile }),
+
+  setBaselineDocFindings: (findings) =>
+    set((s) => (s.baselineDocFindings === findings ? s : { baselineDocFindings: findings })),
 
   isInstantiated: () => get().baseKeyboard !== null,
 

@@ -27,3 +27,15 @@ export function escapeHtml(s: string): string {
 export function phpCommentEscape(s: string): string {
   return s.replace(/\*\//g, "* /");
 }
+
+/**
+ * Escape text for a PHP single-quoted string literal: only `\` and `'` are
+ * special there (`\` first, so the quote's escaping backslash survives). Used
+ * by the help-site header's `$pagename = '...'` (spec 076 FR-003; free-text
+ * safety per spec 061 FR-009). Line breaks are collapsed to a space so a
+ * multi-line display name cannot break the header's one-assignment-per-line
+ * shape.
+ */
+export function phpSingleQuoteEscape(s: string): string {
+  return s.replace(/\r?\n|\r/g, " ").replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+}
