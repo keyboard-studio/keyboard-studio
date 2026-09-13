@@ -28,3 +28,5 @@ export {
   DECISION_RECORD_VFS_PATH,
   STUDIO_METADATA_PREFIX,
 } from "./sidecar.js";
+export { buildHistoryProposal, historyEntryHeading } from "./historyProposal.js";
+export type { HistoryProposalSeed } from "./historyProposal.js";
