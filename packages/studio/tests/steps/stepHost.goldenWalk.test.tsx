@@ -245,6 +245,25 @@ vi.mock("../../src/survey/FlowStepHost.tsx", () => ({
   },
 }));
 
+// The punctuation page is the one REAL step in this walk (there is no stub for
+// it in the survey/index.ts mock below), and since spec 075 it auto-adds the
+// sourced punctuation tier on arrival instead of waiting for a click each. With
+// the real hook, "en-Latn" resolves actual CLDR punctuation, so the walk would
+// carry a non-empty inventory into Phase F — whose coverage gate then blocks
+// (correctly: nothing places those characters, because every gallery here is a
+// stub) and mounts a <dialog> jsdom cannot showModal.
+//
+// This walk is a TRAVERSAL fixture: every other step emits
+// `confirmedInventory: []` (see fakePhaseResult) precisely so routing is tested
+// against a trivial inventory rather than against CLDR's contents. Stubbing the
+// exemplar hook to "no coverage" holds the punctuation page to that same premise
+// — the same "the walk accepts it empty" it always had (see driveCopyTrack) —
+// and stops the fixture depending on pinned CLDR data. The auto-add behaviour
+// itself is covered in src/survey/punctuation/PunctuationStep.test.tsx.
+vi.mock("../../src/survey/useSourcedExemplars.ts", () => ({
+  useSourcedExemplars: () => ({ inventory: null, loading: false }),
+}));
+
 vi.mock("../../src/survey/index.ts", () => ({
   IdentityLite: ({ onComplete }: { onComplete: (result: unknown, identity: unknown) => void }) => {
     mockRefs.identityComplete.current = onComplete;

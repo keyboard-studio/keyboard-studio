@@ -6,8 +6,9 @@
 // is the shared phaseBDraftStore's derived `punctuation` category (so map
 // picks and Phase-B leftovers arrive pre-listed); Done emits the picks as
 // confirmedInventory on a phase:"C" result (never "B" — see the component's
-// module header for the recordPhase shallow-merge hazard); suggestions come
-// from the sourced exemplars' punctuation tier as tick-to-add proposals.
+// module header for the recordPhase shallow-merge hazard); and the sourced
+// exemplars' punctuation tier is added FOR the author on arrival, with
+// removals that stick.
 
 import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
@@ -16,6 +17,7 @@ import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { PunctuationStep } from "./PunctuationStep.tsx";
 import { usePhaseBDraftStore, resetPhaseBDraftDecisions } from "../../stores/phaseBDraftStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { chipIndicatorText } from "../surveyStyles.ts";
 
 // sourcedExemplars does a real (offline-index) lookup when unmocked;
 // charactersInTier is a pure engine re-export, reproduced verbatim so the
@@ -127,7 +129,7 @@ describe("PunctuationStep — shared draft continuity", () => {
   });
 });
 
-describe("PunctuationStep — sourced suggestions", () => {
+describe("PunctuationStep — automatic CLDR punctuation", () => {
   // useSourcedExemplars only looks up when the session carries a BCP47 tag.
   beforeEach(() => {
     useSurveySessionStore.getState().setSurveyContext({
@@ -136,68 +138,157 @@ describe("PunctuationStep — sourced suggestions", () => {
     });
   });
 
-  it("offers the exemplar punctuation tier as tick-to-add proposals that keep their attribution", async () => {
+  function withPunctuationTier(chars: string[]): void {
     mocks.inventory = {
       source: "cldr",
       confidence: "high",
       characters: [
-        { char: "।", tier: "punctuation" },
-        { char: "क", tier: "main" }, // other tiers never offered here
+        ...chars.map((char) => ({ char, tier: "punctuation" })),
+        { char: "क", tier: "main" }, // other tiers are never this page's business
       ],
       digraphs: [],
     };
+  }
+
+  it("adds the exemplar punctuation tier on arrival, attributed to the source, with no clicking", async () => {
+    withPunctuationTier(["।", "॥"]);
     const onComplete = vi.fn();
     render(<PunctuationStep onComplete={onComplete} />);
 
-    const chip = await screen.findByRole("button", { name: /Add । / });
-    fireEvent.click(chip);
-
-    // The tick lands in the list as a PROPOSED pick (dashed attribution) and
-    // leaves the suggestion panel (add-only, like the alphabet screen's).
-    expect(screen.getByTestId("proposed-punctuation-chip")).toBeTruthy();
-    expect(screen.getByText("Every suggested punctuation mark is already in your list below.")).toBeTruthy();
+    // No tick, no chip to hunt for: the marks are simply in the list,
+    // presented as chosen, waiting to be confirmed.
+    await waitFor(() => {
+      expect(screen.getByText("Your punctuation (2)")).toBeTruthy();
+    });
+    expect(screen.getAllByTestId("proposed-punctuation-chip")).toHaveLength(2);
+    expect(screen.queryByTestId("authored-punctuation-chip")).toBeNull();
+    expect(usePhaseBDraftStore.getState().provenance["।"]).toBe("cldr");
 
     fireEvent.click(screen.getByTestId("punctuation-done"));
-    expect(lastResult(onComplete).confirmedInventory).toEqual(["।"]);
+    expect(lastResult(onComplete).confirmedInventory).toEqual(["।", "॥"]);
   });
 
-  it("renders the suggestion chip's accessible name as one full catalog sentence, not an assembled fragment (#1589)", async () => {
-    mocks.inventory = {
-      source: "cldr",
-      confidence: "high",
-      characters: [{ char: "।", tier: "punctuation" }],
-      digraphs: [],
-    };
+  it("explains where the marks came from and that they are already in the list", async () => {
+    withPunctuationTier(["।"]);
     render(<PunctuationStep onComplete={vi.fn()} />);
 
-    expect(await screen.findByRole("button", { name: "Add । (U+0964)" })).toBeTruthy();
+    expect(
+      await screen.findByText(
+        /These marks came from CLDR exemplars for Hindi and are already in your list/,
+      ),
+    ).toBeTruthy();
+    // "dashed" was the styling word, and it no longer describes anything on
+    // screen — the hint names the list, not a pending deletion (#1760).
+    expect(screen.queryByText(/dashed/i)).toBeNull();
+    // The old add-only tray is gone, not left behind as a dead empty region.
+    expect(screen.queryByText("Suggested punctuation")).toBeNull();
+    expect(screen.queryByRole("button", { name: /^Add / })).toBeNull();
   });
 
-  // km-triage finding on #1596: the English-only assertion above proves the
-  // id/macro wiring produces the right English text, but not that a
-  // translator can actually REORDER "Add X (Y)" — the real fr catalog is
-  // still an untranslated stub with nothing to test against. This loads a
-  // test-only locale whose message deliberately reverses the placeholder
-  // order, so a real regression (an assembled fragment ignoring the
-  // catalog's word order) would fail this even if the English text matched.
-  it("a translator's word-order choice actually reaches the rendered name — not locked to English order", async () => {
-    i18n.load("zz", {
-      "survey.punctuation.suggestionChip.addAriaLabel": "({cp}) {char} dda",
+  it("presents an auto-added mark as chosen, not as a removal candidate", async () => {
+    withPunctuationTier(["।"]);
+    render(<PunctuationStep onComplete={vi.fn()} />);
+
+    const chip = await screen.findByTestId("proposed-punctuation-chip");
+    // The chosen-list chip has to speak the character map's in-list vocabulary
+    // for a selected cell ("[x]"), not the bare "x" that reads as
+    // marked-for-deletion on a list that is already correct (#1760).
+    const indicator = chip.querySelector("span:last-of-type");
+    expect(indicator?.textContent).toBe(chipIndicatorText(true));
+    expect(indicator?.textContent).not.toBe("x");
+    // Presentational only: the chip still removes, still says so, still sticks.
+    expect(chip.getAttribute("aria-label")).toMatch(/^Remove ।/);
+    fireEvent.click(chip);
+    await waitFor(() => {
+      expect(usePhaseBDraftStore.getState().punctuation).toEqual([]);
     });
-    i18n.activate("zz");
-
-    mocks.inventory = {
-      source: "cldr",
-      confidence: "high",
-      characters: [{ char: "।", tier: "punctuation" }],
-      digraphs: [],
-    };
-    render(<PunctuationStep onComplete={vi.fn()} />);
-
-    expect(await screen.findByRole("button", { name: "(U+0964) । dda" })).toBeTruthy();
+    expect(usePhaseBDraftStore.getState().rejected).toContain("।");
   });
 
-  it("says so when the source has no punctuation tier for the language", async () => {
+  it("only the punctuation tier is proposed — a main-tier letter never lands in the draft", async () => {
+    withPunctuationTier(["।"]);
+    render(<PunctuationStep onComplete={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Your punctuation (1)")).toBeTruthy();
+    });
+    expect(usePhaseBDraftStore.getState().chars).toEqual(["।"]);
+  });
+
+  it("a removed auto-added mark stays removed across a remount — the proposal never fights the author", async () => {
+    withPunctuationTier(["।"]);
+    const { unmount } = render(<PunctuationStep onComplete={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Your punctuation (1)")).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Remove ।/ }));
+    expect(screen.getByText("Your punctuation (0)")).toBeTruthy();
+    expect(usePhaseBDraftStore.getState().rejected).toContain("।");
+
+    // Remount with the draft empty again: the auto-add gate is open, and the
+    // ONLY thing keeping the mark out is the store's sticky rejection.
+    unmount();
+    const onComplete = vi.fn();
+    render(<PunctuationStep onComplete={onComplete} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Your punctuation (0)")).toBeTruthy();
+    });
+    expect(screen.queryByRole("button", { name: /Remove ।/ })).toBeNull();
+    fireEvent.click(screen.getByTestId("punctuation-done"));
+    expect(lastResult(onComplete).confirmedInventory).toEqual([]);
+  });
+
+  it("a removed mark is not re-added by a re-render of the step", async () => {
+    withPunctuationTier(["।", "॥"]);
+    render(<PunctuationStep onComplete={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Your punctuation (2)")).toBeTruthy();
+    });
+    fireEvent.click(screen.getByRole("button", { name: /Remove ।/ }));
+
+    // A store write re-renders the step; the effect must not put it back.
+    typeAndAdd("!");
+    expect(screen.getByText("Your punctuation (2)")).toBeTruthy();
+    expect(screen.queryByRole("button", { name: /Remove ।/ })).toBeNull();
+    expect(usePhaseBDraftStore.getState().punctuation).toEqual(["॥", "!"]);
+  });
+
+  it("a returning author's existing punctuation is not proposed over", async () => {
+    usePhaseBDraftStore.getState().add("«"); // their own earlier work
+    withPunctuationTier(["।"]);
+    const onComplete = vi.fn();
+    render(<PunctuationStep onComplete={onComplete} />);
+
+    // The loading note is the settle signal — it is on screen only while the
+    // lookup is in flight, so waiting for it to GO proves the inventory really
+    // resolved (a bare "the hint is absent" assertion would pass vacuously on
+    // the first render, before the proposal ever had a chance to fire).
+    expect(screen.getByText(/Adding the suggested punctuation for Hindi/)).toBeTruthy();
+    await waitFor(() => {
+      expect(screen.queryByText(/Adding the suggested punctuation/)).toBeNull();
+    });
+    expect(screen.queryByText(/These marks came from CLDR exemplars/)).toBeNull();
+    expect(screen.getByText("Your punctuation (1)")).toBeTruthy();
+    expect(screen.getByTestId("authored-punctuation-chip")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("punctuation-done"));
+    expect(lastResult(onComplete).confirmedInventory).toEqual(["«"]);
+  });
+
+  it("a gated or unknown tag has nothing to propose, says so, and does not crash", async () => {
+    mocks.inventory = null; // no coverage, or the confidence gate fired
+    render(<PunctuationStep onComplete={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/No suggested punctuation for Hindi/)).toBeTruthy();
+    });
+    expect(usePhaseBDraftStore.getState().punctuation).toEqual([]);
+    expect(screen.queryByTestId("proposed-punctuation-chip")).toBeNull();
+  });
+
+  it("says so when the source covers the language but has no punctuation tier", async () => {
     mocks.inventory = {
       source: "cldr",
       confidence: "high",
@@ -207,8 +298,28 @@ describe("PunctuationStep — sourced suggestions", () => {
     render(<PunctuationStep onComplete={vi.fn()} />);
 
     await waitFor(() => {
-      expect(screen.getByText(/No suggested punctuation/)).toBeTruthy();
+      expect(screen.getByText(/No suggested punctuation for Hindi/)).toBeTruthy();
     });
+    expect(usePhaseBDraftStore.getState().punctuation).toEqual([]);
+  });
+
+  // km-triage finding on #1596: an English-only assertion proves the id/macro
+  // wiring produces the right English text, but not that a translator can
+  // actually REORDER "Remove X (Y)" — the real fr catalog is still an
+  // untranslated stub with nothing to test against. This loads a test-only
+  // locale whose message deliberately reverses the placeholder order, so a
+  // real regression (an assembled fragment ignoring the catalog's word order)
+  // would fail this even if the English text matched.
+  it("a translator's word-order choice actually reaches a chip's accessible name — not locked to English order", async () => {
+    i18n.load("zz", {
+      "survey.punctuation.removeAriaLabel": "({cp}) {char} evomer",
+    });
+    i18n.activate("zz");
+
+    withPunctuationTier(["।"]);
+    render(<PunctuationStep onComplete={vi.fn()} />);
+
+    expect(await screen.findByRole("button", { name: "(U+0964) । evomer" })).toBeTruthy();
   });
 });
 
