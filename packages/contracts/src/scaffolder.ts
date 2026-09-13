@@ -5,6 +5,7 @@ import type { BaseKeyboard } from "./baseKeyboard";
 import type { KeyboardIR } from "./keyboard-ir";
 import type { KpsFontEntry, KpsStylesheetEntry } from "./fontEntry";
 import type { Attribution } from "./attribution";
+import type { WelcomeConvention, WelcomeFolderImage } from "./doc-members";
 
 /**
  * Three-group routing identifier per spec §9. The scaffolder picks a
@@ -146,6 +147,16 @@ export interface ScaffoldResult {
    * job, and one parser shared by both paths is the point of FR-005.
    */
   baseLicenseText?: string;
+  /**
+   * The base's `source/welcome/` image files, verbatim (spec 076 FR-006,
+   * research R9). Surfaced so a Track 1 copy can carry the images — and only
+   * the images — into its own welcome folder: the base's PROSE (welcome/help
+   * text) is deliberately NOT surfaced here, because a copy with a new
+   * identity must never inherit another keyboard's description (FR-007).
+   */
+  baseWelcomeImages?: WelcomeFolderImage[];
+  /** Which welcome-page convention the base used (data-model §6). */
+  baseWelcomeConvention?: WelcomeConvention;
 }
 
 /**
