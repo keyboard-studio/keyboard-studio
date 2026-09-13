@@ -798,3 +798,42 @@ describe("CONTRACT-NAMED: checkInputsSatisfiable(graph) — orphan detection, no
     expect(orphans).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// spec 076 FR-018 (T074): REAL Layer C documentation findings — every code on
+// its broken fixture — are advisory. None reaches the blocking predicate, so
+// no lock-reaching prefix is stranded by a documentation gap.
+// ---------------------------------------------------------------------------
+
+describe("spec 076 FR-018 — documentation findings never block shippability", () => {
+  it("the whole broken-fixture documentation finding set strands nothing", async () => {
+    const { runDocChecks } = await import("@keymanapp/keyboard-lint");
+    // A deliberately broken documentation set: HISTORY version disagrees with
+    // the keyboard, README platforms disagree with targets, a malformed page
+    // name, unbalanced HTML, inconsistent holders.
+    const docFindings = runDocChecks({
+      keyboardId: "kbd",
+      keyboardVersion: "1.2",
+      targets: ["windows"],
+      layerIds: ["default"],
+      displayName: "Kbd",
+      copyrightHolders: { license: "Jane Doe", kmn: "John Roe" },
+      members: {
+        "readme-md": "# Kbd\n\nDesc.\n\n## Supported Platforms\n- windows\n- mac\n",
+        "history-md": "## 2.0 (2024-03-01)\n* Something.\n",
+        "welcome-htm": "<html><body><p>Open<div></p></body></html>",
+        "help-php":
+          "<?php $pagename = 'Wrong'; $pagetitle = $pagename; require_once('header.php'); ?><html><body><p>Different body.</p></body></html>",
+      },
+      deletedFilenames: [],
+    });
+    expect(docFindings.length).toBeGreaterThan(0);
+    expect(docFindings.every((f) => f.severity === "warning" && f.layer === "C")).toBe(true);
+    const mfest: readonly Step[] = [
+      makeSpineStep("s0"),
+      { ...makeSpineStep("s1"), lock: "physical" } satisfies Step,
+      { ...makeSpineStep("s2"), lock: "touch" } satisfies Step,
+    ];
+    expect(checkSpinePrefixShippability(mfest, WC_BOTH_LOCKED, docFindings)).toEqual([]);
+  });
+});
