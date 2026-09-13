@@ -63,6 +63,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | GFF Geʾez Manuscript | `gff_geez_emufi` | `gez` | The Geʾez Frontier Foundation | `../keyboards/experimental/gff/gff_geez_emufi` |
 | Ghana | `ghana` | `ak-Latn`, `ee-Latn`, `ada-Latn`, `dga-Latn`, `hag-Latn`, `nzi-Latn`, `xsm-Latn` | © 2017-2020 SIL International | `../keyboards/release/g/ghana` |
 | Greek Basic | `basic_kbdhe` | `el` | (c) 2009-2019 SIL International | `../keyboards/release/basic/basic_kbdhe` |
+| Haroi | `haroi` | `hro`, `vi` | © SIL Global | `../keyboards/release/h/haroi` |
 | Hausa Kano | `hausa_kano` | `ha-Latn` | Hamza Sulayman | `../keyboards/release/h/hausa_kano` |
 | Bengali Phonetic (ITRANS) | `itrans_bengali` | `bn`, `as` | Shree Devi Kumar | `../keyboards/release/itrans/itrans_bengali` |
 | Hindi Devanagari Phonetic (ITRANS) | `itrans_devanagari_hindi` | `hi`, `mr`, `sa`, `bho`, `mai`, `awa`, `bra`, `mag`, `raj`, `kok`, `gom`, `knn-Deva`, `hne`, `bgc`, `sck` … (+2 more) | Shree Devi Kumar | `../keyboards/release/itrans/itrans_devanagari_hindi` |
@@ -72,6 +73,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Odia/Oriya Phonetic (ITRANS) | `itrans_odia` | `or`, `bdv`, `bfw`, `dso`, `gbj`, `gdb`, `hoc-Orya`, `jun`, `kff-Orya`, `kxv-Orya`, `kyw-Orya`, `pci-Orya`, `peg`, `sat-Orya`, `spv`, `srb-Orya` | Shree Devi Kumar | `../keyboards/release/itrans/itrans_odia` |
 | Ibọnọ Chwerty | `ibono_chwerty` | `ibn` | Rogers Katelem Edeh | `../keyboards/release/i/ibono_chwerty` |
 | Kayah [Myanmar] (SIL) | `sil_kayah_mymr` | `kyu-Mymr` | © SIL Global | `../keyboards/release/sil/sil_kayah_mymr` |
+| Kcho (SIL) | `sil_kcho` | `mwq`, `dao` | SIL Global | `../keyboards/release/sil/sil_kcho` |
 | Khmer Angkor | `khmer_angkor` | `km` | Makara Sok | `../keyboards/release/k/khmer_angkor` |
 | Komono (Côte d'Ivoire) | `komono_ci` | `kqg` | Kirk Rogers | `../keyboards/release/k/komono_ci` |
 | Lao 2008 Basic | `lao_2008_basic` | `lo` | © John Durdin | `../keyboards/release/l/lao_2008_basic` |
