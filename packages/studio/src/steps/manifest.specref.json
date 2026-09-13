@@ -4,7 +4,8 @@
     "specs/030-langtags-identity-autocomplete"
   ],
   "choose_base": [
-    "§8"
+    "§8",
+    "specs/076-documentation-completeness"
   ],
   "track": [
     "§8",
@@ -45,7 +46,8 @@
   ],
   "help": [
     "§8",
-    "specs/061-help-docs-generation"
+    "specs/061-help-docs-generation",
+    "specs/076-documentation-completeness"
   ],
   "package": [
     "§16"
@@ -76,6 +78,12 @@
   ],
   "pf_doc_language": [
     "specs/061-help-docs-generation"
+  ],
+  "pf_history_entry": [
+    "specs/076-documentation-completeness"
+  ],
+  "pf_history_entry_bullets": [
+    "specs/076-documentation-completeness"
   ],
   "pf_contact_info": [
     "specs/064-keyboard-attribution"
