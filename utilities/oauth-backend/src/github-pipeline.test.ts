@@ -45,6 +45,7 @@ const VALID_BODY: ManagedPRBody = {
 interface StepOverrides {
   masterRef?: Partial<GitHubPipelineFetchResponse>;
   parentCommit?: Partial<GitHubPipelineFetchResponse>;
+  blob?: Partial<GitHubPipelineFetchResponse>;
   tree?: Partial<GitHubPipelineFetchResponse>;
   commit?: Partial<GitHubPipelineFetchResponse>;
   branch?: Partial<GitHubPipelineFetchResponse>;
@@ -88,6 +89,7 @@ function makeStub(overrides: StepOverrides = {}): {
 
     if (url.includes("/git/ref/heads/master")) return apply(res({ object: { sha: "masterSha111" } }), overrides.masterRef);
     if (url.includes("/git/commits/masterSha111")) return apply(res({ tree: { sha: "treeShaBase" } }), overrides.parentCommit);
+    if (url.endsWith("/git/blobs") && method === "POST") return apply(res({ sha: "blobSha123" }), overrides.blob);
     if (url.endsWith("/git/trees") && method === "POST") return apply(res({ sha: "newTreeSha" }), overrides.tree);
     if (url.endsWith("/git/commits") && method === "POST") return apply(res({ sha: NEW_COMMIT_SHA }), overrides.commit);
     if (url.endsWith("/git/refs") && method === "POST") return apply(res({ ref: "ok" }, true, 201), overrides.branch);
@@ -292,6 +294,95 @@ describe("submitManagedPR() -- success", () => {
     const { fetch, calls } = makeStub();
     await submitManagedPR(VALID_BODY, makeConfig(fetch));
     expect(calls.some((c) => c.url.endsWith("/forks"))).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// submitManagedPR -- binary (base64) source files, spec 076 welcome images
+// ---------------------------------------------------------------------------
+
+describe("submitManagedPR() -- binary (base64) source files", () => {
+  const BASE64_PNG_BODY: ManagedPRBody = {
+    ...VALID_BODY,
+    sourceFiles: [
+      ...VALID_BODY.sourceFiles,
+      {
+        path: "release/m/my_keyboard/source/welcome/banner.png",
+        content: "AQID",
+        encoding: "base64",
+      },
+    ],
+  };
+
+  it("uploads a base64 entry as a blob and references it by sha in the tree", async () => {
+    const { fetch, calls } = makeStub();
+    const result = await submitManagedPR(BASE64_PNG_BODY, makeConfig(fetch));
+    expect(result.ok).toBe(true);
+
+    const blobCall = calls.find((c) => c.url.endsWith("/git/blobs") && c.method === "POST");
+    expect(blobCall).toBeDefined();
+    const blobBody = JSON.parse(blobCall!.body!) as { content: string; encoding: string };
+    expect(blobBody).toEqual({ content: "AQID", encoding: "base64" });
+
+    const treeCall = calls.find((c) => c.url.endsWith("/git/trees") && c.method === "POST");
+    const treeBody = JSON.parse(treeCall!.body!) as {
+      tree: Array<{ path: string; mode: string; type: string; sha?: string; content?: string }>;
+    };
+    const pngEntry = treeBody.tree.find((t) => t.path.endsWith("banner.png"));
+    expect(pngEntry).toEqual({
+      path: "release/m/my_keyboard/source/welcome/banner.png",
+      mode: "100644",
+      type: "blob",
+      sha: "blobSha123",
+    });
+    const kmnEntry = treeBody.tree.find((t) => t.path.endsWith("my_keyboard.kmn"));
+    expect(kmnEntry?.content).toBe("store(&VERSION) '14.0'");
+    expect(kmnEntry?.sha).toBeUndefined();
+  });
+
+  it("emits no blob calls for a text-only body (tree entries carry content inline, byte-identical to before)", async () => {
+    const { fetch, calls } = makeStub();
+    await submitManagedPR(VALID_BODY, makeConfig(fetch));
+    expect(calls.some((c) => c.url.endsWith("/git/blobs"))).toBe(false);
+
+    const treeCall = calls.find((c) => c.url.endsWith("/git/trees") && c.method === "POST");
+    const treeBody = JSON.parse(treeCall!.body!) as {
+      tree: Array<{ path: string; mode: string; type: string; content?: string; sha?: string }>;
+    };
+    expect(treeBody.tree).toEqual([
+      {
+        path: "release/m/my_keyboard/source/my_keyboard.kmn",
+        mode: "100644",
+        type: "blob",
+        content: "store(&VERSION) '14.0'",
+      },
+      {
+        path: "release/m/my_keyboard/my_keyboard.kps",
+        mode: "100644",
+        type: "blob",
+        content: "<Keyboard/>",
+      },
+    ]);
+  });
+
+  it("maps a blob-creation 429 the same way other steps map rate limiting", async () => {
+    const retryRes: GitHubPipelineFetchResponse = {
+      ok: false,
+      status: 429,
+      statusText: "Too Many Requests",
+      headers: { get: (name: string) => (name.toLowerCase() === "retry-after" ? "45" : null) },
+      json: async () => ({}),
+      text: async () => "{}",
+    };
+    const { fetch, calls } = makeStub({ blob: retryRes });
+    const result = await submitManagedPR(BASE64_PNG_BODY, makeConfig(fetch));
+    expect(result.ok).toBe(false);
+    if (result.ok) throw new Error("unreachable");
+    expect(result.status).toBe(429);
+    expect(result.error).toBe("rate_limited");
+    expect(result.retryAfterSeconds).toBe(45);
+    // Failed before the tree step -- no tree/commit/branch/PR calls follow.
+    expect(calls.some((c) => c.url.endsWith("/git/trees"))).toBe(false);
   });
 });
 
