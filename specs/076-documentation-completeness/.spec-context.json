@@ -2,8 +2,8 @@
   "workflow": "speckit",
   "specName": "Documentation completeness — every package ships its full documentation set",
   "branch": "076-documentation-completeness",
-  "currentStep": "tasks",
-  "status": "ready-to-implement",
+  "currentStep": "implement",
+  "status": "implemented",
   "history": [
     {
       "step": "specify",
@@ -67,6 +67,652 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-09-11T03:10:54.144Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "ai",
+      "at": "2026-09-11T04:06:32Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-12T06:54:12.204Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-12T06:54:12.742Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-12T06:54:13.377Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-12T06:54:14.060Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-12T06:54:14.681Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-12T06:54:15.359Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-12T06:54:16.039Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-12T06:54:16.791Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-12T06:54:17.454Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-12T06:54:18.092Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-12T06:54:18.673Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-12T06:54:19.434Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-12T06:54:20.034Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-12T06:54:29.203Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-12T06:54:29.203Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-12T06:54:29.203Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-12T06:54:29.203Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-12T06:54:29.203Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-12T06:54:29.203Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-12T06:54:29.203Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-12T06:54:29.203Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-12T06:54:29.203Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T038",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T039",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T041",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T042",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T043",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T044",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T045",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T046",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T047",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T048",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T049",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T050",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T051",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T052",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T053",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T054",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T055",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T056",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T057",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T058",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T059",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.690Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T060",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.691Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T061",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.691Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T062",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.691Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T063",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.691Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T064",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.691Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T065",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.691Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T066",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.691Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T067",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.691Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T068",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.691Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T069",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.691Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T070",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.691Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T071",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.691Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T072",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.691Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T073",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.691Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T074",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.691Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T075",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.691Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T076",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.691Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T077",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.691Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T078",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.691Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T079",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.691Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T04:14:47.691Z"
     }
   ],
   "telemetryInstanceId": "1a4e8221-55e8-4182-b12d-ab2f7d0dc808",
@@ -91,6 +737,21 @@
       "decision": "Base documentation profile computed lazily from the already-fetched .kps manifest plus one welcome-probe fetch",
       "why": "The base browser discards the full tree listing and precomputing 1026 profiles is the cost the spec assumption warns about; the .kps answers membership and one probe answers stub-vs-full",
       "rejected": "A build-time facet-index field (deferred, the pure classifier can feed it later) and full-gallery classification"
+    },
+    {
+      "decision": "Loader also fetches welcome images the base page references but its .kps never lists (corpus sweep found 43/725 bases in that state); silent on a miss because the projection already names uncarried references."
+    },
+    {
+      "decision": "Welcome-path migration rewrites a flat welcome.htm reference and appends missing folder files but never invents a welcome-page entry in a descriptor that lists none (an existing projection test treats that as noise)."
+    },
+    {
+      "decision": "LICENSE.md completion (ensurePackageFiles) moved from buildOutputBundle (download-only) into projectWorkingCopyForOutput step 5d so the pull-request path ships all six members (FR-001); the SC-001 matrix would otherwise fail every Track 2 cell."
+    },
+    {
+      "decision": "SC-002 population is 725, not 728: release/packages/* are multi-keyboard packages with no .kmn and cannot be adapted; the sweep excludes that shard."
+    },
+    {
+      "decision": "Follow-ups deferred from the US2 review (km-synthesis P2): one canonical welcome-folder/page constant pair in the engine that build.ts, the loader, the scaffolder stub and serializeWorkingCopy derive from; a shared serializeWorkingCopy test seeder (services mock + six member paths) for the five serializeWorkingCopy.*.test.ts files."
     }
   ],
   "step_summaries": {
@@ -300,5 +961,216 @@
         "T022"
       ]
     }
-  }
+  },
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Added phonebook rows for ahom_star and akha_lahu read from their .kps Info blocks.",
+      "files": [
+        "docs/keyboard-index.md"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Created the additive spec 076 contract types (DocMemberId/State, BaseDocumentationProfile, HistoryEntryState, LayoutChartFile/Input, ChartPreference, DocLintInput) and exported them from the barrel.",
+      "files": [
+        "packages/contracts/src/doc-members.ts",
+        "packages/contracts/src/index.ts"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "Added zod mirrors and compile-time drift guards for the six runtime-boundary types; DocLintInput.members uses z.partialRecord because zod 4 enum records are exhaustive.",
+      "files": [
+        "packages/contracts/src/schemas.ts"
+      ]
+    },
+    "T004": {
+      "status": "DONE",
+      "did": "Added runtime round-trip and rejection tests for every new schema plus the six-member DocMemberId invariant.",
+      "files": [
+        "packages/contracts/src/doc-members.test.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Added helpSiteHeader/helpSitePageName/helpPhpStub (in packageDocs.ts, re-exported via helpDocsRender and the engine barrel) with PHP single-quote escaping and the Keyboard-suffix dedupe.",
+      "files": [
+        "packages/engine/src/shared/packageDocs.ts",
+        "packages/engine/src/shared/escapeHtml.ts",
+        "packages/engine/src/shared/helpDocsRender.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "renderHelpPhp prepends the standard header on the fresh path (answered and placeholder); the base-merge path is unchanged; the scaffolder stub shares the same helper.",
+      "files": [
+        "packages/engine/src/shared/helpDocsRender.ts",
+        "packages/engine/src/scaffolder/index.ts"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "Added header exactness, dedupe, escaping, placeholder, inherited-single-header, and body-parity tests; parity stripper now removes the header.",
+      "files": [
+        "packages/engine/src/shared/helpDocsRender.test.ts"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Stub-completion test pins the header on early production and asserts a fresh help page = header + welcome body.",
+      "files": [
+        "packages/studio/src/lib/serializeWorkingCopy.stubCompletion.test.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE_WITH_CONCERNS",
+      "did": "Updated the scaffolder '*/' defusal test to scope its assertion to the comment block; engine, contracts, and studio projection suites green.",
+      "files": [
+        "packages/engine/src/scaffolder/scaffolder.test.ts"
+      ],
+      "concerns": [
+        "Full engine suite has the known pre-existing local failure recognizer/integration.test.ts '0060 grave RALT K_7' (CI-green per project memory); not touched by this change.",
+        "pnpm lint's crew-lint step crashed on a stale .claude/worktrees node_modules cycle on clean HEAD too; hardened the walk in utilities/crew-lint/index.js as a separate unblocking change."
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Loader resolves the welcome page descriptor-named -> folder -> flat (folder wins, ghost entry degrades), fetches .kps-listed welcome images plus page-referenced unlisted ones as bytes, and fetches README.md/HISTORY.md; result gains baseWelcomeConvention/baseWelcomeImages/baseReadmeMdText/baseHistoryMdText.",
+      "files": [
+        "packages/engine/src/loader/fetchKeyboardSourceToVfs.ts",
+        "packages/contracts/src/doc-members.ts"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "buildKpsContent takes welcomeFolderFiles; <Files> lists welcome\\welcome.htm plus each folder file backslash-relative; <WelcomeFile> is welcome\\welcome.htm; exported WELCOME_PAGE_KPS_REF/welcomeFolderKpsRef/normaliseWelcomeFolderFiles.",
+      "files": [
+        "packages/engine/src/package-descriptor/build.ts",
+        "packages/engine/src/package-descriptor/index.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "applyIdentityToKps gains the welcome-path migration (flat <WelcomeFile>/<File> -> folder form, missing folder files appended, every rewrite named in warnings); module header documents it as the sole sanctioned <Options>/<Files> write.",
+      "files": [
+        "packages/engine/src/package-descriptor/patch.ts"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Scaffolder welcome stub moves to source/welcome/welcome.htm; scaffold() forwards baseWelcomeImages/baseWelcomeConvention from the loader (images only, never prose) via the extended ScaffoldResult contract.",
+      "files": [
+        "packages/engine/src/scaffolder/index.ts",
+        "packages/contracts/src/scaffolder.ts"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "kmpPaths tests cover welcome\\welcome.htm, welcome\\image.png, a ks-layout- chart, and the forward-slash spelling.",
+      "files": [
+        "packages/engine/src/output/kmpPaths.test.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Store slices baseReadmeMdText/baseHistoryMdText/baseWelcomeImages/baseWelcomeConvention with setters, allowlist entries, defaults; persistence snapshots images Base64 under a 2 MB budget (BASE_WELCOME_IMAGES_BUDGET_BYTES) and tolerates pre-076 snapshots.",
+      "files": [
+        "packages/studio/src/stores/workingCopyStore.ts",
+        "packages/studio/src/lib/persistWorkingCopy.ts",
+        "packages/studio/src/lib/persistWorkingCopy.test.ts"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "useKeyboardArtifact sets all four slices on the open-base branch; the scaffold (Track 1) branch sets images + convention only and explicitly nulls every prose slice (FR-007).",
+      "files": [
+        "packages/studio/src/hooks/useKeyboardArtifact.ts"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "Projection step 5c writes source/welcome/welcome.htm (deleting a stale flat copy), writes each carried image beside it, threads welcomeFolderFiles into projectWorkingCopyVfs -> applyIdentityToKps, reports missingInheritedImages (typed + [docs] warning); step 5d completes LICENSE.md on every path (moved out of buildOutputBundle).",
+      "files": [
+        "packages/studio/src/lib/serializeWorkingCopy.ts",
+        "packages/studio/src/lib/projectWorkingCopyVfs.ts",
+        "packages/studio/src/lib/buildOutputBundle.ts"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "renderWelcomeHtm takes welcomeImageFiles and gives a fresh page (and the placeholder) a Keyboard Layout section; new pure extractWelcomeImageRefs and renderWelcomeLayoutSection exported; the help page never receives the section.",
+      "files": [
+        "packages/engine/src/shared/helpDocsRender.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "Loader (12 cases), build (4), patch (7), helpDocsRender (9), descriptor projection (5), and Track 1 no-prose (2) tests added.",
+      "files": [
+        "packages/engine/src/loader/fetchKeyboardSourceToVfs.test.ts",
+        "packages/engine/src/package-descriptor/build.test.ts",
+        "packages/engine/src/package-descriptor/patch.test.ts",
+        "packages/engine/src/shared/helpDocsRender.test.ts",
+        "packages/studio/src/lib/serializeWorkingCopy.descriptor.test.ts",
+        "packages/studio/src/lib/serializeWorkingCopy.test.ts"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "Flat-path pins updated in build.test, scaffolder.test, stubCompletion.test, artifactIndependence.test (file count 10->11 with LICENSE completion), plus comment hygiene in packageDocs/workingCopyStore.",
+      "files": [
+        "packages/engine/src/package-descriptor/build.test.ts",
+        "packages/engine/src/scaffolder/scaffolder.test.ts",
+        "packages/studio/src/lib/serializeWorkingCopy.stubCompletion.test.ts",
+        "packages/studio/src/decisions/artifactIndependence.test.ts"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "utilities/welcome-sweep/run.mjs + README: plain-node SC-002 sweep over the engine dist with a disk-backed fetch; 725/725 folder-convention bases pass, 3373 images carried and listed (release/packages excluded: multi-keyboard packages, not bases); documented in docs/tooling.md.",
+      "files": [
+        "utilities/welcome-sweep/run.mjs",
+        "utilities/welcome-sweep/README.md",
+        "docs/tooling.md"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "serializeWorkingCopy.determinism.test.ts (SC-004 seed, both tracks, pinned clock) and serializeWorkingCopy.memberMatrix.test.ts (SC-001 nine-cell matrix: six members, folder path, no flat file, images/prose per track).",
+      "files": [
+        "packages/studio/src/lib/serializeWorkingCopy.determinism.test.ts",
+        "packages/studio/src/lib/serializeWorkingCopy.memberMatrix.test.ts"
+      ]
+    }
+  },
+  "currentTask": "T079",
+  "verified": [
+    {
+      "what": "US2 gates: pnpm typecheck green; pnpm lint green (0 errors, pre-existing unused-directive warnings only); engine suite 4132 passed with only the known pre-existing recognizer/integration 0060 failure; studio touched suites green (serializeWorkingCopy x7 files 88 tests, persistWorkingCopy, projectWorkingCopyVfs, artifactIndependence); node utilities/welcome-sweep/run.mjs -> 725/725, 3373 images."
+    },
+    {
+      "what": "km-lead review cycle (US2): km-qc PASS WITH NOTES 77/100 (2 P1 fixed in-cycle: traversal guard on the .kps-listed welcome-image loop; over-budget image drop now recorded via baseWelcomeImagesDropped and named in projection warnings; P2 blank <WelcomeFile> rewrite fixed + tests). km-synthesis APPROVE WITH NOTES (in-cycle: kpsRefToPosix moved to kps-parser.ts and shared by loader + patch.ts; dead getEnsurePackageFiles removed from services.ts). km-output APPROVE WITH NOTES (descriptor form, projection PR-safety, kmp flattening, loader fetch-don't-write, scaffolder rename skip all confirmed). Post-fix: engine loader/descriptor/kps-parser 153 tests green, studio projection+persistence 115 green, typecheck green, eslint clean on touched files."
+    },
+    {
+      "what": "km-verification PASS (L2): engine touched suites 431/431, studio touched suites 170/170, full typecheck clean, welcome-sweep reproduced 725/725 (3373 images), descriptor projection test proves byte-identical image carry + folder-form <Files>/<WelcomeFile> + no flat file; Track 1 prose null-out confirmed at useKeyboardArtifact.ts. Not run: a real kmc-package .kmp build (unit-level resolveFilename proof accepted). Transient TS2304 seen mid-review was an in-flight lead fix; settled tree re-verified green."
+    }
+  ],
+  "concerns": [
+    {
+      "note": "Local studio full run shows 26 failing files (theme, i18n, OAuth token storage, draftPersistence, StudioShell) — all untouched by this phase and all the known Node 26 localStorage shadow: with NODE_OPTIONS=--localstorage-file 116/118 of a sample pass. CI on Node 22 is expected green; confirm on the PR run."
+    },
+    {
+      "note": "Sweep notes: 54/725 bases keep files in source/welcome/ their .kps never lists (carried only when the page references them); 4 bases reference images that do not exist or use percent-encoded names (rac_hazaragi) — base defects, surfaced by the projection's missing-image warning, not fixed here."
+    },
+    {
+      "note": "getEnsurePackageFiles in packages/studio/src/lib/services.ts now has no callers (its only call site moved into the shared projection, which imports the engine statically); left in place for km-simplify to remove."
+    },
+    {
+      "note": "P1 follow-up (km-output): packages/engine/src/output/managed-pr.ts submits only string entries, so inherited binary welcome images the migrated descriptor now lists are dropped from an Option B (org-mediated) PR, leaving that tree internally inconsistent. Pre-existing class (icons and fonts are already dropped); Option A (github.ts) base64-encodes binaries and is unaffected. Fix in a follow-up: carry binaries in managed-pr.ts mirroring github.ts, or filter the descriptor's welcome-folder list on that path and say so."
+    }
+  ]
 }
