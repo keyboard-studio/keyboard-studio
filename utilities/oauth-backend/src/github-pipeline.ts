@@ -250,13 +250,30 @@ export async function submitManagedPR(
     const parentData = (await parentCommit.json()) as { tree: { sha: string } };
     const baseTreeSha = parentData.tree.sha;
 
-    // 3. Build the tree from the SPA-filtered source files (text content only).
-    const treeEntries = body.sourceFiles.map((f) => ({
-      path: f.path,
-      mode: "100644",
-      type: "blob",
-      content: f.content,
-    }));
+    // 3. Build the tree from the SPA-filtered source files. Text entries are
+    //    inlined as tree content; base64 (binary) entries -- e.g. welcome-folder
+    //    images, spec 076 -- are uploaded as blobs first and referenced by sha,
+    //    mirroring packages/engine/src/output/github.ts (Option A).
+    const treeEntries: Array<{
+      path: string;
+      mode: string;
+      type: string;
+      content?: string;
+      sha?: string;
+    }> = [];
+    for (const f of body.sourceFiles) {
+      if (f.encoding === "base64") {
+        const blobRes = await call(`${forkBase}/git/blobs`, "POST", {
+          content: f.content,
+          encoding: "base64",
+        });
+        if (!blobRes.ok) return mapNonOk(blobRes);
+        const blobData = (await blobRes.json()) as { sha: string };
+        treeEntries.push({ path: f.path, mode: "100644", type: "blob", sha: blobData.sha });
+      } else {
+        treeEntries.push({ path: f.path, mode: "100644", type: "blob", content: f.content });
+      }
+    }
 
     // 4. Create the tree.
     const newTree = await call(`${forkBase}/git/trees`, "POST", {

@@ -14,8 +14,21 @@
 
 import { slugifyKeyboardId } from "@keyboard-studio/contracts";
 import type { SurveyPhaseResult, HelpDocsAnswers } from "@keyboard-studio/contracts";
+import { bumpKeyboardVersion, historyEntryHeading } from "@keyboard-studio/engine";
 import { makeFlowStepComponent } from "./makeFlowStepComponent.tsx";
 import type { FlowStepOptions, FlowStepDeps } from "./makeFlowStepComponent.tsx";
+import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import {
+  prefill as prefillWelcomeParagraph,
+  requiredWhen as requiredWhenWelcomeParagraph,
+  type AdaptiveDescriptionContext,
+} from "../../survey/questions/f/pf_welcome_paragraph.ts";
+import {
+  deriveHistoryEntryState,
+  applyHistoryEntryAction,
+  isHistoryEntryAction,
+} from "../../survey/questions/f/pf_history_entry.ts";
+import { buildHistoryProposalSeed } from "../../decisions/historyProposalSeed.ts";
 
 // ---------------------------------------------------------------------------
 // track options — reproduces TrackStepAdapter + PhaseTrack behaviour exactly.
@@ -231,6 +244,38 @@ export type PhaseFPayload = SurveyPhaseResult;
  */
 const CTX_AUTHOR_CONTACT = "author_contact";
 
+/**
+ * Reads the four working-copy slices `pf_welcome_paragraph`'s `prefill`/
+ * `requiredWhen` need (spec 076 FR-009), straight off `getState()` rather
+ * than threading them through `FlowStepDeps` — this seed function is called
+ * on-demand (question-transition time / every SurveyRunner render), not
+ * reactively per-render like the hook-level `depsRef` fields above, so a
+ * fresh snapshot read here is equivalent and keeps `FlowStepDeps` unchanged
+ * for every other flow's seeds.
+ */
+function readAdaptiveDescriptionContext(): AdaptiveDescriptionContext {
+  const state = useWorkingCopyStore.getState();
+  return {
+    instantiationMode: state.instantiationMode,
+    baseDocProfile: state.baseDocProfile,
+    baseWelcomeHtmText: state.baseWelcomeHtmText,
+    baseHelpPhpText: state.baseHelpPhpText,
+  };
+}
+
+/**
+ * The version HISTORY's proposed heading is stamped with (spec 076 FR-010),
+ * mirroring `serializeWorkingCopy.ts`'s own `rawVersion`/`bumpKeyboardVersion`
+ * derivation exactly (`baseIr.header.version?.trim() || "1.0"`, bumped only
+ * on an adaptation) so the survey-time proposal and the final output-time
+ * heading never disagree about which version they're for.
+ */
+function deriveHistoryVersion(): string {
+  const state = useWorkingCopyStore.getState();
+  const rawVersion = state.baseIr?.header.version?.trim() || "1.0";
+  return state.instantiationMode === "adapt-existing" ? bumpKeyboardVersion(rawVersion) : rawVersion;
+}
+
 type OptInField =
   | "designRationale" | "fontGuidance" | "canonicalOrder" | "scriptGlossary"
   | "exampleWords" | "scopeVariety" | "provenanceBasis" | "troubleshooting"
@@ -313,14 +358,58 @@ export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {
   title: "Help documentation",
 
   buildContext(deps: FlowStepDeps) {
-    // Match PhaseFAdapter: pass surveyContext from session store.
-    return deps.surveyContext;
+    // Match PhaseFAdapter's surveyContext pass-through, plus (spec 076 US5)
+    // the HISTORY-proposal tokens pf_history_entry's help_text interpolates.
+    // `deps.historyEntryState` is null for exactly one render — before
+    // onMount's first derivation lands — in which case both tokens resolve
+    // to "" (see pf_history_entry.ts's own comment on that one-render gap).
+    const historyState = deps.historyEntryState;
+    const bullets = historyState !== null
+      ? (historyState.editedBullets ?? historyState.proposal.bullets)
+      : [];
+    return {
+      ...deps.surveyContext,
+      history_heading: historyState !== null
+        ? historyEntryHeading(historyState.proposal.version, historyState.proposal.dateIso)
+        : "",
+      history_bullets: bullets.map((bullet) => `- ${bullet}`).join("\n"),
+    };
   },
 
   usesFindings: true,
 
+  // spec 076 US5: derive the HISTORY-entry proposal once per mount (entering
+  // the Phase F step), from the decision record no new journal was needed for
+  // (buildHistoryProposalSeed) and the same version `serializeWorkingCopy.ts`
+  // will independently recompute at output time (deriveHistoryVersion).
+  // Identity-guarded: deriveHistoryEntryState returns `previous` UNCHANGED
+  // when the version has not moved, so a re-mount (Back then forward into
+  // this step again) never re-stamps `dateIso` (research R12) and never
+  // fires a redundant store write.
+  onMount(deps: FlowStepDeps): void {
+    const next = deriveHistoryEntryState({
+      seed: buildHistoryProposalSeed(),
+      version: deriveHistoryVersion(),
+      dateIso: new Date().toISOString().slice(0, 10),
+      previous: deps.historyEntryState,
+    });
+    if (next !== deps.historyEntryState) {
+      deps.setHistoryEntryState(next);
+    }
+  },
+
   seeds: {
     getSeedValue(questionId: string, deps: FlowStepDeps): string | string[] | undefined {
+      // spec 076 FR-009: on an adaptation whose base has a usable description,
+      // propose it for confirmation (accept/edit/replace in one action, §3c).
+      // Net-new, copy (Track 1), and a base classified none/minimal all
+      // resolve to undefined here — pf_welcome_paragraph behaves exactly as
+      // before (required, unfilled). See `getRequiredOverride` below, which
+      // waives `required` in exactly this same case.
+      if (questionId === "pf_welcome_paragraph") {
+        return prefillWelcomeParagraph(readAdaptiveDescriptionContext());
+      }
+
       // pf_contact_info stays OPTIONAL. Seeding pre-fills the field; it does not
       // require an answer. The author can clear it, or replace it with a community
       // channel that is not their own address — several shipped keyboards publish a
@@ -337,6 +426,16 @@ export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {
       // question exists to collect something better than.
       return undefined;
     },
+
+    // spec 076 FR-009: waives pf_welcome_paragraph's static `required: true`
+    // in exactly the case getSeedValue above proposed a value — every other
+    // question (undefined here) keeps its own static `required`.
+    getRequiredOverride(questionId: string): boolean | undefined {
+      if (questionId === "pf_welcome_paragraph") {
+        return requiredWhenWelcomeParagraph(readAdaptiveDescriptionContext());
+      }
+      return undefined;
+    },
   },
 
   extract(result: SurveyPhaseResult): PhaseFPayload | undefined {
@@ -351,6 +450,19 @@ export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {
     const extracted = extractHelpDocs(result);
     if (extracted !== undefined) {
       deps.setHelpDocs(extracted);
+    }
+
+    // spec 076 US5: apply the author's confirm / edit / dismiss decision onto
+    // the proposal onMount derived. A blank/absent pf_history_entry answer
+    // means "not decided yet" (validate() allows this) — status stays
+    // "proposed" and FR-011's placeholder marker is untouched. `current` can
+    // only be null if onMount somehow never ran (defensive; not reachable via
+    // the real factory, which always fires onMount before any answer commits).
+    const historyAction = getTextAnswer(result, "pf_history_entry");
+    const current = deps.historyEntryState;
+    if (historyAction !== undefined && isHistoryEntryAction(historyAction) && current !== null) {
+      const bulletsText = getTextAnswer(result, "pf_history_entry_bullets");
+      deps.setHistoryEntryState(applyHistoryEntryAction(historyAction, bulletsText, current));
     }
   },
 };

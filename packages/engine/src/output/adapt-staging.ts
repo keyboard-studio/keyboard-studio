@@ -9,6 +9,7 @@
 //   stageAdaptHistory(vfs, ..., dateIso) — prepend an adapt entry to HISTORY.md.
 
 import type { VirtualFS } from "@keyboard-studio/contracts";
+import { renderHistoryMd } from "../shared/renderHistoryMd.js";
 
 // ---------------------------------------------------------------------------
 // bumpKeyboardVersion
@@ -101,22 +102,22 @@ export function stageAdaptHistory(
   bumpedVersion: string,
   dateIso: string,
 ): void {
-  const newEntry =
-    `## ${bumpedVersion} (${dateIso})\n` +
-    `* Adapted from ${originalId} v${originalVersion} via keyboard-studio.\n`;
-
+  // spec 076 US5: the entry text is no longer composed here — renderHistoryMd
+  // is the ONE HISTORY.md composer (a null entry renders exactly the
+  // attribution stub this function always wrote), so the two can never drift.
   const existing = vfs.get("HISTORY.md");
-  if (existing === undefined || typeof existing.content !== "string") {
-    // No HISTORY.md — create one with just the new entry.
-    vfs.set("HISTORY.md", newEntry, false);
-  } else {
-    // Prepend the new entry, preserving the original content below.
-    const originalContent = existing.content;
-    // Separate with a single blank line between the new entry and the old content.
-    const combined =
-      originalContent.length > 0
-        ? `${newEntry}\n${originalContent}`
-        : newEntry;
-    vfs.set("HISTORY.md", combined, false);
-  }
+  const baseHistoryText =
+    existing !== undefined && typeof existing.content === "string" && existing.content.length > 0
+      ? existing.content
+      : null;
+  vfs.set(
+    "HISTORY.md",
+    renderHistoryMd(null, {
+      version: bumpedVersion,
+      dateIso,
+      adaptedFrom: { id: originalId, version: originalVersion },
+      baseHistoryText,
+    }),
+    false,
+  );
 }

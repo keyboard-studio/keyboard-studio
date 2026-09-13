@@ -26,11 +26,16 @@
 //   2. A manifest flowRefs declaration
 //   3. One FlowStepOptions record passed to makeFlowStepComponent
 
-import { useMemo, useRef, useCallback } from "react";
+import { useMemo, useRef, useCallback, useEffect } from "react";
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
 import { useLingui } from "@lingui/react/macro";
-import type { SurveyPhaseResult, LintFinding, HelpDocsAnswers } from "@keyboard-studio/contracts";
+import type {
+  SurveyPhaseResult,
+  LintFinding,
+  HelpDocsAnswers,
+  HistoryEntryState,
+} from "@keyboard-studio/contracts";
 import { resolveMessage } from "../../lib/i18nResolve.ts";
 import { FlowStepHost } from "../../survey/FlowStepHost.tsx";
 import { loadModularFlow } from "../../survey/loadModularFlow.ts";
@@ -110,6 +115,23 @@ export interface FlowStepDeps {
    * store-write role above, for the help-docs feature's own field.
    */
   setHelpDocs: (patch: HelpDocsAnswers | null) => void;
+  /**
+   * The session's currently-derived HISTORY-entry proposal state (spec 076
+   * US5), or `null` before it has ever been derived. `phaseFOptions.onMount`
+   * reads this as `deriveHistoryEntryState`'s `previous` (so a re-derivation
+   * with an unchanged version is a no-op, never re-stamping `dateIso` —
+   * research R12), and `phaseFOptions.buildContext` reads it to inject the
+   * proposal's heading/bullets into `pf_history_entry`'s `{{token}}`s.
+   */
+  historyEntryState: HistoryEntryState | null;
+  /**
+   * Record (or clear) the HISTORY-entry proposal state. Mirrors `setHelpDocs`
+   * above: `phaseFOptions.onMount` calls this once per mount with the derived
+   * proposal (identity-guarded — see its own comment), and
+   * `phaseFOptions.onCommit` calls this again with the author's confirm /
+   * edit / dismiss decision applied (`applyHistoryEntryAction`).
+   */
+  setHistoryEntryState: (state: HistoryEntryState | null) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -136,11 +158,27 @@ export interface FlowStepOptions<Extracted = unknown> {
    */
   onCommit?: (extracted: Extracted, deps: FlowStepDeps) => void;
   /**
+   * Fires once per mount (spec 076 US5) — BEFORE the first `buildContext`
+   * consumer sees a derived value, since it runs in a `useEffect` after the
+   * mount render commits, same as every other React effect. Used by
+   * `phaseFOptions` to derive (and identity-guard-store) the HISTORY-entry
+   * proposal on entering the Phase F step; optional because most flows need
+   * no mount-time derivation at all.
+   */
+  onMount?: (deps: FlowStepDeps) => void;
+  /**
    * Optional seeding hooks (e.g. project_name slug derivation).
    */
   seeds?: {
     getSeedValue: (questionId: string, deps: FlowStepDeps) => string | string[] | undefined;
     onAnswerCommit?: (questionId: string, value: string | string[] | undefined, deps: FlowStepDeps) => void;
+    /**
+     * Optional per-question `required` override (spec 076 FR-009). Forwarded
+     * to FlowStepHost -> SurveyRunner's own `getRequiredOverride` prop —
+     * see its doc there for the override contract. Absent for every flow
+     * that has no conditionally-required question (the common case).
+     */
+    getRequiredOverride?: (questionId: string, deps: FlowStepDeps) => boolean | undefined;
   };
   /**
    * When true, the factory reads findingsByQuestionId from workingCopyStore
@@ -207,6 +245,8 @@ export function makeFlowStepComponent<Extracted>(
     const setHelpDocs = useWorkingCopyStore((s) => s.setHelpDocs);
     const selectedTrack = useSurveySessionStore((s) => s.selectedTrack);
     const scaffoldSpec = useSurveySessionStore((s) => s.scaffoldSpec);
+    const historyEntryState = useWorkingCopyStore((s) => s.historyEntryState);
+    const setHistoryEntryState = useWorkingCopyStore((s) => s.setHistoryEntryState);
 
     // Unconditional hook call (hooks must not be conditional). When the flow
     // does not use findings, the derived record is computed but ignored below.
@@ -233,7 +273,20 @@ export function makeFlowStepComponent<Extracted>(
       selectedTrack,
       scaffoldSpec,
       setHelpDocs,
+      historyEntryState,
+      setHistoryEntryState,
     };
+
+    // Fires once per mount (C2.5 — store access confined to this factory).
+    // depsRef.current is current for THIS render by the time the effect runs
+    // (effects fire after commit, and the assignment above is synchronous),
+    // so options.onMount sees the freshest deps without needing them in the
+    // dependency array (which would re-fire on every store change instead of
+    // once per mount).
+    useEffect(() => {
+      options.onMount?.(depsRef.current);
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     // Context derived from current deps.
     const context = options.buildContext(depsRef.current);
@@ -252,6 +305,14 @@ export function makeFlowStepComponent<Extracted>(
         ? (questionId: string, value: string | string[] | undefined) =>
             options.seeds!.onAnswerCommit!(questionId, value, depsRef.current)
         : (_questionId: string, _value: string | string[] | undefined) => undefined,
+      // eslint-disable-next-line react-hooks/exhaustive-deps
+      [],
+    );
+
+    const getRequiredOverride = useCallback(
+      options.seeds?.getRequiredOverride
+        ? (questionId: string) => options.seeds!.getRequiredOverride!(questionId, depsRef.current)
+        : (_questionId: string) => undefined,
       // eslint-disable-next-line react-hooks/exhaustive-deps
       [],
     );
@@ -286,6 +347,7 @@ export function makeFlowStepComponent<Extracted>(
         {...(onBack ? { onBack } : {})}
         {...(options.seeds ? { getSeedValue } : {})}
         {...(options.seeds?.onAnswerCommit ? { onAnswerCommit } : {})}
+        {...(options.seeds?.getRequiredOverride ? { getRequiredOverride } : {})}
         {...(options.usesFindings ? { findingsByQuestionId } : {})}
       />
     );

@@ -4,7 +4,11 @@ import { Trans, useLingui } from "@lingui/react/macro";
 import { msg } from "@lingui/core/macro";
 import type { MessageDescriptor } from "@lingui/core";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
+import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { Badge } from "../ui/index.ts";
 import { BG_CARD, CARD_BORDER, FONT_MONO, SUCCESS_ACCENT, TEXT_MAIN } from "../ui/theme.ts";
+// spec 076 FR-008: one label/tone mapping shared with BaseResolution's cards.
+import { buildDocLevelLabel, DOC_LEVEL_TONE } from "../lib/docLevelBadge.ts";
 
 // [TEMP] Per-fixture typing hints. Hardcoded until the Pattern schema's
 // `tests` field (spec §5) is wired into the UI to drive these automatically.
@@ -50,8 +54,17 @@ function Row({ k, v }: { k: string; v: string }) {
 }
 
 export function MetadataCard({ kb }: { kb: BaseKeyboard }) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const hint = TRY_HINTS[kb.id];
+  // spec 076 FR-008: the classification committed to the working copy at base
+  // SELECTION (BaseResolution.tsx's confirm handler). Guarded against the
+  // store's confirmed base — `kb` here can also be a not-yet-confirmed preview
+  // (CompareScreen / PickerPane's "full" variant), and showing a stale
+  // classification carried over from a PRIOR confirmed base would misattribute
+  // it to whichever keyboard this card currently renders.
+  const baseDocProfile = useWorkingCopyStore((s) =>
+    s.baseKeyboard?.id === kb.id ? s.baseDocProfile : null,
+  );
   return (
     <>
       <div
@@ -74,9 +87,17 @@ export function MetadataCard({ kb }: { kb: BaseKeyboard }) {
             color: SUCCESS_ACCENT,
             fontWeight: 700,
             marginBottom: 4,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
           }}
         >
           <Trans id="metadata.selectedKeyboard.heading">Selected keyboard</Trans>
+          {baseDocProfile !== null && baseDocProfile.level !== "unknown" ? (
+            <Badge tone={DOC_LEVEL_TONE[baseDocProfile.level]} style={{ textTransform: "none", letterSpacing: "normal" }}>
+              {buildDocLevelLabel(baseDocProfile.level, i18n)}
+            </Badge>
+          ) : null}
         </div>
         <Row k="id" v={kb.id} />
         <Row k="name" v={kb.displayName} />

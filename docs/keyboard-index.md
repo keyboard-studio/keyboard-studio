@@ -21,7 +21,9 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 
 | Keyboard | id | Languages (BCP47) | Author | Path |
 | --- | --- | --- | --- | --- |
+| Ahom Star | `ahom_star` | `aho-Ahom` | Dr Hemanta Kumar Gogoi | `../keyboards/release/a/ahom_star` |
 | akan | `akan` | `ak` | dcshci lab | `../keyboards/release/a/akan` |
+| Akha/Lahu | `akha_lahu` | `ahk`, `lhu` | Copyright © SIL Global | `../keyboards/release/a/akha_lahu` |
 | Alkelang | `alkelang` | `bfd`, `aal`, `agq`, `muc`, `bss`, `aku`, `ael`, `ato`, `azo`, `bbk`, `bfj`, `bwt`, `ksf`, `bkc`, `bqz` … (+263 more) | SOSA Developments | `../keyboards/experimental/a/alkelang` |
 | Amazigh Latin (SIL) | `amazigh_latin` | `auj-Latn`, `swn-Latn`, `siz-Latn`, `cnu-Latn`, `jbe-Latn`, `shi-Latn`, `tzm`, `zgh-Latn`, `kab`, `gha-Latn`, `jbn-Latn`, `sds-Latn`, `gho-Latn`, `oua-Latn`, `tjo-Latn` … (+12 more) | SIL Global | `../keyboards/release/a/amazigh_latin` |
 | Anii | `anii` | `blo-Latn` | Martin Zaske | `../keyboards/release/a/anii` |

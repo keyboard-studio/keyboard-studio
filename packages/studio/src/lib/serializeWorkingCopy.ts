@@ -30,14 +30,27 @@ import {
   bumpKeyboardVersion,
   generateStubs,
   resolveInheritedHolders,
-  stageAdaptHistory,
   parseTargetTokens,
   renderReadmeMd,
   renderReadmeHtm,
   renderWelcomeHtm,
   renderHelpPhp,
+  renderHistoryMd,
+  renderLayoutCharts,
+  parseKvks,
+  parseTouchLayout,
+  ensurePackageFiles,
 } from "@keyboard-studio/engine";
 import type { HelpDocsRenderInput } from "@keyboard-studio/engine";
+import type { KeyboardIR, KvksIR, LayoutChartFile, TouchLayoutIR } from "@keyboard-studio/contracts";
+import {
+  WELCOME_PAGE_PATH,
+  FLAT_WELCOME_PATH,
+  carriedWelcomeImages,
+  welcomeFolderFileNames,
+  missingInheritedImageRefs,
+  effectiveChartPreference,
+} from "./welcomeFolder.ts";
 import { readVfsText } from "./vfsText.ts";
 import { snapshotDecisionRecord } from "../decisions/decisionLogStore.ts";
 
@@ -88,6 +101,14 @@ export interface ProjectWorkingCopyForOutputResult {
   version: string;
   /** Warnings from projection steps (carve, assignments, identity). May be empty. */
   warnings: string[];
+  /**
+   * Images the base's welcome page references that this production could not
+   * carry (spec 076 edge case: the base's `.kps` did not list them, or they
+   * 404ed at fetch). Bare `<img src>` values, document order. Also reported in
+   * `warnings`; typed here so the documentation checklist can annotate the
+   * welcome row without parsing prose.
+   */
+  missingInheritedImages: string[];
 }
 
 /**
@@ -154,7 +175,7 @@ export async function projectWorkingCopyForOutput(
 ): Promise<ProjectWorkingCopyForOutputResult | null> {
   // 1. Read current working-copy store state.
   const state = useWorkingCopyStore.getState();
-  const { baseVfs, baseIr, baseKeyboard, deletedNodeIds, deletedItemIds, deletedTouchKeyIds, phaseResults, identity, touchLayoutJson, instantiationMode, attribution, baseLicenseText, baseHolderOverride, helpDocs, baseWelcomeHtmText, baseHelpPhpText } = state;
+  const { baseVfs, baseIr, baseKeyboard, deletedNodeIds, deletedItemIds, deletedTouchKeyIds, phaseResults, identity, touchLayoutJson, instantiationMode, attribution, baseLicenseText, baseHolderOverride, helpDocs, baseWelcomeHtmText, baseHelpPhpText, baseWelcomeImages, baseWelcomeImagesDropped, baseReadmeMdText, baseHistoryMdText, historyEntryState, chartPreference, ir: workingIr } = state;
 
   // Not-instantiated guard.
   if (baseVfs === null || baseIr === null || baseKeyboard === null) {
@@ -282,15 +303,16 @@ export async function projectWorkingCopyForOutput(
   } : { displayName: baseKeyboard.displayName, ...(websiteUrl !== undefined ? { websiteUrl } : {}) };
   // Accumulated warnings for the adapt path — merged with projection warnings below.
   const adaptWarnings: string[] = [];
-  if (instantiationMode === "adapt-existing") {
+  // The release version HISTORY.md's top entry is headed with (spec 076
+  // FR-010): the bumped version on an adaptation, the keyboard's own on a copy.
+  // HISTORY.md itself is written in step 5c through renderHistoryMd, the one
+  // composer both tracks share.
+  let historyVersion = rawVersion;
+  const isAdaptation = instantiationMode === "adapt-existing";
+  if (isAdaptation) {
     const bumpedVersion = bumpKeyboardVersion(rawVersion);
     version = bumpedVersion.replace(/[^\w.\-]/g, "_");
-
-    // Stage the HISTORY.md entry (prepend, newest-first).
-    // See also: packages/engine/src/scaffolder/index.ts generateStubs() — the
-    // Track-1 HISTORY.md entry format. Keep both in sync if the format changes.
-    const dateIso = new Date().toISOString().slice(0, 10);
-    stageAdaptHistory(clonedVfs, outputKeyboardId, keyboardId, rawVersion, bumpedVersion, dateIso);
+    historyVersion = bumpedVersion;
 
     // Patch the .kps <Keyboards><Keyboard><Version> element.
     //
@@ -366,6 +388,35 @@ export async function projectWorkingCopyForOutput(
     identityForProjection = merged;
   }
 
+  // spec 076 FR-006: the base's welcome-folder images ship beside the rendered
+  // page, on BOTH tracks (a Track 1 copy inherits images, never prose — R9).
+  // Their bare names feed the descriptor's `<Files>` list (step 3.6, below)
+  // and the fresh page's "Keyboard Layout" section (step 5c). Loader order is
+  // kept: it is the base's own `.kps` order, and it is deterministic (SC-004).
+  const carriedImages = carriedWelcomeImages(baseWelcomeImages);
+  const carriedImageNames = welcomeFolderFileNames(baseWelcomeImages);
+
+  // spec 076 FR-013..FR-015: one deterministic layout chart per (platform,
+  // layer), generated from the MODEL (never the on-screen preview) unless the
+  // base ships its own images and the author has not asked to regenerate.
+  // Computed before the projection so the descriptor's <Files> can list them.
+  // Chart names carry the reserved `ks-layout-` prefix, so a base image can
+  // never be overwritten; a (theoretical) same-named base image wins.
+  const docWarnings: string[] = [];
+  const baseShipsImages = carriedImageNames.length > 0;
+  const chartsWanted = effectiveChartPreference(chartPreference, baseShipsImages) === "regenerate" || !baseShipsImages;
+  const charts = chartsWanted
+    ? buildLayoutCharts({
+        displayName: identity?.displayName ?? baseKeyboard.displayName,
+        kvksXml: readVfsText(clonedVfs, `source/${keyboardId}.kvks`) ?? null,
+        ir: workingIr ?? baseIr,
+        touchLayoutJson,
+        reservedNames: carriedImageNames,
+        warnings: docWarnings,
+      })
+    : [];
+  const welcomeFolderFiles = [...carriedImageNames, ...charts.map((c) => c.filename)];
+
   // 5. Project the working copy onto the cloned VFS. targetKeyboardId triggers
   //    the final rename pass when the author picked a different id.
   const { warnings: projectionWarnings, effectiveKeyboardId } = projectWorkingCopyVfs({
@@ -380,6 +431,7 @@ export async function projectWorkingCopyForOutput(
     getPattern: (id) => patternCache.get(id),
     identity: identityForProjection,
     touchLayoutJson,
+    welcomeFolderFiles,
     // Anchor for step 3's "is the display name an EDIT?" test. The no-identity
     // fallback above sets identityForProjection.displayName to this same value,
     // so they compare equal and the base's &NAME store is left byte-identical.
@@ -450,10 +502,82 @@ export async function projectWorkingCopyForOutput(
     ...(identityForProjection.bcp47 !== undefined ? { primaryBcp47: identityForProjection.bcp47 } : {}),
     platforms: parseTargetTokens(projectedKmnText),
   };
-  clonedVfs.set("README.md", renderReadmeMd(docsInput), false);
+  // FR-006: an adaptation inherits the base's README description; a copy never
+  // does (FR-007) — the slice is null on Track 1 and the track guard keeps it so.
+  clonedVfs.set("README.md", renderReadmeMd(docsInput, isAdaptation ? baseReadmeMdText : null), false);
   clonedVfs.set("source/readme.htm", renderReadmeHtm(docsInput), false);
-  clonedVfs.set("source/welcome.htm", renderWelcomeHtm(docsInput, baseWelcomeHtmText), false);
+  // spec 076 FR-002: the welcome page lives at the folder-convention path and
+  // NOWHERE else — the flat `source/welcome.htm` is never written. A stale flat
+  // copy can only come from a pre-076 base VFS (an old scaffolded stub or an
+  // imported flat-convention base); it is removed so the shipped tree never
+  // carries two welcome pages (FR-002 "must not appear in output").
+  clonedVfs.delete(FLAT_WELCOME_PATH);
+  clonedVfs.set(
+    WELCOME_PAGE_PATH,
+    renderWelcomeHtm(docsInput, baseWelcomeHtmText, welcomeFolderFiles),
+    false,
+  );
+  // FR-006: every carried base image, beside the page under its own name.
+  for (const img of carriedImages) {
+    clonedVfs.set(`source/${img.path}`, img.bytes, true);
+  }
+  // FR-013: the generated charts, beside the page (text SVG — research R1).
+  for (const chart of charts) {
+    clonedVfs.set(`source/welcome/${chart.filename}`, chart.svg, false);
+  }
   clonedVfs.set(`source/help/${resolvedKeyboardId}.php`, renderHelpPhp(docsInput, baseHelpPhpText), false);
+
+  // spec 076 FR-010..FR-012 / FR-023: HISTORY.md is rendered on EVERY
+  // production from the author's proposal decision — a confirmed or edited
+  // entry at the top, the stub otherwise; an adaptation always carries the
+  // "Adapted from" attribution and keeps the base's entries below (criteria
+  // 19.2 / 3.4). The base text comes from the fetch-don't-write slice, falling
+  // back to whatever HISTORY.md the fetched tree itself carried. The date is
+  // the one nondeterministic input (research R12); a stored proposal's own date
+  // wins inside renderHistoryMd.
+  const dateIso = new Date().toISOString().slice(0, 10);
+  const existingHistoryMd = readVfsText(clonedVfs, "HISTORY.md") ?? null;
+  clonedVfs.set(
+    "HISTORY.md",
+    renderHistoryMd(historyEntryState, {
+      version: historyVersion,
+      dateIso,
+      adaptedFrom: isAdaptation ? { id: keyboardId, version: rawVersion } : null,
+      baseHistoryText: isAdaptation ? (baseHistoryMdText ?? existingHistoryMd) : null,
+    }),
+    false,
+  );
+
+  // spec 076 edge case: the base's page references images the base did not
+  // ship (unlisted in its `.kps`, or 404 at fetch). Named, not swallowed — the
+  // checklist annotates the welcome row and the author can supply them.
+  const missingInheritedImages =
+    baseWelcomeHtmText !== null ? missingInheritedImageRefs(baseWelcomeHtmText, welcomeFolderFiles) : [];
+  if (missingInheritedImages.length > 0) {
+    docWarnings.push(
+      `[docs] the base welcome page references images that were not carried: ${missingInheritedImages.join(", ")}`,
+    );
+  }
+  // The images were carried once but did not survive a reload (over the
+  // draft's size budget). Named so the author knows this production ships
+  // without them and that re-opening the base brings them back.
+  if (baseWelcomeImagesDropped) {
+    docWarnings.push(
+      "[docs] the base's welcome images were too large to keep in the saved draft and are not in this production; re-open the base to carry them again",
+    );
+  }
+
+  // 5d. spec 076 FR-001: LICENSE.md is one of the six members every package
+  //     ships, on EVERY delivery path. Track 1 already has it (generateStubs,
+  //     with the inherited holders); the adapt track starts from a fetched
+  //     `.kmn` whose base LICENSE the loader deliberately never writes, so it is
+  //     completed here — write-if-absent, MIT body, no invented holder (spec 064
+  //     FR-004). This used to run in buildOutputBundle, download path only,
+  //     which left the pull-request tree without it.
+  const { created } = ensurePackageFiles({ vfs: clonedVfs });
+  if (created.length > 0) {
+    docWarnings.push(`[package] generated missing package files: ${created.join(", ")}`);
+  }
 
   // 6. Merge the adapt-path warnings (HISTORY/.kps staging) with the projection
   //    warnings. Both output paths (zip + PR) surface the same set.
@@ -462,7 +586,7 @@ export async function projectWorkingCopyForOutput(
   //    differs from the base id: projectWorkingCopyVfs's targetKeyboardId rename
   //    pass (run in step 5 above) now rewrites source/<baseId>.* → source/<newId>.*
   //    and the in-file id references, so the output is internally consistent.
-  const warnings = [...adaptWarnings, ...projectionWarnings];
+  const warnings = [...adaptWarnings, ...projectionWarnings, ...docWarnings];
 
   // Return the projected VFS plus metadata. `version` carries main's computed /
   // bumped value (the adapt-existing path reassigns it above), so BOTH the zip
@@ -473,8 +597,70 @@ export async function projectWorkingCopyForOutput(
     displayName: identity?.displayName ?? baseKeyboard.displayName,
     version,
     warnings,
+    missingInheritedImages,
   };
 }
+
+// ---------------------------------------------------------------------------
+// Layout charts (spec 076 US6)
+// ---------------------------------------------------------------------------
+
+interface BuildLayoutChartsInput {
+  displayName: string;
+  /** The `.kvks` text when the tree has one; desktop labels come from it. */
+  kvksXml: string | null;
+  ir: KeyboardIR;
+  /** The Phase E touch layout JSON, or null for a desktop-only keyboard. */
+  touchLayoutJson: string | null;
+  /** Carried base image names; a chart may never shadow one (FR-015). */
+  reservedNames: readonly string[];
+  /** Receives a `[docs]` warning when a model cannot be charted. */
+  warnings: string[];
+}
+
+/**
+ * Render the layout charts for this production. A chart that cannot be drawn
+ * never fails the production: a malformed `.kvks` falls back to the rule
+ * outputs, a malformed touch layout yields no touch charts, and a renderer
+ * failure yields no charts at all — each named in the warnings so the author
+ * sees why the welcome page has fewer charts than layers.
+ */
+function buildLayoutCharts(input: BuildLayoutChartsInput): LayoutChartFile[] {
+  const { displayName, kvksXml, ir, touchLayoutJson, reservedNames, warnings } = input;
+  let kvks: KvksIR | null = null;
+  if (kvksXml !== null && kvksXml.trim() !== "") {
+    try {
+      kvks = parseKvks(kvksXml);
+    } catch {
+      warnings.push("[docs] the visual keyboard (.kvks) could not be read; desktop charts use the rule outputs instead");
+    }
+  }
+  let touchLayout: TouchLayoutIR | null = null;
+  if (touchLayoutJson !== null) {
+    try {
+      touchLayout = parseTouchLayout(touchLayoutJson);
+    } catch {
+      warnings.push("[docs] the touch layout could not be read; no touch layout charts were generated");
+    }
+  }
+  let charts: LayoutChartFile[];
+  try {
+    charts = renderLayoutCharts({ displayName, kvks, ir, touchLayout });
+  } catch (err) {
+    warnings.push(`[docs] layout charts were not generated: ${err instanceof Error ? err.message : String(err)}`);
+    return [];
+  }
+  const reserved = new Set(reservedNames.map((n) => n.toLowerCase()));
+  return charts.filter((c) => !reserved.has(c.filename.toLowerCase()));
+}
+
+// ---------------------------------------------------------------------------
+// Welcome-folder helpers (spec 076 US2) — live in lib/welcomeFolder.ts so the
+// Output checklist shares them without importing this (service-heavy) module.
+// Re-exported for the existing call sites and tests.
+// ---------------------------------------------------------------------------
+
+export { WELCOME_PAGE_PATH, FLAT_WELCOME_PATH, missingInheritedImageRefs } from "./welcomeFolder.ts";
 
 /**
  * Build the full projected VFS for the current working copy and zip it.

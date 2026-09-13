@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from "vitest";
 import { lintWithContext } from "./lintContext.js";
-import type { VirtualFS, TouchLayoutIR, KeyboardIR, ToleranceReport } from "@keyboard-studio/contracts";
+import type { VirtualFS, TouchLayoutIR, KeyboardIR, ToleranceReport, DocLintInput } from "@keyboard-studio/contracts";
 
 const KEYBOARD_ID = "test";
 
@@ -124,5 +124,36 @@ describe("lintWithContext — 19.x context tolerance wiring", () => {
     const toleranceFindings = findings.filter((f) => f.code === "KM_WARN_CONTEXT_NOT_TOLERANT");
     expect(toleranceFindings).toHaveLength(1);
     expect(toleranceFindings[0]?.message).toContain("acute-rule");
+  });
+});
+
+// Tests for the spec 076 US7/FR-019 documentation-check wiring: the twelve
+// checks are unit-tested directly under checks/docs/*.test.ts; these tests
+// lock the `docLintInput` context-presence guard at the lintWithContext call
+// site, matching the existing 18.6/19.x gating shape above.
+
+const MISMATCHED_HISTORY_DOC_LINT_INPUT: DocLintInput = {
+  keyboardId: "test",
+  keyboardVersion: "1.3",
+  targets: [],
+  layerIds: [],
+  displayName: "Test",
+  copyrightHolders: {},
+  members: { "history-md": "## 1.2 (2024-03-01)\n* Added shift layer.\n" },
+  deletedFilenames: [],
+};
+
+describe("lintWithContext — documentation-check wiring (spec 076 US7/FR-019)", () => {
+  it("emits no documentation findings when docLintInput is absent", async () => {
+    const findings = await lintWithContext(makeEmptyFS(), KEYBOARD_ID, {});
+    expect(findings.find((f) => f.layer === "C" && f.code.startsWith("KM_LINT_HISTORY"))).toBeUndefined();
+  });
+
+  it("runs the documentation checks when docLintInput is present", async () => {
+    const findings = await lintWithContext(makeEmptyFS(), KEYBOARD_ID, {
+      docLintInput: MISMATCHED_HISTORY_DOC_LINT_INPUT,
+    });
+    expect(findings.find((f) => f.code === "KM_LINT_HISTORY_VERSION_MISMATCH")).toBeDefined();
+    expect(findings.find((f) => f.code === "KM_LINT_KMN_VERSION_MISMATCH")).toBeDefined();
   });
 });

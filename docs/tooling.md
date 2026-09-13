@@ -301,7 +301,8 @@ with `tsx` (see each tool's tsconfig) — except the plain-node ones (`spec-trac
 `node`. Do not treat them as built workspace packages.
 
 Inventory: kbgen, supportability-scanner, smoke-artifact, spec-trace, km-triage-app, hermes,
-Template Cleanup, crowdin-diagnose, content-i18n-normalize, facet-index + facet-index-lint.
+Template Cleanup, crowdin-diagnose, content-i18n-normalize, facet-index + facet-index-lint,
+welcome-sweep.
 
 ### spec-trace
 
@@ -358,6 +359,23 @@ ahead of its classifier (e.g. spec 039's construction facets); the default build
 such a def, and `--classified-only` builds the artifact scoped to facets that have a classifier
 (how the shipped index is built today). `facet-index-lint` is its plain-node artifact validator,
 wired into `pnpm lint`.
+
+### welcome-sweep
+
+[Spec 076](../specs/076-documentation-completeness/)'s offline SC-002 sweep
+([utilities/welcome-sweep/README.md](../utilities/welcome-sweep/README.md)). Walks every
+folder-convention base (`release/<x>/<id>/source/welcome/`) in the sibling `../keyboards`
+checkout, runs the real loader welcome resolution and the real descriptor writer against it
+from the **engine dist**, and asserts the welcome page and every `.kps`-listed image are carried
+and listed as `welcome\…`. Plain node; build the engine first:
+
+```sh
+pnpm --filter @keyboard-studio/engine build
+node utilities/welcome-sweep/run.mjs [--verbose] [--only <id>] [--limit N]
+```
+
+Not in the default CI lane (corpus dependency). Run it after touching the loader's welcome
+resolution, the descriptor `<Files>` list, or the projection's welcome-folder write.
 
 ### kbgen
 

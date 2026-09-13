@@ -17,8 +17,11 @@
 // content, never README content.
 
 import type { HelpDocsAnswers } from "@keyboard-studio/contracts";
-import { escapeHtml, phpCommentEscape } from "./escapeHtml.js";
-import { welcomeHtm, readmeHtm } from "./packageDocs.js";
+import { escapeHtml } from "./escapeHtml.js";
+import { welcomeHtm, readmeHtm, helpSiteHeader, helpPhpStub } from "./packageDocs.js";
+import { layoutChartPlatformFromFilename } from "../layout-chart/filename.js";
+
+export { helpSiteHeader, helpSitePageName, helpPhpStub } from "./packageDocs.js";
 
 export interface DocSection {
   heading: string;
@@ -146,6 +149,15 @@ function setHtmlLang(htmlText: string, lang: string | undefined): string {
   return htmlText.replace(/<html\b/i, `<html lang="${escaped}"`);
 }
 
+/** Insert `addition` just before `</body>` when present, else append below (shared by {@link mergeWithBase} and the FR-006/T051 image-only append path). */
+function insertBeforeClosingBody(html: string, addition: string): string {
+  const closingBodyIdx = html.toLowerCase().lastIndexOf("</body>");
+  if (closingBodyIdx === -1) {
+    return `${html}\n${addition}`;
+  }
+  return `${html.slice(0, closingBodyIdx)}${addition}\n${html.slice(closingBodyIdx)}`;
+}
+
 /**
  * FR-013: preserve a fetched base's original body verbatim, appending the
  * newly-rendered content below a clearly delineated boundary rather than
@@ -154,11 +166,7 @@ function setHtmlLang(htmlText: string, lang: string | undefined): string {
  */
 function mergeWithBase(baseText: string, newBodyHtml: string): string {
   const addition = `${MERGE_BOUNDARY_COMMENT}\n<h2>${escapeHtml(MERGE_BOUNDARY_HEADING)}</h2>\n${newBodyHtml}`;
-  const closingBodyIdx = baseText.toLowerCase().lastIndexOf("</body>");
-  if (closingBodyIdx === -1) {
-    return `${baseText}\n${addition}`;
-  }
-  return `${baseText.slice(0, closingBodyIdx)}${addition}\n${baseText.slice(closingBodyIdx)}`;
+  return insertBeforeClosingBody(baseText, addition);
 }
 
 function buildFreshHtmlDoc(bodyHtml: string, lang: string | undefined): string {
@@ -166,16 +174,107 @@ function buildFreshHtmlDoc(bodyHtml: string, lang: string | undefined): string {
   return `<html${langAttr}><body>${bodyHtml}</body></html>`;
 }
 
-/** `README.md` — package-listing description, links, and supported platforms. No version/copyright (FR-007). */
-export function renderReadmeMd(input: HelpDocsRenderInput): string {
-  const { answers, displayName, platforms } = input;
-  const description = answers !== null ? nonBlank(answers.description) : undefined;
-  if (description === undefined) {
-    // FR-002 fallback — byte-identical to today's bare scaffolder stub.
-    return `# ${displayName}\n`;
-  }
+const KEYBOARD_LAYOUT_HEADING = "Keyboard Layout";
 
-  const lines: string[] = [`# ${displayName}`, "", description];
+/**
+ * A layout image's `alt` text from its file name: `desktop_layout_shift.png` →
+ * `desktop layout shift`. Generated charts and hand-drawn base images alike get
+ * a programmatic name rather than an empty alt (docs/accessibility.md).
+ */
+function layoutImageAlt(fileName: string): string {
+  const stem = fileName.replace(/\.[^.]+$/, "");
+  const words = stem.replace(/^ks-layout-/, "").replace(/[-_]+/g, " ").trim();
+  return words !== "" ? words : stem;
+}
+
+/** Platform grouping order for the layout section (spec 076 T051): generated desktop/phone/tablet charts first, then anything else (a base's own hand-authored images). */
+const LAYOUT_SECTION_GROUPS = ["desktop", "phone", "tablet", "other"] as const;
+type LayoutSectionGroup = (typeof LAYOUT_SECTION_GROUPS)[number];
+
+const LAYOUT_SECTION_GROUP_LABEL: Readonly<Record<LayoutSectionGroup, string>> = {
+  desktop: "Desktop",
+  phone: "Phone",
+  tablet: "Tablet",
+  other: "Other",
+};
+
+/** Bucket `files` by the platform encoded in a generated chart filename (see `layoutChartPlatformFromFilename`), falling back to `"other"` for a base's free-form image names. Preserves each file's relative order within its own bucket. */
+function groupWelcomeImageFiles(files: readonly string[]): ReadonlyMap<LayoutSectionGroup, string[]> {
+  const groups = new Map<LayoutSectionGroup, string[]>(LAYOUT_SECTION_GROUPS.map((g) => [g, []]));
+  for (const file of files) {
+    const group = layoutChartPlatformFromFilename(file) ?? "other";
+    groups.get(group)!.push(file);
+  }
+  return groups;
+}
+
+/**
+ * The welcome page's "Keyboard Layout" section (spec 076 FR-004/T051, research
+ * R9): every file shipped beside the page in `source/welcome/` — the inherited
+ * base images on a Track 1 copy, the generated charts otherwise — grouped by
+ * platform (desktop, phone, tablet, then any other/base image) with no
+ * omission regardless of how many layers/files there are. The `src` is the
+ * bare file name because the page and the images share a folder. `""` when
+ * there is nothing to show, so a page with no images is byte-identical to the
+ * pre-076 render. Welcome-page only: the help page's body never carries it,
+ * which is the one permitted welcome/help difference on the welcome side
+ * (FR-004).
+ */
+export function renderWelcomeLayoutSection(welcomeImageFiles: readonly string[]): string {
+  const files = welcomeImageFiles.map((f) => f.trim()).filter((f) => f !== "");
+  if (files.length === 0) return "";
+  const groups = groupWelcomeImageFiles(files);
+  const groupsHtml = LAYOUT_SECTION_GROUPS.filter((g) => (groups.get(g) ?? []).length > 0)
+    .map((g) => {
+      const images = (groups.get(g) ?? [])
+        .map((f) => `<p><img src="${escapeHtml(f)}" alt="${escapeHtml(layoutImageAlt(f))}"></p>`)
+        .join("");
+      return `<h3>${escapeHtml(LAYOUT_SECTION_GROUP_LABEL[g])}</h3>${images}`;
+    })
+    .join("");
+  return `<h2>${escapeHtml(KEYBOARD_LAYOUT_HEADING)}</h2>${groupsHtml}`;
+}
+
+/**
+ * The distinct relative `<img src>` targets of a welcome page, in document
+ * order (spec 076 contracts/engine-api.md). Scheme-qualified, protocol-
+ * relative, root-anchored and `data:` sources are skipped — only files the
+ * package would have to ship count. A leading `./` is dropped. Used by the
+ * projection to compute `missingInheritedImages` (a base page that references
+ * an image the base does not list) and by the classifier's layout-section strip.
+ */
+export function extractWelcomeImageRefs(welcomeHtml: string): string[] {
+  const refs: string[] = [];
+  const seen = new Set<string>();
+  const imgRe = /<img\b[^>]*?\bsrc\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s"'>]+))/gi;
+  let m: RegExpExecArray | null;
+  while ((m = imgRe.exec(welcomeHtml)) !== null) {
+    const raw = (m[1] ?? m[2] ?? m[3] ?? "").trim();
+    if (raw === "") continue;
+    if (/^[a-z][a-z0-9+.-]*:/i.test(raw) || raw.startsWith("//") || raw.startsWith("/")) continue;
+    const rel = raw.replace(/^\.\//, "");
+    if (rel === "" || seen.has(rel)) continue;
+    seen.add(rel);
+    refs.push(rel);
+  }
+  return refs;
+}
+
+/** `files` with every entry already referenced by `baseHtml`'s own `<img>` tags removed (spec 076 T051: append the layout section only for supplied files the base does not already reference). */
+function filesNotReferencedIn(files: readonly string[], baseHtml: string): string[] {
+  const referenced = new Set(extractWelcomeImageRefs(baseHtml));
+  return files.map((f) => f.trim()).filter((f) => f !== "" && !referenced.has(f));
+}
+
+/** Strip all trailing whitespace/newlines from `s` and add back exactly one. */
+function withOneTrailingNewline(s: string): string {
+  return `${s.replace(/\s+$/, "")}\n`;
+}
+
+/** The description/Links/Supported-Platforms body `renderReadmeMd` shares between the fresh-title path and the FR-006 base-inheritance path, WITHOUT the `# title` heading. */
+function buildReadmeBody(input: HelpDocsRenderInput, description: string): string {
+  const { answers, platforms } = input;
+  const lines: string[] = [description];
 
   const homeUrl = nonBlank(answers?.projectHomeUrl);
   const helpUrl = nonBlank(answers?.projectHelpUrl);
@@ -190,7 +289,39 @@ export function renderReadmeMd(input: HelpDocsRenderInput): string {
     for (const p of platforms) lines.push(`- ${p}`);
   }
 
-  return `${lines.join("\n")}\n`;
+  return lines.join("\n");
+}
+
+/**
+ * `README.md` — package-listing description, links, and supported platforms.
+ * No version/copyright (FR-007).
+ *
+ * @param baseReadmeMdText spec 076 FR-006: a fetched base's own `README.md`,
+ *   inherited even before the author has answered anything. `null` keeps
+ *   today's byte-identical behaviour (the bare `# title` stub, or the
+ *   title + description/links/platforms once answered). Non-null: no
+ *   description yet -> the base text verbatim (one trailing newline); a
+ *   description answered -> the base text, one blank line, then the tool's
+ *   own sections WITHOUT a second `# title` heading (the base already has one).
+ */
+export function renderReadmeMd(
+  input: HelpDocsRenderInput,
+  baseReadmeMdText: string | null = null,
+): string {
+  const { displayName } = input;
+  const description = input.answers !== null ? nonBlank(input.answers.description) : undefined;
+
+  if (baseReadmeMdText !== null) {
+    if (description === undefined) return withOneTrailingNewline(baseReadmeMdText);
+    return `${baseReadmeMdText.replace(/\s+$/, "")}\n\n${buildReadmeBody(input, description)}\n`;
+  }
+
+  if (description === undefined) {
+    // FR-002 fallback — byte-identical to today's bare scaffolder stub.
+    return `# ${displayName}\n`;
+  }
+
+  return `# ${displayName}\n\n${buildReadmeBody(input, description)}\n`;
 }
 
 /** `source/readme.htm` — the same description, condensed for the package-details popup. */
@@ -204,28 +335,64 @@ export function renderReadmeHtm(input: HelpDocsRenderInput): string {
   return `<html><body><h1>${escapeHtml(displayName)}</h1><p>${escapeHtml(description)}</p></body></html>`;
 }
 
-/** `source/welcome.htm` — the first-run page. Merges with the base's own welcome.htm when one was fetched (FR-013). */
+/**
+ * `source/welcome/welcome.htm` — the first-run page. Merges with the base's own
+ * welcome page when one was fetched (FR-013); inherits it verbatim even before
+ * anything is authored (FR-006).
+ *
+ * @param welcomeImageFiles bare names of the image files shipped beside the page
+ *   (spec 076 FR-004/R9/T051) — rendered as a grouped "Keyboard Layout" section.
+ *   On a FRESH page (no base) every file is listed. On a page merged with (or
+ *   inherited from) a base, only files the base does NOT already reference are
+ *   listed (via `extractWelcomeImageRefs`), so a carried image is never shown
+ *   twice.
+ */
 export function renderWelcomeHtm(
   input: HelpDocsRenderInput,
   baseWelcomeHtmText: string | null,
+  welcomeImageFiles: readonly string[] = [],
 ): string {
   const { answers, displayName, primaryBcp47 } = input;
   const description = answers !== null ? nonBlank(answers.description) : undefined;
+  const unlistedFiles =
+    baseWelcomeHtmText !== null
+      ? filesNotReferencedIn(welcomeImageFiles, baseWelcomeHtmText)
+      : welcomeImageFiles;
+  const layoutSection = renderWelcomeLayoutSection(unlistedFiles);
+
   if (description === undefined) {
-    // FR-002 fallback — byte-identical to today's placeholder. Never merged
-    // with a base even when one was fetched: there is nothing authored yet.
-    return welcomeHtm(displayName);
+    if (baseWelcomeHtmText !== null) {
+      // FR-006: inherit the base page even before anything is authored —
+      // never the tool placeholder once a base welcome page exists.
+      if (layoutSection === "") return baseWelcomeHtmText;
+      return insertBeforeClosingBody(baseWelcomeHtmText, layoutSection);
+    }
+    // FR-002 fallback — byte-identical to today's placeholder when there are
+    // no images to reference. With images (a Track 1 copy of an illustrated
+    // base, produced before Phase F) the placeholder still references them,
+    // so the carried files are never orphaned.
+    if (layoutSection === "") return welcomeHtm(displayName);
+    return `<html><body><p>Welcome to ${escapeHtml(displayName)}</p>${layoutSection}</body></html>`;
   }
 
   const bodyHtml = renderDocBodyHtml(answers, description);
+  const bodyWithLayout = layoutSection === "" ? bodyHtml : `${bodyHtml}\n${layoutSection}`;
   const doc =
     baseWelcomeHtmText !== null
-      ? mergeWithBase(baseWelcomeHtmText, bodyHtml)
-      : buildFreshHtmlDoc(bodyHtml, primaryBcp47);
+      ? mergeWithBase(baseWelcomeHtmText, bodyWithLayout)
+      : buildFreshHtmlDoc(bodyWithLayout, primaryBcp47);
   return setHtmlLang(doc, primaryBcp47);
 }
 
-/** `source/help/<id>.php` — the online help page. Merges with the base's own help page when one was fetched (FR-013). */
+/**
+ * `source/help/<id>.php` — the online help page. Merges with the base's own help
+ * page when one was fetched (FR-013); a base page keeps its own header and is
+ * never given a second one. Inherits the base page verbatim even before
+ * anything is authored (FR-006). A FRESH page (no base help text) opens with
+ * the standard help-site header (spec 076 FR-003) above the same body
+ * welcome.htm renders — the header is the one permitted difference between
+ * the two on the help side (spec 076 FR-004).
+ */
 export function renderHelpPhp(
   input: HelpDocsRenderInput,
   baseHelpPhpText: string | null,
@@ -233,14 +400,17 @@ export function renderHelpPhp(
   const { answers, displayName, primaryBcp47 } = input;
   const description = answers !== null ? nonBlank(answers.description) : undefined;
   if (description === undefined) {
-    // FR-002 fallback — byte-identical to today's scaffolder stub.
-    return `<?php /* ${phpCommentEscape(displayName)} help */ ?>`;
+    // FR-006: inherit the base help page even before anything is authored.
+    if (baseHelpPhpText !== null) return baseHelpPhpText;
+    // FR-002 fallback — byte-identical to the scaffolder stub: standard header
+    // + the bare placeholder comment (spec 076 US1-3: an early production's
+    // help page still renders on the help site).
+    return helpPhpStub(displayName);
   }
 
   const bodyHtml = renderDocBodyHtml(answers, description);
-  const doc =
-    baseHelpPhpText !== null
-      ? mergeWithBase(baseHelpPhpText, bodyHtml)
-      : buildFreshHtmlDoc(bodyHtml, primaryBcp47);
-  return setHtmlLang(doc, primaryBcp47);
+  if (baseHelpPhpText !== null) {
+    return setHtmlLang(mergeWithBase(baseHelpPhpText, bodyHtml), primaryBcp47);
+  }
+  return `${helpSiteHeader(displayName)}${setHtmlLang(buildFreshHtmlDoc(bodyHtml, primaryBcp47), primaryBcp47)}`;
 }

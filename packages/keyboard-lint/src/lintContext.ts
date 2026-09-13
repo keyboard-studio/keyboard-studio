@@ -4,7 +4,7 @@
 // package-internal function that accepts optional context so 18.6 can run when
 // the compile gate provides both a KeyboardIR and a LinguistInventory.
 
-import type { VirtualFS, LintFinding, KeyboardIR, LinguistInventory, ToleranceReport, TouchLayoutIR } from "@keyboard-studio/contracts";
+import type { VirtualFS, LintFinding, KeyboardIR, LinguistInventory, ToleranceReport, TouchLayoutIR, DocLintInput } from "@keyboard-studio/contracts";
 import { parseTouchLayout, touchLayoutPath } from "./parsers/parseTouchLayout.js";
 import { checkLongpress } from "./checks/check-18-1-longpress.js";
 import { checkTouchRows } from "./checks/check-18-2-touch-rows.js";
@@ -27,6 +27,40 @@ import {
 } from "./checks/check-18-6-touch-coverage.js";
 import { checkContextTolerance } from "./checks/check-19-x-context-tolerance.js";
 import { resolveJoinedCheckInputs } from "./checks/_shared.js";
+import { checkHistoryOrder } from "./checks/docs/check-3-3-history-order.js";
+import { checkHistoryCumulative } from "./checks/docs/check-3-4-history-cumulative.js";
+import { checkHistoryEntryFormat } from "./checks/docs/check-3-5-history-entry-format.js";
+import { checkHistoryVersionMatch } from "./checks/docs/check-3-6-7-1-version-match.js";
+import { checkHistoryStaleFileRefs } from "./checks/docs/check-3-7-history-stale-refs.js";
+import { checkCopyrightHolder } from "./checks/docs/check-4-7-copyright-holder.js";
+import { checkReadmeTargets } from "./checks/docs/check-5-7-readme-targets.js";
+import { checkHtmlWellFormed } from "./checks/docs/check-11-5-html-wellformed.js";
+import { checkDataStatesComplete } from "./checks/docs/check-11-6-data-states.js";
+import { checkPagenameFormat } from "./checks/docs/check-11-7-pagename-format.js";
+import { checkBodyParity } from "./checks/docs/check-11-9-body-parity.js";
+import { checkStyleParity } from "./checks/docs/check-11-10-style-parity.js";
+
+/**
+ * Run the twelve US7/FR-019 documentation checks (thirteen codes; 3.6/7.1
+ * share one module) in criteria order, returning every finding they produce.
+ * Pure and total: each check returns `[]` on absent input members.
+ */
+export function runDocChecks(input: DocLintInput): LintFinding[] {
+  return [
+    ...checkHistoryOrder(input),
+    ...checkHistoryCumulative(input),
+    ...checkHistoryEntryFormat(input),
+    ...checkHistoryVersionMatch(input),
+    ...checkHistoryStaleFileRefs(input),
+    ...checkCopyrightHolder(input),
+    ...checkReadmeTargets(input),
+    ...checkHtmlWellFormed(input),
+    ...checkDataStatesComplete(input),
+    ...checkPagenameFormat(input),
+    ...checkBodyParity(input),
+    ...checkStyleParity(input),
+  ];
+}
 
 /**
  * Optional extra inputs for Layer C checks that need compiled artefacts.
@@ -69,6 +103,13 @@ export interface LintContext {
    * `inventory`/`touchLayout` above.
    */
   toleranceReport?: ToleranceReport;
+  /**
+   * Rendered/current documentation member texts plus supporting facts (spec
+   * 076 data-model.md §7); required for the twelve US7/FR-019 documentation
+   * checks. Absent -> silently skipped, same gating shape as the other
+   * optional inputs above.
+   */
+  docLintInput?: DocLintInput;
 }
 
 /**
@@ -134,6 +175,13 @@ export async function lintWithContext(
   // for parity with the other compile-gate checks.
   if (ctx.keyboardIR && ctx.toleranceReport) {
     findings.push(...checkContextTolerance(ctx.keyboardIR, ctx.toleranceReport));
+  }
+
+  // spec 076 US7/FR-019: the twelve documentation checks — only when the
+  // studio has assembled a DocLintInput (same absent -> silently skipped
+  // gating shape as every optional input above).
+  if (ctx.docLintInput) {
+    findings.push(...runDocChecks(ctx.docLintInput));
   }
 
   return findings;

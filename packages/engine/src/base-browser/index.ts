@@ -1,6 +1,6 @@
 // see spec.md §8 step 1 — base-browser public API
 export { createBaseBrowser } from "./base-browser.js";
-export type { BaseBrowserConfig } from "./base-browser.js";
+export type { BaseBrowserConfig, BaseBrowserServiceWithDocProfile } from "./base-browser.js";
 export {
   matchKeyboardScopePath,
   dedupeKpsPathsById,
@@ -8,3 +8,4 @@ export {
   KPS_SCOPE_RE_ROOT,
 } from "./corpus-scope.js";
 export type { KeyboardScopeMatch } from "./corpus-scope.js";
+export { classifyBaseDocumentation, extractUsableBaseDescription } from "./classifyBaseDocumentation.js";

@@ -288,3 +288,32 @@ describe("LintSummary — chip count", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// LintSummary — upstream findings (spec 076 FR-020, research R8)
+// ---------------------------------------------------------------------------
+
+describe("LintSummary — upstream findings are excluded from the headline counts", () => {
+  const upstream: LintFinding = { ...layerAFindings[1]!, origin: "upstream" };
+  const authoredWarning: LintFinding = { ...layerAFindings[1]!, origin: "authored" };
+
+  it("counts only authored findings in the severity badges and names the inherited ones separately", () => {
+    render(<LintSummary findings={[upstream, upstream, authoredWarning]} />);
+    expect(screen.getByText(/1 warning/)).toBeTruthy();
+    expect(screen.queryByText(/3 warnings/)).toBeNull();
+    expect(screen.getByTestId("lint-summary-upstream-count").textContent).toContain("2 inherited from the base keyboard");
+  });
+
+  it("announces only the authored count in the live region", () => {
+    render(<LintSummary findings={[upstream, upstream, authoredWarning]} />);
+    expect(screen.getByRole("status").textContent).toContain("1 lint issue");
+  });
+
+  it("with only upstream findings: no headline count, 'No issues found' announced, list still rendered (muted)", () => {
+    render(<LintSummary findings={[upstream, upstream]} />);
+    expect(screen.getByRole("status").textContent).toContain("No issues found");
+    expect(screen.queryByText(/\d warnings?/)).toBeNull();
+    expect(screen.getByTestId("lint-summary-upstream-count").textContent).toContain("2 inherited");
+    expect(screen.getByRole("list", { name: /lint findings/i }).querySelectorAll("li")).toHaveLength(2);
+  });
+});

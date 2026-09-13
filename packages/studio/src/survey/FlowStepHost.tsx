@@ -33,6 +33,12 @@ export interface FlowStepHostProps {
   /** Optional seeding (project_name slug). Forwarded to SurveyRunner. */
   getSeedValue?: (questionId: string) => string | string[] | undefined;
   onAnswerCommit?: (questionId: string, value: string | string[] | undefined) => void;
+  /**
+   * Optional per-question `required` override (spec 076 FR-009's adaptive
+   * description proposal). Forwarded to SurveyRunner unchanged — see its own
+   * doc for the override contract.
+   */
+  getRequiredOverride?: (questionId: string) => boolean | undefined;
   /** Optional per-question lint findings (phase_f). Forwarded to SurveyRunner. */
   findingsByQuestionId?: Record<string, LintFinding[]>;
 }
@@ -50,6 +56,7 @@ export function FlowStepHost({
   getSeedValue,
   onAnswerCommit,
   findingsByQuestionId,
+  getRequiredOverride,
 }: FlowStepHostProps) {
   return (
     <div style={surveyPageColumn}>
@@ -63,6 +70,7 @@ export function FlowStepHost({
         {...(getSeedValue !== undefined ? { getSeedValue } : {})}
         {...(onAnswerCommit !== undefined ? { onAnswerCommit } : {})}
         {...(findingsByQuestionId !== undefined ? { findingsByQuestionId } : {})}
+        {...(getRequiredOverride !== undefined ? { getRequiredOverride } : {})}
       />
     </div>
   );

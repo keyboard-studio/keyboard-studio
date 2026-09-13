@@ -739,12 +739,14 @@ export async function driveTouchGallery(page: Page): Promise<void> {
  * This helper:
  *   1. Fills the welcome paragraph
  *   2. Fills the first usage tip
- *   3. Answers pf_more_detail_gate "No" (the minimum-friction Phase F
+ *   3. Leaves the HISTORY proposal (pf_history_entry, spec 076 US5) undecided
+ *      and advances past it — optional, so Next is enabled with no answer
+ *   4. Answers pf_more_detail_gate "No" (the minimum-friction Phase F
  *      revision's required Yes/No gate, which unconditionally follows
- *      pf_usage_tip_1) — the minimal path every existing walk wants, rather
- *      than opening the optional documentation battery
- *   4. Advances through remaining optional questions in a bounded loop
- *   5. Detects arrival at #output (phase boundary)
+ *      pf_history_entry) — the minimal path every existing walk wants,
+ *      rather than opening the optional documentation battery
+ *   5. Advances through remaining optional questions in a bounded loop
+ *   6. Detects arrival at #output (phase boundary)
  *
  * @param page Page instance
  * @param welcomeText Welcome paragraph text (e.g. "Welcome to the keyboard.")
@@ -761,11 +763,16 @@ export async function driveHelpPhase(
   await page.locator("#pf_usage_tip_1").fill(usageTipText);
   await surveyAdvance(page).click();
 
-  // pf_more_detail_gate — required, and pf_usage_tip_1's `next` points here
-  // unconditionally, so it is reliably the very next question. "No" routes
-  // straight to pf_credits, skipping the opt-in battery (scope/variety,
-  // provenance, canonical order, glossary, examples, troubleshooting, related
-  // keyboards, limitations, further reading, project URL).
+  // pf_history_entry (spec 076 US5) — optional; leave undecided (stays
+  // "proposed") and advance straight through to the gate.
+  await surveyAdvance(page).click();
+
+  // pf_more_detail_gate — required, and pf_history_entry's `next` points
+  // here unconditionally when left undecided, so it is reliably the very
+  // next question. "No" routes straight to pf_credits, skipping the opt-in
+  // battery (scope/variety, provenance, canonical order, glossary, examples,
+  // troubleshooting, related keyboards, limitations, further reading,
+  // project URL).
   const moreDetailNo = page.getByRole("radio", { name: "No" });
   await moreDetailNo.waitFor({ state: "visible", timeout: 15_000 });
   await moreDetailNo.check();

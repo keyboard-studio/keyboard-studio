@@ -123,6 +123,9 @@ export {
   applyIdentityToKps,
   DESCRIPTOR_CONSUMED_FIELDS,
   parseTargetTokens,
+  // spec 076 FR-002 — the welcome page's folder-convention member reference.
+  WELCOME_PAGE_KPS_REF,
+  welcomeFolderKpsRef,
 } from "./package-descriptor/index.js";
 export type {
   PackageDescriptorIdentity,
@@ -137,8 +140,58 @@ export {
   renderReadmeHtm,
   renderWelcomeHtm,
   renderHelpPhp,
+  // spec 076 FR-003 — the standard help-site header a fresh help page opens with.
+  helpSiteHeader,
+  helpSitePageName,
+  helpPhpStub,
+  // spec 076 FR-004/FR-006 — the welcome page's layout section and the pure
+  // `<img src>` extractor the projection diffs carried images against.
+  renderWelcomeLayoutSection,
+  extractWelcomeImageRefs,
 } from "./shared/helpDocsRender.js";
 export type { DocSection, HelpDocsRenderInput } from "./shared/helpDocsRender.js";
+
+// spec 076 FR-022 — the one derivation of each documentation member's source
+// tier + placeholder state (research R5); the Output checklist and the
+// upstream-finding rule both read it.
+export {
+  deriveDocMemberStates,
+  docMemberPath,
+  historyEntryShips,
+  DOC_FILL_STEP_HELP,
+  DOC_FILL_STEP_LICENSE,
+} from "./shared/deriveDocMemberStates.js";
+export type { DeriveDocMemberStatesInput } from "./shared/deriveDocMemberStates.js";
+
+// spec 076 FR-010..012 — the HISTORY proposal built from the decision record
+// and the one HISTORY.md renderer both tracks write through (research R6).
+export { buildHistoryProposal, historyEntryHeading } from "./decision-audit/index.js";
+export type { HistoryProposalSeed } from "./decision-audit/index.js";
+export { renderHistoryMd, HISTORY_INITIAL_RELEASE_BULLET, adaptedFromBullet } from "./shared/renderHistoryMd.js";
+export type { RenderHistoryMdOptions } from "./shared/renderHistoryMd.js";
+
+// spec 076 FR-013..016 — deterministic SVG layout charts (research R1/R2).
+export {
+  renderLayoutCharts,
+  layoutChartFilename,
+  LAYOUT_CHART_PREFIX,
+  isLayoutChartFilename,
+  layoutChartPlatformFromFilename,
+  sanitizeLayerIdForFilename,
+  classifyKeyLegibility,
+  DOTTED_CIRCLE,
+  FALLBACK_FONT_STACK,
+  EMPTY_KEYCAP_CLASS,
+  NO_GLYPH_LABEL_CLASS,
+  SCRIPT_COVERAGE_RANGES,
+  isCodePointCovered,
+  formatCodePointLabel,
+} from "./layout-chart/index.js";
+export type { KeyLegibilityKind, KeyLegibilityResult, ScriptCoverageRange } from "./layout-chart/index.js";
+
+// spec 076 FR-008/FR-009 — base documentation classification (research R4).
+export { classifyBaseDocumentation, extractUsableBaseDescription } from "./base-browser/index.js";
+export type { BaseBrowserServiceWithDocProfile } from "./base-browser/index.js";
 
 // Issue #19 — scaffolder (template-cleanup pipeline).
 export {

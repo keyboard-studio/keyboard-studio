@@ -1,5 +1,7 @@
 // see spec.md section 8 step 1 / section 11 — BaseKeyboard data type
 
+import type { BaseDocumentationProfile } from "./doc-members";
+
 /**
  * Keyman platform-target identifiers used in the `.kps` package
  * Files-block targets list and on {@link BaseKeyboard.targets}.
@@ -95,6 +97,17 @@ export interface BaseKeyboard {
    * @example ["en", "id", "ms", "ht"]
    */
   languages?: string[];
+
+  /**
+   * The base's documentation completeness, classified by
+   * `classifyBaseDocumentation` (spec 076 FR-008, research R4) and cached
+   * here once computed for the focused/selected base. Absent — not
+   * `level: "unknown"` — until a caller has computed it; classifying the
+   * whole gallery is not required.
+   *
+   * @see spec.md §8 step 1 (spec 076 amendment)
+   */
+  docProfile?: BaseDocumentationProfile;
 }
 
 /**

@@ -610,6 +610,7 @@ const managedPipelineFetch: GitHubPipelineFetchFn = async (url, init) => {
   const method = init?.method ?? "GET";
   if (url.includes("/git/ref/heads/master")) return pipelineOk({ object: { sha: "masterSha" } });
   if (url.includes("/git/commits/masterSha")) return pipelineOk({ tree: { sha: "treeSha" } });
+  if (url.endsWith("/git/blobs") && method === "POST") return pipelineOk({ sha: "blobSha" });
   if (url.endsWith("/git/trees") && method === "POST") return pipelineOk({ sha: "newTree" });
   if (url.endsWith("/git/commits") && method === "POST")
     return pipelineOk({ sha: "abc1234000000000000000000000000000000000" });
@@ -742,6 +743,42 @@ describe("POST /submit/managed-pr — body validation", () => {
     const body = JSON.parse(res.body) as { prUrl: string; commitSha: string };
     expect(body.prUrl).toBe("https://github.com/keymanapp/keyboards/pull/77");
     expect(body.commitSha).toBe("abc1234000000000000000000000000000000000");
+  });
+
+  it("returns 200 on a valid submission carrying a base64 (binary) source file", async () => {
+    const res = await mApp.inject({
+      method: "POST",
+      url: "/submit/managed-pr",
+      payload: validManagedBody({
+        sourceFiles: [
+          { path: "release/m/my_keyboard/my_keyboard.kmn", content: "store(&VERSION) '14.0'" },
+          {
+            path: "release/m/my_keyboard/source/welcome/banner.png",
+            content: "AQID",
+            encoding: "base64",
+          },
+        ],
+      }),
+    });
+    expect(res.statusCode).toBe(200);
+  });
+
+  it("returns 400 when a base64-flagged source file's content is not valid base64", async () => {
+    const res = await mApp.inject({
+      method: "POST",
+      url: "/submit/managed-pr",
+      payload: validManagedBody({
+        sourceFiles: [
+          {
+            path: "release/m/my_keyboard/source/welcome/banner.png",
+            content: "not valid base64!!",
+            encoding: "base64",
+          },
+        ],
+      }),
+    });
+    expect(res.statusCode).toBe(400);
+    expect((JSON.parse(res.body) as { error: string }).error).toBe("invalid_request");
   });
 });
 

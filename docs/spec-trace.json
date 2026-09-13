@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-09-10",
+  "lastUpdated": "2026-09-13",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -846,6 +846,14 @@
     "specs/074-uppercase-counterpart-suggestion": {
       "title": "Feature Specification: Suggest the uppercase counterpart when a lowercase cased letter is placed",
       "hash": "sha256:ca92be519a1e69aa",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/076-documentation-completeness": {
+      "title": "Feature Specification: Documentation completeness — every package ships its full documentation set",
+      "hash": "sha256:984b22ae628cbbb6",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

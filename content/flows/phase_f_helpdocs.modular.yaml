@@ -13,12 +13,16 @@
 # author does not have yet (a brand-new keyboard has no support history) is
 # OPT-IN, never on the default path.
 #
-# DEFAULT PATH — 5 screens, exactly ONE of them required:
-#   pf_welcome_paragraph   (REQUIRED — the only thing a help page truly needs)
-#   pf_usage_tip_1         (optional, one tip)
-#   pf_more_detail_gate    (one click; No is a good answer)
-#   pf_credits             (optional)
-#   pf_contact_info        (optional)
+# DEFAULT PATH — 7 screens, exactly ONE of them required:
+#   pf_welcome_paragraph     (REQUIRED — the only thing a help page truly needs)
+#   pf_usage_tip_1           (optional, one tip)
+#   pf_history_entry         (spec 076 US5: confirm/edit/dismiss the drafted
+#                             first HISTORY.md entry — optional, "proposed"
+#                             until decided)
+#   pf_history_entry_bullets (edit branch only — free-text bullet editing)
+#   pf_more_detail_gate      (one click; No is a good answer)
+#   pf_credits               (optional)
+#   pf_contact_info          (optional)
 #
 # OPT-IN BATTERY — reached only when pf_more_detail_gate is Yes:
 #   pf_doc_language -> pf_font_guidance -> pf_usage_tip_2 -> pf_scope_variety
@@ -46,6 +50,12 @@ questions:
   # --- default path ---
   - pf_welcome_paragraph
   - pf_usage_tip_1
+  # HISTORY proposal (spec 076 US5): confirm / edit / dismiss the first
+  # HISTORY.md entry drafted from what changed this session. Reached via
+  # pf_usage_tip_1's `next` (routing is per-module, not list order — see
+  # loadModularFlow.ts); pf_history_entry_bullets is reached only on "edit".
+  - pf_history_entry
+  - pf_history_entry_bullets
   - pf_more_detail_gate
   # --- opt-in battery (gate = Yes) ---
   - pf_doc_language

@@ -2,7 +2,7 @@ import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { pushBreadcrumb } from "../crash/breadcrumbs.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import type { BaseKeyboard, VirtualFS, KeyboardIR, RemovalCapability, TouchLayoutIR, KpsFontEntry, KpsStylesheetEntry } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, VirtualFS, KeyboardIR, RemovalCapability, TouchLayoutIR, KpsFontEntry, KpsStylesheetEntry, WelcomeConvention, WelcomeFolderImage } from "@keyboard-studio/contracts";
 import type { CompileResult } from "@keyboard-studio/contracts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { LOCAL_PROXY_BASE, getScaffolderService } from "../lib/services.ts";
@@ -13,6 +13,7 @@ export { LOCAL_PROXY_BASE };
 import { findKmnPath } from "../lib/findKmnPath.ts";
 import { findTouchLayoutPath } from "../lib/findTouchLayoutPath.ts";
 import { readVfsText } from "../lib/vfsText.ts";
+import { computeBaselineDocFindings } from "../lib/collectDocLintInput.ts";
 import { recoverFromStaleChunk } from "../crash/staleChunk.ts";
 
 interface EngineModule {
@@ -29,6 +30,11 @@ interface EngineModule {
     stylesheets?: KpsStylesheetEntry[];
     baseWelcomeHtmText?: string;
     baseHelpPhpText?: string;
+    // spec 076 US2 — the base documentation bundle (data-model §6).
+    baseReadmeMdText?: string;
+    baseHistoryMdText?: string;
+    baseWelcomeImages?: WelcomeFolderImage[];
+    baseWelcomeConvention?: WelcomeConvention;
   }>;
   init: () => Promise<void>;
   isReady?: () => boolean;
@@ -720,6 +726,20 @@ export function useKeyboardArtifact(
         // same holders. It completes a missing LICENSE.md, and the loader never
         // writes the base's into the VFS, so this is its only source.
         wc.setBaseLicenseText(result.baseLicenseText ?? null);
+        // spec 076 R9 / FR-007: a Track 1 copy inherits the base's welcome
+        // IMAGES (carried into its own welcome folder) and nothing of its
+        // prose. The prose slices are cleared explicitly rather than assumed
+        // null — instantiateFromBase does not touch them, so a prior adapt
+        // session's texts would otherwise survive into this copy and merge.
+        wc.setBaseWelcomeImages(result.baseWelcomeImages ?? null);
+        wc.setBaseWelcomeConvention(result.baseWelcomeConvention ?? null);
+        wc.setBaseWelcomeHtmText(null);
+        wc.setBaseHelpPhpText(null);
+        wc.setBaseReadmeMdText(null);
+        wc.setBaseHistoryMdText(null);
+        // spec 076 FR-020: a copy inherits no prose, so nothing can be an
+        // upstream finding — an EMPTY baseline (computed), not null (pending).
+        wc.setBaselineDocFindings([]);
         vfsRef.current = result.vfs;
         scaffoldWarnings.push(...result.warnings);
         // Build font + CSS blob URLs from scaffold result — mirrors the open-base path below.
@@ -746,6 +766,42 @@ export function useKeyboardArtifact(
         const wc = useWorkingCopyStore.getState();
         wc.setBaseWelcomeHtmText(fetchResult.baseWelcomeHtmText ?? null);
         wc.setBaseHelpPhpText(fetchResult.baseHelpPhpText ?? null);
+        // spec 076 FR-006: the rest of the base's documentation bundle — README
+        // and HISTORY prose (adapt track only, FR-007) plus the welcome-folder
+        // images and which convention the base used (data-model §6).
+        wc.setBaseReadmeMdText(fetchResult.baseReadmeMdText ?? null);
+        wc.setBaseHistoryMdText(fetchResult.baseHistoryMdText ?? null);
+        wc.setBaseWelcomeImages(fetchResult.baseWelcomeImages ?? null);
+        wc.setBaseWelcomeConvention(fetchResult.baseWelcomeConvention ?? null);
+        // spec 076 FR-020 (research R8): run the documentation checks ONCE
+        // over the base's own files as fetched. A later finding on a still-
+        // inherited member whose code appears here is the base's, not the
+        // author's, and renders muted instead of counting against them.
+        {
+          const baselineKmnPath = findKmnPath(vfs);
+          const baselineTouchPath = findTouchLayoutPath(vfs);
+          wc.setBaselineDocFindings(
+            computeBaselineDocFindings({
+              keyboardId: kb.id,
+              displayName: kb.displayName,
+              kmnText: baselineKmnPath ? (readVfsText(vfs, baselineKmnPath) ?? null) : null,
+              kpsText: readVfsText(vfs, `source/${kb.id}.kps`) ?? null,
+              kvksText: readVfsText(vfs, `source/${kb.id}.kvks`) ?? null,
+              touchLayoutJson: baselineTouchPath ? (readVfsText(vfs, baselineTouchPath) ?? null) : null,
+              base: {
+                welcomeHtmText: fetchResult.baseWelcomeHtmText ?? null,
+                helpPhpText: fetchResult.baseHelpPhpText ?? null,
+                readmeMdText: fetchResult.baseReadmeMdText ?? null,
+                historyMdText: fetchResult.baseHistoryMdText ?? null,
+                // The base LICENSE is never written into the VFS (loader FR-011)
+                // and the adapt track's shipped LICENSE.md is generated with no
+                // invented holder, so the base's notice has no current
+                // counterpart to compare against — it is not part of the baseline.
+                licenseText: null,
+              },
+            }),
+          );
+        }
         // Build a blob URL for the OSK font so the frame can inject an
         // @font-face rule before the keyboard JS executes. Stored in refs so
         // it survives recompile() (the font only changes on a new fetch).

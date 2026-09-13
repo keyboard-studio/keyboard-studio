@@ -47,9 +47,16 @@ export function LintSummary({ findings }: LintSummaryProps) {
     }
   }
 
+  // spec 076 FR-020 (research R8): upstream findings — inherited from the base
+  // and untouched by the author — still render in the list (muted, LintChip)
+  // but are excluded from the headline counts and the live-region text, so
+  // twelve muted chips never announce as "12 warnings" against the author.
+  const authored = findings.filter((f) => f.origin !== "upstream");
+  const upstreamCount = findings.length - authored.length;
+
   // Count per severity for the header badges.
   const counts = new Map<LintSeverity, number>();
-  for (const f of findings) {
+  for (const f of authored) {
     counts.set(f.severity, (counts.get(f.severity) ?? 0) + 1);
   }
 
@@ -83,10 +90,10 @@ export function LintSummary({ findings }: LintSummaryProps) {
           clip: "rect(0,0,0,0)",
         }}
       >
-        {findings.length > 0
+        {authored.length > 0
           ? t({
               id: "lint.summary.liveRegion.issueCount",
-              message: plural(findings.length, {
+              message: plural(authored.length, {
                 one: "# lint issue",
                 other: "# lint issues",
               }),
@@ -104,7 +111,7 @@ export function LintSummary({ findings }: LintSummaryProps) {
           minHeight: 22,
         }}
       >
-        {findings.length === 0 ? (
+        {authored.length === 0 ? (
           /* Zero state — visual indicator only; AT announcement is via the live region above */
           <span
             style={{
@@ -151,6 +158,17 @@ export function LintSummary({ findings }: LintSummaryProps) {
               </span>
             );
           })
+        )}
+        {upstreamCount > 0 && (
+          <span
+            data-testid="lint-summary-upstream-count"
+            style={{ fontSize: 12, color: "var(--app-text-subtle)" }}
+          >
+            {t({
+              id: "lint.summary.upstreamCount",
+              message: `${{ count: upstreamCount }} inherited from the base keyboard`,
+            })}
+          </span>
         )}
       </div>
 

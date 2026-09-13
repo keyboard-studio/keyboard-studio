@@ -532,3 +532,195 @@ describe("fetchKeyboardSourceToVfs — binary siblings carry isBinary", () => {
     expect(typeof js!.content).toBe("string");
   });
 });
+
+// ---------------------------------------------------------------------------
+// spec 076 US2 (T010/T019): welcome-page resolution, folder images, README/HISTORY
+// ---------------------------------------------------------------------------
+
+describe("fetchKeyboardSourceToVfs — welcome-page resolution (spec 076 R3)", () => {
+  /** A minimal .kps declaring `<WelcomeFile>` and a `<Files>` list. */
+  function kps(welcomeFile: string, files: string[]): string {
+    const entries = files
+      .map((f) => `    <File>\n      <Name>${f}</Name>\n      <FileType>${f.slice(f.lastIndexOf("."))}</FileType>\n    </File>`)
+      .join("\n");
+    return (
+      `<?xml version="1.0" encoding="utf-8"?>\n<Package>\n` +
+      `  <Options>\n    <ReadMeFile>readme.htm</ReadMeFile>\n    <WelcomeFile>${welcomeFile}</WelcomeFile>\n  </Options>\n` +
+      `  <Files>\n${entries}\n  </Files>\n</Package>\n`
+    );
+  }
+
+  const ok = (body: string | Uint8Array) => ({ ok: true, status: 200, body });
+  const kmnUrl = sourceUrl(euroLatinKb, "sil_euro_latin.kmn");
+  const kpsUrl = sourceUrl(euroLatinKb, "sil_euro_latin.kps");
+  const rootUrl = (file: string) => `${PROXY}/${euroLatinKb.path}/${file}`;
+  const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]);
+
+  async function run(responses: Record<string, { ok: boolean; status: number; body: string | Uint8Array }>) {
+    const { fetchImpl, calls } = makeMockFetch({ [kmnUrl]: ok(kmnMinimal), ...responses });
+    const vfs = createVirtualFS();
+    const result = await fetchKeyboardSourceToVfs(euroLatinKb, vfs, { proxyBase: PROXY, fetchImpl });
+    return { result, calls, vfs };
+  }
+
+  it("takes the .kps-declared folder page first, and reports the folder convention", async () => {
+    const { result, calls } = await run({
+      [kpsUrl]: ok(kps("welcome\\welcome.htm", ["welcome\\welcome.htm", "readme.htm"])),
+      [sourceUrl(euroLatinKb, "welcome/welcome.htm")]: ok("<html>folder page</html>"),
+    });
+    expect(result.baseWelcomeHtmText).toBe("<html>folder page</html>");
+    expect(result.baseWelcomeConvention).toBe("folder");
+    // The declared page satisfied the probe; the flat name was never asked for.
+    expect(calls).not.toContain(sourceUrl(euroLatinKb, "welcome.htm"));
+  });
+
+  it("finds source/welcome/welcome.htm with NO .kps at all (folder probe)", async () => {
+    const { result } = await run({
+      [sourceUrl(euroLatinKb, "welcome/welcome.htm")]: ok("<html>folder page</html>"),
+    });
+    expect(result.baseWelcomeHtmText).toBe("<html>folder page</html>");
+    expect(result.baseWelcomeConvention).toBe("folder");
+    expect(result.baseWelcomeImages).toBeUndefined();
+  });
+
+  it("falls back to the flat source/welcome.htm and reports the flat convention", async () => {
+    const { result } = await run({
+      [kpsUrl]: ok(kps("welcome.htm", ["welcome.htm", "readme.htm"])),
+      [sourceUrl(euroLatinKb, "welcome.htm")]: ok("<html>flat page</html>"),
+    });
+    expect(result.baseWelcomeHtmText).toBe("<html>flat page</html>");
+    expect(result.baseWelcomeConvention).toBe("flat");
+    expect(result.baseWelcomeImages).toBeUndefined();
+  });
+
+  it("folder WINS when both conventions exist, even though the .kps declares the flat name", async () => {
+    const { result } = await run({
+      [kpsUrl]: ok(kps("welcome.htm", ["welcome.htm", "welcome\\chart.png"])),
+      [sourceUrl(euroLatinKb, "welcome.htm")]: ok("<html>flat page</html>"),
+      [sourceUrl(euroLatinKb, "welcome/welcome.htm")]: ok("<html>folder page</html>"),
+      [sourceUrl(euroLatinKb, "welcome/chart.png")]: ok(PNG),
+    });
+    expect(result.baseWelcomeConvention).toBe("folder");
+    expect(result.baseWelcomeHtmText).toBe("<html>folder page</html>");
+    expect(result.baseWelcomeImages?.map((i) => i.path)).toEqual(["welcome/chart.png"]);
+  });
+
+  it("degrades a declared page that 404s (ghost descriptor entry) to the next probe", async () => {
+    const { result } = await run({
+      [kpsUrl]: ok(kps("welcome\\intro.htm", ["welcome\\intro.htm"])),
+      // welcome/intro.htm is NOT served; the folder page is.
+      [sourceUrl(euroLatinKb, "welcome/welcome.htm")]: ok("<html>folder page</html>"),
+    });
+    expect(result.baseWelcomeHtmText).toBe("<html>folder page</html>");
+    expect(result.baseWelcomeConvention).toBe("folder");
+  });
+
+  it("reports `absent` — and no page text — when nothing is served", async () => {
+    const { result } = await run({});
+    expect(result.baseWelcomeHtmText).toBeUndefined();
+    expect(result.baseWelcomeConvention).toBe("absent");
+    expect(result.baseWelcomeImages).toBeUndefined();
+  });
+
+  it("fetches every welcome\\ file the .kps lists as bytes, in .kps order, page excluded (FR-006)", async () => {
+    const { result, vfs } = await run({
+      [kpsUrl]: ok(
+        kps("welcome\\welcome.htm", [
+          "..\\build\\sil_euro_latin.kmx",
+          "welcome\\welcome.htm",
+          "welcome\\desktop_default.png",
+          "welcome\\phone_shift.png",
+          "readme.htm",
+        ]),
+      ),
+      [sourceUrl(euroLatinKb, "welcome/welcome.htm")]: ok("<html>folder page</html>"),
+      [sourceUrl(euroLatinKb, "welcome/desktop_default.png")]: ok(PNG),
+      [sourceUrl(euroLatinKb, "welcome/phone_shift.png")]: ok(new Uint8Array([9, 9])),
+    });
+    expect(result.baseWelcomeImages?.map((i) => i.path)).toEqual([
+      "welcome/desktop_default.png",
+      "welcome/phone_shift.png",
+    ]);
+    expect([...result.baseWelcomeImages![0]!.bytes]).toEqual([...PNG]);
+    expect(result.baseWelcomeImages![1]!.bytes).toBeInstanceOf(Uint8Array);
+    // Fetch-don't-write: neither the page nor the images land in the VFS.
+    expect(vfs.get("source/welcome/welcome.htm")).toBeUndefined();
+    expect(vfs.get("source/welcome/desktop_default.png")).toBeUndefined();
+    expect(result.warnings.filter((w) => w.includes("welcome image"))).toEqual([]);
+  });
+
+  it("skips a listed image the base does not ship and RECORDS it (edge case), keeping the rest", async () => {
+    const { result } = await run({
+      [kpsUrl]: ok(kps("welcome\\welcome.htm", ["welcome\\welcome.htm", "welcome\\ghost.png", "welcome\\real.png"])),
+      [sourceUrl(euroLatinKb, "welcome/welcome.htm")]: ok("<html>folder page</html>"),
+      [sourceUrl(euroLatinKb, "welcome/real.png")]: ok(PNG),
+    });
+    expect(result.baseWelcomeImages?.map((i) => i.path)).toEqual(["welcome/real.png"]);
+    expect(result.warnings.some((w) => w.includes("welcome image welcome/ghost.png") && w.includes("HTTP 404"))).toBe(
+      true,
+    );
+  });
+
+  it("also fetches images the PAGE references that the .kps never listed, after the listed ones; a missing one is silent", async () => {
+    const { result, calls } = await run({
+      [kpsUrl]: ok(kps("welcome\\welcome.htm", ["welcome\\welcome.htm", "welcome\\listed.png"])),
+      [sourceUrl(euroLatinKb, "welcome/welcome.htm")]: ok(
+        '<html><body><img src="mobile_default.png"><img src="listed.png"><img src="./nope.png">' +
+          '<img src="../sil_euro_latin.ico"><img src="https://x.example/remote.png"></body></html>',
+      ),
+      [sourceUrl(euroLatinKb, "welcome/listed.png")]: ok(PNG),
+      [sourceUrl(euroLatinKb, "welcome/mobile_default.png")]: ok(new Uint8Array([5, 5])),
+    });
+    expect(result.baseWelcomeImages?.map((i) => i.path)).toEqual(["welcome/listed.png", "welcome/mobile_default.png"]);
+    // The `..`-relative and remote references are never probed; the 404 is not a warning.
+    expect(calls).not.toContain(`${PROXY}/${euroLatinKb.path}/sil_euro_latin.ico`);
+    expect(calls.some((c) => c.includes("x.example"))).toBe(false);
+    expect(result.warnings.filter((w) => w.includes("nope.png"))).toEqual([]);
+  });
+
+  it("never fetches a traversing reference from either source — a .kps entry or an <img src> that climbs out of welcome/", async () => {
+    const { result, calls } = await run({
+      [kpsUrl]: ok(
+        kps("welcome\\welcome.htm", [
+          "welcome\\welcome.htm",
+          "welcome\\..\\..\\..\\etc\\passwd",
+          "welcome\\ok.png",
+        ]),
+      ),
+      [sourceUrl(euroLatinKb, "welcome/welcome.htm")]: ok(
+        '<html><body><img src="../secret.png"><img src="sub/../../x.png"><img src="ok.png"></body></html>',
+      ),
+      [sourceUrl(euroLatinKb, "welcome/ok.png")]: ok(PNG),
+    });
+    expect(result.baseWelcomeImages?.map((i) => i.path)).toEqual(["welcome/ok.png"]);
+    expect(calls.filter((c) => c.includes(".."))).toEqual([]);
+    expect(calls.filter((c) => c.includes("secret") || c.includes("passwd") || c.includes("x.png"))).toEqual([]);
+  });
+
+  it("does not fetch folder images for a flat-convention base", async () => {
+    const { result, calls } = await run({
+      [kpsUrl]: ok(kps("welcome.htm", ["welcome.htm", "welcome\\stray.png"])),
+      [sourceUrl(euroLatinKb, "welcome.htm")]: ok("<html>flat page</html>"),
+    });
+    expect(result.baseWelcomeConvention).toBe("flat");
+    expect(calls).not.toContain(sourceUrl(euroLatinKb, "welcome/stray.png"));
+  });
+
+  it("fetches the base's README.md and HISTORY.md verbatim, without writing them (FR-006)", async () => {
+    const { result, vfs } = await run({
+      [rootUrl("README.md")]: ok("# EuroLatin\n\nBase readme.\n"),
+      [rootUrl("HISTORY.md")]: ok("## 1.0 (2020-01-01)\n* Initial release.\n"),
+    });
+    expect(result.baseReadmeMdText).toBe("# EuroLatin\n\nBase readme.\n");
+    expect(result.baseHistoryMdText).toBe("## 1.0 (2020-01-01)\n* Initial release.\n");
+    expect(vfs.get("README.md")).toBeUndefined();
+    expect(vfs.get("HISTORY.md")).toBeUndefined();
+  });
+
+  it("leaves README/HISTORY undefined and warning-free when the base has none", async () => {
+    const { result } = await run({});
+    expect(result.baseReadmeMdText).toBeUndefined();
+    expect(result.baseHistoryMdText).toBeUndefined();
+    expect(result.warnings.filter((w) => /README|HISTORY/.test(w))).toEqual([]);
+  });
+});
