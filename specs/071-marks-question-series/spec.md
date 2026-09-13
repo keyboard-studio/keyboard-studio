@@ -439,8 +439,12 @@ combination.
   base+mark combination in the confirmed alphabet has no ready-made
   single-character form, the system MUST propose the base-plus-mark output
   form for the whole keyboard as a pre-explained default, presented as a
-  notice with a plain-language reason and a way to change it, not as an
-  open multi-option question.
+  notice with a plain-language reason, not as an open multi-option
+  question. This branch fires precisely BECAUSE the ready-made form does
+  not exist for some combination, so the notice MUST NOT offer switching to
+  it; it MUST instead say, in plain language, why there is no alternative
+  here. (FR-015's notice keeps its way to change the answer — there, both
+  forms are realisable.)
 - **FR-015**: When every attested or plausible-and-accepted base+mark
   combination has a ready-made single-character form AND no mark-class was
   confirmed as letter-plus-mark, the system MUST propose the
