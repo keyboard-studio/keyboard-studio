@@ -3,7 +3,7 @@
   "specName": "Documentation completeness — every package ships its full documentation set",
   "branch": "076-documentation-completeness",
   "currentStep": "implement",
-  "status": "implemented",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
@@ -713,6 +713,13 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-09-13T04:14:47.691Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-13T13:39:28.558Z"
     }
   ],
   "telemetryInstanceId": "1a4e8221-55e8-4182-b12d-ab2f7d0dc808",
