@@ -59,6 +59,14 @@ import type {
 } from "./decisionRecord";
 import { DECISION_RECORD_FORMAT } from "./decisionRecord";
 import type { HelpDocsAnswers } from "./help-docs";
+import type {
+  BaseDocumentationProfile,
+  ChartPreference,
+  DocLintInput,
+  DocMemberState,
+  HistoryEntryState,
+  LayoutChartFile,
+} from "./doc-members";
 
 // ---------------------------------------------------------------------------
 // Leaf enums — mirror the string-literal unions in the contract types.
@@ -763,6 +771,76 @@ export const HelpDocsAnswersSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// Documentation completeness (spec 076) — mirrors doc-members.ts.
+// ---------------------------------------------------------------------------
+
+export const DocMemberIdSchema = z.enum([
+  "readme-md",
+  "history-md",
+  "license-md",
+  "readme-htm",
+  "welcome-htm",
+  "help-php",
+]);
+
+export const DocSourceTierSchema = z.enum(["derived", "inherited", "authored"]);
+
+export const DocMemberStateSchema = z.object({
+  member: DocMemberIdSchema,
+  path: z.string(),
+  tier: DocSourceTierSchema,
+  placeholder: z.boolean(),
+  fillStepId: z.string(),
+  warnings: z.array(z.string()),
+});
+
+export const BaseDocumentationProfileSchema = z.object({
+  level: z.enum(["none", "minimal", "full", "unknown"]),
+  members: z.array(DocMemberIdSchema),
+  welcomeConvention: z.enum(["folder", "flat", "absent"]),
+  welcomeImages: z.array(z.string()),
+  hasUsableDescription: z.boolean(),
+});
+
+export const HistoryEntryStateSchema = z.object({
+  status: z.enum(["proposed", "confirmed", "edited", "dismissed"]),
+  proposal: z.object({
+    version: z.string(),
+    dateIso: z.string(),
+    bullets: z.array(z.string()),
+  }),
+  editedBullets: z.array(z.string()).nullable(),
+});
+
+export const LayoutChartFileSchema = z.object({
+  filename: z.string(),
+  platform: z.enum(["desktop", "phone", "tablet"]),
+  layerId: z.string(),
+  svg: z.string(),
+});
+
+export const ChartPreferenceSchema = z.enum(["keep-base-images", "regenerate"]);
+
+export const DocLintInputSchema = z.object({
+  keyboardId: z.string(),
+  keyboardVersion: z.string(),
+  targets: z.array(z.string()),
+  layerIds: z.array(z.string()),
+  displayName: z.string(),
+  copyrightHolders: z.object({
+    license: z.string().optional(),
+    kmn: z.string().optional(),
+    kps: z.string().optional(),
+    readme: z.string().optional(),
+    history: z.string().optional(),
+  }),
+  // zod 4: `z.record` over an enum key is exhaustive; the contract is Partial.
+  members: z.partialRecord(DocMemberIdSchema, z.string()),
+  deletedFilenames: z.array(z.string()),
+  baseHistoryMdText: z.string().optional(),
+});
+
+// ---------------------------------------------------------------------------
 // Compile-time drift guards.
 //
 // Each canonical schema's inferred type must stay assignable to the locked
@@ -940,3 +1018,20 @@ type _DecisionRecordGuard = Expect<AssignableTo<z.infer<typeof DecisionRecordSch
 type _HelpDocsAnswersGuard = Expect<
   AssignableTo<z.infer<typeof HelpDocsAnswersSchema>, HelpDocsAnswers>
 >;
+// Documentation completeness (spec 076) — doc-members.ts mirrors.
+type _DocMemberStateGuard = Expect<
+  AssignableTo<z.infer<typeof DocMemberStateSchema>, DocMemberState>
+>;
+type _BaseDocumentationProfileGuard = Expect<
+  AssignableTo<z.infer<typeof BaseDocumentationProfileSchema>, BaseDocumentationProfile>
+>;
+type _HistoryEntryStateGuard = Expect<
+  AssignableTo<z.infer<typeof HistoryEntryStateSchema>, HistoryEntryState>
+>;
+type _LayoutChartFileGuard = Expect<
+  AssignableTo<z.infer<typeof LayoutChartFileSchema>, LayoutChartFile>
+>;
+type _ChartPreferenceGuard = Expect<
+  AssignableTo<z.infer<typeof ChartPreferenceSchema>, ChartPreference>
+>;
+type _DocLintInputGuard = Expect<AssignableTo<z.infer<typeof DocLintInputSchema>, DocLintInput>>;

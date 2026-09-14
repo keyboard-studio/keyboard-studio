@@ -538,6 +538,98 @@ describe("createBaseBrowser", () => {
     expect(warn).not.toHaveBeenCalled();
   });
 
+  // -------------------------------------------------------------------------
+  // getDocProfile (spec 076 T033) — lazy compute from the cached .kps + one
+  // welcome-probe fetch, memoized per base id.
+  // -------------------------------------------------------------------------
+
+  const KPS_BASIC_KBDUS_WITH_FILES = `<?xml version="1.0" encoding="UTF-8"?>
+<Package>
+  <Info>
+    <Name value="US English (Basic)"/>
+    <Version value="1.0"/>
+  </Info>
+  <Files>
+    <File>
+      <Name>welcome\\welcome.htm</Name>
+      <FileType>.htm</FileType>
+    </File>
+    <File>
+      <Name>..\\LICENSE.md</Name>
+      <FileType>.md</FileType>
+    </File>
+  </Files>
+  <Keyboards>
+    <Keyboard>
+      <Name>US English (Basic)</Name>
+      <ID>basic_kbdus</ID>
+      <Version>1.0</Version>
+      <Languages>
+        <Language ID="en-Latn" Name="English"/>
+      </Languages>
+      <Targets>windows macosx linux web</Targets>
+    </Keyboard>
+  </Keyboards>
+</Package>`;
+
+  const WELCOME_PROBE_URL = `${RAW_BASE}/release/b/basic_kbdus/source/welcome/welcome.htm`;
+
+  function createFetchWithWelcome(): { fetch: FetchFn; welcomeFetchCount: () => number } {
+    const fixtureBase = createFixtureFetch();
+    let welcomeFetchCount = 0;
+    const fetchFn: FetchFn = async (url, init) => {
+      if (url === `${RAW_BASE}/release/b/basic_kbdus/source/basic_kbdus.kps`) {
+        return {
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          json: async () => ({}),
+          text: async () => KPS_BASIC_KBDUS_WITH_FILES,
+        };
+      }
+      if (url === WELCOME_PROBE_URL) {
+        welcomeFetchCount++;
+        return {
+          ok: true,
+          status: 200,
+          statusText: "OK",
+          json: async () => ({}),
+          text: async () => "<html><body><p>US English (Basic) is a simple US keyboard layout.</p></body></html>",
+        };
+      }
+      return fixtureBase(url, init);
+    };
+    return { fetch: fetchFn, welcomeFetchCount: () => welcomeFetchCount };
+  }
+
+  it("getDocProfile classifies from the cached .kps plus one welcome-probe fetch", async () => {
+    const { fetch } = createFetchWithWelcome();
+    const service = createBaseBrowser({ fetch });
+
+    const profile = await service.getDocProfile("basic_kbdus");
+    expect(profile.level).toBe("full");
+    expect(profile.welcomeConvention).toBe("folder");
+    expect(profile.hasUsableDescription).toBe(true);
+  });
+
+  it("getDocProfile caches per base id — a second call does not refetch", async () => {
+    const { fetch, welcomeFetchCount } = createFetchWithWelcome();
+    const service = createBaseBrowser({ fetch });
+
+    const first = await service.getDocProfile("basic_kbdus");
+    expect(welcomeFetchCount()).toBe(1);
+
+    const second = await service.getDocProfile("basic_kbdus");
+    expect(welcomeFetchCount()).toBe(1);
+    expect(second).toEqual(first);
+  });
+
+  it("getDocProfile resolves to an unknown-level profile for a base that was never fetched/parsed", async () => {
+    const service = createBaseBrowser({ fetch: createFixtureFetch() });
+    const profile = await service.getDocProfile("no_such_keyboard_xyz");
+    expect(profile.level).toBe("unknown");
+  });
+
   it("warns when a per-subfolder fetch fails and still returns keyboards from the other subfolders", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
 

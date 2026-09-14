@@ -181,6 +181,15 @@ export interface ProjectWorkingCopyVfsInput {
   /** Identity overlay. Pass `null` to skip identity projection. */
   identity: IdentityOverlay | null;
   /**
+   * spec 076 FR-002/FR-006: bare names of the files the OUTPUT projection
+   * ships in `source/welcome/` beside the page (inherited base images,
+   * generated charts), so step 3.6's descriptor `<Files>` list names them.
+   * Optional: the OSK preview path omits it — it builds no package, and the
+   * files themselves are only written at output (step 5c of
+   * `projectWorkingCopyForOutput`) — so its descriptor lists the page alone.
+   */
+  welcomeFolderFiles?: readonly string[];
+  /**
    * The base keyboard's own display name — the value the `.kmn`'s existing
    * `store(&NAME)` already holds. Step 3 treats the overlay's display name as an
    * EDIT and rewrites the name store ONLY when it DIFFERS from this. It is the
@@ -688,6 +697,7 @@ export function projectWorkingCopyVfs(
       kpsIdentity,
       kmnTextForKps,
       identity.version,
+      input.welcomeFolderFiles ?? [],
     );
     warnings.push(...kpsResult.warnings);
   }

@@ -17,7 +17,7 @@
 
 import { describe, it, expect, vi, afterEach, beforeAll, beforeEach } from "vitest";
 import { useState } from "react";
-import { screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
+import { screen, fireEvent, waitFor, cleanup, within } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
@@ -32,6 +32,15 @@ beforeAll(() => {
 // bases via getBaseBrowserService().listAll().
 vi.mock("../../lib/services.ts", () => ({
   getBaseBrowserService: () => ({ listAll: () => Promise.resolve(sampleBaseKeyboards) }),
+  // spec 076 FR-008: defaults every base to "unknown" (no badge) unless a
+  // test overrides it — see the "documentation badge" describe block below.
+  getBaseDocProfile: vi.fn().mockResolvedValue({
+    level: "unknown",
+    members: [],
+    welcomeConvention: "absent",
+    hasUsableDescription: false,
+    welcomeImages: [],
+  }),
   USE_REAL: false,
 }));
 
@@ -40,6 +49,10 @@ import {
   _resetCorpusCacheForTesting,
   _setCorpusCacheForTesting,
 } from "../../components/BaseKeyboardPicker.tsx";
+import { getBaseDocProfile } from "../../lib/services.ts";
+import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+
+const getBaseDocProfileMock = getBaseDocProfile as unknown as ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   // Seed the picker's corpus cache so loadCorpus() never performs its dynamic
@@ -52,6 +65,7 @@ afterEach(() => {
   cleanup();
   _resetCorpusCacheForTesting();
   vi.clearAllMocks();
+  useWorkingCopyStore.setState({ baseDocProfile: null });
 });
 
 // ha-Latn target: sil_euro_latin is a language-match, basic_kbdus the fallback;
@@ -309,5 +323,115 @@ describe("BaseResolution — preview-before-commit (suggestion cards)", () => {
 
     fireEvent.click(confirm);
     expect(onConfirm).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 076 FR-008 — documentation-completeness badge (T034 wiring, T035 render)
+// ---------------------------------------------------------------------------
+
+const FULL_PROFILE = {
+  level: "full" as const,
+  members: ["welcome-htm" as const],
+  welcomeConvention: "folder" as const,
+  hasUsableDescription: true,
+  welcomeImages: [],
+};
+
+const UNKNOWN_PROFILE = {
+  level: "unknown" as const,
+  members: [],
+  welcomeConvention: "absent" as const,
+  hasUsableDescription: false,
+  welcomeImages: [],
+};
+
+describe("BaseResolution — documentation badge (spec 076 FR-008)", () => {
+  it("does not request a doc profile until a base is previewed", async () => {
+    renderControlled();
+    await waitForCombobox();
+    expect(getBaseDocProfileMock).not.toHaveBeenCalled();
+  });
+
+  it("requests, then renders, the badge for a base classified 'full' once previewed", async () => {
+    getBaseDocProfileMock.mockResolvedValueOnce(FULL_PROFILE);
+    renderControlled();
+    await waitForCombobox();
+
+    const card = await waitFor(() => screen.getByTestId("base-card-sil_euro_latin"));
+    fireEvent.click(card);
+
+    expect(getBaseDocProfileMock).toHaveBeenCalledWith("sil_euro_latin");
+    await waitFor(() => {
+      expect(within(card).getByText("Full documentation")).toBeTruthy();
+    });
+  });
+
+  it("renders no badge for a base whose profile resolves to 'unknown'", async () => {
+    getBaseDocProfileMock.mockResolvedValueOnce(UNKNOWN_PROFILE);
+    renderControlled();
+    await waitForCombobox();
+
+    const card = await waitFor(() => screen.getByTestId("base-card-sil_euro_latin"));
+    fireEvent.click(card);
+
+    await waitFor(() => expect(getBaseDocProfileMock).toHaveBeenCalledWith("sil_euro_latin"));
+    // Give the (resolved) promise a tick, then assert no doc-level text ever appears.
+    await Promise.resolve();
+    expect(within(card).queryByText(/documentation/i)).toBeNull();
+  });
+
+  it("re-focusing the same card does not refetch (cached per base id)", async () => {
+    getBaseDocProfileMock.mockResolvedValue(FULL_PROFILE);
+    renderControlled();
+    await waitForCombobox();
+
+    const card = await waitFor(() => screen.getByTestId("base-card-sil_euro_latin"));
+    fireEvent.click(card);
+    await waitFor(() => expect(getBaseDocProfileMock).toHaveBeenCalledTimes(1));
+
+    const otherCard = await waitFor(() => screen.getByTestId("base-card-basic_kbdus"));
+    fireEvent.click(otherCard);
+    fireEvent.click(card);
+
+    // Only the FIRST focus of sil_euro_latin fetched; basic_kbdus fetched once too.
+    await waitFor(() => expect(getBaseDocProfileMock).toHaveBeenCalledTimes(2));
+  });
+
+  it("commits the previewed base's profile to the working copy at SELECTION (confirm)", async () => {
+    getBaseDocProfileMock.mockResolvedValueOnce(FULL_PROFILE);
+    const { onConfirm } = renderControlled();
+    await waitForCombobox();
+
+    const card = await waitFor(() => screen.getByTestId("base-card-sil_euro_latin"));
+    fireEvent.click(card);
+    await waitFor(() => expect(getBaseDocProfileMock).toHaveBeenCalledWith("sil_euro_latin"));
+    // Let the profile land in the hook's cache before confirming.
+    await waitFor(() => {
+      expect(within(card).getByText("Full documentation")).toBeTruthy();
+    });
+
+    const confirm = screen.getByTestId("base-confirm") as HTMLButtonElement;
+    await waitFor(() => expect(confirm.disabled).toBe(false));
+    fireEvent.click(confirm);
+
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(useWorkingCopyStore.getState().baseDocProfile).toEqual(FULL_PROFILE);
+  });
+
+  it("writes null (never an 'unknown' profile object) when confirming before the fetch resolves", async () => {
+    // Never resolves within the test — confirm fires before any profile lands.
+    getBaseDocProfileMock.mockReturnValueOnce(new Promise(() => {}));
+    renderControlled();
+    await waitForCombobox();
+
+    const card = await waitFor(() => screen.getByTestId("base-card-sil_euro_latin"));
+    fireEvent.click(card);
+
+    const confirm = screen.getByTestId("base-confirm") as HTMLButtonElement;
+    await waitFor(() => expect(confirm.disabled).toBe(false));
+    fireEvent.click(confirm);
+
+    expect(useWorkingCopyStore.getState().baseDocProfile).toBeNull();
   });
 });

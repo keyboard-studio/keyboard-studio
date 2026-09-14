@@ -4,6 +4,7 @@ import { devLog } from "@keyboard-studio/contracts/dev-log";
 import {
   makeBaseKeyboard,
   type BaseBrowserService,
+  type BaseDocumentationProfile,
   type BaseKeyboard,
   type KeymanPlatformTarget,
 } from "@keyboard-studio/contracts";
@@ -16,7 +17,8 @@ import {
   type GitTreeItem,
   type GithubClientOptions,
 } from "./github-api.js";
-import { parseKps } from "./kps-parser.js";
+import { classifyBaseDocumentation } from "./classifyBaseDocumentation.js";
+import { kpsRefToPosix, parseKps, parseKpsFiles } from "./kps-parser.js";
 import { offlineKbdus } from "./offline-bundle.js";
 import { dedupeKpsPathsById, matchKeyboardScopePath } from "./corpus-scope.js";
 
@@ -34,10 +36,65 @@ export interface BaseBrowserConfig {
   fetch?: FetchFn;
 }
 
+/**
+ * A {@link BaseBrowserService} extended with the spec 076 documentation
+ * classifier (FR-008, research R4). Not folded into the locked
+ * `BaseBrowserService` contract — additive engine-side surface only.
+ */
+export interface BaseBrowserServiceWithDocProfile extends BaseBrowserService {
+  /**
+   * Classify `baseId`'s documentation completeness (spec 076 FR-008), from
+   * its already-fetched `.kps` manifest plus one welcome-page probe fetch.
+   * Computed lazily for the focused/selected base only — never for the whole
+   * gallery — and cached per base id, so a repeated call for the same id
+   * does not refetch. Resolves to a `level: "unknown"` profile when the base
+   * is not found (never fetched/parsed) or the welcome probe fails outright
+   * (network error, as opposed to an ordinary 404).
+   */
+  getDocProfile(baseId: string): Promise<BaseDocumentationProfile>;
+}
+
+const UNKNOWN_DOC_PROFILE: BaseDocumentationProfile = {
+  level: "unknown",
+  members: [],
+  welcomeConvention: "absent",
+  welcomeImages: [],
+  hasUsableDescription: false,
+};
+
 interface CacheEntry {
   sha: string;
   keyboards: BaseKeyboard[];
   expiry: number;
+}
+
+/** The base's raw `.kps` text plus the folder it (and its source siblings) live under, kept for the doc-profile welcome probe (spec 076 R4) — the base's metadata fetch already paid for this text once. */
+interface KpsCacheEntry {
+  kpsText: string;
+  keyboardRoot: string;
+}
+
+const FOLDER_WELCOME_PAGE = "welcome/welcome.htm";
+const FLAT_WELCOME_PAGE = "welcome.htm";
+
+/**
+ * Which welcome-page path to probe for `kpsFiles`, mirroring the loader's
+ * folder-wins-over-flat priority (`fetchKeyboardSourceToVfs.ts`'s
+ * `resolveBaseWelcome`) without needing the loader's full three-step
+ * descriptor-name resolution — `classifyBaseDocumentation` only needs ONE
+ * page's text to decide stub-vs-usable. `null` when neither is listed.
+ */
+function welcomeProbePath(kpsFiles: ReturnType<typeof parseKpsFiles>): string | null {
+  let folder = false;
+  let flat = false;
+  for (const { name } of kpsFiles) {
+    const rel = kpsRefToPosix(name).toLowerCase();
+    if (rel === FOLDER_WELCOME_PAGE) folder = true;
+    else if (rel === FLAT_WELCOME_PAGE) flat = true;
+  }
+  if (folder) return FOLDER_WELCOME_PAGE;
+  if (flat) return FLAT_WELCOME_PAGE;
+  return null;
 }
 
 /**
@@ -123,7 +180,7 @@ async function collectReleaseItemsIncrementally(
  */
 export function createBaseBrowser(
   config: BaseBrowserConfig = {}
-): BaseBrowserService {
+): BaseBrowserServiceWithDocProfile {
   // fetch is available globally in Node 20+ (engines requirement) and browsers.
   // The dom lib isn't in this package's tsconfig; cast through unknown.
   const fetchFn: FetchFn =
@@ -132,6 +189,12 @@ export function createBaseBrowser(
       (globalThis as unknown as { fetch: FetchFn }).fetch(url, init));
 
   let cache: CacheEntry | null = null;
+  // Per-base .kps text, kept from the metadata fetch above so the doc-profile
+  // welcome probe (getDocProfile) does not refetch it (research R4).
+  const kpsCache = new Map<string, KpsCacheEntry>();
+  // Per-base computed profile — getDocProfile is lazy (focused base only)
+  // and memoized, never precomputed for the whole gallery.
+  const docProfileCache = new Map<string, BaseDocumentationProfile>();
 
   async function loadAll(): Promise<BaseKeyboard[]> {
     const now = Date.now();
@@ -183,6 +246,7 @@ export function createBaseBrowser(
         try {
           const xml = await fetchRawText(`${RAW_BASE}/${kpsPath}`, clientOpts);
           const meta = parseKps(xml);
+          kpsCache.set(id, { kpsText: xml, keyboardRoot });
           keyboards.push(
             makeBaseKeyboard({
               id,
@@ -240,6 +304,37 @@ export function createBaseBrowser(
     async getById(id: string): Promise<BaseKeyboard | undefined> {
       const all = await loadAll();
       return all.find((kb) => kb.id === id);
+    },
+
+    async getDocProfile(baseId: string): Promise<BaseDocumentationProfile> {
+      const cached = docProfileCache.get(baseId);
+      if (cached !== undefined) return cached;
+
+      await loadAll(); // ensures kpsCache is populated for this session's tree
+      const entry = kpsCache.get(baseId);
+      if (entry === undefined) {
+        docProfileCache.set(baseId, UNKNOWN_DOC_PROFILE);
+        return UNKNOWN_DOC_PROFILE;
+      }
+
+      const kpsFiles = parseKpsFiles(entry.kpsText);
+      const probePath = welcomeProbePath(kpsFiles);
+
+      let welcomeText: string | null = null;
+      if (probePath !== null) {
+        try {
+          const res = await fetchFn(`${RAW_BASE}/${entry.keyboardRoot}/source/${probePath}`);
+          if (res.ok) welcomeText = await res.text();
+        } catch {
+          // Network failure on the probe itself — degrade the whole profile
+          // to unknown rather than misreporting the base as undocumented.
+          return UNKNOWN_DOC_PROFILE;
+        }
+      }
+
+      const profile = classifyBaseDocumentation(kpsFiles, welcomeText, null);
+      docProfileCache.set(baseId, profile);
+      return profile;
     },
   };
 }

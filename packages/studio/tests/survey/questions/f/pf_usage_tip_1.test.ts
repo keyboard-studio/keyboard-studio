@@ -17,8 +17,10 @@ describe("pf_usage_tip_1 — definition", () => {
     expect(definition.type).toBe("text");
   });
 
-  it("routes to pf_more_detail_gate", () => {
-    expect(definition.next).toBe("pf_more_detail_gate");
+  // spec 076 US5: the HISTORY proposal screen was spliced in after the tip;
+  // it converges back on pf_more_detail_gate itself.
+  it("routes to pf_history_entry", () => {
+    expect(definition.next).toBe("pf_history_entry");
   });
 
   it("has help text", () => {

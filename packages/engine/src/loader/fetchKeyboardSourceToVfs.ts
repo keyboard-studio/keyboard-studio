@@ -7,10 +7,18 @@
 // compiler flags. Writes everything flat into the VFS at `source/...` (the
 // layout CompilerService.compile() expects).
 
-import type { BaseKeyboard, VirtualFS, KpsFontEntry, KpsStylesheetEntry } from "@keyboard-studio/contracts";
+import type {
+  BaseKeyboard,
+  VirtualFS,
+  KpsFontEntry,
+  KpsStylesheetEntry,
+  WelcomeConvention,
+  WelcomeFolderImage,
+} from "@keyboard-studio/contracts";
 import { parseKmnHeaderStores } from "../compiler/parseKmnHeaderStores.js";
 import { parseKpjFlags, type CompilerOptions } from "../compiler/parseKpjFlags.js";
-import { parseKpsFontRefs } from "../base-browser/kps-parser.js";
+import { kpsRefToPosix, parseKpsFiles, parseKpsFontRefs } from "../base-browser/kps-parser.js";
+import { extractWelcomeImageRefs } from "../shared/helpDocsRender.js";
 import { parseKvks } from "../codec/parse-kvks.js";
 import { pathUtils } from "../compiler/pathUtils.js";
 
@@ -71,10 +79,16 @@ export interface FetchKeyboardSourceResult {
    */
   baseLicenseText?: string;
   /**
-   * The base keyboard's own `source/welcome.htm`, verbatim, or undefined when
-   * it has none (spec 061 FR-013). Fetched for merge purposes at render time
-   * only — NOT written into the VFS, since that path is where the *rendered*
+   * The base keyboard's own welcome page, verbatim, or undefined when it has
+   * none (spec 061 FR-013). Fetched for merge purposes at render time only —
+   * NOT written into the VFS, since the projected path is where the *rendered*
    * (merged) file belongs, not the base's raw copy.
+   *
+   * Resolved in this order (spec 076 research R3): the `.kps`-declared
+   * `<WelcomeFile>` when it names a folder-convention page, then
+   * `source/welcome/welcome.htm`, then the flat `source/welcome.htm` (or the
+   * declared flat name). A declared file that 404s degrades to the next probe
+   * rather than failing (edge case: ghost descriptor entry).
    */
   baseWelcomeHtmText?: string;
   /**
@@ -83,6 +97,35 @@ export interface FetchKeyboardSourceResult {
    * {@link baseWelcomeHtmText}.
    */
   baseHelpPhpText?: string;
+  /**
+   * Which welcome-page convention the base uses (spec 076 data-model §6):
+   * `"folder"` (`source/welcome/welcome.htm`, the corpus majority), `"flat"`
+   * (`source/welcome.htm`), or `"absent"`. `folder` wins when both exist.
+   */
+  baseWelcomeConvention?: WelcomeConvention;
+  /**
+   * The base's welcome-folder images, fetched as bytes (spec 076 FR-006): every
+   * `welcome\…` file its `.kps` `<Files>` lists other than the page itself, in
+   * `.kps` order, followed by any image the page's own `<img src>` references
+   * that the `.kps` forgot to list. Only populated for the folder convention.
+   * Listed-but-unfetchable files are skipped and recorded in `warnings` (edge
+   * case: descriptor names a file the base does not ship). Same
+   * fetch-don't-write contract: the projection writes them beside the
+   * rendered page at output.
+   */
+  baseWelcomeImages?: WelcomeFolderImage[];
+  /**
+   * The base keyboard's own `README.md`, verbatim, or undefined when it has
+   * none (spec 076 FR-006 inheritance). Fetch-don't-write, like
+   * {@link baseLicenseText}: it lives at the keyboard root.
+   */
+  baseReadmeMdText?: string;
+  /**
+   * The base keyboard's own `HISTORY.md`, verbatim, or undefined when it has
+   * none. Fetch-don't-write; the adapt track's rendered HISTORY preserves
+   * these entries below the new one (criterion 3.4).
+   */
+  baseHistoryMdText?: string;
 }
 
 const DEFAULT_PROXY = "/kbd-proxy";
@@ -230,8 +273,11 @@ export async function fetchKeyboardSourceToVfs(
   const stylesheets: KpsStylesheetEntry[] = [];
   const kpsUrl = `${baseUrl}/source/${baseKeyboard.id}.kps`;
   const kpsResp = await getText(kpsUrl, fetchImpl);
-  if (kpsResp.ok && kpsResp.text !== undefined) {
-    const { oskFonts, fileFonts, stylesheets: cssRefs } = parseKpsFontRefs(kpsResp.text);
+  // Hoisted: the welcome-page resolution below (spec 076 R3) reads the same
+  // descriptor for `<WelcomeFile>` and the `welcome\…` `<Files>` entries.
+  const kpsText = kpsResp.ok && kpsResp.text !== undefined ? kpsResp.text : undefined;
+  if (kpsText !== undefined) {
+    const { oskFonts, fileFonts, stylesheets: cssRefs } = parseKpsFontRefs(kpsText);
 
     // Build a deduped map of rawPath -> isOskFont.
     const allRaw = new Map<string, boolean>();
@@ -402,19 +448,38 @@ export async function fetchKeyboardSourceToVfs(
     baseLicenseText = licenseResp.text;
   }
 
-  // spec 061 FR-013: the base's own welcome.htm / help.php, for merge purposes
+  // spec 061 FR-013: the base's own welcome page / help.php, for merge purposes
   // at render time only — not written into the VFS (see baseWelcomeHtmText
   // doc comment). Absence is non-fatal and NOT a warning, same tolerance as
   // baseLicenseText: most bases have no help page at all.
-  let baseWelcomeHtmText: string | undefined;
-  const welcomeResp = await getText(`${baseUrl}/source/welcome.htm`, fetchImpl);
-  if (welcomeResp.ok && welcomeResp.text !== undefined) {
-    baseWelcomeHtmText = welcomeResp.text;
-  }
+  //
+  // spec 076 R3: the welcome page is resolved through the three-step probe
+  // (descriptor-named → folder → flat) and, on the folder convention, its
+  // sibling images come along too.
+  const welcome = await resolveBaseWelcome(baseUrl, kpsText, fetchImpl);
+  const baseWelcomeHtmText = welcome.text;
+  const baseWelcomeConvention = welcome.convention;
+  const baseWelcomeImages = welcome.images;
+  warnings.push(...welcome.warnings);
+
   let baseHelpPhpText: string | undefined;
   const helpPhpResp = await getText(`${baseUrl}/source/help/${baseKeyboard.id}.php`, fetchImpl);
   if (helpPhpResp.ok && helpPhpResp.text !== undefined) {
     baseHelpPhpText = helpPhpResp.text;
+  }
+
+  // spec 076 FR-006: the base's README.md / HISTORY.md, for inheritance at
+  // render time (README prose) and preservation below the new entry (HISTORY,
+  // criterion 3.4). Root-level like LICENSE.md; absence is silent.
+  let baseReadmeMdText: string | undefined;
+  const readmeResp = await getText(`${baseUrl}/README.md`, fetchImpl);
+  if (readmeResp.ok && readmeResp.text !== undefined) {
+    baseReadmeMdText = readmeResp.text;
+  }
+  let baseHistoryMdText: string | undefined;
+  const historyResp = await getText(`${baseUrl}/HISTORY.md`, fetchImpl);
+  if (historyResp.ok && historyResp.text !== undefined) {
+    baseHistoryMdText = historyResp.text;
   }
 
   return {
@@ -426,5 +491,144 @@ export async function fetchKeyboardSourceToVfs(
     ...(baseLicenseText !== undefined ? { baseLicenseText } : {}),
     ...(baseWelcomeHtmText !== undefined ? { baseWelcomeHtmText } : {}),
     ...(baseHelpPhpText !== undefined ? { baseHelpPhpText } : {}),
+    baseWelcomeConvention,
+    ...(baseWelcomeImages.length > 0 ? { baseWelcomeImages } : {}),
+    ...(baseReadmeMdText !== undefined ? { baseReadmeMdText } : {}),
+    ...(baseHistoryMdText !== undefined ? { baseHistoryMdText } : {}),
   };
+}
+
+// ---------------------------------------------------------------------------
+// Welcome-page resolution (spec 076 US2, research R3)
+// ---------------------------------------------------------------------------
+
+/** The `.kps` `<Options><WelcomeFile>` value, or undefined when absent/blank. */
+function parseKpsWelcomeFile(kpsText: string): string | undefined {
+  const m = /<WelcomeFile\s*>([^<]*)<\/WelcomeFile\s*>/i.exec(kpsText);
+  const value = m?.[1]?.trim() ?? "";
+  return value !== "" ? value : undefined;
+}
+
+/**
+ * True when a `source/`-relative reference climbs out of its folder anywhere
+ * (`../x`, `welcome/../../x`). The welcome-folder fetches below reject these
+ * BEFORE building a URL — the same traversal safety net `resolveKpsFontPath`
+ * applies with its `release/` prefix check, applied to both image loops so a
+ * `.kps` entry or an `<img src>` cannot fetch outside the keyboard's folder.
+ */
+function hasTraversal(rel: string): boolean {
+  return rel.split("/").includes("..");
+}
+
+const WELCOME_FOLDER_PREFIX = "welcome/";
+const FOLDER_WELCOME_PAGE = "welcome/welcome.htm";
+const FLAT_WELCOME_PAGE = "welcome.htm";
+
+interface ResolvedBaseWelcome {
+  text: string | undefined;
+  convention: WelcomeConvention;
+  images: WelcomeFolderImage[];
+  warnings: string[];
+}
+
+/**
+ * Locate the base's welcome page and, on the folder convention, its images.
+ *
+ * Order (research R3, spec assumption): the descriptor-named page first, then
+ * `source/welcome/welcome.htm`, then the flat `source/welcome.htm`. Two
+ * refinements keep the spec's edge cases honest:
+ *
+ *   - `folder` WINS when both conventions exist. A descriptor that declares
+ *     the flat name is therefore not taken at its word before the folder page
+ *     has been probed — otherwise a base carrying both would resolve flat and
+ *     the projection would drop the folder's images.
+ *   - A declared name that 404s degrades to the next probe (ghost descriptor
+ *     entry), never to a failure.
+ *
+ * Images are the `welcome\…` `<Files>` entries other than the page, fetched as
+ * bytes. Each miss is skipped and recorded — a listed file the base does not
+ * ship is the base's defect, and the output must still build.
+ */
+async function resolveBaseWelcome(
+  baseUrl: string,
+  kpsText: string | undefined,
+  fetchImpl: FetchFn,
+): Promise<ResolvedBaseWelcome> {
+  const warnings: string[] = [];
+  const declaredRaw = kpsText !== undefined ? parseKpsWelcomeFile(kpsText) : undefined;
+  const declared = declaredRaw !== undefined ? kpsRefToPosix(declaredRaw) : undefined;
+  const declaredIsFolder = declared !== undefined && declared.startsWith(WELCOME_FOLDER_PREFIX);
+
+  let text: string | undefined;
+  let convention: WelcomeConvention = "absent";
+  let pagePath: string | undefined;
+
+  const probe = async (relPath: string): Promise<boolean> => {
+    const resp = await getText(`${baseUrl}/source/${relPath}`, fetchImpl);
+    if (resp.ok && resp.text !== undefined) {
+      text = resp.text;
+      pagePath = relPath;
+      return true;
+    }
+    return false;
+  };
+
+  // 1. Descriptor-named page, when it names a folder-convention file.
+  if (declaredIsFolder && (await probe(declared))) {
+    convention = "folder";
+  } else if (await probe(FOLDER_WELCOME_PAGE)) {
+    // 2. The folder convention (corpus majority) — also the "folder wins" branch
+    //    for a descriptor that declared the flat name.
+    convention = "folder";
+  } else if (
+    // 3. The flat convention: the declared flat name first (it may not be
+    //    literally `welcome.htm`), then the conventional flat name.
+    (declared !== undefined && !declaredIsFolder && declared !== FLAT_WELCOME_PAGE && (await probe(declared))) ||
+    (await probe(FLAT_WELCOME_PAGE))
+  ) {
+    convention = "flat";
+  }
+
+  // Folder images: every `welcome\…` <Files> entry other than the page itself,
+  // in `.kps` order (deterministic, and the order the corpus descriptor uses).
+  const images: WelcomeFolderImage[] = [];
+  const seen = new Set<string>();
+  if (convention === "folder" && kpsText !== undefined) {
+    for (const { name } of parseKpsFiles(kpsText)) {
+      const rel = kpsRefToPosix(name);
+      if (!rel.startsWith(WELCOME_FOLDER_PREFIX) || hasTraversal(rel)) continue;
+      if (rel === pagePath) continue;
+      const key = rel.toLowerCase();
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const r = await getBytes(`${baseUrl}/source/${rel}`, fetchImpl);
+      if (r.ok && r.bytes !== undefined) {
+        images.push({ path: rel, bytes: r.bytes });
+      } else {
+        const detail = r.networkError ? `network error: ${r.networkError}` : `HTTP ${r.status}`;
+        warnings.push(`welcome image ${rel} listed in the .kps was not found (${detail}); skipped`);
+      }
+    }
+  }
+
+  // Then the images the PAGE references that the `.kps` never listed. The
+  // corpus sweep (utilities/welcome-sweep) found 43 of 725 folder-convention
+  // bases in this state — `<img src="mobile_default.png">` beside the page with
+  // no `<File>` entry — and a `.kps`-only fetch would ship those pages with
+  // broken references. Silent on a miss: the projection names images the page
+  // references but nothing carried (its `missingInheritedImages` edge case), so
+  // reporting a 404 here would say the same thing twice.
+  if (convention === "folder" && text !== undefined) {
+    for (const ref of extractWelcomeImageRefs(text)) {
+      if (hasTraversal(ref)) continue;
+      const rel = ref.toLowerCase().startsWith(WELCOME_FOLDER_PREFIX) ? ref : `${WELCOME_FOLDER_PREFIX}${ref}`;
+      const key = rel.toLowerCase();
+      if (rel === pagePath || seen.has(key)) continue;
+      seen.add(key);
+      const r = await getBytes(`${baseUrl}/source/${rel}`, fetchImpl);
+      if (r.ok && r.bytes !== undefined) images.push({ path: rel, bytes: r.bytes });
+    }
+  }
+
+  return { text, convention, images, warnings };
 }

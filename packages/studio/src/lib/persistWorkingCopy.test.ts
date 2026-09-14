@@ -13,6 +13,7 @@ import {
   rehydrateWorkingCopyFromSession,
   snapshotWorkingCopyData,
   prepareWorkingCopySnapshot,
+  BASE_WELCOME_IMAGES_BUDGET_BYTES,
   type WorkingCopySnapshot,
 } from "./persistWorkingCopy.ts";
 import { DRAFT_VERSION } from "./draftPersistence.ts";
@@ -768,6 +769,156 @@ describe("persistWorkingCopy", () => {
       expect(second).not.toBe(first);
       expect(first).toHaveLength(1);
       expect(second).toHaveLength(2);
+    });
+  });
+
+  // spec 076 US2 (T015): the base documentation bundle — three plain slices and
+  // the Base64-encoded, size-budgeted welcome images.
+  describe("base documentation bundle persistence (spec 076 US2)", () => {
+    const IMAGES = [
+      { path: "welcome/desktop_default.png", bytes: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 255]) },
+      { path: "welcome/phone_default.png", bytes: new Uint8Array([1, 2, 3]) },
+    ];
+
+    function instantiate() {
+      useWorkingCopyStore.getState().instantiateFromBase(
+        { id: "kbd", displayName: "Kbd", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
+        { vfs: createVirtualFS(), ir: makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR },
+      );
+      const wc = useWorkingCopyStore.getState();
+      wc.setBaseReadmeMdText("# Base\n");
+      wc.setBaseHistoryMdText("## 1.0 (2020-01-01)\n* Initial release.\n");
+      wc.setBaseWelcomeConvention("folder");
+      wc.setBaseWelcomeImages(IMAGES);
+    }
+
+    it("round-trips all four slices through sessionStorage snapshot/rehydrate, images byte-exact", () => {
+      instantiate();
+      snapshotWorkingCopyToSession();
+      useWorkingCopyStore.getState().reset();
+      expect(useWorkingCopyStore.getState().baseWelcomeImages).toBeNull();
+
+      expect(rehydrateWorkingCopyFromSession()).toBe(true);
+      const s = useWorkingCopyStore.getState();
+      expect(s.baseReadmeMdText).toBe("# Base\n");
+      expect(s.baseHistoryMdText).toBe("## 1.0 (2020-01-01)\n* Initial release.\n");
+      expect(s.baseWelcomeConvention).toBe("folder");
+      expect(s.baseWelcomeImages?.map((i) => i.path)).toEqual(IMAGES.map((i) => i.path));
+      for (let i = 0; i < IMAGES.length; i++) {
+        expect(s.baseWelcomeImages![i]!.bytes).toBeInstanceOf(Uint8Array);
+        expect([...s.baseWelcomeImages![i]!.bytes]).toEqual([...IMAGES[i]!.bytes]);
+      }
+    });
+
+    it("serializes the images as Base64 records, never as sparse JSON objects", () => {
+      instantiate();
+      const snapshot = snapshotWorkingCopyData();
+      expect(snapshot.baseWelcomeImages).toHaveLength(2);
+      expect(snapshot.baseWelcomeImages![0]).toEqual({
+        path: "welcome/desktop_default.png",
+        content: btoa(String.fromCharCode(...IMAGES[0]!.bytes)),
+        isBinary: true,
+      });
+      // The whole snapshot survives JSON, which is what the storage layers do to it.
+      const revived = JSON.parse(JSON.stringify(snapshot)) as WorkingCopySnapshot;
+      expect(prepareWorkingCopySnapshot(revived).baseWelcomeImages?.[1]?.bytes).toEqual(new Uint8Array([1, 2, 3]));
+    });
+
+    it("omits the images from the snapshot when they exceed the size budget, restoring as null (draft survives)", () => {
+      instantiate();
+      useWorkingCopyStore
+        .getState()
+        .setBaseWelcomeImages([{ path: "welcome/huge.png", bytes: new Uint8Array(BASE_WELCOME_IMAGES_BUDGET_BYTES + 1) }]);
+      const snapshot = snapshotWorkingCopyData();
+      expect(snapshot.baseWelcomeImages).toBeUndefined();
+      // ...and the omission is RECORDED, not silent: the restored store knows
+      // the base ships images it no longer holds.
+      expect(snapshot.baseWelcomeImagesDropped).toBe(true);
+      const prepared = prepareWorkingCopySnapshot(snapshot);
+      expect(prepared.baseWelcomeImages).toBeNull();
+      expect(prepared.baseWelcomeImagesDropped).toBe(true);
+      // The plain slices are unaffected by the image budget.
+      expect(prepared.baseWelcomeConvention).toBe("folder");
+    });
+
+    it("does not flag a drop when the images fit, and a fresh carry clears an earlier drop", () => {
+      instantiate();
+      expect(snapshotWorkingCopyData().baseWelcomeImagesDropped).toBe(false);
+      useWorkingCopyStore.setState({ baseWelcomeImages: null, baseWelcomeImagesDropped: true });
+      expect(snapshotWorkingCopyData().baseWelcomeImagesDropped).toBe(true);
+      useWorkingCopyStore.getState().setBaseWelcomeImages(IMAGES);
+      expect(useWorkingCopyStore.getState().baseWelcomeImagesDropped).toBe(false);
+    });
+
+    it("tolerates a pre-076 snapshot with none of the four fields, restoring the store defaults", () => {
+      instantiate();
+      const snapshot = snapshotWorkingCopyData();
+      const legacy = { ...snapshot } as Partial<WorkingCopySnapshot>;
+      delete legacy.baseReadmeMdText;
+      delete legacy.baseHistoryMdText;
+      delete legacy.baseWelcomeConvention;
+      delete legacy.baseWelcomeImages;
+      delete legacy.baseWelcomeImagesDropped;
+
+      const prepared = prepareWorkingCopySnapshot(legacy as WorkingCopySnapshot);
+      expect(prepared.baseReadmeMdText).toBeNull();
+      expect(prepared.baseHistoryMdText).toBeNull();
+      expect(prepared.baseWelcomeConvention).toBeNull();
+      expect(prepared.baseWelcomeImages).toBeNull();
+      expect(prepared.baseWelcomeImagesDropped).toBe(false);
+    });
+  });
+
+  // spec 076 US3 (T025): the two documentation decisions — HISTORY proposal
+  // state and the layout-chart preference — round-trip and tolerate absence.
+  describe("documentation decisions persistence (spec 076 US3)", () => {
+    const ENTRY = {
+      status: "edited" as const,
+      proposal: { version: "1.1", dateIso: "2026-09-12", bullets: ["Adapted from kbd v1.0 via keyboard-studio."] },
+      editedBullets: ["Adapted from kbd v1.0 via keyboard-studio.", "Added 2 characters: a, b"],
+    };
+
+    function instantiate() {
+      useWorkingCopyStore.getState().instantiateFromBase(
+        { id: "kbd", displayName: "Kbd", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
+        { vfs: createVirtualFS(), ir: makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR },
+      );
+    }
+
+    it("round-trips historyEntryState and chartPreference through snapshot/rehydrate", () => {
+      instantiate();
+      useWorkingCopyStore.getState().setHistoryEntryState(ENTRY);
+      useWorkingCopyStore.getState().setChartPreference("regenerate");
+      snapshotWorkingCopyToSession();
+      useWorkingCopyStore.getState().reset();
+      expect(useWorkingCopyStore.getState().historyEntryState).toBeNull();
+      expect(useWorkingCopyStore.getState().chartPreference).toBeNull();
+      expect(rehydrateWorkingCopyFromSession()).toBe(true);
+      expect(useWorkingCopyStore.getState().historyEntryState).toEqual(ENTRY);
+      expect(useWorkingCopyStore.getState().chartPreference).toBe("regenerate");
+    });
+
+    it("tolerates a snapshot written before the fields existed, restoring null", () => {
+      instantiate();
+      const snapshot = snapshotWorkingCopyData();
+      const legacy = { ...snapshot } as Partial<WorkingCopySnapshot>;
+      delete legacy.historyEntryState;
+      delete legacy.chartPreference;
+      const prepared = prepareWorkingCopySnapshot(legacy as WorkingCopySnapshot);
+      expect(prepared.historyEntryState).toBeNull();
+      expect(prepared.chartPreference).toBeNull();
+    });
+
+    it("a fresh instantiation clears both decisions", () => {
+      instantiate();
+      useWorkingCopyStore.getState().setHistoryEntryState(ENTRY);
+      useWorkingCopyStore.getState().setChartPreference("keep-base-images");
+      useWorkingCopyStore.getState().instantiateFromBase(
+        { id: "other", displayName: "Other", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
+        { vfs: createVirtualFS(), ir: makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR },
+      );
+      expect(useWorkingCopyStore.getState().historyEntryState).toBeNull();
+      expect(useWorkingCopyStore.getState().chartPreference).toBeNull();
     });
   });
 });

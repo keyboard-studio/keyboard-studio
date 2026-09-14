@@ -66,7 +66,7 @@ describe("output projection completes the scaffold stubs (Track 1)", () => {
     expect(kps).toContain("<Keyboards>");
     expect(kps).toContain(`<ID>${keyboardId}</ID>`);
 
-    const welcome = readVfsText(projected!.vfs, "source/welcome.htm");
+    const welcome = readVfsText(projected!.vfs, "source/welcome/welcome.htm");
     expect(welcome).toBeDefined();
     expect(welcome!.length).toBeGreaterThan(0);
   });
@@ -91,13 +91,18 @@ describe("output projection completes the scaffold stubs (Track 1)", () => {
 
     const projected = await projectWorkingCopyForOutput();
     expect(projected).not.toBeNull();
-    // LICENSE.md is the stub-only artifact now: step 5c (spec 061) writes
-    // welcome.htm/readme.htm/README.md/help.php on EVERY track (falling back
-    // to the same placeholder text generateStubs used to write), so those
-    // paths' presence no longer distinguishes the tracks. LICENSE.md is
-    // untouched by step 5c, so its absence is what "generateStubs did not
-    // run" looks like from the delivered tree.
-    expect(readVfsText(projected!.vfs, "LICENSE.md")).toBeUndefined();
+    // The tests stub is the stub-only artifact now: step 5c (spec 061) writes
+    // welcome/readme/README/help on EVERY track, and step 5d (spec 076 FR-001)
+    // completes LICENSE.md on every track too, so neither distinguishes the
+    // tracks any more. `tests/<id>_tests.kmn` is written by generateStubs
+    // alone, so its absence is what "generateStubs did not run" looks like
+    // from the delivered tree.
+    expect(readVfsText(projected!.vfs, `tests/${keyboardId}_tests.kmn`)).toBeUndefined();
+    // LICENSE.md IS present — completed by step 5d, and NAMED as generated
+    // (spec 076 FR-001: the six members ship on the PR path as well as the
+    // download path, which is where this completion used to live).
+    expect(readVfsText(projected!.vfs, "LICENSE.md")).toBeDefined();
+    expect(projected!.warnings).toContain("[package] generated missing package files: LICENSE.md");
     // The .kps is NOT a counter-example. Step 5b still skips this track; the
     // descriptor here comes from step 3.6, which runs on BOTH tracks
     // (spec 059 FR-006). It cannot mask imported package metadata — the
@@ -130,7 +135,7 @@ describe("output projection regenerates help docs from helpDocs (spec 061)", () 
 
     expect(readVfsText(projected!.vfs, "README.md")).toContain("A keyboard for testing.");
     expect(readVfsText(projected!.vfs, "source/readme.htm")).toContain("A keyboard for testing.");
-    expect(readVfsText(projected!.vfs, "source/welcome.htm")).toContain("A keyboard for testing.");
+    expect(readVfsText(projected!.vfs, "source/welcome/welcome.htm")).toContain("A keyboard for testing.");
     expect(readVfsText(projected!.vfs, `source/help/${keyboardId}.php`)).toContain(
       "A keyboard for testing.",
     );
@@ -146,12 +151,41 @@ describe("output projection regenerates help docs from helpDocs (spec 061)", () 
     expect(projected).not.toBeNull();
 
     expect(readVfsText(projected!.vfs, "README.md")).toBe(`# ${basicKbdus.displayName}\n`);
-    expect(readVfsText(projected!.vfs, "source/welcome.htm")).toBe(
-      `<html><body><p>Welcome to ${basicKbdus.displayName}</p></body></html>`,
+    // spec 076 FR-013: the placeholder page still references the generated
+    // layout charts (a net-new keyboard has no base images), so the pre-076
+    // bare placeholder is now placeholder + layout section.
+    const welcome = readVfsText(projected!.vfs, "source/welcome/welcome.htm")!;
+    expect(welcome.startsWith(`<html><body><p>Welcome to ${basicKbdus.displayName}</p><h2>Keyboard Layout</h2>`)).toBe(true);
+    expect(welcome).toContain('<img src="ks-layout-desktop-');
+    expect(welcome.endsWith("</body></html>")).toBe(true);
+    // spec 076 FR-003 / US1-3: even an early production's help page opens with
+    // the standard help-site header, above the unchanged placeholder comment.
+    const help = readVfsText(projected!.vfs, `source/help/${keyboardId}.php`);
+    expect(help).toBe(
+      `<?php\n  $pagename = '${basicKbdus.displayName} Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n<?php /* ${basicKbdus.displayName} help */ ?>`,
     );
-    expect(readVfsText(projected!.vfs, `source/help/${keyboardId}.php`)).toBe(
-      `<?php /* ${basicKbdus.displayName} help */ ?>`,
+  });
+
+  it("a fresh help page starts with the standard help-site header and shares the welcome body (spec 076 US1-1)", async () => {
+    const keyboardId = basicKbdus.id;
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: makeFetchedVfs(keyboardId), ir: makeTestIR([]) });
+    useWorkingCopyStore.getState().setHelpDocs({ description: "A keyboard for testing.", usageTips: [] });
+
+    const projected = await projectWorkingCopyForOutput();
+    const help = readVfsText(projected!.vfs, `source/help/${keyboardId}.php`)!;
+    const header = `<?php\n  $pagename = '${basicKbdus.displayName} Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n`;
+    expect(help.startsWith(header)).toBe(true);
+    expect(help.match(/\$pagename =/g)).toHaveLength(1);
+    // spec 076 FR-004: the welcome page's layout section (the generated charts)
+    // is the ONE permitted welcome-side difference; strip it before comparing.
+    const welcomeSansLayout = readVfsText(projected!.vfs, "source/welcome/welcome.htm")!.replace(
+      /\n?<h2>Keyboard Layout<\/h2>[\s\S]*?(?=<\/body>)/,
+      "",
     );
+    expect(help.slice(header.length)).toBe(welcomeSansLayout);
+    expect(welcomeSansLayout).not.toBe(readVfsText(projected!.vfs, "source/welcome/welcome.htm"));
   });
 
   it("regenerates from a REVISED answer on the next production (FR-010/SC-004)", async () => {
@@ -165,8 +199,46 @@ describe("output projection regenerates help docs from helpDocs (spec 061)", () 
     useWorkingCopyStore.getState().setHelpDocs({ description: "Revised answer.", usageTips: [] });
     const second = await projectWorkingCopyForOutput();
 
-    const welcome = readVfsText(second!.vfs, "source/welcome.htm");
+    const welcome = readVfsText(second!.vfs, "source/welcome/welcome.htm");
     expect(welcome).toContain("Revised answer.");
     expect(welcome).not.toContain("First answer.");
+  });
+});
+
+// spec 076 US5/US6 (T045/T054): an early production — no Phase F answers, no
+// HISTORY decision — still ships the HISTORY stub and the generated charts.
+describe("early production (Track 1, nothing answered yet)", () => {
+  function instantiate() {
+    useWorkingCopyStore
+      .getState()
+      .instantiateFromBase(basicKbdus, { vfs: makeFetchedVfs(basicKbdus.id), ir: makeTestIR([]) });
+  }
+
+  it("HISTORY.md is the stub under the keyboard's version, before any proposal decision", async () => {
+    instantiate();
+    const projected = await projectWorkingCopyForOutput();
+    expect(readVfsText(projected!.vfs, "HISTORY.md")).toMatch(/^## 1\.0 \(\d{4}-\d{2}-\d{2}\)\n\* Initial release\.\n$/);
+  });
+
+  it("a dismissed proposal leaves the same stub in place (FR-011)", async () => {
+    instantiate();
+    useWorkingCopyStore.getState().setHistoryEntryState({
+      status: "dismissed",
+      proposal: { version: "1.0", dateIso: "2026-09-12", bullets: ["Added 3 characters: a, b, c"] },
+      editedBullets: null,
+    });
+    const projected = await projectWorkingCopyForOutput();
+    const history = readVfsText(projected!.vfs, "HISTORY.md")!;
+    expect(history).toMatch(/^## 1\.0 \(\d{4}-\d{2}-\d{2}\)\n\* Initial release\.\n$/);
+    expect(history).not.toContain("Added 3 characters");
+  });
+
+  it("still ships the generated layout charts, referenced from the placeholder welcome page (FR-013)", async () => {
+    instantiate();
+    const projected = await projectWorkingCopyForOutput();
+    const charts = projected!.vfs.list("source/welcome/").filter((p) => /ks-layout-.*\.svg$/.test(p));
+    expect(charts.length).toBeGreaterThan(0);
+    const welcome = readVfsText(projected!.vfs, "source/welcome/welcome.htm")!;
+    for (const p of charts) expect(welcome).toContain(p.slice("source/welcome/".length));
   });
 });

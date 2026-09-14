@@ -354,6 +354,36 @@ describe("OutputScreen — output-time touch-layout staleness gate", () => {
     renderWithReadyOutput();
     expect(screen.queryByText(/touch step/i)).toBeNull();
   });
+
+  // spec 076 FR-018 regression: the documentation checklist is informational.
+  // With every prose member still on its placeholder (no Phase F answers, no
+  // HISTORY proposal decision), BOTH output surfaces stay enabled.
+  it("documentation placeholders never gate download or submit (spec 076 FR-018)", () => {
+    renderWithReadyOutput();
+    const checklist = screen.getByTestId("documentation-checklist");
+    const placeholderRows = ["readme-md", "history-md", "readme-htm", "welcome-htm", "help-php"];
+    for (const m of placeholderRows) {
+      expect(screen.getByTestId(`doc-member-${m}`).textContent).toMatch(/placeholder/);
+    }
+    expect(checklist).toBeTruthy();
+
+    const downloadBtn = screen.getByTestId("emit-download") as HTMLButtonElement;
+    expect(downloadBtn.disabled).toBe(false);
+    const kmpBtn = screen.getByTestId("emit-download-kmp") as HTMLButtonElement;
+    expect(kmpBtn.disabled).toBe(false);
+
+    const nameInput = screen.getByRole("textbox", { name: /your name/i });
+    fireEvent.change(nameInput, { target: { value: "Jane" } });
+    fireEvent.blur(nameInput);
+    const emailInput = screen.getByRole("textbox", { name: /email address/i });
+    fireEvent.change(emailInput, { target: { value: "jane@example.com" } });
+    fireEvent.blur(emailInput);
+    fireEvent.click(screen.getByRole("checkbox"));
+    const submitBtn = screen.getByRole("button", {
+      name: /submit keyboard to community repository/i,
+    }) as HTMLButtonElement;
+    expect(submitBtn.disabled).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------

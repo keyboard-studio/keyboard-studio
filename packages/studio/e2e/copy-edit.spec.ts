@@ -25,7 +25,6 @@ import { expectNoSeriousAxeViolations } from "./helpers/axe";
 import { OUTPUT_SCREEN_DEBT } from "./helpers/contrastDebt";
 import { unzipSync } from "fflate";
 import * as fs from "node:fs";
-import * as path from "node:path";
 import {
   driveIdentityLite,
   pickBaseKeyboard,
@@ -338,6 +337,14 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     await completePhaseB(page);
     await finishGalleryWork(page);
     await navigateToOutput(page);
+    // spec 076 FR-017: the documentation checklist is present on Output — six
+    // rows, informational (the download below still proceeds with rows on
+    // placeholder, FR-018).
+    const checklist = page.getByTestId("documentation-checklist");
+    await expect(checklist).toBeVisible();
+    for (const member of ["readme-md", "history-md", "license-md", "readme-htm", "welcome-htm", "help-php"]) {
+      await expect(checklist.getByTestId(`doc-member-${member}`)).toBeVisible();
+    }
     const download = await triggerDownload(page);
 
     const dlPath = await download.path();
@@ -378,12 +385,23 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     expect(kvks, "zip must contain a .kvks visual keyboard file").toBeDefined();
     expect(kvks![1].length, ".kvks must be non-empty").toBeGreaterThan(0);
 
-    // Check for welcome.htm
-    const welcome = entries.find(
-      ([name]) => path.basename(name).toLowerCase() === "welcome.htm",
-    );
-    expect(welcome, "zip must contain welcome.htm").toBeDefined();
-    expect(welcome![1].length, "welcome.htm must be non-empty").toBeGreaterThan(0);
+    // spec 076 FR-001/FR-002: all six documentation members ship, the welcome
+    // page under the folder convention and nowhere else.
+    const zipPaths = entries.map(([name]) => name.replace(/\\/g, "/"));
+    const has = (suffix: string) => zipPaths.find((p) => p.endsWith(suffix));
+    for (const member of ["README.md", "HISTORY.md", "LICENSE.md", "source/readme.htm", "source/welcome/welcome.htm"]) {
+      const found = has(member);
+      expect(found, `zip must contain ${member}`).toBeDefined();
+      expect(entries.find(([n]) => n.replace(/\\/g, "/") === found)![1].length, `${member} must be non-empty`).toBeGreaterThan(0);
+    }
+    expect(zipPaths.some((p) => /(^|\/)source\/welcome\.htm$/.test(p)), "no flat source/welcome.htm").toBe(false);
+    // spec 076 FR-003: the fresh help page opens with the standard help-site header.
+    const help = entries.find(([name]) => /source[\\/]help[\\/][^\\/]+\.php$/.test(name));
+    expect(help, "zip must contain source/help/<id>.php").toBeDefined();
+    const helpText = new TextDecoder().decode(help![1]);
+    expect(helpText.startsWith("<?php")).toBe(true);
+    expect(helpText).toContain("$pagename = ");
+    expect(helpText).toContain("require_once('header.php')");
   });
 });
 

@@ -188,7 +188,8 @@ describe("buildKpsContent — the parts this feature does NOT own (contract §2)
     const kps = buildKpsContent("bm_sil", { displayName: "Bambara" }, KMN);
     expect(kps).toContain("<FollowKeyboardVersion/>");
     expect(kps).toContain("<ReadMeFile>readme.htm</ReadMeFile>");
-    expect(kps).toContain("<WelcomeFile>welcome.htm</WelcomeFile>");
+    // spec 076 FR-002: the folder convention, in the corpus's backslash form.
+    expect(kps).toContain("<WelcomeFile>welcome\\welcome.htm</WelcomeFile>");
     expect(kps.startsWith('<?xml version="1.0" encoding="utf-8"?>')).toBe(true);
   });
 
@@ -196,5 +197,60 @@ describe("buildKpsContent — the parts this feature does NOT own (contract §2)
     const kps = buildKpsContent("bm_sil", { displayName: "Bambara" }, KMN);
     expect(kps).toContain("<Name>..\\LICENSE.md</Name>");
     expect(kps).toMatch(/<Name>\.\.\\LICENSE\.md<\/Name>\s*<FileType>\.md<\/FileType>/);
+  });
+});
+
+/** Every `<File><Name>` value, in document order. */
+function fileNames(kps: string): string[] {
+  return [...kps.matchAll(/<Name>([^<]*)<\/Name>\s*<FileType>/g)].map((m) => m[1] ?? "");
+}
+
+// spec 076 FR-002 / FR-006 (T011): the welcome page ships in the `welcome\`
+// folder with its images, each listed backslash-relative — the corpus form.
+describe("buildKpsContent — the welcome folder (spec 076 FR-002, FR-006)", () => {
+  it("lists welcome\\welcome.htm and names it as the <WelcomeFile>; never the flat welcome.htm", () => {
+    const kps = buildKpsContent("bm_sil", { displayName: "Bambara" }, KMN);
+    expect(fileNames(kps)).toContain("welcome\\welcome.htm");
+    expect(fileNames(kps)).not.toContain("welcome.htm");
+    expect(kps).toContain("<WelcomeFile>welcome\\welcome.htm</WelcomeFile>");
+  });
+
+  it("lists every welcome-folder file after the page, backslash-relative, with its FileType", () => {
+    const kps = buildKpsContent("bm_sil", { displayName: "Bambara" }, KMN, "1.0", [
+      "desktop_layout_default.png",
+      "ks-layout-phone-shift.svg",
+    ]);
+    const names = fileNames(kps);
+    const page = names.indexOf("welcome\\welcome.htm");
+    expect(names.slice(page, page + 3)).toEqual([
+      "welcome\\welcome.htm",
+      "welcome\\desktop_layout_default.png",
+      "welcome\\ks-layout-phone-shift.svg",
+    ]);
+    expect(kps).toMatch(
+      /<Name>welcome\\desktop_layout_default\.png<\/Name>\s*<FileType>\.png<\/FileType>/,
+    );
+    expect(kps).toMatch(/<Name>welcome\\ks-layout-phone-shift\.svg<\/Name>\s*<FileType>\.svg<\/FileType>/);
+  });
+
+  it("normalises caller spellings: a welcome/ prefix is stripped, the page itself and duplicates are dropped, nesting keeps backslashes", () => {
+    const kps = buildKpsContent("bm_sil", { displayName: "Bambara" }, KMN, "1.0", [
+      "welcome/a.png",
+      "welcome\\a.png",
+      "A.PNG",
+      "welcome.htm",
+      "welcome/welcome.htm",
+      " ",
+      "sub/b.png",
+    ]);
+    const welcomeEntries = fileNames(kps).filter((n) => n.toLowerCase().startsWith("welcome\\"));
+    expect(welcomeEntries).toEqual(["welcome\\welcome.htm", "welcome\\a.png", "welcome\\sub\\b.png"]);
+  });
+
+  it("produces a byte-identical descriptor for the same inputs (SC-004)", () => {
+    const files = ["b.png", "a.png"];
+    expect(buildKpsContent("bm_sil", { displayName: "Bambara" }, KMN, "1.0", files)).toBe(
+      buildKpsContent("bm_sil", { displayName: "Bambara" }, KMN, "1.0", files),
+    );
   });
 });

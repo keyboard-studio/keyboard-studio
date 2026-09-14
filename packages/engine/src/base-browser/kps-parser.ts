@@ -156,6 +156,20 @@ export interface KpsFileEntry {
 }
 
 /**
+ * A `.kps` member reference as a `source/`-relative POSIX path: trimmed,
+ * backslashes become slashes, a leading `./` is dropped. Case is PRESERVED
+ * (the result may become a VFS key); callers comparing references lowercase
+ * it themselves. `..`-relative references (`..\build\…`, `..\LICENSE.md`) are
+ * left as they are — resolving them is the caller's decision, not this
+ * normaliser's. Shared by the loader's welcome resolution and the descriptor
+ * writer's welcome-path migration (spec 076), so both read a `<Name>` the
+ * same way.
+ */
+export function kpsRefToPosix(name: string): string {
+  return name.trim().replace(/\\/g, "/").replace(/^\.\//, "");
+}
+
+/**
  * Walk every `<File>` block in the .kps XML and yield its `<Name>` + `<FileType>`.
  * The single `<File>`-block walker shared by {@link extractFileBlocks} (which
  * filters by font/stylesheet type) and the facet-index reader (which needs the

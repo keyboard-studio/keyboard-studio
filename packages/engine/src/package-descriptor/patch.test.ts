@@ -325,3 +325,124 @@ describe("applyIdentityToKps — failure names itself rather than throwing (FR-0
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// spec 076 FR-002 (T012): the welcome-path migration — the one sanctioned
+// <Options>/<Files> write. A pre-076 descriptor (flat `welcome.htm`) is moved to
+// the folder form; the files the projection ships beside the page are listed;
+// every rewrite is NAMED.
+// ---------------------------------------------------------------------------
+
+/** The pre-076 scaffolder stub: today's generate output with the flat name in both places. */
+function flatWelcomeDescriptor(id = "bm_sil"): string {
+  return frenchBaseDescriptor(id).replace(/welcome\\welcome\.htm/g, "welcome.htm");
+}
+
+function fileNames(kps: string): string[] {
+  return [...kps.matchAll(/<Name>([^<]*)<\/Name>\s*<FileType>/g)].map((m) => m[1] ?? "");
+}
+
+describe("applyIdentityToKps — welcome-path migration (spec 076 FR-002)", () => {
+  it("rewrites a flat <WelcomeFile> and <File> to welcome\\welcome.htm and reports both", () => {
+    const vfs = vfsWith("source/bm_sil.kps", flatWelcomeDescriptor());
+    const result = applyIdentityToKps(vfs, "bm_sil", { displayName: "Bambara", languageTag: "bm" }, KMN);
+
+    const kps = textAt(vfs, "source/bm_sil.kps");
+    expect(kps).toContain("<WelcomeFile>welcome\\welcome.htm</WelcomeFile>");
+    expect(fileNames(kps)).toContain("welcome\\welcome.htm");
+    expect(fileNames(kps)).not.toContain("welcome.htm");
+    expect(kps).not.toContain(">welcome.htm<");
+    expect(result.warnings).toEqual([
+      "[package-descriptor] migrated welcome path in source/bm_sil.kps: <WelcomeFile> welcome.htm -> welcome\\welcome.htm",
+      "[package-descriptor] migrated welcome path in source/bm_sil.kps: <File> welcome.htm -> welcome\\welcome.htm",
+    ]);
+  });
+
+  it("rewrites a BLANK <WelcomeFile></WelcomeFile> too, so the shipped page is never orphaned", () => {
+    const blank = frenchBaseDescriptor().replace(
+      /<WelcomeFile>[^<]*<\/WelcomeFile>/,
+      "<WelcomeFile></WelcomeFile>",
+    );
+    const vfs = vfsWith("source/bm_sil.kps", blank);
+    const result = applyIdentityToKps(vfs, "bm_sil", { displayName: "Bambara" }, KMN);
+    expect(textAt(vfs, "source/bm_sil.kps")).toContain("<WelcomeFile>welcome\\welcome.htm</WelcomeFile>");
+    expect(result.warnings).toEqual([
+      "[package-descriptor] migrated welcome path in source/bm_sil.kps: <WelcomeFile> (blank) -> welcome\\welcome.htm",
+    ]);
+  });
+
+  it("appends the welcome-folder files the projection ships, once each, and reports them", () => {
+    const vfs = vfsWith("source/bm_sil.kps", frenchBaseDescriptor());
+    const result = applyIdentityToKps(
+      vfs,
+      "bm_sil",
+      { displayName: "Bambara", languageTag: "bm" },
+      KMN,
+      undefined,
+      ["desktop_default.png", "welcome/desktop_default.png", "ks-layout-phone-default.svg"],
+    );
+
+    const names = fileNames(textAt(vfs, "source/bm_sil.kps"));
+    expect(names.filter((n) => n === "welcome\\desktop_default.png")).toHaveLength(1);
+    expect(names).toContain("welcome\\ks-layout-phone-default.svg");
+    // Appended AFTER the existing entries, so nothing the base listed moves.
+    expect(names.indexOf("welcome\\ks-layout-phone-default.svg")).toBeGreaterThan(names.indexOf("..\\LICENSE.md"));
+    expect(textAt(vfs, "source/bm_sil.kps")).toMatch(
+      /<Name>welcome\\desktop_default\.png<\/Name>\s*<FileType>\.png<\/FileType>/,
+    );
+    expect(result.warnings).toEqual([
+      "[package-descriptor] migrated welcome path in source/bm_sil.kps: appended <File> welcome\\desktop_default.png",
+      "[package-descriptor] migrated welcome path in source/bm_sil.kps: appended <File> welcome\\ks-layout-phone-default.svg",
+    ]);
+  });
+
+  it("does not re-append a folder file the descriptor already lists (case-insensitive)", () => {
+    const listed = frenchBaseDescriptor().replace(
+      "  </Files>",
+      "    <File>\n      <Name>welcome\\Chart.PNG</Name>\n      <FileType>.png</FileType>\n    </File>\n  </Files>",
+    );
+    const vfs = vfsWith("source/bm_sil.kps", listed);
+    const result = applyIdentityToKps(vfs, "bm_sil", { displayName: "Bambara" }, KMN, undefined, ["chart.png"]);
+    expect(fileNames(textAt(vfs, "source/bm_sil.kps")).filter((n) => n.toLowerCase() === "welcome\\chart.png")).toHaveLength(1);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("is a byte-for-byte no-op with no warnings on an already-migrated descriptor (contract §2 still holds)", () => {
+    const before = frenchBaseDescriptor();
+    const vfs = vfsWith("source/bm_sil.kps", before);
+    const result = applyIdentityToKps(vfs, "bm_sil", { displayName: "French AZERTY", languageTag: "fr" }, KMN);
+    const after = textAt(vfs, "source/bm_sil.kps");
+    expect(after.match(/<Files>[\s\S]*?<\/Files>/)?.[0]).toBe(before.match(/<Files>[\s\S]*?<\/Files>/)?.[0]);
+    expect(after.match(/<Options>[\s\S]*?<\/Options>/)?.[0]).toBe(before.match(/<Options>[\s\S]*?<\/Options>/)?.[0]);
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("leaves a descriptor that lists no welcome page at all alone (no invented entry)", () => {
+    const noWelcome = frenchBaseDescriptor()
+      .replace(/    <File>\n      <Name>welcome\\welcome\.htm<\/Name>\n      <FileType>\.htm<\/FileType>\n    <\/File>\n/, "")
+      .replace(/    <WelcomeFile>[^<]*<\/WelcomeFile>\n/, "");
+    const vfs = vfsWith("source/bm_sil.kps", noWelcome);
+    const result = applyIdentityToKps(vfs, "bm_sil", { displayName: "Bambara" }, KMN);
+    expect(fileNames(textAt(vfs, "source/bm_sil.kps"))).not.toContain("welcome\\welcome.htm");
+    expect(result.warnings).toEqual([]);
+  });
+
+  it("names the files it could not list when the descriptor has no <Files> block", () => {
+    const vfs = vfsWith(
+      "source/bm_sil.kps",
+      "<Package>\n  <Info>\n    <Name URL=\"\">X</Name>\n  </Info>\n  <Keyboards>\n    <Keyboard>\n      <Name>X</Name>\n      <ID>bm_sil</ID>\n    </Keyboard>\n  </Keyboards>\n</Package>\n",
+    );
+    const result = applyIdentityToKps(vfs, "bm_sil", { displayName: "Bambara" }, KMN, undefined, ["a.png"]);
+    expect(result.warnings).toContain(
+      "[package-descriptor] could not list welcome-folder files in source/bm_sil.kps (no <Files> block): a.png",
+    );
+  });
+
+  it("GENERATES a descriptor that lists the welcome-folder files (adapt track)", () => {
+    const vfs = createVirtualFS();
+    applyIdentityToKps(vfs, "bm_sil", { displayName: "Bambara" }, KMN, "1.1", ["a.png"]);
+    const names = fileNames(textAt(vfs, "source/bm_sil.kps"));
+    expect(names).toContain("welcome\\welcome.htm");
+    expect(names).toContain("welcome\\a.png");
+  });
+});

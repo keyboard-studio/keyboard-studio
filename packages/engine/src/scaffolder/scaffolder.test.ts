@@ -173,7 +173,7 @@ describe("createScaffolderService", () => {
         "source/my_keyboard.kps",
         "source/my_keyboard.kvks",
         "source/my_keyboard.keyman-touch-layout",
-        "source/welcome.htm",
+        "source/welcome/welcome.htm",
         "source/readme.htm",
         "source/help/my_keyboard.php",
         "LICENSE.md",
@@ -421,7 +421,7 @@ describe("scaffold — displayName sanitization", () => {
   it("HTML-escapes < > & in welcome.htm", async () => {
     const service = createScaffolderService({ fetchImpl: makeFetch(BASE_KMN) as typeof fetch });
     const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "<script>alert('xss')</script>");
-    const content = vfs.get("source/welcome.htm")!.content as string;
+    const content = vfs.get("source/welcome/welcome.htm")!.content as string;
     expect(content).not.toContain("<script>");
     expect(content).toContain("&lt;script&gt;");
   });
@@ -437,9 +437,14 @@ describe("scaffold — displayName sanitization", () => {
     const service = createScaffolderService({ fetchImpl: makeFetch(BASE_KMN) as typeof fetch });
     const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard */ eval('bad')");
     const content = vfs.get("source/help/my_keyboard.php")!.content as string;
+    // spec 076 FR-003: the stub now opens with the help-site header, whose
+    // single-quoted $pagename may legitimately contain '*/' (not a comment
+    // there). The comment block below it is what must be defused.
+    expect(content.startsWith("<?php\n  $pagename = '")).toBe(true);
+    const comment = content.slice(content.indexOf("<?php /*"));
     // The injected '*/' must be defused; the template's own closing '*/' is still present.
-    expect(content).toContain("My Keyboard * / eval");
-    expect(content).not.toContain("My Keyboard */");
+    expect(comment).toContain("My Keyboard * / eval");
+    expect(comment).not.toContain("My Keyboard */");
   });
 
   it("strips newlines from displayName (prevents KMN line injection)", async () => {

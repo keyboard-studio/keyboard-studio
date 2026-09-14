@@ -7,10 +7,10 @@
 //
 // Pipeline:
 //   projectWorkingCopyForOutput()   carve + assignments + identity + descriptor
-//                                   + id rename  (shared with the PR path)
-//     -> ensurePackageFiles()       LICENSE the descriptor lists (welcome.htm/
-//                                   readme.htm are written unconditionally by
-//                                   projectWorkingCopyForOutput itself — spec 061)
+//                                   + id rename + every documentation member
+//                                   (spec 061 / spec 076 — LICENSE.md completion
+//                                   included, so the PR path ships it too; it
+//                                   used to be completed HERE, download-only)
 //     -> compile()                  the projected .kmn, under its final id
 //     -> stage build/<id>.{kmx,kvk,js}
 //
@@ -24,10 +24,9 @@
 // This is NOT a second validation cycle (decision D3): it runs once per explicit
 // download click and emits no live diagnostics into the editor.
 
-import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type { CompilerDiagnostic, VirtualFS } from "@keyboard-studio/contracts";
 import { projectWorkingCopyForOutput, zipProjectedVfs } from "./serializeWorkingCopy.ts";
-import { getBuildKmp, getCompile, getEnsurePackageFiles } from "./services.ts";
+import { getBuildKmp, getCompile } from "./services.ts";
 
 /** The compiled artifacts, keyed the way `buildKmp` expects them. */
 export interface OutputArtifacts {
@@ -82,26 +81,9 @@ export async function buildOutputBundle(): Promise<OutputBundle | null> {
   const { vfs, keyboardId, displayName, version } = projected;
   const warnings = [...projected.warnings];
 
-  // The descriptor lists LICENSE.md; the adapt track may have none of its own.
-  // Report what had to be synthesized — a silently generated file is how the
-  // missing descriptor stayed invisible for as long as it did.
-  try {
-    const ensurePackageFiles = await getEnsurePackageFiles();
-    // No copyright holder is plumbed: `IdentityPatch` does not carry one (only
-    // the projection's own input shape does), so the stub omits the copyright
-    // line rather than inventing a store field for it here.
-    const { created } = ensurePackageFiles({ vfs });
-    if (created.length > 0) {
-      devLog.info("[output] synthesized package files:", created);
-      warnings.push(
-        `[package] generated missing package files: ${created.join(", ")}`,
-      );
-    }
-  } catch (err: unknown) {
-    // Non-fatal: if the files already exist the package builds anyway, and if
-    // they do not the package builder reports the missing member by name.
-    devLog.warn("[output] ensurePackageFiles unavailable:", err);
-  }
+  // LICENSE.md completion moved INTO projectWorkingCopyForOutput (spec 076
+  // FR-001): a member completed only here never reached the pull-request path,
+  // which projects the same tree without coming through this function.
 
   // Compile the PROJECTED copy under its FINAL id.
   const compile = await getCompile();

@@ -19,9 +19,16 @@ import type { TrackPayload } from "./flowStepOptions.tsx";
 import type { FlowStepDeps } from "./makeFlowStepComponent.tsx";
 import pfContactInfoMod from "../../survey/questions/f/pf_contact_info.ts";
 import pfCreditsMod from "../../survey/questions/f/pf_credits.ts";
+import pfWelcomeParagraphMod from "../../survey/questions/f/pf_welcome_paragraph.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-import type { HelpDocsAnswers, SurveyAnswer, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type {
+  BaseDocumentationProfile,
+  HelpDocsAnswers,
+  HistoryEntryState,
+  SurveyAnswer,
+  SurveyPhaseResult,
+} from "@keyboard-studio/contracts";
 
 afterEach(() => {
   useSurveySessionStore.getState().reset();
@@ -40,6 +47,7 @@ function buildDeps(overrides?: Partial<FlowStepDeps>): {
   setScaffoldSpecSpy: ReturnType<typeof vi.fn>;
   setIdentitySpy: ReturnType<typeof vi.fn>;
   setHelpDocsSpy: ReturnType<typeof vi.fn>;
+  setHistoryEntryStateSpy: ReturnType<typeof vi.fn>;
 } {
   const setSelectedTrackSpy = vi.fn(
     (t: "copy" | "adapt" | null) => useSurveySessionStore.getState().setSelectedTrack(t),
@@ -55,6 +63,9 @@ function buildDeps(overrides?: Partial<FlowStepDeps>): {
   const setHelpDocsSpy = vi.fn(
     (patch: HelpDocsAnswers | null) => useWorkingCopyStore.getState().setHelpDocs(patch),
   );
+  const setHistoryEntryStateSpy = vi.fn(
+    (state: HistoryEntryState | null) => useWorkingCopyStore.getState().setHistoryEntryState(state),
+  );
 
   const deps: FlowStepDeps = {
     localBase: null,
@@ -68,10 +79,19 @@ function buildDeps(overrides?: Partial<FlowStepDeps>): {
     selectedTrack: null,
     scaffoldSpec: null,
     setHelpDocs: setHelpDocsSpy,
+    historyEntryState: null,
+    setHistoryEntryState: setHistoryEntryStateSpy,
     ...overrides,
   };
 
-  return { deps, setSelectedTrackSpy, setScaffoldSpecSpy, setIdentitySpy, setHelpDocsSpy };
+  return {
+    deps,
+    setSelectedTrackSpy,
+    setScaffoldSpecSpy,
+    setIdentitySpy,
+    setHelpDocsSpy,
+    setHistoryEntryStateSpy,
+  };
 }
 
 function buildResult(
@@ -222,16 +242,49 @@ describe("trackOptions.onCommit", () => {
 // ---------------------------------------------------------------------------
 
 describe("phaseFOptions.buildContext", () => {
-  it("returns deps.surveyContext unchanged (direct passthrough — buildContext never reads a store itself)", () => {
+  it("passes deps.surveyContext through, plus the (empty, undrived-yet) HISTORY tokens", () => {
     const ctx = { language_name: "Hausa", detected_group: "qwerty-qwertz", bcp47_tag: "ha-Latn" };
     const { deps } = buildDeps({ surveyContext: ctx });
 
-    expect(phaseFOptions.buildContext(deps)).toEqual(ctx);
+    expect(phaseFOptions.buildContext(deps)).toEqual({
+      ...ctx,
+      history_heading: "",
+      history_bullets: "",
+    });
   });
 
-  it("returns an empty object when deps.surveyContext is empty (default)", () => {
+  it("returns just the (empty) HISTORY tokens when deps.surveyContext is empty (default)", () => {
     const { deps } = buildDeps({ surveyContext: {} });
-    expect(phaseFOptions.buildContext(deps)).toEqual({});
+    expect(phaseFOptions.buildContext(deps)).toEqual({ history_heading: "", history_bullets: "" });
+  });
+
+  // spec 076 US5: once onMount has derived a proposal (historyEntryState
+  // non-null), buildContext injects its heading + bullets as tokens
+  // pf_history_entry.ts's help_text interpolates.
+  it("injects history_heading / history_bullets from a derived historyEntryState", () => {
+    const state: HistoryEntryState = {
+      status: "proposed",
+      proposal: { version: "1.1", dateIso: "2026-01-15", bullets: ["Added 2 characters: é, è"] },
+      editedBullets: null,
+    };
+    const { deps } = buildDeps({ historyEntryState: state });
+
+    const ctx = phaseFOptions.buildContext(deps);
+    expect(ctx["history_heading"]).toBe("## 1.1 (2026-01-15)");
+    expect(ctx["history_bullets"]).toBe("- Added 2 characters: é, è");
+  });
+
+  it("prefers editedBullets over the drafted proposal.bullets once the author has edited", () => {
+    const state: HistoryEntryState = {
+      status: "edited",
+      proposal: { version: "1.1", dateIso: "2026-01-15", bullets: ["drafted bullet"] },
+      editedBullets: ["My own bullet one", "My own bullet two"],
+    };
+    const { deps } = buildDeps({ historyEntryState: state });
+
+    expect(phaseFOptions.buildContext(deps)["history_bullets"]).toBe(
+      "- My own bullet one\n- My own bullet two",
+    );
   });
 });
 
@@ -303,6 +356,138 @@ describe("phaseFOptions.onCommit", () => {
 
     expect(setHelpDocsSpy).not.toHaveBeenCalled();
     expect(useWorkingCopyStore.getState().helpDocs).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// phaseFOptions.onMount (spec 076 US5) — derives the HISTORY proposal once
+// per mount, identity-guarded against re-stamping dateIso on a same-version
+// re-derivation.
+// ---------------------------------------------------------------------------
+
+describe("phaseFOptions.onMount", () => {
+  it("declares onMount", () => {
+    expect(phaseFOptions.onMount).toBeDefined();
+  });
+
+  it("derives a fresh 'proposed' state on first mount (previous === null)", () => {
+    const { deps, setHistoryEntryStateSpy } = buildDeps({ historyEntryState: null });
+
+    phaseFOptions.onMount!(deps);
+
+    expect(setHistoryEntryStateSpy).toHaveBeenCalledTimes(1);
+    const written = useWorkingCopyStore.getState().historyEntryState;
+    expect(written?.status).toBe("proposed");
+    expect(written?.proposal.version).toBe("1.0"); // no baseIr set -> "1.0" default
+    expect(written?.proposal.bullets).toEqual(["Initial release."]); // empty decision record
+  });
+
+  // research R12: a re-derivation at the SAME version must not re-stamp
+  // dateIso (or fire a redundant store write at all — identity-guarded).
+  it("an unchanged version does not re-stamp the stored dateIso, and does not write again", () => {
+    const previous: HistoryEntryState = {
+      status: "confirmed",
+      proposal: { version: "1.0", dateIso: "2020-01-01", bullets: ["Initial release."] },
+      editedBullets: null,
+    };
+    const { deps, setHistoryEntryStateSpy } = buildDeps({ historyEntryState: previous });
+
+    phaseFOptions.onMount!(deps);
+
+    expect(setHistoryEntryStateSpy).not.toHaveBeenCalled();
+  });
+
+  it("a version bump (adaptation) re-derives the heading but PRESERVES the original dateIso and status", () => {
+    useWorkingCopyStore.setState({ instantiationMode: "adapt-existing" });
+    const previous: HistoryEntryState = {
+      status: "confirmed",
+      proposal: { version: "1.0", dateIso: "2020-01-01", bullets: ["Initial release."] },
+      editedBullets: null,
+    };
+    const { deps, setHistoryEntryStateSpy } = buildDeps({ historyEntryState: previous });
+
+    phaseFOptions.onMount!(deps);
+
+    expect(setHistoryEntryStateSpy).toHaveBeenCalledTimes(1);
+    const written = useWorkingCopyStore.getState().historyEntryState;
+    expect(written?.proposal.version).toBe("1.1"); // bumpKeyboardVersion("1.0")
+    expect(written?.proposal.dateIso).toBe("2020-01-01"); // preserved, not re-stamped
+    expect(written?.status).toBe("confirmed"); // carried forward untouched
+  });
+});
+
+// ---------------------------------------------------------------------------
+// phaseFOptions.onCommit — pf_history_entry confirm/edit/dismiss (spec 076 US5)
+// ---------------------------------------------------------------------------
+
+function historyResult(
+  action: "confirm" | "edit" | "dismiss" | "",
+  bulletsText?: string,
+): SurveyPhaseResult {
+  const answers: SurveyAnswer[] = [];
+  if (action !== "") {
+    answers.push({ questionId: "pf_history_entry", answerType: "select", value: action });
+  }
+  if (bulletsText !== undefined) {
+    answers.push({ questionId: "pf_history_entry_bullets", answerType: "text", value: bulletsText });
+  }
+  return buildResultG(answers);
+}
+
+const PROPOSED: HistoryEntryState = {
+  status: "proposed",
+  proposal: { version: "1.0", dateIso: "2026-01-15", bullets: ["Initial release."] },
+  editedBullets: null,
+};
+
+describe("phaseFOptions.onCommit — pf_history_entry", () => {
+  it("confirm: reaches the store as status 'confirmed', editedBullets cleared", () => {
+    const { deps, setHistoryEntryStateSpy } = buildDeps({ historyEntryState: PROPOSED });
+
+    phaseFOptions.onCommit!(historyResult("confirm"), deps);
+
+    expect(setHistoryEntryStateSpy).toHaveBeenCalledExactlyOnceWith({
+      ...PROPOSED,
+      status: "confirmed",
+      editedBullets: null,
+    });
+    expect(useWorkingCopyStore.getState().historyEntryState?.status).toBe("confirmed");
+  });
+
+  it("edit: reaches the store as status 'edited' with the author's parsed bullets", () => {
+    const { deps } = buildDeps({ historyEntryState: PROPOSED });
+
+    phaseFOptions.onCommit!(historyResult("edit", "My rewritten bullet.\nA second one."), deps);
+
+    const written = useWorkingCopyStore.getState().historyEntryState;
+    expect(written?.status).toBe("edited");
+    expect(written?.editedBullets).toEqual(["My rewritten bullet.", "A second one."]);
+  });
+
+  it("dismiss: reaches the store as status 'dismissed', editedBullets cleared", () => {
+    const { deps } = buildDeps({ historyEntryState: PROPOSED });
+
+    phaseFOptions.onCommit!(historyResult("dismiss"), deps);
+
+    expect(useWorkingCopyStore.getState().historyEntryState?.status).toBe("dismissed");
+    expect(useWorkingCopyStore.getState().historyEntryState?.editedBullets).toBeNull();
+  });
+
+  it("blank/absent answer (not yet decided): does NOT touch the store", () => {
+    const { deps, setHistoryEntryStateSpy } = buildDeps({ historyEntryState: PROPOSED });
+
+    phaseFOptions.onCommit!(historyResult(""), deps);
+
+    expect(setHistoryEntryStateSpy).not.toHaveBeenCalled();
+    expect(useWorkingCopyStore.getState().historyEntryState).toBeNull(); // reset() default
+  });
+
+  it("does nothing when historyEntryState is null (onMount never ran — defensive)", () => {
+    const { deps, setHistoryEntryStateSpy } = buildDeps({ historyEntryState: null });
+
+    phaseFOptions.onCommit!(historyResult("confirm"), deps);
+
+    expect(setHistoryEntryStateSpy).not.toHaveBeenCalled();
   });
 });
 
@@ -492,5 +677,95 @@ describe("phaseFOptions.seeds — pf_contact_info pre-fill", () => {
   it("pre-filling does not make either question required", () => {
     expect(pfContactInfoMod.definition.required).toBe(false);
     expect(pfCreditsMod.definition.required).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// phaseFOptions.seeds — pf_welcome_paragraph adaptive description proposal
+// (spec 076 FR-009, US4). Reads the four working-copy slices directly off
+// useWorkingCopyStore.getState() (not FlowStepDeps — see
+// readAdaptiveDescriptionContext's doc in flowStepOptions.tsx), so these
+// tests set up REAL store state rather than passing it through `deps`.
+// End-to-end coverage (the seed actually reaching SurveyRunner's rendered
+// input, and the required-override actually gating Next) lives in
+// survey/PhaseFAdaptiveDescription.integration.test.tsx (SC-005).
+// ---------------------------------------------------------------------------
+
+const FULL_PROFILE: BaseDocumentationProfile = {
+  level: "full",
+  members: ["welcome-htm"],
+  welcomeConvention: "folder",
+  hasUsableDescription: true,
+  welcomeImages: [],
+};
+
+const NONE_PROFILE: BaseDocumentationProfile = {
+  level: "none",
+  members: [],
+  welcomeConvention: "absent",
+  hasUsableDescription: false,
+  welcomeImages: [],
+};
+
+describe("phaseFOptions.seeds — pf_welcome_paragraph adaptive description (spec 076 FR-009)", () => {
+  it("declares getRequiredOverride", () => {
+    expect(phaseFOptions.seeds?.getRequiredOverride).toBeDefined();
+  });
+
+  it("adapt-full: seeds the base's usable description and waives required", () => {
+    useWorkingCopyStore.setState({
+      instantiationMode: "adapt-existing",
+      baseDocProfile: FULL_PROFILE,
+      baseWelcomeHtmText: "<p>This keyboard lets you type Bafut on any computer.</p>",
+      baseHelpPhpText: null,
+    });
+    const { deps } = buildDeps();
+
+    expect(phaseFOptions.seeds?.getSeedValue("pf_welcome_paragraph", deps)).toBe(
+      "This keyboard lets you type Bafut on any computer.",
+    );
+    expect(phaseFOptions.seeds?.getRequiredOverride?.("pf_welcome_paragraph", deps)).toBe(false);
+  });
+
+  it("net-new (new-from-base): never seeds, required override stays true (today's behavior)", () => {
+    useWorkingCopyStore.setState({
+      instantiationMode: "new-from-base",
+      baseDocProfile: FULL_PROFILE,
+      baseWelcomeHtmText: "<p>This keyboard lets you type Bafut on any computer.</p>",
+      baseHelpPhpText: null,
+    });
+    const { deps } = buildDeps();
+
+    expect(phaseFOptions.seeds?.getSeedValue("pf_welcome_paragraph", deps)).toBeUndefined();
+    // requiredWhen(ctx) always resolves a defined boolean (never undefined) —
+    // `true` here means "use the static required:true", the same outcome as
+    // no override at all (SurveyRunner's displayQ ends up required either way).
+    expect(phaseFOptions.seeds?.getRequiredOverride?.("pf_welcome_paragraph", deps)).toBe(true);
+  });
+
+  it("copy track (Track 1, instantiationMode never set to adapt-existing): never seeds", () => {
+    const { deps } = buildDeps();
+    // Default reset() state: instantiationMode is null.
+    expect(phaseFOptions.seeds?.getSeedValue("pf_welcome_paragraph", deps)).toBeUndefined();
+    expect(phaseFOptions.seeds?.getRequiredOverride?.("pf_welcome_paragraph", deps)).toBe(true);
+  });
+
+  it("adapt track, base classified none: never seeds", () => {
+    useWorkingCopyStore.setState({
+      instantiationMode: "adapt-existing",
+      baseDocProfile: NONE_PROFILE,
+      baseWelcomeHtmText: null,
+      baseHelpPhpText: null,
+    });
+    const { deps } = buildDeps();
+
+    expect(phaseFOptions.seeds?.getSeedValue("pf_welcome_paragraph", deps)).toBeUndefined();
+    expect(phaseFOptions.seeds?.getRequiredOverride?.("pf_welcome_paragraph", deps)).toBe(true);
+  });
+
+  it("does not disturb pf_welcome_paragraph's static required:true default", () => {
+    // The runtime override is applied by SurveyRunner (getRequiredOverride),
+    // never by mutating the module's own static definition.
+    expect(pfWelcomeParagraphMod.definition.required).toBe(true);
   });
 });

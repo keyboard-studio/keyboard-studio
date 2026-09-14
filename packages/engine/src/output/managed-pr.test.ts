@@ -62,7 +62,7 @@ function postedBody(captured: { body?: string }): {
   prTitle: string;
   prBody: string;
   importAttribution?: string;
-  sourceFiles: Array<{ path: string; content: string }>;
+  sourceFiles: Array<{ path: string; content: string; encoding?: string }>;
 } {
   return JSON.parse(captured.body ?? "{}");
 }
@@ -104,17 +104,42 @@ describe("publishManagedPR() — SS1 source-file filter", () => {
     expect(paths.some((p) => p.endsWith(".imported"))).toBe(false);
   });
 
-  it("skips binary (non-string) entries — the managed body carries text only", async () => {
+  it("includes binary (non-string) entries as base64, flagged encoding: \"base64\"", async () => {
     const fs = createVirtualFS([
       { path: "release/m/my_keyboard/source/my_keyboard.kmn", content: "store(&VERSION) '14.0'" },
-      { path: "release/m/my_keyboard/welcome/banner.png", content: new Uint8Array([1, 2, 3]) },
+      { path: "release/m/my_keyboard/source/welcome/banner.png", content: new Uint8Array([1, 2, 3]) },
     ]);
     const { fetch, captured } = capturingFetch({ ok: true, body: SUCCESS_BODY });
 
     await publishManagedPR(fs, OPTS, fetch);
 
-    const paths = postedBody(captured).sourceFiles.map((f) => f.path);
-    expect(paths).toEqual(["release/m/my_keyboard/source/my_keyboard.kmn"]);
+    const { sourceFiles } = postedBody(captured);
+    const textEntry = sourceFiles.find((f) => f.path.endsWith("my_keyboard.kmn"));
+    expect(textEntry?.encoding).toBeUndefined();
+    expect(textEntry?.content).toBe("store(&VERSION) '14.0'");
+
+    const binaryEntry = sourceFiles.find((f) => f.path.endsWith("banner.png"));
+    expect(binaryEntry?.encoding).toBe("base64");
+    expect(binaryEntry?.content).toBe(Buffer.from([1, 2, 3]).toString("base64"));
+  });
+
+  it("emits no `encoding` key at all when the working copy is text-only (byte-identical to today's shape)", async () => {
+    const fs = createVirtualFS([
+      { path: "release/m/my_keyboard/source/my_keyboard.kmn", content: "store(&VERSION) '14.0'" },
+      { path: "release/m/my_keyboard/my_keyboard.kps", content: "<Keyboard/>" },
+    ]);
+    const { fetch, captured } = capturingFetch({ ok: true, body: SUCCESS_BODY });
+
+    await publishManagedPR(fs, OPTS, fetch);
+
+    const { sourceFiles } = postedBody(captured);
+    expect(sourceFiles).toEqual([
+      { path: "release/m/my_keyboard/source/my_keyboard.kmn", content: "store(&VERSION) '14.0'" },
+      { path: "release/m/my_keyboard/my_keyboard.kps", content: "<Keyboard/>" },
+    ]);
+    for (const f of sourceFiles) {
+      expect(Object.prototype.hasOwnProperty.call(f, "encoding")).toBe(false);
+    }
   });
 });
 

@@ -157,3 +157,30 @@ describe("kmpPathCallbacks — the surface handed to kmc-package", () => {
     expect(kmpPathCallbacks.normalize("source/../x")).toBe("x");
   });
 });
+
+// spec 076 FR-002 (T014): the welcome page and its images ship in the
+// `welcome\` folder, referenced backslash-relative from the `.kps` — the
+// corpus form (e.g. ahom_star.kps). Every member the descriptor lists must
+// resolve to the VFS key the projection wrote, or kmc-package reports KM04003.
+describe("resolveFilename — the welcome-folder convention (spec 076 FR-002)", () => {
+  it("resolves the backslash-relative welcome page into source/welcome/", () => {
+    expect(resolveFilename(KPS, "welcome\\welcome.htm")).toBe("source/welcome/welcome.htm");
+  });
+
+  it("resolves a backslash-relative welcome image beside the page", () => {
+    expect(resolveFilename(KPS, "welcome\\image.png")).toBe("source/welcome/image.png");
+    expect(resolveFilename(KPS, "welcome\\desktop_layout_default.png")).toBe(
+      "source/welcome/desktop_layout_default.png",
+    );
+  });
+
+  it("resolves a generated layout chart the same way (the reserved ks-layout- prefix)", () => {
+    expect(resolveFilename(KPS, "welcome\\ks-layout-desktop-shift.svg")).toBe(
+      "source/welcome/ks-layout-desktop-shift.svg",
+    );
+  });
+
+  it("accepts the forward-slash spelling of the same reference", () => {
+    expect(resolveFilename(KPS, "welcome/welcome.htm")).toBe("source/welcome/welcome.htm");
+  });
+});

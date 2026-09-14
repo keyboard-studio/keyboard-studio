@@ -35,6 +35,11 @@ export function useDocsPreview(): DocsPreview {
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
   const baseWelcomeHtmText = useWorkingCopyStore((s) => s.baseWelcomeHtmText);
   const baseHelpPhpText = useWorkingCopyStore((s) => s.baseHelpPhpText);
+  // spec 076 FR-006: the base README is inherited on an adaptation only; the
+  // slice is null on Track 1 by construction, and the track guard keeps it so.
+  const baseReadmeMdText = useWorkingCopyStore((s) =>
+    s.instantiationMode === "adapt-existing" ? s.baseReadmeMdText : null,
+  );
 
   return useMemo(() => {
     const displayName = identity?.displayName ?? baseKeyboard?.displayName ?? "";
@@ -50,10 +55,10 @@ export function useDocsPreview(): DocsPreview {
       platforms,
     };
     return {
-      readmeMd: renderReadmeMd(input),
+      readmeMd: renderReadmeMd(input, baseReadmeMdText),
       readmeHtm: renderReadmeHtm(input),
       welcomeHtm: renderWelcomeHtm(input, baseWelcomeHtmText),
       helpPhp: renderHelpPhp(input, baseHelpPhpText),
     };
-  }, [helpDocs, identity, baseKeyboard, baseIr, baseWelcomeHtmText, baseHelpPhpText]);
+  }, [helpDocs, identity, baseKeyboard, baseIr, baseWelcomeHtmText, baseHelpPhpText, baseReadmeMdText]);
 }

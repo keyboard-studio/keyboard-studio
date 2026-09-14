@@ -28,11 +28,22 @@ The real engine. Subsystems under `packages/engine/src/`: `codec` (.kmn ↔ Keyb
 (kmcmplib wrapper), `simulator`, `recognizer` (+ generated rules), `pattern-apply`,
 `pattern-library`, `strategy-selector`, `character-discovery`, `inventory`, `loader`,
 `base-browser`, `stub-mutator`, `langtags` (SIL langtags slim-index lookup; exposed as
-`@keyboard-studio/engine/langtags`).
+`@keyboard-studio/engine/langtags`), `layout-chart` (deterministic SVG layout charts per
+platform/layer, spec 076), and `decision-audit`.
+
+Documentation rendering (specs 061 and 076) lives in `shared/`: `helpDocsRender.ts` (the four
+prose members, one body shared by welcome and help), `renderHistoryMd.ts` (the one HISTORY.md
+composer both tracks write through), `deriveDocMemberStates.ts` (the single source of each
+member's tier and placeholder state), with `decision-audit/historyProposal.ts` building the
+HISTORY proposal and `base-browser/classifyBaseDocumentation.ts` classifying a base's
+documentation (none / minimal / full).
 
 ### `@keymanapp/keyboard-lint`
 
-Layer C hygiene lint engine (`lintEngine.ts`, `checks/`, `parsers/`).
+Layer C hygiene lint engine (`lintEngine.ts`, `checks/`, `parsers/`). `checks/docs/` holds the
+thirteen documentation criteria codes (spec 076 FR-019) as pure string-level checks over a
+`DocLintInput`, gated in `lintContext.ts` and runnable standalone via `runDocChecks`; the
+package stays contracts-only.
 
 ### `@keyboard-studio/llm`
 

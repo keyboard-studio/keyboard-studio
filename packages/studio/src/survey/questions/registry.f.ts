@@ -17,6 +17,7 @@ import type { QuestionModule } from "../types.ts";
 import pfDocLanguageMod from "./f/pf_doc_language.ts";
 import pfWelcomeParagraphMod from "./f/pf_welcome_paragraph.ts";
 import pfFontGuidanceMod from "./f/pf_font_guidance.ts";
+import pfHistoryEntryMod, { bulletsModule as pfHistoryEntryBulletsMod } from "./f/pf_history_entry.ts";
 import pfUsageTip1Mod from "./f/pf_usage_tip_1.ts";
 import pfUsageTip2Mod from "./f/pf_usage_tip_2.ts";
 import pfUsageTip3Mod from "./f/pf_usage_tip_3.ts";
@@ -48,6 +49,11 @@ export const phaseFRegistry: Readonly<Record<string, QuestionModule>> = {
   pf_font_guidance: pfFontGuidanceMod,
   pf_usage_tip_1: pfUsageTip1Mod,
   pf_usage_tip_2: pfUsageTip2Mod,
+
+  // --- HISTORY proposal (spec 076 US5): confirm / edit / dismiss, spliced in
+  // via pf_usage_tip_1's `next` (last default-path screen before the gate) ---
+  pf_history_entry: pfHistoryEntryMod,
+  pf_history_entry_bullets: pfHistoryEntryBulletsMod,
 
   // --- Depth gate ---
   pf_more_detail_gate: pfMoreDetailGateMod,

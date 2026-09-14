@@ -109,11 +109,56 @@ export function parseTargetTokens(kmnText: string): string[] {
   return (targetsMatch?.[1] ?? "").toLowerCase().split(/[\s,]+/).filter(Boolean);
 }
 
+/**
+ * The welcome page's `.kps` member reference — the folder convention's
+ * backslash-relative form, as the corpus writes it (spec 076 FR-002).
+ *
+ * Exported so `patch.ts`'s welcome-path migration rewrites a flat reference
+ * to the SAME string the generate path emits.
+ */
+export const WELCOME_PAGE_KPS_REF = "welcome\\welcome.htm";
+
+/**
+ * A welcome-folder file's `.kps` member reference from its bare name
+ * (`desktop_default.png` → `welcome\desktop_default.png`). Shared by the
+ * generate and migration paths so both list a carried image identically.
+ */
+export function welcomeFolderKpsRef(fileName: string): string {
+  return `welcome\\${fileName.replace(/\//g, "\\")}`;
+}
+
+/**
+ * Normalise the caller's `welcomeFolderFiles` into distinct bare file names in
+ * deterministic (caller) order: strips a `welcome/` or `welcome\` prefix if one
+ * was passed, drops blanks, and drops the page itself (it is always listed
+ * first, once, by the writer).
+ */
+export function normaliseWelcomeFolderFiles(welcomeFolderFiles: readonly string[]): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const raw of welcomeFolderFiles) {
+    const name = raw.trim().replace(/\\/g, "/").replace(/^welcome\//i, "");
+    if (name === "" || name.toLowerCase() === "welcome.htm") continue;
+    const key = name.toLowerCase();
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(name);
+  }
+  return out;
+}
+
+/**
+ * @param welcomeFolderFiles the OTHER files shipped in `source/welcome/` beside
+ *   the page — inherited base images and generated layout charts — as bare
+ *   names relative to that folder (spec 076 FR-002/FR-006). Each is listed as
+ *   `welcome\<name>`. The page itself is always listed and never needs passing.
+ */
 export function buildKpsContent(
   keyboardId: string,
   identity: PackageDescriptorIdentity,
   kmnText: string,
   version = "1.0",
+  welcomeFolderFiles: readonly string[] = [],
 ): string {
   const targetTokens = parseTargetTokens(kmnText);
   const emitsJs = targetTokens.some((t) => KMW_JS_TARGETS.has(t));
@@ -122,11 +167,18 @@ export function buildKpsContent(
   const files = [`..\\build\\${keyboardId}.kmx`];
   if (emitsJs) files.push(`..\\build\\${keyboardId}.js`);
   if (hasVisualKeyboard) files.push(`..\\build\\${keyboardId}.kvk`);
-  files.push("welcome.htm", "readme.htm");
+  // spec 076 FR-002: the welcome page lives in the `welcome\` folder — the
+  // corpus-majority convention (728 of 1026 bases) — with its images beside it.
+  // The flat `welcome.htm` never appears in a produced package.
+  files.push(WELCOME_PAGE_KPS_REF);
+  for (const name of normaliseWelcomeFolderFiles(welcomeFolderFiles)) {
+    files.push(welcomeFolderKpsRef(name));
+  }
+  files.push("readme.htm");
   // LICENSE.md lives at the keyboard root, one level above this .kps's own
   // `source/` directory — like the `..\build\` artifacts, not like
-  // welcome.htm/readme.htm, which sit alongside the .kps itself (criterion
-  // 8.4-kps-includes-license-md).
+  // welcome\welcome.htm/readme.htm, which sit alongside (or below) the .kps
+  // itself (criterion 8.4-kps-includes-license-md).
   files.push("..\\LICENSE.md");
 
   const fileEntries = files
@@ -149,7 +201,7 @@ export function buildKpsContent(
     `<?xml version="1.0" encoding="utf-8"?>\n` +
     `<Package>\n` +
     `  <System>\n    <KeymanDeveloperVersion>17.0.0.0</KeymanDeveloperVersion>\n    <FileVersion>7.0</FileVersion>\n  </System>\n` +
-    `  <Options>\n    <ReadMeFile>readme.htm</ReadMeFile>\n    <WelcomeFile>welcome.htm</WelcomeFile>\n    <FollowKeyboardVersion/>\n  </Options>\n` +
+    `  <Options>\n    <ReadMeFile>readme.htm</ReadMeFile>\n    <WelcomeFile>${WELCOME_PAGE_KPS_REF}</WelcomeFile>\n    <FollowKeyboardVersion/>\n  </Options>\n` +
     `  <Info>\n    <Name URL="">${name}</Name>\n    <Description URL="">${description}</Description>\n${website}${buildAttributionBlock(identity)}  </Info>\n` +
     `  <Files>\n${fileEntries}\n  </Files>\n` +
     `  <Keyboards>\n    <Keyboard>\n      <Name>${name}</Name>\n      <ID>${escapeHtml(keyboardId)}</ID>\n      <Version>${escapeHtml(version)}</Version>\n` +

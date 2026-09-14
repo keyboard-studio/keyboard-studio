@@ -6,7 +6,7 @@ Owned by `/km-doc`. Update this file whenever a doc is added, archived, or re-sc
 
 | Doc | Purpose | Update Triggers | Status |
 |---|---|---|---|
-| [`CHANGELOG.md`](../CHANGELOG.md) | Versioned user-visible changes | Every public-API commit | live |
+| `CHANGELOG.md` (repo root) | Versioned user-visible changes | Every public-API commit | planned — not yet created; `/km-doc` starts it under `[Unreleased]` at the first public-API commit |
 
 ## Architecture / module docs
 

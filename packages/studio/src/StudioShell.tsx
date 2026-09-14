@@ -50,6 +50,7 @@ import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
 import { OSKFrame } from "./components/OSKFrame.tsx";
 import { OskModeToggle, type OskMode } from "./components/OskModeToggle.tsx";
 import { useValidator } from "./hooks/useValidator.ts";
+import { useDocumentationFindings } from "./hooks/useDocumentationFindings.ts";
 import { findKmnPath } from "./lib/findKmnPath.ts";
 import { resolveBaseTouchJson } from "./lib/resolveBaseTouchJson.ts";
 import { selectUnmappedFindings } from "./lint/lintToQuestion.ts";
@@ -1191,7 +1192,19 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     const raw = baseVfs.get(path)?.content ?? null;
     return typeof raw === "string" ? raw : null;
   }, [baseVfs]);
-  const { findings } = useValidator(kmnSource);
+  const { findings: validatorFindingsOnly } = useValidator(kmnSource);
+  // spec 076 FR-019 (research R7): the Layer C documentation checks ride the
+  // SAME findings array — a memoised synchronous hook, no second timer (D3) —
+  // so they render, publish, and classify exactly like every other finding.
+  // Warning-severity by the Layer C ceiling, so they can never block (FR-018).
+  const documentationFindings = useDocumentationFindings();
+  const findings = useMemo(
+    () =>
+      documentationFindings.length === 0
+        ? validatorFindingsOnly
+        : [...validatorFindingsOnly, ...documentationFindings],
+    [validatorFindingsOnly, documentationFindings],
+  );
   // spec-014 US5/T034 — publish the SINGLE debounced `useValidator` findings to
   // the store so the sibling `StudioShell` can feed C4 spine-prefix shippability
   // the REAL Layer-A findings WITHOUT a second `useValidator`/debounce (V3 /

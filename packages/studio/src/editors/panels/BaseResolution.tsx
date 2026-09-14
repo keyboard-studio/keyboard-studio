@@ -12,6 +12,8 @@ import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { resolveMessage } from "../../lib/i18nResolve.ts";
+// spec 076 FR-008: one label/tone mapping shared with MetadataCard's badge.
+import { buildDocLevelLabel, DOC_LEVEL_TONE } from "../../lib/docLevelBadge.ts";
 import { getBaseBrowserService } from "../../lib/services.ts";
 import { suggestBases, type SuggestTarget } from "../../lib/suggestBase.ts";
 import {
@@ -24,6 +26,9 @@ import { getLoadedLangtags, loadLangtags } from "../../lib/langtagsDefaults.ts";
 import { BaseKeyboardPicker } from "../../components/BaseKeyboardPicker.tsx";
 import { Badge, Button } from "../../ui/index.ts";
 import type { BadgeTone } from "../../ui/Badge.tsx";
+import { useBaseDocProfile } from "../../hooks/useBaseDocProfile.ts";
+import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+
 
 // Chrome (badge labels); built per-render via the optional-i18n +
 // msg()/resolveMessage() pattern (see Inspector.tsx's storeBlurb) rather than
@@ -97,6 +102,11 @@ export function BaseResolution({
   const [bases, setBases] = useState<BaseKeyboard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // spec 076 FR-008: classify the focused/previewed base's documentation
+  // completeness (lazy, cached per id — never the whole gallery). Fetched on
+  // every preview change; committed to the working copy at SELECTION below.
+  const { profiles: docProfiles, request: requestDocProfile } = useBaseDocProfile();
+  const setBaseDocProfile = useWorkingCopyStore((s) => s.setBaseDocProfile);
   // What the top search bar looks through: the suggested bases (default) or
   // the full catalog. Widened via the toggle or the picker's zero-match action.
   const [searchScope, setSearchScope] = useState<"suggested" | "all">("suggested");
@@ -105,6 +115,14 @@ export function BaseResolution({
   // rank with plain suggestBases and re-rank once it lands. `tick` re-renders
   // when the async load settles.
   const [langtagsTick, setLangtagsTick] = useState(0);
+
+  // Request the focused/previewed base's doc profile on every preview change
+  // (suggestion-card click or search pick — both flow through `onPreview`).
+  // `request` no-ops once cached, so re-focusing a previously-seen base never
+  // refetches.
+  useEffect(() => {
+    if (previewedBase !== null) requestDocProfile(previewedBase.id);
+  }, [previewedBase, requestDocProfile]);
 
   useEffect(() => {
     let live = true;
@@ -284,7 +302,20 @@ export function BaseResolution({
           variant="secondary"
           data-testid="base-confirm"
           disabled={previewedBase === null || previewStatus !== "ready"}
-          onClick={onConfirm}
+          onClick={() => {
+            // spec 076 FR-008: commit the previewed base's doc-completeness
+            // classification to the working copy AT SELECTION — null when the
+            // profile hasn't resolved yet or resolved to "unknown" (never
+            // written as a "none" a caller could confuse with a real
+            // classification).
+            if (previewedBase !== null) {
+              const profile = docProfiles[previewedBase.id];
+              setBaseDocProfile(
+                profile !== undefined && profile.level !== "unknown" ? profile : null,
+              );
+            }
+            onConfirm();
+          }}
           style={{
             marginTop: 10,
             padding: "8px 18px",
@@ -337,23 +368,38 @@ export function BaseResolution({
                 <strong>{base.displayName}</strong>{" "}
                 <span style={{ color: "var(--app-text-muted)", fontSize: 12 }}>({base.id})</span>
               </span>
-              {/* Genealogical suggestions name their closest relative and expose
-                  the numeric distance as a hover tooltip. Distance is the full
-                  path length across both legs — levels up to the nearest common
-                  ancestor plus levels back down to the relative; smaller = closer. */}
-              {reason === "genealogical" && relative !== undefined ? (
-                <Badge
-                  tone={REASON_TONE[reason]}
-                  title={t({
-                    id: "editor.baseResolution.genealogicalDistanceTitle",
-                    message: `Genealogical distance ${{ distance: relative.distance }} — total steps to ${{ name: relative.name }} across both branches (up to the nearest common ancestor, then down); smaller is closer`,
-                  })}
-                >
-                  <Trans id="editor.baseResolution.relatedBadge">Related: {relative.name}, same script</Trans>
-                </Badge>
-              ) : (
-                <Badge tone={REASON_TONE[reason]}>{buildReasonLabel(reason, i18n)}</Badge>
-              )}
+              <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                {/* spec 076 FR-008: documentation-completeness badge — rendered
+                    ONLY for a base whose profile has already been computed
+                    (this session focused it at least once) and resolved to a
+                    known level; "unknown" (not yet classified) renders no
+                    badge at all, never "none". */}
+                {(() => {
+                  const profile = docProfiles[base.id];
+                  if (profile === undefined || profile.level === "unknown") return null;
+                  const level = profile.level;
+                  return (
+                    <Badge tone={DOC_LEVEL_TONE[level]}>{buildDocLevelLabel(level, i18n)}</Badge>
+                  );
+                })()}
+                {/* Genealogical suggestions name their closest relative and expose
+                    the numeric distance as a hover tooltip. Distance is the full
+                    path length across both legs — levels up to the nearest common
+                    ancestor plus levels back down to the relative; smaller = closer. */}
+                {reason === "genealogical" && relative !== undefined ? (
+                  <Badge
+                    tone={REASON_TONE[reason]}
+                    title={t({
+                      id: "editor.baseResolution.genealogicalDistanceTitle",
+                      message: `Genealogical distance ${{ distance: relative.distance }} — total steps to ${{ name: relative.name }} across both branches (up to the nearest common ancestor, then down); smaller is closer`,
+                    })}
+                  >
+                    <Trans id="editor.baseResolution.relatedBadge">Related: {relative.name}, same script</Trans>
+                  </Badge>
+                ) : (
+                  <Badge tone={REASON_TONE[reason]}>{buildReasonLabel(reason, i18n)}</Badge>
+                )}
+              </span>
             </Button>
             );
           })}

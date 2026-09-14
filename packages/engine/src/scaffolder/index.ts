@@ -4,7 +4,14 @@ import type {
   ScaffoldResult,
   RoutingGroup,
 } from "@keyboard-studio/contracts";
-import type { BaseKeyboard, VirtualFS, KeyboardIR, Attribution } from "@keyboard-studio/contracts";
+import type {
+  BaseKeyboard,
+  VirtualFS,
+  KeyboardIR,
+  Attribution,
+  WelcomeConvention,
+  WelcomeFolderImage,
+} from "@keyboard-studio/contracts";
 import {
   createVirtualFS,
   validateScaffolderKeyboardId as contractsValidateKeyboardId,
@@ -31,8 +38,8 @@ import { assetFileExtensions } from "../shared/siblingAssetStores.js";
 // No licenseMd here: Track 1's LICENSE.md comes from the accumulated copyright
 // block (attributionText -> renderLicense), because a derived keyboard must
 // RETAIN the base's holders rather than state a single one (spec 064 US2).
-import { welcomeHtm, readmeHtm } from "../shared/packageDocs.js";
-import { phpCommentEscape } from "../shared/escapeHtml.js";
+import { welcomeHtm, readmeHtm, helpPhpStub } from "../shared/packageDocs.js";
+import { HISTORY_INITIAL_RELEASE_BULLET } from "../shared/renderHistoryMd.js";
 import {
   buildKpsContent,
   type PackageDescriptorIdentity,
@@ -560,7 +567,10 @@ export function generateStubs(
     // tracked as a separate feature; it would write a real `source/<id>.ico` here
     // and re-add the &BITMAP reference.
     {
-      path: `source/welcome.htm`,
+      // spec 076 FR-002: the folder convention, never the flat `source/welcome.htm`.
+      // renameFilesInVfs skips subdirectory files, so this path survives the
+      // id-rename pass untouched (as it must — the descriptor names it verbatim).
+      path: `source/welcome/welcome.htm`,
       // Shared with the adapt track's output-time stubs — see
       // ../shared/packageDocs.ts. The descriptor lists both files, so both
       // tracks must produce them or the .kmp build fails on a missing member.
@@ -572,7 +582,9 @@ export function generateStubs(
     },
     {
       path: `source/help/${keyboardId}.php`,
-      content: `<?php /* ${phpCommentEscape(displayName)} help */ ?>`,
+      // spec 076 FR-003: standard help-site header + the placeholder comment,
+      // from the same helper helpDocsRender's fallback uses (one copy of the rule).
+      content: helpPhpStub(displayName),
     },
     {
       path: `LICENSE.md`,
@@ -583,11 +595,12 @@ export function generateStubs(
       content: license,
     },
     {
-      // Track-1 HISTORY.md entry (new-from-base). For the parallel Track-2 entry
-      // format (adapt-existing), see packages/engine/src/output/adapt-staging.ts
-      // stageAdaptHistory(). Both must use the same ATX heading style; keep them in sync.
+      // Track-1 HISTORY.md stub (new-from-base). The output projection rewrites
+      // this on every production through renderHistoryMd (spec 076 US5), which
+      // owns the entry format; this stub only has to exist and share its
+      // bullet text so an early download reads the same as a rendered one.
       path: `HISTORY.md`,
-      content: `## 1.0 (${yyyy}-${mm}-${dd})\n* Initial release.\n`,
+      content: `## 1.0 (${yyyy}-${mm}-${dd})\n* ${HISTORY_INITIAL_RELEASE_BULLET}\n`,
     },
     {
       path: `README.md`,
@@ -672,6 +685,8 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
       const vfs = createVirtualFS();
       const warnings: string[] = [];
       let baseLicenseText: string | undefined;
+      let baseWelcomeImages: WelcomeFolderImage[] | undefined;
+      let baseWelcomeConvention: WelcomeConvention | undefined;
       const attribution = scaffoldOpts?.attribution;
       // spec 064 D2: the year records when the work was PUBLISHED, and is
       // injectable so tests never read the clock.
@@ -709,6 +724,11 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         loaderStylesheets = loaderResult.stylesheets;
         warnings.push(...loaderResult.warnings);
         baseLicenseText = loaderResult.baseLicenseText;
+        // spec 076 R9: a Track 1 copy inherits the base's welcome IMAGES (and
+        // nothing of its prose — baseWelcomeHtmText/baseHelpPhpText are
+        // deliberately not surfaced from here, FR-007).
+        baseWelcomeImages = loaderResult.baseWelcomeImages;
+        baseWelcomeConvention = loaderResult.baseWelcomeConvention;
       } catch (err) {
         // fetchKeyboardSourceToVfs throws when the required .kmn is unreachable
         // (network error, 404, or offline). Fall through to stub-only output and
@@ -784,6 +804,13 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         // Handed back so the working copy can keep it — the download path needs it
         // to retain these same holders when it completes a missing LICENSE.md.
         ...(baseLicenseText !== undefined ? { baseLicenseText } : {}),
+        // spec 076 FR-006/R9: the base's welcome images, for the copy's own
+        // welcome folder. Handed back rather than written: the projection writes
+        // them beside the RENDERED page at output (fetch-don't-write).
+        ...(baseWelcomeImages !== undefined && baseWelcomeImages.length > 0
+          ? { baseWelcomeImages }
+          : {}),
+        ...(baseWelcomeConvention !== undefined ? { baseWelcomeConvention } : {}),
       };
     },
 

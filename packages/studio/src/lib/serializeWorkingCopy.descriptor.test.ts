@@ -22,6 +22,7 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { Pattern, VirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
+import { buildKpsContent } from "@keyboard-studio/engine";
 
 // ---------------------------------------------------------------------------
 // Only the services boundary is stubbed. The projection is REAL.
@@ -417,5 +418,177 @@ describe("delivered artifact — <WebSite> from helpDocs.projectHomeUrl (spec 06
     await serializeWorkingCopy();
 
     expect(descriptorText("basic_kbdus")).not.toContain("WebSite");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 076 US2 (T017/T019): the welcome folder in the DELIVERED tree — the page
+// at its folder path, every inherited image beside it, all listed, no flat file.
+// ---------------------------------------------------------------------------
+
+/** Every `<File><Name>` value in the descriptor, in document order. */
+function fileNames(kps: string): string[] {
+  return [...kps.matchAll(/<Name>([^<]*)<\/Name>\s*<FileType>/g)].map((m) => m[1] ?? "");
+}
+
+const BASE_IMAGES = [
+  { path: "welcome/desktop_layout_default.png", bytes: new Uint8Array([0x89, 0x50, 0x4e, 0x47]) },
+  { path: "welcome/phone_shift.png", bytes: new Uint8Array([1, 2, 3]) },
+];
+
+/** The copy track's PRE-076 scaffolded stub: today's writer output with the flat name. */
+function seedCopyTrackWithFlatStub() {
+  const flat = buildKpsContent("basic_kbdus", { displayName: "US English (Basic)", languageTag: "en" }, BASE_KMN).replace(
+    /welcome\\welcome\.htm/g,
+    "welcome.htm",
+  );
+  const vfs = createVirtualFS([
+    { path: "source/basic_kbdus.kmn", content: BASE_KMN, isBinary: false },
+    { path: "source/basic_kbdus.kps", content: flat, isBinary: false },
+  ]);
+  const ir = makeTestIR([]);
+  ir.header.version = "1.0";
+  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+  return { vfs, ir };
+}
+
+describe("delivered artifact — the welcome folder (spec 076 FR-002, FR-006, SC-002)", () => {
+  it("adapt track: the page is at source/welcome/welcome.htm, every base image beside it, no flat file", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedAdaptTrackWithoutDescriptor("1.0");
+    const wc = useWorkingCopyStore.getState();
+    wc.setIdentity(AUTHOR_IDENTITY);
+    wc.setBaseWelcomeConvention("folder");
+    wc.setBaseWelcomeHtmText('<html><body><p>Base prose.</p><img src="desktop_layout_default.png"></body></html>');
+    wc.setBaseWelcomeImages(BASE_IMAGES);
+    wc.setHelpDocs({ description: "Author prose.", usageTips: [] });
+
+    const result = await serializeWorkingCopy();
+    expect(result).not.toBeNull();
+
+    expect(deliveredVfs!.get("source/welcome/welcome.htm")).toBeDefined();
+    expect(deliveredVfs!.get("source/welcome.htm")).toBeUndefined();
+    for (const img of BASE_IMAGES) {
+      const entry = deliveredVfs!.get(`source/${img.path}`);
+      expect(entry, `${img.path} must be carried`).toBeDefined();
+      expect(entry!.isBinary).toBe(true);
+      expect([...(entry!.content as Uint8Array)]).toEqual([...img.bytes]);
+    }
+    // No missing-image warning: every referenced image was carried.
+    expect(result!.warnings.filter((w) => w.startsWith("[docs]"))).toEqual([]);
+  });
+
+  it("adapt track: the generated descriptor lists the page and every image as welcome\\…, and names the folder page as <WelcomeFile>", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedAdaptTrackWithoutDescriptor("1.0");
+    const wc = useWorkingCopyStore.getState();
+    wc.setIdentity(AUTHOR_IDENTITY);
+    wc.setBaseWelcomeImages(BASE_IMAGES);
+
+    await serializeWorkingCopy();
+
+    const kps = descriptorText("basic_kbdus");
+    const names = fileNames(kps);
+    expect(names).toContain("welcome\\welcome.htm");
+    expect(names).toContain("welcome\\desktop_layout_default.png");
+    expect(names).toContain("welcome\\phone_shift.png");
+    expect(names).not.toContain("welcome.htm");
+    expect(kps).toContain("<WelcomeFile>welcome\\welcome.htm</WelcomeFile>");
+    // Every listed welcome member exists in the delivered tree (what kmc checks).
+    for (const name of names.filter((n) => n.startsWith("welcome\\"))) {
+      expect(deliveredVfs!.get(`source/${name.replace(/\\/g, "/")}`), `${name} listed but missing`).toBeDefined();
+    }
+  });
+
+  it("copy track: a pre-076 flat-form scaffolded descriptor is migrated to the folder form, and the migration is named", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedCopyTrackWithFlatStub();
+    const wc = useWorkingCopyStore.getState();
+    wc.setIdentity(AUTHOR_IDENTITY);
+    wc.setBaseWelcomeImages([BASE_IMAGES[0]!]);
+
+    const result = await serializeWorkingCopy();
+
+    const kps = descriptorText("basic_kbdus");
+    expect(kps).toContain("<WelcomeFile>welcome\\welcome.htm</WelcomeFile>");
+    expect(fileNames(kps)).toContain("welcome\\welcome.htm");
+    expect(fileNames(kps)).toContain("welcome\\desktop_layout_default.png");
+    expect(fileNames(kps)).not.toContain("welcome.htm");
+    expect(deliveredVfs!.get("source/welcome.htm")).toBeUndefined();
+    expect(deliveredVfs!.get("source/welcome/welcome.htm")).toBeDefined();
+    expect(result!.warnings.some((w) => w.includes("migrated welcome path") && w.includes("<WelcomeFile>"))).toBe(true);
+    expect(result!.warnings.some((w) => w.includes("appended <File> welcome\\desktop_layout_default.png"))).toBe(true);
+  });
+
+  it("names the images a base page references that were NOT carried (edge case), without failing", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedAdaptTrackWithoutDescriptor("1.0");
+    const wc = useWorkingCopyStore.getState();
+    wc.setIdentity(AUTHOR_IDENTITY);
+    wc.setBaseWelcomeHtmText(
+      '<html><body><img src="desktop_layout_default.png"><img src="ghost.png"><img src="welcome/also_ghost.png"></body></html>',
+    );
+    wc.setBaseWelcomeImages([BASE_IMAGES[0]!]);
+    wc.setHelpDocs({ description: "Author prose.", usageTips: [] });
+
+    const result = await serializeWorkingCopy();
+    expect(result).not.toBeNull();
+    expect(result!.warnings).toContain(
+      "[docs] the base welcome page references images that were not carried: ghost.png, welcome/also_ghost.png",
+    );
+  });
+
+  it("a stale flat source/welcome.htm in the base VFS is removed from the delivered tree (FR-002)", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: BASE_KMN, isBinary: false },
+      { path: "source/welcome.htm", content: "<html>stale flat</html>", isBinary: false },
+    ]);
+    const ir = makeTestIR([]);
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir });
+    useWorkingCopyStore.getState().setIdentity(AUTHOR_IDENTITY);
+
+    await serializeWorkingCopy();
+    expect(deliveredVfs!.get("source/welcome.htm")).toBeUndefined();
+    expect(deliveredVfs!.get("source/welcome/welcome.htm")).toBeDefined();
+  });
+});
+
+// spec 076 US6 (T054): every generated chart is a listed welcome-folder member.
+describe("delivered artifact — generated layout charts in <Files> (spec 076 FR-013)", () => {
+  it("adapt track with no base images: each ks-layout-*.svg chart is listed as welcome\\… and exists in the tree", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedAdaptTrackWithoutDescriptor("1.0");
+    useWorkingCopyStore.getState().setIdentity(AUTHOR_IDENTITY);
+
+    await serializeWorkingCopy();
+
+    const kps = descriptorText("basic_kbdus");
+    const names = fileNames(kps);
+    const chartNames = names.filter((n) => /^welcome\\ks-layout-.*\.svg$/.test(n));
+    expect(chartNames.length).toBeGreaterThan(0);
+    for (const name of chartNames) {
+      expect(deliveredVfs!.get(`source/${name.replace(/\\/g, "/")}`), `${name} listed but missing`).toBeDefined();
+    }
+    // And every chart in the tree is listed (no orphan files).
+    const inTree = deliveredVfs!.list("source/welcome/").filter((p) => /ks-layout-.*\.svg$/.test(p));
+    expect(inTree.map((p) => `welcome\\${p.slice("source/welcome/".length)}`).sort()).toEqual([...chartNames].sort());
+  });
+
+  it("copy track with base images: no charts listed by default; regenerate lists both images and charts", async () => {
+    const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
+    seedCopyTrackWithFlatStub();
+    const wc = useWorkingCopyStore.getState();
+    wc.setIdentity(AUTHOR_IDENTITY);
+    wc.setBaseWelcomeImages([BASE_IMAGES[0]!]);
+
+    await serializeWorkingCopy();
+    expect(fileNames(descriptorText("basic_kbdus")).some((n) => n.includes("ks-layout-"))).toBe(false);
+
+    useWorkingCopyStore.getState().setChartPreference("regenerate");
+    await serializeWorkingCopy();
+    const names = fileNames(descriptorText("basic_kbdus"));
+    expect(names).toContain("welcome\\desktop_layout_default.png");
+    expect(names.some((n) => /^welcome\\ks-layout-desktop-.*\.svg$/.test(n))).toBe(true);
   });
 });

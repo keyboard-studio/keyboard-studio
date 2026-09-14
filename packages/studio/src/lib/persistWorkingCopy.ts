@@ -51,7 +51,12 @@
 // and restores its `workingCopy` envelope field through this exact code — never
 // a second enumeration of the WorkingCopyData field list.
 
-import type { RemovalCapability, VirtualFS, VirtualFSEntry } from "@keyboard-studio/contracts";
+import type {
+  RemovalCapability,
+  VirtualFS,
+  VirtualFSEntry,
+  WelcomeFolderImage,
+} from "@keyboard-studio/contracts";
 import { createVirtualFS, mergePhaseResults } from "@keyboard-studio/contracts";
 import { classifyRemovalCapabilities } from "@keyboard-studio/engine";
 import type { KeyEditOverlay } from "@keyboard-studio/engine";
@@ -113,12 +118,26 @@ export type WorkingCopySnapshot = Omit<
   | "session"
   | "keyEditOverlay"
   | "touchEditorMode"
+  | "baseWelcomeImages"
 > & {
   baseVfsEntries: SerializedEntry[];
   deletedNodeIds: string[];
   deletedItemIds: string[];
   deletedTouchKeyIds: string[];
   staleSteps: string[];
+  /**
+   * Optional (spec 076 US2): the base's welcome-folder images, Base64-encoded
+   * through the same `serializeEntry` path as binary VFS entries. Absent from
+   * a pre-076 snapshot, and ALSO absent when the images exceed
+   * {@link BASE_WELCOME_IMAGES_BUDGET_BYTES} — the durable draft shares one
+   * localStorage quota with the base VFS, and a multi-megabyte image set would
+   * evict the whole draft rather than persist. Absent restores as `null`, and
+   * the over-budget case also sets `baseWelcomeImagesDropped` so the projection
+   * names the loss in its warnings and the documentation checklist reports it
+   * rather than hides it. `DRAFT_VERSION` does not bump (additive; VR-1
+   * discards a version-mismatched draft).
+   */
+  baseWelcomeImages?: SerializedEntry[];
   /**
    * Optional (spec 063 T058 / R10.3): a snapshot written before this field
    * existed has no `keyEditOverlay` key at all. `prepareWorkingCopySnapshot`
@@ -172,6 +191,41 @@ export function deserializeEntry(raw: SerializedEntry): VirtualFSEntry {
   return { path: raw.path, content: raw.content, isBinary: false };
 }
 
+/**
+ * Size budget for persisting the base's welcome-folder images (spec 076 US2,
+ * contracts/studio-surfaces.md store table). Raw byte total, before Base64
+ * (which inflates by a third). Corpus welcome folders are typically a few
+ * hundred KB of PNG screenshots; 2 MB keeps the draft comfortably inside the
+ * ~5 MB localStorage quota alongside the base VFS.
+ */
+export const BASE_WELCOME_IMAGES_BUDGET_BYTES = 2 * 1024 * 1024;
+
+/** Base64 the images for the snapshot, or `undefined` when over budget. */
+function serializeWelcomeImages(
+  images: WelcomeFolderImage[] | null,
+): SerializedEntry[] | undefined {
+  if (images === null || images.length === 0) return undefined;
+  const total = images.reduce((sum, img) => sum + img.bytes.byteLength, 0);
+  if (total > BASE_WELCOME_IMAGES_BUDGET_BYTES) return undefined;
+  return images.map((img) => serializeEntry({ path: img.path, content: img.bytes, isBinary: true }));
+}
+
+/** The inverse of {@link serializeWelcomeImages}; tolerant of an absent field. */
+function deserializeWelcomeImages(
+  raw: SerializedEntry[] | undefined,
+): WelcomeFolderImage[] | null {
+  if (raw === undefined || raw.length === 0) return null;
+  const images: WelcomeFolderImage[] = [];
+  for (const entry of raw) {
+    const decoded = deserializeEntry(entry);
+    // A text-typed record cannot be an image; skip rather than store a string
+    // where bytes are expected (the same shape-over-flag rule as serializeEntry).
+    if (typeof decoded.content === "string") continue;
+    images.push({ path: decoded.path, bytes: decoded.content });
+  }
+  return images.length > 0 ? images : null;
+}
+
 // ---------------------------------------------------------------------------
 // Shared snapshot builder / applier (spec 034 US3)
 //
@@ -217,6 +271,7 @@ function serializeBaseVfsEntries(baseVfs: VirtualFS | null): SerializedEntry[] {
  */
 export function snapshotWorkingCopyData(): WorkingCopySnapshot {
   const s = useWorkingCopyStore.getState();
+  const baseWelcomeImages = serializeWelcomeImages(s.baseWelcomeImages);
   return {
     instantiationMode: s.instantiationMode,
     baseKeyboard: s.baseKeyboard,
@@ -238,6 +293,22 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     helpDocs: s.helpDocs,
     baseWelcomeHtmText: s.baseWelcomeHtmText,
     baseHelpPhpText: s.baseHelpPhpText,
+    // spec 076 US2: plain strings / a string literal, straight passthrough; the
+    // images go through the Base64 path (budgeted — see WorkingCopySnapshot).
+    baseReadmeMdText: s.baseReadmeMdText,
+    baseHistoryMdText: s.baseHistoryMdText,
+    baseWelcomeConvention: s.baseWelcomeConvention,
+    ...(baseWelcomeImages !== undefined ? { baseWelcomeImages } : {}),
+    // Over budget => the images are omitted AND the omission is recorded, so a
+    // resumed draft can say so instead of silently shipping without them.
+    baseWelcomeImagesDropped:
+      s.baseWelcomeImagesDropped ||
+      (s.baseWelcomeImages !== null && s.baseWelcomeImages.length > 0 && baseWelcomeImages === undefined),
+    // spec 076 US3/US5/US6: plain JSON documentation decisions, straight passthrough.
+    historyEntryState: s.historyEntryState,
+    chartPreference: s.chartPreference,
+    baseDocProfile: s.baseDocProfile,
+    baselineDocFindings: s.baselineDocFindings,
     ir: s.ir,
     deletedNodeIds: [...s.deletedNodeIds],
     deletedItemIds: [...s.deletedItemIds],
@@ -302,6 +373,17 @@ export function prepareWorkingCopySnapshot(snapshot: WorkingCopySnapshot): Parti
     helpDocs: snapshot.helpDocs ?? null,
     baseWelcomeHtmText: snapshot.baseWelcomeHtmText ?? null,
     baseHelpPhpText: snapshot.baseHelpPhpText ?? null,
+    // Tolerate pre-076 snapshots the same way: absent restores as null.
+    baseReadmeMdText: snapshot.baseReadmeMdText ?? null,
+    baseHistoryMdText: snapshot.baseHistoryMdText ?? null,
+    baseWelcomeConvention: snapshot.baseWelcomeConvention ?? null,
+    baseWelcomeImages: deserializeWelcomeImages(snapshot.baseWelcomeImages),
+    baseWelcomeImagesDropped: snapshot.baseWelcomeImagesDropped === true,
+    // Tolerate snapshots saved before the documentation decisions existed.
+    historyEntryState: snapshot.historyEntryState ?? null,
+    chartPreference: snapshot.chartPreference ?? null,
+    baseDocProfile: snapshot.baseDocProfile ?? null,
+    baselineDocFindings: snapshot.baselineDocFindings ?? null,
     ir: snapshot.ir,
     removalCapabilities,
     deletedNodeIds: new Set(snapshot.deletedNodeIds),

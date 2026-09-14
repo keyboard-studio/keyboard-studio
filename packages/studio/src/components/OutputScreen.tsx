@@ -54,6 +54,7 @@ import { TrackOneIdentityPanel } from "../editors/panels/TrackOneIdentityPanel.t
 import { PickerPane } from "./PickerPane.tsx";
 import { SignUpPanel } from "./SignUpPanel.tsx";
 import { ManagedPRSubmitPanel } from "./ManagedPRSubmitPanel.tsx";
+import { DocumentationChecklist } from "./DocumentationChecklist.tsx";
 import { ResizeHandle } from "./ResizeHandle.tsx";
 import {
   DIVIDER_WIDTH,
@@ -708,6 +709,12 @@ export function OutputScreen() {
                 </button>
               </div>
             )}
+            {/* spec 076 FR-017: what documentation ships and where each file's
+                content came from. Informational only — reads state, gates
+                nothing (FR-018); placeholder rows link back to the step that
+                fills them. */}
+            <DocumentationChecklist />
+
             {/* Option B (org-mediated PR) submit — PRIMARY submit action per
                 docs/github-integration.md §1a. Calls the backend proxy; the
                 user never sees a branch or PR workflow. Gated on canDownload
