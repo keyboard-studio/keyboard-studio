@@ -383,26 +383,6 @@ exports[`buildModularFlowGraph — Phase B honesty (FR-010) > FR-010 Part C — 
     "dangling": false,
     "from": "pb_rtl_short_vowels",
     "kind": "linear",
-    "to": "pb_rtl_direction_marks",
-  },
-  {
-    "dangling": false,
-    "from": "pb_rtl_direction_marks",
-    "kind": "conditional",
-    "label": "value == 'true'",
-    "to": "pb_rtl_direction_marks_detail",
-  },
-  {
-    "dangling": false,
-    "from": "pb_rtl_direction_marks",
-    "kind": "default",
-    "label": "(else)",
-    "to": "pb_rtl_special_letters",
-  },
-  {
-    "dangling": false,
-    "from": "pb_rtl_direction_marks_detail",
-    "kind": "linear",
     "to": "pb_rtl_special_letters",
   },
   {

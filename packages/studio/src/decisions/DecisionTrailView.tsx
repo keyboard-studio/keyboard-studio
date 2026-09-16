@@ -272,6 +272,8 @@ export function DecisionTrailView({
         return t({ id: "trail.stage.name.marks", message: "Accents and marks" });
       case "punctuation":
         return t({ id: "trail.stage.name.punctuation", message: "Punctuation" });
+      case "invisibles":
+        return t({ id: "trail.stage.name.invisibles", message: "Invisible characters" });
       case "convenience":
         return t({ id: "trail.stage.name.convenience", message: "Convenience letters" });
       case "touch_seed_source":

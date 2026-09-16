@@ -220,6 +220,9 @@ describe("phaseBDraftStore — snapshotPhaseBDraft/applyPhaseBDraftSnapshot roun
       rejected: [],
       proposalConfidence: {},
       exemplarMethodDeclined: false,
+      // Spec 075 additions: no proposal seeded, no invisible asked.
+      seededProposals: [],
+      invisibleDecisions: {},
       selectedFont: "charis-sil",
     });
 
@@ -687,5 +690,177 @@ describe("phaseBDraftStore — 047 invariants survive seeding (spec 044 obligati
     expect(s.provenance).toEqual({ a: "author", b: "author" });
     expect(s.rejected).toEqual([]);
     expect(s.exemplarMethodDeclined).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 075 — seeded proposals, invisible decisions, carry-over (contract §2)
+// ---------------------------------------------------------------------------
+
+describe("phaseBDraftStore — seedProposals (spec 075)", () => {
+  beforeEach(() => {
+    usePhaseBDraftStore.getState().reset();
+    resetPhaseBDraftDecisions();
+  });
+
+  it("seeds every character with the given provenance and records the seed key", () => {
+    usePhaseBDraftStore.getState().seedProposals(["!", "?"], "cldr", "punctuation:hi");
+    const s = usePhaseBDraftStore.getState();
+    expect(s.chars).toEqual(["!", "?"]);
+    expect(s.punctuation).toEqual(["!", "?"]);
+    expect(s.provenance).toEqual({ "!": "cldr", "?": "cldr" });
+    expect(s.seededProposals).toEqual(["punctuation:hi"]);
+  });
+
+  it("is a no-op on a repeated seed key, even with different characters", () => {
+    usePhaseBDraftStore.getState().seedProposals(["!"], "cldr", "punctuation:hi");
+    usePhaseBDraftStore.getState().seedProposals(["?"], "cldr", "punctuation:hi");
+    expect(usePhaseBDraftStore.getState().chars).toEqual(["!"]);
+    expect(usePhaseBDraftStore.getState().seededProposals).toEqual(["punctuation:hi"]);
+  });
+
+  it("a different seed key seeds again; proposal sources union (base after cldr)", () => {
+    usePhaseBDraftStore.getState().seedProposals(["!"], "cldr", "punctuation:hi");
+    usePhaseBDraftStore.getState().seedProposals(["!", "#"], "base", "punctuation-base:k1");
+    const s = usePhaseBDraftStore.getState();
+    expect(s.chars).toEqual(["!", "#"]);
+    // The first source to attest a character keeps the attribution.
+    expect(s.provenance).toEqual({ "!": "cldr", "#": "base" });
+    expect(s.seededProposals).toEqual(["punctuation:hi", "punctuation-base:k1"]);
+  });
+
+  it("vetoes a rejected character (FR-022) and never downgrades an author pick (FR-005)", () => {
+    const s = usePhaseBDraftStore.getState();
+    s.addProposed("?", "cldr");
+    s.remove("?"); // rejection
+    s.add("!"); // author
+    s.seedProposals(["!", "?", ";"], "sldr", "punctuation:xx");
+    const after = usePhaseBDraftStore.getState();
+    expect(after.chars).toEqual(["!", ";"]);
+    expect(after.provenance).toEqual({ "!": "author", ";": "sldr" });
+    expect(after.rejected).toEqual(["?"]);
+    // The key is still recorded — the veto is not a reason to retry the seed.
+    expect(after.seededProposals).toEqual(["punctuation:xx"]);
+  });
+
+  it("accepts the new base and ascii-floor provenances", () => {
+    usePhaseBDraftStore.getState().seedProposals(["#"], "ascii-floor", "punctuation-base:floor");
+    expect(usePhaseBDraftStore.getState().provenance["#"]).toBe("ascii-floor");
+  });
+});
+
+describe("phaseBDraftStore — invisible decisions (spec 075)", () => {
+  beforeEach(() => {
+    usePhaseBDraftStore.getState().reset();
+    resetPhaseBDraftDecisions();
+  });
+
+  it("acceptInvisible / declineInvisible write invisibleDecisions and never touch chars", () => {
+    const s = usePhaseBDraftStore.getState();
+    s.acceptInvisible("U+200C");
+    s.declineInvisible("U+200D");
+    const after = usePhaseBDraftStore.getState();
+    expect(after.invisibleDecisions).toEqual({ "U+200C": "accepted", "U+200D": "declined" });
+    expect(after.chars).toEqual([]);
+    expect(after.controls).toEqual([]);
+  });
+
+  it("a later decision overwrites an earlier one for the same character", () => {
+    usePhaseBDraftStore.getState().acceptInvisible("U+200C");
+    usePhaseBDraftStore.getState().declineInvisible("U+200C");
+    expect(usePhaseBDraftStore.getState().invisibleDecisions).toEqual({ "U+200C": "declined" });
+  });
+
+  it("canonicalises the key to uppercase U+XXXX and ignores malformed notation", () => {
+    const s = usePhaseBDraftStore.getState();
+    s.acceptInvisible("u+200c");
+    s.acceptInvisible("00AD");
+    s.acceptInvisible("not a code point");
+    expect(usePhaseBDraftStore.getState().invisibleDecisions).toEqual({
+      "U+200C": "accepted",
+      "U+00AD": "accepted",
+    });
+  });
+});
+
+describe("phaseBDraftStore — adoptControlsAsInvisibles carry-over (spec 075 FR-017)", () => {
+  beforeEach(() => {
+    usePhaseBDraftStore.getState().reset();
+    resetPhaseBDraftDecisions();
+  });
+
+  it("moves every format (Cf) character out of controls into accepted decisions and out of chars", () => {
+    const s = usePhaseBDraftStore.getState();
+    s.add("\u200C"); // ZWNJ — Cf, filed under controls by glyphCategory
+    s.add("\u00AD"); // SOFT HYPHEN — Cf
+    s.add("!");
+    expect(usePhaseBDraftStore.getState().controls).toEqual(["\u200C", "\u00AD"]);
+
+    usePhaseBDraftStore.getState().adoptControlsAsInvisibles();
+    const after = usePhaseBDraftStore.getState();
+    expect(after.invisibleDecisions).toEqual({ "U+200C": "accepted", "U+00AD": "accepted" });
+    expect(after.chars).toEqual(["!"]);
+    expect(after.controls).toEqual([]);
+    expect(after.provenance).toEqual({ "!": "author" });
+    // A migration is not a rejection.
+    expect(after.rejected).toEqual([]);
+  });
+
+  it("is idempotent and leaves non-format controls alone", () => {
+    const s = usePhaseBDraftStore.getState();
+    s.add("\u200D");
+    s.add("\u0007"); // BEL — Cc, a control but not a format character
+    s.adoptControlsAsInvisibles();
+    const once = usePhaseBDraftStore.getState();
+    s.adoptControlsAsInvisibles();
+    const twice = usePhaseBDraftStore.getState();
+    expect(twice.invisibleDecisions).toEqual(once.invisibleDecisions);
+    expect(twice.invisibleDecisions).toEqual({ "U+200D": "accepted" });
+    expect(twice.chars).toEqual(["\u0007"]);
+  });
+});
+
+describe("phaseBDraftStore — sticky class rules for the spec 075 fields", () => {
+  beforeEach(() => {
+    usePhaseBDraftStore.getState().reset();
+    resetPhaseBDraftDecisions();
+  });
+
+  it("seededProposals and invisibleDecisions survive reset() and are cleared only by resetPhaseBDraftDecisions()", () => {
+    const s = usePhaseBDraftStore.getState();
+    s.seedProposals(["!"], "cldr", "punctuation:hi");
+    s.acceptInvisible("U+200C");
+    s.reset();
+    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+    expect(usePhaseBDraftStore.getState().seededProposals).toEqual(["punctuation:hi"]);
+    expect(usePhaseBDraftStore.getState().invisibleDecisions).toEqual({ "U+200C": "accepted" });
+    resetPhaseBDraftDecisions();
+    expect(usePhaseBDraftStore.getState().seededProposals).toEqual([]);
+    expect(usePhaseBDraftStore.getState().invisibleDecisions).toEqual({});
+  });
+
+  it("round-trips through snapshotPhaseBDraft / applyPhaseBDraftSnapshot", () => {
+    const s = usePhaseBDraftStore.getState();
+    s.seedProposals(["!"], "cldr", "punctuation:hi");
+    s.acceptInvisible("U+200C");
+    s.declineInvisible("U+200D");
+    const snap = snapshotPhaseBDraft();
+    expect(snap.seededProposals).toEqual(["punctuation:hi"]);
+    expect(snap.invisibleDecisions).toEqual({ "U+200C": "accepted", "U+200D": "declined" });
+
+    usePhaseBDraftStore.getState().reset();
+    resetPhaseBDraftDecisions();
+    applyPhaseBDraftSnapshot(snap);
+    const after = usePhaseBDraftStore.getState();
+    expect(after.seededProposals).toEqual(["punctuation:hi"]);
+    expect(after.invisibleDecisions).toEqual({ "U+200C": "accepted", "U+200D": "declined" });
+    expect(after.chars).toEqual(["!"]);
+    expect(after.provenance["!"]).toBe("cldr");
+  });
+
+  it("a pre-075 snapshot without the fields restores them empty", () => {
+    applyPhaseBDraftSnapshot({ chars: ["!"], selectedFont: DEFAULT_PHASE_B_FONT });
+    expect(usePhaseBDraftStore.getState().seededProposals).toEqual([]);
+    expect(usePhaseBDraftStore.getState().invisibleDecisions).toEqual({});
   });
 });

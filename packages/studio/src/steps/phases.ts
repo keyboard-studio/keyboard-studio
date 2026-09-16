@@ -56,6 +56,7 @@ export type StepId =
   | "characters"
   | "marks"
   | "punctuation"
+  | "invisibles"
   | "convenience"
   | "carve"
   | "mechanisms"
@@ -102,7 +103,10 @@ export const PHASES: readonly PhaseDef[] = [
     // header comment in manifest.ts) — same C-phase membership as the other
     // three, added here because validatePhaseMap() throws at module load
     // for any manifest step with no phase (this is that guard doing its job).
-    stepIds: ["characters", "marks", "punctuation", "convenience"],
+    // invisibles (spec 075): the always-rendering invisible-characters step
+    // between punctuation and convenience; emits its accepted characters on
+    // the same phase:"C" confirmedInventory union the punctuation step does.
+    stepIds: ["characters", "marks", "punctuation", "invisibles", "convenience"],
   },
   {
     letter: "D",

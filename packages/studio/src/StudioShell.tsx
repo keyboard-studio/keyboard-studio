@@ -384,9 +384,10 @@ function NavBar({
 // by the SurveyRunner, legitimately not promoted to manifest steps).
 //
 // Manifest spine order (FR-012, M2):
-//   identity → choose_base → track → characters → marks → carve →
-//   mechanisms[lock:physical] → sequences →
+//   identity → choose_base → track → characters → marks → punctuation →
+//   invisibles → convenience → carve → mechanisms[lock:physical] →
 //   touch[lock:touch] → help → package[reserved]
+//   (sequences build inline in the mechanism gallery — no spine step)
 //
 // Off-spine (spine:false) steps in array order:
 //   project_name  — copy-track CYOA fork; joinTarget:"characters"
