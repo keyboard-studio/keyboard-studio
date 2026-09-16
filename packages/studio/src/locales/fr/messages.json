@@ -1520,7 +1520,6 @@
   "survey.punctuation.listGroupAriaLabel": "Chosen punctuation — click to remove",
   "survey.punctuation.listSectionAriaLabel": "Your punctuation",
   "survey.punctuation.missingCount": "",
-  "survey.punctuation.noSuggestions": "No suggested punctuation for {displayName}. Add your own below.",
   "survey.punctuation.removeAlsoBaseAriaLabel": "",
   "survey.punctuation.removeAriaLabel": "Remove {char} ({cp})",
   "survey.punctuation.skippedNote": "Skipped {0} — only punctuation is collected here; letters and other characters belong to the earlier alphabet page.",

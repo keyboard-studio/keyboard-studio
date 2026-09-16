@@ -1520,7 +1520,6 @@
   "survey.punctuation.listGroupAriaLabel": "Chosen punctuation — click to remove",
   "survey.punctuation.listSectionAriaLabel": "Your punctuation",
   "survey.punctuation.missingCount": "{missingCount, plural, =0 {Every chosen mark is already on the base keyboard.} one {# of these is not on the base keyboard yet and will need a key.} other {# of these are not on the base keyboard yet and will need a key.}}",
-  "survey.punctuation.noSuggestions": "No suggested punctuation for {displayName}. Add your own below.",
   "survey.punctuation.removeAlsoBaseAriaLabel": "Remove {char} ({cp}) — also produced by the base keyboard",
   "survey.punctuation.removeAriaLabel": "Remove {char} ({cp})",
   "survey.punctuation.skippedNote": "Skipped {0} — only punctuation is collected here; letters and other characters belong to the earlier alphabet page.",

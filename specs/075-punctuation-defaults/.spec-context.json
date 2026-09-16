@@ -4,7 +4,7 @@
   "branch": "075-punctuation-defaults",
   "selectedAt": "2026-09-13T13:39:46.321Z",
   "currentStep": "implement",
-  "status": "implemented",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
@@ -562,6 +562,13 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-09-16T03:06:02.342Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-16T14:02:18.221Z"
     }
   ],
   "telemetryInstanceId": "16be0ac8-7bda-4b73-8398-5e5ddbfe17ad",
