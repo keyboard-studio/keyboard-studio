@@ -34,6 +34,8 @@ import {
   confirmPrefill,
   buildOneCharacterList,
   driveConvenienceStep,
+  driveInvisiblesStep,
+  drivePunctuationStep,
   driveMarksSeries,
   driveMechanismsGallery,
   navigateToOutput,
@@ -603,7 +605,21 @@ test.describe("spec 034 US3 (T028): durable draft survives reload, Back stays co
     ).toBeVisible({ timeout: 20_000 });
     await page.getByRole("button", { name: "Back", exact: true }).click();
 
-    // ...and the entry before convenience is not Phase B either: the marks
+    // The invisible-characters step (spec 075) sits between punctuation and
+    // convenience and always renders, so it is the next entry on the stack…
+    await expect(page.getByRole("heading", { name: /Invisible characters/i })).toBeVisible({
+      timeout: 20_000,
+    });
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+
+    // …followed by the punctuation page (also ungated — drivePunctuationStep
+    // accepted it on the forward walk, so it is on the restored history too).
+    await expect(page.getByRole("heading", { name: /Choose your punctuation/i })).toBeVisible({
+      timeout: 20_000,
+    });
+    await page.getByRole("button", { name: "Back", exact: true }).click();
+
+    // ...and the entry before punctuation is not Phase B either: the marks
     // series (`fc2ee650`, spec 071/052) inserted a step between `characters`
     // and `convenience`, so the locked spine is
     // `characters -> marks -> convenience -> carve`. FIXTURE.charToAdd ("é")
@@ -632,6 +648,8 @@ test.describe("spec 034 US3 (T028): durable draft survives reload, Back stays co
     // The forward path re-traverses the same conditional steps Back walked
     // through; the shared drivers no-op cleanly when a step is skipped.
     await driveMarksSeries(page);
+    await drivePunctuationStep(page);
+    await driveInvisiblesStep(page);
     await driveConvenienceStep(page);
     await page.waitForSelector('[data-testid="carve-gallery"]', { timeout: 20_000 });
 

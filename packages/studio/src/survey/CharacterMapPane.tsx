@@ -113,6 +113,7 @@ export function CharacterMapPane({
   const chars = usePhaseBDraftStore((s) => s.chars);
   const addChar = usePhaseBDraftStore((s) => s.add);
   const removeChar = usePhaseBDraftStore((s) => s.remove);
+  const acceptInvisible = usePhaseBDraftStore((s) => s.acceptInvisible);
   const glyphFontStack = useGlyphFontStack();
   const isGlyphSupported = useFontSupportChecker(glyphFontStack);
 
@@ -372,6 +373,25 @@ export function CharacterMapPane({
     const cp = char.codePointAt(0);
     if (cp !== undefined && isPrivateUseCodePoint(cp)) {
       setPendingPuaChar(char);
+      setRawInput("");
+      setRawError(null);
+      return;
+    }
+    // spec 075 FR-021: on the PUNCTUATION scope a format character (ZWJ,
+    // ZWNJ, …) is handed to the invisibles step — pre-selected there — and
+    // announced through this pane's live region, instead of being filed into
+    // the draft's unrendered `controls` bucket where nothing would ever show
+    // it again. The alphabet scope is unchanged: its code-point entries are
+    // adopted by the invisibles step's carry-over on arrival.
+    if (scope === "punctuation" && /^\p{Cf}$/u.test(char)) {
+      const notation = toUPlusNotation(char);
+      acceptInvisible(notation);
+      setAnnouncement(
+        t({
+          id: "survey.characterMapPane.announce.handedOffInvisible",
+          message: `${{ cp: notation }} is an invisible character — handed to the Invisible characters step, where it is already selected for you.`,
+        }),
+      );
       setRawInput("");
       setRawError(null);
       return;

@@ -35,6 +35,7 @@ type ActiveStepId =
   | "carve"
   | "marks"
   | "punctuation"
+  | "invisibles"
   | "convenience"
   | "mechanisms"
   | "touch_seed_source"
@@ -222,7 +223,15 @@ export function advance(
       // effects — its SurveyPhaseResult reaches the session through StepHost's
       // generic recordPhase path (confirmedInventory union). Absent from
       // STEPS_WITH_APPLY_COMPLETION for that reason.
-      return { next: nextSpineStepAfter("punctuation") }; // convenience
+      return { next: nextSpineStepAfter("punctuation") }; // invisibles
+
+    case "invisibles":
+      // The invisible-characters step (spec 075): always renders, no reducer
+      // side effects — its SurveyPhaseResult (one boolean per offered format
+      // character plus the shared phase-C confirmedInventory union) reaches
+      // the session through StepHost's generic recordPhase path. Absent from
+      // STEPS_WITH_APPLY_COMPLETION for that reason.
+      return { next: nextSpineStepAfter("invisibles") }; // convenience
 
     case "convenience":
       // The pre-carve "keep these letters?" question. No reducer side effects —

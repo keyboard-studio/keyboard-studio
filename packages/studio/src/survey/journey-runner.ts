@@ -33,7 +33,7 @@
 //     them from simulated per-key edits.
 //
 // Steps with no modular flow AND no gallery-action-summary shape in this
-// harness (marks/punctuation/convenience) are completed as a no-op advance —
+// harness (marks/punctuation/invisibles/convenience) are completed as a no-op advance —
 // this stands in for the real S0/gate auto-skip those steps' own React
 // components apply when nothing applies (marks-free alphabet, no surplus
 // convenience letters, etc). A fixture that needs one of these steps to carry
@@ -524,6 +524,7 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
 
         case "marks":
         case "punctuation":
+        case "invisibles":
         case "convenience": {
           // No modular flow and no gallery-action-summary shape for these —
           // see module header. applyStepCompletion("marks", {}, deps) is a

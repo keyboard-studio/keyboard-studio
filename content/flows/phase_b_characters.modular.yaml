@@ -44,8 +44,6 @@ questions:
   - pb_sea_stacked_consonants
   - pb_rtl_direction_confirm
   - pb_rtl_short_vowels
-  - pb_rtl_direction_marks
-  - pb_rtl_direction_marks_detail
   - pb_rtl_special_letters
   - pb_syllabic_note
   - pb_syllabic_grid

@@ -189,6 +189,20 @@ const INVISIBLE_CHAR_LABELS: Record<string, string> = {
   '­': 'SOFT HYPHEN',
   '͏': 'COMBINING GRAPHEME JOINER',
   '᠎': 'MONGOLIAN VOWEL SEPARATOR',
+  // spec 075 — the invisible-characters step offers these by name (FR-015).
+  '\u2060': 'WORD JOINER',
+  '\u200E': 'LEFT-TO-RIGHT MARK',
+  '\u200F': 'RIGHT-TO-LEFT MARK',
+  '\u202A': 'LEFT-TO-RIGHT EMBEDDING',
+  '\u202B': 'RIGHT-TO-LEFT EMBEDDING',
+  '\u202C': 'POP DIRECTIONAL FORMATTING',
+  '\u202D': 'LEFT-TO-RIGHT OVERRIDE',
+  '\u202E': 'RIGHT-TO-LEFT OVERRIDE',
+  '\u2066': 'LEFT-TO-RIGHT ISOLATE',
+  '\u2067': 'RIGHT-TO-LEFT ISOLATE',
+  '\u2068': 'FIRST STRONG ISOLATE',
+  '\u2069': 'POP DIRECTIONAL ISOLATE',
+  '\u061C': 'ARABIC LETTER MARK',
 };
 
 /** Returns a short label if the character is invisible/non-printing, otherwise null. */
@@ -199,6 +213,12 @@ export function invisibleCharLabel(ch: string): string | null {
   if (/^\p{M}/u.test(ch)) {
     const cp = ch.codePointAt(0)!;
     return `COMBINING MARK (U+${cp.toString(16).toUpperCase().padStart(4, '0')})`;
+  }
+  // Any other format character (Cf) — a code-point entry can reach one the
+  // map does not name; it still needs a non-empty label (spec 075 FR-015).
+  if (/^\p{Cf}$/u.test(ch)) {
+    const cp = ch.codePointAt(0)!;
+    return `FORMAT CHARACTER (U+${cp.toString(16).toUpperCase().padStart(4, '0')})`;
   }
   return null;
 }
@@ -2052,6 +2072,14 @@ const PLACEHOLDER_CHARS = new Set(['…', '‹dk›', '🔔', '?']);
  * L/M, not N/P/S, so it does NOT match here — surplus letters/marks are
  * still eligible for removal recommendations. Only bare number/punctuation/
  * symbol codepoints are shielded.
+ *
+ * Punctuation is the one family that now gets its own question BEFORE carve:
+ * the engine's `punctuationProposal.ts` (spec 075) proposes the base's
+ * punctuation for acceptance on the punctuation step, and a mark the author
+ * removes there is declared unsupported in the confirmed inventory — yet this
+ * rule still keeps it on the layout. That disagreement is surfaced on the
+ * punctuation step's base-group caption; changing the rule is a separate
+ * feature.
  */
 function isAlwaysKeepCategory(ch: string): boolean {
   return /^[\p{N}\p{P}\p{S}]$/u.test(ch);
