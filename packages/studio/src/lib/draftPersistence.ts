@@ -34,6 +34,7 @@ import {
   snapshotPhaseBDraft,
   usePhaseBDraftStore,
   type DraftProvenance,
+  type InvisibleDecision,
   type PhaseBDraftSnapshot,
 } from "../stores/phaseBDraftStore.ts";
 import { DEFAULT_PHASE_B_FONT, isPhaseBFontValue } from "../survey/surveyStyles.ts";
@@ -879,6 +880,10 @@ function restorePhaseBDraftSnapshot(raw: unknown): PhaseBDraftSnapshot {
   for (const [k, v] of Object.entries(stringEntries(pb.declaredRoles))) {
     if (v === "letter" || v === "mark") declaredRoles[k] = v;
   }
+  const invisibleDecisions: Record<string, InvisibleDecision> = {};
+  for (const [k, v] of Object.entries(stringEntries(pb.invisibleDecisions))) {
+    if (v === "accepted" || v === "declined") invisibleDecisions[k] = v;
+  }
   return {
     chars: stringArray(pb.chars),
     declaredRoles,
@@ -894,6 +899,9 @@ function restorePhaseBDraftSnapshot(raw: unknown): PhaseBDraftSnapshot {
     rejected: stringArray(pb.rejected),
     proposalConfidence: stringEntries(pb.proposalConfidence),
     exemplarMethodDeclined: pb.exemplarMethodDeclined === true,
+    // spec 075 sticky fields — same tolerant treatment, same reason.
+    seededProposals: stringArray(pb.seededProposals),
+    invisibleDecisions,
     selectedFont: isPhaseBFontValue(pb.selectedFont) ? pb.selectedFont : DEFAULT_PHASE_B_FONT,
   };
 }

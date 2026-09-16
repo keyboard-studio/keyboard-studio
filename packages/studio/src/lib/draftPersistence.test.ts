@@ -1128,6 +1128,10 @@ describe("draftPersistence", () => {
       store.add("\uE000", { role: "mark" });
       store.remove("z"); // removing a PROPOSAL records a rejection
       store.declineExemplarMethod();
+      // spec 075 sticky fields ride along the same way.
+      store.seedProposals(["!"], "cldr", "punctuation:ewo");
+      store.acceptInvisible("U+200C");
+      store.declineInvisible("U+200D");
     }
 
     function coldReset(): void {
@@ -1148,6 +1152,8 @@ describe("draftPersistence", () => {
       expect(before.proposalConfidence).toEqual({ cldr: "approved" });
       expect(before.exemplarMethodDeclined).toBe(true);
       expect(before.declaredRoles).toEqual({ "\uE000": "mark" });
+      expect(before.seededProposals).toEqual(["punctuation:ewo"]);
+      expect(before.invisibleDecisions).toEqual({ "U+200C": "accepted", "U+200D": "declined" });
 
       saveDraft(pk);
       coldReset();
@@ -1162,6 +1168,8 @@ describe("draftPersistence", () => {
       expect(after.proposalConfidence).toEqual(before.proposalConfidence);
       expect(after.exemplarMethodDeclined).toBe(true);
       expect(after.declaredRoles).toEqual(before.declaredRoles);
+      expect(after.seededProposals).toEqual(before.seededProposals);
+      expect(after.invisibleDecisions).toEqual(before.invisibleDecisions);
     });
 
     it("a restored rejection still vetoes the same proposal after reload (the ledger is load-bearing, not decorative)", () => {
@@ -1174,6 +1182,42 @@ describe("draftPersistence", () => {
 
       usePhaseBDraftStore.getState().addProposed("z", "cldr");
       expect(usePhaseBDraftStore.getState().chars).not.toContain("z");
+    });
+  });
+
+  describe("spec 075 SC-006 — a punctuation rejection survives the reload round trip", () => {
+    const TIER = ["\u0964", "\u0965", "!", "?"];
+
+    it("seed, remove N, save, cold-reset, load, re-seed: the chosen list is tier minus N and the ledger still lists the N", () => {
+      const pk = "phaseb-punctuation-rejections";
+      instantiateMinimal(pk);
+      const store = usePhaseBDraftStore.getState();
+      store.seedProposals(TIER, "cldr", "punctuation:hi");
+      store.remove("!");
+      store.remove("?");
+      expect(usePhaseBDraftStore.getState().punctuation).toEqual(["\u0964", "\u0965"]);
+
+      saveDraft(pk);
+      useWorkingCopyStore.getState().reset();
+      useSurveySessionStore.getState().reset();
+      usePhaseBDraftStore.getState().reset();
+      resetPhaseBDraftDecisions();
+      expect(usePhaseBDraftStore.getState().rejected).toEqual([]);
+      expect(usePhaseBDraftStore.getState().seededProposals).toEqual([]);
+
+      expect(loadDraft(pk)).toBe(true);
+      const after = usePhaseBDraftStore.getState();
+      expect(after.punctuation).toEqual(["\u0964", "\u0965"]);
+      expect(after.rejected).toEqual(["!", "?"]);
+      expect(after.seededProposals).toEqual(["punctuation:hi"]);
+
+      // The same key is a no-op after reload; a NEW key (re-resolution) seeds
+      // again and the restored ledger still vetoes the removed marks.
+      after.seedProposals(TIER, "cldr", "punctuation:hi");
+      expect(usePhaseBDraftStore.getState().punctuation).toEqual(["\u0964", "\u0965"]);
+      after.seedProposals(TIER, "cldr", "punctuation:hi-IN");
+      expect(usePhaseBDraftStore.getState().punctuation).toEqual(["\u0964", "\u0965"]);
+      expect(usePhaseBDraftStore.getState().rejected).toEqual(["!", "?"]);
     });
   });
 

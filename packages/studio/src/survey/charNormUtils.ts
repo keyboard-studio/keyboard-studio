@@ -11,6 +11,26 @@ import { glyphCategory, caseCounterpart } from "@keyboard-studio/engine";
  *
  * Empty strings (after NFC normalization) are silently dropped.
  */
+/**
+ * Format characters (Unicode General Category Cf) — ZWJ, ZWNJ, ZWSP, SOFT
+ * HYPHEN, WORD JOINER, the bidi controls. They print nothing, so no character
+ * map can show them and no punctuation/alphabet list should hold them; the
+ * invisible-characters step (spec 075) owns them. One predicate pair, shared by
+ * the draft store, the punctuation page and the invisibles step.
+ */
+const FORMAT_CHAR_RE = /^\p{Cf}$/u;
+const CONTAINS_FORMAT_CHAR_RE = /\p{Cf}/u;
+
+/** True for exactly one format character and nothing else. */
+export function isFormatChar(c: string): boolean {
+  return FORMAT_CHAR_RE.test(c);
+}
+
+/** True when a (possibly multi-codepoint) cluster contains a format character anywhere. */
+export function containsFormatChar(c: string): boolean {
+  return CONTAINS_FORMAT_CHAR_RE.test(c);
+}
+
 export function nfcDedup(base: string[], incoming: string[]): string[] {
   const seen = new Set<string>(base);
   const result = [...base];
