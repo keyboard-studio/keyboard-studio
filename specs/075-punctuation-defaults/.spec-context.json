@@ -1,0 +1,1607 @@
+{
+  "workflow": "companion",
+  "specName": "075-punctuation-defaults",
+  "branch": "075-punctuation-defaults",
+  "selectedAt": "2026-09-13T13:39:46.321Z",
+  "currentStep": "implement",
+  "status": "implemented",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-09-15T22:59:03.445Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-15T23:01:10.147Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-09-15T23:01:15.766Z"
+    },
+    {
+      "step": "plan",
+      "substep": "research",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-15T23:23:17.329Z"
+    },
+    {
+      "step": "plan",
+      "substep": "design",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-15T23:26:05.324Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-15T23:26:14.526Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-09-15T23:43:13.343Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-15T23:50:53.222Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-15T23:52:16.691Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-09-16T00:09:52.695Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T001",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T00:16:28.387Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T002",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T00:16:28.850Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T003",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T00:21:22.943Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T005",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T00:37:37.220Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T006",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T00:37:38.016Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T007",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T00:37:39.134Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T008",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T00:37:40.098Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T009",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T00:37:40.959Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T010",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T00:37:41.827Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T011",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T00:37:42.679Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T012",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T00:37:43.488Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T013",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T00:37:44.244Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T015",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T00:48:38.591Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T016",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T00:48:39.062Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T017",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T00:48:39.610Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T018",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T00:50:13.584Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T019",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:00:50.509Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T020",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:00:51.202Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T021",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:00:51.797Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T022",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:00:52.524Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T023",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:00:53.282Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T024",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:17:15.824Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T025",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:17:16.483Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T026",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:17:17.134Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T027",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:17:17.769Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T028",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:17:18.511Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T029",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:17:19.148Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T030",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:17:19.872Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T031",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:17:20.574Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T032",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:17:21.175Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T033",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:17:21.829Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T034",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:17:22.585Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T035",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:17:23.239Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T036",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:17:23.950Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T037",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:17:24.648Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T038",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:17:25.267Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T039",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:17:26.007Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T040",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:17:26.775Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T041",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:23:47.971Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T042",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:23:48.557Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T043",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:23:49.218Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T044",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:23:49.914Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T045",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:23:50.578Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T046",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:23:51.253Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T047",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:23:52.022Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T048",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:23:53.079Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T049",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:23:53.998Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T050",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:31:17.972Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T051",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:31:18.487Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T052",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:32:32.333Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T053",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:32:32.928Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T054",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:32:33.517Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T055",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:40:34.374Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T056",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:40:34.831Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T057",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:40:35.373Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T058",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:40:35.953Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T059",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:40:36.481Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T014",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T01:56:25.455Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T060",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T02:15:53.539Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T004",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T03:06:02.342Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-16T03:06:02.342Z"
+    }
+  ],
+  "telemetryInstanceId": "16be0ac8-7bda-4b73-8398-5e5ddbfe17ad",
+  "approach": "Seed the CLDR punctuation tier and a base-produced group into the existing phase-B draft store through addProposed/addWithProvenance, computing the groups and the ASCII fallback floor in a pure engine module beside convenienceChars. Add an always-rendering 'invisibles' spine step between punctuation and convenience that owns format-character decisions in a sticky store record and emits the same phase-C confirmedInventory union as the punctuation step. Story 4's rejection ledger already exists (spec 044 FR-017); the draft-restore path that drops it on reload is fixed as its own commit.",
+  "decisions": [
+    {
+      "decision": "Both phase-C inventory emitters (PunctuationStep, InvisiblesStep) emit the same NFC-deduped union via phaseCConfirmedInventory(), so recordPhase field-wise merge never clobbers",
+      "why": "recordPhase shallow-merges same-phase results; a second confirmedInventory emitter would overwrite the first; mergePhaseResults unions across phases so accepted invisibles reach the session inventory without a contracts change",
+      "rejected": "New optional SurveyPhaseResult field (contracts change, would not reach confirmedInventory); reporting under phase D (misuses phase vocabulary)"
+    },
+    {
+      "decision": "Reuse the existing rejected[] ledger and fix draftPersistence.applyEnvelopeToStores to forward all sticky snapshot fields, as a separate fix commit",
+      "why": "phaseBDraftStore already implements the rejection veto (spec 044 FR-017); the only gap is that restore forwards only chars/exemplarDigraphs/selectedFont and wipes rejected/provenance/etc. on reload; that is a pre-existing defect blocking Story 4",
+      "rejected": "A new RejectionLedger entity as the pre-plan data model proposed"
+    },
+    {
+      "decision": "Pure engine module punctuationProposal.ts owns ASCII_PUNCTUATION_FLOOR, basePunctuationCoverage(ir) and buildPunctuationProposal(); hasUnaccountedOpaqueFragment exported from computeInventoryDelta.ts",
+      "why": "Mirrors convenienceChars.ts precedent (pure, colocated test, barrel export); SC-001 becomes a per-tag function oracle over the offline index; one derivation of coverageComplete",
+      "rejected": "Taking an InventoryDelta as input (needs a needed list; base group is the produced side); placing helpers in packages/contracts (shapes only, cannot import engine)"
+    },
+    {
+      "decision": "DraftProvenance stays single-valued (gains base, ascii-floor); multi-source attribution derived at render from the proposal groups",
+      "why": "provenance map is read by chips, setAll, snapshot and spec-044 tests; an array would touch all of them for a presentational need",
+      "rejected": "provenance as Record<string, DraftProvenance[]>"
+    },
+    {
+      "decision": "Format characters entered on the punctuation page are handed off (acceptInvisible + status note), not navigated; carry-over migrates Cf chars out of the draft controls bucket into invisibleDecisions",
+      "why": "Forced navigation breaks typing flow and walk order; leaving carried-over chars in chars would duplicate them into the alphabet answer and the new step answer (FR-017)",
+      "rejected": "Keep the Skipped path; navigate immediately; adopt without removing from chars"
+    },
+    {
+      "decision": "Retire pb_rtl_direction_marks + pb_rtl_direction_marks_detail (rewire pb_rtl_short_vowels.next), registry count 114 to 112",
+      "why": "FR-019 subsume-not-duplicate; no studio code consumes the detail answer; dead modules still extract catalog keys",
+      "rejected": "Gate the modules off with an always-false condition"
+    },
+    {
+      "decision": "Both steps declare inputs: [] and writes: [] (resolves the spec open decision)",
+      "why": "spec 066 FR-006 explicit-empty rule; confirming an inventory is a survey result not an IR write; an input with no upstream writer fails the orphan-input check; convenience precedent",
+      "rejected": "Declaring base-coverage reads as IRPath inputs"
+    },
+    {
+      "decision": "{\"decision\": \"The studio seeds only the Unicode-punctuation members of the ASCII floor (23 of 32); the engine constant stays the full 32-character FR-007 definition\", \"why\": \"The punctuation page collects and emits glyphCategory === punctuation only; the nine symbol members ($ + < = > ^ ` | ~) would land in the unrendered symbols bucket and reach the alphabet result unseen (FR-025). Symbols are family default 5, out of scope and shielded by carve anyway\", \"rejected\": \"Shrinking ASCII_PUNCTUATION_FLOOR to 23 (breaks the contract invariant and FR-007 ranges); widening the page to accept \\p{S} (would let typed $ into a page that declines it today)\"}"
+    },
+    {
+      "decision": "The base group is seeded only when a working copy IR exists; a null IR proposes nothing, and the ASCII floor is reserved for a base whose output is UNKNOWABLE (opaque fragments)",
+      "why": "In the app a working copy always exists by the punctuation step; seeding 23 floor chips into every IR-less render (tests, degraded states) would misreport a missing base as an unknowable one (FR-008)",
+      "rejected": "Treating baseCoverage === null as incomplete coverage in the studio and seeding the floor"
+    },
+    {
+      "decision": "Ticking a suggestion the author previously removed is an author add (provenance author), not a proposal add",
+      "why": "addProposed is vetoed by the rejection ledger, so the re-tick would silently do nothing; ticking back is as deliberate as typing (FR-022 override). Never-rejected ticks keep proposal provenance so the existing attribution test holds",
+      "rejected": "Clearing the rejection and re-adding as a proposal (would re-propose on the next seed)"
+    },
+    {
+      "decision": "The golden-walk harness mocks sourcedExemplars to null",
+      "why": "On a warm exemplar index the punctuation step seeds the locale tier before the walk clicks Done; unplaced typographic marks then block the Phase F coverage gate whose <dialog> jsdom cannot showModal(). That is the product working as specified (FR-011), not a traversal fact the oracle records; PunctuationStep.test.tsx owns seeding",
+      "rejected": "Installing the dialog shim (the gate would still block the walk short of done); resetting the draft store between walks (would not fix the warm-index case)"
+    },
+    {
+      "decision": "writingDirectionFrom precedence: Phase A writing_direction, then any pb_rtl_direction_confirm answer (either value) or pb_non_roman_branch === rtl, then surveyContext.script_family/routing_group, else unknown",
+      "why": "pb_rtl_direction_confirm is only asked on the RTL branch, so its presence is the signal; script_family rtl is the identity prefill; every other family is LTR",
+      "rejected": "Adding a direction field to the draft store"
+    },
+    {
+      "decision": "A format character typed with other text (e.g. a + ZWNJ) is declined as a mixed cluster, not split",
+      "why": "Intl.Segmenter treats ZWJ/ZWNJ as grapheme extenders, so the typed unit really is one cluster; splitting would invent characters the author did not type (FR-021)",
+      "rejected": "Splitting the cluster into its code points"
+    },
+    {
+      "decision": "{\"decision\": \"Review fixes: format-character checks precede the punctuation-category test in PunctuationStep.add(); U+ notation is validated by contracts parseUPlusNotation everywhere; isFormatChar/containsFormatChar live in survey/charNormUtils.ts\", \"why\": \"glyphCategory tests \\p{P} unanchored so a punctuation+Cf cluster read as punctuation (QC P0); three near-identical U+ parsers and four Cf regex literals were introduced in one change (synthesis P1)\", \"rejected\": \"Anchoring glyphCategory itself (shared classifier, out of scope)\"}"
+    }
+  ],
+  "concerns": [
+    {
+      "note": "{\"note\": \"Carve still emits base punctuation an author declined (always-keep rule for \\p{N}\\p{P}\\p{S}); surfaced in the base group caption, carve-side fix is a separate feature\", \"step\": \"plan\", \"kind\": \"deferred\"}"
+    },
+    {
+      "note": "docs/spec-trace.json has no specs/075-punctuation-defaults key; completeness.test specRef check fails until node utilities/spec-trace seed runs and the file is committed",
+      "step": "plan",
+      "kind": "prerequisite"
+    },
+    {
+      "note": "Behaviour change to confirm with the owner: seeding the CLDR tier puts typographic marks the base cannot type (e.g. en: curly quotes, dashes) onto the mechanisms worklist, so the Phase F coverage gate now blocks until they are placed or removed on the punctuation page. Specified by FR-011 but a real change for every author who used to accept an empty list",
+      "step": "implement",
+      "kind": "product"
+    },
+    {
+      "note": "seededProposals survives reset() per the contract, so an author who re-enters the build-list via prefill (fresh alphabet) returns to a punctuation page with no proposals: the keys are recorded and the sticky ledger would already veto removed marks, so clearing seededProposals in reset() may be the better UX; not changed here because the contract pins sticky",
+      "step": "implement",
+      "kind": "deferred"
+    },
+    {
+      "note": "Playwright specs (copy-edit.spec.ts back-walk chain, light-theme-a11y.spec.ts invisibles axe scan, surveyFlow driveInvisiblesStep) were edited but not executed locally; CI must run them. The copy-edit chain also now expects the punctuation heading between invisibles and marks, which the pre-075 chain skipped",
+      "step": "implement",
+      "kind": "verification"
+    },
+    {
+      "note": "Commits deferred: T004, T014, T018, T023, T051, T054, T060 each call for a commit/push; the user global rule gates every commit on explicit say-so, so the whole feature sits uncommitted on km/075-clarify-spec (no upstream). T004 fix commit should be cut first, then one commit per phase",
+      "step": "implement",
+      "kind": "process"
+    },
+    {
+      "note": "Local Node 26 shadows jsdom localStorage; studio suites must run with NODE_OPTIONS=--no-experimental-webstorage locally (CI Node 22 unaffected). Four engine compiler/oracle tests flake under a full parallel run and pass in isolation; recognizer integration 0060 grave is the known pre-existing local failure",
+      "step": "implement",
+      "kind": "environment"
+    },
+    {
+      "note": "spec-trace §11 (criteria.md compliance) drift pre-dates this feature and was deliberately left unacknowledged (seed refreshed its hash; restored from HEAD)",
+      "step": "implement",
+      "kind": "prerequisite"
+    }
+  ],
+  "step_summaries": {
+    "plan": {
+      "summary": "Full plan: seed CLDR + base punctuation via existing addProposed path, pure engine proposal builder with ASCII floor fallback, new always-rendering invisibles spine step owning Cf decisions, shared phase-C inventory union, draft-restore fix for the existing rejection ledger",
+      "key_finding": "The rejection ledger Story 4 asks for already exists (phaseBDraftStore.rejected, spec 044 FR-017) but draftPersistence.applyEnvelopeToStores drops it on reload; and computeInventoryDelta has zero production callers so FR-011 wires its first consumer"
+    },
+    "tasks": {
+      "summary": "60 tasks in 7 phases (Setup 4 incl. own-commit draft-restore fix, Foundational 10, US1 4, US2 5, US3 28, US4 3, Polish 6); 20 explicit waves; every FR-001..025 and SC-001..009 mapped to tasks",
+      "key_finding": "Two artefacts the plan missed: the retired RTL modules have their own tests under packages/studio/tests/survey/questions/b/, and the flow-edge snapshot is dashboard/__snapshots__/buildStepGraph.test.ts.snap; content/flows/phase_b_characters.modular.yaml and content/facets/orth/direction.yaml also reference the retired ids"
+    },
+    "implement": {
+      "summary": "Punctuation defaults shipped: CLDR tier + base-produced punctuation seeded as proposed picks with an ASCII floor fallback and a live missing-side count; new always-rendering invisibles spine step with 18 named format characters, carry-over and Cf hand-off from both punctuation inputs; RTL direction-marks pair retired; draft-restore defect fixed; 59/60 tasks done (T004 commit deferred), gates green, review P0 fixed",
+      "key_finding": "The SC-009 harness caught a real silent write (String#trim swallowed a typed U+FEFF) and the review caught a second (unanchored glyphCategory let a punctuation+ZWNJ cluster through); seeding the CLDR tier means the Phase F coverage gate now blocks until typographic marks the base cannot type are placed or removed"
+    }
+  },
+  "coverage": {
+    "FR-001": {
+      "title": "Pre-populate the chosen punctuation list with the resolved locale's CLDR/SLDR punctuation tier on first arrival",
+      "tasks": [
+        "T015",
+        "T017"
+      ],
+      "tests": [
+        "packages/studio/src/survey/punctuation/PunctuationStep.test.tsx::the tier is already chosen on arrival",
+        "packages/engine/src/character-discovery/punctuationProposal.test.ts"
+      ]
+    },
+    "FR-002": {
+      "title": "Pre-populated characters carry proposed provenance naming the supplying source (CLDR/SLDR, base, ASCII floor)",
+      "tasks": [
+        "T009",
+        "T015",
+        "T017",
+        "T020"
+      ],
+      "tests": [
+        "packages/studio/src/survey/punctuation/PunctuationStep.test.tsx::the group caption names the supplying source"
+      ]
+    },
+    "FR-003": {
+      "title": "Done with no interaction yields the proposed set; empty inventory only by removing everything",
+      "tasks": [
+        "T015",
+        "T017"
+      ],
+      "tests": [
+        "packages/studio/src/survey/punctuation/PunctuationStep.test.tsx::Done with zero clicks confirms it"
+      ]
+    },
+    "FR-004": {
+      "title": "Every proposed character removable by the existing click-to-remove gesture, no dialog",
+      "tasks": [
+        "T017"
+      ],
+      "tests": [
+        "packages/studio/src/survey/punctuation/PunctuationStep.test.tsx::every seeded chip is removable"
+      ]
+    },
+    "FR-005": {
+      "title": "Never modify, restyle or remove author-entered characters when computing proposals",
+      "tasks": [
+        "T005",
+        "T006",
+        "T010",
+        "T015"
+      ],
+      "tests": [
+        "packages/studio/src/survey/punctuation/PunctuationStep.test.tsx::keeps its author attribution",
+        "packages/engine/src/character-discovery/punctuationProposal.test.ts::never proposes a character the author already chose",
+        "packages/studio/src/stores/phaseBDraftStore.test.ts::never downgrades an author pick"
+      ]
+    },
+    "FR-006": {
+      "title": "Surface base-produced punctuation as a proposed group distinct from CLDR, from existing produced-glyph/delta machinery",
+      "tasks": [
+        "T008",
+        "T010",
+        "T019",
+        "T020"
+      ],
+      "tests": [
+        "packages/studio/src/survey/punctuation/PunctuationStep.test.tsx::base group is every produced punctuation char not in the CLDR group",
+        "packages/engine/src/character-discovery/punctuationProposal.test.ts"
+      ]
+    },
+    "FR-007": {
+      "title": "Basic-ASCII floor is a fallback used only when base coverage cannot be determined",
+      "tasks": [
+        "T005",
+        "T010",
+        "T019",
+        "T020"
+      ],
+      "tests": [
+        "packages/studio/src/survey/punctuation/PunctuationStep.test.tsx::ASCII floor under the incomplete caption",
+        "packages/engine/src/character-discovery/punctuationProposal.test.ts::degrades to the floor"
+      ]
+    },
+    "FR-008": {
+      "title": "When coverage is incomplete, state the base set is not fully known; never present a partial set as complete",
+      "tasks": [
+        "T005",
+        "T010",
+        "T019",
+        "T020"
+      ],
+      "tests": [
+        "packages/studio/src/survey/punctuation/PunctuationStep.test.tsx::ASCII floor under the incomplete caption",
+        "packages/engine/src/character-discovery/punctuationProposal.test.ts::KNOWN set is discarded"
+      ]
+    },
+    "FR-009": {
+      "title": "Base group proposes every punctuation character the base can produce; one-way degradation to the floor",
+      "tasks": [
+        "T005",
+        "T010",
+        "T019",
+        "T020"
+      ],
+      "tests": [
+        "packages/engine/src/character-discovery/punctuationProposal.test.ts::floor plays no part",
+        "packages/studio/src/survey/punctuation/PunctuationStep.test.tsx::complete coverage"
+      ]
+    },
+    "FR-010": {
+      "title": "Proposed characters NFC-normalized before de-dup; a multi-source character appears and is counted once",
+      "tasks": [
+        "T005",
+        "T010",
+        "T019",
+        "T020"
+      ],
+      "tests": [
+        "packages/engine/src/character-discovery/punctuationProposal.test.ts::disjoint by NFC",
+        "packages/studio/src/survey/punctuation/PunctuationStep.test.tsx::SC-003/FR-010"
+      ]
+    },
+    "FR-011": {
+      "title": "Confirmed punctuation the base cannot produce is counted on the missing side of the inventory delta before Done",
+      "tasks": [
+        "T013",
+        "T019",
+        "T020"
+      ],
+      "tests": [
+        "packages/studio/src/survey/punctuation/PunctuationStep.test.tsx::missing-side count"
+      ]
+    },
+    "FR-012": {
+      "title": "Base-inheritance default stated per character family as a deliberate choice",
+      "tasks": [
+        "T021"
+      ],
+      "tests": [
+        "specs/075-punctuation-defaults/spec.md::Decisions taken (prose",
+        "no test)"
+      ]
+    },
+    "FR-013": {
+      "title": "Distinct question covering ZWJ, ZWNJ, ZWSP, SOFT HYPHEN, WORD JOINER plus allowlisted bidi controls, reachable by name",
+      "tasks": [
+        "T024",
+        "T025",
+        "T030",
+        "T035"
+      ],
+      "tests": [
+        "packages/studio/src/survey/invisibles/invisibleCandidates.test.ts",
+        "packages/studio/src/survey/invisibles/InvisiblesStep.test.tsx::fixed five are still offered by name"
+      ]
+    },
+    "FR-014": {
+      "title": "Selected invisible characters reach the confirmed inventory, never an unrendered draft bucket",
+      "tasks": [
+        "T006",
+        "T007",
+        "T009",
+        "T011",
+        "T025",
+        "T035"
+      ],
+      "tests": [
+        "packages/studio/src/survey/invisibles/InvisiblesStep.test.tsx::accepted characters reach phaseCConfirmedInventory",
+        "packages/studio/src/survey/phaseCInventory.test.ts::accepted invisibles are NOT in the draft's chars"
+      ]
+    },
+    "FR-015": {
+      "title": "Every offered invisible carries a human-readable name (existing label helper + U+2060), U+ notation, and a need statement",
+      "tasks": [
+        "T024",
+        "T028",
+        "T029",
+        "T030",
+        "T035"
+      ],
+      "tests": [
+        "packages/studio/src/survey/invisibles/invisibleCandidates.test.ts::non-empty label",
+        "packages/studio/src/lib/irToCarveNodes.test.ts::invisibleCharLabel — spec 075 additions"
+      ]
+    },
+    "FR-016": {
+      "title": "Punctuation page inputs stop disagreeing; a typed format character is routed to the invisibles question pre-selected",
+      "tasks": [
+        "T027",
+        "T037"
+      ],
+      "tests": [
+        "packages/studio/src/survey/punctuation/PunctuationStep.test.tsx::format-character hand-off",
+        "packages/studio/src/survey/surveyWriteObservability.test.tsx"
+      ]
+    },
+    "FR-017": {
+      "title": "Existing code-point invisible entries carried over as accepted decisions, neither dropped nor duplicated",
+      "tasks": [
+        "T006",
+        "T009",
+        "T025",
+        "T035"
+      ],
+      "tests": [
+        "packages/studio/src/survey/invisibles/InvisiblesStep.test.tsx::carry-over of code-point entries",
+        "packages/studio/src/stores/phaseBDraftStore.test.ts::adoptControlsAsInvisibles"
+      ]
+    },
+    "FR-018": {
+      "title": "Declined offers recorded as declined, distinguishable from never asked",
+      "tasks": [
+        "T025",
+        "T035"
+      ],
+      "tests": [
+        "packages/studio/src/survey/invisibles/InvisiblesStep.test.tsx::one boolean answer per offered candidate"
+      ]
+    },
+    "FR-019": {
+      "title": "Subsume the RTL-only advisory direction-marks question rather than duplicate it",
+      "tasks": [
+        "T046",
+        "T047",
+        "T048",
+        "T049",
+        "T050"
+      ],
+      "tests": [
+        "packages/studio/src/survey/questions/registry.test.ts::112 entries",
+        "packages/studio/src/dashboard/__snapshots__/buildStepGraph.test.ts.snap"
+      ]
+    },
+    "FR-020": {
+      "title": "Invisibles is its own always-rendering phase-B spine step between punctuation and convenience",
+      "tasks": [
+        "T001",
+        "T025",
+        "T031",
+        "T032",
+        "T033",
+        "T034",
+        "T035",
+        "T036",
+        "T039",
+        "T040",
+        "T041",
+        "T042",
+        "T043",
+        "T044",
+        "T045"
+      ],
+      "tests": [
+        "packages/studio/src/survey/invisibles/InvisiblesStep.test.tsx::always renders",
+        "packages/studio/src/steps/manifest.test.ts",
+        "packages/studio/src/steps/advance.test.ts",
+        "packages/studio/tests/steps/stepHost.goldenWalk.test.tsx"
+      ]
+    },
+    "FR-021": {
+      "title": "Code-point field stays on the punctuation scope; a format character entered there is routed to the invisibles step",
+      "tasks": [
+        "T038",
+        "T055"
+      ],
+      "tests": [
+        "packages/studio/src/survey/surveyWriteObservability.test.tsx::code-point field is handed off",
+        "packages/studio/src/survey/punctuation/PunctuationStep.test.tsx::cluster containing a format character"
+      ]
+    },
+    "FR-022": {
+      "title": "A removed proposal is not re-proposed on revisit or re-resolution; typing it by hand overrides",
+      "tasks": [
+        "T005",
+        "T006",
+        "T009",
+        "T052",
+        "T053",
+        "T054"
+      ],
+      "tests": [
+        "packages/studio/src/survey/punctuation/PunctuationStep.test.tsx::a removed proposal is never re-proposed",
+        "packages/studio/src/stores/phaseBDraftStore.test.ts::vetoes a rejected character",
+        "packages/engine/src/character-discovery/punctuationProposal.test.ts::never proposes a rejected character"
+      ]
+    },
+    "FR-023": {
+      "title": "An author who completed the punctuation step before the feature is not overwritten or extended by new proposals",
+      "tasks": [
+        "T015",
+        "T017",
+        "T020"
+      ],
+      "tests": [
+        "packages/studio/src/survey/punctuation/PunctuationStep.test.tsx::FR-023"
+      ]
+    },
+    "FR-024": {
+      "title": "Punctuation step result stays under phase C; pinned by test, not a comment",
+      "tasks": [
+        "T007",
+        "T011",
+        "T015",
+        "T026",
+        "T035"
+      ],
+      "tests": [
+        "packages/studio/src/survey/punctuation/PunctuationStep.test.tsx::FR-024",
+        "packages/studio/src/survey/phaseCInventory.test.ts::phase-C inventory union pin"
+      ]
+    },
+    "FR-025": {
+      "title": "Every character added through any survey input appears in the step result or is visibly declined with a reason; a silent write fails a test",
+      "tasks": [
+        "T027",
+        "T037",
+        "T038",
+        "T055"
+      ],
+      "tests": [
+        "packages/studio/src/survey/surveyWriteObservability.test.tsx",
+        "packages/studio/src/survey/punctuation/PunctuationStep.test.tsx::format-character hand-off"
+      ]
+    },
+    "SC-001": {
+      "title": "Per-tag exact set comparison: zero-interaction Done equals the locale's CLDR punctuation tier",
+      "tasks": [
+        "T016"
+      ],
+      "tests": [
+        "packages/engine/src/character-discovery/punctuationProposal.test.ts::SC-001 oracle"
+      ]
+    },
+    "SC-002": {
+      "title": "Zero clicks to accept the studio's own punctuation proposal",
+      "tasks": [
+        "T015",
+        "T017"
+      ],
+      "tests": [
+        "packages/studio/src/survey/punctuation/PunctuationStep.test.tsx::Done with zero clicks"
+      ]
+    },
+    "SC-003": {
+      "title": "CLDR and base groups disjoint as rendered; inventory count equals the union",
+      "tasks": [
+        "T019",
+        "T020"
+      ],
+      "tests": [
+        "packages/studio/src/survey/punctuation/PunctuationStep.test.tsx::SC-003/FR-010"
+      ]
+    },
+    "SC-004": {
+      "title": "No invisible character silently discarded anywhere in the survey; carry-over measured separately",
+      "tasks": [
+        "T055"
+      ],
+      "tests": [
+        "packages/studio/src/survey/surveyWriteObservability.test.tsx"
+      ]
+    },
+    "SC-005": {
+      "title": "Every offered invisible has a non-empty label and need statement (completeness assertion)",
+      "tasks": [
+        "T024"
+      ],
+      "tests": [
+        "packages/studio/src/survey/invisibles/invisibleCandidates.test.ts"
+      ]
+    },
+    "SC-006": {
+      "title": "A removal survives step-revisit, re-resolution and reload round trips",
+      "tasks": [
+        "T052",
+        "T053",
+        "T054"
+      ],
+      "tests": [
+        "packages/studio/src/survey/punctuation/PunctuationStep.test.tsx::SC-006",
+        "packages/studio/src/lib/draftPersistence.test.ts::spec 075 SC-006"
+      ]
+    },
+    "SC-007": {
+      "title": "Emitted punctuation set minus confirmed punctuation inventory is empty",
+      "tasks": [
+        "T056"
+      ],
+      "tests": [
+        "packages/studio/src/survey/punctuation/punctuationOutputParity.test.ts"
+      ]
+    },
+    "SC-008": {
+      "title": "Measure the empty-punctuation-inventory rate across the journey corpus; threshold set after first run",
+      "tasks": [
+        "T057"
+      ],
+      "tests": [
+        "packages/studio/src/survey/journeyPunctuationRate.report.test.ts"
+      ]
+    },
+    "SC-009": {
+      "title": "No survey write unobservable; a step that stops rendering stalls the walk instead of passing",
+      "tasks": [
+        "T042",
+        "T055"
+      ],
+      "tests": [
+        "packages/studio/src/survey/surveyWriteObservability.test.tsx",
+        "packages/studio/e2e/helpers/surveyFlow.ts::driveInvisiblesStep"
+      ]
+    }
+  },
+  "currentTask": "T060",
+  "task_summaries": {
+    "T001": {
+      "status": "DONE",
+      "did": "Seeded docs/spec-trace.json with the specs/075-punctuation-defaults unit via node utilities/spec-trace seed; restored the unrelated pre-existing §11 drift hash so it stays visible",
+      "files": [
+        "docs/spec-trace.json"
+      ]
+    },
+    "T002": {
+      "status": "DONE",
+      "did": "Added failing save->cold reset->load round-trip tests for rejected/provenance/proposalConfidence/exemplarMethodDeclined/declaredRoles plus a post-reload veto check",
+      "files": [
+        "packages/studio/src/lib/draftPersistence.test.ts"
+      ]
+    },
+    "T003": {
+      "status": "DONE",
+      "did": "applyEnvelopeToStores now rebuilds the full PhaseBDraftSnapshot tolerantly (restorePhaseBDraftSnapshot) so rejected/provenance/proposalConfidence/exemplarMethodDeclined/declaredRoles survive reload; 89/89 persistence tests pass",
+      "files": [
+        "packages/studio/src/lib/draftPersistence.ts"
+      ]
+    },
+    "T005": {
+      "status": "DONE",
+      "did": "Colocated punctuationProposal.test.ts: floor shape/frozen, base coverage, disjointness, rejected/author exclusion, known-complete vs floor one-way rule, cldrAbsentReason; 12/12 pass",
+      "files": [
+        "packages/engine/src/character-discovery/punctuationProposal.test.ts"
+      ]
+    },
+    "T006": {
+      "status": "DONE",
+      "did": "Store tests for seedProposals idempotence/veto/no-downgrade, accept/declineInvisible, adoptControlsAsInvisibles carry-over + idempotence, sticky survival of reset(), clearing by resetPhaseBDraftDecisions, snapshot round trip",
+      "files": [
+        "packages/studio/src/stores/phaseBDraftStore.test.ts"
+      ]
+    },
+    "T007": {
+      "status": "DONE",
+      "did": "phaseCConfirmedInventory tests: union, declined contributes nothing, both-inputs dedupe, accepted invisibles absent from chars, charFromNotation parsing",
+      "files": [
+        "packages/studio/src/survey/phaseCInventory.test.ts"
+      ]
+    },
+    "T008": {
+      "status": "DONE",
+      "did": "Exported hasUnaccountedOpaqueFragment from computeInventoryDelta.ts with a docstring on why it is shared",
+      "files": [
+        "packages/engine/src/inventory/computeInventoryDelta.ts"
+      ]
+    },
+    "T009": {
+      "status": "DONE",
+      "did": "DraftProvenance += base/ascii-floor; sticky seededProposals + invisibleDecisions; seedProposals/acceptInvisible/declineInvisible/adoptControlsAsInvisibles; snapshot/apply/reset comment/resetPhaseBDraftDecisions extended",
+      "files": [
+        "packages/studio/src/stores/phaseBDraftStore.ts"
+      ]
+    },
+    "T010": {
+      "status": "DONE",
+      "did": "Pure engine module: ASCII_PUNCTUATION_FLOOR (32, frozen), basePunctuationCoverage(ir), buildPunctuationProposal with one-way floor rule and cldrAbsentReason",
+      "files": [
+        "packages/engine/src/character-discovery/punctuationProposal.ts"
+      ]
+    },
+    "T011": {
+      "status": "DONE",
+      "did": "phaseCConfirmedInventory() + charFromNotation/acceptedInvisibleChars helpers reading the draft store",
+      "files": [
+        "packages/studio/src/survey/phaseCInventory.ts"
+      ]
+    },
+    "T012": {
+      "status": "DONE",
+      "did": "restorePhaseBDraftSnapshot forwards seededProposals and invisibleDecisions; T002 round-trip test asserts both",
+      "files": [
+        "packages/studio/src/lib/draftPersistence.ts",
+        "packages/studio/src/lib/draftPersistence.test.ts"
+      ]
+    },
+    "T013": {
+      "status": "DONE",
+      "did": "Barrel exports for punctuationProposal.ts (3 values, 4 types) and hasUnaccountedOpaqueFragment; retired the 'intentionally unwired' note",
+      "files": [
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T015": {
+      "status": "DONE",
+      "did": "Step tests: FR-024 phase-C pin with B intact + session union; tier seeded on settle inside cldr-punctuation-group; zero-click Done confirms tier; caption names source+locale; author char untouched; two distinct absent messages; FR-023 guard records key without seeding; removed proposal re-tick is an author override; three legacy tick-to-add tests moved to the seeded contract",
+      "files": [
+        "packages/studio/src/survey/punctuation/PunctuationStep.test.tsx"
+      ]
+    },
+    "T016": {
+      "status": "DONE",
+      "did": "SC-001 oracle over every locale in the committed exemplar index with a non-empty punctuation tier (cldrGroup === NFC-deduped tier), asserting >100 locales checked",
+      "files": [
+        "packages/engine/src/character-discovery/punctuationProposal.test.ts"
+      ]
+    },
+    "T017": {
+      "status": "DONE",
+      "did": "PunctuationStep seeds the tier via seedProposals once per resolved locale under the FR-023 guard, renders cldr-punctuation-group with source+locale caption, distinct cldrAbsent.noExemplars/emptyTier messages, emits phaseCConfirmedInventory(); ticking a rejected suggestion is an author override",
+      "files": [
+        "packages/studio/src/survey/punctuation/PunctuationStep.tsx"
+      ]
+    },
+    "T018": {
+      "status": "DONE",
+      "did": "messages:extract + i18n-catalog-sort landed 5 new survey.punctuation.* ids in en/fr catalogs; Phase 3 gates (typecheck, engine + studio test files) green; commit deferred: user's global rule gates commits on explicit say-so",
+      "files": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T019": {
+      "status": "DONE",
+      "did": "Step tests for the base group: complete coverage = produced minus CLDR under the base caption; opaque fragment = floor's punctuation members under the incomplete caption with untrusted output excluded; SC-003 disjointness + union count + also-produced-by-base annotation; FR-011 missing count live-updates; carve always-keep note; FR-023 guard on the base seed; no group without a working copy",
+      "files": [
+        "packages/studio/src/survey/punctuation/PunctuationStep.test.tsx"
+      ]
+    },
+    "T020": {
+      "status": "DONE",
+      "did": "PunctuationStep reads useWorkingCopyStore ir/baseKeyboard, computes basePunctuationCoverage + buildPunctuationProposal, seeds the base group (base / ascii-floor provenance) under the FR-023 guard, renders base-punctuation-group with caption/incompleteCaption/carveNote, also-base aria annotation, and punctuation-missing-count via computeInventoryDelta (first production caller)",
+      "files": [
+        "packages/studio/src/survey/punctuation/PunctuationStep.tsx"
+      ]
+    },
+    "T021": {
+      "status": "DONE",
+      "did": "Mirrored the FR-012 five-item family-default statement plus the always-keep disagreement (surfaced, not resolved) into spec.md Assumptions -> Decisions taken",
+      "files": [
+        "specs/075-punctuation-defaults/spec.md"
+      ]
+    },
+    "T022": {
+      "status": "DONE",
+      "did": "Retired the 'punctuation needs no question' premise in the convenienceChars.ts header; cross-references punctuationProposal.ts as the sibling",
+      "files": [
+        "packages/engine/src/character-discovery/convenienceChars.ts"
+      ]
+    },
+    "T023": {
+      "status": "DONE",
+      "did": "messages:extract + i18n-catalog-sort for the base-group, also-base and missingCount ids; Phase 4 gates green (typecheck, engine + studio step tests); commit deferred per the user's commit gate",
+      "files": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T024": {
+      "status": "DONE",
+      "did": "SC-005 completeness test over rtl/ltr/unknown: non-empty label, U+ notation, resolvable need statement (authored for all 18 fixed+bidi code points, carried-over fallback), fixed five first, every isBidiControlCodePoint offered, carry-over once",
+      "files": [
+        "packages/studio/src/survey/invisibles/invisibleCandidates.test.ts"
+      ]
+    },
+    "T025": {
+      "status": "DONE",
+      "did": "InvisiblesStep tests: always renders with heading/continue/back + noneNeeded; role=checkbox + aria-checked bound to invisibleDecisions; accepted chars reach phaseCConfirmedInventory and never chars/controls; one boolean answer per candidate (declined=false); carry-over from controls pre-selected once; bidi collapsed for non-RTL, expanded for RTL; writingDirectionFrom precedence",
+      "files": [
+        "packages/studio/src/survey/invisibles/InvisiblesStep.test.tsx"
+      ]
+    },
+    "T026": {
+      "status": "DONE",
+      "did": "FR-024 union pin: recordPhase punctuation -> invisibles -> punctuation leaves phase-C confirmedInventory = punctuation ∪ acceptedInvisibles each time, phase B intact",
+      "files": [
+        "packages/studio/src/survey/phaseCInventory.test.ts"
+      ]
+    },
+    "T027": {
+      "status": "DONE",
+      "did": "Hand-off tests: single typed Cf recorded as accepted invisible, kept out of chars, role=status handoff note naming the invisibles step, no navigation, rides into phase-C inventory; Cf-containing cluster declined with reason and neither split nor filed",
+      "files": [
+        "packages/studio/src/survey/punctuation/PunctuationStep.test.tsx"
+      ]
+    },
+    "T028": {
+      "status": "DONE",
+      "did": "invisibleCharLabel tests: WORD JOINER + bidi control names, existing labels unchanged, FORMAT CHARACTER fallback for unnamed Cf",
+      "files": [
+        "packages/studio/src/lib/irToCarveNodes.test.ts"
+      ]
+    },
+    "T029": {
+      "status": "DONE",
+      "did": "INVISIBLE_CHAR_LABELS += WORD JOINER and 12 bidi control names; Cf fallback label; isAlwaysKeepCategory docstring cross-references punctuationProposal.ts and the surfaced always-keep disagreement",
+      "files": [
+        "packages/studio/src/lib/irToCarveNodes.ts"
+      ]
+    },
+    "T030": {
+      "status": "DONE",
+      "did": "Pure invisibleCandidatesFor builder: fixed five, bidi allowlist derived from isBidiControlCodePoint (now exported from the engine barrel), carried-over Cf once; NEED_STATEMENTS msg descriptors for all 18 + carried-over fallback",
+      "files": [
+        "packages/studio/src/survey/invisibles/invisibleCandidates.ts",
+        "packages/engine/src/index.ts"
+      ]
+    },
+    "T031": {
+      "status": "DONE",
+      "did": "ActiveStepId += invisibles",
+      "files": [
+        "packages/studio/src/stores/surveySessionStore.ts"
+      ]
+    },
+    "T032": {
+      "status": "DONE",
+      "did": "advance.ts: id mirror + case invisibles -> nextSpineStepAfter; not in STEPS_WITH_APPLY_COMPLETION; advance.test.ts pins updated (punctuation->invisibles->convenience, three spine arrays)",
+      "files": [
+        "packages/studio/src/steps/advance.ts",
+        "packages/studio/src/steps/advance.test.ts"
+      ]
+    },
+    "T033": {
+      "status": "DONE",
+      "did": "phases.ts StepId += invisibles; phase-C stepIds = characters, marks, punctuation, invisibles, convenience (phases.test passes unchanged)",
+      "files": [
+        "packages/studio/src/steps/phases.ts"
+      ]
+    },
+    "T034": {
+      "status": "DONE",
+      "did": "footer.stage.invisibles + trail.stage.name.invisibles stage labels; ResumeDraftBanner STEP_LABELS gains invisibles (Record<ActiveStepId> exhaustiveness)",
+      "files": [
+        "packages/studio/src/decisions/progressDots.ts",
+        "packages/studio/src/decisions/DecisionTrailView.tsx",
+        "packages/studio/src/components/ResumeDraftBanner.tsx"
+      ]
+    },
+    "T035": {
+      "status": "DONE",
+      "did": "InvisiblesStep component: writingDirectionFrom (Phase A answer, RTL branch, script family), carry-over via adoptControlsAsInvisibles on mount, named role=checkbox rows with aria-labelledby/describedby need statements, bidi group collapsed/expandable, emits phase C answers + phaseCConfirmedInventory(); always renders",
+      "files": [
+        "packages/studio/src/survey/invisibles/InvisiblesStep.tsx"
+      ]
+    },
+    "T036": {
+      "status": "DONE",
+      "did": "Manifest entry invisibles between punctuation and convenience (inputs/writes empty, specRef specs/075-punctuation-defaults), expectedSpine + header prose + manifest.test pins; manifest.specref.json regenerated by the specref test",
+      "files": [
+        "packages/studio/src/steps/manifest.ts",
+        "packages/studio/src/steps/manifest.specref.json",
+        "packages/studio/src/steps/manifest.test.ts"
+      ]
+    },
+    "T037": {
+      "status": "DONE",
+      "did": "PunctuationStep type-in routes a single Cf to acceptInvisible with a role=status punctuation-handoff-note (no navigation) and declines a Cf-containing cluster with punctuation-declined-cluster",
+      "files": [
+        "packages/studio/src/survey/punctuation/PunctuationStep.tsx"
+      ]
+    },
+    "T038": {
+      "status": "DONE",
+      "did": "CharacterMapPane punctuation-scope code-point field hands a Cf to acceptInvisible and announces through the pane's live region; alphabet scope unchanged",
+      "files": [
+        "packages/studio/src/survey/CharacterMapPane.tsx"
+      ]
+    },
+    "T039": {
+      "status": "DONE",
+      "did": "journey-runner replay: invisibles joins the marks/punctuation/convenience no-op case group",
+      "files": [
+        "packages/studio/src/survey/journey-runner.ts"
+      ]
+    },
+    "T040": {
+      "status": "DONE",
+      "did": "StudioShell spine-order comment corrected to include punctuation, invisibles and convenience",
+      "files": [
+        "packages/studio/src/StudioShell.tsx"
+      ]
+    },
+    "T041": {
+      "status": "DONE",
+      "did": "InvisiblesStep stubbed in renderSmoke (SC-005 entry), invisibles StepAction added to both golden-walk drivers (punctuation settles on invisibles-continue), both fixtures regenerated",
+      "files": [
+        "packages/studio/tests/steps/stepHost.renderSmoke.test.tsx",
+        "packages/studio/tests/steps/stepHost.goldenWalk.test.tsx",
+        "packages/studio/tests/steps/__fixtures__/goldenWalk/copy.json",
+        "packages/studio/tests/steps/__fixtures__/goldenWalk/adapt.json"
+      ]
+    },
+    "T042": {
+      "status": "DONE",
+      "did": "driveInvisiblesStep(page) — plain waitFor on invisibles-continue, no race — called from buildOneCharacterList between punctuation and convenience",
+      "files": [
+        "packages/studio/e2e/helpers/surveyFlow.ts"
+      ]
+    },
+    "T043": {
+      "status": "DONE",
+      "did": "docs/journey-coverage.json regenerated through journeyCoverage.report.test (totalSteps 14 -> 15)",
+      "files": [
+        "docs/journey-coverage.json"
+      ]
+    },
+    "T044": {
+      "status": "DONE",
+      "did": "copy-edit back-walk heading chain now walks convenience -> Invisible characters -> Choose your punctuation -> Accents & marks; forward re-walk drives punctuation + invisibles",
+      "files": [
+        "packages/studio/e2e/copy-edit.spec.ts"
+      ]
+    },
+    "T045": {
+      "status": "DONE",
+      "did": "light-theme-a11y waits for invisibles-step, runs the axe scan, then drives it",
+      "files": [
+        "packages/studio/e2e/light-theme-a11y.spec.ts"
+      ]
+    },
+    "T046": {
+      "status": "DONE",
+      "did": "Deleted pb_rtl_direction_marks.ts and its test",
+      "files": [
+        "packages/studio/src/survey/questions/b/pb_rtl_direction_marks.ts",
+        "packages/studio/tests/survey/questions/b/pb_rtl_direction_marks.test.ts"
+      ]
+    },
+    "T047": {
+      "status": "DONE",
+      "did": "Deleted pb_rtl_direction_marks_detail.ts and its test",
+      "files": [
+        "packages/studio/src/survey/questions/b/pb_rtl_direction_marks_detail.ts",
+        "packages/studio/tests/survey/questions/b/pb_rtl_direction_marks_detail.test.ts"
+      ]
+    },
+    "T048": {
+      "status": "DONE",
+      "did": "pb_rtl_short_vowels.next -> pb_rtl_special_letters with a retirement note",
+      "files": [
+        "packages/studio/src/survey/questions/b/pb_rtl_short_vowels.ts"
+      ]
+    },
+    "T049": {
+      "status": "DONE",
+      "did": "Removed the two retired ids from the modular flow YAML and the direction facet's prefill consumers",
+      "files": [
+        "content/flows/phase_b_characters.modular.yaml",
+        "content/facets/orth/direction.yaml"
+      ]
+    },
+    "T050": {
+      "status": "DONE",
+      "did": "registry.b.ts drops the two retired entries; registry count 114 -> 112 (47 Phase B); Tier B catalogs re-extracted (6 flowQuestions strings removed); buildStepGraph snapshot regenerated (RTL edges gone); pnpm run test:i18n-utilities green (5 suites)",
+      "files": [
+        "packages/studio/src/survey/questions/registry.b.ts",
+        "packages/studio/src/survey/questions/registry.test.ts",
+        "content/i18n/en/flowQuestions.json",
+        "packages/studio/src/dashboard/__snapshots__/buildStepGraph.test.ts.snap"
+      ]
+    },
+    "T051": {
+      "status": "DONE",
+      "did": "messages:extract + i18n-catalog-sort for every survey.invisibles.*, footer/trail stage labels, handoffNote, declinedCluster and the character-map hand-off announcement (en 1655 ids, fr 47 pending translation); Phase 5 unit gates green; Playwright suites edited but not run locally (needs the global Playwright install); commit deferred per the user's commit gate",
+      "files": [
+        "packages/studio/src/locales/en/messages.json",
+        "packages/studio/src/locales/fr/messages.json"
+      ]
+    },
+    "T052": {
+      "status": "DONE",
+      "did": "SC-006 step test: N removals survive unmount/remount and a new resolvedTag seed; typing a removed mark back restores it as the author's",
+      "files": [
+        "packages/studio/src/survey/punctuation/PunctuationStep.test.tsx"
+      ]
+    },
+    "T053": {
+      "status": "DONE",
+      "did": "SC-006 reload leg: seed, remove N, saveDraft, cold reset (+resetPhaseBDraftDecisions), loadDraft, re-seed same and new key -> tier minus N, ledger intact",
+      "files": [
+        "packages/studio/src/lib/draftPersistence.test.ts"
+      ]
+    },
+    "T054": {
+      "status": "DONE",
+      "did": "Both US4 tests pass against T003/T009/T017 with no code change; added the unbounded-growth + author-override note to the rejected field comment",
+      "files": [
+        "packages/studio/src/stores/phaseBDraftStore.ts"
+      ]
+    },
+    "T055": {
+      "status": "DONE",
+      "did": "surveyWriteObservability harness: every offered Cf (fixed five + 16 bidi) through the punctuation type-in, the punctuation-scope code-point field and the invisibles toggle, classified confirmed/handed-off/declined/silent; found and fixed one silent write (String#trim swallowed U+FEFF so Add stayed disabled); carry-over legs for alphabet-scope controls and saved accepted decisions",
+      "files": [
+        "packages/studio/src/survey/surveyWriteObservability.test.tsx",
+        "packages/studio/src/survey/punctuation/PunctuationStep.tsx"
+      ]
+    },
+    "T056": {
+      "status": "DONE",
+      "did": "SC-007 parity test on a codec-parsed .kmn: emitted punctuation minus confirmed punctuation is empty with zero interaction; names the declined mark carve's always-keep re-admits",
+      "files": [
+        "packages/studio/src/survey/punctuation/punctuationOutputParity.test.ts"
+      ]
+    },
+    "T057": {
+      "status": "DONE",
+      "did": "SC-008 report-only vitest replaying content/journeys/*.yaml: [OK] empty-punctuation-inventory rate: 4/4 (harness replays punctuation as a no-op); baseline + caveat recorded on the spec's SC-008 line",
+      "files": [
+        "packages/studio/src/survey/journeyPunctuationRate.report.test.ts",
+        "specs/075-punctuation-defaults/spec.md"
+      ]
+    },
+    "T058": {
+      "status": "DONE",
+      "did": "Spec Open decisions closed: both steps declare inputs/writes empty (spec 066 FR-006; confirming an inventory is a survey result, not an IR write)",
+      "files": [
+        "specs/075-punctuation-defaults/spec.md"
+      ]
+    },
+    "T059": {
+      "status": "DONE",
+      "did": "docs/architecture.md gains the phase-B spine bullet (marks/punctuation/invisibles/convenience, proposal seeding, retired RTL pair, shared phase-C union); spec-trace units docs/architecture.md and specs/075-punctuation-defaults acknowledged",
+      "files": [
+        "docs/architecture.md",
+        "docs/spec-trace.json"
+      ]
+    },
+    "T014": {
+      "status": "DONE",
+      "did": "Engine rebuilt (tsc -b) so the studio typechecks against the new dist .d.ts; Phase 2 gates green (workspace typecheck, engine suite 4097 pass with the known local recognizer failure, studio store/persistence/phase-C suites); commit deferred per the user's commit gate",
+      "files": [
+        "packages/engine/dist"
+      ]
+    },
+    "T060": {
+      "status": "DONE",
+      "did": "Full gates: pnpm typecheck pass; pnpm lint pass; engine 4097 pass (known local recognizer failure + 4 load flakes green alone); studio 6590 pass with pinChip load timeouts green alone and the 8 review-touched suites 285/285; test:i18n-utilities pass; crew-lint pass; every FR-001..025 and SC-001..009 mapped to a test in coverage; Playwright copy-edit/light-theme-a11y edited, not run locally; commit + push deferred per the user's commit gate",
+      "files": [
+        "(gate",
+        "no file)"
+      ]
+    }
+  },
+  "verified": [
+    {
+      "what": "workspace typecheck",
+      "command": "pnpm typecheck",
+      "result": "pass (all packages, after engine rebuild)",
+      "warnings": []
+    },
+    {
+      "what": "full lint chain",
+      "command": "pnpm lint",
+      "result": "pass (eslint, depcruise, crew-lint, facet/adaptation/i18n/test-antipattern/token/spec-number checkers); pnpm crew-lint re-run alone: pass",
+      "warnings": []
+    },
+    {
+      "what": "engine unit suite",
+      "command": "pnpm --filter @keyboard-studio/engine test",
+      "result": "4097 pass, 2 skipped; 1 known pre-existing local failure (recognizer integration 0060 grave RALT K_7); 4 compiler/oracle WASM tests time out only under the full parallel run and pass in isolation",
+      "warnings": [
+        "recognizer/integration.test.ts 0060 grave: pre-existing local-only failure per memory",
+        "compile.test.ts / stripDanglingAssetStores / oracle / modifierCombos: load flakes, green alone"
+      ]
+    },
+    {
+      "what": "studio unit suite (full)",
+      "command": "NODE_OPTIONS=--no-experimental-webstorage pnpm --filter @keyboard-studio/studio test",
+      "result": "6590 pass / 4 fail before the review fixes: 3 SurveyRunner.pinChip timeouts (30s+, load) and the phaseCInventory test that was mid-edit; the 8 suites the review fixes touch re-run green (285/285) and pinChip re-run alone",
+      "warnings": [
+        "local Node 26 requires --no-experimental-webstorage or every localStorage suite fails"
+      ]
+    },
+    {
+      "what": "contracts/llm/glottolog/keyboard-lint suites",
+      "command": "pnpm -r test",
+      "result": "796 / 9 / 42 / 123 pass; run aborted at utilities/oauth-backend server.test.ts beforeAll 10s hook timeout under load (unrelated to 075)",
+      "warnings": [
+        "oauth-backend hook timeout is environmental"
+      ]
+    },
+    {
+      "what": "i18n utility suites + Tier B extraction",
+      "command": "pnpm run test:i18n-utilities; npx tsx --tsconfig utilities/i18n-content-extract/tsconfig.json utilities/i18n-content-extract/cli.ts",
+      "result": "5 suites pass (30/50/10/19/14); 517 content strings across 4 catalogs, 6 flowQuestions strings removed with the retired RTL pair",
+      "warnings": [
+        "bare npx tsx cli.ts fails to resolve @keyboard-studio/contracts; the --tsconfig form the lint script uses is required"
+      ]
+    },
+    {
+      "what": "spec-trace",
+      "command": "node utilities/spec-trace seed / acknowledge / check --dry-run",
+      "result": "specs/075-punctuation-defaults unit seeded and acknowledged; docs/architecture.md acknowledged; only the pre-existing §11 drift remains",
+      "warnings": [
+        "§11 criteria.md compliance drift pre-dates this feature and was left for its owner"
+      ]
+    },
+    {
+      "what": "km-lead post-implement review cycle (km-frontend, km-qc, km-synthesis in parallel)",
+      "command": "Agent x3, read-only",
+      "result": "1 P0 fixed (unanchored glyphCategory let a punctuation+ZWNJ cluster into the punctuation answer; format-character checks now run first, pinned by a new test); P1s fixed: reuse contracts parseUPlusNotation for notation keys (dropped charFromNotation + the store regex), one shared isFormatChar/containsFormatChar in charNormUtils, base-seed effect reads rejected/provenance from the store at fire time instead of subscribing, direction arg documented; P2s left: store mutates module-level picks (pre-existing idiom), label fallback kept as the type-level guard",
+      "warnings": [
+        "Playwright specs reviewed by reading only"
+      ]
+    }
+  ],
+  "last_action": "implement complete: 59/60 tasks journaled, gates green (typecheck, lint, engine, studio, i18n utilities), review P0+P1s fixed; T004 and all phase commits deferred pending the user's commit approval; PR hook skipped for the same reason"
+}
