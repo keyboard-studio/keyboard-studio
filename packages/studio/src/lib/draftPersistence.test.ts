@@ -25,7 +25,11 @@ import { DEBOUNCE_MS } from "../hooks/useDebounce.ts";
 import type { BaseKeyboard, KeyboardIR, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
+import {
+  usePhaseBDraftStore,
+  snapshotPhaseBDraft,
+  resetPhaseBDraftDecisions,
+} from "../stores/phaseBDraftStore.ts";
 import { DEFAULT_PHASE_B_FONT } from "../survey/surveyStyles.ts";
 import type { IdentityLiteResult } from "../survey/index.ts";
 
@@ -1097,6 +1101,79 @@ describe("draftPersistence", () => {
       expect(saved.phaseBDraft?.chars).toEqual(["q"]);
 
       teardown();
+    });
+  });
+
+  describe("sticky phase-B draft fields survive a reload (spec 044 FR-017 defect, surfaced by spec 075 US4)", () => {
+    // `saveDraft` already writes every sticky decision the draft store keeps
+    // (`rejected`, `provenance`, `proposalConfidence`, `exemplarMethodDeclined`,
+    // `declaredRoles`), but the restore path used to rebuild the snapshot from
+    // `chars`/`exemplarDigraphs`/`selectedFont` alone, so a reload silently
+    // re-proposed every character the author had removed and flattened every
+    // proposed chip to "author". Pinned as a full save -> cold reset -> load
+    // round trip: every sticky field equals what was saved.
+    function seedStickyDraft(): void {
+      const store = usePhaseBDraftStore.getState();
+      store.seedFromProposal({
+        resolvedTag: "ewo",
+        source: "cldr",
+        confidence: "approved",
+        characters: [
+          { char: "d", tier: "main", source: "cldr", confidence: "approved" },
+          { char: "z", tier: "main", source: "cldr", confidence: "approved" },
+        ],
+        digraphs: [],
+      });
+      store.add("q");
+      store.add("\uE000", { role: "mark" });
+      store.remove("z"); // removing a PROPOSAL records a rejection
+      store.declineExemplarMethod();
+    }
+
+    function coldReset(): void {
+      useWorkingCopyStore.getState().reset();
+      useSurveySessionStore.getState().reset();
+      usePhaseBDraftStore.getState().reset();
+      resetPhaseBDraftDecisions();
+    }
+
+    it("restores rejected, provenance, proposalConfidence, exemplarMethodDeclined and declaredRoles exactly as saved", () => {
+      const pk = "phaseb-draft-sticky-fields";
+      instantiateMinimal(pk);
+      seedStickyDraft();
+      const before = snapshotPhaseBDraft();
+      // Sanity: the fixture really exercises every sticky field.
+      expect(before.rejected).toEqual(["z"]);
+      expect(before.provenance).toMatchObject({ d: "cldr", q: "author" });
+      expect(before.proposalConfidence).toEqual({ cldr: "approved" });
+      expect(before.exemplarMethodDeclined).toBe(true);
+      expect(before.declaredRoles).toEqual({ "\uE000": "mark" });
+
+      saveDraft(pk);
+      coldReset();
+      expect(usePhaseBDraftStore.getState().rejected).toEqual([]);
+      expect(usePhaseBDraftStore.getState().provenance).toEqual({});
+
+      expect(loadDraft(pk)).toBe(true);
+      const after = snapshotPhaseBDraft();
+      expect(after.chars).toEqual(before.chars);
+      expect(after.rejected).toEqual(before.rejected);
+      expect(after.provenance).toEqual(before.provenance);
+      expect(after.proposalConfidence).toEqual(before.proposalConfidence);
+      expect(after.exemplarMethodDeclined).toBe(true);
+      expect(after.declaredRoles).toEqual(before.declaredRoles);
+    });
+
+    it("a restored rejection still vetoes the same proposal after reload (the ledger is load-bearing, not decorative)", () => {
+      const pk = "phaseb-draft-sticky-veto";
+      instantiateMinimal(pk);
+      seedStickyDraft();
+      saveDraft(pk);
+      coldReset();
+      expect(loadDraft(pk)).toBe(true);
+
+      usePhaseBDraftStore.getState().addProposed("z", "cldr");
+      expect(usePhaseBDraftStore.getState().chars).not.toContain("z");
     });
   });
 
