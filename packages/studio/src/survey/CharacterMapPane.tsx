@@ -35,7 +35,7 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { characterMapGroups, type CharacterMapGroup } from "../lib/services.ts";
-import { casePairOf, isFoldedUppercase } from "./charNormUtils.ts";
+import { casePairOf, isFoldedUppercase, isFormatChar } from "./charNormUtils.ts";
 import { isPrivateUseCodePoint, glyphCategory } from "@keyboard-studio/engine";
 import { isCombining, prefixCombiningMark } from "../lib/irToCarveNodes.ts";
 import { matchesQuery } from "./characterSearch.ts";
@@ -383,7 +383,7 @@ export function CharacterMapPane({
     // the draft's unrendered `controls` bucket where nothing would ever show
     // it again. The alphabet scope is unchanged: its code-point entries are
     // adopted by the invisibles step's carry-over on arrival.
-    if (scope === "punctuation" && /^\p{Cf}$/u.test(char)) {
+    if (scope === "punctuation" && isFormatChar(char)) {
       const notation = toUPlusNotation(char);
       acceptInvisible(notation);
       setAnnouncement(

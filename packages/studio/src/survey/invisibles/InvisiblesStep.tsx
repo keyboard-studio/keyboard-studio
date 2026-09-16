@@ -212,17 +212,12 @@ const InvisiblesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: 
       .filter((c): c is string => c !== null);
     return [...fromControls, ...fromDecisions];
   }, [controls, invisibleDecisions]);
-  const carriedRef = useRef<readonly string[]>(carriedOver);
   useEffect(() => {
     adoptControlsAsInvisibles();
   }, [adoptControlsAsInvisibles]);
 
   const candidates = useMemo(
-    () =>
-      invisibleCandidatesFor({
-        direction,
-        carriedOver: [...carriedRef.current, ...carriedOver],
-      }),
+    () => invisibleCandidatesFor({ direction, carriedOver }),
     [direction, carriedOver],
   );
   const alwaysCandidates = candidates.filter((c) => c.relevance !== "rtl");

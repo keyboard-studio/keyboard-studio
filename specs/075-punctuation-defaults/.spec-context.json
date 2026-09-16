@@ -632,6 +632,21 @@
     },
     {
       "decision": "{\"decision\": \"Review fixes: format-character checks precede the punctuation-category test in PunctuationStep.add(); U+ notation is validated by contracts parseUPlusNotation everywhere; isFormatChar/containsFormatChar live in survey/charNormUtils.ts\", \"why\": \"glyphCategory tests \\p{P} unanchored so a punctuation+Cf cluster read as punctuation (QC P0); three near-identical U+ parsers and four Cf regex literals were introduced in one change (synthesis P1)\", \"rejected\": \"Anchoring glyphCategory itself (shared classifier, out of scope)\"}"
+    },
+    {
+      "decision": "US1 and US2 landed in one commit; catalogs and shared test files landed once in the last commit that needs them",
+      "why": "they share the same hunks of PunctuationStep.tsx and the catalogs are one extracted artifact",
+      "rejected": "hunk-splitting one component across three commits"
+    },
+    {
+      "decision": "Work landed on new branch km/075-punctuation-defaults-full cut from origin/main, superseding PR #1760 (US1-only)",
+      "why": "the old branch name carried an open PR with an older partial implementation touching the same files",
+      "rejected": "rewriting the pushed history of km/075-punctuation-defaults"
+    },
+    {
+      "decision": "P0 from review (StudioShell.test.tsx not updated for the invisibles step) fixed in a follow-up review-fix commit rather than amending the US3 commit",
+      "why": "the five phase commits are already pushed; rewriting pushed history is not authorised",
+      "rejected": "amend/force-push the US3 commit"
     }
   ],
   "concerns": [
@@ -672,6 +687,31 @@
       "note": "spec-trace §11 (criteria.md compliance) drift pre-dates this feature and was deliberately left unacknowledged (seed refreshed its hash; restored from HEAD)",
       "step": "implement",
       "kind": "prerequisite"
+    },
+    {
+      "note": "InvisiblesStep: bidi embeddings/isolates (U+202A-202B, U+2066-2069) lack the caution copy the overrides carry; none pre-selected, reachable pre-075 via code-point entry",
+      "step": "implement",
+      "kind": "deferred"
+    },
+    {
+      "note": "ASCII floor caption (survey.punctuation.baseGroup.incompleteCaption) should not read as all punctuation; several members double as dead-key triggers (placement is out of scope)",
+      "step": "implement",
+      "kind": "deferred"
+    },
+    {
+      "note": "InvisiblesStep bidiExpanded flips one-way to true when direction becomes rtl; never re-collapses if direction is revised",
+      "step": "implement",
+      "kind": "deferred"
+    },
+    {
+      "note": "engine has 3 near-identical NFC-unique helpers (punctuationProposal, marks/promotion, characterMap); extract a shared inventory/nfcUnique when next touched",
+      "step": "implement",
+      "kind": "deferred"
+    },
+    {
+      "note": "pnpm lint (crew-lint) overflows the stack on this local checkout because .claude/worktrees holds 14 stale agent worktree dirs (12 unregistered) each with node_modules; environmental, not a branch defect",
+      "step": "implement",
+      "kind": "environment"
     }
   ],
   "step_summaries": {
@@ -1601,6 +1641,39 @@
       "warnings": [
         "Playwright specs reviewed by reading only"
       ]
+    },
+    {
+      "what": "km-frontend review of InvisiblesStep/PunctuationStep (a11y, i18n, D3, seed idempotence)",
+      "result": "APPROVE; 3 P2",
+      "command": "km-lead cycle 1"
+    },
+    {
+      "what": "km-domain linguistic review (ASCII floor, family defaults, Cf candidate set, retired RTL questions, labels)",
+      "result": "APPROVE; no P0; 2 P2",
+      "command": "km-lead cycle 1"
+    },
+    {
+      "what": "km-synthesis integration fit (charNormUtils, punctuationProposal, phaseCInventory, restore helpers)",
+      "result": "APPROVE; 1 P1 duplication (inline Cf regex in CharacterMapPane + irToCarveNodes) fixed in cycle 2",
+      "command": "km-lead cycle 1"
+    },
+    {
+      "what": "km-qc code-quality review of the 075 diff",
+      "result": "PASS 91/100, APPROVE; 3 P2 (dead carriedRef, inline Cf regex, issue numbers in test comments)",
+      "command": "km-lead cycle 1"
+    },
+    {
+      "what": "km-verification gate run on km/075-punctuation-defaults-full",
+      "result": "typecheck 0; i18n-utilities 0; engine 4099/4105 (1 known local recognizer failure + 3 contention timeouts green in isolation); studio 20 failures in StudioShell.test.tsx = P0 (spine test not updated for invisibles); all FR-001..025 and SC-001..009 test-pinned",
+      "command": "pnpm typecheck; pnpm --filter engine test; pnpm --filter studio test; pnpm lint; pnpm run test:i18n-utilities",
+      "warnings": [
+        "T060 recorded a green full-gate run that the StudioShell failures contradict"
+      ]
+    },
+    {
+      "what": "km-lead cycle 2 re-verification after review fixes (StudioShell.test.tsx spine update, isFormatChar dedupe, carriedRef removal, issue-number scrub)",
+      "result": "pnpm typecheck exit 0; studio suite 448 files / 6882 tests exit 0 (was 20 failures); eslint on the 6 touched files 0 errors; depcruise 0 violations",
+      "command": "pnpm typecheck; vitest run --maxWorkers=4 (studio); eslint; depcruise"
     }
   ],
   "last_action": "implement complete: 59/60 tasks journaled, gates green (typecheck, lint, engine, studio, i18n utilities), review P0+P1s fixed; T004 and all phase commits deferred pending the user's commit approval; PR hook skipped for the same reason"

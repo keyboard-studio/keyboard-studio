@@ -20,6 +20,7 @@ import { resolveContentString } from './contentI18n.ts';
 import { caseGroupFor, caseTrimSet } from './carveCasePairs.ts';
 import { getLoadedLangtags } from './langtagsDefaults.ts';
 import { lowerBareLetter } from './keyCasing.ts';
+import { isFormatChar } from '../survey/charNormUtils.ts';
 export type CardKind = 'pattern' | 'group' | 'store' | 'raw';
 
 // ---------------------------------------------------------------------------
@@ -216,7 +217,7 @@ export function invisibleCharLabel(ch: string): string | null {
   }
   // Any other format character (Cf) — a code-point entry can reach one the
   // map does not name; it still needs a non-empty label (spec 075 FR-015).
-  if (/^\p{Cf}$/u.test(ch)) {
+  if (isFormatChar(ch)) {
     const cp = ch.codePointAt(0)!;
     return `FORMAT CHARACTER (U+${cp.toString(16).toUpperCase().padStart(4, '0')})`;
   }

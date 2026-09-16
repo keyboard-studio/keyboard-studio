@@ -167,7 +167,7 @@ describe("PunctuationStep — sourced suggestions", () => {
     expect(lastResult(onComplete).confirmedInventory).toEqual(["।"]);
   });
 
-  it("renders the suggestion chip's accessible name as one full catalog sentence, not an assembled fragment (#1589)", async () => {
+  it("renders the suggestion chip's accessible name as one full catalog sentence, not an assembled fragment", async () => {
     mocks.inventory = {
       resolvedTag: "hi",
       source: "cldr",

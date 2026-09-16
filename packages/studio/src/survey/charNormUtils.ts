@@ -16,7 +16,8 @@ import { glyphCategory, caseCounterpart } from "@keyboard-studio/engine";
  * HYPHEN, WORD JOINER, the bidi controls. They print nothing, so no character
  * map can show them and no punctuation/alphabet list should hold them; the
  * invisible-characters step (spec 075) owns them. One predicate pair, shared by
- * the draft store, the punctuation page and the invisibles step.
+ * the draft store, the punctuation page, the invisibles step, the character
+ * map pane, and the carve-node labeller (irToCarveNodes).
  */
 const FORMAT_CHAR_RE = /^\p{Cf}$/u;
 const CONTAINS_FORMAT_CHAR_RE = /\p{Cf}/u;
