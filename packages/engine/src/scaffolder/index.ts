@@ -20,6 +20,7 @@ import {
 import { fetchKeyboardSourceToVfs, type FetchFn } from "../loader/fetchKeyboardSourceToVfs.js";
 import { parse } from "../codec/parse.js";
 import { emit } from "../codec/emit.js";
+import { TOUCH_LAYOUT_JSON_INDENT } from "../codec/parse-touch.js";
 import { detectBaseLayoutFamily } from "../placement/filters.js";
 import { scaffoldIR, sanitizeDisplayName, kmnStringEscape } from "./scaffold-ir.js";
 import { assetFileExtensions } from "../shared/siblingAssetStores.js";
@@ -301,7 +302,7 @@ function applyTouchLayoutCleanup(vfs: VirtualFS, keyboardId: string): void {
     }
   }
 
-  vfs.set(path, JSON.stringify(data, null, 2));
+  vfs.set(path, JSON.stringify(data, null, TOUCH_LAYOUT_JSON_INDENT));
 }
 
 // The scaffolder no longer owns a private `.kps` builder. `buildKpsContent`,
@@ -531,7 +532,14 @@ export function generateStubs(
     },
     {
       path: `source/${keyboardId}.keyman-touch-layout`,
-      content: `{"tablet":{"layer":[{"id":"default","row":[]}]}}`,
+      // Tabulated to match every other `.keyman-touch-layout` in the corpus —
+      // this stub is written AFTER applyTouchLayoutCleanup, so nothing else
+      // reformats it. See TOUCH_LAYOUT_JSON_INDENT in ../codec/parse-touch.ts.
+      content: JSON.stringify(
+        { tablet: { layer: [{ id: "default", row: [] }] } },
+        null,
+        TOUCH_LAYOUT_JSON_INDENT,
+      ),
     },
     // No `source/<id>.ico` stub. Spec §12 lists the icon in the emitted layout,
     // but only a REAL icon belongs there: the base's own `.ico` is carried over

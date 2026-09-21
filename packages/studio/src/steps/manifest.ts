@@ -7,8 +7,8 @@
 //
 // SPINE ORDER (FR-012, M2):
 //   Identity → choose base → Track → [project_name (spine:false)] →
-//   Characters (Phase A/B questions) → Marks → Punctuation → Convenience →
-//   Carve → Mechanisms → [lock: "physical"] →
+//   Characters (Phase A/B questions) → Marks → Punctuation → Invisibles →
+//   Convenience → Carve → Mechanisms → [lock: "physical"] →
 //   touch_seed_source (spine:false) → touch →
 //   [lock: "touch"] → Help → Package (reserved)
 //
@@ -28,6 +28,7 @@ import type { Step } from "./types.ts";
 import { CharactersStep } from "../survey/CharactersStep.tsx";
 import { MarksSeriesStep } from "../survey/marks/MarksSeriesStep.tsx";
 import { PunctuationStep } from "../survey/punctuation/PunctuationStep.tsx";
+import { InvisiblesStep } from "../survey/invisibles/InvisiblesStep.tsx";
 import { ConvenienceCharsStep } from "../survey/convenience/ConvenienceCharsStep.tsx";
 import {
   identityStep,
@@ -89,7 +90,7 @@ const charactersStep: Step = {
 //
 // Rules encoded here:
 //   M2 — spine order: Identity → choose_base → track → Characters → Marks →
-//         Punctuation → Convenience → Carve → Mechanisms → (lock physical) →
+//         Punctuation → Invisibles → Convenience → Carve → Mechanisms → (lock physical) →
 //         touch → (lock touch) → Help → Package
 //   M3 — exactly one lock:"physical" and one lock:"touch", in that order.
 //   M4 — touch_seed_source is spine:false with joinTarget resolving to "touch".
@@ -157,7 +158,29 @@ export const manifest: readonly Step[] = [
     // build-list screen — but unconditionally: this step has no
     // discoveryMethod fork (SurveyView's gate special-cases "characters" only).
     rightPane: "character-map",
-    specRef: ["§8", "specs/020-qu-wire-buildlist"],
+    specRef: ["§8", "specs/020-qu-wire-buildlist", "specs/075-punctuation-defaults"],
+  } satisfies Step,
+
+  // --- Invisible characters (spec 075 US3) ---
+  // Format characters — ZWJ, ZWNJ, ZWSP, SOFT HYPHEN, WORD JOINER and the
+  // bidi controls — have no glyph, so no character map can show them and no
+  // exemplar tier attests them. This step offers each BY NAME with a need
+  // statement; the author's yes/no per character is a recorded decision.
+  // ALWAYS renders (FR-020): no computed gate, no null return, unlike the
+  // marks series and the convenience question on either side of it. Declares
+  // inputs/writes empty (spec 066 FR-006): confirming an inventory is a survey
+  // result, not an IR write. Emits its accepted characters on the SAME
+  // phase:"C" confirmedInventory union the punctuation step emits (see
+  // survey/phaseCInventory.ts), so the two never clobber each other.
+  {
+    kind: "editor-step",
+    id: "invisibles",
+    title: "Invisible characters",
+    spine: true,
+    inputs: [],
+    writes: [],
+    component: InvisiblesStep,
+    specRef: ["specs/075-punctuation-defaults"],
   } satisfies Step,
 
   // --- Convenience characters (pre-carve keep question) ---
@@ -228,7 +251,7 @@ export function validateManifestShape(): void {
   // M2 — spine order.
   const expectedSpine = [
     "identity", "choose_base", "track", "characters",
-    "marks", "punctuation", "convenience", "carve", "mechanisms", "touch", "help", "package",
+    "marks", "punctuation", "invisibles", "convenience", "carve", "mechanisms", "touch", "help", "package",
   ];
   for (let i = 0; i < expectedSpine.length; i++) {
     const expected = expectedSpine[i];

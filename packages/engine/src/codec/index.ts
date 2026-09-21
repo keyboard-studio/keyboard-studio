@@ -10,7 +10,11 @@ export { emit } from "./emit.js";
 
 export { parseKvks } from "./parse-kvks.js";
 
-export { parseTouchLayout, emitTouchLayout } from "./parse-touch.js";
+export {
+  parseTouchLayout,
+  emitTouchLayout,
+  TOUCH_LAYOUT_JSON_INDENT,
+} from "./parse-touch.js";
 
 export { OPAQUE_REASONS } from "./opaque-reasons.js";
 export type { OpaqueReason } from "./opaque-reasons.js";

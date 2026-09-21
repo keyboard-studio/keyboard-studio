@@ -2,7 +2,7 @@
   "_comment": [
     "Curated SUPPLEMENT to the vendored Unicode data -- two roles, both deliberately small:",
     "  1. `name`   : offline fallback so the milestone characters resolve even before",
-    "                fetch-data.js is run. When UnicodeData.txt is present, UCD wins.",
+    "                fetch-data.ts is run. When UnicodeData.txt is present, UCD wins.",
     "  2. `visual`/`ipa` : residual anchor hints for letter-identity look-alikes that",
     "                UTS #39 confusables omits (its scope is visual spoofing, not letter",
     "                identity) and whose Unicode name carries no base letter -- e.g. ENG,",

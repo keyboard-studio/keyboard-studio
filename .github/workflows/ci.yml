@@ -141,6 +141,13 @@ jobs:
       - name: Test (facet-index — outside the pnpm workspace)
         run: pnpm run test:facet-index
 
+      # kbgen is a prototype outside the workspace too, and since the
+      # parseUnicodeSet retirement it imports engine character-discovery
+      # internals by relative src path (spec 044 FR-015: one exemplar path).
+      # Nothing else typechecks it, so an engine rename would break it silently.
+      - name: Test (kbgen — outside the pnpm workspace)
+        run: pnpm run test:kbgen
+
       # Non-blocking: warns in CI log and opens GitHub Issues for any spec
       # sections whose content changed since the last acknowledgement.
       # Never fails the build — drift is a backlog item, not a blocker.

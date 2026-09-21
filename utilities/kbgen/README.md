@@ -34,11 +34,15 @@ A hard **completeness check** proves every base character is still typeable (you
 A codegen tool must be deterministic and offline: the same inputs must always yield the same mapping, and an upstream Unicode/CLDR bump must not silently move a character. So the canonical machine-readable files are **vendored at pinned versions** (mirroring this repo's
 SHA256-verified external-keyboard policy); the human-readable specs are linked for maintainers only. Fetch/refresh them with:
 
-```bash node tools/kbgen/fetch-data.js ha ig yo ak     # locales to pull CLDR exemplars for
+```bash
+npx tsx utilities/kbgen/fetch-data.ts     # no locale arguments
 ```
 
-This writes `data/unicode/{UnicodeData.txt,confusables.txt}`, `data/cldr/<locale>.json`, and `data/SOURCES.json` (pin + checksums). Pinned: **Unicode 16.0.0**, **CLDR 46.1.0** (see
-[fetch-data.js](fetch-data.js)). `data/supplement.json` is a tiny curated layer: an offline name fallback plus the letter-identity look-alikes UTS #39 omits. The engine runs without fetching (supplement-only), but `--locale` and full-codepoint coverage need the vendored data.
+This writes `data/unicode/{UnicodeData.txt,confusables.txt}` and `data/SOURCES.json` (pin + checksums). Pinned: **Unicode 16.0.0** (see [fetch-data.ts](fetch-data.ts)).
+
+CLDR exemplars are **not** fetched here. kbgen's former per-locale `data/cldr/<locale>.json` snapshots were retired in favour of the engine's pinned CLDR+SLDR exemplar index (spec 044 FR-015: one exemplar path repo-wide) — `--locale` resolves through [sources/cldr.ts](sources/cldr.ts) with no fetch step, and each placement map records the index's CLDR release and SLDR commit under `source`. See the retirement note in [INTEGRATION.md](INTEGRATION.md).
+
+`data/supplement.json` is a tiny curated layer: an offline name fallback plus the letter-identity look-alikes UTS #39 omits. The engine runs without fetching (supplement-only), but full-codepoint coverage needs the vendored Unicode data.
 
 ## Usage
 
@@ -62,7 +66,7 @@ Writes `source/<id>.placement-map.json` — the per-character key+method mapping
 - [map.js](map.js) — the physical + touch placement mapping (primary output).
 - [emit.js](emit.js) — optional source-file generation (`--emit-source`).
 - [corpus-diff.js](corpus-diff.js) — non-authoritative comparison.
-- [fetch-data.js](fetch-data.js) — vendor the pinned Unicode/CLDR data.
+- [fetch-data.ts](fetch-data.ts) — vendor the pinned Unicode data (CLDR/SLDR exemplars come from the engine index, not from here).
 - `sources/{ucd,confusables,cldr}.js` — adapters over the vendored data.
 - `data/` — vendored data, `supplement.json`, `SOURCES.json`.
 - [cli.js](cli.js) — entry point. [test/anchors.test.js](test/anchors.test.js) — `npm test`.

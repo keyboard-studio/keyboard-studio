@@ -39,6 +39,7 @@ import {
   parseKeySpec,
   type ModifierToken,
 } from "./modifierCombos.js";
+import { TOUCH_LAYOUT_JSON_INDENT } from "../codec/parse-touch.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -450,7 +451,7 @@ function patchTouchLayout(
   // applyCarveKeycapRemovalsToVfs. A no-op re-serialize would also needlessly
   // reformat the JSON (2-space) even when nothing matched.
   if (changed) {
-    vfs.set(touchPath, JSON.stringify(data, null, 2), false);
+    vfs.set(touchPath, JSON.stringify(data, null, TOUCH_LAYOUT_JSON_INDENT), false);
   }
 }
 

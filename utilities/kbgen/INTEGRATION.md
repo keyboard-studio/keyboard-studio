@@ -103,5 +103,13 @@ theoretical divergence.
    of the sourcing path by design — `SourcedInventory` stays a faithful record
    of what the source attested, and case counterparts are derived by the caller.
 
-Until then, treat kbgen's exemplar output as prototype-grade and do not feed it
-into anything under `packages/*`.
+**Retired (2026-08-31).** The TS port (#132) landed, unblocking this path, and
+it has now been executed: `sources/cldr.ts` is a thin adapter over
+`loadExemplarSource()` / `sourceExemplars()` / `inventoryToExemplarResult()`
+from `packages/engine/src/character-discovery/` (relative src import — kbgen
+stays outside the pnpm workspace and runs under tsx). The duplicate
+`parseUnicodeSet` / `exemplarString` / `loadExemplars` bodies and the
+per-locale `data/cldr/*.json` fetch in `fetch-data.ts` are deleted; uppercase
+augmentation comes from the engine's consumer-side derivation
+(`inventoryToExemplarResult`), never a kbgen inline copy. kbgen's exemplar
+sourcing is now byte-identical to the studio's.

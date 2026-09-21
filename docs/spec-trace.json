@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-08-27",
+  "lastUpdated": "2026-09-16",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -304,7 +304,7 @@
     },
     "specs/008-data-flow": {
       "title": "Feature spec — Data flow (spec.md §8)",
-      "hash": "sha256:3c2ed2a28f95f6bb",
+      "hash": "sha256:e8a0ca18eb48794d",
       "status": "partial",
       "implements": [
         "packages/contracts/src/surveySession.ts",
@@ -317,7 +317,7 @@
     },
     "docs/architecture.md": {
       "title": "Keyboard Studio — architecture & meta-flow",
-      "hash": "sha256:7a71ec94411621ea",
+      "hash": "sha256:a30615d748088806",
       "status": "reference",
       "implements": [],
       "decisions": [],
@@ -846,6 +846,14 @@
     "specs/074-uppercase-counterpart-suggestion": {
       "title": "Feature Specification: Suggest the uppercase counterpart when a lowercase cased letter is placed",
       "hash": "sha256:ca92be519a1e69aa",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/075-punctuation-defaults": {
+      "title": "Feature Specification: Punctuation defaults and the invisible-character question",
+      "hash": "sha256:3e88e0040f85ef47",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

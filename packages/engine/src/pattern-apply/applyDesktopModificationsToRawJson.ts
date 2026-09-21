@@ -58,6 +58,7 @@ import {
 import type { RawKey, RawLayer, RawPlatform, RawRow } from "./touch-layout-wire-format.js";
 import type { DesktopModifications } from "./applyDesktopModifications.js";
 import { DEFAULT_TOUCH_LAYER, touchLayerForChar } from "./touchLayer.js";
+import { TOUCH_LAYOUT_JSON_INDENT } from "../codec/parse-touch.js";
 
 /** The top-level raw .keyman-touch-layout JSON object. */
 type RawTouchLayout = Record<string, unknown>;
@@ -100,7 +101,7 @@ export function applyDesktopModificationsToRawJson(
   const removalSet = buildRemovalSet(mods.removals);
   removeAcrossRawLayout(layout, removalSet);
 
-  return { json: JSON.stringify(layout), warnings };
+  return { json: JSON.stringify(layout, null, TOUCH_LAYOUT_JSON_INDENT), warnings };
 }
 
 // ---------------------------------------------------------------------------

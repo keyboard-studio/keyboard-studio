@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { parseTouchLayout, emitTouchLayout } from "./parse-touch.js";
+import { parseTouchLayout, emitTouchLayout, TOUCH_LAYOUT_JSON_INDENT } from "./parse-touch.js";
 
 const MINIMAL_TOUCH = JSON.stringify({
   tablet: {
@@ -867,5 +867,72 @@ describe("per-key layer override and subkey default preselect (spec 063 FR-030)"
     expect(keys2).toHaveLength(2);
     expect(keys2?.map((k) => k.layer)).toEqual([undefined, "shift"]);
     expect(keys2?.map((k) => k.text)).toEqual(["a", "A"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Output shape — tabulated to match Keyman Developer / the shipped corpus
+// ---------------------------------------------------------------------------
+
+describe("emitTouchLayout output shape", () => {
+  // Keyman Developer writes `.keyman-touch-layout` as two-space-indented JSON
+  // with LF newlines, raw UTF-8 and no trailing newline — i.e. exactly
+  // `JSON.stringify(value, null, 2)`. Verified against real shipped keyboards
+  // in the keyboards content repo (release/g/ghana, release/k/khmer_angkor,
+  // release/s/shan, release/s/sundanese), each of which is byte-identical to
+  // its own `JSON.stringify(JSON.parse(file), null, 2)`.
+  //
+  // These tests exist because the emitter used to call `JSON.stringify(out)`
+  // with no indent, which put an entire multi-thousand-character layout on a
+  // single line: valid JSON, but unreadable and undiffable next to every other
+  // keyboard in the corpus.
+
+  it("uses the shared indent constant, which is 2", () => {
+    expect(TOUCH_LAYOUT_JSON_INDENT).toBe(2);
+  });
+
+  it("is tabulated, not a single line", () => {
+    const json = emitTouchLayout(parseTouchLayout(MULTI_PLATFORM_TOUCH));
+    expect(json.split("\n").length).toBeGreaterThan(10);
+  });
+
+  it("indents with two spaces per level, never a tab", () => {
+    const json = emitTouchLayout(parseTouchLayout(MULTI_PLATFORM_TOUCH));
+    expect(json).not.toContain("\t");
+    const lines = json.split("\n");
+    // Line 0 is the bare `{`; every subsequent indented line must open with a
+    // multiple of two spaces and nothing else.
+    for (const [i, line] of lines.entries()) {
+      if (i === 0 || line === "") continue;
+      const indent = /^ */.exec(line)![0].length;
+      expect(indent % 2, `line ${i} indent (${indent}) must be a multiple of 2: ${line}`).toBe(0);
+    }
+    // The first nested property sits at exactly one indent level.
+    expect(lines[1]).toMatch(/^ {2}"(phone|tablet|desktop)": \{$/);
+  });
+
+  it("uses LF newlines and no trailing newline (matches the corpus)", () => {
+    const json = emitTouchLayout(parseTouchLayout(MULTI_PLATFORM_TOUCH));
+    expect(json).not.toContain("\r");
+    expect(json.endsWith("}")).toBe(true);
+    expect(json.endsWith("\n")).toBe(false);
+  });
+
+  it("writes non-ASCII raw, not \\u-escaped", () => {
+    const ir = parseTouchLayout(
+      JSON.stringify({
+        phone: {
+          layer: [{ id: "default", row: [{ id: 1, key: [{ id: "K_Q", text: "‐" }] }] }],
+        },
+      }),
+    );
+    const json = emitTouchLayout(ir);
+    expect(json).toContain("‐");
+    expect(json).not.toContain("\\u2010");
+  });
+
+  it("is byte-identical to JSON.stringify(parsed, null, 2) — the corpus convention", () => {
+    const json = emitTouchLayout(parseTouchLayout(MULTI_PLATFORM_TOUCH));
+    expect(json).toBe(JSON.stringify(JSON.parse(json), null, 2));
   });
 });

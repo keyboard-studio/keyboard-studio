@@ -21,6 +21,7 @@ function makeMap(physical: KbgenOutputMap['physical'], opts: {
       locale: opts.locale !== undefined ? opts.locale : 'ha-Latn-NG',
       unicodeVersion: null,
       cldrVersion: null,
+      sldrCommit: null,
     },
     freeKeys: [],
     summary: { specials: physical.length, physicalEntries: physical.length, touchEntries: 0, unplaced: 0 },
