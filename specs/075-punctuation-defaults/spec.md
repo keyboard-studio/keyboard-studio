@@ -106,6 +106,21 @@ one page: evidence held but not proposed (CLDR), a character kept but not named
 (base punctuation), and a character that three inputs on one page refuse, hide
 and silently swallow respectively (invisibles).
 
+## Clarifications
+
+### Session 2026-09-15
+
+- Q: Once the invisible-character question is its own spine step, does the
+  "Add any character by code point" field stay on the punctuation scope? → A:
+  Yes, as the escape hatch for characters no question offers; a format
+  character entered there is routed to the invisibles step pre-selected, the
+  same rule FR-016 applies to the input box (FR-021).
+- Q: Should spec 075 adopt the convenience step ("Keep these letters for
+  convenience?") as the spec home for base-inheritance behaviour across both
+  character families? → A: No — close the gap elsewhere. Spec 075 references the
+  step as Story 2's precedent only; giving the step its own spec home is a
+  separate documentation task (Dependencies, Out of scope).
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - CLDR punctuation arrives already chosen (Priority: P1)
@@ -486,12 +501,14 @@ re-resolved and confirm the same two are still absent if they are still proposed
   need this if…" statement per character, and the absorbed RTL-only advisory
   direction-marks question all stand exactly as FR-013, FR-015 and FR-019 state
   them.
-- **FR-021**: The fate of the pane's code-point entry field MUST be resolved:
-  [NEEDS CLARIFICATION: does "Add any character by code point" remain available
-  on the punctuation scope once the named invisibles question exists — keeping an
-  escape hatch for characters no question offers, at the cost of a second route
-  that can reintroduce the routing loss — or is it removed from that scope so the
-  named question is the only way to reach a format character?]
+- **FR-021**: The pane's "Add any character by code point" field MUST remain
+  available on the punctuation scope as the escape hatch for characters no
+  question offers. A format character entered through it MUST be routed to the
+  invisible-character step with that character pre-selected — the same rule
+  FR-016 applies to the input box — and MUST NOT land in the unrendered controls
+  bucket. The field is a second entry route, not a second destination: every
+  path by which an invisible character enters the punctuation page ends on the
+  named question.
 - **FR-022**: A character the author removed from a proposal MUST NOT be
   re-proposed when the step is revisited or when the language tag is re-resolved.
   Typing that character in by hand MUST override the rejection.
@@ -574,8 +591,14 @@ re-resolved and confirm the same two are still absent if they are still proposed
   inventory and asserting the difference is empty.
 - **SC-008**: Across the journey corpus, the proportion of authored keyboards
   whose confirmed punctuation inventory is empty falls below a threshold to be
-  set once the current rate is measured. The current rate has not been measured
-  and this criterion is a measurement to take, not a result already known.
+  set once the current rate is measured. **Baseline measured 2026-09-15**
+  (report-only vitest `journeyPunctuationRate.report.test.ts` replaying
+  `content/journeys/*.yaml` through `journey-runner.ts`): **4/4 empty**. That
+  figure is a harness fact, not a product one — the runner completes the
+  punctuation step as a no-op advance, so no journey can reach a non-empty
+  punctuation inventory until the harness replays the step's seeding. The
+  threshold is deferred until the harness does; the report exists so that
+  change is measured when it lands.
 
 - **SC-009**: No survey write is unobservable. For every input on every survey
   step — the type-in boxes, the character-map grid, the code-point entry field —
@@ -607,6 +630,31 @@ re-resolved and confirm the same two are still absent if they are still proposed
   convenience step's computed auto-skip (FR-020). That the question is its own
   step is settled; it is not reopened by the offer list turning out to be short.
 
+- **2026-09-15, repo owner** — the convenience step is not adopted by this spec.
+  Story 2 follows its shape and cites it as precedent; the step's missing spec
+  home is closed elsewhere, not by widening 075 into the home for both character
+  families.
+
+- **2026-09-15, plan** — the base-inheritance default, stated per character
+  family (FR-012), so that each is a deliberate choice rather than a fall-through:
+  1. **Punctuation the base produces** — proposed for *acceptance*, attributed to
+     the base, removable one chip at a time. This feature.
+  2. **Letters and marks the base produces beyond the orthography** — proposed
+     for *removal* by the convenience question and the carve gallery. Unchanged.
+  3. **Base ASCII letters on a non-Latin target** — an optional, low-priority
+     removal group in the carve gallery. Unchanged.
+  4. **ASCII punctuation arriving by that same fall-through** — treated as item 1,
+     not demoted alongside item 3: the engine's own always-keep rationale holds
+     that punctuation is wanted on essentially every keyboard.
+  5. **Digits and symbols** — still shielded silently by carve's always-keep rule;
+     explicitly out of scope for this feature.
+
+  *Surfaced, not resolved:* carve's always-keep rule for `\p{N}\p{P}\p{S}` still
+  emits base punctuation an author removed here. Removing a mark on this page
+  declares it unsupported in the confirmed inventory, but the base layout keeps
+  typing it until the carve-side rule changes. The base group's caption says so;
+  the carve-side change is a separate feature.
+
 - The offline exemplar index shipped with the engine is the source of the CLDR
   proposal. This feature does not add a network lookup and does not change which
   index is committed.
@@ -630,16 +678,19 @@ re-resolved and confirm the same two are still absent if they are still proposed
 
 ### Open decisions
 
-A genuine choice this spec does not settle, recorded here rather than as
-a clarification marker because the feature is specifiable without it and it can
-be taken at plan time:
+None remain. The one choice left open at specification time was taken at plan
+time and is recorded here so it is not re-litigated:
 
-- **Whether this step starts declaring `writes`.** Consuming base coverage and
-  asserting an inventory may mean the step should declare non-empty
-  `inputs`/`writes` under the spec-066 declaration contract, where it declares
-  both empty today — or confirming an inventory may remain a survey-result
-  concern that leaves both declarations empty. The convenience step is the
-  precedent and also declares both empty.
+- **2026-09-15, plan** — **neither step declares IR `inputs` or `writes`.** The
+  punctuation step and the invisibles step both declare `inputs: []`,
+  `writes: []` under the spec-066 declaration contract (its FR-006 explicit-empty
+  rule). Confirming an inventory is a survey result recorded through
+  `recordPhase`, not an IR write, so there is nothing for the mutate seam to
+  see; and reading base coverage is not an IR *input* in the declaration sense —
+  an `IRPath` input with no upstream writer would fail the orphan-input check
+  for a read that needs no producer. The convenience step is the precedent and
+  declares both empty for the same reason. Rejected: declaring the base-coverage
+  read as an `IRPath` input.
 
 ## Out of scope
 
@@ -656,6 +707,10 @@ be taken at plan time:
   surface answering a different question.
 - Any change to how the alphabet, marks or convenience steps build their own
   inventories, beyond preserving the phase-merge behaviour they depend on.
+- Giving the convenience step its own specification. Its manifest `specRef`
+  points at spec 051, which never describes it; repointing that reference and
+  writing the step's spec home is a separate documentation task, not part of
+  this feature (clarified 2026-09-15).
 
 ## Dependencies
 
@@ -667,16 +722,17 @@ be taken at plan time:
   nearest precedent for offering the author characters the base produces that the
   orthography does not require. Story 2 is that pattern applied to punctuation
   instead of basic-Latin letters.
-- **The convenience question's spec home is unsettled.** The convenience step is
-  the shape Story 2 follows, and it has no spec that describes it: its manifest
-  entry points its `specRef` at `specs/051-carve-orthography-trim`, which never
-  mentions the step, and the component itself cites a "spec v1.3.1 §3c" — the
-  root spec has a §3c that matches in substance, but no such version label
-  appears in it. [NEEDS CLARIFICATION: should spec 075 adopt the convenience
-  step, making this the spec home for base-inheritance behaviour across both
-  character families, or should the gap be closed elsewhere? This is the repo
-  owner's call and is deliberately left unchecked here; spec 051 is not
-  restructured or renumbered either way.]
+- **The convenience question's spec home is closed elsewhere, not here.** The
+  convenience step is the shape Story 2 follows, and it has no spec that
+  describes it: its manifest entry points its `specRef` at
+  `specs/051-carve-orthography-trim`, which never mentions the step, and the
+  component itself cites a "spec v1.3.1 §3c" — the root spec has a §3c that
+  matches in substance, but no such version label appears in it. Spec 075 does
+  **not** adopt the step. It references the step as the precedent for Story 2
+  and depends on its current behaviour, but the step's own specification, the
+  repointing of its `specRef`, and the correction of its citation are a
+  separate documentation task tracked outside this feature. Spec 051 is not
+  restructured or renumbered.
 - [020-qu-wire-buildlist](../020-qu-wire-buildlist/spec.md) — the build-list
   wiring the confirmed inventory feeds.
 - [spec.md](../../spec.md) §3c and §8 — the governing doctrine and the data-flow

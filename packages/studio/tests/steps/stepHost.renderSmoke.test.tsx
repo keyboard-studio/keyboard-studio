@@ -61,6 +61,12 @@ vi.mock("../../src/survey/CharactersStep.tsx", () => ({
   CharactersStep: () => <div data-testid="stub-CharactersStep" />,
 }));
 
+// The invisible-characters step (spec 075) always renders; stubbed here so
+// SC-005 checks the manifest's declared component is what StepHost mounts.
+vi.mock("../../src/survey/invisibles/InvisiblesStep.tsx", () => ({
+  InvisiblesStep: () => <div data-testid="stub-InvisiblesStep" />,
+}));
+
 vi.mock("../../src/editors/panels/BaseResolution.tsx", () => ({
   BaseResolution: () => <div data-testid="stub-BaseResolution" />,
 }));
@@ -276,6 +282,7 @@ const STEP_TO_EXPECTED_STUB: Record<string, string> = {
   track: "stub-FlowStepHost-track",
   project_name: "stub-FlowStepHost-project_name",
   characters: "stub-CharactersStep",
+  invisibles: "stub-InvisiblesStep",
   carve: "stub-CarveGalleryV2",
   mechanisms: "stub-MechanismGallery",
   touch_seed_source: "stub-TouchSeedSourcePanel",

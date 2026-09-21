@@ -23,7 +23,11 @@
   ],
   "punctuation": [
     "§8",
-    "specs/020-qu-wire-buildlist"
+    "specs/020-qu-wire-buildlist",
+    "specs/075-punctuation-defaults"
+  ],
+  "invisibles": [
+    "specs/075-punctuation-defaults"
   ],
   "convenience": [
     "specs/051-carve-orthography-trim"

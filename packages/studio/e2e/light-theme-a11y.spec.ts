@@ -26,6 +26,7 @@ import {
   confirmPrefill,
   buildOneCharacterList,
   drivePunctuationStep,
+  driveInvisiblesStep,
 } from "./helpers/surveyFlow";
 import { expectNoSeriousAxeViolations } from "./helpers/axe";
 
@@ -132,6 +133,15 @@ test("dense wizard screens have no serious axe violations on light", async ({ pa
   // the "discard gallery" wait below timed out waiting for a screen it could
   // never reach — not an app bug, this spec simply predated the step.
   await drivePunctuationStep(page);
+
+  // Invisible characters (spec 075) — always renders between punctuation and
+  // convenience: named checkbox rows (role="checkbox" + aria-checked), a
+  // collapsed direction-controls group behind a disclosure button, and the
+  // dim need-statement text under each name — the contrast pairs most at
+  // risk on the light theme. Scan it, then drive past it.
+  await expect(page.getByTestId("invisibles-step")).toBeVisible({ timeout: 20_000 });
+  await expectNoSeriousAxeViolations(page, "invisible characters (light)");
+  await driveInvisiblesStep(page);
 
   // Discard gallery — the character grid, the suggested-to-discard card with
   // its red top rule and red bulk button, and the details rail. The single

@@ -675,7 +675,18 @@ async function advanceToCarve() {
   advanceToB();
   fireEvent.click(screen.getByTestId("phaseB-complete"));
   fireEvent.click(screen.getByTestId("punctuation-done"));
+  completeInvisibles();
   await screen.findByTestId("stage-carve");
+}
+
+/**
+ * Click through the invisible-characters page's Continue button (spec 075).
+ * Like punctuation, it has no computed gate (FR-020: always renders), so it
+ * appears synchronously right after punctuation is accepted; the walk
+ * accepts it empty.
+ */
+function completeInvisibles() {
+  fireEvent.click(screen.getByTestId("invisibles-continue"));
 }
 
 /** Drive from "identity" to "mechanisms". */
@@ -775,9 +786,12 @@ describe("SurveyView — B → punctuation → carve transition", () => {
     expect(screen.getByTestId("punctuation-step")).toBeTruthy();
     expect(screen.queryByTestId("stage-B")).toBeNull();
 
-    // Accepting it empty lands on carve (convenience auto-skips — async, since
+    // Accepting it empty lands on the invisible-characters page (spec 075,
+    // always renders), then on carve (convenience auto-skips — async, since
     // its gate waits on the exemplar lookup; spec 059).
     fireEvent.click(screen.getByTestId("punctuation-done"));
+    expect(screen.getByTestId("invisibles-step")).toBeTruthy();
+    completeInvisibles();
     expect(await screen.findByTestId("stage-carve")).toBeTruthy();
     expect(screen.queryByTestId("punctuation-step")).toBeNull();
   });
@@ -914,7 +928,7 @@ describe("SurveyView — B → prefill back-navigation", () => {
 // ---------------------------------------------------------------------------
 
 describe("SurveyView — carve → B back-navigation", () => {
-  it("returns to B stage (not prefill) when CarveGallery onBack is called, via the punctuation page", async () => {
+  it("returns to B stage (not prefill) when CarveGallery onBack is called, via the invisibles and punctuation pages", async () => {
     await act(async () => {
       render(<SurveyView baseKeyboard={null} />);
     });
@@ -922,11 +936,15 @@ describe("SurveyView — carve → B back-navigation", () => {
     await advanceToCarve();
     expect(screen.getByTestId("stage-carve")).toBeTruthy();
 
-    // Back from carve lands on the punctuation page (the last real page
-    // before carve — convenience pops through, having auto-skipped forward).
-    // Async: the pop crosses convenience, whose gate waits on the exemplar
-    // lookup (spec 059; see advanceToCarve).
+    // Back from carve lands on the invisible-characters page (spec 075, the
+    // last real page before carve — convenience pops through, having
+    // auto-skipped forward). Async: the pop crosses convenience, whose gate
+    // waits on the exemplar lookup (spec 059; see advanceToCarve).
     fireEvent.click(screen.getByTestId("carve-back"));
+    expect(await screen.findByTestId("invisibles-step")).toBeTruthy();
+
+    // Back again re-enters the punctuation page.
+    fireEvent.click(screen.getByTestId("invisibles-back"));
     expect(await screen.findByTestId("punctuation-step")).toBeTruthy();
 
     // Back again re-enters PhaseB (marks pops through), not prefill.
@@ -1773,15 +1791,21 @@ describe("SurveyView — adapt-track carve → B back-navigation (SC-002 parity)
     fireEvent.click(screen.getByTestId("prefill-confirm"));
     expect(screen.getByTestId("stage-B")).toBeTruthy();
 
-    // Advance through PhaseB (and the ungated punctuation page) to carve — the
-    // landing is async (see advanceToCarve).
+    // Advance through PhaseB (and the ungated punctuation and invisibles
+    // pages) to carve — the landing is async (see advanceToCarve).
     fireEvent.click(screen.getByTestId("phaseB-complete"));
     fireEvent.click(screen.getByTestId("punctuation-done"));
+    completeInvisibles();
     expect(await screen.findByTestId("stage-carve")).toBeTruthy();
 
-    // carve-back lands on the punctuation page (the last real page before
-    // carve — convenience pops through, having auto-skipped forward).
+    // carve-back lands on the invisible-characters page (spec 075, the last
+    // real page before carve — convenience pops through, having auto-skipped
+    // forward).
     fireEvent.click(screen.getByTestId("carve-back"));
+    expect(screen.getByTestId("invisibles-step")).toBeTruthy();
+
+    // invisibles-back re-enters the punctuation page.
+    fireEvent.click(screen.getByTestId("invisibles-back"));
     expect(screen.getByTestId("punctuation-step")).toBeTruthy();
 
     // punctuation-back must re-enter PhaseB (not prefill) — marks pops through.
@@ -1979,7 +2003,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
     expect(exports).not.toContain("SurveyStage");
   });
 
-  it("manifest spine order is: identity → choose_base → track → characters → marks → punctuation → convenience → carve → mechanisms → touch → help → package (M2, spec 071)", () => {
+  it("manifest spine order is: identity → choose_base → track → characters → marks → punctuation → invisibles → convenience → carve → mechanisms → touch → help → package (M2, spec 071/075)", () => {
     // track is now a real manifest step (P0 fix); project_name is spine:false.
     const spineIds = manifest
       .filter((s) => s.spine !== false)
@@ -1991,6 +2015,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
       "characters",
       "marks",
       "punctuation",
+      "invisibles",
       "convenience",
       "carve",
       "mechanisms",
@@ -2070,9 +2095,14 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     fireEvent.click(screen.getByTestId("phaseB-complete"));
     expect(screen.getByTestId("punctuation-step")).toBeTruthy();
 
+    // → invisibles (next spine step after punctuation, spec 075). Always
+    // renders (no gate); the walk accepts it empty.
+    fireEvent.click(screen.getByTestId("punctuation-done"));
+    expect(screen.getByTestId("invisibles-step")).toBeTruthy();
+
     // → carve (convenience auto-skips: nothing to ask on the test walk, but its
     // gate waits on the exemplar lookup — spec 059 — so the landing is async).
-    fireEvent.click(screen.getByTestId("punctuation-done"));
+    completeInvisibles();
     expect(await screen.findByTestId("stage-carve")).toBeTruthy();
 
     // → mechanisms
@@ -2118,9 +2148,10 @@ describe("T029 — runtime step order matches manifest spine order", () => {
 
     // phaseB-complete must land on carve (via the marks step's S0 auto-skip
     // — the marks-free test alphabet completes marks without rendering — and
-    // the ungated punctuation page, accepted empty).
+    // the ungated punctuation and invisibles pages, both accepted empty).
     fireEvent.click(screen.getByTestId("phaseB-complete"));
     fireEvent.click(screen.getByTestId("punctuation-done"));
+    completeInvisibles();
     expect(await screen.findByTestId("stage-carve")).toBeTruthy();
     expect(screen.queryByTestId("stage-mechanisms")).toBeNull();
   });

@@ -1,162 +1,200 @@
 # Data Model: Punctuation defaults and the invisible-character question
 
-Entities this feature introduces or extends. Companion to [spec.md](spec.md);
-the identifier-level surface is in
-[contracts/punctuation-defaults-contract.md](contracts/punctuation-defaults-contract.md).
+Entities this feature introduces or extends, mapped onto where they actually live.
+Companion to [spec.md](spec.md); the identifier-level surface is in
+[contracts/punctuation-defaults-contract.md](contracts/punctuation-defaults-contract.md);
+the reasons behind each mapping are decisions D-01 to D-15 in
+[research.md](research.md) Part II.
 
-Nothing here changes the punctuation step's result shape beyond what FR-024
-permits — the `phase: "C"` reporting stays exactly as it is, because a phase
-`"B"` result is shallow-merged over the alphabet step's `confirmedInventory`
-(`packages/studio/src/survey/punctuation/PunctuationStep.tsx:14-26`,
-`:75-77`).
+Two things did not change and are pinned by test rather than trusted: the punctuation
+step keeps reporting under `phase: "C"` (a phase `"B"` result would be shallow-merged
+over the alphabet step's `confirmedInventory` — `PunctuationStep.tsx:14-26`,
+`workingCopyStore.ts:1265-1273`), and every character identity below is the NFC form
+the draft store already uses (`phaseBDraftStore.ts:297`, `:412`, `:532`).
 
-## `ProposedCharacter`
+## Where state lives
 
-One character the studio puts into the chosen list on the author's behalf. Not a
-separate list from author-chosen characters — the same list, distinguished by
-provenance (FR-002).
+| Concern | Home | New or existing |
+|---|---|---|
+| Proposed / author-chosen distinction | `phaseBDraftStore.provenance` | existing, union widened |
+| Rejection ledger | `phaseBDraftStore.rejected` | existing (spec 044 FR-017) |
+| Seed-once marker | `phaseBDraftStore.seededProposals` | new |
+| Invisible-character decisions | `phaseBDraftStore.invisibleDecisions` | new |
+| Base coverage, floor, proposal groups | pure engine functions, recomputed per render | new, not stored |
+| Confirmed phase-C inventory | `SurveyPhaseResult.confirmedInventory` via `recordPhase` | existing field, new union rule |
+| Declined offers for reviewers | spec-053 decision record, fed from `SurveyPhaseResult.answers` | existing mechanism |
+| Durability across reload | `PhaseBDraftSnapshot` inside the `ks.draft.<key>.v1` envelope | existing, restore path fixed |
+
+## `ProposedCharacter` (derived, not stored)
+
+A character in the draft's `chars` whose `provenance[nfc]` is anything other than
+`"author"`. It sits in the same `punctuation` slice as author-typed characters and is
+removed by the same `remove()` (FR-004); only attribution differs (FR-002).
+
+| Aspect | Realisation |
+|---|---|
+| `char` / `nfc` | the `chars` entry; NFC is the identity key (FR-010) |
+| primary provenance | `provenance[nfc]` — one `DraftProvenance` value, strengthen-only: `"author"` always wins, an existing proposal source is never overwritten by another (`phaseBDraftStore.ts:543-545`) |
+| secondary attribution | derived at render: membership of `PunctuationProposal.cldrGroup` and `baseGroup`; a character in both is rendered once, in the CLDR group, with a "also produced by the base keyboard" marker (FR-002, SC-003) |
+
+**Validation**: one rendered chip and one inventory count per `nfc` — guaranteed by
+`nfcDedup` on `chars` and by the proposal builder's disjointness invariant.
+
+**Not an entity**: an author-typed character. `add()` and `setAll()` are the only
+writers of `"author"`, and no code path converts an author entry into a proposal
+(FR-005).
+
+## `DraftProvenance` (existing union, widened)
+
+```ts
+type DraftProvenance = "cldr" | "sldr" | "text" | "author" | "base" | "ascii-floor";
+```
+
+`"cldr"` / `"sldr"` come from `SourcedInventory["source"]` and are what `addProposed`
+records today. `"base"` marks a character seeded from the base keyboard's produced
+set; `"ascii-floor"` marks one seeded from the fallback constant. The locale a CLDR
+proposal came from is not stored per character: the group caption reads it from the
+live `SourcedInventory.resolvedTag` (FR-002's "with the resolved locale").
+
+## `PunctuationProposal` (engine output, recomputed)
+
+Returned by `buildPunctuationProposal(input)`; never persisted.
 
 | Field | Type | Notes |
 |---|---|---|
-| `char` | `string` | The character as proposed. |
-| `nfc` | `string` | Normalized form used for identity and de-duplication (FR-010), matching what `phaseBDraftStore` already stores (`packages/studio/src/stores/phaseBDraftStore.ts:326-345`). |
-| `provenance` | `ProposalProvenance[]` | Non-empty. Several entries when several sources proposed the same character (FR-002, FR-010). |
-| `group` | `"cldr" \| "base"` | Which rendered group the character belongs to. A character with both provenances renders once, in one group; which one is a UI ordering rule, not a second entity. |
+| `cldrGroup` | `string[]` (NFC) | the locale's punctuation tier minus `rejected` minus `authorChosen` |
+| `baseGroup` | `string[]` (NFC) | every produced punctuation character (coverage complete) **or** the ASCII floor (coverage unknown), minus `rejected`, `authorChosen`, and `cldrGroup` |
+| `cldrAbsentReason` | `"no-exemplars" \| "empty-tier" \| undefined` | `"no-exemplars"` when `exemplars === null`; `"empty-tier"` when non-null but the tier filter is empty. Two states only — the source has no third (research Part II) |
+| `baseCoverageIncomplete` | `boolean` | true exactly when the floor was substituted (FR-007, FR-008) |
 
-**Validation rule**: two `ProposedCharacter` entries with the same `nfc` MUST
-NOT both be rendered or counted (FR-010). Merging is by `nfc`, unioning
-`provenance`.
+**Invariants** (each is a unit test): groups are disjoint by NFC; no member is in
+`rejected` or `authorChosen`; coverage complete ⇒ `baseGroup ⊆ produced` and
+`baseGroup ∪ cldrGroup ⊇ produced ∖ rejected ∖ authorChosen`; coverage unknown ⇒
+`baseGroup ⊆ ASCII_PUNCTUATION_FLOOR`; the floor and a known base set are never
+combined (FR-009).
 
-**Not an entity**: an author-typed character. It has no `provenance` and is never
-converted into one (FR-005).
-
-## `ProposalProvenance`
-
-Why a character was proposed. Drives the visible attribution and de-duplication.
-
-| Variant | Carries | Notes |
-|---|---|---|
-| `cldr-exemplar` | resolved locale tag, side (`cldr` or `sldr`) | From the punctuation tier — `charactersInTier(inventory, "punctuation")` at `PunctuationStep.tsx:153-158`, tier key `p` per `packages/engine/src/character-discovery/exemplarSource.ts:45-50`. Reuses the existing spec-044 proposed attribution rendered at `PunctuationStep.tsx:384-387`. |
-| `base-produced` | nothing beyond the variant | The character is in the base IR's produced set and stamped `inBaseOutput` (`packages/contracts/src/characterDiscovery.ts:85`). |
-| `ascii-floor` | nothing beyond the variant | Supplied by the constant floor, not derived. Applies only when base coverage cannot be determined (FR-007). |
-
-## `BasePunctuationCoverage`
-
-The punctuation subset of the base keyboard's produced-glyph set. Derived from
-existing machinery — `buildProducedSet`
-(`packages/engine/src/inventory/producedGlyphs.ts:35-40`) and
-`computeInventoryDelta`
-(`packages/engine/src/inventory/computeInventoryDelta.ts:84-110`) — not from a
-new base analysis (FR-006).
+## `BasePunctuationCoverage` (engine output, recomputed)
 
 | Field | Type | Notes |
 |---|---|---|
-| `produced` | `string[]` | Punctuation characters the base IR produces, normalized. |
-| `coverageComplete` | `boolean` | False when opaque `RawKmnFragment` nodes make the base output unknowable (`computeInventoryDelta.ts:35-58`). |
+| `produced` | `string[]` (NFC) | `producedGlyphs(ir)` filtered to `glyphCategory(c) === "punctuation"` |
+| `coverageComplete` | `boolean` | `!hasUnaccountedOpaqueFragment(ir)` — the same predicate `computeInventoryDelta` stamps (`computeInventoryDelta.ts:54-58`, `:113`), exported rather than duplicated |
 
-**Validation rule**: when `coverageComplete` is false, `produced` is a **lower
-bound**, never the answer. It MUST NOT be presented as a complete base set
-(FR-008); the ASCII floor stands in for it rather than being merged into it.
+When `coverageComplete` is false, `produced` is a lower bound and is **not** shown as
+the base group; the floor stands in and the caption says the base set is not fully
+known (FR-008).
 
-**State**: recomputed whenever the base selection changes. Not persisted as an
-answer — it is evidence, and only the author's confirmation is an answer.
+## `ASCII_PUNCTUATION_FLOOR` (engine constant)
 
-## `AsciiPunctuationFloor`
+The 32 characters U+0021–U+002F, U+003A–U+0040, U+005B–U+0060, U+007B–U+007E, frozen.
+A fallback, not a policy (FR-007): used only when base coverage is `null` or
+incomplete. Because it is constant, the step can always propose something.
 
-A constant, not a derivation: U+0021–U+002F, U+003A–U+0040, U+005B–U+0060,
-U+007B–U+007E. Thirty-two characters.
+## `seededProposals` (new store field, sticky)
 
-It is a **fallback, not a policy** (FR-007). It stands in for the base group
-only where base coverage cannot be determined — an unresolvable base, or
-incomplete coverage. Where the base set is known, the base set is the proposal
-and the floor plays no part, whether the base set is wider or narrower.
+```ts
+seededProposals: string[]   // seed keys, e.g. "punctuation:hi", "punctuation-base:<baseId>"
+```
 
-Because it is a constant, it is the one proposal that cannot fail to be
-computable, which is what lets the step always propose something.
+Consulted by `seedProposals()`: a key already present means the seed has run for this
+working copy and is not re-run, so revisits do not re-propose (FR-022) and a completed
+pre-feature answer is not extended (FR-023, with the phase-C guard in D-02). A locale
+re-resolution produces a new key and seeds the new tier, still subject to `rejected`.
 
-The base group itself is settled: **every** punctuation character the base can
-produce (FR-009, decided by the repo owner on 2026-09-09).
+Lifecycle: cleared only by `resetPhaseBDraftDecisions()`, never by `reset()`;
+snapshotted as `seededProposals?: string[]`; restored with `?? []`.
 
-## `InvisibleCharacterCandidate`
+## `RejectionLedger` → existing `rejected: string[]`
 
-One offerable format character on the new question (FR-013, FR-015).
+Already in the store. Transitions, unchanged:
 
-| Field | Type | Notes |
-|---|---|---|
-| `codePoint` | `number` | The character. |
-| `notation` | `string` | `U+XXXX` form, matching how `directionControlChars` is already stored (`packages/contracts/src/linguistInventory.ts:155`, `:181`). |
-| `label` | `string` | Plain-language name. Seeded from `INVISIBLE_CHAR_LABELS` (`packages/studio/src/lib/irToCarveNodes.ts:183-204`), which today covers SPACE, ZWSP, ZWNJ, ZWJ, ZWNBSP, SOFT HYPHEN, CGJ, MVS. |
-| `needStatement` | `string` | One line: "you need this if…". No existing source; authored per candidate. |
-| `relevance` | script or condition | Why this candidate is offered to this author. Drives the "propose none, and say why" case in Story 3 Scenario 5. |
+- absent → present: `remove(c)` when `provenance[nfc] !== "author"` (`:421-423`).
+- present → still present but inert: `add(c)` records `"author"` and the veto in
+  `addWithProvenance` (`:537`) no longer applies to it (FR-022, Story 4 Scenario 3).
+- present → absent: only `resetPhaseBDraftDecisions()`.
 
-**Validation rule**: `label` and `needStatement` MUST both be non-empty for every
-offered candidate (SC-005). A codepoint added without an explanation fails the
-completeness assertion rather than rendering bare.
+**What this feature changes**: nothing in the store. The gap is that
+`applyEnvelopeToStores` (`draftPersistence.ts:939-943`) does not forward `rejected`
+on restore, so `applyPhaseBDraftSnapshot`'s `?? []` wipes it on reload. The restore
+call forwards every snapshot field. No pruning: entries for characters no source
+proposes any more are inert; the set is bounded by the distinct characters an author
+has ever removed.
 
-**Known gap**: U+2060 WORD JOINER has no entry in `INVISIBLE_CHAR_LABELS` and
-appears nowhere in the repository. FR-015 requires adding it.
-
-**Overlap**: the bidi allowlist at
-`packages/engine/src/character-discovery/CharacterDiscoveryServiceImpl.ts:109-117`
-supplies further candidates for RTL scripts. FR-019 requires this entity to
-subsume the two characters offered by the existing advisory question
-(`packages/studio/src/survey/questions/b/pb_rtl_direction_marks_detail.ts:7-35`),
-not duplicate them.
-
-## `InvisibleCharacterDecision`
-
-The author's answer, per candidate. Distinguishing a decline from an unasked
-question is the point (FR-017).
+## `InvisibleCharacterCandidate` (studio, computed per render)
 
 | Field | Type | Notes |
 |---|---|---|
-| `codePoint` | `number` | The candidate decided. |
-| `state` | `"accepted" \| "declined"` | A candidate absent from this record was never offered, which is not the same as declined. |
+| `codePoint` | `number` | |
+| `notation` | `string` | `U+XXXX`, the same form `directionControlChars` uses (`linguistInventory.ts:152-155`) and the key of `invisibleDecisions` |
+| `label` | `string` | `invisibleCharLabel(char)`, extended with `U+2060 → "WORD JOINER"` (FR-015). Unicode names, not translated |
+| `needStatementId` | `string` | Lingui id `survey.invisibles.need.u<hex>`; the component renders it with `<Trans>` |
+| `relevance` | `"always" \| "rtl" \| "carried-over"` | `"always"`: ZWJ U+200D, ZWNJ U+200C, ZWSP U+200B, SOFT HYPHEN U+00AD, WORD JOINER U+2060. `"rtl"`: every `isBidiControlCodePoint` code point, offered when the author's `pb_non_roman_branch` answer is `"rtl"`, otherwise offered collapsed with a note. `"carried-over"`: any `\p{Cf}` character already in the draft's `controls` bucket, so nothing entered is ever dropped |
 
-Accepted characters enter the confirmed inventory distinguishably from
-punctuation (Story 3 Scenario 4). The `controls` bucket already derived at
-`phaseBDraftStore.ts:94-97`, `:342-343`, `:355-358` is the natural home and has
-no consumer today.
+**Validation (SC-005)**: every candidate has a non-empty `label` and a
+`needStatementId` that resolves in the `en` catalog; the test enumerates the full list
+so adding a code point without an explanation fails.
 
-## `RejectionLedger`
+## `InvisibleCharacterDecision` → new `invisibleDecisions` (store field, sticky)
 
-Proposals the author removed. Consulted before proposing, so a rejection sticks
-(FR-022).
+```ts
+invisibleDecisions: Record<string /* U+XXXX */, "accepted" | "declined">
+```
 
-| Field | Type | Notes |
-|---|---|---|
-| `rejected` | set of `nfc` strings | Keyed by the same normalized form used for de-duplication, so a rejection matches a re-proposal from any source. |
+A key absent from the record was never decided — distinguishable from `"declined"`
+(FR-018). Accepted characters are **not** added to `chars`; they reach the inventory
+through the phase-C result (below), never through the `controls` bucket (FR-014).
 
-**Scope**: the keyboard being authored. Durable across step revisits and across
-language-tag re-resolution (Story 4 Scenarios 1 and 2).
+Transitions:
 
-**State transitions**:
+- absent → `"accepted"`: the author ticks the candidate; or a `\p{Cf}` character is
+  entered on the punctuation page's type-in box or code-point field (FR-016, FR-021);
+  or carry-over adopts a `controls`-bucket character on the step's first render, which
+  also removes that character from `chars` (FR-017, D-09).
+- `"accepted"` ↔ `"declined"`: the author toggles the candidate.
+- any → absent: only `resetPhaseBDraftDecisions()`.
 
-- absent → `rejected`: the author removes a proposed character.
-- `rejected` → absent: the author types that character in by hand, which
-  overrides the rejection (FR-022, Story 4 Scenario 3).
+Snapshotted as `invisibleDecisions?: Record<string, "accepted" | "declined">`;
+restored with `?? {}`.
 
-**Validation rule**: a rejection MUST NOT resurrect a character, and MUST NOT be
-treated as evidence that the character should be proposed. A rejection for a
-character no source proposes any more is inert, and the edge-case list requires
-it not to accumulate unboundedly.
+## Phase-C result (existing shape, new union rule)
 
-**Migration rule**: an author who completed the step before this feature shipped
-has an empty ledger and a saved answer. FR-023 requires the saved answer to win
-— the absence of a rejection MUST NOT be read as permission to propose over an
-existing confirmed inventory.
+Both `PunctuationStep` and `InvisiblesStep` emit:
+
+```ts
+{ phase: "C", answers, confirmedInventory: phaseCConfirmedInventory() }
+```
+
+where `phaseCConfirmedInventory()` = `nfcDedup([...punctuation, ...acceptedInvisibleChars])`
+read from the draft store. Because `recordPhase` merges same-phase results field-wise,
+whichever step completes last leaves the full union in place; the marks and
+convenience steps' phase-C fields (`marksWorklist`, `retainedConvenienceChars`) are
+untouched. `mergePhaseResults` unions `confirmedInventory` across phases into
+`session.confirmedInventory`, which is what `useCarveNeededSet` reads.
+
+`answers` on the punctuation result stays `[]`. On the invisibles result it carries
+one entry per **offered** candidate:
+
+```ts
+{ questionId: "invisibles.u200c", answerType: "boolean", value: true | false }
+```
+
+so the decision record shows a decline as a recorded "no". `routeAnswersThroughMutate`
+skips ids with no registry module, so these answers never touch the IR.
+
+## `PhaseBDraftSnapshot` (existing, two optional fields added)
+
+`seededProposals?: string[]`, `invisibleDecisions?: Record<string, "accepted" | "declined">`.
+`snapshotPhaseBDraft()` writes them; `applyPhaseBDraftSnapshot()` defaults them; and
+`applyEnvelopeToStores` now passes the whole snapshot through instead of three fields.
 
 ## Reused, unchanged
 
-Read but not modified by this feature:
-
-- `sourceExemplars()` / `charactersInTier` (`exemplarSource.ts:202`, `:238-240`)
-  and the committed index
-  `packages/engine/src/character-discovery/generated/exemplars.generated.json`.
-- Confidence gating, the macrolanguage blocklist, and `chooseSide()`
-  (`exemplarSource.ts:87+`, `:67`, `:157-168`).
-- `isAlwaysKeepCategory` (`packages/studio/src/lib/irToCarveNodes.ts:2056-2058`)
-  — carve's behaviour is out of scope; only the declared inventory changes.
-- `glyphCategory` (`packages/engine/src/character-discovery/glyphCategory.ts:36`,
-  `:20`, `:39-41`) — the classification that routes invisibles away from
-  punctuation stays as it is; what changes is where they are routed to.
+- `sourceExemplars()` / `charactersInTier()` and the committed index; confidence gating,
+  the macrolanguage blocklist and `chooseSide()` (spec 044 rules).
+- `glyphCategory()` — format characters still classify as `"control"`; what changes is
+  where the punctuation page sends them.
+- `isBidiControlCodePoint()` — the allowlist is read, not widened; U+00AD and U+2060
+  stay outside it and are offered by the step directly.
+- `isAlwaysKeepCategory()` — carve's behaviour is out of scope; only the declared
+  inventory changes, and the base group's caption says so.
+- `useCarveNeededSet()`, `buildProducedSet()`, `recordPhase()`, `recordStepCompletion()`.
