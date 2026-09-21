@@ -261,7 +261,7 @@ export { applyIdentityStubMutation } from "./stub-mutator/index.js";
 // Internal helpers (buildLinguistPrompt, parseLinguistJson, cldrCrossCheck,
 // parseUnicodeSet, loadExemplars, SCRIPT_BLOCKS) are NOT re-exported here;
 // tests import them directly from the module file.
-export { createCharacterDiscoveryService } from "./character-discovery/CharacterDiscoveryServiceImpl.js";
+export { createCharacterDiscoveryService, isBidiControlCodePoint } from "./character-discovery/CharacterDiscoveryServiceImpl.js";
 export type { LLMCompleter } from "./character-discovery/CharacterDiscoveryServiceImpl.js";
 export type { CldrLoader, CldrFullLoader, ExemplarResult } from "./character-discovery/cldr.js";
 // The live-CLDR fetch path. NOT the authoring path since spec 044 — authoring
@@ -295,6 +295,20 @@ export { caseCounterpart } from "./character-discovery/casePair.js";
 // base produces that the orthography does not use (loanwords / email / URLs).
 export { surplusBasicLatinCandidates, candidateChars } from "./character-discovery/convenienceChars.js";
 export type { ConvenienceCandidate, SurplusBasicLatinArgs } from "./character-discovery/convenienceChars.js";
+// Punctuation defaults (spec 075): the CLDR-tier + base-produced proposal the
+// punctuation step seeds on arrival, and the fixed basic-ASCII floor that
+// stands in for base output when opaque fragments make it unknowable.
+export {
+  ASCII_PUNCTUATION_FLOOR,
+  basePunctuationCoverage,
+  buildPunctuationProposal,
+} from "./character-discovery/punctuationProposal.js";
+export type {
+  BasePunctuationCoverage,
+  CldrAbsentReason,
+  PunctuationProposalInput,
+  PunctuationProposal,
+} from "./character-discovery/punctuationProposal.js";
 // Phase B tiered/browsable character-map candidate builder (right pane).
 // Reuses the cldr.ts exemplar-loading path; CHARACTER_MAP_BLOCKS is a
 // SEPARATE, multi-block-per-script table from cldr.ts's calibrated SCRIPT_BLOCKS.
@@ -651,17 +665,14 @@ export type { ProducedGlyphsOptions } from "./inventory/producedGlyphs.js";
 
 // Inventory diff (spec §8): needed-vs-produced coverage delta.
 //
-// Intentionally unwired for now — a pure, tested primitive published ahead of
-// its caller, not leftover rebase debris. It is the coverage-diff half of the
-// Phase B worklist derivation sketched in docs/design-notes/survey-flow-rework.md;
-// the caller lands with that rework. Landed here deliberately (see the "My
-// keyboards" PR discussion) rather than split out, so the primitive and the
-// design note that motivates it stay together in history.
-//
-// If you are about to flag this as dead code: it is reachable and tested via
-// computeInventoryDelta.test.ts, and the lack of a production caller is the
-// documented state above, not an oversight.
-export { computeInventoryDelta } from "./inventory/computeInventoryDelta.js";
+// First production caller: the studio's punctuation step (spec 075 FR-011)
+// shows the missing-side count of the chosen punctuation before Done.
+// `hasUnaccountedOpaqueFragment` is the shared "is the base's output fully
+// known?" predicate the delta and `basePunctuationCoverage` both derive from.
+export {
+  computeInventoryDelta,
+  hasUnaccountedOpaqueFragment,
+} from "./inventory/computeInventoryDelta.js";
 
 // Base-keyboard facets baked into the working-copy IR (spec 048) — the single
 // shared casing derivation (FR-008) plus the read/override/clear accessors

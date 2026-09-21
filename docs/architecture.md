@@ -88,6 +88,25 @@ one persistent working copy.
   modelled as component lifetime; content was not.
   → [`specs/057-bulletproof-navigation/`](../specs/057-bulletproof-navigation/spec.md)
 
+- **Phase-B spine steps between `characters` and `carve`.** Four survey steps
+  sit on the manifest spine after the alphabet is confirmed and before the carve
+  gallery, in this order: `marks` (spec 071, computed S0 gate), `punctuation`,
+  `invisibles`, `convenience` (spec 051, computed gate). Since
+  [specs/075](../specs/075-punctuation-defaults/spec.md) the punctuation step
+  starts from a *proposed* list — the locale's CLDR/SLDR punctuation tier plus
+  the punctuation the base keyboard already produces (`buildPunctuationProposal`
+  in [`packages/engine/src/character-discovery/punctuationProposal.ts`](../packages/engine/src/character-discovery/punctuationProposal.ts),
+  with a fixed basic-ASCII floor when opaque fragments make base output
+  unknowable) — seeded once per locale into the shared phase-B draft store,
+  where removals are a sticky ledger. `invisibles` is the one **always-rendering**
+  step of the four: it offers ZWJ, ZWNJ, ZWSP, SOFT HYPHEN, WORD JOINER and the
+  bidi allowlist by name, and it subsumed the Phase B modular flow's RTL-only
+  `pb_rtl_direction_marks` / `pb_rtl_direction_marks_detail` question pair,
+  which no longer exists. Both steps emit the same phase-C `confirmedInventory`
+  union ([`survey/phaseCInventory.ts`](../packages/studio/src/survey/phaseCInventory.ts)),
+  so `recordPhase`'s same-phase field merge can never clobber one with the other.
+  → [`steps/manifest.ts`](../packages/studio/src/steps/manifest.ts)
+
 ## The meta-flow (end to end)
 
 The application is a pipeline, not a set of independent features. One pass,

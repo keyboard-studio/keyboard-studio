@@ -45,8 +45,6 @@ import pbSeaMedialsMod from "./b/pb_sea_medials.ts";
 import pbSeaStackedConsonantsMod from "./b/pb_sea_stacked_consonants.ts";
 import pbRtlDirectionConfirmMod from "./b/pb_rtl_direction_confirm.ts";
 import pbRtlShortVowelsMod from "./b/pb_rtl_short_vowels.ts";
-import pbRtlDirectionMarksMod from "./b/pb_rtl_direction_marks.ts";
-import pbRtlDirectionMarksDetailMod from "./b/pb_rtl_direction_marks_detail.ts";
 import pbRtlSpecialLettersMod from "./b/pb_rtl_special_letters.ts";
 import pbSyllabicNoteMod from "./b/pb_syllabic_note.ts";
 import pbSyllabicGridMod from "./b/pb_syllabic_grid.ts";
@@ -104,8 +102,6 @@ export const phaseBRegistry: Readonly<Record<string, QuestionModule>> = {
   pb_sea_stacked_consonants: pbSeaStackedConsonantsMod,
   pb_rtl_direction_confirm: pbRtlDirectionConfirmMod,
   pb_rtl_short_vowels: pbRtlShortVowelsMod,
-  pb_rtl_direction_marks: pbRtlDirectionMarksMod,
-  pb_rtl_direction_marks_detail: pbRtlDirectionMarksDetailMod,
   pb_rtl_special_letters: pbRtlSpecialLettersMod,
   pb_syllabic_note: pbSyllabicNoteMod,
   pb_syllabic_grid: pbSyllabicGridMod,

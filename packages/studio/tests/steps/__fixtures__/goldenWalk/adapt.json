@@ -67,6 +67,17 @@
     "stepId": "punctuation",
     "applyStepCompletion": [],
     "storeMutations": [
+      "advance"
+    ],
+    "workingCopyMutations": [
+      "recordPhase"
+    ],
+    "navigateTo": []
+  },
+  {
+    "stepId": "invisibles",
+    "applyStepCompletion": [],
+    "storeMutations": [
       "advance",
       "advance"
     ],

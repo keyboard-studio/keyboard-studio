@@ -13,8 +13,11 @@
  * loanword/URL case is specifically about a-z; a Cyrillic or Greek base's own
  * surplus letters stay a pure carve-gallery decision rather than being
  * pre-empted by a question the author has no general reason to answer. Digits
- * and punctuation need no question at all — carve never proposes them (see
- * `isAlwaysKeepCategory` in the studio's irToCarveNodes).
+ * and symbols need no question at all — carve never proposes them (see
+ * `isAlwaysKeepCategory` in the studio's irToCarveNodes). Punctuation DOES get
+ * a question, but the opposite one: `punctuationProposal.ts`, this module's
+ * sibling, proposes the base's punctuation for ACCEPTANCE (spec 075) where this
+ * module proposes surplus letters for retention.
  *
  * Case pairing is plain ASCII (`a`<->`A`), not locale-aware `caseCounterpart`.
  * Within basic Latin the only locale divergence is Turkish dotted/dotless i,

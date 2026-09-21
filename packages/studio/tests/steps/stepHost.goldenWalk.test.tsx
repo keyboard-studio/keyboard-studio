@@ -429,6 +429,20 @@ vi.mock("../../src/editors/touchSeedSource/TouchSeedSourcePanel.tsx", () => ({
   ),
 }));
 
+// The punctuation step (spec 075) seeds the resolved locale's CLDR punctuation
+// tier into the confirmed inventory on arrival. Track 1 carries a real BCP47
+// tag, so on a warm exemplar index that seed lands before the walk clicks
+// Done — and every typographic mark the (uninstantiated) base cannot type then
+// sits on the Phase F coverage gate, whose blocking <dialog> jsdom cannot
+// showModal(). That is the product working as specified (FR-011: unplaced
+// punctuation is owed to the mechanism gallery), not a traversal fact this
+// oracle records. Resolve no exemplars here so the walk stays a spine
+// traversal; PunctuationStep.test.tsx owns the seeding behaviour.
+vi.mock("../../src/lib/services.ts", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../../src/lib/services.ts")>()),
+  sourcedExemplars: async () => null,
+}));
+
 vi.mock("../../src/components/UnsupportedScriptStub.tsx", () => ({
   UnsupportedScriptStub: ({ script }: { script: string }) => (
     <div data-testid="stage-unsupported">{script}</div>
@@ -716,7 +730,7 @@ async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: St
 /**
  * Drive the full copy-track walk.
  * identity -> choose_base -> track(copy) -> project_name ->
- * characters(prefill->B) -> punctuation -> carve -> mechanisms ->
+ * characters(prefill->B) -> punctuation -> invisibles -> carve -> mechanisms ->
  * touch_seed_source -> touch -> help -> done
  *
  * S-03 sequences build inline in the Mechanism Gallery's method chooser (the
@@ -743,7 +757,11 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
     // the walk accepts it empty. The convenience skip that follows it is async
     // (see StepAction.settleFor), so wait for carve's own control to exist
     // before closing this window.
-    { stepId: "punctuation", testId: "punctuation-done", settleFor: "carve-complete" },
+    { stepId: "punctuation", testId: "punctuation-done", settleFor: "invisibles-continue" },
+    // The invisible-characters step (spec 075) ALWAYS renders — no skip gate —
+    // so it is a real stop on every walk; accepted empty. The async
+    // convenience skip that follows it is absorbed by this window instead.
+    { stepId: "invisibles", testId: "invisibles-continue", settleFor: "carve-complete" },
     { stepId: "carve", testId: "carve-complete" },
     { stepId: "mechanisms", testId: "mechanisms-complete" },
     { stepId: "touch_seed_source", testId: "seed-source-complete", async: true },
@@ -755,7 +773,7 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
 /**
  * Drive the full adapt-track walk.
  * identity -> choose_base -> track(adapt) ->
- * characters(prefill->B) -> punctuation -> carve -> mechanisms ->
+ * characters(prefill->B) -> punctuation -> invisibles -> carve -> mechanisms ->
  * touch_seed_source -> touch -> help -> done
  * project_name MUST NOT appear. See driveCopyTrack's docstring for why
  * touch_seed_source appears (spec 035 R4/R12 fork memory) and why there is no
@@ -771,7 +789,11 @@ async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Pro
     { stepId: "characters/B", testId: "phaseB-complete", settleFor: "punctuation-done" },
     // See driveCopyTrack — the ungated punctuation page, accepted empty, whose
     // window absorbs the async convenience skip.
-    { stepId: "punctuation", testId: "punctuation-done", settleFor: "carve-complete" },
+    { stepId: "punctuation", testId: "punctuation-done", settleFor: "invisibles-continue" },
+    // The invisible-characters step (spec 075) ALWAYS renders — no skip gate —
+    // so it is a real stop on every walk; accepted empty. The async
+    // convenience skip that follows it is absorbed by this window instead.
+    { stepId: "invisibles", testId: "invisibles-continue", settleFor: "carve-complete" },
     { stepId: "carve", testId: "carve-complete" },
     { stepId: "mechanisms", testId: "mechanisms-complete" },
     { stepId: "touch_seed_source", testId: "seed-source-complete", async: true },

@@ -204,6 +204,7 @@ const STAGE_LABEL_MESSAGE: Record<string, ReturnType<typeof msg>> = {
   characters: msg({ id: "footer.stage.characters", message: "Characters" }),
   marks: msg({ id: "footer.stage.marks", message: "Accents & marks" }),
   punctuation: msg({ id: "footer.stage.punctuation", message: "Punctuation" }),
+  invisibles: msg({ id: "footer.stage.invisibles", message: "Invisible characters" }),
   convenience: msg({ id: "footer.stage.convenience", message: "Convenience letters" }),
   carve: msg({ id: "footer.stage.carve", message: "Carve" }),
   mechanisms: msg({ id: "footer.stage.mechanisms", message: "Mechanisms" }),
