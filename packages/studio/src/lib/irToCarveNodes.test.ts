@@ -31,6 +31,7 @@ import {
   keySequenceLabel,
   charProducers,
   isTouchOnlyVkeyName,
+  invisibleCharLabel,
 } from './irToCarveNodes.ts';
 import { _setContentCatalogForTesting, _resetContentI18nForTesting } from './contentI18n.ts';
 import { collectCharContributors, parseSlotId, isPlusSeparator, deriveCarveNeededSet } from '@keyboard-studio/engine';
@@ -3972,5 +3973,31 @@ describe('charProducers <-> collectCharContributors parity (no unguarded drift b
     const permRemovalIds = [...collectCharContributors(parityIR, 'x').storeSlotIds];
     expect(wRemovalIds.some((id) => isTouchOnlyRuleLocal(owningRule(id, parityIR)!))).toBe(true);
     expect(permRemovalIds.some((id) => isSelfPermutationRule(owningRule(id, parityIR)!))).toBe(true);
+  });
+});
+
+describe('invisibleCharLabel — spec 075 additions', () => {
+  it('names WORD JOINER and the bidi controls the invisibles step offers', () => {
+    expect(invisibleCharLabel('\u2060')).toBe('WORD JOINER');
+    expect(invisibleCharLabel('\u200E')).toBe('LEFT-TO-RIGHT MARK');
+    expect(invisibleCharLabel('\u200F')).toBe('RIGHT-TO-LEFT MARK');
+    expect(invisibleCharLabel('\u061C')).toBe('ARABIC LETTER MARK');
+    expect(invisibleCharLabel('\u2069')).toBe('POP DIRECTIONAL ISOLATE');
+  });
+
+  it('keeps the existing labels unchanged', () => {
+    expect(invisibleCharLabel(' ')).toBe('SPACE');
+    expect(invisibleCharLabel('\u200B')).toBe('ZERO WIDTH SPACE');
+    expect(invisibleCharLabel('\u200C')).toBe('ZERO WIDTH NON-JOINER');
+    expect(invisibleCharLabel('\u200D')).toBe('ZERO WIDTH JOINER');
+    expect(invisibleCharLabel('\uFEFF')).toBe('ZERO WIDTH NO-BREAK SPACE');
+    expect(invisibleCharLabel('\u00AD')).toBe('SOFT HYPHEN');
+    expect(invisibleCharLabel('\u034F')).toBe('COMBINING GRAPHEME JOINER');
+    expect(invisibleCharLabel('\u0301')).toBe('COMBINING MARK (U+0301)');
+    expect(invisibleCharLabel('a')).toBeNull();
+  });
+
+  it('falls back to a FORMAT CHARACTER label for a Cf character the map does not name', () => {
+    expect(invisibleCharLabel('\u2061')).toBe('FORMAT CHARACTER (U+2061)');
   });
 });

@@ -3,7 +3,7 @@
 Companion to [spec.md](spec.md). This document records the code-level findings
 behind the claim that drives the feature — that the "Choose your punctuation"
 question holds the answer it is asking for — with the citations to check each
-one against. Nothing here is a proposal; the proposals are in the spec.
+one against. Part I records findings only; the proposals are in the spec. Part II, appended at plan time, records the decisions taken on top of them.
 
 **Evidence base.** The `keyboard-studio` working tree at the time of writing,
 branch `main`. Every citation below is `path:line` in that tree and was read
@@ -379,7 +379,224 @@ A blank default, a silent resolution, and a write with no observable consequence
   an edge case for that reason.
 - No corpus measurement was taken. SC-008 is phrased as a threshold to set after
   measuring, not as a known rate.
-- The two remaining open questions carried as `[NEEDS CLARIFICATION]` in the spec,
-  plus the convenience step's spec home, are not answerable from the code and were
-  not guessed at here. The all-versus-floor question was settled by the repo owner
-  on 2026-09-09 and is recorded in the spec's Decisions taken.
+- The one remaining open question carried as `[NEEDS CLARIFICATION]` in the spec
+  — the fate of the pane's code-point entry field — plus the convenience step's
+  spec home, are not answerable from the code and were not guessed at here. The
+  all-versus-floor question and the placement of the invisible-character question
+  were both settled by the repo owner on 2026-09-09 and are recorded in the
+  spec's Decisions taken.
+
+
+---
+
+# Part II — Plan-stage re-verification and decisions (2026-09-15)
+
+Part I above was written with the spec against `main`. This part was written at plan
+time, after re-reading every load-bearing citation in the working tree. Where Part I
+and Part II disagree, Part II is current.
+
+## Re-verification of Part I
+
+| Part I claim | Plan-time finding |
+|---|---|
+| `PunctuationStep.tsx` line numbers "should be re-checked" | Unchanged in substance: result at `:75-77`, hook call `:135`, tier filter `:153-158`, skipped path `:166-167`, `addProposed` at `:279`, proposed test at `:387`, Done at `:416-434`. The file is 439 lines. |
+| `RawCodepointEntry.tsx` beside the pane | It lives at `packages/studio/src/survey/characterMap/RawCodepointEntry.tsx`; the pane renders it at `CharacterMapPane.tsx:490-498` and its submit handler is `handleRawSubmit` at `:354-396` (`addChar(char)` at `:383`). |
+| "No rejection concept exists" (implicit in the spec's `RejectionLedger` entity) | **Wrong.** `phaseBDraftStore.ts:132` already carries `rejected: string[]` (spec 044 FR-017): written only by `remove()` for proposals (`:421-423`), vetoed in `addWithProvenance` (`:537`), survives `reset()` (`:505-510`), cleared by `resetPhaseBDraftDecisions()` (`:565-567`), snapshotted (`:603`, `:619`) and restored (`:643`). Story 4 is largely built at the store level. |
+| — | **New gap.** `draftPersistence.ts:939-943` restores the draft with only `chars`, `exemplarDigraphs` and `selectedFont`, so `applyPhaseBDraftSnapshot`'s `?? []` / `?? {}` / `?? false` defaults (`phaseBDraftStore.ts:638-645`) wipe `rejected`, `provenance`, `proposalConfidence`, `exemplarMethodDeclined` and `declaredRoles` on reload, even though `saveDraft` (`:766`) stores them. A pre-existing defect that Story 4 cannot pass through. |
+| `InventoryDelta` "contract field" in `characterDiscovery.ts` | `InventoryDelta` is an engine type (`computeInventoryDelta.ts:30-42`, exported at `index.ts:625`), not a contract. The contract type is `InventoryChar` (`characterDiscovery.ts:66-88`) whose `inBaseOutput: boolean` is required. `computeInventoryDelta` has **zero** production callers; the engine barrel (`index.ts:599-610`) says so explicitly. |
+| `SourcedExemplars` in the contract sketch | The type is `SourcedInventory` (`exemplarTypes.ts:91-100`: `resolvedTag`, `source`, `confidence`, `characters`, `digraphs`). `sourceExemplars()` returns `null` both for "no confident seed" and for "entry with zero characters across all tiers" (`exemplarSource.ts:213`, `:219`); "resolved but empty punctuation tier" is only observable as a non-null inventory whose tier filter is empty. Two states, not three. |
+| Provenance is per-character, multi-source | The store's `provenance` is `Record<string, DraftProvenance>` — one value per NFC key, strengthen-only (`:543-545`). `DraftProvenance = SourcedInventory["source"] | "author" | "text"` (`:63`). |
+| `INVISIBLE_CHAR_LABELS` eight entries, U+2060 absent | Confirmed (`irToCarveNodes.ts:183-192`). The map is module-private; only `invisibleCharLabel()` (`:194-204`) is exported. Labels are Unicode names, not i18n-wrapped, and `.ts` files are outside the `no-unlocalized-strings` scan. U+2060 appears nowhere in non-generated source. |
+| Bidi allowlist | `isBidiControlCodePoint` (`CharacterDiscoveryServiceImpl.ts:109-117`) covers U+200B–U+200F, U+202A–U+202E, U+2066–U+2069, U+061C, U+FEFF. Neither U+00AD nor U+2060 is in it, so both are dropped from the character map today by `characterMap.ts:321`. |
+| Convenience step precedent | `ConvenienceCharsStep.tsx` reads `useWorkingCopyStore((s) => s.ir)` (`:121`), `useCarveNeededSet()` (`:123`) and `buildProducedSet(ir)` (`:129-132`); emits `{ phase: "C", answers: [], retainedConvenienceChars }` (`:111-113`). Same-phase results are merged **field-wise** by `recordPhase` (`workingCopyStore.ts:1265-1273`), which is why two phase-C emitters coexist today and why a second `confirmedInventory` emitter would clobber the first. |
+| Adding a spine step | Ordering is derived from the manifest, but the id is hard-listed in `advance.ts:29-44`, `phases.ts:51-65` and `:105`, `surveySessionStore.ts:97-112`, and the manifest's own `expectedSpine` (`manifest.ts:229-232`); `journey-runner.ts:602-603` throws on an unhandled step id; `completeness.test.ts:687-690` requires every `specRef` to be a key in `docs/spec-trace.json`, which has no 075 key yet. |
+| Question modules and the engine | Enforced two ways: depcruise `question-modules-no-bypass-mutate-seam` (`.dependency-cruiser.cjs:109-123`) and the content-i18n extractor's contracts-only path map. `pb_rtl_direction_marks_detail.ts` has no runtime imports; its two options are `U+200F` and `U+200E` as notation strings; it is reached only from `pb_rtl_direction_marks.ts:23-26`, whose predecessor is `pb_rtl_short_vowels.ts:33`. No studio code consumes its answer. |
+
+## Decisions
+
+### D-01 — Seed through a new store action, not a component loop
+
+**Decision**: add `seedProposals(chars, source, seedKey)` to `phaseBDraftStore`; it
+no-ops if `seedKey ∈ seededProposals`, otherwise routes every character through the
+existing `addWithProvenance` and records the key. The punctuation step calls it once per
+resolved locale (`"punctuation:" + resolvedTag`).
+**Rationale**: `addWithProvenance` already enforces the rejection veto, the
+author-wins provenance rule and NFC de-duplication, so FR-005, FR-010 and FR-022 come
+for free; a store action keeps the marker atomic with the writes and is unit-testable
+without React.
+**Alternatives considered**: (a) call `addProposed` in a component effect — racy with
+re-renders and leaves the "seeded" fact in component state; (b) generalise
+`seedFromProposal(inv)` with a tier parameter — it also sets `proposalConfidence`,
+expands case pairs and is main-tier-specific by contract; mixing alphabet semantics
+into punctuation seeding was rejected.
+
+### D-02 — FR-023 uses the existing phase-C result as the "completed before" signal
+
+**Decision**: skip seeding when `phaseResults` already contains a phase-C entry with
+`confirmedInventory` defined, and record the seed key anyway.
+**Rationale**: the punctuation step is the only pre-feature emitter of a phase-C
+`confirmedInventory`, so its presence is precisely "this author pressed Done here
+before"; no migration flag or version bump is needed.
+**Alternatives considered**: a draft-version field — heavier and would misfire for a
+fresh working copy created by an old build but never completed.
+
+### D-03 — Pure engine module for floor, base coverage and proposal builder
+
+**Decision**: `packages/engine/src/character-discovery/punctuationProposal.ts`
+exporting `ASCII_PUNCTUATION_FLOOR`, `basePunctuationCoverage(ir)` and
+`buildPunctuationProposal(input)`; `hasUnaccountedOpaqueFragment` is exported from
+`computeInventoryDelta.ts` instead of being re-implemented.
+**Rationale**: mirrors `convenienceChars.ts` (pure, browser-safe, colocated test, barrel
+export); the SC-001 oracle can then be a per-tag function call over the committed index
+rather than a UI test; one derivation of `coverageComplete` keeps FR-008 in step with
+`computeInventoryDelta`.
+**Alternatives considered**: the contract sketch's `basePunctuationCoverage(delta)`
+taking an `InventoryDelta` — rejected because `computeInventoryDelta` needs a `needed`
+list and the base group is the *produced* side, not the covered subset of a needed set;
+placing the helpers in `packages/contracts` — rejected, contracts carries shapes only
+and may not import the engine.
+
+### D-04 — Provenance stays single-valued; multi-source attribution is derived
+
+**Decision**: widen `DraftProvenance` with `"base"` and `"ascii-floor"`; seed a
+character present in both groups once under the CLDR source; compute "also produced by
+the base" at render time from `buildPunctuationProposal`'s groups.
+**Rationale**: `provenance` is read by the punctuation chips, `setAll`, the snapshot
+shape and the spec-044 tests; turning it into an array would touch all of them for a
+purely presentational need, and the groups are recomputed on every render anyway.
+**Alternatives considered**: `provenance: Record<string, DraftProvenance[]>` — rejected
+for blast radius; a parallel `secondarySources` map — rejected as a second source of
+truth for the same fact.
+
+### D-05 — FR-011 wires `computeInventoryDelta` as its first production caller
+
+**Decision**: the punctuation step runs `computeInventoryDelta(chosen, ir)` over the
+chosen punctuation and shows the `missing.length` count before Done; the barrel's
+"intentionally unwired" note is retired.
+**Rationale**: FR-006 and FR-011 name this machinery; the field `inBaseOutput` was
+added for exactly this consumer, and the count is what makes accepting a proposal
+visibly non-free.
+**Alternatives considered**: an inline `buildProducedSet` difference — duplicates the
+engine's partition and leaves the intended consumer unwired.
+
+### D-06 — Both phase-C inventory emitters emit the same union
+
+**Decision**: a shared `phaseCConfirmedInventory()` returns the NFC-deduped union of the
+draft's `punctuation` slice and the accepted invisibles; `PunctuationStep` and
+`InvisiblesStep` both emit `{ phase: "C", …, confirmedInventory: that }`.
+**Rationale**: `recordPhase` shallow-merges same-phase results field-wise, so a second
+`confirmedInventory` emitter would clobber the first; emitting the union from both makes
+the last writer always right and keeps FR-024's phase "C" intact. `mergePhaseResults`
+unions `confirmedInventory` across phases, so the accepted invisibles reach the session
+inventory (FR-014) without a contracts change.
+**Alternatives considered**: a new optional `SurveyPhaseResult` field — a contracts
+change that still would not reach `confirmedInventory`; reporting under phase "D" —
+misuses the phase vocabulary the dashboard's `PHASES` map renders.
+
+### D-07 — Invisible decisions are a sticky draft-store record plus boolean answers
+
+**Decision**: `invisibleDecisions: Record<string, "accepted" | "declined">` keyed by
+`U+XXXX` notation on `phaseBDraftStore`, in the sticky class (`rejected`,
+`exemplarMethodDeclined`), snapshotted and restored; the step's result also carries one
+`boolean` `SurveyAnswer` per offered candidate (`questionId: "invisibles.u200c"`).
+**Rationale**: the store record gives revisit persistence and the pre-selection FR-016
+needs; the `answers` entries give FR-018's reviewer-visible "declined, not unasked" via
+the spec-053 decision record, which `StepHost` writes for every step's answers.
+`routeAnswersThroughMutate` skips unknown question ids, so the IR is untouched.
+**Alternatives considered**: storing accepted characters in `chars` — puts them back in
+the unrendered `controls` bucket FR-014 forbids; a new contracts type for per-character
+decisions — nothing else would consume it.
+
+### D-08 — Hand-off, not navigation, for a format character typed on the punctuation page
+
+**Decision**: the type-in box and the punctuation-scope code-point field test each
+harvested character with `/^\p{Cf}$/u`; a match records `acceptInvisible(notation)`
+and shows a `role="status"` note naming the next step. A multi-codepoint cluster
+containing a format character is declined with a stated reason. The alphabet scope is
+left unchanged and its Cf entries are adopted by carry-over.
+**Rationale**: forcing navigation mid-typing would break the author's flow and the e2e
+walk's step order; the status note is the pattern the page already uses for declined
+input; FR-016 and FR-021 require the same rule on both inputs of the punctuation page,
+and the spec puts the alphabet step's own inventory building out of scope.
+**Alternatives considered**: keeping the "Skipped" path — violates FR-016; routing the
+alphabet scope too — changes an out-of-scope step for no requirement.
+
+### D-09 — Carry-over migrates ownership
+
+**Decision**: on first render the invisibles step moves every `\p{Cf}` character in the
+draft's `controls` bucket into `invisibleDecisions` as `"accepted"` and removes it from
+`chars`.
+**Rationale**: leaving it in `chars` would keep it in the alphabet step's phase-B
+`confirmedInventory` *and* in the new step's answer — the "duplicated into two answers"
+outcome FR-017 forbids. Session-level `confirmedInventory` is a cross-phase union, so
+nothing is lost while the alphabet result is stale.
+**Alternatives considered**: adopt without removing — duplicates; leave in `controls`
+and only mirror — re-asks a decided character.
+
+### D-10 — Candidate list is a studio module, direction read from the Phase B branch
+
+**Decision**: `invisibleCandidates.ts` in `packages/studio/src/survey/invisibles/`
+returns the fixed five, plus the bidi allowlist when the author's `pb_non_roman_branch`
+answer is `"rtl"`, plus any Cf character already in the draft; labels via
+`invisibleCharLabel()` (extended with U+2060), need statements as `<Trans>` ids in the
+component. When direction is unanswered the bidi group is offered collapsed with a
+note, never hidden.
+**Rationale**: the label helper and Tier-A i18n are studio-side, so the candidate list
+cannot live in the engine without moving the labels; the RTL branch answer is the same
+signal the retired gate used, so FR-019's "asked once" holds.
+**Alternatives considered**: a modular question module — cannot import the label
+helper or the engine allowlist (depcruise and the extractor forbid it) and would have to
+inline the list.
+
+### D-11 — Retire the two RTL direction-mark modules rather than gate them off
+
+**Decision**: delete `pb_rtl_direction_marks.ts` and `pb_rtl_direction_marks_detail.ts`,
+rewire `pb_rtl_short_vowels.next` to `pb_rtl_special_letters`, drop the registry count
+to 112, re-extract Tier B catalogs, regenerate the Phase B flow-edge snapshot.
+**Rationale**: no studio code reads the detail answer; a dead module still extracts
+catalog keys and counts in the registry; FR-019 says subsume, not duplicate.
+**Alternatives considered**: keep the modules with an always-false condition — dead
+weight and a second place the same question exists.
+
+### D-12 — Declarations stay `inputs: []`, `writes: []` (resolves the spec's open decision)
+
+**Decision**: both the punctuation step and the new invisibles step declare explicit
+empty arrays.
+**Rationale**: spec 066 FR-006 requires the explicit-empty form for a step that reads
+and writes no IR path; confirming an inventory is a survey result, not an IR write;
+declaring an input with no upstream writer would fail the orphan-input check; the
+convenience step is the precedent.
+**Alternatives considered**: declaring base-coverage reads as `inputs` — there is no
+IRPath for "the produced set", and no writer exists upstream.
+
+### D-13 — Fix the draft-restore gap as a separate commit
+
+**Decision**: `applyEnvelopeToStores` forwards `rejected`, `provenance`,
+`proposalConfidence`, `exemplarMethodDeclined`, `declaredRoles` and the new fields;
+this lands as its own `fix(studio):` commit before Story 4's tests.
+**Rationale**: it is a pre-existing spec-044 defect that happens to block Story 4; the
+cadence rule says out-of-scope unblockers get their own revertable commit.
+**Alternatives considered**: folding it into the Story 4 commit — hides a real bug fix
+under a feature.
+
+### D-14 — Always-render step gets a plain e2e driver
+
+**Decision**: `driveInvisiblesStep` waits for `invisibles-continue` and clicks it, with
+no race against the next landmark; it is added to `buildOneCharacterList` and the two
+direct call sites.
+**Rationale**: the racing idiom exists for a step that may not render; using it here
+would reproduce the very failure SC-009 names (a step that vanishes while the walk
+passes).
+**Alternatives considered**: copying `driveConvenienceStep` verbatim — rejected for that
+reason.
+
+### D-15 — Surface, do not resolve, the always-keep disagreement
+
+**Decision**: the base group's caption states that removing a character declares it
+unsupported but the base layout still types it until carve's rule changes; a concern is
+recorded for a future carve feature.
+**Rationale**: changing carve's `\p{N}\p{P}\p{S}` rule is out of scope by the spec's own
+list; the edge case demands the disagreement be surfaced or explicitly deferred, and a
+caption does both.
+**Alternatives considered**: teaching carve to honour the declined set — a carve
+feature with its own spec.
