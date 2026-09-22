@@ -160,6 +160,50 @@ describe("proposeContextVariants (spec 062, US1)", () => {
     expect(diacriticVariants).toHaveLength(0);
   }, 30_000);
 
+  it("resolves each member of a multi-key any() store to its own literal key and output (#1753)", async () => {
+    // Regression for #1753: a multi-member key store (`any(key.all)`, real
+    // shape e.g. sil_yoruba8's `any(key.all)` acute/grave/tilde/... table)
+    // selects a DIFFERENT physical key per member. Before this fix, the
+    // generator resolved only the first member's key, simulated the fix's
+    // output against just that key, and then emitted a generated rule whose
+    // context still matched `any(key.all)` (every member) — silently
+    // overwriting every other member's correct output with the first
+    // member's. Each member must get its own literal key and its own
+    // simulated output.
+    const kmn = [
+      HEADER,
+      "group(main) using keys",
+      "",
+      "store(base) U+00E0",
+      "store(key.all) '[' ']' ';'",
+      "store(act.all) U+00E2 U+00E1 U+00E3",
+      "",
+      "any(base) + any(key.all) > index(act.all,2)",
+      "",
+    ].join("\n");
+    const { ir } = parse(kmn, "multi_key_fixture");
+    const report = await computeContextTolerance(ir);
+    expect(report.findings.some((f) => f.failingKeystrokes !== undefined)).toBe(true);
+
+    const { ir: fixedIr, variants } = await proposeContextVariants(ir, report);
+    const diacriticVariants = variants.filter((v) => !v.sourceRuleId.startsWith(BACKSPACE_UNWRAP_RULE_PREFIX));
+    expect(diacriticVariants).toHaveLength(3);
+
+    const compiled = await compileIr(fixedIr);
+    expect(compiled.success).toBe(true);
+
+    const decomposedBase = "à"; // a + combining grave, decomposed U+00E0
+    const expectations: Array<[{ vkey: string; modifiers: [] }, string]> = [
+      [{ vkey: "K_LBRKT", modifiers: [] }, "â"],
+      [{ vkey: "K_RBRKT", modifiers: [] }, "á"],
+      [{ vkey: "K_COLON", modifiers: [] }, "ã"],
+    ];
+    for (const [key, expected] of expectations) {
+      const result = simulate(compiled, [key], { text: decomposedBase });
+      expect(result.finalOutput).toBe(expected);
+    }
+  }, 30_000);
+
   it("returns the IR unchanged (no variants) when the report has no gaps", async () => {
     const kmn = [
       HEADER,

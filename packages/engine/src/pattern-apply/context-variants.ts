@@ -57,6 +57,7 @@ import {
   hasSimulatableJs,
   resolveContextCandidates,
   resolveKeyPart,
+  resolveKeyPartCandidates,
   splitRuleAtPlus,
 } from '../validator/context-tolerance.js';
 import { entryGroupOf, insertBlockBeforeTerminalRules } from './ir-insert.js';
@@ -234,44 +235,53 @@ export async function proposeContextVariants(
       const beforeEl = split.before[0]!;
       const candidateResolution = resolveContextCandidates(beforeEl, storeChars);
       if ('reason' in candidateResolution) continue;
-      const keyResolution = resolveKeyPart(split.keyPart, storeChars);
+      // A multi-member `any(key.all)` key part selects a DIFFERENT physical
+      // key per member (e.g. sil_yoruba8's 5-key diacritic-select table), not
+      // one key matched several equivalent ways — so every member needs its
+      // OWN simulated output under its OWN literal key, not the one output
+      // measured for an arbitrarily-chosen first member baked into a rule
+      // that still matches every member via `any()` (spec 062, #1753: that
+      // shape silently overwrites the other members' correct output with the
+      // first member's).
+      const keyResolution = resolveKeyPartCandidates(split.keyPart, storeChars);
       if ('reason' in keyResolution) continue;
-      const key = keyResolution.key;
 
       const decomposable = candidateResolution.chars.filter(
         (c) => [...c].length === 1 && c.normalize('NFD') !== c,
       );
       if (decomposable.length === 0) continue;
 
-      const { fallbackRuleId } = findInsertionPoint(group.rules, key, storeChars);
-
       let variantIndex = 0;
-      const generatedForRule: IRRule[] = [];
-      for (const candidate of decomposable) {
-        const decomposed = candidate.normalize('NFD');
-        const precomposedOutput = simulate(compiled, [key], { text: candidate }).finalOutput;
-        const decomposedOutput = simulate(compiled, [key], { text: decomposed }).finalOutput;
-        if (precomposedOutput === decomposedOutput) continue; // this candidate is already tolerant
+      for (const { key, literal } of keyResolution.candidates) {
+        const { fallbackRuleId } = findInsertionPoint(group.rules, key, storeChars);
 
-        const marker = `${GENERATED_MARKER_PREFIX}${rule.nodeId}_${variantIndex++}`;
-        generatedForRule.push({
-          nodeId: marker,
-          context: [...charsToContext(decomposed), { kind: 'raw', text: '+' }, ...split.keyPart],
-          output: charsToOutput(precomposedOutput),
-          trailingComment: 'generated: context tolerance (spec 062)',
-        });
-        variants.push({
-          sourceRuleId: rule.nodeId,
-          kind: 'added-rule',
-          generatedMarker: marker,
-          precomposedOutput,
-          ...(fallbackRuleId !== undefined ? { precedesFallbackRuleId: fallbackRuleId } : {}),
-        });
-      }
+        const generatedForRule: IRRule[] = [];
+        for (const candidate of decomposable) {
+          const decomposed = candidate.normalize('NFD');
+          const precomposedOutput = simulate(compiled, [key], { text: candidate }).finalOutput;
+          const decomposedOutput = simulate(compiled, [key], { text: decomposed }).finalOutput;
+          if (precomposedOutput === decomposedOutput) continue; // this candidate is already tolerant
 
-      if (generatedForRule.length > 0) {
-        const existing = batchesByGroup.get(group.nodeId) ?? [];
-        batchesByGroup.set(group.nodeId, [...existing, { key, rules: generatedForRule }]);
+          const marker = `${GENERATED_MARKER_PREFIX}${rule.nodeId}_${variantIndex++}`;
+          generatedForRule.push({
+            nodeId: marker,
+            context: [...charsToContext(decomposed), { kind: 'raw', text: '+' }, ...literal],
+            output: charsToOutput(precomposedOutput),
+            trailingComment: 'generated: context tolerance (spec 062)',
+          });
+          variants.push({
+            sourceRuleId: rule.nodeId,
+            kind: 'added-rule',
+            generatedMarker: marker,
+            precomposedOutput,
+            ...(fallbackRuleId !== undefined ? { precedesFallbackRuleId: fallbackRuleId } : {}),
+          });
+        }
+
+        if (generatedForRule.length > 0) {
+          const existing = batchesByGroup.get(group.nodeId) ?? [];
+          batchesByGroup.set(group.nodeId, [...existing, { key, rules: generatedForRule }]);
+        }
       }
     }
   }

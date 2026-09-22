@@ -97,6 +97,52 @@ export function resolveKeyPart(keyPart: ContextElement[], storeChars: Map<string
   return { reason: `key element kind "${el.kind}" not analysed` };
 }
 
+/** One pressable key a rule's key part can resolve to, paired with the literal (never `any()`) context element that names it. */
+export type KeyPartCandidate = { key: SimKeyInput; literal: ContextElement[] };
+export type KeyPartCandidatesResolution = { candidates: KeyPartCandidate[] } | { reason: string };
+
+/**
+ * Resolve every literal keystroke a rule's key part (the single element
+ * after `+`) can represent. A `char`/`vkey` key part resolves to exactly one
+ * candidate, same as {@link resolveKeyPart}. An `any(store)` key part
+ * resolves to one candidate PER store member: a multi-member key store (e.g.
+ * `any(key.all)`) selects a DIFFERENT physical key per member, not one key
+ * matched several equivalent ways, so `resolveKeyPart`'s first-member
+ * shortcut is only ever safe for deciding whether a rule NEEDS a fix, never
+ * for GENERATING one (spec 062, #1753) — a generated rule that keeps the
+ * `any()` reference in its key part while baking in the output measured for
+ * just one member silently corrupts every other member's output once the
+ * decomposed-context rule outranks the original by longest-context-wins.
+ * `pattern-apply/context-variants.ts` therefore calls this, not
+ * `resolveKeyPart`, when building the fix itself, looping once per candidate
+ * so each member gets its own simulated output under its own literal key.
+ */
+export function resolveKeyPartCandidates(
+  keyPart: ContextElement[],
+  storeChars: Map<string, string[]>,
+): KeyPartCandidatesResolution {
+  if (keyPart.length !== 1) {
+    return { reason: 'compound key part (more than one element after "+") not analysed' };
+  }
+  const el = keyPart[0]!;
+  if (el.kind !== 'any') {
+    const single = resolveKeyPart(keyPart, storeChars);
+    if ('reason' in single) return single;
+    return { candidates: [{ key: single.key, literal: keyPart }] };
+  }
+  const members = storeChars.get(el.storeRef);
+  if (members === undefined || members.length === 0) {
+    return { reason: `key store "${el.storeRef}" has no character items` };
+  }
+  const candidates: KeyPartCandidate[] = [];
+  for (const member of members) {
+    const key = reverseUsLayoutKey(member);
+    if (!key) return { reason: `no US-layout key produces character "${member}"` };
+    candidates.push({ key, literal: [{ kind: 'char', value: member }] });
+  }
+  return { candidates };
+}
+
 export type CandidatesResolution = { chars: string[] } | { reason: string };
 
 /**
