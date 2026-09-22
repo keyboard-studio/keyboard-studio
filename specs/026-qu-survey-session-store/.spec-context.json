@@ -248,5 +248,6 @@
       "command": "pnpm --filter @keyboard-studio/studio typecheck; pnpm --filter @keyboard-studio/studio exec vitest run src/dashboard/trackRouting.test.ts src/dashboard/prefillRouting.test.ts src/stores/surveySessionStore.test.ts",
       "result": "shipped via PR 976 (commit 22feabff); typecheck clean; 49/49 relevant tests pass. StudioShell.test.tsx fails locally only on the pre-existing Node26/jsdom localStorage-shadow issue documented earlier this session, not re-run to full green - not a regression, CI on Node 22 unaffected"
     }
-  ]
+  ],
+  "telemetryInstanceId": "0d86403d-4a8b-46e2-b17a-bc1b42525836"
 }
