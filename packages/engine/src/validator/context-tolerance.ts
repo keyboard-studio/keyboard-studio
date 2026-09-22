@@ -22,11 +22,13 @@ import type {
   RuleToleranceFinding,
   SimKeyInput,
   ToleranceReport,
+  VirtualFS,
 } from '@keyboard-studio/contracts';
 import { createVirtualFS, isPlusSeparator } from '@keyboard-studio/contracts';
 
 import { compile } from '../compiler/index.js';
 import { emit } from '../codec/emit.js';
+import { stripDanglingAssetStores } from '../compiler/stripDanglingAssetStores.js';
 import { analyzeStores } from '../pattern-apply/applyStoreSlotRemovals.js';
 import { simulate } from '../simulator/index.js';
 import { reverseUsLayoutKey } from '../simulator/reverseUsLayout.js';
@@ -197,33 +199,60 @@ function locationFor(ir: KeyboardIR, rule: IRRule) {
 }
 
 /**
- * Adjust an IR's header-only stores before compiling purely for behavioural
- * simulation, never for any output the caller keeps:
+ * Force `&TARGETS` to include `any` so kmc-kmn always emits a `.js`
+ * (KeymanWeb) artifact — `simulate()`'s only input. A real keyboard
+ * declaring `&TARGETS 'desktop'` (e.g. `sil_yoruba8`, predating
+ * KeymanWeb-first authoring) would otherwise compile with no `.js` at all,
+ * and the behavioural comparison this whole feature depends on cannot run
+ * without one.
  *
- * - Drops `&BITMAP` / `&VISUALKEYBOARD` directives (e.g. `sil_yoruba8.ico`,
- *   `sil_yoruba8.kvks`). This module never has the referenced binary asset
- *   available, and kmc-kmn validates the referenced file's actual content (a
- *   placeholder empty file still fails as "cannot open ... for reading").
- * - Forces `&TARGETS` to include `any` so kmc-kmn always emits a `.js`
- *   (KeymanWeb) artifact — `simulate()`'s only input. A real keyboard
- *   declaring `&TARGETS 'desktop'` (e.g. `sil_yoruba8`, predating
- *   KeymanWeb-first authoring) would otherwise compile with no `.js` at all,
- *   and the behavioural comparison this whole feature depends on cannot run
- *   without one.
+ * This is the only IR-level adjustment needed before compiling purely for
+ * behavioural simulation; dropping dangling asset-store references (`&BITMAP`,
+ * `&VISUALKEYBOARD`, `&LAYOUTFILE`, ...) is handled textually, after `emit()`,
+ * by {@link buildToleranceCompileVfs} — see that function's doc for why.
  *
  * Neither the diagnostic nor the generator ever returns this adjusted copy
  * to its caller; it exists only to produce a `CompileResult` for
  * `simulate()`.
  */
 export function stripAssetStoresForCompile(ir: KeyboardIR): KeyboardIR {
-  const stores = ir.stores
-    .filter((s) => s.name.toUpperCase() !== 'BITMAP' && s.name.toUpperCase() !== 'VISUALKEYBOARD')
-    .map((s) =>
-      s.name.toUpperCase() === 'TARGETS'
-        ? { ...s, items: [...'any'].map((ch) => ({ kind: 'char' as const, value: ch })) }
-        : s,
-    );
+  const stores = ir.stores.map((s) =>
+    s.name.toUpperCase() === 'TARGETS'
+      ? { ...s, items: [...'any'].map((ch) => ({ kind: 'char' as const, value: ch })) }
+      : s,
+  );
   return { ...ir, stores };
+}
+
+/**
+ * Build the compile-only `VirtualFS` used by both the diagnostic
+ * ({@link computeContextTolerance}) and the generator
+ * (`pattern-apply/context-variants.ts`'s `proposeContextVariants`) to run a
+ * `KeyboardIR` through `compile()` purely for behavioural simulation.
+ *
+ * Two adjustments are required, at two different levels:
+ *
+ * 1. {@link stripAssetStoresForCompile} forces `&TARGETS` at the IR level
+ *    (a store-item rewrite `emit()` needs to see, not a header line removal).
+ * 2. {@link stripDanglingAssetStores} then removes every sibling-asset store
+ *    (`&BITMAP`, `&VISUALKEYBOARD`, `&LAYOUTFILE`, `&DISPLAYMAP`, plus the
+ *    always-stripped help-panel stores) whose file is absent from this VFS —
+ *    which is every one of them, since this VFS only ever contains the one
+ *    `.kmn` file. Previously only `&BITMAP`/`&VISUALKEYBOARD` were dropped
+ *    here by hand; a keyboard declaring `&LAYOUTFILE` (965 of 1,044 corpus
+ *    keyboards) failed this compile outright and was reported as
+ *    "keyboard failed to compile" with zero findings/variants (spec 062,
+ *    #1754) instead of ever reaching the behavioural comparison.
+ */
+export function buildToleranceCompileVfs(ir: KeyboardIR): VirtualFS {
+  const kmnPath = `source/${ir.header.keyboardId}.kmn`;
+  const vfs = createVirtualFS([
+    { path: kmnPath, content: emit(stripAssetStoresForCompile(ir)), isBinary: false },
+  ]);
+  const kmnText = vfs.get(kmnPath)!.content as string;
+  const { kmn: cleaned, stripped } = stripDanglingAssetStores(kmnText, vfs);
+  if (stripped.length > 0) vfs.set(kmnPath, cleaned);
+  return vfs;
 }
 
 /**
@@ -427,10 +456,7 @@ export async function computeContextTolerance(ir: KeyboardIR): Promise<Tolerance
 
   let compiled: CompileResult | undefined;
   if (anyPending) {
-    const vfs = createVirtualFS([
-      { path: `source/${ir.header.keyboardId}.kmn`, content: emit(stripAssetStoresForCompile(ir)), isBinary: false },
-    ]);
-    compiled = await compile(vfs, ir.header.keyboardId);
+    compiled = await compile(buildToleranceCompileVfs(ir), ir.header.keyboardId);
   }
 
   const findings: RuleToleranceFinding[] = resolutions.map((resolution) => {

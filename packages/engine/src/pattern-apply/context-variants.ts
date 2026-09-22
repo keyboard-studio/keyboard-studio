@@ -46,17 +46,15 @@ import type {
   SimKeyInput,
   ToleranceReport,
 } from '@keyboard-studio/contracts';
-import { createVirtualFS } from '@keyboard-studio/contracts';
 
 import { compile } from '../compiler/index.js';
-import { emit } from '../codec/emit.js';
 import { simulate } from '../simulator/index.js';
 import { KMW_JS_TARGETS } from '../package-descriptor/build.js';
 import { isMnemonicLayout } from './shiftRules.js';
 import {
   buildStoreCharIndex,
+  buildToleranceCompileVfs,
   hasSimulatableJs,
-  stripAssetStoresForCompile,
   resolveContextCandidates,
   resolveKeyPart,
   splitRuleAtPlus,
@@ -212,10 +210,7 @@ export async function proposeContextVariants(
     return addBackspaceUnwrap(strippedIr);
   }
 
-  const vfs = createVirtualFS([
-    { path: `source/${ir.header.keyboardId}.kmn`, content: emit(stripAssetStoresForCompile(strippedIr)), isBinary: false },
-  ]);
-  const compiled = await compile(vfs, ir.header.keyboardId);
+  const compiled = await compile(buildToleranceCompileVfs(strippedIr), ir.header.keyboardId);
   // Gate on the simulatable .js, not `success`: this compile forces
   // `&TARGETS 'any'`, which can add web-target-only errors the keyboard's own
   // build never hits (see `hasSimulatableJs`).
