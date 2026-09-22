@@ -17,8 +17,15 @@
 // E2E specs live under packages/studio/e2e/. carve.spec.ts is LIVE (not skipped)
 // and passes against the global CLI; copy-edit.spec.ts and import-improve.spec.ts
 // remain .skip-ped pending their lanes. See each spec header for details.
+//
+// If PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH points at an existing chromium
+// binary, that one is launched instead of the version the local `playwright`
+// package expects — the CD lane ships chromium at a stable path that may lag
+// the pinned download. Absent the env var, behaviour is unchanged.
 
 import { defineConfig } from "playwright/test";
+
+const chromiumExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
 
 export default defineConfig({
   testDir: "e2e",
@@ -39,6 +46,9 @@ export default defineConfig({
   globalSetup: "./e2e/global-setup.ts",
   use: {
     baseURL: "http://localhost:5273",
+    launchOptions: chromiumExecutablePath
+      ? { executablePath: chromiumExecutablePath }
+      : undefined,
   },
   webServer: {
     command: "pnpm dev",
