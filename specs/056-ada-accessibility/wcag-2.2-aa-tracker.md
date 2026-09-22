@@ -80,7 +80,7 @@ Criterion links: [How to Meet WCAG 2.2](https://www.w3.org/WAI/WCAG22/quickref/)
 
 | SC | Name | Level | Status | Evidence | Notes |
 |---|---|---|---|---|---|
-| 4.1.2 | Name, Role, Value | A | unknown | — | Custom widgets (FR-006); axe covers subset, manual completes |
+| 4.1.2 | Name, Role, Value | A | unknown | 2026-08-03 #1460 `nested-interactive` fix — the Cycle 1 rail-card keyboard-activation change briefly put a real `ToggleBox` `<button>` inside a `role="button"` ancestor (axe `nested-interactive`, serious). Fixed in the same PR: the outer wrapper in [Rail.tsx](../../packages/studio/src/editors/assignLoop/parts/Rail.tsx) is now layout-only — no role, no click handler, no tabIndex — with both affordances as real `<button>`s inside. Pinned by [Rail.test.tsx](../../packages/studio/src/editors/assignLoop/parts/Rail.test.tsx) and [CarveGallery.test.tsx](../../packages/studio/src/editors/carve/CarveGallery.test.tsx). Kept at `unknown`: this is one widget, not the FR-006 custom-widget audit a `pass` flip requires. | Custom widgets (FR-006); axe covers subset, manual completes |
 | 4.1.3 | Status Messages | AA | unknown | — | aria-live for diagnostics/autosave (FR-008, D3 constraint) |
 
 *(4.1.1 Parsing was removed in WCAG 2.2 and is intentionally absent.)*
