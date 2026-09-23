@@ -9,8 +9,8 @@
 //
 // Centralizes what used to be pasted verbatim into each test file; see
 // MechanismGallery.test.tsx / TouchGallery.test.tsx / PhaseFGate.test.tsx for
-// the call sites. (ConfirmDialog.test.tsx and CarveGallery.test.tsx carry
-// their own pre-existing copies of this shim, outside this cleanup's scope.)
+// the call sites. (ConfirmDialog.test.tsx carries its own pre-existing copy
+// of this shim, outside this cleanup's scope.)
 export function installDialogShim(): void {
   HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {
     this.setAttribute("open", "");

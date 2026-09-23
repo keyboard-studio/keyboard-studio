@@ -130,8 +130,8 @@ const PROVEN_SCRIPT_BASES: ReadonlyArray<ProvenScriptFixture> = [
  * Carve gallery — see the retained history in git blame if the "phase B
  * complete" label seems mismatched). #1477's ground-truth sweep (live axe run
  * with this list emptied) found every entry it used to carry —
- * ConvenienceCharsStep's Continue, CarveGallery v1's info-panel toggle (dead
- * code; CarveGalleryV2 is unconditional), carve-continue, RemovalBanner's
+ * ConvenienceCharsStep's Continue, CarveGallery v1's info-panel toggle (v1
+ * since removed), carve-continue, RemovalBanner's
  * dismiss control, Rail's/GlyphCell's v1-only surfaces — already clean. The
  * remaining OSK iframe entry is now also fixed at the source
  * (packages/studio/public/osk-frame.html overrides `.kmw-spacebar-caption`'s

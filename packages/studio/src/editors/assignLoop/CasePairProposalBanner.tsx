@@ -155,8 +155,8 @@ export function CasePairProposalBanner({
  * key. The dead-key trigger is a `K_` vkey, so it routes through `keyNameFor`
  * to avoid leaking a raw `K_QUOTE` into the accessible name; the sequence
  * indicator is already a resolved display glyph (its case is meaningful and
- * must survive), so it passes through untouched — the same `K_`-prefix guard
- * `GlyphCell` uses, since `keyNameFor`/`vkeyLabel` upper-normalizes its input.
+ * must survive), so it passes through untouched — hence the `K_`-prefix
+ * guard, since `keyNameFor`/`vkeyLabel` upper-normalizes its input.
  */
 function confirmTargetLabel(proposal: CasePairProposal): string {
   switch (proposal.mechanism) {

@@ -1,6 +1,6 @@
 // Tests for carveCasePairs.ts — cased-letter pairing in carve (spec 051, US4).
 // Test surface P1..P11: specs/051-carve-orthography-trim/contracts/case-pairing.md
-// P6/P9 are gallery-level (recommendedRemovalChars / CarveGallery cascade) and are
+// P6/P9 are gallery-level (recommendedRemovalChars / carve gallery cascade) and are
 // covered elsewhere (T026-T029), not here.
 
 import { describe, it, expect } from 'vitest';

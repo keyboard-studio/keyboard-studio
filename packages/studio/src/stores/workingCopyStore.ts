@@ -1190,7 +1190,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
 
   // keepAll/restoreAll semantics: `restoreAll` is literally the same discard-
   // everything operation as `keepAll` (see the aliasing below and the
-  // interface doc comments) — CarveGallery's "Skip carving" / gate-screen
+  // interface doc comments) — the carve gallery's "Skip carving" / gate-screen
   // buttons call `keepAll()` to mean "discard any pending review, keep every
   // rule as-is", and StatusBar's "Restore all" calls `restoreAll()` to mean
   // "undo every deletion made so far". Both land on the same post-condition:

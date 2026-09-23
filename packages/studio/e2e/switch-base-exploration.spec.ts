@@ -318,9 +318,8 @@ async function buildToLevel(page: Page, level: Level, h: Harness): Promise<void>
   if (level === "L6-phaseB-done") return;
 
   // STALE since v2 went live: carve-card-<id>, raw-remove-anyway, and
-  // raw-confirm-remove are v1-only test-ids (Rail.tsx / Inspector.tsx),
-  // which CarveGalleryV2's adoption commented out in carveAdapter.tsx — v2 is
-  // now unconditionally rendered instead. None of these elements exist in the
+  // raw-confirm-remove were v1-only test-ids (the rule/node carve gallery's
+  // Rail / Inspector, since removed) — v2 is rendered instead. None of these elements exist in the
   // live app, so L7-carve-deleted will time out on `targetCard` below rather
   // than reach the carve step this level is meant to probe. L1 through L6
   // above remain reachable (carve-gallery's own test-id is shared by both
