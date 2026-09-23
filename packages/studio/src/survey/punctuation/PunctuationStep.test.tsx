@@ -55,13 +55,10 @@ function lastResult(onComplete: ReturnType<typeof vi.fn>): SurveyPhaseResult {
 
 beforeEach(() => {
   mocks.inventory = null;
-  usePhaseBDraftStore.getState().reset();
   // reset() deliberately leaves the sticky proposal decisions (`rejected`)
   // alone; clear them so a removal in one test cannot suppress a proposal in
   // the next.
   resetPhaseBDraftDecisions();
-  useSurveySessionStore.getState().reset();
-  useWorkingCopyStore.getState().reset();
 });
 
 afterEach(() => {

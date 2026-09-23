@@ -46,7 +46,6 @@ function confirmedPunctuation(): Set<string> {
 }
 
 beforeEach(() => {
-  usePhaseBDraftStore.getState().reset();
   resetPhaseBDraftDecisions();
 });
 

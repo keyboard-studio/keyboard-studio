@@ -115,13 +115,11 @@ function languageElements(kps: string): string[] {
 }
 
 beforeEach(() => {
-  useWorkingCopyStore.getState().reset();
   deliveredVfs = null;
   vi.clearAllMocks();
 });
 
 afterEach(() => {
-  useWorkingCopyStore.getState().reset();
   deliveredVfs = null;
   vi.clearAllMocks();
 });

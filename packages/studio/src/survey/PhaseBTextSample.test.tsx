@@ -113,7 +113,6 @@ beforeEach(() => {
   getSourcedExemplars.set(null);
   extractionShouldFail.set(false);
   useSurveySessionStore.getState().setDiscoveryMethod(null);
-  usePhaseBDraftStore.getState().reset();
   resetPhaseBDraftDecisions();
 });
 
@@ -121,7 +120,6 @@ afterEach(() => {
   cleanup();
   extractionShouldFail.set(false);
   useSurveySessionStore.getState().setDiscoveryMethod(null);
-  usePhaseBDraftStore.getState().reset();
   resetPhaseBDraftDecisions();
 });
 

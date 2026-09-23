@@ -13,6 +13,7 @@ import type {
   TouchKeyProvenance,
   TouchLayoutIR,
 } from "@keyboard-studio/contracts";
+import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 
 /** Build a single touch key with the given id/text and optional provenance. */
 export function key(
@@ -45,24 +46,10 @@ export function layoutWithKeys(keys: TouchKeyIR[]): TouchLayoutIR {
 
 /** Minimal KeyboardIR header + empty bodies; the touchLayout is the payload. */
 export function irWithTouch(touchLayout: TouchLayoutIR): KeyboardIR {
-  return {
-    origin: "imported",
-    header: {
-      keyboardId: "fixture",
-      name: "Fixture",
-      bcp47: ["en"],
-      copyright: "(c)",
-      version: "1.0",
-      targets: ["any"],
-      storeDirectives: [],
-    },
-    stores: [],
-    groups: [],
-    comments: [],
-    raw: [],
+  return makeTestIR({
+    header: { keyboardId: "fixture", name: "Fixture", bcp47: ["en"], copyright: "(c)", targets: ["any"] },
     touchLayout,
-    recognizedPatterns: [],
-  };
+  });
 }
 
 /**

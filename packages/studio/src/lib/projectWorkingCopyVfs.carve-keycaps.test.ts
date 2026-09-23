@@ -20,7 +20,7 @@
 
 import { describe, it, expect } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
+import { charStore, irGroup, makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import type { IRGroup, IRRule, IRStore, MechanismAssignment, StoreItem } from "@keyboard-studio/contracts";
 import { parseKmn } from "@keyboard-studio/engine";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.js";
@@ -30,11 +30,11 @@ import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.js";
 // ---------------------------------------------------------------------------
 
 function makeGroup(nodeId: string, name: string, rules: IRRule[]): IRGroup {
-  return { nodeId, name, usingKeys: true, rules, readonly: false };
+  return irGroup({ nodeId, name, rules });
 }
 
 function makeStore(nodeId: string, name: string, items: StoreItem[]): IRStore {
-  return { nodeId, name, items, isSystem: false };
+  return charStore({ nodeId, name, items });
 }
 
 /**

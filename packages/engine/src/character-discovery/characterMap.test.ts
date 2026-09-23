@@ -2,45 +2,23 @@ import { describe, it, expect } from "vitest";
 import type { IRGroup, KeyboardIR } from "@keyboard-studio/contracts";
 import type { CldrFullLoader } from "./cldr.js";
 import { buildCharacterMap, CHARACTER_MAP_BLOCKS, isCombiningMarkChar } from "./characterMap.js";
+import { irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
 
 function makeIR(bcp47: string[] = [], groups: IRGroup[] = []): KeyboardIR {
-  return {
-    origin: "imported",
-    header: {
-      keyboardId: "test",
-      name: "Test",
-      bcp47,
-      copyright: "",
-      version: "1.0",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores: [],
-    groups,
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  } as KeyboardIR;
+  return makeTestIR(groups, [], [], { header: { bcp47 } });
 }
 
 /** A minimal group/rule producing the given literal char output — used to
  * give a fixture IR a non-empty producedGlyphs() set for usedByBase tests. */
 function makeProducingGroup(chars: readonly string[]): IRGroup {
-  return {
+  return irGroup({
     nodeId: "group#produces",
-    name: "main",
-    usingKeys: true,
-    readonly: false,
-    rules: chars.map((ch, i) => ({
-      nodeId: `rule#${i}`,
-      context: [{ kind: "vkey", name: `K_${i}`, modifiers: [] }],
-      output: [{ kind: "char", value: ch }],
-    })),
-  };
+    rules: chars.map((ch, i) => vkeyRule({ nodeId: `rule#${i}`, vkey: `K_${i}`, output: ch })),
+  });
 }
 
 // Bambara-ish fixture: main exemplars include ASCII + IPA-Extensions letters

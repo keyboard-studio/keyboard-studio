@@ -4,20 +4,15 @@
 // once via describe.each and asserts its expected_outcomes. Runs via
 // `pnpm --filter @keyboard-studio/studio test` (and therefore `pnpm test`), per FR-011.
 
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { parseJourneyFixture } from "./journeyFixture.ts";
 import { replayJourney } from "./journey-runner.ts";
-import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import {
   JOURNEY_CORPUS_RAW,
   loadJourney,
   loadJourneyCorpus,
   type JourneyCorpusName,
 } from "./__fixtures__/journeyCorpus.ts";
-
-afterEach(() => {
-  useWorkingCopyStore.getState().reset();
-});
 
 describe("journeyFixture parsing", () => {
   it("parses every corpus fixture without throwing, with unique journey_ids", () => {

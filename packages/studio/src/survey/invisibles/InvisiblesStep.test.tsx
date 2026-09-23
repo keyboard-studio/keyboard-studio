@@ -16,7 +16,6 @@ import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { InvisiblesStep, writingDirectionFrom } from "./InvisiblesStep.tsx";
 import { invisibleCandidatesFor } from "./invisibleCandidates.ts";
 import { usePhaseBDraftStore, resetPhaseBDraftDecisions } from "../../stores/phaseBDraftStore.ts";
-import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { phaseCConfirmedInventory } from "../phaseCInventory.ts";
 
@@ -34,10 +33,7 @@ function markRtl(): void {
 }
 
 beforeEach(() => {
-  usePhaseBDraftStore.getState().reset();
   resetPhaseBDraftDecisions();
-  useSurveySessionStore.getState().reset();
-  useWorkingCopyStore.getState().reset();
 });
 
 afterEach(() => {

@@ -20,28 +20,15 @@ import {
 import type { TouchSuggestPolicy } from "./defaults.ts";
 import { touchSuggest } from "./touchSuggest.ts";
 import type { KeyboardIR, TouchKeyIR, TouchLayoutIR } from "@keyboard-studio/contracts";
+import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 
 // A minimal physical IR (Case A — no shipped touch layout). The exact
 // derivation is the engine's concern; the tests assert the provenance LAYER
 // touchSuggest adds on top.
 function physicalIR(): KeyboardIR {
-  return {
-    origin: "imported",
-    header: {
-      keyboardId: "ts",
-      name: "TS",
-      bcp47: ["en"],
-      copyright: "(c)",
-      version: "1.0",
-      targets: ["any"],
-      storeDirectives: [],
-    },
-    stores: [],
-    groups: [],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  };
+  return makeTestIR({
+    header: { keyboardId: "ts", name: "TS", bcp47: ["en"], copyright: "(c)", targets: ["any"] },
+  });
 }
 
 function allKeys(layout: TouchLayoutIR): TouchKeyIR[] {

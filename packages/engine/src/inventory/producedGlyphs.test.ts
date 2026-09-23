@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { producedGlyphs } from "./producedGlyphs.js";
-import { makeTestIR, charItems } from "@keyboard-studio/contracts/fixtures";
+import { charStore, irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import type { IRGroup, IRRule, IRStore } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
@@ -8,24 +8,15 @@ import type { IRGroup, IRRule, IRStore } from "@keyboard-studio/contracts";
 // ---------------------------------------------------------------------------
 
 function makeGroup(rules: IRRule[], name = "main", usingKeys = true): IRGroup {
-  return { nodeId: `group#${name}`, name, usingKeys, readonly: false, rules };
+  return irGroup({ rules, name, usingKeys });
 }
 
 function makeRule(output: IRRule["output"]): IRRule {
-  return {
-    nodeId: `rule#${Math.random().toString(36).slice(2)}`,
-    context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
-    output,
-  };
+  return vkeyRule({ output });
 }
 
 function makeStore(name: string, chars: string): IRStore {
-  return {
-    nodeId: `store#${name}`,
-    name,
-    items: charItems(chars),
-    isSystem: false,
-  };
+  return charStore({ name, chars });
 }
 
 // ---------------------------------------------------------------------------

@@ -11,7 +11,7 @@
 // the compile pipeline, etc.) — those are exercised by StudioShell.test.tsx's
 // full-walk suite instead.
 
-import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { screen, cleanup, act } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { StepHost } from "./StepHost.tsx";
@@ -72,10 +72,6 @@ const fakeReducerDeps: ReducerDeps = {
 
 afterEach(() => {
   cleanup();
-});
-
-beforeEach(() => {
-  useSurveySessionStore.getState().reset();
 });
 
 describe("StepHost onBack gating (F7 defect 2)", () => {

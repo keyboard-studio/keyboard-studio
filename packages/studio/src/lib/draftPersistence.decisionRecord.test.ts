@@ -24,8 +24,6 @@ import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { BaseKeyboard, DecisionRecord, KeyboardIR } from "@keyboard-studio/contracts";
 import { makeEmptyDecisionRecord } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import {
   useDecisionLogStore,
   resetDecisionEntryIds,
@@ -44,29 +42,14 @@ import {
   loadDraft,
   type DurableDraft,
 } from "./draftPersistence.ts";
+import { makeScaffoldedIR } from "../test/irFixtures.ts";
 
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
 
 function makeMinimalIr(): KeyboardIR {
-  return {
-    origin: "scaffolded" as const,
-    header: {
-      keyboardId: "hausa_std",
-      name: "Hausa",
-      bcp47: [],
-      copyright: "",
-      version: "10.0",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores: [],
-    groups: [],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  } as unknown as KeyboardIR;
+  return makeScaffoldedIR({ header: { keyboardId: "hausa_std", name: "Hausa" } });
 }
 
 function instantiate(projectId: string): void {
@@ -105,10 +88,6 @@ const PROJECT = "hausa_std";
 
 beforeEach(() => {
   localStorage.clear();
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-  usePhaseBDraftStore.getState().reset();
-  useDecisionLogStore.getState().reset();
   resetDecisionEntryIds();
 });
 
