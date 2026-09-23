@@ -100,20 +100,9 @@ describe("editorMutate — ADD_GALLERY_WRITES surface", () => {
   });
 });
 
-describe("projectWorkingCopyVfs — add-gallery flag parity (M6/SC-008)", () => {
-  it("emits byte-identical .kmn with the seam on vs off", () => {
-    vi.stubEnv("VITE_KM_MUTATE_SEAM", "");
-    const off = projectKmn();
-
-    vi.stubEnv("VITE_KM_MUTATE_SEAM", "1");
-    const on = projectKmn();
-
-    expect(typeof off).toBe("string");
-    expect(on).toBe(off);
-    // The assignment actually injected (the deadkey trigger rule is present).
-    expect(on).toMatch(/deadkey|dk\(/);
-  });
-
+// The on-vs-off emit parity for an add-gallery assignment runs in the scenario
+// table in projectWorkingCopyVfs.flagParity.test.ts.
+describe("projectWorkingCopyVfs — add-gallery seam derivation (M3)", () => {
   it("the seam derives a canonical assignment IR scoped to groups/stores", () => {
     // Drive the helper directly to prove the derived IR carries the injected
     // mechanism while leaving the base header untouched.

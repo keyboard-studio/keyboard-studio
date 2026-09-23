@@ -1,10 +1,14 @@
-// T011 / spec-014 flag-parity — the carve IR projection produces a BYTE-IDENTICAL
-// emitted .kmn whether the mutate seam flag is on or off.
+// T011 / spec-014 flag-parity — the working-copy projection produces a
+// BYTE-IDENTICAL emitted .kmn and .keyman-touch-layout side-car whether the
+// mutate seam flag is on or off.
 //
 // Flag-off runs today's path (applyStoreSlotRemovals + applyCarveToVfs's internal
-// filter). Flag-on routes the carve IR derivation through the single mutate()
-// write seam (applyCarveMutate → applyMutatePatch / CARVE_WRITES). Both must emit
-// identical artifacts for the same overlay (M6/SC-008).
+// filter; text-based mechanism injection). Flag-on also routes the carve and
+// add-gallery IR derivations through the single mutate() write seam
+// (applyCarveMutate / applyAddGalleryMutate → applyMutatePatch). Both must emit
+// identical artifacts for the same edits (M6/SC-008). One scenario table covers
+// carve, add-gallery (spec 014 T017), touch inject and the whole spine (spec 021
+// T010-T012); each row also asserts its edit really changed the output.
 //
 // This file does NOT mock @keyboard-studio/engine — it exercises the real emit
 // pipeline so the comparison is on actual emitted bytes.
@@ -19,7 +23,7 @@ import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR, latinDeadkeyAcuteSingle } from "@keyboard-studio/contracts/fixtures";
-import { runAllChecks } from "@keyboard-studio/engine";
+import { parseKmn, runAllChecks } from "@keyboard-studio/engine";
 import type {
   IRGroup,
   IRRule,
@@ -88,77 +92,234 @@ function makeFixtureIr(): KeyboardIR {
   return makeTestIR([main, second], [outStore, inStore, extra]);
 }
 
-function makeVfs(keyboardId: string) {
+function makeVfs(keyboardId: string, kmn = "c stub\n") {
   return createVirtualFS([
-    { path: `source/${keyboardId}.kmn`, content: "c stub\n", isBinary: false },
+    { path: `source/${keyboardId}.kmn`, content: kmn, isBinary: false },
   ]);
 }
 
-/** Run the real projection for one overlay and return the emitted .kmn content. */
-function projectKmn(
-  overlay: { deletedNodeIds?: Set<string>; deletedItemIds?: Set<string> },
-): string {
-  const vfs = makeVfs("kb");
+/** A representative physical mechanism assignment (the acute-deadkey gallery item). */
+function makeAssignment(): MechanismAssignment {
+  return {
+    scope: "keyboard-default",
+    target: "",
+    modality: "physical",
+    mechanisms: [
+      {
+        patternId: latinDeadkeyAcuteSingle.id,
+        slotValues: {
+          triggerKey: "K_QUOTE",
+          accentChar: "\u0301",
+          baseLetters: "aeiouAEIOU",
+          accentedForms: "\u00e1\u00e9\u00ed\u00f3\u00fa\u00c1\u00c9\u00cd\u00d3\u00da",
+        },
+      },
+    ],
+  };
+}
+
+function patternResolver(id: string): Pattern | undefined {
+  return id === latinDeadkeyAcuteSingle.id ? latinDeadkeyAcuteSingle : undefined;
+}
+
+/** A minimal, pretty-printed Phase E touch layout JSON (one phone/default key). */
+const TOUCH_JSON =
+  JSON.stringify(
+    {
+      phone: {
+        font: "Tahoma",
+        layer: [{ id: "default", row: [{ id: 1, key: [{ id: "K_A", text: "a" }] }] }],
+      },
+    },
+    null,
+    2,
+  ) + "\n";
+
+/** A bare scaffold: the add-gallery seam parses the injected .kmn back to IR. */
+const SCAFFOLD_KMN =
+  "c Auto-generated scaffold\n" + "store(&VERSION) '10.0'\n" + "begin Unicode > use(main)\n";
+
+interface Projected {
+  kmn: string;
+  /** The .keyman-touch-layout side-car text; undefined when no layout was injected. */
+  touch: string | undefined;
+}
+
+interface Scenario {
+  name: string;
+  deletedNodeIds?: readonly string[];
+  deletedItemIds?: readonly string[];
+  assignments?: readonly MechanismAssignment[];
+  touchLayoutJson?: string;
+  /** Start from the bare scaffold (parsed to IR) instead of the fixture keyboard. */
+  scaffoldBase?: boolean;
+  /** Non-vacuity: the edit really changed (or deliberately did not change) the output. */
+  effect: (out: Projected) => void;
+}
+
+/** Run the real projection for one scenario and one flag state. */
+function project(seamOn: boolean, sc: Omit<Scenario, "name" | "effect">): Projected {
+  vi.stubEnv("VITE_KM_MUTATE_SEAM", seamOn ? "1" : "");
+  const vfs = sc.scaffoldBase === true ? makeVfs("kb", SCAFFOLD_KMN) : makeVfs("kb");
+  const assignments = [...(sc.assignments ?? [])];
   projectWorkingCopyVfs({
     vfs,
     keyboardId: "kb",
-    baseIr: makeFixtureIr(),
-    deletedNodeIds: overlay.deletedNodeIds ?? new Set(),
-    deletedItemIds: overlay.deletedItemIds ?? new Set(),
-    assignments: [],
-    getPattern: () => undefined,
+    baseIr: sc.scaffoldBase === true ? parseKmn(SCAFFOLD_KMN, "kb").ir : makeFixtureIr(),
+    deletedNodeIds: new Set(sc.deletedNodeIds ?? []),
+    deletedItemIds: new Set(sc.deletedItemIds ?? []),
+    assignments,
+    getPattern: assignments.length > 0 ? patternResolver : () => undefined,
+    ...(sc.touchLayoutJson !== undefined ? { touchLayoutJson: sc.touchLayoutJson } : {}),
     identity: null,
   });
-  return vfs.get("source/kb.kmn")?.content as string;
+  return {
+    kmn: vfs.get("source/kb.kmn")?.content as string,
+    touch: vfs.get("source/kb.keyman-touch-layout")?.content as string | undefined,
+  };
 }
 
 afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-const SCENARIOS: Array<{
-  name: string;
-  overlay: { deletedNodeIds?: Set<string>; deletedItemIds?: Set<string> };
-}> = [
-  { name: "no edits (no re-emit)", overlay: {} },
-  { name: "whole-group deletion", overlay: { deletedNodeIds: new Set(["group#second"]) } },
-  { name: "single-rule deletion", overlay: { deletedNodeIds: new Set(["rule#a"]) } },
-  { name: "whole-store deletion", overlay: { deletedNodeIds: new Set(["store#extra"]) } },
-  { name: "store-slot nul rewrite", overlay: { deletedItemIds: new Set(["store#dkt#1"]) } },
+/** The whole spine in one run: carve (whole-node + store-slot) + add-gallery + touch inject. */
+const FULL_SPINE: Omit<Scenario, "name" | "effect"> = {
+  deletedNodeIds: ["group#second", "store#extra"],
+  deletedItemIds: ["store#dkt#1"],
+  assignments: [makeAssignment()],
+  touchLayoutJson: TOUCH_JSON,
+};
+
+const SCENARIOS: readonly Scenario[] = [
+  {
+    name: "no edits (no re-emit)",
+    effect: (out) => {
+      expect(out.kmn).toBe("c stub\n");
+      expect(out.touch).toBeUndefined();
+    },
+  },
+  {
+    name: "whole-group deletion",
+    deletedNodeIds: ["group#second"],
+    effect: (out) => expect(out.kmn).not.toMatch(/group\(second\)/),
+  },
+  {
+    name: "single-rule deletion",
+    deletedNodeIds: ["rule#a"],
+    effect: (out) => {
+      expect(out.kmn).not.toContain("[K_A]");
+      expect(out.kmn).toContain("[K_B]");
+    },
+  },
+  {
+    name: "whole-store deletion",
+    deletedNodeIds: ["store#extra"],
+    effect: (out) => expect(out.kmn).not.toMatch(/store\(extraX\)/),
+  },
+  {
+    name: "whole-group + whole-store deletion",
+    deletedNodeIds: ["group#second", "store#extra"],
+    effect: (out) => {
+      expect(out.kmn).not.toMatch(/group\(second\)/);
+      expect(out.kmn).not.toMatch(/store\(extraX\)/);
+    },
+  },
+  {
+    name: "store-slot nul rewrite",
+    deletedItemIds: ["store#dkt#1"],
+    effect: (out) => expect(out.kmn).toContain("store(dktX) '\u00c0Z'"),
+  },
   {
     name: "slot + whole-rule combined",
-    overlay: {
-      deletedNodeIds: new Set(["rule#b"]),
-      deletedItemIds: new Set(["store#dkt#0"]),
+    deletedNodeIds: ["rule#b"],
+    deletedItemIds: ["store#dkt#0"],
+    effect: (out) => {
+      expect(out.kmn).not.toContain("[K_B]");
+      expect(out.kmn).toContain("store(dktX) '\u03b5Z'");
+    },
+  },
+  {
+    name: "whole-group + slot combined",
+    deletedNodeIds: ["group#second"],
+    deletedItemIds: ["store#dkt#0"],
+    effect: (out) => {
+      expect(out.kmn).not.toMatch(/group\(second\)/);
+      expect(out.kmn).toContain("store(dktX) '\u03b5Z'");
     },
   },
   {
     name: "bare rule item id (whole-node path)",
-    overlay: { deletedItemIds: new Set(["rule#c"]) },
+    deletedItemIds: ["rule#c"],
+    effect: (out) => {
+      expect(out.kmn).toMatch(/group\(second\)/);
+      expect(out.kmn).not.toContain("[K_C]");
+    },
   },
   {
-    // #523 — a drop-class store chip (store#extra/extraX is unreferenced by
-    // any rule, so classifyStoreSlotEdit returns "drop", not "nul-fill").
-    // Inline fixture only (no golden file), per the flagParity CRLF-golden
-    // caveat: this scenario is proved through the SCENARIOS loop, not a
-    // committed golden artifact.
+    // #523 — store#extra/extraX is unreferenced by any rule, so its chip is a
+    // drop-class edit (classifyStoreSlotEdit returns "drop", not "nul-fill").
     name: "store-chip drop-class rewrite (unreferenced store)",
-    overlay: { deletedItemIds: new Set(["store#extra#0"]) },
+    deletedItemIds: ["store#extra#0"],
+    effect: (out) => {
+      expect(out.kmn).toMatch(/store\(extraX\)/);
+      expect(out.kmn).not.toContain("'Q'");
+    },
+  },
+  {
+    name: "physical mechanism assignment (add-gallery), no touch layout",
+    assignments: [makeAssignment()],
+    effect: (out) => {
+      expect(out.kmn).toMatch(/\[K_QUOTE\] > deadkey\(accent\)/);
+      // No layout injected: no side-car file in either flag state.
+      expect(out.touch).toBeUndefined();
+    },
+  },
+  {
+    name: "physical mechanism assignment over a bare scaffold",
+    assignments: [makeAssignment()],
+    scaffoldBase: true,
+    effect: (out) => expect(out.kmn).toMatch(/\[K_QUOTE\] > deadkey\(accent\)/),
+  },
+  {
+    name: "carve + physical assignment",
+    deletedNodeIds: ["group#second", "store#extra"],
+    deletedItemIds: ["store#dkt#1"],
+    assignments: [makeAssignment()],
+    effect: (out) => {
+      expect(out.kmn).not.toMatch(/group\(second\)/);
+      expect(out.kmn).toMatch(/\[K_QUOTE\] > deadkey\(accent\)/);
+    },
+  },
+  {
+    name: "physical assignment + touch layout inject",
+    assignments: [makeAssignment()],
+    touchLayoutJson: TOUCH_JSON,
+    // The add-gallery seam never re-emits touch, so the injected layout returns verbatim.
+    effect: (out) => expect(out.touch).toBe(TOUCH_JSON),
+  },
+  {
+    name: "full spine: carve + add-gallery + touch inject",
+    ...FULL_SPINE,
+    effect: (out) => {
+      expect(out.kmn).not.toMatch(/group\(second\)/);
+      expect(out.kmn).not.toMatch(/store\(extraX\)/);
+      expect(out.kmn).toMatch(/store\(dktX\) '\u00c0Z'/);
+      expect(out.kmn).toMatch(/\[K_QUOTE\] > deadkey\(accent\)/);
+      expect(out.touch).toBe(TOUCH_JSON);
+    },
   },
 ];
 
-describe("projectWorkingCopyVfs — carve flag parity (flag-on === flag-off emit)", () => {
-  for (const { name, overlay } of SCENARIOS) {
-    it(`emits byte-identical .kmn with the seam on vs off — ${name}`, () => {
-      vi.stubEnv("VITE_KM_MUTATE_SEAM", "");
-      const off = projectKmn(overlay);
-
-      vi.stubEnv("VITE_KM_MUTATE_SEAM", "1");
-      const on = projectKmn(overlay);
-
-      expect(on).toBe(off);
-    });
-  }
+describe("projectWorkingCopyVfs — seam flag parity (flag-on === flag-off emit)", () => {
+  it.each(SCENARIOS)("emits byte-identical .kmn and touch side-car with the seam on vs off — $name", (sc) => {
+    const off = project(false, sc);
+    const on = project(true, sc);
+    expect(typeof off.kmn).toBe("string");
+    expect(on.kmn).toBe(off.kmn);
+    expect(on.touch).toBe(off.touch);
+    sc.effect(off);
+  });
 
   it("preserves the entry-group safety gate under the seam (deleting the entry group warns + skips, no re-emit)", () => {
     // group#main is the entry group (first non-readonly). Deleting it must warn
@@ -202,19 +363,14 @@ describe("projectWorkingCopyVfs — carve flag parity (flag-on === flag-off emit
 // ===========================================================================
 // spec-014 Phase 5 step 1 — the FULL-SPINE flag-on proof.
 //
-// The per-scenario block above proves carve emit parity in isolation. This
-// block drives a single representative keyboard through the WHOLE projection
-// spine in one run — carve (whole-node + store-slot) + add-gallery (a real
-// physical mechanism assignment) + an injected Phase E touch layout — and
-// pins the flag-on === flag-off guarantee for the surfaces that MUST match:
+// The "full spine" row above drives a single representative keyboard through
+// the WHOLE projection spine in one run — carve (whole-node + store-slot) +
+// add-gallery (a real physical mechanism assignment) + an injected Phase E
+// touch layout — and pins flag-on === flag-off for the .kmn and for the
+// .keyman-touch-layout text artifact (the add-gallery seam intentionally does
+// NOT re-emit touch, so the injected layout comes back verbatim).
 //
-//   - the emitted .kmn (carve filter + mechanism injection), and
-//   - the .keyman-touch-layout text artifact: the add-gallery seam
-//     intentionally does NOT re-emit touch (keycap/touch projection is
-//     deferred), so the injected layout must come back byte-identical to the
-//     flag-off path.
-//
-// Both artifacts are also asserted against committed golden fixtures
+// This block asserts both artifacts against committed golden fixtures
 // (__fixtures__/flagParity/fullSpine.*) so a future regression in EITHER flag
 // state — not just a flag-on/flag-off drift — is caught.
 //
@@ -232,103 +388,11 @@ function golden(name: string): string {
   return readFileSync(resolve(FIXTURES, name), "utf8");
 }
 
-/** A representative physical mechanism assignment (the acute-deadkey gallery item). */
-function makeFullSpineAssignment(): MechanismAssignment {
-  return {
-    scope: "keyboard-default",
-    target: "",
-    modality: "physical",
-    mechanisms: [
-      {
-        patternId: latinDeadkeyAcuteSingle.id,
-        slotValues: {
-          triggerKey: "K_QUOTE",
-          accentChar: "́",
-          baseLetters: "aeiouAEIOU",
-          accentedForms: "áéíóúÁÉÍÓÚ",
-        },
-      },
-    ],
-  };
-}
-
-function fullSpineResolver(id: string): Pattern | undefined {
-  return id === latinDeadkeyAcuteSingle.id ? latinDeadkeyAcuteSingle : undefined;
-}
-
-/** A minimal, pretty-printed Phase E touch layout JSON (one phone/default key). */
-const FULL_SPINE_TOUCH_JSON =
-  JSON.stringify(
-    {
-      phone: {
-        font: "Tahoma",
-        layer: [{ id: "default", row: [{ id: 1, key: [{ id: "K_A", text: "a" }] }] }],
-      },
-    },
-    null,
-    2,
-  ) + "\n";
-
-/**
- * Run the WHOLE projection spine for one flag state and return both projected
- * artifacts. Carve drops a non-entry group + a whole store + nuls one output
- * slot of the parallel-store deadkey; add-gallery injects the acute mechanism;
- * the Phase E touch layout is injected at step 0.
- */
-function projectFullSpine(seamOn: boolean): { kmn: string; touch: string } {
-  vi.stubEnv("VITE_KM_MUTATE_SEAM", seamOn ? "1" : "");
-  const vfs = makeVfs("kb");
-  projectWorkingCopyVfs({
-    vfs,
-    keyboardId: "kb",
-    baseIr: makeFixtureIr(),
-    // Carve: whole-group + whole-store deletion, plus a store-slot nul rewrite
-    // (slot 1 of the dktX output store referenced by the parallel deadkey rule).
-    deletedNodeIds: new Set(["group#second", "store#extra"]),
-    deletedItemIds: new Set(["store#dkt#1"]),
-    // Add-gallery: a real physical mechanism assignment.
-    assignments: [makeFullSpineAssignment()],
-    getPattern: fullSpineResolver,
-    // Phase E touch layout injected at step 0.
-    touchLayoutJson: FULL_SPINE_TOUCH_JSON,
-    identity: null,
-  });
-  return {
-    kmn: vfs.get("source/kb.kmn")?.content as string,
-    touch: vfs.get("source/kb.keyman-touch-layout")?.content as string,
-  };
+function projectFullSpine(seamOn: boolean): Projected {
+  return project(seamOn, FULL_SPINE);
 }
 
 describe("projectWorkingCopyVfs — FULL-SPINE flag parity (carve + add-gallery + touch inject)", () => {
-  it("emits a byte-identical .kmn with the seam on vs off across the whole spine", () => {
-    const off = projectFullSpine(false);
-    const on = projectFullSpine(true);
-
-    expect(typeof off.kmn).toBe("string");
-    expect(on.kmn).toBe(off.kmn);
-
-    // The spine actually took effect (not a vacuous pass):
-    //   - carve whole-node deletions removed the second group + extra store,
-    //   - the store-slot deletion nul'd slot 1 of the dktX output store,
-    //   - the add-gallery mechanism injected the acute deadkey trigger.
-    expect(on.kmn).not.toMatch(/group\(second\)/);
-    expect(on.kmn).not.toMatch(/store\(extraX\)/);
-    expect(on.kmn).toMatch(/store\(dktX\) 'ÀZ'/);
-    expect(on.kmn).toMatch(/\[K_QUOTE\] > deadkey\(accent\)/);
-  });
-
-  it("emits a byte-identical .keyman-touch-layout with the seam on vs off (add-gallery does NOT re-emit touch)", () => {
-    const off = projectFullSpine(false);
-    const on = projectFullSpine(true);
-
-    expect(typeof off.touch).toBe("string");
-    // The add-gallery seam derives the assignment IR but never re-emits the
-    // touch artifact, so the injected Phase E layout is returned verbatim in
-    // BOTH flag states.
-    expect(on.touch).toBe(off.touch);
-    expect(on.touch).toBe(FULL_SPINE_TOUCH_JSON);
-  });
-
   it("matches the committed golden artifacts in BOTH flag states (regression pin)", () => {
     const goldenKmn = golden("fullSpine.kmn");
     const goldenTouch = golden("fullSpine.keyman-touch-layout");
@@ -369,7 +433,7 @@ describe("projectWorkingCopyVfs — FULL-SPINE flag parity (carve + add-gallery 
   it("touch side-car golden is the verbatim injected artifact, NOT emitTouchLayout output", () => {
     const goldenTouch = golden("fullSpine.keyman-touch-layout");
     // It IS the injected Phase E JSON (pretty-printed, font-first, no defaultHint).
-    expect(goldenTouch).toBe(FULL_SPINE_TOUCH_JSON);
+    expect(goldenTouch).toBe(TOUCH_JSON);
     // It is NOT the compact emitTouchLayout shape (which would carry defaultHint).
     expect(goldenTouch).not.toContain("defaultHint");
   });
