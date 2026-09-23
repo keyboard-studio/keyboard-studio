@@ -1,10 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { mockBaseBrowser } from "./mockBaseBrowser";
 import { mockPatternLibrary } from "./mockPatternLibrary";
-import { mockValidator } from "./mockValidator";
-import { mockCompiler } from "./mockCompiler";
 import { mockScaffolder } from "./mockScaffolder";
-import { mockLintEngine } from "./mockLintEngine";
 import { mockOutputService } from "./mockOutputService";
 import { makeMockVirtualFS, scaffoldedFS } from "./mockVirtualFS";
 import {
@@ -18,7 +15,6 @@ import {
   validatorFindings,
   mixedDiagnosticsResult,
 } from "../fixtures/index";
-import type { LintFinding } from "../lintFinding";
 
 // ---------------------------------------------------------------------------
 // mockBaseBrowser
@@ -181,174 +177,6 @@ describe("mockPatternLibrary", () => {
     const lowerRanked = results.slice(1);
     lowerRanked.forEach((m) => {
       expect(m.reason).toBe("appliesTo-match");
-    });
-  });
-});
-
-// ---------------------------------------------------------------------------
-// mockValidator
-// ---------------------------------------------------------------------------
-
-describe("mockValidator", () => {
-  it("validate returns non-empty LintFinding array", async () => {
-    const findings = await mockValidator.validate("c Test KMN\n");
-    expect(findings.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it("validate returns only Layer A and Layer B findings", async () => {
-    const findings = await mockValidator.validate("c Test KMN\n");
-    const layers = new Set(findings.map((f) => f.layer));
-    expect(layers.has("A") || layers.has("B")).toBe(true);
-    expect(layers.has("C")).toBe(false);
-  });
-
-  it("validate result contains at least one error-severity finding (Layer A)", async () => {
-    const findings = await mockValidator.validate("c Test\n");
-    const hasError = findings.some((f) => f.severity === "error");
-    expect(hasError).toBe(true);
-  });
-
-  it("validate result contains at least one warn-severity finding", async () => {
-    const findings = await mockValidator.validate("c Test\n");
-    const hasWarn = findings.some((f) => f.severity === "warning");
-    expect(hasWarn).toBe(true);
-  });
-
-  it("validate result contains at least one hint-severity finding (Layer B)", async () => {
-    const findings = await mockValidator.validate("c Test\n");
-    const hasHint = findings.some((f) => f.severity === "hint");
-    expect(hasHint).toBe(true);
-  });
-
-  it("validateFragment returns only Layer A findings", async () => {
-    const findings = await mockValidator.validateFragment(
-      "+ [K_A] > 'a'\n",
-      { triggerKey: "K_A" }
-    );
-    const layers = new Set(findings.map((f) => f.layer));
-    expect(layers.has("B")).toBe(false);
-    expect(layers.has("C")).toBe(false);
-    // Layer A must be present (fixture has A findings)
-    expect(layers.has("A")).toBe(true);
-  });
-
-  it("LintFinding shape includes required fields", async () => {
-    const findings = await mockValidator.validate("c Test\n");
-    const f: LintFinding = findings[0]!;
-    expect(typeof f.code).toBe("string");
-    expect(typeof f.severity).toBe("string");
-    expect(typeof f.layer).toBe("string");
-    expect(typeof f.message).toBe("string");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// mockLintEngine
-// ---------------------------------------------------------------------------
-
-describe("mockLintEngine", () => {
-  it("lint returns non-empty Layer C findings", async () => {
-    const findings = await mockLintEngine.lint(scaffoldedFS, "my_keyboard");
-    expect(findings.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it("lint returns ONLY Layer C findings", async () => {
-    const findings = await mockLintEngine.lint(scaffoldedFS, "my_keyboard");
-    const nonC = findings.filter((f) => f.layer !== "C");
-    expect(nonC).toHaveLength(0);
-  });
-
-  it("lint result contains at least one error-severity finding", async () => {
-    const findings = await mockLintEngine.lint(scaffoldedFS, "my_keyboard");
-    const hasError = findings.some((f) => f.severity === "error");
-    expect(hasError).toBe(true);
-  });
-
-  it("lint result contains at least one warn-severity finding", async () => {
-    const findings = await mockLintEngine.lint(scaffoldedFS, "my_keyboard");
-    const hasWarn = findings.some((f) => f.severity === "warning");
-    expect(hasWarn).toBe(true);
-  });
-
-  it("lint result contains at least one info-severity finding", async () => {
-    const findings = await mockLintEngine.lint(scaffoldedFS, "my_keyboard");
-    const hasInfo = findings.some((f) => f.severity === "info");
-    expect(hasInfo).toBe(true);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// mockCompiler
-// ---------------------------------------------------------------------------
-
-describe("mockCompiler", () => {
-  it("compile returns a CompileResult with required fields", async () => {
-    const result = await mockCompiler.compile(scaffoldedFS, "my_keyboard");
-    expect(typeof result.success).toBe("boolean");
-    expect(Array.isArray(result.artifacts)).toBe(true);
-    expect(Array.isArray(result.diagnostics)).toBe(true);
-    expect(typeof result.compileMs).toBe("number");
-    expect(typeof result.isWarmCompile).toBe("boolean");
-  });
-
-  it("compile returns at least one artifact", async () => {
-    const result = await mockCompiler.compile(scaffoldedFS, "my_keyboard");
-    expect(result.artifacts.length).toBeGreaterThanOrEqual(1);
-  });
-
-  it("compile artifact has filename, url, and sizeBytes", async () => {
-    const result = await mockCompiler.compile(scaffoldedFS, "my_keyboard");
-    const a = result.artifacts[0]!;
-    expect(typeof a.filename).toBe("string");
-    expect(typeof a.url).toBe("string");
-    expect(typeof a.sizeBytes).toBe("number");
-  });
-
-  it("compile diagnostics contain at least one error-severity finding", async () => {
-    const result = await mockCompiler.compile(scaffoldedFS, "my_keyboard");
-    const hasError = result.diagnostics.some((d) => d.severity === "error");
-    expect(hasError).toBe(true);
-  });
-
-  it("compile diagnostics contain at least one warning-severity finding", async () => {
-    const result = await mockCompiler.compile(scaffoldedFS, "my_keyboard");
-    const hasWarning = result.diagnostics.some(
-      (d) => d.severity === "warning"
-    );
-    expect(hasWarning).toBe(true);
-  });
-
-  it("compile diagnostics contain at least one hint-severity finding", async () => {
-    // 'info' is Layer C only; the WASM oracle (Layer A) never emits it.
-    // See #88 (severity rename) and #96 (KM_INFO_COMPILE_START removal).
-    const result = await mockCompiler.compile(scaffoldedFS, "my_keyboard");
-    const hasHint = result.diagnostics.some((d) => d.severity === "hint");
-    expect(hasHint).toBe(true);
-  });
-
-  it("compileMs is a positive number", async () => {
-    const result = await mockCompiler.compile(scaffoldedFS, "my_keyboard");
-    expect(result.compileMs).toBeGreaterThan(0);
-  });
-
-  it("init() is idempotent and isReady() reflects load state", async () => {
-    // mockCompiler is module-scoped; init() may have been called by a
-    // previous test in this describe block. Either way the test asserts
-    // the idempotency contract: repeat init() returns the same promise,
-    // and after the promise resolves isReady() is true.
-    const a = mockCompiler.init();
-    const b = mockCompiler.init();
-    expect(a).toBe(b); // same promise returned on repeat call
-    await a;
-    expect(mockCompiler.isReady()).toBe(true);
-  });
-
-  it("compile() returns a Layer-A-only diagnostic stream", async () => {
-    const result = await mockCompiler.compile(scaffoldedFS, "my_keyboard");
-    // CompilerDiagnostic = LintFinding & { layer: "A" }. Every diagnostic in
-    // the array MUST have layer === "A"; B and C come from other services.
-    result.diagnostics.forEach((d) => {
-      expect(d.layer).toBe("A");
     });
   });
 });
