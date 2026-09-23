@@ -186,6 +186,17 @@ jobs:
       - name: Test (kbgen — outside the pnpm workspace)
         run: pnpm run test:kbgen
 
+      # km-triage-app (the km-triage GitHub App's audit/cache/manifest/sweep
+      # helpers) tests with node:test, not vitest, and nothing ran them.
+      - name: Test (km-triage-app — outside the pnpm workspace)
+        run: pnpm run test:km-triage
+
+      # supportability-scanner's own vitest suite — supportability-scan.yml
+      # only runs `scan.ts --check`, so the scanner's unit tests (including
+      # the provenance fix) ran nowhere.
+      - name: Test (supportability-scanner — outside the pnpm workspace)
+        run: pnpm run test:supportability-scanner
+
       # Non-blocking: warns in CI log and opens GitHub Issues for any spec
       # sections whose content changed since the last acknowledgement.
       # Never fails the build — drift is a backlog item, not a blocker.
