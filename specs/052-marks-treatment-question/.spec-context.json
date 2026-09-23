@@ -785,7 +785,7 @@
         "T020"
       ],
       "tests": [
-        "packages/engine/src/scaffolder/scaffoldTouchLayout.test.ts::spec 052 FR-014"
+        "packages/engine/src/scaffolder/__tests__/scaffoldTouchLayout.longpress.test.ts::spec 052 FR-014"
       ]
     },
     "FR-015": {
