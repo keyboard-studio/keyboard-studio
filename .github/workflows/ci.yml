@@ -195,3 +195,81 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SPEC_TRACE_REPO: ${{ github.repository }}
+
+  # Playwright e2e — the lane that carries the spec 034 authoring-walk proof
+  # (MVP gaps A/B assert in copy-edit.spec.ts). NON-BLOCKING while it beds in:
+  # `continue-on-error` keeps a red run from failing the workflow, and this
+  # job is not a required check. Starts with boot-smoke + copy-edit only;
+  # widen the spec list (or drop the filter) as specs prove stable in CI, and
+  # make it blocking once it is.
+  e2e:
+    name: e2e (Playwright, non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 60
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Same pinned corpus as the build job: the dev server's local-keyboards
+      # plugin (vite.config.ts, KEYBOARDS_REPO) serves the catalog and the
+      # base keyboards the walks open from it.
+      - name: Checkout keyboard-studio/keyboards corpus (pinned, release/ only, shallow)
+        uses: actions/checkout@v4
+        with:
+          repository: keyboard-studio/keyboards
+          ref: ${{ env.KEYBOARDS_CORPUS_SHA }}
+          path: .keyboards
+          fetch-depth: 1
+          sparse-checkout: release
+          sparse-checkout-cone-mode: true
+          persist-credentials: false
+
+      - name: Place corpus at ../keyboards
+        run: |
+          corpus="$(dirname "$GITHUB_WORKSPACE")/keyboards"
+          mv "$GITHUB_WORKSPACE/.keyboards" "$corpus"
+          echo "KEYBOARDS_REPO=$corpus" >> "$GITHUB_ENV"
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Codegen (charnames — offline, build input)
+        run: pnpm run codegen-charnames
+
+      # The dev server (playwright.config.ts webServer: `pnpm dev` = vite)
+      # imports the workspace packages through their built dist/. Build only
+      # studio's dependencies (`studio^...`) — studio itself is served from
+      # source, and its production build + postbuild catalog are not needed.
+      - name: Build studio's workspace dependencies
+        run: pnpm --filter "@keyboard-studio/studio^..." build
+
+      - name: Install Playwright Chromium
+        working-directory: packages/studio
+        run: npx playwright install --with-deps chromium
+
+      - name: Playwright (boot-smoke + copy-edit)
+        run: pnpm --filter @keyboard-studio/studio test:e2e boot-smoke copy-edit
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            packages/studio/playwright-report/
+            packages/studio/test-results/
+          retention-days: 14
+          if-no-files-found: ignore
