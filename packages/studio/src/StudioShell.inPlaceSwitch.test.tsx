@@ -68,160 +68,39 @@
 // condition under test.
 
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { useState, useEffect } from "react";
 import { screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { render } from "./test/renderWithI18n.tsx";
-import { createVirtualFS } from "@keyboard-studio/contracts";
-import type { BaseKeyboard, KeyboardIR } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "./stores/phaseBDraftStore.ts";
 import { markVisited } from "./lib/firstVisit.ts";
-import type { OnInstantiateCallback, Stage } from "./hooks/useKeyboardArtifact.ts";
+import { instantiateAndSave } from "./test/draftSeeds.ts";
 
 // ---------------------------------------------------------------------------
-// Mock child survey components — copied verbatim from
-// StudioShell.switchProjects.test.tsx / StudioShell.resumeRename.test.tsx, so
-// SurveyView can mount and render the "identity" step (the traversal
-// position a plain, freshly-instantiated project restores to) without
-// touching WASM/VFS/network.
+// Shared StudioShell harness (test/studioShellMocks/, one module per mocked
+// child): shallow child stubs and heavy-hook stubs, so SurveyView can mount
+// past "identity" without touching WASM/VFS/network.
 // ---------------------------------------------------------------------------
 
-vi.mock("./survey/FlowStepHost.tsx", () => ({
-  FlowStepHost: ({ flow }: { flow: { flow_id: string } }) => (
-    <div data-testid={`flow-stub-${flow.flow_id}`} />
-  ),
-}));
-
-vi.mock("./survey/index.ts", () => {
-  const fakeIdentity = {
-    autonym: "English",
-    english: "English",
-    languageSubtag: "en",
-    targetScriptRaw: "Latn",
-    bcp47: "en-Latn",
-    supported: true,
-    prefill: { script: "Latn", scriptClass: "alphabetic", routingGroup: "qwerty-qwertz" },
-  };
-  const fakePhaseResult = { phase: "B" as const, answers: [], confirmedInventory: [] };
-  return {
-    IdentityLite: ({ onComplete }: { onComplete: (result: unknown, identity: unknown) => void }) => (
-      <div data-testid="stage-identity">
-        <button
-          type="button"
-          data-testid="identity-complete"
-          onClick={() => onComplete(fakePhaseResult, fakeIdentity)}
-        >
-          identity-complete
-        </button>
-      </div>
-    ),
-    Prefill: () => <div data-testid="stage-prefill" />,
-    PhaseB: () => <div data-testid="stage-B" />,
-    PhaseA: () => <div data-testid="stage-A" />,
-    SurveyRunner: () => <div data-testid="survey-runner" />,
-    extractIdentityLite: (r: unknown) => r,
-    extractIdentity: () => ({}),
-    extractProvenance: () => ({}),
-    buildPrefillRows: () => [],
-  };
-});
-
-vi.mock("./editors/panels/BaseResolution.tsx", () => ({
-  BaseResolution: () => <div data-testid="stage-base" />,
-}));
-
-vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => ({
-  MechanismGallery: () => <div data-testid="stage-mechanisms" />,
-}));
-
-vi.mock("./editors/assignLoop/TouchGallery.tsx", () => ({
-  TouchGallery: () => <div data-testid="stage-E" />,
-}));
-
-vi.mock("./editors/touchSeedSource/TouchSeedSourcePanel.tsx", () => ({
-  TouchSeedSourcePanel: () => <div data-testid="stage-seed-source" />,
-}));
-
-vi.mock("./components/UnsupportedScriptStub.tsx", () => ({
-  UnsupportedScriptStub: ({ script }: { script: string }) => (
-    <div data-testid="stage-unsupported">{script}</div>
-  ),
-}));
-
-vi.mock("./editors/panels/TrackStep.tsx", () => ({
-  TrackStep: () => <div data-testid="stage-track" />,
-}));
-
-vi.mock("./editors/panels/ProjectNameStep.tsx", () => ({
-  ProjectNameStep: () => <div data-testid="stage-project-name" />,
-}));
-
-vi.mock("./components/OSKFrame.tsx", () => ({
-  OSKFrame: () => <div data-testid="osk-frame" />,
-}));
-
-vi.mock("./components/OskModeToggle.tsx", () => ({
-  OskModeToggle: () => <div data-testid="osk-toggle" />,
-}));
-
-// ---------------------------------------------------------------------------
-// Mock heavy hooks so WASM / VFS are never touched (same as
-// StudioShell.test.tsx / StudioShell.switchProjects.test.tsx).
-// ---------------------------------------------------------------------------
-
-const artifactHoisted = vi.hoisted(() => ({
-  onInstantiateRef: { current: null as OnInstantiateCallback | null },
-  stageSetters: [] as Array<(s: Stage) => void>,
-}));
-
-vi.mock("./hooks/useKeyboardArtifact.ts", () => ({
-  useKeyboardArtifact: (
-    _base: unknown,
-    _spec: unknown,
-    _transform: unknown,
-    onInstantiate: OnInstantiateCallback | null | undefined,
-  ) => {
-    artifactHoisted.onInstantiateRef.current = onInstantiate ?? null;
-    const [stage, setStage] = useState<Stage>({ kind: "idle" });
-    useEffect(() => {
-      artifactHoisted.stageSetters.push(setStage);
-      return () => {
-        artifactHoisted.stageSetters = artifactHoisted.stageSetters.filter((f) => f !== setStage);
-      };
-    }, []);
-    return { stage, retry: vi.fn(), recompile: vi.fn() };
-  },
-}));
-
-vi.mock("./hooks/useWorkingCopyTransform.ts", () => ({
-  useWorkingCopyTransform: () => null,
-}));
-
-vi.mock("./lib/confirmRebase.ts", () => ({
-  instantiateFromBaseIfConfirmed: vi.fn(),
-  confirmRebaseTo: vi.fn(() => true),
-}));
-
-vi.mock("./lib/buildTouchLayoutJson.ts", () => ({
-  buildTouchLayoutJson: () => ({ json: "{}", warnings: [] }),
-}));
-
-vi.mock("./components/CompareScreen.tsx", () => ({
-  CompareScreen: () => <div data-testid="compare-screen-root">compare-screen</div>,
-}));
-
-vi.mock("./components/OutputScreen.tsx", () => ({
-  OutputScreen: () => <div data-testid="output-screen-root">output-screen</div>,
-}));
-
-vi.mock("./components/WelcomeScreen.tsx", () => ({
-  WelcomeScreen: () => <div data-testid="welcome-screen-root">welcome-screen</div>,
-}));
-
-vi.mock("./dashboard/DashboardView.tsx", () => ({
-  FlowMapView: () => <div data-testid="flow-map-view">flow-map</div>,
-}));
+vi.mock("./survey/FlowStepHost.tsx", () => import("./test/studioShellMocks/FlowStepHost.tsx"));
+vi.mock("./survey/index.ts", () => import("./test/studioShellMocks/surveyIndex.tsx"));
+vi.mock("./editors/panels/BaseResolution.tsx", () => import("./test/studioShellMocks/BaseResolution.tsx"));
+vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => import("./test/studioShellMocks/MechanismGallery.tsx"));
+vi.mock("./editors/assignLoop/TouchGallery.tsx", () => import("./test/studioShellMocks/TouchGallery.tsx"));
+vi.mock("./editors/touchSeedSource/TouchSeedSourcePanel.tsx", () =>
+  import("./test/studioShellMocks/TouchSeedSourcePanel.tsx"),
+);
+vi.mock("./components/UnsupportedScriptStub.tsx", () => import("./test/studioShellMocks/UnsupportedScriptStub.tsx"));
+vi.mock("./components/OSKFrame.tsx", () => import("./test/studioShellMocks/OSKFrame.tsx"));
+vi.mock("./components/OskModeToggle.tsx", () => import("./test/studioShellMocks/OskModeToggle.tsx"));
+vi.mock("./components/CompareScreen.tsx", () => import("./test/studioShellMocks/CompareScreen.tsx"));
+vi.mock("./components/OutputScreen.tsx", () => import("./test/studioShellMocks/OutputScreen.tsx"));
+vi.mock("./components/WelcomeScreen.tsx", () => import("./test/studioShellMocks/WelcomeScreen.tsx"));
+vi.mock("./dashboard/DashboardView.tsx", () => import("./test/studioShellMocks/DashboardView.tsx"));
+vi.mock("./hooks/useKeyboardArtifact.ts", () => import("./test/studioShellMocks/useKeyboardArtifact.ts"));
+vi.mock("./hooks/useWorkingCopyTransform.ts", () => import("./test/studioShellMocks/useWorkingCopyTransform.ts"));
+vi.mock("./lib/confirmRebase.ts", () => import("./test/studioShellMocks/confirmRebase.ts"));
+vi.mock("./lib/buildTouchLayoutJson.ts", () => import("./test/studioShellMocks/buildTouchLayoutJson.ts"));
 
 // ---------------------------------------------------------------------------
 // Guest posture for "My keyboards"/AccountControl: signed out, empty cloud
@@ -231,19 +110,7 @@ vi.mock("./dashboard/DashboardView.tsx", () => ({
 // oversight.
 // ---------------------------------------------------------------------------
 
-vi.mock("./hooks/useGitHubAuth.ts", () => ({
-  useGitHubAuth: vi.fn(() => ({
-    status: "idle",
-    token: null,
-    verify: null,
-    login: null,
-    canSubmit: false,
-    missingScopes: [],
-    error: null,
-    connect: vi.fn(async () => {}),
-    disconnect: vi.fn(),
-  })),
-}));
+vi.mock("./hooks/useGitHubAuth.ts", () => import("./test/studioShellMocks/useGitHubAuth.ts"));
 
 vi.mock("./lib/serverDraftStore.ts", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./lib/serverDraftStore.ts")>();
@@ -258,55 +125,18 @@ import { StudioShell } from "./StudioShell.tsx";
 import {
   draftKey,
   resumeProject,
-  saveDraft,
   listDrafts,
   AUTOSAVE_DEBOUNCE_MS,
   DRAFT_INDEX_KEY,
   type DurableDraft,
 } from "./lib/draftPersistence.ts";
 
-function makeMinimalIr(): KeyboardIR {
-  return {
-    origin: "scaffolded" as const,
-    header: {
-      keyboardId: "test",
-      name: "test",
-      bcp47: [],
-      copyright: "",
-      version: "10.0",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores: [],
-    groups: [],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  } as unknown as KeyboardIR;
-}
 
 const PROJECT_A_ID = "kbd_inplace_alpha";
 const PROJECT_A_NAME = "Alpha In-Place Keyboard";
 const PROJECT_B_ID = "kbd_inplace_beta";
 const PROJECT_B_NAME = "Beta In-Place Keyboard";
 
-/**
- * Seeds ONE genuinely self-consistent, standalone project — same idiom as
- * StudioShell.switchProjects.test.tsx's `instantiateAndSave`: built with the
- * real stores + the real `saveDraft` via `installDraftAutosave`'s own
- * install-time synchronous save (never a hand-rolled JSON envelope — see the
- * fixture-gotcha note in draftPersistence.test.ts).
- */
-function instantiateAndSave(baseId: string, displayName: string): void {
-  const base = { id: baseId, displayName, languages: [] } as unknown as BaseKeyboard;
-  useWorkingCopyStore
-    .getState()
-    .instantiateFromBase(base, { vfs: createVirtualFS([]), ir: makeMinimalIr() });
-  saveDraft(baseId);
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-  usePhaseBDraftStore.getState().reset();
-}
 
 beforeEach(() => {
   localStorage.clear();

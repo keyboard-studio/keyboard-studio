@@ -14,11 +14,10 @@
 // "what a browser already has" fixtures.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createVirtualFS } from "@keyboard-studio/contracts";
-import type { BaseKeyboard, KeyboardIR } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
+import { instantiateMinimal } from "../test/draftSeeds.ts";
 
 vi.mock("./serverDraftStore.ts", () => ({
   saveServerDraft: vi.fn(async () => true),
@@ -55,33 +54,6 @@ function readRawIndexEntries(): Array<{
     status: "draft" | "submitted";
     prUrl: string | null;
   }>;
-}
-
-function makeMinimalIr(): KeyboardIR {
-  return {
-    origin: "scaffolded" as const,
-    header: {
-      keyboardId: "test",
-      name: "test",
-      bcp47: [],
-      copyright: "",
-      version: "10.0",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores: [],
-    groups: [],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  } as unknown as KeyboardIR;
-}
-
-function instantiateMinimal(baseId: string, displayName = "Reconcile Test"): void {
-  const base = { id: baseId, displayName, languages: [] } as unknown as BaseKeyboard;
-  useWorkingCopyStore
-    .getState()
-    .instantiateFromBase(base, { vfs: createVirtualFS([]), ir: makeMinimalIr() });
 }
 
 beforeEach(() => {

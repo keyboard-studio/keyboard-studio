@@ -25,6 +25,7 @@ import { DEBOUNCE_MS } from "../hooks/useDebounce.ts";
 import type { BaseKeyboard, KeyboardIR, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { instantiateMinimal, makeScaffoldedIR } from "../test/draftSeeds.ts";
 import {
   usePhaseBDraftStore,
   snapshotPhaseBDraft,
@@ -84,26 +85,6 @@ const currentDir = path.dirname(fileURLToPath(import.meta.url));
 // Fixtures
 // ---------------------------------------------------------------------------
 
-function makeMinimalIr(): KeyboardIR {
-  return {
-    origin: "scaffolded" as const,
-    header: {
-      keyboardId: "test",
-      name: "test",
-      bcp47: [],
-      copyright: "",
-      version: "10.0",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores: [],
-    groups: [],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  } as unknown as KeyboardIR;
-}
-
 /**
  * An IR with one S-01 removable rule (vkey -> char in a normal group) — reused
  * from persistWorkingCopy.test.ts's own fixture so the draft round-trip test
@@ -142,11 +123,6 @@ function makeIrWithRemovableRule(): KeyboardIR {
     raw: [],
     recognizedPatterns: [],
   } as unknown as KeyboardIR;
-}
-
-function instantiateMinimal(projectId: string): void {
-  const base = { id: projectId, displayName: "Autosave Test", languages: [] } as unknown as BaseKeyboard;
-  useWorkingCopyStore.getState().instantiateFromBase(base, { vfs: createVirtualFS([]), ir: makeMinimalIr() });
 }
 
 // ---------------------------------------------------------------------------
@@ -499,7 +475,7 @@ describe("draftPersistence", () => {
       const vfs = createVirtualFS([
         { path: "source/welcome/welcome.htm", content: new Uint8Array([1, 2, 3, 4]), isBinary: true },
       ]);
-      useWorkingCopyStore.getState().instantiateFromBase(base, { vfs, ir: makeMinimalIr() });
+      useWorkingCopyStore.getState().instantiateFromBase(base, { vfs, ir: makeScaffoldedIR() });
 
       saveDraft(pk);
       const stored = localStorage.getItem(draftKey(pk));
@@ -569,7 +545,7 @@ describe("draftPersistence", () => {
       const vfs = createVirtualFS([
         { path: "source/icon.ico", content: new Uint8Array([9, 8, 7, 6]), isBinary: true },
       ]);
-      useWorkingCopyStore.getState().instantiateFromBase(base, { vfs, ir: makeMinimalIr() });
+      useWorkingCopyStore.getState().instantiateFromBase(base, { vfs, ir: makeScaffoldedIR() });
       saveDraft(pk);
 
       // Corrupt the (isBinary) VFS entry so prepareWorkingCopySnapshot's atob() throws.
@@ -853,7 +829,7 @@ describe("draftPersistence", () => {
       const vfs = createVirtualFS([
         { path: "source/welcome/welcome.htm", content: new Uint8Array([1, 2, 3, 4]), isBinary: true },
       ]);
-      useWorkingCopyStore.getState().instantiateFromBase(base, { vfs, ir: makeMinimalIr() });
+      useWorkingCopyStore.getState().instantiateFromBase(base, { vfs, ir: makeScaffoldedIR() });
       saveDraft("remote_corrupt_project");
       const stored = localStorage.getItem(draftKey("remote_corrupt_project"));
       expect(stored).not.toBeNull();
@@ -899,7 +875,7 @@ describe("draftPersistence", () => {
       } as BaseKeyboard;
       useWorkingCopyStore.getState().instantiateFromBase(base, {
         vfs: createVirtualFS([]),
-        ir: makeMinimalIr(),
+        ir: makeScaffoldedIR(),
       });
 
       const fixedSavedAt = 1_700_000_000_000; // an arbitrary, recognizable timestamp
@@ -920,7 +896,7 @@ describe("draftPersistence", () => {
 
       useWorkingCopyStore.getState().instantiateFromBase(
         { id: "restored_savedat_a", displayName: "A", languages: ["en"] } as BaseKeyboard,
-        { vfs: createVirtualFS([]), ir: makeMinimalIr() },
+        { vfs: createVirtualFS([]), ir: makeScaffoldedIR() },
       );
       vi.spyOn(Date, "now").mockReturnValue(olderSavedAt);
       saveDraft("restored_savedat_a");
@@ -932,7 +908,7 @@ describe("draftPersistence", () => {
 
       useWorkingCopyStore.getState().instantiateFromBase(
         { id: "restored_savedat_b", displayName: "B", languages: ["en"] } as BaseKeyboard,
-        { vfs: createVirtualFS([]), ir: makeMinimalIr() },
+        { vfs: createVirtualFS([]), ir: makeScaffoldedIR() },
       );
       vi.spyOn(Date, "now").mockReturnValue(newerSavedAt);
       saveDraft("restored_savedat_b");
@@ -1412,7 +1388,7 @@ describe("draftPersistence", () => {
       } as BaseKeyboard;
       useWorkingCopyStore.getState().instantiateFromBase(base, {
         vfs: createVirtualFS([]),
-        ir: makeMinimalIr(),
+        ir: makeScaffoldedIR(),
       });
 
       useSurveySessionStore.getState().setScaffoldSpec({
@@ -1469,7 +1445,7 @@ describe("draftPersistence", () => {
       } as unknown as BaseKeyboard;
       useWorkingCopyStore.getState().instantiateFromBase(baseB, {
         vfs: createVirtualFS([]),
-        ir: makeMinimalIr(),
+        ir: makeScaffoldedIR(),
       });
       saveDraft("proj_b");
       expect(

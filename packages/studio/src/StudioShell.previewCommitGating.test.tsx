@@ -30,76 +30,31 @@
 // effect through a different, less-gated component.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { useState, useEffect } from "react";
 import { screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { render } from "./test/renderWithI18n.tsx";
 import { basicKbdus, silEuroLatin, makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
-import type { OnInstantiateCallback, Stage } from "./hooks/useKeyboardArtifact.ts";
+import type { Stage } from "./hooks/useKeyboardArtifact.ts";
 
 // ---------------------------------------------------------------------------
-// vi.hoisted — shared mutable state for the controllable useKeyboardArtifact
-// mock. Must precede vi.mock() calls.
+// Mocks. useKeyboardArtifact is the shared controllable stub: every mounted
+// hook registers its setState in `artifactHoisted.stageSetters`, so a test can
+// push a new stage into the LIVE hook instance (forcing SurveyView to re-render
+// with the new artifactStage, exactly as a real pipeline transition would).
+// confirmRebaseTo always allows: every scenario starts uninstantiated
+// (afterEach resets it), where the real predicate would already return true,
+// so these tests exercise ONLY the commit-gating effect under test.
 // ---------------------------------------------------------------------------
 
-const hoisted = vi.hoisted(() => ({
-  onInstantiateRef: { current: null as OnInstantiateCallback | null },
-  // Every mounted useKeyboardArtifact call registers its setState here so the
-  // test can push a new stage into the LIVE hook instance (forcing SurveyView
-  // to re-render with the new artifactStage, exactly as a real pipeline
-  // transition would).
-  stageSetters: [] as Array<(s: Stage) => void>,
-}));
+vi.mock("./hooks/useKeyboardArtifact.ts", () => import("./test/studioShellMocks/useKeyboardArtifact.ts"));
+vi.mock("./hooks/useWorkingCopyTransform.ts", () => import("./test/studioShellMocks/useWorkingCopyTransform.ts"));
+vi.mock("./lib/confirmRebase.ts", () => import("./test/studioShellMocks/confirmRebase.ts"));
+vi.mock("./lib/navigate.ts", () => import("./test/studioShellMocks/navigate.ts"));
+vi.mock("./components/OSKFrame.tsx", () => import("./test/studioShellMocks/OSKFrame.tsx"));
+vi.mock("./components/OskModeToggle.tsx", () => import("./test/studioShellMocks/OskModeToggle.tsx"));
 
-// ---------------------------------------------------------------------------
-// Mocks
-// ---------------------------------------------------------------------------
-
-vi.mock("./hooks/useKeyboardArtifact.ts", () => ({
-  useKeyboardArtifact: (
-    _base: unknown,
-    _spec: unknown,
-    _transform: unknown,
-    onInstantiate: OnInstantiateCallback | null | undefined,
-  ) => {
-    hoisted.onInstantiateRef.current = onInstantiate ?? null;
-    const [stage, setStage_] = useState<Stage>({ kind: "idle" });
-    useEffect(() => {
-      hoisted.stageSetters.push(setStage_);
-      return () => {
-        hoisted.stageSetters = hoisted.stageSetters.filter((f) => f !== setStage_);
-      };
-    }, []);
-    return { stage, retry: vi.fn(), recompile: vi.fn() };
-  },
-}));
-
-vi.mock("./hooks/useWorkingCopyTransform.ts", () => ({
-  useWorkingCopyTransform: () => null,
-}));
-
-vi.mock("./lib/confirmRebase.ts", () => ({
-  instantiateFromBaseIfConfirmed: vi.fn(),
-  // BaseResolutionAdapter's onConfirm now calls confirmRebaseTo synchronously
-  // (F1 fix) BEFORE these tests' commit-gating assertions run; the working
-  // copy in every scenario here starts uninstantiated (afterEach resets it),
-  // so the real predicate would already return true — mocked to true directly
-  // so these tests keep exercising ONLY the commit-gating effect under test.
-  confirmRebaseTo: vi.fn(() => true),
-}));
-
-vi.mock("./lib/navigate.ts", () => ({
-  navigateTo: vi.fn(),
-}));
-
-vi.mock("./components/OSKFrame.tsx", () => ({
-  OSKFrame: () => <div data-testid="osk-frame" />,
-}));
-
-vi.mock("./components/OskModeToggle.tsx", () => ({
-  OskModeToggle: () => <div data-testid="osk-toggle" />,
-}));
+import { artifactHoisted as hoisted } from "./test/studioShellMocks/useKeyboardArtifact.ts";
 
 // BaseResolution mock — two fixed preview buttons (base A / base B) + one
 // confirm button. Exercises the REAL BaseResolutionAdapter (not mocked)
