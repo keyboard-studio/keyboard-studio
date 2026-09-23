@@ -23,6 +23,7 @@ import type {
   VirtualFS,
 } from "@keyboard-studio/contracts";
 import { CompilerLoadError } from "@keyboard-studio/contracts";
+import { CompilerError, CompilerErrorSeverity } from "@keymanapp/developer-utils";
 import { parseKpjFlags, type CompilerOptions } from "./parseKpjFlags.js";
 import { pathUtils } from "./pathUtils.js";
 
@@ -197,6 +198,86 @@ function unavailableResult(
   };
 }
 
+// ---------------------------------------------------------------------------
+// kmc-kmn message -> CompilerDiagnostic
+// ---------------------------------------------------------------------------
+
+/**
+ * Decode a kmc-kmn/kmcmplib numeric message code into a studio severity.
+ *
+ * kmc-kmn's `CompilerEvent` carries NO `severity` field: severity is bit-packed
+ * into `code` (`CompilerErrorMask.Severity`), e.g. kmcmplib's
+ * ERROR_StoreDoesNotExist arrives as `0x50201D` — Error(0x500000) | KmnCompiler
+ * namespace(0x2000) | base 0x01D. Decoded with developer-utils'
+ * `CompilerError.severity` so the thresholds track upstream's enum rather than
+ * a local copy. Debug/Verbose collapse into "info". A non-numeric code (never
+ * sent by kmc-kmn 19; defensive) stays "warning", the pre-decode behaviour.
+ */
+export function kmnCompilerSeverity(code: unknown): LintSeverity {
+  if (typeof code !== "number" || !Number.isInteger(code)) return "warning";
+  const severity = CompilerError.severity(code);
+  if (severity >= CompilerErrorSeverity.Fatal) return "fatal";
+  if (severity >= CompilerErrorSeverity.Error) return "error";
+  if (severity >= CompilerErrorSeverity.Warn) return "warning";
+  if (severity >= CompilerErrorSeverity.Hint) return "hint";
+  return "info";
+}
+
+/** LintCode prefix per severity — the `KM_<SEV>_` forms `LintCode` admits. */
+const KMCMP_CODE_PREFIX: Record<LintSeverity, string> = {
+  fatal: "KM_FATAL",
+  error: "KM_ERROR",
+  warning: "KM_WARN",
+  hint: "KM_HINT",
+  info: "KM_INFO",
+};
+
+/**
+ * Map one kmc-kmn `CompilerEvent` (`{ code, message, filename?, line? }`) to a
+ * Layer-A diagnostic. `code` keeps the decimal kmcmplib code as its suffix
+ * (`KM_ERROR_KMCMP_5251101`) so a diagnostic can be matched back to
+ * kmn_compiler_errors.h; its prefix follows the decoded severity.
+ *
+ * @internal Exported for unit test.
+ */
+export function mapKmnCompilerEvent(
+  message: Record<string, unknown>,
+  kmnPath: string,
+): CompilerDiagnostic {
+  // kmc-kmn message shape (per kmn-compiler-messages.js): the factories
+  // return { code, message, ... } where `message` is the human-readable
+  // text. Older / lower-level shapes use `text` or even just the raw code.
+  // Try them in order.
+  const text =
+    (typeof message.message === "string" && message.message) ||
+    (typeof message.text === "string" && message.text) ||
+    (typeof message.description === "string" && message.description) ||
+    `(no message; raw=${JSON.stringify(message).slice(0, 200)})`;
+  const severity = kmnCompilerSeverity(message.code);
+  const codeSuffix = String(message.code ?? message.errorCode ?? "UNKNOWN")
+    .replace(/[^A-Z0-9_]/gi, "_")
+    .toUpperCase();
+  const code = `${KMCMP_CODE_PREFIX[severity]}_KMCMP_${codeSuffix}` as LintFinding["code"];
+  // kmc-kmn's CompilerEvent names the field `line`; kmcmplib's raw WASM
+  // callback used `lineNumber`, which kmc-kmn renames before reporting.
+  const line = message.line ?? message.lineNumber;
+  const filename = message.filename;
+  return {
+    code,
+    severity,
+    layer: "A",
+    message: text,
+    ...(typeof line === "number" && line > 0
+      ? {
+          location: {
+            file: typeof filename === "string" && filename !== "" ? filename : kmnPath,
+            line,
+          },
+        }
+      : {}),
+  };
+}
+
 // Note: shared path-utility callbacks live in ./pathUtils.ts (also used by
 // the validator oracle's WASM loader).
 
@@ -257,41 +338,7 @@ export async function compile(
   const callbacks = {
     reportMessage(message: Record<string, unknown>): void {
       devLog.info("[kmcmplib] reportMessage:", message);
-      // kmc-kmn message shape (per kmn-compiler-messages.js): the
-      // factories return { code, message, ... } where `message` is the
-      // human-readable text. Older / lower-level shapes use `text` or
-      // even just the raw code. Try them in order.
-      const text =
-        (typeof message.message === "string" && message.message) ||
-        (typeof message.text === "string" && message.text) ||
-        (typeof message.description === "string" && message.description) ||
-        `(no message; raw=${JSON.stringify(message).slice(0, 200)})`;
-      const severityRaw = String(message.severity ?? "warning").toLowerCase();
-      const severity: LintSeverity = (
-        ["fatal", "error", "warning", "hint", "info"] as const
-      ).includes(severityRaw as LintSeverity)
-        ? (severityRaw as LintSeverity)
-        : "warning";
-      const codeSuffix = String(message.code ?? message.errorCode ?? "UNKNOWN")
-        .replace(/[^A-Z0-9_]/gi, "_")
-        .toUpperCase();
-      const code = `KM_${severity.toUpperCase()}_KMCMP_${codeSuffix}` as LintFinding["code"];
-      const lineNumberRaw = message.lineNumber;
-      const filenameRaw = message.filename;
-      diagnostics.push({
-        code,
-        severity,
-        layer: "A",
-        message: text,
-        ...(typeof lineNumberRaw === "number"
-          ? {
-              location: {
-                file: typeof filenameRaw === "string" ? filenameRaw : kmnPath,
-                line: lineNumberRaw,
-              },
-            }
-          : {}),
-      });
+      diagnostics.push(mapKmnCompilerEvent(message, kmnPath));
     },
     loadFile(filename: string): Uint8Array | null {
       for (const c of vfsPathCandidates(filename)) {

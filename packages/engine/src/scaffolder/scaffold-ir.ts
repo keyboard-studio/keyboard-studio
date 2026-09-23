@@ -100,7 +100,7 @@ function getSystemStoreString(ir: KeyboardIR, name: string): string | null {
  * keyboardId. These stores carry literal filenames like
  * `sil_cameroon_qwerty.kvks` that point at sibling files which
  * `renameFilesInVfs` is about to rename to `<keyboardId>.kvks` etc.
- * Without this update kmcmplib emits KM_WARNING_KMCMP_5253388 ("File ...
+ * Without this update kmcmplib emits KM_ERROR_KMCMP_5253388 ("File ...
  * was not found") and the build fails.
  *
  * Covered stores (per kmcmplib's kmw-compiler.ts store sweep):

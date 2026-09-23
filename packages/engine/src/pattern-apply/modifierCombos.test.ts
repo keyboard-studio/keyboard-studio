@@ -155,7 +155,7 @@ describe("canonicalizeCombo", () => {
 // ---------------------------------------------------------------------------
 //
 // A combo mixing a GENERIC ctrl/alt token (CTRL/ALT) with a CHIRAL one
-// (RCTRL/RALT/LALT) is kmcmplib-invalid (KM_WARNING_KMCMP_4202659: "contains
+// (RCTRL/RALT/LALT) is kmcmplib-invalid (KM_WARN_KMCMP_4202659: "contains
 // Ctrl,Alt and LCtrl,LAlt,RCtrl,RAlt sets of modifiers. Use only one or the
 // other set for web target") and can never be delivered by a real keypress
 // either — so every chiral ctrl/alt token in the mix is demoted to its
@@ -540,7 +540,7 @@ describe("buildComboKeyMap", () => {
 
 // ---------------------------------------------------------------------------
 // kmcmplib oracle — chirality unification actually clears the mixed-modifier
-// warning (KM_WARNING_KMCMP_4202659), not just satisfies unit assertions.
+// warning (KM_WARN_KMCMP_4202659), not just satisfies unit assertions.
 // ---------------------------------------------------------------------------
 
 function minimalKmnWithRule(ruleLine: string): string {
