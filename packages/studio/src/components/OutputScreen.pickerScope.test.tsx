@@ -26,9 +26,10 @@ import { describe, it, expect, vi, afterEach } from "vitest";
 import { screen, cleanup } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { seedInstantiatedWorkingCopy } from "../test/workingCopy.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
+import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import type { Stage } from "../hooks/useKeyboardArtifact.ts";
 
 const READY_STAGE: Stage = {
@@ -64,21 +65,10 @@ vi.mock("../lib/navigate.ts", async (importOriginal) => ({
   navigateTo: (...args: unknown[]) => navigateTo(...args),
 }));
 
-function seedInstantiatedWorkingCopy() {
-  const vfs = createVirtualFS([
-    { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
-  ]);
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir: makeTestIR([]) });
-  // spec 064: download is gated on attribution, and the download control's
-  // aria-label states the blocking reason when it is missing. A working copy that
-  // has reached the ship-it screen has an author, so seed one — otherwise the
-  // id-announcement test below would assert against the blocked label and fail
-  // for a reason that has nothing to do with the id it is checking.
-  useWorkingCopyStore.getState().setAttribution({
-    authorName: "Alice Example",
-    copyrightHolder: "Alice Example",
-  });
-}
+// Seeded working copies are attributed. Download is gated on attribution
+// (spec 064) and the download control's aria-label states the blocking reason
+// when it is missing, so without an author the id-announcement test below would
+// assert against the blocked label, for a reason unrelated to the id it checks.
 
 /** The mode toggle, located the way an author does — by its group label. */
 function modeToggle() {
@@ -92,7 +82,7 @@ afterEach(() => {
 
 describe("OutputScreen — left-pane scope", () => {
   it("with a working copy: no mode toggle and no base picker; read-only provenance instead", async () => {
-    seedInstantiatedWorkingCopy();
+    seedInstantiatedWorkingCopy(undefined, { attributed: true });
 
     const { OutputScreen } = await import("./OutputScreen.tsx");
     render(<OutputScreen />);
@@ -110,7 +100,7 @@ describe("OutputScreen — left-pane scope", () => {
   });
 
   it("with a working copy: the identity form and KMN editor still render", async () => {
-    seedInstantiatedWorkingCopy();
+    seedInstantiatedWorkingCopy(undefined, { attributed: true });
 
     const { OutputScreen } = await import("./OutputScreen.tsx");
     render(<OutputScreen />);
@@ -133,7 +123,7 @@ describe("OutputScreen — left-pane scope", () => {
   });
 
   it("'Change base keyboard' routes to the survey's choose_base step and mutates nothing", async () => {
-    seedInstantiatedWorkingCopy();
+    seedInstantiatedWorkingCopy(undefined, { attributed: true });
     // Walk far enough that choose_base is genuinely behind the author, and arm
     // the commit gate the way a real confirmed base does.
     const session = useSurveySessionStore.getState();
@@ -162,7 +152,7 @@ describe("OutputScreen — left-pane scope", () => {
   });
 
   it("the download control announces the id it will emit, not the base id", async () => {
-    seedInstantiatedWorkingCopy();
+    seedInstantiatedWorkingCopy(undefined, { attributed: true });
     useWorkingCopyStore.getState().setIdentity({ keyboardId: "dagbanli", displayName: "Dagbanli" });
 
     const { OutputScreen } = await import("./OutputScreen.tsx");

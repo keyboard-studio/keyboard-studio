@@ -21,7 +21,6 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { createVirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR, latinDeadkeyAcuteSingle } from "@keyboard-studio/contracts/fixtures";
 import { parseKmn, runAllChecks } from "@keyboard-studio/engine";
 import type {
@@ -35,6 +34,7 @@ import type {
   LintFinding,
 } from "@keyboard-studio/contracts";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.js";
+import { stubKmnVfs } from "../test/workingCopy.ts";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -90,12 +90,6 @@ function makeFixtureIr(): KeyboardIR {
   const second = group("group#second", "second", [rule("rule#c", "K_C", "z")]);
 
   return makeTestIR([main, second], [outStore, inStore, extra]);
-}
-
-function makeVfs(keyboardId: string, kmn = "c stub\n") {
-  return createVirtualFS([
-    { path: `source/${keyboardId}.kmn`, content: kmn, isBinary: false },
-  ]);
 }
 
 /** A representative physical mechanism assignment (the acute-deadkey gallery item). */
@@ -160,7 +154,7 @@ interface Scenario {
 /** Run the real projection for one scenario and one flag state. */
 function project(seamOn: boolean, sc: Omit<Scenario, "name" | "effect">): Projected {
   vi.stubEnv("VITE_KM_MUTATE_SEAM", seamOn ? "1" : "");
-  const vfs = sc.scaffoldBase === true ? makeVfs("kb", SCAFFOLD_KMN) : makeVfs("kb");
+  const vfs = sc.scaffoldBase === true ? stubKmnVfs("kb", SCAFFOLD_KMN) : stubKmnVfs("kb");
   const assignments = [...(sc.assignments ?? [])];
   projectWorkingCopyVfs({
     vfs,
@@ -327,7 +321,7 @@ describe("projectWorkingCopyVfs — seam flag parity (flag-on === flag-off emit)
     const overlay = { deletedNodeIds: new Set(["group#main"]) };
 
     vi.stubEnv("VITE_KM_MUTATE_SEAM", "");
-    const offVfs = makeVfs("kb");
+    const offVfs = stubKmnVfs("kb");
     const offRes = projectWorkingCopyVfs({
       vfs: offVfs,
       keyboardId: "kb",
@@ -340,7 +334,7 @@ describe("projectWorkingCopyVfs — seam flag parity (flag-on === flag-off emit)
     });
 
     vi.stubEnv("VITE_KM_MUTATE_SEAM", "1");
-    const onVfs = makeVfs("kb");
+    const onVfs = stubKmnVfs("kb");
     const onRes = projectWorkingCopyVfs({
       vfs: onVfs,
       keyboardId: "kb",

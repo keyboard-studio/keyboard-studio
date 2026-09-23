@@ -28,6 +28,7 @@ import type { IRGroup, IRRule, IRStore } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
 import { projectWorkingCopyForOutput } from "./serializeWorkingCopy.ts";
+import { stubKmnVfs } from "../test/workingCopy.ts";
 
 // ---------------------------------------------------------------------------
 // Mock services.ts — prevents WASM / network I/O during the test.
@@ -124,14 +125,6 @@ function buildFragmentBearingIR() {
   return ir;
 }
 
-// makeVfs duplicates the helper in projectWorkingCopyVfs.deleted-items.test.ts;
-// intentional — kept separate for test-file isolation (no shared test helpers).
-function makeVfs(keyboardId: string) {
-  return createVirtualFS([
-    { path: `source/${keyboardId}.kmn`, content: "c stub\n", isBinary: false },
-  ]);
-}
-
 // ---------------------------------------------------------------------------
 // Store lifecycle
 // ---------------------------------------------------------------------------
@@ -165,7 +158,7 @@ describe("fragment-bearing keyboard — carve removal surfaces through BOTH cons
   it("preview and zip projections agree; removed nodes absent; fragments preserved in order", async () => {
     const keyboardId = basicKbdus.id; // "basic_kbdus"
     const ir = buildFragmentBearingIR();
-    const vfs = makeVfs(keyboardId);
+    const vfs = stubKmnVfs(keyboardId);
 
     // Seed the store (ZIP path reads from the store).
     useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
@@ -327,7 +320,7 @@ describe("fragment-bearing keyboard — carve removal surfaces through BOTH cons
   it("neither projection path mutates baseIr or baseVfs in the store", async () => {
     const keyboardId = basicKbdus.id;
     const ir = buildFragmentBearingIR();
-    const vfs = makeVfs(keyboardId);
+    const vfs = stubKmnVfs(keyboardId);
 
     useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
     useWorkingCopyStore.getState().deleteNode("rule#remove");

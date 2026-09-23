@@ -30,7 +30,7 @@ import {
   key,
   layoutWithKeys,
   mixedProvenanceIR,
-} from "../fixtures/touchProvenance.ts";
+} from "../../src/test/touchProvenance.ts";
 
 afterEach(() => {
   vi.unstubAllEnvs();
