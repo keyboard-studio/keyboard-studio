@@ -611,10 +611,6 @@ describe("spec 034 T006 — choose_base yields a live working copy via the real 
     };
   }
 
-  beforeEach(() => {
-    useWorkingCopyStore.getState().reset();
-  });
-
   it("TI-1 Track 1 (copy): instantiateFromBase yields a non-null ir + instantiationMode 'new-from-base'", () => {
     applyStepCompletion(CHOOSE_BASE_STEP_ID, { base, ir: realIr, vfs: realVfs, track: "copy" }, realStoreDeps());
     const st = useWorkingCopyStore.getState();

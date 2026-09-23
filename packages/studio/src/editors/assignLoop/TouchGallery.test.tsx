@@ -251,15 +251,11 @@ beforeAll(installDialogShim);
 
 afterEach(() => {
   cleanup();
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
   vi.clearAllMocks();
   capturedVfsTransformRef.current = null;
 });
 
 beforeEach(() => {
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
   // vi.clearAllMocks() (afterEach, above) clears call history but NOT a
   // custom .mockImplementation() a prior test installed via
   // buildTouchLayoutJsonSpy.mockImplementation(...) — re-pin the covering

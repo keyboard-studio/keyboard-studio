@@ -40,16 +40,6 @@ import { promoteOnManualEdit } from "../editors/assignLoop/touchBehavior.ts";
 import { snapshotWorkingCopyToSession, rehydrateWorkingCopyFromSession } from "../lib/persistWorkingCopy.ts";
 
 // ---------------------------------------------------------------------------
-// Reset helpers — clear all state between tests.
-// ---------------------------------------------------------------------------
-
-function resetAll() {
-  useWorkingCopyStore.getState().reset();
-}
-
-beforeEach(resetAll);
-
-// ---------------------------------------------------------------------------
 // Initial state
 // ---------------------------------------------------------------------------
 
@@ -1683,8 +1673,6 @@ describe("workingCopyStore — staleness slice (T041)", () => {
 });
 
 describe("workingCopyStore — cascadeDelete", () => {
-  beforeEach(() => useWorkingCopyStore.getState().reset());
-
   it("routes both whole-rule ids and store-slot ids through the item channel so chips reflect deletion", () => {
     const s = useWorkingCopyStore.getState();
     s.cascadeDelete(["r-eps"], ["sid-dkt#2"]);
@@ -1714,8 +1702,6 @@ describe("workingCopyStore — cascadeDelete", () => {
 });
 
 describe("workingCopyStore — cascadeRestore", () => {
-  beforeEach(() => useWorkingCopyStore.getState().reset());
-
   it("un-deletes every id it is given (clicking a removed chip restores everywhere)", () => {
     useWorkingCopyStore.getState().cascadeDelete(["r-eps"], ["sid-dkt#2"]);
     expect(useWorkingCopyStore.getState().isItemDeleted("r-eps")).toBe(true);
@@ -1992,7 +1978,6 @@ describe("workingCopyStore — Phase B proposal decisions are per-working-copy",
   };
 
   afterEach(() => {
-    usePhaseBDraftStore.getState().reset();
     resetPhaseBDraftDecisions();
   });
 

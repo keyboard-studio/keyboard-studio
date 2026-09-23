@@ -23,10 +23,6 @@ import { DRAFT_VERSION } from "./draftPersistence.ts";
 
 beforeEach(() => {
   sessionStorage.clear();
-  // Use the store's own reset action for full isolation. (A bare setState is a
-  // partial merge — it would only patch the enumerated keys and leave any field
-  // a prior test left dirty, e.g. `ir` / `removalCapabilities`, uncleared.)
-  useWorkingCopyStore.getState().reset();
 });
 
 afterEach(() => {

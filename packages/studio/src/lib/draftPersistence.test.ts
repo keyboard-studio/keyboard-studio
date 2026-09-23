@@ -131,9 +131,6 @@ function makeIrWithRemovableRule(): KeyboardIR {
 
 beforeEach(() => {
   localStorage.clear();
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-  usePhaseBDraftStore.getState().reset();
   mockedSaveServerDraft.mockClear();
   mockedSaveServerDraftBeacon.mockClear();
 });

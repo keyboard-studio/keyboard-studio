@@ -200,7 +200,6 @@ function seedInstantiatedWorkingCopy() {
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
-  useWorkingCopyStore.getState().reset();
   mockStage.current = {
     kind: "ready",
     compileResult: { success: true, artifacts: [], diagnostics: [], compileMs: 0, isWarmCompile: true },

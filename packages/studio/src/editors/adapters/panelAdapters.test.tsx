@@ -71,7 +71,6 @@ function makeIdentityResult(overrides: Partial<IdentityLiteResult>): IdentityLit
 
 afterEach(() => {
   cleanup();
-  useSurveySessionStore.getState().reset();
   // Reset the preview-status store between tests — it is a module-level
   // singleton (Zustand), so a test that flips it to "ready" would otherwise
   // leak into the next test's initial render.

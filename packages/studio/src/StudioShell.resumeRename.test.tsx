@@ -71,9 +71,6 @@
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { render } from "./test/renderWithI18n.tsx";
-import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
-import { usePhaseBDraftStore } from "./stores/phaseBDraftStore.ts";
 import { markVisited } from "./lib/firstVisit.ts";
 import { seedRenamedProjectDraft } from "./test/draftSeeds.ts";
 
@@ -137,9 +134,6 @@ const RELOAD_CUSTOM_ID = "my_renamed_keyboard_reload";
 
 beforeEach(() => {
   localStorage.clear();
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-  usePhaseBDraftStore.getState().reset();
   window.location.hash = "";
 });
 

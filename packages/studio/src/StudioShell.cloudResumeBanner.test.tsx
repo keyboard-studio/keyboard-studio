@@ -161,9 +161,6 @@ function serverMetaFor(envelope: DurableDraft): ServerDraftMeta {
 
 beforeEach(() => {
   localStorage.clear();
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-  usePhaseBDraftStore.getState().reset();
   window.location.hash = "";
   serverDraftHoisted.loadServerDraftMeta.mockReset();
   serverDraftHoisted.loadServerDraftContent.mockReset();

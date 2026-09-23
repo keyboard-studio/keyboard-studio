@@ -240,8 +240,6 @@ function makeUnreachableSymbolIR(symbol: string): KeyboardIR {
 
 afterEach(() => {
   cleanup();
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
   vi.clearAllMocks();
   capturedArtifactCallRef.current = null;
 });

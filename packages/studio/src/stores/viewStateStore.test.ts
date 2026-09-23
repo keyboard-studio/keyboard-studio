@@ -1,11 +1,7 @@
 // viewStateStore.test — spec 057 T013 (FR-050, FR-051, FR-052, FR-053).
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { readPaneSplitPct, useViewStateStore } from "./viewStateStore.ts";
-
-beforeEach(() => {
-  useViewStateStore.getState().reset();
-});
 
 describe("initial values", () => {
   it("starts every slot at its documented initial value", () => {

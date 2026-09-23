@@ -24,8 +24,6 @@ import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { BaseKeyboard, DecisionRecord, KeyboardIR } from "@keyboard-studio/contracts";
 import { makeEmptyDecisionRecord } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import {
   useDecisionLogStore,
   resetDecisionEntryIds,
@@ -105,10 +103,6 @@ const PROJECT = "hausa_std";
 
 beforeEach(() => {
   localStorage.clear();
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-  usePhaseBDraftStore.getState().reset();
-  useDecisionLogStore.getState().reset();
   resetDecisionEntryIds();
 });
 

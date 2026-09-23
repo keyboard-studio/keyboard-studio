@@ -27,7 +27,6 @@ import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { screen, cleanup, act } from "@testing-library/react";
 import { render } from "../../src/test/renderWithI18n.tsx";
 import { useSurveySessionStore } from "../../src/stores/surveySessionStore.ts";
-import { useWorkingCopyStore } from "../../src/stores/workingCopyStore.ts";
 import type { ActiveStepId } from "../../src/stores/surveySessionStore.ts";
 import type { ReducerDeps } from "../../src/steps/reducer.ts";
 
@@ -197,8 +196,6 @@ async function mountAt(stepId: ActiveStepId) {
 
 afterEach(() => {
   cleanup();
-  useSurveySessionStore.getState().reset();
-  useWorkingCopyStore.getState().reset();
   vi.clearAllMocks();
 });
 

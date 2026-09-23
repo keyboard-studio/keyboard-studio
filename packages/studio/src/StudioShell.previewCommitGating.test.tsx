@@ -166,8 +166,6 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
-  useSurveySessionStore.getState().reset();
-  useWorkingCopyStore.getState().reset();
   vi.clearAllMocks();
   localStorage.clear();
 });

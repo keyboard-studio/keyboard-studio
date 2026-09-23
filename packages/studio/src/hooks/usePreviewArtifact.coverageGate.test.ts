@@ -21,7 +21,7 @@
 // unconditionally, so the test isolates the coverage-gate fold rather than
 // driving the real async compile pipeline.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
@@ -47,11 +47,6 @@ vi.mock("./useKeyboardArtifact.ts", async (importOriginal) => ({
     recompile: vi.fn(),
   }),
 }));
-
-function resetStore() {
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-}
 
 function swapAssignment(target: string): MechanismAssignment {
   return {
@@ -82,9 +77,7 @@ function seedInstantiatedWorkingCopy(inventory: string[]) {
   });
 }
 
-beforeEach(resetStore);
 afterEach(() => {
-  resetStore();
   vi.clearAllMocks();
 });
 

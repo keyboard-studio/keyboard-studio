@@ -34,8 +34,6 @@ import {
   PENDING_PROJECT_KEY,
 } from "../lib/draftPersistence.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 
 vi.mock("../hooks/useGitHubAuth.ts", () => ({ useGitHubAuth: vi.fn() }));
 
@@ -187,12 +185,6 @@ beforeEach(() => {
   localStorage.clear();
   mockGitHubAuth({ status: "idle" });
   mockedListServerDrafts.mockResolvedValue([]);
-  // Reset the real stores `seedRealDraft`/`resumeProject` touch, so a Resume
-  // test's instantiation/apply can't leak into the next test (same reset
-  // idiom as draftPersistence.test.ts's beforeEach).
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-  usePhaseBDraftStore.getState().reset();
 });
 
 afterEach(() => {

@@ -6,7 +6,7 @@
 // S0). When there IS something to ask, everything arrives pre-checked and the
 // author's unchecks are what shape the emitted retained list.
 
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, vi, afterEach } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import type { IRGroup, IRRule, SurveyPhaseResult } from "@keyboard-studio/contracts";
@@ -136,11 +136,6 @@ function seedWorkingCopy(produced: string[], bases: string[]): void {
 function seedTwoSurplusPairs(): void {
   seedWorkingCopy(["a", "A", "q", "Q", "x", "X"], ["a"]);
 }
-
-beforeEach(() => {
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-});
 
 afterEach(() => {
   cleanup();

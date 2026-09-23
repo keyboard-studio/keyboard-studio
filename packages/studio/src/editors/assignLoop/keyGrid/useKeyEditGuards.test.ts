@@ -28,7 +28,7 @@
 //      the edit is never refused (no rejection is produced for this class),
 //      because an editor must permit invalid intermediate states.
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, renderHook } from "@testing-library/react";
 import type { TouchKeyIR, TouchLayoutIR } from "@keyboard-studio/contracts";
 import { touchKeyAddress } from "@keyboard-studio/engine";
@@ -68,10 +68,6 @@ function seedAssignedChars(chars: readonly string[]): void {
     suggestionResolvedChars: [],
   });
 }
-
-beforeEach(() => {
-  useWorkingCopyStore.getState().reset();
-});
 
 afterEach(() => {
   cleanup();

@@ -471,8 +471,6 @@ async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Pro
 
 afterEach(() => {
   cleanup();
-  useSurveySessionStore.getState().reset();
-  useWorkingCopyStore.getState().reset();
   vi.clearAllMocks();
 });
 

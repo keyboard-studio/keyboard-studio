@@ -25,7 +25,6 @@ import {
 } from "../lib/draftPersistence.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 
 vi.mock("../lib/navigate.ts", () => ({ navigateTo: vi.fn() }));
 
@@ -108,22 +107,14 @@ function seedIndexOnly(entries: Array<Partial<ProjectIndexEntry> & { projectKey:
   localStorage.setItem(DRAFT_INDEX_KEY, JSON.stringify(rows));
 }
 
-function resetStores(): void {
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-  usePhaseBDraftStore.getState().reset();
-}
-
 beforeEach(() => {
   localStorage.clear();
-  resetStores();
 });
 
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   localStorage.clear();
-  resetStores();
 });
 
 // ---------------------------------------------------------------------------

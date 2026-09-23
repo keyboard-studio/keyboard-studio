@@ -23,8 +23,6 @@ import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { CurrentKeyboardIndicator } from "./CurrentKeyboardIndicator.tsx";
 import { navigateTo } from "../lib/navigate.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 
 vi.mock("../lib/navigate.ts", () => ({ navigateTo: vi.fn() }));
 
@@ -66,9 +64,6 @@ function seedCurrent(): void {
 
 beforeEach(() => {
   localStorage.clear();
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-  usePhaseBDraftStore.getState().reset();
   seedCurrent();
 });
 
@@ -76,9 +71,6 @@ afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   localStorage.clear();
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-  usePhaseBDraftStore.getState().reset();
 });
 
 describe("CurrentKeyboardIndicator — a11y wiring", () => {

@@ -23,7 +23,7 @@
 // `en/messages.json` catalog — so this test exercises the exact interpolation
 // path that broke, not a hand-rolled English string.
 
-import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, afterEach } from "vitest";
 import { screen, fireEvent, cleanup } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
@@ -45,11 +45,6 @@ vi.mock("./flowStepOptions.tsx", async (importOriginal) => ({
   ...(await importOriginal<typeof import("./flowStepOptions.tsx")>()),
   PhaseFStepFactoryComponent: () => null,
 }));
-
-function resetStores() {
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-}
 
 function seedInstantiatedWorkingCopy(inventory: string[]) {
   const vfs = createVirtualFS([
@@ -73,10 +68,8 @@ function swapAssignment(target: string): MechanismAssignment {
   };
 }
 
-beforeEach(resetStores);
 afterEach(() => {
   cleanup();
-  resetStores();
   vi.clearAllMocks();
 });
 

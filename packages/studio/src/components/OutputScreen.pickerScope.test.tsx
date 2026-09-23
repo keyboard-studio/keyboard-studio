@@ -22,7 +22,7 @@
 // to force stage:"ready", seed the real working-copy store, and let the real
 // PickerPane render (it is the component under test here, so it is NOT stubbed).
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { screen, cleanup } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -64,11 +64,6 @@ vi.mock("../lib/navigate.ts", async (importOriginal) => ({
   navigateTo: (...args: unknown[]) => navigateTo(...args),
 }));
 
-function resetStores() {
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-}
-
 function seedInstantiatedWorkingCopy() {
   const vfs = createVirtualFS([
     { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
@@ -90,10 +85,8 @@ function modeToggle() {
   return screen.queryByRole("group", { name: "Keyboard source mode" });
 }
 
-beforeEach(resetStores);
 afterEach(() => {
   cleanup();
-  resetStores();
   vi.clearAllMocks();
 });
 

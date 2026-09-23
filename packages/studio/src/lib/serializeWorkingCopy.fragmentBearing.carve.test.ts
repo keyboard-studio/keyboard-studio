@@ -21,7 +21,7 @@
 // applyCarveToVfs / emitKmn pipeline runs, so the assertions on emitted .kmn
 // content are meaningful. services.ts IS mocked to avoid WASM / network I/O.
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import type { IRGroup, IRRule, IRStore } from "@keyboard-studio/contracts";
@@ -136,17 +136,8 @@ function makeVfs(keyboardId: string) {
 // Store lifecycle
 // ---------------------------------------------------------------------------
 
-function resetStore() {
-  useWorkingCopyStore.getState().reset();
-}
-
 beforeEach(() => {
-  resetStore();
   vi.clearAllMocks();
-});
-
-afterEach(() => {
-  resetStore();
 });
 
 // ---------------------------------------------------------------------------

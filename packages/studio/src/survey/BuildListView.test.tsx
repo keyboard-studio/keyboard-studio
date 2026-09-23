@@ -7,12 +7,11 @@
 //     "Continue" transitions to BuildListView.
 //   - useWorkingCopyStore is seeded directly before each test that needs a baseIr.
 
-import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
+import { describe, it, expect, afterEach, vi } from "vitest";
 import { screen, fireEvent, act, cleanup } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { PhaseB, parseSpacedChars } from "./PhaseB.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import type { SurveyPhaseResult, IRGroup, IRRule } from "@keyboard-studio/contracts";
@@ -72,23 +71,9 @@ function irProducing(chars: string[]) {
 // Setup / teardown
 // ---------------------------------------------------------------------------
 
-beforeEach(() => {
-  useWorkingCopyStore.getState().reset();
-  // discoveryMethod (surveySessionStore) and the draft alphabet
-  // (phaseBDraftStore) are now module-level singletons shared across every
-  // <PhaseB> mount (spec character-map pane work) rather than PhaseB-local
-  // useState — reset both so each test starts at the IntroChooser with an
-  // empty alphabet, matching the old per-mount-fresh behavior.
-  useSurveySessionStore.getState().reset();
-  usePhaseBDraftStore.getState().reset();
-});
-
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-  usePhaseBDraftStore.getState().reset();
 });
 
 // ---------------------------------------------------------------------------

@@ -15,8 +15,6 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { instantiateMinimal } from "../test/draftSeeds.ts";
 
 vi.mock("./serverDraftStore.ts", () => ({
@@ -58,9 +56,6 @@ function readRawIndexEntries(): Array<{
 
 beforeEach(() => {
   localStorage.clear();
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-  usePhaseBDraftStore.getState().reset();
 });
 
 afterEach(() => {

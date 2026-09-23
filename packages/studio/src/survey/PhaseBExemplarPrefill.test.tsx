@@ -97,14 +97,12 @@ async function acceptExemplarsAndContinue(): Promise<void> {
 beforeEach(() => {
   getSourcedExemplars.set(null);
   useSurveySessionStore.getState().setDiscoveryMethod(null);
-  usePhaseBDraftStore.getState().reset();
   resetPhaseBDraftDecisions();
 });
 
 afterEach(() => {
   cleanup();
   useSurveySessionStore.getState().setDiscoveryMethod(null);
-  usePhaseBDraftStore.getState().reset();
   resetPhaseBDraftDecisions();
 });
 

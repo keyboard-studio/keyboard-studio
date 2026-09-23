@@ -198,29 +198,10 @@ async function advanceToF() {
 beforeEach(() => {
   artifactHoisted.onInstantiateRef.current = null;
   artifactHoisted.stageSetters = [];
-  // Spec 057 (FR-072): every test in this file starts from a fresh wizard, and
-  // now has to SAY so.
-  //
-  // It used to be inherited from the defect: `SurveyView`'s mount effect reset
-  // the survey-session store, so every `render()` here silently started at
-  // "identity" no matter where the previous test had left the module-level
-  // singleton. Deleting that reset (D-1) is what makes a tab round trip
-  // preserve the author's position — and it also removes the per-test reset
-  // these suites were leaning on without stating.
-  //
-  // Resetting here is the honest replacement: test isolation is the test
-  // file's job, not a side effect of a component's mount.
-  useSurveySessionStore.getState().reset();
 });
 
 afterEach(() => {
   cleanup();
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-  // The footer's visibility gate reads this store (FR-040's revised rule — a
-  // published walk means the journey has started), so a walk left behind by a
-  // previous test would decide a later test's footer for it.
-  useStepWalkStore.getState().reset();
   vi.clearAllMocks();
   // The first-visit gate reads ks.visited / the ks.studio.draft key from
   // localStorage; clear it so gate state can't leak between tests.
