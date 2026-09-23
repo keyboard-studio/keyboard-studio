@@ -1,27 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { checkInventoryCoverage } from "./check-18-6-inventory-coverage.js";
 import type { KeyboardIR, LinguistInventory, IRGroup, IRStore } from "@keyboard-studio/contracts";
+import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 
 const KMN_PATH = "source/test.kmn";
 
 function makeScaffoldedIR(groups: IRGroup[], stores: IRStore[] = []): KeyboardIR {
-  return {
-    origin: "scaffolded",
-    header: {
-      keyboardId: "test",
-      name: "Test",
-      bcp47: [],
-      copyright: "",
-      version: "1.0",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores,
-    groups,
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  };
+  return makeTestIR(groups, stores, [], { origin: "scaffolded" });
 }
 
 function makeInventory(chars: string[]): LinguistInventory {
