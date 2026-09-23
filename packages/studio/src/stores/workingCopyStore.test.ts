@@ -24,8 +24,9 @@ import { makeTestIR, makeCharStore } from "@keyboard-studio/contracts/fixtures";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { makeTouchKeyRuleJoinFixture, TOUCH_JOIN_IDS } from "@keyboard-studio/contracts/fixtures";
 import { createVirtualFS, irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
-import { defaultFillAxes, selectStrategy, deriveFacets } from "@keyboard-studio/engine";
+import { defaultFillAxes, selectStrategy, deriveFacets, parseKmn } from "@keyboard-studio/engine";
 import type {
+  BaseKeyboard,
   DiscoveryAxisVector,
   IRGroup,
   IRStore,
@@ -36,6 +37,7 @@ import type {
 import type { SourcedInventory } from "@keyboard-studio/engine";
 import type { Step, EditorStep } from "../steps/types.ts";
 import { promoteOnManualEdit } from "../editors/assignLoop/touchBehavior.ts";
+import { snapshotWorkingCopyToSession, rehydrateWorkingCopyFromSession } from "../lib/persistWorkingCopy.ts";
 
 // ---------------------------------------------------------------------------
 // Reset helpers — clear all state between tests.
@@ -2226,5 +2228,84 @@ describe("workingCopyStore — carve overlay mutators never mutate the IR in pla
     expect(s.deletedNodeIds.size).toBe(0);
     expect(s.deletedItemIds.size).toBe(0);
     expect(s.ir).toEqual(snapshot);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 062 US3 (T019): `contextToleranceWriteBack` (a plain optional field on
+// `DiscoveryAxisVector`) needs no new persistence wiring — it rides `irAxes`'s
+// generic passthrough in persistWorkingCopy.ts's snapshot/rehydrate, the
+// sessionStorage cycle draftPersistence.ts uses across an OAuth redirect.
+// ---------------------------------------------------------------------------
+
+describe("workingCopyStore — contextToleranceWriteBack persistence (spec 062 T019)", () => {
+  function instantiate(): void {
+    useWorkingCopyStore.getState().instantiateFromBase(
+      { id: "kbd", displayName: "Kbd", languages: [] } as unknown as BaseKeyboard,
+      { vfs: createVirtualFS([]), ir: makeTestIR([]) },
+    );
+  }
+
+  beforeEach(() => {
+    sessionStorage.clear();
+  });
+
+  it("survives a sessionStorage snapshot/rehydrate round-trip (no new wiring needed)", () => {
+    instantiate();
+    useWorkingCopyStore.getState().setIrAxes({ contextToleranceWriteBack: "own-form" });
+    expect(useWorkingCopyStore.getState().irAxes.contextToleranceWriteBack).toBe("own-form");
+
+    snapshotWorkingCopyToSession();
+    useWorkingCopyStore.getState().reset();
+    expect(useWorkingCopyStore.getState().irAxes.contextToleranceWriteBack).toBeUndefined();
+
+    expect(rehydrateWorkingCopyFromSession()).toBe(true);
+    expect(useWorkingCopyStore.getState().irAxes.contextToleranceWriteBack).toBe("own-form");
+  });
+
+  it("a snapshot predating this field rehydrates with the field absent (defaults to echo per FR-007)", () => {
+    instantiate();
+    // No contextToleranceWriteBack ever set, exactly as a pre-spec-062 draft.
+    snapshotWorkingCopyToSession();
+    useWorkingCopyStore.getState().reset();
+
+    expect(rehydrateWorkingCopyFromSession()).toBe(true);
+    expect(useWorkingCopyStore.getState().irAxes.contextToleranceWriteBack).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FR-013 — a committed transform that changes the produced-character set
+// re-seeds the IR-derived discovery axes so strategy/gallery re-derive
+// (spec 039 / D11, T034).
+// ---------------------------------------------------------------------------
+
+describe("workingCopyStore — commitFacetTransform (FR-013 axis re-seed)", () => {
+  const FACET_KMN = `store(&NAME) 'FT'
+store(&TARGETS) 'any'
+begin Unicode > use(main)
+group(main) using keys
++ [K_A] > 'a'
+`;
+
+  it("re-derives the IR-seeded axis when the produced set changed", () => {
+    useWorkingCopyStore.getState().setIrAxes({ markInputOrder: "postfix" });
+    expect(useWorkingCopyStore.getState().irAxes.markInputOrder).toBe("postfix");
+
+    // The stale axis is dropped and re-derived from the new IR (which carries
+    // no postfix signal, so undefined).
+    useWorkingCopyStore.getState().commitFacetTransform(parseKmn(FACET_KMN, "FT").ir, true);
+    const after = useWorkingCopyStore.getState();
+    expect(after.ir).not.toBeNull();
+    expect(after.irAxes.markInputOrder).toBeUndefined();
+  });
+
+  it("leaves axes untouched when the produced set did NOT change (overlay-preserving write only)", () => {
+    useWorkingCopyStore.getState().setIrAxes({ markInputOrder: "postfix" });
+
+    useWorkingCopyStore.getState().commitFacetTransform(parseKmn(FACET_KMN, "FT").ir, false);
+    const after = useWorkingCopyStore.getState();
+    expect(after.ir).not.toBeNull();
+    expect(after.irAxes.markInputOrder).toBe("postfix");
   });
 });
