@@ -428,7 +428,11 @@ export async function buildOneCharacterList(
   // walks accept it empty.
   await drivePunctuationStep(page);
 
-  // The convenience question sits between punctuation and carve. A
+  // The invisible-characters step (spec 075) sits between punctuation and
+  // convenience and ALWAYS renders — a plain wait, no race.
+  await driveInvisiblesStep(page);
+
+  // The convenience question sits between invisibles and carve. A
   // one-character alphabet on a Latin base leaves almost all of a-z surplus,
   // so this one DOES render on the standard walks.
   await driveConvenienceStep(page);
@@ -445,6 +449,20 @@ export async function drivePunctuationStep(page: Page): Promise<void> {
   const visible = await doneBtn.isVisible({ timeout: 5_000 }).catch(() => false);
   if (!visible) return;
   await doneBtn.click();
+}
+
+/**
+ * Invisible-characters step (spec 075) — sits between punctuation and the
+ * convenience question. Unlike its neighbours it has NO computed skip gate
+ * and never renders null (FR-020), so this is a plain wait for its Continue
+ * control rather than a race against the next landmark: a step that stopped
+ * rendering must STALL the walk here, not be skipped past (SC-009). Nothing
+ * is selected on the standard walks ("Continue without invisible characters").
+ */
+export async function driveInvisiblesStep(page: Page): Promise<void> {
+  const continueBtn = page.getByTestId("invisibles-continue");
+  await continueBtn.waitFor({ state: "visible", timeout: 20_000 });
+  await continueBtn.click();
 }
 
 /**

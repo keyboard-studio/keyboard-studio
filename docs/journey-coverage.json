@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-08-21T01:21:34.685Z",
-  "totalSteps": 14,
+  "generatedAt": "2026-09-16T02:05:20.164Z",
+  "totalSteps": 15,
   "coveredSteps": 10,
   "uncovered": [
     {
@@ -10,6 +10,11 @@
     },
     {
       "stepId": "punctuation",
+      "edgeType": "spine",
+      "covered_by": []
+    },
+    {
+      "stepId": "invisibles",
       "edgeType": "spine",
       "covered_by": []
     },
@@ -84,6 +89,11 @@
       "covered_by": []
     },
     {
+      "stepId": "invisibles",
+      "edgeType": "spine",
+      "covered_by": []
+    },
+    {
       "stepId": "convenience",
       "edgeType": "spine",
       "covered_by": []
@@ -140,6 +150,6 @@
       "covered_by": []
     }
   ],
-  "renderedNodeUniverseSize": 94,
-  "coveragePercent": 71
+  "renderedNodeUniverseSize": 93,
+  "coveragePercent": 67
 }

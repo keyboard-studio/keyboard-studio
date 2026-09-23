@@ -96,8 +96,7 @@ export interface CharContributors {
    * every store a char appears in), which leaves callers unable to ask "is this
    * slot a PRODUCER?". The collateral guard needs exactly that. Additive rather
    * than a shape change to `storeSlotIds`, which is threaded positionally through
-   * `cascadeDelete`, `coordinatedCollateralForSlots`, `buildPendingCascade`, and
-   * the restore path.
+   * `cascadeDelete` and the restore path.
    *
    * A slot reached by both roles (a store any()-consumed in one rule and an
    * index() target in another) is tagged "output" — the producing role dominates,

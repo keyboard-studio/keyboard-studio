@@ -11,11 +11,13 @@ import { describe, it, expect } from "vitest";
 import { questionRegistry } from "./registry.ts";
 
 describe("questionRegistry", () => {
-  // 9 Phase A + 49 Phase B + 22 Phase F + 3 Phase G + 31 Reserve = 114 total
-  // (re-verified 2026-08-17; spec 069 FR-002 — update this count in the same
-  // change that adds or removes a questionRegistry entry).
-  it("has exactly the verified inventory of 114 entries", () => {
-    expect(Object.keys(questionRegistry).length).toBe(114);
+  // 9 Phase A + 47 Phase B + 22 Phase F + 3 Phase G + 31 Reserve = 112 total
+  // (re-verified 2026-09-15; spec 069 FR-002 — update this count in the same
+  // change that adds or removes a questionRegistry entry. Spec 075 FR-019
+  // retired pb_rtl_direction_marks + pb_rtl_direction_marks_detail: the
+  // invisible-characters spine step subsumes them.)
+  it("has exactly the verified inventory of 112 entries", () => {
+    expect(Object.keys(questionRegistry).length).toBe(112);
   });
 
   it("no entry has a 'default' key (namespace-import leak guard)", () => {

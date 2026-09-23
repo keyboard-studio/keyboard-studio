@@ -2,22 +2,20 @@
 // (#1399), including the #533 "suggested to discard" first-group redesign
 // (recommendedRemovalChars rows render as the FIRST group of the gallery
 // instead of a standing banner — see CarveGalleryV2.tsx's header comment).
-// Component-level coverage was previously zero for this file; this suite
-// exercises the behavior CarveGallery.test.tsx already covers for the
-// sibling rule/node "Rail" view, adapted to V2's flatter, dialog-free
+// This suite exercises the carve behavior the removed v1 rule/node "Rail"
+// view's tests used to cover, adapted to V2's flatter, dialog-free
 // interaction model (toggleCell/toggleGroup call cascadeDelete/cascadeRestore
 // directly — there is no ConfirmDialog in this view).
 //
 // collectCharContributors is MOCKED (vi.mock, importActual for everything
-// else) exactly as in CarveGallery.test.tsx, so cascade behavior is driven
-// deterministically. neededCharsForLanguage (../../lib/services.ts) is also
+// else), so cascade behavior is driven deterministically.
+// neededCharsForLanguage (../../lib/services.ts) is also
 // mocked to keep the suite offline/deterministic, per that file's pattern.
 // recommendedRemovalChars (../../lib/irToCarveNodes.ts) is mocked the SAME
 // way (importActual, default implementation forwards to the real function)
 // so most tests exercise the real derivation, but the cross-script-Latin
 // test can inject a `reason: 'cross-script-latin'` row directly rather than
-// reconstructing a real non-Latin bcp47/langtags scenario — the same
-// short-circuit RemovalBanner.test.tsx uses for its own optional-Latin cases.
+// reconstructing a real non-Latin bcp47/langtags scenario.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { cleanup, fireEvent, screen, within } from '@testing-library/react';
@@ -63,7 +61,7 @@ vi.mock('../../lib/irToCarveNodes.ts', async () => {
   };
 });
 
-// Offline stub — see the identical rationale in CarveGallery.test.tsx.
+// Offline stub — keeps the suite deterministic and network-free.
 vi.mock('../../lib/services.ts', () => ({
   neededCharsForLanguage: async () => neededCharsResult.get(),
 }));
@@ -135,7 +133,7 @@ function makeFixtureIR(): KeyboardIR {
   );
 }
 
-/** Maps each fixture character to its contributor ids — mirrors CarveGallery.test.tsx's per-char mock shape. */
+/** Maps each fixture character to its contributor ids. */
 function mockFixtureContributors() {
   collectCharContributorsMock.mockImplementation((_ir: KeyboardIR, ch: string) => {
     if (ch === 'a') return { ...emptyContributors(ch), ruleNodeIds: ['r-a'] };
@@ -146,7 +144,7 @@ function mockFixtureContributors() {
   });
 }
 
-/** Instantiate the working copy (Track 2, mirrors CarveGallery.test.tsx's renderGallery) and render CarveGalleryV2. */
+/** Instantiate the working copy (Track 2) and render CarveGalleryV2. */
 function renderGalleryV2(ir: KeyboardIR, caps: Map<string, RemovalCapability> = new Map()) {
   const vfs = createVirtualFS();
   useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir, removalCapabilities: caps });
@@ -422,8 +420,8 @@ describe('CarveGalleryV2 — suggested-to-discard group', () => {
 
 // ---------------------------------------------------------------------------
 // 9. Optional-Latin group — reason: 'cross-script-latin' rows split into
-// their own secondary, collapsible group (preserved from RemovalBanner's
-// post-#526 follow-on split; see RemovalBanner.tsx's header comment).
+// their own secondary, collapsible group (preserved from the v1 removal
+// banner's post-#526 follow-on split).
 // ---------------------------------------------------------------------------
 
 describe('CarveGalleryV2 — optional Latin group', () => {
@@ -467,7 +465,7 @@ describe('CarveGalleryV2 — optional Latin group', () => {
   // -------------------------------------------------------------------------
   // #1558 — the default carve surface (CarveGalleryV2, since #1579 retired the
   // v1/v2 flag) must forward useCarveNeededSet's blockCandidateChars through
-  // to recommendedRemovalChars, exactly as CarveGallery.tsx (v1) already did.
+  // to recommendedRemovalChars.
   // The existing tests above only exercise the plain CLDR-surplus path; this
   // one is built so 'ç' can NEVER reach the banner via that path — it is not
   // a member of buildProducedSet(ir) at all (no rule in this fixture literally
@@ -506,8 +504,8 @@ describe('CarveGalleryV2 — optional Latin group', () => {
     expect(screen.queryByTestId('carve-v2-suggested-group')).toBeNull();
 
     // instantiateFromExisting (inside renderGalleryV2) resets the session, so
-    // the worklist is seeded AFTER render — same ordering CarveGallery.test.tsx
-    // uses for retainedConvenienceChars (session fields reset by instantiation).
+    // the worklist is seeded AFTER render (session fields are reset by
+    // instantiation).
     const worklist: PlacementWorklist = {
       ownLetterUnits: [],
       markUnits: [],

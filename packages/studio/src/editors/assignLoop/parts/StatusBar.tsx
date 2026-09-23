@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import { KindBadge } from './KindBadge.tsx';
-import { useHoverInfoStore } from '../../../stores/hoverInfoStore.ts';
 import type { CardKind } from './KindBadge.tsx';
 import { KeySeq } from './KeySeq.tsx';
 import { ChevronIcon, UndoIcon, CheckIcon } from './carveShared.tsx';
@@ -165,29 +164,9 @@ interface StatusBarProps {
 }
 
 export function StatusBar({ kept, total, removedList, onRestore, onRestoreAll }: StatusBarProps) {
-  const { t } = useLingui();
-  const setInfo = useHoverInfoStore((s) => s.setInfo);
-  const clearInfo = useHoverInfoStore((s) => s.clearInfo);
-
-  const keptInfo = {
-    kind: 'text' as const,
-    title: t({ id: "editor.assignLoop.statusBar.keptInfoTitle", message: "Characters kept" }),
-    body: t({ id: "editor.assignLoop.statusBar.keptInfoBody", message: "How many characters you are keeping out of the total in this keyboard." }),
-  };
-  const removedInfo = {
-    kind: 'text' as const,
-    title: t({ id: "editor.assignLoop.statusBar.removedInfoTitle", message: "Removed items" }),
-    body: t({ id: "editor.assignLoop.statusBar.removedInfoBody", message: "Open this to see what you removed and restore anything you change your mind about." }),
-  };
-
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap', padding: '12px 22px', borderBottom: '1px solid var(--app-border)', background: 'var(--app-surface)' }}>
-      <div
-        onMouseEnter={() => setInfo(keptInfo)}
-        onFocus={() => setInfo(keptInfo)}
-        onMouseLeave={clearInfo}
-        onBlur={clearInfo}
-      >
+      <div>
         <div style={{ fontSize: 13, color: 'var(--app-text-muted)' }}>
           <Trans id="editor.assignLoop.statusBar.keptLine">
             <b style={{ color: 'var(--app-accent-text)', fontSize: 18 }}>{kept}</b> of {total} characters kept
@@ -199,13 +178,7 @@ export function StatusBar({ kept, total, removedList, onRestore, onRestoreAll }:
           </Trans>
         </div>
       </div>
-      <div
-        style={{ marginLeft: 'auto' }}
-        onMouseEnter={() => setInfo(removedInfo)}
-        onFocus={() => setInfo(removedInfo)}
-        onMouseLeave={clearInfo}
-        onBlur={clearInfo}
-      >
+      <div style={{ marginLeft: 'auto' }}>
         <RemovedDropdown list={removedList} onRestore={onRestore} onRestoreAll={onRestoreAll} />
       </div>
     </div>

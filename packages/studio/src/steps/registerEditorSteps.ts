@@ -122,7 +122,7 @@ export const projectNameStep: EditorStep = step({
 // ---------------------------------------------------------------------------
 
 /**
- * Carve step: CarveGallery (remove-mode, distinct from add galleries).
+ * Carve step: CarveGalleryV2 via CarveAdapter (remove-mode, distinct from add galleries).
  * Self-read: reads and rewrites groups[]/stores[]/raw[] without upstream producer.
  * inputs stays [] to avoid C2 data cycle with mechanisms/touch (FR-002).
  * CARVE_WRITES: groups[] / stores[] / raw[] (editorMutate.ts).

@@ -15,11 +15,10 @@ import { buildProducedSet, resolveEffectiveScript } from '@keyboard-studio/contr
 import { isParallelIndexFanOut, classifyStoreSlotEdit, describeStorePairing, analyzeStores, buildProducerIndex, isCharCoveredForLocale, collectCharContributors, sliceContributorDescriptors, isPlusSeparator, parseSlotId, isCombiningMarkChar } from '@keyboard-studio/engine';
 import type { ProducerIndex } from '@keyboard-studio/engine';
 import type { StoreSlotBlockReason, StoreSlotEditMode, StoreAnalysis, CharContributors, ContributorDescriptor, CharNormalizationForm } from '@keyboard-studio/engine';
-import type { I18n } from '@lingui/core';
-import { resolveContentString } from './contentI18n.ts';
 import { caseGroupFor, caseTrimSet } from './carveCasePairs.ts';
 import { getLoadedLangtags } from './langtagsDefaults.ts';
 import { lowerBareLetter } from './keyCasing.ts';
+import { isFormatChar } from '../survey/charNormUtils.ts';
 export type CardKind = 'pattern' | 'group' | 'store' | 'raw';
 
 // ---------------------------------------------------------------------------
@@ -27,21 +26,6 @@ export type CardKind = 'pattern' | 'group' | 'store' | 'raw';
 // ---------------------------------------------------------------------------
 
 export type ModifierLayer = 'base' | 'shift' | 'ralt' | 'ctrl' | 'other';
-
-/** Single source of truth for the four visible modifier-layer buckets used by Inspector and Rail. */
-export interface ModGroupDef {
-  id: string;
-  /** Display label used by Inspector (e.g. 'Base', 'Shift'). Rail may derive a short label via .toLowerCase(). */
-  label: string;
-  layers: ModifierLayer[];
-}
-
-export const MOD_GROUP_DEFS: ModGroupDef[] = [
-  { id: 'base',  label: 'Base',  layers: ['base'] },
-  { id: 'shift', label: 'Shift', layers: ['shift'] },
-  { id: 'altgr', label: 'AltGr', layers: ['ralt'] },
-  { id: 'other', label: 'Other', layers: ['ctrl', 'other'] },
-];
 
 /**
  * Classify the modifier set of an IRRule into a ModifierLayer bucket.
@@ -52,8 +36,9 @@ export const MOD_GROUP_DEFS: ModGroupDef[] = [
  * `CTRL+RALT` and `CTRL+LALT` both demote to generic `[CTRL ALT]`; also no
  * LCTRL handling here). This function — along with `prettyMod` and
  * `modifierLabel` below — feeds only `CarveGlyph.modifierLayer` /
- * `modifierLabel`, render-only inputs to the Carve Rail/Inspector's fixed
- * 4-bucket display (base/shift/altgr/other). Nothing here reaches emitted
+ * `modifierLabel`, render-only fields bucketed for a fixed 4-bucket display
+ * (base/shift/altgr/other) — read by no live surface since the v1 rule/node
+ * carve gallery was removed. Nothing here reaches emitted
  * `.kmn`, the VFS, or the S-08 combo-authoring path (that path canonicalizes
  * via `MechanismGallery.tsx`, which does use `canonicalizeCombo`). This
  * mirrors the same already-documented decision for `scaffoldTouchLayout.ts`'s
@@ -189,6 +174,20 @@ const INVISIBLE_CHAR_LABELS: Record<string, string> = {
   '­': 'SOFT HYPHEN',
   '͏': 'COMBINING GRAPHEME JOINER',
   '᠎': 'MONGOLIAN VOWEL SEPARATOR',
+  // spec 075 — the invisible-characters step offers these by name (FR-015).
+  '\u2060': 'WORD JOINER',
+  '\u200E': 'LEFT-TO-RIGHT MARK',
+  '\u200F': 'RIGHT-TO-LEFT MARK',
+  '\u202A': 'LEFT-TO-RIGHT EMBEDDING',
+  '\u202B': 'RIGHT-TO-LEFT EMBEDDING',
+  '\u202C': 'POP DIRECTIONAL FORMATTING',
+  '\u202D': 'LEFT-TO-RIGHT OVERRIDE',
+  '\u202E': 'RIGHT-TO-LEFT OVERRIDE',
+  '\u2066': 'LEFT-TO-RIGHT ISOLATE',
+  '\u2067': 'RIGHT-TO-LEFT ISOLATE',
+  '\u2068': 'FIRST STRONG ISOLATE',
+  '\u2069': 'POP DIRECTIONAL ISOLATE',
+  '\u061C': 'ARABIC LETTER MARK',
 };
 
 /** Returns a short label if the character is invisible/non-printing, otherwise null. */
@@ -200,12 +199,13 @@ export function invisibleCharLabel(ch: string): string | null {
     const cp = ch.codePointAt(0)!;
     return `COMBINING MARK (U+${cp.toString(16).toUpperCase().padStart(4, '0')})`;
   }
+  // Any other format character (Cf) — a code-point entry can reach one the
+  // map does not name; it still needs a non-empty label (spec 075 FR-015).
+  if (isFormatChar(ch)) {
+    const cp = ch.codePointAt(0)!;
+    return `FORMAT CHARACTER (U+${cp.toString(16).toUpperCase().padStart(4, '0')})`;
+  }
   return null;
-}
-
-// A glyph tile the user is hovering/focusing, plus its current removed state — used by the Info View.
-export interface HoverGlyph extends Pick<CarveGlyph, 'keys' | 'ch' | 'capability' | 'owners'> {
-  off: boolean;
 }
 
 /**
@@ -231,9 +231,8 @@ export interface CarveGlyph {
   /**
    * Faithful, ordered "how it's typed" step sequence (#1399) — deliberately
    * SEPARATE from `keys` (the simplified display string `contextToKeys`
-   * builds, which the old rule/node Rail view — `CarveGallery.tsx` — reads
-   * and must keep reading unchanged). Consumed only by the character-first
-   * view (`irToCharacterView.ts` -> `CarveGalleryV2.tsx`).
+   * builds for the since-removed v1 rule/node carve gallery). Consumed only by
+   * the character-first view (`irToCharacterView.ts` -> `CarveGalleryV2.tsx`).
    *
    * Semantics: a single entry is one fully-composed CHORD (e.g. "Shift + A",
    * already including any modifier prefix) — simultaneous keys. Multiple
@@ -631,7 +630,7 @@ export function groupToGlyphs(group: IRGroup, ir: KeyboardIR = EMPTY_IR, capabil
 // collectOwnedNodeIds — union of every nodeId claimed by any recognized
 // pattern's ownedNodes (the render-layer hardening for the ghost-chip bug:
 // even if ownedByPattern drifts from a pattern's ownedNodes, this set lets
-// the group-Inspector rendering fall back to the authoritative ownedNodes
+// group rendering fall back to the authoritative ownedNodes
 // list rather than trusting only the per-rule stamp).
 // ---------------------------------------------------------------------------
 
@@ -661,11 +660,10 @@ export function patternToGlyphs(pattern: Pattern, ir: KeyboardIR, capabilities: 
   const ownedIds = new Set(pattern.ownedNodes.map((n) => n.nodeId));
   const glyphs: CarveGlyph[] = [];
   const seen = new Set<string>();
-  // Owning-pattern tag prepended to every produced glyph's owners. Consumed
-  // only by the not-removable info message (InfoView "Managed by the
-  // [Pattern] pattern") — never rendered as a redundant tag in a
-  // pattern-inspector chip (that AC is intentionally not implemented; see
-  // #917 scope decision).
+  // Owning-pattern tag prepended to every produced glyph's owners. Its only
+  // reader was the v1 carve gallery's info panel ("Managed by the [Pattern]
+  // pattern"), since removed; no live surface renders it (see #917 scope
+  // decision).
   const patternOwner: GlyphOwner = { kind: 'pattern', nodeId: pattern.id, label: pattern.title };
 
   for (const group of ir.groups) {
@@ -981,7 +979,7 @@ export function computeStoreRoleLine(
 }
 
 // ---------------------------------------------------------------------------
-// CarveNode — unified rail node type for the Rail + Inspector layout
+// CarveNode — unified rail node type (patterns, groups, stores, raw fragments)
 // ---------------------------------------------------------------------------
 
 export interface CarveNode {
@@ -1007,121 +1005,6 @@ export interface CarveNode {
   pairedStoreRoles?: ('input' | 'output' | 'input+output' | undefined)[] | undefined;
   /** store: short top-of-panel role line ("Output — …" / "Input — …"); undefined when role is undetermined */
   storeRoleLine?: string | undefined;
-  /**
-   * Removal-recommendation confidence, computed by annotateRemovalRecommendations() as a
-   * separate pass over toRailNodes() output (see #525 FOUNDATION slice):
-   *   - 'high'   — safe-to-remove suggestion; every character this node produces is absent
-   *                from the author's confirmed inventory, with no wanted character depending
-   *                on it (see the store dependency guard in annotateRemovalRecommendations).
-   *   - 'medium' — reserved for softer signals (Unicode-block / Phase-C mechanism-not-enabled).
-   *                Not emitted by the slice-1 conservative rule; TODO(#525) once those signals land.
-   *   - 'none'   — no suggestion (default; also the value when Phase B inventory is empty).
-   * Undefined on nodes produced directly by toRailNodes() before annotation runs.
-   */
-  recommendation?: 'high' | 'medium' | 'none' | undefined;
-}
-
-/**
- * `CarveNode.name` is `pattern.title` verbatim for `kind: 'pattern'` nodes
- * (see toRailNodes below) — a Tier B content string (spec 046 T028). Render
- * sites across the Carve editor (Rail, Inspector header, InfoView hover
- * panel, DepBanner, CarveGallery cascade dialogs) all print `node.name`, so
- * resolve it here once rather than duplicating the
- * `node.kind === 'pattern' ? resolveContentString(...) : node.name` branch at
- * every call site. Group/store/raw names are IR-authoring names, not Pattern
- * content, and pass through unresolved.
- */
-export function resolveNodeName(node: CarveNode, i18n?: I18n): string {
-  if (node.kind !== 'pattern') return node.name;
-  return resolveContentString('patterns', node.nodeId, 'title', node.name, i18n);
-}
-
-/**
- * Same resolution as resolveNodeName, for the `{kind, nodeId, label}` shape
- * shared by CharLocation (buildCharWeb's cross-reference web popup, below)
- * and the engine's CharContributors.locations (collectCharContributors) —
- * both carry pattern.title verbatim in `label` for `kind: 'pattern'` entries.
- */
-export function resolveLocationLabel(
-  loc: { kind: 'group' | 'pattern' | 'store' | 'raw'; nodeId: string; label: string },
-  i18n?: I18n,
-): string {
-  if (loc.kind !== 'pattern') return loc.label;
-  return resolveContentString('patterns', loc.nodeId, 'title', loc.label, i18n);
-}
-
-/**
- * `CarveNode.referencedByLabel` mirrors the owning pattern's title verbatim
- * for a store node (spec 046 T028) — same Tier B content string as
- * resolveNodeName/resolveLocationLabel above, just carried under a different
- * field name. Resolves it once rather than duplicating the
- * `referencedByNodeId !== undefined ? resolveContentString(...) : referencedByLabel`
- * ternary at each of its two call sites (InfoView.tsx, Inspector.tsx).
- * Returns undefined when the node has no referencing pattern at all.
- */
-export function resolveReferencedByLabel(node: CarveNode, i18n?: I18n): string | undefined {
-  if (node.referencedByLabel === undefined) return undefined;
-  return node.referencedByNodeId !== undefined
-    ? resolveContentString('patterns', node.referencedByNodeId, 'title', node.referencedByLabel, i18n)
-    : node.referencedByLabel;
-}
-
-// ---------------------------------------------------------------------------
-// idsTriState — tri-state derived purely from a flat array of item ids.
-// Single source shared by glyphsTriState (CarveGlyph.gid) and nodeState's
-// store-chip branch (StoreCharChip.chipId) so both derive tri-state the
-// same way.
-// ---------------------------------------------------------------------------
-
-export function idsTriState(
-  ids: string[],
-  isItemDeleted: (id: string) => boolean,
-): 'on' | 'partial' | 'off' {
-  if (ids.length === 0) return 'on';
-  const off = ids.filter((id) => isItemDeleted(id)).length;
-  if (off === 0) return 'on';
-  if (off === ids.length) return 'off';
-  return 'partial';
-}
-
-// ---------------------------------------------------------------------------
-// glyphsTriState — tri-state derived purely from a flat CarveGlyph array
-// ---------------------------------------------------------------------------
-
-export function glyphsTriState(
-  glyphs: CarveGlyph[],
-  isItemDeleted: (id: string) => boolean,
-): 'on' | 'partial' | 'off' {
-  return idsTriState(glyphs.map((g) => g.gid), isItemDeleted);
-}
-
-// ---------------------------------------------------------------------------
-// nodeState — tri-state based on individual glyph, store-chip, or node deletion
-// ---------------------------------------------------------------------------
-
-export function nodeState(
-  node: CarveNode,
-  isItemDeleted: (id: string) => boolean,
-  isDeleted: (id: string) => boolean,
-): 'on' | 'partial' | 'off' {
-  if (node.glyphs && node.glyphs.length > 0) {
-    return glyphsTriState(node.glyphs, isItemDeleted);
-  }
-  // Stores with at least one toggleable (non-disabled) chip get tri-state
-  // over those chip ids. A whole-deleted store (isDeleted) always reports
-  // 'off' regardless of chip state — deleting the whole store node
-  // supersedes per-character toggling. Stores with no toggleable chips
-  // (all disabled, or no chips at all) fall through to the binary check.
-  if (node.storeChips && node.storeChips.length > 0) {
-    if (isDeleted(node.nodeId)) return 'off';
-    const toggleableIds = node.storeChips
-      .filter((c) => c.action !== 'disabled')
-      .map((c) => c.chipId);
-    if (toggleableIds.length > 0) {
-      return idsTriState(toggleableIds, isItemDeleted);
-    }
-  }
-  return isDeleted(node.nodeId) ? 'off' : 'on';
 }
 
 // ---------------------------------------------------------------------------
@@ -1865,48 +1748,6 @@ export function crossPairTrigger(storeName: string, partnerName: string, ir: Key
 // toRailNodes — build the full node list for the Rail from a KeyboardIR
 // ---------------------------------------------------------------------------
 
-/**
- * One node in a character's cross-reference "web" — a group, pattern, or store
- * where that character also appears. Render-layer only (not a contract type).
- */
-export interface CharLocation {
-  kind: CardKind; // 'group' | 'pattern' | 'store'
-  nodeId: string;
-  label: string;
-}
-
-/**
- * Build the character → locations web ONCE from the already-assembled rail nodes.
- *
- * Keys are the exact glyph `ch` values on screen, so a card's lookup can never
- * mismatch the character it displays. Cost is O(total glyphs), NOT O(chips ×
- * rules) — do not rebuild this per glyph (that path hangs on huge keyboards).
- * The Inspector filters out the currently-viewed card per glyph before display.
- */
-export function buildCharWeb(nodes: CarveNode[]): Map<string, CharLocation[]> {
-  const web = new Map<string, CharLocation[]>();
-  const seen = new Map<string, Set<string>>(); // ch → nodeIds already recorded
-
-  const add = (ch: string, loc: CharLocation) => {
-    if (!ch) return;
-    let ids = seen.get(ch);
-    if (ids === undefined) { ids = new Set(); seen.set(ch, ids); }
-    if (ids.has(loc.nodeId)) return;
-    ids.add(loc.nodeId);
-    const arr = web.get(ch);
-    if (arr) arr.push(loc); else web.set(ch, [loc]);
-  };
-
-  for (const node of nodes) {
-    if (node.kind === 'group' || node.kind === 'pattern') {
-      for (const g of node.glyphs ?? []) add(g.ch, { kind: node.kind, nodeId: node.nodeId, label: node.name });
-    } else if (node.kind === 'store') {
-      for (const c of node.storeChips ?? []) add(c.ch, { kind: 'store', nodeId: node.nodeId, label: node.name });
-    }
-  }
-  return web;
-}
-
 export function toRailNodes(ir: KeyboardIR, capabilities: Map<string, RemovalCapability> = new Map()): CarveNode[] {
   const nodes: CarveNode[] = [];
   const recognized = ir.recognizedPatterns.filter((p) => p.origin === 'recognized');
@@ -2016,27 +1857,6 @@ export function toRailNodes(ir: KeyboardIR, capabilities: Map<string, RemovalCap
   return nodes;
 }
 
-// ---------------------------------------------------------------------------
-// annotateRemovalRecommendations — #525 FOUNDATION slice
-//
-// Separate, pure pass over an already-built CarveNode[] (from toRailNodes()).
-// Kept out of toRailNodes() itself so the node-building pass stays free of the
-// confirmed-inventory signal — callers that don't have a confirmed inventory
-// yet (or don't want recommendations) can use toRailNodes() output unannotated.
-//
-// Slice-1 scope is deliberately narrow: the ONLY signal is "does this node
-// produce any character the author confirmed they want?" No Unicode-block
-// signal, no Phase-C mechanism-not-enabled signal, no Track-1 default
-// filtering — see the TODO(#525) markers below for each deferred signal's
-// natural hook point.
-// ---------------------------------------------------------------------------
-
-// Non-literal markers outputToChar()/displayChar() can emit — a placeholder
-// means "production unknown", not "produces an unwanted character", so these
-// must never be treated as produced chars (they'd otherwise leak into the
-// removal-recommendation signal as false "unwanted" output — see #525 P1).
-const PLACEHOLDER_CHARS = new Set(['…', '‹dk›', '🔔', '?']);
-
 /**
  * Categorical never-remove guard (#525): a character is never recommended
  * for removal if its Unicode General_Category is a Number (`\p{N}`),
@@ -2044,14 +1864,21 @@ const PLACEHOLDER_CHARS = new Set(['…', '‹dk›', '🔔', '?']);
  * language. CLDR's punctuation/number exemplar tiers are language-specific
  * and often sparse (e.g. Greek `el` doesn't list ASCII `.`/`,`/`0-9`), so
  * these fall outside `needed` and would otherwise look surplus even though
- * they're wanted on essentially every keyboard. Shared by both
- * annotateRemovalRecommendations (node-level) and recommendedRemovalChars
- * (character-level) so the two signals agree.
+ * they're wanted on essentially every keyboard. Applied by
+ * recommendedRemovalChars (character-level).
  *
  * A combining/letter grapheme (base letter + mark) normalizes to category
  * L/M, not N/P/S, so it does NOT match here — surplus letters/marks are
  * still eligible for removal recommendations. Only bare number/punctuation/
  * symbol codepoints are shielded.
+ *
+ * Punctuation is the one family that now gets its own question BEFORE carve:
+ * the engine's `punctuationProposal.ts` (spec 075) proposes the base's
+ * punctuation for acceptance on the punctuation step, and a mark the author
+ * removes there is declared unsupported in the confirmed inventory — yet this
+ * rule still keeps it on the layout. That disagreement is surfaced on the
+ * punctuation step's base-group caption; changing the rule is a separate
+ * feature.
  */
 function isAlwaysKeepCategory(ch: string): boolean {
   return /^[\p{N}\p{P}\p{S}]$/u.test(ch);
@@ -2126,44 +1953,12 @@ function isBasicLatinCrossScriptFallthrough(ch: string, bcp47: string | null | u
   return isAsciiLatinLetter(ch) && !targetScriptIsLatin(bcp47);
 }
 
-/**
- * Produced output characters for a single node — the `.ch` of every glyph
- * (group/pattern) or every store chip (store). Raw fragments produce nothing
- * displayable, so they always resolve to an empty set (→ 'none').
- *
- * Two normalizations vs. the raw `.ch`:
- * - Strips a leading dotted-circle (U+25CC) that displayChar() prefixes onto
- *   combining-mark glyphs for standalone visibility, so a combining mark the
- *   author confirmed (e.g. in confirmedInventory as raw `̀`) still
- *   matches a fan-out glyph whose `.ch` is `◌̀`.
- * - Drops placeholder chars (PLACEHOLDER_CHARS) entirely rather than adding
- *   them to the set — an unresolved index()/outs()/deadkey/beep output is
- *   "don't know what this produces," not "produces an unwanted character."
- */
-function producedCharsOf(node: CarveNode, form: CharNormalizationForm = 'NFC'): Set<string> {
-  const chars = new Set<string>();
-  const add = (raw: string) => {
-    const stripped = raw.startsWith('◌') ? raw.slice(1) : raw;
-    const normalized = stripped.normalize(form);
-    // Placeholder-detection uses NFC regardless of `form`: PLACEHOLDER_CHARS
-    // are ASCII/invariant tokens ('…', '‹dk›', '🔔', '?'), identical under
-    // every normalization form, so this check is unaffected by `form`.
-    if (PLACEHOLDER_CHARS.has(stripped.normalize('NFC'))) return;
-    chars.add(normalized);
-  };
-  for (const g of node.glyphs ?? []) add(g.ch);
-  for (const c of node.storeChips ?? []) add(c.ch);
-  return chars;
-}
-
 // ---------------------------------------------------------------------------
 // resolveCoordinatedPartnerItems — SHARED coordinated-partner resolution
 // (#525/#931 follow-up review fix — refactor).
 //
-// Both coordinatedDropHitsNeededChar (boolean short-circuit) and
-// coordinatedCollateralForSlots (display-list builder) independently walked
-// classifyStoreSlotEdit's `coordinatedWith` and looked up each partner
-// store's item at the same `itemsIndex` — this is that walk, written once.
+// Walks classifyStoreSlotEdit's `coordinatedWith` and looks up each partner
+// store's item at the same `itemsIndex`, for coordinatedDropHitsNeededChar.
 // Pure and read-only: it never re-derives or changes the engine's
 // coordinated-drop algorithm (classifyStoreSlotEdit/applyStoreSlotRemovals
 // remain the single source of truth for WHICH stores pair and how), it only
@@ -2172,8 +1967,7 @@ function producedCharsOf(node: CarveNode, form: CharNormalizationForm = 'NFC'): 
 // Takes an ALREADY-CLASSIFIED `mode` rather than (store, ir, analysis) so a
 // caller looping over multiple itemsIndex values for the SAME store can
 // hoist the classifyStoreSlotEdit call once outside that loop (mode never
-// changes across itemsIndex — see the #931-perf fix in
-// annotateRemovalRecommendations below).
+// changes across itemsIndex — the #931 perf fix).
 // ---------------------------------------------------------------------------
 
 /** A coordinated partner store's item at a given slot, resolved from a StoreSlotEditMode. */
@@ -2279,311 +2073,14 @@ function isOutputStore(store: IRStore, analysis: StoreAnalysis): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// coordinatedCollateralForSlots — manual-carve safety helper (#525/#931
-// follow-up, MANUAL-carve gap).
-//
-// collectCharContributors names the store slots a manual chip/cascade click
-// targets DIRECTLY. applyStoreSlotRemovals' coordinated-drop pairing graph
-// (classifyStoreSlotEdit's `coordinatedWith`) then ALSO splices every PAIRED
-// partner store at the SAME itemsIndex — e.g. removing an input char from a
-// deadkey INPUT store silently drops the aligned composed character from the
-// OUTPUT store too. That collateral is otherwise invisible to the confirm
-// dialog. This pass resolves it explicitly for display: for every slot that
-// will actually be dropped (mode 'drop'), it names each coordinated
-// partner's character at the same index, flagging whether it's a needed
-// character (isNeeded) — reusing resolveCoordinatedPartnerItems, the exact
-// same walk coordinatedDropHitsNeededChar above uses for the
-// recommendation-signal guard, never a separate heuristic. Does NOT change
-// or re-derive the engine's coordinated-drop algorithm itself — purely a
-// read-only projection of what applyStoreSlotRemovals will do.
-// ---------------------------------------------------------------------------
-
-/** One character collaterally dropped from a PAIRED store by a coordinated removal. */
-export interface CoordinatedCollateralChar {
-  ch: string;
-  storeName: string;
-  isNeeded: boolean;
-  /**
-   * "<partnerStore.nodeId>#<itemsIndex>" — the locked slot-id contract (same
-   * convention as CharContributors.storeSlotIds / StoreCharChip.chipId).
-   * Lets a caller (e.g. CarveGallery's handleCascadePrimary) fold this
-   * partner slot into cascadeDelete's storeSlotIds argument so a confirmed
-   * "remove everywhere" persists the collateral drop in deletedItemIds —
-   * without this, the Gallery kept showing the collateral char as KEPT even
-   * though export-time applyStoreSlotRemovals had already dropped it.
-   */
-  slotId: string;
-  /**
-   * Whether the partner store PRODUCES this character (`output` — an
-   * index()/outs() target) or merely matches on it (`input` — any()-consumed).
-   * Drives the FR-005 severity split: losing a produced character is a warning,
-   * losing an input mapping is informational (the transform stops firing).
-   */
-  role: 'input' | 'output';
-  /**
-   * True when this drop genuinely makes a needed character unproducible —
-   * `isNeeded && role === 'output' && producerCount <= 1`. Exactly the guard's
-   * conjunction (spec 051 FR-003), surfaced for display so the UI splits
-   * severity by real consequence rather than by `isNeeded` alone.
-   */
-  isLost: boolean;
-}
-
-/**
- * Resolve the coordinated-drop collateral for a set of store-slot ids about
- * to be removed (typically `CharContributors.storeSlotIds` from
- * collectCharContributors). A partner slot already present in `storeSlotIds`
- * itself (i.e. already an explicit removal target, not a hidden surprise) is
- * excluded — this surfaces only the collateral the author did NOT already
- * ask to remove. Deduped by partner slot id (a partner can only be hit once
- * per index, but two different requested slots could in principle name the
- * same partner+index).
- *
- * @param storeSlotIds Slot ids ("<storeNodeId>#<itemsIndex>") targeted for removal.
- * @param ir           The full IR.
- * @param needed       Confirmed-inventory ∪ CLDR needed-set — the same union the
- *                      caller already threads into annotateRemovalRecommendations /
- *                      recommendedRemovalChars.
- * @param bcp47        Target language, for the Turkic-aware case fold in isCharCoveredForLocale.
- * @param analysis     Optional precomputed analyzeStores(ir) result (see StoreAnalysis doc) —
- *                      pass this when calling for many removals against the same ir.
- * @param form         Normalization form both `needed` and the resolved collateral
- *                      character are compared under (default "NFC", preserving
- *                      pre-existing behavior) — see isCharCoveredForLocale's `form` doc.
- */
-export function coordinatedCollateralForSlots(
-  storeSlotIds: readonly string[],
-  ir: KeyboardIR,
-  needed: ReadonlySet<string>,
-  bcp47?: string | null,
-  analysis: StoreAnalysis = analyzeStores(ir),
-  form: CharNormalizationForm = 'NFC',
-  producerIndex: ProducerIndex = buildProducerIndex(ir),
-): CoordinatedCollateralChar[] {
-  if (storeSlotIds.length === 0) return [];
-
-  // storesByNodeId resolves the TARGETED slot's own store (keyed by nodeId,
-  // as parseSlotId yields) — not carried by StoreAnalysis, which keys by
-  // name. storesByName (partner-name resolution) IS carried by StoreAnalysis
-  // (analysis.storeByName), so it is reused rather than rebuilt (#931 perf).
-  const storesByNodeId = new Map(ir.stores.map((s) => [s.nodeId, s]));
-  const targetSlotIds = new Set(storeSlotIds);
-  const seenPartnerSlotIds = new Set<string>();
-  const collateral: CoordinatedCollateralChar[] = [];
-
-  for (const slotId of storeSlotIds) {
-    const parsed = parseSlotId(slotId);
-    if (parsed === null) continue;
-    const store = storesByNodeId.get(parsed.storeNodeId);
-    if (store === undefined) continue;
-
-    const mode = classifyStoreSlotEdit(store, ir, analysis);
-    const partners = resolveCoordinatedPartnerItems(mode, parsed.itemsIndex, analysis.storeByName);
-
-    for (const { partnerStore, item, slotId: partnerSlotId } of partners) {
-      if (targetSlotIds.has(partnerSlotId) || seenPartnerSlotIds.has(partnerSlotId)) continue;
-
-      seenPartnerSlotIds.add(partnerSlotId);
-      const ch = item.value.normalize(form);
-      const isNeeded = isCharCoveredForLocale(ch, needed, bcp47 ?? '', form);
-      const role: 'input' | 'output' = isOutputStore(partnerStore, analysis) ? 'output' : 'input';
-      collateral.push({
-        ch,
-        storeName: partnerStore.name,
-        isNeeded,
-        slotId: partnerSlotId,
-        role,
-        // Same conjunction the guard applies — see coordinatedDropHitsNeededChar.
-        isLost: isNeeded && role === 'output' && (producerIndex.get(ch) ?? 0) <= 1,
-      });
-    }
-  }
-
-  return collateral;
-}
-
-/**
- * Guardrail (#525 items 2/4 — language-driven surplus, confirmed with the
- * user): recognized patterns, opaque/raw fragments, and deadkey/fan-out
- * mechanisms are structural, not simple character producers, so neither
- * signal (inventory-only or language-surplus) may ever recommend removing
- * them, however "surplus" their output looks in isolation.
- *
- * - 'pattern' nodes — owned by a recognized pattern; a rule-level version of
- *   this exclusion already keeps pattern-owned rules out of 'group' nodes
- *   (see ownedByPattern / collectOwnedNodeIds in groupToGlyphs), so excluding
- *   the 'pattern' CardKind here covers "recognized-pattern rules" too.
- * - 'raw' nodes — opaque RawKmnFragment; never produce glyphs anyway
- *   (produced.size === 0 already resolves to 'none'), excluded explicitly
- *   for clarity rather than relying on that side effect.
- * - 'group' nodes containing a deadkey-context rule, a deadkey-*registration*
- *   rule (output `dk(...)`, e.g. `+ [K_COLON] > dk(003b)`), or a
- *   parallel-store fan-out rule (isParallelIndexFanOut — the same predicate
- *   the S-02 deadkey-body/Bamum-transliteration classifier uses) — a deadkey
- *   mechanism's characters are locked together structurally; recommending
- *   removal from the character signal alone could break the composition
- *   without the author realizing it's part of a deadkey chain. Registration
- *   rules commonly live in a different group than the deadkey's consuming
- *   context rules (e.g. `group(main)` registers via output, `group(deadkeys)`
- *   consumes via context) — checking output as well as context catches that
- *   split idiom.
- *
- * Only plain letter/glyph producers (ordinary 'group' rules with no deadkey
- * involvement) and store-char producers ('store' nodes) are eligible.
- *
- * @param ownedNodeIds Precomputed collectOwnedNodeIds(ir) — hoisted by the
- *                      caller (annotateRemovalRecommendations) so this
- *                      O(rules) scan isn't repeated for every group node.
- */
-function isStructuralExclusion(node: CarveNode, ir: KeyboardIR, ownedNodeIds: Set<string>): boolean {
-  if (node.kind === 'pattern' || node.kind === 'raw') return true;
-  if (node.kind !== 'group') return false;
-
-  const group = ir.groups.find((g) => g.nodeId === node.nodeId);
-  if (!group) return false;
-
-  return group.rules.some((rule) => {
-    if (rule.ownedByPattern !== undefined || ownedNodeIds.has(rule.nodeId)) return false; // owned by a pattern — not this group's concern
-    return (
-      rule.context.some((el) => el.kind === 'deadkey') ||
-      rule.output.some((el) => el.kind === 'deadkey') ||
-      isParallelIndexFanOut(rule)
-    );
-  });
-}
-
-/**
- * Annotates each node's `recommendation` field. See CarveNode.recommendation
- * for the meaning of each value; slice-1/2 only ever emit 'high' or 'none'.
- *
- * Conservative by design — "when in doubt, return 'none'": a node is 'high'
- * iff it is not structurally excluded (isStructuralExclusion above), produces
- * at least one character, and every character it produces is absent from
- * `needed` AND (for stores) no rule that references it produces a needed
- * character (the dependency guard above).
- *
- * `needed` (#525 items 2/4 — language-driven surplus) is the union of
- * `neededChars` (a target language's CLDR exemplar set, resolved upstream —
- * see neededCharsForLanguage) and `confirmedInventory` (the author's Phase B
- * choices). Passing `neededChars` as null/undefined (CLDR unavailable for
- * this language, or not yet resolved) falls back to the original
- * inventory-only behavior — `needed` degrades to `confirmedInventory` alone,
- * so this is backward-compatible with 3-argument callers. If BOTH sets are
- * empty, there is no signal at all — every node gets 'none' rather than a
- * spurious "everything is unwanted" result.
- *
- * Membership against `needed` is case-folded via `isCharCoveredForLocale`
- * (reusing suggestMissing.ts's `isCovered` exception-aware fold, incl. the
- * Turkic dotted-I exception) rather than exact-match: CLDR exemplars are
- * lowercase-only, so a keyboard producing an uppercase accented letter (e.g.
- * French "É") must still count as needed. `bcp47` is required for the Turkic
- * exception check; when omitted (no target language resolved yet), a plain
- * non-Turkic fold is used.
- *
- * `form` (default "NFC", preserving pre-046-carve behavior) is the
- * normalization form the marks series' output-form decision resolves to
- * (see `normalizationFormForOutputForm` — "ready-made" => "NFC",
- * "base-plus-mark" => "NFD"). BOTH the produced-character set (via
- * `producedCharsOf`) and `needed` are normalized to this SAME form before
- * comparison, so the chosen output form actually drives which combo
- * grapheme (precomposed vs. decomposed) counts as a match — the "apples to
- * apples" carve-gallery comparison. `needed`'s members are re-normalized
- * here rather than trusted as already-`form`-normalized, since callers may
- * pass sets built against the default NFC assumption.
- *
- * Cross-script ASCII Latin fall-through (`isBasicLatinCrossScriptFallthrough`,
- * post-#526 follow-on) is no longer a hard exclude here: a char that only
- * qualifies on that ground still runs through the ordinary surplus/dependency
- * checks below and ends up 'high' like any other fully-surplus node, rather
- * than being suppressed outright. (A node-level tag distinguishing this case
- * — `recommendationReason` — existed briefly but had no live consumer; #1560
- * dropped it. The character-level equivalent, `RecommendedRemovalChar.reason
- * === 'cross-script-latin'`, is live via RemovalBanner and unaffected.)
- */
-export function annotateRemovalRecommendations(
-  nodes: CarveNode[],
-  ir: KeyboardIR,
-  confirmedInventory: ReadonlySet<string>,
-  neededChars?: ReadonlySet<string> | null,
-  bcp47?: string | null,
-  form: CharNormalizationForm = 'NFC',
-): CarveNode[] {
-  const renormalize = (set: ReadonlySet<string>): Set<string> => new Set([...set].map((ch) => ch.normalize(form)));
-  const needed: ReadonlySet<string> = neededChars
-    ? renormalize(new Set([...neededChars, ...confirmedInventory]))
-    : renormalize(confirmedInventory);
-
-  if (needed.size === 0) {
-    return nodes.map((node) => ({ ...node, recommendation: 'none' }));
-  }
-
-  const ownedNodeIds = collectOwnedNodeIds(ir);
-  // '' is a safe "no locale known" default: primarySubtag('') is '' which is
-  // never in TURKIC_LOCALES, so isCharCoveredForLocale falls back to a plain
-  // (non-Turkic) case fold — matching pre-fix exact-match behavior's intent
-  // as closely as possible when the target language hasn't resolved yet.
-  const isNeeded = (ch: string): boolean => isCharCoveredForLocale(ch, needed, bcp47 ?? '', form);
-
-  // Precomputed ONCE per IR (not per store node) — classifyStoreSlotEdit scans
-  // every rule in the IR, mirroring recommendedRemovalChars' perf note below.
-  // storesByName is NOT rebuilt here — analysis.storeByName already carries
-  // an identical name-keyed map (#931 perf).
-  const analysis = analyzeStores(ir);
-  // Also hoisted ONCE per IR (spec 051 invariant D4) — the coordinated guard's
-  // "does this needed char have another producer?" test reads it per slot.
-  const producerIndex = buildProducerIndex(ir);
-  const storesByNodeId = new Map(ir.stores.map((s) => [s.nodeId, s]));
-
-  return nodes.map((node) => {
-    if (isStructuralExclusion(node, ir, ownedNodeIds)) return { ...node, recommendation: 'none' };
-
-    const produced = producedCharsOf(node, form);
-    if (produced.size === 0) return { ...node, recommendation: 'none' };
-
-    for (const ch of produced) {
-      if (isNeeded(ch) || isAlwaysKeepCategory(ch)) {
-        return { ...node, recommendation: 'none' };
-      }
-    }
-
-    if (node.kind === 'store') {
-      const store = storesByNodeId.get(node.nodeId);
-      if (store !== undefined) {
-        // classifyStoreSlotEdit is index-INDEPENDENT (it classifies the whole
-        // store, not a single slot) — hoisted out of the itemsIndex loop below
-        // so it runs ONCE per store instead of once per item (#931 perf).
-        const mode = classifyStoreSlotEdit(store, ir, analysis);
-        for (let i = 0; i < store.items.length; i++) {
-          if (coordinatedDropHitsNeededChar(mode, i, needed, bcp47, analysis, producerIndex, form)) {
-            return { ...node, recommendation: 'none' };
-          }
-        }
-      }
-    }
-
-    // TODO(#525): fold in the Unicode-block signal here (a node whose produced
-    // chars all fall in a block the author's script routing never touches is a
-    // softer 'medium' signal, not 'high') once §9 routing exposes block ranges.
-    // TODO(#525): fold in the Phase-C mechanism-not-enabled signal here (a node
-    // that exists only to support a mechanism the author didn't select in
-    // Phase C survey answers) once that mechanism-selection data is threaded
-    // through to the carve step.
-    return { ...node, recommendation: 'high' };
-  });
-}
-
-// ---------------------------------------------------------------------------
 // recommendedRemovalChars — #525 BANNER slice
 //
-// Character-level removal-recommendation signal, sibling to
-// annotateRemovalRecommendations's node-level 'high'/'none' pass above. The
-// banner's flat checklist operates at CHARACTER granularity, not node
-// granularity — a node can mix simple and structural producers of the SAME
-// character (e.g. a plain group rule AND a deadkey fan-out both happen to
-// produce the same surplus letter), so the node-level signal alone can't
-// drive a per-character checklist safely. This pass re-derives its own
-// producer-simplicity check per character via collectCharContributors,
-// rather than reusing isStructuralExclusion (which is node-scoped).
+// Character-level removal-recommendation signal. The suggestion list operates
+// at CHARACTER granularity, not node granularity — a node can mix simple and
+// structural producers of the SAME character (e.g. a plain group rule AND a
+// deadkey fan-out both happen to produce the same surplus letter), so this
+// pass derives its own producer-simplicity check per character via
+// collectCharContributors.
 // ---------------------------------------------------------------------------
 
 /**
@@ -2605,8 +2102,7 @@ export function annotateRemovalRecommendations(
  *     as a whole-rule producer (see the ruleNodeIds loop below).
  *   - NOT owned by a recognized pattern (ownedByPattern === undefined) — a
  *     pattern-owned rule is part of a structural mechanism the recognizer
- *     already identified, mirroring isStructuralExclusion's 'pattern'
- *     exclusion at the node level.
+ *     already identified.
  *
  * Default-safe: any shape this predicate doesn't explicitly recognize as
  * simple returns false.
@@ -2737,7 +2233,7 @@ function mergeCharContributors(records: readonly CharContributors[]): CharContri
   };
 }
 
-/** A single recommended-removal character for the CarveGallery banner checklist. */
+/** A single recommended-removal character for the carve gallery's suggestion groups. */
 export interface RecommendedRemovalChar {
   ch: string;
   /** Contributor info for removal — pass straight to cascadeDelete(contributors.ruleNodeIds, contributors.storeSlotIds). */
@@ -2778,12 +2274,11 @@ export interface RecommendedRemovalChar {
 }
 
 /**
- * Character-level removal-recommendation signal for the CarveGallery banner
- * (#525 BANNER slice). A produced character `ch` is recommended iff ALL hold:
+ * Character-level removal-recommendation signal for the carve gallery's
+ * suggestion groups (#525 BANNER slice). A produced character `ch` is recommended iff ALL hold:
  *
  *   1. Surplus — `ch` is absent from `needed` (case-folded via
- *      isCharCoveredForLocale, same fold annotateRemovalRecommendations
- *      uses). The caller pre-unions neededChars ∪ confirmedInventory into
+ *      isCharCoveredForLocale). The caller pre-unions neededChars ∪ confirmedInventory into
  *      `needed` — this function does no signal-merging of its own. `ch` is
  *      also never surplus if it falls in the categorical never-remove guard
  *      (isAlwaysKeepCategory — Unicode Number/Punctuation/Symbol), which
@@ -2824,12 +2319,14 @@ export interface RecommendedRemovalChar {
  * banner UI can offer it as a separate, optional, low-priority removal group
  * instead of silently keeping it.
  *
- * Returns [] when `needed` is empty — no signal at all yet (mirrors
- * annotateRemovalRecommendations's "no default is a defect until we're
- * sure" stance), so the banner never shows before Phase B/CLDR resolves.
+ * Returns [] when `needed` is empty — no signal at all yet (the "no default
+ * is a defect until we're sure" stance), so the banner never shows before
+ * Phase B/CLDR resolves.
  *
- * `form` (default "NFC", preserving pre-046-carve behavior) — see
- * annotateRemovalRecommendations's matching doc. `buildProducedSet` (from
+ * `form` (default "NFC", preserving pre-046-carve behavior) is the
+ * normalization form the marks series' output-form decision resolves to
+ * (see `normalizationFormForOutputForm` — "ready-made" => "NFC",
+ * "base-plus-mark" => "NFD"). `buildProducedSet` (from
  * contracts) always returns NFC; rather than touching that shared helper
  * (used well beyond carve), its output is re-normalized to `form` here at
  * this comparison seam, alongside `needed`, so both sides of the

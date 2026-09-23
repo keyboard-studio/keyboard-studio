@@ -32,6 +32,8 @@
     "test:kbgen": "tsc --noEmit -p utilities/kbgen && vitest run --root utilities/kbgen",
     "test:nfd-tolerance-corpus": "vitest run --root utilities/nfd-tolerance-corpus",
     "nfd-tolerance-corpus": "node utilities/nfd-tolerance-corpus/run.mjs",
+    "test:km-triage": "node --test \"utilities/km-triage-app/*.test.js\"",
+    "test:supportability-scanner": "vitest run --root utilities/supportability-scanner",
     "typecheck": "pnpm -r typecheck",
     "lint": "eslint \"packages/*/src/**/*.{ts,tsx}\" && pnpm run depcruise && pnpm run crew-lint && pnpm run facet-lint && pnpm run facet-index-lint && pnpm run adaptation-catalog-lint && pnpm run i18n-catalog-lint && pnpm run content-i18n-freshness && pnpm run content-i18n-lint && pnpm run test-antipattern-lint && pnpm run token-lint && pnpm run spec-number-lint",
     "depcruise": "depcruise --config .dependency-cruiser.cjs packages/*/src",

@@ -297,10 +297,10 @@ export function rejectsFamilyScope(op: KeyEditOperation): boolean {
  * they touch may well produce a character. That gap is deliberate: this
  * function answers "what does the OPERATION ITSELF say", not "what does the
  * key it addresses produce" — the latter needs the layout the operation
- * resolves against, which is outside an operation-log module's own domain
- * (see the studio's `keyEditOrphanReport.ts`, which falls back to this
- * function first — cheap, no layout needed — before doing that resolution
- * for the four kinds it cannot answer).
+ * resolves against, which is outside an operation-log module's own domain.
+ * A caller that needs the addressed key's characters calls this first
+ * (cheap, no layout needed) and resolves the address itself for the kinds
+ * it cannot answer.
  */
 export function declaredOperationOutput(op: KeyEditOperation): string | undefined {
   switch (op.kind) {

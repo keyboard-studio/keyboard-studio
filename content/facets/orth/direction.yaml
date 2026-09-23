@@ -30,7 +30,6 @@ consumers:
   prefills:
     - writing_direction
     - pb_rtl_direction_confirm
-    - pb_rtl_direction_marks
   proposes:
     - "routing:rtl-branch-gate"
 

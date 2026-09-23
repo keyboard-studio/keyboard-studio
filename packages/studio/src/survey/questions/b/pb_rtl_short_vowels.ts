@@ -30,7 +30,10 @@ export const definition = {
       label: "Never or almost never written",
     },
   ],
-  next: "pb_rtl_direction_marks",
+  // pb_rtl_direction_marks / _detail were retired by spec 075 (FR-019): the
+  // invisible-characters spine step now asks about direction marks BY NAME for
+  // every author, so the RTL branch goes straight on to special letters.
+  next: "pb_rtl_special_letters",
 } satisfies import("../../types.ts").FlowQuestion;
 
 const VALID_VALUES = new Set(["always", "sometimes", "never"]);

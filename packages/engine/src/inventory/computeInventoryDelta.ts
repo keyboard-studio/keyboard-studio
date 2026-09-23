@@ -50,8 +50,12 @@ export interface InventoryDelta {
  * extracted `producedOutput` sketch is absent or empty — its actual output is
  * invisible to static analysis, so `producedGlyphs` cannot have accounted for
  * whatever it emits.
+ *
+ * Exported so `character-discovery/punctuationProposal.ts` derives its
+ * `coverageComplete` from the very same predicate — one definition of "the
+ * base's output is fully known", never two that can drift apart.
  */
-function hasUnaccountedOpaqueFragment(ir: KeyboardIR): boolean {
+export function hasUnaccountedOpaqueFragment(ir: KeyboardIR): boolean {
   return ir.raw.some(
     (frag) => frag.producedOutput === undefined || frag.producedOutput.length === 0,
   );

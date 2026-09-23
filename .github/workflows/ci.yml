@@ -25,6 +25,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Pinned commit of keyboard-studio/keyboards (master) that the corpus-gated
+  # tests run against — see the corpus checkout step.
+  KEYBOARDS_CORPUS_SHA: 435f82d69bfc926eb03c2d8632571b41b6da3266
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -35,6 +40,39 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # The corpus-gated unit tests (codec round-trip, carveViaSplice corpus
+      # sweep, recognizer integration, touch fixtures, facet-index real-corpus
+      # slice, ...) look for a sibling `../keyboards` clone next to the repo
+      # root and `skipIf` it is absent — so without this step ~55 of them
+      # silently skip on every run. Same sparse + shallow inputs as
+      # supportability-scan.yml, but PINNED to one commit of the
+      # keyboard-studio/keyboards fork so CI tests one known corpus rather
+      # than whatever master is today. Bump KEYBOARDS_CORPUS_SHA deliberately
+      # (and re-run the corpus tests locally against it) when the fork moves.
+      - name: Checkout keyboard-studio/keyboards corpus (pinned, release/ only, shallow)
+        uses: actions/checkout@v4
+        with:
+          repository: keyboard-studio/keyboards
+          ref: ${{ env.KEYBOARDS_CORPUS_SHA }}
+          path: .keyboards
+          fetch-depth: 1
+          sparse-checkout: release
+          sparse-checkout-cone-mode: true
+          persist-credentials: false
+
+      # actions/checkout can only write inside the workspace, so move the tree
+      # to the sibling path the tests resolve (`<repo>/../keyboards`). Moving
+      # (not symlinking) keeps it out of the workspace, so no repo-wide walker
+      # (lint, depcruise, vitest globs) ever sees 900 foreign keyboards.
+      # KEYBOARDS_REPO points the studio postbuild (build-keyboards-index.mjs)
+      # and vite.config.ts at the same pinned tree, so the build no longer
+      # clones keyboards master into node_modules/.cache on every run.
+      - name: Place corpus at ../keyboards
+        run: |
+          corpus="$(dirname "$GITHUB_WORKSPACE")/keyboards"
+          mv "$GITHUB_WORKSPACE/.keyboards" "$corpus"
+          echo "KEYBOARDS_REPO=$corpus" >> "$GITHUB_ENV"
 
       - name: Set up pnpm
         # Version comes from package.json "packageManager" (pnpm@9.12.0).
@@ -55,10 +93,10 @@ jobs:
 
       # Offline codegen the build depends on. Most prebuild steps fetch over
       # the network (langtags/glottolog) and commit their derived index, so CI
-      # skips them. Two exceptions run here, for different reasons: this one
-      # because it is hermetic and the build needs it, and fetch-sldr below
-      # because a test needs its raw input even though the derived index is
-      # committed — see that step's own comment.
+      # skips them. Three exceptions run here, for different reasons: this one
+      # because it is hermetic and the build needs it, and fetch-sldr and
+      # fetch-langtags below because a test needs their raw input even though
+      # the derived index is committed — see those steps' own comments.
       #
       # codegen-charnames derives from the committed, SHA-pinned
       # lib/ucd/UnicodeData.txt into a gitignored JSON that
@@ -94,6 +132,26 @@ jobs:
       - name: Fetch SLDR (pinned — determinism-test input)
         if: steps.sldr-cache.outputs.cache-hit != 'true'
         run: pnpm run fetch-sldr
+
+      # Same reasoning and pattern for langtags: the derived index under
+      # packages/engine/src/langtags/generated/ is committed, but the langtags
+      # codegen-determinism test re-derives entries from the raw
+      # packages/engine/data/langtags/langtags.json (gitignored) and skips that
+      # check when the file is absent. fetch-langtags pins the commit and
+      # SHA-256 in scripts/langtags-version.json and fails loudly on a
+      # mismatch; the cache is keyed on that file, so a pin bump forces a
+      # fresh verified fetch. (It also rewrites the committed SOURCES.json,
+      # byte-identically for an unchanged pin.)
+      - name: Cache langtags.json
+        id: langtags-cache
+        uses: actions/cache@v4
+        with:
+          path: packages/engine/data/langtags/langtags.json
+          key: langtags-${{ hashFiles('scripts/langtags-version.json') }}
+
+      - name: Fetch langtags (pinned — determinism-test input)
+        if: steps.langtags-cache.outputs.cache-hit != 'true'
+        run: pnpm run fetch-langtags
 
       # Build before typecheck — engine/studio depend on contracts'
       # dist/*.d.ts at type-resolution time. Without this, downstream
@@ -156,6 +214,17 @@ jobs:
       - name: Test (nfd-tolerance-corpus — outside the pnpm workspace)
         run: pnpm run test:nfd-tolerance-corpus
 
+      # km-triage-app (the km-triage GitHub App's audit/cache/manifest/sweep
+      # helpers) tests with node:test, not vitest, and nothing ran them.
+      - name: Test (km-triage-app — outside the pnpm workspace)
+        run: pnpm run test:km-triage
+
+      # supportability-scanner's own vitest suite — supportability-scan.yml
+      # only runs `scan.ts --check`, so the scanner's unit tests (including
+      # the provenance fix) ran nowhere.
+      - name: Test (supportability-scanner — outside the pnpm workspace)
+        run: pnpm run test:supportability-scanner
+
       # Non-blocking: warns in CI log and opens GitHub Issues for any spec
       # sections whose content changed since the last acknowledgement.
       # Never fails the build — drift is a backlog item, not a blocker.
@@ -165,3 +234,118 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           SPEC_TRACE_REPO: ${{ github.repository }}
+
+  # Playwright e2e — the lane that carries the spec 034 authoring-walk proof
+  # (MVP gaps A/B assert in copy-edit.spec.ts). NON-BLOCKING while it beds in:
+  # `continue-on-error` keeps a red run from failing the workflow, and this
+  # job is not a required check. Starts with boot-smoke + copy-edit only;
+  # widen the spec list (or drop the filter) as specs prove stable in CI, and
+  # make it blocking once it is.
+  e2e:
+    name: e2e (Playwright, non-blocking)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    timeout-minutes: 60
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # Same pinned corpus as the build job: the dev server's local-keyboards
+      # plugin (vite.config.ts, KEYBOARDS_REPO) serves the catalog and the
+      # base keyboards the walks open from it.
+      - name: Checkout keyboard-studio/keyboards corpus (pinned, release/ only, shallow)
+        uses: actions/checkout@v4
+        with:
+          repository: keyboard-studio/keyboards
+          ref: ${{ env.KEYBOARDS_CORPUS_SHA }}
+          path: .keyboards
+          fetch-depth: 1
+          sparse-checkout: release
+          sparse-checkout-cone-mode: true
+          persist-credentials: false
+
+      - name: Place corpus at ../keyboards
+        run: |
+          corpus="$(dirname "$GITHUB_WORKSPACE")/keyboards"
+          mv "$GITHUB_WORKSPACE/.keyboards" "$corpus"
+          echo "KEYBOARDS_REPO=$corpus" >> "$GITHUB_ENV"
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Codegen (charnames — offline, build input)
+        run: pnpm run codegen-charnames
+
+      # The dev server (playwright.config.ts webServer: `pnpm dev` = vite)
+      # imports the workspace packages through their built dist/. Build only
+      # studio's dependencies (`studio^...`) — studio itself is served from
+      # source, and its production build + postbuild catalog are not needed.
+      - name: Build studio's workspace dependencies
+        run: pnpm --filter "@keyboard-studio/studio^..." build
+
+      - name: Install Playwright Chromium
+        working-directory: packages/studio
+        run: npx playwright install --with-deps chromium
+
+      - name: Playwright (boot-smoke + copy-edit)
+        run: pnpm --filter @keyboard-studio/studio test:e2e boot-smoke copy-edit
+
+      # One-screen result table on the run page: counts plus each failing
+      # test's first line per error, from the json reporter (CI-only, see
+      # playwright.config.ts). It also emits one `::error` annotation per
+      # failing test (title = test, body = the head of each error) on stderr,
+      # because the `github` reporter's per-test annotations did not surface
+      # on the check run in practice — annotations are readable from the PR's
+      # Checks tab without access to the job log.
+      - name: Summarize Playwright results
+        if: always()
+        working-directory: packages/studio
+        run: |
+          node - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          const fs = require("node:fs");
+          const file = "test-results/results.json";
+          if (!fs.existsSync(file)) { console.log("### e2e\nNo Playwright results (the run did not reach the tests)."); process.exit(0); }
+          const r = JSON.parse(fs.readFileSync(file, "utf8"));
+          const s = r.stats ?? {};
+          console.log(`### e2e: ${s.expected ?? 0} passed, ${s.unexpected ?? 0} failed, ${s.flaky ?? 0} flaky, ${s.skipped ?? 0} skipped (${Math.round((s.duration ?? 0) / 1000)}s)`);
+          const rows = [];
+          const walk = (suite, trail) => {
+            for (const spec of suite.specs ?? []) for (const t of spec.tests ?? []) {
+              if (t.status === "expected" || t.status === "skipped") continue;
+              const last = t.results?.[t.results.length - 1];
+              const errs = last?.errors?.length ? last.errors : [last?.error ?? { message: last?.status ?? "" }];
+              const msg = errs.map((e) => (e?.message ?? "").replace(/\u001b\[[0-9;]*m/g, "").split("\n")[0]).filter(Boolean).join(" / ").replace(/\|/g, "\\|").slice(0, 300);
+              const title = [...trail, spec.title].join(" > ");
+              rows.push(`| ${t.status} | ${title.replace(/\|/g, "\\|")} | ${msg} |`);
+              const body = errs.map((e) => (e?.message ?? "").replace(/\u001b\[[0-9;]*m/g, "").split("\n").filter((l) => l.trim()).slice(0, 20).join("\n")).join("\n---\n").slice(0, 2000);
+              const esc = (v) => v.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+              console.error(`::error title=${esc(`e2e ${t.status}: ${title}`).replace(/:/g, "%3A").replace(/,/g, "%2C")}::${esc(body)}`);
+            }
+            for (const child of suite.suites ?? []) walk(child, [...trail, child.title]);
+          };
+          for (const suite of r.suites ?? []) walk(suite, [suite.title]);
+          if (rows.length) console.log(["", "| status | test | first line of each error |", "|---|---|---|", ...rows].join("\n"));
+          EOF
+
+      - name: Upload Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: |
+            packages/studio/playwright-report/
+            packages/studio/test-results/
+          retention-days: 14
+          if-no-files-found: ignore

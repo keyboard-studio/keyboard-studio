@@ -24,7 +24,7 @@
 // onComplete with a SurveyPhaseResult carrying `retainedConvenienceChars`; the
 // manifest reducer path (StepHost.handleComplete -> recordPhase) owns the
 // session merge. The carve gallery then unions the merged list into its
-// needed-set (see CarveGallery's retainedSet).
+// needed-set (see CarveGalleryV2's retainedSet).
 
 import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
@@ -56,8 +56,7 @@ import {
 // ---------------------------------------------------------------------------
 
 /**
- * `U+XXXX` for a character — a technical identifier, never translated (mirrors
- * `charCodepointLabel` in the carve gallery's RemovalBanner).
+ * `U+XXXX` for a character — a technical identifier, never translated.
  */
 function codepointLabel(ch: string): string {
   return `U+${ch.codePointAt(0)!.toString(16).toUpperCase().padStart(4, "0")}`;

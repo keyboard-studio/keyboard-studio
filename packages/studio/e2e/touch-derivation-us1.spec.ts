@@ -105,8 +105,7 @@ const TOUCH_ZIP_PATH = `source/${BASE_KEYBOARD_ID}.keyman-touch-layout`;
  * emptied) found every entry this list used to carry — CarveGallery's/Rail's/
  * GlyphCell's v1-only surfaces, ConvenienceCharsStep's Continue button,
  * RemovalBanner's dismiss control — already clean: the v1 gallery components
- * are dead code (CarveGalleryV2 is unconditional; v1 is commented out in
- * carveAdapter.tsx) and the rest were stale exclusions from an earlier
+ * were dead code (since removed) and the rest were stale exclusions from an earlier
  * contrast pass that already fixed them. The remaining OSK iframe entry is
  * now also fixed at the source (packages/studio/public/osk-frame.html
  * overrides `.kmw-spacebar-caption`'s color), so this scan now covers

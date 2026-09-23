@@ -44,10 +44,10 @@
 
 import { create } from "zustand";
 import type { AttestedStack, ConfirmedAlphabet, DeclaredRole } from "@keyboard-studio/contracts";
-import { makeConfirmedAlphabet, stackKey } from "@keyboard-studio/contracts";
+import { makeConfirmedAlphabet, stackKey, toUPlusNotation, parseUPlusNotation } from "@keyboard-studio/contracts";
 import type { SourcedInventory } from "@keyboard-studio/engine";
 import { decomposeGrapheme, isCombiningMarkChar, isPrivateUseCodePoint, glyphCategory } from "@keyboard-studio/engine";
-import { casePairOf, nfcDedup } from "../survey/charNormUtils.ts";
+import { casePairOf, isFormatChar, nfcDedup } from "../survey/charNormUtils.ts";
 import { DEFAULT_PHASE_B_FONT, type PhaseBFontValue } from "../survey/surveyStyles.ts";
 
 /**
@@ -59,8 +59,22 @@ import { DEFAULT_PHASE_B_FONT, type PhaseBFontValue } from "../survey/surveyStyl
  * for the text-sample surface owned by spec 050, and is present so 044 does not
  * bake in the assumption that exemplars are the only proposal source. Proposal
  * sources UNION rather than override (see `seedFromProposal`).
+ *
+ * `"base"` and `"ascii-floor"` (spec 075) attribute punctuation proposed from
+ * the base keyboard's own output, or from the fixed basic-ASCII floor that
+ * stands in for it when that output cannot be fully determined. Single-valued
+ * by design: a character both CLDR and the base attest is seeded once, under
+ * the first source, and "also produced by the base" is derived at render time.
  */
-export type DraftProvenance = SourcedInventory["source"] | "author" | "text";
+export type DraftProvenance =
+  | SourcedInventory["source"]
+  | "author"
+  | "text"
+  | "base"
+  | "ascii-floor";
+
+/** An author's decision about one invisible (format) character, keyed by `U+XXXX`. */
+export type InvisibleDecision = "accepted" | "declined";
 
 /** One designer pick: a whole grapheme, plus the declared role for PUA picks. */
 interface DraftPick {
@@ -124,10 +138,18 @@ export interface PhaseBDraftState {
   exemplarDigraphs: string[];
 
   /**
-   * Proposed characters the author removed. STICKY: `seedFromProposal` must
-   * never re-propose these, so declining a suggestion once is not undone by a
-   * later re-derivation. Removing an AUTHORED character does not add it here —
-   * re-proposal was never at issue for a character the author typed.
+   * Proposed characters the author removed. STICKY: `seedFromProposal` and
+   * `seedProposals` must never re-propose these, so declining a suggestion
+   * once is not undone by a later re-derivation, a step revisit, a locale
+   * re-resolution or a reload (spec 075 SC-006). Removing an AUTHORED
+   * character does not add it here — re-proposal was never at issue for a
+   * character the author typed; and an author add always wins over an entry
+   * here (FR-022: typing a removed mark by hand overrides the rejection).
+   *
+   * Unbounded by design: a keyed NFC set with no pruning. An entry for a
+   * character no source proposes any more is inert and costs bytes only, and
+   * the size is bounded by the number of distinct characters an author has
+   * ever removed — small, and per working copy.
    */
   rejected: string[];
 
@@ -148,6 +170,26 @@ export interface PhaseBDraftState {
    * reachable on page 2.
    */
   exemplarMethodDeclined: boolean;
+
+  /**
+   * Seed keys already applied through `seedProposals` (spec 075). STICKY: a
+   * proposal set is seeded once per key (`"punctuation:" + resolvedTag`,
+   * `"punctuation-base:" + baseKey`), so revisiting the step never re-runs a
+   * seed and the FR-023 "already completed before the feature" guard is
+   * evaluated once. Re-proposal of a REMOVED character is prevented by
+   * `rejected`, not by this list.
+   */
+  seededProposals: string[];
+
+  /**
+   * The author's decisions about invisible (format) characters, keyed by
+   * `U+XXXX` notation (spec 075 FR-013/FR-018). STICKY. `"accepted"` characters
+   * reach the phase-C confirmed inventory through `phaseCConfirmedInventory()`
+   * — they are deliberately NOT pushed into `chars`, so they never land in the
+   * unrendered `controls` bucket (FR-014). A key that is absent was never asked
+   * or never answered; `"declined"` is a recorded refusal.
+   */
+  invisibleDecisions: Record<string, InvisibleDecision>;
 
   /**
    * The font applied to every character glyph rendered while building the
@@ -209,6 +251,29 @@ export interface PhaseBDraftState {
 
   /** Record that the author declined the exemplar method (FR-016a). Sticky. */
   declineExemplarMethod: () => void;
+
+  /**
+   * Seed a proposal set once per `seedKey` (spec 075 FR-001/FR-006). Every
+   * character goes through the same path `addProposed` uses, so a `rejected`
+   * character is vetoed (FR-022) and an `"author"` entry is never downgraded
+   * (FR-005). A repeated key is a no-op; the key is recorded either way.
+   */
+  seedProposals: (chars: readonly string[], source: DraftProvenance, seedKey: string) => void;
+
+  /** Record that the author wants this invisible character (`U+XXXX`). Never touches `chars`. */
+  acceptInvisible: (notation: string) => void;
+
+  /** Record that the author declined this invisible character (`U+XXXX`). Never touches `chars`. */
+  declineInvisible: (notation: string) => void;
+
+  /**
+   * Carry-over (spec 075 FR-017): every format character (General Category
+   * Cf) an earlier code-point entry filed into the `controls` bucket becomes
+   * an `"accepted"` invisible decision and leaves `chars`, so it is offered
+   * once, pre-selected, and appears in one answer instead of two. Not a
+   * rejection — `rejected` is untouched. Idempotent.
+   */
+  adoptControlsAsInvisibles: () => void;
 
   /** Clear back to an empty alphabet (font selection is left untouched). */
   reset: () => void;
@@ -398,6 +463,8 @@ export const usePhaseBDraftStore = create<PhaseBDraftState>((set, get) => ({
   rejected: [],
   proposalConfidence: {},
   exemplarMethodDeclined: false,
+  seededProposals: [],
+  invisibleDecisions: {},
   selectedFont: DEFAULT_PHASE_B_FONT,
 
   add: (c, opts) => {
@@ -485,6 +552,40 @@ export const usePhaseBDraftStore = create<PhaseBDraftState>((set, get) => ({
 
   declineExemplarMethod: () => set({ exemplarMethodDeclined: true }),
 
+  seedProposals: (chars, source, seedKey) => {
+    if (get().seededProposals.includes(seedKey)) return;
+    set({ seededProposals: [...get().seededProposals, seedKey] });
+    for (const ch of chars) addWithProvenance(set, get, ch, source);
+  },
+
+  acceptInvisible: (notation) => {
+    const key = normalizeNotation(notation);
+    if (key === null) return;
+    set({ invisibleDecisions: { ...get().invisibleDecisions, [key]: "accepted" } });
+  },
+
+  declineInvisible: (notation) => {
+    const key = normalizeNotation(notation);
+    if (key === null) return;
+    set({ invisibleDecisions: { ...get().invisibleDecisions, [key]: "declined" } });
+  },
+
+  adoptControlsAsInvisibles: () => {
+    const carried = get().controls.filter(isFormatChar);
+    if (carried.length === 0) return;
+    const invisibleDecisions = { ...get().invisibleDecisions };
+    const provenance = { ...get().provenance };
+    const carriedSet = new Set(carried);
+    for (const c of carried) {
+      invisibleDecisions[toUPlusNotation(c)] = "accepted";
+      delete provenance[c];
+    }
+    picks = picks.filter((p) => !carriedSet.has(p.grapheme));
+    const chars = get().chars.filter((c) => !carriedSet.has(c));
+    // Migration, not rejection: `rejected` is deliberately left alone.
+    set({ ...deriveStores(picks), chars, provenance, invisibleDecisions, lastPick: null });
+  },
+
   reset: () => {
     picks = [];
     set({
@@ -502,12 +603,14 @@ export const usePhaseBDraftStore = create<PhaseBDraftState>((set, get) => ({
       provenance: {},
       exemplarDigraphs: [],
       proposalConfidence: {},
-      // `rejected` and `exemplarMethodDeclined` deliberately SURVIVE a reset:
-      // both record a decision the author made about proposals, and reset() runs
-      // on every entry to the build-list screen. Clearing them would re-propose
-      // characters the author already removed and re-assert an offer they
-      // already declined. resetPhaseBDraftDecisions() clears them for a genuinely
-      // new working copy.
+      // `rejected`, `exemplarMethodDeclined`, `seededProposals` and
+      // `invisibleDecisions` deliberately SURVIVE a reset: each records a
+      // decision the author made about proposals, and reset() runs on every
+      // entry to the build-list screen. Clearing them would re-propose
+      // characters the author already removed, re-assert an offer they already
+      // declined, re-run a seed they already saw, and forget which invisible
+      // characters they accepted or refused. resetPhaseBDraftDecisions() clears
+      // them for a genuinely new working copy.
     });
   },
 }));
@@ -556,14 +659,32 @@ function addWithProvenance(
 }
 
 /**
- * Clear the sticky proposal decisions (`rejected`, `exemplarMethodDeclined`).
+ * Canonical `U+XXXX` key for `invisibleDecisions`: the contracts parser
+ * (`parseUPlusNotation` — optional `U+`/`u+` prefix, 4-6 hex digits, rejects
+ * surrogates and noncharacters) validates, `toUPlusNotation` canonicalises.
+ * Returns null for anything that is not a well-formed code point, so a
+ * malformed key can never be recorded.
+ */
+function normalizeNotation(notation: string): string | null {
+  const ch = parseUPlusNotation(notation.trim());
+  return ch === null ? null : toUPlusNotation(ch);
+}
+
+/**
+ * Clear the sticky proposal decisions (`rejected`, `exemplarMethodDeclined`,
+ * `seededProposals`, `invisibleDecisions`).
  *
  * Those are per-working-copy, not per-visit: `reset()` runs every time the
  * build-list screen is entered and must not undo them. Call this when a genuinely
  * new working copy is instantiated.
  */
 export function resetPhaseBDraftDecisions(): void {
-  usePhaseBDraftStore.setState({ rejected: [], exemplarMethodDeclined: false });
+  usePhaseBDraftStore.setState({
+    rejected: [],
+    exemplarMethodDeclined: false,
+    seededProposals: [],
+    invisibleDecisions: {},
+  });
 }
 
 /** The three-store ConfirmedAlphabet the current draft resolves to (spec 071). */
@@ -605,6 +726,10 @@ export interface PhaseBDraftSnapshot {
   proposalConfidence?: Record<string, string>;
   /** Whether the exemplar method was declined. Absent in pre-044 snapshots. */
   exemplarMethodDeclined?: boolean;
+  /** Seed keys already applied (spec 075). Absent in pre-075 snapshots. */
+  seededProposals?: string[];
+  /** Invisible-character decisions keyed by `U+XXXX` (spec 075). Absent in pre-075 snapshots. */
+  invisibleDecisions?: Record<string, InvisibleDecision>;
   selectedFont: PhaseBFontValue;
 }
 
@@ -619,6 +744,8 @@ export function snapshotPhaseBDraft(): PhaseBDraftSnapshot {
     rejected: s.rejected,
     proposalConfidence: s.proposalConfidence,
     exemplarMethodDeclined: s.exemplarMethodDeclined,
+    seededProposals: s.seededProposals,
+    invisibleDecisions: s.invisibleDecisions,
     selectedFont: s.selectedFont,
   };
 }
@@ -642,6 +769,8 @@ export function applyPhaseBDraftSnapshot(snapshot: PhaseBDraftSnapshot): void {
     rejected: snapshot.rejected ?? [],
     proposalConfidence: snapshot.proposalConfidence ?? {},
     exemplarMethodDeclined: snapshot.exemplarMethodDeclined ?? false,
+    seededProposals: snapshot.seededProposals ?? [],
+    invisibleDecisions: snapshot.invisibleDecisions ?? {},
   });
   usePhaseBDraftStore.getState().setAll(snapshot.chars);
   usePhaseBDraftStore.getState().setSelectedFont(snapshot.selectedFont);

@@ -17,6 +17,7 @@
 // never the 300ms validator/WASM-oracle debounce cycle and never a second
 // validation path — see the comment on installDraftAutosave below.
 
+import type { DeclaredRole } from "@keyboard-studio/contracts";
 import {
   prepareWorkingCopySnapshot,
   snapshotWorkingCopyData,
@@ -32,6 +33,9 @@ import {
   applyPhaseBDraftSnapshot,
   snapshotPhaseBDraft,
   usePhaseBDraftStore,
+  type DraftProvenance,
+  type InvisibleDecision,
+  type PhaseBDraftSnapshot,
 } from "../stores/phaseBDraftStore.ts";
 import { DEFAULT_PHASE_B_FONT, isPhaseBFontValue } from "../survey/surveyStyles.ts";
 import { deriveProjectLabel } from "./projectLabel.ts";
@@ -844,6 +848,64 @@ function discardCorruptDraft(projectKey: string): void {
   }
 }
 
+/** True for a plain JSON object (not null, not an array). */
+function isPlainRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === "object" && v !== null && !Array.isArray(v);
+}
+
+/** The string-valued entries of a plain record, dropping anything malformed. */
+function stringEntries(v: unknown): Record<string, string> {
+  if (!isPlainRecord(v)) return {};
+  const out: Record<string, string> = {};
+  for (const [k, val] of Object.entries(v)) if (typeof val === "string") out[k] = val;
+  return out;
+}
+
+/** The string members of an array, or `[]` for anything that is not one. */
+function stringArray(v: unknown): string[] {
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : [];
+}
+
+/**
+ * Rebuild a full {@link PhaseBDraftSnapshot} from whatever a stored envelope
+ * carries, field by field and tolerantly: a record written before a field
+ * existed, or one with a malformed value, restores that field to its empty
+ * default and keeps everything else. Every sticky decision field is forwarded
+ * so `applyPhaseBDraftSnapshot` never falls back to its own defaults for a
+ * field the envelope actually saved.
+ */
+function restorePhaseBDraftSnapshot(raw: unknown): PhaseBDraftSnapshot {
+  const pb = isPlainRecord(raw) ? raw : {};
+  const declaredRoles: Record<string, DeclaredRole> = {};
+  for (const [k, v] of Object.entries(stringEntries(pb.declaredRoles))) {
+    if (v === "letter" || v === "mark") declaredRoles[k] = v;
+  }
+  const invisibleDecisions: Record<string, InvisibleDecision> = {};
+  for (const [k, v] of Object.entries(stringEntries(pb.invisibleDecisions))) {
+    if (v === "accepted" || v === "declined") invisibleDecisions[k] = v;
+  }
+  return {
+    chars: stringArray(pb.chars),
+    declaredRoles,
+    // Provenance values are an open string union at the storage boundary; the
+    // store only ever compares them against "author", so an unknown origin
+    // simply renders as a proposal from an unnamed source rather than being
+    // dropped and silently re-attributed to the author.
+    provenance: stringEntries(pb.provenance) as Record<string, DraftProvenance>,
+    // Kept OUT of `chars` on the way back in, exactly as on the way out — the
+    // clusters' constituent letters are the alphabet; the clusters are a note
+    // about it.
+    exemplarDigraphs: stringArray(pb.exemplarDigraphs),
+    rejected: stringArray(pb.rejected),
+    proposalConfidence: stringEntries(pb.proposalConfidence),
+    exemplarMethodDeclined: pb.exemplarMethodDeclined === true,
+    // spec 075 sticky fields — same tolerant treatment, same reason.
+    seededProposals: stringArray(pb.seededProposals),
+    invisibleDecisions,
+    selectedFont: isPhaseBFontValue(pb.selectedFont) ? pb.selectedFont : DEFAULT_PHASE_B_FONT,
+  };
+}
+
 /**
  * Outcome of {@link applyEnvelopeToStores}. `"no-real-work"` (VR-2) is
  * distinguished from `"corrupt"` (VR-1 version mismatch, VR-3 bad traversal
@@ -921,26 +983,16 @@ function applyEnvelopeToStores(envelope: DurableDraft, pendingSlotKey: string): 
     // tolerant way — a pre-this-change record has no such field, and an
     // unrecognized value falls back to the default rather than discarding the
     // record.
-    const restoredChars = Array.isArray(envelope.phaseBDraft?.chars)
-      ? envelope.phaseBDraft.chars
-      : [];
-    const restoredFont = isPhaseBFontValue(envelope.phaseBDraft?.selectedFont)
-      ? envelope.phaseBDraft.selectedFont
-      : DEFAULT_PHASE_B_FONT;
-    // Exemplar-attested `{..}` clusters, restored the same tolerant way: a
-    // record written before they were recorded has no field, and a malformed
-    // one degrades to none rather than discarding an otherwise-good draft.
-    // Kept OUT of `chars` on the way back in, exactly as on the way out — the
-    // clusters' constituent letters are the alphabet; the clusters are a note
-    // about it.
-    const restoredDigraphs = Array.isArray(envelope.phaseBDraft?.exemplarDigraphs)
-      ? envelope.phaseBDraft.exemplarDigraphs.filter((d): d is string => typeof d === "string")
-      : [];
-    applyPhaseBDraftSnapshot({
-      chars: restoredChars,
-      exemplarDigraphs: restoredDigraphs,
-      selectedFont: restoredFont,
-    });
+    //
+    // The STICKY decision fields ride along the same way (spec 044 FR-017;
+    // the gap was surfaced by spec 075 US4): `saveDraft` has always written
+    // `rejected`, `provenance`, `proposalConfidence`, `exemplarMethodDeclined`
+    // and `declaredRoles`, but this path used to rebuild the snapshot from
+    // `chars`/`exemplarDigraphs`/`selectedFont` alone, so a reload silently
+    // re-proposed every character the author had removed and flattened every
+    // proposed chip to "author". Each field is validated individually and
+    // degrades to its empty default, never discarding the record.
+    applyPhaseBDraftSnapshot(restorePhaseBDraftSnapshot(envelope.phaseBDraft));
 
     // decisionRecord (spec 053 FR-005): optional/additive, restored the same
     // tolerant way as phaseBDraft above — a record written before the field

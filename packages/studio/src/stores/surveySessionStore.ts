@@ -103,6 +103,7 @@ export type ActiveStepId =
   | "carve"
   | "marks"
   | "punctuation"
+  | "invisibles"
   | "convenience"
   | "mechanisms"
   | "touch_seed_source"
