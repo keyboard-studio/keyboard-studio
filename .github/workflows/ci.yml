@@ -294,6 +294,36 @@ jobs:
       - name: Playwright (boot-smoke + copy-edit)
         run: pnpm --filter @keyboard-studio/studio test:e2e boot-smoke copy-edit
 
+      # One-screen result table on the run page: counts plus each failing
+      # test's first line per error, from the json reporter (CI-only, see
+      # playwright.config.ts). Failing tests also surface as check-run
+      # annotations via the `github` reporter.
+      - name: Summarize Playwright results
+        if: always()
+        working-directory: packages/studio
+        run: |
+          node - <<'EOF' >> "$GITHUB_STEP_SUMMARY"
+          const fs = require("node:fs");
+          const file = "test-results/results.json";
+          if (!fs.existsSync(file)) { console.log("### e2e\nNo Playwright results (the run did not reach the tests)."); process.exit(0); }
+          const r = JSON.parse(fs.readFileSync(file, "utf8"));
+          const s = r.stats ?? {};
+          console.log(`### e2e: ${s.expected ?? 0} passed, ${s.unexpected ?? 0} failed, ${s.flaky ?? 0} flaky, ${s.skipped ?? 0} skipped (${Math.round((s.duration ?? 0) / 1000)}s)`);
+          const rows = [];
+          const walk = (suite, trail) => {
+            for (const spec of suite.specs ?? []) for (const t of spec.tests ?? []) {
+              if (t.status === "expected" || t.status === "skipped") continue;
+              const last = t.results?.[t.results.length - 1];
+              const errs = last?.errors?.length ? last.errors : [last?.error ?? { message: last?.status ?? "" }];
+              const msg = errs.map((e) => (e?.message ?? "").replace(/\u001b\[[0-9;]*m/g, "").split("\n")[0]).filter(Boolean).join(" / ").replace(/\|/g, "\\|").slice(0, 300);
+              rows.push(`| ${t.status} | ${[...trail, spec.title].join(" > ").replace(/\|/g, "\\|")} | ${msg} |`);
+            }
+            for (const child of suite.suites ?? []) walk(child, [...trail, child.title]);
+          };
+          for (const suite of r.suites ?? []) walk(suite, [suite.title]);
+          if (rows.length) console.log(["", "| status | test | first line of each error |", "|---|---|---|", ...rows].join("\n"));
+          EOF
+
       - name: Upload Playwright report
         if: failure()
         uses: actions/upload-artifact@v4

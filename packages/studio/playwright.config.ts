@@ -37,10 +37,19 @@ export default defineConfig({
   // step, never the blocking unit-CI lane (see the file header), so trading
   // wall-clock for reliability here is the right call.
   workers: 1,
-  // CI (the ci.yml `e2e` job) writes an HTML report and keeps traces of
-  // failing tests; the job uploads playwright-report/ + test-results/ as an
-  // artifact on failure. Locally: plain list output, no traces.
-  reporter: process.env["CI"] ? [["list"], ["html", { open: "never" }]] : "list",
+  // CI (the ci.yml `e2e` job) adds: `github` (each failing test becomes a
+  // check-run annotation, readable without the Actions log), `html` (uploaded
+  // as the playwright-report artifact on failure, with the retained traces),
+  // and `json` (read by the job's step-summary step). Locally: plain list
+  // output, no traces.
+  reporter: process.env["CI"]
+    ? [
+        ["list"],
+        ["github"],
+        ["html", { open: "never" }],
+        ["json", { outputFile: "test-results/results.json" }],
+      ]
+    : "list",
   globalSetup: "./e2e/global-setup.ts",
   use: {
     baseURL: "http://localhost:5273",
