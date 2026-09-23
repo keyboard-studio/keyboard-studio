@@ -25,6 +25,7 @@ import type { TouchKeyIR, TouchKeyRuleBinding, TouchKeyRuleIndex, TouchLayoutIR 
 import { normalizeTouchKeyId } from "@keyboard-studio/contracts";
 import { checkKeyEditRejections, type UnsequencedKeyEditOperation } from "./keyEditOps.js";
 import { touchKeyAddress } from "./touchKeyAddress.js";
+import { touchLayout } from "@keyboard-studio/contracts/fixtures";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -36,10 +37,7 @@ function key(id: string, extra: Partial<Omit<TouchKeyIR, "nodeId" | "id">> = {})
 
 /** One platform ("phone"), one layer ("default"), one row. */
 function layoutWith(...keys: readonly TouchKeyIR[]): TouchLayoutIR {
-  return {
-    platforms: [{ id: "phone", layers: [{ id: "default", rows: [{ keys: [...keys] }] }] }],
-    nodeIds: [],
-  };
+  return touchLayout({ keys });
 }
 
 function addr(keyId: string): string {

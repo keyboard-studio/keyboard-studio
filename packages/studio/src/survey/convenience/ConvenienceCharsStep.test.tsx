@@ -10,7 +10,7 @@ import { describe, expect, it, vi, afterEach } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import type { IRGroup, IRRule, SurveyPhaseResult } from "@keyboard-studio/contracts";
-import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
+import { irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import { ConvenienceCharsStep, computeConvenienceGate } from "./ConvenienceCharsStep.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
@@ -103,15 +103,11 @@ describe("computeConvenienceGate", () => {
 // ---------------------------------------------------------------------------
 
 function rule(nodeId: string, vkey: string, char: string): IRRule {
-  return {
-    nodeId,
-    context: [{ kind: "vkey", name: vkey, modifiers: [] }],
-    output: [{ kind: "char", value: char }],
-  };
+  return vkeyRule({ nodeId, vkey, output: char });
 }
 
 function group(rules: IRRule[]): IRGroup {
-  return { nodeId: "g-main", name: "main", usingKeys: true, rules, readonly: false };
+  return irGroup({ nodeId: "g-main", rules });
 }
 
 /**

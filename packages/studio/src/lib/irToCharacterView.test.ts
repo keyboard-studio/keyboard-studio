@@ -15,30 +15,22 @@ import {
   SOURCE_DETAIL_LABEL,
 } from './irToCharacterView.ts';
 import type { CharacterSource } from './irToCharacterView.ts';
+import { irGroup, makeTestIR, type TestIROptions, vkeyRule } from '@keyboard-studio/contracts/fixtures';
 
 // ---------------------------------------------------------------------------
 // Fixture helpers (mirror irToCarveNodes.test.ts's minimal-IR convention)
 // ---------------------------------------------------------------------------
 
 function makeGroup(rules: IRRule[], nodeId = 'g1', name = 'main'): IRGroup {
-  return { nodeId, name, usingKeys: true, rules, readonly: false };
+  return irGroup({ nodeId, name, rules });
 }
 
-function makeIR(overrides: Partial<KeyboardIR> = {}): KeyboardIR {
-  return {
-    origin: 'scaffolded',
-    header: { keyboardId: '', name: '', bcp47: [], copyright: '', version: '', targets: [], storeDirectives: [] },
-    stores: [],
-    groups: [],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-    ...overrides,
-  };
+function makeIR(overrides: TestIROptions = {}): KeyboardIR {
+  return makeTestIR({ origin: 'scaffolded', header: { keyboardId: '', name: '', version: '' }, ...overrides });
 }
 
 function directRule(nodeId: string, key: string, ch: string): IRRule {
-  return { nodeId, context: [{ kind: 'vkey', name: key, modifiers: [] }], output: [{ kind: 'char', value: ch }] };
+  return vkeyRule({ nodeId, vkey: key, output: ch });
 }
 
 describe('irToCharacterView', () => {

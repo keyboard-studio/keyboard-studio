@@ -20,7 +20,7 @@ import { TouchSeedSourcePanel } from "./TouchSeedSourcePanel.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
+import { basicKbdus, irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import type { TouchAssignment, IRGroup, IRRule, KeyboardIR, Pattern, VirtualFS } from "@keyboard-studio/contracts";
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { deriveSeedLayout } from "../../lib/buildTouchLayoutJson.ts";
@@ -163,12 +163,10 @@ function seedBase(touchLayoutJson?: string, groups: IRGroup[] = []) {
  * makeUnreachableSymbolIR below for the fixture that is).
  */
 function makeOverflowGroup(overflowChar: string): IRGroup {
-  const rule: IRRule = {
-    nodeId: "rule:overflow",
-    context: [{ kind: "vkey", name: "K_oE2", modifiers: [] }],
-    output: [{ kind: "char", value: overflowChar }],
-  };
-  return { nodeId: "group:overflow", name: "main", usingKeys: true, rules: [rule], readonly: false };
+  return irGroup({
+    nodeId: "group:overflow",
+    rules: [vkeyRule({ nodeId: "rule:overflow", vkey: "K_oE2", output: overflowChar })],
+  });
 }
 
 /** Seed baseVfs/baseIr from a fully-built KeyboardIR (bypassing makeTestIR),

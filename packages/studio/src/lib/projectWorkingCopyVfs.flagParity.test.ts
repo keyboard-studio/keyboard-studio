@@ -21,7 +21,7 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { makeTestIR, latinDeadkeyAcuteSingle } from "@keyboard-studio/contracts/fixtures";
+import { charStore, irGroup, latinDeadkeyAcuteSingle, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import { parseKmn, runAllChecks } from "@keyboard-studio/engine";
 import type {
   IRGroup,
@@ -41,11 +41,7 @@ import { stubKmnVfs } from "../test/workingCopy.ts";
 // ---------------------------------------------------------------------------
 
 function rule(nodeId: string, vkey: string, char: string): IRRule {
-  return {
-    nodeId,
-    context: [{ kind: "vkey", name: vkey, modifiers: [] }],
-    output: [{ kind: "char", value: char }],
-  };
+  return vkeyRule({ nodeId, vkey, output: char });
 }
 
 function parallelRule(nodeId: string, dkId: number, inN: string, outN: string): IRRule {
@@ -60,11 +56,11 @@ function parallelRule(nodeId: string, dkId: number, inN: string, outN: string): 
 }
 
 function group(nodeId: string, name: string, rules: IRRule[]): IRGroup {
-  return { nodeId, name, usingKeys: true, rules, readonly: false };
+  return irGroup({ nodeId, name, rules });
 }
 
 function store(nodeId: string, name: string, items: StoreItem[]): IRStore {
-  return { nodeId, name, items, isSystem: false };
+  return charStore({ nodeId, name, items });
 }
 
 /** A keyboard with two groups, a parallel-store deadkey pattern, and a stray store. */

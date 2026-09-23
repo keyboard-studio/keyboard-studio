@@ -23,7 +23,7 @@
 
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
+import { basicKbdus, charStore, irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import type { IRGroup, IRRule, IRStore } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
@@ -47,28 +47,15 @@ vi.mock("./services.ts", () => ({
 // ---------------------------------------------------------------------------
 
 function makeRule(nodeId: string, vkey: string, char: string, sourceLine?: number): IRRule {
-  const r: IRRule = {
-    nodeId,
-    context: [{ kind: "vkey", name: vkey, modifiers: [] }],
-    output: [{ kind: "char", value: char }],
-  };
-  if (sourceLine !== undefined) r.sourceLine = sourceLine;
-  return r;
+  return vkeyRule({ nodeId, vkey, output: char, sourceLine });
 }
 
 function makeGroup(nodeId: string, name: string, rules: IRRule[]): IRGroup {
-  return { nodeId, name, usingKeys: true, rules, readonly: false };
+  return irGroup({ nodeId, name, rules });
 }
 
 function makeStore(nodeId: string, name: string, sourceLine?: number): IRStore {
-  const s: IRStore = {
-    nodeId,
-    name,
-    items: [{ kind: "char", value: "x" }],
-    isSystem: false,
-  };
-  if (sourceLine !== undefined) s.sourceLine = sourceLine;
-  return s;
+  return charStore({ nodeId, name, chars: "x", sourceLine });
 }
 
 /**

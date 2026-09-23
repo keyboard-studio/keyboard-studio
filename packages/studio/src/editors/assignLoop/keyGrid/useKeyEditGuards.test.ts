@@ -30,7 +30,6 @@
 
 import { afterEach, describe, expect, it } from "vitest";
 import { cleanup, renderHook } from "@testing-library/react";
-import type { TouchKeyIR, TouchLayoutIR } from "@keyboard-studio/contracts";
 import { touchKeyAddress } from "@keyboard-studio/engine";
 import {
   useWorkingCopyStore,
@@ -41,21 +40,11 @@ import {
   findInvalidatedAssignedCharacters,
   useKeyEditGuards,
 } from "./useKeyEditGuards.ts";
+import { touchKey, touchLayout } from "@keyboard-studio/contracts/fixtures";
 
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
-
-function makeKey(id: string, overrides: Partial<TouchKeyIR> = {}): TouchKeyIR {
-  return { nodeId: `node_${id}`, id, ...overrides };
-}
-
-function makeLayout(keys: TouchKeyIR[]): TouchLayoutIR {
-  return {
-    platforms: [{ id: "phone", layers: [{ id: "default", rows: [{ keys }] }] }],
-    nodeIds: [],
-  };
-}
 
 const ADDR = (keyId: string) => touchKeyAddress("phone", "default", keyId);
 
@@ -80,9 +69,9 @@ afterEach(() => {
 
 describe("findInvalidatedAssignedCharacters", () => {
   it("FR-036f canonical case: suppressing a key that carries a longpress assigned for ɛ names ɛ", () => {
-    const layout = makeLayout([
-      makeKey("K_E", { text: "e", output: "e", sk: [makeKey("U_025B")] }),
-    ]);
+    const layout = touchLayout({ keys: [
+      touchKey({ id: "K_E", text: "e", output: "e", sk: [touchKey({ id: "U_025B" })] }),
+    ] });
     const op: PendingKeyEditOperation = {
       kind: "suppress",
       address: ADDR("K_E"),
@@ -96,7 +85,7 @@ describe("findInvalidatedAssignedCharacters", () => {
   });
 
   it("set: clearing output via an id change (no output re-supplied) invalidates the old character", () => {
-    const layout = makeLayout([makeKey("K_E", { text: "e", output: "e" })]);
+    const layout = touchLayout({ keys: [touchKey({ id: "K_E", text: "e", output: "e" })] });
     const op: PendingKeyEditOperation = {
       kind: "set",
       address: ADDR("K_E"),
@@ -109,7 +98,7 @@ describe("findInvalidatedAssignedCharacters", () => {
   });
 
   it("rename: an id change that drops the old id's decoded character invalidates it", () => {
-    const layout = makeLayout([makeKey("U_0065")]); // decodes to "e"
+    const layout = touchLayout({ keys: [touchKey({ id: "U_0065" })] }); // decodes to "e"
     const op: PendingKeyEditOperation = {
       kind: "rename",
       address: ADDR("U_0065"),
@@ -122,9 +111,9 @@ describe("findInvalidatedAssignedCharacters", () => {
   });
 
   it("remove: removing a key invalidates every character it (and its sub-entries) carried", () => {
-    const layout = makeLayout([
-      makeKey("K_E", { text: "e", output: "e", sk: [makeKey("U_025B")] }),
-    ]);
+    const layout = touchLayout({ keys: [
+      touchKey({ id: "K_E", text: "e", output: "e", sk: [touchKey({ id: "U_025B" })] }),
+    ] });
     const op: PendingKeyEditOperation = {
       kind: "remove",
       address: ADDR("K_E"),
@@ -137,7 +126,7 @@ describe("findInvalidatedAssignedCharacters", () => {
   });
 
   it("suppress: invalidates the main key's own output too, not only its sub-entries", () => {
-    const layout = makeLayout([makeKey("K_E", { text: "e", output: "e" })]);
+    const layout = touchLayout({ keys: [touchKey({ id: "K_E", text: "e", output: "e" })] });
     const op: PendingKeyEditOperation = {
       kind: "suppress",
       address: ADDR("K_E"),
@@ -151,13 +140,14 @@ describe("findInvalidatedAssignedCharacters", () => {
   });
 
   it("removeSubKey: removing one longpress entry invalidates only that entry's character", () => {
-    const layout = makeLayout([
-      makeKey("K_E", {
+    const layout = touchLayout({ keys: [
+      touchKey({
+        id: "K_E",
         text: "e",
         output: "e",
-        sk: [makeKey("U_025B"), makeKey("U_00E9")], // ɛ, é — two distinct longpress entries
+        sk: [touchKey({ id: "U_025B" }), touchKey({ id: "U_00E9" })], // ɛ, é — two distinct longpress entries
       }),
-    ]);
+    ] });
     const op: PendingKeyEditOperation = {
       kind: "removeSubKey",
       address: ADDR("K_E"),
@@ -179,9 +169,9 @@ describe("findInvalidatedAssignedCharacters", () => {
     // a self-decoding id would still credit "ɛ" via `decodeUnicodeKeyId`
     // after the `output` override, which is a real but separate ambiguity
     // this test is not about.
-    const layout = makeLayout([
-      makeKey("K_E", { text: "e", output: "e", sk: [makeKey("T_alt1", { output: "ɛ" })] }),
-    ]);
+    const layout = touchLayout({ keys: [
+      touchKey({ id: "K_E", text: "e", output: "e", sk: [touchKey({ id: "T_alt1", output: "ɛ" })] }),
+    ] });
     const op: PendingKeyEditOperation = {
       kind: "setSubKey",
       address: ADDR("K_E"),
@@ -195,7 +185,7 @@ describe("findInvalidatedAssignedCharacters", () => {
   });
 
   it("add never invalidates anything", () => {
-    const layout = makeLayout([makeKey("K_E", { text: "e", output: "e" })]);
+    const layout = touchLayout({ keys: [touchKey({ id: "K_E", text: "e", output: "e" })] });
     const op: PendingKeyEditOperation = {
       kind: "add",
       address: ADDR("K_E"),
@@ -209,7 +199,7 @@ describe("findInvalidatedAssignedCharacters", () => {
   });
 
   it("an edit that invalidates nothing reports nothing", () => {
-    const layout = makeLayout([makeKey("K_E", { text: "e", output: "e" })]);
+    const layout = touchLayout({ keys: [touchKey({ id: "K_E", text: "e", output: "e" })] });
     const op: PendingKeyEditOperation = {
       kind: "set",
       address: ADDR("K_E"),
@@ -222,7 +212,7 @@ describe("findInvalidatedAssignedCharacters", () => {
   });
 
   it("does not warn about a character that was never tracked as a by-character assignment", () => {
-    const layout = makeLayout([makeKey("K_E", { text: "e", output: "e" })]);
+    const layout = touchLayout({ keys: [touchKey({ id: "K_E", text: "e", output: "e" })] });
     const op: PendingKeyEditOperation = {
       kind: "remove",
       address: ADDR("K_E"),
@@ -246,9 +236,9 @@ describe("findInvalidatedAssignedCharacters", () => {
 
 describe("findCharactersLostForGood", () => {
   it("FR-062: a character with no OTHER producer anywhere in the layout returns to the worklist", () => {
-    const layout = makeLayout([
-      makeKey("K_E", { text: "e", output: "e", sk: [makeKey("U_025B")] }),
-    ]);
+    const layout = touchLayout({ keys: [
+      touchKey({ id: "K_E", text: "e", output: "e", sk: [touchKey({ id: "U_025B" })] }),
+    ] });
     const op: PendingKeyEditOperation = {
       kind: "suppress",
       address: ADDR("K_E"),
@@ -262,12 +252,12 @@ describe("findCharactersLostForGood", () => {
   });
 
   it("FR-061: a character still produced by a completely different key does NOT return to the worklist", () => {
-    const layout = makeLayout([
-      makeKey("K_E", { text: "e", output: "e", sk: [makeKey("U_025B")] }),
+    const layout = touchLayout({ keys: [
+      touchKey({ id: "K_E", text: "e", output: "e", sk: [touchKey({ id: "U_025B" })] }),
       // A second, unrelated key that also produces ɛ — e.g. moved to a
       // symbol layer, the FR-061 worked example.
-      makeKey("K_X", { text: "ɛ", output: "ɛ" }),
-    ]);
+      touchKey({ id: "K_X", text: "ɛ", output: "ɛ" }),
+    ] });
     const op: PendingKeyEditOperation = {
       kind: "suppress",
       address: ADDR("K_E"),
@@ -286,7 +276,7 @@ describe("findCharactersLostForGood", () => {
   });
 
   it("short-circuits to [] when nothing is invalidated (no extra layout apply/coverage pass needed)", () => {
-    const layout = makeLayout([makeKey("K_E", { text: "e", output: "e" })]);
+    const layout = touchLayout({ keys: [touchKey({ id: "K_E", text: "e", output: "e" })] });
     const op: PendingKeyEditOperation = {
       kind: "set",
       address: ADDR("K_E"),
@@ -307,9 +297,9 @@ describe("findCharactersLostForGood", () => {
 describe("useKeyEditGuards", () => {
   it("names the affected character in a localized, ready-to-render message, and marks it as returning to the worklist (canonical FR-036f/FR-062 case)", () => {
     seedAssignedChars(["ɛ"]);
-    const layout = makeLayout([
-      makeKey("K_E", { text: "e", output: "e", sk: [makeKey("U_025B")] }),
-    ]);
+    const layout = touchLayout({ keys: [
+      touchKey({ id: "K_E", text: "e", output: "e", sk: [touchKey({ id: "U_025B" })] }),
+    ] });
 
     const { result } = renderHook(() => useKeyEditGuards({ layout }));
 
@@ -335,10 +325,10 @@ describe("useKeyEditGuards", () => {
 
   it("FR-061: marks a character as NOT returning to the worklist when it remains reachable via a different key", () => {
     seedAssignedChars(["ɛ"]);
-    const layout = makeLayout([
-      makeKey("K_E", { text: "e", output: "e", sk: [makeKey("U_025B")] }),
-      makeKey("K_X", { text: "ɛ", output: "ɛ" }),
-    ]);
+    const layout = touchLayout({ keys: [
+      touchKey({ id: "K_E", text: "e", output: "e", sk: [touchKey({ id: "U_025B" })] }),
+      touchKey({ id: "K_X", text: "ɛ", output: "ɛ" }),
+    ] });
 
     const { result } = renderHook(() => useKeyEditGuards({ layout }));
 
@@ -358,9 +348,9 @@ describe("useKeyEditGuards", () => {
   });
 
   it("returns no warnings when the touch draft has no by-character assignments yet", () => {
-    const layout = makeLayout([
-      makeKey("K_E", { text: "e", output: "e", sk: [makeKey("U_025B")] }),
-    ]);
+    const layout = touchLayout({ keys: [
+      touchKey({ id: "K_E", text: "e", output: "e", sk: [touchKey({ id: "U_025B" })] }),
+    ] });
 
     const { result } = renderHook(() => useKeyEditGuards({ layout }));
 
@@ -393,9 +383,9 @@ describe("useKeyEditGuards — inventory scope (T119, US5 AS3)", () => {
     // shipped layout already typed ɛ, so the walk never stopped on it and
     // there is no charTouchEntries row — yet ɛ IS in the confirmed inventory,
     // and this edit strands it.
-    const layout = makeLayout([
-      makeKey("K_E", { text: "e", output: "e", sk: [makeKey("U_025B")] }),
-    ]);
+    const layout = touchLayout({ keys: [
+      touchKey({ id: "K_E", text: "e", output: "e", sk: [touchKey({ id: "U_025B" })] }),
+    ] });
 
     const { result } = renderHook(() =>
       useKeyEditGuards({ layout, inventoryChars: ["e", "ɛ"] }),
@@ -412,9 +402,9 @@ describe("useKeyEditGuards — inventory scope (T119, US5 AS3)", () => {
   });
 
   it("names the character and states that the step cannot be finished", () => {
-    const layout = makeLayout([
-      makeKey("K_E", { text: "e", output: "e", sk: [makeKey("U_025B")] }),
-    ]);
+    const layout = touchLayout({ keys: [
+      touchKey({ id: "K_E", text: "e", output: "e", sk: [touchKey({ id: "U_025B" })] }),
+    ] });
 
     const { result } = renderHook(() =>
       useKeyEditGuards({ layout, inventoryChars: ["ɛ"] }),
@@ -432,9 +422,9 @@ describe("useKeyEditGuards — inventory scope (T119, US5 AS3)", () => {
 
   it("does NOT mark an assignment-only character as blocking Continue — it is not in the FR-008 denominator", () => {
     seedAssignedChars(["ɛ"]);
-    const layout = makeLayout([
-      makeKey("K_E", { text: "e", output: "e", sk: [makeKey("U_025B")] }),
-    ]);
+    const layout = touchLayout({ keys: [
+      touchKey({ id: "K_E", text: "e", output: "e", sk: [touchKey({ id: "U_025B" })] }),
+    ] });
 
     // ɛ was assigned by the walk but is NOT in the confirmed inventory (e.g.
     // the author placed a character the survey never confirmed).
@@ -454,10 +444,10 @@ describe("useKeyEditGuards — inventory scope (T119, US5 AS3)", () => {
   });
 
   it("FR-061: an inventory character still reachable via a different key blocks nothing", () => {
-    const layout = makeLayout([
-      makeKey("K_E", { text: "e", output: "e", sk: [makeKey("U_025B")] }),
-      makeKey("K_X", { text: "ɛ", output: "ɛ" }),
-    ]);
+    const layout = touchLayout({ keys: [
+      touchKey({ id: "K_E", text: "e", output: "e", sk: [touchKey({ id: "U_025B" })] }),
+      touchKey({ id: "K_X", text: "ɛ", output: "ɛ" }),
+    ] });
 
     const { result } = renderHook(() =>
       useKeyEditGuards({ layout, inventoryChars: ["ɛ"] }),
@@ -472,9 +462,9 @@ describe("useKeyEditGuards — inventory scope (T119, US5 AS3)", () => {
   });
 
   it("permits the invalid intermediate state: an inventory-stranding edit is warned about, never refused", () => {
-    const layout = makeLayout([
-      makeKey("K_E", { text: "e", output: "e", sk: [makeKey("U_025B")] }),
-    ]);
+    const layout = touchLayout({ keys: [
+      touchKey({ id: "K_E", text: "e", output: "e", sk: [touchKey({ id: "U_025B" })] }),
+    ] });
 
     const { result } = renderHook(() =>
       useKeyEditGuards({ layout, inventoryChars: ["e", "ɛ"] }),
@@ -490,9 +480,9 @@ describe("useKeyEditGuards — inventory scope (T119, US5 AS3)", () => {
   });
 
   it("omitting inventoryChars narrows back to the FR-036f assignment-only scope", () => {
-    const layout = makeLayout([
-      makeKey("K_E", { text: "e", output: "e", sk: [makeKey("U_025B")] }),
-    ]);
+    const layout = touchLayout({ keys: [
+      touchKey({ id: "K_E", text: "e", output: "e", sk: [touchKey({ id: "U_025B" })] }),
+    ] });
 
     const { result } = renderHook(() => useKeyEditGuards({ layout }));
 

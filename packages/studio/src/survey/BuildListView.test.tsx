@@ -13,7 +13,7 @@ import { render } from "../test/renderWithI18n.tsx";
 import { PhaseB, parseSpacedChars } from "./PhaseB.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
-import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
+import { irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import type { SurveyPhaseResult, IRGroup, IRRule } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
@@ -48,15 +48,11 @@ vi.mock("../lib/services.ts", () => ({
 // ---------------------------------------------------------------------------
 
 function makeGroup(rules: IRRule[], name = "main"): IRGroup {
-  return { nodeId: `group#${name}`, name, usingKeys: true, readonly: false, rules };
+  return irGroup({ rules, name });
 }
 
 function makeRule(output: IRRule["output"]): IRRule {
-  return {
-    nodeId: `rule#${Math.random().toString(36).slice(2)}`,
-    context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
-    output,
-  };
+  return vkeyRule({ output });
 }
 
 /** A minimal KeyboardIR that produces a known set of characters. */

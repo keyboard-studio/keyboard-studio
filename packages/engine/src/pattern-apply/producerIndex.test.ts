@@ -16,7 +16,7 @@
 import { describe, it, expect } from "vitest";
 import { buildProducerIndex } from "./producerIndex.js";
 import { collectCharContributors } from "./collectCharContributors.js";
-import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
+import { charStore, irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import type { KeyboardIR, IRStore, IRGroup, IRRule, StoreItem } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
@@ -24,7 +24,7 @@ import type { KeyboardIR, IRStore, IRGroup, IRRule, StoreItem } from "@keyboard-
 // ---------------------------------------------------------------------------
 
 function makeStore(nodeId: string, name: string, items: StoreItem[]): IRStore {
-  return { nodeId, name, items, isSystem: false };
+  return charStore({ nodeId, name, items });
 }
 
 function chars(values: string[]): StoreItem[] {
@@ -32,16 +32,12 @@ function chars(values: string[]): StoreItem[] {
 }
 
 function makeGroup(rules: IRRule[]): IRGroup {
-  return { nodeId: "group#main", name: "main", usingKeys: true, rules, readonly: false };
+  return irGroup({ rules });
 }
 
 /** `+ [K_X] > 'ch'` — a whole-rule single-char producer. */
 function makeBaseRule(nodeId: string, vkey: string, ch: string): IRRule {
-  return {
-    nodeId,
-    context: [{ kind: "vkey", name: vkey, modifiers: [] }],
-    output: [{ kind: "char", value: ch }],
-  };
+  return vkeyRule({ nodeId, vkey, output: ch });
 }
 
 /** `dk(id) any(inName) > index(outName, 2)` — the Cameroon deadkey fan-out shape. */

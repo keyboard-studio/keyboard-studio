@@ -5,32 +5,14 @@
 // record is exactly as well-formed as one a real session leaves behind.
 
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import type { BaseKeyboard, KeyboardIR } from "@keyboard-studio/contracts";
+import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
 import { installDraftAutosave, saveDraft } from "../lib/draftPersistence.ts";
+import { makeScaffoldedIR } from "./irFixtures.ts";
 
-/** An empty scaffolded IR with keyboard id "test": enough to instantiate a working copy. */
-export function makeScaffoldedIR(): KeyboardIR {
-  return {
-    origin: "scaffolded" as const,
-    header: {
-      keyboardId: "test",
-      name: "test",
-      bcp47: [],
-      copyright: "",
-      version: "10.0",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores: [],
-    groups: [],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  } as unknown as KeyboardIR;
-}
+export { makeScaffoldedIR };
 
 /** Instantiate the live working copy from a bare base `baseId` with an empty VFS and IR. */
 export function instantiateMinimal(baseId: string, displayName = "Test Keyboard"): void {
