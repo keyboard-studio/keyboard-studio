@@ -7,8 +7,10 @@
 //     LIVE_QUESTION_MODULES, the list src/survey/questions/questionModules.test.ts
 //     runs through the shared contract suite (src/test/questionModuleContract.ts:
 //     fixtures through validate(), definition snapshot, generic invariants);
-//   • reserve/: the module must keep its mirror test at
-//     tests/survey/questions/reserve/<id>.test.ts (spec 022 no-delete guardrail).
+//   • reserve/: the module must be in RESERVE_QUESTION_MODULES, the list the
+//     parametric tests/survey/questions/reserve/reserveModules.test.ts runs
+//     through the same contract suite (the spec 022 no-delete guardrail's
+//     TEST-COVERED leg).
 //
 // Every module that exports validate() must also declare at least one valid
 // fixture, so the suite's fixture run is never vacuous. Walking the directory
@@ -20,16 +22,19 @@ import { describe, it, expect } from "vitest";
 import { readdirSync, existsSync, readFileSync, statSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { LIVE_QUESTION_MODULES, ON_DISK_QUESTION_MODULES } from "../../src/test/questionModuleContract.ts";
+import {
+  LIVE_QUESTION_MODULES,
+  ON_DISK_QUESTION_MODULES,
+  RESERVE_QUESTION_MODULES,
+} from "../../src/test/questionModuleContract.ts";
 
 const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const srcQuestionsRoot = path.join(pkgRoot, "src", "survey", "questions");
-const testsQuestionsRoot = path.join(pkgRoot, "tests", "survey", "questions");
 const liveSuite = path.join(srcQuestionsRoot, "questionModules.test.ts");
+const reserveSuite = path.join(pkgRoot, "tests", "survey", "questions", "reserve", "reserveModules.test.ts");
 
 interface ModuleFile {
   folder: string;
-  id: string;
   /** Path relative to src/survey/questions/, as the contract suite reports it. */
   file: string;
 }
@@ -43,10 +48,10 @@ function walkModules(): ModuleFile[] {
       const childPath = path.join(folderPath, child);
       if (statSync(childPath).isDirectory()) {
         if (existsSync(path.join(childPath, "index.ts"))) {
-          out.push({ folder, id: child, file: `${folder}/${child}/index.ts` });
+          out.push({ folder, file: `${folder}/${child}/index.ts` });
         }
       } else if (child.endsWith(".ts") && !child.endsWith(".test.ts")) {
-        out.push({ folder, id: child.slice(0, -".ts".length), file: `${folder}/${child}` });
+        out.push({ folder, file: `${folder}/${child}` });
       }
     }
   }
@@ -55,6 +60,7 @@ function walkModules(): ModuleFile[] {
 
 const onDisk = walkModules();
 const liveCovered = new Set(LIVE_QUESTION_MODULES.map((e) => e.file));
+const reserveCovered = new Set(RESERVE_QUESTION_MODULES.map((e) => e.file));
 const byFile = new Map(ON_DISK_QUESTION_MODULES.map((e) => [e.file, e.mod]));
 
 describe("question-module coverage gate — no question module ships untested", () => {
@@ -68,11 +74,15 @@ describe("question-module coverage gate — no question module ships untested", 
     expect(source).toMatch(/describeQuestionModules\(\s*"[^"]*",\s*LIVE_QUESTION_MODULES\b/);
   });
 
-  for (const { folder, id, file } of onDisk) {
+  it("the reserve contract suite runs RESERVE_QUESTION_MODULES", () => {
+    const source = readFileSync(reserveSuite, "utf8");
+    expect(source).toMatch(/describeQuestionModules\(\s*"[^"]*",\s*RESERVE_QUESTION_MODULES\b/);
+  });
+
+  for (const { folder, file } of onDisk) {
     it(`${file} is covered`, () => {
       if (folder === "reserve") {
-        const mirror = path.join(testsQuestionsRoot, "reserve", `${id}.test.ts`);
-        expect(existsSync(mirror), `Missing reserve mirror test: ${mirror}`).toBe(true);
+        expect(reserveCovered.has(file), `${file} is not in RESERVE_QUESTION_MODULES`).toBe(true);
       } else {
         expect(liveCovered.has(file), `${file} is not in LIVE_QUESTION_MODULES`).toBe(true);
       }

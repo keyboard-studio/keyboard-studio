@@ -1,22 +1,11 @@
-// Colocated vitest spec for iso_code.
+// iso_code: its mutate() seam (spec-014 M2-M5). Fixtures, definition shape and the
+// generic invariants run in reserveModules.test.ts.
 
 import { describe, it, expect } from "vitest";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { irPath } from "@keyboard-studio/contracts";
 import { applyMutatePatch } from "../../../../src/steps/mutateApply.ts";
-import mod, { fixtures, definition, mutate } from "../../../../src/survey/questions/reserve/iso_code.ts";
-
-describe("iso_code — definition", () => {
-  it("is optional (required: false)", () => {
-    expect(definition.required).toBe(false);
-  });
-  it("has options_source @langtags_iso639", () => {
-    expect(definition.options_source).toBe("@langtags_iso639");
-  });
-  it("routes to region", () => {
-    expect(definition.next).toBe("region");
-  });
-});
+import mod, { mutate } from "../../../../src/survey/questions/reserve/iso_code.ts";
 
 // ---------------------------------------------------------------------------
 // T010 / US1 — mutate() output tests (spec-014 mutate-seam M2–M5)
@@ -63,11 +52,5 @@ describe("iso_code — mutate() writes header.bcp47 only", () => {
 
   it("declared writes is exactly [header.bcp47]", () => {
     expect(mod.writes).toEqual([irPath("header", "bcp47")]);
-  });
-});
-
-describe("iso_code — fixtures", () => {
-  it("has no invalid fixtures", () => {
-    expect(fixtures.invalid).toHaveLength(0);
   });
 });

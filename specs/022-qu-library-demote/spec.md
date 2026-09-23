@@ -1,5 +1,20 @@
 # Feature Specification: Library demote — demote the orphaned non-identity Phase A to reserve/library under the no-delete guardrail
 
+> ## Amendment (2026-09-23, approved by Matt) — what "test-covered" means
+>
+> The no-delete guardrail's **TEST-COVERED** leg (FR-004/FR-005/SC-003) no longer requires one
+> mirror test file per demoted module (`tests/survey/questions/reserve/<id>.test.ts`). Those
+> files were almost all the same template: each module's own fixtures run through its own
+> `validate()`. A demoted module now counts as test-covered when the **parametric reserve
+> suite** (`tests/survey/questions/reserve/reserveModules.test.ts`) runs it. That suite
+> iterates `reserveRegistry` through the shared question-module contract suite (fixtures,
+> definition snapshot, generic invariants). The module must also declare **at least one valid
+> fixture**, so a module whose fixtures are emptied still turns the guardrail RED. Modules with
+> behaviour of their own (the `mutate()` seams) keep dedicated test files. Registered, on disk
+> and revivable are unchanged. Separately, the five Phase B marks modules retired by spec 071
+> were never in this guardrail's demoted set, and they were deleted with owner approval rather
+> than moved to `reserve/`.
+
 > ## Amendment (2026-06-29, approved by Matt; confirmed by km-verification + km-domain)
 >
 > **The `pb_*` step-by-step battery is REMOVED from library-demotion scope.** During
