@@ -22,17 +22,17 @@ import type {
  * them has no such key at all.
  */
 export interface TestIROptions {
-  origin?: IROrigin;
-  header?: Partial<IRHeader>;
-  groups?: IRGroup[];
-  stores?: IRStore[];
-  raw?: RawKmnFragment[];
-  comments?: IRComment[];
-  recognizedPatterns?: KeyboardIR["recognizedPatterns"];
-  touchLayout?: KeyboardIR["touchLayout"];
-  visualKeyboard?: KeyboardIR["visualKeyboard"];
-  facets?: KeyboardIR["facets"];
-  facetOverrides?: KeyboardIR["facetOverrides"];
+  origin?: IROrigin | undefined;
+  header?: Partial<IRHeader> | undefined;
+  groups?: IRGroup[] | undefined;
+  stores?: IRStore[] | undefined;
+  raw?: RawKmnFragment[] | undefined;
+  comments?: IRComment[] | undefined;
+  recognizedPatterns?: KeyboardIR["recognizedPatterns"] | undefined;
+  touchLayout?: KeyboardIR["touchLayout"] | undefined;
+  visualKeyboard?: KeyboardIR["visualKeyboard"] | undefined;
+  facets?: KeyboardIR["facets"] | undefined;
+  facetOverrides?: KeyboardIR["facetOverrides"] | undefined;
 }
 
 /** Overrides accepted after the positional groups/stores/raw arguments. */

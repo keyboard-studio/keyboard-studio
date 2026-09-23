@@ -24,16 +24,16 @@ import { charItems } from "./keyboard-ir.js";
 
 export interface IRGroupInput {
   /** Defaults to `group#${name}`. */
-  nodeId?: string;
+  nodeId?: string | undefined;
   /** Defaults to "main". */
-  name?: string;
+  name?: string | undefined;
   /** Defaults to []. */
-  rules?: IRRule[];
+  rules?: IRRule[] | undefined;
   /** Defaults to true (`group(x) using keys`). */
-  usingKeys?: boolean;
+  usingKeys?: boolean | undefined;
   /** Defaults to false. */
-  readonly?: boolean;
-  sourceLine?: number;
+  readonly?: boolean | undefined;
+  sourceLine?: number | undefined;
 }
 
 /** Build an IRGroup: a writable `using keys` group named "main" unless told otherwise. */
@@ -54,11 +54,14 @@ export function irGroup(input: IRGroupInput = {}): IRGroup {
 // Rules
 // ---------------------------------------------------------------------------
 
-/** Rule fields that are not context/output; each is written only when given. */
-export type IRRuleExtras = Pick<
-  IRRule,
-  "trailingComment" | "ownedByPattern" | "matchKind" | "targetSelector" | "sourceLine"
->;
+/** Rule fields that are not context/output; each is written only when given (not undefined). */
+export interface IRRuleExtras {
+  trailingComment?: IRRule["trailingComment"] | undefined;
+  ownedByPattern?: IRRule["ownedByPattern"] | undefined;
+  matchKind?: IRRule["matchKind"] | undefined;
+  targetSelector?: IRRule["targetSelector"] | undefined;
+  sourceLine?: IRRule["sourceLine"] | undefined;
+}
 
 /** A rule output: a string becomes a single `char` element holding the whole string. */
 export type RuleOutputInput = string | OutputElement[];
@@ -80,11 +83,11 @@ function withRuleExtras(rule: IRRule, extras: IRRuleExtras): IRRule {
 
 export interface VkeyRuleInput extends IRRuleExtras {
   /** Defaults to a fresh unique id (`rule#auto-N`) for tests that never look at it. */
-  nodeId?: string;
+  nodeId?: string | undefined;
   /** Defaults to "K_A". */
-  vkey?: string;
+  vkey?: string | undefined;
   /** Defaults to []. */
-  modifiers?: string[];
+  modifiers?: string[] | undefined;
   output: RuleOutputInput;
 }
 
@@ -105,7 +108,7 @@ export function vkeyRule(input: VkeyRuleInput): IRRule {
 
 export interface CharRuleInput extends IRRuleExtras {
   /** Defaults to a fresh unique id (`rule#auto-N`) for tests that never look at it. */
-  nodeId?: string;
+  nodeId?: string | undefined;
   /** A string becomes a single `char` context element holding the whole string. */
   context: string | ContextElement[];
   output: RuleOutputInput;
@@ -134,21 +137,21 @@ export function charRule(input: CharRuleInput): IRRule {
 
 export interface CharStoreInput {
   /** Defaults to `store#${name}`. */
-  nodeId?: string;
+  nodeId?: string | undefined;
   name: string;
   /**
    * The store's characters. A string is split per code point (see charItems);
    * an array gives one `char` item per element, verbatim. Ignored when `items`
    * is given. Defaults to no items.
    */
-  chars?: string | readonly string[];
+  chars?: string | readonly string[] | undefined;
   /** Explicit items, for stores that hold more than plain characters. */
-  items?: StoreItem[];
+  items?: StoreItem[] | undefined;
   /** Defaults to false. */
-  isSystem?: boolean;
-  targetSelector?: IRStore["targetSelector"];
-  sourceLine?: number;
-  trailingComment?: string;
+  isSystem?: boolean | undefined;
+  targetSelector?: IRStore["targetSelector"] | undefined;
+  sourceLine?: number | undefined;
+  trailingComment?: string | undefined;
 }
 
 /** Build a (by default non-system) IRStore from characters or explicit items. */
@@ -175,7 +178,7 @@ export function charStore(input: CharStoreInput): IRStore {
 // ---------------------------------------------------------------------------
 
 /** Build a TouchKeyIR. `nodeId` defaults to `node_${id}`; every other field is passed through. */
-export function touchKey(input: { id: string; nodeId?: string } & Partial<Omit<TouchKeyIR, "id" | "nodeId">>): TouchKeyIR {
+export function touchKey(input: { id: string; nodeId?: string | undefined } & Partial<Omit<TouchKeyIR, "id" | "nodeId">>): TouchKeyIR {
   const { id, nodeId, ...rest } = input;
   return { nodeId: nodeId ?? `node_${id}`, id, ...rest };
 }
@@ -188,15 +191,15 @@ export type TouchLayerInput = TouchLayer | { id: string; keys: readonly TouchKey
 
 export interface TouchLayoutInput {
   /** Defaults to "phone". */
-  platform?: TouchPlatform["id"];
+  platform?: TouchPlatform["id"] | undefined;
   /** The platform's layers. Ignored when `keys` is given. */
-  layers?: readonly TouchLayerInput[];
+  layers?: readonly TouchLayerInput[] | undefined;
   /** Shorthand for a single one-row layer holding these keys. */
-  keys?: readonly TouchKeyIR[];
+  keys?: readonly TouchKeyIR[] | undefined;
   /** Layer id for the `keys` shorthand. Defaults to "default". */
-  layerId?: string;
+  layerId?: string | undefined;
   /** Defaults to []. */
-  nodeIds?: TouchLayoutIR["nodeIds"];
+  nodeIds?: TouchLayoutIR["nodeIds"] | undefined;
 }
 
 function toLayer(layer: TouchLayerInput): TouchLayer {
