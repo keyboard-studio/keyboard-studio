@@ -3,7 +3,8 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import { compile, kmnCompilerSeverity, mapKmnCompilerEvent } from "./index.js";
+import { compile, mapKmnCompilerEvent } from "./index.js";
+import { loadKmcMessageTables } from "./kmcMessages.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const minimalKmnPath = resolve(here, "__fixtures__", "minimal.kmn");
@@ -150,23 +151,29 @@ describe("compile() — kmcmplib severity and line decode", () => {
     expect(result.diagnostics.some((d) => d.code.startsWith("KM_WARNING_"))).toBe(false);
   }, 30_000);
 
-  it("decodes every CompilerErrorSeverity band from the code's severity bits", () => {
+  it("decodes every CompilerErrorSeverity band from the code's severity bits", async () => {
+    const tables = await loadKmcMessageTables();
     const base = 0x2000 | 0x01d; // KmnCompiler namespace | base code
-    expect(kmnCompilerSeverity(0x000000 | base)).toBe("info"); // Debug
-    expect(kmnCompilerSeverity(0x100000 | base)).toBe("info"); // Verbose
-    expect(kmnCompilerSeverity(0x200000 | base)).toBe("info");
-    expect(kmnCompilerSeverity(0x300000 | base)).toBe("hint");
-    expect(kmnCompilerSeverity(0x400000 | base)).toBe("warning");
-    expect(kmnCompilerSeverity(0x500000 | base)).toBe("error");
-    expect(kmnCompilerSeverity(0x600000 | base)).toBe("fatal");
-    // Non-numeric codes keep the old "warning" fallback.
-    expect(kmnCompilerSeverity("ERROR_Something")).toBe("warning");
-    expect(kmnCompilerSeverity(undefined)).toBe("warning");
+    expect(tables.severity(0x000000 | base)).toBe("info"); // Debug
+    expect(tables.severity(0x100000 | base)).toBe("info"); // Verbose
+    expect(tables.severity(0x200000 | base)).toBe("info");
+    expect(tables.severity(0x300000 | base)).toBe("hint");
+    expect(tables.severity(0x400000 | base)).toBe("warning");
+    expect(tables.severity(0x500000 | base)).toBe("error");
+    expect(tables.severity(0x600000 | base)).toBe("fatal");
+    // Symbolic names come from kmc-kmn's own message tables.
+    expect(tables.name(0x50201d)).toBe("ERROR_StoreDoesNotExist");
+    expect(tables.name(0x3020ae)).toBe("HINT_UnreachableRule");
+    expect(tables.name(0x507004)).toBe("ERROR_TouchLayoutFileDoesNotExist"); // KmwCompiler namespace
+    expect(tables.name(0x5020ff)).toBeUndefined();
   });
 
-  it("maps the CompilerEvent shape: severity-derived code prefix, `line`, filename fallback", () => {
+  it("maps the CompilerEvent shape: severity-derived code prefix, `line`, filename fallback", async () => {
+    const tables = await loadKmcMessageTables();
+    // Non-numeric codes keep the old "warning" fallback.
+    expect(mapKmnCompilerEvent({ code: "ERROR_Something", message: "x" }, "k", tables).severity).toBe("warning");
     expect(
-      mapKmnCompilerEvent({ code: 0x4020a3, message: "w", line: 3 }, "source/k.kmn"),
+      mapKmnCompilerEvent({ code: 0x4020a3, message: "w", line: 3 }, "source/k.kmn", tables),
     ).toEqual({
       code: `KM_WARN_KMCMP_${0x4020a3}`,
       severity: "warning",
@@ -178,10 +185,11 @@ describe("compile() — kmcmplib severity and line decode", () => {
       mapKmnCompilerEvent(
         { code: 0x600000 | 0x2001, message: "f", filename: "source/other.kmn", line: 9 },
         "source/k.kmn",
+        tables,
       ),
     ).toMatchObject({ severity: "fatal", location: { file: "source/other.kmn", line: 9 } });
     // No line → no location (kmc-kmn's own messages, e.g. Error_FileNotFound).
-    expect(mapKmnCompilerEvent({ code: 0x50290c, message: "e" }, "source/k.kmn")).not.toHaveProperty(
+    expect(mapKmnCompilerEvent({ code: 0x50290c, message: "e" }, "source/k.kmn", tables)).not.toHaveProperty(
       "location",
     );
   });

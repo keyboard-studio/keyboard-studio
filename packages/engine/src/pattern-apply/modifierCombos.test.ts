@@ -540,7 +540,9 @@ describe("buildComboKeyMap", () => {
 
 // ---------------------------------------------------------------------------
 // kmcmplib oracle — chirality unification actually clears the mixed-modifier
-// warning (KM_WARN_KMCMP_4202659), not just satisfies unit assertions.
+// warning (WARN_DontMixChiralAndNonChiralModifiers, 0x4020A3 = 4202659), not
+// just satisfies unit assertions. The oracle reports it under its upstream
+// name: KM_WARN_KMCMP_DONTMIXCHIRALANDNONCHIRALMODIFIERS.
 // ---------------------------------------------------------------------------
 
 function minimalKmnWithRule(ruleLine: string): string {
@@ -561,7 +563,7 @@ describe("kmcmplib oracle — mixed generic+chiral modifier warning", () => {
     const source = minimalKmnWithRule("[CTRL RALT K_A]");
     const findings = await validateWithOracle(source);
     const codes = findings.map((f) => f.code);
-    expect(codes.some((c) => c.includes("4202659"))).toBe(true);
+    expect(codes).toContain("KM_WARN_KMCMP_DONTMIXCHIRALANDNONCHIRALMODIFIERS");
   }, 15000);
 
   it("the chirality-unified rule ([CTRL ALT K_A], as canonicalizeCombo actually emits) compiles with no mixed-modifier warning", async () => {
@@ -571,7 +573,7 @@ describe("kmcmplib oracle — mixed generic+chiral modifier warning", () => {
     const source = minimalKmnWithRule(spec);
     const findings = await validateWithOracle(source);
     const codes = findings.map((f) => f.code);
-    expect(codes.some((c) => c.includes("4202659"))).toBe(false);
+    expect(codes).not.toContain("KM_WARN_KMCMP_DONTMIXCHIRALANDNONCHIRALMODIFIERS");
   }, 15000);
 });
 
