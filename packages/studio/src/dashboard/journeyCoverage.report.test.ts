@@ -20,18 +20,19 @@
 // Also runs as part of the normal `pnpm --filter @keyboard-studio/studio test`
 // suite (FR-011's "included in `pnpm test`" concern) — a useful side effect:
 // it doubles as a regression check that report generation does not throw.
+// Only `coverage:report` writes docs/journey-coverage.json: it runs vitest with
+// `--mode coverage-report`, and a plain `pnpm test` computes the report without
+// rewriting the committed file.
 
 import { describe, it, expect } from "vitest";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { computeCoverageReport, renderedNodeUniverseSize } from "./journeyCoverage.ts";
-import { parseJourneyFixture } from "../survey/journeyFixture.ts";
+import { loadJourneyCorpus } from "../survey/__fixtures__/journeyCorpus.ts";
 
-import bafutRaw from "../../../../content/journeys/bafut-end-to-end.yaml?raw";
-import bjCreeWoodsRaw from "../../../../content/journeys/bj-cree-woods-track2.yaml?raw";
-import minimalDefaultsRaw from "../../../../content/journeys/minimal-defaults.yaml?raw";
-import backtrackRaw from "../../../../content/journeys/backtrack-journey.yaml?raw";
+/** Set by `pnpm run coverage:report` (`vitest run --mode coverage-report`). */
+const WRITE_REPORT = import.meta.env.MODE === "coverage-report";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -39,17 +40,15 @@ const __dirname = dirname(__filename);
 const REPORT_PATH = join(__dirname, "..", "..", "..", "..", "docs", "journey-coverage.json");
 
 describe("journey coverage report (spec 032 FR-006/FR-012, US2)", () => {
-  it("computes the coverage report and writes docs/journey-coverage.json", () => {
-    const fixtures = [bafutRaw, bjCreeWoodsRaw, minimalDefaultsRaw, backtrackRaw].map(
-      parseJourneyFixture,
-    );
-    const report = computeCoverageReport(fixtures);
+  it("computes the coverage report (and writes docs/journey-coverage.json under coverage:report)", () => {
+    const report = computeCoverageReport(loadJourneyCorpus());
 
     // Report-only mode (research R6, FR-007): this command never fails CI —
     // it always writes the report and exits 0, regardless of gaps.
     expect(report.totalSteps).toBeGreaterThan(0);
     expect(report.entries).toHaveLength(report.totalSteps);
 
+    if (!WRITE_REPORT) return;
     mkdirSync(dirname(REPORT_PATH), { recursive: true });
     writeFileSync(
       REPORT_PATH,

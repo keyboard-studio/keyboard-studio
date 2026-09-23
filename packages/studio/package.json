@@ -16,7 +16,7 @@
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "coverage:report": "vitest run src/dashboard/journeyCoverage.report.test.ts"
+    "coverage:report": "vitest run src/dashboard/journeyCoverage.report.test.ts --mode coverage-report"
   },
   "dependencies": {
     "@keyboard-studio/contracts": "workspace:*",

@@ -222,7 +222,11 @@ its manifest edge coverage.
   pnpm --filter @keyboard-studio/studio run coverage:report
   ```
 
-  This runs as a `vitest run` invocation of one spec
+  Only this command writes the file: it runs `vitest run --mode coverage-report`, and the same
+  spec under a plain `pnpm test` computes the report without rewriting `docs/journey-coverage.json`.
+  The report and `journey-runner.test.ts` read the fixtures through one module,
+  `packages/studio/src/survey/__fixtures__/journeyCorpus.ts`, so a new journey is added there.
+  The command is a `vitest run` invocation of one spec
   (`src/dashboard/journeyCoverage.report.test.ts`), not a bare `tsx` script — the manifest's
   editor-step components transitively import `content/flows/*.modular.yaml?raw`, a Vite asset
   transform `tsx`/Node cannot resolve; Vitest already runs on Vite's own transform pipeline, so
