@@ -1,140 +1,85 @@
-// Mirror-coverage gate (T015).
+// Question-module coverage gate.
 //
-// At test time, enumerates every src/survey/questions/<phase>/<id>.ts module
-// (excluding index/registry/barrel files and *.test.ts files) and asserts that
-// a matching tests/survey/questions/<phase>/<id>.test.ts exists — BUT ONLY for
-// modules that EXPORT A VALIDATE FUNCTION.
+// Walks src/survey/questions/<folder>/ on disk — flat <id>.ts and folder-form
+// <id>/index.ts, registered or not — and fails if any module is not exercised:
 //
-// Handles both flat form (<id>.ts) and folder form (<id>/index.ts, introduced
-// in US5). For folder form the expected mirror is tests/.../<id>.test.ts keyed
-// on the folder name, not "index".
+//   • live folders (a/, b/, f/, g/, and any new one): the module must be in
+//     LIVE_QUESTION_MODULES, the list src/survey/questions/questionModules.test.ts
+//     runs through the shared contract suite (src/test/questionModuleContract.ts:
+//     fixtures through validate(), definition snapshot, generic invariants);
+//   • reserve/: the module must keep its mirror test at
+//     tests/survey/questions/reserve/<id>.test.ts (spec 022 no-delete guardrail).
 //
-// A module WITHOUT validate() is covered by orphan-input-lint + buildStepGraph
-// reachability; static-config modules (definition, next, type, etc.) do not need
-// a per-file test. Only modules that export a validate() function must have a
-// mirror test. Add the missing test file to tests/survey/questions/<phase>/<id>.test.ts
-// if a module's validate() lacks coverage.
+// Every module that exports validate() must also declare at least one valid
+// fixture, so the suite's fixture run is never vacuous. Walking the directory
+// independently of the suite's import.meta.glob is the point: a module the
+// glob misses (a new nesting shape, a new folder) fails here instead of
+// silently going untested.
 
 import { describe, it, expect } from "vitest";
-import { readdirSync, existsSync, statSync } from "node:fs";
-import { fileURLToPath, URL } from "node:url";
+import { readdirSync, existsSync, readFileSync, statSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { questionRegistry } from "../../src/survey/questions/registry.ts";
+import { LIVE_QUESTION_MODULES, ON_DISK_QUESTION_MODULES } from "../../src/test/questionModuleContract.ts";
 
-// Resolve paths relative to this spec file, which lives at:
-//   packages/studio/tests/survey/mirror-coverage.test.ts
-const thisFile = fileURLToPath(import.meta.url);
-const testsDir = path.dirname(thisFile); // …/tests/survey
-const pkgRoot = path.resolve(testsDir, "../.."); // …/packages/studio
-
+const pkgRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const srcQuestionsRoot = path.join(pkgRoot, "src", "survey", "questions");
 const testsQuestionsRoot = path.join(pkgRoot, "tests", "survey", "questions");
+const liveSuite = path.join(srcQuestionsRoot, "questionModules.test.ts");
 
-// File/folder names that are NOT per-question modules.
-const EXCLUDED_NAMES = new Set([
-  "index",
-  "registry",
-  "registry.a",
-  "registry.b",
-  "registry.f",
-  "registry.test",
-  "types",
-]);
-
-function isExcluded(stem: string): boolean {
-  return EXCLUDED_NAMES.has(stem) || stem.startsWith("registry.");
-}
-
-interface MirrorEntry {
-  phase: string;
+interface ModuleFile {
+  folder: string;
   id: string;
-  srcPath: string;
-  expectedMirror: string;
+  /** Path relative to src/survey/questions/, as the contract suite reports it. */
+  file: string;
 }
 
-// Does the question module export a validate() function? Read it off the typed
-// questionRegistry (QuestionModule.validate) rather than regex-scanning source —
-// the regex missed arrow-function validators (`export const validate = () => …`)
-// and understated the coverage requirement. Keyed by question id.
-function hasValidate(id: string): boolean {
-  return typeof questionRegistry[id]?.validate === "function";
-}
-
-function collectModules(): MirrorEntry[] {
-  const entries: MirrorEntry[] = [];
-
-  let phases: string[];
-  try {
-    phases = readdirSync(srcQuestionsRoot).filter((entry) => {
-      const full = path.join(srcQuestionsRoot, entry);
-      return statSync(full).isDirectory();
-    });
-  } catch {
-    // src tree not found — return empty so the test surfaces a clear message
-    return entries;
-  }
-
-  for (const phase of phases) {
-    const phaseDir = path.join(srcQuestionsRoot, phase);
-    const children = readdirSync(phaseDir);
-
-    for (const child of children) {
-      const fullChild = path.join(phaseDir, child);
-      const childStat = statSync(fullChild);
-
-      if (childStat.isDirectory()) {
-        // Folder form: <id>/index.ts — US5 pattern.
-        const indexFile = path.join(fullChild, "index.ts");
-        if (!existsSync(indexFile)) continue;
-        const id = child;
-        if (isExcluded(id)) continue;
-        // Only require mirror if the module exports validate()
-        if (!hasValidate(id)) continue;
-        const expectedMirror = path.join(
-          testsQuestionsRoot,
-          phase,
-          `${id}.test.ts`,
-        );
-        entries.push({ phase, id, srcPath: indexFile, expectedMirror });
+function walkModules(): ModuleFile[] {
+  const out: ModuleFile[] = [];
+  for (const folder of readdirSync(srcQuestionsRoot)) {
+    const folderPath = path.join(srcQuestionsRoot, folder);
+    if (!statSync(folderPath).isDirectory() || folder.startsWith("__")) continue;
+    for (const child of readdirSync(folderPath)) {
+      const childPath = path.join(folderPath, child);
+      if (statSync(childPath).isDirectory()) {
+        if (existsSync(path.join(childPath, "index.ts"))) {
+          out.push({ folder, id: child, file: `${folder}/${child}/index.ts` });
+        }
       } else if (child.endsWith(".ts") && !child.endsWith(".test.ts")) {
-        // Flat form: <id>.ts
-        const stem = child.slice(0, -".ts".length);
-        if (isExcluded(stem)) continue;
-        // Only require mirror if the module exports validate()
-        if (!hasValidate(stem)) continue;
-        const expectedMirror = path.join(
-          testsQuestionsRoot,
-          phase,
-          `${stem}.test.ts`,
-        );
-        entries.push({
-          phase,
-          id: stem,
-          srcPath: fullChild,
-          expectedMirror,
-        });
+        out.push({ folder, id: child.slice(0, -".ts".length), file: `${folder}/${child}` });
       }
     }
   }
-
-  return entries;
+  return out.sort((a, b) => a.file.localeCompare(b.file));
 }
 
-const modules = collectModules();
+const onDisk = walkModules();
+const liveCovered = new Set(LIVE_QUESTION_MODULES.map((e) => e.file));
+const byFile = new Map(ON_DISK_QUESTION_MODULES.map((e) => [e.file, e.mod]));
 
-describe("mirror-coverage gate — every src question module has a tests/ mirror", () => {
-  it("found at least one module to check (sanity)", () => {
-    expect(modules.length).toBeGreaterThan(0);
+describe("question-module coverage gate — no question module ships untested", () => {
+  it("found modules on disk, and the contract suite enumerates the same files (sanity)", () => {
+    expect(onDisk.length).toBeGreaterThan(0);
+    expect(ON_DISK_QUESTION_MODULES.map((e) => e.file)).toEqual(onDisk.map((m) => m.file));
   });
 
-  for (const { phase, id, expectedMirror } of modules) {
-    it(`${phase}/${id} has tests/survey/questions/${phase}/${id}.test.ts`, () => {
-      expect(
-        existsSync(expectedMirror),
-        `Missing mirror test for ${phase}/${id}.\n` +
-          `Expected: ${expectedMirror}\n` +
-          `Create the file to pass this gate.`,
-      ).toBe(true);
+  it("the live contract suite runs LIVE_QUESTION_MODULES", () => {
+    const source = readFileSync(liveSuite, "utf8");
+    expect(source).toMatch(/describeQuestionModules\(\s*"[^"]*",\s*LIVE_QUESTION_MODULES\b/);
+  });
+
+  for (const { folder, id, file } of onDisk) {
+    it(`${file} is covered`, () => {
+      if (folder === "reserve") {
+        const mirror = path.join(testsQuestionsRoot, "reserve", `${id}.test.ts`);
+        expect(existsSync(mirror), `Missing reserve mirror test: ${mirror}`).toBe(true);
+      } else {
+        expect(liveCovered.has(file), `${file} is not in LIVE_QUESTION_MODULES`).toBe(true);
+      }
+      const mod = byFile.get(file);
+      if (typeof mod?.validate === "function") {
+        expect(mod.fixtures.valid.length, `${file} exports validate() but declares no valid fixture`).toBeGreaterThan(0);
+      }
     });
   }
 });
