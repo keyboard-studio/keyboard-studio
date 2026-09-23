@@ -7,11 +7,13 @@
 //   R4 — editor purity: no editor component calls the reducer (enforced by review; here we
 //         test that the reducer is standalone and not called from the adapter files).
 //   R5 — unknown step id is a no-op.
-//   R6 — behavior parity: for same inputs, observable store state matches pre-refactor inline path.
+//
+// R1 and R2 run once with the mutate seam flag (VITE_KM_MUTATE_SEAM) off and once
+// with it on: both write paths sit outside the flag gate (spec 021 T007/T008).
+// The flag-gated parts (mutate() requests, touch re-propagation at mechanisms)
+// have their own describes below (spec 014 M3/M6, F1/F2).
 //
 // Source of truth: specs/012-step-model-manifest/contracts/manifest-reducer.contract.md
-// Pre-refactor inline path: StudioShell.tsx handleMechanismsComplete (line 377),
-//   handlePhaseEComplete (lines 380-410), onInstantiate (lines 240-253).
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import {
@@ -22,11 +24,14 @@ import {
   type ReducerDeps,
   type InstantiateResult,
   type TouchCompleteResult,
+  type MutateRequest,
 } from "./reducer.ts";
 import type { BaseKeyboard, KeyboardIR, VirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { repropagate as mockRepropagate } from "./repropagate.ts";
+import langNameMod from "../survey/questions/reserve/language_name_english.ts";
+import desktopFirstNotice from "../survey/questions/reserve/desktop_first_notice.ts";
 
 // T024 (single-writer rule): spy on repropagate() to assert the reducer no
 // longer injects setTouchLayoutJson into RepropagateDeps.
@@ -77,17 +82,27 @@ function makeDepsMock(): ReducerDeps {
   };
 }
 
+// R1 and R2 are unconditional: they behave the same with the seam flag off and on.
+const SEAM_FLAG_STATES = [
+  ["off", ""],
+  ["on", "1"],
+] as const;
+
 // ---------------------------------------------------------------------------
 // R1 — lock fires at mechanisms step
 // ---------------------------------------------------------------------------
 
-describe("R1 — lockDesktop fires at the mechanisms step", () => {
+describe.each(SEAM_FLAG_STATES)("R1 — lockDesktop fires at the mechanisms step (seam flag %s)", (_label, flag) => {
   let deps: ReducerDeps;
-  beforeEach(() => { deps = makeDepsMock(); });
+  beforeEach(() => {
+    vi.stubEnv("VITE_KM_MUTATE_SEAM", flag);
+    deps = makeDepsMock();
+  });
+  afterEach(() => { vi.unstubAllEnvs(); });
 
-  it("calls lockDesktop exactly once when stepId is 'mechanisms'", () => {
+  it("calls lockDesktop exactly once, with no arguments, when stepId is 'mechanisms'", () => {
     applyStepCompletion(MECHANISMS_STEP_ID, undefined, deps);
-    expect(deps.lockDesktop).toHaveBeenCalledTimes(1);
+    expect(deps.lockDesktop).toHaveBeenCalledExactlyOnceWith();
   });
 
   it("calls no other store action at the mechanisms step", () => {
@@ -115,14 +130,18 @@ describe("R1 — lockDesktop fires at the mechanisms step", () => {
 // through unchanged; the dep decides null vs a built json string.
 // ---------------------------------------------------------------------------
 
-describe("R2 — touch-layout build at the touch step", () => {
+describe.each(SEAM_FLAG_STATES)("R2 — touch-layout build at the touch step (seam flag %s)", (_label, flag) => {
   let deps: ReducerDeps;
   const baseIr = makeKeyboardIR();
   const baseVfs = makeVirtualFS();
   const assignments = makeTouchAssignments();
   const EMPTY_MODS = { removals: [], placements: [] };
 
-  beforeEach(() => { deps = makeDepsMock(); });
+  beforeEach(() => {
+    vi.stubEnv("VITE_KM_MUTATE_SEAM", flag);
+    deps = makeDepsMock();
+  });
+  afterEach(() => { vi.unstubAllEnvs(); });
 
   // --- Case A: base ships no touch layout (resolveBaseTouchJson returns undefined) ---
 
@@ -151,6 +170,7 @@ describe("R2 — touch-layout build at the touch step", () => {
     (deps.resolveBaseTouchJson as ReturnType<typeof vi.fn>).mockReturnValue(shippedJson);
     const result: TouchCompleteResult = { assignments, baseIr, baseVfs };
     applyStepCompletion(TOUCH_STEP_ID, result, deps);
+    expect(deps.resolveBaseTouchJson).toHaveBeenCalledTimes(1);
     expect(deps.buildTouchLayoutJson).toHaveBeenCalledWith(baseIr, assignments, {
       baseTouchJson: shippedJson,
       mods: EMPTY_MODS,
@@ -261,6 +281,19 @@ describe("R2 — touch-layout build at the touch step", () => {
     expect(() => applyStepCompletion(TOUCH_STEP_ID, undefined, deps)).not.toThrow();
     expect(deps.clearStale).toHaveBeenCalledExactlyOnceWith(TOUCH_STEP_ID);
   });
+
+  // Spec 021 T020: the touch step persists the side-car only; it never routes a
+  // KeyboardIR write through the working copy.
+  it("never writes the working IR, even with the IR setter injected", () => {
+    const setWorkingIR = vi.fn();
+    applyStepCompletion(TOUCH_STEP_ID, { assignments, baseIr, baseVfs }, {
+      ...deps,
+      getWorkingIR: () => baseIr,
+      setWorkingIR,
+    });
+    expect(setWorkingIR).not.toHaveBeenCalled();
+    expect(deps.setTouchLayoutJson).toHaveBeenCalledTimes(1);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -299,6 +332,7 @@ describe("R3 — copy/adapt instantiation routing at choose_base", () => {
     const result: InstantiateResult = { base, ir: null, vfs: null, track: "adapt" };
     applyStepCompletion(CHOOSE_BASE_STEP_ID, result, deps);
     expect(deps.instantiateFromExisting).not.toHaveBeenCalled();
+    expect(deps.instantiateFromBaseIfConfirmed).not.toHaveBeenCalled();
   });
 
   // spec 034 T005 / TI-2: the null-ir adapt path is a mock-only artifact and is
@@ -400,75 +434,11 @@ describe("R5 — unknown step id is a harmless no-op", () => {
 });
 
 // ---------------------------------------------------------------------------
-// R6 — behavior parity with the pre-refactor inline path
-//
-// Golden parity: for the same inputs, the observable store mutations
-// (lockDesktop, setTouchLayoutJson, instantiateFromExisting,
-// instantiateFromBaseIfConfirmed) match what the pre-refactor handlers
-// in StudioShell.tsx performed.
+// R4 — editor purity
 // ---------------------------------------------------------------------------
 
-describe("R6 — behavior parity with pre-refactor inline handlers", () => {
-  let deps: ReducerDeps;
-
-  beforeEach(() => { deps = makeDepsMock(); });
-
-  // Pre-refactor handleMechanismsComplete: calls lockDesktop(), then setStage("E").
-  // The reducer equivalent: lockDesktop() — stage transition is the caller's responsibility.
-  it("mechanisms step: lockDesktop called exactly once (mirrors handleMechanismsComplete)", () => {
-    applyStepCompletion(MECHANISMS_STEP_ID, undefined, deps);
-    expect(deps.lockDesktop).toHaveBeenCalledExactlyOnceWith();
-  });
-
-  // Spec 035 R11 superseded the old "assignments.length === 0 → null"
-  // short-circuit: the reducer now always calls the injected
-  // buildTouchLayoutJson dep when baseIr is present, and the dep (not this
-  // reducer) decides null vs a built json string via the R11 emission
-  // matrix. The one gate this reducer still owns unconditionally is
-  // baseIr === null.
-  it("touch step: empty assignments with baseIr present still calls the build dep (gating moved to R11)", () => {
-    applyStepCompletion(TOUCH_STEP_ID, { assignments: [], baseIr: makeKeyboardIR(), baseVfs: null }, deps);
-    expect(deps.buildTouchLayoutJson).toHaveBeenCalled();
-  });
-
-  it("touch step: null baseIr → setTouchLayoutJson(null)", () => {
-    applyStepCompletion(TOUCH_STEP_ID, { assignments: [{}], baseIr: null, baseVfs: null }, deps);
-    expect(deps.setTouchLayoutJson).toHaveBeenCalledWith(null);
-  });
-
-  it("touch step: successful build → setTouchLayoutJson(json)", () => {
-    const json = '{"k":1}';
-    (deps.buildTouchLayoutJson as ReturnType<typeof vi.fn>).mockReturnValue({ json, warnings: [] });
-    applyStepCompletion(TOUCH_STEP_ID, { assignments: [{}], baseIr: makeKeyboardIR(), baseVfs: null }, deps);
-    expect(deps.setTouchLayoutJson).toHaveBeenCalledWith(json);
-  });
-
-  // Pre-refactor onInstantiate: if track === "adapt" → instantiateFromExisting(...);
-  // else → instantiateFromBaseIfConfirmed(...).
-  it("choose_base step: track adapt → instantiateFromExisting", () => {
-    const base = makeBaseKeyboard();
-    const ir = makeKeyboardIR();
-    const vfs = makeVirtualFS();
-    applyStepCompletion(CHOOSE_BASE_STEP_ID, { base, ir, vfs, track: "adapt" }, deps);
-    expect(deps.instantiateFromExisting).toHaveBeenCalledWith(base, { vfs, ir });
-  });
-
-  it("choose_base step: track null (default) → instantiateFromBaseIfConfirmed", () => {
-    const base = makeBaseKeyboard();
-    const ir = makeKeyboardIR();
-    const vfs = makeVirtualFS();
-    applyStepCompletion(CHOOSE_BASE_STEP_ID, { base, ir, vfs, track: null }, deps);
-    expect(deps.instantiateFromBaseIfConfirmed).toHaveBeenCalledWith(base, { vfs, ir });
-  });
-
-  // Pre-refactor: Track 2 with null ir → console.warn and return (no instantiation).
-  it("choose_base step: Track 2 with null ir → no instantiation (mock engine guard)", () => {
-    applyStepCompletion(CHOOSE_BASE_STEP_ID, { base: makeBaseKeyboard(), ir: null, vfs: null, track: "adapt" }, deps);
-    expect(deps.instantiateFromExisting).not.toHaveBeenCalled();
-    expect(deps.instantiateFromBaseIfConfirmed).not.toHaveBeenCalled();
-  });
-
-  // R4 — editor purity (structural: the reducer does not import from editors/)
+describe("R4 — the reducer holds no store state of its own", () => {
+  // Editor purity (structural: the reducer does not import from editors/)
   // This is enforced by the boundary rule (steps-layer) and by review.
   // We verify here that applyStepCompletion itself is a standalone function
   // that takes all deps injected — if it imported stores/lib, depcruise would fail.
@@ -514,6 +484,87 @@ describe("T024 — repropagate() call site no longer injects setTouchLayoutJson"
     expect(mockRepropagate).toHaveBeenCalledTimes(1);
     const passedDeps = (mockRepropagate as ReturnType<typeof vi.fn>).mock.calls[0]![0] as Record<string, unknown>;
     expect("setTouchLayoutJson" in passedDeps).toBe(false);
+  });
+
+  // Spec 021 T009: with the flag off, the re-propagation add-on does not run even
+  // though every dep it needs is injected, so only lockDesktop() fires.
+  it("flag off: does not re-propagate; lockDesktop() is the only effect at mechanisms", () => {
+    vi.stubEnv("VITE_KM_MUTATE_SEAM", "");
+    applyStepCompletion(MECHANISMS_STEP_ID, undefined, deps);
+    expect(mockRepropagate).not.toHaveBeenCalled();
+    expect(deps.lockDesktop).toHaveBeenCalledTimes(1);
+    expect(deps.setWorkingIR).not.toHaveBeenCalled();
+    expect(deps.setTouchLayoutJson).not.toHaveBeenCalled();
+    expect(deps.buildTouchLayoutJson).not.toHaveBeenCalled();
+    expect(deps.instantiateFromExisting).not.toHaveBeenCalled();
+    expect(deps.instantiateFromBaseIfConfirmed).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 014 T012/T014 — question answers routed through mutate() (M3/M6, F1/F2)
+// ---------------------------------------------------------------------------
+
+describe("mutate seam — question answers routed through mutate()", () => {
+  function mutateDeps(initialIr: KeyboardIR | null) {
+    let ir = initialIr;
+    const deps: ReducerDeps = {
+      ...makeDepsMock(),
+      getWorkingIR: () => ir,
+      setWorkingIR: vi.fn((next: KeyboardIR) => { ir = next; }),
+    };
+    return { deps, getIr: () => ir };
+  }
+
+  function mutateReq(value: string | string[] | undefined): MutateRequest {
+    return { kind: "mutate", mutate: langNameMod.mutate!, value, writes: langNameMod.writes! };
+  }
+
+  afterEach(() => { vi.unstubAllEnvs(); });
+
+  it("flag off: does not call setWorkingIR and leaves the IR unchanged (F2/SC-008)", () => {
+    vi.stubEnv("VITE_KM_MUTATE_SEAM", "");
+    const base = makeTestIR([]);
+    const { deps, getIr } = mutateDeps(base);
+    applyStepCompletion("language_name_english", mutateReq("Bafut"), deps);
+    expect(deps.setWorkingIR).not.toHaveBeenCalled();
+    expect(getIr()!.header.name).toBe(base.header.name);
+  });
+
+  describe("flag on", () => {
+    beforeEach(() => { vi.stubEnv("VITE_KM_MUTATE_SEAM", "1"); });
+
+    it("applies the question's mutate() patch to the working IR without touching the base", () => {
+      const base = makeTestIR([]);
+      const { deps, getIr } = mutateDeps(base);
+      applyStepCompletion("language_name_english", mutateReq("Bafut"), deps);
+      expect(deps.setWorkingIR).toHaveBeenCalledTimes(1);
+      expect(getIr()!.header.name).toBe("Bafut");
+      expect(base.header.name).toBe("Test");
+    });
+
+    it("is a no-op (no setWorkingIR) when no working copy exists yet", () => {
+      const { deps } = mutateDeps(null);
+      applyStepCompletion("language_name_english", mutateReq("Bafut"), deps);
+      expect(deps.setWorkingIR).not.toHaveBeenCalled();
+    });
+
+    it("an empty answer applies an empty patch (no observable IR change) — M5", () => {
+      const base = makeTestIR([]);
+      const { deps, getIr } = mutateDeps(base);
+      applyStepCompletion("language_name_english", mutateReq(""), deps);
+      expect(getIr()!.header.name).toBe(base.header.name);
+    });
+
+    it("a display-only module (empty writes, no mutate) performs no IR change (AC US1-3)", () => {
+      const base = makeTestIR([]);
+      const { deps, getIr } = mutateDeps(base);
+      expect(desktopFirstNotice.writes).toEqual([]);
+      expect(desktopFirstNotice.mutate).toBeUndefined();
+      applyStepCompletion("desktop_first_notice", undefined, deps);
+      expect(deps.setWorkingIR).not.toHaveBeenCalled();
+      expect(getIr()).toEqual(base);
+    });
   });
 });
 
