@@ -21,13 +21,14 @@
 // applyCarveToVfs / emitKmn pipeline runs, so the assertions on emitted .kmn
 // content are meaningful. services.ts IS mocked to avoid WASM / network I/O.
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
+import { basicKbdus, charStore, irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import type { IRGroup, IRRule, IRStore } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.ts";
 import { projectWorkingCopyForOutput } from "./serializeWorkingCopy.ts";
+import { stubKmnVfs } from "../test/workingCopy.ts";
 
 // ---------------------------------------------------------------------------
 // Mock services.ts — prevents WASM / network I/O during the test.
@@ -46,28 +47,15 @@ vi.mock("./services.ts", () => ({
 // ---------------------------------------------------------------------------
 
 function makeRule(nodeId: string, vkey: string, char: string, sourceLine?: number): IRRule {
-  const r: IRRule = {
-    nodeId,
-    context: [{ kind: "vkey", name: vkey, modifiers: [] }],
-    output: [{ kind: "char", value: char }],
-  };
-  if (sourceLine !== undefined) r.sourceLine = sourceLine;
-  return r;
+  return vkeyRule({ nodeId, vkey, output: char, sourceLine });
 }
 
 function makeGroup(nodeId: string, name: string, rules: IRRule[]): IRGroup {
-  return { nodeId, name, usingKeys: true, rules, readonly: false };
+  return irGroup({ nodeId, name, rules });
 }
 
 function makeStore(nodeId: string, name: string, sourceLine?: number): IRStore {
-  const s: IRStore = {
-    nodeId,
-    name,
-    items: [{ kind: "char", value: "x" }],
-    isSystem: false,
-  };
-  if (sourceLine !== undefined) s.sourceLine = sourceLine;
-  return s;
+  return charStore({ nodeId, name, chars: "x", sourceLine });
 }
 
 /**
@@ -124,29 +112,12 @@ function buildFragmentBearingIR() {
   return ir;
 }
 
-// makeVfs duplicates the helper in projectWorkingCopyVfs.deleted-items.test.ts;
-// intentional — kept separate for test-file isolation (no shared test helpers).
-function makeVfs(keyboardId: string) {
-  return createVirtualFS([
-    { path: `source/${keyboardId}.kmn`, content: "c stub\n", isBinary: false },
-  ]);
-}
-
 // ---------------------------------------------------------------------------
 // Store lifecycle
 // ---------------------------------------------------------------------------
 
-function resetStore() {
-  useWorkingCopyStore.getState().reset();
-}
-
 beforeEach(() => {
-  resetStore();
   vi.clearAllMocks();
-});
-
-afterEach(() => {
-  resetStore();
 });
 
 // ---------------------------------------------------------------------------
@@ -174,7 +145,7 @@ describe("fragment-bearing keyboard — carve removal surfaces through BOTH cons
   it("preview and zip projections agree; removed nodes absent; fragments preserved in order", async () => {
     const keyboardId = basicKbdus.id; // "basic_kbdus"
     const ir = buildFragmentBearingIR();
-    const vfs = makeVfs(keyboardId);
+    const vfs = stubKmnVfs(keyboardId);
 
     // Seed the store (ZIP path reads from the store).
     useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
@@ -336,7 +307,7 @@ describe("fragment-bearing keyboard — carve removal surfaces through BOTH cons
   it("neither projection path mutates baseIr or baseVfs in the store", async () => {
     const keyboardId = basicKbdus.id;
     const ir = buildFragmentBearingIR();
-    const vfs = makeVfs(keyboardId);
+    const vfs = stubKmnVfs(keyboardId);
 
     useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
     useWorkingCopyStore.getState().deleteNode("rule#remove");

@@ -21,25 +21,15 @@ import {
   isSpacerKeyClass,
   stripDottedCircle,
 } from "./touch-coverage.js";
-import type { TouchLayoutIR, TouchKeyIR } from "./keyboard-ir.js";
 import { buildTouchKeyRuleIndex } from "./touch-key-rule-join.js";
 import { makeTestIR } from "./fixtures/keyboard-ir.js";
-
-/** Build a single TouchKeyIR for use in test layouts. */
-function makeKey(id: string, overrides: Partial<TouchKeyIR> = {}): TouchKeyIR {
-  return { nodeId: `node_${id}`, id, ...overrides };
-}
-
-/** Build a TouchLayoutIR with a single "phone" platform from the given layers. */
-function makeLayout(layers: TouchLayoutIR["platforms"][number]["layers"]): TouchLayoutIR {
-  return { platforms: [{ id: "phone", layers }], nodeIds: [] };
-}
+import { touchKey, touchLayout } from "./fixtures/ir-builders.js";
 
 describe("computeTouchCoverage", () => {
   it("reports an orphaned inventory char exactly once", () => {
-    const layout = makeLayout([
-      { id: "default", rows: [{ keys: [makeKey("K_A", { text: "a" })] }] },
-    ]);
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "K_A", text: "a" })] }] },
+    ] });
 
     const result = computeTouchCoverage(layout, ["a", "z", "z"]);
 
@@ -47,21 +37,22 @@ describe("computeTouchCoverage", () => {
   });
 
   it("counts coverage via an sk (longpress) entry", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       {
         id: "default",
         rows: [
           {
             keys: [
-              makeKey("K_A", {
+              touchKey({
+                id: "K_A",
                 text: "a",
-                sk: [makeKey("K_A_acute", { text: "á" })],
+                sk: [touchKey({ id: "K_A_acute", text: "á" })],
               }),
             ],
           },
         ],
       },
-    ]);
+    ] });
 
     const result = computeTouchCoverage(layout, ["á"]);
 
@@ -69,21 +60,22 @@ describe("computeTouchCoverage", () => {
   });
 
   it("counts coverage via a flick[direction] entry", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       {
         id: "default",
         rows: [
           {
             keys: [
-              makeKey("K_A", {
+              touchKey({
+                id: "K_A",
                 text: "a",
-                flick: { ne: makeKey("K_A_ne", { text: "â" }) },
+                flick: { ne: touchKey({ id: "K_A_ne", text: "â" }) },
               }),
             ],
           },
         ],
       },
-    ]);
+    ] });
 
     const result = computeTouchCoverage(layout, ["â"]);
 
@@ -91,21 +83,22 @@ describe("computeTouchCoverage", () => {
   });
 
   it("counts coverage via a multitap entry", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       {
         id: "default",
         rows: [
           {
             keys: [
-              makeKey("K_A", {
+              touchKey({
+                id: "K_A",
                 text: "a",
-                multitap: [makeKey("K_A_mt", { text: "ã" })],
+                multitap: [touchKey({ id: "K_A_mt", text: "ã" })],
               }),
             ],
           },
         ],
       },
-    ]);
+    ] });
 
     const result = computeTouchCoverage(layout, ["ã"]);
 
@@ -113,11 +106,11 @@ describe("computeTouchCoverage", () => {
   });
 
   it("marks a char on a layer with no nextlayer chain from default as uncovered", () => {
-    const layout = makeLayout([
-      { id: "default", rows: [{ keys: [makeKey("K_A", { text: "a" })] }] },
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "K_A", text: "a" })] }] },
       // "shift" is never referenced by any nextlayer from "default".
-      { id: "shift", rows: [{ keys: [makeKey("K_A_shift", { text: "A" })] }] },
-    ]);
+      { id: "shift", rows: [{ keys: [touchKey({ id: "K_A_shift", text: "A" })] }] },
+    ] });
 
     const result = computeTouchCoverage(layout, ["A"]);
 
@@ -125,13 +118,13 @@ describe("computeTouchCoverage", () => {
   });
 
   it("counts a nextlayer-reachable layer's chars as covered", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       {
         id: "default",
-        rows: [{ keys: [makeKey("K_SHIFT", { text: "*Shift*", nextlayer: "shift" })] }],
+        rows: [{ keys: [touchKey({ id: "K_SHIFT", text: "*Shift*", nextlayer: "shift" })] }],
       },
-      { id: "shift", rows: [{ keys: [makeKey("K_A_shift", { text: "A" })] }] },
-    ]);
+      { id: "shift", rows: [{ keys: [touchKey({ id: "K_A_shift", text: "A" })] }] },
+    ] });
 
     const result = computeTouchCoverage(layout, ["A"]);
 
@@ -139,23 +132,23 @@ describe("computeTouchCoverage", () => {
   });
 
   it("does not hang on a cycle in nextlayer references", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       {
         id: "default",
-        rows: [{ keys: [makeKey("K_TO_SHIFT", { text: "*Shift*", nextlayer: "shift" })] }],
+        rows: [{ keys: [touchKey({ id: "K_TO_SHIFT", text: "*Shift*", nextlayer: "shift" })] }],
       },
       {
         id: "shift",
         rows: [
           {
             keys: [
-              makeKey("K_A_shift", { text: "A" }),
-              makeKey("K_TO_DEFAULT", { text: "*Default*", nextlayer: "default" }),
+              touchKey({ id: "K_A_shift", text: "A" }),
+              touchKey({ id: "K_TO_DEFAULT", text: "*Default*", nextlayer: "default" }),
             ],
           },
         ],
       },
-    ]);
+    ] });
 
     const result = computeTouchCoverage(layout, ["A"]);
 
@@ -165,9 +158,9 @@ describe("computeTouchCoverage", () => {
   it("covers an NFC inventory char from an NFD-stored layout string", () => {
     // "e" + combining acute accent (U+0065 U+0301), NFD form of "é".
     const nfdText = "é";
-    const layout = makeLayout([
-      { id: "default", rows: [{ keys: [makeKey("K_E_ACUTE", { text: nfdText })] }] },
-    ]);
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "K_E_ACUTE", text: nfdText })] }] },
+    ] });
 
     const result = computeTouchCoverage(layout, ["é"]);
 
@@ -175,12 +168,12 @@ describe("computeTouchCoverage", () => {
   });
 
   it("returns an empty uncovered list when everything is covered", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       {
         id: "default",
-        rows: [{ keys: [makeKey("K_A", { text: "a" }), makeKey("K_B", { text: "b" })] }],
+        rows: [{ keys: [touchKey({ id: "K_A", text: "a" }), touchKey({ id: "K_B", text: "b" })] }],
       },
-    ]);
+    ] });
 
     const result = computeTouchCoverage(layout, ["a", "b"]);
 
@@ -188,9 +181,9 @@ describe("computeTouchCoverage", () => {
   });
 
   it("does not treat a star-label as producing its letters", () => {
-    const layout = makeLayout([
-      { id: "default", rows: [{ keys: [makeKey("K_SHIFT", { text: "*Shift*" })] }] },
-    ]);
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "K_SHIFT", text: "*Shift*" })] }] },
+    ] });
 
     const result = computeTouchCoverage(layout, ["S"]);
 
@@ -198,9 +191,9 @@ describe("computeTouchCoverage", () => {
   });
 
   it("decodes a U_XXXX key id into the char it encodes", () => {
-    const layout = makeLayout([
-      { id: "default", rows: [{ keys: [makeKey("U_00E7")] }] },
-    ]);
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "U_00E7" })] }] },
+    ] });
 
     const result = computeTouchCoverage(layout, ["ç"]);
 
@@ -209,9 +202,9 @@ describe("computeTouchCoverage", () => {
 
   it("decodes a multi-codepoint U_ id (base + combining mark) as its NFC char", () => {
     // U_0061_0303 = "a" (U+0061) + combining tilde (U+0303) -> NFC "ã" (U+00E3).
-    const layout = makeLayout([
-      { id: "default", rows: [{ keys: [makeKey("U_0061_0303")] }] },
-    ]);
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "U_0061_0303" })] }] },
+    ] });
 
     const result = computeTouchCoverage(layout, ["ã"]);
 
@@ -219,12 +212,12 @@ describe("computeTouchCoverage", () => {
   });
 
   it("does not treat a spacer key (sp:10) as a producer", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       {
         id: "default",
-        rows: [{ keys: [makeKey("T_sp", { text: "a", sp: 10 })] }],
+        rows: [{ keys: [touchKey({ id: "T_sp", text: "a", sp: 10 })] }],
       },
-    ]);
+    ] });
 
     const result = computeTouchCoverage(layout, ["a"]);
 
@@ -285,9 +278,9 @@ function irWithRule(keyId: string, text: string) {
 
 describe("computeTouchCoverage — the options argument is additive (FR-005)", () => {
   const layout = () =>
-    makeLayout([
-      { id: "default", rows: [{ keys: [makeKey("T_0300", { text: "◌̀" })] }] },
-    ]);
+    touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "T_0300", text: "◌̀" })] }] },
+    ] });
 
   it("a two-argument call is identical to passing an empty options object", () => {
     const inventory = ["a", "̀", "◌"];
@@ -311,9 +304,9 @@ describe("computeTouchCoverage — the options argument is additive (FR-005)", (
   });
 
   it("credits a K_ key's rule output too — the same defect on a physical key", () => {
-    const physical = makeLayout([
-      { id: "default", rows: [{ keys: [makeKey("K_QUOTE", { text: "◌̀" })] }] },
-    ]);
+    const physical = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "K_QUOTE", text: "◌̀" })] }] },
+    ] });
     const ruleIndex = buildTouchKeyRuleIndex(irWithRule("K_QUOTE", "̀"));
     expect(
       computeTouchCoverage(physical, ["̀"], { ruleIndex, stripDottedCircle: false }).uncovered,
@@ -321,18 +314,18 @@ describe("computeTouchCoverage — the options argument is additive (FR-005)", (
   });
 
   it("credits a sub-key's rule output — the index is passed down into sk", () => {
-    const nested = makeLayout([
+    const nested = touchLayout({ layers: [
       {
         id: "default",
         rows: [
           {
             keys: [
-              makeKey("T_HOST", { text: "h", sk: [makeKey("T_SUB", { text: "s" })] }),
+              touchKey({ id: "T_HOST", text: "h", sk: [touchKey({ id: "T_SUB", text: "s" })] }),
             ],
           },
         ],
       },
-    ]);
+    ] });
     const ruleIndex = buildTouchKeyRuleIndex(irWithRule("T_SUB", "ŝ"));
     expect(computeTouchCoverage(nested, ["ŝ"], { ruleIndex }).uncovered).toEqual([]);
     // …and without the index it stays uncovered, so the assertion above is not
@@ -398,9 +391,9 @@ describe("stripDottedCircle — additive and narrow (FR-006)", () => {
 
 describe("computeTouchCoverage — the U+25CC strip in situ", () => {
   it("credits BOTH the unstripped and stripped forms, never one instead of the other", () => {
-    const layout = makeLayout([
-      { id: "default", rows: [{ keys: [makeKey("T_0300", { text: "◌̀" })] }] },
-    ]);
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "T_0300", text: "◌̀" })] }] },
+    ] });
     // The bare mark is credited by the strip …
     expect(computeTouchCoverage(layout, ["̀"]).uncovered).toEqual([]);
     // … and the full keycap string is still credited as before.
@@ -408,16 +401,16 @@ describe("computeTouchCoverage — the U+25CC strip in situ", () => {
   });
 
   it("a bare ◌ keycap still covers U+25CC and is not stripped away", () => {
-    const layout = makeLayout([
-      { id: "default", rows: [{ keys: [makeKey("T_DOTTED", { text: "◌" })] }] },
-    ]);
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "T_DOTTED", text: "◌" })] }] },
+    ] });
     expect(computeTouchCoverage(layout, ["◌"]).uncovered).toEqual([]);
   });
 
   it("can be turned off, and then the mark is uncovered again", () => {
-    const layout = makeLayout([
-      { id: "default", rows: [{ keys: [makeKey("T_0300", { text: "◌̀" })] }] },
-    ]);
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "T_0300", text: "◌̀" })] }] },
+    ] });
     expect(
       computeTouchCoverage(layout, ["̀"], { stripDottedCircle: false }).uncovered,
     ).toEqual(["̀"]);
@@ -425,41 +418,41 @@ describe("computeTouchCoverage — the U+25CC strip in situ", () => {
 
   it("does not strip a `*`-prefixed frame label", () => {
     // Frame labels are never producers; the strip must not sneak one in.
-    const layout = makeLayout([
-      { id: "default", rows: [{ keys: [makeKey("T_FRAME", { text: "*◌̀*" })] }] },
-    ]);
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "T_FRAME", text: "*◌̀*" })] }] },
+    ] });
     expect(computeTouchCoverage(layout, ["̀"]).uncovered).toEqual(["̀"]);
   });
 });
 
 describe("computeTouchCoverage — the corrected sp enum (FR-012)", () => {
   it("credits a deadkey-styled sp:8 key — it is interactive, not a spacer", () => {
-    const layout = makeLayout([
-      { id: "default", rows: [{ keys: [makeKey("T_DK", { text: "ə", sp: 8 })] }] },
-    ]);
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "T_DK", text: "ə", sp: 8 })] }] },
+    ] });
     expect(computeTouchCoverage(layout, ["ə"]).uncovered).toEqual([]);
   });
 
   it("does NOT credit a blank sp:9 key's keycap text", () => {
     // Cameroon's T_BLANK sites carry " ", so the old {8,10} reading spuriously
     // credited a space as covered while treating sp:8 keys as inert.
-    const layout = makeLayout([
-      { id: "default", rows: [{ keys: [makeKey("T_BLANK", { text: " ", sp: 9 })] }] },
-    ]);
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "T_BLANK", text: " ", sp: 9 })] }] },
+    ] });
     expect(computeTouchCoverage(layout, [" "]).uncovered).toEqual([" "]);
   });
 
   it("does NOT credit a spacer sp:10 key", () => {
-    const layout = makeLayout([
-      { id: "default", rows: [{ keys: [makeKey("T_SPACER", { text: "x", sp: 10 })] }] },
-    ]);
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "T_SPACER", text: "x", sp: 10 })] }] },
+    ] });
     expect(computeTouchCoverage(layout, ["x"]).uncovered).toEqual(["x"]);
   });
 
   it("does not credit an sp:9 key's RULE output either — the class short-circuits first", () => {
-    const layout = makeLayout([
-      { id: "default", rows: [{ keys: [makeKey("T_BLANK", { text: " ", sp: 9 })] }] },
-    ]);
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "T_BLANK", text: " ", sp: 9 })] }] },
+    ] });
     const ruleIndex = buildTouchKeyRuleIndex(irWithRule("T_BLANK", "z"));
     expect(computeTouchCoverage(layout, ["z"], { ruleIndex }).uncovered).toEqual(["z"]);
   });
@@ -500,17 +493,17 @@ describe("computeTouchCoverage — multi-char behaviour", () => {
   it("credits a multi-char keycap as its whole string, not per codepoint", () => {
     // Pre-existing behaviour, pinned here because the rule-index path adds a
     // per-codepoint credit alongside it and the two must not be confused.
-    const layout = makeLayout([
-      { id: "default", rows: [{ keys: [makeKey("T_FCFA", { text: "FCFA" })] }] },
-    ]);
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "T_FCFA", text: "FCFA" })] }] },
+    ] });
     expect(computeTouchCoverage(layout, ["FCFA"]).uncovered).toEqual([]);
     expect(computeTouchCoverage(layout, ["F"]).uncovered).toEqual(["F"]);
   });
 
   it("a multi-char RULE output credits each codepoint individually", () => {
-    const layout = makeLayout([
-      { id: "default", rows: [{ keys: [makeKey("T_FCFA", { text: "*FCFA*" })] }] },
-    ]);
+    const layout = touchLayout({ layers: [
+      { id: "default", rows: [{ keys: [touchKey({ id: "T_FCFA", text: "*FCFA*" })] }] },
+    ] });
     const ruleIndex = buildTouchKeyRuleIndex(irWithRule("T_FCFA", "FCFA"));
     // The join's `produced` is the per-codepoint set, so each letter is covered…
     expect(computeTouchCoverage(layout, ["F", "C", "A"], { ruleIndex }).uncovered).toEqual([]);

@@ -1,20 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { checkTouchRows } from "./check-18-2-touch-rows.js";
 import type { TouchLayoutIR } from "@keyboard-studio/contracts";
+import { touchLayout } from "@keyboard-studio/contracts/fixtures";
 
 const PATH = "source/test.keyman-touch-layout";
 
 function makeIR(platform: "phone" | "tablet" | "desktop", rowCount: number): TouchLayoutIR {
   const rows = Array.from({ length: rowCount }, () => ({ keys: [] as [] }));
-  return {
-    platforms: [
-      {
-        id: platform,
-        layers: [{ id: "default", rows }],
-      },
-    ],
-    nodeIds: [],
-  };
+  return touchLayout({ platform, layers: [{ id: "default", rows }] });
 }
 
 describe("checkTouchRows (18.2 KM_WARN_TOUCH_ROW_COUNT)", () => {

@@ -13,7 +13,7 @@
 // Real engine (generateStubs) runs; services.ts is mocked to avoid WASM /
 // network I/O, same as serializeWorkingCopy.fragmentBearing.carve.test.ts.
 
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -36,17 +36,8 @@ function makeFetchedVfs(keyboardId: string) {
   ]);
 }
 
-function resetStore() {
-  useWorkingCopyStore.getState().reset();
-}
-
 beforeEach(() => {
-  resetStore();
   vi.clearAllMocks();
-});
-
-afterEach(() => {
-  resetStore();
 });
 
 describe("output projection completes the scaffold stubs (Track 1)", () => {

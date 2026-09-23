@@ -31,11 +31,10 @@
 // an actual Resume click + SurveyView remount.
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { createVirtualFS } from "@keyboard-studio/contracts";
-import type { BaseKeyboard, KeyboardIR } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
+import { instantiateMinimal } from "../test/draftSeeds.ts";
 
 // Same idiom as draftPersistence.test.ts: serverDraftStore's fetch-based
 // transport is mocked at the module boundary so nothing here touches the
@@ -58,38 +57,8 @@ import {
   migrateProjectKeyIfChanged,
 } from "./draftPersistence.ts";
 
-function makeMinimalIr(): KeyboardIR {
-  return {
-    origin: "scaffolded" as const,
-    header: {
-      keyboardId: "test",
-      name: "test",
-      bcp47: [],
-      copyright: "",
-      version: "10.0",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores: [],
-    groups: [],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  } as unknown as KeyboardIR;
-}
-
-function instantiateMinimal(baseId: string): void {
-  const base = { id: baseId, displayName: "Rename Test", languages: [] } as unknown as BaseKeyboard;
-  useWorkingCopyStore
-    .getState()
-    .instantiateFromBase(base, { vfs: createVirtualFS([]), ir: makeMinimalIr() });
-}
-
 beforeEach(() => {
   localStorage.clear();
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-  usePhaseBDraftStore.getState().reset();
 });
 
 afterEach(() => {

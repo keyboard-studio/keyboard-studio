@@ -13,7 +13,7 @@
 // exercised end-to-end (real SurveyRunner, real YAML) by
 // PhaseProjectName.integration.test.tsx.
 
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { trackOptions, phaseFOptions, extractHelpDocs } from "./flowStepOptions.tsx";
 import type { TrackPayload } from "./flowStepOptions.tsx";
 import type { FlowStepDeps } from "./makeFlowStepComponent.tsx";
@@ -22,11 +22,6 @@ import pfCreditsMod from "../../survey/questions/f/pf_credits.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import type { HelpDocsAnswers, SurveyAnswer, SurveyPhaseResult } from "@keyboard-studio/contracts";
-
-afterEach(() => {
-  useSurveySessionStore.getState().reset();
-  useWorkingCopyStore.getState().reset();
-});
 
 // ---------------------------------------------------------------------------
 // Deps factory — wires FlowStepDeps callbacks to the REAL stores (via

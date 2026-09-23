@@ -11,7 +11,7 @@
 // inserted ahead of it — the exact array-index failure data-model.md's
 // ViewState section calls out by name.
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import type { RefObject } from "react";
 import { useScrollRestoration } from "./useScrollRestoration.ts";
@@ -27,10 +27,6 @@ function makePaneRef(): { ref: RefObject<HTMLDivElement | null>; el: HTMLDivElem
   const ref = { current: el } as RefObject<HTMLDivElement | null>;
   return { ref, el };
 }
-
-beforeEach(() => {
-  useViewStateStore.getState().reset();
-});
 
 afterEach(() => {
   document.querySelectorAll("[data-scroll-test-pane]").forEach((n) => n.remove());

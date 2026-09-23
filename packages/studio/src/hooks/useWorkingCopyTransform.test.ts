@@ -14,7 +14,7 @@
 // Approach: mock @keyboard-studio/engine to spy on the three projection
 // functions. Render the hook via renderHook with the store seeded.
 
-import { describe, it, expect, vi, afterEach, beforeEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
@@ -63,10 +63,6 @@ vi.mock("@keyboard-studio/engine", async (importOriginal) => {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function resetStore() {
-  useWorkingCopyStore.getState().reset();
-}
-
 function seedBase() {
   const vfs = createVirtualFS([
     { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
@@ -77,9 +73,7 @@ function seedBase() {
   });
 }
 
-beforeEach(resetStore);
 afterEach(() => {
-  resetStore();
   vi.clearAllMocks();
 });
 

@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { checkLongpress } from "./check-18-1-longpress.js";
 import type { TouchLayoutIR } from "@keyboard-studio/contracts";
+import { touchLayout } from "@keyboard-studio/contracts/fixtures";
 
 const PATH = "source/test.keyman-touch-layout";
 
@@ -9,22 +10,7 @@ function makeIR(skCount: number): TouchLayoutIR {
     nodeId: `sk-${i}`,
     id: `K_SK_${i}`,
   }));
-  return {
-    platforms: [
-      {
-        id: "phone",
-        layers: [
-          {
-            id: "default",
-            rows: [
-              { keys: [{ nodeId: "k1", id: "K_A", sk }] },
-            ],
-          },
-        ],
-      },
-    ],
-    nodeIds: [],
-  };
+  return touchLayout({ keys: [{ nodeId: "k1", id: "K_A", sk }] });
 }
 
 describe("checkLongpress (18.1 KM_WARN_LONGPRESS_OVERSIZE)", () => {

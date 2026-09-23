@@ -12,6 +12,7 @@
 import { describe, it, expect } from "vitest";
 import { generateCorpus, D7_MODIFIER_SETS, D7_DEADKEY_DEPTH } from "./corpus.js";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
+import { irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -19,35 +20,15 @@ import type { KeyboardIR } from "@keyboard-studio/contracts";
 
 /** Build a minimal KeyboardIR with the given vkey names in one typed group. */
 function makeIR(vkeys: string[]): KeyboardIR {
-  return {
-    origin: "imported",
-    header: {
-      keyboardId: "test",
-      name: "Test",
-      bcp47: ["und"],
-      copyright: "(c)",
-      version: "1.0",
-      targets: ["any"],
-      storeDirectives: [],
-    },
-    stores: [],
+  return makeTestIR({
+    header: { bcp47: ["und"], copyright: "(c)", targets: ["any"] },
     groups: [
-      {
+      irGroup({
         nodeId: "g1",
-        name: "main",
-        usingKeys: true,
-        readonly: false,
-        rules: vkeys.map((vkey, i) => ({
-          nodeId: `r${i}`,
-          context: [{ kind: "vkey" as const, name: vkey, modifiers: [] }],
-          output: [{ kind: "char" as const, value: "a" }],
-        })),
-      },
+        rules: vkeys.map((vkey, i) => vkeyRule({ nodeId: `r${i}`, vkey, output: "a" })),
+      }),
     ],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  };
+  });
 }
 
 // ---------------------------------------------------------------------------
