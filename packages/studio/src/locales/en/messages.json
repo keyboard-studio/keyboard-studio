@@ -31,6 +31,7 @@
   "base.picker.search.placeholder": "Type to search by name, id, script, or language…",
   "base.picker.searchAll": "Search all keyboards instead (or press Enter)",
   "base.picker.truncationFooter": "showing {MAX_VISIBLE} of {0} — keep typing to narrow",
+  "carve.details.heading": "Character details",
   "carve.recommended.discardAll": "Discard all {count}",
   "carve.recommended.restoreAll": "Restore all",
   "carve.suggested.body": "Your base keyboard can type these characters, but nothing in your confirmed alphabet uses them. Click any character below to keep it instead — nothing is removed until you continue.",

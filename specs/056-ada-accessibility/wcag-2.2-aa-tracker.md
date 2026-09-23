@@ -37,7 +37,7 @@ Criterion links: [How to Meet WCAG 2.2](https://www.w3.org/WAI/WCAG22/quickref/)
 
 | SC | Name | Level | Status | Evidence | Notes |
 |---|---|---|---|---|---|
-| 2.1.1 | Keyboard | A | unknown | — | Full-walk sweep, Cycle 2 (US1) |
+| 2.1.1 | Keyboard | A | unknown | 2026-09-23 partial: [CarveGalleryV2.tsx](../../packages/studio/src/editors/carve/CarveGalleryV2.tsx)'s "Character details" aside scrolls (`overflowY: auto`) but is read-only, so it had no focusable descendant. When its content overflowed, keyboard users could not scroll it (axe `scrollable-region-focusable`, serious; caught by CI on the Track 1 walk's "phase B complete" scan, and locally at 1280x720 in 3 of 3 runs). It is now a `role="region"` with `tabIndex={0}`, named by its own visible heading (`aria-labelledby`, heading in the lingui catalog), with `ks-focus-ring` focus styling. This is the same pattern as `KmnSourceView.tsx`. Pinned by `CarveGalleryV2.test.tsx` ("is a named, keyboard-reachable scroll region") and scanned in rendered layout by `copy-edit.spec.ts`'s axe gate. | Full-walk sweep, Cycle 2 (US1) |
 | 2.1.2 | No Keyboard Trap | A | unknown | — | Popovers, modals, character map |
 | 2.1.4 | Character Key Shortcuts | A | unknown | — | Audit any single-key shortcuts in editor/preview |
 | 2.2.1 | Timing Adjustable | A | unknown | — | Expected trivial pass: no session timeouts in authoring |

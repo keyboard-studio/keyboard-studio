@@ -314,6 +314,29 @@ describe('CarveGalleryV2 — read-only character-details panel', () => {
     expect(screen.queryByRole('button', { name: /discard this character/i })).toBeNull();
     expect(screen.queryByRole('button', { name: /restore this character/i })).toBeNull();
   });
+
+  // WCAG 2.1.1 / axe `scrollable-region-focusable`: the panel scrolls
+  // (overflowY: auto) but, being read-only, holds nothing focusable, so the
+  // panel ITSELF must be the tab stop or keyboard users cannot scroll it.
+  // jsdom has no layout, so axe cannot see the overflow here; this pins the
+  // wiring, and the Track 1 walk's axe scan (copy-edit.spec.ts) is the
+  // rendered-layout check.
+  it('is a named, keyboard-reachable scroll region (it has no focusable content of its own)', () => {
+    mockFixtureContributors();
+    renderGalleryV2(makeFixtureIR());
+    fireEvent.click(screen.getByRole('button', { name: 'a — U+0061' }));
+
+    const region = screen.getByRole('region', { name: 'Character details' });
+    expect(region).toBe(screen.getByTestId('carve-details'));
+    expect(region.style.overflowY).toBe('auto');
+    expect(region.tabIndex).toBe(0);
+    expect(region.className).toContain('ks-focus-ring');
+    // The premise that makes tabIndex={0} the right fix rather than a stray
+    // tab stop: nothing inside the panel is focusable on its own.
+    expect(
+      region.querySelectorAll('button, a[href], input, select, textarea, [tabindex]:not([tabindex="-1"])'),
+    ).toHaveLength(0);
+  });
 });
 
 // ---------------------------------------------------------------------------

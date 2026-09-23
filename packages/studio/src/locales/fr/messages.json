@@ -31,6 +31,7 @@
   "base.picker.search.placeholder": "Tapez pour rechercher par nom, identifiant, écriture ou langue…",
   "base.picker.searchAll": "Rechercher dans tous les claviers à la place (ou appuyez sur Entrée)",
   "base.picker.truncationFooter": "affichage de {MAX_VISIBLE} sur {0} — continuez à taper pour affiner",
+  "carve.details.heading": "Character details",
   "carve.recommended.discardAll": "Discard all {count}",
   "carve.recommended.restoreAll": "Restore all",
   "carve.suggested.body": "Your base keyboard can type these characters, but nothing in your confirmed alphabet uses them. Click any character below to keep it instead — nothing is removed until you continue.",
