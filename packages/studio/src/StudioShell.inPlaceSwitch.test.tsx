@@ -131,10 +131,6 @@ vi.mock("./editors/panels/BaseResolution.tsx", () => ({
   BaseResolution: () => <div data-testid="stage-base" />,
 }));
 
-vi.mock("./editors/carve/CarveGallery.tsx", () => ({
-  CarveGallery: () => <div data-testid="stage-carve" />,
-}));
-
 vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => ({
   MechanismGallery: () => <div data-testid="stage-mechanisms" />,
 }));

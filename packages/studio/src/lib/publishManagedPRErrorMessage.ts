@@ -6,8 +6,8 @@
 // from a real component (ManagedPRSubmitPanel, which has an `i18n` instance
 // from `useLingui()`, bound to the active locale) AND directly from unit
 // tests (which call it with no `i18n` argument at all, asserting on the
-// English source text) — the same shape `keyHint`/`capabilityHint`/`infoFor`
-// use in editors/assignLoop/parts/InfoView.tsx. `msg()` only DEFINES a
+// English source text) — the same shape `capabilityHint` uses in
+// editors/assignLoop/parts/capabilityHint.ts. `msg()` only DEFINES a
 // descriptor; resolving it against whichever `i18n` (if any) is available is
 // `resolveMessage`'s job (see its doc comment in lib/i18nResolve.ts) — kept
 // pure otherwise (no dependency on global mutable i18n state) so this stays

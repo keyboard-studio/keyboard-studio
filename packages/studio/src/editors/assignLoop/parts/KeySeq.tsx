@@ -8,7 +8,7 @@ interface KeySeqProps {
   /**
    * Separator rendered between successive `keys` entries. Default 'plus'
    * preserves the original behavior exactly (simultaneous-chord display,
-   * used by the rule/node Rail view — CarveGallery.tsx et al). 'then' is
+   * e.g. StatusBar's removed-list rows). 'then' is
    * additive (#1399): CarveGalleryV2's faithful multi-step "how it's typed"
    * sequences (e.g. a deadkey trigger THEN a base letter) are typed one
    * after another, not simultaneously, and must read that way.
