@@ -296,8 +296,11 @@ jobs:
 
       # One-screen result table on the run page: counts plus each failing
       # test's first line per error, from the json reporter (CI-only, see
-      # playwright.config.ts). Failing tests also surface as check-run
-      # annotations via the `github` reporter.
+      # playwright.config.ts). It also emits one `::error` annotation per
+      # failing test (title = test, body = the head of each error) on stderr,
+      # because the `github` reporter's per-test annotations did not surface
+      # on the check run in practice — annotations are readable from the PR's
+      # Checks tab without access to the job log.
       - name: Summarize Playwright results
         if: always()
         working-directory: packages/studio
@@ -316,7 +319,11 @@ jobs:
               const last = t.results?.[t.results.length - 1];
               const errs = last?.errors?.length ? last.errors : [last?.error ?? { message: last?.status ?? "" }];
               const msg = errs.map((e) => (e?.message ?? "").replace(/\u001b\[[0-9;]*m/g, "").split("\n")[0]).filter(Boolean).join(" / ").replace(/\|/g, "\\|").slice(0, 300);
-              rows.push(`| ${t.status} | ${[...trail, spec.title].join(" > ").replace(/\|/g, "\\|")} | ${msg} |`);
+              const title = [...trail, spec.title].join(" > ");
+              rows.push(`| ${t.status} | ${title.replace(/\|/g, "\\|")} | ${msg} |`);
+              const body = errs.map((e) => (e?.message ?? "").replace(/\u001b\[[0-9;]*m/g, "").split("\n").filter((l) => l.trim()).slice(0, 20).join("\n")).join("\n---\n").slice(0, 2000);
+              const esc = (v) => v.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+              console.error(`::error title=${esc(`e2e ${t.status}: ${title}`).replace(/:/g, "%3A").replace(/,/g, "%2C")}::${esc(body)}`);
             }
             for (const child of suite.suites ?? []) walk(child, [...trail, child.title]);
           };
