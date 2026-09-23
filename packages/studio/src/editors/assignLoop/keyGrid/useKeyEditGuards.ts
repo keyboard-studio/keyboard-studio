@@ -4,44 +4,33 @@
 // FR-036f: "A key-level edit that invalidates a by-character assignment MUST
 // warn at the moment of the edit, naming the affected character — e.g.
 // suppressing a key that carries a longpress assigned for `ɛ`. Deferring this
-// to the Continue gate is too late to be actionable." This module is the
-// worklist `keyEditOrphanReport.ts`'s own doc comment names (that module's
-// §"the two remedies" section, "The worklist itself is `useKeyEditGuards.ts`").
+// to the Continue gate is too late to be actionable."
 //
-// ## Why this is NOT `keyEditOrphanReport.ts` reused, and NOT a second
-// implementation of it either
+// ## What this answers
 //
-// `keyEditOrphanReport.ts` answers a DIFFERENT question: "did a layout
-// RE-DERIVATION (a new seed replacing the one an overlay was authored
-// against) strand an already-committed operation whose address no longer
-// resolves." Every operation this hook evaluates, by contrast, resolves its
-// address just fine — the author is editing a LIVE key right now. What this
-// hook answers is "does APPLYING this pending operation, by itself, remove
-// something that used to be reachable at that same address" — a same-layout,
-// before/after diff of ONE operation, not a cross-layout orphan scan. The
-// two modules therefore share the same LOW-LEVEL machinery
-// (`resolveKeyAddress`, `resolveSubKeyEntry`, `applyKeyEditsToLayout`, all
-// from `@keyboard-studio/engine`) but compose it differently, and neither
-// re-derives the other's traversal.
+// Every operation this hook evaluates resolves its address just fine — the
+// author is editing a LIVE key right now. What this hook answers is "does
+// APPLYING this pending operation, by itself, remove something that used to
+// be reachable at that same address" — a same-layout, before/after diff of
+// ONE operation, not a cross-layout orphan scan. It composes the shared
+// LOW-LEVEL machinery (`resolveKeyAddress`, `resolveSubKeyEntry`,
+// `applyKeyEditsToLayout`, all from `@keyboard-studio/engine`) rather than
+// re-deriving any traversal.
 //
-// A second reason this hook cannot simply call `keyEditOrphanReport`'s
-// `keyChars`-style extraction as-is: that helper (by design — see its own
-// doc comment) reads only a resolved key's OWN three character sources
-// (`output`, decoded `U_<HEX>` id, rule-bound production) and never recurses
-// into `sk`/`multitap`/`flick`. That is exactly right for a re-derivation
-// orphan (the op's OWN address is what went missing), but it is exactly
-// WRONG for this hook's canonical case: `suppress` neutralizes a key's `id`
-// and flips its `sp` to a non-interactive class WITHOUT clearing its
-// `sk`/`multitap`/`flick` arrays (see `applyKeyEditsToLayout.ts`'s `case
-// "suppress"` — the sub-entries survive in the data, they just become
-// unreachable because their host is no longer interactive). Catching the
-// canonical "suppressing a key that carries a longpress assigned for ɛ"
-// case therefore needs a RECURSIVE, interactivity-gated character collector
-// (`collectAllReachableChars` below) — deliberately not `keyChars`, and
-// deliberately not `keyGridViewModel.ts`'s `collectProducedChars` either
-// (that one is a grid CELL's own narrower "what does striking exactly this
-// key wire to" question, by its own doc comment — also non-recursive, for a
-// different, legitimate reason). Nor is it `enumerateTouchMethodsForChar`
+// Reading only a resolved key's OWN three character sources (`output`,
+// decoded `U_<HEX>` id, rule-bound production) without recursing into
+// `sk`/`multitap`/`flick` would be exactly WRONG for this hook's canonical
+// case: `suppress` neutralizes a key's `id` and flips its `sp` to a
+// non-interactive class WITHOUT clearing its `sk`/`multitap`/`flick` arrays
+// (see `applyKeyEditsToLayout.ts`'s `case "suppress"` — the sub-entries
+// survive in the data, they just become unreachable because their host is no
+// longer interactive). Catching the canonical "suppressing a key that carries
+// a longpress assigned for ɛ" case therefore needs a RECURSIVE,
+// interactivity-gated character collector (`collectAllReachableChars` below)
+// — deliberately not `keyGridViewModel.ts`'s `collectProducedChars` (that one
+// is a grid CELL's own narrower "what does striking exactly this key wire to"
+// question, by its own doc comment — also non-recursive, for a different,
+// legitimate reason). Nor is it `enumerateTouchMethodsForChar`
 // (pattern-apply): that function matches each key/sub-entry's own
 // text/output/id independently of `sp`, so it would (incorrectly, for this
 // hook's purpose) still credit a suppressed key's longpress as "producing"
@@ -74,10 +63,7 @@
 // WHOLE layout): reusing `touchCoverage` is what lets this classification
 // and `keyGridProgress`'s own count agree by construction rather than by
 // discipline (FR-036d: "MUST NOT be independently maintained counters that
-// can disagree"). `keyEditOrphanReport.ts`'s own doc comment draws the
-// identical "not implemented here" line for its `lostCharacters` field —
-// still accurate for THAT module; this one now closes the gap for the
-// by-character-assignment guard.
+// can disagree").
 //
 // `@keyboard-studio/engine`'s `touchKeyCollateral.ts` (T104/T105) computes a
 // closely related classification for a DIFFERENT caller (`RemoveKeyDialog`'s
@@ -466,7 +452,7 @@ export interface KeyEditInvalidationWarning {
 export interface UseKeyEditGuardsOptions {
   /** The EFFECTIVE touch layout the pending operation's address resolves against (overlay already folded) — same contract `keyGridViewModel.ts` and `useModeContextCarry.ts` take. */
   readonly layout: TouchLayoutIR;
-  /** From `buildTouchKeyRuleIndex(ir)`, built once by the caller. Optional — omitting it under-reports a rule-bound production, never over-reports (mirrors `keyEditOrphanReport.ts`'s own convention). */
+  /** From `buildTouchKeyRuleIndex(ir)`, built once by the caller. Optional — omitting it under-reports a rule-bound production, never over-reports. */
   readonly ruleIndex?: TouchKeyRuleIndex;
   /**
    * T119 (US5 AS3): the confirmed inventory (`session.confirmedInventory`, as
@@ -537,8 +523,7 @@ const EMPTY_ASSIGNED_CHARS: ReadonlySet<string> = new Set();
  * FR-036f's "at the moment of the edit" guard for the touch key grid, now
  * additionally classified per FR-062/FR-061 via
  * `returnsToWorklist` (`findCharactersLostForGood`). See this module's doc
- * comment for the full contract and why it cannot reuse
- * `keyEditOrphanReport.ts`'s character extraction as-is.
+ * comment for the full contract and why its character collector recurses.
  */
 export function useKeyEditGuards({
   layout,

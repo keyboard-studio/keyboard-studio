@@ -41,9 +41,7 @@
 // TOGETHER, so a restore never by itself produces a seed-A/seed-B mismatch; that
 // mismatch is a live event — the author navigates back, changes physical
 // assignments, and returns — owned by the touch step's own re-derivation memo,
-// not by snapshot/rehydrate). See `keyEditOrphanReport.ts`
-// (`buildKeyEditReDerivationReport` / `discardOrphanedKeyEdits`) for that
-// correlation; it is deliberately decoupled from this module.
+// not by snapshot/rehydrate).
 //
 // Reuse (spec 034 US3): `WorkingCopySnapshot`, `serializeEntry`/`deserializeEntry`,
 // and the `snapshotWorkingCopyData`/`applyWorkingCopySnapshot` builder/applier are
