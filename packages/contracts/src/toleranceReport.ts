@@ -4,6 +4,7 @@
 // produces this shape; packages/keyboard-lint consumes it as a precomputed
 // input without importing the engine (lint-not-to-engine).
 
+import type { CompilerDiagnostic } from "./compileResult";
 import type { SourceLocation } from "./lintFinding";
 import type { SimKeyInput } from "./simulation";
 
@@ -63,6 +64,15 @@ export interface ToleranceReport {
    * from `findings`.
    */
   notAnalysedCount: number;
+  /**
+   * Diagnostics from the simulation-only compile, when one ran and reported
+   * any. That compile forces `&TARGETS 'any'` so a `.js` exists to simulate,
+   * which can add web-target-only kmcmplib errors (e.g. virtual keys in a
+   * mnemonic layout) that the keyboard's own targets never hit. They do not
+   * block the analysis while the `.js` was produced, but they are carried
+   * here rather than dropped.
+   */
+  compileDiagnostics?: CompilerDiagnostic[];
 }
 
 /**

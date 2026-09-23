@@ -40,5 +40,6 @@
       "what": "retroactive verification 2026-08-19: all 24 tasks checked against live code",
       "result": "shipped via PR 981 (commit d4f787b2), tasks.md already carries a landing note citing PR 1186 crew-verification; StepHost.tsx, steps/advance.ts, registerEditorSteps.ts, stepHost.goldenWalk.test.tsx all confirmed present; T009 correctly superseded by spec 029 makeFlowStepComponent factory (already confirmed during spec 067 work this session); spec.md Status field corrected"
     }
-  ]
+  ],
+  "telemetryInstanceId": "eb3e41ca-8506-41a3-8d67-4ffee0af5741"
 }

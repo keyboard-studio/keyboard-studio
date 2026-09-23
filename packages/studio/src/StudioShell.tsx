@@ -270,12 +270,26 @@ function NavBar({
         activeI18n,
         msg({ id: "nav.ariaLabel", message: "Studio navigation" }),
       )}
+      // WRAPS RATHER THAN OVERLAPS. The bar is one row of --topbar-h whenever
+      // its three zones fit side by side. When they don't (a ~1280px laptop
+      // viewport with every right-zone control showing, 1024px, a long
+      // translation), `flexWrap` moves the zone that no longer fits onto a
+      // second row instead of letting one zone paint over the next. Before
+      // this, the left zone's `minWidth: 0` let its content spill across the
+      // tab row, and the current-keyboard selector sat on top of — and
+      // swallowed clicks meant for — the Studio tab. Wrapping follows DOM
+      // order, so focus order still matches visual reading order (2.4.3),
+      // and `minHeight` (not `height`) lets the shell's flex column give
+      // the second row its space (StudioShell's root is a column flexbox
+      // with this bar `flexShrink: 0`, so nothing below assumes 52px).
       style={{
-        height: "var(--topbar-h)",
+        minHeight: "var(--topbar-h)",
         flexShrink: 0,
         display: "flex",
+        flexWrap: "wrap",
         alignItems: "center",
-        gap: 4,
+        columnGap: 4,
+        rowGap: 0,
         padding: "0 16px",
         background: "var(--app-surface)",
         borderBottom: "1px solid var(--app-border)",
@@ -285,8 +299,14 @@ function NavBar({
       {/* Left zone — brand mark, then the current-keyboard indicator (same
           welcome gate as AccountControl/UnfinishedGalleryIndicator — nothing
           to name before a keyboard exists). flex: 1 1 0 balances the right
-          zone so the center zone (the tab list) sits optically centered. */}
-      <div style={{ display: "flex", alignItems: "center", gap: 9, flex: "1 1 0", minWidth: 0 }}>
+          zone so the center zone (the tab list) sits optically centered.
+          NO `minWidth: 0` here on purpose: the zone's automatic minimum is
+          its min-content width (wordmark + the indicator at its SHRUNK
+          width — see CurrentKeyboardIndicator's SELECT_MIN_WIDTH), and that
+          floor is what makes the bar wrap instead of overflowing into the
+          tabs. `minHeight` keeps a wrapped second row from collapsing
+          against the bar's bottom border. */}
+      <div style={{ display: "flex", alignItems: "center", gap: 9, flex: "1 1 0", minHeight: 44 }}>
         <span
           style={{
             fontSize: 15,
@@ -295,6 +315,7 @@ function NavBar({
             color: "var(--app-text)",
             fontFamily: "var(--app-font)",
             whiteSpace: "nowrap",
+            flexShrink: 0,
           }}
         >
           {/* Wrapped like every other occurrence of the product name
@@ -357,7 +378,16 @@ function NavBar({
           the controls beside it; it renders only while a survey is mounted
           (startOverStore publishes the handler from SurveyView, which exists
           on the #survey route alone). */}
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 12, flex: "1 1 0" }}>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "flex-end",
+          gap: 12,
+          flex: "1 1 0",
+          minHeight: 44,
+        }}
+      >
         {active !== "welcome" && (
           <UnfinishedGalleryIndicator
             desktopCount={unfinishedDesktopCount}

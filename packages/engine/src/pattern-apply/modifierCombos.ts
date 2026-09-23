@@ -40,7 +40,7 @@
  *     (CTRL/ALT) with a CHIRAL ctrl-or-alt token (RCTRL/RALT/LALT, plus raw
  *     spellings LCTRL/LEFTCTRL/RIGHTCTRL/LEFTALT/RIGHTALT recognized before
  *     the `ModifierToken` narrowing filter) is kmcmplib-invalid
- *     (`KM_WARNING_KMCMP_4202659`: "contains Ctrl,Alt and
+ *     (`KM_WARN_KMCMP_4202659`: "contains Ctrl,Alt and
  *     LCtrl,LAlt,RCtrl,RAlt sets of modifiers. Use only one or the other set
  *     for web target") and can never be delivered by a physical keypress
  *     either (hardware/OS delivers either all-chiral bits or the all-generic
