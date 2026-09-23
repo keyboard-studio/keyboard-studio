@@ -2174,3 +2174,57 @@ describe("workingCopyStore — commitTouchKeyRename (spec 063 T091)", () => {
     expect(after.undoStack).toEqual(before.undoStack);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Carve overlay mutators never mutate the IR in place (spec 014 T011, AC US1-2 /
+// SC-001). Carve edits are an overlay (deletedNodeIds / deletedItemIds)
+// projected onto the IR only at serialization; the single executed IR write
+// path is the reducer's mutate() apply.
+// ---------------------------------------------------------------------------
+
+describe("workingCopyStore — carve overlay mutators never mutate the IR in place", () => {
+  function carveIR(): KeyboardIR {
+    return makeTestIR([], [makeCharStore("s0", "letters", "abc"), makeCharStore("s1", "extra", "de")]);
+  }
+
+  it("deleteNode records an overlay and leaves the seeded IR byte-identical", () => {
+    const ir = carveIR();
+    const snapshot = structuredClone(ir);
+    const store = useWorkingCopyStore.getState();
+    store.setIR(ir);
+
+    store.deleteNode("s0");
+
+    expect(useWorkingCopyStore.getState().deletedNodeIds.has("s0")).toBe(true);
+    expect(ir).toEqual(snapshot);
+    expect(useWorkingCopyStore.getState().ir).toEqual(snapshot);
+  });
+
+  it("deleteItem records an overlay and does not touch the IR's stores", () => {
+    const ir = carveIR();
+    const snapshot = structuredClone(ir);
+    const store = useWorkingCopyStore.getState();
+    store.setIR(ir);
+
+    store.deleteItem("s0#0");
+
+    expect(useWorkingCopyStore.getState().deletedItemIds.has("s0#0")).toBe(true);
+    expect(ir.stores).toEqual(snapshot.stores);
+  });
+
+  it("keepAll clears the overlay without ever having written the IR", () => {
+    const ir = carveIR();
+    const snapshot = structuredClone(ir);
+    const store = useWorkingCopyStore.getState();
+    store.setIR(ir);
+
+    store.deleteNode("s0");
+    store.deleteItem("s1#0");
+    store.keepAll();
+
+    const s = useWorkingCopyStore.getState();
+    expect(s.deletedNodeIds.size).toBe(0);
+    expect(s.deletedItemIds.size).toBe(0);
+    expect(s.ir).toEqual(snapshot);
+  });
+});
