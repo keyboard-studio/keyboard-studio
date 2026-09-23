@@ -14,9 +14,9 @@
 //   Browser tests run in a separate manual/CD step, never in the unit CI lane.
 //
 // Browser binaries: run `npx playwright install` once before running E2E.
-// E2E specs live under packages/studio/e2e/. carve.spec.ts is LIVE (not skipped)
-// and passes against the global CLI; copy-edit.spec.ts and import-improve.spec.ts
-// remain .skip-ped pending their lanes. See each spec header for details.
+// E2E specs live under packages/studio/e2e/. Which specs are live and which are
+// skipped is listed in docs/tooling.md ("Spec status"); each skipped spec carries
+// its un-skip recipe in its header.
 
 import { defineConfig } from "playwright/test";
 

@@ -287,7 +287,6 @@ Live and passing:
 
 Skipped, each with an un-skip recipe at the top of its file:
 
-- `import-improve.spec.ts` — Track 2
 - [touch-key-add-remove.spec.ts](../packages/studio/e2e/touch-key-add-remove.spec.ts) — spec 063
   T112 / SC-006. Written in full against the real test ids, but blocked until `TouchGallery.tsx`
   actually mounts the Phase 8 add/remove surfaces — it calls neither `useKeyCommands` nor
