@@ -38,6 +38,36 @@
 // MyKeyboardsList.test.tsx mocks them (guest / empty cloud list) so "My
 // keyboards" never attempts a real network call.
 
+// SECOND SCENARIO (the second describe below): the reload path the Resume
+// click does NOT cover. A project whose stored
+// `identity.keyboardId !== baseKeyboard.id` (a completed mid-session rename), restored via the BOOT path — `main.tsx`'s
+// pre-mount `loadDraft(resolveActiveProjectKey())` call — with NO Resume
+// click anywhere.
+//
+// This matters because `loadDraft()` and `resumeProject()` are NOT the same
+// primitive: `resumeProject` calls `loadDraft` AND THEN re-pins the active
+// pointer (`setActiveProjectKey`) on success. `loadDraft` alone (what
+// `main.tsx` calls before React ever mounts) never touches the active
+// pointer on a successful restore — see draftPersistence.ts's `loadDraft`
+// doc comment: "Load ... and rehydrate both stores" with no mention of the
+// pointer, contrasted with `resumeProject`'s explicit
+// `setActiveProjectKey(projectKey)` call.
+//
+// So on a bare reload of a renamed project, `resolveActiveProjectKey()`
+// keeps naming the ORIGINAL (pre-rename) key straight through `loadDraft()`,
+// and it is `installDraftAutosave`'s own key-change migration — triggered by
+// SurveyView's mount effect deriving the NOW-renamed key from the
+// just-restored working copy — that is solely responsible for cleaning up
+// the stale original-key row. The bug report's fix claims this path is
+// covered "for free" by the same mechanism the Resume-click path uses; that
+// test is what actually pins that claim down. It shares this file's mocks and
+// seed, with ONE deliberate deviation: instead of clicking "Resume" from
+// #profile, it calls `loadDraft()` directly (exactly what `main.tsx`'s
+// `mountApp()` does before `createRoot(...).render(...)`) and mounts
+// StudioShell directly on `#survey` (a bare reload lands wherever the
+// browser's own persisted hash already was; no navigateTo call is involved on
+// that path at all).
+
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { render } from "./test/renderWithI18n.tsx";
@@ -95,13 +125,15 @@ import { StudioShell } from "./StudioShell.tsx";
 import {
   draftKey,
   listDrafts,
+  loadDraft,
+  resolveActiveProjectKey,
   DRAFT_INDEX_KEY,
 } from "./lib/draftPersistence.ts";
 
-
 const BASE_ID = "basic_kbdus";
 const CUSTOM_ID = "my_renamed_keyboard";
-
+const RELOAD_BASE_ID = "basic_kbdus_reload";
+const RELOAD_CUSTOM_ID = "my_renamed_keyboard_reload";
 
 beforeEach(() => {
   localStorage.clear();
@@ -159,5 +191,57 @@ describe("StudioShell — Resume from My keyboards does not duplicate the index 
       projectKey: string;
     }>;
     expect(rawIndex.map((e) => e.projectKey).sort()).toEqual([CUSTOM_ID]);
+  });
+});
+
+describe("StudioShell — bare reload of a renamed project does not duplicate the index row (no Resume click)", () => {
+  it("main.tsx's pre-mount loadDraft() + a direct #survey mount leaves exactly one 'My keyboards' entry", async () => {
+    seedRenamedProjectDraft(RELOAD_BASE_ID, RELOAD_CUSTOM_ID);
+    markVisited();
+
+    expect(listDrafts()).toHaveLength(1);
+    expect(listDrafts()[0]?.projectKey).toBe(RELOAD_BASE_ID);
+
+    // ---- The exact boot sequence main.tsx's mountApp() runs BEFORE React
+    // ever mounts, per that file:
+    //   const activeProjectKey = resolveActiveProjectKey();
+    //   if (activeProjectKey !== null) loadDraft(activeProjectKey);
+    // No resumeProject() call anywhere on this path — loadDraft() alone,
+    // which (unlike resumeProject) never touches the active-project pointer
+    // on success.
+    const activeProjectKey = resolveActiveProjectKey();
+    expect(activeProjectKey).toBe(RELOAD_BASE_ID);
+    const applied = loadDraft(activeProjectKey!);
+    expect(applied).toBe(true);
+
+    // The pointer is UNCHANGED by loadDraft — still the stale, pre-rename
+    // key — exactly the condition that makes installDraftAutosave's own
+    // key-change migration the only thing standing between this path and a
+    // duplicate row.
+    expect(resolveActiveProjectKey()).toBe(RELOAD_BASE_ID);
+
+    // A bare reload lands wherever the browser's own hash already was — no
+    // navigateTo call, no Resume click, no #profile round trip.
+    window.location.hash = "#survey";
+    await act(async () => {
+      render(<StudioShell />);
+    });
+
+    await screen.findByTestId("stage-identity");
+
+    const entries = listDrafts();
+    // EXPECTED (the fix's "covered for free" claim): still exactly one row,
+    // now keyed on the post-rename id, with the stale RELOAD_BASE_ID record gone —
+    // via installDraftAutosave's own migration, triggered purely by
+    // SurveyView's mount effect deriving RELOAD_CUSTOM_ID from the loadDraft()-
+    // restored working copy, with no click anywhere in this test.
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.projectKey).toBe(RELOAD_CUSTOM_ID);
+    expect(localStorage.getItem(draftKey(RELOAD_BASE_ID))).toBeNull();
+
+    const rawIndex = JSON.parse(localStorage.getItem(DRAFT_INDEX_KEY) ?? "[]") as Array<{
+      projectKey: string;
+    }>;
+    expect(rawIndex.map((e) => e.projectKey).sort()).toEqual([RELOAD_CUSTOM_ID]);
   });
 });

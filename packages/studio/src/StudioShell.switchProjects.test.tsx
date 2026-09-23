@@ -35,6 +35,76 @@
 // (see that component's module header: "Same contract `MyKeyboardsList.tsx`'s
 // `handleResume` uses (copied verbatim...)").
 
+// SECOND SCENARIO (the in-place describe below): regression test for a
+// confirmed, self-disclosed P0: silent data loss after an IN-PLACE keyboard
+// switch via the top-bar `CurrentKeyboardIndicator`.
+//
+// THE BUG AS CONFIRMED (this test reproduces it; it does not re-investigate
+// it). At the time this test was written, `StudioShell.tsx` / `switchActive
+// Project.ts` had NOT yet been fixed, and running it against that state
+// produced two RED failures — verbatim (line numbers are from the former
+// StudioShell.inPlaceSwitch.test.tsx, since merged into this file):
+//
+//   AssertionError: expected 'Beta In-Place Keyboard' to be
+//   'Beta In-Place Keyboard EDITED' // Object.is equality
+//     at src/StudioShell.inPlaceSwitch.test.tsx:428
+//   AssertionError: expected 'Alpha In-Place Keyboard' to be
+//   'Alpha In-Place Keyboard EDITED' // Object.is equality
+//     at src/StudioShell.inPlaceSwitch.test.tsx:498
+//
+// (both at the `expect(...Envelope.displayName).toBe(EDITED_..._LABEL)`
+// line — the OLD project's on-disk record was byte-identical to its
+// pre-switch snapshot at that point, GREEN as expected; the NEWLY-switched-to
+// project's own record simply never received the edit at all.)
+//
+// The mechanism, as confirmed: `CurrentKeyboardIndicator.tsx`'s dropdown lets
+// the author switch keyboards from ANY route, including while already
+// sitting on `#survey` with `SurveyView` mounted. Its `handleChange` calls
+// the shared `switchActiveProject()` helper (lib/switchActiveProject.ts),
+// which does `resumeProject(key)` -> `pinActiveProject(key)` ->
+// `navigateTo("survey")`. When the author is ALREADY on `#survey`,
+// `navigateTo("survey")` sets the hash to its CURRENT value — per the WHATWG
+// spec (and jsdom's implementation of it), assigning `location.hash` to the
+// value it already holds fires NO `hashchange` event.
+// `installDraftAutosave`'s subscription lives in a plain React ref inside
+// `SurveyView` (`autosaveTeardownRef`), installed by a mount-only effect. At
+// the time of the RED run above, `StudioShell`'s route-driven render had no
+// OTHER signal that would remount `SurveyView` on an in-place switch, so the
+// OLD subscription (still closed over the abandoned project's key, made
+// inert by a PRIOR fix's orphan guard — `scheduleSave`'s
+// `resolveActiveProjectKey() === projectKey` check, draftPersistence.ts) was
+// all that remained subscribed, and NOTHING installed a fresh subscription
+// for the newly-resumed project. Every edit made after the switch updated the
+// live stores (so the UI looked perfectly normal) but was never scheduled for
+// a write anywhere — silent, permanent loss the moment the tab closed.
+//
+// CURRENT STATUS (see the parallel fixing cycle's own commits/diff for the
+// authoritative account): as of this test's last run, `stores/
+// projectSwitchStore.ts` + a `key={projectSwitchGeneration}` on `SurveyView`
+// in `StudioShell.tsx` + a `bump()` call from `switchActiveProject.ts` now
+// force exactly the missing remount signal, and these tests are GREEN. Do not
+// weaken these assertions to "match" a reintroduced bug — they assert the
+// CORRECT behaviour (the newly-switched-to project keeps a live autosave)
+// and exist so a regression here fails loudly again.
+//
+// UI-DRIVING CHOICE: the in-place tests drive the REAL `CurrentKeyboardIndicator`
+// dropdown (the actual top-bar control, rendered for real inside the actual
+// `StudioShell`/`NavBar` tree — NOT a mock, NOT a standalone component
+// mount), because the bug is specifically about what happens when THAT
+// control's `onChange` fires while `SurveyView` is the ALREADY-mounted
+// sibling in the SAME `StudioShell` render (`NavBar` and `{content}` are
+// siblings — see StudioShell.tsx's final `return`). A standalone
+// `<CurrentKeyboardIndicator />` mount (as in
+// CurrentKeyboardIndicator.test.tsx) cannot reproduce this: there is no
+// sibling `SurveyView` for the switch to leave behind.
+//
+// `lib/navigate.ts` is DELIBERATELY left unmocked, same rationale as
+// StudioShell.resumeRename.test.tsx / the first describe in this file —
+// except here the point is the OPPOSITE of those two: we need the
+// REAL "assigning the same hash value fires no hashchange" behaviour, not a
+// spy that would hide it. Mocking navigate.ts here would destroy the exact
+// condition under test.
+
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { render } from "./test/renderWithI18n.tsx";
@@ -76,7 +146,9 @@ vi.mock("./lib/buildTouchLayoutJson.ts", () => import("./test/studioShellMocks/b
 // `lib/navigate.ts` is DELIBERATELY left unmocked so a real hashchange fires
 // on every Resume click and SurveyView genuinely (re)mounts each time — the
 // crux of what this test needs to exercise `installDraftAutosave`'s
-// key-change migration for real, twice, in both directions.
+// key-change migration for real, twice, in both directions. The in-place
+// describe needs the OPPOSITE real behaviour: assigning the hash its current
+// value fires no hashchange (see the file header).
 // ---------------------------------------------------------------------------
 
 vi.mock("./hooks/useGitHubAuth.ts", () => import("./test/studioShellMocks/useGitHubAuth.ts"));
@@ -95,16 +167,19 @@ import {
   draftKey,
   resumeProject,
   listDrafts,
+  AUTOSAVE_DEBOUNCE_MS,
   DRAFT_INDEX_KEY,
   type DurableDraft,
 } from "./lib/draftPersistence.ts";
-
 
 const PROJECT_A_ID = "kbd_switch_alpha";
 const PROJECT_A_NAME = "Alpha Keyboard";
 const PROJECT_B_ID = "kbd_switch_beta";
 const PROJECT_B_NAME = "Beta Keyboard";
-
+const INPLACE_A_ID = "kbd_inplace_alpha";
+const INPLACE_A_NAME = "Alpha In-Place Keyboard";
+const INPLACE_B_ID = "kbd_inplace_beta";
+const INPLACE_B_NAME = "Beta In-Place Keyboard";
 
 beforeEach(() => {
   localStorage.clear();
@@ -117,6 +192,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
+  vi.useRealTimers();
   localStorage.clear();
   window.location.hash = "";
 });
@@ -206,6 +282,190 @@ describe("StudioShell — switching between two DISTINCT projects must not destr
     }>;
     expect(rawIndex.map((e) => e.projectKey).sort()).toEqual(
       [PROJECT_A_ID, PROJECT_B_ID].sort(),
+    );
+  });
+});
+
+/**
+ * Drives the REAL top-bar `CurrentKeyboardIndicator` dropdown, exactly as an
+ * author would: open the trigger, click the target project's option row.
+ * The trigger's accessible name is fixed ("Keyboard", from
+ * `aria-labelledby` -> `LABEL_ID`'s "Keyboard" label, per ARIA's
+ * `aria-labelledby`-overrides-content-name rule) regardless of which
+ * project is currently active, so this query is stable across the switch
+ * the in-place tests perform (A->B and, in the mirror test, B->A).
+ */
+function switchViaTopBarDropdown(targetProjectLabel: string): void {
+  const trigger = screen.getByRole("button", { name: "Keyboard" });
+  fireEvent.click(trigger);
+  const targetOption = screen.getByRole("option", { name: targetProjectLabel });
+  fireEvent.click(targetOption);
+}
+
+describe("StudioShell — in-place keyboard switch while SurveyView stays mounted (confirmed P0: silent autosave loss)", () => {
+  it("A -> B in place: B gains live autosave, A's own record is left untouched, neither project vanishes from the index", async () => {
+    // ---- Seed two genuinely distinct, unrelated projects ----
+    instantiateAndSave(INPLACE_A_ID, INPLACE_A_NAME);
+    instantiateAndSave(INPLACE_B_ID, INPLACE_B_NAME);
+
+    // Pre-state, read via the RAW index key (not listDrafts()) — listDrafts()
+    // runs reconciliation internally. As of this cycle that reconciliation
+    // (`reconcileProjectIndex`) is additive-only, not the destructive
+    // rename-merge (that moved to boot-gated `runBootRenameReconciliation`),
+    // but the raw read is still the more conservative "before" snapshot and
+    // costs nothing.
+    const seededIndexRaw = JSON.parse(
+      localStorage.getItem(DRAFT_INDEX_KEY) ?? "[]",
+    ) as Array<{ projectKey: string }>;
+    expect(seededIndexRaw.map((e) => e.projectKey).sort()).toEqual(
+      [INPLACE_A_ID, INPLACE_B_ID].sort(),
+    );
+
+    // A was the project the author was last working on — resume it (loads it
+    // into the stores AND re-pins draftPersistence's own active pointer),
+    // exactly as a prior session ending on A would leave things.
+    expect(resumeProject(INPLACE_A_ID)).toBe(true);
+    markVisited();
+
+    // THE CRUX SETUP: mount directly on `#survey` (never routing through
+    // `#profile`), so `SurveyView` mounts ONCE, for the whole test, and never
+    // again. This is what makes the in-place-switch condition reproducible —
+    // routing the résumé through `#profile` (as the first describe in this
+    // file does) would make `SurveyView`
+    // remount on the `#profile` -> `#survey` hashchange, installing a fresh
+    // autosave for whichever project is active at THAT remount and hiding
+    // this exact bug.
+    window.location.hash = "#survey";
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+    await screen.findByTestId("stage-identity");
+
+    // SurveyView's mount effect has now run once, installing autosave for A
+    // (the project already active at mount — see StudioShell.tsx's
+    // "RESTORING BOOT" mount effect). Capture A's on-disk record AFTER this
+    // point (its install-time synchronous save may have rewritten `savedAt`)
+    // as the true "before the switch" baseline.
+    const aRawAfterMount = localStorage.getItem(draftKey(INPLACE_A_ID));
+    expect(aRawAfterMount).not.toBeNull();
+
+    // Fake timers from here on — the debounced autosave write is what this
+    // test needs to control precisely. Every remaining interaction below is
+    // a synchronous fireEvent/act, so nothing depends on real timers or
+    // findBy*/waitFor.
+    vi.useFakeTimers();
+
+    // ---- Switch A -> B via the REAL top-bar dropdown, while already on
+    // #survey with SurveyView mounted ----
+    switchViaTopBarDropdown(INPLACE_B_NAME);
+
+    // Confirm the crux actually held: still on #survey (no navigation
+    // occurred because the hash never changed), and the working copy really
+    // did switch to B.
+    expect(window.location.hash).toBe("#survey");
+    expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe(INPLACE_B_ID);
+
+    // ---- A real edit to B's (now live) working copy ----
+    const EDITED_B_LABEL = `${INPLACE_B_NAME} EDITED`;
+    act(() => {
+      useWorkingCopyStore.getState().setIdentity({
+        keyboardId: INPLACE_B_ID,
+        displayName: EDITED_B_LABEL,
+      });
+    });
+
+    // Advance past the autosave debounce.
+    act(() => {
+      vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS);
+    });
+
+    // ---- THE FAILING ASSERTION: B's persisted record must contain the
+    // edit. Correct behaviour requires SOME live autosave subscription for B
+    // to have existed to pick up the store change and write it. ----
+    const bRawAfterEdit = localStorage.getItem(draftKey(INPLACE_B_ID));
+    expect(bRawAfterEdit).not.toBeNull();
+    const bEnvelope = JSON.parse(bRawAfterEdit!) as DurableDraft;
+    expect(bEnvelope.displayName).toBe(EDITED_B_LABEL);
+
+    // ---- GUARD (must stay GREEN — regression alarm if not): A's own
+    // on-disk record must be byte-identical to what it was right after
+    // mount. This is the cycle-5 orphan-subscription-becomes-inert fix
+    // (draftPersistence.ts scheduleSave's `resolveActiveProjectKey() ===
+    // projectKey` guard) — the OLD subscription (still closed over A) must
+    // NOT have written B's live content under A's key. ----
+    expect(localStorage.getItem(draftKey(INPLACE_A_ID))).toBe(aRawAfterMount);
+
+    // ---- Neither project vanished from "My keyboards" ----
+    vi.useRealTimers();
+    const finalEntries = listDrafts();
+    expect(finalEntries).toHaveLength(2);
+    expect(finalEntries.map((e) => e.projectKey).sort()).toEqual(
+      [INPLACE_A_ID, INPLACE_B_ID].sort(),
+    );
+  });
+
+  // Mirror case (symmetry matters — the abandoned-pointer mechanism that
+  // produced the ORIGINAL duplicate-row defect this codebase already fixed
+  // was itself direction-sensitive; a fix for A->B that silently regresses
+  // B->A would be exactly that class of bug again).
+  it("B -> A in place: A gains live autosave, B's own record is left untouched, neither project vanishes from the index", async () => {
+    instantiateAndSave(INPLACE_A_ID, INPLACE_A_NAME);
+    instantiateAndSave(INPLACE_B_ID, INPLACE_B_NAME);
+
+    const seededIndexRaw = JSON.parse(
+      localStorage.getItem(DRAFT_INDEX_KEY) ?? "[]",
+    ) as Array<{ projectKey: string }>;
+    expect(seededIndexRaw.map((e) => e.projectKey).sort()).toEqual(
+      [INPLACE_A_ID, INPLACE_B_ID].sort(),
+    );
+
+    // This time B is the project the author was last working on.
+    expect(resumeProject(INPLACE_B_ID)).toBe(true);
+    markVisited();
+    window.location.hash = "#survey";
+
+    await act(async () => {
+      render(<StudioShell />);
+    });
+    await screen.findByTestId("stage-identity");
+
+    const bRawAfterMount = localStorage.getItem(draftKey(INPLACE_B_ID));
+    expect(bRawAfterMount).not.toBeNull();
+
+    vi.useFakeTimers();
+
+    switchViaTopBarDropdown(INPLACE_A_NAME);
+
+    expect(window.location.hash).toBe("#survey");
+    expect(useWorkingCopyStore.getState().baseKeyboard?.id).toBe(INPLACE_A_ID);
+
+    const EDITED_A_LABEL = `${INPLACE_A_NAME} EDITED`;
+    act(() => {
+      useWorkingCopyStore.getState().setIdentity({
+        keyboardId: INPLACE_A_ID,
+        displayName: EDITED_A_LABEL,
+      });
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS);
+    });
+
+    // FAILING ASSERTION (mirror): A's persisted record must contain the edit.
+    const aRawAfterEdit = localStorage.getItem(draftKey(INPLACE_A_ID));
+    expect(aRawAfterEdit).not.toBeNull();
+    const aEnvelope = JSON.parse(aRawAfterEdit!) as DurableDraft;
+    expect(aEnvelope.displayName).toBe(EDITED_A_LABEL);
+
+    // GUARD (must stay GREEN): B's own on-disk record is untouched.
+    expect(localStorage.getItem(draftKey(INPLACE_B_ID))).toBe(bRawAfterMount);
+
+    vi.useRealTimers();
+    const finalEntries = listDrafts();
+    expect(finalEntries).toHaveLength(2);
+    expect(finalEntries.map((e) => e.projectKey).sort()).toEqual(
+      [INPLACE_A_ID, INPLACE_B_ID].sort(),
     );
   });
 });

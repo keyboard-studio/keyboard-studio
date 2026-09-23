@@ -16,11 +16,11 @@
 // the working copy.
 //
 // Mocking strategy: the same child-component/hook stub set as
-// StudioShell.resumeRename.test.tsx / StudioShell.bareReload.test.tsx (so
-// SurveyView can mount past "identity" without touching WASM/VFS/network),
-// with ONE deviation from those files' guest posture: `useGitHubAuth` returns
-// a signed-in token here, since the cloud-restore check
-// (StudioShell.tsx's `cloudRestoreCheckedRef` effect) is a no-op for a guest.
+// StudioShell.resumeRename.test.tsx (so SurveyView can mount past "identity"
+// without touching WASM/VFS/network), with ONE deviation from that file's
+// guest posture: `useGitHubAuth` returns a signed-in token here, since the
+// cloud-restore check (StudioShell.tsx's `cloudRestoreCheckedRef` effect) is a
+// no-op for a guest.
 
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
 import { screen, fireEvent, cleanup, act } from "@testing-library/react";
