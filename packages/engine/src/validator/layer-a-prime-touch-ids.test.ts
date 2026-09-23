@@ -15,44 +15,18 @@ import {
 } from "./layer-a-prime.js";
 import { runImportFidelityParseChecks } from "./index-import-fidelity.js";
 import type { ParseResult } from "../codec/parse.js";
+import { irGroup, makeTestIR, touchLayout } from "@keyboard-studio/contracts/fixtures";
 
 function irWithLayout(layout?: TouchLayoutIR): KeyboardIR {
-  const ir: KeyboardIR = {
-    origin: "imported",
-    header: {
-      keyboardId: "kbd",
-      name: "Kbd",
-      bcp47: [],
-      copyright: "",
-      version: "1.0",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores: [],
-    groups: [{ nodeId: "g1", name: "Main", usingKeys: true, readonly: false, rules: [] }],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  };
-  if (layout) ir.touchLayout = layout;
-  return ir;
+  return makeTestIR({
+    header: { keyboardId: "kbd", name: "Kbd" },
+    groups: [irGroup({ nodeId: "g1", name: "Main" })],
+    touchLayout: layout,
+  });
 }
 
 function layoutWithIds(ids: string[]): TouchLayoutIR {
-  return {
-    platforms: [
-      {
-        id: "phone",
-        layers: [
-          {
-            id: "default",
-            rows: [{ keys: ids.map((id, i) => ({ nodeId: `n${i}`, id, text: "x" })) }],
-          },
-        ],
-      },
-    ],
-    nodeIds: [],
-  };
+  return touchLayout({ keys: ids.map((id, i) => ({ nodeId: `n${i}`, id, text: "x" })) });
 }
 
 function result(layout?: TouchLayoutIR): ParseResult {

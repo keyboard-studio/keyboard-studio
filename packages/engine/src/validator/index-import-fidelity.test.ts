@@ -24,6 +24,7 @@ import { buildImportReport, importKeyboard } from "../codec/import-keyboard.js";
 import { parse } from "../codec/parse.js";
 import { ImportStatus, createVirtualFS } from "@keyboard-studio/contracts";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
+import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 
 // ---------------------------------------------------------------------------
 // Shared fixtures
@@ -59,23 +60,15 @@ group(main) using keys
 
 /** A minimal KeyboardIR with all required header fields. */
 function makeIR(): KeyboardIR {
-  return {
-    origin: "imported",
+  return makeTestIR({
     header: {
       keyboardId: "test-kb",
       name: "Test Keyboard",
       bcp47: ["en"],
       copyright: "(c) 2024 SIL",
-      version: "1.0",
       targets: ["any"],
-      storeDirectives: [],
     },
-    stores: [],
-    groups: [],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  };
+  });
 }
 
 /** A canonical emitted .kmn produced by emit(). */

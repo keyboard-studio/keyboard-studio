@@ -17,50 +17,19 @@ import {
   collectCarvedKeycapTexts,
 } from "./applyCarveKeycapRemovalsToVfs.js";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import type { KeyboardIR, IRGroup, IRStore, IRRule, OutputElement } from "@keyboard-studio/contracts";
+import type { KeyboardIR, IRGroup, IRStore, IRRule } from "@keyboard-studio/contracts";
+import { irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
 // ---------------------------------------------------------------------------
 
 function makeCharRule(nodeId: string, char: string, vkeyName = "K_E"): IRRule {
-  return {
-    nodeId,
-    context: [{ kind: "vkey", name: vkeyName, modifiers: [] }],
-    output: [{ kind: "char", value: char }],
-  };
-}
-
-function makeRuleWithOutput(nodeId: string, output: OutputElement[]): IRRule {
-  return {
-    nodeId,
-    context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
-    output,
-  };
-}
-
-function makeGroup(nodeId: string, rules: IRRule[]): IRGroup {
-  return { nodeId, name: "main", usingKeys: true, rules, readonly: false };
+  return vkeyRule({ nodeId, vkey: vkeyName, output: char });
 }
 
 function makeIR(groups: IRGroup[], stores: IRStore[] = []): KeyboardIR {
-  return {
-    origin: "imported",
-    header: {
-      keyboardId: "test",
-      name: "Test",
-      bcp47: [],
-      copyright: "",
-      version: "1.0",
-      targets: ["any"],
-      storeDirectives: [],
-    },
-    stores,
-    groups,
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  };
+  return makeTestIR(groups, stores, [], { header: { targets: ["any"] } });
 }
 
 const KVKS_BASE = `<visualkeyboard>
@@ -96,7 +65,7 @@ function removalsOf(opts: { slotIds?: string[]; wholeNodeIds?: string[] }) {
 describe("applyCarveKeycapRemovalsToVfs — .kvks base layer", () => {
   it("clears the carved keycap text in place, keeping the element and siblings", () => {
     const vfs = makeVfs([{ path: "source/test.kvks", content: KVKS_BASE }]);
-    const ir = makeIR([makeGroup("group#0", [makeCharRule("rule#e", "é")])]);
+    const ir = makeIR([irGroup({ nodeId: "group#0", rules: [makeCharRule("rule#e", "é")] })]);
 
     const { warnings } = applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({
       wholeNodeIds: ["rule#e"],
@@ -125,7 +94,7 @@ describe("applyCarveKeycapRemovalsToVfs — layer-agnostic .kvks scan", () => {
 </layer>
 </encoding></visualkeyboard>`;
     const vfs = makeVfs([{ path: "source/test.kvks", content: kvks }]);
-    const ir = makeIR([makeGroup("group#0", [makeCharRule("rule#e", "é")])]);
+    const ir = makeIR([irGroup({ nodeId: "group#0", rules: [makeCharRule("rule#e", "é")] })]);
 
     applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({ wholeNodeIds: ["rule#e"] }));
 
@@ -170,7 +139,7 @@ describe("applyCarveKeycapRemovalsToVfs — touch layout", () => {
     const vfs = makeVfs([
       { path: "source/test.keyman-touch-layout", content: touchLayout },
     ]);
-    const ir = makeIR([makeGroup("group#0", [makeCharRule("rule#e", "é")])]);
+    const ir = makeIR([irGroup({ nodeId: "group#0", rules: [makeCharRule("rule#e", "é")] })]);
 
     const { warnings } = applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({
       wholeNodeIds: ["rule#e"],
@@ -213,7 +182,7 @@ describe("applyCarveKeycapRemovalsToVfs — touch layout main key U_ id independ
     const vfs = makeVfs([
       { path: "source/test.keyman-touch-layout", content: touchLayout },
     ]);
-    const ir = makeIR([makeGroup("group#0", [makeCharRule("rule#e", "é")])]);
+    const ir = makeIR([irGroup({ nodeId: "group#0", rules: [makeCharRule("rule#e", "é")] })]);
 
     const { warnings } = applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({
       wholeNodeIds: ["rule#e"],
@@ -246,7 +215,7 @@ describe("applyCarveKeycapRemovalsToVfs — touch layout main key matched by out
 
   it("clears a K_ main key matched only by `output` (no text)", () => {
     const vfs = vfsWithMainKey({ id: "K_X", output: "é" });
-    const ir = makeIR([makeGroup("group#0", [makeCharRule("rule#e", "é")])]);
+    const ir = makeIR([irGroup({ nodeId: "group#0", rules: [makeCharRule("rule#e", "é")] })]);
 
     const { warnings } = applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({
       wholeNodeIds: ["rule#e"],
@@ -263,7 +232,7 @@ describe("applyCarveKeycapRemovalsToVfs — touch layout main key matched by out
 
   it("clears a K_ main key matched by both `text` and `output`", () => {
     const vfs = vfsWithMainKey({ id: "K_X", text: "é", output: "é" });
-    const ir = makeIR([makeGroup("group#0", [makeCharRule("rule#e", "é")])]);
+    const ir = makeIR([irGroup({ nodeId: "group#0", rules: [makeCharRule("rule#e", "é")] })]);
 
     applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({ wholeNodeIds: ["rule#e"] }));
 
@@ -275,7 +244,7 @@ describe("applyCarveKeycapRemovalsToVfs — touch layout main key matched by out
 
   it("leaves a main key with a non-carved `output` completely untouched", () => {
     const vfs = vfsWithMainKey({ id: "K_X", output: "z" });
-    const ir = makeIR([makeGroup("group#0", [makeCharRule("rule#e", "é")])]);
+    const ir = makeIR([irGroup({ nodeId: "group#0", rules: [makeCharRule("rule#e", "é")] })]);
     const setSpy = vi.spyOn(vfs, "set");
 
     const { warnings } = applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({
@@ -290,7 +259,7 @@ describe("applyCarveKeycapRemovalsToVfs — touch layout main key matched by out
 
   it("matches an NFD `output` against a carved NFC character", () => {
     const vfs = vfsWithMainKey({ id: "K_X", output: "e" + String.fromCharCode(0x0301) });
-    const ir = makeIR([makeGroup("group#0", [makeCharRule("rule#e", "é")])]);
+    const ir = makeIR([irGroup({ nodeId: "group#0", rules: [makeCharRule("rule#e", "é")] })]);
 
     applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({ wholeNodeIds: ["rule#e"] }));
 
@@ -308,7 +277,7 @@ describe("applyCarveKeycapRemovalsToVfs — carved char absent from layer files"
       { path: "source/test.kvks", content: KVKS_BASE },
       { path: "source/test.keyman-touch-layout", content: touch },
     ]);
-    const ir = makeIR([makeGroup("group#0", [makeCharRule("rule#z", "ƶ")])]);
+    const ir = makeIR([irGroup({ nodeId: "group#0", rules: [makeCharRule("rule#z", "ƶ")] })]);
     const setSpy = vi.spyOn(vfs, "set");
 
     const { warnings } = applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({
@@ -325,7 +294,7 @@ describe("applyCarveKeycapRemovalsToVfs — carved char absent from layer files"
 describe("applyCarveKeycapRemovalsToVfs — no layer files at all", () => {
   it("is a graceful silent no-op", () => {
     const vfs = makeVfs([]);
-    const ir = makeIR([makeGroup("group#0", [makeCharRule("rule#e", "é")])]);
+    const ir = makeIR([irGroup({ nodeId: "group#0", rules: [makeCharRule("rule#e", "é")] })]);
 
     const { warnings } = applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({
       wholeNodeIds: ["rule#e"],
@@ -344,7 +313,7 @@ describe("applyCarveKeycapRemovalsToVfs — NFC comparison", () => {
 </layer>
 </encoding></visualkeyboard>`;
     const vfs = makeVfs([{ path: "source/test.kvks", content: kvks }]);
-    const ir = makeIR([makeGroup("group#0", [makeCharRule("rule#e", "é")])]);
+    const ir = makeIR([irGroup({ nodeId: "group#0", rules: [makeCharRule("rule#e", "é")] })]);
 
     applyCarveKeycapRemovalsToVfs(vfs, "test", ir, removalsOf({ wholeNodeIds: ["rule#e"] }));
 
@@ -382,7 +351,7 @@ describe("collectCarvedKeycapTexts — derivation and survivor guard", () => {
       context: [{ kind: "any", storeRef: "inX" }],
       output: [{ kind: "index", storeRef: "out", offset: 1 }],
     };
-    const ir = makeIR([makeGroup("group#0", [fanOut])], [inStore, outStore]);
+    const ir = makeIR([irGroup({ nodeId: "group#0", rules: [fanOut] })], [inStore, outStore]);
 
     const texts = collectCarvedKeycapTexts(ir, removalsOf({ slotIds: ["store#out#0"] }));
     expect([...texts]).toEqual(["é"]);
@@ -390,10 +359,10 @@ describe("collectCarvedKeycapTexts — derivation and survivor guard", () => {
 
   it("keeps a char produced by a surviving rule out of the carved set", () => {
     const ir = makeIR([
-      makeGroup("group#0", [
+      irGroup({ nodeId: "group#0", rules: [
         makeCharRule("rule#e1", "é", "K_E"),
         makeCharRule("rule#e2", "é", "K_Q"),
-      ]),
+      ] }),
     ]);
 
     // Only one of the two producers carved → the char is still typeable.
@@ -417,10 +386,10 @@ describe("collectCarvedKeycapTexts — derivation and survivor guard", () => {
       ],
       isSystem: false,
     };
-    const fanOut = makeRuleWithOutput("rule#fan", [
+    const fanOut = vkeyRule({ nodeId: "rule#fan", output: [
       { kind: "index", storeRef: "out", offset: 1 },
-    ]);
-    const ir = makeIR([makeGroup("group#0", [fanOut])], [outStore]);
+    ] });
+    const ir = makeIR([irGroup({ nodeId: "group#0", rules: [fanOut] })], [outStore]);
 
     // One of the two é slots carved → the other still produces é.
     expect(
@@ -445,7 +414,7 @@ describe("collectCarvedKeycapTexts — derivation and survivor guard", () => {
       output: [{ kind: "index", storeRef: "dualX", offset: 1 }],
     };
     const ir = makeIR(
-      [makeGroup("group#0", [dualRule, makeCharRule("rule#e", "é")])],
+      [irGroup({ nodeId: "group#0", rules: [dualRule, makeCharRule("rule#e", "é")] })],
       [dualStore],
     );
 
@@ -491,7 +460,7 @@ describe("collectCarvedKeycapTexts — derivation and survivor guard", () => {
       output: [{ kind: "char", value: "x" }],
     };
     const ir = makeIR(
-      [makeGroup("group#0", [crossRule, otherUseRule])],
+      [irGroup({ nodeId: "group#0", rules: [crossRule, otherUseRule] })],
       [inStore, outStore],
     );
 
@@ -515,7 +484,7 @@ describe("collectCarvedKeycapTexts — derivation and survivor guard", () => {
       output: [{ kind: "char", value: "x" }],
     };
     const ir = makeIR(
-      [makeGroup("group#0", [matcher, makeCharRule("rule#e", "é")])],
+      [irGroup({ nodeId: "group#0", rules: [matcher, makeCharRule("rule#e", "é")] })],
       [keysStore],
     );
 

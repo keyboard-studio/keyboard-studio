@@ -3,23 +3,11 @@
 import { describe, it, expect } from 'vitest';
 import type { KeyboardIR, IRRule, IRStore } from '@keyboard-studio/contracts';
 import { collectCharContributors } from './collectCharContributors.js';
+import { irGroup, makeTestIR } from '@keyboard-studio/contracts/fixtures';
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
 // ---------------------------------------------------------------------------
-
-function makeIR(overrides: Partial<KeyboardIR> = {}): KeyboardIR {
-  return {
-    origin: 'imported',
-    header: { keyboardId: 'test', name: 'Test', bcp47: [], copyright: '', version: '1.0', targets: [], storeDirectives: [] },
-    stores: [],
-    groups: [],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-    ...overrides,
-  } as KeyboardIR;
-}
 
 function makeStore(nodeId: string, name: string, items: IRStore['items']): IRStore {
   return { nodeId, name, items, isSystem: false };
@@ -59,12 +47,9 @@ function makeCameroonIR(): KeyboardIR {
     [{ kind: 'index', storeRef: 'dkt003b', offset: 2 }],
     'p1',
   );
-  return makeIR({
+  return makeTestIR({
     stores: [inputStore, outputStore],
-    groups: [{
-      nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
-      rules: [triggerRule, fanOutRule],
-    }],
+    groups: [irGroup({ nodeId: 'g1', rules: [triggerRule, fanOutRule] })],
     recognizedPatterns: [{
       id: 'p1', title: 'Cameroon S-02', origin: 'recognized',
       ownedNodes: [
@@ -95,8 +80,8 @@ describe('collectCharContributors', () => {
       [{ kind: 'vkey', name: 'K_A', modifiers: [] }],
       [{ kind: 'char', value: 'a' }],
     );
-    const ir = makeIR({
-      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+    const ir = makeTestIR({
+      groups: [irGroup({ nodeId: 'g1', rules: [rule] })],
     });
     const result = collectCharContributors(ir, 'a');
     expect(result.ruleNodeIds).toContain('r-s01');
@@ -109,8 +94,8 @@ describe('collectCharContributors', () => {
       [{ kind: 'char', value: 'é' }, { kind: 'vkey', name: 'K_BKSP', modifiers: [] }],
       [{ kind: 'char', value: 'e' }],
     );
-    const ir = makeIR({
-      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+    const ir = makeTestIR({
+      groups: [irGroup({ nodeId: 'g1', rules: [rule] })],
     });
     const result = collectCharContributors(ir, 'e');
     expect(result.ruleNodeIds).not.toContain('r-bksp-removal');
@@ -128,8 +113,8 @@ describe('collectCharContributors', () => {
       [{ kind: 'vkey', name: 'K_E', modifiers: [] }],
       [{ kind: 'char', value: 'e' }],
     );
-    const ir = makeIR({
-      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [bkspRule, normalRule] }],
+    const ir = makeTestIR({
+      groups: [irGroup({ nodeId: 'g1', rules: [bkspRule, normalRule] })],
     });
     const result = collectCharContributors(ir, 'e');
     expect(result.ruleNodeIds).not.toContain('r-bksp-removal');
@@ -143,8 +128,8 @@ describe('collectCharContributors', () => {
       [{ kind: 'vkey', name: 'K_BKSP', modifiers: [] }, { kind: 'char', value: 'x' }],
       [{ kind: 'char', value: 'y' }],
     );
-    const ir = makeIR({
-      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+    const ir = makeTestIR({
+      groups: [irGroup({ nodeId: 'g1', rules: [rule] })],
     });
     const result = collectCharContributors(ir, 'y');
     expect(result.ruleNodeIds).toHaveLength(0);
@@ -183,8 +168,8 @@ describe('collectCharContributors', () => {
       [{ kind: 'vkey', name: 'K_A', modifiers: [] }],
       [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'b' }],
     );
-    const ir = makeIR({
-      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+    const ir = makeTestIR({
+      groups: [irGroup({ nodeId: 'g1', rules: [rule] })],
     });
     const result = collectCharContributors(ir, 'a');
     expect(result.ruleNodeIds).not.toContain('r-multi');
@@ -205,9 +190,9 @@ describe('collectCharContributors', () => {
       [{ kind: 'any', storeRef: 'keys' }],
       [{ kind: 'index', storeRef: 'alphabet', offset: 1 }],
     );
-    const ir = makeIR({
+    const ir = makeTestIR({
       stores: [keys, alphabet],
-      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+      groups: [irGroup({ nodeId: 'g1', rules: [rule] })],
     });
     const result = collectCharContributors(ir, 'ɛ');
     expect(result.storeSlotIds).toContain('sid-alpha#1');
@@ -219,7 +204,7 @@ describe('collectCharContributors', () => {
     // The blocked check walks `producedOutput` structurally (same element-walk
     // buildProducedSet uses) rather than scanning `sourceText` — see
     // collectCharContributors.ts's opaque-fragment doc comment.
-    const ir = makeIR({
+    const ir = makeTestIR({
       raw: [{
         nodeId: 'frag-1',
         origin: 'imported',
@@ -236,7 +221,7 @@ describe('collectCharContributors', () => {
     // The char appears before `>` in sourceText (a match target), not as
     // output — producedOutput (output-side only, per its own doc comment)
     // correctly excludes it, so no false "cannot remove" warning.
-    const ir = makeIR({
+    const ir = makeTestIR({
       raw: [{
         nodeId: 'frag-1',
         origin: 'imported',
@@ -261,7 +246,7 @@ describe('collectCharContributors', () => {
       { kind: 'char', value: 'ᐐ' },
       { kind: 'char', value: 'ᐔ' },
     ]);
-    const ir = makeIR({
+    const ir = makeTestIR({
       stores: [store],
       raw: [{
         nodeId: 'frag-1',
@@ -282,7 +267,7 @@ describe('collectCharContributors', () => {
   });
 
   it('opaque RawKmnFragment with no producedOutput sketch is not in blocked (no fabricated attribution)', () => {
-    const ir = makeIR({
+    const ir = makeTestIR({
       raw: [{
         nodeId: 'frag-1',
         origin: 'imported',
@@ -311,8 +296,8 @@ describe('collectCharContributors', () => {
       [{ kind: 'vkey', name: 'K_A', modifiers: [] }],
       [{ kind: 'char', value: 'a' }],
     );
-    const ir = makeIR({
-      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [s01, ralt] }],
+    const ir = makeTestIR({
+      groups: [irGroup({ nodeId: 'g1', rules: [s01, ralt] })],
     });
     const result = collectCharContributors(ir, 'a');
     expect(result.ruleNodeIds).toContain('r-ralt');
@@ -342,9 +327,9 @@ describe('collectCharContributors', () => {
       [{ kind: 'any', storeRef: 'word' }],
       [{ kind: 'index', storeRef: 'word', offset: 1 }],
     );
-    const ir = makeIR({
+    const ir = makeTestIR({
       stores: [word],
-      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+      groups: [irGroup({ nodeId: 'g1', rules: [rule] })],
     });
     const result = collectCharContributors(ir, 'a');
     // Same slot id from both the input-scan and output-scan passes — deduped to one entry.
@@ -359,9 +344,9 @@ describe('collectCharContributors', () => {
       [{ kind: 'notany', storeRef: 'exclSet' }],
       [{ kind: 'char', value: 'z' }],
     );
-    const ir = makeIR({
+    const ir = makeTestIR({
       stores: [store],
-      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+      groups: [irGroup({ nodeId: 'g1', rules: [rule] })],
     });
     const result = collectCharContributors(ir, 'a');
     expect(result.storeSlotIds).toHaveLength(0);
@@ -394,9 +379,9 @@ describe('collectCharContributors', () => {
       ],
       [{ kind: 'index', storeRef: 'comp-dia', offset: 1 }],
     );
-    const ir = makeIR({
+    const ir = makeTestIR({
       stores: [composed, compDia],
-      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+      groups: [irGroup({ nodeId: 'g1', rules: [rule] })],
     });
     const result = collectCharContributors(ir, 'à');
     // Nominated for removal — dropping "à" must take this unwrap row with it
@@ -413,7 +398,7 @@ describe('collectCharContributors', () => {
   it('returns the targetChar NFC-normalized', () => {
     // Pass NFD é (e + combining acute), get back NFC é
     const nfd = 'é';
-    const ir = makeIR();
+    const ir = makeTestIR();
     const result = collectCharContributors(ir, nfd);
     expect(result.targetChar).toBe('é');
   });
@@ -430,7 +415,7 @@ describe('collectCharContributors', () => {
       [{ kind: 'vkey', name: 'K_E', modifiers: [] }],
       [{ kind: 'char', value: 'e' }, { kind: 'char', value: '́' }], // e + combining acute
     );
-    const ir = makeIR({ groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }] });
+    const ir = makeTestIR({ groups: [irGroup({ nodeId: 'g1', rules: [rule] })] });
     const result = collectCharContributors(ir, 'é'); // precomposed U+00E9
     expect(result.ruleNodeIds).toEqual(['r-decomp']);
     expect(result.blocked).toHaveLength(0);
@@ -445,7 +430,7 @@ describe('collectCharContributors', () => {
         { kind: 'char', value: '̀' }, // combining grave
       ],
     );
-    const ir = makeIR({ groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }] });
+    const ir = makeTestIR({ groups: [irGroup({ nodeId: 'g1', rules: [rule] })] });
     const result = collectCharContributors(ir, 'ầ'); // ầ, precomposed
     expect(result.ruleNodeIds).toEqual(['r-decomp-stack']);
     expect(result.blocked).toHaveLength(0);
@@ -499,15 +484,12 @@ describe('collectCharContributors — role-tagged storeSlots (spec 051)', () => 
       { kind: 'char', value: 'a' },
       { kind: 'char', value: 'ɛ' },
     ]);
-    const selfPaired = makeIR({
+    const selfPaired = makeTestIR({
       stores: [word],
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
-        rules: [makeRule('r-self',
+      groups: [irGroup({ nodeId: 'g1', rules: [makeRule('r-self',
           [{ kind: 'any', storeRef: 'word' }],
           [{ kind: 'index', storeRef: 'word', offset: 1 }],
-        )],
-      }],
+        )] })],
     });
     const result = collectCharContributors(selfPaired, 'ɛ');
     expect(result.storeSlotIds).toEqual(['sid-word#1']);
@@ -530,8 +512,8 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
       [{ kind: 'vkey', name: 'K_A', modifiers: [] }],
       [{ kind: 'char', value: 'a' }],
     );
-    const ir = makeIR({
-      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+    const ir = makeTestIR({
+      groups: [irGroup({ nodeId: 'g1', rules: [rule] })],
     });
     const result = collectCharContributors(ir, 'a');
     expect(result.descriptors).toEqual([
@@ -551,8 +533,8 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
       [{ kind: 'vkey', name: 'K_A', modifiers: ['SHIFT'] }],
       [{ kind: 'char', value: 'A' }],
     );
-    const ir = makeIR({
-      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+    const ir = makeTestIR({
+      groups: [irGroup({ nodeId: 'g1', rules: [rule] })],
     });
     const result = collectCharContributors(ir, 'A');
     expect(result.descriptors).toEqual([
@@ -578,8 +560,8 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
       ],
       [{ kind: 'char', value: 'G' }, { kind: 'char', value: 'H' }, { kind: 'char', value: 'G' }],
     );
-    const ir = makeIR({
-      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+    const ir = makeTestIR({
+      groups: [irGroup({ nodeId: 'g1', rules: [rule] })],
     });
     const result = collectCharContributors(ir, 'GHG');
     expect(result.descriptors).toEqual([
@@ -603,8 +585,8 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
       ],
       [{ kind: 'char', value: 'a' }],
     );
-    const ir = makeIR({
-      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+    const ir = makeTestIR({
+      groups: [irGroup({ nodeId: 'g1', rules: [rule] })],
     });
     const result = collectCharContributors(ir, 'a');
     // `keystrokeDisplay` still resolves (it only ever looks at `vkey`
@@ -658,9 +640,9 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
       // dk(...) any(...) > index(..., 2) shape above.
       [{ kind: 'index', storeRef: 'acuteChars', offset: 2 }],
     );
-    const ir = makeIR({
+    const ir = makeTestIR({
       stores: [inputStore, outputStore],
-      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [triggerRule, fanOutRule] }],
+      groups: [irGroup({ nodeId: 'g1', rules: [triggerRule, fanOutRule] })],
     });
     const result = collectCharContributors(ir, 'á');
     expect(result.descriptors).toEqual([
@@ -703,12 +685,9 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
       ],
       [{ kind: 'index', storeRef: 'outStore', offset: 3 }],
     );
-    const ir = makeIR({
+    const ir = makeTestIR({
       stores: [decoyStore, alignedStore, outStore],
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
-        rules: [triggerRule, fanOutRule],
-      }],
+      groups: [irGroup({ nodeId: 'g1', rules: [triggerRule, fanOutRule] })],
     });
     const result = collectCharContributors(ir, 'ź');
     const deadkeyDescriptor = result.descriptors.find((d) => d.kind === 'deadkey');
@@ -752,12 +731,9 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
       [{ kind: 'deadkey', id: 7 }, { kind: 'any', storeRef: 'baseChars' }],
       [{ kind: 'index', storeRef: 'acuteChars', offset: 2 }],
     );
-    const ir = makeIR({
+    const ir = makeTestIR({
       stores: [baseChars, acuteChars],
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
-        rules: [triggerA, triggerB, fanOutRule],
-      }],
+      groups: [irGroup({ nodeId: 'g1', rules: [triggerA, triggerB, fanOutRule] })],
     });
     const result = collectCharContributors(ir, 'á');
     const deadkeyDescriptor = result.descriptors.find((d) => d.kind === 'deadkey');
@@ -768,12 +744,9 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
 
     // Same result with the two trigger rules in the OPPOSITE order —
     // deterministic, not iteration-order-dependent.
-    const irReversed = makeIR({
+    const irReversed = makeTestIR({
       stores: [baseChars, acuteChars],
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
-        rules: [triggerB, triggerA, fanOutRule],
-      }],
+      groups: [irGroup({ nodeId: 'g1', rules: [triggerB, triggerA, fanOutRule] })],
     });
     const resultReversed = collectCharContributors(irReversed, 'á');
     const deadkeyDescriptorReversed = resultReversed.descriptors.find((d) => d.kind === 'deadkey');
@@ -791,9 +764,9 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
       [{ kind: 'any', storeRef: 'keys' }],
       [{ kind: 'index', storeRef: 'kAlphabetTable', offset: 1 }],
     );
-    const ir = makeIR({
+    const ir = makeTestIR({
       stores: [keys, alphabet],
-      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+      groups: [irGroup({ nodeId: 'g1', rules: [rule] })],
     });
     const result = collectCharContributors(ir, 'ɛ');
     expect(result.descriptors).toEqual([
@@ -821,9 +794,9 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
       [{ kind: 'any', storeRef: 'keys' }],
       [{ kind: 'index', storeRef: 'tbl2', offset: 1 }],
     );
-    const ir = makeIR({
+    const ir = makeTestIR({
       stores: [keys, tbl],
-      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+      groups: [irGroup({ nodeId: 'g1', rules: [rule] })],
     });
     const result = collectCharContributors(ir, 'a');
     expect(result.descriptors).toEqual([
@@ -855,9 +828,9 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
       [{ kind: 'any', storeRef: 'keys' }],
       [{ kind: 'index', storeRef: 'tbl2', offset: 1 }],
     );
-    const ir = makeIR({
+    const ir = makeTestIR({
       stores: [keys, tbl],
-      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+      groups: [irGroup({ nodeId: 'g1', rules: [rule] })],
     });
     const result = collectCharContributors(ir, 'a');
     expect(result.storeSlots).toEqual([{ slotId: 'sid-tbl#0', role: 'input' }]);
@@ -880,9 +853,9 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
       [{ kind: 'any', storeRef: 'keys' }],
       [{ kind: 'index', storeRef: 'tbl2', offset: 1 }],
     );
-    const ir = makeIR({
+    const ir = makeTestIR({
       stores: [keys, tbl],
-      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+      groups: [irGroup({ nodeId: 'g1', rules: [rule] })],
     });
     const result = collectCharContributors(ir, 'a');
     expect(result.descriptors).toEqual([
@@ -896,7 +869,7 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
   });
 
   it('kind "blocked": an opaque RawKmnFragment producer gets blockedReasonCode "opaque-fragment"', () => {
-    const ir = makeIR({
+    const ir = makeTestIR({
       raw: [{
         nodeId: 'frag-1',
         origin: 'imported',
@@ -921,8 +894,8 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
       [{ kind: 'vkey', name: 'K_A', modifiers: [] }],
       [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'b' }],
     );
-    const ir = makeIR({
-      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+    const ir = makeTestIR({
+      groups: [irGroup({ nodeId: 'g1', rules: [rule] })],
     });
     const result = collectCharContributors(ir, 'a');
     expect(result.descriptors).toEqual([
@@ -946,15 +919,12 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
       { kind: 'char', value: 'a' },
       { kind: 'char', value: 'ɛ' },
     ]);
-    const ir = makeIR({
+    const ir = makeTestIR({
       stores: [word],
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
-        rules: [makeRule('r-self',
+      groups: [irGroup({ nodeId: 'g1', rules: [makeRule('r-self',
           [{ kind: 'any', storeRef: 'word' }],
           [{ kind: 'index', storeRef: 'word', offset: 1 }],
-        )],
-      }],
+        )] })],
     });
     const result = collectCharContributors(ir, 'ɛ');
     expect(result.storeSlots).toEqual([{ slotId: 'sid-word#1', role: 'output' }]);
@@ -991,12 +961,9 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
       [{ kind: 'any', storeRef: 'fanout' }],
       [{ kind: 'char', value: 'z' }],
     );
-    const ir = makeIR({
+    const ir = makeTestIR({
       stores: [fanout],
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
-        rules: [outputRule, inputRule],
-      }],
+      groups: [irGroup({ nodeId: 'g1', rules: [outputRule, inputRule] })],
     });
     const result = collectCharContributors(ir, 'ɛ');
     expect(result.storeSlots).toEqual([{ slotId: 'sid-fanout#1', role: 'output' }]);
@@ -1056,9 +1023,9 @@ describe('collectCharContributors — produced vs. used (rule-level production g
       [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'bases' }],
       [{ kind: 'index', storeRef: 'combined', offset: 2 }],
     );
-    return makeIR({
+    return makeTestIR({
       stores: [bases, combined],
-      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [triggerRule, fanOutRule] }],
+      groups: [irGroup({ nodeId: 'g1', rules: [triggerRule, fanOutRule] })],
     });
   }
 
@@ -1102,9 +1069,9 @@ describe('collectCharContributors — produced vs. used (rule-level production g
       [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'bases' }],
       [{ kind: 'index', storeRef: 'combined', offset: 2 }],
     );
-    const ir = makeIR({
+    const ir = makeTestIR({
       stores: [bases, combined],
-      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [triggerRule, fanOutRule] }],
+      groups: [irGroup({ nodeId: 'g1', rules: [triggerRule, fanOutRule] })],
     });
     const result = collectCharContributors(ir, 'C');
     expect(result.storeSlots).toEqual([{ slotId: 'sid-combined#0', role: 'output' }]);
@@ -1136,9 +1103,9 @@ describe('collectCharContributors — produced vs. used (rule-level production g
       [{ kind: 'any', storeRef: 'letters' }, { kind: 'vkey', name: 'K_SPACE', modifiers: [] }],
       [{ kind: 'char', value: 'C' }],
     );
-    const ir = makeIR({
+    const ir = makeTestIR({
       stores: [letters],
-      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+      groups: [irGroup({ nodeId: 'g1', rules: [rule] })],
     });
     const result = collectCharContributors(ir, 'C');
     expect(result.storeSlotIds).toHaveLength(0);
@@ -1177,9 +1144,9 @@ describe('collectCharContributors — produced vs. used (rule-level production g
       [{ kind: 'any', storeRef: 'keys2' }],
       [{ kind: 'index', storeRef: 'tbl2', offset: 1 }],
     );
-    const ir = makeIR({
+    const ir = makeTestIR({
       stores: [keys, tbl],
-      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [rule] }],
+      groups: [irGroup({ nodeId: 'g1', rules: [rule] })],
     });
     const result = collectCharContributors(ir, 'a');
 
