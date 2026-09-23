@@ -1,37 +1,43 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, resolve } from "node:path";
-import { createVirtualFS } from "@keyboard-studio/contracts";
+import { createVirtualFS, type CompileResult } from "@keyboard-studio/contracts";
 import { compile } from "./index.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
-const minimalKmnPath = resolve(here, "__fixtures__", "minimal.kmn");
-const minimalKmn = readFileSync(minimalKmnPath, "utf8");
+const readFixture = (keyboardId: string) =>
+  readFileSync(resolve(here, "__fixtures__", `${keyboardId}.kmn`), "utf8");
+const minimalKmn = readFixture("minimal");
 
-describe("compile() — kmc-kmn pipeline against minimal.kmn fixture", () => {
-  it("produces a non-empty .kmx artifact", async () => {
+// Fixtures that must compile clean through kmc-kmn. Each is compiled once and
+// the assertions share the result.
+//   - minimal: the smallest compilable keyboard.
+//   - nfd_latin_demo: the nfd-latin reorder pattern's demo skeleton (issue
+//     #40). The pattern's demo.filled_kmn is mirrored verbatim into this
+//     fixture so the canonical mark-reorder block is proven to compile clean.
+describe.each(["minimal", "nfd_latin_demo"])("compile() — kmc-kmn pipeline against %s.kmn fixture", (keyboardId) => {
+  let result: CompileResult;
+
+  beforeAll(async () => {
     const vfs = createVirtualFS([
-      { path: "source/minimal.kmn", content: minimalKmn, isBinary: false },
+      { path: `source/${keyboardId}.kmn`, content: readFixture(keyboardId), isBinary: false },
     ]);
-    const result = await compile(vfs, "minimal");
+    result = await compile(vfs, keyboardId);
+  }, 30_000);
 
+  it("produces a non-empty .kmx artifact", () => {
     const kmx = result.artifacts.find((a) => a.filename.endsWith(".kmx"));
     expect(kmx).toBeDefined();
     expect(kmx?.sizeBytes ?? 0).toBeGreaterThan(0);
-  }, 30_000);
+  });
 
-  it("emits no error- or fatal-severity diagnostics", async () => {
-    const vfs = createVirtualFS([
-      { path: "source/minimal.kmn", content: minimalKmn, isBinary: false },
-    ]);
-    const result = await compile(vfs, "minimal");
-
+  it("emits no error- or fatal-severity diagnostics", () => {
     const blocking = result.diagnostics.filter(
       (d) => d.severity === "error" || d.severity === "fatal",
     );
     expect(blocking).toEqual([]);
-  }, 30_000);
+  });
 });
 
 // ---------------------------------------------------------------------------
