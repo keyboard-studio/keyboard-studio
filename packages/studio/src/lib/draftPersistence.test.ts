@@ -22,7 +22,7 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { DEBOUNCE_MS } from "../hooks/useDebounce.ts";
-import type { BaseKeyboard, KeyboardIR, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, IRRule, KeyboardIR, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { instantiateMinimal, makeScaffoldedIR } from "../test/draftSeeds.ts";
@@ -75,6 +75,7 @@ import {
   type DurableDraft,
 } from "./draftPersistence.ts";
 import { saveServerDraft, saveServerDraftBeacon } from "./serverDraftStore.ts";
+import { irGroup } from "@keyboard-studio/contracts/fixtures";
 
 const mockedSaveServerDraft = vi.mocked(saveServerDraft);
 const mockedSaveServerDraftBeacon = vi.mocked(saveServerDraftBeacon);
@@ -92,37 +93,21 @@ const currentDir = path.dirname(fileURLToPath(import.meta.url));
  * one that would hide the removalCapabilities re-derivation bug class).
  */
 function makeIrWithRemovableRule(): KeyboardIR {
-  return {
-    origin: "scaffolded" as const,
-    header: {
-      keyboardId: "test_keyboard",
-      name: "Test",
-      bcp47: [],
-      copyright: "",
-      version: "10.0",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores: [],
+  return makeScaffoldedIR({
+    header: { keyboardId: "test_keyboard", name: "Test" },
     groups: [
-      {
+      irGroup({
         nodeId: "group-main",
-        name: "main",
-        usingKeys: true,
-        readonly: false,
         rules: [
           {
             nodeId: "rule-s01-1",
             context: [{ kind: "vkey" as const, vkey: "K_A", modifiers: [] }],
             output: [{ kind: "char" as const, char: "a" }],
           },
-        ],
-      },
+        ] as unknown as IRRule[],
+      }),
     ],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  } as unknown as KeyboardIR;
+  });
 }
 
 // ---------------------------------------------------------------------------

@@ -29,7 +29,7 @@ import type {
   PlacementMap,
 } from "@keyboard-studio/contracts";
 import { createVirtualFS, toUPlusNotation } from "@keyboard-studio/contracts";
-import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
+import { basicKbdus, irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
 import { CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
 import { expectCurrentChar } from "../../test/currentCharChip.ts";
@@ -3510,15 +3510,11 @@ describe("buildTouchMechanismRef — explicit layer override (touch layer picker
 
 /** A rule with a single vkey context element carrying `modifiers`. */
 function makeVkeyRule(vkey: string, modifiers: string[], output: string): IRRule {
-  return {
-    nodeId: `rule:${vkey}:${modifiers.join(",") || "none"}`,
-    context: [{ kind: "vkey", name: vkey, modifiers }],
-    output: [{ kind: "char", value: output }],
-  };
+  return vkeyRule({ nodeId: `rule:${vkey}:${modifiers.join(",") || "none"}`, vkey, modifiers, output });
 }
 
 function makeIrGroup(rules: IRRule[]): IRGroup {
-  return { nodeId: "group:main", name: "main", usingKeys: true, rules, readonly: false };
+  return irGroup({ nodeId: "group:main", rules });
 }
 
 /** A desktop IR using the base layer, SHIFT, and RALT — the corpus

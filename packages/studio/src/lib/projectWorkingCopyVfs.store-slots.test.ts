@@ -19,7 +19,7 @@
 //        CONTEXT → still blocked (context-index-aligned) → warning, no crash.
 
 import { describe, it, expect } from "vitest";
-import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
+import { charStore, irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import type { IRGroup, IRRule, IRStore, StoreItem } from "@keyboard-studio/contracts";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.js";
 import { stubKmnVfs } from "../test/workingCopy.ts";
@@ -29,11 +29,7 @@ import { stubKmnVfs } from "../test/workingCopy.ts";
 // ---------------------------------------------------------------------------
 
 function makeSimpleRule(nodeId: string, vkey: string, char: string): IRRule {
-  return {
-    nodeId,
-    context: [{ kind: "vkey", name: vkey, modifiers: [] }],
-    output: [{ kind: "char", value: char }],
-  };
+  return vkeyRule({ nodeId, vkey, output: char });
 }
 
 function makeParallelRule(
@@ -53,20 +49,15 @@ function makeParallelRule(
 }
 
 function makeGroup(nodeId: string, name: string, rules: IRRule[]): IRGroup {
-  return { nodeId, name, usingKeys: true, rules, readonly: false };
+  return irGroup({ nodeId, name, rules });
 }
 
 function makeOutputStore(nodeId: string, name: string, items: StoreItem[]): IRStore {
-  return { nodeId, name, items, isSystem: false };
+  return charStore({ nodeId, name, items });
 }
 
 function makeInputStore(nodeId: string, name: string, chars: string[]): IRStore {
-  return {
-    nodeId,
-    name,
-    items: chars.map((c) => ({ kind: "char" as const, value: c })),
-    isSystem: false,
-  };
+  return charStore({ nodeId, name, chars });
 }
 
 /**

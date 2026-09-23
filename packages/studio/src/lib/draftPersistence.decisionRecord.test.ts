@@ -42,29 +42,14 @@ import {
   loadDraft,
   type DurableDraft,
 } from "./draftPersistence.ts";
+import { makeScaffoldedIR } from "../test/irFixtures.ts";
 
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
 
 function makeMinimalIr(): KeyboardIR {
-  return {
-    origin: "scaffolded" as const,
-    header: {
-      keyboardId: "hausa_std",
-      name: "Hausa",
-      bcp47: [],
-      copyright: "",
-      version: "10.0",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores: [],
-    groups: [],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  } as unknown as KeyboardIR;
+  return makeScaffoldedIR({ header: { keyboardId: "hausa_std", name: "Hausa" } });
 }
 
 function instantiate(projectId: string): void {

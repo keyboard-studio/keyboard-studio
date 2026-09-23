@@ -26,31 +26,15 @@ import { describe, it, expect } from "vitest";
 import { buildTouchLayoutJson, deriveSeedLayout, type BuildTouchLayoutJsonOpts } from "./buildTouchLayoutJson";
 import type { KeyboardIR, TouchAssignment, TouchLayoutIR, IRGroup, IRRule, Pattern } from "@keyboard-studio/contracts";
 import { touchCoverage } from "@keyboard-studio/engine";
+import { makeTestIR, type TestIROptions } from "@keyboard-studio/contracts/fixtures";
 
 // ---------------------------------------------------------------------------
 // Minimal KeyboardIR for Case A (IR path) tests.
 // Matches the shape used in scaffoldTouchLayout.test.ts.
 // ---------------------------------------------------------------------------
 
-function makeMinimalIR(overrides: Partial<KeyboardIR> = {}): KeyboardIR {
-  return {
-    origin: "imported",
-    header: {
-      keyboardId: "test_kb",
-      name: "Test KB",
-      bcp47: [],
-      copyright: "",
-      version: "1.0",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores: [],
-    groups: [],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-    ...overrides,
-  };
+function makeMinimalIR(overrides: TestIROptions = {}): KeyboardIR {
+  return makeTestIR({ header: { keyboardId: "test_kb", name: "Test KB" }, ...overrides });
 }
 
 const NO_MODS = { removals: [], placements: [] };

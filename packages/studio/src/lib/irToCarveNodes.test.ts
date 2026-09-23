@@ -28,29 +28,23 @@ import {
 } from './irToCarveNodes.ts';
 import { collectCharContributors, parseSlotId, isPlusSeparator, deriveCarveNeededSet } from '@keyboard-studio/engine';
 import { loadLangtags } from './langtagsDefaults.ts';
+import { charRule, charStore, irGroup, makeTestIR, vkeyRule } from '@keyboard-studio/contracts/fixtures';
+import type { TestIROptions } from '@keyboard-studio/contracts/fixtures';
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
 // ---------------------------------------------------------------------------
 
 function makeVkeyRule(modifiers: string[], nodeId = 'n1'): IRRule {
-  return {
-    nodeId,
-    context: [{ kind: 'vkey', name: 'K_A', modifiers }],
-    output: [{ kind: 'char', value: 'a' }],
-  };
+  return vkeyRule({ nodeId, modifiers, output: 'a' });
 }
 
 function makeCharOnlyRule(nodeId = 'n2'): IRRule {
-  return {
-    nodeId,
-    context: [{ kind: 'char', value: 'x' }],
-    output: [{ kind: 'char', value: 'y' }],
-  };
+  return charRule({ nodeId, context: 'x', output: 'y' });
 }
 
 function makeGroup(rules: IRRule[]): IRGroup {
-  return { nodeId: 'g1', name: 'main', usingKeys: true, rules, readonly: false };
+  return irGroup({ nodeId: 'g1', rules });
 }
 
 // ---------------------------------------------------------------------------
@@ -241,19 +235,16 @@ describe('groupToGlyphs modifierLayer + modifierLabel', () => {
 // ---------------------------------------------------------------------------
 
 function makeStore(name: string, nodeId: string, overrides: Partial<IRStore> = {}): IRStore {
-  return { nodeId, name, items: [], isSystem: false, ...overrides };
+  return charStore({ nodeId, name, ...overrides });
 }
 
-function makeIRWithStores(groups: IRGroup[], stores: IRStore[]): KeyboardIR {
-  return {
-    origin: 'scaffolded',
-    header: { keyboardId: '', name: '', bcp47: [], copyright: '', version: '', targets: [], storeDirectives: [] },
-    stores,
-    groups,
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  };
+/**
+ * The one IR builder for this file: an empty scaffolded IR (the same shape as
+ * irToCarveNodes' own EMPTY_IR) carrying the given groups/stores/patterns.
+ * irToCarveNodes never reads `origin` or `header`, so every suite shares it.
+ */
+function makeIR(parts: TestIROptions = {}): KeyboardIR {
+  return makeTestIR({ origin: 'scaffolded', header: { keyboardId: '', name: '', version: '' }, ...parts });
 }
 
 describe('#917 — GlyphOwner store tags via ruleStoreOwners (through groupToGlyphs)', () => {
@@ -264,7 +255,7 @@ describe('#917 — GlyphOwner store tags via ruleStoreOwners (through groupToGly
       context: [{ kind: 'any', storeRef: 'vowels' }, { kind: 'vkey', name: 'K_A', modifiers: [] }],
       output: [{ kind: 'char', value: 'á' }],
     };
-    const ir = makeIRWithStores([makeGroup([rule])], [store]);
+    const ir = makeIR({ groups: [makeGroup([rule])], stores: [store] });
     const glyphs = groupToGlyphs(makeGroup([rule]), ir, new Map(), new Set());
     expect(glyphs).toHaveLength(1);
     expect(glyphs[0]!.owners).toEqual([{ kind: 'store', nodeId: 'store#vowels', label: 'vowels' }]);
@@ -278,7 +269,7 @@ describe('#917 — GlyphOwner store tags via ruleStoreOwners (through groupToGly
       output: [{ kind: 'char', value: 'x' }, { kind: 'index', storeRef: 'comp-dia', offset: 1 }],
     };
     // outputToChar reads output[0] which is 'char' here so the glyph is displayable.
-    const ir = makeIRWithStores([makeGroup([rule])], [store]);
+    const ir = makeIR({ groups: [makeGroup([rule])], stores: [store] });
     const glyphs = groupToGlyphs(makeGroup([rule]), ir, new Map(), new Set());
     expect(glyphs).toHaveLength(1);
     expect(glyphs[0]!.owners).toEqual([{ kind: 'store', nodeId: 'store#comp-dia', label: 'comp-dia' }]);
@@ -291,7 +282,7 @@ describe('#917 — GlyphOwner store tags via ruleStoreOwners (through groupToGly
       context: [{ kind: 'vkey', name: 'K_B', modifiers: [] }],
       output: [{ kind: 'char', value: 'b' }, { kind: 'outs', storeRef: 'suffix' }],
     };
-    const ir = makeIRWithStores([makeGroup([rule])], [store]);
+    const ir = makeIR({ groups: [makeGroup([rule])], stores: [store] });
     const glyphs = groupToGlyphs(makeGroup([rule]), ir, new Map(), new Set());
     expect(glyphs).toHaveLength(1);
     expect(glyphs[0]!.owners).toEqual([{ kind: 'store', nodeId: 'store#suffix', label: 'suffix' }]);
@@ -310,7 +301,7 @@ describe('#917 — GlyphOwner store tags via ruleStoreOwners (through groupToGly
       context: [{ kind: 'any', storeRef: '&SOME_SYSTEM_STORE' }, { kind: 'vkey', name: 'K_A', modifiers: [] }],
       output: [{ kind: 'char', value: 'a' }],
     };
-    const ir = makeIRWithStores([makeGroup([rule])], [systemStore]);
+    const ir = makeIR({ groups: [makeGroup([rule])], stores: [systemStore] });
     const glyphs = groupToGlyphs(makeGroup([rule]), ir, new Map(), new Set());
     expect(glyphs).toHaveLength(1);
     expect(glyphs[0]!.owners).toBeUndefined();
@@ -327,7 +318,7 @@ describe('#917 — GlyphOwner store tags via ruleStoreOwners (through groupToGly
       context: [{ kind: 'any', storeRef: 'vowels' }, { kind: 'vkey', name: 'K_A', modifiers: [] }],
       output: [{ kind: 'char', value: 'x' }, { kind: 'index', storeRef: 'vowels', offset: 1 }],
     };
-    const ir = makeIRWithStores([makeGroup([rule])], [store]);
+    const ir = makeIR({ groups: [makeGroup([rule])], stores: [store] });
     const glyphs = groupToGlyphs(makeGroup([rule]), ir, new Map(), new Set());
     expect(glyphs).toHaveLength(1);
     expect(glyphs[0]!.owners).toEqual([{ kind: 'store', nodeId: 'store#vowels', label: 'vowels' }]);
@@ -359,7 +350,7 @@ describe('#917 — patternToGlyphs prepends a pattern owner', () => {
       reviewedBy: 'recognizer',
       reviewDate: '2026-01-01',
     } as Pattern;
-    const ir = makeIRWithStores([group], [store]);
+    const ir = makeIR({ groups: [group], stores: [store] });
     ir.recognizedPatterns = [pattern];
 
     const glyphs = patternToGlyphs(pattern, ir);
@@ -393,7 +384,7 @@ describe('#917 — patternToGlyphs prepends a pattern owner', () => {
       reviewedBy: 'recognizer',
       reviewDate: '2026-01-01',
     } as Pattern;
-    const ir = makeIRWithStores([group], []);
+    const ir = makeIR({ groups: [group] });
     ir.recognizedPatterns = [pattern];
 
     const glyphs = patternToGlyphs(pattern, ir);
@@ -418,7 +409,7 @@ describe('#917 — expandParallelStoreRule attaches store owners to slot glyphs'
       context: [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'base_vowels' }],
       output: [{ kind: 'index', storeRef: 'comp_dia', offset: 2 }],
     };
-    const ir = makeIRWithStores([makeGroup([rule])], [outputStore, baseStore]);
+    const ir = makeIR({ groups: [makeGroup([rule])], stores: [outputStore, baseStore] });
 
     const glyphs = groupToGlyphs(makeGroup([rule]), ir, new Map(), new Set());
     expect(glyphs.length).toBeGreaterThan(0);
@@ -457,19 +448,6 @@ function makePatternFixture(id: string, ownedNodeIds: string[]): Pattern {
   } as Pattern;
 }
 
-/** Minimal KeyboardIR fixture — only the fields these tests read. */
-function makeMinimalIR(groups: IRGroup[], recognizedPatterns: Pattern[] = []): KeyboardIR {
-  return {
-    origin: {} as KeyboardIR['origin'],
-    header: {} as KeyboardIR['header'],
-    stores: [],
-    groups,
-    comments: [],
-    raw: [],
-    recognizedPatterns,
-  } as unknown as KeyboardIR;
-}
-
 describe('groupToGlyphs — ownedNodeIds-only exclusion (#886 ghost chip)', () => {
   it('returns [] for a rule claimed via ownedNodes alone (ownedByPattern unset) when ownedNodeIds is passed', () => {
     // The exact drift shape #886 fixed: the rule's own ownedByPattern stamp
@@ -486,7 +464,7 @@ describe('groupToGlyphs — ownedNodeIds-only exclusion (#886 ghost chip)', () =
     };
     const group = makeGroup([ghostOwnedRule]);
     const pattern = makePatternFixture('pattern-1', ['rule#ghost-owned']);
-    const ir = makeMinimalIR([group], [pattern]);
+    const ir = makeIR({ groups: [group], recognizedPatterns: [pattern] });
 
     const ownedNodeIds = collectOwnedNodeIds(ir);
     expect(ownedNodeIds.has('rule#ghost-owned')).toBe(true);
@@ -503,7 +481,7 @@ describe('groupToGlyphs — ownedNodeIds-only exclusion (#886 ghost chip)', () =
     };
     const group = makeGroup([ghostOwnedRule]);
     const pattern = makePatternFixture('pattern-1', ['rule#ghost-owned']);
-    const ir = makeMinimalIR([group], [pattern]);
+    const ir = makeIR({ groups: [group], recognizedPatterns: [pattern] });
 
     const glyphs = patternToGlyphs(pattern, ir);
     expect(glyphs).toHaveLength(1);
@@ -535,7 +513,7 @@ describe('toRailNodes — suppresses a group node when its only rule is claimed 
     };
     const group = makeGroup([ghostOwnedRule]);
     const pattern = makePatternFixture('pattern-1', ['rule#ghost-owned']);
-    const ir = makeMinimalIR([group], [pattern]);
+    const ir = makeIR({ groups: [group], recognizedPatterns: [pattern] });
 
     const nodes = toRailNodes(ir);
     expect(nodes.filter((n) => n.kind === 'group')).toHaveLength(0);
@@ -547,14 +525,14 @@ describe('toRailNodes — suppresses a group node when its only rule is claimed 
 
 describe('collectOwnedNodeIds', () => {
   it('returns an empty set when there are no recognizedPatterns', () => {
-    const ir = makeMinimalIR([], []);
+    const ir = makeIR();
     expect(collectOwnedNodeIds(ir)).toEqual(new Set());
   });
 
   it('unions ownedNodes across multiple recognized patterns', () => {
     const patternA = makePatternFixture('pattern-a', ['rule#a1', 'rule#a2']);
     const patternB = makePatternFixture('pattern-b', ['rule#b1']);
-    const ir = makeMinimalIR([], [patternA, patternB]);
+    const ir = makeIR({ recognizedPatterns: [patternA, patternB] });
 
     const ids = collectOwnedNodeIds(ir);
     expect(ids).toEqual(new Set(['rule#a1', 'rule#a2', 'rule#b1']));
@@ -565,7 +543,7 @@ describe('collectOwnedNodeIds', () => {
       ...makePatternFixture('pattern-authored', ['rule#authored-1']),
       origin: 'authored',
     } as Pattern;
-    const ir = makeMinimalIR([], [authoredPattern]);
+    const ir = makeIR({ recognizedPatterns: [authoredPattern] });
 
     expect(collectOwnedNodeIds(ir)).toEqual(new Set());
   });
@@ -575,32 +553,18 @@ describe('collectOwnedNodeIds', () => {
 // StoreUsage.patternRefs — analyzeStoreUsage via toRailNodes
 // ---------------------------------------------------------------------------
 
-/** Minimal KeyboardIR fixture — only the fields toRailNodes reads. */
-function makeIR(overrides: Partial<KeyboardIR> = {}): KeyboardIR {
-  return {
-    origin: {} as KeyboardIR['origin'],
-    header: {} as KeyboardIR['header'],
-    stores: [],
-    groups: [],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-    ...overrides,
-  } as unknown as KeyboardIR;
-}
-
 describe('StoreUsage.patternRefs', () => {
   it('is empty when no recognized patterns exist', () => {
     const ir = makeIR({
       stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false }],
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [{
           nodeId: 'rule-1',
           context: [{ kind: 'any', storeRef: 'composed' }],
           output: [{ kind: 'char', value: 'á' }],
         }],
-      }],
+      })],
       recognizedPatterns: [],
     });
     const nodes = toRailNodes(ir);
@@ -611,15 +575,15 @@ describe('StoreUsage.patternRefs', () => {
   it('populates patternRefs when a recognized pattern owns a rule referencing the store via any()', () => {
     const ir = makeIR({
       stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false }],
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [{
           nodeId: 'rule-1',
           context: [{ kind: 'any', storeRef: 'composed' }],
           output: [{ kind: 'index', storeRef: 'comp-dia', position: 1 }],
           ownedByPattern: 'pattern-1',
         }],
-      }],
+      })],
       recognizedPatterns: [{
         id: 'pattern-1', title: 'Dead Keys', origin: 'recognized',
         ownedNodes: [{ kind: 'rule', nodeId: 'rule-1' }],
@@ -636,15 +600,15 @@ describe('StoreUsage.patternRefs', () => {
   it('populates patternRefs for the output store (index()) too', () => {
     const ir = makeIR({
       stores: [{ nodeId: 'store-2', name: 'comp-dia', items: [], isSystem: false }],
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [{
           nodeId: 'rule-1',
           context: [{ kind: 'any', storeRef: 'composed' }],
           output: [{ kind: 'index', storeRef: 'comp-dia', position: 1 }],
           ownedByPattern: 'pattern-1',
         }],
-      }],
+      })],
       recognizedPatterns: [{
         id: 'pattern-1', title: 'Dead Keys', origin: 'recognized',
         ownedNodes: [{ kind: 'rule', nodeId: 'rule-1' }],
@@ -684,10 +648,10 @@ describe('StoreUsage.patternRefs', () => {
   it('groupRefs is empty when no unowned rules reference the store', () => {
     const ir = makeIR({
       stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false }],
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [{ nodeId: 'rule-1', context: [{ kind: 'any', storeRef: 'composed' }], output: [{ kind: 'char', value: 'á' }], ownedByPattern: 'pattern-1' }],
-      }],
+      })],
       recognizedPatterns: [],
     });
     const nodes = toRailNodes(ir);
@@ -698,10 +662,10 @@ describe('StoreUsage.patternRefs', () => {
   it('populates groupRefs for unowned rules referencing the store', () => {
     const ir = makeIR({
       stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false }],
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [{ nodeId: 'rule-1', context: [{ kind: 'any', storeRef: 'composed' }], output: [{ kind: 'char', value: 'á' }] }],
-      }],
+      })],
       recognizedPatterns: [],
     });
     const nodes = toRailNodes(ir);
@@ -714,13 +678,13 @@ describe('StoreUsage.patternRefs', () => {
   it('aggregates rule count when a pattern owns multiple rules referencing the same store', () => {
     const ir = makeIR({
       stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false }],
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [
           { nodeId: 'rule-1', context: [{ kind: 'any', storeRef: 'composed' }], output: [{ kind: 'index', storeRef: 'comp-dia', position: 1 }], ownedByPattern: 'pattern-1' },
           { nodeId: 'rule-2', context: [{ kind: 'any', storeRef: 'composed' }], output: [{ kind: 'index', storeRef: 'comp-dia2', position: 1 }], ownedByPattern: 'pattern-1' },
         ],
-      }],
+      })],
       recognizedPatterns: [{
         id: 'pattern-1', title: 'Dead Keys', origin: 'recognized',
         ownedNodes: [{ kind: 'rule', nodeId: 'rule-1' }, { kind: 'rule', nodeId: 'rule-2' }],
@@ -771,14 +735,14 @@ describe('StoreUsage.patternRefs', () => {
   it('still counts a genuinely unowned rule (no ownedByPattern, not in any ownedNodes) under groupRefs', () => {
     const ir = makeIR({
       stores: [{ nodeId: 'store-1', name: 'composed', items: [], isSystem: false }],
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [{
           nodeId: 'rule-unowned',
           context: [{ kind: 'any', storeRef: 'composed' }],
           output: [{ kind: 'char', value: 'á' }],
         }],
-      }],
+      })],
       recognizedPatterns: [{
         id: 'pattern-1', title: 'Dead Keys', origin: 'recognized',
         ownedNodes: [{ kind: 'rule', nodeId: 'rule-1' }], // does not include rule-unowned
@@ -810,22 +774,22 @@ describe('crossPairTrigger', () => {
 
   it('returns undefined when the edge has no trigger (no + separator)', () => {
     const ir = makeIR({
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [{
           nodeId: 'r1',
           context: [{ kind: 'any', storeRef: 'storeA' }],
           output: [{ kind: 'index', storeRef: 'storeB', offset: 1 }],
         }],
-      }],
+      })],
     });
     expect(crossPairTrigger('storeA', 'storeB', ir)).toBeUndefined();
   });
 
   it('captures the trigger key (K_BKSP -> "Backspace") when present after the + separator', () => {
     const ir = makeIR({
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [{
           nodeId: 'r1',
           context: [
@@ -835,7 +799,7 @@ describe('crossPairTrigger', () => {
           ],
           output: [{ kind: 'index', storeRef: 'storeB', offset: 1 }],
         }],
-      }],
+      })],
     });
     expect(crossPairTrigger('storeA', 'storeB', ir)).toBe('Backspace');
     // Symmetric — works from either store's point of view.
@@ -847,8 +811,8 @@ describe('crossPairTrigger', () => {
     // Each index() resolves to its OWN store at its own offset — never a
     // word<->final cross-pair. crossPairTrigger must not invent one.
     const ir = makeIR({
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [{
           nodeId: 'r1',
           context: [
@@ -863,15 +827,15 @@ describe('crossPairTrigger', () => {
             { kind: 'index', storeRef: 'final', offset: 3 },
           ],
         }],
-      }],
+      })],
     });
     expect(crossPairTrigger('word', 'final', ir)).toBeUndefined();
   });
 
   it('deduplicates across multiple rules — the first resolved rule wins', () => {
     const ir = makeIR({
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [
           {
             nodeId: 'r1',
@@ -892,7 +856,7 @@ describe('crossPairTrigger', () => {
             output: [{ kind: 'index', storeRef: 'storeB', offset: 1 }],
           },
         ],
-      }],
+      })],
     });
     expect(crossPairTrigger('storeA', 'storeB', ir)).toBe('Backspace');
   });
@@ -1053,8 +1017,8 @@ describe('toRailNodes store pairedStoreIds / pairedStoreNames / pairedStoreTrigg
         { nodeId: 'sid-A', name: 'storeA', items: [], isSystem: false },
         { nodeId: 'sid-B', name: 'storeB', items: [], isSystem: false },
       ],
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [{
           nodeId: 'r1',
           context: [
@@ -1064,7 +1028,7 @@ describe('toRailNodes store pairedStoreIds / pairedStoreNames / pairedStoreTrigg
           ],
           output: [{ kind: 'index', storeRef: 'storeB', offset: 1 }],
         }],
-      }],
+      })],
     });
     const nodes = toRailNodes(ir);
     const nodeA = nodes.find((n) => n.name === 'storeA');
@@ -1079,8 +1043,8 @@ describe('toRailNodes store pairedStoreIds / pairedStoreNames / pairedStoreTrigg
         { nodeId: 'sid-A', name: 'storeA', items: [], isSystem: false },
         { nodeId: 'sid-B', name: 'storeB', items: [], isSystem: false },
       ],
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [{
           nodeId: 'r1',
           context: [
@@ -1090,7 +1054,7 @@ describe('toRailNodes store pairedStoreIds / pairedStoreNames / pairedStoreTrigg
           ],
           output: [{ kind: 'index', storeRef: 'storeB', offset: 1 }],
         }],
-      }],
+      })],
     });
     const nodes = toRailNodes(ir);
     const nodeB = nodes.find((n) => n.name === 'storeB');
@@ -1104,14 +1068,14 @@ describe('toRailNodes store pairedStoreIds / pairedStoreNames / pairedStoreTrigg
       stores: [
         { nodeId: 'sid-X', name: 'storeX', items: [], isSystem: false },
       ],
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [{
           nodeId: 'r1',
           context: [{ kind: 'char', value: 'a' }],
           output: [{ kind: 'char', value: 'b' }],
         }],
-      }],
+      })],
     });
     const nodes = toRailNodes(ir);
     const nodeX = nodes.find((n) => n.name === 'storeX');
@@ -1133,8 +1097,8 @@ describe('toRailNodes store pairedStoreIds / pairedStoreNames / pairedStoreTrigg
         { nodeId: 'sid-word', name: 'word', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'b' }], isSystem: false },
         { nodeId: 'sid-final', name: 'final', items: [{ kind: 'char', value: '.' }, { kind: 'char', value: '!' }], isSystem: false },
       ],
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [{
           nodeId: 'r1',
           context: [
@@ -1149,7 +1113,7 @@ describe('toRailNodes store pairedStoreIds / pairedStoreNames / pairedStoreTrigg
             { kind: 'index', storeRef: 'final', offset: 3 },
           ],
         }],
-      }],
+      })],
     });
     const nodes = toRailNodes(ir);
     const nodeWord = nodes.find((n) => n.name === 'word');
@@ -1247,23 +1211,7 @@ describe('computeStoreRoleLine', () => {
 // ---------------------------------------------------------------------------
 
 function makeChipStore(nodeId: string, name: string, items: StoreItem[], overrides: Partial<IRStore> = {}): IRStore {
-  return { nodeId, name, items, isSystem: false, ...overrides };
-}
-
-function makeChipGroup(nodeId: string, rules: IRRule[]): IRGroup {
-  return { nodeId, name: 'main', usingKeys: true, rules, readonly: false };
-}
-
-function makeChipIR(groups: IRGroup[], stores: IRStore[]): KeyboardIR {
-  return {
-    origin: 'scaffolded',
-    header: { keyboardId: '', name: '', bcp47: [], copyright: '', version: '', targets: [], storeDirectives: [] },
-    stores,
-    groups,
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  };
+  return charStore({ nodeId, name, items, ...overrides });
 }
 
 describe('storeCharChips — chip id stability + TRUE itemsIndex', () => {
@@ -1273,7 +1221,7 @@ describe('storeCharChips — chip id stability + TRUE itemsIndex', () => {
       { kind: 'vkey', name: 'K_A' },
       { kind: 'char', value: 'b' },
     ]);
-    const ir = makeChipIR([], [store]);
+    const ir = makeIR({ stores: [store] });
 
     const chips = storeCharChips(store, ir);
 
@@ -1291,7 +1239,7 @@ describe('storeCharChips — chip id stability + TRUE itemsIndex', () => {
       { kind: 'raw', text: 'nul' },
       { kind: 'deadkey', id: 1 },
     ]);
-    const ir = makeChipIR([], [store]);
+    const ir = makeIR({ stores: [store] });
     expect(storeCharChips(store, ir)).toEqual([]);
   });
 
@@ -1305,7 +1253,7 @@ describe('storeCharChips — chip id stability + TRUE itemsIndex', () => {
       context: [{ kind: 'any', storeRef: 'nonCharX' }],
       output: [{ kind: 'char', value: 'z' }],
     };
-    const ir = makeChipIR([makeChipGroup('g1', [rule])], [store]);
+    const ir = makeIR({ groups: [irGroup({ nodeId: 'g1', rules: [rule] })], stores: [store] });
 
     expect(storeCharChips(store, ir)).toEqual([]);
   });
@@ -1322,7 +1270,7 @@ describe('storeCharChips — per-class action mapping (classifyStoreSlotEdit dis
       context: [{ kind: 'any', storeRef: 'outX' }],
       output: [{ kind: 'index', storeRef: 'outX', offset: 1 }],
     };
-    const ir = makeChipIR([makeChipGroup('g1', [rule])], [outputStore]);
+    const ir = makeIR({ groups: [irGroup({ nodeId: 'g1', rules: [rule] })], stores: [outputStore] });
 
     const chips = storeCharChips(outputStore, ir);
     expect(chips).toHaveLength(2);
@@ -1339,7 +1287,7 @@ describe('storeCharChips — per-class action mapping (classifyStoreSlotEdit dis
       context: [{ kind: 'vkey', name: 'K_A', modifiers: [] }],
       output: [{ kind: 'index', storeRef: 'out2X', offset: 1 }],
     };
-    const ir = makeChipIR([makeChipGroup('g1', [rule])], [outputStore]);
+    const ir = makeIR({ groups: [irGroup({ nodeId: 'g1', rules: [rule] })], stores: [outputStore] });
 
     const chips = storeCharChips(outputStore, ir);
     expect(chips).toHaveLength(1);
@@ -1357,7 +1305,7 @@ describe('storeCharChips — per-class action mapping (classifyStoreSlotEdit dis
       context: [{ kind: 'any', storeRef: 'inX' }],
       output: [{ kind: 'char', value: 'z' }],
     };
-    const ir = makeChipIR([makeChipGroup('g1', [rule])], [inputStore]);
+    const ir = makeIR({ groups: [irGroup({ nodeId: 'g1', rules: [rule] })], stores: [inputStore] });
 
     const chips = storeCharChips(inputStore, ir);
     expect(chips).toHaveLength(2);
@@ -1369,7 +1317,7 @@ describe('storeCharChips — per-class action mapping (classifyStoreSlotEdit dis
 
   it('drop: a store entirely unreferenced by any rule maps every char chip to drop', () => {
     const unusedStore = makeChipStore('store#unused', 'unusedX', [{ kind: 'char', value: 'q' }]);
-    const ir = makeChipIR([], [unusedStore]);
+    const ir = makeIR({ stores: [unusedStore] });
 
     const chips = storeCharChips(unusedStore, ir);
     expect(chips).toHaveLength(1);
@@ -1378,7 +1326,7 @@ describe('storeCharChips — per-class action mapping (classifyStoreSlotEdit dis
 
   it('disabled (system-store): an isSystem store maps every char chip to disabled with a plain-language reason', () => {
     const systemStore = makeChipStore('store#sys', '&SYSTEM_STORE', [{ kind: 'char', value: 's' }], { isSystem: true });
-    const ir = makeChipIR([], [systemStore]);
+    const ir = makeIR({ stores: [systemStore] });
 
     const chips = storeCharChips(systemStore, ir);
     expect(chips).toHaveLength(1);
@@ -1393,7 +1341,7 @@ describe('storeCharChips — per-class action mapping (classifyStoreSlotEdit dis
       context: [{ kind: 'notany', storeRef: 'notanyX' }],
       output: [{ kind: 'char', value: 'z' }],
     };
-    const ir = makeChipIR([makeChipGroup('g1', [rule])], [store]);
+    const ir = makeIR({ groups: [irGroup({ nodeId: 'g1', rules: [rule] })], stores: [store] });
 
     const chips = storeCharChips(store, ir);
     expect(chips).toHaveLength(1);
@@ -1408,7 +1356,7 @@ describe('storeCharChips — per-class action mapping (classifyStoreSlotEdit dis
       context: [{ kind: 'index', storeRef: 'ctxIdxX', offset: 0 }],
       output: [{ kind: 'char', value: 'z' }],
     };
-    const ir = makeChipIR([makeChipGroup('g1', [rule])], [store]);
+    const ir = makeIR({ groups: [irGroup({ nodeId: 'g1', rules: [rule] })], stores: [store] });
 
     const chips = storeCharChips(store, ir);
     expect(chips).toHaveLength(1);
@@ -1429,7 +1377,7 @@ describe('storeCharChips — per-class action mapping (classifyStoreSlotEdit dis
       context: [{ kind: 'any', storeRef: 'pairedInX' }],
       output: [{ kind: 'index', storeRef: 'pairedOutX', offset: 1 }],
     };
-    const ir = makeChipIR([makeChipGroup('g1', [rule])], [inputStore, outputStore]);
+    const ir = makeIR({ groups: [irGroup({ nodeId: 'g1', rules: [rule] })], stores: [inputStore, outputStore] });
 
     const chips = storeCharChips(inputStore, ir);
     expect(chips).toHaveLength(1);
@@ -1454,7 +1402,7 @@ describe('storeCharChips — per-class action mapping (classifyStoreSlotEdit dis
       context: [{ kind: 'any', storeRef: 'dualX' }],
       output: [{ kind: 'char', value: 'z' }],
     };
-    const ir = makeChipIR([makeChipGroup('g1', [outRule, sourceRule])], [store]);
+    const ir = makeIR({ groups: [irGroup({ nodeId: 'g1', rules: [outRule, sourceRule] })], stores: [store] });
 
     const chips = storeCharChips(store, ir);
     expect(chips).toHaveLength(1);
@@ -1474,7 +1422,7 @@ describe('storeCharChips — per-class action mapping (classifyStoreSlotEdit dis
       ],
       output: [{ kind: 'index', storeRef: 'comp-dia', offset: 1 }],
     };
-    const ir = makeChipIR([makeChipGroup('g1', [rule])], [composed, compDia]);
+    const ir = makeIR({ groups: [irGroup({ nodeId: 'g1', rules: [rule] })], stores: [composed, compDia] });
 
     expect(storeCharChips(composed, ir)).toEqual([]);
     // The real output store is unaffected — still a normal drop chip.
@@ -1494,7 +1442,7 @@ describe('storeCharChips — per-class action mapping (classifyStoreSlotEdit dis
       ],
       output: [{ kind: 'raw', text: 'context' }],
     };
-    const ir = makeChipIR([makeChipGroup('g1', [rule])], [diablock]);
+    const ir = makeIR({ groups: [irGroup({ nodeId: 'g1', rules: [rule] })], stores: [diablock] });
 
     expect(storeCharChips(diablock, ir)).toEqual([]);
   });
@@ -1511,14 +1459,14 @@ describe('toRailNodes storeRoleLine', () => {
         { nodeId: 'sid-A', name: 'storeA', items: [{ kind: 'char', value: 'a' }], isSystem: false },
         { nodeId: 'sid-B', name: 'storeB', items: [{ kind: 'char', value: 'x' }], isSystem: false },
       ],
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [{
           nodeId: 'r1',
           context: [{ kind: 'any', storeRef: 'storeA' }],
           output: [{ kind: 'index', storeRef: 'storeB', offset: 1 }],
         }],
-      }],
+      })],
     });
     const nodeB = toRailNodes(ir).find((n) => n.name === 'storeB');
     expect(nodeB?.storeRoleLine).toMatch(/^Output —/);
@@ -1530,14 +1478,14 @@ describe('toRailNodes storeRoleLine', () => {
         { nodeId: 'sid-A', name: 'storeA', items: [{ kind: 'vkey', name: 'K_Q' }], isSystem: false },
         { nodeId: 'sid-B', name: 'storeB', items: [{ kind: 'char', value: 'x' }], isSystem: false },
       ],
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [{
           nodeId: 'r1',
           context: [{ kind: 'any', storeRef: 'storeA' }],
           output: [{ kind: 'index', storeRef: 'storeB', offset: 1 }],
         }],
-      }],
+      })],
     });
     const nodeA = toRailNodes(ir).find((n) => n.name === 'storeA');
     expect(nodeA?.storeRoleLine).toMatch(/keys you press/i);
@@ -1643,13 +1591,13 @@ describe('recommendedRemovalChars', () => {
 
   it('shields a surplus character when ONE of its producing rules is a deadkey-context rule (not every producer is simple)', () => {
     const ir = makeIR({
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [
           { nodeId: 'rule-simple', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: 'y' }] },
           { nodeId: 'rule-dk', context: [{ kind: 'deadkey', id: 1 }, { kind: 'char', value: 'a' }], output: [{ kind: 'char', value: 'y' }] },
         ],
-      }],
+      })],
     });
 
     const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
@@ -1667,14 +1615,14 @@ describe('recommendedRemovalChars', () => {
     // graph was built to unblock.
     const ir = makeIR({
       stores: [{ nodeId: 'store#fan', name: 'fan', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'y' }], isSystem: false } as IRStore],
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [{
           nodeId: 'rule-fanout',
           context: [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'fan' }],
           output: [{ kind: 'index', storeRef: 'fan', offset: 2 }],
         }],
-      }],
+      })],
     });
 
     const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
@@ -1685,14 +1633,14 @@ describe('recommendedRemovalChars', () => {
   it('shields a surplus character produced through an UNRESOLVED index()-output store fan-out rule (offset does not resolve to an any() context source)', () => {
     const ir = makeIR({
       stores: [{ nodeId: 'store#fan2', name: 'fan2', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'y' }], isSystem: false } as IRStore],
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [{
           nodeId: 'rule-fanout2',
           context: [{ kind: 'deadkey', id: 1 }],
           output: [{ kind: 'index', storeRef: 'fan2', offset: 1 }],
         }],
-      }],
+      })],
     });
 
     const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
@@ -1736,12 +1684,12 @@ describe('recommendedRemovalChars', () => {
       // index. The narrower guard only shields when a PAIRED store's item at
       // the SAME index is needed; S has no partner, so 'y' is not shielded.
       stores: [{ nodeId: 'store#s', name: 'S', items: [{ kind: 'char', value: 'y' }, { kind: 'char', value: 'q' }], isSystem: false } as IRStore],
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [
           { nodeId: 'rule-fill', context: [{ kind: 'any', storeRef: 'S' }], output: [{ kind: 'index', storeRef: 'S', offset: 1 }] },
         ],
-      }],
+      })],
     });
 
     const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
@@ -1764,14 +1712,14 @@ describe('recommendedRemovalChars', () => {
         { nodeId: 'store#dkf', name: 'dkf', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'b' }], isSystem: false } as IRStore,
         { nodeId: 'store#dkt', name: 'dkt', items: [{ kind: 'char', value: 'α' }, { kind: 'char', value: 'β' }], isSystem: false } as IRStore,
       ],
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [
           { nodeId: 'rule-lit-a', context: [{ kind: 'char', value: 'p' }], output: [{ kind: 'char', value: 'a' }] },
           { nodeId: 'rule-lit-b', context: [{ kind: 'char', value: 'q' }], output: [{ kind: 'char', value: 'b' }] },
           { nodeId: 'rule-fanout', context: [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'dkf' }], output: [{ kind: 'index', storeRef: 'dkt', offset: 2 }] },
         ],
-      }],
+      })],
     });
 
     const result = recommendedRemovalChars({ ir, needed: new Set(['α']) });
@@ -1866,10 +1814,10 @@ describe('recommendedRemovalChars', () => {
 
   it('is case-fold aware via isCharCoveredForLocale (French É vs needed é)', () => {
     const ir = makeIR({
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [{ nodeId: 'rule-e-acute', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: 'É' }] }],
-      }],
+      })],
     });
 
     const result = recommendedRemovalChars({ ir, needed: new Set(['é']), bcp47: 'fr' });
@@ -1891,10 +1839,10 @@ describe('recommendedRemovalChars', () => {
       ['at sign', '@'],
     ])('does not recommend a surplus %s (%s) even when absent from `needed` and produced by a simple rule', (_label, ch) => {
       const ir = makeIR({
-        groups: [{
-          nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+        groups: [irGroup({
+          nodeId: 'g1',
           rules: [{ nodeId: 'rule-1', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: ch }] }],
-        }],
+        })],
       });
 
       const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
@@ -1985,9 +1933,9 @@ describe('recommendedRemovalChars — form parameter (spec: base-plus-mark drive
 
   it('does NOT recommend a produced PRECOMPOSED char when the needed-set holds the DECOMPOSED sequence, under NFD', () => {
     const ir = makeIR({
-      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [{
+      groups: [irGroup({ nodeId: 'g1', rules: [{
         nodeId: 'rule-precomposed', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: PRECOMPOSED }],
-      }] }],
+      }]})],
     });
 
     const result = recommendedRemovalChars({ ir, needed: new Set([DECOMPOSED]), form: 'NFD' });
@@ -1997,9 +1945,9 @@ describe('recommendedRemovalChars — form parameter (spec: base-plus-mark drive
 
   it('does NOT recommend a produced DECOMPOSED sequence when the needed-set holds the PRECOMPOSED char, under NFD', () => {
     const ir = makeIR({
-      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [{
+      groups: [irGroup({ nodeId: 'g1', rules: [{
         nodeId: 'rule-decomposed', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: DECOMPOSED }],
-      }] }],
+      }]})],
     });
 
     const result = recommendedRemovalChars({ ir, needed: new Set([PRECOMPOSED]), form: 'NFD' });
@@ -2009,9 +1957,9 @@ describe('recommendedRemovalChars — form parameter (spec: base-plus-mark drive
 
   it('ready-made (NFC, the default) still recognizes a produced PRECOMPOSED char against a needed DECOMPOSED sequence as needed — existing behavior holds', () => {
     const ir = makeIR({
-      groups: [{ nodeId: 'g1', name: 'main', usingKeys: true, readonly: false, rules: [{
+      groups: [irGroup({ nodeId: 'g1', rules: [{
         nodeId: 'rule-precomposed', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: PRECOMPOSED }],
-      }] }],
+      }]})],
     });
 
     // `form` omitted entirely — must default to 'NFC', byte-identical to the
@@ -2072,10 +2020,10 @@ describe('recommendedRemovalChars — needed-implied combining mark guard (#526 
 describe('recommendedRemovalChars — blockCandidateChars (#526 AC #3)', () => {
   it('surfaces a block-candidate grapheme (composed from PlacementWorklist.blockedCombinations via composeCombo) as a candidate, tagged reason "blocked-combination", when its rule shape passes the existing guards', () => {
     const ir = makeIR({
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [{ nodeId: 'rule-blocked-combo', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: 'é' }] }],
-      }],
+      })],
     });
 
     const result = recommendedRemovalChars({
@@ -2099,10 +2047,10 @@ describe('recommendedRemovalChars — blockCandidateChars (#526 AC #3)', () => {
 
   it('shields an ATTESTED combo even when it is also passed as a blockCandidateChars entry — needed still wins (conservative default: block-candidates never bypass the surplus check)', () => {
     const ir = makeIR({
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [{ nodeId: 'rule-attested-combo', context: [{ kind: 'char', value: 'x' }], output: [{ kind: 'char', value: 'é' }] }],
-      }],
+      })],
     });
 
     // 'é' is in `needed` (e.g. an attested stack landed it in requiredPrimary)
@@ -2137,12 +2085,12 @@ describe('recommendedRemovalChars — blockCandidateChars (#526 AC #3)', () => {
 
   it('a block-candidate whose sole producer is a deadkey-context rule is still shielded — block-candidates run through the SAME allowlist rule-shielding guard, not a shortcut around it', () => {
     const ir = makeIR({
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [
           { nodeId: 'rule-dk-combo', context: [{ kind: 'deadkey', id: 1 }, { kind: 'char', value: 'a' }], output: [{ kind: 'char', value: 'é' }] },
         ],
-      }],
+      })],
     });
 
     const result = recommendedRemovalChars({
@@ -2320,8 +2268,8 @@ function makeGraveAccentIR(
       { nodeId: 'store#dkf', name: 'dkf0060', items: inputChars.map((v) => ({ kind: 'char', value: v })), isSystem: false } as IRStore,
       { nodeId: 'store#dkt', name: 'dkt0060', items: outputChars.map((v) => ({ kind: 'char', value: v })), isSystem: false } as IRStore,
     ],
-    groups: [{
-      nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+    groups: [irGroup({
+      nodeId: 'g1',
       rules: [
         ...baseRules,
         {
@@ -2330,7 +2278,7 @@ function makeGraveAccentIR(
           output: [{ kind: 'index', storeRef: 'dkt0060', offset: 2 }],
         },
       ],
-    }],
+    })],
   });
 }
 
@@ -2395,14 +2343,14 @@ function makeChainedPairIR(extraRules: IRRule[] = []): KeyboardIR {
       { nodeId: 'store#s2', name: 'S2', items: [{ kind: 'char', value: 'X' }], isSystem: false } as IRStore,
       { nodeId: 'store#s3', name: 'S3', items: [{ kind: 'char', value: 'Y' }], isSystem: false } as IRStore,
     ],
-    groups: [{
-      nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+    groups: [irGroup({
+      nodeId: 'g1',
       rules: [
         { nodeId: 'rule#1', context: [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'S1' }], output: [{ kind: 'index', storeRef: 'S2', offset: 2 }] },
         { nodeId: 'rule#2', context: [{ kind: 'deadkey', id: 2 }, { kind: 'any', storeRef: 'S2' }], output: [{ kind: 'index', storeRef: 'S3', offset: 2 }] },
         ...extraRules,
       ],
-    }],
+    })],
   });
 }
 
@@ -2441,10 +2389,10 @@ describe('collateral guard — truth table (spec 051 US2)', () => {
     // coordinatedWith is [] and the guard can never fire (invariant D5).
     const ir = makeIR({
       stores: [{ nodeId: 'store#word', name: 'word', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'ɛ' }], isSystem: false } as IRStore],
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [{ nodeId: 'rule#self', context: [{ kind: 'any', storeRef: 'word' }], output: [{ kind: 'index', storeRef: 'word', offset: 1 }] }],
-      }],
+      })],
     });
 
     const result = recommendedRemovalChars({ ir, needed: new Set(['a']) });
@@ -2458,15 +2406,15 @@ describe('collateral guard — truth table (spec 051 US2)', () => {
 
   it('G7: digits, punctuation and symbols stay shielded by isAlwaysKeepCategory', () => {
     const ir = makeIR({
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [
           { nodeId: 'rule#digit', context: [{ kind: 'vkey', name: 'K_1', modifiers: [] }], output: [{ kind: 'char', value: '1' }] },
           { nodeId: 'rule#punct', context: [{ kind: 'vkey', name: 'K_COMMA', modifiers: [] }], output: [{ kind: 'char', value: ',' }] },
           { nodeId: 'rule#symbol', context: [{ kind: 'vkey', name: 'K_4', modifiers: [] }], output: [{ kind: 'char', value: '$' }] },
           { nodeId: 'rule#letter', context: [{ kind: 'vkey', name: 'K_Z', modifiers: [] }], output: [{ kind: 'char', value: 'ʒ' }] },
         ],
-      }],
+      })],
     });
 
     const result = recommendedRemovalChars({ ir, needed: new Set(['q']) }).map((r) => r.ch);
@@ -2479,10 +2427,10 @@ describe('collateral guard — truth table (spec 051 US2)', () => {
 
   it('G8: an opaque-fragment producer is still shielded by the blocked check, BEFORE the producer test', () => {
     const ir = makeIR({
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [{ nodeId: 'rule#z', context: [{ kind: 'vkey', name: 'K_Z', modifiers: [] }], output: [{ kind: 'char', value: 'ʒ' }] }],
-      }],
+      })],
       raw: [{
         nodeId: 'raw#1',
         reason: 'if-guard',
@@ -2511,13 +2459,13 @@ describe('collateral guard — truth table (spec 051 US2)', () => {
 describe('recommendedRemovalChars — paired proposal rows (spec 051 FR-014)', () => {
   it('folds two independently-surplus case-group members into ONE row, not two', () => {
     const ir = makeIR({
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [
           { nodeId: 'rule-lower', context: [{ kind: 'vkey', name: 'K_1', modifiers: [] }], output: [{ kind: 'char', value: 'ǝ' }] },
           { nodeId: 'rule-upper', context: [{ kind: 'vkey', name: 'K_2', modifiers: [] }], output: [{ kind: 'char', value: 'Ǝ' }] },
         ],
-      }],
+      })],
     });
 
     const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
@@ -2544,13 +2492,13 @@ describe('recommendedRemovalChars — paired proposal rows (spec 051 FR-014)', (
     // while 'İ' is excluded from candidacy outright (it's the literal needed char).
     // 'İ' therefore never enters `results`, so the fold below must not pull it in.
     const ir = makeIR({
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [
           { nodeId: 'rule-lower', context: [{ kind: 'vkey', name: 'K_1', modifiers: [] }], output: [{ kind: 'char', value: 'i' }] },
           { nodeId: 'rule-upper', context: [{ kind: 'vkey', name: 'K_2', modifiers: [] }], output: [{ kind: 'char', value: 'İ' }] },
         ],
-      }],
+      })],
     });
 
     const result = recommendedRemovalChars({ ir, needed: new Set(['İ']), bcp47: 'tr' });
@@ -2562,10 +2510,10 @@ describe('recommendedRemovalChars — paired proposal rows (spec 051 FR-014)', (
 
   it('leaves an ordinary, non-paired surplus character unchanged (existing behaviour)', () => {
     const ir = makeIR({
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [{ nodeId: 'rule-z', context: [{ kind: 'vkey', name: 'K_Z', modifiers: [] }], output: [{ kind: 'char', value: 'ʒ' }] }],
-      }],
+      })],
     });
 
     const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
@@ -2576,13 +2524,13 @@ describe('recommendedRemovalChars — paired proposal rows (spec 051 FR-014)', (
 
   it("merges BOTH case-group members' contributors into the folded survivor row (#526 fix 2 — cascadeDelete must drop both cases, not just the survivor's)", () => {
     const ir = makeIR({
-      groups: [{
-        nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+      groups: [irGroup({
+        nodeId: 'g1',
         rules: [
           { nodeId: 'rule-lower', context: [{ kind: 'vkey', name: 'K_1', modifiers: [] }], output: [{ kind: 'char', value: 'ǝ' }] },
           { nodeId: 'rule-upper', context: [{ kind: 'vkey', name: 'K_2', modifiers: [] }], output: [{ kind: 'char', value: 'Ǝ' }] },
         ],
-      }],
+      })],
     });
 
     const result = recommendedRemovalChars({ ir, needed: new Set(['q']) });
@@ -2611,14 +2559,14 @@ describe('recommendedRemovalChars — paired proposal rows (spec 051 FR-014)', (
 /** Rules producing exactly `chars`, one key each — every char is independently trimmable. */
 function makeCharsIR(chars: string[]): KeyboardIR {
   return makeIR({
-    groups: [{
-      nodeId: 'g1', name: 'main', usingKeys: true, readonly: false,
+    groups: [irGroup({
+      nodeId: 'g1',
       rules: chars.map((c, i) => ({
         nodeId: `rule#${i}`,
         context: [{ kind: 'vkey' as const, name: `K_${i}`, modifiers: [] }],
         output: [{ kind: 'char' as const, value: c }],
       })),
-    }],
+    })],
   });
 }
 
@@ -2681,10 +2629,7 @@ describe('keySequenceLabel — deadkey-combination rule (#1399 follow-on)', () =
       context: [{ kind: 'deadkey', id: 1 }, { kind: 'deadkey', id: 2 }],
       output: [{ kind: 'char', value: 'e' }],
     };
-    const ir = makeIRWithStores(
-      [makeGroup([trigger1, trigger2]), { nodeId: 'g2', name: 'deadkeys', usingKeys: true, rules: [bodyRule], readonly: false }],
-      [],
-    );
+    const ir = makeIR({ groups: [makeGroup([trigger1, trigger2]), irGroup({ nodeId: 'g2', name: 'deadkeys', rules: [bodyRule] })] });
 
     expect(keySequenceLabel(bodyRule, ir)).toEqual(['a', 'b']);
   });
@@ -2697,10 +2642,7 @@ describe('keySequenceLabel — deadkey-combination rule (#1399 follow-on)', () =
       context: [{ kind: 'deadkey', id: 1 }, { kind: 'raw', text: '+' }, { kind: 'deadkey', id: 2 }],
       output: [{ kind: 'char', value: 'e' }],
     };
-    const ir = makeIRWithStores(
-      [makeGroup([trigger1, trigger2]), { nodeId: 'g2', name: 'deadkeys', usingKeys: true, rules: [bodyRule], readonly: false }],
-      [],
-    );
+    const ir = makeIR({ groups: [makeGroup([trigger1, trigger2]), irGroup({ nodeId: 'g2', name: 'deadkeys', rules: [bodyRule] })] });
 
     expect(keySequenceLabel(bodyRule, ir)).toEqual(['a', 'b']);
   });
@@ -2713,10 +2655,7 @@ describe('keySequenceLabel — deadkey-combination rule (#1399 follow-on)', () =
       context: [{ kind: 'deadkey', id: 1 }, { kind: 'deadkey', id: 2 }],
       output: [{ kind: 'char', value: 'e' }],
     };
-    const ir = makeIRWithStores(
-      [makeGroup([trigger1]), { nodeId: 'g2', name: 'deadkeys', usingKeys: true, rules: [bodyRule], readonly: false }],
-      [],
-    );
+    const ir = makeIR({ groups: [makeGroup([trigger1]), irGroup({ nodeId: 'g2', name: 'deadkeys', rules: [bodyRule] })] });
 
     expect(keySequenceLabel(bodyRule, ir)).toBeUndefined();
   });
@@ -2737,10 +2676,7 @@ describe('keySequenceLabel — deadkey-combination rule (#1399 follow-on)', () =
       context: [{ kind: 'deadkey', id: 1 }, { kind: 'deadkey', id: 2 }],
       output: [{ kind: 'char', value: 'e' }],
     };
-    const ir = makeIRWithStores(
-      [makeGroup([trigger1, trigger2]), { nodeId: 'g2', name: 'deadkeys', usingKeys: true, rules: [bodyRule], readonly: false }],
-      [],
-    );
+    const ir = makeIR({ groups: [makeGroup([trigger1, trigger2]), irGroup({ nodeId: 'g2', name: 'deadkeys', rules: [bodyRule] })] });
 
     expect(keySequenceLabel(bodyRule, ir)).toEqual(['x', 'y']);
   });
@@ -2755,10 +2691,7 @@ describe('keySequenceLabel — deadkey-combination rule (#1399 follow-on)', () =
       context: [{ kind: 'raw', text: "platform('hardware')" }, { kind: 'deadkey', id: 1 }, { kind: 'deadkey', id: 1 }],
       output: [{ kind: 'char', value: 'e' }],
     };
-    const ir = makeIRWithStores(
-      [makeGroup([trigger1]), { nodeId: 'g2', name: 'deadkeys', usingKeys: true, rules: [bodyRule], readonly: false }],
-      [],
-    );
+    const ir = makeIR({ groups: [makeGroup([trigger1]), irGroup({ nodeId: 'g2', name: 'deadkeys', rules: [bodyRule] })] });
 
     expect(keySequenceLabel(bodyRule, ir)).toEqual(['a', 'a']);
   });
@@ -2802,13 +2735,10 @@ describe('keySequenceLabel — a touch-only trigger never shadows a resolvable d
       context: [{ kind: 'deadkey', id: 1 }],
       output: [{ kind: 'char', value: 'e' }],
     };
-    const ir = makeIRWithStores(
-      [
+    const ir = makeIR({ groups: [
         makeGroup([desktopTrigger, touchOnlyTrigger]),
-        { nodeId: 'g2', name: 'deadkeys', usingKeys: true, rules: [bodyRule], readonly: false },
-      ],
-      [],
-    );
+        irGroup({ nodeId: 'g2', name: 'deadkeys', rules: [bodyRule] }),
+      ] });
 
     expect(keySequenceLabel(bodyRule, ir)).toEqual(['Shift + a']);
   });
@@ -2824,13 +2754,10 @@ describe('keySequenceLabel — a touch-only trigger never shadows a resolvable d
       context: [{ kind: 'deadkey', id: 1 }],
       output: [{ kind: 'char', value: 'e' }],
     };
-    const ir = makeIRWithStores(
-      [
+    const ir = makeIR({ groups: [
         makeGroup([touchOnlyTrigger]),
-        { nodeId: 'g2', name: 'deadkeys', usingKeys: true, rules: [bodyRule], readonly: false },
-      ],
-      [],
-    );
+        irGroup({ nodeId: 'g2', name: 'deadkeys', rules: [bodyRule] }),
+      ] });
 
     // No desktop candidate exists at all — falls back to the touch-only
     // candidate, which still can't be labelled, so the sequence stays
@@ -2858,7 +2785,7 @@ describe('charProducers — partial-cluster inclusion is excluded, not a phantom
       context: [{ kind: 'vkey', name: 'K_A', modifiers: ['SHIFT'] }],
       output: [{ kind: 'char', value: 'a' }],
     };
-    const ir = makeIRWithStores([makeGroup([clusterRule, realRule])], []);
+    const ir = makeIR({ groups: [makeGroup([clusterRule, realRule])] });
 
     expect(charProducers(ir, 'a')).toEqual([{ steps: ['Shift + a'] }]);
   });
@@ -2869,7 +2796,7 @@ describe('charProducers — partial-cluster inclusion is excluded, not a phantom
       context: [{ kind: 'vkey', name: 'K_X', modifiers: [] }],
       output: [{ kind: 'char', value: 'abcd' }],
     };
-    const ir = makeIRWithStores([makeGroup([clusterRule])], []);
+    const ir = makeIR({ groups: [makeGroup([clusterRule])] });
 
     expect(charProducers(ir, 'b')).toEqual([]);
   });
@@ -2895,7 +2822,7 @@ describe('charProducers — a touch-only (T_xxxx) trigger vkey is dropped, never
       context: [{ kind: 'vkey', name: 'T_003B', modifiers: [] }],
       output: [{ kind: 'char', value: ';' }],
     };
-    const ir = makeIRWithStores([makeGroup([desktopRule, touchRule])], []);
+    const ir = makeIR({ groups: [makeGroup([desktopRule, touchRule])] });
 
     expect(charProducers(ir, ';')).toEqual([{ steps: ['AltGr + ;'] }]);
   });
@@ -2906,7 +2833,7 @@ describe('charProducers — a touch-only (T_xxxx) trigger vkey is dropped, never
       context: [{ kind: 'vkey', name: 'T_0300', modifiers: [] }],
       output: [{ kind: 'char', value: '̀' }],
     };
-    const ir = makeIRWithStores([makeGroup([touchOnlyRule])], []);
+    const ir = makeIR({ groups: [makeGroup([touchOnlyRule])] });
 
     expect(charProducers(ir, '̀')).toEqual([]);
   });
@@ -2977,14 +2904,11 @@ describe('charProducers <-> collectCharContributors parity (no unguarded drift b
   const touchOnly: IRRule = { nodeId: 'r-touch', context: [{ kind: 'vkey', name: 'T_0057', modifiers: [] }], output: [{ kind: 'char', value: 'w' }] };
   const selfPerm: IRRule = { nodeId: 'r-selfperm', context: [{ kind: 'any', storeRef: 'perm' }], output: [{ kind: 'index', storeRef: 'perm', offset: 1 }] };
 
-  const parityIR = makeIRWithStores(
-    [makeGroup([dkTrigger, fanout, literal1, literal2, touchOnly, selfPerm])],
-    [
+  const parityIR = makeIR({ groups: [makeGroup([dkTrigger, fanout, literal1, literal2, touchOnly, selfPerm])], stores: [
       makeStore('dkf', 'store#dkf', { items: ['a', 'i', 'u'].map((v) => ({ kind: 'char' as const, value: v })) }),
       makeStore('dkt', 'store#dkt', { items: ['á', 'í', 'ú'].map((v) => ({ kind: 'char' as const, value: v })) }),
       makeStore('perm', 'store#perm', { items: ['x', 'y', 'z'].map((v) => ({ kind: 'char' as const, value: v })) }),
-    ],
-  );
+    ] });
 
   /**
    * Structural replica of tryProduceStoreMatch's self-permutation guard

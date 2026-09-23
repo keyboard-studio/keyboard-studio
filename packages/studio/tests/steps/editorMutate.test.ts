@@ -16,7 +16,7 @@
 
 import { describe, it, expect } from "vitest";
 import { formatIRPath } from "@keyboard-studio/contracts";
-import { makeTestIR, makeCharStore } from "@keyboard-studio/contracts/fixtures";
+import { irGroup, makeCharStore, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import type {
   IRGroup,
   IRPath,
@@ -43,15 +43,11 @@ import { applyMutatePatch, MutatePatchContainmentError } from "../../src/steps/m
 // ---------------------------------------------------------------------------
 
 function rule(nodeId: string): IRRule {
-  return {
-    nodeId,
-    context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
-    output: [{ kind: "char", value: "a" }],
-  };
+  return vkeyRule({ nodeId, output: "a" });
 }
 
 function group(nodeId: string, name: string, rules: IRRule[]): IRGroup {
-  return { nodeId, name, usingKeys: true, rules, readonly: false };
+  return irGroup({ nodeId, name, rules });
 }
 
 function carveIR(): KeyboardIR {
