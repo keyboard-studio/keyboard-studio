@@ -23,7 +23,7 @@ import { escapeHtml } from "../shared/escapeHtml.js";
  * Derived from the emitted `.kmn`'s `&TARGETS` store (what kmc actually reads),
  * not from `BaseKeyboard.targets` — the two can diverge during scaffolding/import.
  */
-const KMW_JS_TARGETS = new Set([
+export const KMW_JS_TARGETS: ReadonlySet<string> = new Set([
   "any",
   "web",
   "mobile",
