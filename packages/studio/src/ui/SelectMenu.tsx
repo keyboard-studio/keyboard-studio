@@ -597,7 +597,15 @@ export function SelectMenu({
         onClick={() => setOpen((prev) => !prev)}
         onKeyDown={handleTriggerKeyDown}
       >
-        <span>{selectedOption !== undefined ? renderOptionLabel(selectedOption) : ""}</span>
+        {/* flexGrow + minWidth: 0 let the label take exactly the width the
+            trigger has, rather than its content's width, so a caller that
+            lets the trigger shrink can ellipsize inside it — see
+            CurrentKeyboardIndicator.tsx. No visible change elsewhere: the
+            arrow was already pushed to the far edge by space-between, and a
+            label narrower than the trigger is laid out as before. */}
+        <span style={{ flexGrow: 1, minWidth: 0 }}>
+          {selectedOption !== undefined ? renderOptionLabel(selectedOption) : ""}
+        </span>
         <span aria-hidden="true">&#9662;</span>
       </button>
       {open &&

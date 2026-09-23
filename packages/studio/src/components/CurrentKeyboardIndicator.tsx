@@ -83,6 +83,7 @@ import { switchActiveProject } from "../lib/switchActiveProject.ts";
 import { SelectMenu, type SelectMenuOption } from "../ui/SelectMenu.tsx";
 
 const LABEL_ID = "nav-current-keyboard-label";
+const SELECT_ID = "nav-current-keyboard-select";
 
 /**
  * Sentinel option value for the fixed "Manage all keyboards…" row. Never a
@@ -101,31 +102,55 @@ const MANAGE_ALL_VALUE = "__manage-all__";
 const UNKEYED_CURRENT_VALUE = "__current-unkeyed__";
 
 /**
- * Caps the visible label so this control plus the four other NavBar right-
- * group controls (and the tab row it now sits beside — see the insertion
- * diff) never wrap or overflow NavBar's hard `height: 48`. Same "cap +
- * ellipsis" convention as `StudioFooter.tsx`'s project-label span, sized for
- * a compact NavBar slot rather than a full-width footer.
+ * The label's width cap when the NavBar has room. Same "cap + ellipsis"
+ * convention as `StudioFooter.tsx`'s project-label span, sized for a compact
+ * NavBar slot rather than a full-width footer.
  */
 const MAX_LABEL_WIDTH = 180;
 
 /**
- * Ellipsizes a (possibly long) keyboard name to `MAX_LABEL_WIDTH`, with the
- * full name available as a tooltip (`title`). Used for BOTH the trigger's
- * current-value display and every open-list row via `renderOptionLabel`, so
- * a long name never blows out either the collapsed control or the popup.
+ * The trigger's width when the NavBar has room: the label cap plus the
+ * trigger's padding, gap and disclosure arrow.
+ */
+const SELECT_WIDTH = MAX_LABEL_WIDTH + 40;
+
+/**
+ * How far the trigger may SHRINK when the NavBar is tight, before the bar
+ * wraps instead (see NavBar in StudioShell.tsx). The trigger used to be a
+ * fixed 220px in a bar that could neither shrink nor wrap: at a 1280px
+ * viewport it painted over the tab row and intercepted clicks on the Studio
+ * tab. This floor still shows a recognisable prefix of the name with an
+ * ellipsis; the full name stays in the trigger's accessible name (see
+ * `ariaLabelledby` below) and in the `title` tooltip.
+ */
+const SELECT_MIN_WIDTH = 120;
+
+/**
+ * Ellipsizes a (possibly long) keyboard name to whatever width its row or
+ * trigger has, with the full name available as a tooltip (`title`). Used for
+ * BOTH the trigger's current-value display and every open-list row via
+ * `renderOptionLabel`, so a long name never blows out either the collapsed
+ * control or the popup (whose width is the trigger's). Ellipsis is visual
+ * only: the full text stays in the DOM, so the accessible name is never
+ * truncated.
+ *
+ * `width: 0` + `minWidth: 100%` is what lets the trigger shrink at all: it
+ * zeroes the label's INTRINSIC width (the width the NavBar's flex layout
+ * reads when deciding whether the bar fits), while still laying the label
+ * out across the full width it is actually given. With the text's own width
+ * as its minimum, the trigger could never get narrower than the name.
  */
 function truncatedLabel(text: string): ReactNode {
   return (
     <span
       title={text}
       style={{
-        display: "inline-block",
-        maxWidth: MAX_LABEL_WIDTH,
+        display: "block",
+        width: 0,
+        minWidth: "100%",
         overflow: "hidden",
         textOverflow: "ellipsis",
         whiteSpace: "nowrap",
-        verticalAlign: "bottom",
       }}
     >
       {text}
@@ -229,32 +254,51 @@ export function CurrentKeyboardIndicator() {
       style={{
         display: "inline-flex",
         alignItems: "center",
+        flex: "1 1 auto",
+        minWidth: 0,
         gap: 6,
         fontSize: 13,
         color: "var(--app-text)",
         fontFamily: "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif",
       }}
     >
-      <span id={LABEL_ID}>
+      <span id={LABEL_ID} style={{ whiteSpace: "nowrap" }}>
         <Trans id="nav.currentKeyboard.label">Keyboard</Trans>
       </span>
-      <SelectMenu
-        id="nav-current-keyboard-select"
-        ariaLabelledby={LABEL_ID}
-        value={currentProjectKey}
-        onChange={handleChange}
-        options={options}
-        renderOptionLabel={(opt) => truncatedLabel(opt.label)}
-        style={{ width: MAX_LABEL_WIDTH + 40 }}
-        // onChange here resumes a different project and navigates — a real
-        // side effect, not just picking a value (see SelectMenu.tsx's
-        // commitMode doc comment). SelectMenu's default "onHighlight" mode
-        // (selection-follows-focus) would resume/navigate on every single
-        // ArrowDown/ArrowUp keypress before the user ever committed — opt
-        // into "onExplicitSelect" so arrow keys only move the highlight and
-        // the switch only happens on Enter/Space/click.
-        commitMode="onExplicitSelect"
-      />
+      {/* The flex item that actually sizes the trigger (which fills it):
+          grows to SELECT_WIDTH when the NavBar has room, shrinks to
+          SELECT_MIN_WIDTH when it doesn't. */}
+      <span
+        style={{
+          display: "block",
+          flex: "1 1 auto",
+          minWidth: SELECT_MIN_WIDTH,
+          maxWidth: SELECT_WIDTH,
+        }}
+      >
+        <SelectMenu
+          id={SELECT_ID}
+          // Label first, then the trigger itself (APG "button + listbox"
+          // naming): the accessible name is "Keyboard <full current name>", so
+          // a screen-reader user hears which keyboard this is even when the
+          // visible text is ellipsized, and the visible label still leads the
+          // name (2.5.3 Label in Name).
+          ariaLabelledby={`${LABEL_ID} ${SELECT_ID}`}
+          value={currentProjectKey}
+          onChange={handleChange}
+          options={options}
+          renderOptionLabel={(opt) => truncatedLabel(opt.label)}
+          style={{ width: "100%", minWidth: 0 }}
+          // onChange here resumes a different project and navigates — a real
+          // side effect, not just picking a value (see SelectMenu.tsx's
+          // commitMode doc comment). SelectMenu's default "onHighlight" mode
+          // (selection-follows-focus) would resume/navigate on every single
+          // ArrowDown/ArrowUp keypress before the user ever committed — opt
+          // into "onExplicitSelect" so arrow keys only move the highlight and
+          // the switch only happens on Enter/Space/click.
+          commitMode="onExplicitSelect"
+        />
+      </span>
     </span>
   );
 }
