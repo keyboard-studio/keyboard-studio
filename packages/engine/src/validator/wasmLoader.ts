@@ -85,8 +85,11 @@ class KmnCompilerOracleHandle implements WasmOracleHandle {
         const codeSym = String(
           message.code ?? message.errorCode ?? "UNKNOWN"
         );
-        const line =
-          typeof message.lineNumber === "number" ? message.lineNumber : 0;
+        // kmc-kmn's CompilerEvent names the field `line`; `lineNumber` is the
+        // raw kmcmplib callback's name, which kmc-kmn renames before
+        // reporting (same mapping as compiler/index.ts).
+        const lineRaw = message.line ?? message.lineNumber;
+        const line = typeof lineRaw === "number" ? lineRaw : 0;
         findings.push({
           kmcmpCode: codeSym,
           line,
