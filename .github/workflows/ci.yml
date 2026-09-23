@@ -25,6 +25,11 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  # Pinned commit of keyboard-studio/keyboards (master) that the corpus-gated
+  # tests run against — see the corpus checkout step.
+  KEYBOARDS_CORPUS_SHA: 435f82d69bfc926eb03c2d8632571b41b6da3266
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -35,6 +40,39 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      # The corpus-gated unit tests (codec round-trip, carveViaSplice corpus
+      # sweep, recognizer integration, touch fixtures, facet-index real-corpus
+      # slice, ...) look for a sibling `../keyboards` clone next to the repo
+      # root and `skipIf` it is absent — so without this step ~55 of them
+      # silently skip on every run. Same sparse + shallow inputs as
+      # supportability-scan.yml, but PINNED to one commit of the
+      # keyboard-studio/keyboards fork so CI tests one known corpus rather
+      # than whatever master is today. Bump KEYBOARDS_CORPUS_SHA deliberately
+      # (and re-run the corpus tests locally against it) when the fork moves.
+      - name: Checkout keyboard-studio/keyboards corpus (pinned, release/ only, shallow)
+        uses: actions/checkout@v4
+        with:
+          repository: keyboard-studio/keyboards
+          ref: ${{ env.KEYBOARDS_CORPUS_SHA }}
+          path: .keyboards
+          fetch-depth: 1
+          sparse-checkout: release
+          sparse-checkout-cone-mode: true
+          persist-credentials: false
+
+      # actions/checkout can only write inside the workspace, so move the tree
+      # to the sibling path the tests resolve (`<repo>/../keyboards`). Moving
+      # (not symlinking) keeps it out of the workspace, so no repo-wide walker
+      # (lint, depcruise, vitest globs) ever sees 900 foreign keyboards.
+      # KEYBOARDS_REPO points the studio postbuild (build-keyboards-index.mjs)
+      # and vite.config.ts at the same pinned tree, so the build no longer
+      # clones keyboards master into node_modules/.cache on every run.
+      - name: Place corpus at ../keyboards
+        run: |
+          corpus="$(dirname "$GITHUB_WORKSPACE")/keyboards"
+          mv "$GITHUB_WORKSPACE/.keyboards" "$corpus"
+          echo "KEYBOARDS_REPO=$corpus" >> "$GITHUB_ENV"
 
       - name: Set up pnpm
         # Version comes from package.json "packageManager" (pnpm@9.12.0).
