@@ -149,22 +149,32 @@ function normalizeSuffix(raw: string): string {
 
 /**
  * Translate a raw kmcmplib code that isn't in CODE_MAP. Severity is
- * derived from the upstream prefix (FATAL_/ERROR_/WARN_/HINT_/INFO_);
- * INFO_ is downgraded to "hint" because Layer A must not emit "info"
- * (see packages/contracts/src/lintFinding.ts:10-12).
+ * derived from the upstream prefix (FATAL_/ERROR_/WARN_/HINT_/INFO_); a code
+ * with no recognizable prefix (a number no upstream table names) uses
+ * `decodedSeverity` — the severity decoded from its numeric code — when
+ * given, else "hint". INFO is downgraded to "hint" because Layer A must not
+ * emit "info" (see packages/contracts/src/lintFinding.ts:10-12).
  *
  * The resulting LintCode embeds "KMCMP" so passthrough findings are
  * visually distinct in tools and logs.
  */
-export function translatePassthrough(kmcmpCode: string): Omit<CodeMapEntry, "group"> {
+export function translatePassthrough(
+  kmcmpCode: string,
+  decodedSeverity?: LintSeverity,
+): Omit<CodeMapEntry, "group"> {
   const match = /^(FATAL|ERROR|WARN|HINT|INFO)_(.*)$/.exec(kmcmpCode);
   const suffix = match
     ? normalizeSuffix(match[2] ?? "")
     : normalizeSuffix(kmcmpCode);
   const safeSuffix = suffix.length > 0 ? suffix : "UNKNOWN";
 
+  if (!match && decodedSeverity !== undefined && decodedSeverity !== "info") {
+    const prefix = { fatal: "KM_FATAL", error: "KM_ERROR", warning: "KM_WARN", hint: "KM_HINT" }[decodedSeverity];
+    return { code: `${prefix}_KMCMP_${safeSuffix}` as LintCode, severity: decodedSeverity };
+  }
+
   if (!match) {
-    // No recognizable prefix — default to hint (safest, non-blocking).
+    // No recognizable prefix or decoded severity — default to hint (safest, non-blocking).
     return {
       code: `KM_HINT_KMCMP_${safeSuffix}`,
       severity: "hint",
@@ -224,7 +234,7 @@ export function translateWasmFinding(
     return { finding, group: entry.group };
   }
 
-  const passthrough = translatePassthrough(raw.kmcmpCode);
+  const passthrough = translatePassthrough(raw.kmcmpCode, raw.severity);
   const finding: LintFinding = {
     code: passthrough.code,
     severity: passthrough.severity,

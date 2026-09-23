@@ -33,6 +33,9 @@ interface CarveGalleryV2Props {
 
 type GroupBy = 'category' | 'source';
 
+/** Names the scrollable character-details region (see the aside below). */
+const DETAILS_HEADING_ID = 'carve-details-heading';
+
 const GROUP_HINTS: Record<string, string> = {
   'basic-letter': 'Plain A-Z letters, typed directly.',
   'special-letter': 'Extra letters for this script, often reached via AltGr or a special layer.',
@@ -750,10 +753,37 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
 
       {/* Two-panel body */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        {/* Left aside — Character details */}
-        <div style={{ width: 290, flexShrink: 0, borderRight: '1px solid var(--app-border)', padding: 18, overflowY: 'auto' }}>
-          <div style={{ font: '600 10.5px/1 var(--app-font)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--app-text-subtle)', marginBottom: 12 }}>
-            Character details
+        {/* Left aside — Character details.
+            role="region" + tabIndex={0}: this panel is a SCROLL CONTAINER
+            (overflowY: auto) whose content is read-only (#1619 AC2: no
+            discard/restore control lives here), so it has no focusable
+            descendant a keyboard user could Tab to and then scroll from.
+            Whenever the details overflow the pane (a short viewport, a
+            taller top bar, a character with several ways to type it) it was
+            reachable by pointer only: WCAG 2.1.1, axe's
+            `scrollable-region-focusable`. Same fix as KmnSourceView.tsx: a
+            named region a keyboard user deliberately enters to scroll. The
+            name comes from the panel's own visible heading (aria-labelledby,
+            so Label in Name holds), and that heading is now in the lingui
+            catalog. ks-focus-ring gives the tab stop the app-wide visible
+            focus treatment.
+            `jsx-a11y/no-noninteractive-tabindex` is a heuristic about
+            interactive widgets with no notion of scroll containers; it and
+            the WCAG requirement genuinely disagree here, hence the scoped
+            disable (block form: the rule reports on the tabIndex attribute
+            line, which a next-line directive above the tag does not reach). */}
+        {/* eslint-disable jsx-a11y/no-noninteractive-tabindex */}
+        <div
+          role="region"
+          aria-labelledby={DETAILS_HEADING_ID}
+          tabIndex={0}
+          className="ks-focus-ring"
+          data-testid="carve-details"
+          style={{ width: 290, flexShrink: 0, borderRight: '1px solid var(--app-border)', padding: 18, overflowY: 'auto' }}
+        >
+          {/* eslint-enable jsx-a11y/no-noninteractive-tabindex */}
+          <div id={DETAILS_HEADING_ID} style={{ font: '600 10.5px/1 var(--app-font)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--app-text-subtle)', marginBottom: 12 }}>
+            <Trans id="carve.details.heading">Character details</Trans>
           </div>
           {selectedCell === undefined ? (
             <p style={{ fontSize: 13, color: 'var(--app-text-muted)' }}>No characters to show.</p>

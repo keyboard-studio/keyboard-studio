@@ -546,6 +546,30 @@ export async function driveMarksSeries(page: Page): Promise<void> {
 }
 
 /**
+ * Carve gallery (CarveGalleryV2) — discard ONE character the base produces.
+ *
+ * Cells are addressed by their accessible name, which carries the U+XXXX
+ * codepoint label (CarveGalleryV2's CharacterCellButton), exactly as
+ * carve.spec.ts does. A character can render twice (in a "suggested to
+ * discard" group AND in the main grid) and both copies share one discard
+ * state, so the first match is clicked and every copy must then read
+ * aria-pressed="true". Does NOT click carve-continue — the caller owns that.
+ */
+export async function carveCharacter(page: Page, ch: string): Promise<void> {
+  const label = [...ch]
+    .map((c) => "U+" + (c.codePointAt(0) ?? 0).toString(16).toUpperCase().padStart(4, "0"))
+    .join(" ");
+  const cells = page.getByTestId("carve-gallery").locator(`button[aria-label*="— ${label}"]`);
+  await expect(cells.first()).toBeVisible({ timeout: 30_000 });
+  await expect(cells.first()).toHaveAttribute("aria-pressed", "false");
+  await cells.first().click();
+  const count = await cells.count();
+  for (let i = 0; i < count; i++) {
+    await expect(cells.nth(i)).toHaveAttribute("aria-pressed", "true");
+  }
+}
+
+/**
  * Mechanisms step — handle the empty-diff exit when no new characters
  * remain after base-inventory comparison.
  *
@@ -564,6 +588,14 @@ export async function confirmMechanismsEmpty(page: Page): Promise<void> {
 
   await expect(page.getByText("No new characters to add.")).toBeVisible({ timeout: 15_000 });
   await page.getByTestId("mechanisms-continue").click();
+}
+
+/** A real key placement for driveMechanismsGallery's `opts.placements`. */
+export interface MechanismPlacement {
+  /** Physical key the character is assigned to, e.g. "K_A". */
+  key: string;
+  /** Modifier layers for the combo, e.g. ["RALT"]; empty/absent = base layer. */
+  layers?: readonly string[];
 }
 
 /**
@@ -612,8 +644,19 @@ export async function confirmMechanismsEmpty(page: Page): Promise<void> {
  * prove a SPECIFIC placed letter landed correctly do so from the emitted
  * output (the .kmn/.keyman-touch-layout ZIP contents), not from an assertion
  * made mid-gallery.
+ *
+ * `opts.placements` pins a REAL key placement for named characters instead of
+ * the generic default/fallback: for a listed character the driver uses the
+ * "Assign to a key" card (the per-character default method) — picks the
+ * physical key, adds each modifier layer in order, and applies. A walk that
+ * must prove a genuinely new letter is typeable from a real key (not a
+ * synthetic sequence) names it here; every other character in the worklist
+ * still takes the generic path above.
  */
-export async function driveMechanismsGallery(page: Page): Promise<void> {
+export async function driveMechanismsGallery(
+  page: Page,
+  opts: { placements?: Readonly<Record<string, MechanismPlacement>> } = {},
+): Promise<void> {
   // NOTE: Locator.isVisible()'s `timeout` option is deprecated/ignored by
   // Playwright — it never actually waits, only reads the CURRENT DOM state.
   // Every presence check below that needs to survive a real render/recompute
@@ -648,13 +691,18 @@ export async function driveMechanismsGallery(page: Page): Promise<void> {
     if (!stillPresent) return; // the gallery has completed (onComplete fired)
 
     if (await waitVisible(applyButton, 2_000)) {
-      if (!(await applyButton.isDisabled())) {
+      const ariaLabel = (await applyButton.getAttribute("aria-label")) ?? "";
+      const placement = opts.placements?.[ariaLabel.replace(/^Apply method for /, "")];
+      if (placement !== undefined) {
+        await assignToKey(page, placement);
+        await expect(applyButton).toBeEnabled({ timeout: 5_000 });
+        await applyButton.click();
+      } else if (!(await applyButton.isDisabled())) {
         await applyButton.click();
       } else {
         // The default method isn't Apply-ready (e.g. a bare combining mark's
         // "Assign to a key" default has no physical key chosen yet) — fall
         // back to "Type a sequence" with a synthetic, collision-free pair.
-        const ariaLabel = (await applyButton.getAttribute("aria-label")) ?? "";
         const currentChar = ariaLabel.replace(/^Apply method for /, "");
         const contentToken =
           "zzq" +
@@ -674,6 +722,31 @@ export async function driveMechanismsGallery(page: Page): Promise<void> {
   throw new Error(
     "driveMechanismsGallery: did not complete within the expected character count",
   );
+}
+
+/**
+ * Fill the "Assign to a key" card for the gallery's current character: open
+ * the card (it is the default method, but a decomposable character opens on
+ * the deadkey card instead), pick the physical key, then add one layer slot
+ * per modifier and choose it. Leaves the Apply click to the caller.
+ */
+async function assignToKey(page: Page, placement: MechanismPlacement): Promise<void> {
+  const card = page.getByRole("button", { name: /^Assign to a key/ });
+  if ((await card.getAttribute("aria-pressed")) !== "true") await card.click();
+  await selectMenuOption(
+    page,
+    page.getByRole("button", { name: "Physical key for Assign to a key" }),
+    placement.key,
+  );
+  const layers = placement.layers ?? [];
+  for (let i = 0; i < layers.length; i++) {
+    await page.getByRole("button", { name: "Add another layer" }).click();
+    await selectMenuOption(
+      page,
+      page.getByRole("button", { name: `Layer ${i + 1} for layer-switch combo` }),
+      layers[i]!,
+    );
+  }
 }
 
 /**
