@@ -6,7 +6,12 @@ import { emit } from "../codec/emit.js";
 import { compile } from "../compiler/index.js";
 import { simulate } from "../simulator/index.js";
 import { computeContextTolerance } from "../validator/context-tolerance.js";
-import { proposeContextVariants, GENERATED_MARKER_PREFIX, BACKSPACE_UNWRAP_RULE_PREFIX } from "./context-variants.js";
+import {
+  proposeContextVariants,
+  GENERATED_MARKER_PREFIX,
+  BACKSPACE_UNWRAP_RULE_PREFIX,
+  BACKSPACE_UNWRAP_SKIPPED_MNEMONIC_WEB_NOTE,
+} from "./context-variants.js";
 
 const HEADER = [
   "store(&NAME) 'ContextVariants'",
@@ -147,10 +152,10 @@ describe("proposeContextVariants (spec 062, US1)", () => {
     const { variants } = await proposeContextVariants(ir, report);
 
     // No DIACRITIC fix variant — the store-pairing safety check must skip
-    // it. `store(mystore) U+00E2` is itself a composed unit, so Story 4's
-    // unconditional backspace-unwrap variant (spec 062 US4, added after this
-    // test) is expected here too; it is independent of the store-pairing gap
-    // this test exists to check.
+    // it. Backspace-unwrap variants (spec 062 US4) are filtered out because
+    // they are independent of the store-pairing gap this test exists to
+    // check (this mnemonic web fixture gets none anyway — see the
+    // "mnemonic layouts" describe block below).
     const diacriticVariants = variants.filter((v) => !v.sourceRuleId.startsWith(BACKSPACE_UNWRAP_RULE_PREFIX));
     expect(diacriticVariants).toHaveLength(0);
   }, 30_000);
@@ -167,5 +172,58 @@ describe("proposeContextVariants (spec 062, US1)", () => {
     const report = await computeContextTolerance(ir);
     const { variants } = await proposeContextVariants(ir, report);
     expect(variants).toHaveLength(0);
+  }, 30_000);
+});
+
+// ---------------------------------------------------------------------------
+// Backspace unwrap vs. mnemonic layouts. `[K_BKSP]` in a mnemonic layout is a
+// hard kmcmplib error for KeymanWeb targets
+// (ERROR_VirtualKeysNotValidForMnemonicLayouts, 0x502058), so the generator
+// must not emit it there — but a desktop-only mnemonic keyboard compiles it
+// fine and keeps the unwrap. Positional-layout unwrap emission is covered in
+// context-variants.backspaceUnwrap.test.ts.
+// ---------------------------------------------------------------------------
+
+describe("proposeContextVariants — backspace unwrap on mnemonic layouts", () => {
+  const hasBkspRule = (ir: KeyboardIR): boolean =>
+    ir.groups.some((g) =>
+      g.rules.some((r) => r.context.some((el) => el.kind === "vkey" && el.name === "K_BKSP")),
+    );
+
+  it("skips the [K_BKSP] unwrap for a mnemonic keyboard that targets the web, and says why", async () => {
+    const { ir } = parse(GAP_KMN, "mnemonic_web");
+    const report = await computeContextTolerance(ir);
+    const { ir: fixedIr, variants, notes } = await proposeContextVariants(ir, report);
+
+    expect(variants.some((v) => v.sourceRuleId.startsWith(BACKSPACE_UNWRAP_RULE_PREFIX))).toBe(false);
+    expect(hasBkspRule(fixedIr)).toBe(false);
+    expect(notes).toEqual([BACKSPACE_UNWRAP_SKIPPED_MNEMONIC_WEB_NOTE]);
+    // The diacritic fix is still generated, and the result compiles clean.
+    expect(variants.length).toBeGreaterThan(0);
+    const compiled = await compileIr(fixedIr);
+    expect(compiled.success).toBe(true);
+    expect(compiled.diagnostics.filter((d) => d.severity === "error")).toEqual([]);
+  }, 30_000);
+
+  it("keeps the unwrap for a desktop-only mnemonic keyboard, whose build accepts [K_BKSP]", async () => {
+    const desktopKmn = GAP_KMN.replace("store(&TARGETS) 'any'", "store(&TARGETS) 'desktop'");
+    expect(desktopKmn).not.toBe(GAP_KMN);
+    const { ir } = parse(desktopKmn, "mnemonic_desktop");
+    const report = await computeContextTolerance(ir);
+    const { ir: fixedIr, variants, notes } = await proposeContextVariants(ir, report);
+
+    expect(variants.some((v) => v.sourceRuleId.startsWith(BACKSPACE_UNWRAP_RULE_PREFIX))).toBe(true);
+    expect(hasBkspRule(fixedIr)).toBe(true);
+    expect(notes).toBeUndefined();
+    const compiled = await compileIr(fixedIr);
+    expect(compiled.success).toBe(true);
+  }, 30_000);
+
+  it("adds no note when there is nothing to unwrap", async () => {
+    const kmn = [HEADER, "group(main) using keys", "", "+ 'a' > 'a'", ""].join("\n");
+    const { ir } = parse(kmn, "mnemonic_web_nothing");
+    const report = await computeContextTolerance(ir);
+    const { notes } = await proposeContextVariants(ir, report);
+    expect(notes).toBeUndefined();
   }, 30_000);
 });

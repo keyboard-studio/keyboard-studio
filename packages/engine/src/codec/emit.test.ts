@@ -1053,7 +1053,7 @@ describe("range re-collapse on emit (spec 042)", () => {
 
   // A store that contains a `dk()` deadkey item must NOT get range re-collapse:
   // kmcmplib rejects a store holding both a `X .. Y` range and a `dk()` item in
-  // the same declaration with KM_WARNING_KMCMP_5251093 "Invalid 'deadkey' or 'dk'
+  // the same declaration with KM_ERROR_KMCMP_5251093 "Invalid 'deadkey' or 'dk'
   // statement" (no .kmx produced). This is exactly the shape of the deadkey
   // lookup store `store(dkf0021)` in sil_cameroon_azerty — a run of consecutive
   // combining marks followed by a trailing deadkey — and re-collapsing it broke a

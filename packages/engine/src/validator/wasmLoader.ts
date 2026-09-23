@@ -21,7 +21,8 @@ import type { GroupName } from "./types.js";
 import { OracleLoadError } from "./OracleLoadError.js";
 import { getKmnCompilerCtor, type KmnCompilerLike } from "../compiler/index.js";
 import { pathUtils } from "../compiler/pathUtils.js";
-import { CompilerLoadError } from "@keyboard-studio/contracts";
+import { loadKmcMessageTables, type KmcMessageTables } from "../compiler/kmcMessages.js";
+import { CompilerLoadError, type LintSeverity } from "@keyboard-studio/contracts";
 
 /**
  * Minimal structured diagnostic returned by the WASM compiler. The oracle
@@ -29,11 +30,18 @@ import { CompilerLoadError } from "@keyboard-studio/contracts";
  */
 export interface RawWasmFinding {
   /**
-   * kmcmplib code symbol as a string (e.g. "ERROR_InvalidIf"). Numeric
-   * codes from `KmnCompilerMessages` should be resolved to their symbolic
-   * name on the WASM side before being returned.
+   * kmcmplib code symbol as a string (e.g. "ERROR_InvalidIf"). kmc-kmn
+   * reports numeric codes; the production handle resolves them to their
+   * symbolic name via kmc-kmn's own message tables. A code no table defines
+   * stays in its decimal string form.
    */
   kmcmpCode: string;
+  /**
+   * Severity decoded from the numeric code's severity bits, when the handle
+   * had one. Used for codes with no symbolic name (whose severity would
+   * otherwise be unknowable from `kmcmpCode`).
+   */
+  severity?: LintSeverity;
   /** 1-based source line. */
   line: number;
   /** 1-based column when available. */
@@ -66,7 +74,10 @@ const ORACLE_SOURCE_FILE = "__oracle_source__.kmn";
 const ORACLE_OUTPUT_FILE = "__oracle_out__.kmx";
 
 class KmnCompilerOracleHandle implements WasmOracleHandle {
-  constructor(private readonly Ctor: new () => KmnCompilerLike) {}
+  constructor(
+    private readonly Ctor: new () => KmnCompilerLike,
+    private readonly tables: KmcMessageTables,
+  ) {}
 
   async lintWasmGroups(
     source: string,
@@ -74,6 +85,7 @@ class KmnCompilerOracleHandle implements WasmOracleHandle {
   ): Promise<RawWasmFinding[]> {
     const findings: RawWasmFinding[] = [];
     const sourceBytes = new TextEncoder().encode(source);
+    const tables = this.tables;
 
     const callbacks = {
       reportMessage(message: Record<string, unknown>): void {
@@ -82,13 +94,23 @@ class KmnCompilerOracleHandle implements WasmOracleHandle {
           (typeof message.text === "string" && message.text) ||
           (typeof message.description === "string" && message.description) ||
           "";
-        const codeSym = String(
-          message.code ?? message.errorCode ?? "UNKNOWN"
-        );
-        const line =
-          typeof message.lineNumber === "number" ? message.lineNumber : 0;
+        // kmc-kmn sends the NUMERIC code (severity | namespace | base);
+        // codeMap.ts keys on upstream's symbolic names.
+        const numeric =
+          typeof message.code === "number" && Number.isInteger(message.code)
+            ? message.code
+            : undefined;
+        const codeSym =
+          (numeric !== undefined ? tables.name(numeric) : undefined) ??
+          String(message.code ?? message.errorCode ?? "UNKNOWN");
+        // kmc-kmn's CompilerEvent names the field `line`; `lineNumber` is the
+        // raw kmcmplib callback's name, which kmc-kmn renames before
+        // reporting (same mapping as compiler/index.ts).
+        const lineRaw = message.line ?? message.lineNumber;
+        const line = typeof lineRaw === "number" ? lineRaw : 0;
         findings.push({
           kmcmpCode: codeSym,
+          ...(numeric !== undefined ? { severity: tables.severity(numeric) } : {}),
           line,
           column: 0,
           text,
@@ -145,8 +167,10 @@ export async function loadWasmOracle(_options?: {
   wasmUrl?: string;
 }): Promise<WasmOracleHandle> {
   let Ctor: new () => KmnCompilerLike;
+  let tables: KmcMessageTables;
   try {
     Ctor = await getKmnCompilerCtor();
+    tables = await loadKmcMessageTables();
   } catch (err) {
     if (err instanceof CompilerLoadError) {
       throw new OracleLoadError(
@@ -157,5 +181,5 @@ export async function loadWasmOracle(_options?: {
     }
     throw err;
   }
-  return new KmnCompilerOracleHandle(Ctor);
+  return new KmnCompilerOracleHandle(Ctor, tables);
 }

@@ -618,7 +618,7 @@ describe("applyKeycapLabelsToVfs — S-08 generalized combos", () => {
     // [CTRL RALT K_B] mixes a generic CTRL with a chiral RALT —
     // modifierCombos.ts's chirality unification demotes RALT to ALT before
     // this module ever sees it, since a mixed generic+chiral combo is
-    // kmcmplib-invalid (KM_WARNING_KMCMP_4202659) and undeliverable by any
+    // kmcmplib-invalid (KM_WARN_KMCMP_4202659) and undeliverable by any
     // real keypress. The resulting all-generic [CTRL ALT] combo has no RALT
     // token, so no <usealtgr/> hint is added — it is not an AltGr-only layer.
     const vfs = makeVfs([{ path: "source/test.kvks", content: KVKS_BASE }]);

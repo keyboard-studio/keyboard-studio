@@ -82,6 +82,9 @@ importers:
       '@keyboard-studio/llm':
         specifier: workspace:*
         version: link:../llm
+      '@keymanapp/developer-utils':
+        specifier: 19.0.240-alpha
+        version: 19.0.240-alpha
       '@keymanapp/kmc-kmn':
         specifier: 19.0.240-alpha
         version: 19.0.240-alpha
