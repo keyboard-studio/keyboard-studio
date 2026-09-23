@@ -30,8 +30,8 @@ derivations:
       the base's script is outside Latn/Cyrl/Grek, per the scope note below.
 
 consumers:
-  prefills:
-    - pb_mark_style
+  # pb_mark_style was retired by spec 071 and has been deleted.
+  prefills: []
   proposes:
     - "transform-offer:normalization-migrate"
 

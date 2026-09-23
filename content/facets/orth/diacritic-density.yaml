@@ -24,11 +24,10 @@ derivations:
     notes: Straightforward NFD decomposition + CCC analysis over orth.inventory-delta's output.
 
 consumers:
-  prefills:
-    - pb_accent_marks_gate
-    - pb_diacritic_select
-    - pb_stacking_marks
-    - pb_capitals_marks
+  # The Phase B marks questions this facet prefilled (pb_accent_marks_gate,
+  # pb_diacritic_select, pb_stacking_marks, pb_capitals_marks) were retired by
+  # spec 071 and have been deleted.
+  prefills: []
   proposes:
     - "axis:A4"
     - "reorder:pattern-need"
