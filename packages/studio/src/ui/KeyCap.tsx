@@ -4,8 +4,8 @@ import { CSS_BORDER_STRONG, CSS_FONT_MONO, CSS_SURFACE_2, CSS_TEXT_MUTED } from 
 // Consolidated (P1, second-pass review) from a byte-for-byte duplicate that
 // briefly lived at editors/assignLoop/parts/KeyCap.tsx — this file is now the
 // ONE KeyCap primitive. The style below is that original component's exact
-// values (a proven fit for the tight chip/grid contexts it already ships in
-// — GlyphCell tiles, StatusBar's removed-list rows, InfoView's title bar),
+// values (a proven fit for tight chip/grid contexts such as StatusBar's
+// removed-list rows),
 // ported from its own `var(--app-*)` literals onto this module's theme.ts
 // token accessors so it never hardcodes a color/font outside that one
 // source, and dark-mode-safe by construction (the tokens are already

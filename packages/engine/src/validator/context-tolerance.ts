@@ -255,6 +255,8 @@ export function splitRuleAtPlus(
 interface PendingSimulation {
   base: { ruleId: string; location: { file: string; line: number } };
   key: SimKeyInput;
+  /** The rule's key part is a `[K_…]` virtual key, not a character/any() key. */
+  keyIsVirtual: boolean;
   candidates: string[];
 }
 
@@ -349,10 +351,42 @@ function resolveRuleStatically(
     return { finding: { ...base, status: 'tolerant' } };
   }
 
-  return { pending: { base, key: keyResolution.key, candidates: decomposable } };
+  const keyIsVirtual = keyPart[0]?.kind === 'vkey';
+  return { pending: { base, key: keyResolution.key, keyIsVirtual, candidates: decomposable } };
 }
 
-/** Run the behavioural both-forms comparison for one rule against a successfully compiled build. */
+/**
+ * True when `compiled` carries the KeymanWeb `.js` that `simulate()` runs.
+ *
+ * Deliberately NOT `compiled.success`: the simulation compile forces
+ * `&TARGETS 'any'` (see {@link stripAssetStoresForCompile}), so a desktop-only
+ * keyboard can pick up web-target-only kmcmplib errors — e.g.
+ * ERROR_VirtualKeysNotValidForMnemonicLayouts for sil_yoruba8's own
+ * `+ [K_BKSP]` rules — that its real build never reports. kmcmplib still emits
+ * the `.js`, dropping only the offending rules, so character-key rules still
+ * simulate faithfully. Virtual-key rules are the ones such errors drop, so
+ * those are held back when the compile reported errors — see
+ * {@link compileMayHaveDroppedRule}. The diagnostics themselves are returned
+ * on `ToleranceReport.compileDiagnostics`.
+ */
+export function hasSimulatableJs(compiled: CompileResult | undefined): compiled is CompileResult {
+  return compiled?.artifacts.some((a) => a.filename.toLowerCase().endsWith('.js')) ?? false;
+}
+
+/**
+ * True when the compile reported an error/fatal and `pending` is keyed on a
+ * virtual key: kmcmplib's web-target rejections (virtual keys in a mnemonic
+ * layout, virtual character keys in KeymanWeb) drop exactly such rules from
+ * the `.js`, so simulating one would report the absence of the rule as its
+ * behaviour. Diagnostic lines refer to the emitted simulation source, not the
+ * author's file, so this is keyed on the rule's shape rather than its line.
+ */
+function compileMayHaveDroppedRule(compiled: CompileResult, pending: PendingSimulation): boolean {
+  if (!pending.keyIsVirtual) return false;
+  return compiled.diagnostics.some((d) => d.severity === 'error' || d.severity === 'fatal');
+}
+
+/** Run the behavioural both-forms comparison for one rule against a compiled build with a `.js`. */
 function simulatePending(compiled: CompileResult, pending: PendingSimulation): RuleToleranceFinding {
   for (const candidate of pending.candidates) {
     const decomposed = candidate.normalize('NFD');
@@ -402,7 +436,15 @@ export async function computeContextTolerance(ir: KeyboardIR): Promise<Tolerance
   const findings: RuleToleranceFinding[] = resolutions.map((resolution) => {
     if ('finding' in resolution) return resolution.finding;
     const pending = resolution.pending;
-    if (compiled?.success) return simulatePending(compiled, pending);
+    if (hasSimulatableJs(compiled)) {
+      if (!compileMayHaveDroppedRule(compiled, pending)) return simulatePending(compiled, pending);
+      return {
+        ...pending.base,
+        status: 'not-analysed',
+        notAnalysedReason:
+          'the simulation compile reported errors and this virtual-key rule may be missing from the KeymanWeb build',
+      };
+    }
     return {
       ...pending.base,
       status: 'not-analysed',
@@ -411,6 +453,9 @@ export async function computeContextTolerance(ir: KeyboardIR): Promise<Tolerance
   });
 
   const report: ToleranceReport = { findings, notAnalysedCount: ir.raw.length };
+  if (compiled !== undefined && compiled.diagnostics.length > 0) {
+    report.compileDiagnostics = compiled.diagnostics;
+  }
 
   if (report.findings.length + report.notAnalysedCount !== totalRuleCount) {
     throw new Error(

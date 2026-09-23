@@ -98,6 +98,22 @@ describe("CurrentKeyboardIndicator — a11y wiring", () => {
     expect(trigger.getAttribute("aria-expanded")).toBe("false");
   });
 
+  it("the accessible name carries the FULL current keyboard name, not just the label", () => {
+    render(<CurrentKeyboardIndicator />);
+
+    // The trigger's visible text can be ellipsized when the NavBar is tight,
+    // so the name has to come from the DOM text (never truncated) rather
+    // than from what happens to be painted. Label first (2.5.3 Label in
+    // Name), then the current value.
+    const trigger = screen.getByRole("button", { name: /^Keyboard/ });
+    const valueText = trigger.querySelector("[title]");
+    expect(valueText).not.toBeNull();
+    const fullName = valueText!.getAttribute("title")!;
+    expect(fullName.length).toBeGreaterThan(0);
+    expect(valueText!.textContent).toBe(fullName);
+    expect(screen.getByRole("button", { name: `Keyboard ${fullName}` })).toBe(trigger);
+  });
+
   it("opens with Enter, exposes a real listbox, and closes back to the trigger on Escape", async () => {
     const user = userEvent.setup();
     render(<CurrentKeyboardIndicator />);

@@ -111,10 +111,21 @@ export function KmnEditor({ vfs, onRecompile }: KmnEditorProps) {
           outline: "none",
         }}
       />
+      {/* --app-text-subtle, NOT --app-text-disabled. This is a live hint, not
+          a disabled control, so it gets no WCAG 1.4.3 exemption. The disabled
+          token (35% alpha) measured 2.92:1 here on navy's --app-bg, well under
+          the 4.5:1 that 11px text needs. --app-text-subtle is the token for
+          quiet caption/hint text: 4.56:1 on light --app-bg and 5.01:1 on
+          navy's (see colors.css). axe reported this only some of the time
+          because it skips text that is scrolled out of its overflow
+          container's visible area. This hint sits at the foot of the
+          Output screen's scrolling left pane, below the fold at scrollTop 0,
+          and mounts only once the compile reaches "ready". So a scan
+          flagged it only when it happened to be scrolled into view. */}
       <div
         style={{
           fontSize: 11,
-          color: "var(--app-text-disabled)",
+          color: "var(--app-text-subtle)",
           fontFamily: FONT_MONO,
         }}
         aria-live="polite"

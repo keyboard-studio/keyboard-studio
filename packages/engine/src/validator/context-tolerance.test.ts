@@ -130,3 +130,46 @@ describe("computeContextTolerance (spec 062, US2)", () => {
     expect(report.findings.length + report.notAnalysedCount).toBe(totalRuleCount);
   }, 30_000);
 });
+
+// ---------------------------------------------------------------------------
+// The simulation compile forces &TARGETS 'any'. For a mnemonic keyboard that
+// adds KeymanWeb-only kmcmplib errors (virtual keys are not valid in mnemonic
+// layouts, 0x502058) which its own build may never hit. The analysis must
+// still run off the .js kmcmplib produced, carry the diagnostics on the
+// report, and hold back only the virtual-key rules those errors drop.
+// ---------------------------------------------------------------------------
+
+describe("computeContextTolerance — web-only compile errors from the forced targets", () => {
+  const kmn = [
+    HEADER.replace("store(&TARGETS) 'any'", "store(&TARGETS) 'desktop'"),
+    "group(main) using keys",
+    "",
+    "store(base) U+00E0",
+    "store(acute) U+00E2",
+    "store(key.act) ']'",
+    "",
+    "any(base) + any(key.act) > index(acute,1)",
+    "any(base) + [K_QUOTE] > U+00E1",
+    "'x' + [K_BKSP] > nul",
+    "+ ']' > U+00B4",
+    "",
+  ].join("\n");
+
+  it("still analyses character-key rules and reports the compile diagnostics", async () => {
+    const { ir } = parse(kmn, "web_only_errors");
+    const report = await computeContextTolerance(ir);
+
+    expect(report.compileDiagnostics?.some((d) => d.code === `KM_ERROR_KMCMP_${0x502058}` && d.severity === "error")).toBe(true);
+    const gap = report.findings.find((f) => f.failingKeystrokes !== undefined);
+    expect(gap?.failingKeystrokes).toEqual([{ vkey: "K_RBRKT", modifiers: [] }]);
+    expect(report.findings.some((f) => /failed to compile/.test(f.notAnalysedReason ?? ""))).toBe(false);
+  }, 30_000);
+
+  it("holds back a virtual-key rule the errors may have dropped from the .js", async () => {
+    const { ir } = parse(kmn, "web_only_errors");
+    const report = await computeContextTolerance(ir);
+    const vkeyRule = report.findings.find((f) => /virtual-key rule/.test(f.notAnalysedReason ?? ""));
+    expect(vkeyRule?.status).toBe("not-analysed");
+    expect(vkeyRule?.failingKeystrokes).toBeUndefined();
+  }, 30_000);
+});

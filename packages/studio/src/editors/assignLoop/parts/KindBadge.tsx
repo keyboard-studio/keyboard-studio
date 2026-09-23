@@ -21,11 +21,11 @@ export const KIND_COLOR: Record<CardKind, string> = {
 };
 
 // Chrome (human-readable category labels) — built per-render via the
-// optional-i18n + msg()/resolveMessage() pattern (see Inspector.tsx's
-// storeBlurb/ruleDetailLabel) rather than taking `t` as a bare function
-// parameter — Lingui's macro tracks the specific binding introduced by
-// useLingui(), so a re-bound `t` parameter is a distinct binding the
-// extractor does not follow and its ids never make it into the catalog.
+// optional-i18n + msg()/resolveMessage() pattern (see lib/i18nResolve.ts)
+// rather than taking `t` as a bare function parameter — Lingui's macro
+// tracks the specific binding introduced by useLingui(), so a re-bound `t`
+// parameter is a distinct binding the extractor does not follow and its ids
+// never make it into the catalog.
 function buildKindLabel(kind: CardKind, i18n?: I18n): string {
   switch (kind) {
     case 'pattern': return resolveMessage(i18n, msg({ id: "editor.assignLoop.kindBadge.pattern", message: "Pattern" }));

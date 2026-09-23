@@ -259,7 +259,7 @@ export function irToCharacterView(
 
   // Pattern/group glyphs first (richest entries — faithful key STEPS, #1399:
   // CharacterCell.keys comes from the new g.keySteps, never the display-only
-  // g.keys the old rule/node Rail view (CarveGallery.tsx) reads).
+  // g.keys).
   for (const node of nodes) {
     if (node.kind !== 'pattern' && node.kind !== 'group') continue;
     for (const g of node.glyphs ?? []) {
@@ -373,8 +373,8 @@ function advancedRuleOnlyChars(ir: KeyboardIR): Set<string> {
 //
 // Deliberately additive and LOCAL to this file: walks ir.groups directly
 // rather than changing irToCarveNodes.ts's shared glyph-production path, so
-// the rule/node Rail view (CarveGallery.tsx) is completely unaffected — this
-// widens only the character-first view's coverage.
+// toRailNodes' other consumers are unaffected — this widens only the
+// character-first view's coverage.
 // ---------------------------------------------------------------------------
 
 function sequenceShapeCells(ir: KeyboardIR): { ch: string; keys: string[] }[] {

@@ -482,9 +482,9 @@ export function useKeyboardArtifact(
 
       // Strip dangling packaging-asset references before compiling for preview.
       // If the base names a BITMAP / VISUALKEYBOARD / LAYOUTFILE that wasn't
-      // fetched into the VFS, kmcmplib produces ZERO artifacts while the
-      // diagnostic arrives under the engine's own "warning" severity fallback,
-      // which surfaces as "no usable artifacts" and a blank preview. The preview
+      // fetched into the VFS, kmcmplib produces ZERO artifacts (with an
+      // error-severity "cannot read file" diagnostic), which surfaces as
+      // "no usable artifacts" and a blank preview. The preview
       // needs none of these assets; present ones are kept (full-quality OSK).
       // The output/zip path serializes the IR separately and is unaffected.
       if (kmnPath && engine.stripDanglingAssetStores) {

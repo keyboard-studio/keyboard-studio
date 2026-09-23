@@ -25,7 +25,9 @@ import { expectNoSeriousAxeViolations } from "./helpers/axe";
 import { OUTPUT_SCREEN_DEBT } from "./helpers/contrastDebt";
 import { unzipSync } from "fflate";
 import * as fs from "node:fs";
+import * as os from "node:os";
 import * as path from "node:path";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import {
   driveIdentityLite,
   pickBaseKeyboard,
@@ -42,6 +44,8 @@ import {
   triggerDownload,
   seedReturningVisitor,
   switchTab,
+  carveCharacter,
+  type MechanismPlacement,
 } from "./helpers/surveyFlow";
 
 // ---------------------------------------------------------------------------
@@ -82,6 +86,12 @@ const FIXTURE = {
 //
 // NB: `basic_kbdgr` is GERMAN (Windows "GR" = German), NOT Greek — do not use it.
 //
+// The Cyrillic row does REAL authoring work rather than re-adding a letter the
+// base already has: it adds `ә` (U+04D9, Kazakh/Tatar/Bashkir schwa), which
+// basic_kbdru does not produce, places it on RAlt+A in the Mechanisms gallery,
+// and discards `ё` in the Carve gallery. T010 then compiles the downloaded
+// source node-side and checks both edits are in it — see that test.
+//
 // #1439: russian_mnemonic_r/armenian_mnemonic_r previously covered Cyrl/Armn
 // here — both are mnemonic keyboards (phonetic QWERTY remap by design/name,
 // not the &MNEMONICLAYOUT store flag, so no lint can catch this; see the
@@ -111,11 +121,18 @@ interface ProvenScriptFixture {
   targetScript: string;
   /** A representative character to add in Phase B for this script. */
   charToAdd: string;
+  /** Optional: a character the base produces, discarded in the Carve gallery. */
+  charToCarve?: string;
+  /** Optional: pin a real key placement for charToAdd in the Mechanisms gallery. */
+  placement?: MechanismPlacement;
 }
 
 const PROVEN_SCRIPT_BASES: ReadonlyArray<ProvenScriptFixture> = [
   { script: "Latn", baseKeyboardId: "basic_kbdfr",         languageCode: "fr",  targetScript: "Latn", charToAdd: "é" },
-  { script: "Cyrl", baseKeyboardId: "basic_kbdru",         languageCode: "ru",  targetScript: "Cyrl", charToAdd: "я" },
+  {
+    script: "Cyrl", baseKeyboardId: "basic_kbdru", languageCode: "ru", targetScript: "Cyrl",
+    charToAdd: "ә", charToCarve: "ё", placement: { key: "K_A", layers: ["RALT"] },
+  },
   { script: "Grek", baseKeyboardId: "basic_kbdhe",         languageCode: "el",  targetScript: "Grek", charToAdd: "ω" },
   { script: "Geor", baseKeyboardId: "basic_kbdgeo",        languageCode: "ka",  targetScript: "Geor", charToAdd: "ქ" },
   { script: "Armn", baseKeyboardId: "basic_kbdarme",       languageCode: "hy",  targetScript: "Armn", charToAdd: "ա" },
@@ -130,8 +147,8 @@ const PROVEN_SCRIPT_BASES: ReadonlyArray<ProvenScriptFixture> = [
  * Carve gallery — see the retained history in git blame if the "phase B
  * complete" label seems mismatched). #1477's ground-truth sweep (live axe run
  * with this list emptied) found every entry it used to carry —
- * ConvenienceCharsStep's Continue, CarveGallery v1's info-panel toggle (dead
- * code; CarveGalleryV2 is unconditional), carve-continue, RemovalBanner's
+ * ConvenienceCharsStep's Continue, CarveGallery v1's info-panel toggle (v1
+ * since removed), carve-continue, RemovalBanner's
  * dismiss control, Rail's/GlyphCell's v1-only surfaces — already clean. The
  * remaining OSK iframe entry is now also fixed at the source
  * (packages/studio/public/osk-frame.html overrides `.kmw-spacebar-caption`'s
@@ -149,6 +166,8 @@ interface WalkFixture {
   targetScript: string;
   baseKeyboardId: string;
   charToAdd: string;
+  charToCarve?: string;
+  placement?: MechanismPlacement;
 }
 
 /** Build a full WalkFixture from a proven-script row (autonym seeded from the script). */
@@ -160,6 +179,8 @@ function walkFixtureFor(f: ProvenScriptFixture): WalkFixture {
     targetScript: f.targetScript,
     baseKeyboardId: f.baseKeyboardId,
     charToAdd: f.charToAdd,
+    ...(f.charToCarve !== undefined ? { charToCarve: f.charToCarve } : {}),
+    ...(f.placement !== undefined ? { placement: f.placement } : {}),
   };
 }
 
@@ -203,8 +224,8 @@ async function completePhaseB(page: Page, fx: WalkFixture = FIXTURE): Promise<vo
  * Drive Carve + Mechanisms to completion so the Output nav gate
  * (useInventoryCoverageGate) is satisfied before navigateToOutput is called.
  *
- * Every fixture in this file adds a character the base ALREADY produces (é on
- * basic_kbdfr, я on russian_mnemonic_r, etc.) — before the spec 071 marks
+ * Most fixtures in this file add a character the base ALREADY produces (é on
+ * basic_kbdfr, ω on basic_kbdhe, etc.) — before the spec 071 marks
  * series existed, that made lettersToAdd empty and the Output nav link
  * unconditionally reachable straight off Phase B. It no longer is: an
  * accepted marks-series proposal for a decomposable charToAdd promotes its
@@ -214,11 +235,92 @@ async function completePhaseB(page: Page, fx: WalkFixture = FIXTURE): Promise<vo
  * with no combining-mark promotion at all (e.g. the Georgian fixture) via
  * driveMechanismsGallery's own empty-diff branch. See
  * specs/057-bulletproof-navigation/reviews/classB-diagnosis.md.
+ *
+ * A fixture with `charToCarve` discards that character before continuing, and
+ * one with `placement` pins charToAdd to a real key (see the Cyrillic row).
  */
-async function finishGalleryWork(page: Page): Promise<void> {
+async function finishGalleryWork(page: Page, fx: WalkFixture = FIXTURE): Promise<void> {
   await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
+  if (fx.charToCarve !== undefined) await carveCharacter(page, fx.charToCarve);
   await page.getByTestId("carve-continue").click();
-  await driveMechanismsGallery(page);
+  await driveMechanismsGallery(
+    page,
+    fx.placement !== undefined ? { placements: { [fx.charToAdd]: fx.placement } } : {},
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Node-side compile of a downloaded ZIP
+//
+// The enabled download button only proves the PREVIEW compiled. This compiles
+// the archived source itself with @keymanapp/kmc-kmn — the same compiler the
+// engine wraps (resolved from the engine package, which depends on it; the
+// engine barrel itself is bundler-resolved and does not load in plain Node).
+// ---------------------------------------------------------------------------
+
+/** developer-utils CompilerErrorMask.Severity / CompilerErrorSeverity.Error. */
+const KMC_SEVERITY_MASK = 0xf00000;
+const KMC_SEVERITY_ERROR = 0x500000;
+
+interface KmcMessage {
+  code: number;
+  message?: string;
+}
+
+interface ArchiveCompile {
+  /** Artifact kinds produced (kmx / kvk / js); empty when the compile failed. */
+  artifacts: string[];
+  /** Error- and Fatal-severity messages (severity is encoded in the code). */
+  blocking: KmcMessage[];
+}
+
+async function compileArchive(files: Record<string, Uint8Array>, kmnPath: string): Promise<ArchiveCompile> {
+  const here = path.dirname(fileURLToPath(import.meta.url));
+  const kmcDir = fs.realpathSync(path.resolve(here, "../../engine/node_modules/@keymanapp/kmc-kmn"));
+  const kmcPkg = JSON.parse(fs.readFileSync(path.join(kmcDir, "package.json"), "utf8")) as {
+    exports: { ".": string };
+  };
+  const { KmnCompiler } = (await import(pathToFileURL(path.join(kmcDir, kmcPkg.exports["."])).href)) as {
+    KmnCompiler: new () => {
+      init(callbacks: unknown, options: unknown): Promise<boolean>;
+      run(inFile: string, outFile: string): Promise<{ artifacts: Record<string, unknown> } | null>;
+    };
+  };
+
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "ks-e2e-zip-"));
+  try {
+    for (const [name, data] of Object.entries(files)) {
+      const dest = path.resolve(root, name);
+      if (name.endsWith("/") || !dest.startsWith(root + path.sep)) continue;
+      fs.mkdirSync(path.dirname(dest), { recursive: true });
+      fs.writeFileSync(dest, data);
+    }
+    const messages: KmcMessage[] = [];
+    const callbacks = {
+      reportMessage: (m: KmcMessage) => messages.push(m),
+      loadFile: (f: string) => {
+        try {
+          return new Uint8Array(fs.readFileSync(f));
+        } catch {
+          return null;
+        }
+      },
+      resolveFilename: (base: string, f: string) =>
+        path.isAbsolute(f) ? f : path.resolve(path.dirname(base), f),
+      fs,
+      path,
+    };
+    const compiler = new KmnCompiler();
+    expect(await compiler.init(callbacks, { compilerWarningsAsErrors: false, warnDeprecatedCode: true })).toBe(true);
+    const kmnFile = path.join(root, kmnPath);
+    const result = await compiler.run(kmnFile, kmnFile.replace(/\.kmn$/, ".kmx"));
+    return {
+      artifacts: result === null ? [] : Object.keys(result.artifacts).filter((k) => result.artifacts[k] != null),
+      blocking: messages.filter((m) => (m.code & KMC_SEVERITY_MASK) >= KMC_SEVERITY_ERROR),
+    };
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -415,7 +517,7 @@ async function walkToOutput(page: Page, fx: WalkFixture): Promise<void> {
   await switchTab(page, "preview");
   await switchTab(page, "survey");
   await completePhaseB(page, fx);
-  await finishGalleryWork(page);
+  await finishGalleryWork(page, fx);
   await navigateToOutput(page);
 }
 
@@ -430,8 +532,9 @@ test.describe("spec 034 proven-script walks + publish paths", () => {
     await page.goto("/");
   });
 
-  // --- T010: Cyrillic end-to-end walk (identity → ZIP), asserting the ZIP compiles.
-  test("T010 [US1]: Cyrillic (basic_kbdru) walks identity → downloadable, compilable ZIP", async ({
+  // --- T010: Cyrillic end-to-end walk (identity → ZIP) that places a NEW letter
+  // and carves one, then compiles the DOWNLOADED source and checks both edits.
+  test("T010 [US1]: Cyrillic (basic_kbdru) walks identity → ZIP that compiles and carries a new letter", async ({
     page,
   }) => {
     const cyrl = PROVEN_SCRIPT_BASES.find((f) => f.script === "Cyrl")!;
@@ -442,12 +545,21 @@ test.describe("spec 034 proven-script walks + publish paths", () => {
     const zipBuf = fs.readFileSync(dlPath!);
     expect(zipBuf.length).toBeGreaterThan(100);
 
-    // The .kmn must be present + non-empty. (Reaching the enabled download button
-    // already asserts the base compiled clean via the kmcmplib oracle.)
-    const entries = Object.entries(unzipSync(new Uint8Array(zipBuf)));
-    const kmn = entries.find(([name]) => name.endsWith(".kmn"));
-    expect(kmn, "Cyrillic zip must contain a .kmn source file").toBeDefined();
-    expect(kmn![1].length, ".kmn must be non-empty").toBeGreaterThan(0);
+    const files = unzipSync(new Uint8Array(zipBuf));
+    const kmnPath = Object.keys(files).find((name) => /^source\/[^/]+\.kmn$/.test(name));
+    expect(kmnPath, "Cyrillic zip must contain source/<id>.kmn").toBeDefined();
+    const kmn = new TextDecoder().decode(files[kmnPath!]);
+
+    // The archived source compiles — not just the preview behind the button.
+    const compiled = await compileArchive(files, kmnPath!);
+    expect(compiled.blocking, "kmcmplib error/fatal messages").toEqual([]);
+    expect(compiled.artifacts).toEqual(expect.arrayContaining(["kmx", "js"]));
+
+    // Non-vacuity: the walk's edits are in what shipped. basic_kbdru has no ә
+    // and binds ё to K_BKQUOTE; the placement is an S-08 RAlt+A rule.
+    expect(kmn, "the new letter ә must be in the source").toMatch(/ә|U\+04D9/);
+    expect(kmn, "the RAlt+A placement must be in the source").toMatch(/\[RALT K_A\]/);
+    expect(kmn, "the carved ё must be gone").not.toMatch(/ё|U\+0451/);
   });
 
   // --- T011: all five proven scripts (FR-011, SC-004), plus a bonus Cameroon

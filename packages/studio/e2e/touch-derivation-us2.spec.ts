@@ -170,8 +170,7 @@ const PIAROA_TOUCH_ZIP_PATH = `source/${PIAROA_BASE_ID}.keyman-touch-layout`;
 /**
  * #1477's ground-truth sweep (live axe run with this list emptied) found
  * every entry this list used to carry already clean: CarveGallery's/Rail's/
- * GlyphCell's v1-only surfaces are dead code (CarveGalleryV2 is
- * unconditional; v1 is commented out in carveAdapter.tsx), and
+ * GlyphCell's v1-only surfaces were dead code (since removed), and
  * ConvenienceCharsStep's Continue button plus RemovalBanner's dismiss
  * control and region were stale exclusions from an earlier contrast pass
  * that already fixed them. Nothing left to exclude on this screen.

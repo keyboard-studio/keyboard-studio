@@ -582,5 +582,6 @@
       "step": "implement"
     }
   ],
-  "last_action": "retroactively verified and closed: all 27 tasks confirmed against shipped code (PRs 1139/1334/1556/1603); two doc-only spec.md corrections applied; oauth-backend 270/270 tests + clean typecheck; studio typecheck clean, 49/49 relevant vitest green (4 files blocked by pre-existing local Node26 jsdom issue)"
+  "last_action": "retroactively verified and closed: all 27 tasks confirmed against shipped code (PRs 1139/1334/1556/1603); two doc-only spec.md corrections applied; oauth-backend 270/270 tests + clean typecheck; studio typecheck clean, 49/49 relevant vitest green (4 files blocked by pre-existing local Node26 jsdom issue)",
+  "telemetryInstanceId": "50f9c404-3a4b-497c-8696-68c16f2b0ccf"
 }

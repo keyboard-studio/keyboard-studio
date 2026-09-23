@@ -51,8 +51,11 @@ import { createVirtualFS } from '@keyboard-studio/contracts';
 import { compile } from '../compiler/index.js';
 import { emit } from '../codec/emit.js';
 import { simulate } from '../simulator/index.js';
+import { KMW_JS_TARGETS } from '../package-descriptor/build.js';
+import { isMnemonicLayout } from './shiftRules.js';
 import {
   buildStoreCharIndex,
+  hasSimulatableJs,
   stripAssetStoresForCompile,
   resolveContextCandidates,
   resolveKeyPart,
@@ -81,6 +84,38 @@ export const BACKSPACE_UNWRAP_RULE_PREFIX = `${GENERATED_MARKER_PREFIX}bksp_unwr
 export interface ContextVariantsResult {
   ir: KeyboardIR;
   variants: ContextVariant[];
+  /**
+   * Author-facing notes on tolerance the generator deliberately did NOT add,
+   * and why (FR-013: record what could not be made tolerant rather than
+   * report blanket success). Absent when there is nothing to say.
+   */
+  notes?: string[];
+}
+
+/**
+ * Note returned when the backspace unwrap is skipped for a mnemonic-layout
+ * keyboard that builds for KeymanWeb. Exported for tests.
+ */
+export const BACKSPACE_UNWRAP_SKIPPED_MNEMONIC_WEB_NOTE =
+  'Backspace unwrap not added: this keyboard uses a mnemonic layout and builds for the web, ' +
+  'where the Keyman compiler rejects virtual keys such as [K_BKSP] ("Virtual keys are not valid ' +
+  'for mnemonic layouts"). Backspace keeps its default behaviour.';
+
+/**
+ * True when the keyboard's `&TARGETS` includes a KeymanWeb target (`any`,
+ * `web`, `mobile`, …). A keyboard with no `&TARGETS` store builds desktop
+ * only (kmcmplib emits just the `.kmx`), so it is not a web target.
+ */
+function targetsIncludeWeb(ir: KeyboardIR): boolean {
+  const targets = ir.stores.find((s) => s.isSystem && s.name.toUpperCase() === 'TARGETS');
+  if (targets === undefined) return false;
+  const text = targets.items
+    .map((item) => (item.kind === 'char' ? item.value : item.kind === 'raw' ? item.text : ' '))
+    .join('');
+  return text
+    .toLowerCase()
+    .split(/[\s,]+/)
+    .some((t) => KMW_JS_TARGETS.has(t));
 }
 
 /**
@@ -181,7 +216,10 @@ export async function proposeContextVariants(
     { path: `source/${ir.header.keyboardId}.kmn`, content: emit(stripAssetStoresForCompile(strippedIr)), isBinary: false },
   ]);
   const compiled = await compile(vfs, ir.header.keyboardId);
-  if (!compiled.success) {
+  // Gate on the simulatable .js, not `success`: this compile forces
+  // `&TARGETS 'any'`, which can add web-target-only errors the keyboard's own
+  // build never hits (see `hasSimulatableJs`).
+  if (!hasSimulatableJs(compiled)) {
     return addBackspaceUnwrap(strippedIr);
   }
 
@@ -402,6 +440,15 @@ function addBackspaceUnwrap(ir: KeyboardIR, existingVariants: ContextVariant[] =
 
   const entry = entryGroupOf(ir.groups);
   if (entry === undefined) return { ir, variants: existingVariants };
+
+  // `[K_BKSP]` in a mnemonic layout is a hard kmcmplib error for any KeymanWeb
+  // target (ERROR_VirtualKeysNotValidForMnemonicLayouts) — emitting it would
+  // break the author's web build. Desktop-only mnemonic keyboards (e.g.
+  // sil_yoruba8, which ships its own `+ [K_BKSP]` rules) still compile it, so
+  // they keep the unwrap. See KNOWN LIMITATION 1 above for the runtime side.
+  if (isMnemonicLayout(ir) && targetsIncludeWeb(ir)) {
+    return { ir, variants: existingVariants, notes: [BACKSPACE_UNWRAP_SKIPPED_MNEMONIC_WEB_NOTE] };
+  }
 
   const bkspKey: ContextElement[] = [{ kind: 'vkey', name: 'K_BKSP', modifiers: [] }];
 

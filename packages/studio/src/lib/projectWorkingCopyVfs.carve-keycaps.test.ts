@@ -227,8 +227,7 @@ describe("projectWorkingCopyVfs carve keycaps end-to-end — real engine, no moc
 
     // Author declared an alphabet of just 'a' — 'q' is a base character the
     // base keyboard has but the author doesn't want, so its whole rule is
-    // carved (deletedNodeIds), the same path CarveGallery's rule-level delete
-    // takes.
+    // carved (deletedNodeIds), the store's whole-node delete path.
     const { warnings } = projectWorkingCopyVfs({
       vfs,
       keyboardId: "test_kb",

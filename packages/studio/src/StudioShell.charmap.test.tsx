@@ -151,8 +151,7 @@ vi.mock("./editors/panels/BaseResolution.tsx", () => ({
 // Carve/mechanisms/touch stubs — never reached by the gating tests below
 // (they stop at "characters"), but StudioShell.tsx imports these modules
 // statically, so they must resolve to something lightweight.
-// Mocks CarveGalleryV2 (v2, the live carve gallery); v1's CarveGallery.tsx
-// is retained but commented out in carveAdapter.tsx for rollback.
+// Mocks CarveGalleryV2, the carve gallery carveAdapter.tsx renders.
 vi.mock("./editors/carve/CarveGalleryV2.tsx", () => ({
   CarveGalleryV2: () => <div data-testid="stage-carve" />,
 }));

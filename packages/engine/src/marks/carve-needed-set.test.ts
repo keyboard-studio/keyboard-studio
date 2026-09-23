@@ -229,7 +229,7 @@ describe("deriveCarveNeededSet", () => {
     expect(basePlusMark.requiredPrimary.has(verbatim)).toBe(true);
     expect(verbatim.normalize("NFD")).toBe(canonical); // typed order != canonical
 
-    // The carve comparison seam (annotateRemovalRecommendations / CarveGallery's
+    // The carve comparison seam (recommendedRemovalChars / CarveGalleryV2's
     // neededSet) normalizes BOTH the needed literal and the produced literal to
     // the output form's normalization form (base-plus-mark => NFD) before
     // matching. So a produced "ậ" (in either typed or canonical order) collapses
