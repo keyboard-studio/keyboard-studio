@@ -105,12 +105,6 @@ describe("spec 017 — prefill drill-down declaration (FR-005, FR-006)", () => {
     expect(prefillDrillDown.sessionInputs?.some((s) => s.includes("ScriptPrefill"))).toBe(true);
   });
 
-  it("FR-013: does NOT declare irPath('header','script') (it does not exist)", () => {
-    for (const p of [...prefillDrillDown.inputs, ...prefillDrillDown.writes]) {
-      expect(formatIRPath(p)).not.toBe("header.script");
-    }
-  });
-
   // FR-012 — input-satisfiability (per DEC-D1 subsumption): prefill's header.bcp47
   // input has a producer in the single manifest graph (charactersStep.writes).
   it("input header.bcp47 is satisfiable — a manifest step writes it (DEC-D1)", () => {

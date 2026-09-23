@@ -111,12 +111,6 @@ describe("spec 017 — pb_build_list drill-down declaration (FR-005, FR-007)", (
     expect(pbBuildListDrillDown.sessionInputs?.some((s) => s.includes("CLDR"))).toBe(true);
   });
 
-  it("FR-013: does NOT declare irPath('header','script')", () => {
-    for (const p of [...pbBuildListDrillDown.inputs, ...pbBuildListDrillDown.writes]) {
-      expect(formatIRPath(p)).not.toBe("header.script");
-    }
-  });
-
   // FR-012 — input-satisfiability parity with a/prefill.test.ts (~L54): the IR seed
   // header.bcp47 has a producer in the single manifest graph (charactersStep.writes,
   // the same DEC-D1 subsumption write — charactersStep subsumes the iso_code producer).

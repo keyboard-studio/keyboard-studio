@@ -231,7 +231,7 @@ export function describeQuestionModules(
 
       const own = probes[id] ?? [];
       if (own.length > 0) {
-        it.each(own)("validate() probe: $note", (probe) => {
+        it.each(own)("validate() probe $value ($note)", (probe) => {
           const result = validate(probe.value);
           if ("accepts" in probe) {
             expect(result, label(probe.value)).toEqual({ ok: true });
