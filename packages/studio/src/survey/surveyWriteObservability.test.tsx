@@ -37,8 +37,6 @@ import {
   resetPhaseBDraftDecisions,
   applyPhaseBDraftSnapshot,
 } from "../stores/phaseBDraftStore.ts";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { DEFAULT_PHASE_B_FONT } from "./surveyStyles.ts";
 
 // The punctuation step and the pane both read lib/services.ts; neither route
@@ -85,10 +83,7 @@ function classify(cp: number): Outcome {
 }
 
 beforeEach(() => {
-  usePhaseBDraftStore.getState().reset();
   resetPhaseBDraftDecisions();
-  useSurveySessionStore.getState().reset();
-  useWorkingCopyStore.getState().reset();
 });
 
 afterEach(() => {

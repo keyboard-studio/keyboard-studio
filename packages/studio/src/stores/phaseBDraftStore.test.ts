@@ -30,10 +30,6 @@ import { DEFAULT_PHASE_B_FONT } from "../survey/surveyStyles.ts";
 const PRECOMPOSED_E_ACUTE = "é";
 const DECOMPOSED_E_ACUTE = "é";
 
-afterEach(() => {
-  usePhaseBDraftStore.getState().reset();
-});
-
 describe("phaseBDraftStore — add", () => {
   it("adds a single character to an empty store", () => {
     usePhaseBDraftStore.getState().add("a");
@@ -243,10 +239,6 @@ describe("phaseBDraftStore — snapshotPhaseBDraft/applyPhaseBDraftSnapshot roun
 describe("phaseBDraftStore — three-store split (spec 071)", () => {
   const ACUTE = "́";
 
-  beforeEach(() => {
-    usePhaseBDraftStore.getState().reset();
-  });
-
   it("a precomposed pick contributes base, mark, and attested stack; chars keeps the whole grapheme", () => {
     usePhaseBDraftStore.getState().add("é");
     const s = usePhaseBDraftStore.getState();
@@ -349,10 +341,6 @@ describe("phaseBDraftStore — three-store split (spec 071)", () => {
 describe("phaseBDraftStore — category split (spec 047)", () => {
   const NBSP = " ";
   const ZWSP = "​";
-
-  beforeEach(() => {
-    usePhaseBDraftStore.getState().reset();
-  });
 
   it("routes a letter, digit, punctuation, symbol, NBSP, and a surviving control each to exactly one array (FR-005/SC-002)", () => {
     usePhaseBDraftStore.getState().setAll(["a", "1", ".", "€", NBSP, ZWSP]);
@@ -699,7 +687,6 @@ describe("phaseBDraftStore — 047 invariants survive seeding (spec 044 obligati
 
 describe("phaseBDraftStore — seedProposals (spec 075)", () => {
   beforeEach(() => {
-    usePhaseBDraftStore.getState().reset();
     resetPhaseBDraftDecisions();
   });
 
@@ -751,7 +738,6 @@ describe("phaseBDraftStore — seedProposals (spec 075)", () => {
 
 describe("phaseBDraftStore — invisible decisions (spec 075)", () => {
   beforeEach(() => {
-    usePhaseBDraftStore.getState().reset();
     resetPhaseBDraftDecisions();
   });
 
@@ -785,7 +771,6 @@ describe("phaseBDraftStore — invisible decisions (spec 075)", () => {
 
 describe("phaseBDraftStore — adoptControlsAsInvisibles carry-over (spec 075 FR-017)", () => {
   beforeEach(() => {
-    usePhaseBDraftStore.getState().reset();
     resetPhaseBDraftDecisions();
   });
 
@@ -822,7 +807,6 @@ describe("phaseBDraftStore — adoptControlsAsInvisibles carry-over (spec 075 FR
 
 describe("phaseBDraftStore — sticky class rules for the spec 075 fields", () => {
   beforeEach(() => {
-    usePhaseBDraftStore.getState().reset();
     resetPhaseBDraftDecisions();
   });
 

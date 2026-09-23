@@ -14,7 +14,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { createVirtualFS, makeBaseKeyboard } from "@keyboard-studio/contracts";
-import type { KeyboardIR } from "@keyboard-studio/contracts";
 import { CurrentKeyboardIndicator } from "./CurrentKeyboardIndicator.tsx";
 import { navigateTo } from "../lib/navigate.ts";
 import {
@@ -25,7 +24,7 @@ import {
 } from "../lib/draftPersistence.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
+import { makeScaffoldedIR } from "../test/irFixtures.ts";
 
 vi.mock("../lib/navigate.ts", () => ({ navigateTo: vi.fn() }));
 
@@ -44,26 +43,6 @@ const mockedResumeProject = vi.mocked(resumeProject);
 // Fixtures
 // ---------------------------------------------------------------------------
 
-function makeMinimalIr(): KeyboardIR {
-  return {
-    origin: "scaffolded" as const,
-    header: {
-      keyboardId: "test",
-      name: "test",
-      bcp47: [],
-      copyright: "",
-      version: "10.0",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores: [],
-    groups: [],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  } as unknown as KeyboardIR;
-}
-
 /** Instantiates a real working copy as `projectKey`, so it becomes "the
  * current keyboard" until the next `instantiateFromBase` call. */
 function instantiateAsCurrent(projectKey: string, displayName: string): void {
@@ -77,7 +56,7 @@ function instantiateAsCurrent(projectKey: string, displayName: string): void {
   });
   useWorkingCopyStore
     .getState()
-    .instantiateFromBase(base, { vfs: createVirtualFS([]), ir: makeMinimalIr() });
+    .instantiateFromBase(base, { vfs: createVirtualFS([]), ir: makeScaffoldedIR() });
 }
 
 /**
@@ -108,22 +87,14 @@ function seedIndexOnly(entries: Array<Partial<ProjectIndexEntry> & { projectKey:
   localStorage.setItem(DRAFT_INDEX_KEY, JSON.stringify(rows));
 }
 
-function resetStores(): void {
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-  usePhaseBDraftStore.getState().reset();
-}
-
 beforeEach(() => {
   localStorage.clear();
-  resetStores();
 });
 
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
   localStorage.clear();
-  resetStores();
 });
 
 // ---------------------------------------------------------------------------

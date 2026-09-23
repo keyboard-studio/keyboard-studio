@@ -19,6 +19,7 @@ import { scaffoldTouchLayoutWithDiagnostics } from "../scaffolder/scaffoldTouchL
 import type { TouchLayoutIR, TouchKeyIR } from "@keyboard-studio/contracts";
 import type { TouchAssignment } from "@keyboard-studio/contracts";
 import type { KeyboardIR, IRRule } from "@keyboard-studio/contracts";
+import { irGroup, makeTestIR, touchKey, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -26,7 +27,7 @@ import type { KeyboardIR, IRRule } from "@keyboard-studio/contracts";
 
 /** Build a single TouchKeyIR for use in test layouts. */
 function makeKey(id: string, overrides: Partial<TouchKeyIR> = {}): TouchKeyIR {
-  return { nodeId: `node_${id}`, id, text: id.toLowerCase(), output: id.toLowerCase(), ...overrides };
+  return touchKey({ id, text: id.toLowerCase(), output: id.toLowerCase(), ...overrides });
 }
 
 /**
@@ -916,30 +917,14 @@ describe("applyTouchAssignments — layer targeting", () => {
  *  uppercase special letter, enough to make the tablet scaffolder emit both
  *  secondary layers. */
 function makeRaltIR(): KeyboardIR {
-  const rule = (vkey: string, modifiers: string[], output: string): IRRule => ({
-    nodeId: `rule_${vkey}_${modifiers.join("") || "none"}_${output}`,
-    context: [{ kind: "vkey", name: vkey, modifiers }],
-    output: [{ kind: "char", value: output }],
-  });
+  const rule = (vkey: string, modifiers: string[], output: string): IRRule =>
+    vkeyRule({ nodeId: `rule_${vkey}_${modifiers.join("") || "none"}_${output}`, vkey, modifiers, output });
 
-  return {
-    origin: "imported",
-    header: {
-      keyboardId: "test_kb",
-      name: "Test KB",
-      bcp47: [],
-      copyright: "",
-      version: "1.0",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores: [],
+  return makeTestIR({
+    header: { keyboardId: "test_kb", name: "Test KB" },
     groups: [
-      {
+      irGroup({
         nodeId: "group:main",
-        name: "main",
-        usingKeys: true,
-        readonly: false,
         rules: [
           rule("K_A", [], "a"),
           rule("K_A", ["SHIFT"], "A"),
@@ -949,12 +934,9 @@ function makeRaltIR(): KeyboardIR {
           rule("K_N", [], "n"),
           rule("K_N", ["RALT", "SHIFT"], "Ŋ"),
         ],
-      },
+      }),
     ],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  };
+  });
 }
 
 describe("applyTouchAssignments — reseed-from-desktop tablet rightalt layer (regression)", () => {

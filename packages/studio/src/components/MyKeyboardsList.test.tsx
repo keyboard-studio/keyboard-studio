@@ -20,7 +20,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, screen, fireEvent, waitFor, within } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import type { BaseKeyboard, KeyboardIR } from "@keyboard-studio/contracts";
+import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { MyKeyboardsList, mergeProjectEntries } from "./MyKeyboardsList.tsx";
 import { useGitHubAuth, type UseGitHubAuthResult } from "../hooks/useGitHubAuth.ts";
 import { listServerDrafts, type ServerDraftMeta } from "../lib/serverDraftStore.ts";
@@ -34,8 +34,7 @@ import {
   PENDING_PROJECT_KEY,
 } from "../lib/draftPersistence.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
+import { makeScaffoldedIR } from "../test/irFixtures.ts";
 
 vi.mock("../hooks/useGitHubAuth.ts", () => ({ useGitHubAuth: vi.fn() }));
 
@@ -108,26 +107,6 @@ function seedLocalIndex(entries: Fixture[]): void {
   }
 }
 
-function makeMinimalIr(): KeyboardIR {
-  return {
-    origin: "scaffolded" as const,
-    header: {
-      keyboardId: "test",
-      name: "test",
-      bcp47: [],
-      copyright: "",
-      version: "10.0",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores: [],
-    groups: [],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  } as unknown as KeyboardIR;
-}
-
 /**
  * Seeds a REAL, `loadDraft()`-loadable per-project record: instantiates a
  * real working copy into the (real, unmocked) working-copy/survey-session
@@ -142,7 +121,7 @@ function seedRealDraft(projectKey: string, displayName: string): void {
   const base = { id: projectKey, displayName, languages: [] } as unknown as BaseKeyboard;
   useWorkingCopyStore
     .getState()
-    .instantiateFromBase(base, { vfs: createVirtualFS([]), ir: makeMinimalIr() });
+    .instantiateFromBase(base, { vfs: createVirtualFS([]), ir: makeScaffoldedIR() });
   saveDraft(projectKey);
 }
 
@@ -187,12 +166,6 @@ beforeEach(() => {
   localStorage.clear();
   mockGitHubAuth({ status: "idle" });
   mockedListServerDrafts.mockResolvedValue([]);
-  // Reset the real stores `seedRealDraft`/`resumeProject` touch, so a Resume
-  // test's instantiation/apply can't leak into the next test (same reset
-  // idiom as draftPersistence.test.ts's beforeEach).
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-  usePhaseBDraftStore.getState().reset();
 });
 
 afterEach(() => {
