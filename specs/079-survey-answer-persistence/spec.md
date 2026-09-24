@@ -1,0 +1,220 @@
+# Feature Specification: Survey answers persist per question — navigation never undoes a decision
+
+**Feature Branch**: `km/079-survey-answer-persistence`
+
+**Created**: 2026-09-24
+
+**Status**: Clarified 2026-09-24 — FR-015 (alphabet edits carry over) and FR-040 (record on Next) resolved; FR-007 (unsaved questions must justify) added.
+
+**Input**: User description: "Every survey question saves its answer as soon as it is given, and navigation never undoes a decision. Moving back to earlier questions and returning (without changing responses) must never undo any decision, even if a full set of questions was not completed. Every question should save its results, unless we jump to a clarifying question that will determine the shape of the current question." Origin: issue #1787 (Accents and marks answers lost after Back to Confirm your alphabet, then Done), which is one instance of a systemic defect.
+
+## Governing documents
+
+This spec **implements**, and does not restate, the following. On conflict they win, except where this spec explicitly amends them (see [Amendments](#amendments-to-existing-specs)).
+
+- [spec.md](../../spec.md) §3c (v1.3.1, defaults-first) — a default the author confirmed or overturned is **their decision**. Silently putting the proposal back undoes that decision, so it is a defect under "no default is a defect", not an inconvenience.
+- [specs/057-bulletproof-navigation/](../057-bulletproof-navigation/spec.md) — the author's *location* survives navigation (FR-001…FR-008), a deep link arrives at the recorded answer, not a re-proposed default (FR-031), and revisions re-propagate through the existing staleness mechanism (FR-033). This feature is 057's counterpart for *answer content*: 057 made the author's position durable, this makes every answer at that position durable.
+- [specs/026-qu-survey-session-store/](../026-qu-survey-session-store/) — the single source of truth for traversal. This feature adds no second notion of "where am I".
+- [specs/034-mvp-authoring-walk/](../034-mvp-authoring-walk/) US3 — the durable draft envelope. Anything this feature makes durable must round-trip through that envelope.
+- [specs/071-marks-question-series/](../071-marks-question-series/spec.md) — the Accents and marks series. FR-023 (re-confirmation when alphabet edits change the evidence behind a completed station) is the model for this spec's shape-change rule, generalised to every step.
+- [specs/075-punctuation-defaults/](../075-punctuation-defaults/spec.md) — the punctuation step's seed-once-per-evidence-key behaviour and its "removals survive a step revisit" guarantee, which this feature adopts as the rule for every step.
+- [specs/053-decision-audit/](../053-decision-audit/spec.md) and [specs/055-legible-decision-trail/](../055-legible-decision-trail/spec.md) — the append-only decision record. This feature does not change the record's model.
+- [specs/012-step-model-manifest/](../012-step-model-manifest/) and constitution Article IX — the manifest is the single source of survey ordering. This feature adds no survey surface.
+- Constitution Article IV / decision D3 — nothing in this feature validates, so it introduces no validation timer. Saving answers rides the existing autosave seam, which D3 does not govern.
+
+## Problem statement
+
+The rule the author is entitled to expect is simple: **an answer, once given, stays given until the author changes it.** The studio does not honour it. Several steps keep the author's answers only while the step is on screen, and write anything durable only when the whole step is finished. Leaving a step, even to look at an earlier question and come straight back without touching anything, destroys those answers. When the author returns, the step rebuilds itself from its proposals and starts again at its first question. Nothing tells the author this happened.
+
+Issue #1787 reported this for **Accents and marks**. An audit of every step in the manifest (2026-09-24) found the same class of defect in other steps. In one case it is worse: the author's **alphabet itself** can be wiped.
+
+### Observed defects
+
+File references are to [packages/studio/src](../../packages/studio/src/) and are evidence for planning, not requirements.
+
+- **D-1 — Accents and marks holds every answer only while it is on screen.** The mark attachments, per-class and per-mark treatment, promotions, explicitly set input order, output form, stacking choice, confirmed stacks and the current station all live in component state ([MarksSeriesStep.tsx](../../packages/studio/src/survey/marks/MarksSeriesStep.tsx)). Leaving the step discards them. Returning rebuilds them from proposals and returns to the first station. The only durable output is the step's *derived* result, recorded on completion, from which the raw answers cannot be rebuilt. The re-proposal rules that fire when evidence changes (071 FR-023) are therefore applied to nothing: they reset to proposals rather than adjusting saved answers. This is issue #1787.
+- **D-2 — Convenience letters holds its answers only while it is on screen.** The author's un-ticked convenience letters are component state ([ConvenienceCharsStep.tsx](../../packages/studio/src/survey/ConvenienceCharsStep.tsx)). On return, every letter is ticked again. The recorded result of the step is never read back.
+- **D-3 — Passing back through the prefill confirmation wipes the alphabet.** Confirming the prefill screen always starts a fresh alphabet ([CharactersStep.tsx](../../packages/studio/src/survey/CharactersStep.tsx)). That clears the characters, bases, marks, their provenance and the punctuation picks. The prefill screen is only a confirmation of the language, script and base already chosen. It asks nothing new, yet passing through it unchanged discards everything built after it. Routes that pass through it with no change:
+  - Back twice from Confirm your alphabet, then forward again.
+  - Pressing Done again on Project name (copy track) or on the track choice (adapt track), which routes into the characters step at prefill ([steps/advance.ts](../../packages/studio/src/steps/advance.ts)).
+
+  After the wipe, the author lands on an **empty** build list, because the method they chose for building it is kept. Punctuation proposals are also never offered again, because the step remembers that it already proposed them. 057 FR-007 tied clearing to "a genuine prefill → build-list transition" and fixed the remount case, but a deliberate pass through an unchanged prefill still counts as genuine. This spec narrows that (see Amendments).
+- **D-4 — Steps that share a phase overwrite each other's recorded answers.** Accents and marks, Punctuation, Invisible characters and Convenience letters all record their result into the same phase slot. The last step to finish replaces the others' recorded answers ([workingCopyStore.ts](../../packages/studio/src/stores/workingCopyStore.ts), `recordPhase`). For example, finishing Convenience letters erases the Invisible characters answers from the phase result. The UI is currently unaffected only because the decision record is kept separately. Anything that restores answers from the phase result would restore the wrong ones.
+- **D-5 — Question-by-question steps survive leaving, but not a reload.** Identity, Track, Project name, Help and the manual characters path keep each unfinished answer and the current question in a store that outlives the component. That store is deliberately left out of the saved draft ([stepWalkStore.ts](../../packages/studio/src/stores/stepWalkStore.ts)), so reloading the page loses them. The stated reason (the walk is derived and large) applies to the walk, not to the author's answers or position, which are small.
+- **D-6 — Re-completing Accents and marks re-applies its effects.** Each completion of the step re-applies its mark guards to the working copy. Whether that is idempotent is unverified. If it is not, "complete the step again with no change" is itself a change.
+
+Steps already correct (precedents): **Punctuation** and **Invisible characters** keep their answers in a durable shared draft, seed proposals once per evidence key, and keep the author's removals across revisits. The punctuation step's "removals survive a step revisit" test is the model. The base, carve, mechanisms and touch steps keep their answers in the working copy and are believed correct, but that was not verified in depth.
+
+## Clarifications
+
+### Session 2026-09-24
+
+- Q: If the author really changes their language, script or base, what happens to the characters they added or removed by hand? → A: They carry over to the new proposal. Additions are kept where they still fit, removals are re-applied, and anything that no longer makes sense is flagged for reconfirmation (FR-015).
+- Q: When do answers reach the decision trail? → A: When the author clicks Next on the question. Each Next is a recording point, whether or not the step is finished. A Next with no change records nothing (FR-040).
+- Q: May a question leave its answer or status unsaved? → A: Only with an explicit written justification (FR-007).
+
+## User Scenarios & Testing *(mandatory)*
+
+### User Story 1 - Look back and come back with nothing lost (Priority: P1)
+
+An author is partway through a step. In Accents and marks, say, they have un-ticked two attachments, changed a treatment and are on the third station. They go Back to an earlier question to check something, change nothing, and come forward again. Every answer they gave is still there, and they are on the station they left.
+
+**Why this priority**: This is the reported data loss (#1787) and the core promise. An author who cannot safely look back cannot trust the survey at all.
+
+**Independent Test**: For each survey step, answer some questions away from their proposals without finishing the step. Navigate back one or more steps and forward again with no changes. Compare every answer and the current question with what was there before leaving. Delivers value on its own for any single step fixed.
+
+**Acceptance Scenarios**:
+
+1. **Given** an author has changed answers in Accents and marks and moved on to later stations, **When** they go Back to Confirm your alphabet and press Done without editing the alphabet, **Then** every Accents and marks answer is as they left it and they are on the station they left.
+2. **Given** an author has un-ticked some convenience letters, **When** they leave the step and return with no upstream change, **Then** those letters are still un-ticked.
+3. **Given** an author is partway through a step and has *not* finished it, **When** they leave and return with no upstream change, **Then** their partial answers and their position are kept. Finishing a step is not a precondition for its answers being kept.
+4. **Given** an author has already finished a step, **When** they revisit it and leave without changing anything, **Then** no answer changes, the step's effects on the keyboard are not re-applied in a way that alters it, and no new decision is recorded.
+
+---
+
+### User Story 2 - Going back through the prefill confirmation keeps the alphabet (Priority: P1)
+
+An author has built an alphabet and chosen punctuation. They step back past Confirm your alphabet to the prefill confirmation, or press Done again on Project name or on the track choice, then come forward without changing their language, script or base. Their alphabet, punctuation choices and everything after them are intact.
+
+**Why this priority**: This is the largest loss the audit found: the whole alphabet, not just one step's answers. It is reachable with two Back presses.
+
+**Independent Test**: Build an alphabet with added and removed characters, pick punctuation, then take each of the three routes through the prefill confirmation with no change. Verify the alphabet, punctuation picks and later steps' answers are unchanged.
+
+**Acceptance Scenarios**:
+
+1. **Given** a built alphabet and punctuation picks, **When** the author goes Back twice from Confirm your alphabet and then forward through the prefill confirmation without changing anything, **Then** the alphabet and punctuation picks are unchanged and the build list is not empty.
+2. **Given** the same state, **When** the author presses Done again on Project name or on the track choice with no change, **Then** the alphabet and every later answer are unchanged.
+3. **Given** the same state, **When** the author changes their language, script or base keyboard and comes forward, **Then** the alphabet is treated as depending on a changed shape-determining answer and handled under User Story 3.
+
+---
+
+### User Story 3 - A real change re-proposes only what it affects (Priority: P2)
+
+An author goes back and changes a clarifying answer that decides the shape of a later question, such as adding a base letter to the alphabet after Accents and marks is done. Only the later answers that the change actually affects are proposed again, and the author is told which. Everything the change does not touch is kept exactly as they left it.
+
+**Why this priority**: This is the one sanctioned exception to "never undo". Getting its boundary right is what keeps User Story 1 from being over-applied, where a stale answer silently survives a change that invalidated it, or under-applied, where a whole step is reset for a one-letter edit.
+
+**Independent Test**: Complete Accents and marks with several answers overturned. Go back and make one alphabet edit that affects a single mark. Return and verify that only that mark's answers are re-proposed and flagged, and that all other answers are unchanged.
+
+**Acceptance Scenarios**:
+
+1. **Given** Accents and marks is answered, **When** the author adds one base letter to the alphabet, **Then** only the answers involving that base (its attachments and any treatment whose evidence it changes) are re-proposed and flagged for reconfirmation, and every other answer is kept.
+2. **Given** the author explicitly set an input order, **When** an alphabet change re-proposes attachment answers, **Then** the explicitly set input order is kept unless the change makes it inapplicable.
+3. **Given** a shape-determining answer was changed and then changed back to its original value before the dependent step was revisited, **When** the author returns to the dependent step, **Then** their original answers are restored and nothing is flagged.
+4. **Given** an answer was re-proposed because of a shape change, **When** the author views that question, **Then** they can see that it was re-proposed and why, in terms they understand.
+
+---
+
+### User Story 4 - Answers survive a reload (Priority: P2)
+
+An author closes the tab or reloads partway through any step. When their draft is restored, every answer they had given, finished step or not, and the question they were on are exactly as they left them.
+
+**Why this priority**: Durability across a reload is the same promise as durability across navigation, at a longer range. Without it, D-5 leaves the question-by-question steps half-fixed.
+
+**Independent Test**: For each step, give partial answers, reload the studio, restore the draft, and compare answers and position.
+
+**Acceptance Scenarios**:
+
+1. **Given** partial answers in Accents and marks, **When** the author reloads and the draft is restored, **Then** every answer and the current station are restored.
+2. **Given** a half-answered Identity or Project name question, **When** the author reloads, **Then** the answer and current question are restored.
+3. **Given** a draft saved before this feature shipped, **When** it is restored, **Then** it loads without error. Answers it never saved fall back to proposals, and nothing is invented.
+
+---
+
+### Edge Cases
+
+- **Several steps sharing a phase.** Recording one step's answers must never erase another step's answers (D-4).
+- **Rapid Back/Forward.** Navigating away before a just-given answer has been written durably must not lose it. The answer is saved when it is given, not when the author leaves.
+- **Revisit without change of a completed step.** It must not append a decision-record entry, must not mark anything stale, and must not re-apply step effects non-idempotently (D-6).
+- **Shape change to a step the author never reached.** Nothing to re-propose. The step derives its proposals fresh when first reached.
+- **Shape change that removes a question entirely**, such as removing the last diacritic so Accents and marks no longer applies. The step's saved answers are kept but inactive. If the change is reversed, they come back rather than being re-proposed.
+- **Start over / new project.** Explicit start-over and switching to a genuinely new project still clear answers (057 FR-003). This feature must not make a new project inherit the previous one's answers.
+- **Deep link to a question** (057 FR-031). Arrives at the saved answer, including for a step that was never finished.
+- **Compare tab** (057 FR-021). Reads nothing into and writes nothing to the saved answers.
+
+## Requirements *(mandatory)*
+
+### A. The rule
+
+- **FR-001**: Every survey question MUST save the author's answer at the moment it is given, into state that outlives the question's presentation. No answer may exist only while its question is on screen.
+- **FR-002**: A step's answers MUST be saved whether or not the step has been finished. Finishing a step MUST NOT be a precondition for any of its answers being kept.
+- **FR-003**: Navigating away from a question, by Back, by the footer, by a deep link, by switching tabs or by reloading, and returning to it MUST present the saved answer, not a proposal, unless FR-010 applies.
+- **FR-004**: Returning to a step MUST return the author to the question or station within it they were last on, unless FR-010 moves them.
+- **FR-005**: Passing through an earlier question or confirmation screen without changing its answer MUST NOT alter any later answer. "Without changing" means the answer's value is unchanged. Re-confirming, re-pressing Done or re-visiting is not a change.
+- **FR-006**: Revisiting a finished step and leaving it without changing any answer MUST NOT append a decision-record entry, mark any consequence stale, or change the keyboard being authored.
+- **FR-007**: Saving is the default for every question, with no exceptions by omission. A question whose answer or status is **not** saved MUST carry an explicit, written justification for why saving is unnecessary or harmful, such as a purely transient UI toggle that records no decision. The justification MUST sit beside the question's declaration, where a reviewer sees it, and MUST be listed in the FR-050 classification. An unsaved question with no justification is a defect. The shape-determining exception (FR-010) is not an exemption from saving: the answer is saved and then re-proposed.
+
+### B. The one exception: shape-determining answers
+
+- **FR-010**: When the author **changes** an answer that determines the shape of a later question, the system MUST re-propose only the later answers the change actually affects, and MUST keep every other saved answer. A step MUST NOT be reset wholesale because one of its inputs changed.
+- **FR-011**: Each step MUST declare which earlier answers are shape-determining for it, and each saved answer MUST record the value of that evidence it was given against, so that the system can tell a real change from a revisit.
+- **FR-012**: Re-proposal MUST start from the **saved** answers and adjust them. It MUST NOT start from nothing. Answers the author set explicitly, such as an explicitly chosen input order, MUST be kept unless the change makes them inapplicable. This generalises 071 FR-023 to every step.
+- **FR-013**: A re-proposed answer MUST be visibly marked as needing reconfirmation, with a reason naming the change that caused it, in the author's terms. The author MUST NOT be able to pass a flagged question without either confirming the re-proposal or overturning it.
+- **FR-014**: If a shape-determining answer is changed and then restored to its earlier value before the dependent answers are reconfirmed, the dependent answers MUST return to their saved values, with no flags.
+- **FR-015**: When the author changes a shape-determining answer that affects the alphabet (the language, script or base keyboard), the author's own alphabet edits MUST carry over to the new proposal. Characters the author added MUST be kept where they still fit the new language, script and base. Characters the author removed MUST be removed again from the new proposal. An edit that no longer makes sense against the new evidence, such as an added character outside the new script, MUST be flagged for reconfirmation under FR-013, never silently dropped. The author's edits MUST NOT be discarded, even with a warning (clarified 2026-09-24).
+
+### C. The characters step
+
+- **FR-020**: Passing through the prefill confirmation with the language, script and base unchanged MUST NOT clear or replace the alphabet, its provenance, or the punctuation picks. This applies on every route: Back through it, and re-pressing Done on Project name or on the track choice.
+- **FR-021**: The author MUST never land on an empty build list as a result of navigation when they previously had an alphabet.
+- **FR-022**: When a genuine change to language, script or base does require the alphabet to be re-proposed, proposals that depend on it, such as punctuation defaults, MUST be re-derived for the new evidence rather than suppressed because they were offered once before.
+
+### D. Durability
+
+- **FR-030**: Every saved answer, and each step's current question or station, MUST be included in the durable draft and restored with it. This covers the question-by-question steps currently excluded (D-5).
+- **FR-031**: Recording one step's answers MUST NOT erase or overwrite another step's answers, including steps that share a phase (D-4).
+- **FR-032**: Restoring a draft saved before this feature MUST succeed. Any answer that draft never saved MUST fall back to its proposal, and the author MUST NOT be shown an answer they never gave.
+- **FR-033**: Explicit start-over and switching to a new project MUST continue to clear saved answers (057 FR-003). Nothing else may.
+- **FR-034**: Saving answers MUST NOT introduce a validation timer or a second validation path (D3). It MAY use the existing autosave mechanism.
+
+### E. Decision record
+
+- **FR-040**: An answer MUST be recorded in the decision record when the author clicks Next on its question or station, whether or not the step is finished (clarified 2026-09-24). Saving (FR-001) and recording are distinct:
+  - An answer is saved the moment it is given.
+  - It is recorded when the author moves forward past it.
+  - Leaving by Back, by the footer, by a deep link or by switching tabs saves the answer but does not record it. It is recorded at the next Next past it.
+  - A Next with no changed answer since the last recording MUST record nothing (FR-006).
+  - Changing a recorded answer and clicking Next again MUST append a superseding entry (FR-041), never a duplicate.
+- **FR-041**: A re-proposal caused by a shape change (FR-010) that the author then confirms or overturns MUST be recorded through the existing append-only supersession path (053 FR-015). No new supersession concept is introduced.
+
+### F. Coverage and verification
+
+- **FR-050**: Every step in the manifest MUST be classified as compliant, non-compliant, or justified-exempt (FR-007) with FR-001…FR-007, with evidence, and every non-compliant step MUST be fixed by this feature or have a tracked follow-up. Accents and marks (D-1), Convenience letters (D-2), the characters step (D-3), the shared phase slot (D-4) and the question-by-question steps' durability (D-5) are in scope for this feature.
+- **FR-051**: Each fixed step MUST have a test that leaves the step with changed answers, returns with no upstream change, and asserts every answer and the current position are unchanged. The punctuation step's "removals survive a step revisit" test is the model.
+- **FR-052**: Each step with shape-determining inputs MUST have a test that changes one input and asserts that only the affected answers are re-proposed.
+- **FR-053**: A test MUST cover save-and-reload of partial answers for at least Accents and marks and one question-by-question step.
+- **FR-054**: Re-completing Accents and marks with no change MUST leave the keyboard being authored unchanged, verified by test (D-6).
+
+### Key Entities
+
+- **Saved answer**: the author's response to one question. It holds its value, whether it was proposed, confirmed or overturned, and the evidence key it was given against. It outlives the question's presentation and is part of the durable draft.
+- **Evidence key**: a compact fingerprint of the shape-determining answers a question depends on, such as the confirmed alphabet for Accents and marks, or the language, script and base for the alphabet. A saved answer is *current* when its evidence key matches the present one, and *affected* when it does not.
+- **Step position**: the question or station within a step the author was last on. Part of the durable draft.
+- **Re-proposal flag**: marks a saved answer that a shape change re-proposed. It carries the reason and clears when the author confirms or overturns the answer.
+
+## Success Criteria *(mandatory)*
+
+### Measurable Outcomes
+
+- **SC-001**: For every survey step, leaving with changed answers and returning with no upstream change keeps 100% of answers and the current position. Verified by one revisit test per step.
+- **SC-002**: Zero routes exist by which passing through an unchanged earlier question or confirmation clears a later answer. Verified for the three prefill routes (D-3) and the marks route (#1787).
+- **SC-003**: A single-item upstream change, such as adding one letter, re-proposes only the answers that depend on that item. In the marks test case, every answer not involving the added item is unchanged.
+- **SC-004**: After a reload, 100% of saved answers and positions are restored for every step covered by FR-053.
+- **SC-005**: Revisiting a finished step without change adds zero decision-record entries and leaves the keyboard source unchanged.
+- **SC-006**: All acceptance criteria of issue #1787 are met.
+- **SC-007**: Every question that does not save its answer or status appears in the FR-050 classification with a written justification. Unjustified exemptions: zero.
+
+## Amendments to existing specs
+
+- **057 FR-007** is narrowed. Clearing the alphabet is tied not to "a genuine prefill → build-list transition" but to a **change** in the language, script or base the prefill confirms (FR-020). Passing through the prefill confirmation unchanged is not a change.
+- **053 capture boundary** is refined. The decision record's append-only model and supersession chains are unchanged, but the capture point moves from step completion to **each Next** within a step (FR-040). A multi-question step therefore records per question as the author advances, rather than once when it is finished.
+- **071 FR-023** is generalised. Its re-confirmation behaviour applies to saved answers (FR-012), whether or not the marks series was completed, and becomes the pattern for every step (FR-010…FR-014).
+
+## Assumptions
+
+- Only an answer's **value** determines whether it changed. Re-confirming an unchanged value is never a change (FR-005).
+- A shape-determining answer is always earlier in the walk than the answers it shapes. The manifest ordering guarantees this.
+- The base, carve, mechanisms and touch steps already keep their answers in the working copy and are compliant. FR-050's classification will confirm or refute this, and any gap it finds is either fixed or filed.
+- Re-proposed answers are flagged rather than silently changed (FR-013), following 071 FR-023's reconfirmation model. The wording of the flag is Content-owned survey text.
+- Ownership: Engine team (studio SPA, stores, draft persistence). The wording of re-proposal notices is Content-owned (Article VI).
+- Out of scope: survey-editing opaque `RawKmnFragment` content, the Compare tab (read-only under 057), and any change to the decision record's model.
