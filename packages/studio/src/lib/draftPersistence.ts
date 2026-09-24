@@ -53,6 +53,7 @@ import {
   snapshotDecisionRecord,
 } from "../decisions/decisionLogStore.ts";
 import { parseDecisionRecord, shedDecisionDetail } from "@keyboard-studio/engine";
+import { alphabetKeyOf } from "../steps/evidence.ts";
 // Re-exported (not just imported) so existing external consumers of this
 // module (draftPersistence.test.ts, StudioShell.tsx, etc.) keep importing
 // `DurableDraft`/`ProjectIndexEntry`/`DraftMeta` from here unchanged, even
@@ -885,6 +886,21 @@ function stringArray(v: unknown): string[] {
  * so `applyPhaseBDraftSnapshot` never falls back to its own defaults for a
  * field the envelope actually saved.
  */
+/**
+ * A draft saved before spec 079 carries a built alphabet but no
+ * `alphabetEvidenceKey`. Unstamped means "first build" to the characters
+ * prefill confirm, which would wipe it; the alphabet was built from the
+ * identity and base restored alongside it, so stamp their key here instead
+ * (spec 079 R-07, FR-032). Runs after the traversal restore it reads.
+ */
+function stampPre079Alphabet(): void {
+  const draft = usePhaseBDraftStore.getState();
+  if (draft.alphabetEvidenceKey !== undefined || draft.chars.length === 0) return;
+  const { identityResult, localBase } = useSurveySessionStore.getState();
+  if (identityResult === null || localBase === null) return;
+  draft.setAlphabetEvidenceKey(alphabetKeyOf(identityResult, localBase));
+}
+
 function restorePhaseBDraftSnapshot(raw: unknown): PhaseBDraftSnapshot {
   const pb = isPlainRecord(raw) ? raw : {};
   const declaredRoles: Record<string, DeclaredRole> = {};
@@ -913,6 +929,9 @@ function restorePhaseBDraftSnapshot(raw: unknown): PhaseBDraftSnapshot {
     // spec 075 sticky fields — same tolerant treatment, same reason.
     seededProposals: stringArray(pb.seededProposals),
     invisibleDecisions,
+    // spec 079 R-07: a non-string key is dropped, never coerced — an absent
+    // key reads as "not yet stamped", which the prefill confirm handles.
+    ...(typeof pb.alphabetEvidenceKey === "string" ? { alphabetEvidenceKey: pb.alphabetEvidenceKey } : {}),
     selectedFont: isPhaseBFontValue(pb.selectedFont) ? pb.selectedFont : DEFAULT_PHASE_B_FONT,
   };
 }
@@ -1084,6 +1103,7 @@ function applyEnvelopeToStores(envelope: DurableDraft, pendingSlotKey: string): 
     // proposed chip to "author". Each field is validated individually and
     // degrades to its empty default, never discarding the record.
     applyPhaseBDraftSnapshot(restorePhaseBDraftSnapshot(envelope.phaseBDraft));
+    stampPre079Alphabet();
 
     // surveyAnswers (spec 079 R-01, FR-032): optional/additive, restored the
     // same tolerant way. Applied even when absent, so a pre-079 draft (or a

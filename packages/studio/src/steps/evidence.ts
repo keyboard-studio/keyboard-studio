@@ -41,6 +41,24 @@ export function alphabetKey(e: AlphabetEvidence): EvidenceKey {
   return [e.bcp47 ?? "", e.script ?? "", e.variant ?? "", e.baseId ?? ""].join("|");
 }
 
+/**
+ * The alphabet key of an identity answer and a chosen base — the ONE mapping
+ * from session values to `AlphabetEvidence`, shared by the characters prefill
+ * confirm and the pre-079 draft restore so the two can never disagree.
+ * Structural parameter types: steps/ may not import survey/ or stores/.
+ */
+export function alphabetKeyOf(
+  identity: { bcp47: string; targetScriptRaw: string; prefill: { script: string } },
+  base: { id: string },
+): EvidenceKey {
+  return alphabetKey({
+    bcp47: identity.bcp47,
+    script: identity.prefill.script,
+    variant: identity.targetScriptRaw,
+    baseId: base.id,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // marks — the accents & marks series (R-02, R-04)
 // ---------------------------------------------------------------------------

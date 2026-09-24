@@ -29,6 +29,7 @@ import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
 import { useStartOverStore } from "./stores/startOverStore.ts";
 import { useStepWalkStore } from "./stores/stepWalkStore.ts";
+import { usePhaseBDraftStore, resetPhaseBDraftDecisions } from "./stores/phaseBDraftStore.ts";
 import { consumePendingWelcomeLocation, jumpToLocation } from "./lib/jumpToLocation.ts";
 import type { OnInstantiateCallback, Stage } from "./hooks/useKeyboardArtifact.ts";
 
@@ -739,6 +740,12 @@ afterEach(() => {
   // published walk means the journey has started), so a walk left behind by a
   // previous test would decide a later test's footer for it.
   useStepWalkStore.getState().reset();
+  // Spec 079 R-07: the prefill confirm no longer wipes the draft alphabet when
+  // its evidence key is unchanged — which is every test here — so an alphabet
+  // (and its stamp) left by one test would reach the next. Same reasoning as
+  // the survey-session reset above: isolation is this file's job.
+  usePhaseBDraftStore.getState().reset();
+  resetPhaseBDraftDecisions();
   vi.clearAllMocks();
   // The first-visit gate reads ks.visited / the ks.studio.draft key from
   // localStorage; clear it so gate state can't leak between tests.

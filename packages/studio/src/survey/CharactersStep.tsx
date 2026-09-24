@@ -15,8 +15,11 @@
 import { useEffect, useRef, type ComponentType } from "react";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import type { EditorStepProps } from "../steps/types.ts";
+import { alphabetKeyOf } from "../steps/evidence.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore, draftConfirmedAlphabet } from "../stores/phaseBDraftStore.ts";
+import type { IdentityLiteResult } from "./identityLiteResult.ts";
+import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import { peekStepCursor } from "../stores/stepWalkStore.ts";
 import { useValidatorFindings } from "../hooks/useValidatorFindings.ts";
@@ -44,6 +47,43 @@ import { Prefill, PhaseB } from "./index.ts";
 // unit test) that never reaches PhaseB's own state to restore it.
 const CHARACTERS_STEP_ID = "characters";
 
+/** Seed-key prefixes the punctuation step records (see PunctuationStep's seed effects). */
+const PUNCTUATION_SEED_PREFIXES = ["punctuation:", "punctuation-base:"] as const;
+
+/**
+ * The prefill confirm — the ONE chokepoint every route into the build list
+ * passes (Back from Phase B, Done on Project name, Done on the adapt track:
+ * steps/advance.ts leaves them all at substage "prefill"), so FR-020 holds on
+ * every route by construction (spec 079 R-07).
+ *
+ * - Unchanged evidence with a built alphabet: nothing is reset. The author
+ *   returns to the build list where they were — `discoveryMethod` survives the
+ *   trip through prefill, so PhaseB reopens on the same screen (FR-004).
+ * - A different key is a real shape change: fresh alphabet, the punctuation
+ *   seeds tied to the old evidence cleared so its defaults are proposed again
+ *   (FR-022), and the new key stamped. Carrying the author's edits across is
+ *   US3's carry-over reset.
+ * - No stamp is a first build — or a new working copy, whose instantiate
+ *   cleared the stamp but not the previous project's draft — so it resets
+ *   too. A draft saved before spec 079 is stamped on restore instead
+ *   (lib/draftPersistence.ts `loadDraft`), so it is never mistaken for one.
+ */
+function confirmPrefill(identity: IdentityLiteResult, base: BaseKeyboard): void {
+  const draft = usePhaseBDraftStore.getState();
+  const key = alphabetKeyOf(identity, base);
+  const stamp = draft.alphabetEvidenceKey;
+  if (draft.chars.length > 0 && stamp === key) return;
+  draft.reset();
+  if (stamp !== undefined) {
+    usePhaseBDraftStore.setState({
+      seededProposals: usePhaseBDraftStore
+        .getState()
+        .seededProposals.filter((k) => !PUNCTUATION_SEED_PREFIXES.some((p) => k.startsWith(p))),
+    });
+  }
+  usePhaseBDraftStore.getState().setAlphabetEvidenceKey(key);
+}
+
 /**
  * Self-contained characters step adapter.
  *
@@ -63,7 +103,6 @@ const CharactersStep: ComponentType<EditorStepProps> = ({
   const setCharactersSubStage = useSurveySessionStore((s) => s.setCharactersSubStage);
   const discoveryMethod = useSurveySessionStore((s) => s.discoveryMethod);
   const setDiscoveryMethod = useSurveySessionStore((s) => s.setDiscoveryMethod);
-  const resetPhaseBDraft = usePhaseBDraftStore((s) => s.reset);
   const setPosition = useSurveyAnswerStore((s) => s.setPosition);
 
   const findingsByQuestionId = useValidatorFindings();
@@ -122,10 +161,10 @@ const CharactersStep: ComponentType<EditorStepProps> = ({
         identity={identityResult}
         base={localBase}
         onConfirm={() => {
-          // Fresh draft alphabet each time the build-list screen is (re)entered
-          // (spec character-map pane work) — NOT on every BuildListView/
-          // CharacterMapPane render, only on this prefill -> B transition.
-          resetPhaseBDraft();
+          // Only this prefill -> B transition may reset the draft alphabet —
+          // never a BuildListView/CharacterMapPane render — and only when the
+          // evidence it was built from changed (confirmPrefill above).
+          confirmPrefill(identityResult, localBase);
           setCharactersSubStage("B");
         }}
         // Conditionally spread (not `() => onBack?.()`) — F7 sweep: an

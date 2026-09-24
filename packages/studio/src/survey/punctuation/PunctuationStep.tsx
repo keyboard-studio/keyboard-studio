@@ -56,6 +56,8 @@ import type { EditorStepProps } from "../../steps/types.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { usePhaseBDraftStore, type DraftProvenance } from "../../stores/phaseBDraftStore.ts";
+import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
+import { punctuationKey } from "../../steps/evidence.ts";
 import { useSourcedExemplars } from "../useSourcedExemplars.ts";
 import { charactersInTier } from "../../lib/services.ts";
 import { containsFormatChar, harvestChars, isFormatChar } from "../charNormUtils.ts";
@@ -92,6 +94,18 @@ import {
  * See the module header for why the label is "C" and never "B", and why the
  * inventory is the shared phase-C union rather than this page's slice alone.
  */
+/** Manifest step id — matches steps/manifest.ts's "punctuation" entry. */
+const PUNCTUATION_STEP_ID = "punctuation";
+
+/**
+ * The saved answer that carries the evidence key the confirmed inventory was
+ * built on (spec 079 R-07, FR-022). The inventory itself stays where it always
+ * was (the shared draft + the phase-C result); this answer records only what
+ * it was confirmed FOR, so the FR-023 guard can tell "confirmed here" from
+ * "confirmed for another language or base".
+ */
+const PUNCTUATION_INVENTORY_ANSWER_ID = "punctuation.inventory";
+
 function punctuationResult(): SurveyPhaseResult {
   return { phase: "C", answers: [], confirmedInventory: phaseCConfirmedInventory() };
 }
@@ -226,14 +240,11 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
   const seedProposals = usePhaseBDraftStore((s) => s.seedProposals);
   const acceptInvisible = usePhaseBDraftStore((s) => s.acceptInvisible);
 
-  // FR-023: a phase-C confirmedInventory already on the session means the
-  // author confirmed this step (possibly before proposals existed). Their
-  // decision stands — nothing is seeded on top of it.
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
-  const alreadyConfirmed = useMemo(
-    () => phaseResults.some((p) => p.phase === "C" && p.confirmedInventory !== undefined),
-    [phaseResults],
+  const confirmedForKey = useSurveyAnswerStore(
+    (s) => s.steps[PUNCTUATION_STEP_ID]?.answers[PUNCTUATION_INVENTORY_ANSWER_ID]?.evidenceKey,
   );
+  const saveAnswer = useSurveyAnswerStore((s) => s.saveAnswer);
 
   const { inventory, loading } = useSourcedExemplars(bcp47);
 
@@ -245,6 +256,21 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
   const baseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
   const baseCoverage = useMemo(() => (ir === null ? null : basePunctuationCoverage(ir)), [ir]);
   const baseCoverageIncomplete = baseCoverage === null || !baseCoverage.coverageComplete;
+
+  const evidenceKey = punctuationKey(inventory?.resolvedTag, baseKeyboard?.id);
+
+  // FR-023: a phase-C confirmedInventory already on the session means the
+  // author confirmed this step (possibly before proposals existed). Their
+  // decision stands — nothing is seeded on top of it — but only for the
+  // evidence it was confirmed on (spec 079 FR-022): after a language or base
+  // change the defaults are proposed again. A confirmation with no recorded
+  // key predates spec 079 and is honoured as before.
+  const alreadyConfirmed = useMemo(
+    () =>
+      phaseResults.some((p) => p.phase === "C" && p.confirmedInventory !== undefined) &&
+      (confirmedForKey === undefined || confirmedForKey === null || confirmedForKey === evidenceKey),
+    [phaseResults, confirmedForKey, evidenceKey],
+  );
 
   const [inputVal, setInputVal] = useState("");
   // Non-punctuation characters the type-in box declined, shown (not silently
@@ -391,7 +417,16 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
   function complete(): void {
     if (completedRef.current) return;
     completedRef.current = true;
-    onComplete(punctuationResult());
+    const result = punctuationResult();
+    saveAnswer(PUNCTUATION_STEP_ID, PUNCTUATION_INVENTORY_ANSWER_ID, {
+      value: result.confirmedInventory ?? [],
+      answerType: "char-list",
+      origin: "confirmed",
+      stage: "confirmed",
+      evidenceKey,
+      screenId: PUNCTUATION_STEP_ID,
+    });
+    onComplete(result);
   }
 
   // NOT `inputVal.trim() === ""`: String#trim strips U+FEFF (and every other

@@ -21,6 +21,7 @@ import { PunctuationStep } from "./PunctuationStep.tsx";
 import { usePhaseBDraftStore, resetPhaseBDraftDecisions } from "../../stores/phaseBDraftStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
 
 // sourcedExemplars does a real (offline-index) lookup when unmocked;
 // charactersInTier is a pure engine re-export, reproduced verbatim so the
@@ -690,5 +691,63 @@ describe("PunctuationStep — leave and return (spec 079 FR-051)", () => {
     const phaseC = useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C");
     expect(phaseC).toBeDefined();
     expect(phaseC!.answers).toContainEqual(invisiblesResult.answers[0]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 079 T040 (R-07, FR-022) — the FR-023 guard is scoped to the evidence the
+// inventory was confirmed on (`resolvedTag|baseId`), not "any confirmed
+// inventory". No working copy in these tests, so the base part is empty.
+// ---------------------------------------------------------------------------
+
+describe("PunctuationStep — alreadyConfirmed is scoped to the current evidence (spec 079 FR-022)", () => {
+  beforeEach(() => {
+    useSurveyAnswerStore.getState().reset();
+    useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: "hi", language_name: "Hindi" });
+  });
+
+  function confirmedFor(key: string | null): void {
+    useWorkingCopyStore.getState().recordPhase({ phase: "C", answers: [], confirmedInventory: ["!"] });
+    useSurveyAnswerStore.getState().saveAnswer("punctuation", "punctuation.inventory", {
+      value: ["!"],
+      answerType: "char-list",
+      origin: "confirmed",
+      stage: "confirmed",
+      evidenceKey: key,
+      screenId: "punctuation",
+    });
+    usePhaseBDraftStore.getState().add("!");
+  }
+
+  it("Done records the evidence key the inventory was confirmed on", async () => {
+    mocks.inventory = hindiInventory();
+    const onComplete = vi.fn();
+    render(<PunctuationStep onComplete={onComplete} />);
+    await screen.findByTestId("cldr-punctuation-group");
+    fireEvent.click(screen.getByTestId("punctuation-done"));
+
+    const saved = useSurveyAnswerStore.getState().steps["punctuation"]?.answers["punctuation.inventory"];
+    expect(saved?.evidenceKey).toBe("hi|");
+    expect(saved?.value).toEqual(lastResult(onComplete).confirmedInventory);
+  });
+
+  it("a confirmation on the CURRENT evidence stands: nothing is seeded on top of it", async () => {
+    confirmedFor("hi|");
+    mocks.inventory = hindiInventory();
+    render(<PunctuationStep onComplete={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(usePhaseBDraftStore.getState().seededProposals).toEqual(["punctuation:hi"]);
+    });
+    expect(usePhaseBDraftStore.getState().chars).toEqual(["!"]);
+  });
+
+  it("a confirmation on OTHER evidence does not: the punctuation defaults are proposed again", async () => {
+    confirmedFor("ewo|");
+    mocks.inventory = hindiInventory();
+    render(<PunctuationStep onComplete={vi.fn()} />);
+
+    await screen.findByTestId("cldr-punctuation-group");
+    expect(usePhaseBDraftStore.getState().chars).toEqual(expect.arrayContaining(HI_TIER));
   });
 });

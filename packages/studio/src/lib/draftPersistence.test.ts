@@ -1349,6 +1349,66 @@ describe("draftPersistence", () => {
     });
   });
 
+  describe("spec 079 T041 — alphabetEvidenceKey rides the phase-B draft snapshot", () => {
+    it("restores a string alphabetEvidenceKey", () => {
+      const pk = "phaseb-alphabet-key";
+      instantiateMinimal(pk);
+      usePhaseBDraftStore.getState().add("a");
+      usePhaseBDraftStore.getState().setAlphabetEvidenceKey("tl-Latn|Latn|Latn|basic_kbdus");
+      saveDraft(pk);
+      usePhaseBDraftStore.getState().reset();
+      resetPhaseBDraftDecisions();
+      expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBeUndefined();
+
+      expect(loadDraft(pk)).toBe(true);
+      expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBe("tl-Latn|Latn|Latn|basic_kbdus");
+    });
+
+    it("a pre-079 draft (built alphabet, no key) is stamped on load from its restored identity and base (FR-032)", () => {
+      const pk = "phaseb-alphabet-key-pre079";
+      instantiateMinimal(pk);
+      useSurveySessionStore.setState({
+        identityResult: {
+          autonym: "Test",
+          english: "Test",
+          languageSubtag: "tl",
+          region: "",
+          targetScriptRaw: "Latn",
+          bcp47: "tl-Latn",
+          supported: true,
+          attribution: null,
+          prefill: { script: "Latn", scriptClass: "alphabetic", routingGroup: "qwerty-qwertz" },
+        } as never,
+        localBase: { id: "basic_kbdus", path: "release/b/basic_kbdus", script: "Latn", displayName: "US" } as never,
+      });
+      usePhaseBDraftStore.getState().add("a");
+      saveDraft(pk);
+      expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBeUndefined();
+      usePhaseBDraftStore.getState().reset();
+      useSurveySessionStore.getState().reset();
+
+      expect(loadDraft(pk)).toBe(true);
+      expect(usePhaseBDraftStore.getState().chars).toEqual(["a"]);
+      expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBe("tl-Latn|Latn|Latn|basic_kbdus");
+    });
+
+    it("drops a non-string alphabetEvidenceKey rather than coercing it", () => {
+      const pk = "phaseb-alphabet-key-bad";
+      instantiateMinimal(pk);
+      usePhaseBDraftStore.getState().add("a");
+      saveDraft(pk);
+      const raw = JSON.parse(localStorage.getItem(draftKey(pk))!) as { phaseBDraft: Record<string, unknown> };
+      raw.phaseBDraft.alphabetEvidenceKey = 42;
+      localStorage.setItem(draftKey(pk), JSON.stringify(raw));
+      usePhaseBDraftStore.getState().reset();
+      resetPhaseBDraftDecisions();
+
+      expect(loadDraft(pk)).toBe(true);
+      expect(usePhaseBDraftStore.getState().chars).toEqual(["a"]);
+      expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBeUndefined();
+    });
+  });
+
   describe("spec 075 SC-006 — a punctuation rejection survives the reload round trip", () => {
     const TIER = ["\u0964", "\u0965", "!", "?"];
 
