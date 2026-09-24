@@ -10,6 +10,7 @@ import { webcrypto } from "node:crypto";
 import { File as NodeFile, Blob as NodeBlob } from "node:buffer";
 import { beforeEach } from "vitest";
 import { useStepWalkStore } from "./stores/stepWalkStore.ts";
+import { useSurveyAnswerStore } from "./stores/surveyAnswerStore.ts";
 
 if (!globalThis.crypto) {
   globalThis.crypto = webcrypto as unknown as Crypto;
@@ -41,6 +42,8 @@ if (typeof globalThis.File.prototype.text !== "function") {
 // making this an opt-out that would be forgotten rather than an opt-in.
 beforeEach(() => {
   useStepWalkStore.getState().reset();
+  // spec 079: positions and saved answers moved here from stepWalkStore.
+  useSurveyAnswerStore.getState().reset();
 });
 
 /**

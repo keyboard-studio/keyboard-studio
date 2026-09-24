@@ -21,6 +21,7 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
 import { useStepWalkStore } from "../stores/stepWalkStore.ts";
+import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import { charToPositionToken } from "../lib/stepWalk.ts";
 import { StudioFooter } from "./StudioFooter.tsx";
 
@@ -272,7 +273,7 @@ describe("StudioFooter — within-step walk dots", () => {
       { id: charToPositionToken("é"), label: "é (U+00E9)", done: false },
       { id: charToPositionToken("í"), label: "í (U+00ED)", done: false },
     ]);
-    useStepWalkStore.getState().setStepCursor("mechanisms", charToPositionToken("é"));
+    useSurveyAnswerStore.getState().setPosition("mechanisms", charToPositionToken("é"));
 
     render(<StudioFooter />);
     const names = screen.getAllByRole("button").map((b) => b.getAttribute("aria-label") ?? "");
@@ -384,13 +385,23 @@ describe("StudioFooter — jumping back and forward again (FR-045/FR-063)", () =
       { id: "il_language_english", done: true },
       { id: "il_language_autonym", done: false },
     ]);
-    walkStore.setStepCursor("identity", "il_language_autonym");
-    walkStore.setAnswerDraft("identity", { il_language_english: "Bambara" });
+    const answerStore = useSurveyAnswerStore.getState();
+    answerStore.setPosition("identity", "il_language_autonym");
+    answerStore.setStepAnswers("identity", {
+      il_language_english: {
+        value: "Bambara",
+        answerType: "text",
+        origin: "confirmed",
+        stage: "draft",
+        evidenceKey: null,
+        screenId: "il_language_english",
+      },
+    });
     walkStore.publishStepWalk("mechanisms", [
       { id: charToPositionToken("á"), done: true },
       { id: charToPositionToken("é"), done: false },
     ]);
-    walkStore.setStepCursor("mechanisms", charToPositionToken("é"));
+    useSurveyAnswerStore.getState().setPosition("mechanisms", charToPositionToken("é"));
 
     const session = useSurveySessionStore.getState();
     session.jumpToStep("identity");
@@ -398,11 +409,12 @@ describe("StudioFooter — jumping back and forward again (FR-045/FR-063)", () =
     session.jumpToStep("identity");
 
     const after = useStepWalkStore.getState();
-    expect(after.answerDrafts["identity"]).toEqual({ il_language_english: "Bambara" });
-    expect(after.cursors["identity"]).toBe("il_language_autonym");
+    const afterAnswers = useSurveyAnswerStore.getState();
+    expect(afterAnswers.steps["identity"]?.answers["il_language_english"]?.value).toBe("Bambara");
+    expect(afterAnswers.steps["identity"]?.position).toBe("il_language_autonym");
     expect(after.walks["identity"]).toHaveLength(2);
     // The gallery it passed through twice is exactly as it was left.
-    expect(after.cursors["mechanisms"]).toBe(charToPositionToken("é"));
+    expect(afterAnswers.steps["mechanisms"]?.position).toBe(charToPositionToken("é"));
     expect(after.walks["mechanisms"]?.[0]?.done).toBe(true);
   });
 

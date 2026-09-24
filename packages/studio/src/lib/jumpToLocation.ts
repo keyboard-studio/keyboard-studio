@@ -19,6 +19,7 @@ import { questionRegistry } from "../survey/questions/registry.ts";
 import { snapshotTraversal, useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useStepWalkStore } from "../stores/stepWalkStore.ts";
+import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import { stepPositionIds } from "./stepWalk.ts";
 
 export interface JumpOptions {
@@ -159,7 +160,7 @@ export function jumpToLocation(loc: Location, opts?: JumpOptions): JumpOutcome {
     // author is already on, where no remount happens at all and the pending-jump
     // hand-off below would never be consumed.
     if (target.question !== undefined) {
-      useStepWalkStore.getState().setStepCursor(target.step, target.question);
+      useSurveyAnswerStore.getState().setPosition(target.step, target.question);
     }
   }
 

@@ -44,8 +44,8 @@ import { PhaseFGate } from "../editors/adapters/PhaseFGate.tsx";
 
 /** Creates an EditorStep with common defaults, reducing boilerplate. */
 function step(
-  base: Pick<EditorStep, "id" | "title" | "component"> &
-    Partial<Omit<EditorStep, "kind" | "id" | "title" | "component">>,
+  base: Pick<EditorStep, "id" | "title" | "component" | "persistence"> &
+    Partial<Omit<EditorStep, "kind" | "id" | "title" | "component" | "persistence">>,
 ): EditorStep {
   return {
     kind: "editor-step",
@@ -72,6 +72,7 @@ export const identityStep: EditorStep = step({
   component: IdentityLiteAdapter,
   flowRefs: ["identity_lite"],
   specRef: ["§8", "specs/030-langtags-identity-autocomplete"],
+  persistence: "answer-store",
 });
 
 /**
@@ -83,6 +84,7 @@ export const chooseBaseStep: EditorStep = step({
   title: "Choose Base Keyboard",
   component: BaseResolutionAdapter,
   specRef: "§8",
+  persistence: "working-copy",
 });
 
 /**
@@ -98,6 +100,7 @@ export const trackStep: EditorStep = step({
   inputs: [irPath("header", "bcp47"), irPath("header", "name")],
   flowRefs: ["track"],
   specRef: ["§8", "specs/018-qu-wire-track"],
+  persistence: "answer-store",
 });
 
 /**
@@ -115,6 +118,7 @@ export const projectNameStep: EditorStep = step({
   writes: [irPath("header", "name"), irPath("header", "keyboardId")],
   flowRefs: ["project_name"],
   specRef: "§8",
+  persistence: "answer-store",
 });
 
 // ---------------------------------------------------------------------------
@@ -134,6 +138,7 @@ export const carveStep: EditorStep = step({
   component: CarveAdapter,
   writes: [...CARVE_WRITES],
   specRef: ["§8", "specs/051-carve-orthography-trim"],
+  persistence: "working-copy",
 });
 
 /**
@@ -155,6 +160,7 @@ export const mechanismsStep: EditorStep = step({
   surface: "physical",
   writes: [...ADD_GALLERY_WRITES],
   specRef: ["§8", "specs/007-strategy-selection"],
+  persistence: "working-copy",
 });
 
 /**
@@ -183,6 +189,7 @@ export const touchSeedSourceStep: EditorStep = step({
   joinTarget: "touch",
   component: TouchSeedSourcePanel,
   specRef: "specs/035-mobile-touch-derivation",
+  persistence: "working-copy",
 });
 
 /**
@@ -199,6 +206,7 @@ export const touchStep: EditorStep = step({
   surface: "touch",
   writes: [...TOUCH_WRITES],
   specRef: ["§8", "specs/035-mobile-touch-derivation"],
+  persistence: "working-copy",
 });
 
 // ---------------------------------------------------------------------------
@@ -218,6 +226,7 @@ export const helpStep: EditorStep = step({
   component: PhaseFGate,
   flowRefs: ["phase_f_helpdocs"],
   specRef: ["§8", "specs/061-help-docs-generation"],
+  persistence: "answer-store",
 });
 
 /**
@@ -229,6 +238,10 @@ export const packageStep: EditorStep = step({
   title: "Package (reserved)",
   component: PhaseFStepFactoryComponent,
   specRef: "§16",
+  persistence: {
+    exempt:
+      "Output screen: records no decision; its only state is the chosen download, re-derived on entry.",
+  },
 });
 
 // ---------------------------------------------------------------------------

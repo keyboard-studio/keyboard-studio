@@ -31,7 +31,7 @@
 //   remain in SurveyView. StepHost only decides which container a step renders into.
 
 import type { ReactNode, CSSProperties } from "react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Trans } from "@lingui/react/macro";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import {
@@ -51,6 +51,7 @@ import {
 } from "../steps/reducer.ts";
 import { advance, STEPS_WITH_APPLY_COMPLETION } from "../steps/advance.ts";
 import { navigateTo } from "../lib/navigate.ts";
+import { QuestionRecorderContext, type ScreenRecorder } from "../lib/questionRecorder.ts";
 import { peekPendingJump, clearPendingJump, jumpToLocation } from "../lib/jumpToLocation.ts";
 import type { Location } from "../lib/location.ts";
 import { UnsupportedScriptStub } from "./UnsupportedScriptStub.tsx";
@@ -188,6 +189,14 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
   const setCharactersSubStage = useSurveySessionStore((s) => s.setCharactersSubStage);
 
   const recordPhase = useWorkingCopyStore((s) => s.recordPhase);
+
+  // spec 079 R-04: each Next inside the active step records that screen's
+  // answers. Bound to the active step id here so a step never names itself.
+  const recordQuestionAnswers = reducerDeps.recordQuestionAnswers;
+  const recordScreen: ScreenRecorder = useCallback(
+    (screenId, answers) => recordQuestionAnswers?.(activeStepId, screenId, answers),
+    [recordQuestionAnswers, activeStepId],
+  );
 
   // ---------------------------------------------------------------------------
   // Phase F hard-gate inputs — derived via the SAME shared hook
@@ -353,7 +362,8 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
   function handleComplete(result: unknown): void {
     // 1. If SurveyPhaseResult-shaped: recordPhase + routeAnswersThroughMutate.
     if (isSurveyPhaseResult(result)) {
-      recordPhase(result);
+      // spec 079 D-4: the step owns its own answers within the phase slot.
+      recordPhase(result, { stepId: resolvedStep.id });
       routeAnswersThroughMutate(result, reducerDeps);
     }
 
@@ -469,11 +479,13 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
   const Component = resolvedStep.component;
 
   const content = (
-    <Component
-      onComplete={handleComplete}
-      {...(canGoBack ? { onBack: handleBack } : {})}
-      {...(ctx !== undefined ? { ctx } : {})}
-    />
+    <QuestionRecorderContext.Provider value={recordScreen}>
+      <Component
+        onComplete={handleComplete}
+        {...(canGoBack ? { onBack: handleBack } : {})}
+        {...(ctx !== undefined ? { ctx } : {})}
+      />
+    </QuestionRecorderContext.Provider>
   );
 
   // FR-034/Q3: shown exactly while the author is on the step a decision-trail

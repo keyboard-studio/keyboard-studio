@@ -52,6 +52,7 @@ function makeSpineStep(id: string): EditorStep {
     component: (() => null) as EditorStep["component"],
     inputs: [],
     writes: [],
+    persistence: "working-copy",
   };
 }
 

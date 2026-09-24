@@ -7,6 +7,7 @@
 
 import type { IRPath } from "@keyboard-studio/contracts";
 import type { SurveyContext } from "../survey/types.ts";
+import type { EvidenceKeyFnId } from "./evidence.ts";
 
 // Re-export SurveyContext so consumers can import from one place.
 export type { SurveyContext };
@@ -16,6 +17,30 @@ export type { SurveyContext };
 // ---------------------------------------------------------------------------
 
 export type StepKind = "question-step" | "editor-step";
+
+// ---------------------------------------------------------------------------
+// Answer persistence declarations (spec 079 R-02, R-12)
+// ---------------------------------------------------------------------------
+
+/** What earlier answers shape this step's questions (FR-011). */
+export interface EvidenceDeclaration {
+  /** Plain-language list of the shape-determining inputs, for reviewers. */
+  inputs: readonly string[];
+  /** Id of the pure key function in steps/evidence.ts. */
+  keyFn: EvidenceKeyFnId;
+}
+
+/**
+ * Where a step's answers are kept so that leaving and returning loses nothing
+ * (FR-007). `{ exempt }` needs a written justification; the manifest test fails
+ * on an empty one, which is what makes "unjustified exemptions: zero" (SC-007)
+ * a failing test rather than a checklist item.
+ */
+export type PersistenceDeclaration =
+  | "answer-store"
+  | "phase-b-draft"
+  | "working-copy"
+  | { exempt: string };
 
 // ---------------------------------------------------------------------------
 // StepBase — fields shared by all steps (FR-002)
@@ -71,6 +96,17 @@ export interface StepBase {
    * dashboard/completeness.ts's checkSpecRef, not by this type).
    */
   specRef?: string | readonly string[];
+  /**
+   * The evidence this step's questions depend on (spec 079 R-02). Absent when
+   * no earlier answer shapes the step.
+   */
+  evidence?: EvidenceDeclaration;
+  /**
+   * Where this step's answers persist (spec 079 R-12, FR-007). Required;
+   * cross-checked against contracts/step-classification.md by
+   * manifest.persistence.test.ts.
+   */
+  persistence: PersistenceDeclaration;
   // Reserved seam (spec §9 loop primitive, not built): iterates?: string
 }
 

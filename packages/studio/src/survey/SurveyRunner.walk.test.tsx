@@ -24,6 +24,7 @@ import React from "react";
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import type { FlowDef } from "./types.ts";
 import { useStepWalkStore } from "../stores/stepWalkStore.ts";
+import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { charToPositionToken } from "../lib/stepWalk.ts";
 
@@ -190,10 +191,10 @@ describe("SurveyRunner — publishes its walk", () => {
     type("alpha");
     next();
 
-    const { walks, cursors } = useStepWalkStore.getState();
+    const { walks } = useStepWalkStore.getState();
     expect(walks["identity"]?.map((p) => p.id)).toEqual(["q1", "q2"]);
     expect(walks["identity"]?.map((p) => p.done)).toEqual([true, false]);
-    expect(cursors["identity"]).toBe("q2");
+    expect(useSurveyAnswerStore.getState().steps["identity"]?.position).toBe("q2");
   });
 
   it("marks the current stop done as soon as it is answered, before Next", () => {
@@ -218,7 +219,7 @@ describe("SurveyRunner — publishes its walk", () => {
     next();
     cleanup();
 
-    useStepWalkStore.getState().setStepCursor("identity", "q1");
+    useSurveyAnswerStore.getState().setPosition("identity", "q1");
     render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />);
     expect(screen.getByText("First question")).toBeTruthy();
     expect(field().value).toBe("alpha");
@@ -238,7 +239,7 @@ describe("SurveyRunner — publishes its walk", () => {
     // `jumpToLocation` does, but there the ensuing hash change re-renders the
     // tree for us.
     act(() => {
-      useStepWalkStore.getState().setStepCursor("identity", "q1");
+      useSurveyAnswerStore.getState().setPosition("identity", "q1");
     });
     expect(screen.getByText("First question")).toBeTruthy();
     expect(field().value).toBe("alpha");
@@ -246,7 +247,7 @@ describe("SurveyRunner — publishes its walk", () => {
 
   it("ignores a cursor naming a stop this walk does not have", () => {
     render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />);
-    useStepWalkStore.getState().setStepCursor("identity", charToPositionToken("á"));
+    useSurveyAnswerStore.getState().setPosition("identity", charToPositionToken("á"));
     expect(screen.getByText("First question")).toBeTruthy();
   });
 });

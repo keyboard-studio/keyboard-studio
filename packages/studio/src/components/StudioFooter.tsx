@@ -46,6 +46,7 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
 import { useStepWalkStore } from "../stores/stepWalkStore.ts";
+import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import { stepPositionIds } from "../lib/stepWalk.ts";
 import { manifest } from "../steps/manifest.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
@@ -107,7 +108,16 @@ export function StudioFooter() {
   // rather than only right after a deep-link arrival.
   // ---------------------------------------------------------------------------
   const walks = useStepWalkStore((s) => s.walks);
-  const cursors = useStepWalkStore((s) => s.cursors);
+  // Positions live in the answer store (spec 079 R-01) so they survive a
+  // reload; `buildProgressDots` still takes them as the same `stepCursors` map.
+  const answerSteps = useSurveyAnswerStore((s) => s.steps);
+  const cursors = useMemo(() => {
+    const out: Record<string, string> = {};
+    for (const [stepId, step] of Object.entries(answerSteps)) {
+      if (step.position !== null) out[stepId] = step.position;
+    }
+    return out;
+  }, [answerSteps]);
 
   // `peekPendingJump()` is a plain read of jumpToLocation.ts's module-level
   // slot, not a subscribable store. It remains the fallback refinement for the

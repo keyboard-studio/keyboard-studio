@@ -46,6 +46,7 @@ import { usePositionalCharNav } from "./usePositionalCharNav.ts";
 import { useWorkingCopyStore, bindManifest } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useStepWalkStore } from "../../stores/stepWalkStore.ts";
+import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
 import { charToPositionToken } from "../../lib/stepWalk.ts";
 import {
   MECHANISMS_STEP_ID,
@@ -6659,7 +6660,7 @@ describe("MechanismGallery — within-step walk position", () => {
     await act(async () => {
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
-    expect(useStepWalkStore.getState().cursors[MECHANISMS_STEP_ID]).toBe(
+    expect(useSurveyAnswerStore.getState().steps[MECHANISMS_STEP_ID]?.position).toBe(
       charToPositionToken("á"),
     );
     // "Skip this character" no longer exists (mechanism-gallery-progression
@@ -6676,7 +6677,7 @@ describe("MechanismGallery — within-step walk position", () => {
       fireEvent.click(screen.getByRole("button", { name: /Next character/i }));
     });
     expectCurrentChar("é");
-    expect(useStepWalkStore.getState().cursors[MECHANISMS_STEP_ID]).toBe(
+    expect(useSurveyAnswerStore.getState().steps[MECHANISMS_STEP_ID]?.position).toBe(
       charToPositionToken("é"),
     );
   });
@@ -6725,7 +6726,7 @@ describe("MechanismGallery — within-step walk position", () => {
     // A footer dot inside the step the author is already on: no route change, no
     // step change, nothing remounts, so only the live cursor can carry it.
     await act(async () => {
-      useStepWalkStore.getState().setStepCursor(MECHANISMS_STEP_ID, charToPositionToken("í"));
+      useSurveyAnswerStore.getState().setPosition(MECHANISMS_STEP_ID, charToPositionToken("í"));
     });
     expectCurrentChar("í");
   });
@@ -6733,7 +6734,7 @@ describe("MechanismGallery — within-step walk position", () => {
   it("ignores a cursor naming a character this walk does not hold", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      useStepWalkStore.getState().setStepCursor(MECHANISMS_STEP_ID, charToPositionToken("ω"));
+      useSurveyAnswerStore.getState().setPosition(MECHANISMS_STEP_ID, charToPositionToken("ω"));
       render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
     });
     expectCurrentChar("á");

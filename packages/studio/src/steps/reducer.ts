@@ -23,7 +23,7 @@
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type { IRPath, KeyboardIR, TouchAssignment, VirtualFS, SurveyPhaseResult, PlacementWorklist } from "@keyboard-studio/contracts";
-import type { BaseKeyboard, RemovalCapability } from "@keyboard-studio/contracts";
+import type { BaseKeyboard, RemovalCapability, SurveyAnswer } from "@keyboard-studio/contracts";
 import type { MutateContext } from "../survey/types.ts";
 // DesktopModifications is a type from the engine package (a workspace
 // dependency, not an internal studio/src/ layer) — the steps-layer boundary
@@ -270,6 +270,17 @@ export interface ReducerDeps {
    * than something it merely skips internally.
    */
   recordDecision?: (event: { stepId: string; result: unknown }) => void;
+  /**
+   * spec 079 R-04: record one screen's answers at its Next, inside a step.
+   * Injected (like `recordDecision`) so the reducer layer never reaches into
+   * decisions/ or stores/; StepHost hands it to the step through
+   * lib/questionRecorder.ts.
+   */
+  recordQuestionAnswers?: (
+    stepId: string,
+    screenId: string,
+    answers: readonly SurveyAnswer[],
+  ) => void;
 }
 
 // ---------------------------------------------------------------------------

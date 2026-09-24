@@ -25,6 +25,7 @@ import { DEBOUNCE_MS } from "../hooks/useDebounce.ts";
 import type { BaseKeyboard, KeyboardIR, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import {
   usePhaseBDraftStore,
   snapshotPhaseBDraft,
@@ -71,6 +72,7 @@ import {
   CLOUD_SYNC_DEBOUNCE_MS,
   MAX_CLOUD_DRAFT_BYTES,
   PENDING_PROJECT_KEY,
+  restoreSurveyAnswerSnapshot,
   type DurableDraft,
 } from "./draftPersistence.ts";
 import { saveServerDraft, saveServerDraftBeacon } from "./serverDraftStore.ts";
@@ -158,6 +160,7 @@ beforeEach(() => {
   useWorkingCopyStore.getState().reset();
   useSurveySessionStore.getState().reset();
   usePhaseBDraftStore.getState().reset();
+  useSurveyAnswerStore.getState().reset();
   mockedSaveServerDraft.mockClear();
   mockedSaveServerDraftBeacon.mockClear();
 });
@@ -1099,6 +1102,167 @@ describe("draftPersistence", () => {
       vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS);
       const saved = JSON.parse(localStorage.getItem(draftKey(pk))!) as DurableDraft;
       expect(saved.phaseBDraft?.chars).toEqual(["q"]);
+
+      teardown();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // spec 079 R-01/FR-032/FR-034: surveyAnswerStore rides the same durable draft
+  // and the same autosave timer as everything else.
+  // ---------------------------------------------------------------------------
+  describe("restoreSurveyAnswerSnapshot (spec 079 FR-032): tolerant restore, symmetric with restorePhaseBDraftSnapshot", () => {
+    function validAnswer(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+      return {
+        value: "x",
+        answerType: "text",
+        origin: "confirmed",
+        stage: "draft",
+        evidenceKey: null,
+        screenId: "q1",
+        savedAt: 123,
+        ...overrides,
+      };
+    }
+
+    it("keeps an unknown step id verbatim (forward-compat — a future step this build doesn't know about)", () => {
+      const raw = {
+        steps: {
+          some_future_step: {
+            answers: { q1: validAnswer() },
+            position: "q1",
+            status: { kind: "in-progress" },
+            lastRecorded: {},
+          },
+        },
+        recordedScreenOf: {},
+      };
+
+      const restored = restoreSurveyAnswerSnapshot(raw);
+
+      expect(restored.steps["some_future_step"]?.answers["q1"]?.value).toBe("x");
+      expect(restored.steps["some_future_step"]?.position).toBe("q1");
+    });
+
+    it("drops a malformed SavedAnswer with a bad answerType, keeping the rest of the step's good answers", () => {
+      const raw = {
+        steps: {
+          identity: {
+            answers: {
+              good: validAnswer({ screenId: "good" }),
+              bad: validAnswer({ answerType: "not-a-real-answer-type", screenId: "bad" }),
+            },
+            position: null,
+            status: { kind: "in-progress" },
+            lastRecorded: {},
+          },
+        },
+        recordedScreenOf: {},
+      };
+
+      const restored = restoreSurveyAnswerSnapshot(raw);
+
+      expect(restored.steps["identity"]?.answers["good"]?.value).toBe("x");
+      expect(restored.steps["identity"]?.answers["bad"]).toBeUndefined();
+    });
+
+    it("drops a malformed SavedAnswer with a non-string screenId", () => {
+      const raw = {
+        steps: {
+          identity: {
+            answers: { bad: validAnswer({ screenId: 42 }) },
+            position: null,
+            status: { kind: "in-progress" },
+            lastRecorded: {},
+          },
+        },
+        recordedScreenOf: {},
+      };
+
+      expect(restoreSurveyAnswerSnapshot(raw).steps["identity"]?.answers["bad"]).toBeUndefined();
+    });
+
+    it("drops a malformed SavedAnswer with a bad origin", () => {
+      const raw = {
+        steps: {
+          identity: {
+            answers: { bad: validAnswer({ origin: "invented" }) },
+            position: null,
+            status: { kind: "in-progress" },
+            lastRecorded: {},
+          },
+        },
+        recordedScreenOf: {},
+      };
+
+      expect(restoreSurveyAnswerSnapshot(raw).steps["identity"]?.answers["bad"]).toBeUndefined();
+    });
+
+    it("drops a malformed SavedAnswer with a bad stage", () => {
+      const raw = {
+        steps: {
+          identity: {
+            answers: { bad: validAnswer({ stage: "half-done" }) },
+            position: null,
+            status: { kind: "in-progress" },
+            lastRecorded: {},
+          },
+        },
+        recordedScreenOf: {},
+      };
+
+      expect(restoreSurveyAnswerSnapshot(raw).steps["identity"]?.answers["bad"]).toBeUndefined();
+    });
+
+    it("yields an empty store when surveyAnswers is absent from the envelope (FR-032 — a pre-079 draft)", () => {
+      expect(restoreSurveyAnswerSnapshot(undefined)).toEqual({ steps: {}, recordedScreenOf: {} });
+    });
+  });
+
+  describe("installDraftAutosave + surveyAnswerStore: same timer, real teardown (spec 079 FR-034)", () => {
+    it("teardown unsubscribes the answer store — a change made after teardown schedules no save", () => {
+      vi.useFakeTimers();
+      const pk = "autosave-answerstore-teardown";
+      instantiateMinimal(pk);
+
+      const teardown = installDraftAutosave(pk);
+      teardown();
+      // Isolate the write this test cares about from installDraftAutosave's own
+      // synchronous install-time save.
+      localStorage.removeItem(draftKey(pk));
+
+      useSurveyAnswerStore.getState().setPosition("identity", "q1");
+      vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 1000);
+
+      expect(localStorage.getItem(draftKey(pk))).toBeNull();
+    });
+
+    it("AUTOSAVE_DEBOUNCE_MS is 500 and a burst across working copy, survey session, phaseBDraft and surveyAnswer schedules exactly one save (single-cycle invariant)", () => {
+      expect(AUTOSAVE_DEBOUNCE_MS).toBe(500);
+
+      vi.useFakeTimers();
+      const pk = "autosave-burst-four-stores";
+      instantiateMinimal(pk);
+
+      const teardown = installDraftAutosave(pk);
+      // The P1 install-time save already happened above the spy attach point.
+      const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+
+      useWorkingCopyStore.getState().lockDesktop();
+      useSurveySessionStore.getState().advance("choose_base");
+      usePhaseBDraftStore.getState().add("q");
+      useSurveyAnswerStore.getState().setPosition("identity", "q1");
+
+      vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS);
+
+      const draftWrites = setItemSpy.mock.calls.filter(([key]) => key === draftKey(pk));
+      expect(draftWrites).toHaveLength(1);
+
+      const saved = JSON.parse(localStorage.getItem(draftKey(pk))!) as DurableDraft;
+      expect(saved.workingCopy.desktopLocked).toBe(true);
+      expect(saved.traversal.activeStepId).toBe("choose_base");
+      expect(saved.phaseBDraft?.chars).toEqual(["q"]);
+      expect(saved.surveyAnswers?.steps["identity"]?.position).toBe("q1");
 
       teardown();
     });
