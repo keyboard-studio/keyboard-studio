@@ -1,7 +1,7 @@
 # orth.diacritic-density — computed by NFD-decomposing the confirmed inventory:
 # how many characters carry marks, which marks, and how deep the stacks go.
-# Prefill for the whole accent-marks question cluster and the main proposer
-# for axis A4.
+# The main proposer for axis A4. It prefills no survey question: the
+# accent-marks question cluster it once fed was retired by spec 071.
 
 id: orth.diacritic-density
 family: orth
@@ -11,7 +11,10 @@ description: >
   marked characters, the specific marks in use (acute, grave, dot-below, tone
   marks...), maximum stack depth, and whether marks combine across families.
   Pure Unicode arithmetic over the inventory — no elicitation needed except
-  confirmation.
+  confirmation. No live consumer currently reads this profile: the spec 071
+  marks series derives mark classes and stacks directly from the confirmed
+  alphabet (packages/engine/src/marks/mark-classes.ts,
+  nfc-posture-of-inventory.ts) rather than from this facet.
 valueType: vector
 
 modality: both
