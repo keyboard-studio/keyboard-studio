@@ -6,13 +6,15 @@
 // the series shell.
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { screen, cleanup, act, fireEvent } from "@testing-library/react";
+import { screen, cleanup, act, fireEvent, within } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
-import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type { SurveyAnswer, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { MarksSeriesStep, computeMarksGate } from "./MarksSeriesStep.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
+import { QuestionRecorderContext, type ScreenRecorder } from "../../lib/questionRecorder.ts";
 
 const ACUTE = "́";
 
@@ -818,13 +820,21 @@ describe("MarksSeriesStep — S2 treatment station (spec 052 US1)", () => {
     expect(["prefix", "postfix"]).toContain(result.computedAxes?.markInputOrder);
   });
 
-  it("FR-020/US1 AC7: an alphabet edit re-proposes and returns to the first station", () => {
+  it("spec 079 supersedes FR-020's old 'returns to the first station': an alphabet edit re-proposes affected answers but does NOT move the author off their current station", () => {
+    // Old (pre-079) behaviour: any alphabet edit reset `stationIndex` to 0.
+    // Spec 079 removes that reset entirely (FR-004/FR-023 generalised,
+    // amendment to spec 071/spec 052) — navigation, including a re-proposal,
+    // never undoes the author's position. The station-count/content change
+    // this edit provokes is still real (evidence keys move, so affected
+    // answers reconcile to `reproposed` — flag UI itself is a later task),
+    // but the AUTHOR stays exactly where they were.
     seedMatrixEntry(SCRIPT_MATRIX[0] ?? { bases: ["a"], marks: [ACUTE] });
     act(() => {
       render(<MarksSeriesStep onComplete={vi.fn()} />);
     });
     // Walk past S1 onto the treatment station.
     expect(reachTreatment()).not.toBeNull();
+    expect(screen.queryByTestId("marks-attachment")).toBeNull();
     // Edit the confirmed alphabet: a new mark changes the evidence.
     act(() => {
       useWorkingCopyStore.getState().recordPhase({
@@ -844,9 +854,9 @@ describe("MarksSeriesStep — S2 treatment station (spec 052 US1)", () => {
         },
       });
     });
-    // Back at the first station — the re-seeded decisions must be walked again.
-    expect(screen.getByTestId("marks-attachment")).toBeTruthy();
-    expect(screen.queryByTestId("marks-treatment")).toBeNull();
+    // Still on the treatment station — the edit did not move the author.
+    expect(screen.getByTestId("marks-treatment")).toBeTruthy();
+    expect(screen.queryByTestId("marks-attachment")).toBeNull();
   });
 });
 
@@ -903,5 +913,252 @@ describe("MarksSeriesStep — S4 open choice (US4)", () => {
     // SC-005 holds on the open-choice rendering too.
     expect(station.textContent).not.toMatch(/unicode/i);
     expect(station.textContent).not.toMatch(/normali[sz]/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 079 T023/T024/T083 — answers persist per question, recorded per Next
+// ---------------------------------------------------------------------------
+
+describe("MarksSeriesStep — spec 079 persistence (T023, T024, T083)", () => {
+  const GRAVE = "̀";
+
+  /**
+   * Tonal fixture (bases a/e/i, marks acute+grave, every pair attested):
+   * gives all FOUR stations — attachment (productive), treatment (a
+   * productive above-marks class → a real class-level decision), output-form
+   * (every pair composes, hasOwnKeyMark decides which policy row fires), and
+   * stacking (the two marks' reachable sets overlap — FR-018).
+   */
+  function seedFixture(): void {
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "B",
+      answers: [],
+      alphabet: {
+        bases: ["a", "e", "i"],
+        marks: [ACUTE, GRAVE],
+        attestedStacks: [
+          { base: "a", marks: [ACUTE] },
+          { base: "e", marks: [ACUTE] },
+          { base: "i", marks: [ACUTE] },
+          { base: "a", marks: [GRAVE] },
+          { base: "e", marks: [GRAVE] },
+          { base: "i", marks: [GRAVE] },
+        ],
+        declaredRoles: {},
+      },
+    });
+  }
+
+  /** Renders MarksSeriesStep wrapped in a recorder spy, returning the spy. */
+  function renderWithRecorder(
+    onComplete: (r: SurveyPhaseResult) => void = vi.fn(),
+  ): ScreenRecorder & ReturnType<typeof vi.fn> {
+    const recorder = vi.fn() as unknown as ScreenRecorder & ReturnType<typeof vi.fn>;
+    render(
+      <QuestionRecorderContext.Provider value={recorder}>
+        <MarksSeriesStep onComplete={onComplete} />
+      </QuestionRecorderContext.Provider>,
+    );
+    return recorder;
+  }
+
+  it("T023: un-ticking attachments, changing treatment/order and stacking survive an unmount/remount with the SAME alphabet, at the same position", () => {
+    seedFixture();
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+
+    // S1 — un-tick two attachments.
+    const attachmentStation = screen.getByTestId("marks-attachment");
+    const checkedBoxes = within(attachmentStation)
+      .getAllByRole("checkbox")
+      .filter((cb) => (cb as HTMLInputElement).checked) as HTMLInputElement[];
+    expect(checkedBoxes.length).toBeGreaterThanOrEqual(2);
+    const uncheckedLabels = [
+      checkedBoxes[0]!.getAttribute("aria-label")!,
+      checkedBoxes[1]!.getAttribute("aria-label")!,
+    ];
+    fireEvent.click(checkedBoxes[0]!);
+    fireEvent.click(checkedBoxes[1]!);
+    for (const label of uncheckedLabels) {
+      expect((screen.getByLabelText(label) as HTMLInputElement).checked).toBe(false);
+    }
+    fireEvent.click(screen.getByTestId("marks-continue"));
+
+    // S2 — change a class treatment away from its recommendation, and set the
+    // input order explicitly.
+    expect(screen.getByTestId("marks-treatment")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("treatment-option-above-1-composed"));
+    fireEvent.click(screen.getByTestId("input-order-option-prefix"));
+    expect(
+      (screen.getByTestId("treatment-option-above-1-composed").querySelector("input") as HTMLInputElement)
+        .checked,
+    ).toBe(true);
+    fireEvent.click(screen.getByTestId("marks-continue"));
+
+    // S4 — output form: leave as proposed, just advance.
+    expect(screen.getByTestId("marks-output-form")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("marks-continue"));
+
+    // S5 — change stacking to "allowed" (default proposal is "not allowed":
+    // no attested multi-mark stack exists here, only overlapping reach).
+    expect(screen.getByTestId("marks-stacking")).toBeTruthy();
+    fireEvent.click(screen.getByRole("radio", { name: /Yes — some letters carry two marks/ }));
+
+    // Position: the third station beyond the first (index 3, "marks_stacking").
+    expect(useSurveyAnswerStore.getState().steps["marks"]?.position).toBe("marks_stacking");
+
+    cleanup();
+
+    // Revisit with the SAME alphabet — nothing re-seeds.
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+
+    // Lands back on the stacking station (position unchanged).
+    expect(screen.getByTestId("marks-stacking")).toBeTruthy();
+    expect(useSurveyAnswerStore.getState().steps["marks"]?.position).toBe("marks_stacking");
+    expect(
+      (screen.getByRole("radio", { name: /Yes — some letters carry two marks/ }) as HTMLInputElement)
+        .checked,
+    ).toBe(true);
+
+    // Step back through the walked stations and assert every control still
+    // renders the saved value.
+    fireEvent.click(screen.getByRole("button", { name: "Back" })); // -> output form
+    fireEvent.click(screen.getByRole("button", { name: "Back" })); // -> treatment
+    expect(screen.getByTestId("marks-treatment")).toBeTruthy();
+    expect(
+      (screen.getByTestId("treatment-option-above-1-composed").querySelector("input") as HTMLInputElement)
+        .checked,
+    ).toBe(true);
+    expect(
+      (screen.getByTestId("input-order-option-prefix").querySelector("input") as HTMLInputElement).checked,
+    ).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Back" })); // -> attachment
+    expect(screen.getByTestId("marks-attachment")).toBeTruthy();
+    for (const label of uncheckedLabels) {
+      expect((screen.getByLabelText(label) as HTMLInputElement).checked).toBe(false);
+    }
+
+    // Store-level check: every saved answer's value matches the edits above.
+    const savedAnswers = useSurveyAnswerStore.getState().steps["marks"]?.answers ?? {};
+    expect(savedAnswers["marks_treatment.class.above-1"]?.value).toBe("composed");
+    expect(savedAnswers["marks_treatment.input_order"]?.value).toBe("prefix");
+    expect(savedAnswers["marks_stacking.allowed"]?.value).toBe(true);
+  });
+
+  it("T024: each station's Next records that station's answers with `marks.<station>.<subject>` ids and existing AnswerTypes; the final station's Next does not call the recorder directly (it rides step completion)", () => {
+    seedFixture();
+    const onComplete = vi.fn();
+    const recorder = renderWithRecorder(onComplete);
+
+    // S1 Next — attachment answers, one per mark, char-list of accepted bases.
+    fireEvent.click(screen.getByTestId("marks-continue"));
+    expect(recorder).toHaveBeenCalledTimes(1);
+    const [attachmentScreen, attachmentAnswers] = recorder.mock.calls[0] as [
+      string,
+      readonly SurveyAnswer[],
+    ];
+    expect(attachmentScreen).toBe("marks_attachment");
+    expect(attachmentAnswers.map((a) => a.questionId).sort()).toEqual([
+      `marks.marks_attachment.${ACUTE}`,
+      `marks.marks_attachment.${GRAVE}`,
+    ].sort());
+    for (const a of attachmentAnswers) {
+      expect(a.answerType).toBe("char-list");
+      expect(a.value).toEqual(["a", "e", "i"]);
+    }
+
+    // S2 Next — treatment: class, input order (no mark override here, no
+    // promotion picked).
+    fireEvent.click(screen.getByTestId("marks-continue"));
+    expect(recorder).toHaveBeenCalledTimes(2);
+    const [treatmentScreen, treatmentAnswers] = recorder.mock.calls[1] as [
+      string,
+      readonly SurveyAnswer[],
+    ];
+    expect(treatmentScreen).toBe("marks_treatment");
+    const treatmentIds = treatmentAnswers.map((a) => a.questionId);
+    expect(treatmentIds).toContain("marks.marks_treatment.class.above-1");
+    expect(treatmentIds).toContain("marks.marks_treatment.promoted");
+    expect(treatmentIds).toContain("marks.marks_treatment.input_order");
+    const classAnswer = treatmentAnswers.find(
+      (a) => a.questionId === "marks.marks_treatment.class.above-1",
+    );
+    expect(classAnswer?.answerType).toBe("select");
+    const promotedAnswer = treatmentAnswers.find(
+      (a) => a.questionId === "marks.marks_treatment.promoted",
+    );
+    expect(promotedAnswer?.answerType).toBe("char-list");
+    const orderAnswer = treatmentAnswers.find(
+      (a) => a.questionId === "marks.marks_treatment.input_order",
+    );
+    expect(orderAnswer?.answerType).toBe("select");
+
+    // S4 Next (output form) — recorded too; not applying mark guards yet.
+    fireEvent.click(screen.getByTestId("marks-continue"));
+    expect(recorder).toHaveBeenCalledTimes(3);
+    const [outputScreen, outputAnswers] = recorder.mock.calls[2] as [string, readonly SurveyAnswer[]];
+    expect(outputScreen).toBe("marks_output_form");
+    expect(outputAnswers).toEqual([
+      { questionId: "marks.marks_output_form.form", answerType: "select", value: expect.any(String) },
+    ]);
+
+    // S5 (final) Next — completes the step. The recorder is NOT called again
+    // here: the final station's answers ride step completion (R-05), not a
+    // direct `recordQuestionAnswers` call.
+    fireEvent.click(screen.getByTestId("marks-continue"));
+    expect(recorder).toHaveBeenCalledTimes(3);
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    const result = onComplete.mock.calls[0]?.[0] as SurveyPhaseResult;
+    // The completion result carries EVERY station's answers (R-04), including
+    // the stacking answers this final Next itself resolved.
+    const finalIds = result.answers.map((a) => a.questionId);
+    expect(finalIds).toContain("marks.marks_stacking.allowed");
+    expect(finalIds).toContain("marks.marks_stacking.stacks");
+    expect(finalIds).toEqual(expect.arrayContaining(attachmentAnswers.map((a) => a.questionId)));
+    expect(finalIds).toEqual(expect.arrayContaining(treatmentIds));
+  });
+
+  it("T083: a position parked via setPosition before mount (what jumpToLocation does) lands on that station with its saved answers", () => {
+    seedFixture();
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    fireEvent.click(screen.getByTestId("marks-continue")); // -> treatment
+    fireEvent.click(screen.getByTestId("treatment-option-above-1-composed"));
+    cleanup();
+
+    useSurveyAnswerStore.getState().setPosition("marks", "marks_treatment");
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+
+    expect(screen.getByTestId("marks-treatment")).toBeTruthy();
+    expect(
+      (screen.getByTestId("treatment-option-above-1-composed").querySelector("input") as HTMLInputElement)
+        .checked,
+    ).toBe(true);
+  });
+
+  it("T083: switching the studio tab away and back (unmount/remount, no Next) keeps a draft answer and records nothing", () => {
+    seedFixture();
+    const recorder = renderWithRecorder();
+    // Toggle one attachment without pressing Next.
+    const attachmentStation = screen.getByTestId("marks-attachment");
+    const checkbox = within(attachmentStation).getAllByRole("checkbox")[0] as HTMLInputElement;
+    const wasChecked = checkbox.checked;
+    fireEvent.click(checkbox);
+    expect(recorder).not.toHaveBeenCalled();
+
+    cleanup();
+    renderWithRecorder();
+
+    const attachmentStationAfter = screen.getByTestId("marks-attachment");
+    const checkboxAfter = within(attachmentStationAfter).getAllByRole("checkbox")[0] as HTMLInputElement;
+    expect(checkboxAfter.checked).toBe(!wasChecked);
+    expect(recorder).not.toHaveBeenCalled();
   });
 });

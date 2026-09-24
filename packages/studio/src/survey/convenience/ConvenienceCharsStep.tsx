@@ -26,7 +26,7 @@
 // session merge. The carve gallery then unions the merged list into its
 // needed-set (see CarveGalleryV2's retainedSet).
 
-import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
+import { useEffect, useMemo, useRef, type ComponentType } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
@@ -36,6 +36,8 @@ import type { ConvenienceCandidate } from "@keyboard-studio/engine";
 import type { EditorStepProps } from "../../steps/types.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
+import { offeredKey } from "../../steps/evidence.ts";
 import { useCarveNeededSet } from "../../hooks/useCarveNeededSet.ts";
 import {
   ACCENT,
@@ -149,10 +151,27 @@ const ConvenienceCharsStep: ComponentType<EditorStepProps> = (
     [ready, produced, neededSet, hasSignal, instantiationMode],
   );
 
-  // Everything pre-checked (propose-then-confirm). Tracks what the author has
-  // explicitly UNCHECKED, so a candidate absent from this set is checked by
-  // construction and a re-seeded candidate list needs no sync effect.
-  const [unchecked, setUnchecked] = useState<Set<string>>(() => new Set());
+  // Store-backed (spec 079 T034): one boolean answer per candidate, keyed by
+  // the candidate's `primary` char, in `surveyAnswerStore.steps.convenience`.
+  // `unchecked` is DERIVED from those saved answers, not held in component
+  // state — a toggle calls `saveAnswer` synchronously (FR-001), so the choice
+  // survives an unmount (tab switch) exactly like every other survey answer.
+  // Everything pre-checked (propose-then-confirm): a candidate with no saved
+  // answer, or a saved answer of `true`, is checked by construction.
+  const convenienceAnswers = useSurveyAnswerStore((s) => s.steps["convenience"]?.answers);
+  const saveAnswer = useSurveyAnswerStore((s) => s.saveAnswer);
+  const offeredPrimaries = useMemo(
+    () => new Set(gate.candidates.map((c) => c.primary)),
+    [gate.candidates],
+  );
+  const unchecked = useMemo(() => {
+    const set = new Set<string>();
+    for (const candidate of gate.candidates) {
+      const saved = convenienceAnswers?.[candidate.primary];
+      if (saved !== undefined && saved.value === false) set.add(candidate.primary);
+    }
+    return set;
+  }, [gate.candidates, convenienceAnswers]);
 
   // Stay TRANSPARENT in the direction of travel on a skip: complete forward,
   // but on a back-pop (the author pressed Back in the carve gallery) keep
@@ -173,13 +192,19 @@ const ConvenienceCharsStep: ComponentType<EditorStepProps> = (
 
   const keptCount = gate.candidates.length - unchecked.size;
 
-  function toggle(primary: string): void {
-    setUnchecked((prev) => {
-      const next = new Set(prev);
-      if (next.has(primary)) next.delete(primary);
-      else next.add(primary);
-      return next;
+  function saveKept(primary: string, kept: boolean): void {
+    saveAnswer("convenience", primary, {
+      value: kept,
+      answerType: "boolean",
+      origin: "confirmed",
+      stage: "draft",
+      evidenceKey: offeredKey(primary, offeredPrimaries),
+      screenId: "convenience",
     });
+  }
+
+  function toggle(primary: string): void {
+    saveKept(primary, unchecked.has(primary));
   }
 
   function complete(): void {
@@ -252,7 +277,9 @@ const ConvenienceCharsStep: ComponentType<EditorStepProps> = (
         <button
           type="button"
           data-testid="convenience-keep-all"
-          onClick={() => setUnchecked(new Set())}
+          onClick={() => {
+            for (const c of gate.candidates) saveKept(c.primary, true);
+          }}
           style={secondaryButton}
         >
           <Trans id="survey.convenience.keepAllButton">Keep all</Trans>
@@ -260,7 +287,9 @@ const ConvenienceCharsStep: ComponentType<EditorStepProps> = (
         <button
           type="button"
           data-testid="convenience-keep-none"
-          onClick={() => setUnchecked(new Set(gate.candidates.map((c) => c.primary)))}
+          onClick={() => {
+            for (const c of gate.candidates) saveKept(c.primary, false);
+          }}
           style={secondaryButton}
         >
           <Trans id="survey.convenience.keepNoneButton">Keep none</Trans>

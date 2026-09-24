@@ -18,6 +18,7 @@ import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import type { SurveyPhaseResult, LintFinding } from "@keyboard-studio/contracts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import { buildFindingsByQuestionId } from "../lint/lintToQuestion.ts";
 
 // ---------------------------------------------------------------------------
@@ -348,5 +349,61 @@ describe("CharactersStep — Phase B draft alphabet lifecycle (spec 057 FR-007)"
     // Re-confirming prefill IS the transition, and clears.
     fireEvent.click(screen.getByTestId("prefill-confirm"));
     expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// (g) Spec 079 T081 — sub-screen position survives a leave-and-return
+//
+// CharactersStep.tsx is the SINGLE writer of this step's surveyAnswerStore
+// position (spec 079 T035/T081) — PhaseB itself never touches it. The
+// vocabulary is PhaseB's own screen id: "prefill" for the prefill screen,
+// then "intro" (the discovery-method chooser) once past it — PhaseB is
+// mocked in this file, so `discoveryMethod` never advances past its default
+// null, and "intro" is what a real, unmocked PhaseB would show first too.
+// ---------------------------------------------------------------------------
+
+describe("CharactersStep — sub-screen position survives a leave-and-return (spec 079 FR-051, FR-004)", () => {
+  it("build-list path: advancing to the PhaseB sub-screen, then unmount/remount with the same evidence, leaves position and the rendered sub-screen unchanged", () => {
+    seedSessionStore();
+
+    const first = render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
+    expect(screen.getByTestId("mock-prefill")).toBeTruthy();
+    expect(useSurveyAnswerStore.getState().steps["characters"]?.position).toBe("prefill");
+
+    // Advance to sub-screen 2 (PhaseB / "intro" — discoveryMethod still null).
+    fireEvent.click(screen.getByTestId("prefill-confirm"));
+    expect(screen.getByTestId("mock-phase-b")).toBeTruthy();
+    expect(useSurveyAnswerStore.getState().steps["characters"]?.position).toBe("intro");
+
+    const positionBeforeRemount = useSurveyAnswerStore.getState().steps["characters"]?.position;
+
+    // Unmount/remount with the same evidence (identity + base unchanged).
+    first.unmount();
+    render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
+
+    // Rendered sub-screen unchanged: still PhaseB, not back at Prefill.
+    expect(screen.getByTestId("mock-phase-b")).toBeTruthy();
+    expect(screen.queryByTestId("mock-prefill")).toBeNull();
+    // Position unchanged.
+    expect(useSurveyAnswerStore.getState().steps["characters"]?.position).toBe(positionBeforeRemount);
+  });
+
+  it("restores at PhaseB on a fresh mount whose ONLY signal is a saved answer-store position (deep-link shape)", () => {
+    seedSessionStore();
+    // Nothing sets charactersSubStage directly (it starts at its default
+    // "prefill") — the saved surveyAnswerStore position is the only thing
+    // naming the build-list screen, mirroring how a jump/deep-link would
+    // arrive (lib/jumpToLocation.ts writes surveyAnswerStore's position
+    // before the remount that reads it).
+    useSurveyAnswerStore.getState().setPosition("characters", "build-list");
+
+    render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
+
+    expect(screen.getByTestId("mock-phase-b")).toBeTruthy();
+    expect(screen.queryByTestId("mock-prefill")).toBeNull();
+    // "build-list" also restores discoveryMethod, so a real PhaseB would
+    // land on BuildListView rather than replaying the intro chooser.
+    expect(useSurveySessionStore.getState().discoveryMethod).toBe("build-list");
   });
 });

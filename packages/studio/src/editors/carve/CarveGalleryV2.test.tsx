@@ -642,3 +642,35 @@ describe('CarveGalleryV2 — optional Latin group', () => {
     expect(screen.getByText(/blocks this combination/)).not.toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// spec 079 T029 — "verify by revisit test" (contracts/step-classification.md):
+// carve is believed `working-copy`-compliant (a discard/restore is a direct
+// working-copy store mutation, applied immediately). This pins that an
+// unmount/remount with the SAME working copy (no re-instantiation) leaves a
+// discarded character discarded — the gallery must not re-derive/re-apply
+// its own recommendation state on a plain revisit.
+// ---------------------------------------------------------------------------
+
+describe('CarveGalleryV2 — leave and return (spec 079 FR-051, T029)', () => {
+  it('a discarded character survives an unmount/remount of the gallery with the same working copy', () => {
+    mockFixtureContributors();
+    const first = renderGalleryV2(makeFixtureIR());
+
+    const cell = screen.getByRole('button', { name: 'a — U+0061' });
+    fireEvent.click(cell);
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(true);
+    first.unmount();
+
+    // Revisit: same working copy, no re-instantiation — mirrors carve-back
+    // re-entry (CharactersStep.tsx) rather than a fresh Track-2 import.
+    render(<CarveGalleryV2 onComplete={vi.fn()} />);
+
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(true);
+    // The accessible name appends ", discarded" once a cell is discarded
+    // (CharacterCellButton) — the same cell, still found, still pressed.
+    expect(
+      screen.getByRole('button', { name: 'a — U+0061, discarded' }).getAttribute('aria-pressed'),
+    ).toBe('true');
+  });
+});

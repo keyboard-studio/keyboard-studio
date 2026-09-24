@@ -31,6 +31,7 @@ import type { SurveyContext, FlowDef } from "./types.ts";
 import { buildPlacementSeeds } from "./placementSeeds.ts";
 import { useSurveySessionStore, type DiscoveryMethod } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
+import { useRecordQuestionAnswers } from "../lib/questionRecorder.ts";
 import { useGlyphFontStack } from "./useGlyphFontStack.ts";
 import {
   nfcDedup,
@@ -80,6 +81,16 @@ import phaseBModularRaw from "../../../../content/flows/phase_b_characters.modul
 // Question id that begins the manual step-by-step path.
 // makeManualOnlyFlow routes pb_discovery_intro straight here.
 const PHASE_B_MANUAL_ENTRY = "pb_routing_branch";
+
+// Manifest step id (steps/manifest.ts's "characters" entry) — the position for
+// this step is owned SOLELY by CharactersStep.tsx (spec 079 T035/T081, single
+// writer): "prefill" | "intro" | "build-list", or — while
+// discoveryMethod === "manual" — a question id owned by SurveyRunner's own
+// per-question cursor (T031). PhaseB itself no longer reads or writes that
+// position; it only reads/writes `discoveryMethod` (surveySessionStore),
+// which CharactersStep observes to compute the position value. This also
+// means a standalone `<PhaseB>` render (as in PhaseB*.test.tsx) never touches
+// surveyAnswerStore at all.
 
 // ---------------------------------------------------------------------------
 // Character extraction — populates confirmedInventory on the phase result
@@ -1196,6 +1207,11 @@ export function PhaseB({ context = {}, onComplete, onBack, findingsByQuestionId,
   // rules of hooks — useMemo must not be called after a conditional return.
   const manualFlow = useMemo(() => makeManualOnlyFlow(flow), [flow]);
 
+  // No position bookkeeping here (spec 079 T081): CharactersStep.tsx is the
+  // single writer/restorer of this step's surveyAnswerStore position, driven
+  // by watching this same `discoveryMethod` field. See the module comment
+  // above.
+
   // Build the placement seed lookup from the PlacementMap (if provided).
   // Recompute only when placementMap changes (reference equality).
   const placementSeeds = useMemo(
@@ -1296,6 +1312,10 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
   const seedFromProposal = usePhaseBDraftStore((s) => s.seedFromProposal);
   const declineExemplarMethod = usePhaseBDraftStore((s) => s.declineExemplarMethod);
   const declinedBefore = usePhaseBDraftStore((s) => s.exemplarMethodDeclined);
+  // "intro" is never the step's final screen (build-list's Done and the
+  // manual walk's last question both are, and each records through its own
+  // path — R-04) — record its answer here, on its own Next (spec 079 T035).
+  const recordQuestionAnswers = useRecordQuestionAnswers();
 
   // Defaults-first (spec §3c): when a sourced inventory exists it is the
   // pre-selected option — unless the author already declined it for this
@@ -1347,6 +1367,14 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
   ];
 
   function handleContinue(): void {
+    // Record the choice on this screen's own Next, before dispatching it —
+    // "exemplars" resolves to the "build-list" DiscoveryMethod either way,
+    // so the recorded value matches what onChoose below actually sets.
+    const resolvedMethod: DiscoveryMethod = selected === "exemplars" ? "build-list" : selected;
+    recordQuestionAnswers("intro", [
+      { questionId: "phaseB.discoveryMethod", answerType: "select", value: resolvedMethod },
+    ]);
+
     if (selected === "exemplars" && inventory !== null) {
       // Exactly once, here — never on the prefill -> B transition (P1a).
       // seedFromProposal is idempotent, so a Back-and-Continue is safe.

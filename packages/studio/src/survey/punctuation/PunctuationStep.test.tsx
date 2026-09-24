@@ -655,3 +655,40 @@ describe("PunctuationStep — a removed proposal is never re-proposed (US4)", ()
     expect(screen.getAllByTestId("authored-punctuation-chip")).toHaveLength(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// spec 079 T027 — leave-and-return, and the phase-C answer slot's per-step
+// ownership (D-4/R-08): convenience recording into the same phase must not
+// erase invisibles' (or any other phase-C step's) already-recorded answers.
+// ---------------------------------------------------------------------------
+
+describe("PunctuationStep — leave and return (spec 079 FR-051)", () => {
+  it("typed-in picks survive an unmount/remount with the same evidence", () => {
+    const first = render(<PunctuationStep onComplete={vi.fn()} />);
+    typeAndAdd("! ?");
+    expect(usePhaseBDraftStore.getState().punctuation).toEqual(["!", "?"]);
+    first.unmount();
+
+    render(<PunctuationStep onComplete={vi.fn()} />);
+    expect(usePhaseBDraftStore.getState().punctuation).toEqual(["!", "?"]);
+    expect(screen.getByText("Your punctuation (2)")).toBeTruthy();
+  });
+
+  it("the phase-C answer slot still holds invisibles' answers after convenience records into the same phase (D-4/R-08)", () => {
+    const recordPhase = useWorkingCopyStore.getState().recordPhase;
+    const invisiblesResult: SurveyPhaseResult = {
+      phase: "C",
+      answers: [{ questionId: "invisibles.u200c", answerType: "boolean", value: true }],
+      confirmedInventory: ["‌"],
+    };
+    recordPhase(invisiblesResult, { stepId: "invisibles" });
+
+    // Convenience records into the SAME phase with its own (empty) answers —
+    // this must not clobber invisibles' entries.
+    recordPhase({ phase: "C", answers: [] }, { stepId: "convenience" });
+
+    const phaseC = useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C");
+    expect(phaseC).toBeDefined();
+    expect(phaseC!.answers).toContainEqual(invisiblesResult.answers[0]);
+  });
+});

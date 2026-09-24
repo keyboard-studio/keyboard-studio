@@ -253,4 +253,29 @@ describe("ConvenienceCharsStep — the question", () => {
     expect(onBack).toHaveBeenCalledTimes(1);
     expect(onComplete).not.toHaveBeenCalled();
   });
+
+  // spec 079 T025: unchecking is store-backed (T034) — it survives an unmount
+  // (tab switch) the way every other survey answer does, as long as the
+  // evidence (the offered candidate set) is unchanged on remount.
+  it("un-ticking survives unmount/remount with the same evidence (T025)", async () => {
+    await renderQuestion();
+    fireEvent.click(screen.getByLabelText("Keep q Q"));
+    fireEvent.click(screen.getByLabelText("Keep x X"));
+    for (const box of screen.getAllByRole("checkbox")) {
+      expect((box as HTMLInputElement).checked).toBe(false);
+    }
+
+    cleanup();
+    // Same evidence: same base/orthography seed as renderQuestion's setup.
+    const onComplete = vi.fn();
+    render(<ConvenienceCharsStep onComplete={onComplete} />);
+    await screen.findByTestId("convenience-chars");
+
+    const boxes = screen.getAllByRole("checkbox");
+    expect(boxes).toHaveLength(2);
+    for (const box of boxes) expect((box as HTMLInputElement).checked).toBe(false);
+    expect(screen.getByTestId("convenience-continue").textContent).toBe(
+      "Continue, keeping none",
+    );
+  });
 });

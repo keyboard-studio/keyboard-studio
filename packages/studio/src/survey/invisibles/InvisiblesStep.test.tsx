@@ -170,6 +170,44 @@ describe("InvisiblesStep — carry-over of code-point entries (FR-017)", () => {
   });
 });
 
+describe("InvisiblesStep — leave and return (spec 079 FR-051, D-4)", () => {
+  it("an accepted candidate survives an unmount/remount with the same evidence", () => {
+    const first = render(<InvisiblesStep onComplete={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("invisible-candidate-200c"));
+    expect(usePhaseBDraftStore.getState().invisibleDecisions["U+200C"]).toBe("accepted");
+    expect(screen.getByTestId("invisible-candidate-200c").getAttribute("aria-checked")).toBe("true");
+
+    first.unmount();
+    render(<InvisiblesStep onComplete={vi.fn()} />);
+
+    expect(usePhaseBDraftStore.getState().invisibleDecisions["U+200C"]).toBe("accepted");
+    expect(screen.getByTestId("invisible-candidate-200c").getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("the phase-C answer slot still holds invisibles' own answers after convenience records into the same phase (D-4/R-08)", () => {
+    const recordPhase = useWorkingCopyStore.getState().recordPhase;
+    const onComplete = vi.fn();
+    render(<InvisiblesStep onComplete={onComplete} />);
+    fireEvent.click(screen.getByTestId("invisible-candidate-200d"));
+    fireEvent.click(screen.getByTestId("invisibles-continue"));
+    const invisiblesResult = lastResult(onComplete);
+
+    recordPhase(invisiblesResult, { stepId: "invisibles" });
+
+    // Convenience records into the SAME phase ("C") with its own (empty,
+    // never-asked-yet) answer set — this must not erase invisibles' entries.
+    recordPhase({ phase: "C", answers: [] }, { stepId: "convenience" });
+
+    const phaseC = useWorkingCopyStore
+      .getState()
+      .phaseResults.find((p) => p.phase === "C");
+    expect(phaseC).toBeDefined();
+    for (const a of invisiblesResult.answers) {
+      expect(phaseC!.answers).toContainEqual(a);
+    }
+  });
+});
+
 describe("InvisiblesStep — the bidi group and writing direction", () => {
   it("collapses the direction controls under the collapsed note when the author is not right-to-left, and can expand them", () => {
     render(<InvisiblesStep onComplete={vi.fn()} />);

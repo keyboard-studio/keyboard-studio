@@ -675,3 +675,28 @@ describe("TouchSeedSourcePanel — draft-discard warning (R12)", () => {
     expect(useWorkingCopyStore.getState().touchDraft).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// spec 079 T029 — "verify by revisit test" (contracts/step-classification.md):
+// touch_seed_source is believed `working-copy`-compliant; this pins that an
+// unmount/remount with the same evidence keeps the author's recorded choice
+// rather than silently re-deriving the base's default.
+// ---------------------------------------------------------------------------
+
+describe("TouchSeedSourcePanel — leave and return (spec 079 FR-051, T029)", () => {
+  it("a NON-default recorded choice survives an unmount/remount with the same evidence", () => {
+    // A usable base layout means the base's own default is "import-adapt" —
+    // the author explicitly overriding it to "reseed-from-desktop" is the
+    // choice that must survive, not merely happen to match the default.
+    seedBase(PHONE_ONLY_JSON);
+    const first = render(<TouchSeedSourcePanel onComplete={() => undefined} onBack={() => undefined} />);
+    fireEvent.click(screen.getByTestId("seed-source-reseed"));
+    fireEvent.click(screen.getByTestId("seed-source-confirm"));
+    expect(useSurveySessionStore.getState().touchSeedSource).toBe("reseed-from-desktop");
+    first.unmount();
+
+    render(<TouchSeedSourcePanel onComplete={() => undefined} onBack={() => undefined} />);
+    expect(screen.getByTestId("seed-source-reseed").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId("seed-source-import-adapt").getAttribute("aria-pressed")).toBe("false");
+  });
+});

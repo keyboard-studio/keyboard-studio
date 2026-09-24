@@ -25,6 +25,7 @@ import {
   peekAnswerDraft,
 } from "../stores/stepWalkStore.ts";
 import { useSurveyAnswerStore, type SavedAnswer } from "../stores/surveyAnswerStore.ts";
+import { useRecordQuestionAnswers } from "../lib/questionRecorder.ts";
 import type { StepWalkPositions } from "../lib/stepWalk.ts";
 import {
   secondaryButton,
@@ -432,6 +433,7 @@ export function SurveyRunner({
   const publishStepWalk = useStepWalkStore((s) => s.publishStepWalk);
   const setPosition = useSurveyAnswerStore((s) => s.setPosition);
   const setStepAnswers = useSurveyAnswerStore((s) => s.setStepAnswers);
+  const recordQuestionAnswers = useRecordQuestionAnswers();
   const externalCursor = useSurveyAnswerStore((s) => s.steps[walkStepId]?.position ?? undefined);
 
   // The walk: every question this run has visited, in order, plus WHICH ONE is
@@ -714,6 +716,15 @@ export function SurveyRunner({
       const phase = flow.phase as SurveyPhaseResult["phase"];
       onComplete({ phase, answers });
       return;
+    }
+
+    // Record this question's answer on its own Next (spec 079 R-04/T031). The
+    // step's FINAL Next is excluded — that flows through the end-of-flow branch
+    // above and onComplete, so step completion records it (the keyboard-effect
+    // diff attaches at that boundary, not here).
+    const recordedAnswer = toSurveyAnswer(currentQId, currentQ, committedValue);
+    if (recordedAnswer !== null) {
+      recordQuestionAnswers(currentQId, [recordedAnswer]);
     }
 
     // Notify the caller that this answer has been committed. Fires synchronously
