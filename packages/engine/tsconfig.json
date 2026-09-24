@@ -24,5 +24,5 @@
     { "path": "../llm" }
   ],
   "include": ["src/**/*", "src/character-discovery/generated/*.json"],
-  "exclude": ["dist", "node_modules", "**/*.test.ts", "**/__tests__/**"]
+  "exclude": ["dist", "node_modules", "**/*.test.ts"]
 }

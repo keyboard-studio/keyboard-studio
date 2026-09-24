@@ -1,7 +1,8 @@
-// Shared fixture builders and assertions for the scaffoldTouchLayout.*.test.ts
-// topic files in this folder.
+// Shared fixture builders for the scaffolder/scaffoldTouchLayout.*.test.ts
+// topic files. Pure data/inspection helpers only: no vitest import, so this
+// module compiles under the package tsconfig like every other __fixtures__ file.
+// Call sites own the assertions (e.g. `expect(findDanglingNextlayers(r)).toEqual([])`).
 
-import { expect } from "vitest";
 import type {
   KeyboardIR,
   IRGroup,
@@ -104,16 +105,24 @@ export function getLayer(result: TouchLayoutIR, layerId: string, platformId = "p
 /**
  * Reusable graph-stranding regression lock (see the hasRightAlt=false /
  * hasRightAltShift=true bug class): collects every layer id actually emitted on
- * the phone platform, walks every key on every layer, and asserts
+ * the given platform, walks every key on every layer, and returns one
+ * descriptive string per violation of
  *   (1) no key's `nextlayer` points to a layer id that isn't emitted, and
  *   (2) every emitted layer reaches "default" within a bounded number of
  *       hops (a BFS over the nextlayer edges, bounded by the layer count so
  *       it can't loop forever on a cycle).
- * Locks the INVARIANT stated in scaffoldTouchLayout.ts's buildRightAltToggleKey
- * doc comment, not just the one instance the bug report described.
+ * An empty array means the graph is sound; call sites assert
+ * `expect(findDanglingNextlayers(result)).toEqual([])` so a failure diff lists
+ * every offending key/layer. Locks the INVARIANT stated in
+ * scaffoldTouchLayout.ts's buildRightAltToggleKey doc comment, not just the one
+ * instance the bug report described.
  */
-export function assertNoDanglingNextlayer(result: TouchLayoutIR, platformId = "phone"): void {
-  const platform = result.platforms.find((p) => p.id === platformId)!;
+export function findDanglingNextlayers(result: TouchLayoutIR, platformId = "phone"): string[] {
+  const problems: string[] = [];
+  const platform = result.platforms.find((p) => p.id === platformId);
+  if (platform === undefined) {
+    return [`platform "${platformId}" is not emitted`];
+  }
   const emittedLayerIds = new Set(platform.layers.map((l) => l.id));
 
   const edges = new Map<string, Set<string>>();
@@ -123,11 +132,12 @@ export function assertNoDanglingNextlayer(result: TouchLayoutIR, platformId = "p
     for (const row of layer.rows) {
       for (const key of row.keys) {
         if (key.nextlayer === undefined) continue;
-        expect(
-          emittedLayerIds.has(key.nextlayer),
-          `key "${key.id}" on layer "${layer.id}" has nextlayer:"${key.nextlayer}" which is ` +
-            `not an emitted layer (emitted: ${[...emittedLayerIds].join(", ")})`,
-        ).toBe(true);
+        if (!emittedLayerIds.has(key.nextlayer)) {
+          problems.push(
+            `key "${key.id}" on layer "${layer.id}" has nextlayer:"${key.nextlayer}" which is ` +
+              `not an emitted layer (emitted: ${[...emittedLayerIds].join(", ")})`,
+          );
+        }
         edges.get(layer.id)!.add(key.nextlayer);
       }
     }
@@ -155,9 +165,10 @@ export function assertNoDanglingNextlayer(result: TouchLayoutIR, platformId = "p
       }
       frontier = next;
     }
-    expect(
-      reachedDefault,
-      `layer "${start}" cannot reach "default" within ${emittedLayerIds.size} hops`,
-    ).toBe(true);
+    if (!reachedDefault) {
+      problems.push(`layer "${start}" cannot reach "default" within ${emittedLayerIds.size} hops`);
+    }
   }
+
+  return problems;
 }

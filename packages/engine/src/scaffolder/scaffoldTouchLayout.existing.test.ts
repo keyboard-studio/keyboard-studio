@@ -6,7 +6,7 @@ import { describe, it, expect } from "vitest";
 import {
   scaffoldTouchLayout,
   buildMinimalPhoneTouchLayout,
-} from "../scaffoldTouchLayout.js";
+} from "./scaffoldTouchLayout.js";
 import type {
   IRRule,
   TouchLayoutIR,
@@ -16,7 +16,7 @@ import {
   makeMinimalIR,
   makeGroup,
   makeS02Pattern,
-} from "./scaffoldTouchLayoutHelpers.js";
+} from "./__fixtures__/touchLayout.js";
 
 describe("scaffoldTouchLayout", () => {
   describe("buildMinimalPhoneTouchLayout — compact 3-layer structure", () => {

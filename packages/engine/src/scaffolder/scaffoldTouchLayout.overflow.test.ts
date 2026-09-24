@@ -6,7 +6,7 @@ import { describe, it, expect } from "vitest";
 import {
   scaffoldTouchLayout,
   scaffoldTouchLayoutWithDiagnostics,
-} from "../scaffoldTouchLayout.js";
+} from "./scaffoldTouchLayout.js";
 import type {
   IRRule,
   TouchLayoutIR,
@@ -18,7 +18,7 @@ import {
   makeCharRule,
   makeGroup,
   getLayer,
-} from "./scaffoldTouchLayoutHelpers.js";
+} from "./__fixtures__/touchLayout.js";
 
 describe("scaffoldTouchLayout", () => {
   describe("overflow spilling for non-slot vkeys (defect 2 fix)", () => {

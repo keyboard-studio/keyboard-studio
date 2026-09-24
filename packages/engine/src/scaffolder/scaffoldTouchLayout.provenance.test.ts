@@ -5,8 +5,8 @@
 import { describe, it, expect } from "vitest";
 import {
   scaffoldTouchLayout,
-} from "../scaffoldTouchLayout.js";
-import { emitTouchLayout } from "../../codec/index.js";
+} from "./scaffoldTouchLayout.js";
+import { emitTouchLayout } from "../codec/index.js";
 import type {
   IRRule,
   TouchLayoutIR,
@@ -18,7 +18,7 @@ import {
   makeGroup,
   makeS02Pattern,
   getLayer,
-} from "./scaffoldTouchLayoutHelpers.js";
+} from "./__fixtures__/touchLayout.js";
 
 describe("scaffoldTouchLayout", () => {
   describe("provenance tagging (T021)", () => {

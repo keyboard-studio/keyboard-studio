@@ -19,7 +19,7 @@ pnpm --filter @keyboard-studio/engine test src/pattern-apply/applyDesktopModific
 pnpm --filter @keyboard-studio/engine test src/pattern-apply/applyDesktopModificationsToRawJson.test.ts
 pnpm --filter @keyboard-studio/engine test src/pattern-apply/touchCoverage.test.ts
 # Engine: projection still emits the compact phone platform + replay in both cases
-pnpm --filter @keyboard-studio/engine test src/scaffolder/__tests__/
+pnpm --filter @keyboard-studio/engine test src/scaffolder/scaffoldTouchLayout
 # Studio: advance routes mechanisms → touch_seed_source → touch
 pnpm --filter @keyboard-studio/studio test src/steps/advance.test.ts
 ```

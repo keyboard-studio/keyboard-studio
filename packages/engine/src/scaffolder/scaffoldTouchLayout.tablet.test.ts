@@ -5,7 +5,7 @@
 import { describe, it, expect } from "vitest";
 import {
   scaffoldTouchLayoutWithDiagnostics,
-} from "../scaffoldTouchLayout.js";
+} from "./scaffoldTouchLayout.js";
 import type {
   KeyboardIR,
   IRRule,
@@ -16,8 +16,8 @@ import {
   makeGroup,
   makeS02Pattern,
   getLayer,
-  assertNoDanglingNextlayer,
-} from "./scaffoldTouchLayoutHelpers.js";
+  findDanglingNextlayers,
+} from "./__fixtures__/touchLayout.js";
 
 // ---------------------------------------------------------------------------
 // Tablet path (platformStyle:"tablet") — reseed-from-desktop tablet-style
@@ -124,7 +124,7 @@ describe("scaffoldTouchLayoutWithDiagnostics — tablet path (platformStyle:\"ta
     expect(shiftRow3.keys.length).toBe(defaultRow3.keys.length);
 
     // Still dangling-free with the shift layer's specials key wired in.
-    assertNoDanglingNextlayer(result.layout, "tablet");
+    expect(findDanglingNextlayers(result.layout, "tablet")).toEqual([]);
   });
 
   it("rightalt letter keys carry nextlayer:\"default\" (auto-return after a tap)", () => {
@@ -162,7 +162,7 @@ describe("scaffoldTouchLayoutWithDiagnostics — tablet path (platformStyle:\"ta
   it("has no dangling nextlayer references and every layer reaches default", () => {
     const ir = makeEwondoLikeIR();
     const result = scaffoldTouchLayoutWithDiagnostics(ir, "tablet");
-    assertNoDanglingNextlayer(result.layout, "tablet");
+    expect(findDanglingNextlayers(result.layout, "tablet")).toEqual([]);
   });
 
   // Geometry parity — the tablet default/shift layers have 5 rows (number

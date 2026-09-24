@@ -5,7 +5,7 @@
 import { describe, it, expect } from "vitest";
 import {
   scaffoldTouchLayout,
-} from "../scaffoldTouchLayout.js";
+} from "./scaffoldTouchLayout.js";
 import type {
   KeyboardIR,
   IRRule,
@@ -20,7 +20,7 @@ import {
   makeGroup,
   makeS02Pattern,
   getLayer,
-} from "./scaffoldTouchLayoutHelpers.js";
+} from "./__fixtures__/touchLayout.js";
 
 describe("scaffoldTouchLayout", () => {
   describe("deadkey → sk[]", () => {

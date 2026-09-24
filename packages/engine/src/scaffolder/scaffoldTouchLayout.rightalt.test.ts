@@ -5,7 +5,7 @@
 import { describe, it, expect } from "vitest";
 import {
   scaffoldTouchLayout,
-} from "../scaffoldTouchLayout.js";
+} from "./scaffoldTouchLayout.js";
 import type {
   KeyboardIR,
 } from "@keyboard-studio/contracts";
@@ -14,8 +14,8 @@ import {
   makeCharRule,
   makeGroup,
   getLayer,
-  assertNoDanglingNextlayer,
-} from "./scaffoldTouchLayoutHelpers.js";
+  findDanglingNextlayers,
+} from "./__fixtures__/touchLayout.js";
 
 describe("scaffoldTouchLayout", () => {
   describe("rightalt layer", () => {
@@ -77,7 +77,7 @@ describe("scaffoldTouchLayout", () => {
 
       // No stranding: every nextlayer targets an emitted layer, and every
       // emitted layer (including rightalt-shift) reaches "default".
-      assertNoDanglingNextlayer(result);
+      expect(findDanglingNextlayers(result)).toEqual([]);
     });
 
     it("rightalt layer every row has ≤10 keys", () => {
@@ -298,7 +298,7 @@ describe("scaffoldTouchLayout", () => {
       expect(shiftKey?.sp).toBe(2);
       expect(shiftKey?.nextlayer).toBe("rightalt");
 
-      assertNoDanglingNextlayer(result);
+      expect(findDanglingNextlayers(result)).toEqual([]);
     });
 
     it("rightalt-shift layer's K_SHIFT key returns to default (sp:2, nextlayer:'default') when there is NO plain-rightalt layer", () => {
@@ -400,7 +400,7 @@ describe("scaffoldTouchLayout", () => {
 
     it("(b) no key anywhere has a nextlayer pointing to a non-emitted layer", () => {
       const result = scaffoldTouchLayout(makeNoPlainRightAltIR());
-      assertNoDanglingNextlayer(result);
+      expect(findDanglingNextlayers(result)).toEqual([]);
     });
 
     it("(c) rightalt-shift reaches default", () => {
@@ -411,7 +411,7 @@ describe("scaffoldTouchLayout", () => {
       // Direct single-hop exit to default (no rightalt layer exists to route
       // through), plus the general reachability check below.
       expect(shiftKey?.nextlayer).toBe("default");
-      assertNoDanglingNextlayer(result);
+      expect(findDanglingNextlayers(result)).toEqual([]);
     });
   });
 
