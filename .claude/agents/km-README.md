@@ -6,7 +6,7 @@ model: haiku
 ---
 # KM Team — Code & Spec Review Crew
 
-The review crew for the keyboard-studio project. Installed at `.claude/agents/km-*.md` and dispatched via `.claude/commands/km-*.md` slash commands.
+The review crew for the keyboard-studio project. Installed at `.claude/agents/km-*.md` and dispatched by `/km-lead` as Agent subagents. The only slash commands are `/km-lead`, `/km-triage`, and `/km-archivist`; the per-role commands are archived under `.claude/archive/commands/`.
 
 Originally adapted from the flexlibs2 LEX crew (May 2026); rebuilt for keyboard-studio in June 2026 with project-specific seats (km-keyman, km-strategy, km-validator, km-output, km-frontend, km-testing) and the km-author / km-domain seats repointed to speak for keymanapp/keyman and general linguistics respectively.
 
