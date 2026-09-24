@@ -55,7 +55,7 @@ Steps already correct (precedents): **Punctuation** and **Invisible characters**
 - Q: When does a saved answer take effect on the keyboard? → A: For survey questions, on Next, which confirms it. In the mechanism galleries, where the author works through many sub-tasks and tests as they go, each action updates the keyboard immediately, as it does today. Navigation between questions puts neither kind of decision at risk (FR-008). Addendum: gallery pages that do not show the keyboard must still save every action immediately, but need not recompile the keyboard while it cannot be seen. Whether to apply each action fully or hold them provisionally and batch them on confirm is left to planning.
 - Q: When is the author told that a change will re-propose later answers? → A: On Next at the changed question, with a notice that does not block and names the later answers that will need reconfirming. The per-question flags remain as well (FR-016).
 - Q: Where does the author land when a step they return to has flagged answers? → A: Where they were. The step lists its flagged earlier questions with links, and Next is blocked until those before the author's position are resolved (FR-013). New mechanism: after a change such as adding a letter, the footer's journey-strip marks for every question or stage with work to do, such as the physical and touch mechanism galleries, carry a "work to do" badge. The author jumps there from the badge and is never moved automatically (FR-017).
-- Q: How do multi-question steps show on the journey strip? → A: As two tiers, in a `000000oooo000` layout. Every section is a large mark, and the section the author is in expands in place into small question marks, one per screen, with the current one highlighted. Question marks are never subsumed into one dot and never one per recorded answer (FR-060).
+- Q: How do multi-question steps show on the journey strip? → A: As two tiers, in a `000000oooo000` layout. The existing rule that a filled dot means "has a response" is kept at both tiers, and size is the tier cue. Every section is a large mark, and the section the author is in expands in place into small question marks, one per screen, with the current one highlighted. Question marks are never subsumed into one dot and never one per recorded answer (FR-060).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -208,21 +208,30 @@ These two issues sit on the same seams as FR-008, FR-017 and FR-040 (what gets r
 
 Leaving the Invisible characters step with no interaction adds dozens of dots to the journey strip, one per offered candidate, each labelled with a raw id such as `invisibles.u2068`. The step deliberately records one answer per candidate, so the decision record can tell "declined" from "never asked". The journey strip then draws a mark for every recorded answer. Because FR-040 now records at every Next, and FR-017 hangs badges on those marks, the grain of a mark has to be fixed.
 
-- **FR-060**: The journey strip MUST have two tiers of mark, differing by size or shape as well as colour (057 FR-046), and laid out as an inline expansion of the current section (clarified 2026-09-24):
+- **FR-060**: The journey strip MUST have two tiers of mark, laid out as an inline expansion of the current section (clarified 2026-09-24):
 
   ```
-  ● ● ● ● ● ● ○ ○ ◉ ○ ● ● ●
-  sections    current     sections
-  before      section's   ahead
-              questions
+  ● ● ● ● ● ●  • • ◎ ·  □ □ □
+  sections     current  sections
+  before       section  ahead
+               (small)
   ```
 
+  The strip's existing visual vocabulary is kept, and the tier is added on top of it, not in place of any part of it:
+  - **Fill means "has a response".** A filled mark has an answer; an empty mark has none yet. This is unchanged and applies at both tiers.
+  - **Shape** still separates reached marks (circles) from upcoming stages (hollow squares).
+  - **The current position** keeps its ring and `aria-current`.
+  - **Size** is the tier cue. Section marks are larger than question marks. Because size is therefore no longer free to mark the current position, the current position MUST be distinguishable by its ring alone, still never by colour alone (057 FR-046).
+
+  In the diagram: `●` is an answered section, `•` an answered question, `·` an unanswered question, `◎` the current question, and `□` an upcoming section.
+
+  Structure:
   - **Section marks** (large): one per step or section, such as Characters, Accents and marks, Invisible characters, or the physical and touch galleries.
   - **Question marks** (small): one per author-facing question or station, meaning one screen and one Next. The section the author is **in** MUST expand in place into its question marks, with the current question highlighted by a non-colour cue as well as colour (057 FR-046). Every other section MUST be shown as its single section mark.
   - Within the current section, question marks MUST be shown, never hidden, and several questions or stations MUST NOT be subsumed into one mark. This applies to every multi-question step, such as the Accents and marks stations and the characters sub-screens (#1789).
   - A question mark is per screen, not per recorded answer. A Next that records several answers, such as one per offered candidate on Invisible characters, MUST add exactly one question mark (#1795).
   - A single-screen section expands to one question mark.
-  - When the author moves into another section, that section expands and the one they left collapses back to its section mark. Collapsing never loses progress: the section mark shows whether the section is completed, in progress or not reached.
+  - When the author moves into another section, that section expands and the one they left collapses back to its section mark. Collapsing never loses progress. A collapsed section mark is filled when every question in it has a response, and MUST show a distinct, non-colour "partly answered" state when only some do. The exact glyph for that state is left to planning.
   - Activating a collapsed section mark MUST jump to the author's last position in that section (FR-004) through the one jump mechanism (057 FR-045).
   - 057 FR-047's overflow rules apply: every mark stays reachable, and the current position stays visible.
 - **FR-061**: Recording several answers on one Next MUST keep every one of them in the decision record, with "declined" and "never asked" still distinguishable. FR-060 governs how they are shown, not what is recorded.
