@@ -25,7 +25,7 @@ import { parse } from "../codec/parse.js";
 import { emit } from "../codec/emit.js";
 import { compile } from "../compiler/index.js";
 import { simulate } from "../simulator/index.js";
-import { computeContextTolerance, stripAssetStoresForCompile } from "../validator/context-tolerance.js";
+import { computeContextTolerance, buildToleranceCompileVfs } from "../validator/context-tolerance.js";
 import { proposeContextVariants } from "./context-variants.js";
 
 const ACUTE_ACCENT_MARK = "´"; // the bare fallback's literal output
@@ -74,13 +74,13 @@ describe("proposeContextVariants - sil_yoruba8 canary (real keyboard, SC-004)", 
       );
       expect(ownBuild.success).toBe(true);
 
-      // The simulation build forces &TARGETS 'any' to get a .js. That adds
-      // KeymanWeb-only errors for the keyboard's virtual-key rules (its own
-      // `+ [K_BKSP]` rules and the generated unwrap) — and nothing else.
-      const vfs = createVirtualFS([
-        { path: "source/sil_yoruba8.kmn", content: emit(stripAssetStoresForCompile(fixedIr)), isBinary: false },
-      ]);
-      const compiled = await compile(vfs, "sil_yoruba8");
+      // The simulation build forces &TARGETS 'any' to get a .js (via the
+      // shared buildToleranceCompileVfs, which also drops every dangling
+      // asset store — not just BITMAP/VISUALKEYBOARD, per #1754). That
+      // still adds KeymanWeb-only errors for the keyboard's virtual-key
+      // rules (its own `+ [K_BKSP]` rules and the generated unwrap) — and
+      // nothing else.
+      const compiled = await compile(buildToleranceCompileVfs(fixedIr), "sil_yoruba8");
       expect(compiled.artifacts.some((a) => a.filename.endsWith(".js"))).toBe(true);
       const WEB_ONLY_ERRORS = new Set([
         `KM_ERROR_KMCMP_${0x502058}`, // ERROR_VirtualKeysNotValidForMnemonicLayouts

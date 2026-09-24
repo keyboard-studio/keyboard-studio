@@ -459,17 +459,23 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     expect(kps![1].length, ".kps must be non-empty").toBeGreaterThan(0);
 
     const kpsText = new TextDecoder().decode(kps![1]);
-    // The author's composed tag: language code + target script, taken whole from
-    // the identity-lite result. EXACTLY ONE <Language>, so a base tag cannot be
-    // sitting alongside it.
+    // The author's composed tag, taken whole from the identity-lite result.
+    // buildTargetBcp47 elides the script subtag when it is the language's
+    // langtags defaultScript (canonical BCP47), and Latn is French's default, so
+    // fr + Latn composes `fr`, not `fr-Latn`. The literal is deliberate: the
+    // composer needs the lazily-loaded langtags module, which this Node-side spec
+    // does not load. EXACTLY ONE <Language>, so a base tag cannot be sitting
+    // alongside it.
     const languageElements = kpsText.match(/<Language\b[^>]*>[^<]*<\/Language>/g) ?? [];
     expect(
       languageElements,
       ".kps must declare exactly one language: the author's composed tag, with their language's English name as its display text",
     ).toEqual([
-      `<Language ID="${FIXTURE.languageCode}-${FIXTURE.targetScript}">${FIXTURE.english}</Language>`,
+      `<Language ID="fr">${FIXTURE.english}</Language>`,
     ]);
     // SC-002 stated directly: the base keyboard's own language declaration is gone.
+    // Both declare ID="fr" now, so the display text is what tells them apart: the
+    // author's reads their English name, the base's reads `fr`.
     expect(kpsText, ".kps must not declare the base keyboard's language").not.toContain(
       '<Language ID="fr">fr</Language>',
     );
