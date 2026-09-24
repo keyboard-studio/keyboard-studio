@@ -204,6 +204,48 @@ describe("proposeContextVariants (spec 062, US1)", () => {
     }
   }, 30_000);
 
+  it("preempts an existing fallback whose OWN key part is a multi-member any() store (km-qc finding on #1774)", async () => {
+    // findInsertionPoint must resolve an existing fallback rule's key part
+    // via resolveKeyPartCandidates, not resolveKeyPart's first-member
+    // shortcut: the fallback here (`any(key.all) > U+00B4`) matches its
+    // SECOND member (']', the same key the gap rule's own fix is keyed on).
+    // Resolving only the first member ('[') would never recognise this as a
+    // conflicting fallback, so the generated fix could land after it in
+    // rule order — the exact silent-shadowing shape #1753 fixed on the
+    // generation side, reproduced here on the fallback-detection side.
+    const kmn = [
+      HEADER,
+      "group(main) using keys",
+      "",
+      "store(base) U+00E0",
+      "store(acute) U+00E2",
+      "store(key.act) ']'",
+      "store(key.all) '[' ']' ';'",
+      "",
+      "any(base) + any(key.act) > index(acute,1)",
+      "any(key.all) > U+00B4",
+      "",
+    ].join("\n");
+    const { ir } = parse(kmn, "multi_key_fallback_fixture");
+    const report = await computeContextTolerance(ir);
+    const { ir: fixedIr, variants } = await proposeContextVariants(ir, report);
+
+    const fallbackVariant = variants.find((v) => v.precedesFallbackRuleId !== undefined);
+    expect(fallbackVariant).toBeDefined();
+
+    const main = fixedIr.groups.find((g) => g.name === "main")!;
+    const generatedIndex = main.rules.findIndex((r) => r.nodeId === fallbackVariant!.generatedMarker);
+    const fallbackIndex = main.rules.findIndex((r) => r.nodeId === fallbackVariant!.precedesFallbackRuleId);
+    expect(generatedIndex).toBeGreaterThanOrEqual(0);
+    expect(fallbackIndex).toBeGreaterThan(generatedIndex);
+
+    const compiled = await compileIr(fixedIr);
+    const result = simulate(compiled, [{ vkey: "K_RBRKT", modifiers: [] }], { text: "à" });
+    // Must be the tolerant rule's output, never the bare fallback's literal acute-accent mark.
+    expect(result.finalOutput).not.toContain("´");
+    expect(result.finalOutput).toBe("â");
+  }, 30_000);
+
   it("returns the IR unchanged (no variants) when the report has no gaps", async () => {
     const kmn = [
       HEADER,

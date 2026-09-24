@@ -56,7 +56,6 @@ import {
   buildToleranceCompileVfs,
   hasSimulatableJs,
   resolveContextCandidates,
-  resolveKeyPart,
   resolveKeyPartCandidates,
   splitRuleAtPlus,
 } from '../validator/context-tolerance.js';
@@ -139,6 +138,15 @@ function sameKey(a: SimKeyInput, b: SimKeyInput): boolean {
  * requirement that match/nomatch rules be last) the first match/nomatch
  * rule, whichever comes first. Returns the insertion index and the
  * conflicting fallback rule's id, if any.
+ *
+ * Resolves each candidate fallback's key part via
+ * {@link resolveKeyPartCandidates}, not `resolveKeyPart`: a fallback whose
+ * own key part is a multi-member `any(store)` matches every member's
+ * physical key, not just the store's first one (the same shape #1753 fixed
+ * on the generation side). Checking only the first member here would miss a
+ * real conflict whenever `key` matches a non-first member of the
+ * fallback's store, letting that fallback shadow the just-generated fix for
+ * that member.
  */
 function findInsertionPoint(
   rules: IRRule[],
@@ -152,8 +160,8 @@ function findInsertionPoint(
     }
     const split = splitRuleAtPlus(r);
     if (split !== undefined && split.before.length === 0) {
-      const keyResolution = resolveKeyPart(split.keyPart, storeChars);
-      if ('key' in keyResolution && sameKey(keyResolution.key, key)) {
+      const keyResolution = resolveKeyPartCandidates(split.keyPart, storeChars);
+      if ('candidates' in keyResolution && keyResolution.candidates.some((c) => sameKey(c.key, key))) {
         return { index: i, fallbackRuleId: r.nodeId };
       }
     }
