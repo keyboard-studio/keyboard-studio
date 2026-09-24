@@ -48,6 +48,7 @@ interface Options {
   maxProbes: number;
   verbose: boolean;
   quiet: boolean;
+  failOnRegressed: boolean;
 }
 
 const USAGE = [
@@ -60,6 +61,7 @@ const USAGE = [
   "  --out <path>          JSON report path (default: reports/nfd-tolerance-corpus.json)",
   "  --verbose             keep the compiler's own console output",
   "  --quiet               JSON report only, no human summary",
+  "  --fail-on-regressed   exit 1 when any keyboard is bucketed regressed (CI gate)",
   "  --help                this text",
 ].join("\n");
 
@@ -71,6 +73,7 @@ function parseArgs(argv: readonly string[]): Options | "help" {
     maxProbes: DEFAULT_MAX_PROBES,
     verbose: false,
     quiet: false,
+    failOnRegressed: false,
   };
 
   for (let i = 0; i < argv.length; i++) {
@@ -115,6 +118,9 @@ function parseArgs(argv: readonly string[]): Options | "help" {
         break;
       case "--quiet":
         options.quiet = true;
+        break;
+      case "--fail-on-regressed":
+        options.failOnRegressed = true;
         break;
       default:
         throw new Error(`unknown option "${arg}"`);
@@ -261,6 +267,10 @@ export async function main(argv: readonly string[]): Promise<number> {
   if (!options.quiet) {
     console.log(humanSummary(report));
     console.log(`\nreport written to ${options.out}`);
+  }
+  if (options.failOnRegressed && report.buckets.regressed > 0) {
+    console.error(`[ERROR] ${report.buckets.regressed} keyboard(s) regressed by the context-tolerance transform`);
+    return 1;
   }
   return 0;
 }

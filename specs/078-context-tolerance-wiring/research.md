@@ -293,6 +293,34 @@ of `main` at `e3b72f66`, plus the owner's answer to the Story 4 clarification
 - **Spec 077** has no plan and no implementation branch. 078 therefore
   establishes the shared shapes (D6).
 
+**Implementation update (2026-09-24, T001).** PR #1757 is still open. Its branch
+(`km/nfd-tolerance-corpus-harness`) was merged into `078-context-tolerance-wiring`
+as a separate commit; the PR itself was not merged. Baseline harness verdicts,
+taken before any spec 078 engine change:
+
+- **Corpus:** local `../keyboards` at `1450362c8`. This is **not** the CI pin
+  (`KEYBOARDS_CORPUS_SHA` `435f82d6`), so the CI gate re-measures on the pin.
+- **Scope:** 915 keyboards analysed, at most 400 probes each.
+
+| bucket | keyboards |
+|---|---|
+| regressed | 0 |
+| gap-remaining | 28 |
+| gap-fixed | 34 |
+| refused | 46 |
+| compile-failed | 165 |
+| harness-error | 28 |
+| no-gap | 614 |
+
+- **SC-004:** `regressed = 0`.
+- **SC-005:** gap-fixed is 34 of the 62 keyboards with a gap (34 + 28), which is
+  55%, above the 40% bar.
+- **Harness errors:** all 28 come from the harness's own probe enumeration. It
+  hands `simulate()` a touch-only `T_*` id, a lower-case `K_*` id, or a quoted
+  character as a virtual key. That is a harness limitation, not a transform
+  outcome.
+- **Top refusal:** the largest refusal gate is `compound-context` (233,231 rules).
+
 ### D1: Browser-safe simulator
 
 - **Decision:** Keep the vendored KeymanWeb engine and replace its two
