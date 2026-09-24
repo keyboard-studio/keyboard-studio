@@ -2,8 +2,8 @@
   "workflow": "speckit",
   "specName": "Survey answers persist per question — navigation never undoes a decision",
   "branch": "km/079-survey-answer-persistence",
-  "currentStep": "plan",
-  "status": "planned",
+  "currentStep": "tasks",
+  "status": "ready-to-implement",
   "history": [
     {
       "step": "specify",
@@ -18,6 +18,13 @@
       "kind": "start",
       "by": "extension",
       "at": "2026-09-24T18:27:57.485Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-09-24T18:33:23.800Z"
     }
   ],
   "telemetryInstanceId": "88610f36-f96c-42cf-a336-7b22bf44b45f"
