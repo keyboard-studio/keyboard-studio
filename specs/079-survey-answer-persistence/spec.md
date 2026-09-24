@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-24
 
-**Status**: Clarified 2026-09-24 — FR-015 (alphabet edits carry over) and FR-040 (record on Next) resolved; FR-007 (unsaved questions must justify) added.
+**Status**: Clarified 2026-09-24 — six decisions recorded (see Clarifications): alphabet edits carry over (FR-015), record on Next (FR-040), unsaved questions must justify (FR-007), confirm-on-Next vs live galleries (FR-008), non-blocking re-proposal notice (FR-016), no auto-move plus journey-strip work-to-do badges (FR-013, FR-017).
 
 **Input**: User description: "Every survey question saves its answer as soon as it is given, and navigation never undoes a decision. Moving back to earlier questions and returning (without changing responses) must never undo any decision, even if a full set of questions was not completed. Every question should save its results, unless we jump to a clarifying question that will determine the shape of the current question." Origin: issue #1787 (Accents and marks answers lost after Back to Confirm your alphabet, then Done), which is one instance of a systemic defect.
 
@@ -52,6 +52,9 @@ Steps already correct (precedents): **Punctuation** and **Invisible characters**
 - Q: If the author really changes their language, script or base, what happens to the characters they added or removed by hand? → A: They carry over to the new proposal. Additions are kept where they still fit, removals are re-applied, and anything that no longer makes sense is flagged for reconfirmation (FR-015).
 - Q: When do answers reach the decision trail? → A: When the author clicks Next on the question. Each Next is a recording point, whether or not the step is finished. A Next with no change records nothing (FR-040).
 - Q: May a question leave its answer or status unsaved? → A: Only with an explicit written justification (FR-007).
+- Q: When does a saved answer take effect on the keyboard? → A: For survey questions, on Next, which confirms it. In the mechanism galleries, where the author works through many sub-tasks and tests as they go, each action updates the keyboard immediately, as it does today. Navigation between questions puts neither kind of decision at risk (FR-008). Addendum: gallery pages that do not show the keyboard must still save every action immediately, but need not recompile the keyboard while it cannot be seen. Whether to apply each action fully or hold them provisionally and batch them on confirm is left to planning.
+- Q: When is the author told that a change will re-propose later answers? → A: On Next at the changed question, with a notice that does not block and names the later answers that will need reconfirming. The per-question flags remain as well (FR-016).
+- Q: Where does the author land when a step they return to has flagged answers? → A: Where they were. The step lists its flagged earlier questions with links, and Next is blocked until those before the author's position are resolved (FR-013). New mechanism: after a change such as adding a letter, the footer's journey-strip marks for every question or stage with work to do, such as the physical and touch mechanism galleries, carry a "work to do" badge. The author jumps there from the badge and is never moved automatically (FR-017).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -102,6 +105,7 @@ An author goes back and changes a clarifying answer that decides the shape of a 
 2. **Given** the author explicitly set an input order, **When** an alphabet change re-proposes attachment answers, **Then** the explicitly set input order is kept unless the change makes it inapplicable.
 3. **Given** a shape-determining answer was changed and then changed back to its original value before the dependent step was revisited, **When** the author returns to the dependent step, **Then** their original answers are restored and nothing is flagged.
 4. **Given** an answer was re-proposed because of a shape change, **When** the author views that question, **Then** they can see that it was re-proposed and why, in terms they understand.
+5. **Given** the author has assigned keys in the physical and touch mechanism galleries, **When** they go back, add a letter and click Next, **Then** they stay where they are. A notice names the later work, and the journey-strip marks for the physical and touch galleries carry a "work to do" badge. Activating a badge takes them to that gallery, and the badge clears once the new letter has a key.
 
 ---
 
@@ -139,19 +143,34 @@ An author closes the tab or reloads partway through any step. When their draft i
 - **FR-001**: Every survey question MUST save the author's answer at the moment it is given, into state that outlives the question's presentation. No answer may exist only while its question is on screen.
 - **FR-002**: A step's answers MUST be saved whether or not the step has been finished. Finishing a step MUST NOT be a precondition for any of its answers being kept.
 - **FR-003**: Navigating away from a question, by Back, by the footer, by a deep link, by switching tabs or by reloading, and returning to it MUST present the saved answer, not a proposal, unless FR-010 applies.
-- **FR-004**: Returning to a step MUST return the author to the question or station within it they were last on, unless FR-010 moves them.
+- **FR-004**: Returning to a step MUST return the author to the question or station within it they were last on. This holds even when a shape change has flagged answers elsewhere: the system MUST NOT move the author because of a flag (FR-017).
 - **FR-005**: Passing through an earlier question or confirmation screen without changing its answer MUST NOT alter any later answer. "Without changing" means the answer's value is unchanged. Re-confirming, re-pressing Done or re-visiting is not a change.
 - **FR-006**: Revisiting a finished step and leaving it without changing any answer MUST NOT append a decision-record entry, mark any consequence stale, or change the keyboard being authored.
 - **FR-007**: Saving is the default for every question, with no exceptions by omission. A question whose answer or status is **not** saved MUST carry an explicit, written justification for why saving is unnecessary or harmful, such as a purely transient UI toggle that records no decision. The justification MUST sit beside the question's declaration, where a reviewer sees it, and MUST be listed in the FR-050 classification. An unsaved question with no justification is a defect. The shape-determining exception (FR-010) is not an exemption from saving: the answer is saved and then re-proposed.
+- **FR-008**: When an answer takes effect on the keyboard depends on the kind of surface (clarified 2026-09-24):
+  - **Survey questions**: a saved answer is a draft until the author clicks Next to confirm it. On Next, the keyboard is updated and the answer is recorded (FR-040) together, so the decision trail always explains what the keyboard does. Leaving by any other route keeps the draft answer (FR-003) but does not apply it.
+  - **Mechanism galleries** (the physical and touch key-assignment surfaces, where the author works through many sub-tasks and tests as they go): each action MUST be saved immediately.
+    - On a gallery page that **shows the keyboard**, each action MUST continue to update it immediately, as it does today, so the author can try it out at once.
+    - On a gallery page that **does not show the keyboard**, each action MUST still be saved immediately. The keyboard need not recompile until it is next visible or the author confirms. Whether such actions are applied fully at once, or held provisionally and applied as a batch on confirm, is deferred to planning. Either way, no action may be lost.
+  - For both kinds, navigating between questions, stations or gallery sub-tasks MUST NOT undo, revert or re-propose any decision already made, whether confirmed, still in draft, or applied by a gallery action.
 
 ### B. The one exception: shape-determining answers
 
 - **FR-010**: When the author **changes** an answer that determines the shape of a later question, the system MUST re-propose only the later answers the change actually affects, and MUST keep every other saved answer. A step MUST NOT be reset wholesale because one of its inputs changed.
 - **FR-011**: Each step MUST declare which earlier answers are shape-determining for it, and each saved answer MUST record the value of that evidence it was given against, so that the system can tell a real change from a revisit.
 - **FR-012**: Re-proposal MUST start from the **saved** answers and adjust them. It MUST NOT start from nothing. Answers the author set explicitly, such as an explicitly chosen input order, MUST be kept unless the change makes them inapplicable. This generalises 071 FR-023 to every step.
-- **FR-013**: A re-proposed answer MUST be visibly marked as needing reconfirmation, with a reason naming the change that caused it, in the author's terms. The author MUST NOT be able to pass a flagged question without either confirming the re-proposal or overturning it.
+- **FR-013**: A re-proposed answer MUST be visibly marked as needing reconfirmation, with a reason naming the change that caused it, in the author's terms. The author MUST NOT be able to pass a flagged question without either confirming the re-proposal or overturning it. Within a step, the author stays where they were. The step lists its flagged earlier questions, each with a link to it, and Next is blocked until every flagged question before the author's position is resolved (clarified 2026-09-24).
 - **FR-014**: If a shape-determining answer is changed and then restored to its earlier value before the dependent answers are reconfirmed, the dependent answers MUST return to their saved values, with no flags.
+- **FR-017**: **Work-to-do badges on the journey strip.** When a change leaves work to do at a later question or stage, the corresponding mark on the footer's journey strip (057 FR-042) MUST carry a "work to do" badge (clarified 2026-09-24). Work to do includes:
+  - flagged, re-proposed answers (FR-013)
+  - new items that a later stage must handle, such as a newly added letter that still needs a key in the physical or touch mechanism gallery
+  - The author MUST NOT be moved. The badge is how they find the work.
+  - Activating a badged mark MUST jump to that question or stage through the existing jump mechanism (057 FR-045). This is one jump implementation, not a second.
+  - The badge MUST clear once the work at that question or stage is resolved.
+  - The badge MUST carry a non-colour cue, and the mark's accessible name MUST state that work is waiting and what kind, in the active locale (057 FR-043, FR-046, spec 056 house rules). All strings go through the message catalog.
+  - A badge MAY appear on an upcoming-stage mark, such as a gallery not yet reached. Activating it follows 057 FR-045's rules for upcoming stages: it is refused with a reason if a lock or gate stands in the way.
 - **FR-015**: When the author changes a shape-determining answer that affects the alphabet (the language, script or base keyboard), the author's own alphabet edits MUST carry over to the new proposal. Characters the author added MUST be kept where they still fit the new language, script and base. Characters the author removed MUST be removed again from the new proposal. An edit that no longer makes sense against the new evidence, such as an added character outside the new script, MUST be flagged for reconfirmation under FR-013, never silently dropped. The author's edits MUST NOT be discarded, even with a warning (clarified 2026-09-24).
+- **FR-016**: When the author clicks Next on a changed shape-determining answer, and the change re-proposes one or more later answers, the system MUST show a notice that does not block, naming in the author's terms which later steps and answers will need reconfirming (clarified 2026-09-24). The notice MUST NOT appear when the change re-proposes nothing. It MUST NOT gate the Next, and it does not replace the FR-013 flags or the FR-017 badges. It MUST point the author to the badged marks on the journey strip, where they can jump to the work. Like every status message, it MUST be announced to assistive technology (spec 056 house rules) and go through the message catalog.
 
 ### C. The characters step
 
@@ -187,7 +206,7 @@ An author closes the tab or reloads partway through any step. When their draft i
 
 ### Key Entities
 
-- **Saved answer**: the author's response to one question. It holds its value, whether it was proposed, confirmed or overturned, and the evidence key it was given against. It outlives the question's presentation and is part of the durable draft.
+- **Saved answer**: the author's response to one question. It holds its value, whether it was proposed, confirmed or overturned, whether it is still a draft or has been confirmed by Next (FR-008), and the evidence key it was given against. It outlives the question's presentation and is part of the durable draft.
 - **Evidence key**: a compact fingerprint of the shape-determining answers a question depends on, such as the confirmed alphabet for Accents and marks, or the language, script and base for the alphabet. A saved answer is *current* when its evidence key matches the present one, and *affected* when it does not.
 - **Step position**: the question or station within a step the author was last on. Part of the durable draft.
 - **Re-proposal flag**: marks a saved answer that a shape change re-proposed. It carries the reason and clears when the author confirms or overturns the answer.
@@ -203,9 +222,11 @@ An author closes the tab or reloads partway through any step. When their draft i
 - **SC-005**: Revisiting a finished step without change adds zero decision-record entries and leaves the keyboard source unchanged.
 - **SC-006**: All acceptance criteria of issue #1787 are met.
 - **SC-007**: Every question that does not save its answer or status appears in the FR-050 classification with a written justification. Unjustified exemptions: zero.
+- **SC-008**: After an upstream change that leaves later work, 100% of the affected questions and stages show a "work to do" badge on the journey strip, none of the unaffected ones do, and the author's position does not change.
 
 ## Amendments to existing specs
 
+- **057 FR-042** (journey strip) gains a mark state. Any mark may carry a "work to do" badge (FR-017), alongside its existing class and position cues. 057's accessibility and jump rules apply to it unchanged.
 - **057 FR-007** is narrowed. Clearing the alphabet is tied not to "a genuine prefill → build-list transition" but to a **change** in the language, script or base the prefill confirms (FR-020). Passing through the prefill confirmation unchanged is not a change.
 - **053 capture boundary** is refined. The decision record's append-only model and supersession chains are unchanged, but the capture point moves from step completion to **each Next** within a step (FR-040). A multi-question step therefore records per question as the author advances, rather than once when it is finished.
 - **071 FR-023** is generalised. Its re-confirmation behaviour applies to saved answers (FR-012), whether or not the marks series was completed, and becomes the pattern for every step (FR-010…FR-014).
