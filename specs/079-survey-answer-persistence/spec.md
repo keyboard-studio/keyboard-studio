@@ -6,7 +6,7 @@
 
 **Status**: Clarified 2026-09-24 — six decisions recorded (see Clarifications): alphabet edits carry over (FR-015), record on Next (FR-040), unsaved questions must justify (FR-007), confirm-on-Next vs live galleries (FR-008), non-blocking re-proposal notice (FR-016), no auto-move plus journey-strip work-to-do badges (FR-013, FR-017).
 
-**Input**: User description: "Every survey question saves its answer as soon as it is given, and navigation never undoes a decision. Moving back to earlier questions and returning (without changing responses) must never undo any decision, even if a full set of questions was not completed. Every question should save its results, unless we jump to a clarifying question that will determine the shape of the current question." Origin: issue #1787 (Accents and marks answers lost after Back to Confirm your alphabet, then Done), which is one instance of a systemic defect. Designed together with the flow-interrelated issues #1795 (the journey strip floods with one dot per recorded answer) and #1796 (Convenience letters skips itself on missing evidence); see section F2.
+**Input**: User description: "Every survey question saves its answer as soon as it is given, and navigation never undoes a decision. Moving back to earlier questions and returning (without changing responses) must never undo any decision, even if a full set of questions was not completed. Every question should save its results, unless we jump to a clarifying question that will determine the shape of the current question." Origin: issue #1787 (Accents and marks answers lost after Back to Confirm your alphabet, then Done), which is one instance of a systemic defect. Designed together with the flow-interrelated issues #1795 (the journey strip floods with one dot per recorded answer), #1789 (per-question dots inside multi-screen steps) and #1796 (Convenience letters skips itself on missing evidence); see section F2.
 
 ## Governing documents
 
@@ -55,6 +55,7 @@ Steps already correct (precedents): **Punctuation** and **Invisible characters**
 - Q: When does a saved answer take effect on the keyboard? → A: For survey questions, on Next, which confirms it. In the mechanism galleries, where the author works through many sub-tasks and tests as they go, each action updates the keyboard immediately, as it does today. Navigation between questions puts neither kind of decision at risk (FR-008). Addendum: gallery pages that do not show the keyboard must still save every action immediately, but need not recompile the keyboard while it cannot be seen. Whether to apply each action fully or hold them provisionally and batch them on confirm is left to planning.
 - Q: When is the author told that a change will re-propose later answers? → A: On Next at the changed question, with a notice that does not block and names the later answers that will need reconfirming. The per-question flags remain as well (FR-016).
 - Q: Where does the author land when a step they return to has flagged answers? → A: Where they were. The step lists its flagged earlier questions with links, and Next is blocked until those before the author's position are resolved (FR-013). New mechanism: after a change such as adding a letter, the footer's journey-strip marks for every question or stage with work to do, such as the physical and touch mechanism galleries, carry a "work to do" badge. The author jumps there from the badge and is never moved automatically (FR-017).
+- Q: How do multi-question steps show on the journey strip? → A: As two tiers. Large section marks group small question marks, one per screen. Question marks are always shown, never subsumed into one dot, and never one per recorded answer (FR-060).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -129,7 +130,8 @@ An author closes the tab or reloads partway through any step. When their draft i
 
 - **Several steps sharing a phase.** Recording one step's answers must never erase another step's answers (D-4).
 - **A step judged not to apply, later made applicable.** For example, Convenience letters is skipped, then an alphabet edit leaves surplus letters. This is a shape change: the step gets a work-to-do badge and is never silently left behind (FR-067).
-- **A screen that records many answers at once**, such as Invisible characters with one answer per candidate. It is one mark on the journey strip, never one per answer (FR-060).
+- **A screen that records many answers at once**, such as Invisible characters with one answer per candidate. It is one question mark on the journey strip, never one per answer (FR-060).
+- **A multi-question step**, such as the Accents and marks stations. Each question gets its own visible question mark under the section mark, never one mark for the whole step (FR-060).
 - **Rapid Back/Forward.** Navigating away before a just-given answer has been written durably must not lose it. The answer is saved when it is given, not when the author leaves.
 - **Revisit without change of a completed step.** It must not append a decision-record entry, must not mark anything stale, and must not re-apply step effects non-idempotently (D-6).
 - **Shape change to a step the author never reached.** Nothing to re-propose. The step derives its proposals fresh when first reached.
@@ -202,14 +204,19 @@ An author closes the tab or reloads partway through any step. When their draft i
 
 These two issues sit on the same seams as FR-008, FR-017 and FR-040 (what gets recorded, what the journey strip shows, and when a step may pass without asking). They are designed together with this feature rather than fixed separately.
 
-**#1795: one Next, one mark.**
+**#1795 and #1789: one screen, one question mark, grouped under section marks.**
 
 Leaving the Invisible characters step with no interaction adds dozens of dots to the journey strip, one per offered candidate, each labelled with a raw id such as `invisibles.u2068`. The step deliberately records one answer per candidate, so the decision record can tell "declined" from "never asked". The journey strip then draws a mark for every recorded answer. Because FR-040 now records at every Next, and FR-017 hangs badges on those marks, the grain of a mark has to be fixed.
 
-- **FR-060**: The journey strip MUST show at most one mark per author-facing question or station: one screen and one Next. It MUST NOT show one mark per recorded answer. A Next that records several answers, such as one per offered candidate, MUST add at most one mark.
+- **FR-060**: The journey strip MUST have two tiers of mark, differing by size or shape as well as colour (057 FR-046) (clarified 2026-09-24):
+  - **Section marks** (large): one per step or section, such as Characters, Accents and marks, Invisible characters, or the physical and touch galleries.
+  - **Question marks** (small): one per author-facing question or station within a section, meaning one screen and one Next. Question marks MUST be shown, not collapsed into their section mark or hidden. Several questions or stations MUST NOT be subsumed into one mark. This applies to every multi-question step, such as the Accents and marks stations and the characters sub-screens (#1789).
+  - A question mark is per screen, not per recorded answer. A Next that records several answers, such as one per offered candidate on Invisible characters, MUST add exactly one question mark (#1795).
+  - A single-screen section has one question mark under its section mark.
+  - 057 FR-047's overflow rules apply to both tiers: every mark stays reachable, and the current position stays visible.
 - **FR-061**: Recording several answers on one Next MUST keep every one of them in the decision record, with "declined" and "never asked" still distinguishable. FR-060 governs how they are shown, not what is recorded.
 - **FR-062**: Every mark's label and accessible name MUST be a human-readable question or stage name from the message catalog. A raw answer id MUST never be shown.
-- **FR-063**: Work-to-do badges (FR-017) attach to the same marks. A badge on a multi-answer screen covers every answer on that screen.
+- **FR-063**: Work-to-do badges (FR-017) attach to the question mark of each screen with work to do. A badge on a multi-answer screen covers every answer on that screen. The section mark MUST also show that some question in the section has work waiting. Activating either jumps through the one jump mechanism (057 FR-045).
 
 **#1796: a step may not skip itself on missing evidence.**
 
@@ -245,15 +252,16 @@ The Convenience letters step checks when it mounts whether it applies. If it doe
 - **SC-003**: A single-item upstream change, such as adding one letter, re-proposes only the answers that depend on that item. In the marks test case, every answer not involving the added item is unchanged.
 - **SC-004**: After a reload, 100% of saved answers and positions are restored for every step covered by FR-053.
 - **SC-005**: Revisiting a finished step without change adds zero decision-record entries and leaves the keyboard source unchanged.
-- **SC-006**: All acceptance criteria of issues #1787, #1795 and #1796 are met.
+- **SC-006**: All acceptance criteria of issues #1787, #1789, #1795 and #1796 are met.
 - **SC-007**: Every question that does not save its answer or status appears in the FR-050 classification with a written justification. Unjustified exemptions: zero.
-- **SC-009**: Completing Invisible characters, with or without interaction, adds at most one journey-strip mark, and no mark anywhere shows a raw answer id (#1795).
+- **SC-009**: Completing Invisible characters, with or without interaction, adds exactly one question mark. Every station of Accents and marks has its own visible question mark under the section mark. No mark anywhere shows a raw answer id (#1795, #1789).
 - **SC-010**: On both the defaults path and the ask-me path, when the base has surplus letters for the confirmed orthography, Convenience letters is asked before carve. It is skipped only when there are genuinely none, and a skip is recorded as "not asked" with its reason (#1796).
 - **SC-008**: After an upstream change that leaves later work, 100% of the affected questions and stages show a "work to do" badge on the journey strip, none of the unaffected ones do, and the author's position does not change.
 
 ## Amendments to existing specs
 
-- **057 FR-042/FR-049** (journey strip grain) is pinned. There is one mark per author-facing question or station, never one per recorded answer (FR-060). This also bounds #1789 (per-question dots inside multi-screen steps).
+- **057 FR-042/FR-049** (journey strip grain) is pinned. The strip has section marks (large) and question marks (small). There is one question mark per author-facing screen, always shown and never one per recorded answer (FR-060). This covers #1789 (per-question dots inside multi-screen steps).
+- **057 FR-042** "a dot appears when its step completes… the decision-recording path is NOT changed to commit per question" is superseded. Recording now happens at each Next (FR-040), so a question mark becomes a completed mark at its own Next, not when its step finishes.
 - **057 FR-042** (journey strip) gains a mark state. Any mark may carry a "work to do" badge (FR-017), alongside its existing class and position cues. 057's accessibility and jump rules apply to it unchanged.
 - **057 FR-007** is narrowed. Clearing the alphabet is tied not to "a genuine prefill → build-list transition" but to a **change** in the language, script or base the prefill confirms (FR-020). Passing through the prefill confirmation unchanged is not a change.
 - **053 capture boundary** is refined. The decision record's append-only model and supersession chains are unchanged, but the capture point moves from step completion to **each Next** within a step (FR-040). A multi-question step therefore records per question as the author advances, rather than once when it is finished.
