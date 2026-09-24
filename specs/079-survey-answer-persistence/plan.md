@@ -53,7 +53,7 @@ The technical approach reuses existing infrastructure wherever it already does t
 | Project Type | pnpm monorepo. The change is almost entirely in `packages/studio`, plus one engine fix |
 | Performance Goals | A saved answer is written synchronously in the change handler. A draft write is ≤ one per autosave debounce (500 ms), as today. The persisted answers stay small (keyed values, not walks) |
 | Constraints | D3: no new timer, no validation path. 057 invariants: one jump mechanism, the session store stays the only "where am I". Record model and `AnswerType` unchanged. No contracts change |
-| Scale/Scope | 15 manifest steps. Of these, 7 need fixes (identity, track, project_name, characters, marks, convenience, help), 3 need targeted fixes (punctuation, invisibles, carve), and 4 are verified by revisit test. Plus the footer strip |
+| Scale/Scope | 15 manifest steps. Of these, 7 need fixes (identity, track, project_name, characters, marks, convenience, help), 2 need targeted fixes (punctuation, invisibles), 2 are already compliant (mechanisms, touch), 3 are verified by revisit test (choose_base, carve, touch_seed_source; carve also gets a regression test for the skipped-convenience misread), and 1 is justified-exempt (package). Plus the footer strip |
 
 Every Technical Context unknown is resolved in [research.md](research.md) Part II. None remains
 `NEEDS CLARIFICATION`. The one decision the spec deferred to planning, gallery "apply fully vs hold and
