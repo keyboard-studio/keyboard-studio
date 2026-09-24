@@ -1,9 +1,9 @@
 {
   "workflow": "speckit",
   "specName": "Context tolerance reaches the author",
-  "branch": "077-base-decisions",
-  "currentStep": "specify",
-  "status": "specified",
+  "branch": "078-context-tolerance-wiring",
+  "currentStep": "implement",
+  "status": "implementing",
   "history": [
     {
       "step": "specify",
@@ -11,6 +11,41 @@
       "kind": "start",
       "by": "extension",
       "at": "2026-09-23T07:55:38.676Z"
+    },
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-24T19:14:50.818Z"
+    },
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-09-24T19:14:51.152Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-09-24T19:54:47.492Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-24T22:55:02.221Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-09-24T22:55:07.844Z"
     }
   ],
   "telemetryInstanceId": "e3963a54-193e-4377-b386-8058b4a9a8a6"
