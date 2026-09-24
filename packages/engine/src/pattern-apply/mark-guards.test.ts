@@ -155,6 +155,45 @@ describe("applyMarkGuards — stepwise backspace unwrap", () => {
   });
 });
 
+describe("applyMarkGuards — regression to an empty worklist (D-6)", () => {
+  it("applying the same worklist twice yields byte-equal emitted .kmn", () => {
+    const { ir } = parse(BASE_KMN, "guards");
+    const wl = worklist({ blockedCombinations: [{ base: "k", mark: ACUTE }] });
+    const once = applyMarkGuards(ir, wl, "base-plus-mark");
+    const twice = applyMarkGuards(once.ir, wl, "base-plus-mark");
+    expect(emit(twice.ir)).toBe(emit(once.ir));
+  });
+
+  it("leaves no generated_marks_guard group, rules, or stores after a worklist with blocked pairs is followed by one with none", () => {
+    const { ir } = parse(BASE_KMN, "guards");
+    const blocked = applyMarkGuards(
+      ir,
+      worklist({
+        blockedCombinations: [{ base: "k", mark: ACUTE }],
+        ownLetterUnits: ["e", "é"],
+      }),
+      "ready-made",
+    );
+    // Sanity: the first run actually produced the artifacts we expect to
+    // later see torn down.
+    expect(blocked.ir.groups.some((g) => g.name === MARKS_GUARD_GROUP)).toBe(true);
+    expect(blocked.ir.stores.some((s) => s.name === MARKS_UNWRAP_FROM_STORE)).toBe(true);
+
+    const cleared = applyMarkGuards(blocked.ir, worklist(), "ready-made");
+
+    expect(cleared.ir.groups.some((g) => g.name === MARKS_GUARD_GROUP)).toBe(false);
+    expect(cleared.ir.stores.some((s) => s.name === MARKS_UNWRAP_FROM_STORE)).toBe(false);
+    expect(cleared.ir.stores.some((s) => s.name === MARKS_UNWRAP_TO_STORE)).toBe(false);
+    const main = cleared.ir.groups.find((g) => g.name === "main");
+    expect(main?.rules.some((r) => r.nodeId === "gen-marks-unwrap-rule")).toBe(false);
+    expect(main?.rules.some((r) => r.matchKind === "match")).toBe(false);
+    const emitted = emit(cleared.ir);
+    expect(emitted).not.toContain(MARKS_GUARD_GROUP);
+    expect(emitted).not.toContain(MARKS_UNWRAP_FROM_STORE);
+    expect(emitted).not.toContain(MARKS_UNWRAP_TO_STORE);
+  });
+});
+
 describe("applyMarkGuards — guard-hop purity, idempotency, ordering", () => {
   it("does not mutate an existing match rule from the input IR (purity)", () => {
     const { ir } = parse(FOREIGN_MATCH_KMN, "guards");
