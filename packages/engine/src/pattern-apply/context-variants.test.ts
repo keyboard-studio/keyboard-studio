@@ -160,6 +160,92 @@ describe("proposeContextVariants (spec 062, US1)", () => {
     expect(diacriticVariants).toHaveLength(0);
   }, 30_000);
 
+  it("resolves each member of a multi-key any() store to its own literal key and output (#1753)", async () => {
+    // Regression for #1753: a multi-member key store (`any(key.all)`, real
+    // shape e.g. sil_yoruba8's `any(key.all)` acute/grave/tilde/... table)
+    // selects a DIFFERENT physical key per member. Before this fix, the
+    // generator resolved only the first member's key, simulated the fix's
+    // output against just that key, and then emitted a generated rule whose
+    // context still matched `any(key.all)` (every member) — silently
+    // overwriting every other member's correct output with the first
+    // member's. Each member must get its own literal key and its own
+    // simulated output.
+    const kmn = [
+      HEADER,
+      "group(main) using keys",
+      "",
+      "store(base) U+00E0",
+      "store(key.all) '[' ']' ';'",
+      "store(act.all) U+00E2 U+00E1 U+00E3",
+      "",
+      "any(base) + any(key.all) > index(act.all,2)",
+      "",
+    ].join("\n");
+    const { ir } = parse(kmn, "multi_key_fixture");
+    const report = await computeContextTolerance(ir);
+    expect(report.findings.some((f) => f.failingKeystrokes !== undefined)).toBe(true);
+
+    const { ir: fixedIr, variants } = await proposeContextVariants(ir, report);
+    const diacriticVariants = variants.filter((v) => !v.sourceRuleId.startsWith(BACKSPACE_UNWRAP_RULE_PREFIX));
+    expect(diacriticVariants).toHaveLength(3);
+
+    const compiled = await compileIr(fixedIr);
+    expect(compiled.success).toBe(true);
+
+    const decomposedBase = "à"; // a + combining grave, decomposed U+00E0
+    const expectations: Array<[{ vkey: string; modifiers: [] }, string]> = [
+      [{ vkey: "K_LBRKT", modifiers: [] }, "â"],
+      [{ vkey: "K_RBRKT", modifiers: [] }, "á"],
+      [{ vkey: "K_COLON", modifiers: [] }, "ã"],
+    ];
+    for (const [key, expected] of expectations) {
+      const result = simulate(compiled, [key], { text: decomposedBase });
+      expect(result.finalOutput).toBe(expected);
+    }
+  }, 30_000);
+
+  it("preempts an existing fallback whose OWN key part is a multi-member any() store (km-qc finding on #1774)", async () => {
+    // findInsertionPoint must resolve an existing fallback rule's key part
+    // via resolveKeyPartCandidates, not resolveKeyPart's first-member
+    // shortcut: the fallback here (`any(key.all) > U+00B4`) matches its
+    // SECOND member (']', the same key the gap rule's own fix is keyed on).
+    // Resolving only the first member ('[') would never recognise this as a
+    // conflicting fallback, so the generated fix could land after it in
+    // rule order — the exact silent-shadowing shape #1753 fixed on the
+    // generation side, reproduced here on the fallback-detection side.
+    const kmn = [
+      HEADER,
+      "group(main) using keys",
+      "",
+      "store(base) U+00E0",
+      "store(acute) U+00E2",
+      "store(key.act) ']'",
+      "store(key.all) '[' ']' ';'",
+      "",
+      "any(base) + any(key.act) > index(acute,1)",
+      "any(key.all) > U+00B4",
+      "",
+    ].join("\n");
+    const { ir } = parse(kmn, "multi_key_fallback_fixture");
+    const report = await computeContextTolerance(ir);
+    const { ir: fixedIr, variants } = await proposeContextVariants(ir, report);
+
+    const fallbackVariant = variants.find((v) => v.precedesFallbackRuleId !== undefined);
+    expect(fallbackVariant).toBeDefined();
+
+    const main = fixedIr.groups.find((g) => g.name === "main")!;
+    const generatedIndex = main.rules.findIndex((r) => r.nodeId === fallbackVariant!.generatedMarker);
+    const fallbackIndex = main.rules.findIndex((r) => r.nodeId === fallbackVariant!.precedesFallbackRuleId);
+    expect(generatedIndex).toBeGreaterThanOrEqual(0);
+    expect(fallbackIndex).toBeGreaterThan(generatedIndex);
+
+    const compiled = await compileIr(fixedIr);
+    const result = simulate(compiled, [{ vkey: "K_RBRKT", modifiers: [] }], { text: "à" });
+    // Must be the tolerant rule's output, never the bare fallback's literal acute-accent mark.
+    expect(result.finalOutput).not.toContain("´");
+    expect(result.finalOutput).toBe("â");
+  }, 30_000);
+
   it("returns the IR unchanged (no variants) when the report has no gaps", async () => {
     const kmn = [
       HEADER,

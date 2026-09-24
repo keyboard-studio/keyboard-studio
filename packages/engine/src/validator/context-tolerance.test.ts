@@ -107,6 +107,45 @@ describe("computeContextTolerance (spec 062, US2)", () => {
     expect(pairingFinding?.failingKeystrokes).toBeUndefined();
   }, 30_000);
 
+  it("still runs the behavioural comparison for a keyboard declaring &LAYOUTFILE (#1754)", async () => {
+    // Regression for #1754: computeContextTolerance's own compile VFS only
+    // ever contains the one .kmn file, so a keyboard naming a sibling
+    // touch-layout file (965 of 1,044 real corpus keyboards do) previously
+    // failed the internal compile outright and every pending rule was
+    // reported "keyboard failed to compile" rather than actually diagnosed.
+    const kmn = [
+      "store(&NAME) 'ContextTolerance'",
+      "store(&VERSION) '14.0'",
+      "store(&KEYBOARDVERSION) '1.0'",
+      "store(&TARGETS) 'any'",
+      "store(&mnemoniclayout) '1'",
+      "store(&LAYOUTFILE) 'layoutfile_fixture.keyman-touch-layout'",
+      "",
+      "begin Unicode > use(main)",
+      "",
+      "group(main) using keys",
+      "",
+      "store(base) U+00E0",
+      "store(acute) U+00E2",
+      "store(key.act) ']'",
+      "",
+      "any(base) + any(key.act) > index(acute,1)",
+      "+ ']' > U+00B4",
+      "",
+    ].join("\n");
+    const { ir } = parse(kmn, "layoutfile_fixture");
+
+    const report = await computeContextTolerance(ir);
+
+    // A gap actually diagnosed via simulate() carries failingKeystrokes; the
+    // "keyboard failed to compile" fallback never does (see simulatePending
+    // vs. computeContextTolerance's compile-failure branch) — so finding one
+    // here proves the compile succeeded despite &LAYOUTFILE.
+    const gapFinding = report.findings.find((f) => f.failingKeystrokes !== undefined);
+    expect(gapFinding).toBeDefined();
+    expect(gapFinding?.precomposedOutput).toBe("â");
+  }, 30_000);
+
   it("SC-006 invariant: findings.length + notAnalysedCount always equals the total rule count", async () => {
     const kmn = [
       HEADER,
