@@ -25,7 +25,12 @@ import React from "react";
 import { SurveyRunner } from "./SurveyRunner.tsx";
 import type { FlowDef } from "./types.ts";
 import type { SurveyAnswer } from "@keyboard-studio/contracts";
-import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
+import {
+  useSurveyAnswerStore,
+  applySurveyAnswerSnapshot,
+  getSurveyAnswerSnapshot,
+  type SurveyAnswerSnapshot,
+} from "../stores/surveyAnswerStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { QuestionRecorderContext, type ScreenRecorder } from "../lib/questionRecorder.ts";
 
@@ -234,5 +239,34 @@ describe("SurveyRunner — a pre-mount position lands on the saved answer (T083)
 
     expect(screen.getByText("First question")).toBeTruthy();
     expect(field().value).toBe("alpha");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 4. Spec 079 T070 (US4 scenarios 1-2) — restore, then mount: after a reload
+//    the store is rebuilt from the durable draft (applySurveyAnswerSnapshot)
+//    before the step ever mounts, and the runner must land on the saved
+//    question with the saved answer.
+// ---------------------------------------------------------------------------
+
+describe("SurveyRunner — restore-then-mount (spec 079 US4)", () => {
+  it("mounts on the saved question with the saved answer after applySurveyAnswerSnapshot", () => {
+    useSurveyAnswerStore.getState().reset();
+    renderWithRecorder();
+    type("alpha");
+    next();
+    type("half-typed");
+    // What the durable draft holds: a JSON round trip of the snapshot.
+    const persisted = JSON.parse(JSON.stringify(getSurveyAnswerSnapshot())) as SurveyAnswerSnapshot;
+    cleanup();
+
+    // Cold start: empty store, then the restore, then the first mount.
+    useSurveyAnswerStore.getState().reset();
+    applySurveyAnswerSnapshot(persisted);
+    renderWithRecorder();
+
+    expect(screen.getByText("Second question")).toBeTruthy();
+    expect(field().value).toBe("half-typed");
+    expect(useSurveyAnswerStore.getState().steps["identity"]?.answers["q1"]?.value).toBe("alpha");
   });
 });

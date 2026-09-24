@@ -13,7 +13,12 @@ import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { MarksSeriesStep, computeMarksGate } from "./MarksSeriesStep.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
-import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
+import {
+  useSurveyAnswerStore,
+  applySurveyAnswerSnapshot,
+  getSurveyAnswerSnapshot,
+  type SurveyAnswerSnapshot,
+} from "../../stores/surveyAnswerStore.ts";
 import { QuestionRecorderContext, type ScreenRecorder } from "../../lib/questionRecorder.ts";
 
 const ACUTE = "́";
@@ -1047,6 +1052,43 @@ describe("MarksSeriesStep — spec 079 persistence (T023, T024, T083)", () => {
     expect(savedAnswers["marks_treatment.class.above-1"]?.value).toBe("composed");
     expect(savedAnswers["marks_treatment.input_order"]?.value).toBe("prefix");
     expect(savedAnswers["marks_stacking.allowed"]?.value).toBe(true);
+  });
+
+  it("T070 (spec 079 US4): after a reload restore (applySurveyAnswerSnapshot before the first mount) the step opens on the saved station with the saved answers", () => {
+    seedFixture();
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    const attachmentStation = screen.getByTestId("marks-attachment");
+    const firstChecked = within(attachmentStation)
+      .getAllByRole("checkbox")
+      .find((cb) => (cb as HTMLInputElement).checked) as HTMLInputElement;
+    const uncheckedLabel = firstChecked.getAttribute("aria-label")!;
+    fireEvent.click(firstChecked);
+    fireEvent.click(screen.getByTestId("marks-continue"));
+    fireEvent.click(screen.getByTestId("treatment-option-above-1-composed"));
+    fireEvent.click(screen.getByTestId("marks-continue"));
+    expect(screen.getByTestId("marks-output-form")).toBeTruthy();
+
+    // What the durable draft holds, as JSON.
+    const persisted = JSON.parse(JSON.stringify(getSurveyAnswerSnapshot())) as SurveyAnswerSnapshot;
+    cleanup();
+
+    // Cold start: empty store, restore, then the first mount.
+    useSurveyAnswerStore.getState().reset();
+    applySurveyAnswerSnapshot(persisted);
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+
+    expect(screen.getByTestId("marks-output-form")).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Back" })); // -> treatment
+    expect(
+      (screen.getByTestId("treatment-option-above-1-composed").querySelector("input") as HTMLInputElement)
+        .checked,
+    ).toBe(true);
+    fireEvent.click(screen.getByRole("button", { name: "Back" })); // -> attachment
+    expect((screen.getByLabelText(uncheckedLabel) as HTMLInputElement).checked).toBe(false);
   });
 
   it("T024: each station's Next records that station's answers with `marks.<station>.<subject>` ids and existing AnswerTypes; the final station's Next does not call the recorder directly (it rides step completion)", () => {

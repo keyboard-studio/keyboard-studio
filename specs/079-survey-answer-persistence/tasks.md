@@ -192,10 +192,10 @@ cleanly. Closes FR-030, FR-032, FR-053, SC-004.
 
 **Independent test**: give partial answers, reload, restore, compare answers and position (quickstart US4).
 
-- [ ] T068 [P] [US4] Extend `studio/src/lib/draftPersistence.test.ts` (FR-053): populate marks answers (some stations answered, position on station 3) and a half-answered identity question, serialize through the autosave path, clear the stores, restore, assert `steps.marks`, `steps.identity`, positions and `recordedScreenOf` match exactly
-- [ ] T069 [P] [US4] Same file (FR-032, US4 scenario 3): a checked-in pre-feature draft fixture (no `surveyAnswers`, no `phaseAnswersByStep`, no `alphabetEvidenceKey`) under `studio/src/lib/__fixtures__/` restores without error, the store is empty, phase answers load under `"legacy"`, and every step renders its proposal with no invented answer
-- [ ] T070 [P] [US4] Extend `studio/src/survey/marks/MarksSeriesStep.test.tsx` and `studio/src/survey/SurveyRunner.persistence.test.tsx` with a restore-then-mount case: after `applySurveyAnswerSnapshot`, the step mounts on the saved station/question with the saved answers (US4 scenarios 1-2)
-- [ ] T071 [US4] Fix any restore gap T068-T070 expose in `studio/src/lib/draftPersistence.ts` or `studio/src/stores/surveyAnswerStore.ts`
+- [X] T068 [P] [US4] Extend `studio/src/lib/draftPersistence.test.ts` (FR-053): populate marks answers (some stations answered, position on station 3) and a half-answered identity question, serialize through the autosave path, clear the stores, restore, assert `steps.marks`, `steps.identity`, positions and `recordedScreenOf` match exactly
+- [X] T069 [P] [US4] Same file (FR-032, US4 scenario 3): a checked-in pre-feature draft fixture (no `surveyAnswers`, no `phaseAnswersByStep`, no `alphabetEvidenceKey`) under `studio/src/lib/__fixtures__/` restores without error, the store is empty, phase answers load under `"legacy"`, and every step renders its proposal with no invented answer
+- [X] T070 [P] [US4] Extend `studio/src/survey/marks/MarksSeriesStep.test.tsx` and `studio/src/survey/SurveyRunner.persistence.test.tsx` with a restore-then-mount case: after `applySurveyAnswerSnapshot`, the step mounts on the saved station/question with the saved answers (US4 scenarios 1-2)
+- [X] T071 [US4] Fix any restore gap T068-T070 expose in `studio/src/lib/draftPersistence.ts` or `studio/src/stores/surveyAnswerStore.ts`
 
 **Checkpoint**: commit `fix(studio): 079 US4 answers and positions survive reload` (spec 079 T068-T071).
 
