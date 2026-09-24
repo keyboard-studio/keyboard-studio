@@ -3,7 +3,7 @@
   "specName": "Text-sample prefill (paste or upload)",
   "branch": "050-text-sample-prefill",
   "currentStep": "tasks",
-  "status": "implementing",
+  "status": "completed",
   "history": [
     {
       "step": "specify",
@@ -67,6 +67,13 @@
       "kind": "complete",
       "by": "ai",
       "at": "2026-08-19T23:42:32.887Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-24T01:38:02.887Z"
     }
   ],
   "decisions": [
@@ -107,5 +114,6 @@
       "summary": "17 tasks across 5 phases: paste (US1/P1 MVP), upload (US2/P2), exemplar+text union (US3/P3), polish",
       "key_finding": "Zero store/engine changes needed - addProposed/DraftProvenance(text)/harvestFromText all pre-exist; scope is PhaseB.tsx + its test file only"
     }
-  }
+  },
+  "telemetryInstanceId": "9b269f69-31cc-4a65-96ce-47244a4139ed"
 }

@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "Qu Map Projection",
+  "branch": "",
+  "currentStep": "specify",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-24T01:35:59.935Z"
+    }
+  ],
+  "telemetryInstanceId": "a46ccb15-737e-4944-aa9a-51e2bb77ce28"
+}
