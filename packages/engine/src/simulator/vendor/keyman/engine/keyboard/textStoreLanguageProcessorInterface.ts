@@ -3,10 +3,10 @@
  * Keyman is copyright (C) SIL Global. MIT License.
  */
 
-import { LexicalModelTypes } from '@keymanapp/common-types';
+import { type LexicalModelTypes } from '../../common/types/main.js';
 import { KeyEvent } from './keyEvent.js';
 import { Transcription } from './keyboards/transcription.js';
-import { Alternate } from './keyboards/textTransform.js';
+import { type Alternate } from './keyboards/textTransform.js';
 
 /**
  * Interface with the methods LanguageProcessor needs from TextStore

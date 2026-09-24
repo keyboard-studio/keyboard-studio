@@ -1,6 +1,6 @@
 // @ts-nocheck
-import { KMWString } from "keyman/common/web-utils";
-import { Alternate, TextTransform } from "./keyboards/textTransform.js";
+import { KMWString } from "../../common/web-utils/index.js";
+import { type Alternate, TextTransform } from "./keyboards/textTransform.js";
 import { Transcription } from "./keyboards/transcription.js";
 import { findCommonSubstringEndIndex } from "./stringDivergence.js";
 // VENDORED ANNOTATION: SyntheticTextStore import removed to break ESM circular dep.
@@ -14,9 +14,9 @@ import { findCommonSubstringEndIndex } from "./stringDivergence.js";
 
 // Defines deadkey management in a manner attachable to each element interface.
 import { type KeyEvent } from './keyEvent.js';
-import { TextStoreLanguageProcessorInterface } from './textStoreLanguageProcessorInterface.js';
+import { type TextStoreLanguageProcessorInterface } from './textStoreLanguageProcessorInterface.js';
 import { Deadkey, DeadkeyTracker } from "./deadkeys.js";
-import { LexicalModelTypes } from '@keymanapp/common-types';
+import { type LexicalModelTypes } from '../../common/types/main.js';
 
 export abstract class TextStore {
   private _deadkeys: DeadkeyTracker;

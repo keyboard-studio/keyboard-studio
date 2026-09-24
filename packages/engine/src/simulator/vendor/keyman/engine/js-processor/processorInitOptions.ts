@@ -2,7 +2,7 @@
 /*
  * Keyman is copyright (C) SIL Global. MIT License.
  */
-import { DefaultOutputRules } from "keyman/engine/keyboard";
+import { DefaultOutputRules } from "../keyboard/index.js";
 import { JSKeyboardInterface } from './jsKeyboardInterface.js';
 
 /**

@@ -2,7 +2,7 @@
 /*
  * Keyman is copyright (C) SIL Global. MIT License.
  */
-import { LexicalModelTypes } from '@keymanapp/common-types';
+import { type LexicalModelTypes } from '../../../common/types/main.js';
 
 export type Alternate = LexicalModelTypes.ProbabilityMass<LexicalModelTypes.Transform>;
 

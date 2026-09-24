@@ -8,18 +8,18 @@
 // #region Big ol' list of imports
 
 import { EventEmitter } from 'eventemitter3';
-import { ModifierKeyConstants } from '@keymanapp/common-types';
+import { ModifierKeyConstants } from '../../common/types/main.js';
 import {
   Codes, type JSKeyboard, KeyEvent, Layouts,
   DefaultOutputRules, EmulationKeystrokes, type MutableSystemStore,
   TextStore, ProcessorAction, SystemStoreIDs, SyntheticTextStore,
-  KeyboardProcessor,
-  EventMap,
-  BeepHandler,
-} from "keyman/engine/keyboard";
+  type KeyboardProcessor,
+  type EventMap,
+  type BeepHandler,
+} from "../keyboard/index.js";
 import { JSKeyboardInterface }  from './jsKeyboardInterface.js';
-import { DeviceSpec, KMWString } from "keyman/common/web-utils";
-import { ProcessorInitOptions } from './processorInitOptions.js';
+import { DeviceSpec, KMWString } from "../../common/web-utils/index.js";
+import { type ProcessorInitOptions } from './processorInitOptions.js';
 
 // #endregion
 

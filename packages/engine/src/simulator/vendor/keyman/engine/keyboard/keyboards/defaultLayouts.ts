@@ -4,8 +4,8 @@
    Copyright 2017 SIL International
 ***/
 
-import { Version, deepCopy } from "keyman/common/web-utils";
-import { KeymanWebKeyboard, ModifierKeyConstants, TouchLayout } from "@keymanapp/common-types";
+import { Version, deepCopy } from "../../../common/web-utils/index.js";
+import { KeymanWebKeyboard, ModifierKeyConstants, TouchLayout } from "../../../common/types/main.js";
 
 import EncodedVisualKeyboard = KeymanWebKeyboard.EncodedVisualKeyboard;
 import LayoutSpec = KeymanWebKeyboard.LayoutSpec;

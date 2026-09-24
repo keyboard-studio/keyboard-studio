@@ -5,7 +5,7 @@
  * Definitions for basic stores (see kmn reference)
  */
 
-import { StoreNonCharEntry } from './jsKeyboardInterface.js';
+import { type StoreNonCharEntry } from './jsKeyboardInterface.js';
 
 /*
 * Type alias definitions to reflect the parameters of the fullContextMatch() callback (KMW 10+).

@@ -1,7 +1,7 @@
 // @ts-nocheck
 import { TextStore } from './textStore.js';
-import { TextStoreLanguageProcessorInterface } from './textStoreLanguageProcessorInterface.js';
-import { KMWString } from 'keyman/common/web-utils';
+import { type TextStoreLanguageProcessorInterface } from './textStoreLanguageProcessorInterface.js';
+import { KMWString } from '../../common/web-utils/index.js';
 
 export class SyntheticTextStore extends TextStore {
   text: string;

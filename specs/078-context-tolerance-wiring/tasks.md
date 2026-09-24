@@ -27,9 +27,9 @@
 
 **Purpose**: The flag, the dependency harness, and the CI gate (FR-011, FR-012).
 
-- [ ] T001 Merge PR #1757, or rebase `078-context-tolerance-wiring` onto it, so that `utilities/nfd-tolerance-corpus/` exists on the branch. This is a dependency and gets its own commit. Record the harness's baseline verdict counts on the pinned `../keyboards` corpus in `specs/078-context-tolerance-wiring/research.md` §10, under "Dependency status at plan time".
-- [ ] T002 [P] Create `packages/studio/src/flags/contextToleranceFlag.ts`, exporting `isContextToleranceEnabled()`. It reads `VITE_KM_CONTEXT_TOLERANCE` through the same `readEnvFlag` helper `packages/studio/src/flags/mutateFlag.ts` uses, and defaults to off.
-- [ ] T003 [P] Add a CI step that runs `node utilities/nfd-tolerance-corpus` on the pinned corpus and fails on any `regressed` verdict (FR-012). Put it in the existing workflow under `.github/workflows/`, following the pattern the `/api` bundle-safety step uses for suites outside `pnpm -r`.
+- [X] T001 Merge PR #1757, or rebase `078-context-tolerance-wiring` onto it, so that `utilities/nfd-tolerance-corpus/` exists on the branch. This is a dependency and gets its own commit. Record the harness's baseline verdict counts on the pinned `../keyboards` corpus in `specs/078-context-tolerance-wiring/research.md` §10, under "Dependency status at plan time".
+- [X] T002 [P] Create `packages/studio/src/flags/contextToleranceFlag.ts`, exporting `isContextToleranceEnabled()`. It reads `VITE_KM_CONTEXT_TOLERANCE` through the same `readEnvFlag` helper `packages/studio/src/flags/mutateFlag.ts` uses, and defaults to off.
+- [X] T003 [P] Add a CI step that runs `node utilities/nfd-tolerance-corpus` on the pinned corpus and fails on any `regressed` verdict (FR-012). Put it in the existing workflow under `.github/workflows/`, following the pattern the `/api` bundle-safety step uses for suites outside `pnpm -r`.
 
 ---
 
@@ -41,8 +41,8 @@
 
 ### Tests for Foundational
 
-- [ ] T004 [P] Write a loader-equivalence test in `packages/engine/src/simulator/keyboardLoader.test.ts`. The same compiled `sil_yoruba8` must give identical `simulate()` output for the composed seed and the decomposed (NFD) seed under `nodeKeyboardLoader` and under `browserKeyboardLoader`. Repeat for the `basic_kbdfr` recognizer fixture. The test fails until T006 and T007 exist.
-- [ ] T005 [P] Write a bundle-safety test in `packages/studio/tests/contextToleranceBundle.test.ts`. It builds (or inspects) the studio production bundle and asserts:
+- [X] T004 [P] Write a loader-equivalence test in `packages/engine/src/simulator/keyboardLoader.test.ts`. The same compiled `sil_yoruba8` must give identical `simulate()` output for the composed seed and the decomposed (NFD) seed under `nodeKeyboardLoader` and under `browserKeyboardLoader`. Repeat for the `basic_kbdfr` recognizer fixture. The test fails until T006 and T007 exist.
+- [X] T005 [P] Write a bundle-safety test in `packages/studio/tests/contextToleranceBundle.test.ts`. It builds (or inspects) the studio production bundle and asserts:
   - no `node:vm`;
   - no unresolved `keyman/engine/` or `@keymanapp/keyman-version` bare specifier;
   - no simulator code in the chunk for the root `@keyboard-studio/engine` entry.
@@ -51,12 +51,12 @@
 
 ### Implementation for Foundational
 
-- [ ] T006 Create `packages/engine/src/simulator/keyboardLoader.ts` with the `KeyboardLoader` interface and `setKeyboardLoader()`, as in [contracts/engine-context-tolerance-entry.md](contracts/engine-context-tolerance-entry.md). Refactor `packages/engine/src/simulator/nodeKeyboardLoader.ts` to implement it. Remove the side-effect import of `./nodeKeyboardLoader.js` from `packages/engine/src/simulator/reverseUsLayout.ts`, and select the loader through the seam instead. Behaviour under Node is unchanged.
-- [ ] T007 Create `packages/engine/src/simulator/browserKeyboardLoader.ts`. It evaluates the compiled keyboard JS with `new Function(...)` and injects the same sandbox globals that `nodeKeyboardLoader` passes to `vm.createContext`.
-- [ ] T008 Rewrite the bare specifiers in `packages/engine/src/simulator/vendor/**` to relative paths: `@keymanapp/common-types`, `keyman/engine/keyboard`, `keyman/engine/js-processor`, `keyman/common/web-utils`, and `@keymanapp/keyman-version`. Then remove the now-unused alias entries from `packages/engine/tsconfig.json` `paths` and `packages/engine/vitest.config.ts`. Confirm `pnpm --filter @keyboard-studio/engine test` is green (research D1).
-- [ ] T009 Add `classifyToleranceFinding(f)` to `packages/engine/src/validator/context-tolerance.ts`, with unit tests in `packages/engine/src/validator/context-tolerance.classify.test.ts`. It returns `"tolerant" | "made-tolerant" | "gap" | "not-analysed"`, where a gap is `not-analysed` plus `failingKeystrokes` and no reason. Also cover the SC-005 accounting invariant from [data-model.md](data-model.md) (research D5).
-- [ ] T010 [P] Create `packages/engine/src/pattern-apply/tolerance-fingerprint.ts` exporting `toleranceFingerprint(ir, ruleIds)`. It is an FNV-1a 64-bit hex digest over each rule's emitted `.kmn` text, sorted by rule id. Test it in `packages/engine/src/pattern-apply/tolerance-fingerprint.test.ts`: the digest is stable across a parse→emit→parse round trip, is independent of input order, and changes when one rule's text changes (research D7).
-- [ ] T011 Create `packages/engine/src/context-tolerance/index.ts`. It re-exports the full list in [contracts/engine-context-tolerance-entry.md](contracts/engine-context-tolerance-entry.md), and in the browser build it installs `browserKeyboardLoader`:
+- [X] T006 Create `packages/engine/src/simulator/keyboardLoader.ts` with the `KeyboardLoader` interface and `setKeyboardLoader()`, as in [contracts/engine-context-tolerance-entry.md](contracts/engine-context-tolerance-entry.md). Refactor `packages/engine/src/simulator/nodeKeyboardLoader.ts` to implement it. Remove the side-effect import of `./nodeKeyboardLoader.js` from `packages/engine/src/simulator/reverseUsLayout.ts`, and select the loader through the seam instead. Behaviour under Node is unchanged.
+- [X] T007 Create `packages/engine/src/simulator/browserKeyboardLoader.ts`. It evaluates the compiled keyboard JS with `new Function(...)` and injects the same sandbox globals that `nodeKeyboardLoader` passes to `vm.createContext`.
+- [X] T008 Rewrite the bare specifiers in `packages/engine/src/simulator/vendor/**` to relative paths: `@keymanapp/common-types`, `keyman/engine/keyboard`, `keyman/engine/js-processor`, `keyman/common/web-utils`, and `@keymanapp/keyman-version`. Then remove the now-unused alias entries from `packages/engine/tsconfig.json` `paths` and `packages/engine/vitest.config.ts`. Confirm `pnpm --filter @keyboard-studio/engine test` is green (research D1).
+- [X] T009 Add `classifyToleranceFinding(f)` to `packages/engine/src/validator/context-tolerance.ts`, with unit tests in `packages/engine/src/validator/context-tolerance.classify.test.ts`. It returns `"tolerant" | "made-tolerant" | "gap" | "not-analysed"`, where a gap is `not-analysed` plus `failingKeystrokes` and no reason. Also cover the SC-005 accounting invariant from [data-model.md](data-model.md) (research D5).
+- [X] T010 [P] Create `packages/engine/src/pattern-apply/tolerance-fingerprint.ts` exporting `toleranceFingerprint(ir, ruleIds)`. It is an FNV-1a 64-bit hex digest over each rule's emitted `.kmn` text, sorted by rule id. Test it in `packages/engine/src/pattern-apply/tolerance-fingerprint.test.ts`: the digest is stable across a parse→emit→parse round trip, is independent of input order, and changes when one rule's text changes (research D7).
+- [X] T011 Create `packages/engine/src/context-tolerance/index.ts`. It re-exports the full list in [contracts/engine-context-tolerance-entry.md](contracts/engine-context-tolerance-entry.md), and in the browser build it installs `browserKeyboardLoader`:
   - `computeContextTolerance`
   - `classifyToleranceFinding`
   - `proposeContextVariants`
@@ -66,9 +66,9 @@
   - `loadCharNames` from `packages/engine/src/character-discovery/charNames.ts`
 
   Add a `"./context-tolerance"` entry to the `exports` of `packages/engine/package.json`, with `browser`, `import` and `types` conditions. Do **not** touch `packages/engine/src/index.ts`.
-- [ ] T012 Add a depcruise rule to `.dependency-cruiser.cjs` that forbids `packages/engine/src/context-tolerance/**` from reaching `simulator/nodeKeyboardLoader`. Run `pnpm lint` to confirm it passes.
-- [ ] T013 Create `packages/studio/src/lib/contextToleranceEngine.ts`: a memoised `import("@keyboard-studio/engine/context-tolerance")` that caches only a successful load. It follows the `packages/studio/src/lib/langtagsDefaults.ts` `_modulePromise` pattern.
-- [ ] T014 Add a browser-environment test in `packages/studio/src/lib/contextToleranceEngine.test.ts` (jsdom or happy-dom, whichever `packages/studio/vitest.config.ts` uses). It loads the subpath through T013 and runs `computeContextTolerance` on the parsed `sil_yoruba8` IR from the `../keyboards` corpus. Assert at least one `gap` via `classifyToleranceFinding`, and assert no `compileDiagnostics`. This covers the `&LAYOUTFILE` strip fixed in #1774.
+- [X] T012 Add a depcruise rule to `.dependency-cruiser.cjs` that forbids `packages/engine/src/context-tolerance/**` from reaching `simulator/nodeKeyboardLoader`. Run `pnpm lint` to confirm it passes.
+- [X] T013 Create `packages/studio/src/lib/contextToleranceEngine.ts`: a memoised `import("@keyboard-studio/engine/context-tolerance")` that caches only a successful load. It follows the `packages/studio/src/lib/langtagsDefaults.ts` `_modulePromise` pattern.
+- [X] T014 Add a browser-environment test in `packages/studio/src/lib/contextToleranceEngine.test.ts` (jsdom or happy-dom, whichever `packages/studio/vitest.config.ts` uses). It loads the subpath through T013 and runs `computeContextTolerance` on the parsed `sil_yoruba8` IR from the `../keyboards` corpus. Assert at least one `gap` via `classifyToleranceFinding`, and assert no `compileDiagnostics`. This covers the `&LAYOUTFILE` strip fixed in #1774.
 
 **Checkpoint**: T004, T005 and T014 are green, and the analysis now runs in the browser. User-story work can begin.
 

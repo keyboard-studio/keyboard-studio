@@ -3,13 +3,13 @@
  * Keyman is copyright (C) SIL Global. MIT License.
  */
 import { EventEmitter } from 'eventemitter3';
-import { DeviceSpec } from 'keyman/common/web-utils';
+import { DeviceSpec } from '../../../common/web-utils/index.js';
 import { KeyEvent } from '../keyEvent.js';
 import { type MutableSystemStore } from "../systemStore.js";
-import { Keyboard } from './keyboard.js';
-import { KeyboardMinimalInterface } from './keyboardMinimalInterface.js';
+import { type Keyboard } from './keyboard.js';
+import { type KeyboardMinimalInterface } from './keyboardMinimalInterface.js';
 import { ProcessorAction } from './processorAction.js';
-import { StateKeyMap } from './stateKeyMap.js';
+import { type StateKeyMap } from './stateKeyMap.js';
 import { TextStore } from '../textStore.js';
 
 export interface EventMap {

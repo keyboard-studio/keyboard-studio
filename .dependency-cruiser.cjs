@@ -33,6 +33,16 @@ module.exports = {
       to: { path: '^packages/engine/' },
     },
     {
+      name: 'context-tolerance-browser-safe',
+      comment:
+        'The @keyboard-studio/engine/context-tolerance subpath is lazy-imported by ' +
+        'the studio browser bundle (spec 078). Nothing it reaches may pull in the ' +
+        'Node vm keyboard loader; the browser loader is installed instead.',
+      severity: 'error',
+      from: { path: '^packages/engine/src/context-tolerance/' },
+      to: { path: '^packages/engine/src/simulator/nodeKeyboardLoader', reachable: true },
+    },
+    {
       name: 'engine-not-to-studio',
       comment:
         'Engine must not import the studio SPA — the engine is upstream of the ' +

@@ -538,3 +538,18 @@ export async function computeContextTolerance(ir: KeyboardIR): Promise<Tolerance
 
   return report;
 }
+
+/** How a finding reads to the author (spec 078, research D5). */
+export type ToleranceClassification = 'tolerant' | 'made-tolerant' | 'gap' | 'not-analysed';
+
+/**
+ * Classify one finding. `ToleranceStatus` has no gap member: a rule whose
+ * two forms were simulated and disagreed is reported `not-analysed` carrying
+ * `failingKeystrokes` and no reason, while a rule the analysis genuinely
+ * could not check carries a `notAnalysedReason`. This splits the two.
+ */
+export function classifyToleranceFinding(f: RuleToleranceFinding): ToleranceClassification {
+  if (f.status !== 'not-analysed') return f.status;
+  if (f.notAnalysedReason === undefined && f.failingKeystrokes !== undefined) return 'gap';
+  return 'not-analysed';
+}

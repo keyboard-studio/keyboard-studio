@@ -2,7 +2,7 @@
 /*
  * Keyman is copyright (C) SIL Global. MIT License.
  */
-import { TouchLayoutPlatform as LayoutFormFactorSpec } from './keyman-touch-layout/keyman-touch-layout-file.js';
+import { type TouchLayoutPlatform as LayoutFormFactorSpec } from './keyman-touch-layout/keyman-touch-layout-file.js';
 
 export type ComplexKeyboardStore = (string | { t: 'd', d: number } | { ['t']: 'b' })[];
 
