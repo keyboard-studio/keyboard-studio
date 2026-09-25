@@ -179,7 +179,6 @@ export {
   layoutChartPlatformFromFilename,
   sanitizeLayerIdForFilename,
   classifyKeyLegibility,
-  DOTTED_CIRCLE,
   FALLBACK_FONT_STACK,
   EMPTY_KEYCAP_CLASS,
   NO_GLYPH_LABEL_CLASS,

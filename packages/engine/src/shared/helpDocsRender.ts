@@ -149,6 +149,20 @@ function setHtmlLang(htmlText: string, lang: string | undefined): string {
   return htmlText.replace(/<html\b/i, `<html lang="${escaped}"`);
 }
 
+/**
+ * Wrap `bodyHtml` in a `<div lang="…">` when `lang` is non-blank, otherwise
+ * return it unwrapped. Used for fresh help.php productions: the help site's
+ * own `header.php` already supplies an outer `<html>` / `<body>` frame, so
+ * the page fragment must not nest another full document inside it. The `lang`
+ * attribute satisfies FR-006 on a content-root element rather than on
+ * `<html>` itself (spec 080 decision B).
+ */
+function wrapBodyFragmentWithLang(bodyHtml: string, lang: string | undefined): string {
+  const value = nonBlank(lang);
+  if (value === undefined) return bodyHtml;
+  return `<div lang="${escapeHtml(value)}">${bodyHtml}</div>`;
+}
+
 /** Insert `addition` just before `</body>` when present, else append below (shared by {@link mergeWithBase} and the FR-006/T051 image-only append path). */
 function insertBeforeClosingBody(html: string, addition: string): string {
   const closingBodyIdx = html.toLowerCase().lastIndexOf("</body>");
@@ -412,5 +426,5 @@ export function renderHelpPhp(
   if (baseHelpPhpText !== null) {
     return setHtmlLang(mergeWithBase(baseHelpPhpText, bodyHtml), primaryBcp47);
   }
-  return `${helpSiteHeader(displayName)}${setHtmlLang(buildFreshHtmlDoc(bodyHtml, primaryBcp47), primaryBcp47)}`;
+  return `${helpSiteHeader(displayName)}${wrapBodyFragmentWithLang(bodyHtml, primaryBcp47)}`;
 }

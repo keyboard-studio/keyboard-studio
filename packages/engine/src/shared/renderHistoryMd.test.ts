@@ -142,6 +142,20 @@ describe("renderHistoryMd — confirmed/edited entry", () => {
     );
   });
 
+  it("inserts the new entry AFTER a preamble title in the base text", () => {
+    const entry = confirmedEntry(["Added shift layer."]);
+    const baseHistoryText = "# Change History\n\n## 1.0 (2025-01-01)\n* Initial release.\n";
+    const rendered = renderHistoryMd(entry, {
+      version: "1.1",
+      dateIso: "2026-06-18",
+      adaptedFrom: null,
+      baseHistoryText,
+    });
+    expect(rendered).toBe(
+      "# Change History\n\n## 1.1 (2026-06-18)\n* Added shift layer.\n\n## 1.0 (2025-01-01)\n* Initial release.\n",
+    );
+  });
+
   it("injects 'Adapted from' first even when the author's edited bullets omit it", () => {
     const entry = confirmedEntry([], {
       status: "edited",

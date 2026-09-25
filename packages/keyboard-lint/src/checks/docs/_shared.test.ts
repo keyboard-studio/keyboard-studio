@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   docMemberPath,
   parseHistoryEntries,
+  extractHistoryPreamble,
   compareVersions,
   parseReadmePlatforms,
   parsePagename,
@@ -59,6 +60,48 @@ describe("parseHistoryEntries", () => {
 
   it("returns [] for text with no ## headings", () => {
     expect(parseHistoryEntries("no headings here\n")).toEqual([]);
+  });
+
+  it("parses setext (underline) style H2 headings", () => {
+    const text = "1.2 (2024-03-01)\n-----------------\n* Added shift layer.\n\n1.0 (2024-01-01)\n-----------------\n* Initial release.\n";
+    const entries = parseHistoryEntries(text);
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toMatchObject({ version: "1.2", date: "2024-03-01", bullets: ["Added shift layer."] });
+    expect(entries[1]).toMatchObject({ version: "1.0", date: "2024-01-01", bullets: ["Initial release."] });
+  });
+
+  it("ignores an ATX H1 preamble title and parses entries below it", () => {
+    const text = "# Change History\n\n## 1.0 (2024-01-01)\n* Initial release.\n";
+    const entries = parseHistoryEntries(text);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.version).toBe("1.0");
+  });
+
+  it("ignores a setext H1 preamble title and parses entries below it", () => {
+    const text = "Change History\n==============\n\n1.0 (2024-01-01)\n-----------------\n* Initial release.\n";
+    const entries = parseHistoryEntries(text);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.version).toBe("1.0");
+  });
+});
+
+describe("extractHistoryPreamble", () => {
+  it("returns '' when there is no preamble", () => {
+    expect(extractHistoryPreamble("## 1.0 (2024-01-01)\n* Initial release.\n")).toBe("");
+  });
+
+  it("extracts an ATX H1 preamble with trailing blank line", () => {
+    const text = "# Change History\n\n## 1.0 (2024-01-01)\n* Initial release.\n";
+    expect(extractHistoryPreamble(text)).toBe("# Change History\n\n");
+  });
+
+  it("extracts a setext H1 preamble", () => {
+    const text = "Change History\n==============\n\n1.0 (2024-01-01)\n-----------------\n* Initial release.\n";
+    expect(extractHistoryPreamble(text)).toBe("Change History\n==============\n\n");
+  });
+
+  it("returns '' for an empty string", () => {
+    expect(extractHistoryPreamble("")).toBe("");
   });
 });
 
@@ -149,6 +192,18 @@ describe("stripPhpHeader / stripKeyboardLayoutSection / normalizeDocBody", () =>
     const a = "<html><body><p>Hi</p></body></html>";
     const b = "  <html><body><p>Hi</p></body></html>  \n";
     expect(normalizeDocBody(a)).toBe(normalizeDocBody(b));
+  });
+
+  it("strips html/body wrappers so welcome.htm and fresh help.php bodies compare equal", () => {
+    const welcome = "<html><body><p>Welcome to Test</p></body></html>";
+    const helpFrag = "<p>Welcome to Test</p>";
+    expect(normalizeDocBody(welcome)).toBe(normalizeDocBody(helpFrag));
+  });
+
+  it("strips a root-level div-lang wrapper (spec 080 decision B)", () => {
+    const helpFrag = '<div lang="ha"><p>Welcome</p></div>';
+    const welcome = "<html><body><p>Welcome</p></body></html>";
+    expect(normalizeDocBody(helpFrag)).toBe(normalizeDocBody(welcome));
   });
 });
 

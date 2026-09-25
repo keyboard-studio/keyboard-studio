@@ -39,10 +39,49 @@ function renderEntry(version: string, dateIso: string, bullets: readonly string[
   return `${heading(version, dateIso)}\n${bullets.map((b) => `* ${b}\n`).join("")}`;
 }
 
-/** Append `baseHistoryText` verbatim below `entryText`, separated by exactly one blank line (criterion 3.4). No-op when there is nothing to preserve. */
+/** Append `baseHistoryText` verbatim below `entryText`, separated by exactly one blank line (criterion 3.4). When the base starts with a title preamble (`# …` ATX or setext `===` H1), the new entry is inserted AFTER the preamble so the title is preserved at the top. No-op when there is nothing to preserve. */
 function withBaseText(entryText: string, baseHistoryText: string | null): string {
   if (baseHistoryText === null || baseHistoryText === "") return entryText;
-  return `${entryText}\n${baseHistoryText}`;
+  const preamble = extractBasePreamble(baseHistoryText);
+  if (preamble === "") return `${entryText}\n${baseHistoryText}`;
+  const afterPreamble = baseHistoryText.slice(preamble.length);
+  return `${preamble}${entryText}\n${afterPreamble}`;
+}
+
+/**
+ * Extract a leading title preamble from a HISTORY.md text: an ATX H1
+ * (`# …`) or setext H1 (`Title\n======`) block, plus any trailing blank
+ * lines. Returns `""` when no preamble is detected.
+ */
+function extractBasePreamble(text: string): string {
+  const lines = text.split(/\r\n|\r|\n/);
+  let i = 0;
+
+  // Skip leading blank lines
+  while (i < lines.length && (lines[i] ?? "").trim() === "") i++;
+  if (i >= lines.length) return "";
+
+  const firstLine = lines[i] ?? "";
+  let end = 0;
+
+  if (/^#\s+/.test(firstLine)) {
+    // ATX H1
+    i++;
+    while (i < lines.length && (lines[i] ?? "").trim() === "") i++;
+    end = i;
+  } else if (
+    i + 1 < lines.length &&
+    /^={2,}\s*$/.test(lines[i + 1] ?? "") &&
+    firstLine.trim() !== ""
+  ) {
+    // Setext H1
+    i += 2;
+    while (i < lines.length && (lines[i] ?? "").trim() === "") i++;
+    end = i;
+  }
+
+  if (end === 0) return "";
+  return lines.slice(0, end).join("\n") + "\n";
 }
 
 export interface RenderHistoryMdOptions {

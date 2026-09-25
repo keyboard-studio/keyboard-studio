@@ -31,6 +31,7 @@ import {
   buildComboKeyMap,
   collectLayerCombosInUse,
   comboToTouchLayerId,
+  kvksShiftTokenToHelpLayerId,
   type ModifierToken,
 } from "../pattern-apply/index.js";
 
@@ -43,7 +44,6 @@ export { layoutChartFilename, LAYOUT_CHART_PREFIX, isLayoutChartFilename, layout
 export { DESKTOP_GEOMETRY, DESKTOP_GEOMETRY_WIDTH } from "./geometry.js";
 export {
   classifyKeyLegibility,
-  DOTTED_CIRCLE,
   FALLBACK_FONT_STACK,
   NO_GLYPH_FONT_STACK,
   NORMAL_KEYCAP_CLASS,
@@ -75,7 +75,7 @@ interface DesktopLayer {
 function collectDesktopLayers(kvks: KvksIR | null, ir: KeyboardIR): DesktopLayer[] {
   if (kvks !== null && kvks.layers.length > 0) {
     return kvks.layers.map((layer) => {
-      const layerId = layer.shift === "" ? "default" : layer.shift;
+      const layerId = kvksShiftTokenToHelpLayerId(layer.shift);
       const outputs = new Map<string, string>();
       for (const key of layer.keys) {
         outputs.set(key.vkey, key.label);

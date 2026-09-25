@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import type { KeyboardIR, KvksIR, LayoutChartInput, TouchLayoutIR } from "@keyboard-studio/contracts";
+import { DOTTED_CIRCLE } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 
 import {
@@ -9,7 +10,6 @@ import {
   isLayoutChartFilename,
   layoutChartPlatformFromFilename,
   sanitizeLayerIdForFilename,
-  DOTTED_CIRCLE,
   EMPTY_KEYCAP_CLASS,
   NO_GLYPH_LABEL_CLASS,
 } from "./index.js";

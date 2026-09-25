@@ -68,6 +68,18 @@ describe("buildHistoryProposal", () => {
     ]);
   });
 
+  it("uses singular 'character' for exactly one character added", () => {
+    const seed = emptySeed({ charactersAdded: ["a"] });
+    const proposal = buildHistoryProposal(seed, "1.0", "2026-06-18");
+    expect(proposal.bullets).toEqual(["Added 1 character: a."]);
+  });
+
+  it("uses singular 'key' for exactly one key removed", () => {
+    const seed = emptySeed({ keysRemoved: 1 });
+    const proposal = buildHistoryProposal(seed, "1.0", "2026-06-18");
+    expect(proposal.bullets).toEqual(["Removed 1 key."]);
+  });
+
   it("lists every character under the inline cap", () => {
     const seed = emptySeed({ charactersAdded: ["a", "b", "c"] });
     const proposal = buildHistoryProposal(seed, "1.0", "2026-06-18");
