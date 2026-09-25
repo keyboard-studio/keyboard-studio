@@ -17,6 +17,7 @@ import { InvisiblesStep, writingDirectionFrom } from "./InvisiblesStep.tsx";
 import { invisibleCandidatesFor } from "./invisibleCandidates.ts";
 import { usePhaseBDraftStore, resetPhaseBDraftDecisions } from "../../stores/phaseBDraftStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { phaseCConfirmedInventory } from "../phaseCInventory.ts";
 
 function lastResult(onComplete: ReturnType<typeof vi.fn>): SurveyPhaseResult {
