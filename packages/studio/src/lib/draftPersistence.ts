@@ -1477,11 +1477,24 @@ export function installDraftAutosave(projectKey: string): () => void {
   // spec 079 FR-034: saved answers ride this same timer — no second one.
   const unsubscribeSurveyAnswers = useSurveyAnswerStore.subscribe(scheduleSave);
 
+  // spec 079 FR-030: a reload or tab close inside the debounce window would
+  // drop the last answer. `pagehide` flushes a PENDING save only — no new
+  // timer, and nothing is written when no change is waiting.
+  const flushPending = (): void => {
+    if (timer === null) return;
+    clearTimeout(timer);
+    timer = null;
+    if (resolveActiveProjectKey() !== projectKey) return;
+    saveDraft(projectKey);
+  };
+  if (typeof window !== "undefined") window.addEventListener("pagehide", flushPending);
+
   return () => {
     unsubscribeWorkingCopy();
     unsubscribeSurveySession();
     unsubscribePhaseBDraft();
     unsubscribeSurveyAnswers();
+    if (typeof window !== "undefined") window.removeEventListener("pagehide", flushPending);
     if (timer !== null) {
       clearTimeout(timer);
       timer = null;

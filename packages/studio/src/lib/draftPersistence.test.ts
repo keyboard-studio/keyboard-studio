@@ -1266,6 +1266,42 @@ describe("draftPersistence", () => {
 
       teardown();
     });
+
+    it("pagehide flushes a pending save, so a reload inside the debounce window keeps the last answer (FR-030)", () => {
+      vi.useFakeTimers();
+      const pk = "autosave-pagehide-flush";
+      instantiateMinimal(pk);
+
+      const teardown = installDraftAutosave(pk);
+      useSurveyAnswerStore.getState().setPosition("identity", "q2");
+      window.dispatchEvent(new Event("pagehide"));
+
+      const saved = JSON.parse(localStorage.getItem(draftKey(pk))!) as DurableDraft;
+      expect(saved.surveyAnswers?.steps["identity"]?.position).toBe("q2");
+
+      // The flush consumed the pending timer: no second write when it would have fired.
+      const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+      vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 1000);
+      expect(setItemSpy.mock.calls.filter(([key]) => key === draftKey(pk))).toHaveLength(0);
+
+      teardown();
+    });
+
+    it("pagehide with no pending change writes nothing, and teardown removes the listener", () => {
+      vi.useFakeTimers();
+      const pk = "autosave-pagehide-idle";
+      instantiateMinimal(pk);
+
+      const teardown = installDraftAutosave(pk);
+      const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+      window.dispatchEvent(new Event("pagehide"));
+      expect(setItemSpy.mock.calls.filter(([key]) => key === draftKey(pk))).toHaveLength(0);
+
+      teardown();
+      useSurveyAnswerStore.getState().setPosition("identity", "q3");
+      window.dispatchEvent(new Event("pagehide"));
+      expect(setItemSpy.mock.calls.filter(([key]) => key === draftKey(pk))).toHaveLength(0);
+    });
   });
 
   describe("sticky phase-B draft fields survive a reload (spec 044 FR-017 defect, surfaced by spec 075 US4)", () => {
