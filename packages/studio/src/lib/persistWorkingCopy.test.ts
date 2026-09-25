@@ -13,9 +13,12 @@ import {
   rehydrateWorkingCopyFromSession,
   snapshotWorkingCopyData,
   prepareWorkingCopySnapshot,
+  BASE_WELCOME_IMAGES_BUDGET_BYTES,
   type WorkingCopySnapshot,
 } from "./persistWorkingCopy.ts";
 import { DRAFT_VERSION } from "./draftPersistence.ts";
+import { makeScaffoldedIR } from "../test/irFixtures.ts";
+import { irGroup } from "@keyboard-studio/contracts/fixtures";
 
 // ---------------------------------------------------------------------------
 // sessionStorage stub (jsdom provides it but let's ensure clean isolation)
@@ -23,39 +26,11 @@ import { DRAFT_VERSION } from "./draftPersistence.ts";
 
 beforeEach(() => {
   sessionStorage.clear();
-  // Use the store's own reset action for full isolation. (A bare setState is a
-  // partial merge — it would only patch the enumerated keys and leave any field
-  // a prior test left dirty, e.g. `ir` / `removalCapabilities`, uncleared.)
-  useWorkingCopyStore.getState().reset();
 });
 
 afterEach(() => {
   sessionStorage.clear();
 });
-
-// ---------------------------------------------------------------------------
-// Helper — minimal KeyboardIR-like object
-// ---------------------------------------------------------------------------
-
-function makeMinimalIr() {
-  return {
-    origin: "scaffolded" as const,
-    header: {
-      keyboardId: "test",
-      name: "test",
-      bcp47: [],
-      copyright: "",
-      version: "10.0",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores: [],
-    groups: [],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -79,7 +54,7 @@ describe("persistWorkingCopy", () => {
   });
 
   it("round-trips a string VFS entry verbatim", () => {
-    const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+    const ir = makeScaffoldedIR();
     const vfs = createVirtualFS([
       { path: "source/test.kmn", content: "c Test keyboard\nstore(&NAME) 'Test'\n", isBinary: false },
     ]);
@@ -131,7 +106,7 @@ describe("persistWorkingCopy", () => {
   });
 
   it("round-trips a binary VFS entry byte-for-byte (the Base64 critical case)", () => {
-    const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+    const ir = makeScaffoldedIR();
 
     // Fake .ico: 16 bytes with varied values including 0x00 and 0xFF.
     const fakeIco = new Uint8Array([0x00, 0x01, 0x7F, 0x80, 0xFF, 0xFE, 0x0A, 0x0D,
@@ -208,7 +183,7 @@ describe("persistWorkingCopy", () => {
   // emits zero artifacts — so resuming a draft of any keyboard with an icon
   // produced no .kmx, no .js, and a blank preview.
   it("round-trips byte content even when the entry's isBinary flag was never set", () => {
-    const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+    const ir = makeScaffoldedIR();
 
     const fakeIco = new Uint8Array([0x00, 0x00, 0x01, 0x00, 0x80, 0x81, 0xFF, 0xFE]);
 
@@ -257,7 +232,7 @@ describe("persistWorkingCopy", () => {
   });
 
   it("clears the snapshot key after rehydration (consume-and-clear)", () => {
-    const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+    const ir = makeScaffoldedIR();
     const vfs = createVirtualFS([]);
     useWorkingCopyStore.setState({
       instantiationMode: "adapt-existing",
@@ -303,31 +278,15 @@ describe("persistWorkingCopy", () => {
       context: [{ kind: "vkey" as const, vkey: "K_A", modifiers: [] }],
       output: [{ kind: "char" as const, char: "a" }],
     };
-    const irWithRemovable = {
-      origin: "scaffolded" as const,
-      header: {
-        keyboardId: "test",
-        name: "Test",
-        bcp47: [],
-        copyright: "",
-        version: "10.0",
-        targets: [],
-        storeDirectives: [],
-      },
-      stores: [],
+    const irWithRemovable = makeScaffoldedIR({
+      header: { name: "Test" },
       groups: [
-        {
+        irGroup({
           nodeId: "group-main",
-          name: "main",
-          usingKeys: true,
-          readonly: false,
-          rules: [removableRule],
-        },
+          rules: [removableRule] as unknown as import("@keyboard-studio/contracts").IRRule[],
+        }),
       ],
-      comments: [],
-      raw: [],
-      recognizedPatterns: [],
-    } as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+    });
 
     // Phase B result so session.axes is non-empty after merge.
     const testPhaseResults: import("@keyboard-studio/contracts").SurveyPhaseResult[] = [
@@ -397,25 +356,12 @@ describe("persistWorkingCopy", () => {
       output: [{ kind: "char" as const, char: "a" }],
     };
     const makeIr = (rules: unknown[]) =>
-      ({
-        origin: "scaffolded" as const,
-        header: {
-          keyboardId: "test",
-          name: "Test",
-          bcp47: [],
-          copyright: "",
-          version: "10.0",
-          targets: [],
-          storeDirectives: [],
-        },
-        stores: [],
+      makeScaffoldedIR({
+        header: { name: "Test" },
         groups: [
-          { nodeId: "group-main", name: "main", usingKeys: true, readonly: false, rules },
+          irGroup({ nodeId: "group-main", rules: rules as import("@keyboard-studio/contracts").IRRule[] }),
         ],
-        comments: [],
-        raw: [],
-        recognizedPatterns: [],
-      }) as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+      });
 
     const baseIr = makeIr([removableRule]); // base retains the removable rule
     const carveIr = makeIr([]); // carve working IR has had it removed
@@ -452,7 +398,7 @@ describe("persistWorkingCopy", () => {
   });
 
   it("round-trips Set fields as Sets (not arrays) after rehydration", () => {
-    const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+    const ir = makeScaffoldedIR();
     const vfs = createVirtualFS([]);
 
     useWorkingCopyStore.setState({
@@ -508,7 +454,7 @@ describe("persistWorkingCopy", () => {
 
   describe("deletedTouchKeyIds round-trip", () => {
     it("round-trips through sessionStorage snapshot/rehydrate", () => {
-      const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+      const ir = makeScaffoldedIR();
       const vfs = createVirtualFS([
         { path: "source/test.kmn", content: "c test\n", isBinary: false },
       ]);
@@ -556,7 +502,7 @@ describe("persistWorkingCopy", () => {
     it("snapshotWorkingCopyData serializes the Set as a plain string[]", () => {
       useWorkingCopyStore.getState().instantiateFromBase(
         { id: "kbd", displayName: "Kbd", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
-        { vfs: createVirtualFS(), ir: makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR },
+        { vfs: createVirtualFS(), ir: makeScaffoldedIR() },
       );
       useWorkingCopyStore.getState().deleteTouchKey("phone:default:U_0063");
 
@@ -566,7 +512,7 @@ describe("persistWorkingCopy", () => {
     });
 
     it("prepareWorkingCopySnapshot tolerates a pre-existing snapshot missing the field", () => {
-      const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+      const ir = makeScaffoldedIR();
       const legacySnapshot = {
         instantiationMode: "new-from-base",
         baseKeyboard: { id: "kbd", displayName: "Kbd", languages: [] },
@@ -611,7 +557,7 @@ describe("persistWorkingCopy", () => {
     });
 
     it("round-trip through sessionStorage snapshot/rehydrate", () => {
-      const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+      const ir = makeScaffoldedIR();
       const vfs = createVirtualFS([]);
 
       useWorkingCopyStore.getState().instantiateFromBase(
@@ -641,7 +587,7 @@ describe("persistWorkingCopy", () => {
     it("snapshotWorkingCopyData serializes both fields as plain JSON-safe data", () => {
       useWorkingCopyStore.getState().instantiateFromBase(
         { id: "kbd", displayName: "Kbd", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
-        { vfs: createVirtualFS(), ir: makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR },
+        { vfs: createVirtualFS(), ir: makeScaffoldedIR() },
       );
       useWorkingCopyStore.getState().commitKeyEdit({
         address: "phone:default:K_A",
@@ -658,7 +604,7 @@ describe("persistWorkingCopy", () => {
     });
 
     it("prepareWorkingCopySnapshot tolerates a pre-058 snapshot missing both fields, without clobbering store defaults", () => {
-      const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+      const ir = makeScaffoldedIR();
       const legacySnapshot = {
         instantiationMode: "new-from-base",
         baseKeyboard: { id: "kbd", displayName: "Kbd", languages: [] },
@@ -692,7 +638,7 @@ describe("persistWorkingCopy", () => {
     it("a rehydrated pre-058 snapshot loads without clobbering the store defaults", () => {
       // Write a raw pre-058-shaped envelope straight into sessionStorage —
       // simulating a draft saved by an older build, before these fields existed.
-      const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+      const ir = makeScaffoldedIR();
       const legacySnapshot = {
         instantiationMode: "new-from-base",
         baseKeyboard: { id: "kbd", displayName: "Kbd", languages: [] },
@@ -730,7 +676,7 @@ describe("persistWorkingCopy", () => {
   });
 
   describe("base-VFS serialization cache (efficiency)", () => {
-    const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+    const ir = makeScaffoldedIR();
     const base = { id: "cache_kbd", displayName: "Cache Test", languages: ["en"] } as import("@keyboard-studio/contracts").BaseKeyboard;
 
     it("reuses the SAME baseVfsEntries array across calls while baseVfs is unchanged (no re-serialization)", () => {
@@ -768,6 +714,156 @@ describe("persistWorkingCopy", () => {
       expect(second).not.toBe(first);
       expect(first).toHaveLength(1);
       expect(second).toHaveLength(2);
+    });
+  });
+
+  // spec 080 US2 (T015): the base documentation bundle — three plain slices and
+  // the Base64-encoded, size-budgeted welcome images.
+  describe("base documentation bundle persistence (spec 080 US2)", () => {
+    const IMAGES = [
+      { path: "welcome/desktop_default.png", bytes: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 255]) },
+      { path: "welcome/phone_default.png", bytes: new Uint8Array([1, 2, 3]) },
+    ];
+
+    function instantiate() {
+      useWorkingCopyStore.getState().instantiateFromBase(
+        { id: "kbd", displayName: "Kbd", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
+        { vfs: createVirtualFS(), ir: makeScaffoldedIR() },
+      );
+      const wc = useWorkingCopyStore.getState();
+      wc.setBaseReadmeMdText("# Base\n");
+      wc.setBaseHistoryMdText("## 1.0 (2020-01-01)\n* Initial release.\n");
+      wc.setBaseWelcomeConvention("folder");
+      wc.setBaseWelcomeImages(IMAGES);
+    }
+
+    it("round-trips all four slices through sessionStorage snapshot/rehydrate, images byte-exact", () => {
+      instantiate();
+      snapshotWorkingCopyToSession();
+      useWorkingCopyStore.getState().reset();
+      expect(useWorkingCopyStore.getState().baseWelcomeImages).toBeNull();
+
+      expect(rehydrateWorkingCopyFromSession()).toBe(true);
+      const s = useWorkingCopyStore.getState();
+      expect(s.baseReadmeMdText).toBe("# Base\n");
+      expect(s.baseHistoryMdText).toBe("## 1.0 (2020-01-01)\n* Initial release.\n");
+      expect(s.baseWelcomeConvention).toBe("folder");
+      expect(s.baseWelcomeImages?.map((i) => i.path)).toEqual(IMAGES.map((i) => i.path));
+      for (let i = 0; i < IMAGES.length; i++) {
+        expect(s.baseWelcomeImages![i]!.bytes).toBeInstanceOf(Uint8Array);
+        expect([...s.baseWelcomeImages![i]!.bytes]).toEqual([...IMAGES[i]!.bytes]);
+      }
+    });
+
+    it("serializes the images as Base64 records, never as sparse JSON objects", () => {
+      instantiate();
+      const snapshot = snapshotWorkingCopyData();
+      expect(snapshot.baseWelcomeImages).toHaveLength(2);
+      expect(snapshot.baseWelcomeImages![0]).toEqual({
+        path: "welcome/desktop_default.png",
+        content: btoa(String.fromCharCode(...IMAGES[0]!.bytes)),
+        isBinary: true,
+      });
+      // The whole snapshot survives JSON, which is what the storage layers do to it.
+      const revived = JSON.parse(JSON.stringify(snapshot)) as WorkingCopySnapshot;
+      expect(prepareWorkingCopySnapshot(revived).baseWelcomeImages?.[1]?.bytes).toEqual(new Uint8Array([1, 2, 3]));
+    });
+
+    it("omits the images from the snapshot when they exceed the size budget, restoring as null (draft survives)", () => {
+      instantiate();
+      useWorkingCopyStore
+        .getState()
+        .setBaseWelcomeImages([{ path: "welcome/huge.png", bytes: new Uint8Array(BASE_WELCOME_IMAGES_BUDGET_BYTES + 1) }]);
+      const snapshot = snapshotWorkingCopyData();
+      expect(snapshot.baseWelcomeImages).toBeUndefined();
+      // ...and the omission is RECORDED, not silent: the restored store knows
+      // the base ships images it no longer holds.
+      expect(snapshot.baseWelcomeImagesDropped).toBe(true);
+      const prepared = prepareWorkingCopySnapshot(snapshot);
+      expect(prepared.baseWelcomeImages).toBeNull();
+      expect(prepared.baseWelcomeImagesDropped).toBe(true);
+      // The plain slices are unaffected by the image budget.
+      expect(prepared.baseWelcomeConvention).toBe("folder");
+    });
+
+    it("does not flag a drop when the images fit, and a fresh carry clears an earlier drop", () => {
+      instantiate();
+      expect(snapshotWorkingCopyData().baseWelcomeImagesDropped).toBe(false);
+      useWorkingCopyStore.setState({ baseWelcomeImages: null, baseWelcomeImagesDropped: true });
+      expect(snapshotWorkingCopyData().baseWelcomeImagesDropped).toBe(true);
+      useWorkingCopyStore.getState().setBaseWelcomeImages(IMAGES);
+      expect(useWorkingCopyStore.getState().baseWelcomeImagesDropped).toBe(false);
+    });
+
+    it("tolerates a pre-080 snapshot with none of the four fields, restoring the store defaults", () => {
+      instantiate();
+      const snapshot = snapshotWorkingCopyData();
+      const legacy = { ...snapshot } as Partial<WorkingCopySnapshot>;
+      delete legacy.baseReadmeMdText;
+      delete legacy.baseHistoryMdText;
+      delete legacy.baseWelcomeConvention;
+      delete legacy.baseWelcomeImages;
+      delete legacy.baseWelcomeImagesDropped;
+
+      const prepared = prepareWorkingCopySnapshot(legacy as WorkingCopySnapshot);
+      expect(prepared.baseReadmeMdText).toBeNull();
+      expect(prepared.baseHistoryMdText).toBeNull();
+      expect(prepared.baseWelcomeConvention).toBeNull();
+      expect(prepared.baseWelcomeImages).toBeNull();
+      expect(prepared.baseWelcomeImagesDropped).toBe(false);
+    });
+  });
+
+  // spec 080 US3 (T025): the two documentation decisions — HISTORY proposal
+  // state and the layout-chart preference — round-trip and tolerate absence.
+  describe("documentation decisions persistence (spec 080 US3)", () => {
+    const ENTRY = {
+      status: "edited" as const,
+      proposal: { version: "1.1", dateIso: "2026-09-12", bullets: ["Adapted from kbd v1.0 via keyboard-studio."] },
+      editedBullets: ["Adapted from kbd v1.0 via keyboard-studio.", "Added 2 characters: a, b"],
+    };
+
+    function instantiate() {
+      useWorkingCopyStore.getState().instantiateFromBase(
+        { id: "kbd", displayName: "Kbd", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
+        { vfs: createVirtualFS(), ir: makeScaffoldedIR() },
+      );
+    }
+
+    it("round-trips historyEntryState and chartPreference through snapshot/rehydrate", () => {
+      instantiate();
+      useWorkingCopyStore.getState().setHistoryEntryState(ENTRY);
+      useWorkingCopyStore.getState().setChartPreference("regenerate");
+      snapshotWorkingCopyToSession();
+      useWorkingCopyStore.getState().reset();
+      expect(useWorkingCopyStore.getState().historyEntryState).toBeNull();
+      expect(useWorkingCopyStore.getState().chartPreference).toBeNull();
+      expect(rehydrateWorkingCopyFromSession()).toBe(true);
+      expect(useWorkingCopyStore.getState().historyEntryState).toEqual(ENTRY);
+      expect(useWorkingCopyStore.getState().chartPreference).toBe("regenerate");
+    });
+
+    it("tolerates a snapshot written before the fields existed, restoring null", () => {
+      instantiate();
+      const snapshot = snapshotWorkingCopyData();
+      const legacy = { ...snapshot } as Partial<WorkingCopySnapshot>;
+      delete legacy.historyEntryState;
+      delete legacy.chartPreference;
+      const prepared = prepareWorkingCopySnapshot(legacy as WorkingCopySnapshot);
+      expect(prepared.historyEntryState).toBeNull();
+      expect(prepared.chartPreference).toBeNull();
+    });
+
+    it("a fresh instantiation clears both decisions", () => {
+      instantiate();
+      useWorkingCopyStore.getState().setHistoryEntryState(ENTRY);
+      useWorkingCopyStore.getState().setChartPreference("keep-base-images");
+      useWorkingCopyStore.getState().instantiateFromBase(
+        { id: "other", displayName: "Other", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
+        { vfs: createVirtualFS(), ir: makeScaffoldedIR() },
+      );
+      expect(useWorkingCopyStore.getState().historyEntryState).toBeNull();
+      expect(useWorkingCopyStore.getState().chartPreference).toBeNull();
     });
   });
 });

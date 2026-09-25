@@ -1,10 +1,11 @@
-// Colocated vitest spec for pa_copyright_holder.
+// pa_copyright_holder: its mutate() seam (spec-014 M2-M5). Fixtures, definition shape and the
+// generic invariants run in reserveModules.test.ts.
 
 import { describe, it, expect } from "vitest";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { irPath } from "@keyboard-studio/contracts";
 import { applyMutatePatch, MutatePatchContainmentError } from "../../../../src/steps/mutateApply.ts";
-import mod, { validate, fixtures, mutate } from "../../../../src/survey/questions/reserve/pa_copyright_holder.ts";
+import mod, { mutate } from "../../../../src/survey/questions/reserve/pa_copyright_holder.ts";
 
 // ---------------------------------------------------------------------------
 // T010 / US1 — mutate() output tests (spec-014 mutate-seam M2–M5)
@@ -43,33 +44,5 @@ describe("pa_copyright_holder — mutate() writes header.copyright only", () => 
 
   it("declared writes is exactly [header.copyright]", () => {
     expect(mod.writes).toEqual([irPath("header", "copyright")]);
-  });
-});
-
-describe("pa_copyright_holder — validate() valid fixtures", () => {
-  for (const { value, note } of fixtures.valid) {
-    it(`accepts ${JSON.stringify(value)}${note ? ` (${note})` : ""}`, () => {
-      expect(validate(value)).toEqual({ ok: true });
-    });
-  }
-});
-
-describe("pa_copyright_holder — validate() invalid fixtures", () => {
-  for (const { value, note, expectedCode } of fixtures.invalid) {
-    it(`rejects ${JSON.stringify(value)}${note ? ` (${note})` : ""}`, () => {
-      const result = validate(value);
-      expect(result.ok).toBe(false);
-      if (expectedCode !== undefined && result.ok === false) {
-        expect(result.code).toBe(expectedCode);
-      }
-    });
-  }
-});
-
-describe("pa_copyright_holder — validate() edge cases", () => {
-  it("rejects empty array", () => {
-    const r = validate([]);
-    expect(r.ok).toBe(false);
-    if (r.ok === false) expect(r.code).toBe("required");
   });
 });

@@ -439,8 +439,12 @@ combination.
   base+mark combination in the confirmed alphabet has no ready-made
   single-character form, the system MUST propose the base-plus-mark output
   form for the whole keyboard as a pre-explained default, presented as a
-  notice with a plain-language reason and a way to change it, not as an
-  open multi-option question.
+  notice with a plain-language reason, not as an open multi-option
+  question. This branch fires precisely BECAUSE the ready-made form does
+  not exist for some combination, so the notice MUST NOT offer switching to
+  it; it MUST instead say, in plain language, why there is no alternative
+  here. (FR-015's notice keeps its way to change the answer — there, both
+  forms are realisable.)
 - **FR-015**: When every attested or plausible-and-accepted base+mark
   combination has a ready-made single-character form AND no mark-class was
   confirmed as letter-plus-mark, the system MUST propose the
@@ -500,6 +504,12 @@ combination.
   the output form was set to the ready-made-character form), the system
   MUST mark the affected station(s) as requiring reconfirmation before the
   designer can proceed past them again.
+  **Amendment (spec 079).** Generalised. The reconfirmation behaviour applies
+  to *saved* answers (079 FR-012) whether or not the series was completed,
+  and only to the answers whose evidence actually changed (079 FR-010), with
+  a reason naming the change (079 FR-013). The designer's position in the
+  series is not moved by a flag (079 FR-004). It is the pattern every step
+  now follows (079 FR-010…FR-014).
 - **FR-024**: The marks series MUST NOT be presented, at any station, as a
   single up-front question asked before the alphabet is confirmed; every
   station's content MUST be derived from the alphabet already confirmed at

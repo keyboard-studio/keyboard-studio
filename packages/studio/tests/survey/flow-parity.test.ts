@@ -9,7 +9,7 @@
 // Deliberately NOT asserted here — removed as churn that protects no functionality:
 //   - Hardcoded question-ID order arrays (`.map(q => q.id)).toEqual([...])`). Order
 //     that actually matters is covered insertion-tolerantly by indexOf assertions in
-//     IdentityLite.us1.test.ts and by buildStepGraph reachability; a pinned array
+//     IdentityLite.test.ts and by buildStepGraph reachability; a pinned array
 //     breaks on every legitimate reorder or insertion without catching a real defect.
 //   - `toMatchSnapshot` projections (a 621-line snapshot that churned on any field
 //     edit). Question presence/reachability is enforced by the per-question registry
@@ -107,7 +107,7 @@ describe("flow-parity: phase_f_helpdocs — questions[]", () => {
     expect(required).toEqual(["pf_welcome_paragraph", "pf_more_detail_gate"]);
   });
 
-  it("the default path (gate = No) is 5 screens", () => {
+  it("the default path (gate = No) is 6 screens", () => {
     const index = new Map(modular.questions.map((q) => [q.id, q]));
     const path: string[] = [];
     let cur: string | null = modular.questions[0]!.id;
@@ -129,6 +129,9 @@ describe("flow-parity: phase_f_helpdocs — questions[]", () => {
     expect(path).toEqual([
       "pf_welcome_paragraph",
       "pf_usage_tip_1",
+      // spec 080 US5: the HISTORY proposal screen sits between the tips and
+      // the opt-in gate; confirm is one click, so it stays on the default path.
+      "pf_history_entry",
       "pf_more_detail_gate",
       "pf_credits",
       "pf_contact_info",
@@ -185,7 +188,7 @@ describe("flow-parity: phase_f_helpdocs — questions[]", () => {
 
 // ---------------------------------------------------------------------------
 // identity_lite structural integrity (T017)
-// Order + derivation are covered insertion-tolerantly in IdentityLite.us1.test.ts;
+// Order + derivation are covered insertion-tolerantly in IdentityLite.test.ts;
 // here we keep the routing-shape invariants (gate / terminal / branch / options)
 // that are unique to this harness.
 // ---------------------------------------------------------------------------

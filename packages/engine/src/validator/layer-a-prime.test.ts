@@ -24,6 +24,7 @@ import { parse } from "../codec/parse.js";
 import { computeSha256Hex } from "../codec/hash.js";
 import { makePattern } from "@keyboard-studio/contracts";
 import type { KeyboardIR, IRNodeRef } from "@keyboard-studio/contracts";
+import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 
 // ---------------------------------------------------------------------------
 // Shared fixtures
@@ -44,24 +45,16 @@ group(main) using keys
 `;
 
 function makeCleanIR(overrides: Partial<KeyboardIR["header"]> = {}): KeyboardIR {
-  return {
-    origin: "imported",
+  return makeTestIR({
     header: {
       keyboardId: "test-kb",
       name: "Test Keyboard",
       bcp47: ["en"],
       copyright: "(c) 2024 SIL",
-      version: "1.0",
       targets: ["any"],
-      storeDirectives: [],
       ...overrides,
     },
-    stores: [],
-    groups: [],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  };
+  });
 }
 
 // ---------------------------------------------------------------------------

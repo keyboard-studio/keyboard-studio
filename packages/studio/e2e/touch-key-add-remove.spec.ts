@@ -59,7 +59,7 @@
 //
 // The durable guarantee for key-mode editing is therefore the vitest key-mode
 // integration block in
-// `packages/studio/src/editors/assignLoop/TouchGallery.test.tsx` (spec 065
+// `packages/studio/src/editors/assignLoop/TouchGallery.keyModeEditing.test.tsx` (spec 065
 // T009, FR-009), which mounts the real component in the lane a pull request
 // runs. This walk corroborates it in a real browser and covers the emitted-
 // artifact fidelity claim a second, independent time (SC-005 keeps a vitest

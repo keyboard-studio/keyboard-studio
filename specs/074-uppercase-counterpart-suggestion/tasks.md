@@ -46,7 +46,7 @@ floors will be measured against. No production code is written in this phase.
 
 - [x] T001 Verify toolchain and build: `node --version` (must be >= 22.19.0), `pnpm install`, `pnpm build` from repo root per [quickstart.md](quickstart.md) §Prerequisites
 - [x] T002 [P] Capture the engine touch-applier baseline: run `pnpm --filter @keyboard-studio/engine test src/pattern-apply/applyTouchAssignments.test.ts src/pattern-apply/applyTouchAssignmentsToRawJson.test.ts` and record the passing case list — this is the absent-`layer` regression floor for Phase 2
-- [x] T003 [P] Capture the studio companion baseline: run `pnpm --filter @keyboard-studio/studio test src/editors/assignLoop/MechanismGallery.test.tsx` and record the names of the existing `pendingCompanion` cases (CAPS quad, non-CAPS append, mnemonic suppression) — these must pass **unedited** after the Phase 3 extraction (SC-005)
+- [x] T003 [P] Capture the studio companion baseline: run `pnpm --filter @keyboard-studio/studio test src/editors/assignLoop/MechanismGallery.casePair.test.tsx` and record the names of the existing `pendingCompanion` cases (CAPS quad, non-CAPS append, mnemonic suppression) — these must pass **unedited** after the Phase 3 extraction (SC-005)
 - [x] T004 [P] Record the current `editor.assignLoop.companion.*` ids and their exact English messages from `packages/studio/src/locales/en/messages.json` — reused ids must keep their current messages (renaming or rewording orphans translations)
 
 ---
@@ -85,7 +85,7 @@ structurally and FR-002 ("no second casing path") becomes impossible to violate 
 keyboard; the case-pair banner offers `Θ` on that key's shift layer, confirming records exactly the
 assignment the prompt was raised for, dismissing records nothing, and a mnemonic layout raises nothing.
 
-**Gate (SC-005)**: the existing `MechanismGallery.test.tsx` companion cases pass **unedited**. That is
+**Gate (SC-005)**: the existing `MechanismGallery.casePair.test.tsx` companion cases pass **unedited**. That is
 what proves the extraction was behavior-preserving; it is not optional polish.
 
 ### Tests for User Story 1
@@ -103,8 +103,8 @@ what proves the extraction was behavior-preserving; it is not optional polish.
 - [x] T019 [US1] Raise the physical proposal from the `method === "swap"` branch of `handleApply` in `packages/studio/src/editors/assignLoop/MechanismGallery.tsx` via `propose({ mechanism: "physical", ... })`, preserving the existing gates: `effectiveLayer === "base"` and `shiftLayerAllowed` (mnemonic suppression, FR-010) enforced at propose time, and carrying `vkey`, `capsHandling` from `planShiftAssignment(ir, "main", vkey)`, and `baseAssignment` by object identity (FR-008)
 - [x] T020 [US1] Move the physical confirm logic **verbatim** from `handleCompanionConfirm` in `packages/studio/src/editors/assignLoop/MechanismGallery.tsx` onto the banner's `onConfirm`: `capsHandling === true` replaces the base assignment (index via `indexOf(baseAssignment)`) with one combined `buildCasePairRuleLines(vkey, originalChar, counterpart, { capsHandling: true })` assignment; `capsHandling === false` appends a `buildShiftRuleLines(vkey, counterpart, { capsHandling: false })` assignment targeting `counterpart`. Do not re-derive this branch — it is Layer-A Check #10 load-bearing ([research.md](research.md) R10)
 - [x] T021 [US1] Add the stale-base guard to the confirm path in `packages/studio/src/editors/assignLoop/MechanismGallery.tsx`: if `baseAssignment` is no longer present in the assignment list, `clear()` and record nothing (FR-008)
-- [x] T022 [US1] Extend `packages/studio/src/editors/assignLoop/MechanismGallery.test.tsx` with the two identity cases from the contract test surface: confirm applies to the raising placement when the character carries multiple mechanisms, and a base assignment removed before confirm records nothing. Do **not** modify any existing companion case
-- [x] T023 [US1] Run the SC-005 gate: `pnpm --filter @keyboard-studio/studio test src/editors/assignLoop/MechanismGallery.test.tsx` — all pre-existing companion cases pass with a zero-line diff against the T003 baseline; plus `pnpm --filter @keyboard-studio/studio test src/editors/assignLoop/casePairCompanion.test.ts`
+- [x] T022 [US1] Extend `packages/studio/src/editors/assignLoop/MechanismGallery.casePair.test.tsx` with the two identity cases from the contract test surface: confirm applies to the raising placement when the character carries multiple mechanisms, and a base assignment removed before confirm records nothing. Do **not** modify any existing companion case
+- [x] T023 [US1] Run the SC-005 gate: `pnpm --filter @keyboard-studio/studio test src/editors/assignLoop/MechanismGallery.casePair.test.tsx` — all pre-existing companion cases pass with a zero-line diff against the T003 baseline; plus `pnpm --filter @keyboard-studio/studio test src/editors/assignLoop/casePairCompanion.test.ts`
 
 **Checkpoint**: physical-key behavior is byte-identical to today, now served by the shared hook + banner. MVP.
 
@@ -126,7 +126,7 @@ multi-character content (`ng`) raises nothing.
 
 ### Tests for User Story 2
 
-- [x] T024 [P] [US2] Add S-02 cases to `packages/studio/src/editors/assignLoop/MechanismGallery.test.tsx`: a dead-key apply producing a lowercase accented letter raises a proposal; confirming appends a `PATTERN_DEADKEY` ref with `triggerKey` / `deadkeyName` / `accentChar` **unchanged** and `baseLetters` / `accentedForms` case-shifted; a caseless or self-mapping base letter raises nothing
+- [x] T024 [P] [US2] Add S-02 cases to `packages/studio/src/editors/assignLoop/MechanismGallery.casePair.test.tsx`: a dead-key apply producing a lowercase accented letter raises a proposal; confirming appends a `PATTERN_DEADKEY` ref with `triggerKey` / `deadkeyName` / `accentChar` **unchanged** and `baseLetters` / `accentedForms` case-shifted; a caseless or self-mapping base letter raises nothing
 - [x] T025 [P] [US2] Add S-03 cases to `packages/studio/src/editors/assignLoop/SequenceBuilderPanel.test.tsx`: a sequence apply whose `firstLetterOut` is a single cased character raises a proposal; confirming appends a `PATTERN_SEQUENCE` ref with `secondLetter` unchanged and `firstLetterOut` / `collapsedChar` case-shifted; multi-character content (`ng`) raises **no** proposal ([research.md](research.md) R4); an already-recorded parallel combo is a no-op under the existing `(firstLetterOut, secondLetter)` dedup, not a duplicate ref
 
 ### Implementation for User Story 2
@@ -137,7 +137,7 @@ multi-character content (`ng`) raises nothing.
 - [x] T029 [US2] Raise the S-03 proposal from `handleApply` in `packages/studio/src/editors/assignLoop/SequenceBuilderPanel.tsx` by calling into MechanismGallery's shared hook through the existing `onApplied` callback seam — no second banner is rendered in the panel
 - [x] T030 [US2] Implement the S-03 confirm: append a `PATTERN_SEQUENCE` ref to the character's sequence bucket via `partitionSequenceAssignment` with `secondLetter` unchanged, `firstLetterOut` = the uppercased content, `collapsedChar` = `counterpart`, relying on the existing `(firstLetterOut, secondLetter)` dedup
 - [x] T031 [US2] Add the combo prompt wording to `packages/studio/src/editors/assignLoop/CasePairProposalBanner.tsx` as the **additive** id `editor.assignLoop.companion.prompt.combo` ("the uppercase combo"), leaving the physical `.prompt` id and its message untouched
-- [x] T032 [US2] Run `pnpm --filter @keyboard-studio/studio test src/editors/assignLoop/MechanismGallery.test.tsx src/editors/assignLoop/SequenceBuilderPanel.test.tsx` — new S-02/S-03 cases pass and every pre-existing case still passes
+- [x] T032 [US2] Run `pnpm --filter @keyboard-studio/studio test src/editors/assignLoop/MechanismGallery.casePair.test.tsx src/editors/assignLoop/SequenceBuilderPanel.test.tsx` — new S-02/S-03 cases pass and every pre-existing case still passes
 
 **Checkpoint**: US1 and US2 both work independently; the trigger/indicator is never case-shifted.
 

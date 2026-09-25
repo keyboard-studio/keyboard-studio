@@ -6,14 +6,15 @@
 // S0). When there IS something to ask, everything arrives pre-checked and the
 // author's unchecks are what shape the emitted retained list.
 
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, vi, afterEach } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import type { IRGroup, IRRule, SurveyPhaseResult } from "@keyboard-studio/contracts";
-import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
+import { irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import { ConvenienceCharsStep, computeConvenienceGate } from "./ConvenienceCharsStep.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
+import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
 
 // neededCharsForLanguage does a real CLDR lookup when unmocked (see the same
 // stub in CarveGalleryV2.test.tsx). These tests leave identity unset, so it is
@@ -35,56 +36,55 @@ function fullLatinBase(): Set<string> {
 const INSTANTIATED = { instantiated: true, hasSignal: true } as const;
 
 describe("computeConvenienceGate", () => {
-  it("asks when the base produces basic-Latin letters the orthography does not use", () => {
+  it("applies when the base produces basic-Latin letters the orthography does not use", () => {
     const gate = computeConvenienceGate({
       ...INSTANTIATED,
       produced: fullLatinBase(),
       needed: new Set(["a", "b", "c"]),
     });
-    expect(gate.skip).toBe(false);
-    expect(gate.candidates.length).toBe(23);
+    expect(gate.kind).toBe("applies");
+    expect(gate.kind === "applies" && gate.candidates.length).toBe(23);
   });
 
-  it("skips when the orthography uses every basic-Latin letter", () => {
+  it("is not-applicable when the orthography uses every basic-Latin letter (a genuine no-surplus base)", () => {
     const gate = computeConvenienceGate({
       ...INSTANTIATED,
       produced: fullLatinBase(),
       needed: new Set("abcdefghijklmnopqrstuvwxyz".split("")),
     });
-    expect(gate).toEqual({ skip: true, candidates: [] });
+    expect(gate).toEqual({ kind: "not-applicable", reason: { code: "convenience-no-surplus" } });
   });
 
-  it("skips for a base that produces no basic Latin at all", () => {
+  it("is not-applicable for a base that produces no basic Latin at all", () => {
     const gate = computeConvenienceGate({
       ...INSTANTIATED,
       produced: new Set(["а", "б", "в"]),
       needed: new Set(["а"]),
     });
-    expect(gate).toEqual({ skip: true, candidates: [] });
+    expect(gate).toEqual({ kind: "not-applicable", reason: { code: "convenience-no-surplus" } });
   });
 
-  // The two "cannot ask" cases below MUST resolve to skip, never to a
-  // render-nothing-and-wait state: a spine step that renders null without
-  // completing is a dead end the author cannot navigate out of.
+  // FR-064: missing/unknown evidence must NEVER read as "does not apply" —
+  // it is `unknown`, and the step must render rather than silently pass.
 
-  it("skips — rather than offering all 26 — when no orthography is confirmed yet", () => {
+  it("is unknown — never not-applicable, never offering all 26 — when no orthography is confirmed yet", () => {
     const gate = computeConvenienceGate({
       instantiated: true,
       hasSignal: false,
       produced: fullLatinBase(),
       needed: new Set(),
     });
-    expect(gate).toEqual({ skip: true, candidates: [] });
+    expect(gate).toEqual({ kind: "unknown", reason: { code: "convenience-signal-unknown" } });
   });
 
-  it("skips when no working copy has been instantiated", () => {
+  it("is not-applicable when no working copy has been instantiated (genuinely nothing to carve)", () => {
     const gate = computeConvenienceGate({
       instantiated: false,
       hasSignal: true,
       produced: fullLatinBase(),
       needed: new Set(["a"]),
     });
-    expect(gate).toEqual({ skip: true, candidates: [] });
+    expect(gate).toEqual({ kind: "not-applicable", reason: { code: "convenience-not-instantiated" } });
   });
 
   it("offers each surplus letter once, as a case pair carrying both characters", () => {
@@ -93,7 +93,7 @@ describe("computeConvenienceGate", () => {
       produced: new Set(["q", "Q", "a", "A"]),
       needed: new Set(["a"]),
     });
-    expect(gate.candidates).toEqual([{ primary: "q", chars: ["q", "Q"] }]);
+    expect(gate.kind === "applies" && gate.candidates).toEqual([{ primary: "q", chars: ["q", "Q"] }]);
   });
 });
 
@@ -103,15 +103,11 @@ describe("computeConvenienceGate", () => {
 // ---------------------------------------------------------------------------
 
 function rule(nodeId: string, vkey: string, char: string): IRRule {
-  return {
-    nodeId,
-    context: [{ kind: "vkey", name: vkey, modifiers: [] }],
-    output: [{ kind: "char", value: char }],
-  };
+  return vkeyRule({ nodeId, vkey, output: char });
 }
 
 function group(rules: IRRule[]): IRGroup {
-  return { nodeId: "g-main", name: "main", usingKeys: true, rules, readonly: false };
+  return irGroup({ nodeId: "g-main", rules });
 }
 
 /**
@@ -137,18 +133,24 @@ function seedTwoSurplusPairs(): void {
   seedWorkingCopy(["a", "A", "q", "Q", "x", "X"], ["a"]);
 }
 
-beforeEach(() => {
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-});
+/**
+ * A working copy that IS instantiated but has never confirmed an alphabet —
+ * `hasSignal` is false, so the gate reads `unknown` (FR-064), not
+ * `not-applicable`.
+ */
+function seedInstantiatedNoAlphabet(): void {
+  const ir = makeTestIR([group([rule("r-0", "K_0", "a")])]);
+  useWorkingCopyStore.setState({ ir, instantiationMode: "adapt-existing" });
+}
 
 afterEach(() => {
   cleanup();
 });
 
-describe("ConvenienceCharsStep — skip path (computed, never rendered)", () => {
-  it("completes with an empty retained list and renders nothing (forward entry)", async () => {
-    // Every basic-Latin letter the base produces is in the alphabet.
+describe("ConvenienceCharsStep — not-applicable (computed, never rendered)", () => {
+  it("completes without retainedConvenienceChars and renders nothing (forward entry)", async () => {
+    // Every basic-Latin letter the base produces is in the alphabet: a
+    // genuinely no-surplus base, known evidence.
     seedWorkingCopy(["a", "A"], ["a"]);
     const onComplete = vi.fn();
     render(<ConvenienceCharsStep onComplete={onComplete} />);
@@ -156,8 +158,27 @@ describe("ConvenienceCharsStep — skip path (computed, never rendered)", () => 
     await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId("convenience-chars")).toBeNull();
     const result = onComplete.mock.calls[0]?.[0] as SurveyPhaseResult;
-    // `[]` records "asked, kept nothing" — distinct from absent (never asked).
-    expect(result.retainedConvenienceChars).toEqual([]);
+    // Absent — not `[]` — means "never asked" (R-09); `[]` is reserved for a
+    // step the author was actually asked and who kept nothing.
+    expect(result.retainedConvenienceChars).toBeUndefined();
+  });
+
+  it("writes a not-asked status with reason and evidence key, and appends no decision entry (FR-065)", async () => {
+    seedWorkingCopy(["a", "A"], ["a"]);
+    const onComplete = vi.fn();
+    render(<ConvenienceCharsStep onComplete={onComplete} />);
+
+    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
+    const result = onComplete.mock.calls[0]?.[0] as SurveyPhaseResult;
+    expect(result.answers).toEqual([]);
+
+    const status = useSurveyAnswerStore.getState().steps["convenience"]?.status;
+    expect(status?.kind).toBe("not-asked");
+    expect(status).toMatchObject({
+      kind: "not-asked",
+      reason: { code: "convenience-no-surplus" },
+    });
+    expect(typeof (status as { evidenceKey?: unknown })?.evidenceKey).toBe("string");
   });
 
   it("pops backward instead of completing when entered via back-navigation", async () => {
@@ -172,6 +193,47 @@ describe("ConvenienceCharsStep — skip path (computed, never rendered)", () => 
     render(<ConvenienceCharsStep onComplete={onComplete} onBack={onBack} />);
 
     await waitFor(() => expect(onBack).toHaveBeenCalledTimes(1));
+    expect(onComplete).not.toHaveBeenCalled();
+  });
+});
+
+describe("ConvenienceCharsStep — unknown evidence (FR-064: renders, never skips)", () => {
+  it("renders the gap explanation instead of skipping when no orthography signal exists yet", async () => {
+    seedInstantiatedNoAlphabet();
+    const onComplete = vi.fn();
+    render(<ConvenienceCharsStep onComplete={onComplete} />);
+
+    await screen.findByTestId("convenience-chars");
+    expect(screen.getByTestId("convenience-unknown-notice")).not.toBeNull();
+    expect(onComplete).not.toHaveBeenCalled();
+    // Never written as a judged skip — there is nothing to judge yet.
+    expect(useSurveyAnswerStore.getState().steps["convenience"]?.status).toBeUndefined();
+  });
+
+  it("is completable: Continue finishes the step with nothing retained", async () => {
+    seedInstantiatedNoAlphabet();
+    const onComplete = vi.fn();
+    render(<ConvenienceCharsStep onComplete={onComplete} />);
+    await screen.findByTestId("convenience-chars");
+
+    fireEvent.click(screen.getByTestId("convenience-continue"));
+
+    expect(onComplete).toHaveBeenCalledTimes(1);
+    const result = onComplete.mock.calls[0]?.[0] as SurveyPhaseResult;
+    expect(result.retainedConvenienceChars).toEqual([]);
+    expect(useSurveyAnswerStore.getState().steps["convenience"]?.status).toEqual({ kind: "finished" });
+  });
+
+  it("still allows Back without completing", async () => {
+    seedInstantiatedNoAlphabet();
+    const onComplete = vi.fn();
+    const onBack = vi.fn();
+    render(<ConvenienceCharsStep onComplete={onComplete} onBack={onBack} />);
+    await screen.findByTestId("convenience-chars");
+
+    fireEvent.click(screen.getByRole("button", { name: "Back" }));
+
+    expect(onBack).toHaveBeenCalledTimes(1);
     expect(onComplete).not.toHaveBeenCalled();
   });
 });
@@ -252,5 +314,71 @@ describe("ConvenienceCharsStep — the question", () => {
 
     expect(onBack).toHaveBeenCalledTimes(1);
     expect(onComplete).not.toHaveBeenCalled();
+  });
+
+  // spec 079 T025: unchecking is store-backed (T034) — it survives an unmount
+  // (tab switch) the way every other survey answer does, as long as the
+  // evidence (the offered candidate set) is unchanged on remount.
+  it("un-ticking survives unmount/remount with the same evidence (T025)", async () => {
+    await renderQuestion();
+    fireEvent.click(screen.getByLabelText("Keep q Q"));
+    fireEvent.click(screen.getByLabelText("Keep x X"));
+    for (const box of screen.getAllByRole("checkbox")) {
+      expect((box as HTMLInputElement).checked).toBe(false);
+    }
+
+    cleanup();
+    // Same evidence: same base/orthography seed as renderQuestion's setup.
+    const onComplete = vi.fn();
+    render(<ConvenienceCharsStep onComplete={onComplete} />);
+    await screen.findByTestId("convenience-chars");
+
+    const boxes = screen.getAllByRole("checkbox");
+    expect(boxes).toHaveLength(2);
+    for (const box of boxes) expect((box as HTMLInputElement).checked).toBe(false);
+    expect(screen.getByTestId("convenience-continue").textContent).toBe(
+      "Continue, keeping none",
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 079 US3 T048/T079 — a shape change (a new surplus letter appears)
+// proposes it pre-checked while an earlier un-tick survives; there is
+// structurally no `reproposed` flag to show (see ./convenienceFlags.ts).
+// ---------------------------------------------------------------------------
+
+describe("ConvenienceCharsStep — shape change: new surplus proposed, un-ticks kept, no flags (spec 079 US3 T048/T079)", () => {
+  it("a newly-surplus letter is proposed pre-checked while an earlier un-tick survives", async () => {
+    seedWorkingCopy(["a", "A", "q", "Q"], ["a"]); // one surplus pair initially
+    const first = render(<ConvenienceCharsStep onComplete={vi.fn()} />);
+    await screen.findByTestId("convenience-chars");
+    fireEvent.click(screen.getByLabelText("Keep q Q"));
+    expect((screen.getByLabelText("Keep q Q") as HTMLInputElement).checked).toBe(false);
+    first.unmount();
+
+    // Shape change: the base now also has an 'x'/'X' surplus pair.
+    seedWorkingCopy(["a", "A", "q", "Q", "x", "X"], ["a"]);
+    render(<ConvenienceCharsStep onComplete={vi.fn()} />);
+    await screen.findByTestId("convenience-chars");
+
+    // Existing un-tick survives.
+    expect((screen.getByLabelText("Keep q Q") as HTMLInputElement).checked).toBe(false);
+    // New candidate proposed, checked by default (defaults are the product).
+    expect((screen.getByLabelText("Keep x X") as HTMLInputElement).checked).toBe(true);
+  });
+
+  it("never shows a flagged-answers list — there is no `reproposed` state for this step's per-answer design", async () => {
+    seedWorkingCopy(["a", "A", "q", "Q"], ["a"]);
+    const first = render(<ConvenienceCharsStep onComplete={vi.fn()} />);
+    await screen.findByTestId("convenience-chars");
+    fireEvent.click(screen.getByLabelText("Keep q Q"));
+    first.unmount();
+
+    seedWorkingCopy(["a", "A", "q", "Q", "x", "X"], ["a"]);
+    render(<ConvenienceCharsStep onComplete={vi.fn()} />);
+    await screen.findByTestId("convenience-chars");
+
+    expect(screen.queryByTestId("flagged-answers-list")).toBeNull();
   });
 });

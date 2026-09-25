@@ -4,16 +4,12 @@
 // answers, and that editing helpDocs (no output package produced) is
 // reflected on the next render.
 
-import { describe, it, expect, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useDocsPreview } from "./useDocsPreview.ts";
-
-afterEach(() => {
-  useWorkingCopyStore.getState().reset();
-});
 
 function instantiate() {
   const vfs = createVirtualFS([

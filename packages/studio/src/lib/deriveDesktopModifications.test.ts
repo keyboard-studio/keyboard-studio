@@ -4,7 +4,7 @@
 // the placements filter (Phase C physical + individual assignments).
 
 import { describe, it, expect } from "vitest";
-import { makeTestIR, makeCharStore } from "@keyboard-studio/contracts/fixtures";
+import { irGroup, makeCharStore, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import type { IRGroup, IRRule, IRStore, SurveyPhaseResult, MechanismAssignment } from "@keyboard-studio/contracts";
 import { deriveDesktopModifications } from "./deriveDesktopModifications.js";
 
@@ -13,15 +13,11 @@ import { deriveDesktopModifications } from "./deriveDesktopModifications.js";
 // ---------------------------------------------------------------------------
 
 function makeGroup(nodeId: string, name: string, rules: IRRule[]): IRGroup {
-  return { nodeId, name, usingKeys: true, rules, readonly: false };
+  return irGroup({ nodeId, name, rules });
 }
 
 function makeVkeyRule(nodeId: string, vkey: string, output: IRRule["output"]): IRRule {
-  return {
-    nodeId,
-    context: [{ kind: "vkey", name: vkey, modifiers: [] }],
-    output,
-  };
+  return vkeyRule({ nodeId, vkey, output });
 }
 
 function makePhaseC(assignments: MechanismAssignment[]): SurveyPhaseResult {

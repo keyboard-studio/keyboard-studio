@@ -43,6 +43,18 @@ const BASES: BaseKeyboard[] = [basicKbdus, silEuroLatin];
 
 vi.mock("../../lib/services.ts", () => ({
   getBaseBrowserService: () => ({ listAll: () => Promise.resolve(BASES) }),
+  // spec 080 FR-008: BaseResolution's doc-profile hook calls this on every
+  // preview; default every base to "unknown" (no badge) — this file's
+  // coverage is the preview/commit wiring, not the classification badge
+  // itself (see BaseResolution.test.tsx for that).
+  getBaseDocProfile: () =>
+    Promise.resolve({
+      level: "unknown",
+      members: [],
+      welcomeConvention: "absent",
+      hasUsableDescription: false,
+      welcomeImages: [],
+    }),
   USE_REAL: false,
 }));
 
@@ -72,7 +84,6 @@ function makeIdentityResult(overrides: Partial<IdentityLiteResult>): IdentityLit
 
 afterEach(() => {
   cleanup();
-  useSurveySessionStore.getState().reset();
   // Reset the preview-status store between tests — it is a module-level
   // singleton (Zustand), so a test that flips it to "ready" would otherwise
   // leak into the next test's initial render.

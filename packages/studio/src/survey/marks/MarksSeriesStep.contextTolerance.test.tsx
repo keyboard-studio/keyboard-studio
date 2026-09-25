@@ -69,6 +69,11 @@ function priorDecision(fingerprint: string, extra: Partial<MarksContextTolerance
   });
 }
 
+/** The context-tolerance answers only; other stations' answers also ride completion. */
+function toleranceAnswers(result: SurveyPhaseResult) {
+  return result.answers.filter((a) => a.questionId.startsWith("marks.context_tolerance"));
+}
+
 /** Click Continue until the station (or the end of the series) is reached. */
 function walkToStation(): void {
   for (let i = 0; i < 6; i++) {
@@ -112,7 +117,10 @@ describe("MarksSeriesStep — context-tolerance station (spec 078)", () => {
       proposedSiteIds: ["site-r10"],
       fingerprint: FINGERPRINT,
     });
-    expect(result.answers).toEqual([{ questionId: "marks.context_tolerance", answerType: "select", value: "accept" }]);
+    // Every station's answers ride completion (spec 079); these are the decision's own.
+    expect(toleranceAnswers(result)).toEqual([
+      { questionId: "marks.context_tolerance", answerType: "select", value: "accept" },
+    ]);
   });
 
   it("while the analysis runs it shows 'checking' and lets the author continue with no decision", () => {
@@ -124,7 +132,7 @@ describe("MarksSeriesStep — context-tolerance station (spec 078)", () => {
 
     const result = onComplete.mock.calls[0]![0] as SurveyPhaseResult;
     expect(result.marksContextTolerance).toBeUndefined();
-    expect(result.answers).toEqual([]);
+    expect(toleranceAnswers(result)).toEqual([]);
   });
 
   it("a prior decision with the same fingerprint is shown read-only and carried forward unchanged (FR-009)", () => {

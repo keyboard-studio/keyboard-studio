@@ -10,7 +10,8 @@
 //   - the draft-discard warning (R12) is shown ONLY on re-entry with a
 //     DIFFERENT selection than the recorded choice, while a touch draft exists
 //   - the live preview is now the REAL OSK (mocked here the same way
-//     TouchGallery.test.tsx mocks it — no iframe/KMW in jsdom), forced into
+//     the TouchGallery.*.test.tsx suites mock it, via
+//     ../../test/touchGallery/mocks.tsx — no iframe/KMW in jsdom), forced into
 //     mobile/touch mode, swapping its injected VFS content per selected card
 
 import { describe, it, expect, afterEach, vi } from "vitest";
@@ -20,7 +21,7 @@ import { TouchSeedSourcePanel } from "./TouchSeedSourcePanel.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
+import { basicKbdus, irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import type { TouchAssignment, IRGroup, IRRule, KeyboardIR, Pattern, VirtualFS } from "@keyboard-studio/contracts";
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { deriveSeedLayout } from "../../lib/buildTouchLayoutJson.ts";
@@ -44,7 +45,8 @@ vi.mock("../../lib/buildTouchLayoutJson.ts", async (importOriginal) => {
 
 // ---------------------------------------------------------------------------
 // Mock useKeyboardArtifact — capture the (baseKeyboard, scaffoldSpec,
-// vfsTransform) triple passed in, same pattern as TouchGallery.test.tsx. No
+// vfsTransform) triple passed in, same pattern as the TouchGallery.*.test.tsx
+// suites. No
 // real fetch/compile/WASM runs in jsdom.
 // ---------------------------------------------------------------------------
 
@@ -163,12 +165,10 @@ function seedBase(touchLayoutJson?: string, groups: IRGroup[] = []) {
  * makeUnreachableSymbolIR below for the fixture that is).
  */
 function makeOverflowGroup(overflowChar: string): IRGroup {
-  const rule: IRRule = {
-    nodeId: "rule:overflow",
-    context: [{ kind: "vkey", name: "K_oE2", modifiers: [] }],
-    output: [{ kind: "char", value: overflowChar }],
-  };
-  return { nodeId: "group:overflow", name: "main", usingKeys: true, rules: [rule], readonly: false };
+  return irGroup({
+    nodeId: "group:overflow",
+    rules: [vkeyRule({ nodeId: "rule:overflow", vkey: "K_oE2", output: overflowChar })],
+  });
 }
 
 /** Seed baseVfs/baseIr from a fully-built KeyboardIR (bypassing makeTestIR),
@@ -240,8 +240,6 @@ function makeUnreachableSymbolIR(symbol: string): KeyboardIR {
 
 afterEach(() => {
   cleanup();
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
   vi.clearAllMocks();
   capturedArtifactCallRef.current = null;
 });
@@ -452,7 +450,8 @@ describe("TouchSeedSourcePanel — live preview (R4a)", () => {
 // ---------------------------------------------------------------------------
 // Real OSK live preview (spec 035 R4b amendment — supersedes the homemade
 // TouchLayoutPreview keycap grid). The OSK itself is mocked (no iframe/KMW in
-// jsdom, same pattern as TouchGallery.test.tsx); these tests assert the
+// jsdom, same pattern as the TouchGallery.*.test.tsx suites); these tests
+// assert the
 // wiring: forced tablet mode, no mode toggle, and the injected VFS
 // content swapping per the currently-selected card.
 // ---------------------------------------------------------------------------
@@ -673,5 +672,30 @@ describe("TouchSeedSourcePanel — draft-discard warning (R12)", () => {
 
     expect(useSurveySessionStore.getState().touchSeedSource).toBe("reseed-from-desktop");
     expect(useWorkingCopyStore.getState().touchDraft).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 079 T029 — "verify by revisit test" (contracts/step-classification.md):
+// touch_seed_source is believed `working-copy`-compliant; this pins that an
+// unmount/remount with the same evidence keeps the author's recorded choice
+// rather than silently re-deriving the base's default.
+// ---------------------------------------------------------------------------
+
+describe("TouchSeedSourcePanel — leave and return (spec 079 FR-051, T029)", () => {
+  it("a NON-default recorded choice survives an unmount/remount with the same evidence", () => {
+    // A usable base layout means the base's own default is "import-adapt" —
+    // the author explicitly overriding it to "reseed-from-desktop" is the
+    // choice that must survive, not merely happen to match the default.
+    seedBase(PHONE_ONLY_JSON);
+    const first = render(<TouchSeedSourcePanel onComplete={() => undefined} onBack={() => undefined} />);
+    fireEvent.click(screen.getByTestId("seed-source-reseed"));
+    fireEvent.click(screen.getByTestId("seed-source-confirm"));
+    expect(useSurveySessionStore.getState().touchSeedSource).toBe("reseed-from-desktop");
+    first.unmount();
+
+    render(<TouchSeedSourcePanel onComplete={() => undefined} onBack={() => undefined} />);
+    expect(screen.getByTestId("seed-source-reseed").getAttribute("aria-pressed")).toBe("true");
+    expect(screen.getByTestId("seed-source-import-adapt").getAttribute("aria-pressed")).toBe("false");
   });
 });

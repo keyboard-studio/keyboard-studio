@@ -1,19 +1,16 @@
 // stepWalkStore — the within-step position store.
 //
 // The equality guards are the part worth testing rather than the setters: every
-// publisher calls `publishStepWalk`/`setAnswerDraft` from an effect whose input
+// publisher calls `publishStepWalk` from an effect whose input
 // is a freshly derived object on each render, so a store that wrote
 // unconditionally would notify the footer on every keystroke and, where a
 // publishing effect's own deps read back from the store, re-enter itself. "A
 // no-change publish is a genuine no-op" is what makes those call sites safe, and
 // it is asserted by state IDENTITY, which is the only thing a subscriber sees.
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { useStepWalkStore, peekStepCursor, peekAnswerDraft } from "./stepWalkStore.ts";
-
-beforeEach(() => {
-  useStepWalkStore.getState().reset();
-});
+import { useSurveyAnswerStore } from "./surveyAnswerStore.ts";
 
 describe("publishStepWalk", () => {
   it("stores a step's stops", () => {
@@ -48,60 +45,28 @@ describe("publishStepWalk", () => {
   });
 });
 
-describe("setStepCursor", () => {
-  it("stores and reads back a cursor per step", () => {
-    useStepWalkStore.getState().setStepCursor("identity", "q2");
-    useStepWalkStore.getState().setStepCursor("mechanisms", "u00e1");
+describe("compat readers over the answer store (spec 079 R-01)", () => {
+  it("peekStepCursor reads the answer store's position", () => {
+    useSurveyAnswerStore.getState().setPosition("identity", "q2");
     expect(peekStepCursor("identity")).toBe("q2");
-    expect(peekStepCursor("mechanisms")).toBe("u00e1");
     expect(peekStepCursor("carve")).toBeUndefined();
   });
 
-  it("is a no-op when unchanged", () => {
-    useStepWalkStore.getState().setStepCursor("identity", "q2");
-    const before = useStepWalkStore.getState().cursors;
-    useStepWalkStore.getState().setStepCursor("identity", "q2");
-    expect(useStepWalkStore.getState().cursors).toBe(before);
-  });
-});
-
-describe("setAnswerDraft", () => {
-  it("stores and reads back a step's in-progress answers", () => {
-    useStepWalkStore.getState().setAnswerDraft("identity", { q1: "alpha", q2: ["x", "y"] });
+  it("peekAnswerDraft projects each saved answer's value, keyed by question id", () => {
+    const save = useSurveyAnswerStore.getState().saveAnswer;
+    const base = { origin: "confirmed", stage: "draft", evidenceKey: null } as const;
+    save("identity", "q1", { ...base, value: "alpha", answerType: "text", screenId: "q1" });
+    save("identity", "q2", { ...base, value: ["x", "y"], answerType: "char-list", screenId: "q2" });
     expect(peekAnswerDraft("identity")).toEqual({ q1: "alpha", q2: ["x", "y"] });
-  });
-
-  it("is a no-op for a value-identical redraft, including array contents", () => {
-    const { setAnswerDraft } = useStepWalkStore.getState();
-    setAnswerDraft("identity", { q1: "alpha", q2: ["x", "y"] });
-    const before = useStepWalkStore.getState().answerDrafts;
-    setAnswerDraft("identity", { q1: "alpha", q2: ["x", "y"] });
-    expect(useStepWalkStore.getState().answerDrafts).toBe(before);
-  });
-
-  it("writes when an array answer's order changes", () => {
-    // Order is author-visible in the character lists these flows collect, so a
-    // reorder is a different answer.
-    const { setAnswerDraft } = useStepWalkStore.getState();
-    setAnswerDraft("identity", { q: ["x", "y"] });
-    const before = useStepWalkStore.getState().answerDrafts;
-    setAnswerDraft("identity", { q: ["y", "x"] });
-    expect(useStepWalkStore.getState().answerDrafts).not.toBe(before);
-  });
-
-  it("writes when a key is removed", () => {
-    const { setAnswerDraft } = useStepWalkStore.getState();
-    setAnswerDraft("identity", { q1: "alpha", q2: "beta" });
-    setAnswerDraft("identity", { q1: "alpha" });
-    expect(peekAnswerDraft("identity")).toEqual({ q1: "alpha" });
+    expect(peekAnswerDraft("track")).toBeUndefined();
   });
 });
 
 describe("clearStepWalk", () => {
-  it("drops the stops but KEEPS the cursor — an unmount is not a start-over", () => {
+  it("drops the stops but KEEPS the position — an unmount is not a start-over", () => {
     const s = useStepWalkStore.getState();
     s.publishStepWalk("mechanisms", [{ id: "u00e1", done: false }]);
-    s.setStepCursor("mechanisms", "u00e1");
+    useSurveyAnswerStore.getState().setPosition("mechanisms", "u00e1");
     s.clearStepWalk("mechanisms");
     expect(useStepWalkStore.getState().walks["mechanisms"]).toBeUndefined();
     expect(peekStepCursor("mechanisms")).toBe("u00e1");
@@ -109,14 +74,10 @@ describe("clearStepWalk", () => {
 });
 
 describe("reset", () => {
-  it("clears stops, cursors and drafts together", () => {
+  it("clears the stops", () => {
     const s = useStepWalkStore.getState();
     s.publishStepWalk("identity", [{ id: "q1", done: true }]);
-    s.setStepCursor("identity", "q1");
-    s.setAnswerDraft("identity", { q1: "alpha" });
     s.reset();
     expect(useStepWalkStore.getState().walks).toEqual({});
-    expect(useStepWalkStore.getState().cursors).toEqual({});
-    expect(useStepWalkStore.getState().answerDrafts).toEqual({});
   });
 });

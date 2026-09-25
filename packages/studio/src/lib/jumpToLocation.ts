@@ -19,6 +19,7 @@ import { questionRegistry } from "../survey/questions/registry.ts";
 import { snapshotTraversal, useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useStepWalkStore } from "../stores/stepWalkStore.ts";
+import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import { stepPositionIds } from "./stepWalk.ts";
 
 export interface JumpOptions {
@@ -125,8 +126,27 @@ export function liveResolveContext(): ResolveContext {
     // (a gallery's characters). Without this a footer dot naming a character
     // would resolve `question-not-in-build` and refuse itself — see
     // ResolveContext.stepPositions.
-    stepPositions: stepPositionIds(useStepWalkStore.getState().walks),
+    stepPositions: withSavedPositions(stepPositionIds(useStepWalkStore.getState().walks)),
   };
+}
+
+/**
+ * A step's own saved position is addressable even while its walk is not
+ * published (a step publishes only while mounted). The footer's collapsed
+ * section jumps to exactly that position (journey-strip-contract.md §5), so
+ * without this it would degrade to the bare step with a false
+ * "question-not-in-build" reason.
+ */
+function withSavedPositions(
+  positions: Readonly<Record<string, readonly string[]>>,
+): Readonly<Record<string, readonly string[]>> {
+  const out: Record<string, readonly string[]> = { ...positions };
+  for (const [stepId, step] of Object.entries(useSurveyAnswerStore.getState().steps)) {
+    if (step.position === null) continue;
+    const ids = out[stepId] ?? [];
+    if (!ids.includes(step.position)) out[stepId] = [...ids, step.position];
+  }
+  return out;
 }
 
 /**
@@ -159,7 +179,7 @@ export function jumpToLocation(loc: Location, opts?: JumpOptions): JumpOutcome {
     // author is already on, where no remount happens at all and the pending-jump
     // hand-off below would never be consumed.
     if (target.question !== undefined) {
-      useStepWalkStore.getState().setStepCursor(target.step, target.question);
+      useSurveyAnswerStore.getState().setPosition(target.step, target.question);
     }
   }
 

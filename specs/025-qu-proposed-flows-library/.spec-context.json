@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "Qu Proposed Flows Library",
+  "branch": "",
+  "currentStep": "specify",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-24T01:39:02.550Z"
+    }
+  ],
+  "telemetryInstanceId": "24700ce4-2b1c-4273-bfe0-2ddfca7b0f23"
+}

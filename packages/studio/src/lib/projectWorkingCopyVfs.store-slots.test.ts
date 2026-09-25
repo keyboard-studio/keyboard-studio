@@ -19,21 +19,17 @@
 //        CONTEXT → still blocked (context-index-aligned) → warning, no crash.
 
 import { describe, it, expect } from "vitest";
-import { createVirtualFS } from "@keyboard-studio/contracts";
-import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
+import { charStore, irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import type { IRGroup, IRRule, IRStore, StoreItem } from "@keyboard-studio/contracts";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.js";
+import { stubKmnVfs } from "../test/workingCopy.ts";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
 // ---------------------------------------------------------------------------
 
 function makeSimpleRule(nodeId: string, vkey: string, char: string): IRRule {
-  return {
-    nodeId,
-    context: [{ kind: "vkey", name: vkey, modifiers: [] }],
-    output: [{ kind: "char", value: char }],
-  };
+  return vkeyRule({ nodeId, vkey, output: char });
 }
 
 function makeParallelRule(
@@ -53,26 +49,15 @@ function makeParallelRule(
 }
 
 function makeGroup(nodeId: string, name: string, rules: IRRule[]): IRGroup {
-  return { nodeId, name, usingKeys: true, rules, readonly: false };
+  return irGroup({ nodeId, name, rules });
 }
 
 function makeOutputStore(nodeId: string, name: string, items: StoreItem[]): IRStore {
-  return { nodeId, name, items, isSystem: false };
+  return charStore({ nodeId, name, items });
 }
 
 function makeInputStore(nodeId: string, name: string, chars: string[]): IRStore {
-  return {
-    nodeId,
-    name,
-    items: chars.map((c) => ({ kind: "char" as const, value: c })),
-    isSystem: false,
-  };
-}
-
-function makeVfs(keyboardId: string) {
-  return createVirtualFS([
-    { path: `source/${keyboardId}.kmn`, content: "c stub\n", isBinary: false },
-  ]);
+  return charStore({ nodeId, name, chars });
 }
 
 /**
@@ -112,7 +97,7 @@ function makeParallelIr(opts: {
 describe("projectWorkingCopyVfs store-slots end-to-end — real engine, no mock", () => {
   it("AC#1: slot deletion nulls the store at the carved position; body rule and input store survive", () => {
     const ir = makeParallelIr();
-    const vfs = makeVfs("test_kb");
+    const vfs = stubKmnVfs("test_kb");
 
     const { warnings } = projectWorkingCopyVfs({
       vfs,
@@ -153,7 +138,7 @@ describe("projectWorkingCopyVfs store-slots end-to-end — real engine, no mock"
 
   it("AC#1 complement: empty deletedItemIds leaves VFS with the original stub content", () => {
     const ir = makeParallelIr();
-    const vfs = makeVfs("test_kb");
+    const vfs = stubKmnVfs("test_kb");
 
     projectWorkingCopyVfs({
       vfs,
@@ -178,7 +163,7 @@ describe("projectWorkingCopyVfs store-slots end-to-end — real engine, no mock"
   it("AC#2: slot id nulled AND whole-rule nodeId removed in one call", () => {
     const extraSimpleRule = makeSimpleRule("rule#simple", "K_A", "x");
     const ir = makeParallelIr({ extraRules: [extraSimpleRule] });
-    const vfs = makeVfs("test_kb");
+    const vfs = stubKmnVfs("test_kb");
 
     const { warnings } = projectWorkingCopyVfs({
       vfs,
@@ -213,7 +198,7 @@ describe("projectWorkingCopyVfs store-slots end-to-end — real engine, no mock"
 
   it("AC#3: baseIr is not mutated by projectWorkingCopyVfs", () => {
     const ir = makeParallelIr();
-    const vfs = makeVfs("test_kb");
+    const vfs = stubKmnVfs("test_kb");
 
     const irBefore = structuredClone(ir);
 
@@ -240,7 +225,7 @@ describe("projectWorkingCopyVfs store-slots end-to-end — real engine, no mock"
 
   it("AC#4: input-only store slot id whose pairing resolves succeeds as a coordinated drop on both stores; no warning", () => {
     const ir = makeParallelIr();
-    const vfs = makeVfs("test_kb");
+    const vfs = stubKmnVfs("test_kb");
 
     const { warnings } = projectWorkingCopyVfs({
       vfs,
@@ -284,7 +269,7 @@ describe("projectWorkingCopyVfs store-slots end-to-end — real engine, no mock"
     };
     const group = makeGroup("group#main", "main", [ctxIndexRule]);
     const ir = makeTestIR([group], [ctxIndexStore]);
-    const vfs = makeVfs("test_kb");
+    const vfs = stubKmnVfs("test_kb");
 
     const { warnings } = projectWorkingCopyVfs({
       vfs,
@@ -327,7 +312,7 @@ describe("projectWorkingCopyVfs store-slots end-to-end — real engine, no mock"
     };
     const group = makeGroup("group#main", "main", [simpleRule]);
     const ir = makeTestIR([group], [inputOnlyStore]);
-    const vfs = makeVfs("test_kb");
+    const vfs = stubKmnVfs("test_kb");
 
     const { warnings } = projectWorkingCopyVfs({
       vfs,

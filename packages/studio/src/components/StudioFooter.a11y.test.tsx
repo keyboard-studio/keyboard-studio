@@ -21,6 +21,8 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
 import { useStepWalkStore } from "../stores/stepWalkStore.ts";
+import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
+import { useReproposalNoticeStore } from "../stores/reproposalNoticeStore.ts";
 import { charToPositionToken } from "../lib/stepWalk.ts";
 import { StudioFooter } from "./StudioFooter.tsx";
 
@@ -81,10 +83,8 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-  useDecisionLogStore.getState().reset();
-  useStepWalkStore.getState().reset();
+  // No reset() on this store — global test-setup only clears stores with reset().
+  useReproposalNoticeStore.getState().clear();
   window.location.hash = "";
 });
 
@@ -272,7 +272,7 @@ describe("StudioFooter — within-step walk dots", () => {
       { id: charToPositionToken("é"), label: "é (U+00E9)", done: false },
       { id: charToPositionToken("í"), label: "í (U+00ED)", done: false },
     ]);
-    useStepWalkStore.getState().setStepCursor("mechanisms", charToPositionToken("é"));
+    useSurveyAnswerStore.getState().setPosition("mechanisms", charToPositionToken("é"));
 
     render(<StudioFooter />);
     const names = screen.getAllByRole("button").map((b) => b.getAttribute("aria-label") ?? "");
@@ -297,12 +297,19 @@ describe("StudioFooter — within-step walk dots", () => {
     ]);
 
     render(<StudioFooter />);
-    // These ids have no catalog entry, so the resolver falls through to the raw
-    // id — which is all this case needs: two stops, two dots.
+    // spec 079 journey-strip-contract.md §4: a label is NEVER a raw answer/
+    // stop id — these two stops have no catalog entry, so both fall through
+    // to the STAGE label ("Accents & marks"), not to the raw id (the exact
+    // gap §4 closes). Two stops still yield two QUESTION-tier marks — that is
+    // what this case is actually pinning, via the structural
+    // `data-progress-dot-tier` hook rather than the (now-collapsed) label text.
     const marksDots = screen
       .getAllByRole("button")
-      .filter((b) => (b.getAttribute("aria-label") ?? "").startsWith("ms_series_"));
+      .filter((b) => b.getAttribute("data-progress-dot-tier") === "question");
     expect(marksDots).toHaveLength(2);
+    for (const dot of marksDots) {
+      expect(dot.getAttribute("aria-label") ?? "").not.toMatch(/ms_series_/);
+    }
   });
 });
 
@@ -384,13 +391,23 @@ describe("StudioFooter — jumping back and forward again (FR-045/FR-063)", () =
       { id: "il_language_english", done: true },
       { id: "il_language_autonym", done: false },
     ]);
-    walkStore.setStepCursor("identity", "il_language_autonym");
-    walkStore.setAnswerDraft("identity", { il_language_english: "Bambara" });
+    const answerStore = useSurveyAnswerStore.getState();
+    answerStore.setPosition("identity", "il_language_autonym");
+    answerStore.setStepAnswers("identity", {
+      il_language_english: {
+        value: "Bambara",
+        answerType: "text",
+        origin: "confirmed",
+        stage: "draft",
+        evidenceKey: null,
+        screenId: "il_language_english",
+      },
+    });
     walkStore.publishStepWalk("mechanisms", [
       { id: charToPositionToken("á"), done: true },
       { id: charToPositionToken("é"), done: false },
     ]);
-    walkStore.setStepCursor("mechanisms", charToPositionToken("é"));
+    useSurveyAnswerStore.getState().setPosition("mechanisms", charToPositionToken("é"));
 
     const session = useSurveySessionStore.getState();
     session.jumpToStep("identity");
@@ -398,11 +415,12 @@ describe("StudioFooter — jumping back and forward again (FR-045/FR-063)", () =
     session.jumpToStep("identity");
 
     const after = useStepWalkStore.getState();
-    expect(after.answerDrafts["identity"]).toEqual({ il_language_english: "Bambara" });
-    expect(after.cursors["identity"]).toBe("il_language_autonym");
+    const afterAnswers = useSurveyAnswerStore.getState();
+    expect(afterAnswers.steps["identity"]?.answers["il_language_english"]?.value).toBe("Bambara");
+    expect(afterAnswers.steps["identity"]?.position).toBe("il_language_autonym");
     expect(after.walks["identity"]).toHaveLength(2);
     // The gallery it passed through twice is exactly as it was left.
-    expect(after.cursors["mechanisms"]).toBe(charToPositionToken("é"));
+    expect(afterAnswers.steps["mechanisms"]?.position).toBe(charToPositionToken("é"));
     expect(after.walks["mechanisms"]?.[0]?.done).toBe(true);
   });
 
@@ -429,5 +447,172 @@ describe("StudioFooter — jumping back and forward again (FR-045/FR-063)", () =
     // The gate held, with a stated reason, and the author did not move.
     expect(screen.getByRole("status").textContent ?? "").not.toBe("");
     expect(useSurveySessionStore.getState().activeStepId).toBe("track");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Two-tier strip additions (spec 079 T054, journey-strip-contract.md
+// §3a-§3c, §9).
+// ---------------------------------------------------------------------------
+
+describe("StudioFooter — two-tier strip (spec 079)", () => {
+  it("a section with some but not all screens done reads as 'partly answered'", () => {
+    // "identity" is behind the current position ("characters") and has a
+    // published walk (not a character walk) with one done stop and one not —
+    // its section mark must aggregate to `partial`, not `full` or `none`.
+    useStepWalkStore
+      .getState()
+      .publishStepWalk("identity", [
+        { id: "il_language_english", done: true },
+        { id: "il_language_autonym", done: false },
+      ]);
+
+    render(<StudioFooter />);
+    const partial = screen
+      .getAllByRole("button")
+      .find((b) => (b.getAttribute("aria-label") ?? "").match(/partly answered/i));
+    expect(partial).toBeDefined();
+    expect(partial!.getAttribute("data-progress-dot-fill")).toBe("partial");
+    expect(partial!.getAttribute("data-progress-dot-tier")).toBe("section");
+  });
+
+  it("the FR-016 notice rides the SAME role=status span — no second aria-live region", () => {
+    useReproposalNoticeStore.getState().setMessage("2 questions in Accents & marks will need reconfirming.", "characters");
+
+    render(<StudioFooter />);
+
+    const liveRegions = screen.getAllByRole("status");
+    expect(liveRegions).toHaveLength(1);
+    expect(liveRegions[0]?.textContent).toMatch(/need reconfirming/i);
+    expect(document.querySelectorAll('[aria-live]')).toHaveLength(1);
+  });
+
+  it("the notice clears on the NEXT navigation away from the step it was raised for", () => {
+    useReproposalNoticeStore.getState().setMessage("2 questions will need reconfirming.", "characters");
+    const { rerender } = render(<StudioFooter />);
+    expect(screen.getByRole("status").textContent).toMatch(/need reconfirming/i);
+
+    // Navigate away from "characters" — the notice was raised FOR that step.
+    useSurveySessionStore.setState({ activeStepId: "marks" });
+    rerender(<StudioFooter />);
+
+    expect(screen.getByRole("status").textContent ?? "").not.toMatch(/need reconfirming/i);
+    expect(useReproposalNoticeStore.getState().message).toBeNull();
+  });
+
+  it("a not-asked step's section mark reads as 'passed — {reason}', never as an answer", () => {
+    useSurveyAnswerStore.getState().setStatus("convenience", {
+      kind: "not-asked",
+      reason: { code: "convenience-no-surplus" },
+      evidenceKey: "k1",
+    });
+
+    render(<StudioFooter />);
+    const passed = screen
+      .getAllByRole("button")
+      .find((b) => (b.getAttribute("aria-label") ?? "").match(/passed —/i));
+    expect(passed).toBeDefined();
+    expect(passed!.getAttribute("aria-label") ?? "").not.toMatch(/completed/i);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §5 jump rules, end to end through the mounted footer and the REAL
+// `useWorkToDo()` wiring (not a fixture — journey-strip-contract.md §5's
+// exception only matters if the live badge computation actually produces a
+// badge for the same mark the click resolves against).
+//
+// The badge is produced the same way MarksSeriesStep's own reproposal cue is
+// (spec 079 US3 item 4): a saved `marks_attachment` answer whose
+// `evidenceKey` no longer matches the current proposal's key
+// (`survey/marks/marksViews.ts`'s `classify()`). Mirrors the fixture
+// `hooks/useWorkToDo.marksParity.test.tsx` already established for the same
+// purpose.
+// ---------------------------------------------------------------------------
+
+describe("StudioFooter — §5 jump target (badged vs. unbadged collapsed section)", () => {
+  const ACUTE = "́";
+  const ALPHABET = {
+    bases: ["e", "a"],
+    marks: [ACUTE],
+    attestedStacks: [{ base: "e", marks: [ACUTE] }],
+    declaredRoles: {},
+  };
+  const SAVED_POSITION = "some-other-saved-marker";
+
+  function seedMarksAheadOfCarve(): void {
+    useWorkingCopyStore.getState().recordPhase({ phase: "B", answers: [], alphabet: ALPHABET });
+    useSurveySessionStore.setState({
+      activeStepId: "carve",
+      history: [
+        "identity", "choose_base", "track", "characters",
+        "marks", "punctuation", "invisibles", "convenience",
+      ],
+      selectedTrack: "adapt",
+    });
+    // The author already walked through "marks" earlier — MarksSeriesStep.tsx
+    // publishes its `visibleStations` as this exact walk (:647-653), and the
+    // store keeps a step's last-published walk until overwritten (it is not
+    // cleared on leaving the step). Without this, "marks_attachment" is not
+    // an addressable question in this build (no registry entry, no published
+    // stop), and the badged jump target degrades to the bare step — a real
+    // finding this test exists to pin, not an artefact of the fixture.
+    useStepWalkStore.getState().publishStepWalk("marks", [
+      { id: "marks_attachment", done: true },
+      { id: "marks_treatment", done: true },
+      { id: "marks_output_form", done: true },
+      { id: "marks_stacking", done: true },
+    ]);
+    // The author's own last position inside "marks" — read by the UNBADGED
+    // jump case; the badged case must ignore it (§5's deliberate exception).
+    useSurveyAnswerStore.getState().setPosition("marks", SAVED_POSITION);
+  }
+
+  function findMarksButton(): HTMLElement {
+    const button = screen
+      .getAllByRole("button")
+      .find((b) => (b.getAttribute("aria-label") ?? "").startsWith("Accents & marks"));
+    expect(button).toBeDefined();
+    return button!;
+  }
+
+  it("a BADGED collapsed section jumps to the earliest work item, not the saved position", async () => {
+    const user = userEvent.setup();
+    seedMarksAheadOfCarve();
+    // A stale evidenceKey makes `classify()` read this attachment as
+    // "reproposed" — a real badge from the real hook, not an injected fixture.
+    useSurveyAnswerStore.getState().saveAnswer("marks", `marks_attachment.${ACUTE}|e`, {
+      value: true,
+      answerType: "boolean",
+      origin: "confirmed",
+      stage: "confirmed",
+      evidenceKey: "stale-key-that-no-longer-matches",
+      screenId: "marks_attachment",
+    });
+
+    render(<StudioFooter />);
+    const marksButton = findMarksButton();
+    expect(marksButton.getAttribute("aria-label") ?? "").toMatch(/work waiting/i);
+
+    marksButton.focus();
+    await user.keyboard("{Enter}");
+
+    expect(useSurveyAnswerStore.getState().steps["marks"]?.position).toBe("marks_attachment");
+    expect(useSurveyAnswerStore.getState().steps["marks"]?.position).not.toBe(SAVED_POSITION);
+  });
+
+  it("an UNBADGED collapsed section jumps to the author's saved position", async () => {
+    const user = userEvent.setup();
+    seedMarksAheadOfCarve();
+    // No stale answer this time — nothing for the real hook to flag.
+
+    render(<StudioFooter />);
+    const marksButton = findMarksButton();
+    expect(marksButton.getAttribute("aria-label") ?? "").not.toMatch(/work waiting/i);
+
+    marksButton.focus();
+    await user.keyboard(" ");
+
+    expect(useSurveyAnswerStore.getState().steps["marks"]?.position).toBe(SAVED_POSITION);
   });
 });

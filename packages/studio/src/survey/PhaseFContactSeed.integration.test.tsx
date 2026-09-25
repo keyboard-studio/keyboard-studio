@@ -23,12 +23,9 @@ import { screen, fireEvent, act, cleanup } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { PhaseFStepFactoryComponent } from "../editors/adapters/flowStepOptions.tsx";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 
 afterEach(() => {
   cleanup();
-  useSurveySessionStore.getState().reset();
-  useWorkingCopyStore.getState().reset();
 });
 
 const CONTACT = "info@bafutliteracy.org";
@@ -50,8 +47,9 @@ function typeInto(value: string): void {
 /**
  * Walk the default path to pf_contact_info and return its rendered value.
  *
- * Default path (5 screens): pf_welcome_paragraph -> pf_usage_tip_1 ->
- * pf_more_detail_gate (No) -> pf_credits -> pf_contact_info.
+ * Default path (6 screens): pf_welcome_paragraph -> pf_usage_tip_1 ->
+ * pf_history_entry (spec 080 US5, left undecided) -> pf_more_detail_gate
+ * (No) -> pf_credits -> pf_contact_info.
  */
 function walkToContactField(ctx: Record<string, string | undefined>): string {
   useSurveySessionStore.getState().setSurveyContext(ctx);
@@ -64,17 +62,20 @@ function walkToContactField(ctx: Record<string, string | undefined>): string {
   // 2. pf_usage_tip_1 — optional, leave blank.
   next();
 
-  // 3. pf_more_detail_gate — answer No to take the minimum path.
+  // 3. pf_history_entry — optional, leave undecided (stays "proposed").
+  next();
+
+  // 4. pf_more_detail_gate — answer No to take the minimum path.
   const no = screen.getByRole("radio", { name: /^no$/i });
   act(() => {
     fireEvent.click(no);
   });
   next();
 
-  // 4. pf_credits — optional, leave blank.
+  // 5. pf_credits — optional, leave blank.
   next();
 
-  // 5. pf_contact_info — the field under test.
+  // 6. pf_contact_info — the field under test.
   const contactBox = screen.getAllByRole("textbox")[0]!;
   return (contactBox as HTMLInputElement | HTMLTextAreaElement).value;
 }
@@ -108,14 +109,15 @@ describe("Phase F — pf_contact_info pre-fill (end to end)", () => {
     );
 
     typeInto("A keyboard for typing Bafut.");
-    next();
-    next();
+    next(); // pf_welcome_paragraph
+    next(); // pf_usage_tip_1
+    next(); // pf_history_entry (spec 080 US5, left undecided)
     const no = screen.getByRole("radio", { name: /^no$/i });
     act(() => {
       fireEvent.click(no);
     });
-    next();
-    next();
+    next(); // pf_more_detail_gate
+    next(); // pf_credits
 
     // Seeded, then cleared by the author.
     expect((screen.getAllByRole("textbox")[0] as HTMLInputElement).value).toBe(CONTACT);

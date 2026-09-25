@@ -22,6 +22,7 @@ import {
 } from "../../../../src/steps/registerEditorSteps.ts";
 import { CARVE_WRITES, ADD_GALLERY_WRITES, TOUCH_WRITES } from "../../../../src/steps/editorMutate.ts";
 import { manifest } from "../../../../src/steps/manifest.ts";
+import { drillDownDeclarations } from "../../../../src/survey/questions/drillDownDeclarations.ts";
 import {
   checkInputsSatisfiableFromManifest,
   findUnreachable,
@@ -126,6 +127,18 @@ describe("spec 017 — FR-013 forbidden-path guard: no declaration references he
     for (const step of all) {
       for (const p of [...step.inputs, ...step.writes]) {
         expect(formatIRPath(p)).not.toBe("header.script");
+      }
+    }
+  });
+
+  // The drill-down declarations under `characters` (prefill, pb_build_list) are
+  // not manifest steps, so they are checked here rather than in their own files.
+  it("no drill-down declaration (prefill, pb_build_list) references header.script", () => {
+    const all = Object.values(drillDownDeclarations).flat();
+    expect(all.map((d) => d.id).sort()).toEqual(["pb_build_list", "prefill"]);
+    for (const decl of all) {
+      for (const p of [...decl.inputs, ...decl.writes]) {
+        expect(formatIRPath(p), `drill-down "${decl.id}" declares header.script`).not.toBe("header.script");
       }
     }
   });

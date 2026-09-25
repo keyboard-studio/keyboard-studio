@@ -1,0 +1,63 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`reserve question modules (spec 022) > reserve/author_contact_email.ts > definition contract 1`] = `"text | required | next pa_copyright_holder | format email | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`reserve question modules (spec 022) > reserve/author_display_name.ts > definition contract 1`] = `"text | required | next author_contact_email | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`reserve question modules (spec 022) > reserve/desktop_first_notice.ts > definition contract 1`] = `"notice | required (absent) | next language_name_english | no prompt | no help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`reserve question modules (spec 022) > reserve/iso_code.ts > definition contract 1`] = `"autocomplete | optional | next region | options_source @langtags_iso639 | prompt | help_text | no validate | blank fixture | inputs [] | writes [header.bcp47]"`;
+
+exports[`reserve question modules (spec 022) > reserve/language_name_autonym.ts > definition contract 1`] = `"autocomplete | required | next iso_code | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`reserve question modules (spec 022) > reserve/language_name_english.ts > definition contract 1`] = `"autocomplete | required | next language_name_autonym | options_source @langtags_names | prompt | help_text | validate | no blank fixture | inputs [] | writes [header.name]"`;
+
+exports[`reserve question modules (spec 022) > reserve/layout_family.ts > definition contract 1`] = `"radio | optional | next [value == 'non-roman' -> script_family; (default) -> pa_primary_target] | options [qwerty, qwertz, azerty, non-roman] | prompt | help_text | no validate | blank fixture | inputs [header.bcp47] | writes []"`;
+
+exports[`reserve question modules (spec 022) > reserve/pa_copyright_holder.ts > definition contract 1`] = `"short_text | required | next provenance_opt_in | prompt | help_text | validate | no blank fixture | inputs [] | writes [header.copyright]"`;
+
+exports[`reserve question modules (spec 022) > reserve/pa_primary_target.ts > definition contract 1`] = `"radio | optional | next author_display_name | options [desktop, mobile, both] | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`reserve question modules (spec 022) > reserve/pb_mark_input_order.ts > definition contract 1`] = `"radio | required | next pb_special_letters | options [prefix, postfix] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`reserve question modules (spec 022) > reserve/primary_script.ts > definition contract 1`] = `"select | required | next [value == 'Ethi' or value == 'Hang' or value == 'Hani' -> script_not_supported_stub; value == 'Arab' or value == 'Hebr' or value == 'Thaa' or value == 'Nkoo' or value == 'Adlm' or value == 'Syrc' or value == 'Mand' or value == 'Samr' or value == 'Rohg' -> writing_direction; value == 'Latn' or value == 'Cyrl' or value == 'Grek' or value == 'Geor' or value == 'Armn' -> layout_family; (default) -> layout_family] | options [Latn, Arab, Hebr, Thaa, Nkoo, Adlm, Syrc, Mand, Samr, Rohg, Deva, Beng, Taml, Telu, Knda, Mlym, Guru, Gujr, Orya, Sinh, Thai, Khmr, Mymr, Laoo, Ethi, Hang, Hani, Geor, Armn, Cyrl, Grek, Tibt, Cans, Cher, Other] | prompt | help_text | validate | no blank fixture | inputs [] | writes [header.bcp47]"`;
+
+exports[`reserve question modules (spec 022) > reserve/provenance_additional_notes.ts > definition contract 1`] = `"text | optional | next null | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`reserve question modules (spec 022) > reserve/provenance_casing_notes.ts > definition contract 1`] = `"text | optional | next provenance_additional_notes | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`reserve question modules (spec 022) > reserve/provenance_community_involvement.ts > definition contract 1`] = `"text | optional | next provenance_casing_notes | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`reserve question modules (spec 022) > reserve/provenance_community_rep_email.ts > definition contract 1`] = `"text | optional | next provenance_speaker_count | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`reserve question modules (spec 022) > reserve/provenance_community_rep_name.ts > definition contract 1`] = `"text | optional | next provenance_community_rep_role | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`reserve question modules (spec 022) > reserve/provenance_community_rep_role.ts > definition contract 1`] = `"text | optional | next provenance_community_rep_email | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`reserve question modules (spec 022) > reserve/provenance_existing_tools.ts > definition contract 1`] = `"text | optional | next provenance_orthography_url | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`reserve question modules (spec 022) > reserve/provenance_language_status.ts > definition contract 1`] = `"text | optional | next provenance_existing_tools | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`reserve question modules (spec 022) > reserve/provenance_opt_in.ts > definition contract 1`] = `"bool | optional | next [value == 'true' -> provenance_requester_name; (default) -> null] | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`reserve question modules (spec 022) > reserve/provenance_orthography_url.ts > definition contract 1`] = `"text | optional | next provenance_community_involvement | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`reserve question modules (spec 022) > reserve/provenance_regions.ts > definition contract 1`] = `"text | optional | next provenance_language_status | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`reserve question modules (spec 022) > reserve/provenance_requester_affiliation.ts > definition contract 1`] = `"text | optional | next provenance_requester_relation | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`reserve question modules (spec 022) > reserve/provenance_requester_contact.ts > definition contract 1`] = `"text | optional | next provenance_requester_affiliation | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`reserve question modules (spec 022) > reserve/provenance_requester_name.ts > definition contract 1`] = `"text | optional | next provenance_requester_contact | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`reserve question modules (spec 022) > reserve/provenance_requester_relation.ts > definition contract 1`] = `"text | optional | next provenance_community_rep_name | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`reserve question modules (spec 022) > reserve/provenance_speaker_count.ts > definition contract 1`] = `"text | optional | next provenance_regions | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`reserve question modules (spec 022) > reserve/region.ts > definition contract 1`] = `"text | required | next primary_script | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`reserve question modules (spec 022) > reserve/script_family.ts > definition contract 1`] = `"radio | required | next pa_primary_target | options [indic, sea, rtl, syllabic, alpha-nonlatin, other] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`reserve question modules (spec 022) > reserve/script_not_supported_stub.ts > definition contract 1`] = `"notice | optional | next null | prompt | help_text | no validate | blank fixture | inputs [header.bcp47] | writes []"`;
+
+exports[`reserve question modules (spec 022) > reserve/writing_direction.ts > definition contract 1`] = `"radio | required | next layout_family | options [rtl, ltr] | prompt | help_text | validate | no blank fixture | inputs [header.bcp47] | writes []"`;

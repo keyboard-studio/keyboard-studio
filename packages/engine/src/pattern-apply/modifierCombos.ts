@@ -428,6 +428,48 @@ export function comboToKvksShiftToken(tokens: readonly ModifierToken[]): string 
   return canon.map((t) => KVKS_FRAGMENT[t]).join("");
 }
 
+/**
+ * Inverse of {@link comboToKvksShiftToken} for layer ids shared by layout
+ * charts, Layer C `data-states` checks, and the no-`.kvks` fallback path:
+ * parse a run-together `.kvks` `shift="…"` token (e.g. `"SRA"`) into the same
+ * id {@link comboToTouchLayerId} would produce for that combo
+ * (`"rightalt-shift"`). Longer fragments match first so `RA` is not read as
+ * `R`+`A`. An empty / whitespace-only token is `"default"`; a string with no
+ * recognised fragments passes through lower-cased so an unusual layer is
+ * never flagged as phantom.
+ *
+ * One helper, one naming convention — chart filenames no longer change
+ * depending on whether a `.kvks` file happened to be present.
+ */
+const KVKS_SHIFT_TOKEN_RE = /LC|RC|LA|RA|S|C|A/g;
+
+const KVKS_TOKEN_TO_MODIFIER: Record<string, ModifierToken> = {
+  S: "SHIFT",
+  C: "CTRL",
+  RC: "RCTRL",
+  LC: "LCTRL",
+  A: "ALT",
+  RA: "RALT",
+  LA: "LALT",
+};
+
+export function kvksShiftTokenToLayerId(shift: string): string {
+  const trimmed = shift.trim();
+  if (trimmed === "") return "default";
+
+  const matched: ModifierToken[] = [];
+  for (const m of trimmed.toUpperCase().matchAll(KVKS_SHIFT_TOKEN_RE)) {
+    const tok = KVKS_TOKEN_TO_MODIFIER[m[0]!];
+    if (tok !== undefined) matched.push(tok);
+  }
+  if (matched.length === 0) return trimmed.toLowerCase();
+
+  return comboToTouchLayerId([...new Set(matched)]) ?? "default";
+}
+
+/** @deprecated Alias — prefer {@link kvksShiftTokenToLayerId}. */
+export const kvksShiftTokenToHelpLayerId = kvksShiftTokenToLayerId;
+
 // ---------------------------------------------------------------------------
 // IR scanning — generalized from scaffoldTouchLayout.ts's classifyModifiers
 // ---------------------------------------------------------------------------

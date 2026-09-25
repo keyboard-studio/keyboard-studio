@@ -34,4 +34,7 @@ export const registeredQuestionSteps: readonly QuestionStep[] = Object.entries(
   inputs: mod.inputs ?? [],
   writes: mod.writes ?? [],
   questionId: mod.definition.id,
+  // A question module's answer is collected by a SurveyRunner flow, which
+  // saves it in the answer store (spec 079 R-01).
+  persistence: "answer-store",
 }));

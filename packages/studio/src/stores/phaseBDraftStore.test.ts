@@ -30,10 +30,6 @@ import { DEFAULT_PHASE_B_FONT } from "../survey/surveyStyles.ts";
 const PRECOMPOSED_E_ACUTE = "é";
 const DECOMPOSED_E_ACUTE = "é";
 
-afterEach(() => {
-  usePhaseBDraftStore.getState().reset();
-});
-
 describe("phaseBDraftStore — add", () => {
   it("adds a single character to an empty store", () => {
     usePhaseBDraftStore.getState().add("a");
@@ -243,10 +239,6 @@ describe("phaseBDraftStore — snapshotPhaseBDraft/applyPhaseBDraftSnapshot roun
 describe("phaseBDraftStore — three-store split (spec 071)", () => {
   const ACUTE = "́";
 
-  beforeEach(() => {
-    usePhaseBDraftStore.getState().reset();
-  });
-
   it("a precomposed pick contributes base, mark, and attested stack; chars keeps the whole grapheme", () => {
     usePhaseBDraftStore.getState().add("é");
     const s = usePhaseBDraftStore.getState();
@@ -349,10 +341,6 @@ describe("phaseBDraftStore — three-store split (spec 071)", () => {
 describe("phaseBDraftStore — category split (spec 047)", () => {
   const NBSP = " ";
   const ZWSP = "​";
-
-  beforeEach(() => {
-    usePhaseBDraftStore.getState().reset();
-  });
 
   it("routes a letter, digit, punctuation, symbol, NBSP, and a surviving control each to exactly one array (FR-005/SC-002)", () => {
     usePhaseBDraftStore.getState().setAll(["a", "1", ".", "€", NBSP, ZWSP]);
@@ -699,7 +687,6 @@ describe("phaseBDraftStore — 047 invariants survive seeding (spec 044 obligati
 
 describe("phaseBDraftStore — seedProposals (spec 075)", () => {
   beforeEach(() => {
-    usePhaseBDraftStore.getState().reset();
     resetPhaseBDraftDecisions();
   });
 
@@ -751,7 +738,6 @@ describe("phaseBDraftStore — seedProposals (spec 075)", () => {
 
 describe("phaseBDraftStore — invisible decisions (spec 075)", () => {
   beforeEach(() => {
-    usePhaseBDraftStore.getState().reset();
     resetPhaseBDraftDecisions();
   });
 
@@ -785,7 +771,6 @@ describe("phaseBDraftStore — invisible decisions (spec 075)", () => {
 
 describe("phaseBDraftStore — adoptControlsAsInvisibles carry-over (spec 075 FR-017)", () => {
   beforeEach(() => {
-    usePhaseBDraftStore.getState().reset();
     resetPhaseBDraftDecisions();
   });
 
@@ -822,7 +807,6 @@ describe("phaseBDraftStore — adoptControlsAsInvisibles carry-over (spec 075 FR
 
 describe("phaseBDraftStore — sticky class rules for the spec 075 fields", () => {
   beforeEach(() => {
-    usePhaseBDraftStore.getState().reset();
     resetPhaseBDraftDecisions();
   });
 
@@ -862,5 +846,52 @@ describe("phaseBDraftStore — sticky class rules for the spec 075 fields", () =
     applyPhaseBDraftSnapshot({ chars: ["!"], selectedFont: DEFAULT_PHASE_B_FONT });
     expect(usePhaseBDraftStore.getState().seededProposals).toEqual([]);
     expect(usePhaseBDraftStore.getState().invisibleDecisions).toEqual({});
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 079 T037 (R-07) — the sticky alphabet evidence key
+// ---------------------------------------------------------------------------
+
+describe("phaseBDraftStore — alphabetEvidenceKey (spec 079 R-07)", () => {
+  beforeEach(() => {
+    usePhaseBDraftStore.getState().reset();
+    resetPhaseBDraftDecisions();
+  });
+
+  it("is absent until the alphabet is first built, then holds the stamped key", () => {
+    expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBeUndefined();
+    usePhaseBDraftStore.getState().setAlphabetEvidenceKey("tl-Latn|Latn|Latn|basic_kbdus");
+    expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBe("tl-Latn|Latn|Latn|basic_kbdus");
+  });
+
+  it("survives reset() — reset runs on every build-list entry and must not forget the evidence", () => {
+    usePhaseBDraftStore.getState().setAlphabetEvidenceKey("k1");
+    usePhaseBDraftStore.getState().add("a");
+    usePhaseBDraftStore.getState().reset();
+    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+    expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBe("k1");
+  });
+
+  it("is cleared by resetPhaseBDraftDecisions() — a genuinely new working copy", () => {
+    usePhaseBDraftStore.getState().setAlphabetEvidenceKey("k1");
+    resetPhaseBDraftDecisions();
+    expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBeUndefined();
+  });
+
+  it("round-trips through PhaseBDraftSnapshot, and an old snapshot without it restores as unstamped", () => {
+    usePhaseBDraftStore.getState().add("a");
+    usePhaseBDraftStore.getState().setAlphabetEvidenceKey("k1");
+    const snap = snapshotPhaseBDraft();
+    expect(snap.alphabetEvidenceKey).toBe("k1");
+
+    resetPhaseBDraftDecisions();
+    usePhaseBDraftStore.getState().reset();
+    applyPhaseBDraftSnapshot(snap);
+    expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBe("k1");
+    expect(usePhaseBDraftStore.getState().chars).toEqual(["a"]);
+
+    applyPhaseBDraftSnapshot({ chars: ["a"], selectedFont: DEFAULT_PHASE_B_FONT });
+    expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBeUndefined();
   });
 });

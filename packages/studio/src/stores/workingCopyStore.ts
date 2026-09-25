@@ -22,7 +22,9 @@
 
 import { create } from "zustand";
 import type {
-  Attribution, AxisFill, BaseKeyboard, HelpDocsAnswers, KeyboardIR, LintFinding, RemovalCapability, ToleranceReport, VirtualFS } from "@keyboard-studio/contracts";
+  Attribution, AxisFill, BaseKeyboard, HelpDocsAnswers, KeyboardIR, LintFinding, RemovalCapability, ToleranceReport, VirtualFS,
+  WelcomeConvention, WelcomeFolderImage, HistoryEntryState, ChartPreference,
+  BaseDocumentationProfile } from "@keyboard-studio/contracts";
 import { detectMarkInputOrderFromImport, renameTouchKey, deriveFacets } from "@keyboard-studio/engine";
 import type { ContextToleranceOverlay, KeyEditOperation, KeyEditOverlay } from "@keyboard-studio/engine";
 import type { ContextVariantsResult, ToleranceClassification } from "@keyboard-studio/engine/context-tolerance";
@@ -31,6 +33,7 @@ import {
   type DiscoveryAxisVector,
   type MarkInputOrder,
   type MechanismAssignment,
+  type SurveyAnswer,
   type SurveyPhaseResult,
   type SurveySession,
   type TouchAssignment,
@@ -38,6 +41,7 @@ import {
 import { computeStalenessFromManifest } from "../dashboard/completeness.ts";
 import { resetPhaseBDraftDecisions } from "./phaseBDraftStore.ts";
 import type { Step } from "../steps/types.ts";
+import { STEP_ORDER } from "../steps/stepOrder.ts";
 import { isSequenceAssignmentForChar } from "../editors/assignLoop/patternIds.ts";
 import { promoteKeyAtAddressToHandSet } from "../editors/assignLoop/touchBehavior.ts";
 
@@ -372,8 +376,10 @@ export interface WorkingCopyState {
   helpDocs: HelpDocsAnswers | null;
 
   /**
-   * The base keyboard's own `source/welcome.htm`, verbatim, or null when it
-   * has none (spec 061 FR-013), or on Track 1 (nothing to merge with).
+   * The base keyboard's own welcome page (`source/welcome/welcome.htm`, or the
+   * flat `source/welcome.htm` on a pre-folder-convention base — spec 079 R3),
+   * verbatim, or null when it has none (spec 061 FR-013), or on Track 1
+   * (nothing to merge with).
    *
    * Same fetch-don't-write contract as {@link baseLicenseText}: the loader
    * deliberately never writes this into the VFS, so the output-projection
@@ -386,6 +392,78 @@ export interface WorkingCopyState {
    * fetch-don't-write contract as {@link baseWelcomeHtmText}.
    */
   baseHelpPhpText: string | null;
+
+  // -- Base documentation bundle (spec 079 US2) --------------------------------
+  /**
+   * The base keyboard's own `README.md`, verbatim, or null when it has none
+   * or on Track 1 (a copy inherits no base prose, FR-007). Fetch-don't-write
+   * like {@link baseLicenseText}.
+   */
+  baseReadmeMdText: string | null;
+  /**
+   * The base keyboard's own `HISTORY.md`, verbatim, or null. Same contract as
+   * {@link baseReadmeMdText}; the adapt track's rendered HISTORY preserves
+   * these entries below the new one (criterion 3.4).
+   */
+  baseHistoryMdText: string | null;
+  /**
+   * The base's `source/welcome/` image files (spec 079 FR-006), or null when
+   * the base ships none. Set on BOTH tracks — a Track 1 copy inherits the
+   * images and the welcome page's skeleton, never its prose (research R9).
+   * The projection writes each beside the rendered welcome page and lists it
+   * in the descriptor; nothing else reads the bytes.
+   */
+  baseWelcomeImages: WelcomeFolderImage[] | null;
+  /**
+   * Which welcome-page convention the base used (`folder` / `flat` / `absent`),
+   * or null before instantiation. Metadata for the documentation checklist;
+   * output always uses the folder convention regardless (FR-002).
+   */
+  baseWelcomeConvention: WelcomeConvention | null;
+  /**
+   * True when the base's welcome images were carried at instantiation but
+   * could NOT be kept across a reload — they exceeded the draft's image size
+   * budget (persistWorkingCopy `BASE_WELCOME_IMAGES_BUDGET_BYTES`), so the
+   * resumed working copy has {@link baseWelcomeImages} `null` while the base
+   * really does ship images. The projection names this in its warnings and the
+   * documentation checklist reports it, so the loss is visible rather than
+   * silently absorbed. Cleared by the next `setBaseWelcomeImages` (re-opening
+   * the base re-fetches them).
+   */
+  baseWelcomeImagesDropped: boolean;
+
+  // -- Documentation decisions (spec 079 US3/US5/US6) --------------------------
+  /**
+   * The HISTORY proposal's state (spec 079 FR-010..012): null until the Phase F
+   * `pf_history_entry` screen first proposes an entry; then `proposed`,
+   * `confirmed`, `edited` or `dismissed`. Only a confirmed or edited entry
+   * ships — anything else leaves the stub and marks HISTORY placeholder on the
+   * Output checklist (FR-011). Whole-value replace like {@link helpDocs}.
+   */
+  historyEntryState: HistoryEntryState | null;
+  /**
+   * The author's layout-chart choice (spec 079 FR-015): keep the base's own
+   * welcome images, or regenerate charts from the model. Null means "not
+   * chosen" — the FR-015 default then applies at read time (keep the base's
+   * images when it ships any, generate charts otherwise), so a base picked
+   * AFTER this slice was seeded still gets the right default. Persisted.
+   */
+  chartPreference: ChartPreference | null;
+  /**
+   * The selected base's documentation profile (spec 079 FR-008), computed by
+   * the base browser for the focused base and recorded at selection; null
+   * before a base is chosen or while the profile is still unknown. Drives the
+   * adaptive description question (FR-009). Persisted.
+   */
+  baseDocProfile: BaseDocumentationProfile | null;
+  /**
+   * The Layer C documentation findings the BASE's own files carried at
+   * instantiation (spec 079 FR-020, research R8) — the baseline the studio's
+   * documentation-findings hook compares against to classify a current finding
+   * as `origin: "upstream"`. Null until computed once per instantiation; an
+   * empty array means "computed, nothing found". Persisted.
+   */
+  baselineDocFindings: LintFinding[] | null;
 
   // -- Carve working IR (irStore slots) ----------------------------------------
   /**
@@ -432,6 +510,15 @@ export interface WorkingCopyState {
   // -- Survey results (surveyResultsStore slots) --------------------------------
   /** Phase results captured so far, in completion order (A → B → … → F). */
   phaseResults: SurveyPhaseResult[];
+  /**
+   * Who owns which answers inside each phase slot (spec 079 D-4, R-08). Several
+   * steps record into phase C; each step's list lives under its own id, and
+   * `phaseResults[p].answers` is DERIVED as their concatenation in manifest
+   * order (`"legacy"` first). A step re-recording replaces only its own list,
+   * so Convenience letters can no longer erase what Invisible characters
+   * recorded. Studio-only: the contracts `SurveyPhaseResult` is untouched.
+   */
+  phaseAnswersByStep: PhaseAnswersByStep;
   /**
    * IR-derived axis baseline, set before Phase A from the recognized patterns.
    * Updating this re-derives the session.
@@ -686,7 +773,7 @@ export interface WorkingCopyState {
    * unconditionally instead would change the reducer's skip-path default
    * (`?? "base-plus-mark"`, steps/reducer.ts), which is a separate decision.
    */
-  recordPhase: (result: SurveyPhaseResult) => void;
+  recordPhase: (result: SurveyPhaseResult, opts?: { stepId?: string }) => void;
   /**
    * Record a Phase C result carrying the given assignments, replacing any
    * prior Phase C assignments (last-wins semantics) and preserving every other
@@ -866,6 +953,30 @@ export interface WorkingCopyState {
 
   /** Retain the base's verbatim help/<id>.php so the output merge can read it. */
   setBaseHelpPhpText: (text: string | null) => void;
+
+  /** Retain the base's verbatim README.md (spec 079 FR-006). */
+  setBaseReadmeMdText: (text: string | null) => void;
+
+  /** Retain the base's verbatim HISTORY.md (spec 079 FR-006 / criterion 3.4). */
+  setBaseHistoryMdText: (text: string | null) => void;
+
+  /** Retain the base's welcome-folder images so the projection can ship them (spec 079 FR-006). */
+  setBaseWelcomeImages: (images: WelcomeFolderImage[] | null) => void;
+
+  /** Record which welcome-page convention the base used (spec 079 data-model §6). */
+  setBaseWelcomeConvention: (convention: WelcomeConvention | null) => void;
+
+  /** Record the HISTORY proposal's state (spec 079 FR-011). Whole-value replace. */
+  setHistoryEntryState: (state: HistoryEntryState | null) => void;
+
+  /** Record the author's keep-base-images / regenerate choice (spec 079 FR-015). */
+  setChartPreference: (preference: ChartPreference | null) => void;
+
+  /** Record the selected base's documentation profile (spec 079 FR-008). */
+  setBaseDocProfile: (profile: BaseDocumentationProfile | null) => void;
+
+  /** Record the base's own documentation findings at instantiation (spec 079 FR-020). */
+  setBaselineDocFindings: (findings: LintFinding[] | null) => void;
 
   /**
    * Returns true once instantiateFromBase or instantiateFromExisting has been
@@ -1052,6 +1163,51 @@ function resolveInstantiationCase(
 
 const INITIAL_SURVEY = remerge({}, []);
 
+// ---------------------------------------------------------------------------
+// Per-step phase answers (spec 079 D-4, R-08)
+// ---------------------------------------------------------------------------
+
+/** Answers recorded into each phase, keyed by the step that recorded them. */
+export type PhaseAnswersByStep = Record<string, Record<string, SurveyAnswer[]>>;
+
+/** Owner id for answers whose recording step is unknown (pre-079 data, no stepId). */
+export const LEGACY_ANSWER_OWNER = "legacy";
+
+/** Owner order: `"legacy"` first, then manifest order, then anything unknown. */
+function ownerRank(owner: string): number {
+  if (owner === LEGACY_ANSWER_OWNER) return -1;
+  const i = STEP_ORDER.indexOf(owner);
+  return i === -1 ? STEP_ORDER.length : i;
+}
+
+/** The phase entry's `answers`: every owner's list concatenated in owner order. */
+export function concatPhaseAnswers(owners: Record<string, SurveyAnswer[]>): SurveyAnswer[] {
+  return Object.keys(owners)
+    .sort((a, b) => ownerRank(a) - ownerRank(b))
+    .flatMap((owner) => owners[owner] ?? []);
+}
+
+function sameAnswerList(a: readonly SurveyAnswer[], b: readonly SurveyAnswer[]): boolean {
+  return a === b || JSON.stringify(a) === JSON.stringify(b);
+}
+
+/**
+ * The owner map for `phase`, trusted only while it still describes the stored
+ * answers. Anything that replaced `phaseResults` wholesale (a reset, a genuine
+ * re-instantiation, a restored pre-079 snapshot) leaves the sidecar out of step;
+ * the stored answers are then adopted under `"legacy"` rather than invented.
+ */
+function ownersOf(
+  sidecar: PhaseAnswersByStep,
+  stored: SurveyPhaseResult | undefined,
+  phase: string,
+): Record<string, SurveyAnswer[]> {
+  const storedAnswers = stored?.answers ?? [];
+  const owners = sidecar[phase];
+  if (owners !== undefined && sameAnswerList(concatPhaseAnswers(owners), storedAnswers)) return owners;
+  return storedAnswers.length > 0 ? { [LEGACY_ANSWER_OWNER]: storedAnswers } : {};
+}
+
 /**
  * The store's data fields only — actions excluded. This is the single source of
  * truth for "what is the serializable shape of a working copy": `INITIAL_STATE`
@@ -1075,6 +1231,8 @@ export type WorkingCopyData = Omit<
   | "setAttribution" | "setLicenseUnparseable" | "setBaseHolderOverride"
   | "setBaseLicenseText"
   | "setHelpDocs" | "setBaseWelcomeHtmText" | "setBaseHelpPhpText"
+  | "setBaseReadmeMdText" | "setBaseHistoryMdText" | "setBaseWelcomeImages" | "setBaseWelcomeConvention"
+  | "setHistoryEntryState" | "setChartPreference" | "setBaseDocProfile" | "setBaselineDocFindings"
   | "markStale" | "clearStale"
   | "setValidatorFindings"
   | "setContextTolerance"
@@ -1098,6 +1256,15 @@ const INITIAL_STATE: WorkingCopyData = {
   helpDocs: null,
   baseWelcomeHtmText: null,
   baseHelpPhpText: null,
+  baseReadmeMdText: null,
+  baseHistoryMdText: null,
+  baseWelcomeImages: null,
+  baseWelcomeConvention: null,
+  baseWelcomeImagesDropped: false,
+  historyEntryState: null,
+  chartPreference: null,
+  baseDocProfile: null,
+  baselineDocFindings: null,
   // carve IR slots
   ir: null,
   removalCapabilities: new Map(),
@@ -1107,6 +1274,7 @@ const INITIAL_STATE: WorkingCopyData = {
   undoStack: [],
   // survey slots
   ...INITIAL_SURVEY,
+  phaseAnswersByStep: {},
   desktopLocked: false,
   sequenceFlaggedChars: [],
   touchLayoutJson: null,
@@ -1331,14 +1499,26 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
 
   // -- surveyResultsStore actions --------------------------------------------
 
-  recordPhase: (result) => {
+  recordPhase: (result, opts) => {
     const prev = get().phaseResults;
     const idx = prev.findIndex((p) => p.phase === result.phase);
-    const next =
-      idx === -1
-        ? [...prev, result]
-        : prev.map((p, i) => (i === idx ? { ...p, ...result } : p));
-    set(remerge(get().irAxes, next));
+    // spec 079 D-4: the recording step replaces only ITS answers in the slot;
+    // every other field keeps the shallow-merge semantics documented above.
+    const owner = opts?.stepId ?? LEGACY_ANSWER_OWNER;
+    const owners = {
+      ...ownersOf(get().phaseAnswersByStep, prev[idx], result.phase),
+      [owner]: result.answers,
+    };
+    const merged: SurveyPhaseResult = {
+      ...(idx === -1 ? {} : prev[idx]),
+      ...result,
+      answers: concatPhaseAnswers(owners),
+    };
+    const next = idx === -1 ? [...prev, merged] : prev.map((p, i) => (i === idx ? merged : p));
+    set({
+      ...remerge(get().irAxes, next),
+      phaseAnswersByStep: { ...get().phaseAnswersByStep, [result.phase]: owners },
+    });
   },
 
   recordAssignments: (assignments) => {
@@ -1557,6 +1737,13 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     resetPhaseBDraftDecisions();
     set({
       instantiationMode: "new-from-base",
+      // A new working copy starts with no documentation decisions (spec 079):
+      // the HISTORY proposal is re-proposed for this keyboard and the chart
+      // choice falls back to the FR-015 default.
+      historyEntryState: null,
+      chartPreference: null,
+      // Recomputed by the instantiation effect for the new base (FR-020).
+      baselineDocFindings: null,
       baseKeyboard: base,
       baseVfs: vfs,
       baseIr: ir,
@@ -1620,6 +1807,10 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     // Track 2: adapt existing keyboard — identity PRESERVED from loaded keyboard.
     set({
       instantiationMode: "adapt-existing",
+      // See instantiateFromBase: documentation decisions are per working copy.
+      historyEntryState: null,
+      chartPreference: null,
+      baselineDocFindings: null,
       baseKeyboard: keyboard,
       baseVfs: vfs,
       baseIr: ir,
@@ -1676,6 +1867,24 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   setBaseWelcomeHtmText: (text) => set({ baseWelcomeHtmText: text }),
 
   setBaseHelpPhpText: (text) => set({ baseHelpPhpText: text }),
+
+  setBaseReadmeMdText: (text) => set({ baseReadmeMdText: text }),
+
+  setBaseHistoryMdText: (text) => set({ baseHistoryMdText: text }),
+
+  // A fresh carry supersedes any earlier "dropped on reload" state.
+  setBaseWelcomeImages: (images) => set({ baseWelcomeImages: images, baseWelcomeImagesDropped: false }),
+
+  setBaseWelcomeConvention: (convention) => set({ baseWelcomeConvention: convention }),
+
+  setHistoryEntryState: (state) => set({ historyEntryState: state }),
+
+  setChartPreference: (preference) => set({ chartPreference: preference }),
+
+  setBaseDocProfile: (profile) => set({ baseDocProfile: profile }),
+
+  setBaselineDocFindings: (findings) =>
+    set((s) => (s.baselineDocFindings === findings ? s : { baselineDocFindings: findings })),
 
   isInstantiated: () => get().baseKeyboard !== null,
 

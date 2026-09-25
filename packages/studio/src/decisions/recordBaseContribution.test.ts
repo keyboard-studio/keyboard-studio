@@ -23,6 +23,7 @@ import {
   type RecordBaseContributionDeps,
 } from "./recordBaseContribution.ts";
 import type { DecisionEntryInput } from "./decisionLogStore.ts";
+import { irGroup, makeTestIR } from "@keyboard-studio/contracts/fixtures";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -37,28 +38,15 @@ function charRule(nodeId: string): IRRule {
 }
 
 function group(nodeId: string, rules: IRRule[]): IRGroup {
-  return { nodeId, name: "main", usingKeys: true, rules, readonly: false };
+  return irGroup({ nodeId, rules });
 }
 
 /** Minimal KeyboardIR fixture — a group of plain char rules, no patterns/stores. */
 function makeIr(groups: IRGroup[]): KeyboardIR {
-  return {
+  return makeTestIR(groups, [], [], {
     origin: "scaffolded",
-    header: {
-      keyboardId: "",
-      name: "",
-      bcp47: [],
-      copyright: "",
-      version: "",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores: [],
-    groups,
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  };
+    header: { keyboardId: "", name: "", version: "" },
+  });
 }
 
 function baseKeyboardFixture(): BaseKeyboard {

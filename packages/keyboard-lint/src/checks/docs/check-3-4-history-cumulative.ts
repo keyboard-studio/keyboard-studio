@@ -1,0 +1,53 @@
+// Check 3.4 — KM_LINT_HISTORY_TRUNCATED
+// Criteria (criteria.json "3.4-history-cumulative"): "HISTORY.md is
+// cumulative — prior entries are preserved, not overwritten." Fires when a
+// base HISTORY.md entry present at instantiation (`DocLintInput.baseHistoryMdText`,
+// data-model.md §7) is missing from the current text.
+
+import type { DocLintInput, LintFinding } from "@keyboard-studio/contracts";
+import { docMemberPath, parseHistoryEntries } from "./_shared.js";
+
+function entryKey(version: string, date: string | null): string {
+  return `${version}\u0000${date ?? ""}`;
+}
+
+/**
+ * Check that every base HISTORY.md entry present at instantiation is still
+ * present in the current text (by version + date).
+ *
+ * @param input - Documentation check input (uses `baseHistoryMdText` and
+ *   `members["history-md"]`).
+ */
+export function checkHistoryCumulative(input: DocLintInput): LintFinding[] {
+  const baseText = input.baseHistoryMdText;
+  const currentText = input.members["history-md"];
+  if (baseText === undefined || currentText === undefined) return [];
+
+  const baseEntries = parseHistoryEntries(baseText).filter(
+    (e): e is typeof e & { version: string } => e.version !== null,
+  );
+  if (baseEntries.length === 0) return [];
+
+  const currentKeys = new Set(
+    parseHistoryEntries(currentText)
+      .filter((e): e is typeof e & { version: string } => e.version !== null)
+      .map((e) => entryKey(e.version, e.date)),
+  );
+
+  const missing = baseEntries.filter((e) => !currentKeys.has(entryKey(e.version, e.date)));
+  if (missing.length === 0) return [];
+
+  const path = docMemberPath("history-md", input.keyboardId);
+  const versions = missing.map((e) => e.version).join(", ");
+  const plural = missing.length === 1;
+  return [
+    {
+      code: "KM_LINT_HISTORY_TRUNCATED",
+      severity: "warning",
+      layer: "C",
+      message: `HISTORY.md is missing ${plural ? "an entry" : "entries"} from the base keyboard: ${versions}.`,
+      location: { file: path, line: 1 },
+      hint: `Restore the ${versions} HISTORY.md entr${plural ? "y" : "ies"} instead of overwriting it — HISTORY.md must be cumulative.`,
+    },
+  ];
+}

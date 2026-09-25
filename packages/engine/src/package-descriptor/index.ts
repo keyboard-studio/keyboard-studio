@@ -16,7 +16,15 @@
 // descriptor the zip does — which it only does while the write rides the shared
 // projection.
 
-export { buildKpsContent, buildLanguageElement, buildLanguagesBlock, parseTargetTokens } from "./build.js";
+export {
+  buildKpsContent,
+  buildLanguageElement,
+  buildLanguagesBlock,
+  parseTargetTokens,
+  WELCOME_PAGE_KPS_REF,
+  welcomeFolderKpsRef,
+  normaliseWelcomeFolderFiles,
+} from "./build.js";
 export type { PackageDescriptorIdentity } from "./build.js";
 export { applyIdentityToKps } from "./patch.js";
 export type { ApplyIdentityToKpsResult } from "./patch.js";

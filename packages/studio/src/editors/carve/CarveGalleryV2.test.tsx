@@ -17,8 +17,8 @@
 // test can inject a `reason: 'cross-script-latin'` row directly rather than
 // reconstructing a real non-Latin bcp47/langtags scenario.
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { cleanup, fireEvent, screen, within } from '@testing-library/react';
+import { describe, it, expect, afterEach, vi } from 'vitest';
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { render } from '../../test/renderWithI18n.tsx';
 import type { IRRule, IRGroup, IRStore, KeyboardIR, RemovalCapability, PlacementWorklist } from '@keyboard-studio/contracts';
 import { createVirtualFS } from '@keyboard-studio/contracts';
@@ -70,10 +70,6 @@ afterEach(() => {
   cleanup();
   collectCharContributorsMock.mockReset();
   neededCharsResult.set(null);
-});
-
-beforeEach(() => {
-  useWorkingCopyStore.getState().reset();
 });
 
 // ---------------------------------------------------------------------------
@@ -439,6 +435,93 @@ describe('CarveGalleryV2 — suggested-to-discard group', () => {
     expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(false);
     expect(screen.getByTestId('carve-v2-suggested-toggle-all').textContent).toMatch(/Discard all/);
   });
+
+  // -------------------------------------------------------------------------
+  // The cellsByCh backfill inserts a synthesized fallback ONLY for a
+  // recommended row absent from `cells` (`if (!map.has(key))`). A recommended
+  // row for a character the keyboard genuinely produces must keep its REAL
+  // cell — keys, waysToType and source intact. Nothing else in this file pins
+  // that: every other assertion reads the cell BUTTON's accessible name
+  // (glyph + code point), which a synthesized cell reproduces exactly, so
+  // dropping the guard would blank the details rail for every recommended
+  // real character while leaving this suite green.
+  // -------------------------------------------------------------------------
+  it('keeps the real cell for a recommended character that IS produced, rather than shadowing it with a fallback', async () => {
+    mockFixtureContributors();
+    neededCharsResult.set(new Set(['a']));
+
+    renderGalleryV2(makeFixtureIR());
+
+    const suggestedGroup = await screen.findByTestId('carve-v2-suggested-group');
+    const realCell = within(suggestedGroup).getByRole('button', { name: 'C — U+0043' });
+
+    // Open the details rail on the recommended-but-produced character.
+    fireEvent.mouseEnter(realCell);
+
+    // The rail shows its genuine producer. A synthesized fallback carries
+    // waysToType: [] and source 'blocked-candidate', so it would render the
+    // blocked-combination line and no "How it's typed" section at all.
+    expect(screen.getByText(/How it's typed/)).not.toBeNull();
+    expect(screen.queryByText(/blocks this combination/)).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 8b. retainedConvenienceChars absent === "not-asked" — spec 079 R-09, T052.
+// No carve code change: CarveGalleryV2.tsx already maps
+// `retainedConvenienceChars ?? []`, so an absent value (never asked, or
+// judged `not-applicable`) and an explicit `[]` (asked, kept nothing) must
+// read identically, and a retained letter must never be proposed for removal.
+// ---------------------------------------------------------------------------
+
+describe('CarveGalleryV2 — retainedConvenienceChars absent vs. answered-empty (spec 079 R-09, T052)', () => {
+  it('an absent retainedConvenienceChars yields the same needed set as an answered-empty step', async () => {
+    mockFixtureContributors();
+    neededCharsResult.set(new Set(['a']));
+
+    // Absent: Convenience letters was never asked (e.g. a `not-asked` pass —
+    // carve never reads surveyAnswerStore's status, only this session field).
+    renderGalleryV2(makeFixtureIR());
+    await screen.findByTestId('carve-v2-suggested-group');
+    const absentLabels = within(screen.getByTestId('carve-v2-suggested-group'))
+      .getAllByRole('button')
+      .map((b) => b.getAttribute('aria-label'))
+      .sort();
+    cleanup();
+    useWorkingCopyStore.getState().reset();
+
+    // Answered-empty: the author was actually asked and kept nothing.
+    const vfs = createVirtualFS();
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir: makeFixtureIR(), removalCapabilities: new Map() });
+    useWorkingCopyStore.getState().recordPhase({ phase: 'C', answers: [], retainedConvenienceChars: [] });
+    render(<CarveGalleryV2 onComplete={vi.fn()} />);
+    await screen.findByTestId('carve-v2-suggested-group');
+    const emptyLabels = within(screen.getByTestId('carve-v2-suggested-group'))
+      .getAllByRole('button')
+      .map((b) => b.getAttribute('aria-label'))
+      .sort();
+
+    expect(emptyLabels).toEqual(absentLabels);
+  });
+
+  it('does not propose removing a letter the author retained for convenience', async () => {
+    mockFixtureContributors();
+    neededCharsResult.set(new Set(['a']));
+    renderGalleryV2(makeFixtureIR());
+
+    // Baseline: 'C' is surplus and recommended for removal.
+    await screen.findByTestId('carve-v2-suggested-group');
+    expect(within(screen.getByTestId('carve-v2-suggested-group')).getByRole('button', { name: 'C — U+0043' })).not.toBeNull();
+
+    // The author kept 'C' at the convenience question.
+    act(() => {
+      useWorkingCopyStore.getState().recordPhase({ phase: 'C', answers: [], retainedConvenienceChars: ['C'] });
+    });
+
+    // 'C' is no longer a removal candidate, so the suggested group — which
+    // had exactly one row — is gone entirely.
+    await waitFor(() => expect(screen.queryByTestId('carve-v2-suggested-group')).toBeNull());
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -640,5 +723,37 @@ describe('CarveGalleryV2 — optional Latin group', () => {
     expect(screen.queryByText(/Produced by an advanced rule/)).toBeNull();
     expect(screen.queryByText(/Advanced rule/)).toBeNull();
     expect(screen.getByText(/blocks this combination/)).not.toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 079 T029 — "verify by revisit test" (contracts/step-classification.md):
+// carve is believed `working-copy`-compliant (a discard/restore is a direct
+// working-copy store mutation, applied immediately). This pins that an
+// unmount/remount with the SAME working copy (no re-instantiation) leaves a
+// discarded character discarded — the gallery must not re-derive/re-apply
+// its own recommendation state on a plain revisit.
+// ---------------------------------------------------------------------------
+
+describe('CarveGalleryV2 — leave and return (spec 079 FR-051, T029)', () => {
+  it('a discarded character survives an unmount/remount of the gallery with the same working copy', () => {
+    mockFixtureContributors();
+    const first = renderGalleryV2(makeFixtureIR());
+
+    const cell = screen.getByRole('button', { name: 'a — U+0061' });
+    fireEvent.click(cell);
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(true);
+    first.unmount();
+
+    // Revisit: same working copy, no re-instantiation — mirrors carve-back
+    // re-entry (CharactersStep.tsx) rather than a fresh Track-2 import.
+    render(<CarveGalleryV2 onComplete={vi.fn()} />);
+
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(true);
+    // The accessible name appends ", discarded" once a cell is discarded
+    // (CharacterCellButton) — the same cell, still found, still pressed.
+    expect(
+      screen.getByRole('button', { name: 'a — U+0061, discarded' }).getAttribute('aria-pressed'),
+    ).toBe('true');
   });
 });

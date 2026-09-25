@@ -18,7 +18,6 @@ function dispatchPopState(state: unknown): void {
 }
 
 beforeEach(() => {
-  useSurveySessionStore.getState().reset();
   // Start each test from a clean, known browser-history entry.
   window.history.replaceState(null, "");
 });

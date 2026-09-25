@@ -11,25 +11,22 @@
 // Why a SEPARATE store from surveySessionStore: `walks` is derived, per-mount,
 // potentially large (a whole character inventory) and meaningless to persist —
 // whereas every slot in `surveySessionStore` is part of `TraversalSnapshot` and
-// gets serialized into the durable draft by construction (its `Omit`-based
-// `SurveySessionData` type makes a new field a compile error until it is added
-// to `snapshotTraversal`). Putting a rebuilt-on-mount index in there would
-// bloat every draft write for no benefit. The CURSOR is small and durable in
-// principle; it lives here beside the walk it indexes so there is one module to
-// read when a position does not come back, and is re-derived from the walk on
-// the next mount if it is ever lost.
+// gets serialized into the durable draft by construction. Everything this store
+// holds is rebuilt on the next mount, so it is never persisted.
+//
+// The CURSOR and the in-progress ANSWERS used to live here too. They are durable
+// state — losing them on reload was a defect — so they moved to
+// stores/surveyAnswerStore.ts (spec 079 R-01), which the draft envelope carries.
+// `peekStepCursor` / `peekAnswerDraft` below are thin readers over that store,
+// kept so their callers did not change shape.
 //
 // SINGLE WRITER PER STEP. `publishStepWalk` is called only by the component
 // that owns that step's walk (SurveyRunner for a flow, MechanismGallery /
-// TouchGallery for a character walk). `setStepCursor` has two callers by
-// design: that same component (the author moved within the step) and
-// `lib/jumpToLocation.ts` (the author asked to land on a specific stop). The
-// second is why the cursor is not folded into `publishStepWalk`: a jump writes
-// it BEFORE the target component exists, and that component reads it as its
-// arrival position.
+// TouchGallery for a character walk).
 
 import { create } from "zustand";
-import type { StepCursorMap, StepWalkMap, StepWalkPositions } from "../lib/stepWalk.ts";
+import type { StepWalkMap, StepWalkPositions } from "../lib/stepWalk.ts";
+import { useSurveyAnswerStore } from "./surveyAnswerStore.ts";
 
 // ---------------------------------------------------------------------------
 // Equality guard
@@ -60,38 +57,14 @@ function samePositions(a: StepWalkPositions | undefined, b: StepWalkPositions): 
 // ---------------------------------------------------------------------------
 
 /**
- * Answers a step's flow has collected but not yet COMMITTED, keyed by question
- * id. See `StepWalkState.answerDrafts` for why this exists and why it is not a
- * second source of truth for recorded answers.
+ * Answers a step's flow has collected but not yet recorded, keyed by question
+ * id — a projection of that step's saved answers (stores/surveyAnswerStore.ts).
  */
 export type AnswerDraft = Readonly<Record<string, string | string[]>>;
 
 export interface StepWalkState {
   /** Every published walk, keyed by manifest step id. */
   walks: StepWalkMap;
-  /** Where the author is inside each step, keyed by manifest step id. */
-  cursors: StepCursorMap;
-  /**
-   * In-progress answers per step, keyed by manifest step id.
-   *
-   * WHY THIS IS NOT A SECOND ANSWER STORE. A survey answer is recorded into the
-   * decision record at STEP COMPLETION and nowhere earlier — spec 053's capture
-   * boundary, deliberately untouched here. Until then the answers live in
-   * SurveyRunner's `useState` answer stack, which is destroyed by the very thing
-   * this store exists for: a tab switch unmounts the step. So an author who
-   * answered four of five identity questions, looked at Compare, and came back
-   * found question one and an empty form — the position was not the only thing
-   * lost, the answers were too, and restoring a cursor into a walk that no longer
-   * has those answers would land them on question one anyway.
-   *
-   * This is that stack's home outside the component: the WORKING BUFFER for the
-   * step in progress, not a record of decisions. The record stays the single
-   * source of truth for what was decided; this is the single source of truth for
-   * what has been typed but not yet submitted, and it is replayed through the
-   * SAME `buildResumeStack` path a completed run already uses rather than a
-   * second restoration mechanism.
-   */
-  answerDrafts: Readonly<Record<string, AnswerDraft>>;
 
   /**
    * Replace `stepId`'s stops. A no-op when the positions are field-for-field
@@ -101,73 +74,22 @@ export interface StepWalkState {
   publishStepWalk: (stepId: string, positions: StepWalkPositions) => void;
 
   /**
-   * Record the author's position inside `stepId`. A no-op when unchanged (same
-   * reason as above — the publishing component calls this from an effect).
-   */
-  setStepCursor: (stepId: string, positionId: string) => void;
-
-  /**
-   * Record the answers `stepId`'s flow has collected so far. A no-op when
-   * value-for-value identical to what is stored (same reason as above).
-   */
-  setAnswerDraft: (stepId: string, answers: AnswerDraft) => void;
-
-  /**
    * Forget `stepId`'s stops. Called when a step's walk genuinely ceases to
-   * exist rather than merely unmounting — the cursor is DELIBERATELY kept, so
-   * an unmount-then-remount (the tab switch this store exists for) still knows
-   * where to land.
+   * exist rather than merely unmounting.
    */
   clearStepWalk: (stepId: string) => void;
 
-  /** Drop every walk and cursor — start-over, and base re-instantiation. */
+  /** Drop every walk — start-over, and new project. */
   reset: () => void;
 }
 
-/** Value-equality for an answer draft — same rationale as `samePositions`. */
-function sameAnswerDraft(a: AnswerDraft | undefined, b: AnswerDraft): boolean {
-  if (a === undefined) return false;
-  if (a === b) return true;
-  const aKeys = Object.keys(a);
-  if (aKeys.length !== Object.keys(b).length) return false;
-  for (const key of aKeys) {
-    const x = a[key];
-    const y = b[key];
-    if (x === y) continue;
-    if (Array.isArray(x) && Array.isArray(y)) {
-      if (x.length !== y.length || x.some((v, i) => v !== y[i])) return false;
-      continue;
-    }
-    return false;
-  }
-  return true;
-}
-
-const INITIAL: Pick<StepWalkState, "walks" | "cursors" | "answerDrafts"> = {
-  walks: {},
-  cursors: {},
-  answerDrafts: {},
-};
-
 export const useStepWalkStore = create<StepWalkState>((set) => ({
-  ...INITIAL,
+  walks: {},
 
   publishStepWalk: (stepId, positions) =>
     set((s) => {
       if (samePositions(s.walks[stepId], positions)) return s;
       return { walks: { ...s.walks, [stepId]: positions } };
-    }),
-
-  setStepCursor: (stepId, positionId) =>
-    set((s) => {
-      if (s.cursors[stepId] === positionId) return s;
-      return { cursors: { ...s.cursors, [stepId]: positionId } };
-    }),
-
-  setAnswerDraft: (stepId, answers) =>
-    set((s) => {
-      if (sameAnswerDraft(s.answerDrafts[stepId], answers)) return s;
-      return { answerDrafts: { ...s.answerDrafts, [stepId]: answers } };
     }),
 
   clearStepWalk: (stepId) =>
@@ -178,24 +100,30 @@ export const useStepWalkStore = create<StepWalkState>((set) => ({
       return { walks };
     }),
 
-  reset: () => set({ walks: {}, cursors: {}, answerDrafts: {} }),
+  reset: () => set({ walks: {} }),
 }));
 
 /**
- * The cursor for `stepId` right now, without subscribing. For a component
- * initialising its arrival position in a `useState` initializer or a sync
- * effect, where a subscription would be the wrong shape.
+ * The author's position inside `stepId` right now, without subscribing. For a
+ * component initialising its arrival position in a `useState` initializer or a
+ * sync effect, where a subscription would be the wrong shape.
  */
 export function peekStepCursor(stepId: string): string | undefined {
-  return useStepWalkStore.getState().cursors[stepId];
+  return useSurveyAnswerStore.getState().steps[stepId]?.position ?? undefined;
 }
 
 /**
- * `stepId`'s in-progress answers right now, without subscribing. Read by
- * SurveyRunner's state initializer, which needs them before its first render —
- * an effect would be a render too late and would have to overwrite the fresh
- * question-one stack it had already built.
+ * `stepId`'s saved answers right now, as question id -> value, without
+ * subscribing. Read by SurveyRunner's state initializer, which needs them before
+ * its first render. Boolean-valued answers (which no SurveyRunner question
+ * produces) are left out, keeping the historical return shape.
  */
 export function peekAnswerDraft(stepId: string): AnswerDraft | undefined {
-  return useStepWalkStore.getState().answerDrafts[stepId];
+  const answers = useSurveyAnswerStore.getState().steps[stepId]?.answers;
+  if (answers === undefined) return undefined;
+  const out: Record<string, string | string[]> = {};
+  for (const [id, a] of Object.entries(answers)) {
+    if (typeof a.value === "string" || Array.isArray(a.value)) out[id] = a.value;
+  }
+  return Object.keys(out).length === 0 ? undefined : out;
 }

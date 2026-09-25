@@ -16,7 +16,9 @@
 //   • REGISTERED   — a key in phaseFRegistry and in the merged questionRegistry,
 //                    with the key matching definition.id;
 //   • ON DISK      — resolvable at survey/questions/f/<id>.ts;
-//   • TEST-COVERED — a colocated spec at tests/survey/questions/f/<id>.test.ts;
+//   • TEST-COVERED — run by the live question-module contract suite
+//                    (questionModules.test.ts iterates LIVE_QUESTION_MODULES) with
+//                    at least one valid fixture, so the run is not vacuous;
 //   • REVIVABLE    — re-adding the id to content/flows/phase_f_helpdocs.modular.yaml
 //                    restores it with no code change, no re-registration, no file
 //                    restore.
@@ -26,6 +28,7 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
+import { LIVE_QUESTION_MODULES } from "../../test/questionModuleContract.ts";
 import { questionRegistry } from "./registry.ts";
 import { phaseFRegistry } from "./registry.f.ts";
 
@@ -38,13 +41,9 @@ export const DEMOTED_PHASE_F: readonly string[] = [
 
 const thisDir = path.dirname(fileURLToPath(import.meta.url));
 const moduleDir = path.join(thisDir, "f");
-const testDir = path.resolve(thisDir, "../../../tests/survey/questions/f");
 
 function modulePath(id: string): string {
   return path.join(moduleDir, `${id}.ts`);
-}
-function testPath(id: string): string {
-  return path.join(testDir, `${id}.test.ts`);
 }
 
 describe("Phase F demotion — no-delete guardrail", () => {
@@ -75,12 +74,11 @@ describe("Phase F demotion — no-delete guardrail", () => {
     }
   });
 
-  it("every demoted id REMAINS TEST-COVERED (tests/survey/questions/f/<id>.test.ts)", () => {
+  it("every demoted id REMAINS TEST-COVERED (contract suite + at least one valid fixture)", () => {
     for (const id of DEMOTED_PHASE_F) {
-      expect(
-        existsSync(testPath(id)),
-        `demoted module test coverage missing: ${testPath(id)}`,
-      ).toBe(true);
+      const entry = LIVE_QUESTION_MODULES.find((e) => e.file === `f/${id}.ts`);
+      expect(entry, `demoted module f/${id}.ts is not run by the question-module contract suite`).toBeDefined();
+      expect(entry!.mod.fixtures.valid.length, `demoted module "${id}" declares no valid fixture`).toBeGreaterThan(0);
     }
   });
 

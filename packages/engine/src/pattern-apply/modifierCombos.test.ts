@@ -9,6 +9,8 @@ import {
   parseKeySpec,
   comboToTouchLayerId,
   comboToKvksShiftToken,
+  kvksShiftTokenToLayerId,
+  kvksShiftTokenToHelpLayerId,
   collectModifierTokensInUse,
   collectLayerCombosInUse,
   buildComboKeyMap,
@@ -387,6 +389,35 @@ describe("comboToKvksShiftToken", () => {
   it("returns null for a bare/combined NCAPS combo too — same restriction as CAPS", () => {
     expect(comboToKvksShiftToken(["NCAPS"])).toBeNull();
     expect(comboToKvksShiftToken(["RALT", "NCAPS"])).toBeNull();
+  });
+});
+
+describe("kvksShiftTokenToLayerId", () => {
+  it("maps the empty / whitespace shift to default", () => {
+    expect(kvksShiftTokenToLayerId("")).toBe("default");
+    expect(kvksShiftTokenToLayerId("   ")).toBe("default");
+  });
+
+  it("maps single fragments", () => {
+    expect(kvksShiftTokenToLayerId("S")).toBe("shift");
+    expect(kvksShiftTokenToLayerId("RA")).toBe("rightalt");
+    expect(kvksShiftTokenToLayerId("LC")).toBe("leftctrl");
+  });
+
+  it("tokenises run-together .kvks tokens (SRA, not space-separated)", () => {
+    // Same ids as comboToTouchLayerId (the no-.kvks chart fallback).
+    expect(kvksShiftTokenToLayerId("SRA")).toBe("rightalt-shift");
+    expect(kvksShiftTokenToLayerId("SCA")).toBe("shift-ctrl-alt");
+    expect(kvksShiftTokenToLayerId("SRC")).toBe("rightctrl-shift");
+  });
+
+  it("passes an unrecognised token through lower-cased", () => {
+    // Avoid letters that are themselves KVKS fragments (C/S/A/…).
+    expect(kvksShiftTokenToLayerId("XYZ")).toBe("xyz");
+  });
+
+  it("aliases the deprecated help-layer name onto the same helper", () => {
+    expect(kvksShiftTokenToHelpLayerId("SRA")).toBe(kvksShiftTokenToLayerId("SRA"));
   });
 });
 

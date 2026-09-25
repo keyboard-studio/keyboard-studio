@@ -79,6 +79,23 @@ function renderTrail(
   );
 }
 
+/** spec 079 T065: same as `renderTrail`, plus `stepStatuses` (the real
+ * StudioShell call site now passes `surveyAnswerStore`'s per-step status the
+ * same way). A separate helper rather than growing `renderTrail`'s
+ * positional-arg list, which every other test above already depends on. */
+function renderTrailWithStatuses(
+  record: DecisionRecord,
+  stepStatuses: Record<string, import("../steps/answerTypes.ts").StepStatus>,
+) {
+  return render(
+    <DecisionTrailView
+      record={record}
+      resolveImpact={() => CAPTURED}
+      stepStatuses={stepStatuses}
+    />,
+  );
+}
+
 describe("FR-012 — ordered trail", () => {
   it("renders every entry in append order", () => {
     renderTrail(
@@ -622,5 +639,66 @@ describe("stage-toggle accessible name (trail a11y review P1)", () => {
     expect(document.getElementById(controlsId!)).toBe(
       within(groupFor("carve")).getAllByTestId("decision-entry")[0]!.closest("ul"),
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// FR-068 (spec 079 T065) — a `not-asked` step reads as PASSED, never as an
+// answer, whether or not it shares the trail with a stage that DID record
+// something.
+// ---------------------------------------------------------------------------
+
+describe("FR-068 — not-asked steps read as 'passed — {reason}'", () => {
+  it("a not-asked step with NO decision entries at all still surfaces its own passed row", () => {
+    // Convenience letters (T055) completes without a decision entry when
+    // not-asked — `buildStageGroups` therefore never produces a group for it,
+    // so this is the case `nonEmptyStageGroups` alone would have dropped
+    // silently before `stepStatuses` was wired in.
+    renderTrailWithStatuses(recordOf([answerEntry("d1", { stepId: "identity" })]), {
+      convenience: {
+        kind: "not-asked",
+        reason: { code: "convenience-no-surplus" },
+        evidenceKey: "k1",
+      },
+    });
+
+    const row = screen.getByTestId("decision-stage-not-asked-only");
+    expect(within(row).getByTestId("decision-stage-summary").textContent).toMatch(/passed —/i);
+    expect(within(row).getByTestId("decision-stage-summary").textContent).not.toMatch(/completed/i);
+    // No expand/collapse control — there is nothing to expand into.
+    expect(within(row).queryByTestId("decision-stage-toggle")).toBeNull();
+  });
+
+  it("never invents an answer for it — the row names no questionId/answerId", () => {
+    renderTrailWithStatuses(recordOf([]), {
+      convenience: {
+        kind: "not-asked",
+        reason: { code: "convenience-signal-unknown" },
+        evidenceKey: "k1",
+      },
+    });
+    const row = screen.getByTestId("decision-stage-not-asked-only");
+    expect(within(row).queryByTestId("decision-entry")).toBeNull();
+  });
+
+  it("without `stepStatuses`, behaviour is unchanged from before this prop existed", () => {
+    renderTrail(recordOf([answerEntry("d1", { stepId: "identity" })]));
+    expect(screen.queryByTestId("decision-stage-not-asked-only")).toBeNull();
+  });
+
+  it("a not-asked step that ALSO has other recorded entries appends the passed note inline, not as a second row", () => {
+    renderTrailWithStatuses(
+      recordOf([answerEntry("d1", { stepId: "convenience", payload: { kind: "survey-answer", questionId: "q_x", answerType: "text", value: "kept" } })]),
+      {
+        convenience: {
+          kind: "not-asked",
+          reason: { code: "convenience-no-surplus" },
+          evidenceKey: "k1",
+        },
+      },
+    );
+    expect(screen.queryByTestId("decision-stage-not-asked-only")).toBeNull();
+    const group = groupFor("convenience");
+    expect(within(group).getByTestId("decision-stage-not-asked").textContent).toMatch(/passed —/i);
   });
 });

@@ -3,8 +3,9 @@
 // using this character" bottom list.
 //
 // NOTE: the badge itself is `getProducerBadge` (the 3-signal count model) —
-// see charMechanisms.test.ts's sibling coverage in MechanismGallery.test.tsx/
-// TouchGallery.test.tsx (integration, render-level) and this file's own
+// see charMechanisms.test.ts's sibling coverage in
+// MechanismGallery.charStrip.test.tsx/TouchGallery.navigation.test.tsx
+// (integration, render-level) and this file's own
 // header comment. `getCharMechanisms`'s `producesCount` below is the narrower,
 // composition-unaware direct-match predicate only — exercised here in
 // isolation.
@@ -243,7 +244,7 @@ describe("getCharMechanisms — usesSequences", () => {
 // allCharsCovered — whole-inventory "every char has getProducerBadge count
 // >= 1" check (the shared helper the Done-button forward-button spec in both
 // galleries calls). Direct-unit coverage complementing the render-level pins
-// in MechanismGallery.test.tsx/TouchGallery.test.tsx.
+// in MechanismGallery.progression.test.tsx/TouchGallery.completion.test.tsx.
 // ---------------------------------------------------------------------------
 
 describe("allCharsCovered", () => {

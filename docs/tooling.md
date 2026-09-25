@@ -239,7 +239,11 @@ its manifest edge coverage.
   pnpm --filter @keyboard-studio/studio run coverage:report
   ```
 
-  This runs as a `vitest run` invocation of one spec
+  Only this command writes the file: it runs `vitest run --mode coverage-report`, and the same
+  spec under a plain `pnpm test` computes the report without rewriting `docs/journey-coverage.json`.
+  The report and `journey-runner.test.ts` read the fixtures through one module,
+  `packages/studio/src/survey/__fixtures__/journeyCorpus.ts`, so a new journey is added there.
+  The command is a `vitest run` invocation of one spec
   (`src/dashboard/journeyCoverage.report.test.ts`), not a bare `tsx` script — the manifest's
   editor-step components transitively import `content/flows/*.modular.yaml?raw`, a Vite asset
   transform `tsx`/Node cannot resolve; Vitest already runs on Vite's own transform pipeline, so
@@ -310,7 +314,6 @@ Live and passing:
 
 Skipped, each with an un-skip recipe at the top of its file:
 
-- `import-improve.spec.ts` — Track 2
 - [touch-key-add-remove.spec.ts](../packages/studio/e2e/touch-key-add-remove.spec.ts) — spec 063
   T112 / SC-006. Written in full against the real test ids, but blocked until `TouchGallery.tsx`
   actually mounts the Phase 8 add/remove surfaces — it calls neither `useKeyCommands` nor
@@ -325,7 +328,7 @@ with `tsx` (see each tool's tsconfig) — except the plain-node ones (`spec-trac
 
 Inventory: kbgen, supportability-scanner, smoke-artifact, spec-trace, km-triage-app, hermes,
 Template Cleanup, crowdin-diagnose, content-i18n-normalize, facet-index + facet-index-lint,
-nfd-tolerance-corpus.
+welcome-sweep, nfd-tolerance-corpus.
 
 ### spec-trace
 
@@ -402,6 +405,23 @@ ahead of its classifier (e.g. spec 039's construction facets); the default build
 such a def, and `--classified-only` builds the artifact scoped to facets that have a classifier
 (how the shipped index is built today). `facet-index-lint` is its plain-node artifact validator,
 wired into `pnpm lint`.
+
+### welcome-sweep
+
+[Spec 080](../specs/080-documentation-completeness/)'s offline SC-002 sweep
+([utilities/welcome-sweep/README.md](../utilities/welcome-sweep/README.md)). Walks every
+folder-convention base (`release/<x>/<id>/source/welcome/`) in the sibling `../keyboards`
+checkout, runs the real loader welcome resolution and the real descriptor writer against it
+from the **engine dist**, and asserts the welcome page and every `.kps`-listed image are carried
+and listed as `welcome\…`. Plain node; build the engine first:
+
+```sh
+pnpm --filter @keyboard-studio/engine build
+node utilities/welcome-sweep/run.mjs [--verbose] [--only <id>] [--limit N]
+```
+
+Not in the default CI lane (corpus dependency). Run it after touching the loader's welcome
+resolution, the descriptor `<Files>` list, or the projection's welcome-folder write.
 
 ### kbgen
 

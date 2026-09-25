@@ -6,7 +6,7 @@
 // (determinism + no mutation of the input).
 
 import { describe, it, expect } from "vitest";
-import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
+import { irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import type { IRGroup, IRRule } from "@keyboard-studio/contracts";
 import { occupiedHostKeys } from "./occupiedHostKeys.js";
 
@@ -15,7 +15,7 @@ import { occupiedHostKeys } from "./occupiedHostKeys.js";
 // ---------------------------------------------------------------------------
 
 function makeGroup(nodeId: string, name: string, rules: IRRule[]): IRGroup {
-  return { nodeId, name, usingKeys: true, rules, readonly: false };
+  return irGroup({ nodeId, name, rules });
 }
 
 function makeVkeyRule(
@@ -24,11 +24,7 @@ function makeVkeyRule(
   modifiers: string[],
   outputChar: string,
 ): IRRule {
-  return {
-    nodeId,
-    context: [{ kind: "vkey", name: vkey, modifiers }],
-    output: [{ kind: "char", value: outputChar }],
-  };
+  return vkeyRule({ nodeId, vkey, modifiers, output: outputChar });
 }
 
 function makeDeadkeyRule(

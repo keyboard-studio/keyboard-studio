@@ -6,6 +6,8 @@ export * from "./lintFindings";
 export * from "./compileResults";
 export * from "./provenance";
 export * from "./keyboard-ir";
+// Object-param builders for IR groups, rules, stores and touch layouts.
+export * from "./ir-builders";
 export * from "./linguistInventories";
 export * from "./placementMaps";
 export * from "./surveySessions";

@@ -1,20 +1,26 @@
 // progressDots — assemble the footer's whole-journey row (spec 057 §E/§G;
-// FR-042, FR-049, FR-060…FR-063; US4/US6).
+// FR-042, FR-049, FR-060…FR-063; US4/US6; spec 079 journey-strip-contract.md).
 //
-// THREE SOURCES, ONE ROW (data-model.md "ProgressDot"):
+// TWO TIERS, ONE ROW (journey-strip-contract.md §2):
 //
-//   - completed  — one dot per completed QUESTION, from
-//     `effectiveEntries(record.entries)` filtered to `payload.kind ===
-//     "survey-answer"`, in record order. `effectiveEntries` already collapses
-//     supersession chains, so "a revised question has exactly one dot" needs
-//     no rule of its own (Q1/FR-042 resolved 2026-08-03).
-//   - current    — the author's live position, from TRAVERSAL state, never
-//     the record, so it stays accurate inside a step whose answers are not
-//     yet recorded (FR-060). US6/T063.
-//   - upcoming   — one dot per STAGE (manifest step) still ahead on this
-//     author's path (FR-042's "upcoming stage" is stage-granularity, not
-//     question-granularity — the manifest cannot know which individual
-//     Phase A/B/F questions lie ahead inside a not-yet-reached battery step).
+//   - SECTION mark — one per manifest STEP, collapsed. Every step the row
+//     covers gets exactly one, in manifest order, EXCEPT a step this
+//     author's track skips (FR-049a: absent, never greyed) — that is the one
+//     case a manifest step earns no mark at all.
+//   - QUESTION mark — one per author-facing SCREEN (one `Next`), shown only
+//     for the section the author is CURRENTLY in. Every other section stays
+//     collapsed to its one section mark (§2, §4). A gallery's character walk
+//     stays collapsed even while current (`collapsedWalkDot` — out of scope
+//     for this feature, §1).
+//
+// FILL/SHAPE/RING/BADGE are independent axes carried by every mark (§3): this
+// module derives `fill` ("full"/"partial"/"none") and `badge`
+// (`WorkKind[]`, from `selectWorkToDo()`) alongside the pre-existing `kind`
+// ("completed"/"current"/"upcoming"), which stays the SHAPE/ring discriminator
+// (circle vs. square, ring vs. none) `ProgressDot.tsx` and every existing
+// consumer (`data-progress-dot-kind`) already key on. `kind` is not replaced —
+// `fill`/`tier`/`badge` are added ALONGSIDE it (contract §7's "keep `kind`
+// with a `tier` field added" option).
 //
 // DEPCRUISE BOUNDARY (why this does NOT import dashboard/manifestProjection.ts
 // even though FR-049b is worded around it): `.dependency-cruiser.cjs`'s
@@ -31,52 +37,19 @@
 // `ResolveContext.manifest` — the exact array manifestProjection.ts itself
 // maps over, not a second ordering.
 //
-// WHAT "READ, DON'T RE-DERIVE" ACTUALLY MEANS HERE: the thing FR-049b forbids
-// re-deriving is the FLOW MAP's graph-walking/layout logic (forks, joins,
-// drill-downs, reserve nodes — buildStepGraph.ts's real complexity). Deciding
-// "is this manifest STEP still ahead, and is it on this author's TRACK" is a
-// much narrower question, and the answer already exists: `resolveLocation`
-// (lib/resolveLocation.ts, spec 057 T011/T017 — ALREADY BUILT, not re-derived
-// here) already encodes exactly "reached vs ahead" (`isReached`) and "this
-// author's track" (`walkedByTrack`'s `skipped-by-track` reason). Calling it
-// once per candidate step, rather than reimplementing either rule, is the
-// same "one jump implementation" discipline jumpToLocation.ts documents for
-// navigation — applied here to derive a row instead of to perform a jump.
-//
 // A LOAD-BEARING READING OF resolveLocation.ts: for ANY location that names a
 // `step`, `refuse()` ALWAYS returns `kind:"degraded"` — never bare
 // `kind:"unreachable"` (that variant is only reachable when `loc.step` is
 // itself absent, which a bare-route location can't fail to resolve in the
 // first place). So "beyond-gate" and "skipped-by-track" both surface here as
 // `kind:"degraded"`, not `kind:"unreachable"` — see resolveLocation.test.ts's
-// own fixtures, which assert `kind:"degraded"` for every named reason. Do not
-// "fix" the `!== "reachable"` checks below to look for `kind:"unreachable"`;
-// that variant is dead for a step-bearing location by the resolver's own
-// construction, not by an oversight here.
+// own fixtures, which assert `kind:"degraded"` for every named reason.
 //
-// THE "CURRENT QUESTION" ARCHITECTURE GAP — NOW CLOSED (see lib/stepWalk.ts).
-//
-// As originally shipped, this module's finest granularity inside a
-// not-yet-completed step was the STAGE, because nothing exposed "which question
-// is SurveyRunner showing right now". The consequence the author hit: a stage
-// with a dozen internal stops was one dot, and leaving it half-finished (a tab
-// switch unmounts the step component) lost the position with no way back into
-// the middle of it.
-//
-// The fix is a WITHIN-STEP WALK the owning component publishes — an ordered list
-// of stops plus which one is current — arriving here as `input.stepWalks`. That
-// is not the "second notion of position" FR-006 forbids: it is the SAME
-// location model extended one level (route -> step -> position), with a single
-// writer per step and nothing derived from the rendered tree (FR-062 holds).
-// It reaches this module as an explicit input for the same reason
-// `ctx.traversal` does — `decisions/` may not import `stores/`, and keeping the
-// derivation a pure function of its inputs is what makes the row a unit-test
-// matrix. StudioFooter.tsx is where the live store is read.
-//
-// `input.currentQuestion` predates this and is retained: it refines the STAGE
-// dot for a step with no published walk (a deep-link arrival at a step whose
-// runner has not published yet). A published walk supersedes it — the walk knows
-// the whole row, not just the one stop a jump named.
+// WITHIN-STEP WALKS (lib/stepWalk.ts) remain the source of a flow's own
+// per-question stops for the active step; a step with no published walk (a
+// single-screen editor step, or a deep-link arrival before the runner
+// mounts) falls back to `input.currentQuestion`/the stage dot exactly as
+// before this feature.
 
 import type { I18n } from "@lingui/core";
 import { msg } from "@lingui/core/macro";
@@ -95,6 +68,9 @@ import type { Location } from "../lib/location.ts";
 import { positionTokenToChar } from "../lib/stepWalk.ts";
 import type { StepWalkMap, StepWalkPositions } from "../lib/stepWalk.ts";
 import { resolveMessage } from "../lib/i18nResolve.ts";
+import type { WorkItem, WorkKind } from "../steps/workToDo.ts";
+import type { StepStatus } from "../steps/answerTypes.ts";
+import { notAskedPassedMessage } from "../survey/notAskedStatusMessage.ts";
 import { createLookupQuestionLabel } from "./lookupQuestionLabel.ts";
 
 /** `Location.step`'s value type, without importing `ActiveStepId` from
@@ -114,17 +90,6 @@ const PACKAGE_STEP_ID = "package";
 /**
  * Questions that never earn a dot of their own, whatever their source (author's
  * call, 2026-08-04 — "every question except Confirm your language code").
- *
- * `il_language_code` asks the author to CONFIRM a subtag the language-name
- * answer already determined (IdentityLite seeds it from the resolved langtags
- * entry); it is a checkpoint on another decision rather than a decision of its
- * own, so a dot for it would offer navigation to a stop with nothing to revise
- * independently. Excluded here — the ONE place a dot is created — rather than in
- * each publisher, so the walk and the decision record cannot disagree about it.
- *
- * NOT an exclusion list for `notice`/acknowledgement screens: those record no
- * answer and appear in no walk as `done`, so they are already absent by
- * construction (spec 057 Q1's resolution) and must not be re-litigated here.
  */
 const DOTLESS_QUESTION_IDS: ReadonlySet<string> = new Set([]);
 
@@ -134,9 +99,24 @@ const DOTLESS_QUESTION_IDS: ReadonlySet<string> = new Set([]);
 
 export type ProgressDotKind = "completed" | "current" | "upcoming";
 
-/** One mark in the footer's journey row (data-model.md "ProgressDot"). */
+/** Which grain a mark represents (journey-strip-contract.md §2). */
+export type MarkTier = "section" | "question";
+
+/** "Has a response" (journey-strip-contract.md §3) — independent of `kind`. */
+export type MarkFill = "full" | "partial" | "none";
+
+/** One mark in the footer's journey row (data-model.md "ProgressDot", extended
+ * by journey-strip-contract.md §3 for the two-tier strip). */
 export interface ProgressDot {
   readonly kind: ProgressDotKind;
+  /** §2: which grain this mark represents. */
+  readonly tier: MarkTier;
+  /** §3: independent "has a response" axis — drives the half-filled section glyph. */
+  readonly fill: MarkFill;
+  /** §3c: work waiting on this mark (or, for a collapsed section, somewhere inside it). */
+  readonly badge?: readonly WorkKind[];
+  /** FR-068: pre-resolved "passed — {reason}" text for a `not-asked` step's mark. */
+  readonly passedReason?: string;
   /** The question id for `completed`/`current` (when question-accurate); the
    * step id for `upcoming`, and for `current` when only stage-accurate. */
   readonly id: string;
@@ -160,40 +140,24 @@ export interface ProgressDotsInput {
    * architecture note above). Absent means the current position is known only
    * at step granularity. */
   readonly currentQuestion?: string;
-  /**
-   * Within-step stops per step id, from `stores/stepWalkStore.ts` (see
-   * lib/stepWalk.ts). A step present here renders one dot PER STOP instead of a
-   * single stage dot, and the decision-record dots for THOSE STOPS are suppressed
-   * — the walk is authoritative for the questions it names, so a revisited step
-   * does not get two dots for one question. Record entries for the same step that
-   * the walk does NOT name are kept (see buildCompletedDots's `walkIdsByStep`).
-   *
-   * Absent (or a step with no entry) behaves exactly as before this field
-   * existed: record-derived completed dots, one stage dot for the current
-   * position, one stage dot per upcoming stage.
-   */
+  /** Within-step stops per step id, from `stores/stepWalkStore.ts`. */
   readonly stepWalks?: StepWalkMap;
-  /** Where the author is inside each step, keyed by step id (same store). */
+  /** Where the author is inside each step, keyed by step id (same store) —
+   * ALSO the §5 jump target for an unbadged collapsed section. */
   readonly stepCursors?: Readonly<Record<string, string>>;
+  /** Which screen (one `Next`) each decision-record entry was recorded on
+   * (spec 079 `SurveyAnswerSnapshot.recordedScreenOf`, §4). An entry absent
+   * from this map falls back to one mark for the rest of its step. */
+  readonly recordedScreenOf?: Readonly<Record<string, string>>;
+  /** `selectWorkToDo()`'s live output (spec 079 R-10) — drives §3c badges. */
+  readonly workToDo?: Readonly<Record<string, WorkItem[]>>;
+  /** Each step's current `StepStatus` (spec 079 `surveyAnswerStore`) — drives
+   * FR-068's "passed — {reason}" statement for a `not-asked` step. */
+  readonly stepStatuses?: Readonly<Record<string, StepStatus>>;
 }
 
 // ---------------------------------------------------------------------------
-// Stage labels — a closed-ish map from manifest step id to localized prose.
-//
-// Modeled on decisions/stageText.ts's `Record<ClosedUnion, msg descriptor>` +
-// `resolveMessage` idiom (same directory, same purpose: one place a code
-// becomes author-facing text). Keyed by plain `string` rather than
-// `ActiveStepId` — narrowing to that closed union would need the same
-// stores/-import this module deliberately avoids (see the StepId note
-// above); the `stageLabel` fallback (the raw id) keeps an unmapped key
-// non-fatal rather than narrowing at compile time.
-//
-// Message ids are new (`footer.stage.*`) — not previously named in tasks.md's
-// T049 id list, but FR-048 ("ALL footer strings … go through the message
-// catalog") leaves no other place for a stage's own name to come from:
-// `steps/manifest.ts`'s `Step.title` is a bare English string, and this
-// module cannot edit that file (out of ownership) even if it wanted to
-// localize titles there instead.
+// Stage labels
 // ---------------------------------------------------------------------------
 
 const STAGE_LABEL_MESSAGE: Record<string, ReturnType<typeof msg>> = {
@@ -214,23 +178,17 @@ const STAGE_LABEL_MESSAGE: Record<string, ReturnType<typeof msg>> = {
 };
 
 /** A manifest step's localized name, falling back to the raw id (never
- * blank, never throws) for a step this map does not (yet) name. */
-function stageLabel(stepId: string, i18n?: I18n): string {
+ * blank, never throws) for a step this map does not (yet) name. Exported —
+ * `components/StepHost.tsx`'s FR-016 notice (T064) names affected steps
+ * through the SAME map, so the notice and the strip can never disagree about
+ * what a step is called. */
+export function stageLabel(stepId: string, i18n?: I18n): string {
   const descriptor = STAGE_LABEL_MESSAGE[stepId];
   return descriptor === undefined ? stepId : resolveMessage(i18n, descriptor);
 }
 
 // ---------------------------------------------------------------------------
-// Unreachable-reason prose — shared vocabulary with the trail's deep links
-// (tasks.md T040: "trail.jump.label" + one "trail.jump.unreachable.*" id per
-// UnreachableReason, "shared by the trail and the footer's upcoming dots").
-// T040 had not landed when this module was written (Phase 5/US3 is a
-// different agent's concurrent work); the ids below are chosen to MATCH that
-// convention on the expectation they converge, rather than invent a
-// second naming scheme decisions/DecisionEntryRow.tsx would have to
-// reconcile with later. If T040 lands with different ids, the two
-// independently-authored `msg()` calls simply add two catalog entries for
-// the same concept — not a build break.
+// Unreachable-reason prose — shared vocabulary with the trail's deep links.
 // ---------------------------------------------------------------------------
 
 const UNREACHABLE_REASON_MESSAGE: Record<UnreachableReason, ReturnType<typeof msg>> = {
@@ -257,71 +215,336 @@ const UNREACHABLE_REASON_MESSAGE: Record<UnreachableReason, ReturnType<typeof ms
 };
 
 /** Localized prose for an `UnreachableReason` — the ONE place a reason code
- * becomes author-facing text, shared (by naming convention, see above) with
- * the decision trail's deep links. */
+ * becomes author-facing text, shared with the decision trail's deep links. */
 export function unreachableReasonLabel(reason: UnreachableReason, i18n?: I18n): string {
   return resolveMessage(i18n, UNREACHABLE_REASON_MESSAGE[reason]);
 }
 
 // ---------------------------------------------------------------------------
-// Completed dots — from the decision record (FR-042 "Completed question").
+// Screen-grouped record marks (journey-strip-contract.md §4).
+//
+// One mark per SCREEN, not per recorded answer: entries sharing a
+// `recordedScreenOf` mapping collapse to one mark (Invisibles' one-Next-many-
+// answers case). An entry with NO mapping (a pre-`screenId` draft, or a
+// record predating this feature) falls into ONE shared "rest of the step"
+// bucket per step — never one mark per unmapped entry (§4's documented
+// degrade).
 // ---------------------------------------------------------------------------
 
-function buildCompletedDots(
-  record: DecisionRecord,
-  ctx: ResolveContext,
-  lookupQuestionLabel: (questionId: string) => string | undefined,
-  /**
-   * Per step, the stop ids its published walk already covers. Those entries are
-   * skipped here so a revisited step does not show two dots for one question —
-   * but only THOSE, not the step wholesale.
-   *
-   * Per-question and not per-step because a stage can be walked by more than one
-   * flow in sequence: the `characters` stage runs PhaseA's prefill confirmations
-   * and then PhaseB, and the second runner's walk replaces the first's in the
-   * store. Suppressing the whole step would have made PhaseA's dots VANISH once
-   * PhaseB published — dots disappearing as the author moves forward, which is
-   * the opposite of what the row is for. The union keeps them: the walk owns the
-   * questions it knows about (it has live `done` state for them, which the record
-   * cannot have until the step completes), and the record covers the rest.
-   */
-  walkIdsByStep: ReadonlyMap<string, ReadonlySet<string>>,
-): ProgressDot[] {
-  const dots: ProgressDot[] = [];
-  for (const entry of effectiveEntries(record.entries)) {
-    // `notice` nodes and pure-acknowledgement screens record NOTHING, so they
-    // are excluded here by construction — no exclusion list, exactly Q1's
-    // resolution. Editor-action / base-contribution entries likewise never
-    // produce a dot of their own (data-model.md's "Upcoming dots" note) —
-    // stages appear only via the upcoming projection below, never as a
-    // completed-stage class that does not exist in the taxonomy.
-    if (entry.payload.kind !== "survey-answer") continue;
-    // A pre-identity entry has no step to jump to (PRE_IDENTITY_STEP_ID is a
-    // placeholder, not a manifest id — pathOverlay.ts excludes it from the
-    // walked-path overlay for the identical reason).
-    if (entry.stepId === PRE_IDENTITY_STEP_ID) continue;
+interface ScreenMarkSource {
+  readonly screenId: string;
+  /** The first entry's own question id — used as the JUMP target (a real,
+   * registry-known question) even though the mark may represent several
+   * entries sharing one screen. */
+  readonly questionId: string;
+  readonly entryIds: readonly string[];
+}
 
-    const questionId = entry.payload.questionId;
-    if (DOTLESS_QUESTION_IDS.has(questionId)) continue;
-    if (walkIdsByStep.get(entry.stepId)?.has(questionId) === true) continue;
-    const location: Location = {
-      route: "survey",
-      step: entry.stepId as StepId,
-      question: questionId,
-    };
-    dots.push({
-      kind: "completed",
-      id: questionId,
-      location,
-      label: lookupQuestionLabel(questionId) ?? questionId,
-      resolution: resolveLocation(location, ctx),
-    });
+/** Group a step's completed record entries by screen (§4). Order: first
+ * appearance in record order, matching how the author actually answered. */
+function groupEntriesByScreen(
+  stepId: string,
+  entries: readonly { entryId: string; questionId: string }[],
+  recordedScreenOf: Readonly<Record<string, string>>,
+): ScreenMarkSource[] {
+  const byScreen = new Map<string, ScreenMarkSource>();
+  const order: string[] = [];
+  const FALLBACK_KEY = `__unmapped__:${stepId}`;
+  for (const entry of entries) {
+    const screenId = recordedScreenOf[entry.entryId] ?? FALLBACK_KEY;
+    const existing = byScreen.get(screenId);
+    if (existing === undefined) {
+      byScreen.set(screenId, { screenId, questionId: entry.questionId, entryIds: [entry.entryId] });
+      order.push(screenId);
+    } else {
+      byScreen.set(screenId, { ...existing, entryIds: [...existing.entryIds, entry.entryId] });
+    }
   }
-  return dots;
+  return order.map((id) => byScreen.get(id)!);
+}
+
+function screenMarkLabel(
+  source: ScreenMarkSource,
+  stepId: string,
+  lookupQuestionLabel: (questionId: string) => string | undefined,
+  i18n: I18n | undefined,
+): string {
+  // §4: the screen or stage's catalog label — NEVER the raw id. A synthetic
+  // multi-answer screen id resolves nothing in the flow-question registry, so
+  // this falls through to the first entry's own question label, and finally
+  // to the stage's name — closing the exact gap the old `?? questionId`
+  // fallback left open for a multi-answer screen.
+  return (
+    lookupQuestionLabel(source.screenId) ??
+    lookupQuestionLabel(source.questionId) ??
+    stageLabel(stepId, i18n)
+  );
 }
 
 // ---------------------------------------------------------------------------
-// The current dot — from TRAVERSAL state, never the record (FR-060, US6).
+// Within-step walk classification (unchanged from pre-079 — see header).
+// ---------------------------------------------------------------------------
+
+function isCharacterWalk(positions: StepWalkPositions): boolean {
+  return positions.length > 0 && positions.every((p) => positionTokenToChar(p.id) !== null);
+}
+
+/** Every kind of "screen-shaped" unit inside a step, before it becomes a mark. */
+interface StepScreen {
+  readonly id: string;
+  readonly location: Location;
+  readonly label: string;
+  readonly done: boolean;
+  readonly isCursor: boolean;
+}
+
+/**
+ * The step's screens — from its record entries (grouped by screen) and any
+ * published (non-character) walk stops — in the order the author reached
+ * them (record first, then the live walk, matching pre-079's ordering
+ * rationale for a stage walked by two flows in sequence).
+ */
+function stepScreens(
+  stepId: string,
+  entries: readonly { entryId: string; questionId: string }[],
+  recordedScreenOf: Readonly<Record<string, string>>,
+  walkPositions: StepWalkPositions | undefined,
+  cursorId: string | undefined,
+  lookupQuestionLabel: (questionId: string) => string | undefined,
+  i18n: I18n | undefined,
+): StepScreen[] {
+  // The walk is authoritative for the screens it names: drop record entries
+  // it covers, whether matched by question id or by the screen id they were
+  // recorded under (a marks station groups several question ids under its
+  // own screen id — matching only question ids double-rendered each station).
+  const walkIds = new Set((walkPositions ?? []).map((p) => p.id));
+  const groups = groupEntriesByScreen(
+    stepId,
+    entries.filter((e) => !walkIds.has(e.questionId) && !DOTLESS_QUESTION_IDS.has(e.questionId)),
+    recordedScreenOf,
+  ).filter((group) => !walkIds.has(group.screenId));
+  const screens: StepScreen[] = groups.map((source) => ({
+    id: source.screenId,
+    location: { route: "survey", step: stepId as StepId, question: source.questionId },
+    label: screenMarkLabel(source, stepId, lookupQuestionLabel, i18n),
+    done: true, // a record entry IS a settled answer.
+    isCursor: source.screenId === cursorId,
+  }));
+
+  const positions = (walkPositions ?? []).filter((p) => !DOTLESS_QUESTION_IDS.has(p.id));
+  for (const position of positions) {
+    screens.push({
+      id: position.id,
+      location: { route: "survey", step: stepId as StepId, question: position.id },
+      // A flow question deliberately publishes no label of its own — see
+      // StepWalkPosition.label for why the precedence lives here.
+      label: position.label ?? lookupQuestionLabel(position.id) ?? stageLabel(stepId, i18n),
+      done: position.done,
+      isCursor: position.id === cursorId,
+    });
+  }
+  return screens;
+}
+
+/**
+ * The single dot a character walk contributes (author's call, 2026-08-05;
+ * unchanged by this feature — §1 non-goal). A gallery is ONE stop in the
+ * journey; each gallery has its own in-page navigation to the character it
+ * needs.
+ */
+function collapsedWalkDot(
+  stepId: string,
+  positions: StepWalkPositions,
+  isActiveStep: boolean,
+  ctx: ResolveContext,
+  i18n: I18n | undefined,
+  workToDo: readonly WorkItem[] | undefined,
+): ProgressDot {
+  const location: Location = { route: "survey", step: stepId as StepId };
+  const allDone = positions.every((p) => p.done);
+  const kind: ProgressDotKind = isActiveStep ? "current" : allDone ? "completed" : "upcoming";
+  const badge = badgeKinds(workToDo);
+  return {
+    kind,
+    tier: "section",
+    fill: allDone ? "full" : positions.some((p) => p.done) ? "partial" : "none",
+    ...(badge !== undefined ? { badge } : {}),
+    id: stepId,
+    location,
+    label: stageLabel(stepId, i18n),
+    resolution: resolveLocation(location, ctx),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// The active step's expansion — one question mark per screen (§2).
+// ---------------------------------------------------------------------------
+
+function buildActiveStepMarks(
+  stepId: string,
+  screens: readonly StepScreen[],
+  ctx: ResolveContext,
+  workToDo: readonly WorkItem[] | undefined,
+): { marks: ProgressDot[]; markedCurrent: boolean } {
+  let markedCurrent = false;
+  const marks = screens.map((screen) => {
+    const kind: ProgressDotKind = screen.isCursor ? "current" : screen.done ? "completed" : "upcoming";
+    if (kind === "current") markedCurrent = true;
+    const badge = badgeForScreen(screen.id, workToDo);
+    return {
+      kind,
+      tier: "question" as const,
+      fill: screen.done ? ("full" as const) : ("none" as const),
+      ...(badge !== undefined ? { badge } : {}),
+      id: screen.id,
+      location: screen.location,
+      label: screen.label,
+      resolution: resolveLocation(screen.location, ctx),
+    };
+  });
+  return { marks, markedCurrent };
+}
+
+function badgeForScreen(
+  screenId: string,
+  workToDo: readonly WorkItem[] | undefined,
+): readonly WorkKind[] | undefined {
+  if (workToDo === undefined) return undefined;
+  return badgeKinds(workToDo.filter((item) => item.kind === "reproposed" && item.screenId === screenId));
+}
+
+/** A mark's badge: each work KIND once (§3c — the accessible name carries one
+ * suffix per kind, not one per item), `undefined` when there is no work. */
+function badgeKinds(items: readonly WorkItem[] | undefined): readonly WorkKind[] | undefined {
+  if (items === undefined || items.length === 0) return undefined;
+  return [...new Set(items.map((item) => item.kind))];
+}
+
+// ---------------------------------------------------------------------------
+// A non-active step's ONE section mark (§2, §3b, §4).
+// ---------------------------------------------------------------------------
+
+function aggregateFill(screens: readonly StepScreen[]): MarkFill {
+  if (screens.length === 0) return "none";
+  const doneCount = screens.filter((s) => s.done).length;
+  if (doneCount === screens.length) return "full";
+  if (doneCount === 0) return "none";
+  return "partial";
+}
+
+/** Earliest (record/walk order) screen with work to do, for the §5 badged-
+ * collapsed-section jump exception. `undefined` when no item names a screen
+ * (e.g. an "unassigned" mechanisms/touch count) — the bare step remains the
+ * target, which is already "the gallery" for those two steps. */
+function earliestWorkScreenId(items: readonly WorkItem[]): string | undefined {
+  for (const item of items) {
+    if (item.kind === "reproposed") return item.screenId;
+  }
+  return undefined;
+}
+
+function buildSectionMark(
+  stepId: string,
+  screens: readonly StepScreen[],
+  index: number,
+  currentIndex: number,
+  ctx: ResolveContext,
+  i18n: I18n | undefined,
+  stepCursor: string | undefined,
+  workToDo: readonly WorkItem[] | undefined,
+  stepStatus: StepStatus | undefined,
+): ProgressDot | null {
+  const badge = badgeKinds(workToDo);
+  const passedReason =
+    stepStatus?.kind === "not-asked" ? notAskedPassedMessage(stepStatus.reason, i18n) : undefined;
+
+  if (screens.length > 0) {
+    const fill = aggregateFill(screens);
+    const location = sectionJumpLocation(stepId, badge, workToDo, stepCursor);
+    return {
+      kind: fill === "none" ? "upcoming" : "completed",
+      tier: "section",
+      fill,
+      ...(badge !== undefined ? { badge } : {}),
+      ...(passedReason !== undefined ? { passedReason } : {}),
+      id: stepId,
+      location,
+      label: stageLabel(stepId, i18n),
+      resolution: resolveLocation(location, ctx),
+    };
+  }
+
+  // No screens at all for this step: a `not-asked` step (FR-068), a pure
+  // editor-action stage (choose_base, track, carve — no survey answers of
+  // its own), or a step genuinely still ahead. One resolveLocation call on
+  // the bare step tells us which: `reachable` (already visited — behind or
+  // at the current position with nothing recorded), `beyond-gate` (ahead,
+  // not yet reached), or `skipped-by-track`/other (this author's path never
+  // includes it — FR-049a: absent, not a greyed placeholder).
+  const bareLocation: Location = { route: "survey", step: stepId as StepId };
+  const bareResolution = resolveLocation(bareLocation, ctx);
+
+  if (bareResolution.kind === "reachable") {
+    const location = sectionJumpLocation(stepId, badge, workToDo, stepCursor);
+    return {
+      kind: "completed",
+      tier: "section",
+      fill: "full",
+      ...(badge !== undefined ? { badge } : {}),
+      ...(passedReason !== undefined ? { passedReason } : {}),
+      id: stepId,
+      location,
+      label: stageLabel(stepId, i18n),
+      resolution: resolveLocation(location, ctx),
+    };
+  }
+
+  if (bareResolution.kind === "degraded" && bareResolution.reason === "beyond-gate") {
+    if (index <= currentIndex) {
+      // Defensive: a "beyond-gate" bare step behind/at the current index
+      // should not occur, but never claim "ahead" for a step that is not.
+      return null;
+    }
+    if (stepId === PACKAGE_STEP_ID) return null;
+    return {
+      kind: "upcoming",
+      tier: "section",
+      fill: "none",
+      ...(badge !== undefined ? { badge } : {}),
+      ...(passedReason !== undefined ? { passedReason } : {}),
+      id: stepId,
+      location: bareLocation,
+      label: stageLabel(stepId, i18n),
+      resolution: bareResolution,
+    };
+  }
+
+  // skipped-by-track / question-not-in-build / no-project: this author's
+  // path never includes this step. Absent, per FR-049a.
+  return null;
+}
+
+function sectionJumpLocation(
+  stepId: string,
+  badge: readonly WorkKind[] | undefined,
+  workToDo: readonly WorkItem[] | undefined,
+  stepCursor: string | undefined,
+): Location {
+  if (badge !== undefined && badge.length > 0 && workToDo !== undefined) {
+    const earliest = earliestWorkScreenId(workToDo);
+    if (earliest !== undefined) {
+      return { route: "survey", step: stepId as StepId, question: earliest };
+    }
+    return { route: "survey", step: stepId as StepId };
+  }
+  return stepCursor !== undefined
+    ? { route: "survey", step: stepId as StepId, question: stepCursor }
+    : { route: "survey", step: stepId as StepId };
+}
+
+// ---------------------------------------------------------------------------
+// The current dot when the active step publishes no screens at all — the
+// pre-079 stage-granular fallback (US6), unchanged.
 // ---------------------------------------------------------------------------
 
 function buildCurrentDot(
@@ -331,8 +554,6 @@ function buildCurrentDot(
   i18n: I18n | undefined,
 ): ProgressDot | null {
   const stepId = ctx.traversal.activeStepId;
-  // "done" / "unsupported" are terminal states, not manifest steps — once the
-  // walk is over there is no "current stage" left to mark.
   if (stepId === "done" || stepId === "unsupported") return null;
 
   const location: Location =
@@ -346,222 +567,17 @@ function buildCurrentDot(
 
   return {
     kind: "current",
+    tier: currentQuestion !== undefined ? "question" : "section",
+    fill: "none",
     id: currentQuestion ?? stepId,
     location,
     label,
-    // Always "reachable" by construction: the author IS at `activeStepId`
-    // right now (isReached's first disjunct), and a currentQuestion only
-    // ever arrives here via a jump `resolveLocation` already approved.
     resolution: resolveLocation(location, ctx),
   };
 }
 
 // ---------------------------------------------------------------------------
-// Upcoming stage dot — one per STAGE still ahead on this author's path (FR-042
-// "Upcoming stage", FR-049).
-// ---------------------------------------------------------------------------
-
-/**
- * The upcoming dot for `step`, or `null` when this stage is not "ahead on this
- * author's path". `stepIndex`/`currentIndex` are manifest positions; a terminal
- * `activeStepId` arrives as `currentIndex === -1`, for which nothing is ahead.
- */
-function aheadStageDot(
-  step: { readonly id: string },
-  stepIndex: number,
-  currentIndex: number,
-  ctx: ResolveContext,
-  i18n: I18n | undefined,
-): ProgressDot | null {
-  // A terminal `activeStepId` ("done"/"unsupported") is not in the manifest at
-  // all — findIndex returns -1, which would make EVERY step "after" position
-  // -1 under a naive `stepIndex > currentIndex` test. Guard explicitly: once
-  // the walk is over, nothing is still "ahead".
-  if (currentIndex === -1) return null;
-  if (stepIndex <= currentIndex) return null;
-  // Reserved / out of scope for v1 — never promise a stage the walk will not
-  // visit (see PACKAGE_STEP_ID).
-  if (step.id === PACKAGE_STEP_ID) return null;
-
-  const location: Location = { route: "survey", step: step.id as StepId };
-  const resolution = resolveLocation(location, ctx);
-
-  // A stage AHEAD of the current position that the author has nonetheless
-  // already been to — they jumped back behind it. It resolves `reachable`
-  // (surveySessionStore's `visited` high-water mark, not the truncated
-  // back-stack), so it is jumpable, and it is rendered `completed` because
-  // that is what it is: finished work sitting ahead of where they are
-  // standing. FR-063's "dots ahead of the landing point are still present"
-  // is satisfied by KEEPING this dot rather than, as before, by the stage
-  // falling back to `beyond-gate` and reappearing as `upcoming` — which
-  // presented the author's own finished stages as unvisited and, worse,
-  // refused every click on them.
-  if (resolution.kind === "reachable") {
-    return {
-      kind: "completed",
-      id: step.id,
-      location,
-      label: stageLabel(step.id, i18n),
-      resolution,
-    };
-  }
-
-  // Every OTHER outcome for a step-bearing location is `kind:"degraded"`
-  // (see the module header's load-bearing-reading note — `resolveLocation`
-  // never returns bare `kind:"unreachable"` when `loc.step` is set).
-  // `skipped-by-track` means this stage is not on this author's path AT
-  // ALL (FR-049a: absent, never a greyed-out placeholder) — this is also
-  // what makes the row GROW: `walkedByTrack` reads `traversal.selectedTrack`
-  // live, so `project_name` flips from excluded to included the instant the
-  // track question resolves to "copy", with no extra code here (FR-049c).
-  // It is likewise what makes the row SHRINK AT THE TAIL: once the current
-  // position's manifest index passes an off-spine fork that was never
-  // walked (e.g. `touch_seed_source` bypassed straight to `touch`), that
-  // fork's index is no longer `> currentIndex` and this branch is never
-  // reached for it again (FR-049d).
-  if (resolution.kind !== "degraded" || resolution.reason !== "beyond-gate") return null;
-
-  return {
-    kind: "upcoming",
-    id: step.id,
-    location,
-    label: stageLabel(step.id, i18n),
-    resolution,
-  };
-}
-
-// ---------------------------------------------------------------------------
-// Within-step dots — one per STOP in a published walk (see lib/stepWalk.ts).
-//
-// Kinds inside a step, and why they are these three and not a fourth class:
-//   current   — the walk's own cursor, on the ACTIVE step only. A cursor stored
-//               for a step the author is not in describes where they WOULD land,
-//               not where they are; marking it "current" would put two "you are
-//               here" markers in one row.
-//   completed — a settled stop (answered / assigned), from `position.done`.
-//               The decision record cannot answer this inside an unfinished
-//               step: answers are recorded at step completion (spec 053's
-//               capture boundary, deliberately untouched), which is precisely
-//               why the walk carries `done` itself.
-//   upcoming  — an unsettled stop. NOTE its resolution is `reachable`, unlike an
-//               upcoming STAGE's `beyond-gate`: the step is already reached, so
-//               its stops are all addressable and activating one jumps. "Not yet
-//               answered" and "not yet reached" render identically (FR-046's
-//               hollow square) because to the author they mean the same thing —
-//               there is nothing there yet.
-// ---------------------------------------------------------------------------
-
-/**
- * Whether this walk is a CHARACTER walk (a gallery's inventory) rather than a
- * flow's questions.
- *
- * `positionTokenToChar` is the existing "cheap recognition" of a character
- * stop — lib/stepWalk.ts documents that a flow question id and a character
- * token deliberately share the same slot and that this codec is how they are
- * told apart. Classifying here rather than keeping a list of gallery step ids
- * means a new gallery gets the right treatment on the day it publishes a walk,
- * with nothing to remember to add.
- *
- * Requires EVERY stop to decode: a mixed walk is not a shape any publisher
- * emits today, and collapsing one would silently swallow real questions.
- */
-function isCharacterWalk(positions: StepWalkPositions): boolean {
-  return positions.length > 0 && positions.every((p) => positionTokenToChar(p.id) !== null);
-}
-
-/**
- * The single dot a character walk contributes (author's call, 2026-08-05).
- *
- * A gallery is ONE stop in the journey, not one per letter. The row's job is
- * "where am I in the whole build", and a thirty-character inventory rendering
- * as thirty dots drowns the eight or nine stages around it. The per-letter
- * addressing this replaces is not lost to the author — each gallery has its own
- * in-page navigation to the character it needs, which is the affordance the
- * dots were duplicating.
- *
- * `location` names the STEP with no `question`, so activating it lands on the
- * gallery and lets that in-page navigation take over. Kind mirrors the walk:
- * the author is either standing in it, finished with every character, or
- * has not settled it yet.
- */
-function collapsedWalkDot(
-  stepId: string,
-  positions: StepWalkPositions,
-  isActiveStep: boolean,
-  ctx: ResolveContext,
-  i18n: I18n | undefined,
-): ProgressDot {
-  const location: Location = { route: "survey", step: stepId as StepId };
-  const kind: ProgressDotKind = isActiveStep
-    ? "current"
-    : positions.every((p) => p.done)
-      ? "completed"
-      : "upcoming";
-  return {
-    kind,
-    id: stepId,
-    location,
-    label: stageLabel(stepId, i18n),
-    resolution: resolveLocation(location, ctx),
-  };
-}
-
-function buildWalkDots(
-  stepId: string,
-  positions: StepWalkPositions,
-  cursorId: string | undefined,
-  isActiveStep: boolean,
-  ctx: ResolveContext,
-  lookupQuestionLabel: (questionId: string) => string | undefined,
-  i18n: I18n | undefined,
-): ProgressDot[] {
-  if (isCharacterWalk(positions)) {
-    return [collapsedWalkDot(stepId, positions, isActiveStep, ctx, i18n)];
-  }
-  const shown = positions.filter((position) => !DOTLESS_QUESTION_IDS.has(position.id));
-  return shown.map((position) => {
-    const location: Location = {
-      route: "survey",
-      step: stepId as StepId,
-      question: position.id,
-    };
-    const kind: ProgressDotKind =
-      isActiveStep && position.id === cursorId
-        ? "current"
-        : position.done
-          ? "completed"
-          : "upcoming";
-    return {
-      kind,
-      id: position.id,
-      location,
-      // A flow question deliberately publishes no label — see
-      // StepWalkPosition.label for why this precedence lives here.
-      label: position.label ?? lookupQuestionLabel(position.id) ?? position.id,
-      resolution: resolveLocation(location, ctx),
-    };
-  });
-}
-
-// ---------------------------------------------------------------------------
-// Assemble the whole row, in journey order (FR-042).
-//
-// ONE PASS OVER THE MANIFEST, which is what makes "journey order" true rather
-// than approximately true. The pre-walk implementation concatenated three
-// independently-ordered lists (record order, then the current dot, then
-// manifest-ordered look-ahead); that read correctly only because a stage
-// contributed at most one dot and the record happened to be appended in walked
-// order. With a stage now able to contribute a dozen dots, and with FR-063
-// keeping record dots for stages the author has since jumped back BEHIND, the
-// three lists would interleave wrongly — e.g. `help`'s recorded answers ahead
-// of `mechanisms`' character stops. Iterating the manifest and asking each step
-// what it contributes makes the order structural.
-//
-// Record entries whose `stepId` is not in this build's manifest cannot be placed
-// in that order at all. They are appended at the tail rather than dropped: a
-// renamed step in a restored draft must still surface FR-013's stated reason on
-// activation ("This step is not part of this build."), and a broken reference's
-// exact position in the row is not load-bearing.
+// Assemble the whole row, in journey order (FR-042, §2/§4).
 // ---------------------------------------------------------------------------
 
 export function buildProgressDots(input: ProgressDotsInput): readonly ProgressDot[] {
@@ -571,26 +587,25 @@ export function buildProgressDots(input: ProgressDotsInput): readonly ProgressDo
   const { ctx, i18n } = input;
   const walks = input.stepWalks ?? {};
   const cursors = input.stepCursors ?? {};
+  const recordedScreenOf = input.recordedScreenOf ?? {};
+  const workToDo = input.workToDo ?? {};
+  const stepStatuses = input.stepStatuses ?? {};
   const activeStepId = ctx.traversal.activeStepId;
 
-  // Which stops each step's walk already covers — see buildCompletedDots's
-  // `walkIdsByStep` for why this is per question, not per step.
-  const walkIdsByStep = new Map<string, ReadonlySet<string>>();
-  for (const [stepId, positions] of Object.entries(walks)) {
-    if (positions !== undefined && positions.length > 0) {
-      walkIdsByStep.set(stepId, new Set(positions.map((p) => p.id)));
-    }
-  }
-
-  // Record dots first, grouped by step but keeping RECORD order within a step —
-  // that is the order the author answered them in, which no other source knows.
-  const recordDots = buildCompletedDots(input.record, ctx, lookupQuestionLabel, walkIdsByStep);
-  const byStep = new Map<string, ProgressDot[]>();
-  for (const dot of recordDots) {
-    const stepId = dot.location.step ?? "";
-    const bucket = byStep.get(stepId);
-    if (bucket === undefined) byStep.set(stepId, [dot]);
-    else bucket.push(dot);
+  // Record entries per step, in record order (effectiveEntries collapses
+  // supersession chains — Q1's resolution, unchanged).
+  const entriesByStep = new Map<string, { entryId: string; questionId: string }[]>();
+  const orphanSteps = new Set<string>();
+  const manifestIds = new Set(ctx.manifest.map((s) => s.id));
+  for (const entry of effectiveEntries(input.record.entries)) {
+    if (entry.payload.kind !== "survey-answer") continue;
+    if (entry.stepId === PRE_IDENTITY_STEP_ID) continue;
+    const questionId = entry.payload.questionId;
+    if (DOTLESS_QUESTION_IDS.has(questionId)) continue;
+    const bucket = entriesByStep.get(entry.stepId);
+    if (bucket === undefined) entriesByStep.set(entry.stepId, [{ entryId: entry.entryId, questionId }]);
+    else bucket.push({ entryId: entry.entryId, questionId });
+    if (!manifestIds.has(entry.stepId)) orphanSteps.add(entry.stepId);
   }
 
   const currentIndex = ctx.manifest.findIndex((s) => s.id === activeStepId);
@@ -600,61 +615,100 @@ export function buildProgressDots(input: ProgressDotsInput): readonly ProgressDo
     const step = ctx.manifest[i];
     if (step === undefined) continue;
     const isActiveStep = step.id === activeStepId;
-
-    // FR-063: a step's record dots are emitted whether or not it is still
-    // "reached" — jumping back truncates `history`, not progress. They come
-    // BEFORE this step's walk dots: when a stage is walked by two flows in
-    // sequence (PhaseA then PhaseB inside `characters`), the record holds the
-    // earlier flow's questions and the walk holds the later one's, so record-then-
-    // walk is the order the author actually answered them in.
-    const stepRecordDots = byStep.get(step.id) ?? [];
-    row.push(...stepRecordDots);
-    byStep.delete(step.id);
-
+    const entries = entriesByStep.get(step.id) ?? [];
     const positions = walks[step.id];
-    let markedCurrent = false;
-    let walkDotCount = 0;
-    if (positions !== undefined && positions.length > 0) {
-      const walkDots = buildWalkDots(
-        step.id,
-        positions,
-        cursors[step.id],
-        isActiveStep,
-        ctx,
-        lookupQuestionLabel,
-        i18n,
-      );
-      row.push(...walkDots);
-      walkDotCount = walkDots.length;
-      markedCurrent = walkDots.some((d) => d.kind === "current");
+    const stepWorkToDo = workToDo[step.id];
+
+    if (positions !== undefined && positions.length > 0 && isCharacterWalk(positions)) {
+      row.push(collapsedWalkDot(step.id, positions, isActiveStep, ctx, i18n, stepWorkToDo));
+      continue;
     }
 
-    // The stage-granular current dot, for an active step whose walk published
-    // nothing (or published no cursor) — the pre-walk behaviour, unchanged.
-    if (isActiveStep && !markedCurrent) {
-      const currentDot = buildCurrentDot(ctx, input.currentQuestion, lookupQuestionLabel, i18n);
-      if (currentDot !== null) row.push(currentDot);
+    const screens = stepScreens(
+      step.id,
+      entries,
+      recordedScreenOf,
+      positions,
+      cursors[step.id],
+      lookupQuestionLabel,
+      i18n,
+    );
+
+    if (isActiveStep) {
+      if (screens.length === 0) {
+        const currentDot = buildCurrentDot(ctx, input.currentQuestion, lookupQuestionLabel, i18n);
+        if (currentDot !== null) row.push(currentDot);
+        continue;
+      }
+      const { marks, markedCurrent } = buildActiveStepMarks(step.id, screens, ctx, stepWorkToDo);
+      if (!markedCurrent && cursors[step.id] !== undefined) {
+        // A cursor was recorded, but it names something none of this step's
+        // screens matched (pre-079's "falls back to the stage dot when the
+        // walk names no reachable cursor" case) — fall back to the
+        // stage-granular dot rather than guessing which screen is current.
+        row.push(...marks);
+        const currentDot = buildCurrentDot(ctx, input.currentQuestion, lookupQuestionLabel, i18n);
+        if (currentDot !== null) row.push(currentDot);
+      } else if (!markedCurrent) {
+        // No cursor was ever recorded for this step at all (a fully
+        // record-derived active step — no walk publishes a cursor concept for
+        // completed screens). Rather than adding a SECOND, stage-granular
+        // "current" mark alongside the screen marks (the double-dot this
+        // replaces), the LAST screen the author reached stands in as the
+        // current position — exactly one "you are here" ring for the row,
+        // on the screen most likely to be where the author actually is.
+        const lastIndex = marks.length - 1;
+        row.push(
+          ...marks.map((mark, idx) =>
+            idx === lastIndex ? { ...mark, kind: "current" as const } : mark,
+          ),
+        );
+      } else {
+        row.push(...marks);
+      }
+      continue;
     }
 
-    // The stage dot is the FALLBACK granularity, so it is emitted only when
-    // this step contributed nothing finer. Without that guard, a stage the
-    // author has answered and then jumped behind carries both its recorded
-    // question dots AND a stage dot — the "mix of empty and complete dots for
-    // the same stage" the row was reported showing.
-    if (!isActiveStep && stepRecordDots.length === 0 && walkDotCount === 0) {
-      const ahead = aheadStageDot(step, i, currentIndex, ctx, i18n);
-      if (ahead !== null) row.push(ahead);
-    }
+    const mark = buildSectionMark(
+      step.id,
+      screens,
+      i,
+      currentIndex,
+      ctx,
+      i18n,
+      cursors[step.id],
+      stepWorkToDo,
+      stepStatuses[step.id],
+    );
+    if (mark !== null) row.push(mark);
   }
 
-  // Steps not in this build's manifest (see the header note above).
-  for (const leftover of byStep.values()) row.push(...leftover);
+  // Steps not in this build's manifest (FR-013: a renamed step in a restored
+  // draft must still surface a reason on activation) — one section mark per
+  // orphan step, at the tail, position not load-bearing.
+  for (const stepId of orphanSteps) {
+    const entries = entriesByStep.get(stepId) ?? [];
+    const firstQuestionId = entries[0]?.questionId;
+    const location: Location = {
+      route: "survey",
+      step: stepId as StepId,
+      ...(firstQuestionId !== undefined ? { question: firstQuestionId } : {}),
+    };
+    row.push({
+      kind: "completed",
+      tier: "section",
+      fill: "full",
+      id: stepId,
+      location,
+      label: stageLabel(stepId, i18n),
+      resolution: resolveLocation(location, ctx),
+    });
+  }
 
   return row;
 }
 
 // Re-export so StudioFooter.tsx and its tests need only this module for the
-// resolver vocabulary they consume (ProgressDot carries a LocationResolution;
-// callers checking `resolution.reason` want the same type without a second
-// import from lib/resolveLocation.ts).
+// resolver vocabulary they consume.
 export type { LocationResolution, ResolveContext, UnreachableReason };
+export type { WorkKind } from "../steps/workToDo.ts";

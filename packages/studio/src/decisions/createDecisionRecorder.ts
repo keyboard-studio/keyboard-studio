@@ -34,6 +34,7 @@ import type {
   KeyboardIR,
   MechanismAssignment,
   RemovalCapability,
+  SurveyAnswer,
   SurveyPhaseResult,
 } from "@keyboard-studio/contracts";
 import { useDecisionLogStore } from "./decisionLogStore.ts";
@@ -90,6 +91,49 @@ export interface DecisionRecorderDeps {
   getRemovalCapabilities: () => Map<string, RemovalCapability>;
   /** Optional per-question proposal register — see recordSurveyAnswers.ts. */
   resolveProposal?: ProposalLookup;
+  /**
+   * spec 079 R-04: told which screen each newly appended survey entry was
+   * recorded on, with the hash of that screen's answers. The studio wires this
+   * to the answer store (`markScreenRecorded` + `setRecordedScreen`) — a
+   * callback because decisions/ may not import stores/.
+   */
+  onScreenRecorded?: (
+    stepId: string,
+    screenId: string,
+    entryIds: readonly string[],
+    hash: string,
+  ) => void;
+  /** The hash recorded at `screenId`'s last Next, for the FR-040 no-op check. */
+  getLastRecordedHash?: (stepId: string, screenId: string) => string | undefined;
+  /**
+   * The screen a step's COMPLETION records on: the step's last position
+   * (its final screen), or the step itself for a single-screen step.
+   */
+  resolveCompletionScreen?: (stepId: string) => string;
+}
+
+/** Records one screen's answers at its Next (spec 079 R-04). */
+export type RecordQuestionAnswers = (
+  stepId: string,
+  screenId: string,
+  answers: readonly SurveyAnswer[],
+) => void;
+
+/**
+ * The recorder: callable as the reducer's `recordDecision` (step completion),
+ * plus `recordQuestionAnswers` for every earlier Next inside a step.
+ */
+export interface DecisionRecorder {
+  (event: { stepId: string; result: unknown }): void;
+  recordQuestionAnswers: RecordQuestionAnswers;
+}
+
+/**
+ * Stable fingerprint of a screen's answers. Order-sensitive on purpose: the
+ * same screen always emits its answers in the same order.
+ */
+export function answersHash(answers: readonly SurveyAnswer[]): string {
+  return JSON.stringify(answers.map((a) => [a.questionId, a.answerType, a.value]));
 }
 
 /** Same shape guard the host uses on its generic completion path. */
@@ -102,17 +146,62 @@ function isSurveyPhaseResult(r: unknown): r is SurveyPhaseResult {
 }
 
 /**
- * Build the `recordDecision` callback.
+ * Build the recorder.
  *
  * Synchronous and non-throwing: it runs inside a step transition, so it must
  * never delay one and must never break one. The source capture it kicks off is
  * fire-and-forget — the entry is already recorded by the time the diff resolves,
  * and the diff is attached afterwards (see `attachImpact`'s write-once contract).
+ *
+ * EVERY NEXT IS A BOUNDARY (spec 079 R-04). `recordQuestionAnswers` and step
+ * completion share `captureAndAttach`, so each recording pairs its appends with
+ * exactly one capture. An intermediate screen changes no keyboard source, so its
+ * entries get `{ state: "none" }`; the keyboard effect lands at completion, and
+ * its diff attaches to the entries recorded there — the final screen's.
  */
-export function createDecisionRecorder(
-  deps: DecisionRecorderDeps,
-): (event: { stepId: string; result: unknown }) => void {
-  return ({ stepId, result }) => {
+export function createDecisionRecorder(deps: DecisionRecorderDeps): DecisionRecorder {
+  /**
+   * Advance the source baseline and attach the net diff to `recordedIds`.
+   *
+   * One capture, attached to every entry this boundary recorded. Only a
+   * "captured" impact carries `sharedWith` (the contract's other two states
+   * have no per-file data to share); it is added only when there is more than
+   * one co-decision, and always excludes the entry's own id.
+   */
+  function captureAndAttach(recordedIds: readonly string[]): void {
+    void deps.snapshotter
+      .captureAtBoundary()
+      .then((impact) => {
+        if (impact === null || recordedIds.length === 0) return;
+        const store = useDecisionLogStore.getState();
+        for (const entryId of recordedIds) {
+          const forEntry: DecisionImpact =
+            impact.state === "captured" && recordedIds.length > 1
+              ? { ...impact, sharedWith: recordedIds.filter((id) => id !== entryId) }
+              : impact;
+          store.attachImpact(entryId, forEntry);
+        }
+      })
+      .catch(() => {
+        // Capture is best-effort by design: the decision is already recorded, and
+        // an entry with no captured change is a state the trail renders. Swallowed
+        // rather than surfaced because there is nothing the author could do.
+      });
+  }
+
+  function appendAnswers(
+    stepId: string,
+    answers: readonly SurveyAnswer[],
+    resolveProposal: ProposalLookup | undefined = deps.resolveProposal,
+  ): string[] {
+    const log = useDecisionLogStore.getState();
+    return recordSurveyAnswers(stepId, { answers: [...answers] }, {
+      append: log.append,
+      ...(resolveProposal !== undefined ? { resolveProposal } : {}),
+    });
+  }
+
+  const recordDecision = (({ stepId, result }: { stepId: string; result: unknown }) => {
     const log = useDecisionLogStore.getState();
 
     // FR-004: carry the identity onto the record as soon as there is one. Entries
@@ -142,17 +231,19 @@ export function createDecisionRecorder(
       });
     }
 
+    // Answers already recorded at an earlier Next are identical revisits here
+    // and append nothing, so completion is idempotent (spec 079 R-04).
     // spec 078: a context-tolerance decision carries its own proposal (what
     // the tool offered), so it resolves against this result, not a store.
-    const resolveProposal = isSurveyPhaseResult(result)
-      ? withContextToleranceProposal(result, deps.resolveProposal)
-      : deps.resolveProposal;
-    const answerIds = isSurveyPhaseResult(result)
-      ? recordSurveyAnswers(stepId, result, {
-          append: log.append,
-          ...(resolveProposal !== undefined ? { resolveProposal } : {}),
-        })
-      : [];
+    const answers = isSurveyPhaseResult(result) ? result.answers : [];
+    const answerIds =
+      answers.length > 0
+        ? appendAnswers(stepId, answers, isSurveyPhaseResult(result) ? withContextToleranceProposal(result, deps.resolveProposal) : undefined)
+        : [];
+    if (answerIds.length > 0) {
+      const screenId = deps.resolveCompletionScreen?.(stepId) ?? stepId;
+      deps.onScreenRecorded?.(stepId, screenId, answerIds, answersHash(answers));
+    }
 
     const editorId = recordEditorStep(stepId, result, {
       append: log.append,
@@ -168,32 +259,22 @@ export function createDecisionRecorder(
     // editor step's single aggregated entry (never both: a step is one or the
     // other). This is the boundary's full co-decision set, collected BEFORE the
     // capture resolves so `sharedWith` can name every sibling once it lands.
-    const recordedIds: string[] = editorId !== null ? [editorId] : answerIds;
-
+    //
     // Advance the source baseline on EVERY completion, whether or not anything
     // was recorded. Skipping non-recording steps would make the next diff span
     // two boundaries and attribute another step's change to this one.
-    void deps.snapshotter
-      .captureAtBoundary()
-      .then((impact) => {
-        if (impact === null || recordedIds.length === 0) return;
-        const store = useDecisionLogStore.getState();
-        // One capture, attached to every entry this boundary recorded. Only a
-        // "captured" impact carries `sharedWith` (the contract's other two
-        // states have no per-file data to share); it is added only when there
-        // is more than one co-decision, and always excludes the entry's own id.
-        for (const entryId of recordedIds) {
-          const forEntry: DecisionImpact =
-            impact.state === "captured" && recordedIds.length > 1
-              ? { ...impact, sharedWith: recordedIds.filter((id) => id !== entryId) }
-              : impact;
-          store.attachImpact(entryId, forEntry);
-        }
-      })
-      .catch(() => {
-        // Capture is best-effort by design: the decision is already recorded, and
-        // an entry with no captured change is a state the trail renders. Swallowed
-        // rather than surfaced because there is nothing the author could do.
-      });
+    captureAndAttach(editorId !== null ? [editorId] : answerIds);
+  }) as DecisionRecorder;
+
+  recordDecision.recordQuestionAnswers = (stepId, screenId, answers) => {
+    const hash = answersHash(answers);
+    // FR-040: a Next with no change records nothing and is no boundary.
+    if (deps.getLastRecordedHash?.(stepId, screenId) === hash) return;
+    useDecisionLogStore.getState().setKeyboardId(deps.getKeyboardId());
+    const ids = appendAnswers(stepId, answers);
+    deps.onScreenRecorded?.(stepId, screenId, ids, hash);
+    captureAndAttach(ids);
   };
+
+  return recordDecision;
 }

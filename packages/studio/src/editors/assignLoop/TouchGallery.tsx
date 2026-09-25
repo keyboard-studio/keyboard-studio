@@ -3966,7 +3966,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   //
   // Defense-in-depth no-op guard (mechanism-gallery-progression; reconciled
   // with T120 below): no modal, ever — see the "no modal, ever" describe
-  // block in TouchGallery.test.tsx and MechanismGallery's matching
+  // block in TouchGallery.completion.test.tsx and MechanismGallery's matching
   // "Done-blocked inline hint (no modal)" suite. The by-character pane's
   // forward button (`touchForwardButton` below) AND the key-mode pane's
   // Continue button (`touch-key-mode-continue`) are BOTH disabled proactively

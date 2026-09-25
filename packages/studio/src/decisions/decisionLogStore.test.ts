@@ -44,7 +44,6 @@ function carve(keysRemoved: number, sample: string[] = []): DecisionPayload {
 }
 
 beforeEach(() => {
-  useDecisionLogStore.getState().reset();
   resetDecisionEntryIds();
 });
 

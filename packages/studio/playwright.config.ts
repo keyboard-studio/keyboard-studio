@@ -16,10 +16,18 @@
 //   copy-edit to start), and manually/locally for the rest.
 //
 // Browser binaries: run `npx playwright install` once before running E2E.
-// E2E specs live under packages/studio/e2e/. Live/skipped status per spec is
-// tracked in docs/tooling.md "Spec status"; see each spec header for details.
+// E2E specs live under packages/studio/e2e/. Which specs are live and which are
+// skipped is listed in docs/tooling.md ("Spec status"); each skipped spec carries
+// its un-skip recipe in its header.
+//
+// If PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH points at an existing chromium
+// binary, that one is launched instead of the version the local `playwright`
+// package expects — the CD lane ships chromium at a stable path that may lag
+// the pinned download. Absent the env var, behaviour is unchanged.
 
 import { defineConfig } from "playwright/test";
+
+const chromiumExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
 
 export default defineConfig({
   testDir: "e2e",
@@ -53,6 +61,9 @@ export default defineConfig({
   globalSetup: "./e2e/global-setup.ts",
   use: {
     baseURL: "http://localhost:5273",
+    launchOptions: chromiumExecutablePath
+      ? { executablePath: chromiumExecutablePath }
+      : undefined,
     trace: process.env["CI"] ? "retain-on-failure" : "off",
   },
   webServer: {

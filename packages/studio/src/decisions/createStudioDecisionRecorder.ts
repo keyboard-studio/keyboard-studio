@@ -36,7 +36,7 @@ import type {
 } from "@keyboard-studio/contracts";
 import { selectDesktopAssignments } from "../lib/unimplementedInventory.ts";
 import { deriveProjectKeyFromWorkingCopy } from "../lib/draftPersistence.ts";
-import { createDecisionRecorder } from "./createDecisionRecorder.ts";
+import { createDecisionRecorder, type DecisionRecorder, type DecisionRecorderDeps } from "./createDecisionRecorder.ts";
 import type { InstantiatedMode } from "./recordBaseContribution.ts";
 import type { SourceSnapshotter } from "./snapshotSource.ts";
 
@@ -62,6 +62,14 @@ export interface CreateStudioDecisionRecorderDeps {
    * factory only forwards it.
    */
   snapshotter: SourceSnapshotter;
+  /**
+   * spec 079 R-04 answer-store hooks, forwarded to `createDecisionRecorder`.
+   * StudioShell wires them to stores/surveyAnswerStore.ts (decisions/ may not
+   * import it).
+   */
+  onScreenRecorded?: DecisionRecorderDeps["onScreenRecorded"];
+  getLastRecordedHash?: DecisionRecorderDeps["getLastRecordedHash"];
+  resolveCompletionScreen?: DecisionRecorderDeps["resolveCompletionScreen"];
 }
 
 /**
@@ -71,11 +79,16 @@ export interface CreateStudioDecisionRecorderDeps {
  */
 export function createStudioDecisionRecorder(
   deps: CreateStudioDecisionRecorderDeps,
-): (event: { stepId: string; result: unknown }) => void {
+): DecisionRecorder {
   const { getWorkingCopyState, snapshotter } = deps;
 
   return createDecisionRecorder({
     snapshotter,
+    ...(deps.onScreenRecorded !== undefined ? { onScreenRecorded: deps.onScreenRecorded } : {}),
+    ...(deps.getLastRecordedHash !== undefined ? { getLastRecordedHash: deps.getLastRecordedHash } : {}),
+    ...(deps.resolveCompletionScreen !== undefined
+      ? { resolveCompletionScreen: deps.resolveCompletionScreen }
+      : {}),
     getDeletionCounts: () => {
       const wc = getWorkingCopyState();
       return {

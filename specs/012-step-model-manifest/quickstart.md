@@ -36,7 +36,7 @@ pnpm lint
 **Goal**: every gallery/panel renders through an editor-step adapter with byte-identical behavior; new editor edges are allowed; `SurveyStage` still drives ordering.
 
 1. **Adapters compile to the contract** — `pnpm typecheck` passes; each adapter in `editors/adapters/` is assignable to `React.ComponentType<EditorStepProps>` (contracts/step-model G3).
-2. **Byte-identical behavior** — `pnpm --filter @keyboard-studio/studio test`: the existing gallery/panel suites (`CarveGallery`, `MechanismGallery.test`, `TouchGallery.test`, `BaseResolution.test`, `TrackOneIdentityPanel.test`, `GalleryIntroSplash.test`) pass **unchanged** against the moved+adapted components (SC-002).
+2. **Byte-identical behavior** — `pnpm --filter @keyboard-studio/studio test`: the existing gallery/panel suites (`CarveGallery`, `MechanismGallery.*.test`, `TouchGallery.*.test`, `BaseResolution.test`, `TrackOneIdentityPanel.test`, `GalleryIntroSplash.test`) pass **unchanged** against the moved+adapted components (SC-002).
 3. **Boundaries** — `pnpm depcruise`: `editors/ → stores/` and `editors/ → lib/` pass (allowed); `ui/` leaf still green; a temporary probe `editors/ → dashboard/` import goes **red** then green when removed (contracts/boundaries B1–B3).
 4. **Reserved seams declared, inert** — `editors/assignLoop/provenance.ts` exposes the three provenance values (default `hand-set`); `editors/touchSuggest/defaults.ts` exposes the overridable policy; no propagation code path executes (FR-020/021; SC-010).
 5. **Still union-driven** — `SurveyStage` union still present in `StudioShell.tsx`; the full survey runs exactly as before. (P4a is revertible by repointing imports.)

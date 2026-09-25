@@ -37,6 +37,7 @@ import { collectCharContributors } from "./collectCharContributors.js";
 import { applyStoreSlotRemovals } from "./applyStoreSlotRemovals.js";
 import { carveFilterIr } from "./carveFilterIr.js";
 import { collectCarvedKeycapTexts } from "./applyCarveKeycapRemovalsToVfs.js";
+import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 
 const AE = "æ"; // æ
 const AE_ACUTE = "ǽ"; // ǽ  (æ + acute)
@@ -57,12 +58,8 @@ function makeRule(nodeId: string, context: IRRule["context"], output: IRRule["ou
  * declares it.
  */
 function makeIR(): KeyboardIR {
-  return {
-    origin: "imported",
-    header: {
-      keyboardId: "t", name: "T", bcp47: [], copyright: "", version: "1.0",
-      targets: [], storeDirectives: [],
-    },
+  return makeTestIR({
+    header: { keyboardId: "t", name: "T" },
     stores: [
       // Generated deconstruction pair — cross-paired via index(comp-dia,1).
       makeStore("s-composed", "composed", [
@@ -110,8 +107,7 @@ function makeIR(): KeyboardIR {
         ], [{ kind: "index", storeRef: "comp-dia", offset: 1 }]),
       ],
     }],
-    comments: [], raw: [], recognizedPatterns: [],
-  } as KeyboardIR;
+  });
 }
 
 /** The carve projection the studio applies: slot nul-fill, then whole-node filter. */
