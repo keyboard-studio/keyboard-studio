@@ -82,13 +82,13 @@
 
 ### Tests for User Story 1
 
-- [ ] T015 [P] [US1] Write a keyboard-lint test for the new narrow entry in `packages/keyboard-lint/src/lintContextTolerance.test.ts`, feeding it a hand-built `ToleranceReport`. `lintContextTolerance(ir, report)` returns exactly the `KM_WARN_CONTEXT_NOT_TOLERANT` and `KM_HINT_CONTEXT_NOT_ANALYSED` findings and nothing from any other Layer C check.
-- [ ] T016 [P] [US1] Write a hook test in `packages/studio/src/hooks/useKeyboardArtifact.contextTolerance.test.ts` for the new option `analyseContextTolerance: true`:
+- [X] T015 [P] [US1] Write a keyboard-lint test for the new narrow entry in `packages/keyboard-lint/src/lintContextTolerance.test.ts`, feeding it a hand-built `ToleranceReport`. `lintContextTolerance(ir, report)` returns exactly the `KM_WARN_CONTEXT_NOT_TOLERANT` and `KM_HINT_CONTEXT_NOT_ANALYSED` findings and nothing from any other Layer C check.
+- [X] T016 [P] [US1] Write a hook test in `packages/studio/src/hooks/useKeyboardArtifact.contextTolerance.test.ts` for the new option `analyseContextTolerance: true`:
   - The stage reaches `ready` **before** the slice leaves `analysing`, so the preview is not delayed (FR-001).
   - A superseded `runId` discards its result.
   - A thrown analysis sets `failed`.
   - Without the option, or with the flag off, no analysis runs.
-- [ ] T017 [P] [US1] Write a component test in `packages/studio/src/lint/ContextToleranceNotice.test.tsx`:
+- [X] T017 [P] [US1] Write a component test in `packages/studio/src/lint/ContextToleranceNotice.test.tsx`:
   - **Collapsed view:** one line with the rule count.
   - **Expanded view:**
     - each case renders `U+006F LATIN SMALL LETTER O` and `U+0323 COMBINING DOT BELOW`;
@@ -96,28 +96,29 @@
     - no rendered text contains `NFC`, `NFD`, `normalization` or `canonical` unless a gloss follows (FR-013).
   - **Could-not-check:** the notice renders a count and reasons, both for a `failed` slice and for a `compileDiagnostics` report (FR-004).
   - **Live region:** the notice sits inside the existing live region (FR-014).
-- [ ] T018 [P] [US1] Write a Playwright e2e test in `packages/studio/e2e/context-tolerance.spec.ts`, US1 part, with `VITE_KM_CONTEXT_TOLERANCE=1`:
+- [X] T018 [P] [US1] Write a Playwright e2e test in `packages/studio/e2e/context-tolerance.spec.ts`, US1 part, with `VITE_KM_CONTEXT_TOLERANCE=1`:
   - Import `sil_yoruba8`. The finding appears after the preview is ready, the download button stays enabled, and expanding the finding shows named characters.
   - A keyboard that is already tolerant shows no finding.
 
 ### Implementation for User Story 1
 
-- [ ] T019 [P] [US1] Add `lintContextTolerance(ir, report): LintFinding[]` to `packages/keyboard-lint/src/lintContext.ts`, wrapping `checkContextTolerance` from `packages/keyboard-lint/src/checks/check-19-x-context-tolerance.ts`. Export it from `packages/keyboard-lint/src/index.ts`. Add no engine import (depcruise).
-- [ ] T020 [P] [US1] Add the `contextTolerance: ContextToleranceState` slice (shape in [data-model.md](data-model.md)) to `packages/studio/src/stores/workingCopyStore.ts`, with setter `setContextTolerance` and a reference-equality guard like `setValidatorFindings`. Do **not** add it to `packages/studio/src/lib/persistWorkingCopy.ts`.
-- [ ] T021 [US1] Implement the analysis task in `packages/studio/src/hooks/useKeyboardArtifact.ts`, per [contracts/studio-tolerance-state.md](contracts/studio-tolerance-state.md) § Analysis task:
+- [X] T019 [P] [US1] Add `lintContextTolerance(ir, report): LintFinding[]` to `packages/keyboard-lint/src/lintContext.ts`, wrapping `checkContextTolerance` from `packages/keyboard-lint/src/checks/check-19-x-context-tolerance.ts`. Export it from `packages/keyboard-lint/src/index.ts`. Add no engine import (depcruise).
+- [X] T020 [P] [US1] Add the `contextTolerance: ContextToleranceState` slice (shape in [data-model.md](data-model.md)) to `packages/studio/src/stores/workingCopyStore.ts`, with setter `setContextTolerance` and a reference-equality guard like `setValidatorFindings`. Do **not** add it to `packages/studio/src/lib/persistWorkingCopy.ts`.
+- [X] T021 [US1] Implement the analysis task in `packages/studio/src/hooks/useKeyboardArtifact.ts`, per [contracts/studio-tolerance-state.md](contracts/studio-tolerance-state.md) § Analysis task:
   - Add the option `analyseContextTolerance?: boolean`.
   - After the `ready` `setStage` in `runCompile`, launch an un-awaited async task that loads the engine through `lib/contextToleranceEngine.ts`, then runs `computeContextTolerance`, then `lintContextTolerance`.
   - Compute `fixableRuleIds` and `fingerprint`.
   - Check `runId.current` after every await, and write to the slice.
   - Never join the `Promise.all`. Add no timer (D3).
-- [ ] T022 [US1] Pass `analyseContextTolerance: isContextToleranceEnabled()` at the `useKeyboardArtifact` call in `packages/studio/src/StudioShell.tsx` (around line 1171) only. Leave every other caller unchanged.
-- [ ] T023 [US1] Create `packages/studio/src/lint/ContextToleranceNotice.tsx` per [contracts/studio-tolerance-state.md](contracts/studio-tolerance-state.md) § Notice:
+  - *As built (research §10 A1):* the task analyses the IR parsed from the compiled `.kmn`, minus any applied fix, and also publishes `siteKeys` and `analysedIr`.
+- [X] T022 [US1] Pass `analyseContextTolerance: isContextToleranceEnabled()` at the `useKeyboardArtifact` call in `packages/studio/src/StudioShell.tsx` (around line 1171) only. Leave every other caller unchanged.
+- [X] T023 [US1] Create `packages/studio/src/lint/ContextToleranceNotice.tsx` per [contracts/studio-tolerance-state.md](contracts/studio-tolerance-state.md) § Notice:
   - Render a collapsible finding with a per-rule case in plain words. Build it from the report's `failingKeystrokes`, `precomposedOutput` and `decomposedOutput`, not from the lint message string.
   - Resolve character names with `loadCharNames()`.
   - Render a separate could-not-check notice.
   - Add no shippability or C4 entry (FR-002).
-- [ ] T024 [US1] Mount `ContextToleranceNotice` next to `<LintSummary>` inside the existing `role="status" aria-live="polite"` region in `packages/studio/src/StudioShell.tsx` (around lines 1494–1512). Render nothing when the flag is off or the slice is `idle`.
-- [ ] T025 [US1] Wrap every US1 string under `lint.contextTolerance.*` using Lingui (`<Trans>` or `t`). Use ICU plurals for the rule counts. Take the FR-013 reference glosses as the first draft. Run the i18n extract and the lint checkers (`pnpm lint`) so the tier-1 catalog stays consistent.
+- [X] T024 [US1] Mount `ContextToleranceNotice` next to `<LintSummary>` inside the existing `role="status" aria-live="polite"` region in `packages/studio/src/StudioShell.tsx` (around lines 1494–1512). Render nothing when the flag is off or the slice is `idle`.
+- [X] T025 [US1] Wrap every US1 string under `lint.contextTolerance.*` using Lingui (`<Trans>` or `t`). Use ICU plurals for the rule counts. Take the FR-013 reference glosses as the first draft. Run the i18n extract and the lint checkers (`pnpm lint`) so the tier-1 catalog stays consistent.
 
 **Checkpoint**: T015–T018 are green. US1 can ship on its own behind the flag.
 
@@ -131,11 +132,11 @@
 
 ### Tests for User Story 2
 
-- [ ] T026 [P] [US2] Write an engine test in `packages/engine/src/pattern-apply/context-variants.disclosure.test.ts` for the per-variant `VariantDisclosure`:
+- [X] T026 [P] [US2] Write an engine test in `packages/engine/src/pattern-apply/context-variants.disclosure.test.ts` for the per-variant `VariantDisclosure`:
   - A fixture with a non-fallback overlapping rule on the same key reports it in `shadows`, as well as the bare fallback.
   - A `&mnemoniclayout` keyboard marks its backspace-unwrap sites `unobservable: "mnemonic-backspace"`.
   - A two-class stack gets a `markOrderNote`.
-- [ ] T027 [P] [US2] Write an engine test in `packages/engine/src/pattern-apply/context-variants.refusal.test.ts`. No site is produced for any FR-010 hazard shape, and each one is reported as `not-analysed` with a reason:
+- [X] T027 [P] [US2] Write an engine test in `packages/engine/src/pattern-apply/context-variants.refusal.test.ts`. No site is produced for any FR-010 hazard shape, and each one is reported as `not-analysed` with a reason:
   - a key store selecting different physical keys per member, with key-position `index()`;
   - compound key parts;
   - `notany()`;
@@ -143,56 +144,56 @@
   - a store mixing characters and deadkeys;
   - `if()`, `platform()` or `baselayout()` guards;
   - an opaque rule.
-- [ ] T028 [P] [US2] Write a contracts test in `packages/contracts/src/surveyPhaseResult.contextTolerance.test.ts` for the zod round-trip and drift guard of `SurveyPhaseResult.marksContextTolerance`, the `DecisionProposalSource` member `"analysis"`, and the `DecisionProvenance.proposed` field. Also check that a v2 decision record without the new fields still parses.
-- [ ] T029 [P] [US2] Write a station test in `packages/studio/src/survey/marks/ContextToleranceStation.test.tsx`:
+- [X] T028 [P] [US2] Write a contracts test in `packages/contracts/src/surveyPhaseResult.contextTolerance.test.ts` for the zod round-trip and drift guard of `SurveyPhaseResult.marksContextTolerance`, the `DecisionProposalSource` member `"analysis"`, and the `DecisionProvenance.proposed` field. Also check that a v2 decision record without the new fields still parses.
+- [X] T029 [P] [US2] Write a station test in `packages/studio/src/survey/marks/ContextToleranceStation.test.tsx`:
   - Every site is pre-ticked.
   - The disclosure rows render.
   - Confirming with every site ticked gives `accept`; unticking one gives `partial` with the right `acceptedSiteIds`.
   - Each tick is a labelled checkbox and the panel is keyboard-operable (FR-014).
   - Accept takes at most two interactions (SC-002).
-- [ ] T030 [P] [US2] Write an apply-effect test in `packages/studio/src/hooks/useContextToleranceApply.test.ts`:
+- [X] T030 [P] [US2] Write an apply-effect test in `packages/studio/src/hooks/useContextToleranceApply.test.ts`:
   - `accept` writes through `applyMutatePatch` with `CONTEXT_TOLERANCE_WRITES`.
   - A patch outside the declared writes throws.
   - A stale site, whose rule changed after the decision, is dropped and reported.
   - A non-`committed` `applyFacetTransform` result leaves the IR unchanged.
   - Re-running with the same `appliedFingerprint` does nothing (FR-008).
-- [ ] T031 [P] [US2] Write a decision-trail test in `packages/studio/src/decisions/contextToleranceTrail.test.ts`:
+- [X] T031 [P] [US2] Write a decision-trail test in `packages/studio/src/decisions/contextToleranceTrail.test.ts`:
   - `accept` records `marks.context_tolerance` as `tool-proposed` with source `analysis`.
   - `partial` records `hand-set` with `proposed.siteIds`, plus a `marks.context_tolerance.sites` answer.
   - The headline renders with a real question label, not "unknown question".
-- [ ] T032 [US2] Extend `packages/studio/e2e/context-tolerance.spec.ts` with US2:
+- [X] T032 [US2] Extend `packages/studio/e2e/context-tolerance.spec.ts` with US2:
   - Walk to the marks series and confirm. The trail shows the accepted entry, and after the next compile the notice reports the rules made tolerant.
   - In the simulator, decomposed `o` + U+0323 plus each of the five accent keys gives the correct accent (SC-003).
   - Composed output is byte-identical to the unfixed keyboard (FR-008).
   - A partial run changes only the ticked sites.
 
 ### Implementation for User Story 2
-
-- [ ] T033 [P] [US2] Add these to `packages/contracts/src/surveyPhaseResult.ts`: the `MarksContextToleranceDecision` type and the optional `marksContextTolerance` field, where the last phase carrying it wins in `mergePhaseResults`, mirroring `marksOutputForm`. Add their zod mirror and a drift guard in `packages/contracts/src/schemas.ts`.
-- [ ] T034 [P] [US2] In `packages/contracts/src/decisionRecord.ts`, add `"analysis"` to `DecisionProposalSource` and the optional `proposed?: { value: string; siteIds?: string[] }` to `DecisionProvenance`. Update the zod schemas in `packages/contracts/src/schemas.ts` (around lines 621 and 722). Leave `DECISION_RECORD_VERSION` at 2.
-- [ ] T035 [US2] Extend `packages/engine/src/pattern-apply/context-variants.ts` so `proposeContextVariants` attaches a `VariantDisclosure` to each variant (research D9):
+  - *As built:* the e2e (`context-tolerance.spec.ts`) asserts accept, partial and decline through the notice, because the Output tab is gated behind the rest of the walk. SC-003 and composed byte-identity are asserted on the same replayed overlay in the engine's `context-tolerance-overlay.test.ts`. The trail entry is asserted in `contextToleranceTrail.test.ts`, and the `.kmn` replay in `projectWorkingCopyVfs.contextTolerance.test.ts`.
+- [X] T033 [P] [US2] Add these to `packages/contracts/src/surveyPhaseResult.ts`: the `MarksContextToleranceDecision` type and the optional `marksContextTolerance` field, where the last phase carrying it wins in `mergePhaseResults`, mirroring `marksOutputForm`. Add their zod mirror and a drift guard in `packages/contracts/src/schemas.ts`.
+- [X] T034 [P] [US2] In `packages/contracts/src/decisionRecord.ts`, add `"analysis"` to `DecisionProposalSource` and the optional `proposed?: { value: string; siteIds?: string[] }` to `DecisionProvenance`. Update the zod schemas in `packages/contracts/src/schemas.ts` (around lines 621 and 722). Leave `DECISION_RECORD_VERSION` at 2.
+- [X] T035 [US2] Extend `packages/engine/src/pattern-apply/context-variants.ts` so `proposeContextVariants` attaches a `VariantDisclosure` to each variant (research D9):
   - overlap detection against non-fallback rules on the same key, alongside the existing `precedesFallbackRuleId`;
   - the mnemonic backspace flag;
   - the two-class mark-order note, reusing `packages/engine/src/pattern-apply/mark-decomposition.ts`.
 
   Make sure the FR-010 refusal list is complete. Export `VariantDisclosure` through `packages/engine/src/context-tolerance/index.ts`.
-- [ ] T036 [US2] Audit and name the generated rules and stores. In `packages/engine/src/pattern-apply/context-variants.ts`, rename them so each describes what it does rather than which tool made it. Emit one source comment on the generated block that names its origin and purpose (FR-015). Update the affected snapshot and fixture expectations in the same package.
-- [ ] T037 [US2] Change `commit` in `packages/studio/src/hooks/useFacetTransform.ts` to accept `options?: { ruleOverride?: MigrationRule }` and forward it to `applyFacetTransform`. Import `MigrationRule` as a type only.
-- [ ] T038 [US2] Create `packages/studio/src/steps/contextToleranceWrites.ts`, exporting `CONTEXT_TOLERANCE_WRITES: readonly IRPath[]` (the groups' rules and the stores). Spread it into the `marks` entry's `writes` in `packages/studio/src/steps/manifest.ts` (around lines 129–138). Update the `validateManifestShape` expectations in its test if needed.
-- [ ] T039 [US2] Create `packages/studio/src/survey/marks/ContextToleranceStation.tsx` per [contracts/marks-context-tolerance-station.md](contracts/marks-context-tolerance-station.md):
+- [X] T036 [US2] Audit and name the generated rules and stores. In `packages/engine/src/pattern-apply/context-variants.ts`, rename them so each describes what it does rather than which tool made it. Emit one source comment on the generated block that names its origin and purpose (FR-015). Update the affected snapshot and fixture expectations in the same package.
+- [X] T037 [US2] Change `commit` in `packages/studio/src/hooks/useFacetTransform.ts` to accept `options?: { ruleOverride?: MigrationRule }` and forward it to `applyFacetTransform`. Import `MigrationRule` as a type only.
+- [X] T038 [US2] Create `packages/studio/src/steps/contextToleranceWrites.ts`, exporting `CONTEXT_TOLERANCE_WRITES: readonly IRPath[]` (the groups' rules and the stores). Spread it into the `marks` entry's `writes` in `packages/studio/src/steps/manifest.ts` (around lines 129–138). Update the `validateManifestShape` expectations in its test if needed.
+- [X] T039 [US2] Create `packages/studio/src/survey/marks/ContextToleranceStation.tsx` per [contracts/marks-context-tolerance-station.md](contracts/marks-context-tolerance-station.md):
   - Mount `packages/studio/src/components/facet-transform/FacetTransformPanel.tsx` with a `TransformProposal` built from `ContextVariantsResult`, every site `accepted`.
   - Add the disclosure rows.
   - Confirm produces `accept` or `partial`; Decline produces `decline`.
   - Wrap strings under `marks.contextTolerance.*`.
-- [ ] T040 [US2] Wire the station into `packages/studio/src/survey/marks/MarksSeriesStep.tsx`:
+- [X] T040 [US2] Wire the station into `packages/studio/src/survey/marks/MarksSeriesStep.tsx`:
   - Add `"marks_context_tolerance"` to `MarksStationId`, ordered after `marks_output_form` and `marks_stacking`.
   - Apply the visibility table from the station contract, reading the `contextTolerance` slice.
   - For the `analysing` state, render a "checking…" message that still lets the author continue.
   - Have `seriesResult()` emit `marksContextTolerance` and the `marks.context_tolerance` / `.sites` answers.
-- [ ] T041 [US2] Make the decision trail record the new question:
+- [X] T041 [US2] Make the decision trail record the new question:
   - In `packages/studio/src/decisions/createStudioDecisionRecorder.ts`, teach `resolveProposal` the `marks.context_tolerance` question id. Accept-all resolves to `tool-proposed` / `analysis`; partial resolves to `hand-set` plus `proposed`.
   - Add a label source for both question ids in `packages/studio/src/decisions/lookupQuestionLabel.ts`, so that `packages/studio/src/decisions/headline.ts` renders a real label.
-- [ ] T042 [US2] Create `packages/studio/src/hooks/useContextToleranceApply.ts` per [contracts/studio-tolerance-state.md](contracts/studio-tolerance-state.md) § Apply effect:
+- [X] T042 [US2] Create `packages/studio/src/hooks/useContextToleranceApply.ts` per [contracts/studio-tolerance-state.md](contracts/studio-tolerance-state.md) § Apply effect:
   1. Recompute the report and proposal on the current IR.
   2. Intersect the accepted sites with the fixable sites whose fingerprint still matches.
   3. Verify with `applyFacetTransform` and `ruleOverride: createContextToleranceMigrationRule(result, "echo")`.
@@ -200,7 +201,8 @@
   5. Record `appliedFingerprint`.
 
   Surface stale sites and refusals to the notice.
-- [ ] T043 [US2] Mount `useContextToleranceApply` in `packages/studio/src/StudioShell.tsx`, gated on `isContextToleranceEnabled()`. Extend `ContextToleranceNotice.tsx` to show "made tolerant" counts, stale-site messages, and apply refusals.
+  - *As built (research §10 A1, owner-approved):* the verified fix is committed through `applyMutatePatch` and also as a persisted overlay that `projectWorkingCopyVfs` step 2.7 replays, because the working IR never reaches the artifact. `CONTEXT_TOLERANCE_WRITES` also declares `comments[]`. `applyFacetTransform`'s compile gate now strips packaging-asset stores before compiling (a spec 039 latent defect).
+- [X] T043 [US2] Mount `useContextToleranceApply` in `packages/studio/src/StudioShell.tsx`, gated on `isContextToleranceEnabled()`. Extend `ContextToleranceNotice.tsx` to show "made tolerant" counts, stale-site messages, and apply refusals.
 
 **Checkpoint**: T026–T032 are green. US1 and US2 both work.
 
@@ -214,23 +216,23 @@
 
 ### Tests for User Story 3
 
-- [ ] T044 [P] [US3] Extend `packages/studio/src/survey/marks/ContextToleranceStation.test.tsx` and `MarksSeriesStep.test.tsx`:
+- [X] T044 [P] [US3] Extend `packages/studio/src/survey/marks/ContextToleranceStation.test.tsx` and `MarksSeriesStep.test.tsx`:
   - `decline` sets `acceptedSiteIds: []`.
   - A prior decision with an identical fingerprint renders read-only with the prior outcome and a "change" control, and is not raised again.
   - A changed fingerprint raises the proposal again, pre-filled (FR-009).
-- [ ] T045 [P] [US3] Extend `packages/studio/src/decisions/contextToleranceTrail.test.ts`. A decline records `hand-set` with `proposed: { value: "accept", siteIds }`, and a revisit with the same value does not append a duplicate entry.
-- [ ] T046 [US3] Extend `packages/studio/e2e/context-tolerance.spec.ts` with US3:
+- [X] T045 [P] [US3] Extend `packages/studio/src/decisions/contextToleranceTrail.test.ts`. A decline records `hand-set` with `proposed: { value: "accept", siteIds }`, and a revisit with the same value does not append a duplicate entry.
+- [X] T046 [US3] Extend `packages/studio/e2e/context-tolerance.spec.ts` with US3:
   - Decline and download. The `.kmn` equals the emitted working copy with the flag off (SC-008).
   - Revisit the marks series: no re-proposal.
   - Edit an affected rule: after the next compile, the proposal is raised again.
 
 ### Implementation for User Story 3
-
-- [ ] T047 [US3] Add decline handling in `packages/studio/src/survey/marks/ContextToleranceStation.tsx`:
+  - *As built:* the e2e asserts that a decline leaves no rule fixed and keeps the finding. "No overlay leaves the `.kmn` untouched" (SC-008) is pinned in `projectWorkingCopyVfs.contextTolerance.test.ts`. Revisit and edit re-raise are pinned in `MarksSeriesStep.contextTolerance.test.tsx`, because reaching the series again mid-walk has no stable e2e handle.
+- [X] T047 [US3] Add decline handling in `packages/studio/src/survey/marks/ContextToleranceStation.tsx`:
   - a "Leave my keyboard as it is" action;
   - the read-only prior-decision view with a "change" control;
   - the `marks.contextTolerance.station.prior.*` strings.
-- [ ] T048 [US3] Implement re-raise suppression in `packages/studio/src/survey/marks/MarksSeriesStep.tsx` by comparing the stored `marksContextTolerance.fingerprint` with the slice's current `fingerprint`. Confirm `useContextToleranceApply` never acts on `decline` (`packages/studio/src/hooks/useContextToleranceApply.ts`).
+- [X] T048 [US3] Implement re-raise suppression in `packages/studio/src/survey/marks/MarksSeriesStep.tsx` by comparing the stored `marksContextTolerance.fingerprint` with the slice's current `fingerprint`. Confirm `useContextToleranceApply` never acts on `decline` (`packages/studio/src/hooks/useContextToleranceApply.ts`).
 - [ ] T049 [US3] Route every drafted author-facing string (`lint.contextTolerance.*`, `marks.contextTolerance.*`) to content for sign-off (Constitution Art. VI). Record the approved wording, and any changes, in `specs/078-context-tolerance-wiring/research.md` §10. Update the catalogs without renaming ids, because the meaning is unchanged.
 
 **Checkpoint**: All three stories work independently behind the flag.
@@ -239,16 +241,16 @@
 
 ## Phase 6: Polish & cross-cutting concerns
 
-- [ ] T050 [P] Add or update rows in `specs/056-ada-accessibility/wcag-2.2-aa-tracker.md` for the notice (live region) and the station (labelled ticks, keyboard operation). Name the test evidence from T017 and T029 (FR-014).
-- [ ] T051 [P] Update [docs/architecture.md](../../docs/architecture.md) and [docs/packages.md](../../docs/packages.md):
+- [X] T050 [P] Add or update rows in `specs/056-ada-accessibility/wcag-2.2-aa-tracker.md` for the notice (live region) and the station (labelled ticks, keyboard operation). Name the test evidence from T017 and T029 (FR-014).
+- [X] T051 [P] Update [docs/architecture.md](../../docs/architecture.md) and [docs/packages.md](../../docs/packages.md):
   - the new engine subpath `./context-tolerance`;
   - the browser keyboard loader;
   - Layer C's first production caller (`lintContextTolerance`);
   - the async-compute → mutate-seam apply pattern (research D8).
-- [ ] T052 [P] Add a `sil_yoruba8` row to [docs/keyboard-index.md](../../docs/keyboard-index.md) if one is missing, along with rows for any other keyboard newly used as a fixture in T004, T014, T026 or T027. Read each `<id>.kps` for name, BCP47 and author. Run `node utilities/spec-trace check` and acknowledge the spec 078 units that changed.
-- [ ] T053 Run the full [quickstart.md](quickstart.md) walk. The harness must report `regressed = 0` and `gap-fixed ≥ 40%` of the keyboards with a gap (SC-004, SC-005). Record the numbers in `specs/078-context-tolerance-wiring/research.md` §10.
+- [X] T052 [P] Add a `sil_yoruba8` row to [docs/keyboard-index.md](../../docs/keyboard-index.md) if one is missing, along with rows for any other keyboard newly used as a fixture in T004, T014, T026 or T027. Read each `<id>.kps` for name, BCP47 and author. Run `node utilities/spec-trace check` and acknowledge the spec 078 units that changed.
+- [X] T053 Run the full [quickstart.md](quickstart.md) walk. The harness must report `regressed = 0` and `gap-fixed ≥ 40%` of the keyboards with a gap (SC-004, SC-005). Record the numbers in `specs/078-context-tolerance-wiring/research.md` §10.
 - [ ] T054 Retire the flag once T053 passes (FR-011): make `isContextToleranceEnabled()` default on in `packages/studio/src/flags/contextToleranceFlag.ts`, and keep the env override as a kill switch. Land this in its **own** commit so it can be reverted independently.
-- [ ] T055 Run `pnpm typecheck && pnpm lint && pnpm test`, plus the studio e2e suite, and fix any fallout. Out-of-scope repairs to shared helpers get their own commits.
+- [X] T055 Run `pnpm typecheck && pnpm lint && pnpm test`, plus the studio e2e suite, and fix any fallout. Out-of-scope repairs to shared helpers get their own commits.
 
 ---
 

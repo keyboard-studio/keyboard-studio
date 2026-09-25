@@ -30,9 +30,26 @@ The real engine. Subsystems under `packages/engine/src/`: `codec` (.kmn ↔ Keyb
 `base-browser`, `stub-mutator`, `langtags` (SIL langtags slim-index lookup; exposed as
 `@keyboard-studio/engine/langtags`).
 
+The root entry stays simulator-free. Two subpaths carry the simulator:
+
+- `@keyboard-studio/engine/simulator` is the Node entry (`simulator/node.ts`). It installs the
+  `vm`-sandbox keyboard loader.
+- `@keyboard-studio/engine/context-tolerance` is the browser-safe entry the studio lazy-imports
+  (spec 078). It installs the `new Function` loader (`simulator/browserKeyboardLoader.ts`) and
+  exposes the context-tolerance analysis, the fix generator, the fingerprint and site keys, and
+  the Unicode-name table.
+
+The loader seam is `simulator/keyboardLoader.ts`. The vendored KeymanWeb sources address each
+other by relative path, so no alias is needed to resolve them. The depcruise rule
+`context-tolerance-browser-safe` keeps the Node loader out of the browser entry. The
+context-tolerance overlay (`pattern-apply/context-tolerance-overlay.ts`) is exported from the
+root entry, because the studio replays it inside its synchronous VFS projection.
+
 ### `@keymanapp/keyboard-lint`
 
-Layer C hygiene lint engine (`lintEngine.ts`, `checks/`, `parsers/`).
+Layer C hygiene lint engine (`lintEngine.ts`, `checks/`, `parsers/`). Its first production
+caller is `lintContextTolerance(ir, report)` (spec 078), a narrow entry that runs only check
+19.x over a report the studio computed. keyboard-lint itself still never imports the engine.
 
 ### `@keyboard-studio/llm`
 

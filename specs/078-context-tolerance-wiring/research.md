@@ -510,3 +510,106 @@ Beyond the panel's source diff, the station's preview adds three things:
   sites are never shown as a simulated success.
 - **Mark order.** For any two-class mark stack in the inventory, it shows the
   resulting mark order.
+
+### Implementation amendments (2026-09-24, during `/speckit-implement`)
+
+**A1: The apply path reaches the artifact through an overlay (amends D7 and D8).**
+The plan applied an accepted decision with `applyMutatePatch` → `setWorkingIR`.
+The studio never emits the working IR into the artifact:
+`lib/projectWorkingCopyVfs.ts` re-projects the `.kmn` from the base keyboard plus
+recorded overlays (carve, assignments, key edits) for both the preview and the
+download. Its own header says a rule written only into `store.ir` "would be a
+silent no-op". So, as planned, SC-003 could never pass. The owner chose to
+follow the spec 063 key-edit overlay precedent:
+
+- **Apply effect.** `hooks/useContextToleranceApply.ts` verifies the fix with
+  `applyFacetTransform` (with `ruleOverride`), then commits it twice:
+  - to the working IR through `applyMutatePatch` against `CONTEXT_TOLERANCE_WRITES`,
+    which now also declares `comments[]` for the block comment (Art. IX is unchanged);
+  - as a persisted `contextToleranceOverlay` slice.
+- **Overlay format.** The overlay (`engine/src/pattern-apply/context-tolerance-overlay.ts`)
+  holds the accepted generated rules as data. Each batch names its group, its
+  insertion anchor (the emitted text of the rule it sits before), its block
+  comment, and its site key.
+- **Replay.** `projectWorkingCopyVfs` step 2.7 replays the overlay synchronously.
+  A batch whose anchor is gone is skipped with a warning, never misplaced.
+- **Rule ids are positional.** The parser's id minter is sequential, so inserting
+  rules renumbers every later rule. Nothing the decision stores depends on an id:
+  - `toleranceFingerprint` sorts rule texts, not ids;
+  - site ids are per-rule text digests (`toleranceSiteKeys`);
+  - the analysis removes a replayed overlay by text before analysing
+    (`removeContextToleranceOverlay`), so the fingerprint and sites do not move
+    once the fix lands.
+- **Made tolerant.** A site whose batch is actually present in the compiled
+  keyboard (`presentContextToleranceSites`) reads `made-tolerant`. Nothing in the
+  engine produced that status before.
+- **Analysis input.** The analysis now runs on the IR parsed from the compiled
+  (projected) `.kmn`, not `store.ir`, because that is what the author runs.
+- **Evidence.**
+  - `context-tolerance-overlay.test.ts`: on sil_yoruba8, the replayed overlay
+    fixes all five accent keys on decomposed `o`/`e` + U+0323 (SC-003), with
+    joined input byte-identical (FR-008). It also covers JSON round trip,
+    removal and idempotence.
+  - `useContextToleranceApply.test.ts`: analyse → apply → replay with the real
+    engine in the studio environment.
+
+**A2: FR-010 "key stores that select different physical keys per member".**
+Read as "withhold unless handled per member". PR #1774 expands such a key part
+into one literal-key rule per member, with each member's output measured by
+simulation, and that is how sil_yoruba8 is fixed (SC-003). The refusal test
+asserts the hazard itself cannot occur: every generated rule's key part is a
+single literal key, never a copied multi-member `any()`. The other FR-010 shapes
+are refused with a reason:
+
+- a store mixing characters and deadkeys (new gate);
+- an output `index()` that the pairing analysis cannot resolve to a context
+  position (new gate);
+- compound key parts, `notany()`, `if()`, `platform()`, `baselayout()` and opaque
+  rules, through the existing catch-alls.
+
+**A3: `RuleToleranceFinding.precedingText` (additive, optional).** The finding
+lacked the text before the keystroke, so the notice could not give a
+reproducible case (FR-003). The field is set on gap findings in `simulatePending`.
+There is no zod mirror for `ToleranceReport`, so no schema changed.
+
+**A4: `DecisionProvenance.proposed` on override.** `deriveAnswerProvenance` now
+attaches an `AnswerProposal.keepOnOverride` offer when the author overrides it.
+Only the context-tolerance proposal sets it: partial and decline record
+`hand-set` with `proposed: { value: "accept", siteIds }`. Other questions are
+unchanged.
+
+**A5: Could-not-check reasons are engine English.** The notice localizes its
+counts and framing, but lists each `notAnalysedReason` verbatim. Content
+sign-off (T049) should decide whether to map the reason strings to catalog ids.
+
+**Strings awaiting content sign-off (T049).** These are drafted from FR-013's
+reference glosses and are not yet approved:
+
+- `lint.contextTolerance.*` (15 ids);
+- `marks.contextTolerance.*` (station, disclosure and prior-decision ids);
+- `trail.question.marksContextTolerance` and `trail.question.marksContextToleranceSites`.
+
+The ids stay fixed when the wording changes.
+
+**T053 corpus re-measurement (2026-09-24, after every spec 078 engine change).**
+Same local corpus (`1450362c8`), 915 keyboards, `--fail-on-regressed` exit 0.
+
+| bucket | baseline | after |
+|---|---|---|
+| regressed | 0 | **0** |
+| gap-remaining | 28 | 29 |
+| gap-fixed | 34 | 33 |
+| refused | 46 | 50 |
+| compile-failed | 165 | 165 |
+| harness-error | 28 | 28 |
+| no-gap | 614 | 610 |
+
+- **SC-004:** 0 regressed.
+- **SC-005:** 33 of 62 keyboards with a gap are fixed, which is 53%, above the 40% bar.
+- **Keyboards that moved:**
+  - Four no-gap keyboards now read `refused`: `khudawadi_inscript`, `mahajani_inscript`, `old_hungarian` and `old_hungarian_carpathian_highlands`. They had no gap either way; the new output-`index()` pairing gate (A2) now names why some rules are unanalysed.
+  - `tay_latn` moved from gap-fixed to gap-remaining for the same gate. The previous transform happened to fix it, but the generator cannot prove the pairing, so FR-010 withholds it. That is under-reach, not corruption.
+- **Harness gaps:**
+  - The harness does not yet map the new "mixes characters and deadkeys" refusal reason to a gate id, so it prints the raw reason.
+  - Twice the harness failed at startup with a 60 s Vite SSR module-load timeout on a cold cache, and succeeded on retry. The CI step may need a warm-up or a longer runner timeout.
+- **Quickstart walk:** `e2e/context-tolerance.spec.ts` (5/5) walks quickstart §3 to §5 with the flag on.

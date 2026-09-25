@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-09-16",
+  "lastUpdated": "2026-09-25",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -317,7 +317,7 @@
     },
     "docs/architecture.md": {
       "title": "Keyboard Studio — architecture & meta-flow",
-      "hash": "sha256:a30615d748088806",
+      "hash": "sha256:d38c67b6a8b94872",
       "status": "reference",
       "implements": [],
       "decisions": [],
@@ -854,6 +854,14 @@
     "specs/075-punctuation-defaults": {
       "title": "Feature Specification: Punctuation defaults and the invisible-character question",
       "hash": "sha256:3e88e0040f85ef47",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/078-context-tolerance-wiring": {
+      "title": "Feature Specification: Context tolerance reaches the author",
+      "hash": "sha256:1c37c260290b420a",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
