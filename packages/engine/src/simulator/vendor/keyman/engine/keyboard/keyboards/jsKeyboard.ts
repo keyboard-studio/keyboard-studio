@@ -4,8 +4,8 @@ import { Layouts } from "./defaultLayouts.js";
 import { ActiveKey, ActiveLayout, ActiveSubKey } from "./activeLayout.js";
 import { KeyEvent } from "../keyEvent.js";
 import { type TextStore } from "../textStore.js";
-import { KeymanWebKeyboard, ModifierKeyConstants, TouchLayout } from "@keymanapp/common-types";
-import { VariableStores } from "../variableStore.js";
+import { KeymanWebKeyboard, ModifierKeyConstants, TouchLayout } from "../../../common/types/main.js";
+import { type VariableStores } from "../variableStore.js";
 
 import ComplexKeyboardStore = KeymanWebKeyboard.ComplexKeyboardStore;
 import KeyboardObject = KeymanWebKeyboard.KeyboardObject;
@@ -13,10 +13,10 @@ import LayoutSpec = KeymanWebKeyboard.LayoutSpec;
 
 type TouchLayoutSpec = TouchLayout.TouchLayoutPlatform & { isDefault?: boolean};
 
-import { Version, DeviceSpec } from "keyman/common/web-utils";
-import { StateKeyMap } from "./stateKeyMap.js";
+import { Version, DeviceSpec } from "../../../common/web-utils/index.js";
+import { type StateKeyMap } from "./stateKeyMap.js";
 import { NotifyEventCode } from './keyboardLoaderBase.js';
-import { Keyboard } from './keyboard.js';
+import { type Keyboard } from './keyboard.js';
 
 /**
  * Stores preprocessed properties of a keyboard for quick retrieval later.

@@ -20,6 +20,7 @@ import {
 } from "@keyboard-studio/contracts";
 import { emit as emitKmn } from "../codec/emit.js";
 import { compile } from "../compiler/index.js";
+import { stripDanglingAssetStores } from "../compiler/stripDanglingAssetStores.js";
 import { generateCorpus } from "../validator/corpus.js";
 import { validateWithOracle } from "../validator/oracle.js";
 import { MIGRATION_RULES } from "./migrations/index.js";
@@ -102,10 +103,21 @@ function chordToSim(chord: KeyChord): SimKeyInput {
 // Compile helper
 // ---------------------------------------------------------------------------
 
-/** Emit `ir` to a `.kmn` and compile it in a minimal VirtualFS. */
+/**
+ * Emit `ir` to a `.kmn` with its packaging-asset stores dropped. The minimal
+ * VFS below holds no `&LAYOUTFILE`/`&BITMAP`/`&VISUALKEYBOARD` files, and
+ * kmcmplib emits nothing when a header store names a file it cannot open, so
+ * an imported keyboard would otherwise always "fail to compile" here. Assets
+ * never affect rule behaviour, which is all this gate verifies.
+ */
+function emitForVerification(ir: KeyboardIR): string {
+  return stripDanglingAssetStores(emitKmn(ir), createVirtualFS()).kmn;
+}
+
+/** Emit `ir` (assets stripped) and compile it in a minimal VirtualFS. */
 async function compileIr(ir: KeyboardIR) {
   const keyboardId = ir.header.keyboardId || "keyboard";
-  const kmn = emitKmn(ir);
+  const kmn = emitForVerification(ir);
   const vfs = createVirtualFS([
     { path: `source/${keyboardId}.kmn`, content: kmn, isBinary: false },
   ]);
@@ -262,10 +274,11 @@ async function compileRegressionGate(
 ): Promise<{ ok: true } | { ok: false; failure: CommitFailure }> {
   // One-shot, undebounced (research D8/D9): compile the transient candidate and
   // also collect blocking oracle findings. A failed compile (`success: false`)
-  // OR an error/fatal finding blocks the commit (FR-010/SC-006).
+  // OR an error/fatal finding blocks the commit (FR-010/SC-006). Both see the
+  // candidate with its packaging-asset stores dropped (see emitForVerification).
   const [compiled, findings] = await Promise.all([
     compileIr(candidate),
-    validateWithOracle(emitKmn(candidate)),
+    validateWithOracle(emitForVerification(candidate)),
   ]);
   const blocking = findings.filter((f) => f.severity === "error" || f.severity === "fatal");
   if (!compiled.success || blocking.length > 0) {

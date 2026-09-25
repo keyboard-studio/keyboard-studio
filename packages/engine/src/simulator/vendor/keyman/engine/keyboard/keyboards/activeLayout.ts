@@ -1,18 +1,18 @@
 // @ts-nocheck
 import { Codes } from "../codes.js";
-import { KeyEvent, KeyEventSpec } from "../keyEvent.js";
+import { KeyEvent, type KeyEventSpec } from "../keyEvent.js";
 import { KeyMapping } from "../keyMapping.js";
 import { ButtonClasses, Layouts } from "./defaultLayouts.js";
 import type { LayoutKey, LayoutSubKey, LayoutRow, LayoutLayer, LayoutFormFactor, ButtonClass } from "./defaultLayouts.js";
 import { type JSKeyboard } from "./jsKeyboard.js";
 
-import { TouchLayout } from "@keymanapp/common-types";
+import { TouchLayout } from "../../../common/types/main.js";
 import TouchLayoutDefaultHint = TouchLayout.TouchLayoutDefaultHint;
 import TouchLayoutFlick = TouchLayout.TouchLayoutFlick;
 import TouchLayoutSpec = TouchLayout.TouchLayoutPlatform;
 import TouchLayerSpec = TouchLayout.TouchLayoutLayer;
 import TouchLayoutKeySp = TouchLayout.TouchLayoutKeySp;
-import { type DeviceSpec } from "keyman/common/web-utils";
+import { type DeviceSpec } from "../../../common/web-utils/index.js";
 
 // TS 3.9 changed behavior of getters to make them
 // non-enumerable by default. This broke our 'polyfill'

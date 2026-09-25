@@ -12,8 +12,13 @@
       "import": "./dist/index.js"
     },
     "./simulator": {
-      "types": "./dist/simulator/index.d.ts",
-      "import": "./dist/simulator/index.js"
+      "types": "./dist/simulator/node.d.ts",
+      "import": "./dist/simulator/node.js"
+    },
+    "./context-tolerance": {
+      "types": "./dist/context-tolerance/index.d.ts",
+      "browser": "./dist/context-tolerance/index.js",
+      "import": "./dist/context-tolerance/index.js"
     },
     "./pattern-schema": {
       "types": "./dist/pattern-library/patternSchema.d.ts",

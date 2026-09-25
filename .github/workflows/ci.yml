@@ -199,6 +199,18 @@ jobs:
       - name: Test (facet-index — outside the pnpm workspace)
         run: pnpm run test:facet-index
 
+      # spec 078 FR-012: the context-tolerance transform must never make a
+      # keyboard worse. The corpus harness (utilities/nfd-tolerance-corpus, outside
+      # the workspace) runs the real transform over the pinned corpus checked out
+      # above, recompiles and re-simulates each keyboard, and --fail-on-regressed
+      # exits 1 when any keyboard lands in the `regressed` bucket. Its hermetic
+      # unit suite runs first; the sweep itself takes several minutes.
+      - name: Test (nfd-tolerance-corpus — outside the pnpm workspace)
+        run: pnpm run test:nfd-tolerance-corpus
+
+      - name: Corpus gate (context tolerance — zero regressed keyboards)
+        run: node utilities/nfd-tolerance-corpus/run.mjs --fail-on-regressed
+
       # kbgen is a prototype outside the workspace too, and since the
       # parseUnicodeSet retirement it imports engine character-discovery
       # internals by relative src path (spec 044 FR-015: one exemplar path).

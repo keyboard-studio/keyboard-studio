@@ -5,16 +5,7 @@
     "noImplicitReturns": false,
     "noUncheckedIndexedAccess": false,
     "exactOptionalPropertyTypes": false,
-    "lib": ["ES2022", "DOM"],
-    "paths": {
-      "@keymanapp/common-types": ["./keyman/common/types/main.ts"],
-      "keyman/engine/keyboard": ["./keyman/engine/keyboard/index.ts"],
-      "keyman/engine/keyboard/*": ["./keyman/engine/keyboard/*"],
-      "keyman/engine/js-processor": ["./keyman/engine/js-processor/index.ts"],
-      "keyman/engine/js-processor/*": ["./keyman/engine/js-processor/*"],
-      "keyman/common/web-utils": ["./keyman/common/web-utils/index.ts"],
-      "keyman/common/web-utils/*": ["./keyman/common/web-utils/*"]
-    }
+    "lib": ["ES2022", "DOM"]
   },
   "include": [
     "keyman/**/*.ts"

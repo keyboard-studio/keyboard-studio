@@ -6,14 +6,14 @@
 
 //#region Imports
 
-import { type DeviceSpec, KMWString } from "keyman/common/web-utils";
-import { ModifierKeyConstants } from '@keymanapp/common-types';
+import { type DeviceSpec, KMWString } from "../../common/web-utils/index.js";
+import { ModifierKeyConstants } from '../../common/types/main.js';
 import {
   Codes,
   JSKeyboard,
-  Keyboard,
+  type Keyboard,
   KeyboardHarness,
-  KeyboardKeymanGlobal,
+  type KeyboardKeymanGlobal,
   KeyMapping,
   SyntheticTextStore,
   MutableSystemStore,
@@ -23,11 +23,11 @@ import {
   type Deadkey,
   type KeyEvent,
   type TextStore,
-  VariableStores,
-  VariableStoreSerializer,
-} from "keyman/engine/keyboard";
+  type VariableStores,
+  type VariableStoreSerializer,
+} from "../keyboard/index.js";
 import { PlatformSystemStore } from './platformSystemStore.js';
-import { ComplexKeyboardStore, type KeyboardStore, KeyboardStoreElement } from "./stores.js";
+import { type ComplexKeyboardStore, type KeyboardStore, type KeyboardStoreElement } from "./stores.js";
 
 //#endregion
 

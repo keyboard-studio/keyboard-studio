@@ -237,6 +237,10 @@ export function useWorkingCopyTransform(
   // conditional useWorkingCopyStore call, and this is the existing pre-058
   // behavior for every caller that omits the override.
   const storeTouchLayoutJson = useWorkingCopyStore((s) => s.touchLayoutJson);
+  // spec 078: the applied context-tolerance fix, replayed by the projection.
+  // Replaced wholesale on every apply (never mutated), so its reference is a
+  // correct memo key.
+  const contextToleranceOverlay = useWorkingCopyStore((s) => s.contextToleranceOverlay?.overlay ?? null);
 
   // Effective touch layout JSON: the live-layout override's own in-progress
   // value takes precedence over the store's field WHEN the override is
@@ -388,6 +392,7 @@ export function useWorkingCopyTransform(
         identity: identityArg,
         ...(touchLayoutJson !== null ? { touchLayoutJson } : {}),
         ...(storeBaseDisplayName !== null ? { baseDisplayName: storeBaseDisplayName } : {}),
+        contextToleranceOverlay,
       });
 
       return {
@@ -410,5 +415,6 @@ export function useWorkingCopyTransform(
     patternMap,
     touchLayoutJson,
     keyEditOpsKey,
+    contextToleranceOverlay,
   ]);
 }

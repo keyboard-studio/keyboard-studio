@@ -3,7 +3,7 @@
  * Keyman is copyright (C) SIL Global. MIT License.
  */
 import { KeyEvent } from '../keyEvent.js';
-import { Alternate, TextTransform } from './textTransform.js';
+import { type Alternate, TextTransform } from './textTransform.js';
 // VENDORED ANNOTATION: changed to `import type` to break the ESM circular evaluation
 // chain textStore → transcription → syntheticTextStore → textStore.  In the upstream
 // Keyman build (CJS / esbuild bundle) this cycle is harmless; in Node ESM vitest the

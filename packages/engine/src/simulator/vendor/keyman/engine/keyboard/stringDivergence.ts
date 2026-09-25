@@ -1,5 +1,5 @@
 // @ts-nocheck
-import { Uni_IsSurrogate1, Uni_IsSurrogate2 } from '@keymanapp/common-types';
+import { Uni_IsSurrogate1, Uni_IsSurrogate2 } from '../../common/types/main.js';
 
 /**
  * Returns the index for the code point divergence point between two strings, as measured in code

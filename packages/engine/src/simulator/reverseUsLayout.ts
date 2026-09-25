@@ -18,7 +18,8 @@ import { DefaultOutputRules } from './vendor/keyman/engine/keyboard/defaultOutpu
 // Imported for its side effect of establishing the vendor module init order
 // the vendored code requires (mirrors ./index.ts's own import ordering) —
 // loading defaultOutputRules.js in isolation otherwise throws at module init.
-import './nodeKeyboardLoader.js';
+// Host-neutral: the keyboard loader itself is installed by the host entry.
+import './keyboardLoader.js';
 import { DEVICE } from './index.js';
 
 let cache: Map<string, { vkey: string; shift: boolean }> | null = null;

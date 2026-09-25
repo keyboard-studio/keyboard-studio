@@ -145,6 +145,19 @@ Three layers gate the working copy (spec [§10](../spec.md#10-validator-and-lint
   plus Layer A′ import-fidelity checks I1–I6 →
   [`packages/engine/src/validator/`](../packages/engine/src/validator/)
 - **Layer C** hygiene → [`@keymanapp/keyboard-lint`](../packages/keyboard-lint/)
+- **Compile-gate analyses** ride the preview compile, not the debounce. After
+  `useKeyboardArtifact` reaches `ready`, the context-tolerance analysis (spec 078)
+  runs as an un-awaited follow-on task gated by the compile's `runId`. It never
+  delays the preview and adds no timer. Its report reaches Layer C through
+  `lintContextTolerance`.
+- **Async compute, synchronous write (spec 078, research D8).** A fix that must
+  compile and simulate to be generated is computed asynchronously, outside any
+  step. It is committed in two places. The working IR takes it through
+  `applyMutatePatch` against paths the manifest declares (`CONTEXT_TOLERANCE_WRITES`
+  on the `marks` step). The artifact takes it as a persisted overlay that
+  `projectWorkingCopyVfs` replays synchronously, because the preview and the
+  download are re-projected from the base keyboard and never emit the working IR.
+  The step itself writes only the author's decision.
 - One **300 ms debounce** cycle runs the TS check and the WASM `kmcmplib` oracle
   as concurrent microtasks (decision D3). Do not add a second timer.
   - **Scope of D3.** D3 governs the *validation/preview* trigger only — the rule
@@ -208,7 +221,8 @@ not a number maintained by hand here.)
 | Pattern library | spec §5 / [specs/005](../specs/005-pattern-schema/spec.md) | `packages/engine/src/pattern-library/`, `pattern-apply/` |
 | Validator (A/B/A′/C) | spec §10 | `packages/engine/src/validator/`, `packages/keyboard-lint/` |
 | Compiler (kmcmplib) | spec §4 | `packages/engine/src/compiler/` (wasm ships in the `@keymanapp/kmc-kmn` npm dependency) |
-| Simulator | spec §4 | `packages/engine/src/simulator/` |
+| Simulator | spec §4 | `packages/engine/src/simulator/`: host-injected keyboard loader (`keyboardLoader.ts`), Node `vm` and browser `new Function` loaders |
+| Context tolerance | [specs/078](../specs/078-context-tolerance-wiring/spec.md) | engine `./context-tolerance` subpath + `pattern-apply/context-tolerance-overlay.ts`; studio `lib/contextToleranceAnalysis.ts`, `hooks/useContextToleranceApply.ts`, `survey/marks/ContextToleranceStation.tsx` |
 | Output / scaffolder | spec §11 / §12 | `packages/engine/src/{output,scaffolder}/` |
 | Studio SPA | spec §4 | `packages/studio/` |
 | Criteria compliance | spec §11 | `packages/contracts/data/criteria.json` (+ `criteria-summary.md`) |

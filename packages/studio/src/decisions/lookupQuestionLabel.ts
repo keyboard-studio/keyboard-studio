@@ -12,7 +12,8 @@
 // reads from when it builds the catalog `resolveContentString` looks up
 // against.
 
-import type { I18n } from "@lingui/core";
+import type { I18n, MessageDescriptor } from "@lingui/core";
+import { msg } from "@lingui/core/macro";
 import { resolveContentString } from "../lib/contentI18n.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
 import type { FlowQuestion } from "../survey/types.ts";
@@ -41,6 +42,22 @@ function defaultGetQuestionLabelSource(questionId: string): QuestionLabelSource 
   };
 }
 
+/**
+ * Labels for questions an editor step records itself, which have no flow-question
+ * module to read a prompt from (spec 078: the marks series' context-tolerance
+ * decision). Consulted only when the registry has no entry for the id.
+ */
+const EDITOR_QUESTION_LABELS: Readonly<Record<string, MessageDescriptor>> = {
+  "marks.context_tolerance": msg({
+    id: "trail.question.marksContextTolerance",
+    message: "Accents typed as separate characters",
+  }),
+  "marks.context_tolerance.sites": msg({
+    id: "trail.question.marksContextToleranceSites",
+    message: "Rules fixed for accents typed as separate characters",
+  }),
+};
+
 /** Same trim guard the extractor uses to decide a field counts as "authored" (contract §2). */
 function nonEmpty(value: string | undefined): string | undefined {
   if (value === undefined) return undefined;
@@ -61,7 +78,11 @@ export function createLookupQuestionLabel(
 ): (questionId: string) => string | undefined {
   return (questionId: string): string | undefined => {
     const source = getQuestionLabelSource(questionId);
-    if (source === undefined) return undefined;
+    if (source === undefined) {
+      const editorLabel = EDITOR_QUESTION_LABELS[questionId];
+      if (editorLabel === undefined) return undefined;
+      return i18n !== undefined ? i18n._(editorLabel) : (editorLabel.message ?? editorLabel.id);
+    }
 
     const auditLabel = nonEmpty(source.audit_label);
     if (auditLabel !== undefined) {
