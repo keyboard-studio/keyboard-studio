@@ -1,5 +1,5 @@
 // docLevelBadge — the ONE label + tone mapping for the base documentation
-// classification badge (spec 076 FR-008), shared by the choose-base
+// classification badge (spec 079 FR-008), shared by the choose-base
 // suggestion cards (editors/panels/BaseResolution.tsx) and the selected-base
 // MetadataCard (components/MetadataCard.tsx) so the two surfaces can never
 // disagree about the wording or colour of the same level.

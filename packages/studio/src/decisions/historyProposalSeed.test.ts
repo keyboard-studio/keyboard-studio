@@ -1,4 +1,4 @@
-// Tests for historyProposalSeed (spec 076 T042).
+// Tests for historyProposalSeed (spec 079 T042).
 //
 // Coverage:
 //   1. Empty record -> the all-empty seed.

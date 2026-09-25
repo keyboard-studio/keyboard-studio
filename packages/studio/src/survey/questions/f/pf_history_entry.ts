@@ -1,4 +1,4 @@
-// Per-question module: pf_history_entry (Phase F, spec 076 US5 / T043)
+// Per-question module: pf_history_entry (Phase F, spec 079 US5 / T043)
 //
 // The HISTORY.md proposal surface (contracts/studio-surfaces.md §3, research
 // R6, data-model.md §3): confirm / edit / dismiss the first HISTORY entry the
@@ -47,7 +47,7 @@ export function isHistoryEntryAction(value: string): value is HistoryEntryAction
 export const definition = {
   id: "pf_history_entry",
   prompt: "Here is the first HISTORY entry we propose — confirm, edit, or dismiss it.",
-  // `{{history_heading}}`/`{{history_bullets}}` (spec 076 US5): the actual
+  // `{{history_heading}}`/`{{history_bullets}}` (spec 079 US5): the actual
   // proposed entry text, injected via SurveyContext by
   // phaseFOptions.buildContext (flowStepOptions.tsx) — the same `{{token}}`
   // interpolation mechanism every other context-dependent flow string already
@@ -120,7 +120,7 @@ const mod: QuestionModule = {
   fixtures,
   inputs: [],
   writes: [],
-  specRef: "specs/076-documentation-completeness",
+  specRef: "specs/079-documentation-completeness",
 };
 export default mod;
 

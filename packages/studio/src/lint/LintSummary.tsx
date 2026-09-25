@@ -47,7 +47,7 @@ export function LintSummary({ findings }: LintSummaryProps) {
     }
   }
 
-  // spec 076 FR-020 (research R8): upstream findings — inherited from the base
+  // spec 079 FR-020 (research R8): upstream findings — inherited from the base
   // and untouched by the author — still render in the list (muted, LintChip)
   // but are excluded from the headline counts and the live-region text, so
   // twelve muted chips never announce as "12 warnings" against the author.

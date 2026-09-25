@@ -1,8 +1,8 @@
 # Implementation Plan: Documentation completeness — every package ships its full documentation set
 
-**Branch**: `076-documentation-completeness` | **Date**: 2026-09-10 | **Spec**: [spec.md](spec.md)
+**Branch**: `079-documentation-completeness` | **Date**: 2026-09-10 | **Spec**: [spec.md](spec.md)
 
-**Input**: Feature specification from `/specs/076-documentation-completeness/spec.md`
+**Input**: Feature specification from `/specs/079-documentation-completeness/spec.md`
 
 ## Summary
 
@@ -83,7 +83,7 @@ violations; no Complexity Tracking entries).*
 ### Documentation (this feature)
 
 ```text
-specs/076-documentation-completeness/
+specs/079-documentation-completeness/
 ├── plan.md              # This file
 ├── research.md          # Phase 0 — 13 resolved decisions (R1–R13)
 ├── data-model.md        # Phase 1 — entities & relationships

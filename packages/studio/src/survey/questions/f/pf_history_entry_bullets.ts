@@ -1,4 +1,4 @@
-// Per-question module: pf_history_entry_bullets (Phase F, spec 076 US5 / T043)
+// Per-question module: pf_history_entry_bullets (Phase F, spec 079 US5 / T043)
 //
 // Edit-branch companion to pf_history_entry: reached only when the author
 // chooses "edit" on the HISTORY proposal. Free-text bullet editing, one
@@ -20,7 +20,7 @@ export const definition = {
 
 export const fixtures: QuestionModule["fixtures"] = {
   valid: [
-    { value: "Adapted from basic_kbdfr v1.3 via keyboard-studio.\nAdded 2 characters: é, è", note: "two edited bullets" },
+    { value: "Adapted from basic_kbdfr v1.3 via keyboard-studio.\nAdded 2 characters: é, è.", note: "two edited bullets" },
     { value: "", note: "blank is fine — falls back to the drafted bullets (see applyHistoryEntryAction)" },
     { value: undefined, note: "undefined is fine (optional)" },
   ],
@@ -40,6 +40,6 @@ const mod: QuestionModule = {
   fixtures,
   inputs: [],
   writes: [],
-  specRef: "specs/076-documentation-completeness",
+  specRef: "specs/079-documentation-completeness",
 };
 export default mod;

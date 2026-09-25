@@ -1,4 +1,4 @@
-// Unit tests for useBaseDocProfile (spec 076 FR-008): the per-base-id cache
+// Unit tests for useBaseDocProfile (spec 079 FR-008): the per-base-id cache
 // that drives BaseResolution's suggestion-card badges.
 
 import { describe, it, expect, vi, afterEach } from "vitest";

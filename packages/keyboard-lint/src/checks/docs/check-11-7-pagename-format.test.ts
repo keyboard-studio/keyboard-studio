@@ -1,17 +1,19 @@
 import { describe, it, expect } from "vitest";
 import { checkPagenameFormat } from "./check-11-7-pagename-format.js";
 import type { DocLintInput } from "@keyboard-studio/contracts";
+import { CLEAN_DOC_LINT_INPUT } from "./fixtures/clean.js";
 
 function makeInput(helpPhp: string | undefined, displayName: string): DocLintInput {
+  const membersWithout = Object.fromEntries(
+    Object.entries(CLEAN_DOC_LINT_INPUT.members).filter(([k]) => k !== "help-php"),
+  ) as DocLintInput["members"];
   return {
-    keyboardId: "test_kbd",
-    keyboardVersion: "1.0",
-    targets: [],
-    layerIds: [],
+    ...CLEAN_DOC_LINT_INPUT,
     displayName,
-    copyrightHolders: {},
-    members: helpPhp !== undefined ? { "help-php": helpPhp } : {},
-    deletedFilenames: [],
+    members:
+      helpPhp !== undefined
+        ? { ...CLEAN_DOC_LINT_INPUT.members, "help-php": helpPhp }
+        : membersWithout,
   };
 }
 

@@ -8,7 +8,7 @@
 // Pipeline:
 //   projectWorkingCopyForOutput()   carve + assignments + identity + descriptor
 //                                   + id rename + every documentation member
-//                                   (spec 061 / spec 076 — LICENSE.md completion
+//                                   (spec 061 / spec 079 — LICENSE.md completion
 //                                   included, so the PR path ships it too; it
 //                                   used to be completed HERE, download-only)
 //     -> compile()                  the projected .kmn, under its final id
@@ -81,7 +81,7 @@ export async function buildOutputBundle(): Promise<OutputBundle | null> {
   const { vfs, keyboardId, displayName, version } = projected;
   const warnings = [...projected.warnings];
 
-  // LICENSE.md completion moved INTO projectWorkingCopyForOutput (spec 076
+  // LICENSE.md completion moved INTO projectWorkingCopyForOutput (spec 079
   // FR-001): a member completed only here never reached the pull-request path,
   // which projects the same tree without coming through this function.
 

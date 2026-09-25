@@ -3,7 +3,7 @@
 // `.kmn` file"; 7.1 "`.kmn` version matches `HISTORY.md` top entry" — the
 // same fact viewed from each file's side (contracts/lint-checks.md). One
 // comparison, both codes emitted at most once each, message naming both
-// versions (spec 076 US7-1).
+// versions (spec 079 US7-1).
 
 import type { DocLintInput, LintFinding } from "@keyboard-studio/contracts";
 import { docMemberPath, parseHistoryEntries } from "./_shared.js";

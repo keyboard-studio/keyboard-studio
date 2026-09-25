@@ -1,4 +1,4 @@
-// collectDocLintInput — spec 076 US7 (T070/T072): the pure assembly of the
+// collectDocLintInput — spec 079 US7 (T070/T072): the pure assembly of the
 // Layer C documentation input from working-copy data, and the FR-020 baseline.
 
 import { describe, it, expect } from "vitest";

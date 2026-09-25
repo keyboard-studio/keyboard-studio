@@ -3,7 +3,7 @@
 // `welcome.htm` and `.php` is well-formed — balanced tags, proper headings,
 // no unclosed elements (in-browser check via DOMParser)." Implemented with
 // the dependency-free tag-balance scanner in `_shared.ts` rather than
-// DOMParser (spec 076 research R7 — see that module's header for why).
+// DOMParser (spec 079 research R7 — see that module's header for why).
 
 import type { DocLintInput, DocMemberId, LintFinding } from "@keyboard-studio/contracts";
 import { docMemberPath, findUnbalancedTags, stripPhpHeader } from "./_shared.js";

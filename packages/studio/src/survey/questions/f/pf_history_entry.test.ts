@@ -1,4 +1,4 @@
-// Tests for pf_history_entry (spec 076 T043/T045, contracts/studio-surfaces.md §3).
+// Tests for pf_history_entry (spec 079 T043/T045, contracts/studio-surfaces.md §3).
 //
 // Coverage:
 //   - module shape (definition/id/routing, inputs/writes)
@@ -52,7 +52,7 @@ describe("pf_history_entry — module shape", () => {
   it("declares no IR reads/writes (store-slice pattern, spec 061 precedent)", () => {
     expect(mod.inputs).toEqual([]);
     expect(mod.writes).toEqual([]);
-    expect(mod.specRef).toBe("specs/076-documentation-completeness");
+    expect(mod.specRef).toBe("specs/079-documentation-completeness");
   });
 
   it("the bullets companion routes straight to the opt-in gate", () => {
@@ -95,9 +95,9 @@ describe("deriveHistoryEntryState — first render (no prior state)", () => {
     expect(state.proposal.dateIso).toBe("2026-06-18");
     expect(state.proposal.bullets).toEqual([
       "Adapted from basic_kbdfr v1.3 via keyboard-studio.",
-      "Added 2 characters: é, è",
-      "Assigned mechanisms: dead key",
-      "Removed 2 keys",
+      "Added 2 characters: é, è.",
+      "Assigned mechanisms: dead key.",
+      "Removed 2 keys.",
     ]);
   });
 
@@ -149,9 +149,9 @@ describe("deriveHistoryEntryState — version change (spec edge case)", () => {
     expect(state.proposal.dateIso).toBe("2026-06-18");
     expect(state.proposal.bullets).toEqual([
       "Adapted from basic_kbdfr v1.3 via keyboard-studio.",
-      "Added 2 characters: é, è",
-      "Assigned mechanisms: dead key",
-      "Removed 2 keys",
+      "Added 2 characters: é, è.",
+      "Assigned mechanisms: dead key.",
+      "Removed 2 keys.",
     ]);
   });
 

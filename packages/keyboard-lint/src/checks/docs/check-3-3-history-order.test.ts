@@ -1,17 +1,18 @@
 import { describe, it, expect } from "vitest";
 import { checkHistoryOrder } from "./check-3-3-history-order.js";
 import type { DocLintInput } from "@keyboard-studio/contracts";
+import { CLEAN_DOC_LINT_INPUT } from "./fixtures/clean.js";
 
 function makeInput(historyMd: string | undefined): DocLintInput {
+  const membersWithout = Object.fromEntries(
+    Object.entries(CLEAN_DOC_LINT_INPUT.members).filter(([k]) => k !== "history-md"),
+  ) as DocLintInput["members"];
   return {
-    keyboardId: "test_kbd",
-    keyboardVersion: "1.2",
-    targets: [],
-    layerIds: [],
-    displayName: "Test",
-    copyrightHolders: {},
-    members: historyMd !== undefined ? { "history-md": historyMd } : {},
-    deletedFilenames: [],
+    ...CLEAN_DOC_LINT_INPUT,
+    members:
+      historyMd !== undefined
+        ? { ...CLEAN_DOC_LINT_INPUT.members, "history-md": historyMd }
+        : membersWithout,
   };
 }
 

@@ -1,4 +1,4 @@
-# Contract: Studio surfaces (spec 076, FR-017 / FR-021 / Article IX)
+# Contract: Studio surfaces (spec 079, FR-017 / FR-021 / Article IX)
 
 The four new user-facing surfaces and their manifest/store contracts.
 
@@ -11,7 +11,7 @@ The four new user-facing surfaces and their manifest/store contracts.
 - **Data**: `classifyBaseDocumentation` over the base's already-fetched `.kps`
   manifest + a lazy welcome-probe fetch for the focused base; cached per base id.
 - **Manifest**: display-only addition to the existing editor step; `specRef` gains
-  `specs/076-documentation-completeness`. No writes.
+  `specs/079-documentation-completeness`. No writes.
 
 ## 2. Adaptive description proposal (US4, FR-009)
 
@@ -34,7 +34,7 @@ The four new user-facing surfaces and their manifest/store contracts.
   on `workingCopyStore`, persisted via `persistWorkingCopy` (both snapshot and
   rehydrate), allowlisted in the mutation-name list. Not an IR write.
 - **Manifest**: question module declares `inputs: []`, `writes: []` (store-slice
-  pattern per spec 061 precedent), `specRef: "specs/076-documentation-completeness"`.
+  pattern per spec 061 precedent), `specRef: "specs/079-documentation-completeness"`.
 
 ## 4. Output documentation checklist (US3, FR-017/FR-018)
 

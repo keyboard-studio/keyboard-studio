@@ -181,7 +181,7 @@ export interface ProjectWorkingCopyVfsInput {
   /** Identity overlay. Pass `null` to skip identity projection. */
   identity: IdentityOverlay | null;
   /**
-   * spec 076 FR-002/FR-006: bare names of the files the OUTPUT projection
+   * spec 079 FR-002/FR-006: bare names of the files the OUTPUT projection
    * ships in `source/welcome/` beside the page (inherited base images,
    * generated charts), so step 3.6's descriptor `<Files>` list names them.
    * Optional: the OSK preview path omits it — it builds no package, and the

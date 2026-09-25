@@ -1224,7 +1224,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     return typeof raw === "string" ? raw : null;
   }, [baseVfs]);
   const { findings: validatorFindingsOnly } = useValidator(kmnSource);
-  // spec 076 FR-019 (research R7): the Layer C documentation checks ride the
+  // spec 079 FR-019 (research R7): the Layer C documentation checks ride the
   // SAME findings array — a memoised synchronous hook, no second timer (D3) —
   // so they render, publish, and classify exactly like every other finding.
   // Warning-severity by the Layer C ceiling, so they can never block (FR-018).

@@ -1,4 +1,4 @@
-// deriveDocMemberStates — spec 076 US3 (T024): the FR-022 single source of
+// deriveDocMemberStates — spec 079 US3 (T024): the FR-022 single source of
 // truth for member tier + placeholder across the authoring tracks.
 
 import { describe, it, expect } from "vitest";

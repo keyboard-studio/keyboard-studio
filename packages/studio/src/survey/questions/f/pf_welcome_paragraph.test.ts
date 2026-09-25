@@ -1,5 +1,5 @@
 // Tests for pf_welcome_paragraph's adaptive description proposal
-// (spec 076 FR-009, US4, contracts/studio-surfaces.md §2).
+// (spec 079 FR-009, US4, contracts/studio-surfaces.md §2).
 //
 // Covers T037: prefill + waived required on an adaptation whose base has a
 // usable description (adapt-full); required + empty (today's behavior,
@@ -50,7 +50,7 @@ describe("pf_welcome_paragraph — module shape", () => {
   });
 });
 
-describe("pf_welcome_paragraph — prefill (spec 076 FR-009)", () => {
+describe("pf_welcome_paragraph — prefill (spec 079 FR-009)", () => {
   it("adapt-full: prefills from the base's usable welcome-page description", () => {
     const value = prefill(
       ctx({
@@ -119,7 +119,7 @@ describe("pf_welcome_paragraph — prefill (spec 076 FR-009)", () => {
   });
 });
 
-describe("pf_welcome_paragraph — requiredWhen (spec 076 FR-009)", () => {
+describe("pf_welcome_paragraph — requiredWhen (spec 079 FR-009)", () => {
   it("adapt-full: required is WAIVED (a usable description was proposed)", () => {
     expect(
       requiredWhen(

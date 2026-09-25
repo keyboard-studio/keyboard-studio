@@ -420,7 +420,7 @@ describe("delivered artifact — <WebSite> from helpDocs.projectHomeUrl (spec 06
 });
 
 // ---------------------------------------------------------------------------
-// spec 076 US2 (T017/T019): the welcome folder in the DELIVERED tree — the page
+// spec 079 US2 (T017/T019): the welcome folder in the DELIVERED tree — the page
 // at its folder path, every inherited image beside it, all listed, no flat file.
 // ---------------------------------------------------------------------------
 
@@ -450,7 +450,7 @@ function seedCopyTrackWithFlatStub() {
   return { vfs, ir };
 }
 
-describe("delivered artifact — the welcome folder (spec 076 FR-002, FR-006, SC-002)", () => {
+describe("delivered artifact — the welcome folder (spec 079 FR-002, FR-006, SC-002)", () => {
   it("adapt track: the page is at source/welcome/welcome.htm, every base image beside it, no flat file", async () => {
     const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
     seedAdaptTrackWithoutDescriptor("1.0");
@@ -552,8 +552,8 @@ describe("delivered artifact — the welcome folder (spec 076 FR-002, FR-006, SC
   });
 });
 
-// spec 076 US6 (T054): every generated chart is a listed welcome-folder member.
-describe("delivered artifact — generated layout charts in <Files> (spec 076 FR-013)", () => {
+// spec 079 US6 (T054): every generated chart is a listed welcome-folder member.
+describe("delivered artifact — generated layout charts in <Files> (spec 079 FR-013)", () => {
   it("adapt track with no base images: each ks-layout-*.svg chart is listed as welcome\\… and exists in the tree", async () => {
     const { serializeWorkingCopy } = await import("./serializeWorkingCopy.ts");
     seedAdaptTrackWithoutDescriptor("1.0");

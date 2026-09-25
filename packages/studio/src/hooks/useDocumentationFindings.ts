@@ -1,5 +1,5 @@
 // useDocumentationFindings — the Layer C documentation checks, run inside the
-// existing render/validation cycle (spec 076 US7 / FR-019, research R7), with
+// existing render/validation cycle (spec 079 US7 / FR-019, research R7), with
 // the FR-020 upstream classification applied (research R8).
 //
 // A `useMemo` over the same store slices the docs preview consumes — the

@@ -37,13 +37,13 @@ export interface BaseBrowserConfig {
 }
 
 /**
- * A {@link BaseBrowserService} extended with the spec 076 documentation
+ * A {@link BaseBrowserService} extended with the spec 079 documentation
  * classifier (FR-008, research R4). Not folded into the locked
  * `BaseBrowserService` contract — additive engine-side surface only.
  */
 export interface BaseBrowserServiceWithDocProfile extends BaseBrowserService {
   /**
-   * Classify `baseId`'s documentation completeness (spec 076 FR-008), from
+   * Classify `baseId`'s documentation completeness (spec 079 FR-008), from
    * its already-fetched `.kps` manifest plus one welcome-page probe fetch.
    * Computed lazily for the focused/selected base only — never for the whole
    * gallery — and cached per base id, so a repeated call for the same id
@@ -68,7 +68,7 @@ interface CacheEntry {
   expiry: number;
 }
 
-/** The base's raw `.kps` text plus the folder it (and its source siblings) live under, kept for the doc-profile welcome probe (spec 076 R4) — the base's metadata fetch already paid for this text once. */
+/** The base's raw `.kps` text plus the folder it (and its source siblings) live under, kept for the doc-profile welcome probe (spec 079 R4) — the base's metadata fetch already paid for this text once. */
 interface KpsCacheEntry {
   kpsText: string;
   keyboardRoot: string;

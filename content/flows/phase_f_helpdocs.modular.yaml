@@ -16,7 +16,7 @@
 # DEFAULT PATH — 7 screens, exactly ONE of them required:
 #   pf_welcome_paragraph     (REQUIRED — the only thing a help page truly needs)
 #   pf_usage_tip_1           (optional, one tip)
-#   pf_history_entry         (spec 076 US5: confirm/edit/dismiss the drafted
+#   pf_history_entry         (spec 079 US5: confirm/edit/dismiss the drafted
 #                             first HISTORY.md entry — optional, "proposed"
 #                             until decided)
 #   pf_history_entry_bullets (edit branch only — free-text bullet editing)
@@ -50,7 +50,7 @@ questions:
   # --- default path ---
   - pf_welcome_paragraph
   - pf_usage_tip_1
-  # HISTORY proposal (spec 076 US5): confirm / edit / dismiss the first
+  # HISTORY proposal (spec 079 US5): confirm / edit / dismiss the first
   # HISTORY.md entry drafted from what changed this session. Reached via
   # pf_usage_tip_1's `next` (routing is per-module, not list order — see
   # loadModularFlow.ts); pf_history_entry_bullets is reached only on "edit".

@@ -1,4 +1,4 @@
-// classifyBaseDocumentation — spec 076 FR-008/FR-009, research R4.
+// classifyBaseDocumentation — spec 079 FR-008/FR-009, research R4.
 //
 // Pure classification of a base's documentation completeness from its already-
 // parsed `.kps` <Files> manifest plus (when fetched) its welcome/help page
@@ -47,7 +47,7 @@ function mapMember(relPath: string): DocMemberId | null {
 }
 
 /**
- * Classify a base's documentation profile (spec 076 data-model §2).
+ * Classify a base's documentation profile (spec 079 data-model §2).
  *
  * `members`/`welcomeConvention`/`welcomeImages` come from the `.kps` manifest
  * alone; `level`/`hasUsableDescription` also weigh the fetched welcome/help

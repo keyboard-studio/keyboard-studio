@@ -437,7 +437,7 @@ describe("scaffold — displayName sanitization", () => {
     const service = createScaffolderService({ fetchImpl: makeFetch(BASE_KMN) as typeof fetch });
     const { vfs } = await service.scaffold(baseKeyboard, "my_keyboard", "My Keyboard */ eval('bad')");
     const content = vfs.get("source/help/my_keyboard.php")!.content as string;
-    // spec 076 FR-003: the stub now opens with the help-site header, whose
+    // spec 079 FR-003: the stub now opens with the help-site header, whose
     // single-quoted $pagename may legitimately contain '*/' (not a comment
     // there). The comment block below it is what must be defused.
     expect(content.startsWith("<?php\n  $pagename = '")).toBe(true);

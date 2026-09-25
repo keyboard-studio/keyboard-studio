@@ -78,7 +78,7 @@ export const identityStep: EditorStep = step({
  * Choose-base step: BaseResolution (keyboard base picker ONLY).
  * Track selection is a separate manifest step (trackStep).
  *
- * spec 076: this step also surfaces the documentation-completeness badge on
+ * spec 079: this step also surfaces the documentation-completeness badge on
  * suggestion cards / MetadataCard (FR-008) — a DISPLAY-ONLY addition; it adds
  * no new writes to the step's own completion path.
  */
@@ -86,7 +86,7 @@ export const chooseBaseStep: EditorStep = step({
   id: "choose_base",
   title: "Choose Base Keyboard",
   component: BaseResolutionAdapter,
-  specRef: ["§8", "specs/076-documentation-completeness"],
+  specRef: ["§8", "specs/079-documentation-completeness"],
 });
 
 /**
@@ -216,7 +216,7 @@ export const touchStep: EditorStep = step({
  * Wrapped in PhaseFGate — the hard "every character implemented" gate (the Phase F hard gate)
  * layered on top of PhaseFStepFactoryComponent; see PhaseFGate.tsx.
  *
- * spec 076: this step supplies the content of every documentation member the
+ * spec 079: this step supplies the content of every documentation member the
  * Output route's documentation checklist reports (FR-017/FR-021), hosts the
  * adaptive description proposal (FR-009) and the HISTORY proposal
  * (`pf_history_entry`, FR-010..012), and is where every placeholder row's
@@ -229,7 +229,7 @@ export const helpStep: EditorStep = step({
   title: "Help & Tips",
   component: PhaseFGate,
   flowRefs: ["phase_f_helpdocs"],
-  specRef: ["§8", "specs/061-help-docs-generation", "specs/076-documentation-completeness"],
+  specRef: ["§8", "specs/061-help-docs-generation", "specs/079-documentation-completeness"],
 });
 
 /**

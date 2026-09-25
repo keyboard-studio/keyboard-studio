@@ -1,6 +1,6 @@
 {
   "workflow": "speckit",
-  "specName": "Documentation completeness — every package ships its full documentation set",
+  "specName": "Documentation completeness \u2014 every package ships its full documentation set",
   "branch": "076-documentation-completeness",
   "currentStep": "implement",
   "status": "completed",
@@ -1168,10 +1168,10 @@
   ],
   "concerns": [
     {
-      "note": "Local studio full run shows 26 failing files (theme, i18n, OAuth token storage, draftPersistence, StudioShell) — all untouched by this phase and all the known Node 26 localStorage shadow: with NODE_OPTIONS=--localstorage-file 116/118 of a sample pass. CI on Node 22 is expected green; confirm on the PR run."
+      "note": "Local studio full run shows 26 failing files (theme, i18n, OAuth token storage, draftPersistence, StudioShell) \u2014 all untouched by this phase and all the known Node 26 localStorage shadow: with NODE_OPTIONS=--localstorage-file 116/118 of a sample pass. CI on Node 22 is expected green; confirm on the PR run."
     },
     {
-      "note": "Sweep notes: 54/725 bases keep files in source/welcome/ their .kps never lists (carried only when the page references them); 4 bases reference images that do not exist or use percent-encoded names (rac_hazaragi) — base defects, surfaced by the projection's missing-image warning, not fixed here."
+      "note": "Sweep notes: 54/725 bases keep files in source/welcome/ their .kps never lists (carried only when the page references them); 4 bases reference images that do not exist or use percent-encoded names (rac_hazaragi) \u2014 base defects, surfaced by the projection's missing-image warning, not fixed here."
     },
     {
       "note": "getEnsurePackageFiles in packages/studio/src/lib/services.ts now has no callers (its only call site moved into the shared projection, which imports the engine statically); left in place for km-simplify to remove."

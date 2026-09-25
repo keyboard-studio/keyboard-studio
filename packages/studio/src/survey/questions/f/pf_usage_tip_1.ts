@@ -21,7 +21,7 @@ export const definition = {
     "Leave it blank if the layout speaks for itself.",
   type: "text" as const,
   required: false,
-  // Spec 076 US5: routes through the HISTORY proposal (pf_history_entry)
+  // Spec 079 US5: routes through the HISTORY proposal (pf_history_entry)
   // before the opt-in gate. Routing in this flow is per-module
   // (`definition.next`), so splicing in a new screen means repointing the
   // node immediately before it — this is that one-line change; the new

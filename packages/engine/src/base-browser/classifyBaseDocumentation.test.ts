@@ -1,4 +1,4 @@
-// classifyBaseDocumentation / extractUsableBaseDescription (spec 076 T032).
+// classifyBaseDocumentation / extractUsableBaseDescription (spec 079 T032).
 //
 // `ahom_star`-shaped fixtures are the corpus's real full-documentation shape
 // (folder convention, welcome images, a real description before the

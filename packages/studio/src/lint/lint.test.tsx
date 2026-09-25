@@ -290,7 +290,7 @@ describe("LintSummary — chip count", () => {
 });
 
 // ---------------------------------------------------------------------------
-// LintSummary — upstream findings (spec 076 FR-020, research R8)
+// LintSummary — upstream findings (spec 079 FR-020, research R8)
 // ---------------------------------------------------------------------------
 
 describe("LintSummary — upstream findings are excluded from the headline counts", () => {

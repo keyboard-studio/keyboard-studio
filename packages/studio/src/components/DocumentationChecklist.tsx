@@ -1,5 +1,5 @@
 // DocumentationChecklist — the Output step's informational list of the six
-// documentation members every package ships (spec 076 FR-017, research R10).
+// documentation members every package ships (spec 079 FR-017, research R10).
 //
 // Six rows from `useDocMemberStates` (the FR-022 single source of truth): the
 // member's name and projected path, the tier its content came from (derived /

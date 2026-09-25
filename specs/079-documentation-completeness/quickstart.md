@@ -1,4 +1,4 @@
-# Quickstart: Validating spec 076 (documentation completeness)
+# Quickstart: Validating spec 079 (documentation completeness)
 
 Runnable scenarios proving the feature end-to-end. Contracts:
 [contracts/](contracts/); entities: [data-model.md](data-model.md).

@@ -11,13 +11,13 @@ authoring *plan*; criteria.md is the review *checklist* the result gets held to.
 **Every produced package ships all six documentation members** — `README.md`, `HISTORY.md`,
 `LICENSE.md`, `source/readme.htm`, `source/welcome/welcome.htm`, and `source/help/<id>.php` —
 regardless of base or how far the author got
-([specs/076-documentation-completeness](../specs/076-documentation-completeness/spec.md) FR-001).
+([specs/079-documentation-completeness](../specs/079-documentation-completeness/spec.md) FR-001).
 `projectWorkingCopyForOutput` regenerates them on every production
 ([packages/engine/src/shared/helpDocsRender.ts](../packages/engine/src/shared/helpDocsRender.ts),
 [renderHistoryMd.ts](../packages/engine/src/shared/renderHistoryMd.ts)), via the SAME render
 modules the in-studio preview uses, so the two cannot visibly disagree.
 
-**Three source tiers, in priority order** (076 FR-005): facts *derived* from the keyboard itself
+**Three source tiers, in priority order** (079 FR-005): facts *derived* from the keyboard itself
 (names, language, platforms, holder) are always applied; content *inherited* from the base is
 used on a Track 2 adaptation (welcome page and its images, help body, README description,
 HISTORY entries — the author's answers are appended below, never replacing it); content
@@ -36,7 +36,7 @@ and inherited. **A fresh help page opens with the corpus-standard help-site head
 (`$pagename = '<Display Name> Keyboard Help'`, `$pagetitle = $pagename`,
 `require_once('header.php')`); an inherited help page keeps its own (FR-003).
 
-**Layout charts** (076 FR-013..016): one deterministic SVG per (platform, layer) —
+**Layout charts** (079 FR-013..016): one deterministic SVG per (platform, layer) —
 `ks-layout-<platform>-<layer>.svg`, generated from the keyboard model by
 `renderLayoutCharts` (`packages/engine/src/layout-chart/`) — is written into `source/welcome/`,
 referenced from the welcome page's "Keyboard Layout" section, and listed in the descriptor.
@@ -56,7 +56,7 @@ base content is inherited:
 | `source/welcome/welcome.htm` | `Welcome to <name>` — one line, plus the layout-chart section |
 | `source/help/<id>.php` | the help-site header + `<?php /* <name> help */ ?>` |
 
-**`HISTORY.md` is proposed, not stubbed** (076 FR-010..012): the Phase F `pf_history_entry`
+**`HISTORY.md` is proposed, not stubbed** (079 FR-010..012): the Phase F `pf_history_entry`
 screen proposes a first entry built from the decision record — the base it started from,
 characters added, mechanisms assigned, keys removed — under `## <version> (<YYYY-MM-DD>)`.
 Confirm, edit, or dismiss it; a dismissed proposal leaves the stub and the checklist marks
@@ -70,7 +70,7 @@ below (criterion 3.4).
 | `HISTORY.md` | the confirmed proposal, else `## <version> (<date>)\n* Initial release.` (+ the "Adapted from" bullet on an adaptation) |
 
 **Thirteen documentation criteria run as Layer C warnings inside the existing validation cycle**
-(076 FR-019; `packages/keyboard-lint/src/checks/docs/`): HISTORY order, cumulativeness, entry
+(079 FR-019; `packages/keyboard-lint/src/checks/docs/`): HISTORY order, cumulativeness, entry
 format, version agreement (both sides), stale file references, copyright-holder consistency,
 README platforms vs. targets, HTML well-formedness, help-page layer list, page-name format, and
 welcome/help body and style parity. A finding the base's own files already carried shows as an

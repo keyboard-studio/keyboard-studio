@@ -18,7 +18,7 @@ import { bumpKeyboardVersion, historyEntryHeading } from "@keyboard-studio/engin
 import { makeFlowStepComponent } from "./makeFlowStepComponent.tsx";
 import type { FlowStepOptions, FlowStepDeps } from "./makeFlowStepComponent.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
-// spec 076: the engine-backed helpers live in lib/, not in the question
+// spec 079: the engine-backed helpers live in lib/, not in the question
 // modules — those stay pure descriptors the standalone content-i18n
 // extractor can load without the engine.
 import {
@@ -246,7 +246,7 @@ const CTX_AUTHOR_CONTACT = "author_contact";
 
 /**
  * Reads the four working-copy slices `pf_welcome_paragraph`'s `prefill`/
- * `requiredWhen` need (spec 076 FR-009), straight off `getState()` rather
+ * `requiredWhen` need (spec 079 FR-009), straight off `getState()` rather
  * than threading them through `FlowStepDeps` — this seed function is called
  * on-demand (question-transition time / every SurveyRunner render), not
  * reactively per-render like the hook-level `depsRef` fields above, so a
@@ -264,7 +264,7 @@ function readAdaptiveDescriptionContext(): AdaptiveDescriptionContext {
 }
 
 /**
- * The version HISTORY's proposed heading is stamped with (spec 076 FR-010),
+ * The version HISTORY's proposed heading is stamped with (spec 079 FR-010),
  * mirroring `serializeWorkingCopy.ts`'s own `rawVersion`/`bumpKeyboardVersion`
  * derivation exactly (`baseIr.header.version?.trim() || "1.0"`, bumped only
  * on an adaptation) so the survey-time proposal and the final output-time
@@ -358,7 +358,7 @@ export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {
   title: "Help documentation",
 
   buildContext(deps: FlowStepDeps) {
-    // Match PhaseFAdapter's surveyContext pass-through, plus (spec 076 US5)
+    // Match PhaseFAdapter's surveyContext pass-through, plus (spec 079 US5)
     // the HISTORY-proposal tokens pf_history_entry's help_text interpolates.
     // `deps.historyEntryState` is null for exactly one render — before
     // onMount's first derivation lands — in which case both tokens resolve
@@ -378,7 +378,7 @@ export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {
 
   usesFindings: true,
 
-  // spec 076 US5: derive the HISTORY-entry proposal once per mount (entering
+  // spec 079 US5: derive the HISTORY-entry proposal once per mount (entering
   // the Phase F step), from the decision record no new journal was needed for
   // (buildHistoryProposalSeed) and the same version `serializeWorkingCopy.ts`
   // will independently recompute at output time (deriveHistoryVersion).
@@ -400,7 +400,7 @@ export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {
 
   seeds: {
     getSeedValue(questionId: string, deps: FlowStepDeps): string | string[] | undefined {
-      // spec 076 FR-009: on an adaptation whose base has a usable description,
+      // spec 079 FR-009: on an adaptation whose base has a usable description,
       // propose it for confirmation (accept/edit/replace in one action, §3c).
       // Net-new, copy (Track 1), and a base classified none/minimal all
       // resolve to undefined here — pf_welcome_paragraph behaves exactly as
@@ -427,7 +427,7 @@ export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {
       return undefined;
     },
 
-    // spec 076 FR-009: waives pf_welcome_paragraph's static `required: true`
+    // spec 079 FR-009: waives pf_welcome_paragraph's static `required: true`
     // in exactly the case getSeedValue above proposed a value — every other
     // question (undefined here) keeps its own static `required`.
     getRequiredOverride(questionId: string): boolean | undefined {
@@ -452,7 +452,7 @@ export const phaseFOptions: FlowStepOptions<PhaseFPayload> = {
       deps.setHelpDocs(extracted);
     }
 
-    // spec 076 US5: apply the author's confirm / edit / dismiss decision onto
+    // spec 079 US5: apply the author's confirm / edit / dismiss decision onto
     // the proposal onMount derived. A blank/absent pf_history_entry answer
     // means "not decided yet" (validate() allows this) — status stays
     // "proposed" and FR-011's placeholder marker is untouched. `current` can

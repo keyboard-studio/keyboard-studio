@@ -572,10 +572,10 @@ describe("serializeWorkingCopy — adapt-existing path (Track 2)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// spec 076 US2 (T019): Track 1 copy — images and skeleton inherited, never prose
+// spec 079 US2 (T019): Track 1 copy — images and skeleton inherited, never prose
 // ---------------------------------------------------------------------------
 
-describe("serializeWorkingCopy — Track 1 copy inherits welcome images, never base prose (spec 076 FR-007, R9)", () => {
+describe("serializeWorkingCopy — Track 1 copy inherits welcome images, never base prose (spec 079 FR-007, R9)", () => {
   const IMAGES = [
     { path: "welcome/desktop_default.png", bytes: new Uint8Array([1, 2, 3]) },
     { path: "welcome/phone_default.png", bytes: new Uint8Array([4, 5, 6]) },
@@ -637,12 +637,12 @@ describe("serializeWorkingCopy — Track 1 copy inherits welcome images, never b
 });
 
 // ---------------------------------------------------------------------------
-// spec 076 US5 (T044/T045): HISTORY.md is rendered through renderHistoryMd on
+// spec 079 US5 (T044/T045): HISTORY.md is rendered through renderHistoryMd on
 // every production — the author's confirmed/edited entry at the top, the
 // attribution always present on an adaptation, the base's entries preserved.
 // ---------------------------------------------------------------------------
 
-describe("serializeWorkingCopy — HISTORY.md from the proposal decision (spec 076 FR-010..012)", () => {
+describe("serializeWorkingCopy — HISTORY.md from the proposal decision (spec 079 FR-010..012)", () => {
   const BASE_HISTORY = "## 1.0 (2020-01-01)\n* Initial release.\n";
   const PROPOSAL = { version: "1.1", dateIso: "2026-09-12", bullets: ["Added 2 characters: a, b"] };
 
@@ -695,10 +695,10 @@ describe("serializeWorkingCopy — HISTORY.md from the proposal decision (spec 0
 });
 
 // ---------------------------------------------------------------------------
-// spec 076 US6 (T052/T054): generated layout charts in source/welcome/.
+// spec 079 US6 (T052/T054): generated layout charts in source/welcome/.
 // ---------------------------------------------------------------------------
 
-describe("serializeWorkingCopy — layout charts (spec 076 FR-013..FR-015)", () => {
+describe("serializeWorkingCopy — layout charts (spec 079 FR-013..FR-015)", () => {
   const IMAGES = [{ path: "welcome/desktop_default.png", bytes: new Uint8Array([1, 2, 3]) }];
 
   function chartNames(vfs: { list(prefix: string): string[] }): string[] {

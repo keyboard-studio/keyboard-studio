@@ -298,7 +298,7 @@ describe("submitManagedPR() -- success", () => {
 });
 
 // ---------------------------------------------------------------------------
-// submitManagedPR -- binary (base64) source files, spec 076 welcome images
+// submitManagedPR -- binary (base64) source files, spec 079 welcome images
 // ---------------------------------------------------------------------------
 
 describe("submitManagedPR() -- binary (base64) source files", () => {

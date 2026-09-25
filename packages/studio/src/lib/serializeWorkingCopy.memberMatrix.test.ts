@@ -1,4 +1,4 @@
-// Every produced package ships all six documentation members (spec 076 SC-001 /
+// Every produced package ships all six documentation members (spec 079 SC-001 /
 // FR-001), whatever the track and whatever the base shipped — a parametrized
 // nine-cell matrix (T022):
 //

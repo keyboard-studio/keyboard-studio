@@ -34,7 +34,7 @@ export interface FlowStepHostProps {
   getSeedValue?: (questionId: string) => string | string[] | undefined;
   onAnswerCommit?: (questionId: string, value: string | string[] | undefined) => void;
   /**
-   * Optional per-question `required` override (spec 076 FR-009's adaptive
+   * Optional per-question `required` override (spec 079 FR-009's adaptive
    * description proposal). Forwarded to SurveyRunner unchanged — see its own
    * doc for the override contract.
    */

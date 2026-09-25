@@ -1,4 +1,4 @@
-// DocumentationChecklist — spec 076 US3 (T029): six rows, tier labels, the
+// DocumentationChecklist — spec 079 US3 (T029): six rows, tier labels, the
 // placeholder marker, "Go to" routing through the back-style jump (never
 // `advance()`), per-row warnings, and the layout-chart preference control
 // (US6 T053) on the welcome row.

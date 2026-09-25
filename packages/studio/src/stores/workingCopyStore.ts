@@ -327,7 +327,7 @@ export interface WorkingCopyState {
 
   /**
    * The base keyboard's own welcome page (`source/welcome/welcome.htm`, or the
-   * flat `source/welcome.htm` on a pre-folder-convention base — spec 076 R3),
+   * flat `source/welcome.htm` on a pre-folder-convention base — spec 079 R3),
    * verbatim, or null when it has none (spec 061 FR-013), or on Track 1
    * (nothing to merge with).
    *
@@ -343,7 +343,7 @@ export interface WorkingCopyState {
    */
   baseHelpPhpText: string | null;
 
-  // -- Base documentation bundle (spec 076 US2) --------------------------------
+  // -- Base documentation bundle (spec 079 US2) --------------------------------
   /**
    * The base keyboard's own `README.md`, verbatim, or null when it has none
    * or on Track 1 (a copy inherits no base prose, FR-007). Fetch-don't-write
@@ -357,7 +357,7 @@ export interface WorkingCopyState {
    */
   baseHistoryMdText: string | null;
   /**
-   * The base's `source/welcome/` image files (spec 076 FR-006), or null when
+   * The base's `source/welcome/` image files (spec 079 FR-006), or null when
    * the base ships none. Set on BOTH tracks — a Track 1 copy inherits the
    * images and the welcome page's skeleton, never its prose (research R9).
    * The projection writes each beside the rendered welcome page and lists it
@@ -382,9 +382,9 @@ export interface WorkingCopyState {
    */
   baseWelcomeImagesDropped: boolean;
 
-  // -- Documentation decisions (spec 076 US3/US5/US6) --------------------------
+  // -- Documentation decisions (spec 079 US3/US5/US6) --------------------------
   /**
-   * The HISTORY proposal's state (spec 076 FR-010..012): null until the Phase F
+   * The HISTORY proposal's state (spec 079 FR-010..012): null until the Phase F
    * `pf_history_entry` screen first proposes an entry; then `proposed`,
    * `confirmed`, `edited` or `dismissed`. Only a confirmed or edited entry
    * ships — anything else leaves the stub and marks HISTORY placeholder on the
@@ -392,7 +392,7 @@ export interface WorkingCopyState {
    */
   historyEntryState: HistoryEntryState | null;
   /**
-   * The author's layout-chart choice (spec 076 FR-015): keep the base's own
+   * The author's layout-chart choice (spec 079 FR-015): keep the base's own
    * welcome images, or regenerate charts from the model. Null means "not
    * chosen" — the FR-015 default then applies at read time (keep the base's
    * images when it ships any, generate charts otherwise), so a base picked
@@ -400,7 +400,7 @@ export interface WorkingCopyState {
    */
   chartPreference: ChartPreference | null;
   /**
-   * The selected base's documentation profile (spec 076 FR-008), computed by
+   * The selected base's documentation profile (spec 079 FR-008), computed by
    * the base browser for the focused base and recorded at selection; null
    * before a base is chosen or while the profile is still unknown. Drives the
    * adaptive description question (FR-009). Persisted.
@@ -408,7 +408,7 @@ export interface WorkingCopyState {
   baseDocProfile: BaseDocumentationProfile | null;
   /**
    * The Layer C documentation findings the BASE's own files carried at
-   * instantiation (spec 076 FR-020, research R8) — the baseline the studio's
+   * instantiation (spec 079 FR-020, research R8) — the baseline the studio's
    * documentation-findings hook compares against to classify a current finding
    * as `origin: "upstream"`. Null until computed once per instantiation; an
    * empty array means "computed, nothing found". Persisted.
@@ -889,28 +889,28 @@ export interface WorkingCopyState {
   /** Retain the base's verbatim help/<id>.php so the output merge can read it. */
   setBaseHelpPhpText: (text: string | null) => void;
 
-  /** Retain the base's verbatim README.md (spec 076 FR-006). */
+  /** Retain the base's verbatim README.md (spec 079 FR-006). */
   setBaseReadmeMdText: (text: string | null) => void;
 
-  /** Retain the base's verbatim HISTORY.md (spec 076 FR-006 / criterion 3.4). */
+  /** Retain the base's verbatim HISTORY.md (spec 079 FR-006 / criterion 3.4). */
   setBaseHistoryMdText: (text: string | null) => void;
 
-  /** Retain the base's welcome-folder images so the projection can ship them (spec 076 FR-006). */
+  /** Retain the base's welcome-folder images so the projection can ship them (spec 079 FR-006). */
   setBaseWelcomeImages: (images: WelcomeFolderImage[] | null) => void;
 
-  /** Record which welcome-page convention the base used (spec 076 data-model §6). */
+  /** Record which welcome-page convention the base used (spec 079 data-model §6). */
   setBaseWelcomeConvention: (convention: WelcomeConvention | null) => void;
 
-  /** Record the HISTORY proposal's state (spec 076 FR-011). Whole-value replace. */
+  /** Record the HISTORY proposal's state (spec 079 FR-011). Whole-value replace. */
   setHistoryEntryState: (state: HistoryEntryState | null) => void;
 
-  /** Record the author's keep-base-images / regenerate choice (spec 076 FR-015). */
+  /** Record the author's keep-base-images / regenerate choice (spec 079 FR-015). */
   setChartPreference: (preference: ChartPreference | null) => void;
 
-  /** Record the selected base's documentation profile (spec 076 FR-008). */
+  /** Record the selected base's documentation profile (spec 079 FR-008). */
   setBaseDocProfile: (profile: BaseDocumentationProfile | null) => void;
 
-  /** Record the base's own documentation findings at instantiation (spec 076 FR-020). */
+  /** Record the base's own documentation findings at instantiation (spec 079 FR-020). */
   setBaselineDocFindings: (findings: LintFinding[] | null) => void;
 
   /**
@@ -1599,7 +1599,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     resetPhaseBDraftDecisions();
     set({
       instantiationMode: "new-from-base",
-      // A new working copy starts with no documentation decisions (spec 076):
+      // A new working copy starts with no documentation decisions (spec 079):
       // the HISTORY proposal is re-proposed for this keyboard and the chart
       // choice falls back to the FR-015 default.
       historyEntryState: null,

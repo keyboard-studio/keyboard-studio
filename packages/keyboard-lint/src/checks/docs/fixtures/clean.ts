@@ -1,5 +1,5 @@
 // The shared "clean" DocLintInput fixture for the SC-007 fixture contract
-// (spec 076 contracts/lint-checks.md): realistic tool-rendered member texts
+// (spec 079 contracts/lint-checks.md): realistic tool-rendered member texts
 // that produce zero findings from every one of the twelve documentation
 // checks (thirteen codes). Used by bijection.test.ts and available to any
 // individual check test that wants a known-good baseline.

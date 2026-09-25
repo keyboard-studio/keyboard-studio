@@ -18,7 +18,7 @@ import { z } from "zod";
 const BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
 
 // One entry in sourceFiles. Text entries (the default) carry `content` as-is;
-// binary source entries (e.g. welcome-folder images, spec 076) are flagged
+// binary source entries (e.g. welcome-folder images, spec 079) are flagged
 // `encoding: "base64"` and validated as base64 so github-pipeline.ts can
 // upload them as Git blobs instead of inlining them as tree content. The
 // 1 MiB cap applies to the (already-larger) encoded string, so it still

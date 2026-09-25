@@ -1,4 +1,4 @@
-// Shared helpers for the checks/docs/* (spec 076 US7 / FR-019) documentation
+// Shared helpers for the checks/docs/* (spec 079 US7 / FR-019) documentation
 // checks — internal to this directory.
 //
 // These checks work over the plain rendered/current text of the six shipped
@@ -8,7 +8,7 @@
 // 11.5 criterion text says "in-browser check via DOMParser" — this package
 // implements the same *fact* (unbalanced/unclosed HTML elements) with a small
 // dependency-free tag-balance scanner instead, a deliberate deviation from
-// the criterion's suggested mechanism (spec 076 research R7). It binds the
+// the criterion's suggested mechanism (spec 079 research R7). It binds the
 // fact checked, not the API.
 
 import type { DocLintInput, DocMemberId } from "@keyboard-studio/contracts";
@@ -214,12 +214,12 @@ export function extractDataStatesLayers(html: string): string[] {
 
 const KEYBOARD_LAYOUT_SECTION_RE = /<h2>Keyboard Layout<\/h2>[\s\S]*?(?=<h2>|<\/body>|$)/i;
 
-/** Strip a leading `<?php ... ?>` header block (the help-site header, spec 076 FR-003). */
+/** Strip a leading `<?php ... ?>` header block (the help-site header, spec 079 FR-003). */
 export function stripPhpHeader(text: string): string {
   return text.replace(/^\s*<\?php[\s\S]*?\?>\s*/, "");
 }
 
-/** Strip the welcome-only "Keyboard Layout" section (spec 076 FR-004) so welcome/help bodies compare fairly. */
+/** Strip the welcome-only "Keyboard Layout" section (spec 079 FR-004) so welcome/help bodies compare fairly. */
 export function stripKeyboardLayoutSection(html: string): string {
   return html.replace(KEYBOARD_LAYOUT_SECTION_RE, "");
 }
@@ -311,7 +311,7 @@ export interface UnbalancedTag {
 const TAG_RE = /<!--[\s\S]*?-->|<\/([a-zA-Z][a-zA-Z0-9-]*)\s*>|<([a-zA-Z][a-zA-Z0-9-]*)\b([^>]*)>/g;
 
 /**
- * A dependency-free, void-element-aware tag-balance scanner (spec 076
+ * A dependency-free, void-element-aware tag-balance scanner (spec 079
  * research R7 — see module header for why this replaces DOMParser). Finds
  * unclosed elements, elements closed out of nesting order, and stray closing
  * tags with no matching open tag. Comments are skipped; PHP `<?php ... ?>`

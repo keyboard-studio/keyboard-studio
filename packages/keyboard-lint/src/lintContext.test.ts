@@ -108,7 +108,7 @@ describe("lintWithContext — 19.x context tolerance wiring", () => {
   });
 });
 
-// Tests for the spec 076 US7/FR-019 documentation-check wiring: the twelve
+// Tests for the spec 079 US7/FR-019 documentation-check wiring: the twelve
 // checks are unit-tested directly under checks/docs/*.test.ts; these tests
 // lock the `docLintInput` context-presence guard at the lintWithContext call
 // site, matching the existing 18.6/19.x gating shape above.
@@ -124,7 +124,7 @@ const MISMATCHED_HISTORY_DOC_LINT_INPUT: DocLintInput = {
   deletedFilenames: [],
 };
 
-describe("lintWithContext — documentation-check wiring (spec 076 US7/FR-019)", () => {
+describe("lintWithContext — documentation-check wiring (spec 079 US7/FR-019)", () => {
   it("emits no documentation findings when docLintInput is absent", async () => {
     const findings = await lintWithContext(makeEmptyFS(), KEYBOARD_ID, {});
     expect(findings.find((f) => f.layer === "C" && f.code.startsWith("KM_LINT_HISTORY"))).toBeUndefined();

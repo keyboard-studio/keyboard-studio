@@ -1,5 +1,5 @@
 // welcomeFolder — the `source/welcome/` folder convention's paths and the one
-// "which base images went missing" rule (spec 076 FR-002 / FR-006).
+// "which base images went missing" rule (spec 079 FR-002 / FR-006).
 //
 // Split out of serializeWorkingCopy.ts so the Output documentation checklist
 // (hooks/useDocMemberStates.ts) can compute the same missing-image warning the
@@ -11,7 +11,7 @@ import type { ChartPreference, WelcomeFolderImage } from "@keyboard-studio/contr
 import { extractWelcomeImageRefs } from "@keyboard-studio/engine";
 
 /**
- * The layout-chart choice in force (spec 076 FR-015): the author's explicit
+ * The layout-chart choice in force (spec 079 FR-015): the author's explicit
  * choice when made, else keep the base's own images when it ships any and
  * generate charts otherwise. The one place the default is resolved — the
  * Output checklist control and the projection both read it.
@@ -23,7 +23,7 @@ export function effectiveChartPreference(
   return chartPreference ?? (baseShipsImages ? "keep-base-images" : "regenerate");
 }
 
-/** The `source/`-relative welcome folder (spec 076 FR-002). */
+/** The `source/`-relative welcome folder (spec 079 FR-002). */
 export const WELCOME_FOLDER = "welcome";
 /** Where the welcome page ships (FR-002). */
 export const WELCOME_PAGE_PATH = `source/${WELCOME_FOLDER}/welcome.htm`;

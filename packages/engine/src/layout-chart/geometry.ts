@@ -1,6 +1,6 @@
 /**
  * geometry — the fixed physical-grid table the desktop layout chart draws
- * against (spec 076 T047, research R2).
+ * against (spec 079 T047, research R2).
  *
  * `KvksIR` carries labels but no coordinates, and the IR-rule fallback carries
  * neither, so a fixed ANSI/ISO-style grid stands in for the physical keyboard

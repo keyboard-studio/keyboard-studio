@@ -124,7 +124,7 @@ export type WorkingCopySnapshot = Omit<
   deletedTouchKeyIds: string[];
   staleSteps: string[];
   /**
-   * Optional (spec 076 US2): the base's welcome-folder images, Base64-encoded
+   * Optional (spec 079 US2): the base's welcome-folder images, Base64-encoded
    * through the same `serializeEntry` path as binary VFS entries. Absent from
    * a pre-076 snapshot, and ALSO absent when the images exceed
    * {@link BASE_WELCOME_IMAGES_BUDGET_BYTES} — the durable draft shares one
@@ -190,7 +190,7 @@ export function deserializeEntry(raw: SerializedEntry): VirtualFSEntry {
 }
 
 /**
- * Size budget for persisting the base's welcome-folder images (spec 076 US2,
+ * Size budget for persisting the base's welcome-folder images (spec 079 US2,
  * contracts/studio-surfaces.md store table). Raw byte total, before Base64
  * (which inflates by a third). Corpus welcome folders are typically a few
  * hundred KB of PNG screenshots; 2 MB keeps the draft comfortably inside the
@@ -291,7 +291,7 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     helpDocs: s.helpDocs,
     baseWelcomeHtmText: s.baseWelcomeHtmText,
     baseHelpPhpText: s.baseHelpPhpText,
-    // spec 076 US2: plain strings / a string literal, straight passthrough; the
+    // spec 079 US2: plain strings / a string literal, straight passthrough; the
     // images go through the Base64 path (budgeted — see WorkingCopySnapshot).
     baseReadmeMdText: s.baseReadmeMdText,
     baseHistoryMdText: s.baseHistoryMdText,
@@ -302,7 +302,7 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     baseWelcomeImagesDropped:
       s.baseWelcomeImagesDropped ||
       (s.baseWelcomeImages !== null && s.baseWelcomeImages.length > 0 && baseWelcomeImages === undefined),
-    // spec 076 US3/US5/US6: plain JSON documentation decisions, straight passthrough.
+    // spec 079 US3/US5/US6: plain JSON documentation decisions, straight passthrough.
     historyEntryState: s.historyEntryState,
     chartPreference: s.chartPreference,
     baseDocProfile: s.baseDocProfile,

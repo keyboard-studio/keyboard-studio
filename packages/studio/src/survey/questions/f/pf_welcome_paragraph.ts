@@ -5,7 +5,7 @@ import type { QuestionModule, ValidationResult } from "../../types.ts";
 
 export const definition = {
   id: "pf_welcome_paragraph",
-  // spec 076 T038: FlowQuestion.prompt is a static string — this module has
+  // spec 079 T038: FlowQuestion.prompt is a static string — this module has
   // no context-dependent prompt-override channel (unlike `required`, which
   // gained one via SurveyRunner's getRequiredOverride prop for this same
   // feature; a second override channel just for prompt text was judged not
@@ -29,7 +29,7 @@ export const definition = {
   type: "text" as const,
   // Static default: required, unfilled. Net-new, copy (Track 1), and an
   // adaptation whose base has no usable description all keep this behavior
-  // unchanged (spec 076 FR-009). An adaptation WITH a usable base description
+  // unchanged (spec 079 FR-009). An adaptation WITH a usable base description
   // waives this at RUNTIME — see `requiredWhen`/`prefill` below, applied onto
   // the live FlowQuestion by phaseFOptions.seeds in
   // editors/adapters/flowStepOptions.tsx (getSeedValue / getRequiredOverride),
@@ -41,10 +41,10 @@ export const definition = {
 } satisfies import("../../types.ts").FlowQuestion;
 
 // ---------------------------------------------------------------------------
-// Adaptive description proposal (spec 076 FR-009, US4, §3c propose-then-confirm)
+// Adaptive description proposal (spec 079 FR-009, US4, §3c propose-then-confirm)
 // ---------------------------------------------------------------------------
 
-// spec 076 FR-009: the adaptive prefill / conditional-required rule
+// spec 079 FR-009: the adaptive prefill / conditional-required rule
 // (`prefill`, `requiredWhen`, `AdaptiveDescriptionContext`) lives in
 // lib/adaptiveDescription.ts — it needs the engine's
 // extractUsableBaseDescription, and question modules stay engine-free so the

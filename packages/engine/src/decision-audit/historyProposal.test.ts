@@ -1,4 +1,4 @@
-// Tests for historyProposal (spec 076 T039/T041).
+// Tests for historyProposal (spec 079 T039/T041).
 //
 // Coverage:
 //   historyEntryHeading:
@@ -11,7 +11,8 @@
 //     6. Characters-added bullet caps the inline list with "and N more".
 //     7. Mechanisms-assigned bullet lists every mechanism under the cap.
 //     8. keysRemoved === 0 -> no "Removed" bullet.
-//     9. keysRemoved > 0 -> "Removed N keys" bullet.
+//     9. keysRemoved > 0 -> "Removed N keys." bullet.
+//     11. Combining marks in charactersAdded render on a dotted-circle carrier.
 //     10. version/dateIso pass through onto the returned HistoryProposal unchanged.
 
 import { describe, it, expect } from "vitest";
@@ -61,16 +62,16 @@ describe("buildHistoryProposal", () => {
     const proposal = buildHistoryProposal(seed, "1.1", "2026-06-18");
     expect(proposal.bullets).toEqual([
       "Adapted from basic_kbdfr v1.3 via keyboard-studio.",
-      "Added 2 characters: é, è",
-      "Assigned mechanisms: dead key",
-      "Removed 2 keys",
+      "Added 2 characters: é, è.",
+      "Assigned mechanisms: dead key.",
+      "Removed 2 keys.",
     ]);
   });
 
   it("lists every character under the inline cap", () => {
     const seed = emptySeed({ charactersAdded: ["a", "b", "c"] });
     const proposal = buildHistoryProposal(seed, "1.0", "2026-06-18");
-    expect(proposal.bullets).toEqual(["Added 3 characters: a, b, c"]);
+    expect(proposal.bullets).toEqual(["Added 3 characters: a, b, c."]);
   });
 
   it("caps a long characters-added list with 'and N more'", () => {
@@ -78,14 +79,14 @@ describe("buildHistoryProposal", () => {
     const seed = emptySeed({ charactersAdded: chars });
     const proposal = buildHistoryProposal(seed, "1.0", "2026-06-18");
     expect(proposal.bullets).toEqual([
-      "Added 13 characters: a, b, c, d, e, f, g, h, i, j, and 3 more",
+      "Added 13 characters: a, b, c, d, e, f, g, h, i, j, and 3 more.",
     ]);
   });
 
   it("lists every mechanism assigned", () => {
     const seed = emptySeed({ mechanismsAssigned: ["dead key", "multi-tap"] });
     const proposal = buildHistoryProposal(seed, "1.0", "2026-06-18");
-    expect(proposal.bullets).toEqual(["Assigned mechanisms: dead key, multi-tap"]);
+    expect(proposal.bullets).toEqual(["Assigned mechanisms: dead key, multi-tap."]);
   });
 
   it("omits the 'Removed' bullet when keysRemoved is 0", () => {
@@ -94,10 +95,17 @@ describe("buildHistoryProposal", () => {
     expect(proposal.bullets.some((b) => b.startsWith("Removed"))).toBe(false);
   });
 
-  it("includes a 'Removed N keys' bullet when keysRemoved > 0", () => {
+  it("includes a 'Removed N keys.' bullet when keysRemoved > 0", () => {
     const seed = emptySeed({ keysRemoved: 5 });
     const proposal = buildHistoryProposal(seed, "1.0", "2026-06-18");
-    expect(proposal.bullets).toEqual(["Removed 5 keys"]);
+    expect(proposal.bullets).toEqual(["Removed 5 keys."]);
+  });
+
+  it("renders combining marks on a dotted-circle carrier", () => {
+    const nukta = "\u093C"; // Devanagari nukta (Mn)
+    const seed = emptySeed({ charactersAdded: ["a", nukta, "é"] });
+    const proposal = buildHistoryProposal(seed, "1.0", "2026-06-18");
+    expect(proposal.bullets).toEqual([`Added 3 characters: a, ◌${nukta}, é.`]);
   });
 
   it("passes version and dateIso through unchanged", () => {

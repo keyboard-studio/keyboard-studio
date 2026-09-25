@@ -1,4 +1,4 @@
-// useDocumentationFindings — spec 076 US7 (T074): memoised recompute on input
+// useDocumentationFindings — spec 079 US7 (T074): memoised recompute on input
 // change only; the FR-020 upstream classification flips once the member is
 // authored; nothing here can block output (FR-018).
 

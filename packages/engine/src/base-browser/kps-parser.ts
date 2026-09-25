@@ -162,7 +162,7 @@ export interface KpsFileEntry {
  * it themselves. `..`-relative references (`..\build\…`, `..\LICENSE.md`) are
  * left as they are — resolving them is the caller's decision, not this
  * normaliser's. Shared by the loader's welcome resolution and the descriptor
- * writer's welcome-path migration (spec 076), so both read a `<Name>` the
+ * writer's welcome-path migration (spec 079), so both read a `<Name>` the
  * same way.
  */
 export function kpsRefToPosix(name: string): string {

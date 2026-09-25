@@ -830,7 +830,7 @@ export async function driveTouchGallery(page: Page): Promise<void> {
  * This helper:
  *   1. Fills the welcome paragraph
  *   2. Fills the first usage tip
- *   3. Leaves the HISTORY proposal (pf_history_entry, spec 076 US5) undecided
+ *   3. Leaves the HISTORY proposal (pf_history_entry, spec 079 US5) undecided
  *      and advances past it — optional, so Next is enabled with no answer
  *   4. Answers pf_more_detail_gate "No" (the minimum-friction Phase F
  *      revision's required Yes/No gate, which unconditionally follows
@@ -854,7 +854,7 @@ export async function driveHelpPhase(
   await page.locator("#pf_usage_tip_1").fill(usageTipText);
   await surveyAdvance(page).click();
 
-  // pf_history_entry (spec 076 US5) — optional; leave undecided (stays
+  // pf_history_entry (spec 079 US5) — optional; leave undecided (stays
   // "proposed") and advance straight through to the gate.
   await surveyAdvance(page).click();
 

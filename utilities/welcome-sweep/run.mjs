@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// welcome-sweep — the offline SC-002 corpus sweep for spec 076 (research R13).
+// welcome-sweep — the offline SC-002 corpus sweep for spec 079 (research R13).
 //
 // For every folder-convention base in the sibling `../keyboards` checkout
 // (`release/<x>/<id>/source/welcome/`), run the REAL loader welcome resolution

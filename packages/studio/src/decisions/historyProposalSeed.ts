@@ -1,5 +1,5 @@
 // historyProposalSeed — build the engine's HistoryProposalSeed from the
-// decision record already recorded for this working copy (spec 076 T042,
+// decision record already recorded for this working copy (spec 079 T042,
 // research R6, contracts/studio-surfaces.md §3).
 //
 // NO NEW CHANGE JOURNAL (spec assumption). Every fact this module reads

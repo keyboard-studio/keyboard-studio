@@ -534,10 +534,10 @@ describe("fetchKeyboardSourceToVfs — binary siblings carry isBinary", () => {
 });
 
 // ---------------------------------------------------------------------------
-// spec 076 US2 (T010/T019): welcome-page resolution, folder images, README/HISTORY
+// spec 079 US2 (T010/T019): welcome-page resolution, folder images, README/HISTORY
 // ---------------------------------------------------------------------------
 
-describe("fetchKeyboardSourceToVfs — welcome-page resolution (spec 076 R3)", () => {
+describe("fetchKeyboardSourceToVfs — welcome-page resolution (spec 079 R3)", () => {
   /** A minimal .kps declaring `<WelcomeFile>` and a `<Files>` list. */
   function kps(welcomeFile: string, files: string[]): string {
     const entries = files

@@ -252,7 +252,7 @@ export async function submitManagedPR(
 
     // 3. Build the tree from the SPA-filtered source files. Text entries are
     //    inlined as tree content; base64 (binary) entries -- e.g. welcome-folder
-    //    images, spec 076 -- are uploaded as blobs first and referenced by sha,
+    //    images, spec 079 -- are uploaded as blobs first and referenced by sha,
     //    mirroring packages/engine/src/output/github.ts (Option A).
     const treeEntries: Array<{
       path: string;

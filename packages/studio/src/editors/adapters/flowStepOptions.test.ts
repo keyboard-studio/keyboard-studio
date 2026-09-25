@@ -253,7 +253,7 @@ describe("phaseFOptions.buildContext", () => {
     expect(phaseFOptions.buildContext(deps)).toEqual({ history_heading: "", history_bullets: "" });
   });
 
-  // spec 076 US5: once onMount has derived a proposal (historyEntryState
+  // spec 079 US5: once onMount has derived a proposal (historyEntryState
   // non-null), buildContext injects its heading + bullets as tokens
   // pf_history_entry.ts's help_text interpolates.
   it("injects history_heading / history_bullets from a derived historyEntryState", () => {
@@ -355,7 +355,7 @@ describe("phaseFOptions.onCommit", () => {
 });
 
 // ---------------------------------------------------------------------------
-// phaseFOptions.onMount (spec 076 US5) — derives the HISTORY proposal once
+// phaseFOptions.onMount (spec 079 US5) — derives the HISTORY proposal once
 // per mount, identity-guarded against re-stamping dateIso on a same-version
 // re-derivation.
 // ---------------------------------------------------------------------------
@@ -412,7 +412,7 @@ describe("phaseFOptions.onMount", () => {
 });
 
 // ---------------------------------------------------------------------------
-// phaseFOptions.onCommit — pf_history_entry confirm/edit/dismiss (spec 076 US5)
+// phaseFOptions.onCommit — pf_history_entry confirm/edit/dismiss (spec 079 US5)
 // ---------------------------------------------------------------------------
 
 function historyResult(
@@ -677,7 +677,7 @@ describe("phaseFOptions.seeds — pf_contact_info pre-fill", () => {
 
 // ---------------------------------------------------------------------------
 // phaseFOptions.seeds — pf_welcome_paragraph adaptive description proposal
-// (spec 076 FR-009, US4). Reads the four working-copy slices directly off
+// (spec 079 FR-009, US4). Reads the four working-copy slices directly off
 // useWorkingCopyStore.getState() (not FlowStepDeps — see
 // readAdaptiveDescriptionContext's doc in flowStepOptions.tsx), so these
 // tests set up REAL store state rather than passing it through `deps`.
@@ -702,7 +702,7 @@ const NONE_PROFILE: BaseDocumentationProfile = {
   welcomeImages: [],
 };
 
-describe("phaseFOptions.seeds — pf_welcome_paragraph adaptive description (spec 076 FR-009)", () => {
+describe("phaseFOptions.seeds — pf_welcome_paragraph adaptive description (spec 079 FR-009)", () => {
   it("declares getRequiredOverride", () => {
     expect(phaseFOptions.seeds?.getRequiredOverride).toBeDefined();
   });

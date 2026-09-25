@@ -1,5 +1,5 @@
 // renderHistoryMd — turn a stored HISTORY proposal decision into the shipped
-// HISTORY.md text for either authoring track (spec 076 FR-010–FR-012,
+// HISTORY.md text for either authoring track (spec 079 FR-010–FR-012,
 // research R6/R12).
 //
 // Pure: no VFS, no Date usage. A confirmed/edited entry's own

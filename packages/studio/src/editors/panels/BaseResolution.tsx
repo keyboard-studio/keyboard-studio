@@ -12,7 +12,7 @@ import { msg } from "@lingui/core/macro";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { resolveMessage } from "../../lib/i18nResolve.ts";
-// spec 076 FR-008: one label/tone mapping shared with MetadataCard's badge.
+// spec 079 FR-008: one label/tone mapping shared with MetadataCard's badge.
 import { buildDocLevelLabel, DOC_LEVEL_TONE } from "../../lib/docLevelBadge.ts";
 import { getBaseBrowserService } from "../../lib/services.ts";
 import { suggestBases, type SuggestTarget } from "../../lib/suggestBase.ts";
@@ -102,7 +102,7 @@ export function BaseResolution({
   const [bases, setBases] = useState<BaseKeyboard[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  // spec 076 FR-008: classify the focused/previewed base's documentation
+  // spec 079 FR-008: classify the focused/previewed base's documentation
   // completeness (lazy, cached per id — never the whole gallery). Fetched on
   // every preview change; committed to the working copy at SELECTION below.
   const { profiles: docProfiles, request: requestDocProfile } = useBaseDocProfile();
@@ -303,7 +303,7 @@ export function BaseResolution({
           data-testid="base-confirm"
           disabled={previewedBase === null || previewStatus !== "ready"}
           onClick={() => {
-            // spec 076 FR-008: commit the previewed base's doc-completeness
+            // spec 079 FR-008: commit the previewed base's doc-completeness
             // classification to the working copy AT SELECTION — null when the
             // profile hasn't resolved yet or resolved to "unknown" (never
             // written as a "none" a caller could confuse with a real
@@ -369,7 +369,7 @@ export function BaseResolution({
                 <span style={{ color: "var(--app-text-muted)", fontSize: 12 }}>({base.id})</span>
               </span>
               <span style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                {/* spec 076 FR-008: documentation-completeness badge — rendered
+                {/* spec 079 FR-008: documentation-completeness badge — rendered
                     ONLY for a base whose profile has already been computed
                     (this session focused it at least once) and resolved to a
                     known level; "unknown" (not yet classified) renders no

@@ -1,4 +1,4 @@
-// Byte-identical documentation across productions (spec 076 SC-004 / FR-014).
+// Byte-identical documentation across productions (spec 079 SC-004 / FR-014).
 //
 // Seeded by US2 (T022) and EXTENDED by later phases: US5 adds the confirmed
 // HISTORY entry, US6 adds the generated layout charts. Each phase appends to
@@ -24,7 +24,7 @@ vi.mock("./services.ts", () => ({
 
 const KMN_TEXT = "store(&NAME) 'Determinism'\nstore(&TARGETS) 'any'\nbegin Unicode > use(main)\ngroup(main) using keys\n";
 
-/** The six documentation members (spec 076 FR-001), plus whatever later phases add. */
+/** The six documentation members (spec 079 FR-001), plus whatever later phases add. */
 function docMemberPaths(keyboardId: string): string[] {
   return [
     "README.md",
@@ -149,7 +149,7 @@ describe("SC-004 — producing an unchanged working copy twice yields byte-ident
   });
 });
 
-// spec 076 US5/US6 (T045/T054): the confirmed HISTORY entry and the generated
+// spec 079 US5/US6 (T045/T054): the confirmed HISTORY entry and the generated
 // charts join the byte-identity guarantee.
 describe("SC-004 — later-phase members", () => {
   it("a confirmed HISTORY entry carries its own stored date, so the clock no longer moves HISTORY.md (R12)", async () => {

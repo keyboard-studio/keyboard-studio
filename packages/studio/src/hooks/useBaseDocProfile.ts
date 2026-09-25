@@ -1,5 +1,5 @@
 // useBaseDocProfile — lazy, per-base-id cache of BaseDocumentationProfile
-// (spec 076 FR-008, contracts/studio-surfaces.md §1).
+// (spec 079 FR-008, contracts/studio-surfaces.md §1).
 //
 // The classifier is only ever asked about the FOCUSED/PREVIEWED base — never
 // the whole gallery (see BaseBrowserServiceWithDocProfile's own doc comment in

@@ -48,7 +48,7 @@ function typeInto(value: string): void {
  * Walk the default path to pf_contact_info and return its rendered value.
  *
  * Default path (6 screens): pf_welcome_paragraph -> pf_usage_tip_1 ->
- * pf_history_entry (spec 076 US5, left undecided) -> pf_more_detail_gate
+ * pf_history_entry (spec 079 US5, left undecided) -> pf_more_detail_gate
  * (No) -> pf_credits -> pf_contact_info.
  */
 function walkToContactField(ctx: Record<string, string | undefined>): string {
@@ -111,7 +111,7 @@ describe("Phase F — pf_contact_info pre-fill (end to end)", () => {
     typeInto("A keyboard for typing Bafut.");
     next(); // pf_welcome_paragraph
     next(); // pf_usage_tip_1
-    next(); // pf_history_entry (spec 076 US5, left undecided)
+    next(); // pf_history_entry (spec 079 US5, left undecided)
     const no = screen.getByRole("radio", { name: /^no$/i });
     act(() => {
       fireEvent.click(no);

@@ -1,4 +1,4 @@
-// Tests for MetadataCard's documentation-completeness badge (spec 076 FR-008,
+// Tests for MetadataCard's documentation-completeness badge (spec 079 FR-008,
 // T035). The heading ("Selected keyboard") always renders; the badge is
 // additive and only appears for a KNOWN level committed to the working copy
 // for THIS card's base — "unknown" (or no profile at all) renders no badge.
@@ -41,7 +41,7 @@ afterEach(() => {
   useWorkingCopyStore.setState({ baseKeyboard: null, baseDocProfile: null });
 });
 
-describe("MetadataCard — documentation badge (spec 076 FR-008)", () => {
+describe("MetadataCard — documentation badge (spec 079 FR-008)", () => {
   it("renders no badge when the working copy has no doc profile committed", () => {
     render(<MetadataCard kb={KB} />);
     expect(screen.getByText("Selected keyboard")).toBeTruthy();

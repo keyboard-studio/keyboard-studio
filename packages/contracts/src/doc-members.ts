@@ -1,4 +1,4 @@
-// Documentation completeness (spec 076, data-model.md).
+// Documentation completeness (spec 079, data-model.md).
 //
 // Additive contract types for the six documentation members every produced
 // package ships, the tier each member's content came from, the base's

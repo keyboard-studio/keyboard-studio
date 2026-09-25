@@ -1,6 +1,6 @@
 // deriveDocMemberStates — the ONE source of truth for which tier supplied each
 // of the six shipped documentation members and whether the member is still the
-// fallback stub (spec 076 FR-022, research R5).
+// fallback stub (spec 079 FR-022, research R5).
 //
 // Pure: a function of working-copy state the studio already holds (the Phase F
 // answers, the HISTORY proposal state, the base's fetched documentation, the

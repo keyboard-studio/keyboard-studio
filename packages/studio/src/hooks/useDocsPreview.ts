@@ -35,7 +35,7 @@ export function useDocsPreview(): DocsPreview {
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
   const baseWelcomeHtmText = useWorkingCopyStore((s) => s.baseWelcomeHtmText);
   const baseHelpPhpText = useWorkingCopyStore((s) => s.baseHelpPhpText);
-  // spec 076 FR-006: the base README is inherited on an adaptation only; the
+  // spec 079 FR-006: the base README is inherited on an adaptation only; the
   // slice is null on Track 1 by construction, and the track guard keeps it so.
   const baseReadmeMdText = useWorkingCopyStore((s) =>
     s.instantiationMode === "adapt-existing" ? s.baseReadmeMdText : null,

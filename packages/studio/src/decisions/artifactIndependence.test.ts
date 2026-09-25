@@ -494,7 +494,7 @@ describe("FR-007 / SC-008 — the projected keyboard does not depend on recordin
     // The fixture ships seven files; spec 061's step 5c unconditionally adds
     // three more (source/readme.htm, source/welcome/welcome.htm,
     // source/help/<id>.php — README.md already existed in the fixture) and
-    // spec 076's step 5d completes LICENSE.md and its step 5c adds one
+    // spec 079's step 5d completes LICENSE.md and its step 5c adds one
     // generated desktop layout chart (source/welcome/ks-layout-desktop-*.svg,
     // US6) on a base that ships no images, on both runs equally, so twelve
     // is the new floor. A projection that collapsed to one would still make

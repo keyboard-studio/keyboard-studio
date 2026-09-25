@@ -103,7 +103,7 @@ export interface ProjectWorkingCopyForOutputResult {
   warnings: string[];
   /**
    * Images the base's welcome page references that this production could not
-   * carry (spec 076 edge case: the base's `.kps` did not list them, or they
+   * carry (spec 079 edge case: the base's `.kps` did not list them, or they
    * 404ed at fetch). Bare `<img src>` values, document order. Also reported in
    * `warnings`; typed here so the documentation checklist can annotate the
    * welcome row without parsing prose.
@@ -303,7 +303,7 @@ export async function projectWorkingCopyForOutput(
   } : { displayName: baseKeyboard.displayName, ...(websiteUrl !== undefined ? { websiteUrl } : {}) };
   // Accumulated warnings for the adapt path — merged with projection warnings below.
   const adaptWarnings: string[] = [];
-  // The release version HISTORY.md's top entry is headed with (spec 076
+  // The release version HISTORY.md's top entry is headed with (spec 079
   // FR-010): the bumped version on an adaptation, the keyboard's own on a copy.
   // HISTORY.md itself is written in step 5c through renderHistoryMd, the one
   // composer both tracks share.
@@ -388,7 +388,7 @@ export async function projectWorkingCopyForOutput(
     identityForProjection = merged;
   }
 
-  // spec 076 FR-006: the base's welcome-folder images ship beside the rendered
+  // spec 079 FR-006: the base's welcome-folder images ship beside the rendered
   // page, on BOTH tracks (a Track 1 copy inherits images, never prose — R9).
   // Their bare names feed the descriptor's `<Files>` list (step 3.6, below)
   // and the fresh page's "Keyboard Layout" section (step 5c). Loader order is
@@ -396,7 +396,7 @@ export async function projectWorkingCopyForOutput(
   const carriedImages = carriedWelcomeImages(baseWelcomeImages);
   const carriedImageNames = welcomeFolderFileNames(baseWelcomeImages);
 
-  // spec 076 FR-013..FR-015: one deterministic layout chart per (platform,
+  // spec 079 FR-013..FR-015: one deterministic layout chart per (platform,
   // layer), generated from the MODEL (never the on-screen preview) unless the
   // base ships its own images and the author has not asked to regenerate.
   // Computed before the projection so the descriptor's <Files> can list them.
@@ -506,7 +506,7 @@ export async function projectWorkingCopyForOutput(
   // does (FR-007) — the slice is null on Track 1 and the track guard keeps it so.
   clonedVfs.set("README.md", renderReadmeMd(docsInput, isAdaptation ? baseReadmeMdText : null), false);
   clonedVfs.set("source/readme.htm", renderReadmeHtm(docsInput), false);
-  // spec 076 FR-002: the welcome page lives at the folder-convention path and
+  // spec 079 FR-002: the welcome page lives at the folder-convention path and
   // NOWHERE else — the flat `source/welcome.htm` is never written. A stale flat
   // copy can only come from a pre-076 base VFS (an old scaffolded stub or an
   // imported flat-convention base); it is removed so the shipped tree never
@@ -527,7 +527,7 @@ export async function projectWorkingCopyForOutput(
   }
   clonedVfs.set(`source/help/${resolvedKeyboardId}.php`, renderHelpPhp(docsInput, baseHelpPhpText), false);
 
-  // spec 076 FR-010..FR-012 / FR-023: HISTORY.md is rendered on EVERY
+  // spec 079 FR-010..FR-012 / FR-023: HISTORY.md is rendered on EVERY
   // production from the author's proposal decision — a confirmed or edited
   // entry at the top, the stub otherwise; an adaptation always carries the
   // "Adapted from" attribution and keeps the base's entries below (criteria
@@ -548,7 +548,7 @@ export async function projectWorkingCopyForOutput(
     false,
   );
 
-  // spec 076 edge case: the base's page references images the base did not
+  // spec 079 edge case: the base's page references images the base did not
   // ship (unlisted in its `.kps`, or 404 at fetch). Named, not swallowed — the
   // checklist annotates the welcome row and the author can supply them.
   const missingInheritedImages =
@@ -567,7 +567,7 @@ export async function projectWorkingCopyForOutput(
     );
   }
 
-  // 5d. spec 076 FR-001: LICENSE.md is one of the six members every package
+  // 5d. spec 079 FR-001: LICENSE.md is one of the six members every package
   //     ships, on EVERY delivery path. Track 1 already has it (generateStubs,
   //     with the inherited holders); the adapt track starts from a fetched
   //     `.kmn` whose base LICENSE the loader deliberately never writes, so it is
@@ -602,7 +602,7 @@ export async function projectWorkingCopyForOutput(
 }
 
 // ---------------------------------------------------------------------------
-// Layout charts (spec 076 US6)
+// Layout charts (spec 079 US6)
 // ---------------------------------------------------------------------------
 
 interface BuildLayoutChartsInput {
@@ -655,7 +655,7 @@ function buildLayoutCharts(input: BuildLayoutChartsInput): LayoutChartFile[] {
 }
 
 // ---------------------------------------------------------------------------
-// Welcome-folder helpers (spec 076 US2) — live in lib/welcomeFolder.ts so the
+// Welcome-folder helpers (spec 079 US2) — live in lib/welcomeFolder.ts so the
 // Output checklist shares them without importing this (service-heavy) module.
 // Re-exported for the existing call sites and tests.
 // ---------------------------------------------------------------------------

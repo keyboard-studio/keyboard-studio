@@ -31,7 +31,7 @@ export function phpCommentEscape(s: string): string {
 /**
  * Escape text for a PHP single-quoted string literal: only `\` and `'` are
  * special there (`\` first, so the quote's escaping backslash survives). Used
- * by the help-site header's `$pagename = '...'` (spec 076 FR-003; free-text
+ * by the help-site header's `$pagename = '...'` (spec 079 FR-003; free-text
  * safety per spec 061 FR-009). Line breaks are collapsed to a space so a
  * multi-line display name cannot break the header's one-assignment-per-line
  * shape.

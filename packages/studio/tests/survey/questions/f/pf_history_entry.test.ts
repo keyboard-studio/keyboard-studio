@@ -19,7 +19,7 @@ describe("pf_history_entry — definition", () => {
     expect(rules.find((r) => r.default === true)?.goto).toBe("pf_more_detail_gate");
   });
 
-  it("offers exactly the three proposal actions (spec 076 FR-011)", () => {
+  it("offers exactly the three proposal actions (spec 079 FR-011)", () => {
     expect([...HISTORY_ENTRY_ACTIONS]).toEqual(["confirm", "edit", "dismiss"]);
   });
 });

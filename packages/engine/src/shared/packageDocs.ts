@@ -1,7 +1,7 @@
 // Documentation stubs a Keyman package must ship.
 //
 // The package descriptor's `<Options>` names `welcome\welcome.htm` /
-// `readme.htm` (spec 076 FR-002: the welcome page lives in the folder
+// `readme.htm` (spec 079 FR-002: the welcome page lives in the folder
 // convention) and its `<Files>` lists them, so kmc-package fails the build
 // (KM04003, "file does not exist") if either is absent.
 //
@@ -22,7 +22,7 @@ import { escapeHtml, phpCommentEscape, phpSingleQuoteEscape } from "./escapeHtml
 
 /**
  * The standard help-site header every published keyboard's `source/help/<id>.php`
- * opens with (spec 076 FR-003, contracts/help-header.md). Verified against the
+ * opens with (spec 079 FR-003, contracts/help-header.md). Verified against the
  * corpus (`ahom_star`, `akha_lahu`): `$pagename` / `$pagetitle = $pagename` /
  * `require_once('header.php')`. The help site supplies `header.php`; the tool
  * emits the include reference only and never bundles or emulates it.

@@ -1,4 +1,4 @@
-// Tests for renderHistoryMd (spec 076 T040/T041).
+// Tests for renderHistoryMd (spec 079 T040/T041).
 //
 // Coverage:
 //   1. null entry, Track 1 (no adaptedFrom) -> byte-identical to the

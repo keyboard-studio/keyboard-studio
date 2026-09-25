@@ -1,18 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { checkHtmlWellFormed } from "./check-11-5-html-wellformed.js";
 import type { DocLintInput } from "@keyboard-studio/contracts";
+import { CLEAN_DOC_LINT_INPUT } from "./fixtures/clean.js";
 
 function makeInput(members: DocLintInput["members"]): DocLintInput {
-  return {
-    keyboardId: "test_kbd",
-    keyboardVersion: "1.0",
-    targets: [],
-    layerIds: [],
-    displayName: "Test",
-    copyrightHolders: {},
-    members,
-    deletedFilenames: [],
-  };
+  return { ...CLEAN_DOC_LINT_INPUT, members };
 }
 
 describe("checkHtmlWellFormed (11.5 KM_LINT_HTML_NOT_WELL_FORMED)", () => {

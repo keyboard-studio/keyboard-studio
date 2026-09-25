@@ -23,7 +23,7 @@
 // THE ONE SANCTIONED `<Options>` / `<Files>` WRITE: THE WELCOME-PATH MIGRATION
 //
 // This module otherwise leaves `<Options>`, `<Files>`, `<System>` and `<Version>`
-// exactly as it finds them. The single exception is spec 076 FR-002: a produced
+// exactly as it finds them. The single exception is spec 079 FR-002: a produced
 // package MUST ship its welcome page at `source/welcome/welcome.htm` and MUST NOT
 // ship a flat `source/welcome.htm`, so a pre-076 descriptor (the copy track's
 // scaffolded stub, or an imported one) that still references the flat name is
@@ -78,7 +78,7 @@ const INFO_ELEMENT_RE = /(<Info>)([\s\S]*?)(<\/Info>)/;
  * Mutates `vfs` in place. Writes the identity elements named in the contract
  * (§2) plus `<WebSite>` (spec 061 FR-012) and touches nothing else: `<Files>`,
  * `<System>`, `<Options>`, and `<Version>` are left as they stand — with the
- * ONE exception of the welcome-path migration (spec 076 FR-002; see the module
+ * ONE exception of the welcome-path migration (spec 079 FR-002; see the module
  * header), which rewrites a flat `welcome.htm` reference to the folder form
  * and appends missing welcome-folder entries, reporting each rewrite. The
  * `<Version>` element stays owned by the adapt path's existing bump patch and
@@ -147,7 +147,7 @@ export function applyIdentityToKps(
       `[package-descriptor] could not write identity into ${path}: ${result.unwritable.join("; ")}`,
     );
   }
-  // spec 076 FR-002: the welcome-path migration — the module's one sanctioned
+  // spec 079 FR-002: the welcome-path migration — the module's one sanctioned
   // write into <Options> / <Files>. Reported rewrite by rewrite.
   const migrated = migrateWelcomePaths(result.text, welcomeFolderFiles);
   for (const rewrite of migrated.rewrites) {
@@ -177,7 +177,7 @@ function memberKey(name: string): string {
 const WELCOME_PAGE_KEY = memberKey(WELCOME_PAGE_KPS_REF);
 
 /**
- * The welcome-path migration (spec 076 FR-002). Pure.
+ * The welcome-path migration (spec 079 FR-002). Pure.
  *
  *   - `<Options><WelcomeFile>` naming anything outside the `welcome\` folder —
  *     including a blank element — is rewritten to `welcome\welcome.htm`.

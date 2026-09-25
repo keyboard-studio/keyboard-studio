@@ -1,5 +1,5 @@
 // useDocMemberStates — the studio's memoised read of the FR-022 documentation
-// tier record (spec 076 US3, research R5).
+// tier record (spec 079 US3, research R5).
 //
 // A `useMemo` over the exact store slices `deriveDocMemberStates` consumes —
 // no `useEffect`, no timer. Constitution Article IV reserves the studio's one

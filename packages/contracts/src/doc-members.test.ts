@@ -1,4 +1,4 @@
-// Runtime coverage for the spec 076 documentation-completeness schemas
+// Runtime coverage for the spec 079 documentation-completeness schemas
 // (doc-members.ts ↔ schemas.ts). The compile-time drift guards pin the
 // inferred types to the interfaces; these tests pin the runtime direction —
 // each schema accepts a well-formed literal unchanged and rejects malformed
@@ -26,7 +26,7 @@ const MEMBER_PATHS: Record<DocMemberId, string> = {
   "help-php": "source/help/<id>.php",
 };
 
-describe("DocMemberId (spec 076 FR-001)", () => {
+describe("DocMemberId (spec 079 FR-001)", () => {
   it("enumerates exactly six members with their projected paths", () => {
     expect(DOC_MEMBER_IDS).toHaveLength(6);
     expect(new Set(DOC_MEMBER_IDS).size).toBe(6);
@@ -75,7 +75,7 @@ describe("BaseDocumentationProfileSchema", () => {
   });
 });
 
-describe("BaseKeyboard.docProfile (spec 076 T033 — additive carrier field)", () => {
+describe("BaseKeyboard.docProfile (spec 079 T033 — additive carrier field)", () => {
   it("is absent by default and construction is unaffected", () => {
     const base = makeBaseKeyboard({
       id: "basic_kbdus",

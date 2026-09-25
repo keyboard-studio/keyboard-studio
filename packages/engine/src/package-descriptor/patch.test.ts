@@ -327,7 +327,7 @@ describe("applyIdentityToKps — failure names itself rather than throwing (FR-0
 });
 
 // ---------------------------------------------------------------------------
-// spec 076 FR-002 (T012): the welcome-path migration — the one sanctioned
+// spec 079 FR-002 (T012): the welcome-path migration — the one sanctioned
 // <Options>/<Files> write. A pre-076 descriptor (flat `welcome.htm`) is moved to
 // the folder form; the files the projection ships beside the page are listed;
 // every rewrite is NAMED.
@@ -342,7 +342,7 @@ function fileNames(kps: string): string[] {
   return [...kps.matchAll(/<Name>([^<]*)<\/Name>\s*<FileType>/g)].map((m) => m[1] ?? "");
 }
 
-describe("applyIdentityToKps — welcome-path migration (spec 076 FR-002)", () => {
+describe("applyIdentityToKps — welcome-path migration (spec 079 FR-002)", () => {
   it("rewrites a flat <WelcomeFile> and <File> to welcome\\welcome.htm and reports both", () => {
     const vfs = vfsWith("source/bm_sil.kps", flatWelcomeDescriptor());
     const result = applyIdentityToKps(vfs, "bm_sil", { displayName: "Bambara", languageTag: "bm" }, KMN);

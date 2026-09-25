@@ -187,7 +187,7 @@ function layoutImageAlt(fileName: string): string {
   return words !== "" ? words : stem;
 }
 
-/** Platform grouping order for the layout section (spec 076 T051): generated desktop/phone/tablet charts first, then anything else (a base's own hand-authored images). */
+/** Platform grouping order for the layout section (spec 079 T051): generated desktop/phone/tablet charts first, then anything else (a base's own hand-authored images). */
 const LAYOUT_SECTION_GROUPS = ["desktop", "phone", "tablet", "other"] as const;
 type LayoutSectionGroup = (typeof LAYOUT_SECTION_GROUPS)[number];
 
@@ -209,7 +209,7 @@ function groupWelcomeImageFiles(files: readonly string[]): ReadonlyMap<LayoutSec
 }
 
 /**
- * The welcome page's "Keyboard Layout" section (spec 076 FR-004/T051, research
+ * The welcome page's "Keyboard Layout" section (spec 079 FR-004/T051, research
  * R9): every file shipped beside the page in `source/welcome/` — the inherited
  * base images on a Track 1 copy, the generated charts otherwise — grouped by
  * platform (desktop, phone, tablet, then any other/base image) with no
@@ -237,7 +237,7 @@ export function renderWelcomeLayoutSection(welcomeImageFiles: readonly string[])
 
 /**
  * The distinct relative `<img src>` targets of a welcome page, in document
- * order (spec 076 contracts/engine-api.md). Scheme-qualified, protocol-
+ * order (spec 079 contracts/engine-api.md). Scheme-qualified, protocol-
  * relative, root-anchored and `data:` sources are skipped — only files the
  * package would have to ship count. A leading `./` is dropped. Used by the
  * projection to compute `missingInheritedImages` (a base page that references
@@ -260,7 +260,7 @@ export function extractWelcomeImageRefs(welcomeHtml: string): string[] {
   return refs;
 }
 
-/** `files` with every entry already referenced by `baseHtml`'s own `<img>` tags removed (spec 076 T051: append the layout section only for supplied files the base does not already reference). */
+/** `files` with every entry already referenced by `baseHtml`'s own `<img>` tags removed (spec 079 T051: append the layout section only for supplied files the base does not already reference). */
 function filesNotReferencedIn(files: readonly string[], baseHtml: string): string[] {
   const referenced = new Set(extractWelcomeImageRefs(baseHtml));
   return files.map((f) => f.trim()).filter((f) => f !== "" && !referenced.has(f));
@@ -296,7 +296,7 @@ function buildReadmeBody(input: HelpDocsRenderInput, description: string): strin
  * `README.md` — package-listing description, links, and supported platforms.
  * No version/copyright (FR-007).
  *
- * @param baseReadmeMdText spec 076 FR-006: a fetched base's own `README.md`,
+ * @param baseReadmeMdText spec 079 FR-006: a fetched base's own `README.md`,
  *   inherited even before the author has answered anything. `null` keeps
  *   today's byte-identical behaviour (the bare `# title` stub, or the
  *   title + description/links/platforms once answered). Non-null: no
@@ -341,7 +341,7 @@ export function renderReadmeHtm(input: HelpDocsRenderInput): string {
  * anything is authored (FR-006).
  *
  * @param welcomeImageFiles bare names of the image files shipped beside the page
- *   (spec 076 FR-004/R9/T051) — rendered as a grouped "Keyboard Layout" section.
+ *   (spec 079 FR-004/R9/T051) — rendered as a grouped "Keyboard Layout" section.
  *   On a FRESH page (no base) every file is listed. On a page merged with (or
  *   inherited from) a base, only files the base does NOT already reference are
  *   listed (via `extractWelcomeImageRefs`), so a carried image is never shown
@@ -389,9 +389,9 @@ export function renderWelcomeHtm(
  * page when one was fetched (FR-013); a base page keeps its own header and is
  * never given a second one. Inherits the base page verbatim even before
  * anything is authored (FR-006). A FRESH page (no base help text) opens with
- * the standard help-site header (spec 076 FR-003) above the same body
+ * the standard help-site header (spec 079 FR-003) above the same body
  * welcome.htm renders — the header is the one permitted difference between
- * the two on the help side (spec 076 FR-004).
+ * the two on the help side (spec 079 FR-004).
  */
 export function renderHelpPhp(
   input: HelpDocsRenderInput,
@@ -403,7 +403,7 @@ export function renderHelpPhp(
     // FR-006: inherit the base help page even before anything is authored.
     if (baseHelpPhpText !== null) return baseHelpPhpText;
     // FR-002 fallback — byte-identical to the scaffolder stub: standard header
-    // + the bare placeholder comment (spec 076 US1-3: an early production's
+    // + the bare placeholder comment (spec 079 US1-3: an early production's
     // help page still renders on the help site).
     return helpPhpStub(displayName);
   }

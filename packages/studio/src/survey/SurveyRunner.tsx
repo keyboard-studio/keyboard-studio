@@ -306,7 +306,7 @@ export interface SurveyRunnerProps {
   getSeedOptions?: (questionId: string) => FlowOption[] | undefined;
   /**
    * Called at render to optionally override the current question's static
-   * `required` flag — spec 076 FR-009's adaptive description proposal waives
+   * `required` flag — spec 079 FR-009's adaptive description proposal waives
    * `pf_welcome_paragraph`'s `required` exactly when it was also seeded from
    * the base (getSeedValue above), so accept/edit/replace is a single action
    * (SC-005) instead of being blocked by a "required" gate on a field that
@@ -649,7 +649,7 @@ export function SurveyRunner({
   // Tier-B catalog string and interpolates `{{token}}`s itself (see above).
   const dynamicOptions = getSeedOptionsRef.current?.(currentQId);
   const hasDynamicOptions = dynamicOptions !== undefined && dynamicOptions.length > 0;
-  // spec 076 FR-009: `undefined` means "use the question's own static
+  // spec 079 FR-009: `undefined` means "use the question's own static
   // `required`" — only a defined override (true or false) replaces it.
   const requiredOverride = getRequiredOverrideRef.current?.(currentQId);
   const displayQ: FlowQuestion =

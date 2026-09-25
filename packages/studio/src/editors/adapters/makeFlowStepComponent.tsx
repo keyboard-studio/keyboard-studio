@@ -116,7 +116,7 @@ export interface FlowStepDeps {
    */
   setHelpDocs: (patch: HelpDocsAnswers | null) => void;
   /**
-   * The session's currently-derived HISTORY-entry proposal state (spec 076
+   * The session's currently-derived HISTORY-entry proposal state (spec 079
    * US5), or `null` before it has ever been derived. `phaseFOptions.onMount`
    * reads this as `deriveHistoryEntryState`'s `previous` (so a re-derivation
    * with an unchanged version is a no-op, never re-stamping `dateIso` —
@@ -158,7 +158,7 @@ export interface FlowStepOptions<Extracted = unknown> {
    */
   onCommit?: (extracted: Extracted, deps: FlowStepDeps) => void;
   /**
-   * Fires once per mount (spec 076 US5) — BEFORE the first `buildContext`
+   * Fires once per mount (spec 079 US5) — BEFORE the first `buildContext`
    * consumer sees a derived value, since it runs in a `useEffect` after the
    * mount render commits, same as every other React effect. Used by
    * `phaseFOptions` to derive (and identity-guard-store) the HISTORY-entry
@@ -173,7 +173,7 @@ export interface FlowStepOptions<Extracted = unknown> {
     getSeedValue: (questionId: string, deps: FlowStepDeps) => string | string[] | undefined;
     onAnswerCommit?: (questionId: string, value: string | string[] | undefined, deps: FlowStepDeps) => void;
     /**
-     * Optional per-question `required` override (spec 076 FR-009). Forwarded
+     * Optional per-question `required` override (spec 079 FR-009). Forwarded
      * to FlowStepHost -> SurveyRunner's own `getRequiredOverride` prop —
      * see its doc there for the override contract. Absent for every flow
      * that has no conditionally-required question (the common case).

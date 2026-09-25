@@ -1,5 +1,5 @@
 // Integration test: pf_welcome_paragraph's adaptive description proposal
-// (spec 076 FR-009, US4, SC-005) with the REAL SurveyRunner.
+// (spec 079 FR-009, US4, SC-005) with the REAL SurveyRunner.
 //
 // Verifies the prefill + waived-required override travels end to end:
 //   workingCopyStore (instantiationMode / baseDocProfile / baseWelcomeHtmText)
@@ -55,7 +55,7 @@ function nextButton(): HTMLButtonElement {
   return screen.getByRole("button", { name: /next|continue|finish|done/i }) as HTMLButtonElement;
 }
 
-describe("Phase F — pf_welcome_paragraph adaptive description proposal (spec 076 FR-009, SC-005)", () => {
+describe("Phase F — pf_welcome_paragraph adaptive description proposal (spec 079 FR-009, SC-005)", () => {
   it("SC-005: adapt-full prefills the description and a SINGLE confirm (no typing) advances", () => {
     useWorkingCopyStore.setState({
       instantiationMode: "adapt-existing",

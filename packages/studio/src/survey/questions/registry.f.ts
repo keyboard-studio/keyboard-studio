@@ -51,7 +51,7 @@ export const phaseFRegistry: Readonly<Record<string, QuestionModule>> = {
   pf_usage_tip_1: pfUsageTip1Mod,
   pf_usage_tip_2: pfUsageTip2Mod,
 
-  // --- HISTORY proposal (spec 076 US5): confirm / edit / dismiss, spliced in
+  // --- HISTORY proposal (spec 079 US5): confirm / edit / dismiss, spliced in
   // via pf_usage_tip_1's `next` (last default-path screen before the gate) ---
   pf_history_entry: pfHistoryEntryMod,
   pf_history_entry_bullets: pfHistoryEntryBulletsMod,

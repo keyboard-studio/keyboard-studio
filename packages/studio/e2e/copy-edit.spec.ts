@@ -442,7 +442,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     await completePhaseB(page);
     await finishGalleryWork(page);
     await navigateToOutput(page);
-    // spec 076 FR-017: the documentation checklist is present on Output — six
+    // spec 079 FR-017: the documentation checklist is present on Output — six
     // rows, informational (the download below still proceeds with rows on
     // placeholder, FR-018).
     const checklist = page.getByTestId("documentation-checklist");
@@ -496,7 +496,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     expect(kvks, "zip must contain a .kvks visual keyboard file").toBeDefined();
     expect(kvks![1].length, ".kvks must be non-empty").toBeGreaterThan(0);
 
-    // spec 076 FR-001/FR-002: all six documentation members ship, the welcome
+    // spec 079 FR-001/FR-002: all six documentation members ship, the welcome
     // page under the folder convention and nowhere else.
     const zipPaths = entries.map(([name]) => name.replace(/\\/g, "/"));
     const has = (suffix: string) => zipPaths.find((p) => p.endsWith(suffix));
@@ -506,7 +506,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
       expect(entries.find(([n]) => n.replace(/\\/g, "/") === found)![1].length, `${member} must be non-empty`).toBeGreaterThan(0);
     }
     expect(zipPaths.some((p) => /(^|\/)source\/welcome\.htm$/.test(p)), "no flat source/welcome.htm").toBe(false);
-    // spec 076 FR-003: the fresh help page opens with the standard help-site header.
+    // spec 079 FR-003: the fresh help page opens with the standard help-site header.
     const help = entries.find(([name]) => /source[\\/]help[\\/][^\\/]+\.php$/.test(name));
     expect(help, "zip must contain source/help/<id>.php").toBeDefined();
     const helpText = new TextDecoder().decode(help![1]);

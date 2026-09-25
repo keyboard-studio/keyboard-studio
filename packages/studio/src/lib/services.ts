@@ -66,7 +66,7 @@ export function getBaseBrowserService(): BaseBrowserService {
   return USE_REAL ? localBaseBrowser : mockBaseBrowser;
 }
 
-// getBaseDocProfile: spec 076 FR-008's base-documentation classifier (research
+// getBaseDocProfile: spec 079 FR-008's base-documentation classifier (research
 // R4). Neither `localBaseBrowser` (dev proxy of the static /local-kbd-api/list
 // catalog) nor `mockBaseBrowser` implement the classifier — it needs a live
 // `.kps` + welcome-page probe fetch, which the catalog snapshot does not carry
@@ -218,7 +218,7 @@ export async function getCompile(): Promise<CompileFn> {
 }
 
 // (`getEnsurePackageFiles` used to live here. LICENSE.md completion now runs
-// inside the shared output projection — serializeWorkingCopy step 5d, spec 076
+// inside the shared output projection — serializeWorkingCopy step 5d, spec 079
 // FR-001 — which imports the engine statically, so the lazy accessor had no
 // caller left.)
 

@@ -129,7 +129,7 @@ describe("flow-parity: phase_f_helpdocs — questions[]", () => {
     expect(path).toEqual([
       "pf_welcome_paragraph",
       "pf_usage_tip_1",
-      // spec 076 US5: the HISTORY proposal screen sits between the tips and
+      // spec 079 US5: the HISTORY proposal screen sits between the tips and
       // the opt-in gate; confirm is one click, so it stays on the default path.
       "pf_history_entry",
       "pf_more_detail_gate",

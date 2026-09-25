@@ -1,10 +1,10 @@
-# Research: Documentation completeness (spec 076)
+# Research: Documentation completeness (spec 079)
 
 **Date**: 2026-09-10 | **Input**: [spec.md](spec.md) | **Feeds**: [plan.md](plan.md)
 
 All unknowns from the Technical Context resolved below. Each decision records what was
 chosen, why, and what was rejected. Codebase facts were verified against the working
-tree at branch `076-documentation-completeness` (commit `fee0e529`).
+tree at branch `079-documentation-completeness` (commit `fee0e529`).
 
 ---
 

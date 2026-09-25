@@ -1,7 +1,7 @@
 // Check 11.9 — KM_LINT_PHP_HTM_BODY_MISMATCH
 // Criteria (criteria.json "11.9-php-htm-body-parity"): "`welcome.htm` and
 // `.php` body content are identical after stripping headers and normalizing
-// whitespace" (spec 076 US7-3).
+// whitespace" (spec 079 US7-3).
 
 import type { DocLintInput, LintFinding } from "@keyboard-studio/contracts";
 import { docMemberPath, normalizeDocBody } from "./_shared.js";

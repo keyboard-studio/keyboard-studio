@@ -567,7 +567,7 @@ export function generateStubs(
     // tracked as a separate feature; it would write a real `source/<id>.ico` here
     // and re-add the &BITMAP reference.
     {
-      // spec 076 FR-002: the folder convention, never the flat `source/welcome.htm`.
+      // spec 079 FR-002: the folder convention, never the flat `source/welcome.htm`.
       // renameFilesInVfs skips subdirectory files, so this path survives the
       // id-rename pass untouched (as it must — the descriptor names it verbatim).
       path: `source/welcome/welcome.htm`,
@@ -582,7 +582,7 @@ export function generateStubs(
     },
     {
       path: `source/help/${keyboardId}.php`,
-      // spec 076 FR-003: standard help-site header + the placeholder comment,
+      // spec 079 FR-003: standard help-site header + the placeholder comment,
       // from the same helper helpDocsRender's fallback uses (one copy of the rule).
       content: helpPhpStub(displayName),
     },
@@ -596,7 +596,7 @@ export function generateStubs(
     },
     {
       // Track-1 HISTORY.md stub (new-from-base). The output projection rewrites
-      // this on every production through renderHistoryMd (spec 076 US5), which
+      // this on every production through renderHistoryMd (spec 079 US5), which
       // owns the entry format; this stub only has to exist and share its
       // bullet text so an early download reads the same as a rendered one.
       path: `HISTORY.md`,
@@ -724,7 +724,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         loaderStylesheets = loaderResult.stylesheets;
         warnings.push(...loaderResult.warnings);
         baseLicenseText = loaderResult.baseLicenseText;
-        // spec 076 R9: a Track 1 copy inherits the base's welcome IMAGES (and
+        // spec 079 R9: a Track 1 copy inherits the base's welcome IMAGES (and
         // nothing of its prose — baseWelcomeHtmText/baseHelpPhpText are
         // deliberately not surfaced from here, FR-007).
         baseWelcomeImages = loaderResult.baseWelcomeImages;
@@ -804,7 +804,7 @@ export function createScaffolderService(opts?: ScaffolderServiceOptions): Scaffo
         // Handed back so the working copy can keep it — the download path needs it
         // to retain these same holders when it completes a missing LICENSE.md.
         ...(baseLicenseText !== undefined ? { baseLicenseText } : {}),
-        // spec 076 FR-006/R9: the base's welcome images, for the copy's own
+        // spec 079 FR-006/R9: the base's welcome images, for the copy's own
         // welcome folder. Handed back rather than written: the projection writes
         // them beside the RENDERED page at output (fetch-don't-write).
         ...(baseWelcomeImages !== undefined && baseWelcomeImages.length > 0

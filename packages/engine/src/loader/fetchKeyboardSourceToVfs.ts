@@ -84,7 +84,7 @@ export interface FetchKeyboardSourceResult {
    * NOT written into the VFS, since the projected path is where the *rendered*
    * (merged) file belongs, not the base's raw copy.
    *
-   * Resolved in this order (spec 076 research R3): the `.kps`-declared
+   * Resolved in this order (spec 079 research R3): the `.kps`-declared
    * `<WelcomeFile>` when it names a folder-convention page, then
    * `source/welcome/welcome.htm`, then the flat `source/welcome.htm` (or the
    * declared flat name). A declared file that 404s degrades to the next probe
@@ -98,13 +98,13 @@ export interface FetchKeyboardSourceResult {
    */
   baseHelpPhpText?: string;
   /**
-   * Which welcome-page convention the base uses (spec 076 data-model §6):
+   * Which welcome-page convention the base uses (spec 079 data-model §6):
    * `"folder"` (`source/welcome/welcome.htm`, the corpus majority), `"flat"`
    * (`source/welcome.htm`), or `"absent"`. `folder` wins when both exist.
    */
   baseWelcomeConvention?: WelcomeConvention;
   /**
-   * The base's welcome-folder images, fetched as bytes (spec 076 FR-006): every
+   * The base's welcome-folder images, fetched as bytes (spec 079 FR-006): every
    * `welcome\…` file its `.kps` `<Files>` lists other than the page itself, in
    * `.kps` order, followed by any image the page's own `<img src>` references
    * that the `.kps` forgot to list. Only populated for the folder convention.
@@ -116,7 +116,7 @@ export interface FetchKeyboardSourceResult {
   baseWelcomeImages?: WelcomeFolderImage[];
   /**
    * The base keyboard's own `README.md`, verbatim, or undefined when it has
-   * none (spec 076 FR-006 inheritance). Fetch-don't-write, like
+   * none (spec 079 FR-006 inheritance). Fetch-don't-write, like
    * {@link baseLicenseText}: it lives at the keyboard root.
    */
   baseReadmeMdText?: string;
@@ -272,7 +272,7 @@ export async function fetchKeyboardSourceToVfs(
   const stylesheets: KpsStylesheetEntry[] = [];
   const kpsUrl = `${baseUrl}/source/${baseKeyboard.id}.kps`;
   const kpsResp = await getText(kpsUrl, fetchImpl);
-  // Hoisted: the welcome-page resolution below (spec 076 R3) reads the same
+  // Hoisted: the welcome-page resolution below (spec 079 R3) reads the same
   // descriptor for `<WelcomeFile>` and the `welcome\…` `<Files>` entries.
   const kpsText = kpsResp.ok && kpsResp.text !== undefined ? kpsResp.text : undefined;
   if (kpsText !== undefined) {
@@ -452,7 +452,7 @@ export async function fetchKeyboardSourceToVfs(
   // doc comment). Absence is non-fatal and NOT a warning, same tolerance as
   // baseLicenseText: most bases have no help page at all.
   //
-  // spec 076 R3: the welcome page is resolved through the three-step probe
+  // spec 079 R3: the welcome page is resolved through the three-step probe
   // (descriptor-named → folder → flat) and, on the folder convention, its
   // sibling images come along too.
   const welcome = await resolveBaseWelcome(baseUrl, kpsText, fetchImpl);
@@ -467,7 +467,7 @@ export async function fetchKeyboardSourceToVfs(
     baseHelpPhpText = helpPhpResp.text;
   }
 
-  // spec 076 FR-006: the base's README.md / HISTORY.md, for inheritance at
+  // spec 079 FR-006: the base's README.md / HISTORY.md, for inheritance at
   // render time (README prose) and preservation below the new entry (HISTORY,
   // criterion 3.4). Root-level like LICENSE.md; absence is silent.
   let baseReadmeMdText: string | undefined;
@@ -498,7 +498,7 @@ export async function fetchKeyboardSourceToVfs(
 }
 
 // ---------------------------------------------------------------------------
-// Welcome-page resolution (spec 076 US2, research R3)
+// Welcome-page resolution (spec 079 US2, research R3)
 // ---------------------------------------------------------------------------
 
 /** The `.kps` `<Options><WelcomeFile>` value, or undefined when absent/blank. */

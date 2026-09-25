@@ -1,6 +1,6 @@
 /**
  * svg — the deterministic SVG string emitter shared by every layout chart
- * (spec 076 T049, FR-014).
+ * (spec 079 T049, FR-014).
  *
  * No DOM, no timestamps, no randomness: every element is built by plain
  * string concatenation with a fixed attribute order, and every number is
