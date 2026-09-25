@@ -880,7 +880,7 @@
       "tests": [
         "casePairCompanion.test.ts",
         "MechanismGallery.casePair.test.tsx::case-pair companion proposal",
-        "TouchGallery.test.tsx::shift-layer case-pair proposal"
+        "TouchGallery.casing.test.tsx::shift-layer case-pair proposal"
       ]
     },
     "FR-002": {
@@ -902,19 +902,19 @@
     },
     "FR-005": {
       "tests": [
-        "TouchGallery.test.tsx::shift-layer case-pair proposal",
+        "TouchGallery.casing.test.tsx::shift-layer case-pair proposal",
         "applyTouchAssignments.test.ts::layer targeting"
       ]
     },
     "FR-006": {
       "tests": [
-        "TouchGallery.test.tsx::buildTouchMechanismRef - case-derived layer"
+        "TouchGallery.casing.test.tsx::buildTouchMechanismRef - case-derived layer"
       ]
     },
     "FR-007": {
       "tests": [
         "MechanismGallery.casePair.test.tsx::records nothing additional when the companion prompt is declined",
-        "TouchGallery.test.tsx::dismissing records nothing"
+        "TouchGallery.casing.test.tsx::dismissing records nothing"
       ]
     },
     "FR-008": {

@@ -406,8 +406,8 @@ describe("TouchGallery — character-scroll-strip producer badge (integration)",
 // Compose marker (CharScrollStrip Part 1, 3-signal count model) — integration
 // coverage for the TOUCH modality specifically.
 //
-// MechanismGallery.test.tsx already pins the compose marker's render-level
-// contract (data-testid `char-scroll-badge-compose-<HEX>`) for the desktop/
+// MechanismGallery.charStrip.test.tsx already pins the compose marker's
+// render-level contract (data-testid `char-scroll-badge-compose-<HEX>`) for the desktop/
 // physical path. The touch path is MORE complex — its composition signal
 // (`directTouchProducedSet`, charMechanisms.ts's `getProducerBadge` signal
 // (c) input) folds a cross-modality union of `desktopDirectProducedSet`
