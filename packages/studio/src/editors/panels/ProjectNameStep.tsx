@@ -1,7 +1,16 @@
-// ProjectNameStep — wizard stage for Track 1 (Copy) where the author names
-// their new keyboard. Pre-fills with the language autonym; derives a keyboardId
-// slug live as the user types. "Next" is blocked while the derived id is invalid.
-// spec §8 v1.3.0, Track 1.
+// ProjectNameStep — LEGACY panel, unreachable from the live wizard.
+//
+// Track 1 "Name your keyboard" ships via ProjectNameStepFactoryComponent
+// (flowStepOptions.projectNameOptions → registerEditorSteps). The adapter
+// that once wrapped this panel was deleted (panelAdapters.tsx); nothing
+// imports or renders ProjectNameStep. Kept only as a historical reference /
+// smoke-test mock target. Keyboard-id seeding policy (English-name preference,
+// issue #1777) lives in projectNameOptions — do not revive this panel without
+// applying the same rule.
+//
+// Historical behaviour: pre-filled with the language autonym; derived a
+// keyboardId slug live as the user typed. "Next" blocked while the derived
+// id was invalid. spec §8 v1.3.0, Track 1.
 
 import { useState, useMemo } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";

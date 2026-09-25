@@ -1,12 +1,13 @@
 // Per-question module: project_keyboard_id (Phase G — Project Name, copy-track)
 //
-// Text question for the keyboard's unique ID (slug). Seeded from the
-// project_display_name answer via getSeedValue in PhaseProjectName, applying
-// slugifyKeyboardId. The user may edit the suggested slug before confirming.
+// Text question for the keyboard's unique ID (slug). Seeded via getSeedValue in
+// projectNameOptions from the English language name (fallback: display-name /
+// autonym slug) — see issue #1777. The user may edit the suggested slug before
+// confirming.
 //
-// The same slug-derivation and validation logic is used by ProjectNameStep.tsx
-// (the legacy panel). Both import from @keyboard-studio/contracts so the logic
-// is not duplicated.
+// Slug derivation and validation live in @keyboard-studio/contracts
+// (slugifyKeyboardId / validateKeyboardId); the live seed wiring is in
+// projectNameOptions. The legacy ProjectNameStep panel is unreachable.
 //
 // inputs:  header.bcp47    — language context.
 // writes:  header.keyboardId — the keyboard ID is stored here.
@@ -25,7 +26,7 @@ export const definition = {
     "the keyboard repository (e.g. \"hausa_qwerty\", \"ewondo\"). " +
     "It must start with a lowercase letter or underscore and may contain only " +
     "lowercase letters, digits, and underscores. Maximum 254 characters. " +
-    "A suggestion has been filled in from your display name — edit it if needed.",
+    "A suggestion has been filled in from the English language name — edit it if needed.",
   required: true,
   // Terminal question in the project_name flow — null means flow ends here.
   next: null,

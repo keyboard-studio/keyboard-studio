@@ -91,7 +91,10 @@ export const trackOptions: FlowStepOptions<TrackPayload> = {
 // projectNameOptions — reproduces ProjectNameStepAdapter + PhaseProjectName.
 //
 // Context: {} (empty — matches PhaseProjectName today).
-// Seeds: displayName from identityResult autonym/english; keyboardId slug.
+// Seeds: displayName from identityResult autonym/english; keyboardId slug
+//   from the English language name (fallback: display-name / autonym) —
+//   non-decomposing Latin letters in an autonym would otherwise collapse to
+//   underscores under slugifyKeyboardId (issue #1777 / Bafut `bfd`).
 //   Back→forward re-derivation: the ref-based pattern from PhaseProjectName
 //   is preserved via a closure ref inside getSeedValue/onAnswerCommit.
 // Extract: display + id (both trimmed); undefined unless both non-empty.
@@ -100,6 +103,24 @@ export const trackOptions: FlowStepOptions<TrackPayload> = {
 // ---------------------------------------------------------------------------
 
 export type ProjectNamePayload = { displayName: string; keyboardId: string };
+
+/**
+ * True when `slug` keeps at least half the source's letter count after
+ * NFD + mark-stripping. Used to decide whether an author-edited display name
+ * is a safe keyboard-id seed, or whether we should fall back to English
+ * (autonyms with non-decomposing letters like `ɨ` otherwise yield `b_f`).
+ *
+ * Source letters are counted with `\p{L}` so non-ASCII Latin (ɨ, ɛ, ɔ, …)
+ * still contribute to the denominator; the slug only has `[a-z]`.
+ */
+export function slugRetainsMostLetters(source: string, slug: string): boolean {
+  const sourceLetters = (
+    source.normalize("NFD").replace(/\p{M}/gu, "").match(/\p{L}/gu) ?? []
+  ).length;
+  if (sourceLetters === 0) return slug.length > 0;
+  const slugLetters = slug.replace(/[^a-z]/g, "").length;
+  return slugLetters * 2 >= sourceLetters;
+}
 
 export const projectNameOptions: FlowStepOptions<ProjectNamePayload> = {
   flowRef: "project_name",
@@ -112,6 +133,7 @@ export const projectNameOptions: FlowStepOptions<ProjectNamePayload> = {
 
   seeds: {
     getSeedValue(questionId: string, deps: FlowStepDeps): string | string[] | undefined {
+      const english = deps.identityResult?.english ?? "";
       const defaultDisplayName =
         deps.identityResult !== null
           ? deps.identityResult.autonym || deps.identityResult.english
@@ -145,10 +167,29 @@ export const projectNameOptions: FlowStepOptions<ProjectNamePayload> = {
         if (deps.scaffoldSpec?.keyboardId !== undefined && deps.scaffoldSpec.keyboardId !== "") {
           return deps.scaffoldSpec.keyboardId;
         }
-        // Derive slug from the committed display name (via the per-mount ref).
-        const name = deps.displayNameRef.current !== "" ? deps.displayNameRef.current : defaultDisplayName;
-        const slug = slugifyKeyboardId(name);
-        return slug !== "" ? slug : undefined;
+
+        const committedName =
+          deps.displayNameRef.current !== ""
+            ? deps.displayNameRef.current
+            : defaultDisplayName;
+
+        // Author edited the display name away from the identity default —
+        // re-derive from their edit when the slug keeps most of the letters.
+        // Otherwise fall through to the English-preferred seed (#1777).
+        if (committedName !== "" && committedName !== defaultDisplayName) {
+          const fromEdit = slugifyKeyboardId(committedName);
+          if (fromEdit !== "" && slugRetainsMostLetters(committedName, fromEdit)) {
+            return fromEdit;
+          }
+        }
+
+        // Prefer the English language name; fall back to the display-name /
+        // autonym slug only when English is empty or yields nothing.
+        const fromEnglish = english !== "" ? slugifyKeyboardId(english) : "";
+        if (fromEnglish !== "") return fromEnglish;
+
+        const fromDisplay = slugifyKeyboardId(committedName);
+        return fromDisplay !== "" ? fromDisplay : undefined;
       }
       return undefined;
     },
