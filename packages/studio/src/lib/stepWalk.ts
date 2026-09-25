@@ -66,6 +66,12 @@ export interface StepWalkPosition {
    * boundary, deliberately unchanged here).
    */
   readonly done: boolean;
+  /**
+   * An OPTIONAL stop the author walked past without answering. Not `done` —
+   * nothing was said — but not outstanding either: the footer greys it rather
+   * than leaving it hollow, and it does not hold its section below full.
+   */
+  readonly skipped?: boolean;
 }
 
 /** A step's ordered stops. Published by the ONE component that owns the walk. */

@@ -564,8 +564,19 @@ export function SurveyRunner({
   );
 
   const positions: StepWalkPositions = useMemo(
-    () => stack.map((entry, i) => ({ id: entry.questionId, done: hasValue(liveValues[i]) })),
-    [stack, liveValues],
+    () =>
+      stack.map((entry, i) => {
+        const done = hasValue(liveValues[i]);
+        const q = index.get(entry.questionId);
+        // Behind the cursor and blank: a notice has nothing to answer (settled
+        // by reading it); any other non-required question was skipped.
+        if (done || i >= cursor || q === undefined) return { id: entry.questionId, done };
+        if (q.type === "notice") return { id: entry.questionId, done: true };
+        return q.required === true
+          ? { id: entry.questionId, done }
+          : { id: entry.questionId, done, skipped: true };
+      }),
+    [stack, liveValues, cursor, index],
   );
 
   // Every answer the walk holds, saved as given (spec 079 FR-001): the field's

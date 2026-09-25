@@ -14,8 +14,9 @@
 //              expanded (current) section.
 //
 // FOUR INDEPENDENT AXES (§3), never conflated:
-//   fill  — full / partial / none ("has a response"), a shape fill, not a
-//           colour. `partial` renders as a half-filled circle (left half
+//   fill  — full / partial / none / skipped ("has a response"), a shape fill,
+//           not a colour. `skipped` (optional, passed blank) is a grey disc
+//           with a dashed outline. `partial` renders as a half-filled circle (left half
 //           filled, right half hollow — the glyph journey-strip-contract.md
 //           §11 leaves to planning; this is that choice).
 //   shape — circle (reached) vs. hollow square (upcoming/unreached),
@@ -32,7 +33,7 @@
 import type { CSSProperties } from "react";
 import { useLingui } from "@lingui/react/macro";
 import { msg } from "@lingui/core/macro";
-import { CSS_ACCENT, CSS_BORDER, CSS_TEXT } from "../ui/theme.ts";
+import { CSS_ACCENT, CSS_BORDER, CSS_TEXT, CSS_TEXT_MUTED } from "../ui/theme.ts";
 import { resolveMessage } from "../lib/i18nResolve.ts";
 import type { ProgressDot as ProgressDotData, WorkKind } from "../decisions/progressDots.ts";
 
@@ -82,7 +83,12 @@ export function ProgressDot({ dot, onActivate }: ProgressDotProps) {
             id: "footer.dot.current.ariaLabel",
             message: `${{ label: dot.label }} — you are here`,
           })
-        : dot.fill === "partial"
+        : dot.fill === "skipped"
+          ? t({
+              id: "footer.dot.skipped.ariaLabel",
+              message: `${{ label: dot.label }} — optional, left blank`,
+            })
+          : dot.fill === "partial"
           ? t({
               id: "footer.dot.partial.ariaLabel",
               message: `${{ label: dot.label }} — partly answered`,
@@ -129,7 +135,16 @@ export function ProgressDot({ dot, onActivate }: ProgressDotProps) {
         background: "transparent",
         border: `1px solid ${CSS_BORDER}`,
       }
-    : dot.fill === "partial"
+    : dot.fill === "skipped" && dot.kind !== "current"
+      ? {
+          // Optional, left blank — greyed rather than hollow (settled, unlike
+          // "no answer yet"). The dashed outline is the non-colour cue that
+          // keeps it from reading as an answered (solid) mark.
+          borderRadius: "50%",
+          background: `color-mix(in srgb, ${CSS_TEXT_MUTED} 45%, transparent)`,
+          border: `1px dashed ${CSS_TEXT_MUTED}`,
+        }
+      : dot.fill === "partial"
       ? {
           // Half-filled circle — left half filled, right half hollow. A
           // shape fill, not a colour cue (§3b).

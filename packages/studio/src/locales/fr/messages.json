@@ -864,6 +864,7 @@
   "footer.dot.current.ariaLabel": "{label} — you are here",
   "footer.dot.partial.ariaLabel": "",
   "footer.dot.question.unanswered.ariaLabel": "",
+  "footer.dot.skipped.ariaLabel": "",
   "footer.dot.upcoming.ariaLabel": "{label} — not yet reached",
   "footer.notice.reproposal.body": "",
   "footer.project.label": "Project: {name}",

@@ -480,6 +480,23 @@ describe("StudioFooter — two-tier strip (spec 079)", () => {
     expect(partial!.getAttribute("data-progress-dot-tier")).toBe("section");
   });
 
+  it("an optional page passed blank reads as such, not as unanswered", () => {
+    // "characters" is the active step, so its walk expands to one mark per
+    // page; the skipped page is behind the author's current one.
+    useStepWalkStore.getState().publishStepWalk("characters", [
+      { id: "il_language_autonym", done: false, skipped: true },
+      { id: "il_language_english", done: false },
+    ]);
+
+    render(<StudioFooter />);
+    const skipped = screen
+      .getAllByRole("button")
+      .find((b) => (b.getAttribute("aria-label") ?? "").match(/optional, left blank/i));
+    expect(skipped).toBeDefined();
+    expect(skipped!.getAttribute("data-progress-dot-fill")).toBe("skipped");
+    expect(skipped!.getAttribute("data-progress-dot-tier")).toBe("question");
+  });
+
   it("the FR-016 notice rides the SAME role=status span — no second aria-live region", () => {
     useReproposalNoticeStore.getState().setMessage("2 questions in Accents & marks will need reconfirming.", "characters");
 
