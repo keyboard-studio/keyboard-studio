@@ -50,8 +50,8 @@ import { createVirtualFS } from "@keyboard-studio/contracts";
 import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import type { Stage } from "../../hooks/useKeyboardArtifact.ts";
 import { expectCurrentChar } from "../../test/currentCharChip.ts";
-import { installMechanismGalleryHooks, setMockStage, _lastVfsTransform } from "../../test/mechanismGallery/mocks.tsx";
-import { seedInventory } from "../../test/mechanismGallery/harness.ts";
+import { installMechanismGalleryHooks, setMockStage } from "../../test/mechanismGallery/mocks.tsx";
+import { seedInventory, capturedVfsTransform } from "../../test/mechanismGallery/harness.ts";
 
 vi.mock("../../lib/services.ts", () => import("../../test/mechanismGallery/mocks.tsx"));
 vi.mock("../../hooks/useKeyboardArtifact.ts", () => import("../../test/mechanismGallery/mocks.tsx"));
@@ -284,8 +284,8 @@ describe("MechanismGallery — vfsTransform passed to useKeyboardArtifact", () =
       await new Promise((r) => setTimeout(r, 0));
     });
     // GalleryPreviewWithPatterns mounted → useKeyboardArtifact called → transform captured.
-    expect(_lastVfsTransform).not.toBeNull();
-    expect(typeof _lastVfsTransform).toBe("function");
+    expect(capturedVfsTransform()).not.toBeNull();
+    expect(typeof capturedVfsTransform()).toBe("function");
   });
 });
 

@@ -1,18 +1,25 @@
 // Shared seeders, IR fixtures, and query helpers for the
 // MechanismGallery.*.test.tsx suites. The module mocks, the spies/state they
 // share with test bodies, and the lifecycle hooks every suite installs live in
-// ./mocks.tsx. This module imports nothing from vitest.
+// ./mocks.tsx. This module imports nothing from vitest directly; it reads
+// mock-captured state from ./mocks.tsx through accessors (the reverse import
+// would cycle through the mocked engine, so it only runs this way).
 
 import { screen } from "@testing-library/react";
 import type { IRGroup, IRRule, IRStore, MechanismAssignment } from "@keyboard-studio/contracts";
-import { createVirtualFS } from "@keyboard-studio/contracts";
 import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { stubKmnVfs } from "../workingCopy.ts";
+import { capturedVfsTransformRef } from "./mocks.tsx";
 
 // ---------------------------------------------------------------------------
 // Query helpers
 // ---------------------------------------------------------------------------
 
+/** The vfsTransform the component last passed to the useKeyboardArtifact mock. */
+export function capturedVfsTransform() {
+  return capturedVfsTransformRef.current;
+}
 
 /**
  * The kbgen suggestion row's full visible text, read off its `role="note"`
@@ -101,9 +108,7 @@ export function mnemonicStore(): IRStore {
  * branch of planShiftAssignment.
  */
 export function instantiateWorkingCopy(opts: { mnemonic?: boolean; caps?: boolean } = {}) {
-  const seedVfs = createVirtualFS([
-    { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
-  ]);
+  const seedVfs = stubKmnVfs("basic_kbdus", "c test\n");
   const group = opts.caps === true ? mainGroupWithCaps() : mainGroup();
   const ir = makeTestIR([group], opts.mnemonic === true ? [mnemonicStore()] : []);
   useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs: seedVfs, ir });
@@ -127,9 +132,7 @@ export function groupWithModifiers(vkey: string, modifiers: string[]): IRGroup {
 }
 
 export function instantiateWithModifiersInUse(vkey: string, modifiers: string[]): void {
-  const seedVfs = createVirtualFS([
-    { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
-  ]);
+  const seedVfs = stubKmnVfs("basic_kbdus", "c test\n");
   const ir = makeTestIR([groupWithModifiers(vkey, modifiers)], []);
   useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs: seedVfs, ir });
 }

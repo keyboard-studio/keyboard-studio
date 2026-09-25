@@ -110,16 +110,15 @@ export const USE_REAL = false;
 // ---------------------------------------------------------------------------
 // hooks/useKeyboardArtifact.ts — tests never touch WASM. The stage is set per
 // test via setMockStage; the vfsTransform the component passes is captured
-// in _lastVfsTransform (a live binding, so importers read the current value).
+// in capturedVfsTransformRef (read via capturedVfsTransform() in ./harness.ts).
 // ---------------------------------------------------------------------------
 
 export let _mockStage: Stage = { kind: "idle" };
 export const _mockRetry: Mock = vi.fn();
 export const _mockRecompile: Mock = vi.fn();
-export let _lastVfsTransform:
-  | ((vfs: VirtualFS, keyboardId: string) => { warnings: string[] })
-  | null
-  | undefined = undefined;
+export const capturedVfsTransformRef: {
+  current: ((vfs: VirtualFS, keyboardId: string) => { warnings: string[] }) | null | undefined;
+} = { current: undefined };
 
 export function setMockStage(s: Stage) {
   _mockStage = s;
@@ -130,7 +129,7 @@ export const useKeyboardArtifact = (
   _scaffoldSpec: unknown,
   vfsTransform: ((vfs: VirtualFS, keyboardId: string) => { warnings: string[] }) | null | undefined,
 ): { stage: Stage; retry: Mock; recompile: Mock } => {
-  _lastVfsTransform = vfsTransform;
+  capturedVfsTransformRef.current = vfsTransform;
   return { stage: _mockStage, retry: _mockRetry, recompile: _mockRecompile };
 };
 
@@ -193,6 +192,6 @@ export function installMechanismGalleryHooks() {
     cleanup();
     vi.clearAllMocks();
     _mockStage = { kind: "idle" };
-    _lastVfsTransform = undefined;
+    capturedVfsTransformRef.current = undefined;
   });
 }
