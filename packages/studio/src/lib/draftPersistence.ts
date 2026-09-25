@@ -17,7 +17,7 @@
 // never the 300ms validator/WASM-oracle debounce cycle and never a second
 // validation path — see the comment on installDraftAutosave below.
 
-import type { DeclaredRole } from "@keyboard-studio/contracts";
+import { AnswerTypeSchema, type DeclaredRole } from "@keyboard-studio/contracts";
 import {
   prepareWorkingCopySnapshot,
   snapshotWorkingCopyData,
@@ -37,6 +37,15 @@ import {
   type InvisibleDecision,
   type PhaseBDraftSnapshot,
 } from "../stores/phaseBDraftStore.ts";
+import {
+  applySurveyAnswerSnapshot,
+  getSurveyAnswerSnapshot,
+  useSurveyAnswerStore,
+  type SavedAnswer,
+  type StepAnswers,
+  type StepStatus,
+  type SurveyAnswerSnapshot,
+} from "../stores/surveyAnswerStore.ts";
 import { DEFAULT_PHASE_B_FONT, isPhaseBFontValue } from "../survey/surveyStyles.ts";
 import { deriveProjectLabel } from "./projectLabel.ts";
 import {
@@ -44,6 +53,7 @@ import {
   snapshotDecisionRecord,
 } from "../decisions/decisionLogStore.ts";
 import { parseDecisionRecord, shedDecisionDetail } from "@keyboard-studio/engine";
+import { alphabetKeyOf } from "../steps/evidence.ts";
 // Re-exported (not just imported) so existing external consumers of this
 // module (draftPersistence.test.ts, StudioShell.tsx, etc.) keep importing
 // `DurableDraft`/`ProjectIndexEntry`/`DraftMeta` from here unchanged, even
@@ -774,6 +784,8 @@ export function saveDraft(projectKey: string): void {
     // in startCloudSync), so a large record degrades what SYNCS, never what is
     // saved locally.
     decisionRecord: snapshotDecisionRecord(),
+    // spec 079 R-01: saved answers and within-step positions survive a reload.
+    surveyAnswers: getSurveyAnswerSnapshot(),
   };
 
   try {
@@ -874,6 +886,21 @@ function stringArray(v: unknown): string[] {
  * so `applyPhaseBDraftSnapshot` never falls back to its own defaults for a
  * field the envelope actually saved.
  */
+/**
+ * A draft saved before spec 079 carries a built alphabet but no
+ * `alphabetEvidenceKey`. Unstamped means "first build" to the characters
+ * prefill confirm, which would wipe it; the alphabet was built from the
+ * identity and base restored alongside it, so stamp their key here instead
+ * (spec 079 R-07, FR-032). Runs after the traversal restore it reads.
+ */
+function stampPre079Alphabet(): void {
+  const draft = usePhaseBDraftStore.getState();
+  if (draft.alphabetEvidenceKey !== undefined || draft.chars.length === 0) return;
+  const { identityResult, localBase } = useSurveySessionStore.getState();
+  if (identityResult === null || localBase === null) return;
+  draft.setAlphabetEvidenceKey(alphabetKeyOf(identityResult, localBase));
+}
+
 function restorePhaseBDraftSnapshot(raw: unknown): PhaseBDraftSnapshot {
   const pb = isPlainRecord(raw) ? raw : {};
   const declaredRoles: Record<string, DeclaredRole> = {};
@@ -902,8 +929,82 @@ function restorePhaseBDraftSnapshot(raw: unknown): PhaseBDraftSnapshot {
     // spec 075 sticky fields — same tolerant treatment, same reason.
     seededProposals: stringArray(pb.seededProposals),
     invisibleDecisions,
+    // spec 079 R-07: a non-string key is dropped, never coerced — an absent
+    // key reads as "not yet stamped", which the prefill confirm handles.
+    ...(typeof pb.alphabetEvidenceKey === "string" ? { alphabetEvidenceKey: pb.alphabetEvidenceKey } : {}),
     selectedFont: isPhaseBFontValue(pb.selectedFont) ? pb.selectedFont : DEFAULT_PHASE_B_FONT,
   };
+}
+
+/** One stored answer, or `null` when any field is malformed — never a guess. */
+function restoreSavedAnswer(raw: unknown): SavedAnswer | null {
+  if (!isPlainRecord(raw)) return null;
+  const { value, answerType, origin, stage, evidenceKey, screenId, savedAt } = raw;
+  const valueOk =
+    typeof value === "string" ||
+    typeof value === "boolean" ||
+    (Array.isArray(value) && value.every((v) => typeof v === "string"));
+  if (!valueOk) return null;
+  // Bound to AnswerTypeSchema so a new AnswerType can't silently desync here.
+  if (!AnswerTypeSchema.safeParse(answerType).success) return null;
+  if (origin !== "proposed" && origin !== "confirmed" && origin !== "overturned") return null;
+  if (stage !== "draft" && stage !== "confirmed") return null;
+  if (evidenceKey !== null && typeof evidenceKey !== "string") return null;
+  if (typeof screenId !== "string") return null;
+  return {
+    value: value as SavedAnswer["value"],
+    answerType: answerType as SavedAnswer["answerType"],
+    origin,
+    stage,
+    evidenceKey,
+    screenId,
+    savedAt: typeof savedAt === "number" ? savedAt : 0,
+  };
+}
+
+function restoreStepStatus(raw: unknown): StepStatus {
+  if (isPlainRecord(raw)) {
+    if (raw.kind === "finished") return { kind: "finished" };
+    if (
+      raw.kind === "not-asked" &&
+      isPlainRecord(raw.reason) &&
+      typeof raw.reason.code === "string" &&
+      typeof raw.evidenceKey === "string"
+    ) {
+      return { kind: "not-asked", reason: { code: raw.reason.code }, evidenceKey: raw.evidenceKey };
+    }
+  }
+  return { kind: "in-progress" };
+}
+
+/**
+ * Rebuild the {@link SurveyAnswerSnapshot} a stored envelope carries, modelled
+ * on {@link restorePhaseBDraftSnapshot} (spec 079 FR-032): an unknown step id is
+ * kept verbatim (forward-compat), a malformed answer is DROPPED so that one
+ * question shows its proposal, and a missing field yields an empty store.
+ */
+export function restoreSurveyAnswerSnapshot(raw: unknown): SurveyAnswerSnapshot {
+  const sa = isPlainRecord(raw) ? raw : {};
+  const steps: Record<string, StepAnswers> = {};
+  if (isPlainRecord(sa.steps)) {
+    for (const [stepId, rawStep] of Object.entries(sa.steps)) {
+      if (!isPlainRecord(rawStep)) continue;
+      const answers: Record<string, SavedAnswer> = {};
+      if (isPlainRecord(rawStep.answers)) {
+        for (const [answerId, rawAnswer] of Object.entries(rawStep.answers)) {
+          const answer = restoreSavedAnswer(rawAnswer);
+          if (answer !== null) answers[answerId] = answer;
+        }
+      }
+      steps[stepId] = {
+        answers,
+        position: typeof rawStep.position === "string" ? rawStep.position : null,
+        status: restoreStepStatus(rawStep.status),
+        lastRecorded: stringEntries(rawStep.lastRecorded),
+      };
+    }
+  }
+  return { steps, recordedScreenOf: stringEntries(sa.recordedScreenOf) };
 }
 
 /**
@@ -993,6 +1094,13 @@ function applyEnvelopeToStores(envelope: DurableDraft, pendingSlotKey: string): 
     // proposed chip to "author". Each field is validated individually and
     // degrades to its empty default, never discarding the record.
     applyPhaseBDraftSnapshot(restorePhaseBDraftSnapshot(envelope.phaseBDraft));
+    stampPre079Alphabet();
+
+    // surveyAnswers (spec 079 R-01, FR-032): optional/additive, restored the
+    // same tolerant way. Applied even when absent, so a pre-079 draft (or a
+    // project switch) starts from an empty store rather than inheriting another
+    // project's answers.
+    applySurveyAnswerSnapshot(restoreSurveyAnswerSnapshot(envelope.surveyAnswers));
 
     // decisionRecord (spec 053 FR-005): optional/additive, restored the same
     // tolerant way as phaseBDraft above — a record written before the field
@@ -1357,11 +1465,27 @@ export function installDraftAutosave(projectKey: string): () => void {
   const unsubscribeWorkingCopy = useWorkingCopyStore.subscribe(scheduleSave);
   const unsubscribeSurveySession = useSurveySessionStore.subscribe(scheduleSave);
   const unsubscribePhaseBDraft = usePhaseBDraftStore.subscribe(scheduleSave);
+  // spec 079 FR-034: saved answers ride this same timer — no second one.
+  const unsubscribeSurveyAnswers = useSurveyAnswerStore.subscribe(scheduleSave);
+
+  // spec 079 FR-030: a reload or tab close inside the debounce window would
+  // drop the last answer. `pagehide` flushes a PENDING save only — no new
+  // timer, and nothing is written when no change is waiting.
+  const flushPending = (): void => {
+    if (timer === null) return;
+    clearTimeout(timer);
+    timer = null;
+    if (resolveActiveProjectKey() !== projectKey) return;
+    saveDraft(projectKey);
+  };
+  if (typeof window !== "undefined") window.addEventListener("pagehide", flushPending);
 
   return () => {
     unsubscribeWorkingCopy();
     unsubscribeSurveySession();
     unsubscribePhaseBDraft();
+    unsubscribeSurveyAnswers();
+    if (typeof window !== "undefined") window.removeEventListener("pagehide", flushPending);
     if (timer !== null) {
       clearTimeout(timer);
       timer = null;

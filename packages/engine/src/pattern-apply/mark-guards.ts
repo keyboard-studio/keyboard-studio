@@ -148,11 +148,32 @@ export function applyMarkGuards(
 ): MarkGuardsResult {
   const guardGroup = buildGuardGroup(worklist);
   const unwrap = buildUnwrap(worklist, outputForm);
-  if (guardGroup === null && unwrap === null) {
+
+  // Whether the input IR already carries any previously generated artifact
+  // that the strip below would remove. Checked before stripping so a
+  // worklist with nothing to block/unwrap can still tell "genuinely nothing
+  // to do" (return the IR unchanged, same reference) apart from "there was a
+  // previous run's guard/unwrap that must be torn down" — otherwise a
+  // worklist that regresses from blocked pairs to none would leave stale
+  // guards behind (D-6).
+  const hadPriorArtifacts =
+    ir.groups.some((g) => g.name === MARKS_GUARD_GROUP) ||
+    ir.stores.some((s) => s.name === MARKS_UNWRAP_FROM_STORE || s.name === MARKS_UNWRAP_TO_STORE) ||
+    ir.groups.some((g) =>
+      g.rules.some(
+        (r) =>
+          r.nodeId === "gen-marks-unwrap-rule" ||
+          (r.matchKind === "match" && r.nodeId === "gen-marks-guard-hop") ||
+          r.output.some((o) => isUseGroupOutputFor(o, MARKS_GUARD_GROUP)),
+      ),
+    );
+
+  if (guardGroup === null && unwrap === null && !hadPriorArtifacts) {
     return { ir, blockingRuleCount: 0, unwrapPairCount: 0 };
   }
 
-  // Strip any previously generated artifacts (idempotent re-run). Never
+  // Strip any previously generated artifacts (idempotent re-run, and the
+  // block->none regression above). Never
   // mutates a rule object shared with the input IR — every rule that needs
   // changing is rebuilt as a new object.
   const groups = ir.groups

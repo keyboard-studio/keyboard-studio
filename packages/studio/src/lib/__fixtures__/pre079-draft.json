@@ -1,0 +1,163 @@
+{
+  "version": 1,
+  "savedAt": 1790280052835,
+  "projectKey": "pre079",
+  "displayName": "Pre-079 fixture",
+  "languageTag": "tl-Latn",
+  "workingCopy": {
+    "instantiationMode": "new-from-base",
+    "baseKeyboard": {
+      "id": "pre079",
+      "displayName": "Pre-079 fixture",
+      "languages": []
+    },
+    "baseVfsEntries": [],
+    "baseIr": {
+      "origin": "scaffolded",
+      "header": {
+        "keyboardId": "pre079",
+        "name": "pre079",
+        "bcp47": [],
+        "copyright": "",
+        "version": "10.0",
+        "targets": [],
+        "storeDirectives": []
+      },
+      "stores": [],
+      "groups": [],
+      "comments": [],
+      "raw": [],
+      "recognizedPatterns": [],
+      "facets": {
+        "casing": {
+          "provenance": "undetermined"
+        }
+      }
+    },
+    "identity": null,
+    "attribution": null,
+    "licenseUnparseable": null,
+    "baseHolderOverride": null,
+    "baseLicenseText": null,
+    "helpDocs": null,
+    "baseWelcomeHtmText": null,
+    "baseHelpPhpText": null,
+    "ir": {
+      "origin": "scaffolded",
+      "header": {
+        "keyboardId": "pre079",
+        "name": "pre079",
+        "bcp47": [],
+        "copyright": "",
+        "version": "10.0",
+        "targets": [],
+        "storeDirectives": []
+      },
+      "stores": [],
+      "groups": [],
+      "comments": [],
+      "raw": [],
+      "recognizedPatterns": [],
+      "facets": {
+        "casing": {
+          "provenance": "undetermined"
+        }
+      }
+    },
+    "deletedNodeIds": [],
+    "deletedItemIds": [],
+    "deletedTouchKeyIds": [],
+    "undoStack": [],
+    "phaseResults": [
+      {
+        "phase": "C",
+        "answers": [
+          {
+            "questionId": "invisibles.u200c",
+            "answerType": "boolean",
+            "value": true
+          }
+        ],
+        "confirmedInventory": [
+          "!"
+        ]
+      }
+    ],
+    "irAxes": {},
+    "desktopLocked": false,
+    "sequenceFlaggedChars": [],
+    "touchLayoutJson": null,
+    "touchDraft": null,
+    "galleryIntrosSeen": {
+      "mechanism": false,
+      "touch": false
+    },
+    "staleSteps": [],
+    "validatorFindings": [],
+    "axisFills": [],
+    "keyEditOverlay": {
+      "ops": []
+    },
+    "touchEditorMode": "character"
+  },
+  "traversal": {
+    "activeStepId": "identity",
+    "history": [],
+    "visited": [
+      "identity"
+    ],
+    "lastNavigation": "advance",
+    "marksMigrationNeeded": false,
+    "identityResult": {
+      "autonym": "Test",
+      "english": "Test",
+      "languageSubtag": "tl",
+      "region": "",
+      "targetScriptRaw": "Latn",
+      "bcp47": "tl-Latn",
+      "supported": true,
+      "attribution": null,
+      "prefill": {
+        "script": "Latn",
+        "scriptClass": "alphabetic",
+        "routingGroup": "qwerty-qwertz"
+      }
+    },
+    "identityPhaseResult": null,
+    "surveyContext": {},
+    "selectedTrack": null,
+    "scaffoldSpec": null,
+    "localBase": null,
+    "baseConfirmed": false,
+    "charactersSubStage": "prefill",
+    "touchSeedSource": null,
+    "discoveryMethod": null,
+    "markedForLaterDesktop": [],
+    "markedForLaterTouch": []
+  },
+  "phaseBDraft": {
+    "chars": [
+      "a",
+      "ŋ"
+    ],
+    "declaredRoles": {},
+    "provenance": {
+      "a": "author",
+      "ŋ": "author"
+    },
+    "exemplarDigraphs": [],
+    "rejected": [],
+    "proposalConfidence": {},
+    "exemplarMethodDeclined": false,
+    "seededProposals": [],
+    "invisibleDecisions": {},
+    "selectedFont": "noto-sans"
+  },
+  "decisionRecord": {
+    "format": "keyboard-studio.decision-record",
+    "version": 2,
+    "keyboardId": null,
+    "entries": [],
+    "truncated": null
+  }
+}

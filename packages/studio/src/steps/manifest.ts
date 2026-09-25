@@ -83,6 +83,11 @@ const charactersStep: Step = {
   // IntroChooser keep the OSK preview).
   rightPane: "character-map",
   specRef: ["§8", "specs/027-qu-characters-step"],
+  evidence: {
+    inputs: ["language tag", "script", "variant", "base keyboard"],
+    keyFn: "alphabet",
+  },
+  persistence: "phase-b-draft", // the alphabet; its sub-screen position and manual-path answers live in the answer store
 } as const;
 
 // ---------------------------------------------------------------------------
@@ -135,6 +140,11 @@ export const manifest: readonly Step[] = [
     writes: [],
     component: MarksSeriesStep,
     specRef: ["specs/071-marks-question-series", "specs/052-marks-treatment-question"],
+    evidence: {
+      inputs: ["the confirmed alphabet: its bases, marks and attested combinations"],
+      keyFn: "marks",
+    },
+    persistence: "answer-store",
   } satisfies Step,
 
   // --- Punctuation (clone of the Phase B build-list, scoped to punctuation) ---
@@ -159,6 +169,8 @@ export const manifest: readonly Step[] = [
     // discoveryMethod fork (SurveyView's gate special-cases "characters" only).
     rightPane: "character-map",
     specRef: ["§8", "specs/020-qu-wire-buildlist", "specs/075-punctuation-defaults"],
+    evidence: { inputs: ["resolved language tag", "base keyboard"], keyFn: "punctuation" },
+    persistence: "phase-b-draft",
   } satisfies Step,
 
   // --- Invisible characters (spec 075 US3) ---
@@ -181,6 +193,8 @@ export const manifest: readonly Step[] = [
     writes: [],
     component: InvisiblesStep,
     specRef: ["specs/075-punctuation-defaults"],
+    evidence: { inputs: ["the invisible-character candidates offered"], keyFn: "invisibles" },
+    persistence: "phase-b-draft",
   } satisfies Step,
 
   // --- Convenience characters (pre-carve keep question) ---
@@ -201,6 +215,11 @@ export const manifest: readonly Step[] = [
     writes: [],
     component: ConvenienceCharsStep,
     specRef: "specs/051-carve-orthography-trim",
+    evidence: {
+      inputs: ["surplus basic-Latin candidates on the base", "whether the orthography signal is known"],
+      keyFn: "convenience",
+    },
+    persistence: "answer-store",
   } satisfies Step,
 
   // --- Carve (Phase D: remove unwanted base keys) ---

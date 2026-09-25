@@ -111,6 +111,7 @@ export type WorkingCopySnapshot = Omit<
   | "session"
   | "keyEditOverlay"
   | "touchEditorMode"
+  | "phaseAnswersByStep"
 > & {
   baseVfsEntries: SerializedEntry[];
   deletedNodeIds: string[];
@@ -129,6 +130,13 @@ export type WorkingCopySnapshot = Omit<
   keyEditOverlay?: KeyEditOverlay;
   /** Optional for the same reason as `keyEditOverlay` above — see its comment. */
   touchEditorMode?: TouchEditorMode;
+  /**
+   * Optional (spec 079 D-4): which step recorded which phase answers. A
+   * snapshot written before this field existed has none, and the store then
+   * adopts each phase's stored `answers` under the `"legacy"` owner rather
+   * than inventing an attribution.
+   */
+  phaseAnswersByStep?: WorkingCopyData["phaseAnswersByStep"];
 };
 
 export function serializeEntry(entry: VirtualFSEntry): SerializedEntry {
@@ -257,6 +265,7 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     // key at all (R10.3).
     keyEditOverlay: s.keyEditOverlay,
     touchEditorMode: s.touchEditorMode,
+    phaseAnswersByStep: s.phaseAnswersByStep,
   };
 }
 
@@ -326,6 +335,10 @@ export function prepareWorkingCopySnapshot(snapshot: WorkingCopySnapshot): Parti
     // undefined — same idiom as deletedTouchKeyIds/sequenceFlaggedChars above.
     keyEditOverlay: snapshot.keyEditOverlay ?? { ops: [] },
     touchEditorMode: snapshot.touchEditorMode ?? "character",
+    // spec 079 D-4: absent on a pre-079 snapshot. `{}` is safe — the store
+    // adopts each phase's stored answers under "legacy" when the sidecar does
+    // not describe them.
+    phaseAnswersByStep: snapshot.phaseAnswersByStep ?? {},
   };
 }
 

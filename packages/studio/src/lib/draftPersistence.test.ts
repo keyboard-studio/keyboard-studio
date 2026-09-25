@@ -25,6 +25,7 @@ import { DEBOUNCE_MS } from "../hooks/useDebounce.ts";
 import type { BaseKeyboard, IRRule, KeyboardIR, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { useSurveyAnswerStore, getSurveyAnswerSnapshot } from "../stores/surveyAnswerStore.ts";
 import { instantiateMinimal, makeScaffoldedIR } from "../test/draftSeeds.ts";
 import {
   usePhaseBDraftStore,
@@ -72,6 +73,7 @@ import {
   CLOUD_SYNC_DEBOUNCE_MS,
   MAX_CLOUD_DRAFT_BYTES,
   PENDING_PROJECT_KEY,
+  restoreSurveyAnswerSnapshot,
   type DurableDraft,
 } from "./draftPersistence.ts";
 import { saveServerDraft, saveServerDraftBeacon } from "./serverDraftStore.ts";
@@ -1062,6 +1064,203 @@ describe("draftPersistence", () => {
     });
   });
 
+  // ---------------------------------------------------------------------------
+  // spec 079 R-01/FR-032/FR-034: surveyAnswerStore rides the same durable draft
+  // and the same autosave timer as everything else.
+  // ---------------------------------------------------------------------------
+  describe("restoreSurveyAnswerSnapshot (spec 079 FR-032): tolerant restore, symmetric with restorePhaseBDraftSnapshot", () => {
+    function validAnswer(overrides: Record<string, unknown> = {}): Record<string, unknown> {
+      return {
+        value: "x",
+        answerType: "text",
+        origin: "confirmed",
+        stage: "draft",
+        evidenceKey: null,
+        screenId: "q1",
+        savedAt: 123,
+        ...overrides,
+      };
+    }
+
+    it("keeps an unknown step id verbatim (forward-compat — a future step this build doesn't know about)", () => {
+      const raw = {
+        steps: {
+          some_future_step: {
+            answers: { q1: validAnswer() },
+            position: "q1",
+            status: { kind: "in-progress" },
+            lastRecorded: {},
+          },
+        },
+        recordedScreenOf: {},
+      };
+
+      const restored = restoreSurveyAnswerSnapshot(raw);
+
+      expect(restored.steps["some_future_step"]?.answers["q1"]?.value).toBe("x");
+      expect(restored.steps["some_future_step"]?.position).toBe("q1");
+    });
+
+    it("drops a malformed SavedAnswer with a bad answerType, keeping the rest of the step's good answers", () => {
+      const raw = {
+        steps: {
+          identity: {
+            answers: {
+              good: validAnswer({ screenId: "good" }),
+              bad: validAnswer({ answerType: "not-a-real-answer-type", screenId: "bad" }),
+            },
+            position: null,
+            status: { kind: "in-progress" },
+            lastRecorded: {},
+          },
+        },
+        recordedScreenOf: {},
+      };
+
+      const restored = restoreSurveyAnswerSnapshot(raw);
+
+      expect(restored.steps["identity"]?.answers["good"]?.value).toBe("x");
+      expect(restored.steps["identity"]?.answers["bad"]).toBeUndefined();
+    });
+
+    it("drops a malformed SavedAnswer with a non-string screenId", () => {
+      const raw = {
+        steps: {
+          identity: {
+            answers: { bad: validAnswer({ screenId: 42 }) },
+            position: null,
+            status: { kind: "in-progress" },
+            lastRecorded: {},
+          },
+        },
+        recordedScreenOf: {},
+      };
+
+      expect(restoreSurveyAnswerSnapshot(raw).steps["identity"]?.answers["bad"]).toBeUndefined();
+    });
+
+    it("drops a malformed SavedAnswer with a bad origin", () => {
+      const raw = {
+        steps: {
+          identity: {
+            answers: { bad: validAnswer({ origin: "invented" }) },
+            position: null,
+            status: { kind: "in-progress" },
+            lastRecorded: {},
+          },
+        },
+        recordedScreenOf: {},
+      };
+
+      expect(restoreSurveyAnswerSnapshot(raw).steps["identity"]?.answers["bad"]).toBeUndefined();
+    });
+
+    it("drops a malformed SavedAnswer with a bad stage", () => {
+      const raw = {
+        steps: {
+          identity: {
+            answers: { bad: validAnswer({ stage: "half-done" }) },
+            position: null,
+            status: { kind: "in-progress" },
+            lastRecorded: {},
+          },
+        },
+        recordedScreenOf: {},
+      };
+
+      expect(restoreSurveyAnswerSnapshot(raw).steps["identity"]?.answers["bad"]).toBeUndefined();
+    });
+
+    it("yields an empty store when surveyAnswers is absent from the envelope (FR-032 — a pre-079 draft)", () => {
+      expect(restoreSurveyAnswerSnapshot(undefined)).toEqual({ steps: {}, recordedScreenOf: {} });
+    });
+  });
+
+  describe("installDraftAutosave + surveyAnswerStore: same timer, real teardown (spec 079 FR-034)", () => {
+    it("teardown unsubscribes the answer store — a change made after teardown schedules no save", () => {
+      vi.useFakeTimers();
+      const pk = "autosave-answerstore-teardown";
+      instantiateMinimal(pk);
+
+      const teardown = installDraftAutosave(pk);
+      teardown();
+      // Isolate the write this test cares about from installDraftAutosave's own
+      // synchronous install-time save.
+      localStorage.removeItem(draftKey(pk));
+
+      useSurveyAnswerStore.getState().setPosition("identity", "q1");
+      vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 1000);
+
+      expect(localStorage.getItem(draftKey(pk))).toBeNull();
+    });
+
+    it("AUTOSAVE_DEBOUNCE_MS is 500 and a burst across working copy, survey session, phaseBDraft and surveyAnswer schedules exactly one save (single-cycle invariant)", () => {
+      expect(AUTOSAVE_DEBOUNCE_MS).toBe(500);
+
+      vi.useFakeTimers();
+      const pk = "autosave-burst-four-stores";
+      instantiateMinimal(pk);
+
+      const teardown = installDraftAutosave(pk);
+      // The P1 install-time save already happened above the spy attach point.
+      const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+
+      useWorkingCopyStore.getState().lockDesktop();
+      useSurveySessionStore.getState().advance("choose_base");
+      usePhaseBDraftStore.getState().add("q");
+      useSurveyAnswerStore.getState().setPosition("identity", "q1");
+
+      vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS);
+
+      const draftWrites = setItemSpy.mock.calls.filter(([key]) => key === draftKey(pk));
+      expect(draftWrites).toHaveLength(1);
+
+      const saved = JSON.parse(localStorage.getItem(draftKey(pk))!) as DurableDraft;
+      expect(saved.workingCopy.desktopLocked).toBe(true);
+      expect(saved.traversal.activeStepId).toBe("choose_base");
+      expect(saved.phaseBDraft?.chars).toEqual(["q"]);
+      expect(saved.surveyAnswers?.steps["identity"]?.position).toBe("q1");
+
+      teardown();
+    });
+
+    it("pagehide flushes a pending save, so a reload inside the debounce window keeps the last answer (FR-030)", () => {
+      vi.useFakeTimers();
+      const pk = "autosave-pagehide-flush";
+      instantiateMinimal(pk);
+
+      const teardown = installDraftAutosave(pk);
+      useSurveyAnswerStore.getState().setPosition("identity", "q2");
+      window.dispatchEvent(new Event("pagehide"));
+
+      const saved = JSON.parse(localStorage.getItem(draftKey(pk))!) as DurableDraft;
+      expect(saved.surveyAnswers?.steps["identity"]?.position).toBe("q2");
+
+      // The flush consumed the pending timer: no second write when it would have fired.
+      const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+      vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 1000);
+      expect(setItemSpy.mock.calls.filter(([key]) => key === draftKey(pk))).toHaveLength(0);
+
+      teardown();
+    });
+
+    it("pagehide with no pending change writes nothing, and teardown removes the listener", () => {
+      vi.useFakeTimers();
+      const pk = "autosave-pagehide-idle";
+      instantiateMinimal(pk);
+
+      const teardown = installDraftAutosave(pk);
+      const setItemSpy = vi.spyOn(Storage.prototype, "setItem");
+      window.dispatchEvent(new Event("pagehide"));
+      expect(setItemSpy.mock.calls.filter(([key]) => key === draftKey(pk))).toHaveLength(0);
+
+      teardown();
+      useSurveyAnswerStore.getState().setPosition("identity", "q3");
+      window.dispatchEvent(new Event("pagehide"));
+      expect(setItemSpy.mock.calls.filter(([key]) => key === draftKey(pk))).toHaveLength(0);
+    });
+  });
+
   describe("sticky phase-B draft fields survive a reload (spec 044 FR-017 defect, surfaced by spec 075 US4)", () => {
     // `saveDraft` already writes every sticky decision the draft store keeps
     // (`rejected`, `provenance`, `proposalConfidence`, `exemplarMethodDeclined`,
@@ -1140,6 +1339,66 @@ describe("draftPersistence", () => {
 
       usePhaseBDraftStore.getState().addProposed("z", "cldr");
       expect(usePhaseBDraftStore.getState().chars).not.toContain("z");
+    });
+  });
+
+  describe("spec 079 T041 — alphabetEvidenceKey rides the phase-B draft snapshot", () => {
+    it("restores a string alphabetEvidenceKey", () => {
+      const pk = "phaseb-alphabet-key";
+      instantiateMinimal(pk);
+      usePhaseBDraftStore.getState().add("a");
+      usePhaseBDraftStore.getState().setAlphabetEvidenceKey("tl-Latn|Latn|Latn|basic_kbdus");
+      saveDraft(pk);
+      usePhaseBDraftStore.getState().reset();
+      resetPhaseBDraftDecisions();
+      expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBeUndefined();
+
+      expect(loadDraft(pk)).toBe(true);
+      expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBe("tl-Latn|Latn|Latn|basic_kbdus");
+    });
+
+    it("a pre-079 draft (built alphabet, no key) is stamped on load from its restored identity and base (FR-032)", () => {
+      const pk = "phaseb-alphabet-key-pre079";
+      instantiateMinimal(pk);
+      useSurveySessionStore.setState({
+        identityResult: {
+          autonym: "Test",
+          english: "Test",
+          languageSubtag: "tl",
+          region: "",
+          targetScriptRaw: "Latn",
+          bcp47: "tl-Latn",
+          supported: true,
+          attribution: null,
+          prefill: { script: "Latn", scriptClass: "alphabetic", routingGroup: "qwerty-qwertz" },
+        } as never,
+        localBase: { id: "basic_kbdus", path: "release/b/basic_kbdus", script: "Latn", displayName: "US" } as never,
+      });
+      usePhaseBDraftStore.getState().add("a");
+      saveDraft(pk);
+      expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBeUndefined();
+      usePhaseBDraftStore.getState().reset();
+      useSurveySessionStore.getState().reset();
+
+      expect(loadDraft(pk)).toBe(true);
+      expect(usePhaseBDraftStore.getState().chars).toEqual(["a"]);
+      expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBe("tl-Latn|Latn|Latn|basic_kbdus");
+    });
+
+    it("drops a non-string alphabetEvidenceKey rather than coercing it", () => {
+      const pk = "phaseb-alphabet-key-bad";
+      instantiateMinimal(pk);
+      usePhaseBDraftStore.getState().add("a");
+      saveDraft(pk);
+      const raw = JSON.parse(localStorage.getItem(draftKey(pk))!) as { phaseBDraft: Record<string, unknown> };
+      raw.phaseBDraft.alphabetEvidenceKey = 42;
+      localStorage.setItem(draftKey(pk), JSON.stringify(raw));
+      usePhaseBDraftStore.getState().reset();
+      resetPhaseBDraftDecisions();
+
+      expect(loadDraft(pk)).toBe(true);
+      expect(usePhaseBDraftStore.getState().chars).toEqual(["a"]);
+      expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBeUndefined();
     });
   });
 
@@ -2058,6 +2317,97 @@ describe("draftPersistence", () => {
         .phaseResults.find((r) => r.phase === "C");
       expect(restored?.marksWorklist).toEqual(dualReachable.marksWorklist);
       expect(restored?.computedAxes).toEqual(dualReachable.computedAxes);
+    });
+  });
+
+
+  // -------------------------------------------------------------------------
+  // Spec 079 US4 (T068, T069) — answers and positions survive a reload
+  // -------------------------------------------------------------------------
+
+  describe("spec 079 US4 — answers and positions survive a reload", () => {
+    function saved(value: string | boolean | string[], screenId: string, stage: "draft" | "confirmed" = "confirmed") {
+      return {
+        value,
+        answerType: (Array.isArray(value) ? "char-list" : typeof value === "boolean" ? "boolean" : "select") as
+          | "char-list"
+          | "boolean"
+          | "select",
+        origin: "confirmed" as const,
+        stage,
+        evidenceKey: `key-${screenId}`,
+        screenId,
+      };
+    }
+
+    it("T068 (FR-053): partial marks answers at station 3 and a half-answered identity question round-trip through the autosave path exactly", () => {
+      vi.useFakeTimers();
+      const pk = "us4-reload-roundtrip";
+      instantiateMinimal(pk);
+      const teardown = installDraftAutosave(pk);
+
+      const answers = useSurveyAnswerStore.getState();
+      answers.saveAnswer("marks", "marks.attachments.́", saved(["a", "e"], "attachments"));
+      answers.saveAnswer("marks", "marks.treatment.acute", saved("dead-key", "treatment"));
+      answers.saveAnswer("marks", "marks.stacking.allowed", saved(false, "stacking", "draft"));
+      answers.setPosition("marks", "stacking");
+      answers.markScreenRecorded("marks", "attachments", "hash-1");
+      answers.setRecordedScreen("entry-1", "attachments");
+      answers.saveAnswer("identity", "il_language_name", saved("Ewondo", "il_language_name", "draft"));
+      answers.setPosition("identity", "il_target_script");
+
+      vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS);
+      teardown();
+      const before = JSON.parse(JSON.stringify(getSurveyAnswerSnapshot())) as ReturnType<typeof getSurveyAnswerSnapshot>;
+      expect(Object.keys(before.steps["marks"]?.answers ?? {})).toHaveLength(3);
+
+      useSurveyAnswerStore.getState().reset();
+      useWorkingCopyStore.getState().reset();
+      useSurveySessionStore.getState().reset();
+      expect(useSurveyAnswerStore.getState().steps).toEqual({});
+
+      expect(loadDraft(pk)).toBe(true);
+      const after = getSurveyAnswerSnapshot();
+      expect(after.steps["marks"]).toEqual(before.steps["marks"]);
+      expect(after.steps["identity"]).toEqual(before.steps["identity"]);
+      expect(after.steps["marks"]?.position).toBe("stacking");
+      expect(after.steps["identity"]?.position).toBe("il_target_script");
+      expect(after.recordedScreenOf).toEqual({ "entry-1": "attachments" });
+    });
+
+    it("T069 (FR-032, US4 scenario 3): a checked-in pre-079 draft restores cleanly — empty answer store, phase answers adopted under \"legacy\", no stamp invented", () => {
+      const fixture = readFileSync(path.join(currentDir, "__fixtures__", "pre079-draft.json"), "utf8");
+      const envelope = JSON.parse(fixture) as Record<string, unknown> & { workingCopy: Record<string, unknown>; phaseBDraft: Record<string, unknown> };
+      // The fixture really is pre-079: none of the three additive fields.
+      expect(envelope.surveyAnswers).toBeUndefined();
+      expect(envelope.workingCopy.phaseAnswersByStep).toBeUndefined();
+      expect(envelope.phaseBDraft.alphabetEvidenceKey).toBeUndefined();
+
+      // Answers from a previous project must not survive into this one.
+      useSurveyAnswerStore.getState().saveAnswer("identity", "stale", saved("x", "stale"));
+      localStorage.setItem(draftKey("pre079"), fixture);
+
+      expect(() => loadDraft("pre079")).not.toThrow();
+      expect(useSurveyAnswerStore.getState().steps).toEqual({});
+      expect(useSurveyAnswerStore.getState().recordedScreenOf).toEqual({});
+      expect(usePhaseBDraftStore.getState().chars).toEqual(["a", "ŋ"]);
+      // No base in the fixture's traversal, so nothing to derive a stamp from.
+      expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBeUndefined();
+
+      // The phase-C answers recorded before 079 have no owner step; the next
+      // step to record into phase C must not overwrite them (D-4).
+      const phaseC = () => useWorkingCopyStore.getState().phaseResults.find((p) => p.phase === "C");
+      expect(phaseC()?.answers.map((a) => a.questionId)).toEqual(["invisibles.u200c"]);
+      useWorkingCopyStore
+        .getState()
+        .recordPhase(
+          { phase: "C", answers: [{ questionId: "convenience.x", answerType: "boolean", value: false }] },
+          { stepId: "convenience" },
+        );
+      expect(useWorkingCopyStore.getState().phaseAnswersByStep["C"]?.["legacy"]?.map((a) => a.questionId)).toEqual([
+        "invisibles.u200c",
+      ]);
+      expect(phaseC()?.answers.map((a) => a.questionId)).toEqual(["invisibles.u200c", "convenience.x"]);
     });
   });
 

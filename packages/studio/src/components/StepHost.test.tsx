@@ -12,12 +12,18 @@
 // full-walk suite instead.
 
 import { describe, it, expect, afterEach, vi } from "vitest";
-import { screen, cleanup, act } from "@testing-library/react";
+import { screen, cleanup, act, fireEvent } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { StepHost } from "./StepHost.tsx";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
+import { createStudioDecisionRecorder } from "../decisions/createStudioDecisionRecorder.ts";
+import type { SourceSnapshotter } from "../decisions/snapshotSource.ts";
 import type { ReducerDeps } from "../steps/reducer.ts";
 import type { EditorStepProps } from "../steps/types.ts";
+import { createVirtualFS } from "@keyboard-studio/contracts";
+import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
 
 // ---------------------------------------------------------------------------
 // Mocked manifest — two trivial editor-steps standing in for "identity" and
@@ -38,6 +44,61 @@ function TrivialStep({ onBack }: EditorStepProps): React.ReactElement {
   );
 }
 
+// vi.mock's factory is hoisted above every top-level declaration in this
+// file, so anything it closes over must be built through vi.hoisted rather
+// than an ordinary top-level const/function (vitest docs: "no top level
+// variables inside").
+const { MARKS_RESULT, INVISIBLES_RESULT, makeFixedResultStep } = vi.hoisted(() => {
+  /**
+   * A fixed `SurveyPhaseResult` payload, for a "revisit a finished step,
+   * complete again with no change" test (spec 079 T028) — the SAME payload
+   * is submitted both times, so any new decision entry means the completion
+   * path is not idempotent.
+   */
+  const marksResult = {
+    phase: "C" as const,
+    answers: [{ questionId: "marks.station.attachment", answerType: "select" as const, value: "confirmed" }],
+  };
+
+  const invisiblesResult = {
+    phase: "C" as const,
+    answers: [{ questionId: "invisibles.u200c", answerType: "boolean" as const, value: true }],
+  };
+
+  /**
+   * A trivial single-screen step that completes with a FIXED payload on
+   * click — standing in for a real multi-station (marks) or single-screen
+   * (invisibles) step. What this file exercises is StepHost's own
+   * completion-recording idempotency, not either step's internal UI (owned
+   * elsewhere).
+   */
+  function makeStep(result: unknown) {
+    return function FixedResultStep({
+      onComplete,
+      onBack,
+    }: {
+      onComplete: (r: unknown) => void;
+      onBack?: () => void;
+    }) {
+      return (
+        <div>
+          <span data-testid="step-marker">rendered</span>
+          <button type="button" data-testid="fixed-result-complete" onClick={() => onComplete(result)}>
+            Complete
+          </button>
+          {onBack !== undefined && (
+            <button type="button" onClick={onBack}>
+              Back
+            </button>
+          )}
+        </div>
+      );
+    };
+  }
+
+  return { MARKS_RESULT: marksResult, INVISIBLES_RESULT: invisiblesResult, makeFixedResultStep: makeStep };
+});
+
 vi.mock("../steps/manifest.ts", () => ({
   manifest: [
     {
@@ -56,6 +117,22 @@ vi.mock("../steps/manifest.ts", () => ({
       writes: [],
       component: TrivialStep,
     },
+    {
+      kind: "editor-step",
+      id: "marks",
+      title: "Marks",
+      inputs: [],
+      writes: [],
+      component: makeFixedResultStep(MARKS_RESULT),
+    },
+    {
+      kind: "editor-step",
+      id: "invisibles",
+      title: "Invisible characters",
+      inputs: [],
+      writes: [],
+      component: makeFixedResultStep(INVISIBLES_RESULT),
+    },
   ],
 }));
 
@@ -69,6 +146,31 @@ const fakeReducerDeps: ReducerDeps = {
   resolveBaseTouchJson: vi.fn(() => undefined),
   instantiateFromBaseIfConfirmed: vi.fn(() => true),
 };
+
+/** A snapshotter that captures nothing (mirrors reducer.decisionRecording.test.ts's inertSnapshotter). */
+function inertSnapshotter(): SourceSnapshotter {
+  return {
+    captureAtBoundary: () => Promise.resolve(null),
+    reset: () => {},
+  };
+}
+
+/**
+ * `fakeReducerDeps` plus a REAL decision recorder — the same
+ * `createStudioDecisionRecorder` factory StudioShell.tsx and
+ * reducer.decisionRecording.test.ts's `realRecorder()` both call, pointed at
+ * the real working-copy store, with only the snapshotter faked out (spec 079
+ * T028).
+ */
+function reducerDepsWithRealRecorder(): ReducerDeps {
+  return {
+    ...fakeReducerDeps,
+    recordDecision: createStudioDecisionRecorder({
+      getWorkingCopyState: () => useWorkingCopyStore.getState(),
+      snapshotter: inertSnapshotter(),
+    }),
+  };
+}
 
 afterEach(() => {
   cleanup();
@@ -112,5 +214,102 @@ describe("StepHost onBack gating (F7 defect 2)", () => {
       useSurveySessionStore.getState().reset();
     });
     expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 079 T028 — re-completing a FINISHED step with NO change records zero
+// new decision entries, leaves no stale consequence, and does not touch the
+// working-copy IR. Driven through StepHost's real `handleComplete` path
+// (recordPhase -> recordStepCompletion -> the injected recorder), per SC-005 /
+// FR-006 / US1 scenario 4.
+// ---------------------------------------------------------------------------
+
+describe("StepHost — revisiting a finished step and completing with no change (spec 079 T028)", () => {
+  it("a finished marks-shaped step: re-completing with the identical answers appends no new decision entry", () => {
+    const deps = reducerDepsWithRealRecorder();
+
+    act(() => {
+      useSurveySessionStore.getState().advance("marks");
+    });
+    const first = render(<StepHost reducerDeps={deps} onStartOver={() => {}} />);
+    act(() => {
+      fireEvent.click(screen.getByTestId("fixed-result-complete"));
+    });
+    const entriesAfterFirstComplete = useDecisionLogStore.getState().record.entries.length;
+    expect(entriesAfterFirstComplete).toBeGreaterThan(0);
+    const irAfterFirstComplete = useWorkingCopyStore.getState().baseIr;
+    first.unmount();
+
+    // Revisit: land back on "marks" (a finished step) the way an ordinary
+    // Back / journey-strip jump would.
+    act(() => {
+      useSurveySessionStore.getState().advance("marks");
+    });
+    render(<StepHost reducerDeps={deps} onStartOver={() => {}} />);
+    act(() => {
+      fireEvent.click(screen.getByTestId("fixed-result-complete"));
+    });
+
+    expect(useDecisionLogStore.getState().record.entries.length).toBe(entriesAfterFirstComplete);
+    expect(useWorkingCopyStore.getState().baseIr).toBe(irAfterFirstComplete);
+  });
+
+  it("a finished single-screen step (invisibles): re-completing with the identical answers appends no new decision entry", () => {
+    const deps = reducerDepsWithRealRecorder();
+
+    act(() => {
+      useSurveySessionStore.getState().advance("invisibles");
+    });
+    const first = render(<StepHost reducerDeps={deps} onStartOver={() => {}} />);
+    act(() => {
+      fireEvent.click(screen.getByTestId("fixed-result-complete"));
+    });
+    const entriesAfterFirstComplete = useDecisionLogStore.getState().record.entries.length;
+    expect(entriesAfterFirstComplete).toBeGreaterThan(0);
+    const irAfterFirstComplete = useWorkingCopyStore.getState().baseIr;
+    first.unmount();
+
+    act(() => {
+      useSurveySessionStore.getState().advance("invisibles");
+    });
+    render(<StepHost reducerDeps={deps} onStartOver={() => {}} />);
+    act(() => {
+      fireEvent.click(screen.getByTestId("fixed-result-complete"));
+    });
+
+    expect(useDecisionLogStore.getState().record.entries.length).toBe(entriesAfterFirstComplete);
+    expect(useWorkingCopyStore.getState().baseIr).toBe(irAfterFirstComplete);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 079 T029 — "verify by revisit test" (contracts/step-classification.md):
+// choose_base is believed `working-copy`-compliant (the instantiated base
+// IS the working copy) — this pins that an unmount/remount at "choose_base"
+// with the same evidence leaves the chosen base untouched.
+// ---------------------------------------------------------------------------
+
+describe("StepHost — choose_base revisit keeps the instantiated base (spec 079 T029)", () => {
+  it("an unmount/remount at choose_base with the same evidence leaves baseKeyboard/baseIr unchanged", () => {
+    const ir = makeTestIR([]);
+    const vfs = createVirtualFS([
+      { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
+    ]);
+    useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir });
+    const baseKeyboardBefore = useWorkingCopyStore.getState().baseKeyboard;
+    const baseIrBefore = useWorkingCopyStore.getState().baseIr;
+
+    act(() => {
+      useSurveySessionStore.getState().advance("choose_base");
+    });
+    const first = render(<StepHost reducerDeps={fakeReducerDeps} onStartOver={() => {}} />);
+    expect(screen.getByTestId("step-marker")).toBeTruthy();
+    first.unmount();
+
+    render(<StepHost reducerDeps={fakeReducerDeps} onStartOver={() => {}} />);
+    expect(screen.getByTestId("step-marker")).toBeTruthy();
+    expect(useWorkingCopyStore.getState().baseKeyboard).toBe(baseKeyboardBefore);
+    expect(useWorkingCopyStore.getState().baseIr).toBe(baseIrBefore);
   });
 });

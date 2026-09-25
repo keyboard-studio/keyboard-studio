@@ -29,6 +29,7 @@ import type { ActiveStepId, TraversalSnapshot } from "../stores/surveySessionSto
 import type { WorkingCopySnapshot } from "./persistWorkingCopy.ts";
 import type { PhaseBDraftSnapshot } from "../stores/phaseBDraftStore.ts";
 import type { DecisionRecordSnapshot } from "../decisions/decisionLogStore.ts";
+import type { SurveyAnswerSnapshot } from "../stores/surveyAnswerStore.ts";
 
 /** Lightweight peek at a stored draft, for a future resume-affordance. */
 export interface DraftMeta {
@@ -131,4 +132,12 @@ export interface DurableDraft {
    * by a wide margin (research D-08, SC-009).
    */
   decisionRecord?: DecisionRecordSnapshot;
+  /**
+   * Every survey question's saved answer, each step's position and status
+   * (spec 079 R-01, stores/surveyAnswerStore.ts). Optional and additive with no
+   * `DRAFT_VERSION` bump, following the `phaseBDraft` / `decisionRecord`
+   * precedent: a draft written before this field existed restores an empty
+   * store, so every step shows its proposal and nothing is invented (FR-032).
+   */
+  surveyAnswers?: SurveyAnswerSnapshot;
 }

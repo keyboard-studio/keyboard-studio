@@ -848,3 +848,50 @@ describe("phaseBDraftStore — sticky class rules for the spec 075 fields", () =
     expect(usePhaseBDraftStore.getState().invisibleDecisions).toEqual({});
   });
 });
+
+// ---------------------------------------------------------------------------
+// Spec 079 T037 (R-07) — the sticky alphabet evidence key
+// ---------------------------------------------------------------------------
+
+describe("phaseBDraftStore — alphabetEvidenceKey (spec 079 R-07)", () => {
+  beforeEach(() => {
+    usePhaseBDraftStore.getState().reset();
+    resetPhaseBDraftDecisions();
+  });
+
+  it("is absent until the alphabet is first built, then holds the stamped key", () => {
+    expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBeUndefined();
+    usePhaseBDraftStore.getState().setAlphabetEvidenceKey("tl-Latn|Latn|Latn|basic_kbdus");
+    expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBe("tl-Latn|Latn|Latn|basic_kbdus");
+  });
+
+  it("survives reset() — reset runs on every build-list entry and must not forget the evidence", () => {
+    usePhaseBDraftStore.getState().setAlphabetEvidenceKey("k1");
+    usePhaseBDraftStore.getState().add("a");
+    usePhaseBDraftStore.getState().reset();
+    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+    expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBe("k1");
+  });
+
+  it("is cleared by resetPhaseBDraftDecisions() — a genuinely new working copy", () => {
+    usePhaseBDraftStore.getState().setAlphabetEvidenceKey("k1");
+    resetPhaseBDraftDecisions();
+    expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBeUndefined();
+  });
+
+  it("round-trips through PhaseBDraftSnapshot, and an old snapshot without it restores as unstamped", () => {
+    usePhaseBDraftStore.getState().add("a");
+    usePhaseBDraftStore.getState().setAlphabetEvidenceKey("k1");
+    const snap = snapshotPhaseBDraft();
+    expect(snap.alphabetEvidenceKey).toBe("k1");
+
+    resetPhaseBDraftDecisions();
+    usePhaseBDraftStore.getState().reset();
+    applyPhaseBDraftSnapshot(snap);
+    expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBe("k1");
+    expect(usePhaseBDraftStore.getState().chars).toEqual(["a"]);
+
+    applyPhaseBDraftSnapshot({ chars: ["a"], selectedFont: DEFAULT_PHASE_B_FONT });
+    expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBeUndefined();
+  });
+});

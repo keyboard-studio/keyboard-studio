@@ -17,6 +17,7 @@ import { InvisiblesStep, writingDirectionFrom } from "./InvisiblesStep.tsx";
 import { invisibleCandidatesFor } from "./invisibleCandidates.ts";
 import { usePhaseBDraftStore, resetPhaseBDraftDecisions } from "../../stores/phaseBDraftStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { phaseCConfirmedInventory } from "../phaseCInventory.ts";
 
 function lastResult(onComplete: ReturnType<typeof vi.fn>): SurveyPhaseResult {
@@ -163,6 +164,83 @@ describe("InvisiblesStep — carry-over of code-point entries (FR-017)", () => {
     expect(result.confirmedInventory).toEqual(["!", "⁡", "‌"]);
     expect(result.answers.filter((a) => a.questionId === "invisibles.u2061")).toHaveLength(1);
     expect(result.answers.find((a) => a.questionId === "invisibles.u2061")?.value).toBe(true);
+  });
+});
+
+describe("InvisiblesStep — leave and return (spec 079 FR-051, D-4)", () => {
+  it("an accepted candidate survives an unmount/remount with the same evidence", () => {
+    const first = render(<InvisiblesStep onComplete={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("invisible-candidate-200c"));
+    expect(usePhaseBDraftStore.getState().invisibleDecisions["U+200C"]).toBe("accepted");
+    expect(screen.getByTestId("invisible-candidate-200c").getAttribute("aria-checked")).toBe("true");
+
+    first.unmount();
+    render(<InvisiblesStep onComplete={vi.fn()} />);
+
+    expect(usePhaseBDraftStore.getState().invisibleDecisions["U+200C"]).toBe("accepted");
+    expect(screen.getByTestId("invisible-candidate-200c").getAttribute("aria-checked")).toBe("true");
+  });
+
+  it("the phase-C answer slot still holds invisibles' own answers after convenience records into the same phase (D-4/R-08)", () => {
+    const recordPhase = useWorkingCopyStore.getState().recordPhase;
+    const onComplete = vi.fn();
+    render(<InvisiblesStep onComplete={onComplete} />);
+    fireEvent.click(screen.getByTestId("invisible-candidate-200d"));
+    fireEvent.click(screen.getByTestId("invisibles-continue"));
+    const invisiblesResult = lastResult(onComplete);
+
+    recordPhase(invisiblesResult, { stepId: "invisibles" });
+
+    // Convenience records into the SAME phase ("C") with its own (empty,
+    // never-asked-yet) answer set — this must not erase invisibles' entries.
+    recordPhase({ phase: "C", answers: [] }, { stepId: "convenience" });
+
+    const phaseC = useWorkingCopyStore
+      .getState()
+      .phaseResults.find((p) => p.phase === "C");
+    expect(phaseC).toBeDefined();
+    for (const a of invisiblesResult.answers) {
+      expect(phaseC!.answers).toContainEqual(a);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 079 US3 T048/T079 — a shape change (writing direction becomes RTL)
+// proposes new bidi candidates while keeping the earlier decision, and there
+// is structurally no `reproposed` flag to show (see ../invisiblesFlags.ts).
+// ---------------------------------------------------------------------------
+
+describe("InvisiblesStep — shape change: new candidates proposed, decisions kept, no flags (spec 079 US3 T048/T079)", () => {
+  it("a writing-direction change to RTL proposes the bidi candidates while an earlier LTR decision survives", () => {
+    const first = render(<InvisiblesStep onComplete={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("invisible-candidate-200c")); // an always-offered candidate
+    expect(usePhaseBDraftStore.getState().invisibleDecisions["U+200C"]).toBe("accepted");
+    first.unmount();
+
+    // Shape change: the author is now known to be RTL — new bidi candidates
+    // become relevant.
+    useSurveySessionStore.getState().setSurveyContext({ script_family: "rtl" });
+    render(<InvisiblesStep onComplete={vi.fn()} />);
+
+    // The earlier decision survives untouched.
+    expect(usePhaseBDraftStore.getState().invisibleDecisions["U+200C"]).toBe("accepted");
+    expect(screen.getByTestId("invisible-candidate-200c").getAttribute("aria-checked")).toBe("true");
+    // The bidi group is now expanded with its candidates newly offered,
+    // defaulting to unchecked (proposed, not "reproposed" — nothing was ever
+    // decided about them before).
+    expect(screen.getByTestId("invisible-candidate-200e").getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("never shows a flagged-answers list or reason cue — there is no `reproposed` state for this step's per-answer design", () => {
+    const first = render(<InvisiblesStep onComplete={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("invisible-candidate-200c"));
+    first.unmount();
+
+    useSurveySessionStore.getState().setSurveyContext({ script_family: "rtl" });
+    render(<InvisiblesStep onComplete={vi.fn()} />);
+
+    expect(screen.queryByTestId("flagged-answers-list")).toBeNull();
   });
 });
 

@@ -39,6 +39,7 @@ import { markVisited } from "../lib/firstVisit.ts";
 import { consumePendingWelcomeLocation, jumpToLocation } from "../lib/jumpToLocation.ts";
 import { useViewStateStore } from "../stores/viewStateStore.ts";
 import { useStepWalkStore } from "../stores/stepWalkStore.ts";
+import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import { discardActiveDraft } from "../lib/draftPersistence.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -331,6 +332,7 @@ export function WelcomeScreen() {
                 // Within-step positions belong to the abandoned walk — see the
                 // same call in StudioShell's handleStartOver.
                 useStepWalkStore.getState().reset();
+                useSurveyAnswerStore.getState().reset();
                 leaveWelcome(() => navigateTo("survey"));
               }}
               style={{

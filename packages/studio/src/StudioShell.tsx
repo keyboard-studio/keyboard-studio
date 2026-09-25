@@ -44,6 +44,7 @@ import { parseLocation } from "./lib/location.ts";
 import { liveResolveContext, setPendingWelcomeLocation } from "./lib/jumpToLocation.ts";
 import { readPaneSplitPct, useViewStateStore } from "./stores/viewStateStore.ts";
 import { useStepWalkStore } from "./stores/stepWalkStore.ts";
+import { useSurveyAnswerStore } from "./stores/surveyAnswerStore.ts";
 import { useProjectSwitchStore } from "./stores/projectSwitchStore.ts";
 import { useKeyboardArtifact, type OnInstantiateCallback } from "./hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
@@ -915,6 +916,18 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       createStudioDecisionRecorder({
         getWorkingCopyState: () => useWorkingCopyStore.getState(),
         snapshotter: snapshotterRef.current,
+        // spec 079 R-04: the answer store learns which screen each entry was
+        // recorded on (journey-strip grouping) and each screen's last hash
+        // (FR-040 "a Next with no change records nothing").
+        onScreenRecorded: (stepId, screenId, entryIds, hash) => {
+          const answers = useSurveyAnswerStore.getState();
+          answers.markScreenRecorded(stepId, screenId, hash);
+          for (const entryId of entryIds) answers.setRecordedScreen(entryId, screenId);
+        },
+        getLastRecordedHash: (stepId, screenId) =>
+          useSurveyAnswerStore.getState().steps[stepId]?.lastRecorded[screenId],
+        resolveCompletionScreen: (stepId) =>
+          useSurveyAnswerStore.getState().steps[stepId]?.position ?? stepId,
       }),
     [],
   );
@@ -980,6 +993,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       // Spec 053 FR-001/FR-002: record every step's decisions. Injected like
       // everything else here; the reducer knows only that it has a callback.
       recordDecision,
+      recordQuestionAnswers: recordDecision.recordQuestionAnswers,
     }),
     // Wrapper lambdas delegate to stable module imports — excluded from deps intentionally.
     [lockDesktop, clearStale, setTouchLayoutJson, instantiateFromBase, instantiateFromExisting, setTouchSeedSource, recordDecision],
@@ -1283,6 +1297,9 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     // from the previous project's inventory — a cursor is only meaningful
     // against the walk that published it (stores/stepWalkStore.ts).
     useStepWalkStore.getState().reset();
+    // Saved answers and within-step positions belong to the abandoned project
+    // (spec 079 FR-033: one of the only two reset sites).
+    useSurveyAnswerStore.getState().reset();
     snapshotterRef.current.reset();
     pendingArtifactRef.current = null;
     // F6 fix: re-arm the pre-instantiation pending autosave for the NEXT
@@ -1753,6 +1770,17 @@ export function StudioShell() {
   // ---------------------------------------------------------------------------
   const decisionRecord = useDecisionLogStore((s) => s.record);
   const decisionDroppedCount = useDecisionLogStore((s) => s.droppedCount);
+  // spec 079 FR-068 (T065): each step's current `StepStatus`, read here (the
+  // `decisions-layer` depcruise rule forbids `decisions/ -> stores/`) and
+  // passed down so a `not-asked` step's stage group can read "passed —
+  // {reason}" instead of either rendering nothing or a fabricated answer —
+  // same store-boundary pattern as `decisionRecord`/`resolveCtx` above.
+  const trailAnswerSteps = useSurveyAnswerStore((s) => s.steps);
+  const trailStepStatuses = useMemo(() => {
+    const out: Record<string, (typeof trailAnswerSteps)[string]["status"]> = {};
+    for (const [stepId, step] of Object.entries(trailAnswerSteps)) out[stepId] = step.status;
+    return out;
+  }, [trailAnswerSteps]);
   const impactDeps = useMemo(
     () => ({
       getWorkingIR: () => useWorkingCopyStore.getState().ir,
@@ -1890,6 +1918,7 @@ export function StudioShell() {
           // is possible. Read at render time — a pure, store-free computation
           // that resolves no impact (FR-036 is about impact, not location).
           resolveCtx={liveResolveContext()}
+          stepStatuses={trailStepStatuses}
         />
       );
       break;

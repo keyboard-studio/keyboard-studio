@@ -31,9 +31,14 @@
 //   remain in SurveyView. StepHost only decides which container a step renders into.
 
 import type { ReactNode, CSSProperties } from "react";
-import { useEffect, useState } from "react";
-import { Trans } from "@lingui/react/macro";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Trans, useLingui } from "@lingui/react/macro";
+import { plural } from "@lingui/core/macro";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
+import { diffWorkToDo } from "../steps/workToDo.ts";
+import { useWorkToDo } from "../hooks/useWorkToDo.ts";
+import { useReproposalNoticeStore } from "../stores/reproposalNoticeStore.ts";
+import { affectedStepNames } from "../decisions/reproposalNotice.ts";
 import {
   useSurveySessionStore,
   performManifestBack,
@@ -51,6 +56,8 @@ import {
 } from "../steps/reducer.ts";
 import { advance, STEPS_WITH_APPLY_COMPLETION } from "../steps/advance.ts";
 import { navigateTo } from "../lib/navigate.ts";
+import { QuestionRecorderContext, type ScreenRecorder } from "../lib/questionRecorder.ts";
+import { JumpContext, type JumpToScreen } from "../lib/jumpContext.ts";
 import { peekPendingJump, clearPendingJump, jumpToLocation } from "../lib/jumpToLocation.ts";
 import type { Location } from "../lib/location.ts";
 import { UnsupportedScriptStub } from "./UnsupportedScriptStub.tsx";
@@ -176,6 +183,7 @@ const DEEP_LINK_CONTINUE_BUTTON_STYLE: CSSProperties = {
 // ---------------------------------------------------------------------------
 
 export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): ReactNode {
+  const { t, i18n } = useLingui();
   const activeStepId = useSurveySessionStore((s) => s.activeStepId);
   // identityResult is read here only for the terminal panels (unsupported stub).
   const identityResult = useSurveySessionStore((s) => s.identityResult);
@@ -188,6 +196,60 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
   const setCharactersSubStage = useSurveySessionStore((s) => s.setCharactersSubStage);
 
   const recordPhase = useWorkingCopyStore((s) => s.recordPhase);
+
+  // spec 079 R-04: each Next inside the active step records that screen's
+  // answers. Bound to the active step id here so a step never names itself.
+  const recordQuestionAnswers = reducerDeps.recordQuestionAnswers;
+  const recordScreen: ScreenRecorder = useCallback(
+    (screenId, answers) => recordQuestionAnswers?.(activeStepId, screenId, answers),
+    [recordQuestionAnswers, activeStepId],
+  );
+
+  // spec 079 US3: lets a step (via `components/FlaggedAnswersList.tsx`)
+  // trigger a jump without importing `jumpToLocation.ts` itself — see
+  // `lib/jumpContext.ts`'s header for why that import must not happen from
+  // anything `steps/manifest.ts` reaches (a `no-circular` violation).
+  const jumpToScreen: JumpToScreen = useCallback(
+    (stepId, screenId) => {
+      jumpToLocation({ route: "survey", step: stepId as typeof activeStepId, question: screenId });
+    },
+    [],
+  );
+
+  // ---------------------------------------------------------------------------
+  // FR-016 non-blocking notice (spec 079 T064, journey-strip-contract.md §9).
+  //
+  // "Compute selectWorkToDo() before and after the commit; a non-empty delta
+  // produces the notice" — but `useWorkToDo()` is a HOOK (it composes several
+  // other hooks' live state), so it cannot be called imperatively inside
+  // `handleComplete`. Instead: `workToDo` is read on every render, like any
+  // other hook value, and a REF holds the value from the render just before
+  // the author pressed Next — the same "peek the last rendered value"
+  // idiom `deepLinkArrival`'s own docstring already uses for a StrictMode-safe
+  // read. `handleComplete` snapshots that ref into `pendingBeforeRef` at the
+  // moment of the click (before ANY mutation runs); once the commit's state
+  // changes propagate and this component re-renders with the NEW `workToDo`,
+  // the effect below diffs against the snapshot and raises the notice — one
+  // Next, one diff, no polling and no new D3-governed timer.
+  const workToDo = useWorkToDo();
+  const pendingBeforeRef = useRef<typeof workToDo | null>(null);
+  useEffect(() => {
+    if (pendingBeforeRef.current === null) return;
+    const before = pendingBeforeRef.current;
+    pendingBeforeRef.current = null;
+    const delta = diffWorkToDo(before, workToDo);
+    if (delta.length === 0) return;
+    const steps = affectedStepNames(delta, i18n);
+    const message = t({
+      id: "footer.notice.reproposal.body",
+      message: plural(delta.length, {
+        one: `# question in ${{ steps }} will need reconfirming — look for the work-to-do marks below.`,
+        other: `# questions in ${{ steps }} will need reconfirming — look for the work-to-do marks below.`,
+      }),
+    });
+    useReproposalNoticeStore.getState().setMessage(message, useSurveySessionStore.getState().activeStepId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workToDo]);
 
   // ---------------------------------------------------------------------------
   // Phase F hard-gate inputs — derived via the SAME shared hook
@@ -351,9 +413,22 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
   // ---------------------------------------------------------------------------
 
   function handleComplete(result: unknown): void {
+    // spec 079 T064: snapshot work-to-do as it stood the instant BEFORE this
+    // Next's mutations run. `workToDo` here is THIS render's hook value —
+    // `handleComplete` is a fresh closure per render (same idiom this file
+    // already uses for `activeStepId` in `recordScreen` above), so it is
+    // exactly "the value at the moment Next was pressed", with no extra ref
+    // needed for the BEFORE half. The effect below supplies the AFTER half
+    // once the commit's re-render lands. A Next with nothing downstream
+    // simply produces an empty delta, a silent no-op — cheaper than trying to
+    // detect "does this step's evidence feed a later step" ahead of time, and
+    // never wrong.
+    pendingBeforeRef.current = workToDo;
+
     // 1. If SurveyPhaseResult-shaped: recordPhase + routeAnswersThroughMutate.
     if (isSurveyPhaseResult(result)) {
-      recordPhase(result);
+      // spec 079 D-4: the step owns its own answers within the phase slot.
+      recordPhase(result, { stepId: resolvedStep.id });
       routeAnswersThroughMutate(result, reducerDeps);
     }
 
@@ -469,11 +544,15 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
   const Component = resolvedStep.component;
 
   const content = (
-    <Component
-      onComplete={handleComplete}
-      {...(canGoBack ? { onBack: handleBack } : {})}
-      {...(ctx !== undefined ? { ctx } : {})}
-    />
+    <QuestionRecorderContext.Provider value={recordScreen}>
+      <JumpContext.Provider value={jumpToScreen}>
+        <Component
+          onComplete={handleComplete}
+          {...(canGoBack ? { onBack: handleBack } : {})}
+          {...(ctx !== undefined ? { ctx } : {})}
+        />
+      </JumpContext.Provider>
+    </QuestionRecorderContext.Provider>
   );
 
   // FR-034/Q3: shown exactly while the author is on the step a decision-trail
