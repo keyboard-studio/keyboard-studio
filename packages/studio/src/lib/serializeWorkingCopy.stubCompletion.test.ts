@@ -169,13 +169,23 @@ describe("output projection regenerates help docs from helpDocs (spec 061)", () 
     const header = `<?php\n  $pagename = '${basicKbdus.displayName} Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n`;
     expect(help.startsWith(header)).toBe(true);
     expect(help.match(/\$pagename =/g)).toHaveLength(1);
+    // spec 079 decision B: fresh help.php is a body fragment — no html/body wrappers.
+    expect(help).not.toContain("<html");
+    expect(help).not.toContain("<body");
     // spec 079 FR-004: the welcome page's layout section (the generated charts)
     // is the ONE permitted welcome-side difference; strip it before comparing.
+    // Strip html/body from welcome.htm and the div-lang wrapper from help.php.
+    const stripDocWrapper = (s: string) =>
+      s
+        .replace(/<\/?html\b[^>]*>/gi, "")
+        .replace(/<\/?body\b[^>]*>/gi, "")
+        .replace(/^<div\s[^>]*lang\s*=[^>]*>([\s\S]*)<\/div>\s*$/, "$1")
+        .trim();
     const welcomeSansLayout = readVfsText(projected!.vfs, "source/welcome/welcome.htm")!.replace(
       /\n?<h2>Keyboard Layout<\/h2>[\s\S]*?(?=<\/body>)/,
       "",
     );
-    expect(help.slice(header.length)).toBe(welcomeSansLayout);
+    expect(stripDocWrapper(help.slice(header.length))).toBe(stripDocWrapper(welcomeSansLayout));
     expect(welcomeSansLayout).not.toBe(readVfsText(projected!.vfs, "source/welcome/welcome.htm"));
   });
 
