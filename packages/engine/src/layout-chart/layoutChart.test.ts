@@ -152,6 +152,30 @@ describe("renderLayoutCharts — one file per (platform, layer)", () => {
     expect(files.length).toBeGreaterThan(0);
   });
 
+  it("names .kvks layers with the same touch/fallback ids the no-.kvks path uses (not raw shift tokens)", () => {
+    const kvks: KvksIR = {
+      layers: [
+        { shift: "", keys: [{ vkey: "K_A", label: "a" }] },
+        { shift: "S", keys: [{ vkey: "K_A", label: "A" }] },
+        { shift: "SRA", keys: [{ vkey: "K_A", label: "á" }] },
+      ],
+      usealtgr: false,
+      nodeIds: [],
+    };
+    const files = renderLayoutCharts({
+      displayName: "Kvks Ids",
+      kvks,
+      ir: makeTestIR([]),
+      touchLayout: null,
+    });
+    expect(files.map((f) => f.layerId)).toEqual(["default", "shift", "rightalt-shift"]);
+    expect(files.map((f) => f.filename)).toEqual([
+      "ks-layout-desktop-default.svg",
+      "ks-layout-desktop-shift.svg",
+      "ks-layout-desktop-rightalt-shift.svg",
+    ]);
+  });
+
   it("renders zero touch files when touchLayout is null", () => {
     const files = renderLayoutCharts(desktopOnlyInput());
     expect(files.some((f) => f.platform === "phone" || f.platform === "tablet")).toBe(false);

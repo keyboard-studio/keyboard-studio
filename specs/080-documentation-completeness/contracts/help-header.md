@@ -23,7 +23,13 @@ Rules:
   — free-text safety per spec 061 FR-009 (spec edge case: names needing escaping).
 - The header is followed by the rendered documentation body — the SAME body the
   welcome page renders (spec 061 FR-005 parity; FR-004 permits only the header and the
-  welcome layout section to differ).
+  welcome layout section to differ). Fresh help pages emit the header plus that
+  body as an HTML **fragment** — no wrapping `<html>`/`<body>` and no closing
+  `</body>`/`</html>` (criteria.md §11.4 / keymanapp/keyboards#3877). The site's
+  `header.php` owns the document chrome; nesting a second document inside it is
+  non-compliant. `<html lang>` (spec 061 FR-006) therefore applies to
+  `welcome.htm` (and to inherited help pages that already carry an `<html>`
+  element); a fresh help page has no `<html>` to annotate.
 - **Placeholder productions** (description unanswered): the header still ships, above
   the placeholder body (acceptance scenario US1-3). This changes the current behavior
   where `renderHelpPhp` returns a bare `<?php /* <name> help */ ?>` stub — the stub

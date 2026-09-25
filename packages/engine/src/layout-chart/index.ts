@@ -31,7 +31,7 @@ import {
   buildComboKeyMap,
   collectLayerCombosInUse,
   comboToTouchLayerId,
-  kvksShiftTokenToHelpLayerId,
+  kvksShiftTokenToLayerId,
   type ModifierToken,
 } from "../pattern-apply/index.js";
 
@@ -71,11 +71,11 @@ interface DesktopLayer {
   readonly outputs: ReadonlyMap<string, string>;
 }
 
-/** One entry per `KvksIR` layer, or per desktop combo in use when no `KvksIR` is present — the empty combo (base layer) always first. */
+/** One entry per `KvksIR` layer, or per desktop combo in use when no `KvksIR` is present — the empty combo (base layer) always first. Layer ids always use the touch/fallback vocabulary ({@link kvksShiftTokenToLayerId} / {@link comboToTouchLayerId}), so chart filenames do not depend on whether a `.kvks` happened to be present. */
 function collectDesktopLayers(kvks: KvksIR | null, ir: KeyboardIR): DesktopLayer[] {
   if (kvks !== null && kvks.layers.length > 0) {
     return kvks.layers.map((layer) => {
-      const layerId = kvksShiftTokenToHelpLayerId(layer.shift);
+      const layerId = kvksShiftTokenToLayerId(layer.shift);
       const outputs = new Map<string, string>();
       for (const key of layer.keys) {
         outputs.set(key.vkey, key.label);
