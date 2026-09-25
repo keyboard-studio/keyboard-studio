@@ -1,0 +1,18 @@
+{
+  "workflow": "companion",
+  "specName": "081-footer-step-nav",
+  "branch": "081-footer-step-nav",
+  "selectedAt": "2026-09-25T20:14:15.564Z",
+  "currentStep": "specify",
+  "status": "specified",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-09-25T20:25:22.691Z"
+    }
+  ],
+  "telemetryInstanceId": "aec2ed41-12ce-42de-91fe-f2d70e38939f"
+}

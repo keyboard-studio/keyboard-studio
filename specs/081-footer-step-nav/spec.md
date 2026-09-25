@@ -4,7 +4,7 @@
 
 **Created**: 2026-09-25
 
-**Status**: Draft. Two open questions remain (FR-031, FR-042).
+**Status**: Draft. Clarified 2026-09-25; no open questions remain.
 
 **Input**: User description: "Move the survey progress buttons (Back / Skip / Continue / Next / Done / Confirm) out of each survey page and into the global footer. The nav cluster goes on the left and the progress dots are right-aligned." Origin: issue #1778 (`feat(studio): move survey progress buttons (Back/Continue) into the footer, dots right-aligned`). This spec **refs #1778**.
 
@@ -44,7 +44,10 @@ Audit findings (2026-09-25; evidence for planning, not requirements; full detail
 
 ## Clarifications
 
-None recorded yet. The open items are marked inline (FR-031, FR-042).
+### Session 2026-09-25
+
+- Q: On long pages such as the mechanism and touch galleries, is Enter-to-advance plus putting the nav first in the footer's Tab order enough to keep Continue quick to reach? Or should this feature add a skip link or a primary-action shortcut? → A: That is enough. This feature adds no new mechanism. A skip link or shortcut is a follow-up (FR-031).
+- Q: Once the forward button is in the footer, does a sighted author need a visible cue next to a disabled button, or is the in-body "why blocked" hint enough? → A: The in-body hint is enough. It is linked to the button by `aria-describedby` (FR-033), and the question is revisited after the manual walk (FR-042).
 
 ## User Scenarios & Testing *(mandatory)*
 
@@ -212,7 +215,7 @@ The inheritance-posture step is built but not yet mounted in production. When it
 ### D. Accessibility
 
 - **FR-030**: The footer MUST keep exactly one `role="status"` live region, shared as in 079 contract §9. The nav cluster MUST NOT add a live region.
-- **FR-031**: Tab order MUST run from the step content to the footer nav cluster (Back, secondary, primary), then the project label, then the dots. Enter-to-advance MUST be kept wherever it exists today. [NEEDS CLARIFICATION: Is Enter-to-advance plus nav-first-in-footer enough to keep Continue "quick to reach" on long pages such as the mechanism and touch galleries? Or should this feature also add a skip link ("Skip to step navigation") or a keyboard shortcut for the primary action? A skip link would also advance tracker row 2.4.1. A shortcut needs a collision audit against the OSK and text inputs. Proposed default: no new mechanism in this feature, and file a follow-up.]
+- **FR-031**: Tab order MUST run from the step content to the footer nav cluster (Back, secondary, primary), then the project label, then the dots. Enter-to-advance MUST be kept wherever it exists today. This feature adds no skip link and no primary-action shortcut. A follow-up issue MUST be filed to consider either one; it would also advance tracker row 2.4.1.
 - **FR-032**: Focus MUST behave as it does today. Within a step, the footer button that was pressed keeps focus across screen changes. On a step change, the footer's nav buttons MUST remount, so focus is not carried into the next step and Enter cannot be repeated onto a step the author has not seen. *Rationale*: this matches current behaviour, where the in-body button unmounts with its step. Moving focus to the new step's heading is a separate improvement and is out of scope.
 - **FR-033**: A disabled forward button's "why blocked" reason (marks, mechanism gallery, touch completion gate) MUST stay in the step body and MUST be referenced by the footer button's `aria-describedby`. The question-flow progress description MUST stay mounted, with a unique id, and stay referenced by the footer Next.
 - **FR-034**: The nav cluster MUST be a labelled group (for example "Step navigation", via the catalog) inside the footer landmark, so its buttons are identifiable as a set (3.2.3, 3.2.4).
@@ -223,7 +226,7 @@ The inheritance-posture step is built but not yet mounted in production. When it
 
 - **FR-040**: Every existing nav `data-testid` MUST be preserved on the footer-rendered button that replaces it (Appendix A, "Existing").
 - **FR-041**: Every nav button that has no test handle today MUST gain the stable handle listed in Appendix A ("New"). Test mocks that invented handles the real components never had MUST be updated to use the real ones.
-- **FR-042**: A disabled forward button's reason must reach sighted users too. [NEEDS CLARIFICATION: Once the forward button is in the footer, is the in-body "why blocked" hint close enough for a sighted author who sees a greyed Continue at the bottom of the window? Or should the footer also show a short visible cue next to the disabled button (for example a "Why?" link that scrolls to and focuses the hint)? Proposed default: keep the hint in the body only, and link it by `aria-describedby` (FR-033). Revisit after the manual walk.]
+- **FR-042**: A disabled forward button's reason MUST reach sighted users through the "why blocked" hint, which stays in the step body (FR-033). The footer MUST NOT add a visible cue next to the disabled button in this feature. The manual walk (section F) MUST record whether the hint is visible enough from the footer; if it is not, file a follow-up.
 - **FR-043**: Every existing nav message id MUST be kept. The strings keep their meaning, so their ids stay (spec 046).
 - **FR-044**: Carve's Back, Skip, Continue and loading strings MUST be localised. Back, Skip and Continue MUST reuse the retired `editor.carve.backButton`, `editor.carve.skipButton` and `editor.carve.continueButton` ids, restored with their original source strings, so that the existing Crowdin translations come back. The loading string and the nav group label (FR-034) get new ids that follow the `area.segment` convention.
 - **FR-045**: The en and fr catalogs MUST be re-extracted, sorted and linted (`i18n-catalog-sort`, `i18n-catalog-lint`) with the change.
@@ -274,8 +277,9 @@ The inheritance-posture step is built but not yet mounted in production. When it
 - Progress buttons on the retired TrackStep and ProjectNameStep panels (FR-007). A deletion follow-up is filed instead.
 - PhaseF gate modal, WelcomeScreen ("Continue as guest"), OutputScreen, confirm dialogs (exemplar apply, key-grid confirms), StepHost start-over controls, and the deep-link banner (FR-004).
 - In-page decision buttons (FR-005).
-- A skip link or keyboard shortcut for the primary action (pending FR-031).
+- A skip link or keyboard shortcut for the primary action. It is deferred to a follow-up (FR-031).
 - Moving focus to the new step's heading on a step change (FR-032).
+- A visible footer cue next to a disabled forward button (FR-042).
 - Meeting 1.4.10 Reflow at 320 px (FR-024).
 - Porting the deleted v1 Carve gallery. It was removed after the issue was filed, so that row of the issue is moot.
 

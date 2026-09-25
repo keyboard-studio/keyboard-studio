@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain
+- [x] No [NEEDS CLARIFICATION] markers remain
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)
@@ -31,7 +31,7 @@
 
 ## Notes
 
-- Two markers remain open, both with a proposed default: FR-031 (whether to add a skip link or a primary-action shortcut in addition to Enter-to-advance and putting the nav first in the footer) and FR-042 (whether the footer shows a visible cue next to a disabled forward button, or relies on the in-body hint linked by `aria-describedby`). Resolve them with `/speckit-clarify` before `/speckit-plan`.
+- Both markers were resolved on 2026-09-25 with their proposed defaults (see spec Clarifications). FR-031: no skip link or shortcut, file a follow-up. FR-042: the hint stays in the body only, revisited after the manual walk.
 - The Problem statement audit findings (A-1 to A-6) and the Appendix A step inventory cite source files and line numbers as evidence, following the house style of [057](../../057-bulletproof-navigation/spec.md) and [079](../../079-survey-answer-persistence/spec.md). The requirements, entities and success criteria stay implementation-free. The issue's proposed store and hook are recorded only under "Implementation notes (non-normative)".
 - Test handles (`data-testid`) and message ids appear in the FRs because preserving them is an explicit acceptance criterion of #1778 and a spec 046 rule. They are contract surfaces, not implementation choices.
 - One deliberate amendment is recorded: the 079 journey-strip contract §6 height may grow to 52 px under a coarse pointer (FR-020a). 057 FR-040 is not amended.
