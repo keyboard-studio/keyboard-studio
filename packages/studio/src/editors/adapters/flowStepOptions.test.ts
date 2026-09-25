@@ -9,14 +9,21 @@
 // so we can assert both call semantics and the resulting store state), reset
 // between tests per the surveySessionStore.test.ts idiom.
 //
-// projectNameOptions is intentionally NOT covered here — it is already
-// exercised end-to-end (real SurveyRunner, real YAML) by
+// projectNameOptions seed policy (English-preferred keyboard id, FR-031) is
+// covered below; end-to-end SurveyRunner coverage remains in
 // PhaseProjectName.integration.test.tsx.
 
 import { describe, it, expect, vi } from "vitest";
-import { trackOptions, phaseFOptions, extractHelpDocs } from "./flowStepOptions.tsx";
+import {
+  trackOptions,
+  phaseFOptions,
+  extractHelpDocs,
+  projectNameOptions,
+  slugRetainsMostLetters,
+} from "./flowStepOptions.tsx";
 import type { TrackPayload } from "./flowStepOptions.tsx";
 import type { FlowStepDeps } from "./makeFlowStepComponent.tsx";
+import { slugifyKeyboardId } from "@keyboard-studio/contracts";
 import pfContactInfoMod from "../../survey/questions/f/pf_contact_info.ts";
 import pfCreditsMod from "../../survey/questions/f/pf_credits.ts";
 import pfWelcomeParagraphMod from "../../survey/questions/f/pf_welcome_paragraph.ts";
@@ -130,6 +137,93 @@ describe("trackOptions.seeds.getSeedValue (FR-031 recorded-answer prefill)", () 
   it("returns undefined for any other questionId", () => {
     const { deps } = buildDeps({ selectedTrack: "copy" });
     expect(trackOptions.seeds!.getSeedValue("some_other_question", deps)).toBeUndefined();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// projectNameOptions.seeds — English-preferred keyboard id (#1777) + FR-031
+// ---------------------------------------------------------------------------
+
+describe("slugRetainsMostLetters", () => {
+  it("accepts a slug that keeps most ASCII letters", () => {
+    expect(slugRetainsMostLetters("Ewondo (AZERTY)", "ewondo_azerty")).toBe(true);
+  });
+
+  it("rejects a slug that collapses non-decomposing letters (Bafut autonym)", () => {
+    // slugifyKeyboardId("Bɨfɨɨ̀") → "b_f" — only 2 of 5 letters survive
+    expect(slugRetainsMostLetters("Bɨfɨɨ̀", "b_f")).toBe(false);
+  });
+});
+
+describe("projectNameOptions.seeds.getSeedValue (English-preferred keyboard id)", () => {
+  const bafutIdentity = {
+    autonym: "Bɨfɨɨ̀",
+    english: "Bafut",
+    bcp47: "bfd",
+  };
+
+  it("seeds project_display_name from the autonym", () => {
+    const { deps } = buildDeps({ identityResult: bafutIdentity });
+    expect(projectNameOptions.seeds!.getSeedValue("project_display_name", deps)).toBe(
+      "Bɨfɨɨ̀",
+    );
+  });
+
+  it("seeds project_keyboard_id from the English name when the display name is the autonym", () => {
+    const { deps } = buildDeps({
+      identityResult: bafutIdentity,
+      displayNameRef: { current: "Bɨfɨɨ̀" },
+    });
+    expect(projectNameOptions.seeds!.getSeedValue("project_keyboard_id", deps)).toBe(
+      "bafut",
+    );
+    // Contrast: slugifying the autonym alone would lose most letters.
+    expect(slugifyKeyboardId("Bɨfɨɨ̀")).toBe("b_f");
+  });
+
+  it("falls back to the display-name slug when English is empty", () => {
+    const { deps } = buildDeps({
+      identityResult: { autonym: "Hausa", english: "", bcp47: "ha" },
+      displayNameRef: { current: "Hausa" },
+    });
+    expect(projectNameOptions.seeds!.getSeedValue("project_keyboard_id", deps)).toBe(
+      "hausa",
+    );
+  });
+
+  it("re-derives from an edited display name that slugifies cleanly", () => {
+    const { deps } = buildDeps({
+      identityResult: {
+        autonym: "Ewondo",
+        english: "Ewondo",
+        bcp47: "ewo",
+      },
+      displayNameRef: { current: "Ewondo (AZERTY)" },
+    });
+    expect(projectNameOptions.seeds!.getSeedValue("project_keyboard_id", deps)).toBe(
+      "ewondo_azerty",
+    );
+  });
+
+  it("FR-031: a previously-recorded keyboardId wins over any re-derived seed", () => {
+    const { deps } = buildDeps({
+      identityResult: bafutIdentity,
+      displayNameRef: { current: "Bɨfɨɨ̀" },
+      scaffoldSpec: { keyboardId: "custom_bfd", displayName: "Bɨfɨɨ̀" },
+    });
+    expect(projectNameOptions.seeds!.getSeedValue("project_keyboard_id", deps)).toBe(
+      "custom_bfd",
+    );
+  });
+
+  it("FR-031: a previously-recorded displayName wins for project_display_name", () => {
+    const { deps } = buildDeps({
+      identityResult: bafutIdentity,
+      scaffoldSpec: { keyboardId: "bafut", displayName: "My Bafut Keyboard" },
+    });
+    expect(projectNameOptions.seeds!.getSeedValue("project_display_name", deps)).toBe(
+      "My Bafut Keyboard",
+    );
   });
 });
 

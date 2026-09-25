@@ -249,7 +249,7 @@
   "content.flowQuestion.project_display_name.audit_label": "Keyboard display name",
   "content.flowQuestion.project_display_name.help_text": "Give your keyboard a human-readable name, for example \"Hausa (QWERTY)\" or \"Ewondo Keyboard\". This name appears in the Keyman application and the keyboard repository. It can include spaces, accents, and non-ASCII characters.",
   "content.flowQuestion.project_display_name.prompt": "What is the display name for your new keyboard?",
-  "content.flowQuestion.project_keyboard_id.help_text": "The keyboard ID is a short lowercase identifier used as the folder name in the keyboard repository (e.g. \"hausa_qwerty\", \"ewondo\"). It must start with a lowercase letter or underscore and may contain only lowercase letters, digits, and underscores. Maximum 254 characters. A suggestion has been filled in from your display name — edit it if needed.",
+  "content.flowQuestion.project_keyboard_id.help_text": "The keyboard ID is a short lowercase identifier used as the folder name in the keyboard repository (e.g. \"hausa_qwerty\", \"ewondo\"). It must start with a lowercase letter or underscore and may contain only lowercase letters, digits, and underscores. Maximum 254 characters. A suggestion has been filled in from the English language name — edit it if needed.",
   "content.flowQuestion.project_keyboard_id.prompt": "Confirm the keyboard ID",
   "content.flowQuestion.track_choice.audit_label": "Authoring approach",
   "content.flowQuestion.track_choice.help_text": "Choose how you want to use this base keyboard. Copy creates an independent new keyboard you can fully rename and own. Adapt lets you modify the existing keyboard keeping its name and ID.",

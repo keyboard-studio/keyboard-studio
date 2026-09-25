@@ -200,6 +200,43 @@ describe("ProjectNameStepFactoryComponent — displayName->slug seed chain (real
     expect(resultKeyboardId).toBe(editedSlug);
   });
 
+  it("Bafut (bfd): display name stays the autonym; keyboard id seeds from English", async () => {
+    // Repro for issue #1777: slugifyKeyboardId("Bɨfɨɨ̀") → "b_f" because ɨ
+    // has no ASCII decomposition. English "Bafut" yields a usable id.
+    const autonym = "Bɨfɨɨ̀";
+    const english = "Bafut";
+
+    act(() => {
+      useSurveySessionStore.setState({
+        identityResult: {
+          autonym,
+          english,
+          languageSubtag: "bfd",
+          targetScriptRaw: "Latn",
+          bcp47: "bfd",
+          supported: true,
+          prefill: { script: "Latn", scriptClass: "alphabetic", routingGroup: "qwerty-qwertz" },
+        },
+        scaffoldSpec: null,
+      });
+    });
+
+    const onComplete = vi.fn();
+    render(<ProjectNameStepFactoryComponent onComplete={onComplete} onBack={vi.fn()} />);
+
+    const displayNameInput = screen.getByRole("textbox");
+    expect((displayNameInput as HTMLInputElement).value).toBe(autonym);
+
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: /next|continue/i }));
+    });
+
+    const slugInput = screen.getByRole("textbox");
+    expect((slugInput as HTMLInputElement).value).toBe("bafut");
+    // Sanity: the autonym alone would still collapse.
+    expect(slugifyKeyboardId(autonym)).toBe("b_f");
+  });
+
   it("onBack fires when Back is clicked", async () => {
     act(() => {
       useSurveySessionStore.setState({
