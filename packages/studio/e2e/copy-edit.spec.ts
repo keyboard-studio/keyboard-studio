@@ -749,10 +749,20 @@ test.describe("spec 034 US3 (T028): durable draft survives reload, Back stays co
     // that still assumed the pre-marks spine — at a call site that diagnosis
     // did not reach, not a spec 057 regression: the walk arrives on
     // "Accents & marks" exactly as the spine says it should.
+    //
+    // Spec 079 persists the within-step marks cursor, so after the forward
+    // `driveMarksSeries` the restored position is the LAST station. One Back
+    // therefore steps to the previous station rather than leaving the step —
+    // keep clicking Back while the marks heading is up (same 6-station
+    // budget as `driveMarksSeries`) until the step exits onto Phase B.
     await expect(page.getByRole("heading", { name: /Accents & marks/i })).toBeVisible({
       timeout: 20_000,
     });
-    await page.getByRole("button", { name: "Back", exact: true }).click();
+    for (let i = 0; i < 6; i++) {
+      const marksHeading = page.getByRole("heading", { name: /Accents & marks/i });
+      if (!(await marksHeading.isVisible().catch(() => false))) break;
+      await page.getByRole("button", { name: "Back", exact: true }).click();
+    }
 
     await page.waitForSelector('[aria-label="Character to add"]', { timeout: 20_000 });
     await page.fill('[aria-label="Character to add"]', FIXTURE.charToAdd);
