@@ -75,6 +75,8 @@ import {
   chipGlyph,
   chipCodepoint,
   chipIndicator,
+  chipIndicatorColor,
+  chipIndicatorText,
   visuallyHidden,
   FONT_OPTIONS,
   phaseBFontStack,
@@ -708,6 +710,96 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
 }
 
 // ---------------------------------------------------------------------------
+// LoanwordsSection — the exemplar AUXILIARY tier, offered but not selected
+//
+// A language's sources list some letters as loanword-only (Bafut's
+// [c h ʼ p q v x]). Seeding takes the main tier only, so these are not in the
+// alphabet — and they are not counted as needed anywhere else either (the
+// engine's needed set leaves the auxiliary tier out). This section is where
+// the author sees them and decides: each chip toggles the letter (with its
+// case pair) in or out of the SAME draft the right-pane character map edits.
+// A letter the author leaves out stays surplus, so the convenience question
+// and carve can ask about it later.
+//
+// Letters the main tier already carries (Bafut's h, via its {gh} cluster) are
+// not repeated here. Adding is an authoring act, so removing one again is an
+// edit, not a rejection of a proposal.
+// ---------------------------------------------------------------------------
+
+function LoanwordsSection({ bcp47 }: { bcp47?: string | undefined }) {
+  const { t } = useLingui();
+  const { inventory } = useSourcedExemplars(bcp47);
+  const chars = usePhaseBDraftStore((s) => s.chars);
+  const add = usePhaseBDraftStore((s) => s.add);
+  const remove = usePhaseBDraftStore((s) => s.remove);
+
+  const loanwords = useMemo(() => {
+    if (inventory === null) return [];
+    const main = new Set(charactersInTier(inventory, "main").map((c) => c.normalize("NFC")));
+    return collate(
+      nfcDedup([], charactersInTier(inventory, "auxiliary")).filter((c) => !main.has(c)),
+    );
+  }, [inventory]);
+
+  if (loanwords.length === 0) return null;
+
+  return (
+    <section
+      data-testid="alphabet-loanwords"
+      aria-labelledby="alphabet-loanwords-heading"
+      style={{ display: "flex", flexDirection: "column", gap: 6 }}
+    >
+      <h3 id="alphabet-loanwords-heading" style={sectionHeading}>
+        {t({
+          id: "survey.phaseB.loanwords.heading",
+          message: `Loanword letters (${{ count: loanwords.length }})`,
+        })}
+      </h3>
+      <p style={{ ...mutedParaFlush, margin: 0, fontSize: 12 }}>
+        <Trans id="survey.phaseB.loanwords.note">
+          Your language&apos;s sources list these letters for borrowed words. They are not in
+          your alphabet yet. Add any that your keyboard should type.
+        </Trans>
+      </p>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+        {loanwords.map((ch) => {
+          const pair = casePairOf(ch, bcp47);
+          const selected = chars.includes(ch);
+          const letters = pair.join(" ");
+          const { title } = codepointLabel(ch);
+          return (
+            <button
+              key={ch}
+              type="button"
+              aria-pressed={selected}
+              aria-label={t({
+                id: "survey.phaseB.loanwords.chipAriaLabel",
+                message: `${{ letters }} (${{ cp: title }})`,
+              })}
+              title={title}
+              onClick={() => {
+                for (const c of pair) {
+                  if (selected) remove(c);
+                  else add(c);
+                }
+              }}
+              className="ks-focus-ring ks-hit-target"
+              style={charChip(selected)}
+            >
+              <span style={chipGlyph(selected)}>{letters}</span>
+              <CpLabel grapheme={ch} />
+              <span style={chipIndicator(chipIndicatorColor(selected))}>
+                {chipIndicatorText(selected)}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // BuildListView — unified "add your whole alphabet" method
 //
 // The alphabet accumulated here is shared with CharacterMapPane (the right-pane
@@ -889,6 +981,9 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
           spec-047 category sections — renders once the alphabet implies marks,
           accented letters, or any non-letter category. */}
       <AlphabetBreakdown bcp47={context.bcp47_tag} />
+
+      {/* Section 3b: the exemplar loanword tier — shown, never pre-selected. */}
+      <LoanwordsSection bcp47={context.bcp47_tag} />
 
       {/* The character grid has moved to the right pane —
           see CharacterMapPane.tsx, rendered by StudioShell's SurveyView. */}

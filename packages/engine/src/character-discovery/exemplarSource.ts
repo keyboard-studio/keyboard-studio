@@ -275,10 +275,12 @@ export function inventoryToExemplarResult(inv: SourcedInventory): ExemplarResult
 }
 
 /**
- * Every character a language needs, per the sourced inventory — all four
- * tiers, not just the letters. This is the "needed" signal for language-driven
- * surplus detection.
+ * Every character a language needs, per the sourced inventory — the main,
+ * punctuation and numbers tiers, not just the letters. This is the "needed"
+ * signal for language-driven surplus detection. The auxiliary (loanword) tier
+ * is excluded: those letters are needed only once the author adds them to the
+ * alphabet (see `neededCharsForLanguage`).
  */
 export function neededCharsFromInventory(inv: SourcedInventory): Set<string> {
-  return new Set(inv.characters.map((c) => c.char));
+  return new Set(inv.characters.filter((c) => c.tier !== "auxiliary").map((c) => c.char));
 }

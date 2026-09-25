@@ -16,14 +16,11 @@
 //     question must render them, and the letters the author keeps must reach
 //     the carve gallery's needed set (kept letters are not proposed for
 //     removal; an un-ticked one still is).
+//   - Opens with exemplar data: Bafut's main tier leaves out c p q v x, which
+//     SLDR lists only as loanword (auxiliary) letters. The auxiliary tier is
+//     not part of the needed set, so the question must offer those five.
 //   - Stays shut: English's exemplars cover every basic-Latin letter, so the
 //     step must complete without painting a screen and record why.
-//
-// Which languages open the gate at all is narrower than it looks: the needed
-// set includes the exemplar AUXILIARY tier, which for most CLDR/SLDR locales
-// lists the whole basic-Latin alphabet as loanword letters. A language with
-// exemplar data therefore rarely has a surplus basic-Latin letter on this
-// base, which is why the positive case uses a language with none.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { readFileSync } from "node:fs";
@@ -65,6 +62,14 @@ function seed(bcp47: string, bases: string[]): void {
     alphabet: { bases, marks: [], attestedStacks: [], declaredRoles: {} },
   });
 }
+
+/**
+ * Bafut's letters as an author gets them by accepting its exemplars: the SLDR
+ * main tier, with h contributed by the {gh} cluster.
+ */
+const BAFUT_BASES = [..."abdeɛəfgiɨjklmnŋoɔrstuwyzh"];
+/** basic_kbdus letters Bafut uses only in loanwords. */
+const BAFUT_SURPLUS = [..."cpqvx"];
 
 /** Samoan's letters, plus the ʻokina. */
 const SAMOAN_BASES = [..."aeioufglmnpstvhkr", "ʻ"];
@@ -129,6 +134,30 @@ describe("Convenience letters gate, real data: opens for a surplus-letter orthog
     for (const ch of kept) {
       expect(proposed.some((label) => label.startsWith(`${ch} —`))).toBe(false);
     }
+  });
+});
+
+describe("Convenience letters gate, real data: loanword-only letters are surplus", () => {
+  it("offers the letters Bafut lists only as loanwords", async () => {
+    seed("bfd", BAFUT_BASES);
+    const onComplete = vi.fn();
+    render(<ConvenienceCharsStep onComplete={onComplete} />);
+
+    await screen.findByTestId("convenience-chars");
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(screen.getAllByRole("checkbox")).toHaveLength(BAFUT_SURPLUS.length);
+    for (const ch of BAFUT_SURPLUS) {
+      expect(screen.getByLabelText(`Keep ${ch} ${ch.toUpperCase()}`)).not.toBeNull();
+    }
+  });
+
+  it("does not offer a loanword letter the author added to the alphabet", async () => {
+    seed("bfd", [...BAFUT_BASES, "q"]);
+    render(<ConvenienceCharsStep onComplete={vi.fn()} />);
+
+    await screen.findByTestId("convenience-chars");
+    expect(screen.queryByLabelText("Keep q Q")).toBeNull();
+    expect(screen.getAllByRole("checkbox")).toHaveLength(BAFUT_SURPLUS.length - 1);
   });
 });
 

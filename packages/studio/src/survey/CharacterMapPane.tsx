@@ -44,7 +44,6 @@ import { useGlyphFontStack } from "./useGlyphFontStack.ts";
 import { useFontSupportChecker } from "./useFontSupportChecker.ts";
 import { ACCENT, TEXT_DIM, mutedNote, visuallyHidden } from "./surveyStyles.ts";
 import { groupKey } from "./characterMap/groupKey.ts";
-import { BASE_OUTPUT_BORDER } from "./characterMap/constants.ts";
 import type { CharacterMapCell } from "./characterMap/types.ts";
 import { parseCodepointInput } from "./characterMap/rawCodepointEntry.ts";
 import { RawCodepointEntry } from "./characterMap/RawCodepointEntry.tsx";
@@ -501,9 +500,10 @@ export function CharacterMapPane({
         )}
       </p>
       {baseProduced.size > 0 && (
-        <p style={{ margin: 0, fontSize: 12, color: BASE_OUTPUT_BORDER, lineHeight: 1.5 }}>
-          <Trans id="survey.characterMapPane.baseOutputNote">
-            Note: Characters outlined in yellow are available in your chosen base keyboard.
+        <p style={{ margin: 0, fontSize: 12, color: TEXT_DIM, lineHeight: 1.5 }}>
+          <Trans id="survey.characterMapPane.baseOutputLegend">
+            Characters with a dashed outline are on your base keyboard. They are not in
+            your alphabet until you add them.
           </Trans>
         </p>
       )}
