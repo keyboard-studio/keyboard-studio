@@ -81,10 +81,6 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-  useDecisionLogStore.getState().reset();
-  useStepWalkStore.getState().reset();
   window.location.hash = "";
 });
 

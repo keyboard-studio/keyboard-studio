@@ -36,6 +36,7 @@ import {
   type TouchKeyFinding,
 } from "./touch-key-diagnostics";
 import { touchKeyAddress } from "./touch-key-address";
+import { touchLayout } from "./fixtures/ir-builders";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -45,20 +46,8 @@ function key(id: string, extra: Partial<Omit<TouchKeyIR, "nodeId" | "id">> = {})
   return { nodeId: `n-${id || "empty"}`, id, ...extra };
 }
 
-/** One platform ("phone"), one layer per entry, one row each. */
-function makeLayout(
-  layers: ReadonlyArray<{ id: string; keys: readonly TouchKeyIR[] }>,
-): TouchLayoutIR {
-  return {
-    platforms: [
-      { id: "phone", layers: layers.map((l) => ({ id: l.id, rows: [{ keys: [...l.keys] }] })) },
-    ],
-    nodeIds: [],
-  };
-}
-
 function oneLayer(...keys: readonly TouchKeyIR[]): TouchLayoutIR {
-  return makeLayout([{ id: "default", keys }]);
+  return touchLayout({ keys });
 }
 
 function emptyRuleIndex(opaqueFragmentCount = 0): TouchKeyRuleIndex {
@@ -119,10 +108,10 @@ describe("findUnidentifiedTouchKeys (0x099)", () => {
   it("reports the same bad id once per (layer, key) occurrence, not once globally", () => {
     // Unlike a dead `T_` key (one id, one shared rule gap), an unresolvable id is
     // a property of the occurrence — and an empty id gives nothing to dedup on.
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       { id: "default", keys: [key("bad", { sp: 0 })] },
       { id: "shift", keys: [key("bad", { sp: 0 })] },
-    ]);
+    ] });
     expect(findUnidentifiedTouchKeys(layout)).toHaveLength(2);
   });
 });
@@ -203,10 +192,10 @@ describe("structured fields, fixes, and scope", () => {
   });
 
   it("offers repoint-or-remove for a dangling nextlayer, with the platform's real layer ids as candidates", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       { id: "default", keys: [key("K_SHIFT", { sp: 1, nextlayer: "nowhere" })] },
       { id: "shift", keys: [key("K_A", { sp: 0 })] },
-    ]);
+    ] });
     const findings = findMissingTouchLayers(layout);
     expect(codes(findings)).toEqual(["TOUCH_KEY_MISSING_LAYER"]);
     const finding = findings[0]!;
@@ -227,7 +216,7 @@ describe("structured fields, fixes, and scope", () => {
 
   it("gives every finding at least one fix (FR-041)", () => {
     // A layout carrying several distinct defects at once.
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       {
         id: "default",
         keys: [
@@ -239,7 +228,7 @@ describe("structured fields, fixes, and scope", () => {
           key("T_DUP", { sp: 0 }),
         ],
       },
-    ]);
+    ] });
     const findings = computeTouchKeyDiagnostics({
       ir: irWith(layout),
       layout,
@@ -265,7 +254,7 @@ describe("computeTouchKeyDiagnostics", () => {
   });
 
   it("collects every distinct code the layout earns", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       {
         id: "default",
         keys: [
@@ -278,7 +267,7 @@ describe("computeTouchKeyDiagnostics", () => {
           key("K_SW", { sp: 1, nextlayer: "nowhere" }),
         ],
       },
-    ]);
+    ] });
     const found = new Set(
       codes(computeTouchKeyDiagnostics({ ir: irWith(layout), layout, ruleIndex: emptyRuleIndex() })),
     );
@@ -313,9 +302,9 @@ describe("computeTouchKeyDiagnostics", () => {
   });
 
   it("emits no `error` severity — 0x05A is the only touch error and it routes to rejection instead", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       { id: "default", keys: [key("T_DEAD", { sp: 0 }), key("9BAD", { sp: 0 }), key("T_LBL", { sp: 0, text: "*x*" })] },
-    ]);
+    ] });
     const findings = computeTouchKeyDiagnostics({
       ir: irWith(layout),
       layout,
@@ -447,10 +436,10 @@ describe("detector addresses name the occurrence they found", () => {
   });
 
   it("counts per layer, so an id repeated across layers starts over at zero", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       { id: "default", keys: [key("T_X", { sp: 0, text: "*a*" })] },
       { id: "shift", keys: [key("T_X", { sp: 0, text: "*a*" })] },
-    ]);
+    ] });
     expect(findSpecialLabelOnNormalKeys(layout).map((f) => f.address)).toEqual([
       touchKeyAddress("phone", "default", "T_X"),
       touchKeyAddress("phone", "shift", "T_X"),

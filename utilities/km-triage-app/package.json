@@ -8,6 +8,7 @@
   },
   "scripts": {
     "setup": "node setup.js",
-    "mint": "node mint-token.js"
+    "mint": "node mint-token.js",
+    "test": "node --test \"*.test.js\""
   }
 }

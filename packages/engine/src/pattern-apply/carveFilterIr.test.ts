@@ -20,21 +20,14 @@ import type {
   RawKmnFragment,
   IRComment,
 } from "@keyboard-studio/contracts";
+import { charStore, irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 
 function makeStore(nodeId: string, name: string): IRStore {
-  return { nodeId, name, items: [{ kind: "char", value: "1" }], isSystem: false };
+  return charStore({ nodeId, name, chars: "1" });
 }
 
 function makeRule(nodeId: string): IRRule {
-  return {
-    nodeId,
-    context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
-    output: [{ kind: "char", value: "a" }],
-  };
-}
-
-function makeGroup(nodeId: string, name: string, rules: IRRule[]): IRGroup {
-  return { nodeId, name, usingKeys: true, rules, readonly: false };
+  return vkeyRule({ nodeId, output: "a" });
 }
 
 function makeRaw(nodeId: string, text: string): RawKmnFragment {
@@ -51,29 +44,13 @@ function makeIR(opts?: {
   raw?: RawKmnFragment[];
   comments?: IRComment[];
 }): KeyboardIR {
-  return {
-    origin: "imported",
-    header: {
-      keyboardId: "test",
-      name: "Test",
-      bcp47: ["en"],
-      copyright: "(c) test",
-      version: "1.0",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores: opts?.stores ?? [],
-    groups: opts?.groups ?? [],
-    comments: opts?.comments ?? [],
-    raw: opts?.raw ?? [],
-    recognizedPatterns: [],
-  };
+  return makeTestIR({ ...opts, header: { bcp47: ["en"], copyright: "(c) test" } });
 }
 
 describe("carveFilterIr", () => {
   it("returns a structurally equal IR for an empty deletion set", () => {
     const ir = makeIR({
-      groups: [makeGroup("g0", "main", [makeRule("r0")])],
+      groups: [irGroup({ nodeId: "g0", rules: [makeRule("r0")] })],
       stores: [makeStore("s0", "letters")],
     });
     const out = carveFilterIr(ir, new Set());
@@ -84,8 +61,8 @@ describe("carveFilterIr", () => {
   it("drops a whole group (header + rules) when the group nodeId is deleted", () => {
     const ir = makeIR({
       groups: [
-        makeGroup("g0", "main", [makeRule("r0"), makeRule("r1")]),
-        makeGroup("g1", "extra", [makeRule("r2")]),
+        irGroup({ nodeId: "g0", rules: [makeRule("r0"), makeRule("r1")] }),
+        irGroup({ nodeId: "g1", name: "extra", rules: [makeRule("r2")] }),
       ],
     });
     const out = carveFilterIr(ir, new Set(["g0"]));
@@ -94,7 +71,7 @@ describe("carveFilterIr", () => {
 
   it("drops only the targeted rule and keeps the group header", () => {
     const ir = makeIR({
-      groups: [makeGroup("g0", "main", [makeRule("r0"), makeRule("r1")])],
+      groups: [irGroup({ nodeId: "g0", rules: [makeRule("r0"), makeRule("r1")] })],
     });
     const out = carveFilterIr(ir, new Set(["r0"]));
     expect(out.groups).toHaveLength(1);
@@ -124,7 +101,7 @@ describe("carveFilterIr", () => {
         anchorRef: { kind: "rule" as const, nodeId: "r0" },
       },
     ];
-    const ir = makeIR({ comments, groups: [makeGroup("g0", "main", [makeRule("r0")])] });
+    const ir = makeIR({ comments, groups: [irGroup({ nodeId: "g0", rules: [makeRule("r0")] })] });
     const out = carveFilterIr(ir, new Set(["g0"]));
     expect(out.header).toEqual(ir.header);
     // The freestanding comment survives; the one anchored to the deleted
@@ -135,7 +112,7 @@ describe("carveFilterIr", () => {
 
   it("never mutates baseIr", () => {
     const ir = makeIR({
-      groups: [makeGroup("g0", "main", [makeRule("r0"), makeRule("r1")])],
+      groups: [irGroup({ nodeId: "g0", rules: [makeRule("r0"), makeRule("r1")] })],
       stores: [makeStore("s0", "a")],
       raw: [makeRaw("f0", "x")],
     });
@@ -145,9 +122,9 @@ describe("carveFilterIr", () => {
   });
 
   it("keeps a group's reference when none of its rules were deleted (structural sharing)", () => {
-    const untouched = makeGroup("g0", "main", [makeRule("r0")]);
+    const untouched = irGroup({ nodeId: "g0", rules: [makeRule("r0")] });
     const ir = makeIR({
-      groups: [untouched, makeGroup("g1", "extra", [makeRule("r1"), makeRule("r2")])],
+      groups: [untouched, irGroup({ nodeId: "g1", name: "extra", rules: [makeRule("r1"), makeRule("r2")] })],
     });
     const out = carveFilterIr(ir, new Set(["r1"]));
     // g0 untouched → same reference; g1 had a rule removed → fresh object.

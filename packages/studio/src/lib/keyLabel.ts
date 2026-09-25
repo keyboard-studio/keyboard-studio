@@ -61,7 +61,7 @@ export function physicalKeyLabel(vkeyName: string): string | undefined {
  * the `physicalKeyLabel(x) ?? stripVkeyPrefix(x)` pair — call this rather than
  * re-inlining the `??` at every key-naming site. Callers whose input may be a
  * non-vkey token (an already-resolved glyph) still guard on `startsWith("K_")`
- * before calling — see `GlyphCell`.
+ * before calling.
  */
 export function keyLabelOrRaw(vkeyName: string): string {
   return physicalKeyLabel(vkeyName) ?? stripVkeyPrefix(vkeyName);

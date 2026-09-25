@@ -245,9 +245,9 @@ function chooseBaseResult(base: BaseKeyboard, ir: KeyboardIR | null): Instantiat
  * Every toggleable unit the carve rail offers for an IR, in the order it
  * offers them.
  *
- * `CarveGallery` deletes a glyph with `deleteItem(g.gid)` (its `toggleGlyph`)
- * and tallies its own total as the sum of `node.glyphs.length` — the same two
- * halves `recordBaseContribution`'s `countStartingKeys` and the recorder's
+ * The rule/node carve gallery deleted a glyph with `deleteItem(g.gid)` (its
+ * `toggleGlyph`) and tallied its own total as the sum of
+ * `node.glyphs.length` — the same two halves `recordBaseContribution`'s `countStartingKeys` and the recorder's
  * `keysRemoved` read. Deriving the ids from the rail rather than hand-listing
  * them is what makes the FR-034 unit assertion below a real comparison.
  */
@@ -426,9 +426,6 @@ function expectPresentZero(summary: EditorActionSummary, key: keyof EditorAction
 }
 
 beforeEach(() => {
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-  useDecisionLogStore.getState().reset();
   resetDecisionEntryIds();
 });
 
@@ -1219,8 +1216,8 @@ describe("FR-034 — a stage's counts are interpretable against the baseline", (
     recordStepCompletion("choose_base", chooseBaseResult(BASE, ir), deps);
     const starting = onlyBaseContribution().payload.startingKeyCount;
 
-    // Carve away EVERY unit the rail offers, through the store action
-    // CarveGallery's own glyph toggle calls. If the baseline were counted in a
+    // Carve away EVERY unit the rail offers, through the store's per-item
+    // delete action. If the baseline were counted in a
     // different unit from the removals — a produced-character set, say, or the
     // raw rule count — removing everything would not land on the baseline.
     const gids = railGlyphGids(ir);

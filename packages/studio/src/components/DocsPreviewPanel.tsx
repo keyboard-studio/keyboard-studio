@@ -1,8 +1,8 @@
 // DocsPreviewPanel — spec 061 Story 2: an in-studio, live preview of the four
 // shipped documentation files, mounted from the Phase F ("help") step.
 //
-// Behind a "Preview documentation" disclosure toggle (same aria-expanded /
-// aria-controls convention as editors/assignLoop/parts/RemovalBanner.tsx),
+// Behind a "Preview documentation" disclosure toggle (the usual
+// aria-expanded / aria-controls disclosure convention),
 // so it never crowds the survey question above it by default. Reads
 // useDocsPreview() on every render — no fetch, no debounce, no compiled
 // artifact — so it reflects the current answers immediately, before any

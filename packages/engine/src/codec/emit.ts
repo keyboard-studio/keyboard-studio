@@ -286,7 +286,7 @@ function emitStoreItems(items: StoreItem[]): string {
   // Range re-collapse (spec 042, FR-008) is suppressed for any store that also
   // contains a `dk()` deadkey item. kmcmplib cannot parse a store that holds
   // both a `X .. Y` range AND a `dk()` item in the same declaration — it emits
-  // KM_WARNING_KMCMP_5251093 "Invalid 'deadkey' or 'dk' statement" and produces
+  // KM_ERROR_KMCMP_5251093 "Invalid 'deadkey' or 'dk' statement" and produces
   // no .kmx. This bites the deadkey lookup stores that pair a run of consecutive
   // combining marks with a trailing deadkey (e.g. `store(dkf0021)` in
   // sil_cameroon_azerty: `U+0300 U+0301 U+0302 U+0303 ... dk(003d)`), so a Track-1

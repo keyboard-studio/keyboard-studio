@@ -11,7 +11,7 @@
 // shape.
 //
 // Kept pure (no React, no store reads) and callable with an optional
-// `i18n` — same convention as capabilityHint/keyHint (parts/InfoView.tsx)
+// `i18n` — same convention as capabilityHint (parts/capabilityHint.ts)
 // and publishManagedPRErrorMessage (lib/publishManagedPRErrorMessage.ts):
 // real components pass `i18n` from `useLingui()`; unit tests call these with
 // no `i18n` at all and assert on the English source text baked into the

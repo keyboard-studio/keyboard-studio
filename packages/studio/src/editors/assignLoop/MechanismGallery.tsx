@@ -89,7 +89,7 @@ import { cursorCharIn } from "../../lib/stepWalk.ts";
 import { peekStepCursor } from "../../stores/stepWalkStore.ts";
 import { getPatternLibraryService } from "../../lib/services.ts";
 import { displayChar } from "../../lib/irToCarveNodes.ts";
-import { capabilityHint } from "./parts/InfoView.tsx";
+import { capabilityHint } from "./parts/capabilityHint.ts";
 import type { AxisFill, DiscoveryAxisVector } from "@keyboard-studio/contracts";
 import {
   defaultFillAxes,
@@ -234,7 +234,7 @@ const selectStyle: CSSProperties = gallerySelectMenuStyle(140);
 // msg()/resolveMessage() rather than a bare `t` parameter — Lingui's macro
 // tracks the specific binding introduced by useLingui(), so a re-bound `t`
 // parameter is a distinct binding the extractor does not follow (see
-// Inspector.tsx's storeBlurb for the same fix).
+// resolveMessage in lib/i18nResolve.ts).
 function buildDeadkeyBaseLetterResolveOptions(
   i18n?: I18n,
 ): ResolveCharInputOptions {
@@ -264,7 +264,7 @@ const TRIGGER_KEY_RESOLVE_OPTIONS: KeyPickerResolveOptions = {
 // Takes an optional i18n + resolves via msg()/resolveMessage() rather than a
 // bare `t` parameter — Lingui's macro tracks the specific binding introduced
 // by useLingui(), so a re-bound `t` parameter is a distinct binding the
-// extractor does not follow (see Inspector.tsx's storeBlurb for the same fix).
+// extractor does not follow (see resolveMessage in lib/i18nResolve.ts).
 function methodLabel(
   ref: { patternId: string; slotValues?: Record<string, string> },
   i18n?: I18n,
@@ -3596,7 +3596,7 @@ export function MechanismGallery({
     (row: ExistingMethodRow) => {
       if (!row.deletable) return;
       // Routes through the SAME cascadeDelete the full carve gallery uses
-      // (CarveGallery.tsx) — a rule nodeId and a store slot id both go
+      // (CarveGalleryV2.tsx) — a rule nodeId and a store slot id both go
       // through the item channel there too, so a removal made here is
       // reversible via the identical Undo stack and is reflected at output
       // by the existing carve-deletion projection step. No new store state.

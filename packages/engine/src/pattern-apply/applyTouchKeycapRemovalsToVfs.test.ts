@@ -32,21 +32,11 @@ import {
 } from "./applyTouchKeycapRemovalsToVfs.js";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { TouchLayoutIR, TouchKeyIR } from "@keyboard-studio/contracts";
+import { touchKey, touchLayout } from "@keyboard-studio/contracts/fixtures";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers (mirrors applyDesktopModifications.test.ts's conventions)
 // ---------------------------------------------------------------------------
-
-function makeKey(id: string, overrides: Partial<TouchKeyIR> = {}): TouchKeyIR {
-  return { nodeId: `node_${id}`, id, ...overrides };
-}
-
-function makeLayout(phoneDefaultKeys: TouchKeyIR[]): TouchLayoutIR {
-  return {
-    platforms: [{ id: "phone", layers: [{ id: "default", rows: [{ keys: phoneDefaultKeys }] }] }],
-    nodeIds: [],
-  };
-}
 
 function phoneDefaultKeys(layout: TouchLayoutIR): TouchKeyIR[] {
   const phone = layout.platforms.find((p) => p.id === "phone")!;
@@ -64,7 +54,7 @@ function getKey(layout: TouchLayoutIR, keyId: string): TouchKeyIR | undefined {
 
 describe("applyTouchKeycapRemovalsToLayout", () => {
   it("blanks a main U_-id key: id neutralized, text/output cleared, key kept", () => {
-    const layout = makeLayout([makeKey("U_0061", { text: "a" }), makeKey("U_0062", { text: "b" })]);
+    const layout = touchLayout({ keys: [touchKey({ id: "U_0061", text: "a" }), touchKey({ id: "U_0062", text: "b" })] });
 
     const { layout: next, warnings } = applyTouchKeycapRemovalsToLayout(
       layout,
@@ -82,9 +72,9 @@ describe("applyTouchKeycapRemovalsToLayout", () => {
   });
 
   it("blanks a plain K_<letter> text-only main key: id STILL neutralized, and a hosted sk[] not itself addressed survives", () => {
-    const layout = makeLayout([
-      makeKey("K_A", { text: "a", sk: [makeKey("U_00E1", { text: "á" })] }),
-    ]);
+    const layout = touchLayout({ keys: [
+      touchKey({ id: "K_A", text: "a", sk: [touchKey({ id: "U_00E1", text: "á" })] }),
+    ] });
 
     const { layout: next, warnings } = applyTouchKeycapRemovalsToLayout(
       layout,
@@ -104,9 +94,9 @@ describe("applyTouchKeycapRemovalsToLayout", () => {
   });
 
   it("removes a longpress (sk[]) entry, leaving the main key untouched", () => {
-    const layout = makeLayout([
-      makeKey("U_0061", { text: "a", sk: [makeKey("U_00E1", { text: "á" }), makeKey("U_00E2", { text: "â" })] }),
-    ]);
+    const layout = touchLayout({ keys: [
+      touchKey({ id: "U_0061", text: "a", sk: [touchKey({ id: "U_00E1", text: "á" }), touchKey({ id: "U_00E2", text: "â" })] }),
+    ] });
 
     const { layout: next } = applyTouchKeycapRemovalsToLayout(
       layout,
@@ -120,13 +110,14 @@ describe("applyTouchKeycapRemovalsToLayout", () => {
   });
 
   it("removes a multitap entry and a flick entry independently", () => {
-    const layout = makeLayout([
-      makeKey("U_0065", {
+    const layout = touchLayout({ keys: [
+      touchKey({
+        id: "U_0065",
         text: "e",
-        multitap: [makeKey("U_00E9", { text: "é" })],
-        flick: { ne: makeKey("U_0301", { text: "́" }) },
+        multitap: [touchKey({ id: "U_00E9", text: "é" })],
+        flick: { ne: touchKey({ id: "U_0301", text: "́" }) },
       }),
-    ]);
+    ] });
 
     const { layout: next } = applyTouchKeycapRemovalsToLayout(
       layout,
@@ -139,7 +130,7 @@ describe("applyTouchKeycapRemovalsToLayout", () => {
   });
 
   it("returns untouched platforms/layers/rows by reference (structural sharing)", () => {
-    const layout = makeLayout([makeKey("U_0061", { text: "a" })]);
+    const layout = touchLayout({ keys: [touchKey({ id: "U_0061", text: "a" })] });
     const untouchedPlatform = { ...layout, platforms: [...layout.platforms] };
 
     const { layout: next } = applyTouchKeycapRemovalsToLayout(layout, new Set(["nonexistent:address"]));
@@ -149,7 +140,7 @@ describe("applyTouchKeycapRemovalsToLayout", () => {
   });
 
   it("is idempotent — applying the same id twice yields the same result", () => {
-    const layout = makeLayout([makeKey("U_0061", { text: "a" })]);
+    const layout = touchLayout({ keys: [touchKey({ id: "U_0061", text: "a" })] });
     const ids = new Set(["phone:default:U_0061"]);
 
     const once = applyTouchKeycapRemovalsToLayout(layout, ids);

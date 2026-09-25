@@ -46,16 +46,17 @@ import type {
   SimKeyInput,
   ToleranceReport,
 } from '@keyboard-studio/contracts';
-import { createVirtualFS } from '@keyboard-studio/contracts';
 
 import { compile } from '../compiler/index.js';
-import { emit } from '../codec/emit.js';
 import { simulate } from '../simulator/index.js';
+import { KMW_JS_TARGETS } from '../package-descriptor/build.js';
+import { isMnemonicLayout } from './shiftRules.js';
 import {
   buildStoreCharIndex,
-  stripAssetStoresForCompile,
+  buildToleranceCompileVfs,
+  hasSimulatableJs,
   resolveContextCandidates,
-  resolveKeyPart,
+  resolveKeyPartCandidates,
   splitRuleAtPlus,
 } from '../validator/context-tolerance.js';
 import { entryGroupOf, insertBlockBeforeTerminalRules } from './ir-insert.js';
@@ -81,6 +82,38 @@ export const BACKSPACE_UNWRAP_RULE_PREFIX = `${GENERATED_MARKER_PREFIX}bksp_unwr
 export interface ContextVariantsResult {
   ir: KeyboardIR;
   variants: ContextVariant[];
+  /**
+   * Author-facing notes on tolerance the generator deliberately did NOT add,
+   * and why (FR-013: record what could not be made tolerant rather than
+   * report blanket success). Absent when there is nothing to say.
+   */
+  notes?: string[];
+}
+
+/**
+ * Note returned when the backspace unwrap is skipped for a mnemonic-layout
+ * keyboard that builds for KeymanWeb. Exported for tests.
+ */
+export const BACKSPACE_UNWRAP_SKIPPED_MNEMONIC_WEB_NOTE =
+  'Backspace unwrap not added: this keyboard uses a mnemonic layout and builds for the web, ' +
+  'where the Keyman compiler rejects virtual keys such as [K_BKSP] ("Virtual keys are not valid ' +
+  'for mnemonic layouts"). Backspace keeps its default behaviour.';
+
+/**
+ * True when the keyboard's `&TARGETS` includes a KeymanWeb target (`any`,
+ * `web`, `mobile`, …). A keyboard with no `&TARGETS` store builds desktop
+ * only (kmcmplib emits just the `.kmx`), so it is not a web target.
+ */
+function targetsIncludeWeb(ir: KeyboardIR): boolean {
+  const targets = ir.stores.find((s) => s.isSystem && s.name.toUpperCase() === 'TARGETS');
+  if (targets === undefined) return false;
+  const text = targets.items
+    .map((item) => (item.kind === 'char' ? item.value : item.kind === 'raw' ? item.text : ' '))
+    .join('');
+  return text
+    .toLowerCase()
+    .split(/[\s,]+/)
+    .some((t) => KMW_JS_TARGETS.has(t));
 }
 
 /**
@@ -105,6 +138,15 @@ function sameKey(a: SimKeyInput, b: SimKeyInput): boolean {
  * requirement that match/nomatch rules be last) the first match/nomatch
  * rule, whichever comes first. Returns the insertion index and the
  * conflicting fallback rule's id, if any.
+ *
+ * Resolves each candidate fallback's key part via
+ * {@link resolveKeyPartCandidates}, not `resolveKeyPart`: a fallback whose
+ * own key part is a multi-member `any(store)` matches every member's
+ * physical key, not just the store's first one (the same shape #1753 fixed
+ * on the generation side). Checking only the first member here would miss a
+ * real conflict whenever `key` matches a non-first member of the
+ * fallback's store, letting that fallback shadow the just-generated fix for
+ * that member.
  */
 function findInsertionPoint(
   rules: IRRule[],
@@ -118,8 +160,8 @@ function findInsertionPoint(
     }
     const split = splitRuleAtPlus(r);
     if (split !== undefined && split.before.length === 0) {
-      const keyResolution = resolveKeyPart(split.keyPart, storeChars);
-      if ('key' in keyResolution && sameKey(keyResolution.key, key)) {
+      const keyResolution = resolveKeyPartCandidates(split.keyPart, storeChars);
+      if ('candidates' in keyResolution && keyResolution.candidates.some((c) => sameKey(c.key, key))) {
         return { index: i, fallbackRuleId: r.nodeId };
       }
     }
@@ -177,11 +219,11 @@ export async function proposeContextVariants(
     return addBackspaceUnwrap(strippedIr);
   }
 
-  const vfs = createVirtualFS([
-    { path: `source/${ir.header.keyboardId}.kmn`, content: emit(stripAssetStoresForCompile(strippedIr)), isBinary: false },
-  ]);
-  const compiled = await compile(vfs, ir.header.keyboardId);
-  if (!compiled.success) {
+  const compiled = await compile(buildToleranceCompileVfs(strippedIr), ir.header.keyboardId);
+  // Gate on the simulatable .js, not `success`: this compile forces
+  // `&TARGETS 'any'`, which can add web-target-only errors the keyboard's own
+  // build never hits (see `hasSimulatableJs`).
+  if (!hasSimulatableJs(compiled)) {
     return addBackspaceUnwrap(strippedIr);
   }
 
@@ -201,44 +243,53 @@ export async function proposeContextVariants(
       const beforeEl = split.before[0]!;
       const candidateResolution = resolveContextCandidates(beforeEl, storeChars);
       if ('reason' in candidateResolution) continue;
-      const keyResolution = resolveKeyPart(split.keyPart, storeChars);
+      // A multi-member `any(key.all)` key part selects a DIFFERENT physical
+      // key per member (e.g. sil_yoruba8's 5-key diacritic-select table), not
+      // one key matched several equivalent ways — so every member needs its
+      // OWN simulated output under its OWN literal key, not the one output
+      // measured for an arbitrarily-chosen first member baked into a rule
+      // that still matches every member via `any()` (spec 062, #1753: that
+      // shape silently overwrites the other members' correct output with the
+      // first member's).
+      const keyResolution = resolveKeyPartCandidates(split.keyPart, storeChars);
       if ('reason' in keyResolution) continue;
-      const key = keyResolution.key;
 
       const decomposable = candidateResolution.chars.filter(
         (c) => [...c].length === 1 && c.normalize('NFD') !== c,
       );
       if (decomposable.length === 0) continue;
 
-      const { fallbackRuleId } = findInsertionPoint(group.rules, key, storeChars);
-
       let variantIndex = 0;
-      const generatedForRule: IRRule[] = [];
-      for (const candidate of decomposable) {
-        const decomposed = candidate.normalize('NFD');
-        const precomposedOutput = simulate(compiled, [key], { text: candidate }).finalOutput;
-        const decomposedOutput = simulate(compiled, [key], { text: decomposed }).finalOutput;
-        if (precomposedOutput === decomposedOutput) continue; // this candidate is already tolerant
+      for (const { key, literal } of keyResolution.candidates) {
+        const { fallbackRuleId } = findInsertionPoint(group.rules, key, storeChars);
 
-        const marker = `${GENERATED_MARKER_PREFIX}${rule.nodeId}_${variantIndex++}`;
-        generatedForRule.push({
-          nodeId: marker,
-          context: [...charsToContext(decomposed), { kind: 'raw', text: '+' }, ...split.keyPart],
-          output: charsToOutput(precomposedOutput),
-          trailingComment: 'generated: context tolerance (spec 062)',
-        });
-        variants.push({
-          sourceRuleId: rule.nodeId,
-          kind: 'added-rule',
-          generatedMarker: marker,
-          precomposedOutput,
-          ...(fallbackRuleId !== undefined ? { precedesFallbackRuleId: fallbackRuleId } : {}),
-        });
-      }
+        const generatedForRule: IRRule[] = [];
+        for (const candidate of decomposable) {
+          const decomposed = candidate.normalize('NFD');
+          const precomposedOutput = simulate(compiled, [key], { text: candidate }).finalOutput;
+          const decomposedOutput = simulate(compiled, [key], { text: decomposed }).finalOutput;
+          if (precomposedOutput === decomposedOutput) continue; // this candidate is already tolerant
 
-      if (generatedForRule.length > 0) {
-        const existing = batchesByGroup.get(group.nodeId) ?? [];
-        batchesByGroup.set(group.nodeId, [...existing, { key, rules: generatedForRule }]);
+          const marker = `${GENERATED_MARKER_PREFIX}${rule.nodeId}_${variantIndex++}`;
+          generatedForRule.push({
+            nodeId: marker,
+            context: [...charsToContext(decomposed), { kind: 'raw', text: '+' }, ...literal],
+            output: charsToOutput(precomposedOutput),
+            trailingComment: 'generated: context tolerance (spec 062)',
+          });
+          variants.push({
+            sourceRuleId: rule.nodeId,
+            kind: 'added-rule',
+            generatedMarker: marker,
+            precomposedOutput,
+            ...(fallbackRuleId !== undefined ? { precedesFallbackRuleId: fallbackRuleId } : {}),
+          });
+        }
+
+        if (generatedForRule.length > 0) {
+          const existing = batchesByGroup.get(group.nodeId) ?? [];
+          batchesByGroup.set(group.nodeId, [...existing, { key, rules: generatedForRule }]);
+        }
       }
     }
   }
@@ -402,6 +453,15 @@ function addBackspaceUnwrap(ir: KeyboardIR, existingVariants: ContextVariant[] =
 
   const entry = entryGroupOf(ir.groups);
   if (entry === undefined) return { ir, variants: existingVariants };
+
+  // `[K_BKSP]` in a mnemonic layout is a hard kmcmplib error for any KeymanWeb
+  // target (ERROR_VirtualKeysNotValidForMnemonicLayouts) — emitting it would
+  // break the author's web build. Desktop-only mnemonic keyboards (e.g.
+  // sil_yoruba8, which ships its own `+ [K_BKSP]` rules) still compile it, so
+  // they keep the unwrap. See KNOWN LIMITATION 1 above for the runtime side.
+  if (isMnemonicLayout(ir) && targetsIncludeWeb(ir)) {
+    return { ir, variants: existingVariants, notes: [BACKSPACE_UNWRAP_SKIPPED_MNEMONIC_WEB_NOTE] };
+  }
 
   const bkspKey: ContextElement[] = [{ kind: 'vkey', name: 'K_BKSP', modifiers: [] }];
 

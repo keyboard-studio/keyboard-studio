@@ -26,6 +26,7 @@ import {
   checkTouchKeyNoRule,
   checkTouchRuleOrphan,
 } from "./check-18-6-touch-coverage.js";
+import { irGroup, makeTestIR, touchLayout, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 
 const PATH = "source/kbd.keyman-touch-layout";
 
@@ -41,44 +42,17 @@ function hash(s: string): number {
 }
 
 function layout(keys: TouchKeyIR[], layerId = "default"): TouchLayoutIR {
-  return {
-    platforms: [{ id: "phone", layers: [{ id: layerId, rows: [{ keys }] }] }],
-    nodeIds: [],
-  };
+  return touchLayout({ keys, layerId });
 }
 
-/**
- * Minimal IR builder, inline rather than imported from
- * `@keyboard-studio/contracts/fixtures`: this package's tests deliberately depend
- * only on the main contracts barrel, so a fixture-subpath import here would be a
- * new dependency edge for three lines of object literal.
- */
 function ir(rules: IRRule[] = [], raw: KeyboardIR["raw"] = []): KeyboardIR {
-  return {
-    origin: "imported",
-    header: {
-      keyboardId: "kbd",
-      name: "Kbd",
-      bcp47: [],
-      copyright: "",
-      version: "1.0",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores: [],
-    groups: [{ nodeId: "g1", name: "Main", usingKeys: true, readonly: false, rules }],
-    comments: [],
-    raw,
-    recognizedPatterns: [],
-  };
+  return makeTestIR([irGroup({ nodeId: "g1", name: "Main", rules })], [], raw, {
+    header: { keyboardId: "kbd", name: "Kbd" },
+  });
 }
 
 function producing(keyId: string, text = "x"): IRRule {
-  return {
-    nodeId: `r_${keyId}`,
-    context: [{ kind: "vkey", name: keyId, modifiers: [] }],
-    output: [{ kind: "char", value: text }],
-  };
+  return vkeyRule({ nodeId: `r_${keyId}`, vkey: keyId, output: text });
 }
 
 function inputs(keys: TouchKeyIR[], rules: IRRule[] = [], raw: KeyboardIR["raw"] = []) {

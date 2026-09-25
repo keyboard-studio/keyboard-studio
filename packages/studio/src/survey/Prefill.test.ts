@@ -67,8 +67,7 @@ describe("buildPrefillRows", () => {
 
 // ---------------------------------------------------------------------------
 // buildScriptAlignmentRows — Tier B content-i18n for the provenance chip
-// (spec 046 T028). Mirrors the resolveNodeName/resolveLocationLabel coverage
-// in irToCarveNodes.test.ts for this loader's third render site.
+// (spec 046 T028).
 // ---------------------------------------------------------------------------
 
 function firedQuestion(overrides: Partial<FiredQuestion> = {}): FiredQuestion {

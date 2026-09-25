@@ -129,7 +129,7 @@ const SEQ_CONTENT_RESOLVE_OPTIONS: ResolveCharInputOptions = {
 // Takes an optional i18n + resolves via msg()/resolveMessage() rather than a
 // bare `t` parameter — Lingui's macro tracks the specific binding introduced
 // by useLingui(), so a re-bound `t` parameter is a distinct binding the
-// extractor does not follow (see Inspector.tsx's storeBlurb for the same fix).
+// extractor does not follow (see resolveMessage in lib/i18nResolve.ts).
 function buildSeqIndicatorResolveOptions(i18n?: I18n): ResolveCharInputOptions {
   return {
     multiToken: true,

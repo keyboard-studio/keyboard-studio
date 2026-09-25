@@ -12,7 +12,7 @@
 // directly here so it has a real unit-level consumer, which is what justifies
 // keeping it exported (see confirmRebase.ts's module doc).
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { makeTestIR, basicKbdus, silEuroLatin } from "@keyboard-studio/contracts/fixtures";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
@@ -42,12 +42,7 @@ function recordAnEdit() {
 
 const payload = { vfs: createVirtualFS([]), ir: makeTestIR([]), removalCapabilities: new Map() };
 
-beforeEach(() => {
-  useWorkingCopyStore.getState().reset();
-});
-
 afterEach(() => {
-  useWorkingCopyStore.getState().reset();
   vi.restoreAllMocks();
 });
 

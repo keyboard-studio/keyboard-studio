@@ -5,7 +5,7 @@
 //
 // ONE ENTRY, ONCE, FROM THE INSTANTIATED STORE — never a re-read of the base
 // keyboard's source (FR-035). Every input arrives through an injected getter
-// over the same `useWorkingCopyStore` state `CarveGallery` already reads
+// over the same `useWorkingCopyStore` state the carve gallery already reads
 // (`baseKeyboard`, `baseIr`, `irAxes`, `instantiationMode`,
 // `removalCapabilities`): describing the base's *source* would describe the
 // base, not what the author actually started from, and the two can diverge
@@ -51,8 +51,8 @@ export interface RecordBaseContributionDeps {
   /** `null` before instantiation; one of the two literals once instantiated. */
   getInstantiationMode: () => InstantiatedMode | null;
   /**
-   * Same map `CarveGallery` reads to build its own rail (`toRailNodes`'s
-   * second argument) — read here rather than defaulted, so a starting count
+   * Same map the carve gallery reads to build its rail nodes (`toRailNodes`'s
+   * second argument, via irToCharacterView) — read here rather than defaulted, so a starting count
    * taken before capability analysis has run cannot silently disagree with
    * the one the carve gallery renders moments later.
    */
@@ -63,7 +63,7 @@ export interface RecordBaseContributionDeps {
  * Total toggleable units in a base's starting layout, in the same
  * `nodes + items` unit `recordEditorStep`'s `keysRemoved` reports (FR-034).
  *
- * Mirrors `CarveGallery`'s own kept/total tally: every pattern/group
+ * Mirrors the rule/node carve gallery's kept/total tally: every pattern/group
  * `CarveNode`'s `glyphs` entry is one toggleable unit, whether its `gid`
  * addresses a whole rule node or one fan-out store item — the same flat count
  * `deletedNodeIds.size + deletedItemIds.size` accumulates from the deletion

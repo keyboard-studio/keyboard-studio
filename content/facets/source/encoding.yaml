@@ -2,9 +2,7 @@
 # whether input-side VK matching uses bare virtual keys or named/split
 # modifiers, and whether base/combining store literals use quoted characters
 # or \u notation. A construction-style fact about the chosen base, not a
-# preference the author holds — feeds the same pb_mark_style prefill that
-# orth.mark-composition-posture feeds, from the opposite direction (what the
-# base already does vs what the target orthography needs).
+# preference the author holds.
 
 id: source.encoding
 family: source
@@ -14,10 +12,11 @@ description: >
   literals), how the chosen base .kmn source is written today: bare virtual
   keys vs named/split modifiers for input matching; quoted-character vs
   \u-notation for base/combining store literals. Read directly off the
-  base's rules and stores before any adaptation. Prefills pb_mark_style
-  (the base's own combining-literal style is a strong prior for how the
-  adapted keyboard should be written) and proposes the encoding-normalize
-  transform when the profile is mixed.
+  base's rules and stores before any adaptation. Proposes the
+  encoding-normalize transform when the profile is mixed. No live consumer
+  currently reads this facet for marks purposes: the marks series' base
+  mechanism signal is derived independently from the base IR by
+  detectBaseMarkMechanism() in packages/engine/src/marks/treatment-prefill.ts.
 valueType: set
 subProfiles:
   # A rule's INPUT is not always a key-reference like [K_E] — it can also be
@@ -51,8 +50,8 @@ derivations:
       quoted-literal or \u-notation.
 
 consumers:
-  prefills:
-    - pb_mark_style
+  # pb_mark_style was retired by spec 071 and has been deleted.
+  prefills: []
   proposes:
     - "transform-offer:encoding-normalize"
 

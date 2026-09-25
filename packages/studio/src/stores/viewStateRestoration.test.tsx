@@ -41,7 +41,7 @@
 // state reach either seam would fail every test here, not just a dedicated
 // one.
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, screen } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import type { DecisionEntry, DecisionImpact, DecisionRecord } from "@keyboard-studio/contracts";
@@ -69,10 +69,6 @@ vi.mock("@keyboard-studio/engine", async (importOriginal) => {
   compileSpy.mockImplementation(actual.compile);
   validateWithOracleSpy.mockImplementation(actual.validateWithOracle);
   return { ...actual, compile: compileSpy, validateWithOracle: validateWithOracleSpy };
-});
-
-beforeEach(() => {
-  useViewStateStore.getState().reset();
 });
 
 afterEach(() => {

@@ -3,7 +3,7 @@
 //
 // Two groups:
 //   1. detectMarkInputOrderFromImport() unit shape tests, against hand-built
-//      IR fixtures (mirrors s02-deadkey-single-tap.test.ts's fixture style).
+//      IR fixtures (mirrors recognizer/rules/__fixtures__/recognizerIr.ts's fixture style).
 //   2. An end-to-end lock: parse() a trimmed sil_ipa-shaped .kmn fixture
 //      (the §7.5 IPA exemplar's real guard-free rule shape: `any(base) +
 //      "trigger" > index(marked, 1)`), thread the detected AxisFill into defaultFillAxes

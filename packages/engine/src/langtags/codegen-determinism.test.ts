@@ -13,7 +13,7 @@
  * is a key determinism invariant of the codegen script.
  */
 
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
@@ -29,6 +29,10 @@ const DATA_FILE = join(
   "langtags",
   "langtags.json"
 );
+// langtags.json is gitignored (packages/engine/data/langtags/.gitignore); CI
+// fetches it pinned + SHA-verified (`pnpm run fetch-langtags`). Without it the
+// re-derive check is skipped *visibly* rather than passing with no assertions.
+const dataPresent = existsSync(DATA_FILE);
 
 function parseFull(full: string): { script?: string; region?: string } {
   const parts = full.split("-");
@@ -66,16 +70,9 @@ describe("codegen determinism (T011)", () => {
     }
   });
 
-  it("re-derived index matches generated index for 'ha' and 'hi'", () => {
+  it.skipIf(!dataPresent)("re-derived index matches generated index for 'ha' and 'hi'", () => {
     // Re-derive from the source data to verify determinism
-    let raw: unknown[];
-    try {
-      raw = JSON.parse(readFileSync(DATA_FILE, "utf8")) as unknown[];
-    } catch {
-      // If the data file is not present (CI without fetch step), skip gracefully
-      console.warn("[WARN] langtags.json not found — skipping re-derive check");
-      return;
-    }
+    const raw = JSON.parse(readFileSync(DATA_FILE, "utf8")) as unknown[];
 
     // Derive records for ha and hi
     for (const tag of ["ha", "hi"]) {

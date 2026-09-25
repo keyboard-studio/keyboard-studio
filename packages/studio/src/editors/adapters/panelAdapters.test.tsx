@@ -21,6 +21,7 @@ import {
 
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useBasePreviewStatusStore } from "../../stores/basePreviewStatusStore.ts";
+import { buildTargetBcp47 } from "../../survey/IdentityLite.tsx";
 import type { IdentityLiteResult } from "../../survey/IdentityLite.tsx";
 
 // ---------------------------------------------------------------------------
@@ -71,7 +72,6 @@ function makeIdentityResult(overrides: Partial<IdentityLiteResult>): IdentityLit
 
 afterEach(() => {
   cleanup();
-  useSurveySessionStore.getState().reset();
   // Reset the preview-status store between tests — it is a module-level
   // singleton (Zustand), so a test that flips it to "ready" would otherwise
   // leak into the next test's initial render.
@@ -275,7 +275,10 @@ describe("IdentityLiteAdapter — resume from identityPhaseResult", () => {
     expect(atCompletion, "store was not snapshotted — onComplete never ran").not.toBeNull();
     const s = atCompletion!;
     // Every write below must have landed BEFORE onComplete fired.
-    expect(s.identityResult?.bcp47).toBe("ha-Latn");
+    // Through the composer: this assertion is about the WRITE having landed
+    // before onComplete, and `Latn` is Hausa's default script, so the tag's own
+    // spelling belongs to the composer's tests, not this one.
+    expect(s.identityResult?.bcp47).toBe(buildTargetBcp47("ha", "Latn"));
     expect(s.surveyContext.language_name).toBe("Hausa");
     // 4 -> 7: spec 064 US1 appends the three attribution answers.
     expect(s.identityPhaseResult?.answers.length).toBe(7);

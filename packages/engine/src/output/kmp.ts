@@ -168,10 +168,8 @@ const SEVERITY_MASK = 0x00f00000;
 const ERROR_MASK = 0x000fffff;
 
 /**
- * `CompilerEvent` has NO `severity` field — severity is bit-packed into `code`.
- * (The kmn bridge reads a `message.severity` that never exists, which is why
- * every kmc-kmn diagnostic is currently labelled `warning`; that is a
- * pre-existing defect tracked separately. Do not copy it here.)
+ * `CompilerEvent` has NO `severity` field — severity is bit-packed into `code`
+ * (the kmn bridge, compiler/index.ts, decodes it the same way).
  *
  * Values are CompilerErrorSeverity: Debug 0, Verbose 0x100000, Info 0x200000,
  * Hint 0x300000, Warn 0x400000, Error 0x500000, Fatal 0x600000.

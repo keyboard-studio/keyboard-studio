@@ -19,6 +19,7 @@ import {
   TouchKeyProvenanceSchema,
 } from "./schemas";
 import type { KeyboardIR, TouchLayoutIR } from "./keyboard-ir";
+import { makeTestIR } from "./fixtures/keyboard-ir";
 
 // A touch layout mixing every provenance state + one untagged (legacy) key.
 function makeTaggedLayout(): TouchLayoutIR {
@@ -49,24 +50,10 @@ function makeTaggedLayout(): TouchLayoutIR {
 }
 
 function makeIR(touchLayout: TouchLayoutIR): KeyboardIR {
-  return {
-    origin: "imported",
-    header: {
-      keyboardId: "kbd",
-      name: "Test",
-      bcp47: ["en"],
-      copyright: "(c)",
-      version: "1.0",
-      targets: ["any"],
-      storeDirectives: [],
-    },
-    stores: [],
-    groups: [],
-    comments: [],
-    raw: [],
+  return makeTestIR({
+    header: { keyboardId: "kbd", bcp47: ["en"], copyright: "(c)", targets: ["any"] },
     touchLayout,
-    recognizedPatterns: [],
-  };
+  });
 }
 
 describe("TouchKeyProvenanceSchema (spec-014 FR-008)", () => {

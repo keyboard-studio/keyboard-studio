@@ -126,7 +126,9 @@ build artifacts you should regenerate rather than hand-edit:
 
 - `fetch-langtags` — downloads the pinned SIL `langtags.json` (MIT; SHA-256 pinned in
   [scripts/langtags-version.json](../scripts/langtags-version.json); raw file gitignored under
-  `packages/engine/data/langtags/`).
+  `packages/engine/data/langtags/`). CI runs this one (cached on the pin file) so the langtags
+  codegen-determinism re-derive check has its input; without the file that test is a visible
+  skip, not a silent pass.
 - `codegen-langtags` — derives the slim lookup index into
   `packages/engine/src/langtags/generated/` from the downloaded data.
 - `compile-recognizer-rules` — codegens `content/recognizer-rules/*.yaml` →
@@ -195,7 +197,21 @@ Suites outside the pnpm workspace need their own invocation, and CI runs each ex
 - `/api` functions: `npx vitest run --config api/vitest.config.ts`
 - i18n utilities: `pnpm run test:i18n-utilities`
 - spec-trace: `pnpm run test:spec-trace`
+- facet-index: `pnpm run test:facet-index`
 - kbgen: `pnpm run test:kbgen` (typecheck + tests; it imports engine `src/` internals by relative path, so this is the only thing that catches an engine rename)
+- km-triage-app: `pnpm run test:km-triage` (`node:test`, not vitest; the glob is quoted so Node
+  expands it — Node 22 does not accept a bare directory argument to `--test`)
+- supportability-scanner: `pnpm run test:supportability-scanner`
+
+### Corpus-gated tests
+
+Many engine/studio/facet-index tests `skipIf` the sibling `../keyboards` checkout (the
+`keyboard-studio/keyboards` fork, `release/` tree) is absent. CI checks that corpus out —
+sparse `release/`, depth 1, **pinned** to the commit in `KEYBOARDS_CORPUS_SHA` at the top of
+[ci.yml](../.github/workflows/ci.yml) — and moves it to `<repo>/../keyboards`, so those tests run
+on every PR against one known corpus. It also sets `KEYBOARDS_REPO` to that path for the studio
+postbuild and dev server. When the fork moves, bump the pin deliberately and re-run the
+corpus-gated tests locally against the new commit first.
 
 ## Journey corpus (spec 032)
 
@@ -222,7 +238,11 @@ its manifest edge coverage.
   pnpm --filter @keyboard-studio/studio run coverage:report
   ```
 
-  This runs as a `vitest run` invocation of one spec
+  Only this command writes the file: it runs `vitest run --mode coverage-report`, and the same
+  spec under a plain `pnpm test` computes the report without rewriting `docs/journey-coverage.json`.
+  The report and `journey-runner.test.ts` read the fixtures through one module,
+  `packages/studio/src/survey/__fixtures__/journeyCorpus.ts`, so a new journey is added there.
+  The command is a `vitest run` invocation of one spec
   (`src/dashboard/journeyCoverage.report.test.ts`), not a bare `tsx` script — the manifest's
   editor-step components transitively import `content/flows/*.modular.yaml?raw`, a Vite asset
   transform `tsx`/Node cannot resolve; Vitest already runs on Vite's own transform pipeline, so
@@ -240,7 +260,13 @@ cd packages/studio && npx playwright test <spec>     # a single spec
 npx playwright install chromium                       # once per version bump
 ```
 
-E2E stays out of the unit CI lanes (vitest and tsc both exclude `e2e/**`). All specs import from
+E2E stays out of the unit CI lanes (vitest and tsc both exclude `e2e/**`), but CI runs it in its
+own **non-blocking** `e2e` job in [ci.yml](../.github/workflows/ci.yml) (`continue-on-error`, not a
+required check): it checks out the pinned corpus, builds studio's workspace dependencies,
+installs Chromium, and runs `test:e2e boot-smoke copy-edit` — Playwright's positional args are
+file filters, so widening the lane is adding a spec name there. On failure the HTML report and
+traces (`playwright-report/`, `test-results/`, CI-only) upload as the `playwright-report`
+artifact. Make the job blocking once it has proved stable. All specs import from
 `"playwright/test"` — the `playwright` package's test entry; do not add `@playwright/test` as a
 second runner package.
 
@@ -287,7 +313,6 @@ Live and passing:
 
 Skipped, each with an un-skip recipe at the top of its file:
 
-- `import-improve.spec.ts` — Track 2
 - [touch-key-add-remove.spec.ts](../packages/studio/e2e/touch-key-add-remove.spec.ts) — spec 063
   T112 / SC-006. Written in full against the real test ids, but blocked until `TouchGallery.tsx`
   actually mounts the Phase 8 add/remove surfaces — it calls neither `useKeyCommands` nor

@@ -11,12 +11,14 @@
 //   - vitest (packages/studio/vitest.config.ts exclude: ["e2e/**"])
 //   - tsc typecheck (packages/studio/tsconfig.json include does not cover
 //     playwright.config.ts or e2e/**)
-//   Browser tests run in a separate manual/CD step, never in the unit CI lane.
+//   Browser tests never run in the unit CI lane. They run in their own
+//   NON-BLOCKING `e2e` job in .github/workflows/ci.yml (boot-smoke +
+//   copy-edit to start), and manually/locally for the rest.
 //
 // Browser binaries: run `npx playwright install` once before running E2E.
-// E2E specs live under packages/studio/e2e/. carve.spec.ts is LIVE (not skipped)
-// and passes against the global CLI; copy-edit.spec.ts and import-improve.spec.ts
-// remain .skip-ped pending their lanes. See each spec header for details.
+// E2E specs live under packages/studio/e2e/. Which specs are live and which are
+// skipped is listed in docs/tooling.md ("Spec status"); each skipped spec carries
+// its un-skip recipe in its header.
 //
 // If PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH points at an existing chromium
 // binary, that one is launched instead of the version the local `playwright`
@@ -43,12 +45,26 @@ export default defineConfig({
   // step, never the blocking unit-CI lane (see the file header), so trading
   // wall-clock for reliability here is the right call.
   workers: 1,
+  // CI (the ci.yml `e2e` job) adds: `github` (each failing test becomes a
+  // check-run annotation, readable without the Actions log), `html` (uploaded
+  // as the playwright-report artifact on failure, with the retained traces),
+  // and `json` (read by the job's step-summary step). Locally: plain list
+  // output, no traces.
+  reporter: process.env["CI"]
+    ? [
+        ["list"],
+        ["github"],
+        ["html", { open: "never" }],
+        ["json", { outputFile: "test-results/results.json" }],
+      ]
+    : "list",
   globalSetup: "./e2e/global-setup.ts",
   use: {
     baseURL: "http://localhost:5273",
     launchOptions: chromiumExecutablePath
       ? { executablePath: chromiumExecutablePath }
       : undefined,
+    trace: process.env["CI"] ? "retain-on-failure" : "off",
   },
   webServer: {
     command: "pnpm dev",

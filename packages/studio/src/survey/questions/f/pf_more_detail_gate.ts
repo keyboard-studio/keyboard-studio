@@ -9,7 +9,7 @@
 //
 // Answering "no" routes straight to credits, so a minimal keyboard finishes in
 // a few screens. Answering "yes" opens the optional documentation battery.
-// Follows the established Phase B gate pattern (see pb_accent_marks_gate).
+// Follows the established Phase B gate pattern (see pb_punctuation_gate).
 
 import type { QuestionModule, ValidationResult } from "../../types.ts";
 

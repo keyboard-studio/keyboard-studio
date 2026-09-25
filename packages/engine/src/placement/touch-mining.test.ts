@@ -6,41 +6,38 @@
  */
 
 import { describe, it, expect } from "vitest";
-import type { TouchLayoutIR, TouchKeyIR } from "@keyboard-studio/contracts";
+import type { TouchKeyIR } from "@keyboard-studio/contracts";
 import { mineLongpressHosts, aggregateTouchHosts, touchHostsToEntries } from "./touch-mining.js";
+import { touchLayout } from "@keyboard-studio/contracts/fixtures";
 
 function makeKey(id: string, overrides: Partial<TouchKeyIR> = {}): TouchKeyIR {
   return { nodeId: `n_${id}`, id, ...overrides };
 }
 
-function makeLayout(layers: TouchLayoutIR["platforms"][number]["layers"]): TouchLayoutIR {
-  return { platforms: [{ id: "phone", layers }], nodeIds: [] };
-}
-
 describe("mineLongpressHosts", () => {
   it("mines a longpress (sk[]) entry into a codepoint/vkey/layerClass observation", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       {
         id: "default",
         rows: [{ keys: [makeKey("K_E", { text: "e", sk: [makeKey("K_E", { text: "ɛ" })] })] }],
       },
-    ]);
+    ] });
     const observations = mineLongpressHosts(layout);
     expect(observations).toEqual([{ codepoint: "U+025B", vkey: "K_E", layerClass: "default" }]);
   });
 
   it("buckets the OUTER layer id: 'default' / 'shift' / anything else -> 'other'", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       { id: "default", rows: [{ keys: [makeKey("K_E", { sk: [makeKey("K_E", { text: "ɛ" })] })] }] },
       { id: "shift", rows: [{ keys: [makeKey("K_E", { sk: [makeKey("K_E", { text: "Ɛ" })] })] }] },
       { id: "symbol", rows: [{ keys: [makeKey("K_E", { sk: [makeKey("K_E", { text: "€" })] })] }] },
-    ]);
+    ] });
     const observations = mineLongpressHosts(layout);
     expect(observations.map((o) => o.layerClass)).toEqual(["default", "shift", "other"]);
   });
 
   it("ignores the sk[] sub-entry's own layerAnnotation for bucketing (ghana's 'rightalt' hint)", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       {
         id: "default",
         rows: [
@@ -54,7 +51,7 @@ describe("mineLongpressHosts", () => {
           },
         ],
       },
-    ]);
+    ] });
     // Outer layer is "default" — the sk's own "rightalt" annotation must not
     // override that bucketing.
     expect(mineLongpressHosts(layout)).toEqual([
@@ -63,7 +60,7 @@ describe("mineLongpressHosts", () => {
   });
 
   it("skips multitap and flick entries (longpress only)", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       {
         id: "default",
         rows: [
@@ -78,47 +75,47 @@ describe("mineLongpressHosts", () => {
           },
         ],
       },
-    ]);
+    ] });
     expect(mineLongpressHosts(layout)).toEqual([]);
   });
 
   it("drops non-K_ host vkeys (T_/U_ touch-specific ids are not standard suggestable keys)", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       {
         id: "default",
         rows: [{ keys: [makeKey("T_sp", { sk: [makeKey("K_E", { text: "ɛ" })] })] }],
       },
-    ]);
+    ] });
     expect(mineLongpressHosts(layout)).toEqual([]);
   });
 
   it("skips a spacer-class host key (sp:8/10)", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       {
         id: "default",
         rows: [{ keys: [makeKey("K_E", { sp: 8, sk: [makeKey("K_E", { text: "ɛ" })] })] }],
       },
-    ]);
+    ] });
     expect(mineLongpressHosts(layout)).toEqual([]);
   });
 
   it("skips an sk sub-entry with no char-producing field", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       {
         id: "default",
         rows: [{ keys: [makeKey("K_E", { sk: [makeKey("K_LAYER", { nextlayer: "shift" })] })] }],
       },
-    ]);
+    ] });
     expect(mineLongpressHosts(layout)).toEqual([]);
   });
 
   it("skips a multi-codepoint sk char (not a single codepoint)", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       {
         id: "default",
         rows: [{ keys: [makeKey("K_E", { sk: [makeKey("K_E", { text: "ab" })] })] }],
       },
-    ]);
+    ] });
     expect(mineLongpressHosts(layout)).toEqual([]);
   });
 });

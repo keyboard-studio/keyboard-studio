@@ -42,14 +42,14 @@
  * last mechanism ANYWHERE" sweep (FR-062) is reserved for a later worklist
  * over that same file (tasks.md T106). This module IS that FR-062 sweep,
  * built at the engine layer so both T106's worklist and any other caller
- * can consume one implementation instead of forking a third recursive
- * character collector (the file already has two divergent ones —
- * `collectAllReachableChars` here, `keyChars` in `keyEditOrphanReport.ts`).
- * T106 should call {@link analyzeKeyEditCollateral} rather than deriving a
- * fourth. This module does not import from the studio (engine cannot
- * depend on studio; dependency-cruiser would block it regardless) — the
- * seam is a one-way "T106 imports from here", stated so the next author
- * does not silently re-derive this file's logic a second time.
+ * can consume one implementation instead of forking another recursive
+ * character collector (the studio's `useKeyEditGuards.ts` already has one,
+ * `collectAllReachableChars`). T106 should call
+ * {@link analyzeKeyEditCollateral} rather than deriving another. This
+ * module does not import from the studio (engine cannot depend on studio;
+ * dependency-cruiser would block it regardless) — the seam is a one-way
+ * "T106 imports from here", stated so the next author does not silently
+ * re-derive this file's logic a second time.
  *
  * ## Why `producedByKeyId`/rule-index reasoning is used, but NOT
  * `buildProducerIndex` (producerIndex.ts)
@@ -108,8 +108,8 @@
  *   sources (text, output, decoded id, rule production) but not that fifth.
  *   `collectKeyChars` itself is a private, non-exported helper inside
  *   `touch-coverage.ts` (contracts) — duplicating its four-source slice here
- *   is the same tradeoff `keyEditOrphanReport.ts`'s own `keyChars` already
- *   documents ("duplicating three lines is cheaper than coupling").
+ *   is a deliberate tradeoff: duplicating a few lines is cheaper than
+ *   coupling to another package's private helper.
  * - **A `set`/`rename` is only collateral-bearing when it changes `id`.**
  *   A `set` that flips `sp` to a non-interactive class WITHOUT going
  *   through the dedicated `suppress` op is FR-029c's "half-done
@@ -428,8 +428,8 @@ function collectDiscardTargets(
  * `id` — see the module doc's "what this deliberately does not do".
  *
  * `ruleIndex` is optional: omitting it under-reports a rule-bound
- * production (never over-reports), matching `keyEditOrphanReport.ts`'s and
- * `useKeyEditGuards.ts`'s own convention for the same parameter.
+ * production (never over-reports), matching `useKeyEditGuards.ts`'s own
+ * convention for the same parameter.
  */
 export function enumerateKeyLinkedOutputs(
   layout: TouchLayoutIR,

@@ -116,7 +116,6 @@ let originalCreateObjectURL: typeof URL.createObjectURL;
 let originalRevokeObjectURL: typeof URL.revokeObjectURL;
 
 beforeEach(() => {
-  useWorkingCopyStore.getState().reset();
   capturedDownloads.current = [];
   mockKmp.current = {
     ok: true,
