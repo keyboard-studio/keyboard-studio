@@ -76,6 +76,7 @@ function renderWithRecorder(): ScreenRecorder & ReturnType<typeof vi.fn> {
     <QuestionRecorderContext.Provider value={recorder}>
       <SurveyRunner flow={FLOW} onComplete={vi.fn()} />
     </QuestionRecorderContext.Provider>,
+    { withStepNav: true },
   );
   return recorder;
 }
@@ -204,7 +205,9 @@ describe("SurveyRunner — a pre-mount position lands on the saved answer (T083)
     // before the remount reads it.
     useSurveyAnswerStore.getState().setPosition("identity", "q2");
     const getSeedValue = vi.fn(() => "should-not-be-used");
-    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} getSeedValue={getSeedValue} />);
+    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} getSeedValue={getSeedValue} />, {
+      withStepNav: true,
+    });
 
     expect(screen.getByText("Second question")).toBeTruthy();
     expect(field().value).toBe("beta");

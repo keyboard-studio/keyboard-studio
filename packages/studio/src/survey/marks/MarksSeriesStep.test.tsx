@@ -72,7 +72,7 @@ describe("MarksSeriesStep — S0 skip path", () => {
   it("completes immediately with an EMPTY worklist and renders nothing (forward entry)", () => {
     const onComplete = vi.fn();
     act(() => {
-      render(<MarksSeriesStep onComplete={onComplete} />);
+      render(<MarksSeriesStep onComplete={onComplete} />, { withStepNav: true });
     });
     expect(screen.queryByTestId("marks-series")).toBeNull();
     expect(onComplete).toHaveBeenCalledTimes(1);
@@ -95,7 +95,7 @@ describe("MarksSeriesStep — S0 skip path", () => {
       useSurveySessionStore.getState().popHistory();
     });
     act(() => {
-      render(<MarksSeriesStep onComplete={onComplete} onBack={onBack} />);
+      render(<MarksSeriesStep onComplete={onComplete} onBack={onBack} />, { withStepNav: true });
     });
     expect(onBack).toHaveBeenCalledTimes(1);
     expect(onComplete).not.toHaveBeenCalled();
@@ -107,7 +107,7 @@ describe("MarksSeriesStep — series runs when marks exist", () => {
     seedAlphabet([ACUTE]);
     const onComplete = vi.fn();
     act(() => {
-      render(<MarksSeriesStep onComplete={onComplete} />);
+      render(<MarksSeriesStep onComplete={onComplete} />, { withStepNav: true });
     });
     expect(screen.getByTestId("marks-series")).toBeTruthy();
     expect(onComplete).not.toHaveBeenCalled();
@@ -126,7 +126,7 @@ describe("MarksSeriesStep — station Back affordance gating", () => {
   it("first station + no onBack: renders no Back button", () => {
     seedAlphabet([ACUTE], ["e"]);
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     expect(screen.getByTestId("marks-attachment")).toBeTruthy();
     expect(screen.queryByRole("button", { name: "Back" })).toBeNull();
@@ -136,7 +136,7 @@ describe("MarksSeriesStep — station Back affordance gating", () => {
     seedAlphabet([ACUTE], ["e"]);
     const onBack = vi.fn();
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} onBack={onBack} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} onBack={onBack} />, { withStepNav: true });
     });
     const backButton = screen.getByRole("button", { name: "Back" });
     fireEvent.click(backButton);
@@ -149,7 +149,7 @@ describe("MarksSeriesStep — station Back affordance gating", () => {
     // confirmation — a second station beyond attachment.
     seedAlphabet([ACUTE, "̀"], ["e"]);
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     expect(screen.getByTestId("marks-attachment")).toBeTruthy();
     fireEvent.click(screen.getByTestId("marks-continue"));
@@ -168,7 +168,7 @@ describe("MarksSeriesStep — S1 attachment station", () => {
   it("renders one row per mark with attested bases pre-checked", () => {
     seedAlphabet([ACUTE], ["e"]);
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     const station = screen.getByTestId("marks-attachment");
     expect(station).toBeTruthy();
@@ -179,7 +179,7 @@ describe("MarksSeriesStep — S1 attachment station", () => {
   it("renders a single-attested-base mark as an auto-confirmed summary (FR-008)", () => {
     seedAlphabet([ACUTE], ["e"]);
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     const row = screen.getByTestId("attachment-row-U+0301");
     expect(row.tagName.toLowerCase()).toBe("details");
@@ -189,7 +189,7 @@ describe("MarksSeriesStep — S1 attachment station", () => {
   it("states the unchecked-means-blocked consequence in the row help text (FR-007)", () => {
     seedAlphabet([ACUTE], ["e"]);
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     expect(screen.getByTestId("marks-attachment").textContent).toContain(
       "will not take this mark",
@@ -200,7 +200,7 @@ describe("MarksSeriesStep — S1 attachment station", () => {
     seedAlphabet([ACUTE], ["e"]);
     const onComplete = vi.fn();
     act(() => {
-      render(<MarksSeriesStep onComplete={onComplete} />);
+      render(<MarksSeriesStep onComplete={onComplete} />, { withStepNav: true });
     });
     // Screen 1: the auto-confirmed attachment summary.
     expect(screen.getByTestId("marks-attachment")).toBeTruthy();
@@ -246,7 +246,7 @@ describe("MarksSeriesStep — lowercase-only base choices (spec 049)", () => {
   it("US1/SC-001: the attachment row offers no uppercase duplicate of a present lowercase", () => {
     seedCasedAlphabet();
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     // The row exposes one checkbox per offered base via its aria-label
     // "<base> can carry ...". Uppercase E / A must not appear as choices.
@@ -280,7 +280,7 @@ describe("MarksSeriesStep — lowercase-only base choices (spec 049)", () => {
       },
     });
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     // No fold: every base is offered as its own choice.
     expect(screen.getByLabelText(/^E can carry/)).toBeTruthy();
@@ -315,7 +315,7 @@ describe("MarksSeriesStep — lowercase-only base choices (spec 049)", () => {
     });
     const onComplete = vi.fn();
     act(() => {
-      render(<MarksSeriesStep onComplete={onComplete} />);
+      render(<MarksSeriesStep onComplete={onComplete} />, { withStepNav: true });
     });
     // Folded: uppercase E/A are not offered as their own choice.
     expect(screen.queryByLabelText(/^E can carry/)).toBeNull();
@@ -359,7 +359,7 @@ describe("MarksSeriesStep — lowercase-only base choices (spec 049)", () => {
       },
     });
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     expect(screen.getByLabelText(/^E can carry/)).toBeTruthy();
     expect(screen.getByLabelText(/^A can carry/)).toBeTruthy();
@@ -389,7 +389,7 @@ describe("MarksSeriesStep — lowercase-only base choices (spec 049)", () => {
       },
     });
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     expect(screen.getByLabelText(/^E can carry/)).toBeTruthy();
     expect(screen.getByLabelText(/^A can carry/)).toBeTruthy();
@@ -414,7 +414,7 @@ describe("MarksSeriesStep — lowercase-only base choices (spec 049)", () => {
       },
     });
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     expect(screen.getByLabelText(new RegExp(`^${KA} can carry`))).toBeTruthy();
   });
@@ -422,7 +422,7 @@ describe("MarksSeriesStep — lowercase-only base choices (spec 049)", () => {
   it("US1/SC-004: the case-pair note reflects the lowercase-fold count", () => {
     seedCasedAlphabet();
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     // e and a each have a present uppercase counterpart → 2 pairs.
     expect(screen.getByTestId("marks-attachment").textContent).toContain(
@@ -447,7 +447,7 @@ describe("MarksSeriesStep — lowercase-only base choices (spec 049)", () => {
       },
     });
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     const row = screen.getByTestId("attachment-row-U+0301");
     expect(row.tagName.toLowerCase()).toBe("details"); // auto-confirmed
@@ -460,7 +460,7 @@ describe("MarksSeriesStep — lowercase-only base choices (spec 049)", () => {
     seedCasedAlphabet();
     const onComplete = vi.fn();
     act(() => {
-      render(<MarksSeriesStep onComplete={onComplete} />);
+      render(<MarksSeriesStep onComplete={onComplete} />, { withStepNav: true });
     });
     // Walk to completion (attested e/a acute stay checked).
     for (let i = 0; i < 6 && onComplete.mock.calls.length === 0; i++) {
@@ -492,7 +492,7 @@ describe("MarksSeriesStep — S4 output-form station", () => {
   it("proposes base-plus-mark as a notice when a pair never composes (FR-014, US3 AC1)", () => {
     seedAlphabet([ACUTE], [SCHWA]);
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     reachOutputForm();
     const station = screen.getByTestId("marks-output-form");
@@ -504,7 +504,7 @@ describe("MarksSeriesStep — S4 output-form station", () => {
   it("proposes ready-made as a notice when every pair composes (FR-015, US2 AC2)", () => {
     seedAlphabet([ACUTE], ["e"]);
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     reachOutputForm();
     expect(screen.getByTestId("marks-output-form").textContent).toContain("ready-made");
@@ -513,7 +513,7 @@ describe("MarksSeriesStep — S4 output-form station", () => {
   it("shows the mandatory step-by-step backspace preview (FR-017)", () => {
     seedAlphabet([ACUTE], ["e"]);
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     reachOutputForm();
     expect(screen.getByTestId("backspace-preview")).toBeTruthy();
@@ -522,7 +522,7 @@ describe("MarksSeriesStep — S4 output-form station", () => {
   it("offers a way to change the proposed form (propose-then-confirm)", () => {
     seedAlphabet([ACUTE], ["e"]);
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     reachOutputForm();
     fireEvent.click(screen.getByTestId("output-form-change"));
@@ -538,7 +538,7 @@ describe("MarksSeriesStep — S4 output-form station", () => {
     // the ready-made explanation.
     seedAlphabet([ACUTE], ["e"]);
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     reachOutputForm();
     // Before the override: ready-made, with the ready-made explanation.
@@ -558,7 +558,7 @@ describe("MarksSeriesStep — S4 output-form station", () => {
   it("hides the override when no ready-made form exists for some pair (row 1)", () => {
     seedAlphabet([ACUTE], [SCHWA]);
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     reachOutputForm();
     expect(screen.queryByTestId("output-form-change")).toBeNull();
@@ -570,7 +570,7 @@ describe("MarksSeriesStep — S4 output-form station", () => {
   it("states the S2 outcome as a premise (no own-key mark)", () => {
     seedAlphabet([ACUTE], ["e"]);
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     reachOutputForm();
     expect(screen.getByTestId("output-form-premise").textContent).toContain(
@@ -584,7 +584,7 @@ describe("MarksSeriesStep — S4 output-form station", () => {
       useWorkingCopyStore.getState().reset();
       seedAlphabet([ACUTE], bases);
       act(() => {
-        render(<MarksSeriesStep onComplete={vi.fn()} />);
+        render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
       });
       reachOutputForm();
       const text = screen.getByTestId("marks-output-form").textContent ?? "";
@@ -635,7 +635,7 @@ describe("MarksSeriesStep — worklist handoff (US7)", () => {
     seedTonalAlphabet();
     const onComplete = vi.fn();
     act(() => {
-      render(<MarksSeriesStep onComplete={onComplete} />);
+      render(<MarksSeriesStep onComplete={onComplete} />, { withStepNav: true });
     });
     // S1 renders first; the series completes within the four-station budget
     // (spec 052 SC-003 supersedes spec 071's five-screen SC-006).
@@ -660,7 +660,7 @@ describe("MarksSeriesStep — worklist handoff (US7)", () => {
     seedTonalAlphabet();
     const onComplete = vi.fn();
     act(() => {
-      render(<MarksSeriesStep onComplete={onComplete} />);
+      render(<MarksSeriesStep onComplete={onComplete} />, { withStepNav: true });
     });
     const seen = new Set<string>();
     let sawFoldedOrder = false;
@@ -761,7 +761,7 @@ describe("MarksSeriesStep — S2 treatment station (spec 052 US1)", () => {
       useSurveySessionStore.getState().reset();
       seedMatrixEntry(entry);
       act(() => {
-        render(<MarksSeriesStep onComplete={vi.fn()} />);
+        render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
       });
       const station = reachTreatment();
       expect(station, `${entry.name}: treatment station never rendered`).not.toBeNull();
@@ -779,7 +779,7 @@ describe("MarksSeriesStep — S2 treatment station (spec 052 US1)", () => {
       useSurveySessionStore.getState().reset();
       seedMatrixEntry(entry);
       act(() => {
-        render(<MarksSeriesStep onComplete={vi.fn()} />);
+        render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
       });
       const text = reachTreatment()?.textContent ?? "";
       expect(text, entry.name).not.toMatch(/dead ?key/i);
@@ -794,7 +794,7 @@ describe("MarksSeriesStep — S2 treatment station (spec 052 US1)", () => {
     seedMatrixEntry(SCRIPT_MATRIX[0] ?? { bases: ["a"], marks: [ACUTE] });
     const onComplete = vi.fn();
     act(() => {
-      render(<MarksSeriesStep onComplete={onComplete} />);
+      render(<MarksSeriesStep onComplete={onComplete} />, { withStepNav: true });
     });
     let screens = 0;
     while (onComplete.mock.calls.length === 0 && screens < 10) {
@@ -808,7 +808,7 @@ describe("MarksSeriesStep — S2 treatment station (spec 052 US1)", () => {
     seedAlphabet([ACUTE], ["e"]);
     const onComplete = vi.fn();
     act(() => {
-      render(<MarksSeriesStep onComplete={onComplete} />);
+      render(<MarksSeriesStep onComplete={onComplete} />, { withStepNav: true });
     });
     let screens = 0;
     while (onComplete.mock.calls.length === 0 && screens < 10) {
@@ -821,7 +821,7 @@ describe("MarksSeriesStep — S2 treatment station (spec 052 US1)", () => {
   it("US1 AC5: an empty marks store skips the series entirely", () => {
     const onComplete = vi.fn();
     act(() => {
-      render(<MarksSeriesStep onComplete={onComplete} />);
+      render(<MarksSeriesStep onComplete={onComplete} />, { withStepNav: true });
     });
     expect(screen.queryByTestId("marks-treatment")).toBeNull();
     expect(screen.queryByTestId("marks-series")).toBeNull();
@@ -833,7 +833,7 @@ describe("MarksSeriesStep — S2 treatment station (spec 052 US1)", () => {
     seedAlphabet([ACUTE], ["e"]);
     const onComplete = vi.fn();
     act(() => {
-      render(<MarksSeriesStep onComplete={onComplete} />);
+      render(<MarksSeriesStep onComplete={onComplete} />, { withStepNav: true });
     });
     for (let i = 0; i < 6 && onComplete.mock.calls.length === 0; i++) {
       expect(screen.queryByTestId("marks-treatment")).toBeNull();
@@ -855,7 +855,7 @@ describe("MarksSeriesStep — S2 treatment station (spec 052 US1)", () => {
     seedTonalAlphabetForAxes();
     const onComplete = vi.fn();
     act(() => {
-      render(<MarksSeriesStep onComplete={onComplete} />);
+      render(<MarksSeriesStep onComplete={onComplete} />, { withStepNav: true });
     });
     for (let i = 0; i < 6 && onComplete.mock.calls.length === 0; i++) {
       fireEvent.click(screen.getByTestId("marks-continue"));
@@ -877,7 +877,7 @@ describe("MarksSeriesStep — S2 treatment station (spec 052 US1)", () => {
     // but the AUTHOR stays exactly where they were.
     seedMatrixEntry(SCRIPT_MATRIX[0] ?? { bases: ["a"], marks: [ACUTE] });
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     // Walk past S1 onto the treatment station.
     expect(reachTreatment()).not.toBeNull();
@@ -946,7 +946,7 @@ describe("MarksSeriesStep — S4 open choice (US4)", () => {
   it("renders as an OPEN choice with the recommended option first and previews for both (US4 AC1+AC2)", () => {
     seedComposableProductiveAlphabet();
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     reachStation("marks-output-form");
     const station = screen.getByTestId("marks-output-form");
@@ -966,7 +966,7 @@ describe("MarksSeriesStep — S4 open choice (US4)", () => {
   it("names the own-key marks from S2 as a premise, and keeps the override (row 2)", () => {
     seedComposableProductiveAlphabet();
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     reachStation("marks-output-form");
     const premise = screen.getByTestId("output-form-premise").textContent ?? "";
@@ -982,7 +982,7 @@ describe("MarksSeriesStep — S4 open choice (US4)", () => {
     // a screen that no longer offers the button to undo it.
     seedComposableProductiveAlphabet();
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     reachStation("marks-output-form");
 
@@ -1072,6 +1072,7 @@ describe("MarksSeriesStep — spec 079 persistence (T023, T024, T083)", () => {
       <QuestionRecorderContext.Provider value={recorder}>
         <MarksSeriesStep onComplete={onComplete} />
       </QuestionRecorderContext.Provider>,
+      { withStepNav: true },
     );
     return recorder;
   }
@@ -1079,7 +1080,7 @@ describe("MarksSeriesStep — spec 079 persistence (T023, T024, T083)", () => {
   it("T023: un-ticking attachments, changing treatment/order and stacking survive an unmount/remount with the SAME alphabet, at the same position", () => {
     seedFixture();
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
 
     // S1 — un-tick two attachments.
@@ -1126,7 +1127,7 @@ describe("MarksSeriesStep — spec 079 persistence (T023, T024, T083)", () => {
 
     // Revisit with the SAME alphabet — nothing re-seeds.
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
 
     // Lands back on the stacking station (position unchanged).
@@ -1165,7 +1166,7 @@ describe("MarksSeriesStep — spec 079 persistence (T023, T024, T083)", () => {
   it("T070 (spec 079 US4): after a reload restore (applySurveyAnswerSnapshot before the first mount) the step opens on the saved station with the saved answers", () => {
     seedFixture();
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     const attachmentStation = screen.getByTestId("marks-attachment");
     const firstChecked = within(attachmentStation)
@@ -1186,7 +1187,7 @@ describe("MarksSeriesStep — spec 079 persistence (T023, T024, T083)", () => {
     useSurveyAnswerStore.getState().reset();
     applySurveyAnswerSnapshot(persisted);
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
 
     expect(screen.getByTestId("marks-output-form")).toBeTruthy();
@@ -1276,7 +1277,7 @@ describe("MarksSeriesStep — spec 079 persistence (T023, T024, T083)", () => {
     seedFixture();
     expect(useSurveyAnswerStore.getState().steps["marks"]?.position ?? null).toBeNull();
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
 
     expect(screen.getByTestId("marks-attachment")).toBeTruthy();
@@ -1287,7 +1288,7 @@ describe("MarksSeriesStep — spec 079 persistence (T023, T024, T083)", () => {
     seedFixture();
     useSurveyAnswerStore.getState().setPosition("marks", "marks_no_longer_visible");
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
 
     expect(screen.getByTestId("marks-attachment")).toBeTruthy();
@@ -1297,7 +1298,7 @@ describe("MarksSeriesStep — spec 079 persistence (T023, T024, T083)", () => {
   it("T083: a position parked via setPosition before mount (what jumpToLocation does) lands on that station with its saved answers", () => {
     seedFixture();
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     fireEvent.click(screen.getByTestId("marks-continue")); // -> treatment
     fireEvent.click(screen.getByTestId("treatment-option-above-1-composed"));
@@ -1305,7 +1306,7 @@ describe("MarksSeriesStep — spec 079 persistence (T023, T024, T083)", () => {
 
     useSurveyAnswerStore.getState().setPosition("marks", "marks_treatment");
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
 
     expect(screen.getByTestId("marks-treatment")).toBeTruthy();
@@ -1357,7 +1358,7 @@ describe("MarksSeriesStep — US3 targeted re-proposal (T045, T046, T058, T082)"
   it("adding one base letter flags only that base's attachment answers; everything else stays unflagged (SC-003)", () => {
     seedFullAlphabet(TWO_BASE_ALPHABET);
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     // Confirm the attachment station once, so its screen counts as "already
     // confirmed" (the flag rule's item-4(b) condition) and move to treatment.
@@ -1375,7 +1376,7 @@ describe("MarksSeriesStep — US3 targeted re-proposal (T045, T046, T058, T082)"
       attestedStacks: [...TWO_BASE_ALPHABET.attestedStacks, { base: "b", marks: [ACUTE] }],
     });
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
 
     // Position was saved at "marks_treatment" (or later); the earlier,
@@ -1395,7 +1396,7 @@ describe("MarksSeriesStep — US3 targeted re-proposal (T045, T046, T058, T082)"
   it("explicit input order survives an unrelated evidence change while still applicable (FR-012)", () => {
     seedFullAlphabet(TWO_BASE_ALPHABET);
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     useSurveyAnswerStore.getState().saveAnswer("marks", "marks_treatment.input_order", {
       value: "prefix",
@@ -1421,7 +1422,7 @@ describe("MarksSeriesStep — US3 targeted re-proposal (T045, T046, T058, T082)"
   it("add-then-remove a letter before revisiting shows no flags and the original answers (FR-014)", () => {
     seedFullAlphabet(TWO_BASE_ALPHABET);
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     fireEvent.click(screen.getByTestId("marks-continue"));
     cleanup();
@@ -1434,7 +1435,7 @@ describe("MarksSeriesStep — US3 targeted re-proposal (T045, T046, T058, T082)"
     });
     seedFullAlphabet(TWO_BASE_ALPHABET);
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
 
     expect(screen.queryByTestId("flagged-answers-list")).toBeNull();
@@ -1444,7 +1445,7 @@ describe("MarksSeriesStep — US3 targeted re-proposal (T045, T046, T058, T082)"
   it("a flagged answer shows its catalog reason", () => {
     seedFullAlphabet(TWO_BASE_ALPHABET);
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     fireEvent.click(screen.getByTestId("marks-continue"));
     useSurveyAnswerStore.getState().markScreenRecorded("marks", "marks_attachment", "h1");
@@ -1455,7 +1456,7 @@ describe("MarksSeriesStep — US3 targeted re-proposal (T045, T046, T058, T082)"
       attestedStacks: [...TWO_BASE_ALPHABET.attestedStacks, { base: "b", marks: [ACUTE] }],
     });
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     expect(screen.getByTestId("flagged-answers-list").textContent).toMatch(/you added/i);
   });
@@ -1463,7 +1464,7 @@ describe("MarksSeriesStep — US3 targeted re-proposal (T045, T046, T058, T082)"
   it("confirming a station re-stamps its answers' evidence key, clearing the flag (FR-041)", () => {
     seedFullAlphabet(TWO_BASE_ALPHABET);
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     fireEvent.click(screen.getByTestId("marks-continue")); // confirms attachment
     useSurveyAnswerStore.getState().markScreenRecorded("marks", "marks_attachment", "h1");
@@ -1476,7 +1477,7 @@ describe("MarksSeriesStep — US3 targeted re-proposal (T045, T046, T058, T082)"
     // Jump straight back to the attachment station and confirm it again.
     useSurveyAnswerStore.getState().setPosition("marks", "marks_attachment");
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     expect(screen.getByTestId("marks-attachment")).toBeTruthy();
     fireEvent.click(screen.getByTestId("marks-continue"));
@@ -1484,7 +1485,7 @@ describe("MarksSeriesStep — US3 targeted re-proposal (T045, T046, T058, T082)"
     expect(answer?.stage).toBe("confirmed");
     cleanup();
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     expect(screen.queryByTestId("flagged-answers-list")).toBeNull();
   });
@@ -1493,7 +1494,7 @@ describe("MarksSeriesStep — US3 targeted re-proposal (T045, T046, T058, T082)"
     seedFullAlphabet({ bases: ["e"], marks: [ACUTE], attestedStacks: [{ base: "e", marks: [ACUTE] }], declaredRoles: {} });
     const onComplete = vi.fn();
     act(() => {
-      render(<MarksSeriesStep onComplete={onComplete} />);
+      render(<MarksSeriesStep onComplete={onComplete} />, { withStepNav: true });
     });
     // Walk to completion so every station's answers are saved.
     while (!onComplete.mock.calls.length) {
@@ -1507,7 +1508,7 @@ describe("MarksSeriesStep — US3 targeted re-proposal (T045, T046, T058, T082)"
     seedFullAlphabet({ bases: ["e"], marks: [], attestedStacks: [], declaredRoles: {} });
     const onCompleteAfterRemoval = vi.fn();
     act(() => {
-      render(<MarksSeriesStep onComplete={onCompleteAfterRemoval} />);
+      render(<MarksSeriesStep onComplete={onCompleteAfterRemoval} />, { withStepNav: true });
     });
     expect(onCompleteAfterRemoval).toHaveBeenCalledTimes(1);
     // Answers are KEPT in the store, not cleared.
@@ -1517,7 +1518,7 @@ describe("MarksSeriesStep — US3 targeted re-proposal (T045, T046, T058, T082)"
     // Restore the diacritic: every original answer renders unflagged again.
     seedFullAlphabet({ bases: ["e"], marks: [ACUTE], attestedStacks: [{ base: "e", marks: [ACUTE] }], declaredRoles: {} });
     act(() => {
-      render(<MarksSeriesStep onComplete={vi.fn()} />);
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
     });
     expect(screen.queryByTestId("flagged-answers-list")).toBeNull();
   });

@@ -79,7 +79,7 @@ function back(): void {
 describe("SurveyRunner — Back then forward preserves committed answers", () => {
   it("restores the answer to the question walked back behind, with no seed available", () => {
     // No getSeedValue at all — the post-remount state of the real seeds.
-    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />);
+    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />, { withStepNav: true });
 
     type("alpha");
     next();
@@ -98,7 +98,7 @@ describe("SurveyRunner — Back then forward preserves committed answers", () =>
   });
 
   it("restores answers two questions ahead — the whole tail is kept, not just one entry", () => {
-    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />);
+    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />, { withStepNav: true });
 
     type("alpha");
     next();
@@ -124,7 +124,7 @@ describe("SurveyRunner — Back then forward preserves committed answers", () =>
     const getSeedValue = vi.fn((questionId: string) =>
       questionId === "q3" ? "seeded-for-q3" : undefined,
     );
-    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} getSeedValue={getSeedValue} />);
+    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} getSeedValue={getSeedValue} />, { withStepNav: true });
 
     type("alpha");
     next();
@@ -153,7 +153,7 @@ describe("SurveyRunner — Back then forward preserves committed answers", () =>
 
 describe("SurveyRunner — an unfinished step survives unmount", () => {
   it("remounts on the question the author was on, with every answer restored", () => {
-    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />);
+    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />, { withStepNav: true });
     type("alpha");
     next();
     type("beta");
@@ -164,7 +164,7 @@ describe("SurveyRunner — an unfinished step survives unmount", () => {
     // wizard unmounts the whole step. `resumeAnswers` is NOT supplied — the step
     // never completed, so nothing recorded a phase result for it.
     cleanup();
-    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />);
+    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />, { withStepNav: true });
 
     expect(screen.getByText("Third question")).toBeTruthy();
     back();
@@ -174,9 +174,9 @@ describe("SurveyRunner — an unfinished step survives unmount", () => {
   });
 
   it("still mounts on question 1 when nothing was answered before the unmount", () => {
-    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />);
+    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />, { withStepNav: true });
     cleanup();
-    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />);
+    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />, { withStepNav: true });
     expect(screen.getByText("First question")).toBeTruthy();
   });
 });
@@ -187,7 +187,7 @@ describe("SurveyRunner — an unfinished step survives unmount", () => {
 
 describe("SurveyRunner — publishes its walk", () => {
   it("publishes one stop per visited question, marking answered ones done", () => {
-    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />);
+    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />, { withStepNav: true });
     type("alpha");
     next();
 
@@ -198,21 +198,21 @@ describe("SurveyRunner — publishes its walk", () => {
   });
 
   it("marks the current stop done as soon as it is answered, before Next", () => {
-    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />);
+    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />, { withStepNav: true });
     expect(useStepWalkStore.getState().walks["identity"]?.[0]?.done).toBe(false);
     type("alpha");
     expect(useStepWalkStore.getState().walks["identity"]?.[0]?.done).toBe(true);
   });
 
   it("publishes no label — the question-label precedence has exactly one owner", () => {
-    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />);
+    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />, { withStepNav: true });
     expect(useStepWalkStore.getState().walks["identity"]?.[0]?.label).toBeUndefined();
   });
 
   it("honours a cursor a jump parked before this runner existed", () => {
     // Seed a walk and its answers the way a previous visit would have, then ask
     // for the FIRST question — what activating its footer dot does.
-    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />);
+    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />, { withStepNav: true });
     type("alpha");
     next();
     type("beta");
@@ -220,13 +220,13 @@ describe("SurveyRunner — publishes its walk", () => {
     cleanup();
 
     useSurveyAnswerStore.getState().setPosition("identity", "q1");
-    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />);
+    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />, { withStepNav: true });
     expect(screen.getByText("First question")).toBeTruthy();
     expect(field().value).toBe("alpha");
   });
 
   it("honours a cursor written while already mounted — the same-step jump", () => {
-    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />);
+    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />, { withStepNav: true });
     type("alpha");
     next();
     type("beta");
@@ -246,7 +246,7 @@ describe("SurveyRunner — publishes its walk", () => {
   });
 
   it("ignores a cursor naming a stop this walk does not have", () => {
-    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />);
+    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />, { withStepNav: true });
     useSurveyAnswerStore.getState().setPosition("identity", charToPositionToken("á"));
     expect(screen.getByText("First question")).toBeTruthy();
   });

@@ -40,6 +40,7 @@ import { plural } from "@lingui/core/macro";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { buildProducedSet } from "@keyboard-studio/contracts";
 import type { EditorStepProps } from "../../steps/types.ts";
+import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
@@ -55,7 +56,6 @@ import {
   phaseHeadingFlush,
   mutedParaFlush,
   secondaryButton,
-  primaryButton,
   charChip,
   chipGlyph,
   chipCodepoint,
@@ -201,9 +201,39 @@ const ConvenienceCharsStep: ComponentType<EditorStepProps> = (
     }
   }, [gate, onComplete, onBack, hasSignal, setStatus]);
 
-  if (gate === null || gate.kind === "not-applicable") return null;
-
   const keptCount = candidates.length - unchecked.size;
+
+  // Back / Continue render in the footer (spec 081). Mirrors today's
+  // rendering: Back is published whenever the step itself renders, whatever
+  // `onBack` is (the "only when onBack is defined" fix is T046, not here).
+  usePublishStepNav(
+    gate === null || gate.kind === "not-applicable"
+      ? {}
+      : {
+          back: {
+            label: t({ id: "survey.convenience.backButton", message: "Back" }),
+            onClick: () => onBack?.(),
+            testId: "convenience-back",
+          },
+          forward: {
+            label: unknown
+              ? t({ id: "survey.convenience.unknownEvidence.continueButton", message: "Continue" })
+              : keptCount === 0
+                ? t({ id: "survey.convenience.continueButtonNone", message: "Continue, keeping none" })
+                : t({
+                    id: "survey.convenience.continueButton",
+                    message: plural(keptCount, {
+                      one: "Continue, keeping # letter",
+                      other: "Continue, keeping # letters",
+                    }),
+                  }),
+            onClick: complete,
+            testId: "convenience-continue",
+          },
+        },
+  );
+
+  if (gate === null || gate.kind === "not-applicable") return null;
 
   function saveKept(primary: string, kept: boolean): void {
     saveAnswer("convenience", primary, {
@@ -242,10 +272,6 @@ const ConvenienceCharsStep: ComponentType<EditorStepProps> = (
         fontFamily: FONT, color: TEXT_MAIN, padding: 16, overflow: "auto",
       }}
     >
-      <button type="button" onClick={() => onBack?.()} style={{ alignSelf: "flex-start", ...secondaryButton }}>
-        <Trans id="survey.convenience.backButton">Back</Trans>
-      </button>
-
       <h2 style={{ ...phaseHeadingFlush, color: ACCENT }}>
         {unknown
           ? t({
@@ -335,27 +361,6 @@ const ConvenienceCharsStep: ComponentType<EditorStepProps> = (
           </div>
         </>
       )}
-
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <button
-          type="button"
-          data-testid="convenience-continue"
-          onClick={complete}
-          style={primaryButton(false)}
-        >
-          {unknown
-            ? t({ id: "survey.convenience.unknownEvidence.continueButton", message: "Continue" })
-            : keptCount === 0
-              ? t({ id: "survey.convenience.continueButtonNone", message: "Continue, keeping none" })
-              : t({
-                id: "survey.convenience.continueButton",
-                message: plural(keptCount, {
-                  one: "Continue, keeping # letter",
-                  other: "Continue, keeping # letters",
-                }),
-              })}
-        </button>
-      </div>
     </div>
   );
 };

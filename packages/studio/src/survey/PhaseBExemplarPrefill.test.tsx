@@ -67,7 +67,7 @@ const CONTEXT = { bcp47_tag: "ewo", language_name: "Ewondo" };
 
 function renderPhaseB(): { onComplete: ReturnType<typeof vi.fn> } {
   const onComplete = vi.fn();
-  render(<PhaseB context={CONTEXT} onComplete={onComplete} />);
+  render(<PhaseB context={CONTEXT} onComplete={onComplete} />, { withStepNav: true });
   return { onComplete };
 }
 
