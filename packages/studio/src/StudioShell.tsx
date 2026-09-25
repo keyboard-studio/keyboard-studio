@@ -44,6 +44,7 @@ import { parseLocation } from "./lib/location.ts";
 import { liveResolveContext, setPendingWelcomeLocation } from "./lib/jumpToLocation.ts";
 import { readPaneSplitPct, useViewStateStore } from "./stores/viewStateStore.ts";
 import { useStepWalkStore } from "./stores/stepWalkStore.ts";
+import { useStepNavStore } from "./stores/stepNavStore.ts";
 import { useSurveyAnswerStore } from "./stores/surveyAnswerStore.ts";
 import { useProjectSwitchStore } from "./stores/projectSwitchStore.ts";
 import { useKeyboardArtifact, type OnInstantiateCallback } from "./hooks/useKeyboardArtifact.ts";
@@ -1324,6 +1325,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     // from the previous project's inventory — a cursor is only meaningful
     // against the walk that published it (stores/stepWalkStore.ts).
     useStepWalkStore.getState().reset();
+    // Footer nav buttons belong to the abandoned project's steps (spec 081).
+    useStepNavStore.getState().reset();
     // Saved answers and within-step positions belong to the abandoned project
     // (spec 080 FR-033: one of the only two reset sites).
     useSurveyAnswerStore.getState().reset();

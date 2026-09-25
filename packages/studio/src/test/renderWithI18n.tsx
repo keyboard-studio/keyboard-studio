@@ -21,11 +21,19 @@
 //   import { render } from "<relative path to this file>";
 // Everything else (screen, fireEvent, waitFor, cleanup, act, ...) still
 // comes straight from "@testing-library/react".
+//
+// `withStepNav: true` (spec 081) also renders the footer's nav cluster after
+// `ui`, so a step rendered on its own — with no StepHost around it — still has
+// its Back / forward buttons on screen, under the same test ids they had in the
+// step body. The cluster reads the standalone slot a provider-less step
+// publishes into.
 import type { ReactElement, ReactNode } from "react";
 import { render as rtlRender, type RenderOptions, type RenderResult } from "@testing-library/react";
 import { i18n } from "@lingui/core";
 import { I18nProvider } from "@lingui/react";
 import { messages as enMessages } from "../locales/en/messages.json?lingui";
+import { StepNavCluster } from "../components/StepNavCluster.tsx";
+import { STANDALONE_STEP_ID } from "../stores/stepNavStore.ts";
 
 i18n.load("en", enMessages);
 i18n.activate("en");
@@ -41,8 +49,22 @@ function I18nTestWrapper({ children }: { children?: ReactNode }): ReactElement {
  * pass an explicit `wrapper` to override the default if a test needs a
  * different combination of providers.
  */
-export function render(ui: ReactElement, options?: RenderOptions): RenderResult {
-  return rtlRender(ui, { wrapper: I18nTestWrapper, ...options });
+export function render(
+  ui: ReactElement,
+  options?: RenderOptions & { withStepNav?: boolean },
+): RenderResult {
+  const { withStepNav = false, ...rest } = options ?? {};
+  if (!withStepNav) return rtlRender(ui, { wrapper: I18nTestWrapper, ...rest });
+  const Wrapper = rest.wrapper ?? I18nTestWrapper;
+  function WithStepNav({ children }: { children?: ReactNode }): ReactElement {
+    return (
+      <Wrapper>
+        {children}
+        <StepNavCluster stepId={STANDALONE_STEP_ID} />
+      </Wrapper>
+    );
+  }
+  return rtlRender(ui, { ...rest, wrapper: WithStepNav });
 }
 
 export { i18n };

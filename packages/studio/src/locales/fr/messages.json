@@ -869,6 +869,7 @@
   "footer.dot.question.unanswered.ariaLabel": "{label} — no answer yet",
   "footer.dot.skipped.ariaLabel": "",
   "footer.dot.upcoming.ariaLabel": "{label} — pas encore atteint",
+  "footer.nav.groupLabel": "Navigation entre les étapes",
   "footer.notice.reproposal.body": "{0, plural, one {# question in {steps} will need reconfirming — look for the work-to-do marks below.} other {# questions in {steps} will need reconfirming — look for the work-to-do marks below.}}",
   "footer.project.label": "Projet : {name}",
   "footer.stage.carve": "Sculpter",
