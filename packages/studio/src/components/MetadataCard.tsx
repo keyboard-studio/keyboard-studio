@@ -7,7 +7,7 @@ import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { Badge } from "../ui/index.ts";
 import { BG_CARD, CARD_BORDER, FONT_MONO, SUCCESS_ACCENT, TEXT_MAIN } from "../ui/theme.ts";
-// spec 079 FR-008: one label/tone mapping shared with BaseResolution's cards.
+// spec 080 FR-008: one label/tone mapping shared with BaseResolution's cards.
 import { buildDocLevelLabel, DOC_LEVEL_TONE } from "../lib/docLevelBadge.ts";
 
 // [TEMP] Per-fixture typing hints. Hardcoded until the Pattern schema's
@@ -56,7 +56,7 @@ function Row({ k, v }: { k: string; v: string }) {
 export function MetadataCard({ kb }: { kb: BaseKeyboard }) {
   const { t, i18n } = useLingui();
   const hint = TRY_HINTS[kb.id];
-  // spec 079 FR-008: the classification committed to the working copy at base
+  // spec 080 FR-008: the classification committed to the working copy at base
   // SELECTION (BaseResolution.tsx's confirm handler). Guarded against the
   // store's confirmed base — `kb` here can also be a not-yet-confirmed preview
   // (CompareScreen / PickerPane's "full" variant), and showing a stale

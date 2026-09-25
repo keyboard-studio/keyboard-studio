@@ -1,4 +1,4 @@
-// Tests for historyProposal (spec 079 T039/T041).
+// Tests for historyProposal (spec 080 T039/T041).
 //
 // Coverage:
 //   historyEntryHeading:

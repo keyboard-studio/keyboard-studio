@@ -1,6 +1,6 @@
 /**
  * layout-chart — deterministic SVG layout charts for the welcome folder
- * (spec 079 T049, FR-013/FR-014/FR-015/FR-016, research R1/R2).
+ * (spec 080 T049, FR-013/FR-014/FR-015/FR-016, research R1/R2).
  *
  * `renderLayoutCharts` is a pure projection over contracts types only, one
  * file per (platform, layer) pair present in the model:

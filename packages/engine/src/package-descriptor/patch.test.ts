@@ -327,13 +327,13 @@ describe("applyIdentityToKps — failure names itself rather than throwing (FR-0
 });
 
 // ---------------------------------------------------------------------------
-// spec 079 FR-002 (T012): the welcome-path migration — the one sanctioned
-// <Options>/<Files> write. A pre-076 descriptor (flat `welcome.htm`) is moved to
+// spec 080 FR-002 (T012): the welcome-path migration — the one sanctioned
+// <Options>/<Files> write. A pre-080 descriptor (flat `welcome.htm`) is moved to
 // the folder form; the files the projection ships beside the page are listed;
 // every rewrite is NAMED.
 // ---------------------------------------------------------------------------
 
-/** The pre-076 scaffolder stub: today's generate output with the flat name in both places. */
+/** The pre-080 scaffolder stub: today's generate output with the flat name in both places. */
 function flatWelcomeDescriptor(id = "bm_sil"): string {
   return frenchBaseDescriptor(id).replace(/welcome\\welcome\.htm/g, "welcome.htm");
 }
@@ -342,7 +342,7 @@ function fileNames(kps: string): string[] {
   return [...kps.matchAll(/<Name>([^<]*)<\/Name>\s*<FileType>/g)].map((m) => m[1] ?? "");
 }
 
-describe("applyIdentityToKps — welcome-path migration (spec 079 FR-002)", () => {
+describe("applyIdentityToKps — welcome-path migration (spec 080 FR-002)", () => {
   it("rewrites a flat <WelcomeFile> and <File> to welcome\\welcome.htm and reports both", () => {
     const vfs = vfsWith("source/bm_sil.kps", flatWelcomeDescriptor());
     const result = applyIdentityToKps(vfs, "bm_sil", { displayName: "Bambara", languageTag: "bm" }, KMN);

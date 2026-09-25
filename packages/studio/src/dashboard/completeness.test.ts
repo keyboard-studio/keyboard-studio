@@ -800,12 +800,12 @@ describe("CONTRACT-NAMED: checkInputsSatisfiable(graph) — orphan detection, no
 });
 
 // ---------------------------------------------------------------------------
-// spec 079 FR-018 (T074): REAL Layer C documentation findings — every code on
+// spec 080 FR-018 (T074): REAL Layer C documentation findings — every code on
 // its broken fixture — are advisory. None reaches the blocking predicate, so
 // no lock-reaching prefix is stranded by a documentation gap.
 // ---------------------------------------------------------------------------
 
-describe("spec 079 FR-018 — documentation findings never block shippability", () => {
+describe("spec 080 FR-018 — documentation findings never block shippability", () => {
   it("the whole broken-fixture documentation finding set strands nothing", async () => {
     const { runDocChecks } = await import("@keymanapp/keyboard-lint");
     // A deliberately broken documentation set: HISTORY version disagrees with

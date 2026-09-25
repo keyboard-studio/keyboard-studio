@@ -33,6 +33,9 @@ import { formatClauseList, stageActionLabel } from "./stageText.ts";
 import type { HeadlineDimension } from "./headline.ts";
 import { ACCENT, BORDER, FONT, TEXT_DIM } from "../ui/theme.ts";
 import { useScrollRestoration } from "../hooks/useScrollRestoration.ts";
+import type { StepStatus } from "../steps/answerTypes.ts";
+import { notAskedPassedMessage } from "../survey/notAskedStatusMessage.ts";
+import { manifest } from "../steps/manifest.ts";
 
 export interface DecisionTrailViewProps {
   record: DecisionRecord;
@@ -84,6 +87,17 @@ export interface DecisionTrailViewProps {
   initialShowSuperseded?: boolean;
   /** Called whenever the replaced-decisions toggle changes. */
   onShowSupersededChange?: (show: boolean) => void;
+  /**
+   * Each survey step's current `StepStatus` (spec 079 `surveyAnswerStore`,
+   * FR-068). Optional and additive: a `not-asked` step recorded no decision
+   * entry at all (T055), so `stageGroups.ts` already omits it from
+   * `nonEmptyStageGroups` with nothing to fix there — this prop lets a
+   * caller that DOES want that stage surfaced (e.g. alongside a step that
+   * still has other, answered entries) render its status as "passed —
+   * {reason}" rather than rendering nothing or, worse, inventing an answer
+   * for it. Absent: no behaviour change from before this prop existed.
+   */
+  stepStatuses?: Readonly<Record<string, StepStatus>>;
 }
 
 const containerStyle: React.CSSProperties = {
@@ -152,6 +166,7 @@ export function DecisionTrailView({
   onToggleStage,
   initialShowSuperseded,
   onShowSupersededChange,
+  stepStatuses,
 }: DecisionTrailViewProps) {
   const { t, i18n } = useLingui();
   // FR-015: superseded entries stay in the DOM as history, collapsed by default so
@@ -203,6 +218,46 @@ export function DecisionTrailView({
   // entries.length > 0 (FR-026 keeps that history reachable), so it is NOT
   // dropped here — only a stage truly untouched is.
   const nonEmptyStageGroups = stageGroups.filter((group) => group.entries.length > 0);
+
+  // spec 079 FR-068 (T065): a `not-asked` step usually records NO decision
+  // entry at all (T055 — Convenience letters completes without one), so it
+  // never earns a `StageGroup` and `nonEmptyStageGroups` above would omit it
+  // entirely — the trail would say nothing about it rather than "passed —
+  // {reason}". Steps that DO still have other recorded entries are handled by
+  // `notAskedNoticeFor` below (appended to their existing group); a step with
+  // NONE gets its own entries-free row here instead of silently vanishing.
+  const groupStepIds = useMemo(() => new Set(nonEmptyStageGroups.map((g) => g.stepId)), [nonEmptyStageGroups]);
+  const notAskedOnlySteps = useMemo(() => {
+    if (stepStatuses === undefined) return [];
+    return Object.entries(stepStatuses)
+      .filter((entry): entry is [string, Extract<StepStatus, { kind: "not-asked" }>] => {
+        const [stepId, status] = entry;
+        return status.kind === "not-asked" && !groupStepIds.has(stepId);
+      })
+      .map(([stepId, status]) => ({ stepId, status }));
+  }, [stepStatuses, groupStepIds]);
+
+  // One list. FR-022's ordering (stageGroups.ts's own walked/first-appearance
+  // order, including FR-024's "an unknown stepId sorts ahead of every
+  // manifest stage") governs the ORDINARY stage groups and is NOT
+  // re-derived or re-sorted here. `not-asked`-only rows have no entries at
+  // all, so they carry no walked position of their own — they are appended
+  // AFTER every stage group, in manifest order among themselves, rather than
+  // spliced into a sequence whose ordering rule is deliberately not this
+  // component's to reinvent.
+  type DisplayItem =
+    | { kind: "group"; group: StageGroup }
+    | { kind: "notAsked"; stepId: string; status: Extract<StepStatus, { kind: "not-asked" }> };
+  const manifestOrder = useMemo(() => new Map(manifest.map((s, i) => [s.id, i])), []);
+  const displayItems = useMemo<DisplayItem[]>(() => {
+    const sortedNotAsked = [...notAskedOnlySteps].sort(
+      (a, b) => (manifestOrder.get(a.stepId) ?? 0) - (manifestOrder.get(b.stepId) ?? 0),
+    );
+    return [
+      ...nonEmptyStageGroups.map((group): DisplayItem => ({ kind: "group", group })),
+      ...sortedNotAsked.map(({ stepId, status }): DisplayItem => ({ kind: "notAsked", stepId, status })),
+    ];
+  }, [nonEmptyStageGroups, notAskedOnlySteps, manifestOrder]);
 
   // The editor stage a roll-up's `actionType` names (FR-008/FR-010) — the SAME
   // function DecisionEntryRow uses for entry headlines (stageText.ts), not a
@@ -324,6 +379,15 @@ export function DecisionTrailView({
   // `EditorActionType` and the non-editor stepId are closed catalogs), and
   // keeps the visible text ("Show/Hide decisions") as a leading substring of
   // the accessible name (WCAG 2.5.3 Label in Name).
+  // FR-068: a `not-asked` step reads as PASSED, never as an answer — the ONE
+  // place this trail turns a `StepStatus` into text, via the shared
+  // `notAskedStatusMessage.ts` mapping so the wording can never diverge from
+  // the journey strip's own use of it (decisions/progressDots.ts).
+  const notAskedNoticeFor = (group: StageGroup): string | null => {
+    const status = stepStatuses?.[group.stepId];
+    return status?.kind === "not-asked" ? notAskedPassedMessage(status.reason, i18n) : null;
+  };
+
   const stageToggleAriaLabel = (group: StageGroup, expanded: boolean): string => {
     const stage = groupStageName(group);
     return expanded
@@ -432,7 +496,7 @@ export function DecisionTrailView({
         </p>
       )}
 
-      {record.entries.length === 0 ? (
+      {displayItems.length === 0 ? (
         <div data-testid="decision-trail-empty">
           <h3 style={{ margin: "0 0 4px", fontSize: 14 }}>
             <Trans id="trail.empty.title">No decisions recorded yet</Trans>
@@ -466,7 +530,27 @@ export function DecisionTrailView({
               than filtered when the toggle is off — see DecisionEntryRow's
               `hidden` prop for why. */}
           <ul style={listStyle}>
-            {nonEmptyStageGroups.map((group) => {
+            {displayItems.map((item) => {
+              if (item.kind === "notAsked") {
+                // FR-068: no decisions were recorded here at all — a passed
+                // statement, never an expandable stage (there is nothing to
+                // expand into).
+                return (
+                  <li
+                    key={item.stepId}
+                    style={stageGroupStyle}
+                    data-testid="decision-stage-not-asked-only"
+                    data-step-id={item.stepId}
+                  >
+                    <span data-testid="decision-stage-summary">
+                      {stepStageLabel(item.stepId)}
+                      {" — "}
+                      {notAskedPassedMessage(item.status.reason, i18n)}
+                    </span>
+                  </li>
+                );
+              }
+              const group = item.group;
               const expanded = !collapsedSteps.has(group.stepId);
               // Derived from the manifest stepId (unique per group), never
               // rendered as text — an `id` attribute is not author-facing
@@ -483,6 +567,12 @@ export function DecisionTrailView({
                   <div style={stageHeaderStyle}>
                     <span style={{ flex: 1, minWidth: 0 }} data-testid="decision-stage-summary">
                       {stageRollUpText(group)}
+                      {notAskedNoticeFor(group) !== null && (
+                        <span data-testid="decision-stage-not-asked" style={{ color: TEXT_DIM }}>
+                          {" — "}
+                          {notAskedNoticeFor(group)}
+                        </span>
+                      )}
                     </span>
                     <button
                       type="button"

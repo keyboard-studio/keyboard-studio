@@ -177,7 +177,7 @@ export async function lintWithContext(
     findings.push(...checkContextTolerance(ctx.keyboardIR, ctx.toleranceReport));
   }
 
-  // spec 079 US7/FR-019: the twelve documentation checks — only when the
+  // spec 080 US7/FR-019: the twelve documentation checks — only when the
   // studio has assembled a DocLintInput (same absent -> silently skipped
   // gating shape as every optional input above).
   if (ctx.docLintInput) {

@@ -1,4 +1,4 @@
-# Contract: Documentation Layer C checks (spec 079, US7 / FR-019)
+# Contract: Documentation Layer C checks (spec 080, US7 / FR-019)
 
 Thirteen criteria rows (thirteen codes) land as pure check functions in twelve modules in
 `packages/keyboard-lint/src/checks/docs/`, input `DocLintInput`

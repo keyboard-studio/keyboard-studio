@@ -1,4 +1,4 @@
-// Per-question module: pf_history_entry_bullets (Phase F, spec 079 US5 / T043)
+// Per-question module: pf_history_entry_bullets (Phase F, spec 080 US5 / T043)
 //
 // Edit-branch companion to pf_history_entry: reached only when the author
 // chooses "edit" on the HISTORY proposal. Free-text bullet editing, one
@@ -40,6 +40,6 @@ const mod: QuestionModule = {
   fixtures,
   inputs: [],
   writes: [],
-  specRef: "specs/079-documentation-completeness",
+  specRef: "specs/080-documentation-completeness",
 };
 export default mod;

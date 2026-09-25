@@ -43,7 +43,7 @@ const BASES: BaseKeyboard[] = [basicKbdus, silEuroLatin];
 
 vi.mock("../../lib/services.ts", () => ({
   getBaseBrowserService: () => ({ listAll: () => Promise.resolve(BASES) }),
-  // spec 079 FR-008: BaseResolution's doc-profile hook calls this on every
+  // spec 080 FR-008: BaseResolution's doc-profile hook calls this on every
   // preview; default every base to "unknown" (no badge) — this file's
   // coverage is the preview/commit wiring, not the classification badge
   // itself (see BaseResolution.test.tsx for that).

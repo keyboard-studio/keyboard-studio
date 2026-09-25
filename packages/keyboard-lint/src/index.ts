@@ -29,7 +29,7 @@ export {
 export { resolveJoinedCheckInputs } from "./checks/_shared.js";
 export type { JoinedCheckInputs } from "./checks/_shared.js";
 
-// spec 079 US7/FR-019 — the twelve documentation check modules (thirteen
+// spec 080 US7/FR-019 — the twelve documentation check modules (thirteen
 // codes; 3.6/7.1 share one module) and their shared helpers.
 export { checkHistoryOrder } from "./checks/docs/check-3-3-history-order.js";
 export { checkHistoryCumulative } from "./checks/docs/check-3-4-history-cumulative.js";

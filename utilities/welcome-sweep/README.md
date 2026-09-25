@@ -1,8 +1,8 @@
 # welcome-sweep
 
-The offline corpus sweep behind spec 079's **SC-002**: every folder-convention base in
+The offline corpus sweep behind spec 080's **SC-002**: every folder-convention base in
 the `keymanapp/keyboards` corpus preserves its welcome page and 100 % of its welcome
-images through adaptation ([specs/079-documentation-completeness](../../specs/079-documentation-completeness/spec.md),
+images through adaptation ([specs/080-documentation-completeness](../../specs/080-documentation-completeness/spec.md),
 research R13).
 
 It runs the **real** engine code — the loader's welcome resolution

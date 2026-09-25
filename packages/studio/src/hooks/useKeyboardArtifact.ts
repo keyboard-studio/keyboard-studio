@@ -30,7 +30,7 @@ interface EngineModule {
     stylesheets?: KpsStylesheetEntry[];
     baseWelcomeHtmText?: string;
     baseHelpPhpText?: string;
-    // spec 079 US2 — the base documentation bundle (data-model §6).
+    // spec 080 US2 — the base documentation bundle (data-model §6).
     baseReadmeMdText?: string;
     baseHistoryMdText?: string;
     baseWelcomeImages?: WelcomeFolderImage[];
@@ -726,7 +726,7 @@ export function useKeyboardArtifact(
         // same holders. It completes a missing LICENSE.md, and the loader never
         // writes the base's into the VFS, so this is its only source.
         wc.setBaseLicenseText(result.baseLicenseText ?? null);
-        // spec 079 R9 / FR-007: a Track 1 copy inherits the base's welcome
+        // spec 080 R9 / FR-007: a Track 1 copy inherits the base's welcome
         // IMAGES (carried into its own welcome folder) and nothing of its
         // prose. The prose slices are cleared explicitly rather than assumed
         // null — instantiateFromBase does not touch them, so a prior adapt
@@ -737,7 +737,7 @@ export function useKeyboardArtifact(
         wc.setBaseHelpPhpText(null);
         wc.setBaseReadmeMdText(null);
         wc.setBaseHistoryMdText(null);
-        // spec 079 FR-020: a copy inherits no prose, so nothing can be an
+        // spec 080 FR-020: a copy inherits no prose, so nothing can be an
         // upstream finding — an EMPTY baseline (computed), not null (pending).
         wc.setBaselineDocFindings([]);
         vfsRef.current = result.vfs;
@@ -766,14 +766,14 @@ export function useKeyboardArtifact(
         const wc = useWorkingCopyStore.getState();
         wc.setBaseWelcomeHtmText(fetchResult.baseWelcomeHtmText ?? null);
         wc.setBaseHelpPhpText(fetchResult.baseHelpPhpText ?? null);
-        // spec 079 FR-006: the rest of the base's documentation bundle — README
+        // spec 080 FR-006: the rest of the base's documentation bundle — README
         // and HISTORY prose (adapt track only, FR-007) plus the welcome-folder
         // images and which convention the base used (data-model §6).
         wc.setBaseReadmeMdText(fetchResult.baseReadmeMdText ?? null);
         wc.setBaseHistoryMdText(fetchResult.baseHistoryMdText ?? null);
         wc.setBaseWelcomeImages(fetchResult.baseWelcomeImages ?? null);
         wc.setBaseWelcomeConvention(fetchResult.baseWelcomeConvention ?? null);
-        // spec 079 FR-020 (research R8): run the documentation checks ONCE
+        // spec 080 FR-020 (research R8): run the documentation checks ONCE
         // over the base's own files as fetched. A later finding on a still-
         // inherited member whose code appears here is the base's, not the
         // author's, and renders muted instead of counting against them.

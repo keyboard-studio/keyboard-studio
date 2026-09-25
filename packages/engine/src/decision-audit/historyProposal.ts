@@ -1,5 +1,5 @@
 // historyProposal — builds the proposed first HISTORY.md entry from the
-// recorded changes to the working copy (spec 079 FR-010, research R6).
+// recorded changes to the working copy (spec 080 FR-010, research R6).
 //
 // Pure: no VFS, no store reads, no Date usage — the caller injects `dateIso`
 // (R12 determinism, matching `generateStubs(emitYear)` /

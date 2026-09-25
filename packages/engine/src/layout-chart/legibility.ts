@@ -1,6 +1,6 @@
 /**
  * legibility — per-key rendering classification for the layout chart
- * (spec 079 T048, FR-016, research R2).
+ * (spec 080 T048, FR-016, research R2).
  *
  * SVG text rendering falls to the viewer's own fonts, so "no available glyph"
  * cannot be answered exactly without a font-coverage database. This module

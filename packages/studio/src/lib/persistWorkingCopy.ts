@@ -117,6 +117,7 @@ export type WorkingCopySnapshot = Omit<
   | "keyEditOverlay"
   | "touchEditorMode"
   | "baseWelcomeImages"
+  | "phaseAnswersByStep"
 > & {
   baseVfsEntries: SerializedEntry[];
   deletedNodeIds: string[];
@@ -124,9 +125,9 @@ export type WorkingCopySnapshot = Omit<
   deletedTouchKeyIds: string[];
   staleSteps: string[];
   /**
-   * Optional (spec 079 US2): the base's welcome-folder images, Base64-encoded
+   * Optional (spec 080 US2): the base's welcome-folder images, Base64-encoded
    * through the same `serializeEntry` path as binary VFS entries. Absent from
-   * a pre-076 snapshot, and ALSO absent when the images exceed
+   * a pre-080 snapshot, and ALSO absent when the images exceed
    * {@link BASE_WELCOME_IMAGES_BUDGET_BYTES} — the durable draft shares one
    * localStorage quota with the base VFS, and a multi-megabyte image set would
    * evict the whole draft rather than persist. Absent restores as `null`, and
@@ -148,6 +149,13 @@ export type WorkingCopySnapshot = Omit<
   keyEditOverlay?: KeyEditOverlay;
   /** Optional for the same reason as `keyEditOverlay` above — see its comment. */
   touchEditorMode?: TouchEditorMode;
+  /**
+   * Optional (spec 079 D-4): which step recorded which phase answers. A
+   * snapshot written before this field existed has none, and the store then
+   * adopts each phase's stored `answers` under the `"legacy"` owner rather
+   * than inventing an attribution.
+   */
+  phaseAnswersByStep?: WorkingCopyData["phaseAnswersByStep"];
 };
 
 export function serializeEntry(entry: VirtualFSEntry): SerializedEntry {
@@ -190,7 +198,7 @@ export function deserializeEntry(raw: SerializedEntry): VirtualFSEntry {
 }
 
 /**
- * Size budget for persisting the base's welcome-folder images (spec 079 US2,
+ * Size budget for persisting the base's welcome-folder images (spec 080 US2,
  * contracts/studio-surfaces.md store table). Raw byte total, before Base64
  * (which inflates by a third). Corpus welcome folders are typically a few
  * hundred KB of PNG screenshots; 2 MB keeps the draft comfortably inside the
@@ -291,7 +299,7 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     helpDocs: s.helpDocs,
     baseWelcomeHtmText: s.baseWelcomeHtmText,
     baseHelpPhpText: s.baseHelpPhpText,
-    // spec 079 US2: plain strings / a string literal, straight passthrough; the
+    // spec 080 US2: plain strings / a string literal, straight passthrough; the
     // images go through the Base64 path (budgeted — see WorkingCopySnapshot).
     baseReadmeMdText: s.baseReadmeMdText,
     baseHistoryMdText: s.baseHistoryMdText,
@@ -302,7 +310,7 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     baseWelcomeImagesDropped:
       s.baseWelcomeImagesDropped ||
       (s.baseWelcomeImages !== null && s.baseWelcomeImages.length > 0 && baseWelcomeImages === undefined),
-    // spec 079 US3/US5/US6: plain JSON documentation decisions, straight passthrough.
+    // spec 080 US3/US5/US6: plain JSON documentation decisions, straight passthrough.
     historyEntryState: s.historyEntryState,
     chartPreference: s.chartPreference,
     baseDocProfile: s.baseDocProfile,
@@ -328,6 +336,7 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     // key at all (R10.3).
     keyEditOverlay: s.keyEditOverlay,
     touchEditorMode: s.touchEditorMode,
+    phaseAnswersByStep: s.phaseAnswersByStep,
   };
 }
 
@@ -371,7 +380,7 @@ export function prepareWorkingCopySnapshot(snapshot: WorkingCopySnapshot): Parti
     helpDocs: snapshot.helpDocs ?? null,
     baseWelcomeHtmText: snapshot.baseWelcomeHtmText ?? null,
     baseHelpPhpText: snapshot.baseHelpPhpText ?? null,
-    // Tolerate pre-076 snapshots the same way: absent restores as null.
+    // Tolerate pre-080 snapshots the same way: absent restores as null.
     baseReadmeMdText: snapshot.baseReadmeMdText ?? null,
     baseHistoryMdText: snapshot.baseHistoryMdText ?? null,
     baseWelcomeConvention: snapshot.baseWelcomeConvention ?? null,
@@ -408,6 +417,10 @@ export function prepareWorkingCopySnapshot(snapshot: WorkingCopySnapshot): Parti
     // undefined — same idiom as deletedTouchKeyIds/sequenceFlaggedChars above.
     keyEditOverlay: snapshot.keyEditOverlay ?? { ops: [] },
     touchEditorMode: snapshot.touchEditorMode ?? "character",
+    // spec 079 D-4: absent on a pre-079 snapshot. `{}` is safe — the store
+    // adopts each phase's stored answers under "legacy" when the sidecar does
+    // not describe them.
+    phaseAnswersByStep: snapshot.phaseAnswersByStep ?? {},
   };
 }
 

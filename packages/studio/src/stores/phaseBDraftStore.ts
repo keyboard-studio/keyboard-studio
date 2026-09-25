@@ -182,6 +182,17 @@ export interface PhaseBDraftState {
   seededProposals: string[];
 
   /**
+   * The evidence key (steps/evidence.ts `alphabetKey`: `bcp47|script|variant|
+   * baseId`) the current alphabet was built from (spec 079 R-07). STICKY:
+   * stamped when the alphabet is first built, kept by `reset()`, cleared only
+   * by `resetPhaseBDraftDecisions()`. The characters prefill confirm compares it
+   * with the current key, so passing through an unchanged prefill never clears
+   * the alphabet (FR-020); a different key is a real shape change. Absent until
+   * the first build, and in drafts saved before spec 079.
+   */
+  alphabetEvidenceKey?: string | undefined;
+
+  /**
    * The author's decisions about invisible (format) characters, keyed by
    * `U+XXXX` notation (spec 075 FR-013/FR-018). STICKY. `"accepted"` characters
    * reach the phase-C confirmed inventory through `phaseCConfirmedInventory()`
@@ -274,6 +285,9 @@ export interface PhaseBDraftState {
    * rejection — `rejected` is untouched. Idempotent.
    */
   adoptControlsAsInvisibles: () => void;
+
+  /** Stamp the evidence key the alphabet is built from (spec 079 R-07). */
+  setAlphabetEvidenceKey: (key: string) => void;
 
   /** Clear back to an empty alphabet (font selection is left untouched). */
   reset: () => void;
@@ -558,6 +572,8 @@ export const usePhaseBDraftStore = create<PhaseBDraftState>((set, get) => ({
     for (const ch of chars) addWithProvenance(set, get, ch, source);
   },
 
+  setAlphabetEvidenceKey: (key) => set({ alphabetEvidenceKey: key }),
+
   acceptInvisible: (notation) => {
     const key = normalizeNotation(notation);
     if (key === null) return;
@@ -603,8 +619,9 @@ export const usePhaseBDraftStore = create<PhaseBDraftState>((set, get) => ({
       provenance: {},
       exemplarDigraphs: [],
       proposalConfidence: {},
-      // `rejected`, `exemplarMethodDeclined`, `seededProposals` and
-      // `invisibleDecisions` deliberately SURVIVE a reset: each records a
+      // `rejected`, `exemplarMethodDeclined`, `seededProposals`,
+      // `invisibleDecisions` and `alphabetEvidenceKey` deliberately SURVIVE a
+      // reset: each records a
       // decision the author made about proposals, and reset() runs on every
       // entry to the build-list screen. Clearing them would re-propose
       // characters the author already removed, re-assert an offer they already
@@ -672,7 +689,7 @@ function normalizeNotation(notation: string): string | null {
 
 /**
  * Clear the sticky proposal decisions (`rejected`, `exemplarMethodDeclined`,
- * `seededProposals`, `invisibleDecisions`).
+ * `seededProposals`, `invisibleDecisions`, `alphabetEvidenceKey`).
  *
  * Those are per-working-copy, not per-visit: `reset()` runs every time the
  * build-list screen is entered and must not undo them. Call this when a genuinely
@@ -684,6 +701,7 @@ export function resetPhaseBDraftDecisions(): void {
     exemplarMethodDeclined: false,
     seededProposals: [],
     invisibleDecisions: {},
+    alphabetEvidenceKey: undefined,
   });
 }
 
@@ -730,6 +748,8 @@ export interface PhaseBDraftSnapshot {
   seededProposals?: string[];
   /** Invisible-character decisions keyed by `U+XXXX` (spec 075). Absent in pre-075 snapshots. */
   invisibleDecisions?: Record<string, InvisibleDecision>;
+  /** The evidence key the alphabet was built from (spec 079). Absent in pre-079 snapshots. */
+  alphabetEvidenceKey?: string | undefined;
   selectedFont: PhaseBFontValue;
 }
 
@@ -746,6 +766,7 @@ export function snapshotPhaseBDraft(): PhaseBDraftSnapshot {
     exemplarMethodDeclined: s.exemplarMethodDeclined,
     seededProposals: s.seededProposals,
     invisibleDecisions: s.invisibleDecisions,
+    ...(s.alphabetEvidenceKey !== undefined ? { alphabetEvidenceKey: s.alphabetEvidenceKey } : {}),
     selectedFont: s.selectedFont,
   };
 }
@@ -771,6 +792,7 @@ export function applyPhaseBDraftSnapshot(snapshot: PhaseBDraftSnapshot): void {
     exemplarMethodDeclined: snapshot.exemplarMethodDeclined ?? false,
     seededProposals: snapshot.seededProposals ?? [],
     invisibleDecisions: snapshot.invisibleDecisions ?? {},
+    alphabetEvidenceKey: snapshot.alphabetEvidenceKey,
   });
   usePhaseBDraftStore.getState().setAll(snapshot.chars);
   usePhaseBDraftStore.getState().setSelectedFont(snapshot.selectedFont);

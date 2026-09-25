@@ -408,7 +408,7 @@ wired into `pnpm lint`.
 
 ### welcome-sweep
 
-[Spec 079](../specs/079-documentation-completeness/)'s offline SC-002 sweep
+[Spec 080](../specs/080-documentation-completeness/)'s offline SC-002 sweep
 ([utilities/welcome-sweep/README.md](../utilities/welcome-sweep/README.md)). Walks every
 folder-convention base (`release/<x>/<id>/source/welcome/`) in the sibling `../keyboards`
 checkout, runs the real loader welcome resolution and the real descriptor writer against it

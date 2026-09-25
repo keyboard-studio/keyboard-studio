@@ -102,7 +102,7 @@ export function stageAdaptHistory(
   bumpedVersion: string,
   dateIso: string,
 ): void {
-  // spec 079 US5: the entry text is no longer composed here — renderHistoryMd
+  // spec 080 US5: the entry text is no longer composed here — renderHistoryMd
   // is the ONE HISTORY.md composer (a null entry renders exactly the
   // attribution stub this function always wrote), so the two can never drift.
   const existing = vfs.get("HISTORY.md");

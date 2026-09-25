@@ -148,7 +148,7 @@ export interface ScaffoldResult {
    */
   baseLicenseText?: string;
   /**
-   * The base's `source/welcome/` image files, verbatim (spec 079 FR-006,
+   * The base's `source/welcome/` image files, verbatim (spec 080 FR-006,
    * research R9). Surfaced so a Track 1 copy can carry the images — and only
    * the images — into its own welcome folder: the base's PROSE (welcome/help
    * text) is deliberately NOT surfaced here, because a copy with a new

@@ -442,7 +442,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     await completePhaseB(page);
     await finishGalleryWork(page);
     await navigateToOutput(page);
-    // spec 079 FR-017: the documentation checklist is present on Output — six
+    // spec 080 FR-017: the documentation checklist is present on Output — six
     // rows, informational (the download below still proceeds with rows on
     // placeholder, FR-018).
     const checklist = page.getByTestId("documentation-checklist");
@@ -496,7 +496,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
     expect(kvks, "zip must contain a .kvks visual keyboard file").toBeDefined();
     expect(kvks![1].length, ".kvks must be non-empty").toBeGreaterThan(0);
 
-    // spec 079 FR-001/FR-002: all six documentation members ship, the welcome
+    // spec 080 FR-001/FR-002: all six documentation members ship, the welcome
     // page under the folder convention and nowhere else.
     const zipPaths = entries.map(([name]) => name.replace(/\\/g, "/"));
     const has = (suffix: string) => zipPaths.find((p) => p.endsWith(suffix));
@@ -506,7 +506,7 @@ test.describe("Track 1 (copy-edit) E2E", () => {
       expect(entries.find(([n]) => n.replace(/\\/g, "/") === found)![1].length, `${member} must be non-empty`).toBeGreaterThan(0);
     }
     expect(zipPaths.some((p) => /(^|\/)source\/welcome\.htm$/.test(p)), "no flat source/welcome.htm").toBe(false);
-    // spec 079 FR-003: the fresh help page opens with the standard help-site header.
+    // spec 080 FR-003: the fresh help page opens with the standard help-site header.
     const help = entries.find(([name]) => /source[\\/]help[\\/][^\\/]+\.php$/.test(name));
     expect(help, "zip must contain source/help/<id>.php").toBeDefined();
     const helpText = new TextDecoder().decode(help![1]);
@@ -768,10 +768,20 @@ test.describe("spec 034 US3 (T028): durable draft survives reload, Back stays co
     // that still assumed the pre-marks spine — at a call site that diagnosis
     // did not reach, not a spec 057 regression: the walk arrives on
     // "Accents & marks" exactly as the spine says it should.
+    //
+    // Spec 080 persists the within-step marks cursor, so after the forward
+    // `driveMarksSeries` the restored position is the LAST station. One Back
+    // therefore steps to the previous station rather than leaving the step —
+    // keep clicking Back while the marks heading is up (same 6-station
+    // budget as `driveMarksSeries`) until the step exits onto Phase B.
     await expect(page.getByRole("heading", { name: /Accents & marks/i })).toBeVisible({
       timeout: 20_000,
     });
-    await page.getByRole("button", { name: "Back", exact: true }).click();
+    for (let i = 0; i < 6; i++) {
+      const marksHeading = page.getByRole("heading", { name: /Accents & marks/i });
+      if (!(await marksHeading.isVisible().catch(() => false))) break;
+      await page.getByRole("button", { name: "Back", exact: true }).click();
+    }
 
     await page.waitForSelector('[aria-label="Character to add"]', { timeout: 20_000 });
     await page.fill('[aria-label="Character to add"]', FIXTURE.charToAdd);

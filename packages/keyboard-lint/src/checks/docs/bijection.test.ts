@@ -1,8 +1,8 @@
-// SC-007 bijection test (spec 079 contracts/lint-checks.md): every FR-019
+// SC-007 bijection test (spec 080 contracts/lint-checks.md): every FR-019
 // `lintRuleId` in criteria.json must be emitted by the registered documentation
 // checks on its own broken fixture, and by none of them on the shared clean
 // fixture. Closes the "nothing enforces code<->criterion" gap the research
-// notes call out (spec 079 research R7).
+// notes call out (spec 080 research R7).
 
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
@@ -49,7 +49,7 @@ function loadFr019LintRuleIds(): string[] {
   });
 }
 
-describe("documentation check bijection (spec 079 SC-007 / FR-019)", () => {
+describe("documentation check bijection (spec 080 SC-007 / FR-019)", () => {
   const lintRuleIds = loadFr019LintRuleIds();
 
   it("criteria.json carries exactly the thirteen FR-019 rows this test knows about", () => {

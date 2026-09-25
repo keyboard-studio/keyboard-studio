@@ -693,7 +693,7 @@
     },
     "specs/053-decision-audit": {
       "title": "Feature Specification: Per-keyboard decision audit (CYOA Phase 1 — record and review)",
-      "hash": "sha256:beb0740daabeff6c",
+      "hash": "sha256:ecb802963d7f9e16",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -733,7 +733,7 @@
     },
     "specs/057-bulletproof-navigation": {
       "title": "Feature Specification: Bulletproof navigation — return where you were, compare without consequence, and jump back to any decision",
-      "hash": "sha256:d88aceb7bf36cac7",
+      "hash": "sha256:35a2db3e19f18799",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],
@@ -859,7 +859,15 @@
       "decisions": [],
       "notes": ""
     },
-    "specs/079-documentation-completeness": {
+    "specs/079-survey-answer-persistence": {
+      "title": "Feature Specification: Survey answers persist per question — navigation never undoes a decision",
+      "hash": "sha256:42def115042e801e",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/080-documentation-completeness": {
       "title": "Feature Specification: Documentation completeness — every package ships its full documentation set",
       "hash": "sha256:f6fd6d97d6da3009",
       "status": "unreviewed",

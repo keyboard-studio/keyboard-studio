@@ -1,4 +1,4 @@
-// Tests for pf_history_entry (spec 079 T043/T045, contracts/studio-surfaces.md §3).
+// Tests for pf_history_entry (spec 080 T043/T045, contracts/studio-surfaces.md §3).
 //
 // Coverage:
 //   - module shape (definition/id/routing, inputs/writes)
@@ -52,7 +52,7 @@ describe("pf_history_entry — module shape", () => {
   it("declares no IR reads/writes (store-slice pattern, spec 061 precedent)", () => {
     expect(mod.inputs).toEqual([]);
     expect(mod.writes).toEqual([]);
-    expect(mod.specRef).toBe("specs/079-documentation-completeness");
+    expect(mod.specRef).toBe("specs/080-documentation-completeness");
   });
 
   it("the bullets companion routes straight to the opt-in gate", () => {

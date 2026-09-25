@@ -709,7 +709,7 @@ export function OutputScreen() {
                 </button>
               </div>
             )}
-            {/* spec 079 FR-017: what documentation ships and where each file's
+            {/* spec 080 FR-017: what documentation ships and where each file's
                 content came from. Informational only — reads state, gates
                 nothing (FR-018); placeholder rows link back to the step that
                 fills them. */}

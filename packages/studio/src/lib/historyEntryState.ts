@@ -1,4 +1,4 @@
-// historyEntryState — the HISTORY proposal's state machine (spec 079 US5,
+// historyEntryState — the HISTORY proposal's state machine (spec 080 US5,
 // FR-010..FR-012): build or re-derive the stored `HistoryEntryState` for the
 // current version, and apply the author's confirm / edit / dismiss answer.
 //

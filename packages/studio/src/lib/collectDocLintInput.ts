@@ -1,5 +1,5 @@
 // collectDocLintInput — assemble the Layer C documentation checks' input from
-// the working copy (spec 079 US7 / FR-019, research R7) and compute the base's
+// the working copy (spec 080 US7 / FR-019, research R7) and compute the base's
 // own baseline findings for the upstream classifier (FR-020, research R8).
 //
 // Pure functions over plain data: the rendered member texts (the SAME

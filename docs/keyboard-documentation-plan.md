@@ -11,7 +11,7 @@ authoring *plan*; criteria.md is the review *checklist* the result gets held to.
 **Every produced package ships all six documentation members** — `README.md`, `HISTORY.md`,
 `LICENSE.md`, `source/readme.htm`, `source/welcome/welcome.htm`, and `source/help/<id>.php` —
 regardless of base or how far the author got
-([specs/079-documentation-completeness](../specs/079-documentation-completeness/spec.md) FR-001).
+([specs/080-documentation-completeness](../specs/080-documentation-completeness/spec.md) FR-001).
 `projectWorkingCopyForOutput` regenerates them on every production
 ([packages/engine/src/shared/helpDocsRender.ts](../packages/engine/src/shared/helpDocsRender.ts),
 [renderHistoryMd.ts](../packages/engine/src/shared/renderHistoryMd.ts)), via the SAME render

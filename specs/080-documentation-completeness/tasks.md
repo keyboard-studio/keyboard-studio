@@ -1,6 +1,6 @@
 # Tasks: Documentation completeness — every package ships its full documentation set
 
-**Input**: Design documents from `specs/079-documentation-completeness/`
+**Input**: Design documents from `specs/080-documentation-completeness/`
 
 **Prerequisites**: [plan.md](plan.md), [spec.md](spec.md), [research.md](research.md),
 [data-model.md](data-model.md), [contracts/](contracts/), [quickstart.md](quickstart.md)
@@ -12,8 +12,8 @@ convention; they are written alongside implementation, not TDD-first.
 
 **Organization**: One phase per user story in spec priority order (P1 → P7). Each phase lands
 independently with green gates (`pnpm typecheck && pnpm lint` plus the touched packages'
-`vitest`) and one commit on branch `079-documentation-completeness`
-(`feat(engine|studio|…): … spec 079 TNNN-TNNN`). Push to the feature branch after each green
+`vitest`) and one commit on branch `080-documentation-completeness`
+(`feat(engine|studio|…): … spec 080 TNNN-TNNN`). Push to the feature branch after each green
 phase; never merge unasked.
 
 **Team ownership** (Constitution Article VI): the engine team owns every task below **except**
@@ -73,7 +73,7 @@ header above the placeholder body.
 - [X] T008 [US1] Extend `packages/studio/src/lib/serializeWorkingCopy.stubCompletion.test.ts`: early production (no Phase F answers) writes a help page that begins with the standard header and is marked placeholder-bodied
 - [X] T009 [US1] Update every test or fixture that pins the old bare help stub (`grep -rn "help \*/" packages/engine/src packages/studio/src --include=*.test.ts`) to the new header-prefixed form; run `pnpm --filter @keyboard-studio/engine test` and `pnpm --filter @keyboard-studio/studio test`
 
-**Checkpoint**: US1 ships alone. Commit `feat(engine): standard help-site header on fresh help pages (spec 079 T005-T009)`.
+**Checkpoint**: US1 ships alone. Commit `feat(engine): standard help-site header on fresh help pages (spec 080 T005-T009)`.
 
 ---
 
@@ -106,7 +106,7 @@ the folder path. Track 1 copy: images carried, no base prose.
 - [X] T021 [P] [US2] Create the SC-002 offline sweep `utilities/welcome-sweep/run.mjs` (+ `README.md`): walk `../keyboards/release/**/source/welcome/`, run the loader's welcome-resolution and descriptor-projection logic against each folder-convention base, assert the welcome page and 100% of images are carried and listed; `[OK]`/`[ERROR]` console output, non-zero exit on any miss; add it to the standalone-utilities inventory in `docs/tooling.md`
 - [X] T022 [US2] Add `packages/studio/src/lib/serializeWorkingCopy.determinism.test.ts` (SC-004 seed): produce the same working copy twice with injected clock values and assert byte-identical `README.md`, `HISTORY.md`, `LICENSE.md`, `source/readme.htm`, `source/welcome/welcome.htm`, `source/help/<id>.php`; later phases extend this test. Add `packages/studio/src/lib/serializeWorkingCopy.memberMatrix.test.ts` (SC-001): a parametrized nine-cell matrix — net-new, Track 1 copy, Track 2 adaptation × flat-convention base, folder-convention base, base with no documentation — asserting every cell's output contains all six members with the welcome page at the folder path
 
-**Checkpoint**: Run `node utilities/welcome-sweep/run.mjs` once against the corpus and record the count in the commit message. Commit `feat(engine): welcome folder convention end-to-end (spec 079 T010-T022)`.
+**Checkpoint**: Run `node utilities/welcome-sweep/run.mjs` once against the corpus and record the count in the commit message. Commit `feat(engine): welcome folder convention end-to-end (spec 080 T010-T022)`.
 
 ---
 
@@ -127,11 +127,11 @@ download and submission both remain enabled with every row on placeholder.
 - [X] T025 [US3] Add store slices `historyEntryState: HistoryEntryState | null` (setter `setHistoryEntryState`) and `chartPreference: ChartPreference` (setter `setChartPreference`, default per FR-015) to `packages/studio/src/stores/workingCopyStore.ts` with allowlist entries, and snapshot/rehydrate coverage in `packages/studio/src/lib/persistWorkingCopy.ts` + `persistWorkingCopy.test.ts` — the derivation input needs them now; US5/US6 fill them
 - [X] T026 [US3] Create `packages/studio/src/hooks/useDocMemberStates.ts`: `useMemo`-wrapped call to `deriveDocMemberStates` keyed on the store slices it reads (`instantiationMode`, `helpDocs`, `historyEntryState`, base doc texts/images, keyboard id, projection warnings) — no timer (D3)
 - [X] T027 [US3] Create `packages/studio/src/components/DocumentationChecklist.tsx`: a semantic list of six rows showing member name, tier label (derived / inherited / authored), placeholder marker, and per-row warnings; placeholder rows render a "Go to <step>" button using existing store back-navigation actions plus `navigateTo("survey")` for Phase F — **never `advance()`** (documented P0 regression at `surveySessionStore.ts` ≈446–457); disclosure pattern per `packages/studio/src/editors/assignLoop/parts/RemovalBanner.tsx`; programmatic labels per `docs/accessibility.md`; strings wrapped with Lingui ids under `output.docs.checklist.*` (spec 046 conventions) **[content]** owns the copy
-- [X] T028 [US3] Mount `DocumentationChecklist` in `packages/studio/src/components/OutputScreen.tsx` between the download section and `ManagedPRSubmitPanel`; extend the Output editor step's `specRef` with `specs/079-documentation-completeness` in `packages/studio/src/steps/manifest.ts` / `manifest.specref.json` (FR-021, Article IX); do **not** touch `canDownload` (`usePreviewArtifact.ts`) or `submitEnabled` (`ManagedPRSubmitPanel.tsx`)
+- [X] T028 [US3] Mount `DocumentationChecklist` in `packages/studio/src/components/OutputScreen.tsx` between the download section and `ManagedPRSubmitPanel`; extend the Output editor step's `specRef` with `specs/080-documentation-completeness` in `packages/studio/src/steps/manifest.ts` / `manifest.specref.json` (FR-021, Article IX); do **not** touch `canDownload` (`usePreviewArtifact.ts`) or `submitEnabled` (`ManagedPRSubmitPanel.tsx`)
 - [X] T029 [US3] Tests: `packages/studio/src/components/DocumentationChecklist.test.tsx` (six rows, tier labels, placeholder marker, "Go to" calls the nav action and never `advance`); extend `packages/studio/src/components/OutputScreen.test.tsx` with the FR-018 regression — download and submit remain enabled with every row on placeholder; `packages/studio/src/steps/manifest.test.ts` still passes with the extended `specRef`
 - [X] T030 [US3] Run `pnpm --filter @keyboard-studio/studio messages:extract` so the new `output.docs.checklist.*` ids land in the source catalog; run `pnpm lint` (both i18n tiers)
 
-**Checkpoint**: Commit `feat(studio): Output documentation checklist + deriveDocMemberStates (spec 079 T023-T030)`.
+**Checkpoint**: Commit `feat(studio): Output documentation checklist + deriveDocMemberStates (spec 080 T023-T030)`.
 
 ---
 
@@ -157,7 +157,7 @@ Track 1 copy of a full base → required, nothing prefilled.
 - [X] T037 [US4] Tests: `packages/studio/src/survey/questions/f/pf_welcome_paragraph.test.ts` (prefill + waived on adapt-full; required + empty on net-new, Track 1, and adapt-none); badge render tests in `BaseResolution.test.tsx` / `MetadataCard.test.tsx` (unknown → absent); an SC-005 test proving the help step completes with a single confirm on an adapt-full fixture
 - [X] T038 [P] [US4] **[content]** Update the description prompt wording in `content/flows/phase_f_helpdocs.modular.yaml` to read as a proposal when prefilled ("We found this description in the base — keep, edit, or replace it"); run `pnpm lint` (content-i18n tier)
 
-**Checkpoint**: Commit `feat(studio): base documentation profile + adaptive description (spec 079 T031-T038)`.
+**Checkpoint**: Commit `feat(studio): base documentation profile + adaptive description (spec 080 T031-T038)`.
 
 ---
 
@@ -179,12 +179,12 @@ plus "Adapted from", base entries below. Dismiss instead: stub ships, Output mar
 - [X] T040 [P] [US5] Create `packages/engine/src/shared/renderHistoryMd.ts`: `renderHistoryMd(entry, opts)` per the contract — confirmed/edited entry at top (edited bullets win), `baseHistoryText` preserved verbatim below (criterion 3.4), dismissed/null renders the existing `Initial release.` stub unchanged, "Adapted from" injected on adaptations regardless of edits (FR-012 / criterion 19.2), date taken from the stored `proposal.dateIso` (research R12); export from `packages/engine/src/index.ts`
 - [X] T041 [US5] Add `packages/engine/src/decision-audit/historyProposal.test.ts` and `packages/engine/src/shared/renderHistoryMd.test.ts` covering every guarantee in T039–T040, including the version-change case (heading re-derived, `editedBullets` kept)
 - [X] T042 [US5] Create `packages/studio/src/decisions/historyProposalSeed.ts`: build `HistoryProposalSeed` from `snapshotDecisionRecord()` (`packages/studio/src/decisions/decisionLogStore.ts` ≈line 401), the `recordBaseContribution` baseline, and `EditorActionSummary` counts — no new change journal (spec assumption); add `historyProposalSeed.test.ts`
-- [X] T043 [US5] Create the question module `packages/studio/src/survey/questions/f/pf_history_entry.ts` (`inputs: []`, `writes: []`, `specRef: "specs/079-documentation-completeness"`, store-slice pattern per spec 061) rendering the proposal heading + bullets with confirm / edit-bullets / dismiss actions that call `setHistoryEntryState`; register it in `packages/studio/src/survey/questions/registry.f.ts`; **[content]** add the `pf_history_entry` screen to `content/flows/phase_f_helpdocs.modular.yaml` between the description and the opt-in gate, with its wording; re-derive `proposal.version` when the keyboard version changes while preserving `editedBullets`
+- [X] T043 [US5] Create the question module `packages/studio/src/survey/questions/f/pf_history_entry.ts` (`inputs: []`, `writes: []`, `specRef: "specs/080-documentation-completeness"`, store-slice pattern per spec 061) rendering the proposal heading + bullets with confirm / edit-bullets / dismiss actions that call `setHistoryEntryState`; register it in `packages/studio/src/survey/questions/registry.f.ts`; **[content]** add the `pf_history_entry` screen to `content/flows/phase_f_helpdocs.modular.yaml` between the description and the opt-in gate, with its wording; re-derive `proposal.version` when the keyboard version changes while preserving `editedBullets`
 - [X] T044 [US5] In `packages/studio/src/lib/serializeWorkingCopy.ts` write `HISTORY.md` via `renderHistoryMd` every production: Track 1 replaces the stub body under the same heading; Track 2 supplies the entry `stageAdaptHistory` (`packages/engine/src/output/adapt-staging.ts` ≈line 96) prepends, with `baseHistoryMdText` preserved below — adjust `stageAdaptHistory` to accept the rendered entry rather than composing its own
 - [X] T045 [US5] Tests: extend `serializeWorkingCopy.stubCompletion.test.ts` (dismissed → stub + `history-md.placeholder`), `serializeWorkingCopy.test.ts` (confirmed/edited entry at top, base entries preserved, "Adapted from" present after edits), `packages/engine/src/output/adapt-staging.test.ts` for the new input, and `serializeWorkingCopy.determinism.test.ts` (confirmed entry byte-identical across two productions); `pf_history_entry.test.ts` for the three actions and the registry pickup via `registerQuestionSteps`; `manifest.test.ts` sees the new question
 - [X] T046 [US5] Confirm the Output checklist HISTORY row's "Go to" lands on the `pf_history_entry` screen and that returning shows `authored` — extend `DocumentationChecklist.test.tsx` (US3-2 / quickstart scenario 3.2)
 
-**Checkpoint**: Commit `feat(studio): HISTORY proposal + renderHistoryMd (spec 079 T039-T046)`.
+**Checkpoint**: Commit `feat(studio): HISTORY proposal + renderHistoryMd (spec 080 T039-T046)`.
 
 ---
 
@@ -212,7 +212,7 @@ Legibility fixture draws a dotted-circle carrier, `U+XXXX`, and a distinct empty
 - [X] T053 [US6] Add a "Regenerate layout charts" / "Keep base images" control on the welcome row of `packages/studio/src/components/DocumentationChecklist.tsx` writing `setChartPreference` (store write, not a gate; the fifth FR-021 surface, declared in research R11 and covered by the Output step `specRef` extension from T028); Lingui ids under `output.docs.charts.*` **[content]**; `DocumentationChecklist.test.tsx` covers the toggle
 - [X] T054 [US6] Tests: extend `serializeWorkingCopy.test.ts` (charts present and listed; base-image keyboard yields no charts by default and keeps images; regenerate adds charts without touching base images), `serializeWorkingCopy.descriptor.test.ts` (each chart in `<Files>`), `serializeWorkingCopy.stubCompletion.test.ts` (early production still has charts), and `serializeWorkingCopy.determinism.test.ts` (chart bytes identical across two productions)
 
-**Checkpoint**: Commit `feat(engine): deterministic SVG layout charts in the welcome folder (spec 079 T047-T054)`.
+**Checkpoint**: Commit `feat(engine): deterministic SVG layout charts in the welcome folder (spec 080 T047-T054)`.
 
 ---
 
@@ -252,7 +252,7 @@ emitting check.
 - [X] T073 [US7] In `packages/studio/src/lint/LintSummary.tsx` exclude `origin: "upstream"` findings from the headline severity counts and the live-region text (they still render muted via `LintChip.tsx`); extend `LintSummary.test.tsx`
 - [X] T074 [US7] Tests: `useDocumentationFindings.test.tsx` (memo recomputes on input change only; the US7-1 store mutation yields exactly one `KM_LINT_HISTORY_VERSION_MISMATCH` warning with a hint; upstream classification flips to authored once the member is edited); FR-018 regression asserting documentation findings never reach `canDownload`, `submitEnabled`, or the blocking predicate in `packages/studio/src/dashboard/completeness.ts`; `lintContext.test.ts` covers the `docLintInput` gate (absent → no doc findings)
 
-**Checkpoint**: Commit `feat(keyboard-lint): thirteen documentation check codes + upstream findings (spec 079 T055-T074)`.
+**Checkpoint**: Commit `feat(keyboard-lint): thirteen documentation check codes + upstream findings (spec 080 T055-T074)`.
 
 ---
 

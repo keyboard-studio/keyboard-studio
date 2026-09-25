@@ -539,7 +539,7 @@ describe("createBaseBrowser", () => {
   });
 
   // -------------------------------------------------------------------------
-  // getDocProfile (spec 079 T033) — lazy compute from the cached .kps + one
+  // getDocProfile (spec 080 T033) — lazy compute from the cached .kps + one
   // welcome-probe fetch, memoized per base id.
   // -------------------------------------------------------------------------
 

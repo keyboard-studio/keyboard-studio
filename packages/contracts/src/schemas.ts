@@ -771,7 +771,7 @@ export const HelpDocsAnswersSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
-// Documentation completeness (spec 079) — mirrors doc-members.ts.
+// Documentation completeness (spec 080) — mirrors doc-members.ts.
 // ---------------------------------------------------------------------------
 
 export const DocMemberIdSchema = z.enum([
@@ -1018,7 +1018,7 @@ type _DecisionRecordGuard = Expect<AssignableTo<z.infer<typeof DecisionRecordSch
 type _HelpDocsAnswersGuard = Expect<
   AssignableTo<z.infer<typeof HelpDocsAnswersSchema>, HelpDocsAnswers>
 >;
-// Documentation completeness (spec 079) — doc-members.ts mirrors.
+// Documentation completeness (spec 080) — doc-members.ts mirrors.
 type _DocMemberStateGuard = Expect<
   AssignableTo<z.infer<typeof DocMemberStateSchema>, DocMemberState>
 >;

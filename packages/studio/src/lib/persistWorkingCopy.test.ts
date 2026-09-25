@@ -717,9 +717,9 @@ describe("persistWorkingCopy", () => {
     });
   });
 
-  // spec 079 US2 (T015): the base documentation bundle — three plain slices and
+  // spec 080 US2 (T015): the base documentation bundle — three plain slices and
   // the Base64-encoded, size-budgeted welcome images.
-  describe("base documentation bundle persistence (spec 079 US2)", () => {
+  describe("base documentation bundle persistence (spec 080 US2)", () => {
     const IMAGES = [
       { path: "welcome/desktop_default.png", bytes: new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0, 255]) },
       { path: "welcome/phone_default.png", bytes: new Uint8Array([1, 2, 3]) },
@@ -795,7 +795,7 @@ describe("persistWorkingCopy", () => {
       expect(useWorkingCopyStore.getState().baseWelcomeImagesDropped).toBe(false);
     });
 
-    it("tolerates a pre-076 snapshot with none of the four fields, restoring the store defaults", () => {
+    it("tolerates a pre-080 snapshot with none of the four fields, restoring the store defaults", () => {
       instantiate();
       const snapshot = snapshotWorkingCopyData();
       const legacy = { ...snapshot } as Partial<WorkingCopySnapshot>;
@@ -814,9 +814,9 @@ describe("persistWorkingCopy", () => {
     });
   });
 
-  // spec 079 US3 (T025): the two documentation decisions — HISTORY proposal
+  // spec 080 US3 (T025): the two documentation decisions — HISTORY proposal
   // state and the layout-chart preference — round-trip and tolerate absence.
-  describe("documentation decisions persistence (spec 079 US3)", () => {
+  describe("documentation decisions persistence (spec 080 US3)", () => {
     const ENTRY = {
       status: "edited" as const,
       proposal: { version: "1.1", dateIso: "2026-09-12", bullets: ["Adapted from kbd v1.0 via keyboard-studio."] },

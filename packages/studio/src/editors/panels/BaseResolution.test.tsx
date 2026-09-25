@@ -32,7 +32,7 @@ beforeAll(() => {
 // bases via getBaseBrowserService().listAll().
 vi.mock("../../lib/services.ts", () => ({
   getBaseBrowserService: () => ({ listAll: () => Promise.resolve(sampleBaseKeyboards) }),
-  // spec 079 FR-008: defaults every base to "unknown" (no badge) unless a
+  // spec 080 FR-008: defaults every base to "unknown" (no badge) unless a
   // test overrides it — see the "documentation badge" describe block below.
   getBaseDocProfile: vi.fn().mockResolvedValue({
     level: "unknown",
@@ -327,7 +327,7 @@ describe("BaseResolution — preview-before-commit (suggestion cards)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// spec 079 FR-008 — documentation-completeness badge (T034 wiring, T035 render)
+// spec 080 FR-008 — documentation-completeness badge (T034 wiring, T035 render)
 // ---------------------------------------------------------------------------
 
 const FULL_PROFILE = {
@@ -346,7 +346,7 @@ const UNKNOWN_PROFILE = {
   welcomeImages: [],
 };
 
-describe("BaseResolution — documentation badge (spec 079 FR-008)", () => {
+describe("BaseResolution — documentation badge (spec 080 FR-008)", () => {
   it("does not request a doc profile until a base is previewed", async () => {
     renderControlled();
     await waitForCombobox();

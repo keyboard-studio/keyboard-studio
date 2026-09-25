@@ -1,5 +1,5 @@
 // adaptiveDescription — the FR-009 proposal rule for the Phase F description
-// question (spec 079 US4): on an adaptation whose base has a usable
+// question (spec 080 US4): on an adaptation whose base has a usable
 // description, propose it and waive `required`; otherwise the question is
 // exactly as before (required, unfilled).
 //

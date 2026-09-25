@@ -111,7 +111,7 @@ export function parseTargetTokens(kmnText: string): string[] {
 
 /**
  * The welcome page's `.kps` member reference — the folder convention's
- * backslash-relative form, as the corpus writes it (spec 079 FR-002).
+ * backslash-relative form, as the corpus writes it (spec 080 FR-002).
  *
  * Exported so `patch.ts`'s welcome-path migration rewrites a flat reference
  * to the SAME string the generate path emits.
@@ -150,7 +150,7 @@ export function normaliseWelcomeFolderFiles(welcomeFolderFiles: readonly string[
 /**
  * @param welcomeFolderFiles the OTHER files shipped in `source/welcome/` beside
  *   the page — inherited base images and generated layout charts — as bare
- *   names relative to that folder (spec 079 FR-002/FR-006). Each is listed as
+ *   names relative to that folder (spec 080 FR-002/FR-006). Each is listed as
  *   `welcome\<name>`. The page itself is always listed and never needs passing.
  */
 export function buildKpsContent(
@@ -167,7 +167,7 @@ export function buildKpsContent(
   const files = [`..\\build\\${keyboardId}.kmx`];
   if (emitsJs) files.push(`..\\build\\${keyboardId}.js`);
   if (hasVisualKeyboard) files.push(`..\\build\\${keyboardId}.kvk`);
-  // spec 079 FR-002: the welcome page lives in the `welcome\` folder — the
+  // spec 080 FR-002: the welcome page lives in the `welcome\` folder — the
   // corpus-majority convention (728 of 1026 bases) — with its images beside it.
   // The flat `welcome.htm` never appears in a produced package.
   files.push(WELCOME_PAGE_KPS_REF);

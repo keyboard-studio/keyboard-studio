@@ -41,6 +41,7 @@
 
 import { useEffect, useMemo } from "react";
 import { useStepWalkStore } from "../stores/stepWalkStore.ts";
+import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import {
   charToPositionToken,
   charWalkLabel,
@@ -73,8 +74,8 @@ export function useCharWalkPosition({
   isDone,
 }: UseCharWalkPositionOptions): void {
   const publishStepWalk = useStepWalkStore((s) => s.publishStepWalk);
-  const setStepCursor = useStepWalkStore((s) => s.setStepCursor);
-  const externalCursor = useStepWalkStore((s) => s.cursors[stepId]);
+  const setPosition = useSurveyAnswerStore((s) => s.setPosition);
+  const externalCursor = useSurveyAnswerStore((s) => s.steps[stepId]?.position ?? undefined);
 
   // A stable primitive proxy for `list`, the same `join("\0")` idiom both
   // galleries already use for their own list-keyed effects — the array identity
@@ -101,8 +102,8 @@ export function useCharWalkPosition({
 
   useEffect(() => {
     if (currentChar === null) return;
-    setStepCursor(stepId, charToPositionToken(currentChar));
-  }, [stepId, currentChar, setStepCursor]);
+    setPosition(stepId, charToPositionToken(currentChar));
+  }, [stepId, currentChar, setPosition]);
 
   useEffect(() => {
     const requested = cursorCharIn(externalCursor, list);

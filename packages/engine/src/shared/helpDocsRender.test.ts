@@ -49,7 +49,7 @@ describe("helpDocsRender — FR-002 placeholder fallback", () => {
     expect(renderWelcomeHtm(baseInput(), null)).toBe(welcomeHtm("Piaroa"));
   });
 
-  it("renderWelcomeHtm inherits a fetched base verbatim when nothing is authored yet (spec 079 FR-006)", () => {
+  it("renderWelcomeHtm inherits a fetched base verbatim when nothing is authored yet (spec 080 FR-006)", () => {
     const base = "<html><body>base</body></html>";
     expect(renderWelcomeHtm(baseInput(), base)).toBe(base);
   });
@@ -67,7 +67,7 @@ describe("helpDocsRender — FR-002 placeholder fallback", () => {
   });
 });
 
-describe("helpDocsRender — spec 079 FR-003 standard help-site header (US1)", () => {
+describe("helpDocsRender — spec 080 FR-003 standard help-site header (US1)", () => {
   it("emits the exact corpus header block for a plain display name", () => {
     expect(helpSiteHeader("Hausa Basic")).toBe(HAUSA_HEADER);
     expect(helpSitePageName("Hausa Basic")).toBe("Hausa Basic Keyboard Help");
@@ -245,7 +245,7 @@ describe("helpDocsRender — welcome.htm / help.php sections (US3/US4)", () => {
     }
   });
 
-  it("the help page body after the header equals the welcome page (spec 079 FR-004)", () => {
+  it("the help page body after the header equals the welcome page (spec 080 FR-004)", () => {
     const input = baseInput({ answers: answersWith({ usageTips: ["Tip one."] }), primaryBcp47: "pid" });
     const help = renderHelpPhp(input, null);
     const header = helpSiteHeader("Piaroa");
@@ -271,7 +271,7 @@ describe("helpDocsRender — FR-013 merge with a fetched base", () => {
     expect(rendered.trim().endsWith("</body></html>")).toBe(true);
   });
 
-  it("inherits the base verbatim rather than merging when the author has no description yet (spec 079 FR-006)", () => {
+  it("inherits the base verbatim rather than merging when the author has no description yet (spec 080 FR-006)", () => {
     const rendered = renderWelcomeHtm(baseInput(), baseWelcome);
     expect(rendered).toBe(baseWelcome);
     expect(rendered).toContain("Hand-authored");
@@ -336,8 +336,8 @@ describe("helpDocsRender — README (FR-004/FR-008)", () => {
 });
 
 describe("helpDocsRender — cross-file parity (FR-005/SC-005)", () => {
-  // The help page's standard help-site header (spec 079 FR-003) is the one
-  // permitted difference on the help side (spec 079 FR-004), so strip it too.
+  // The help page's standard help-site header (spec 080 FR-003) is the one
+  // permitted difference on the help side (spec 080 FR-004), so strip it too.
   const stripDoc = (html: string): string =>
     html
       .replace(/^<\?php\n[\s\S]*?\?>\n/, "")
@@ -388,11 +388,11 @@ describe("helpDocsRender — cross-file parity (FR-005/SC-005)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// spec 079 US2 (T018): the welcome page's "Keyboard Layout" section and the
+// spec 080 US2 (T018): the welcome page's "Keyboard Layout" section and the
 // `<img src>` extractor the projection diffs carried images against.
 // ---------------------------------------------------------------------------
 
-describe("helpDocsRender — welcome layout section (spec 079 FR-004 / R9 / T051)", () => {
+describe("helpDocsRender — welcome layout section (spec 080 FR-004 / R9 / T051)", () => {
   // "desktop_layout_default.png" carries no reserved chart prefix, so it
   // groups as "Other"; "ks-layout-phone-shift.svg" is a generated chart, so
   // it groups as "Phone" — ahead of "Other" per the desktop/phone/tablet/other
@@ -447,7 +447,7 @@ describe("helpDocsRender — welcome layout section (spec 079 FR-004 / R9 / T051
     expect(renderWelcomeHtm(input, null, [])).toBe(welcomeHtm("Hausa Basic"));
   });
 
-  it("a MERGED base page keeps its own layout reference and appends only the files it does not already reference (spec 079 T051)", () => {
+  it("a MERGED base page keeps its own layout reference and appends only the files it does not already reference (spec 080 T051)", () => {
     const base = '<html><body><h2>Keyboard Layout</h2><img src="old.png"></body></html>';
     const input = baseInput({ answers: answersWith({ description: "Plain." }) });
     const merged = renderWelcomeHtm(input, base, IMAGES);
@@ -478,7 +478,7 @@ describe("helpDocsRender — welcome layout section (spec 079 FR-004 / R9 / T051
   });
 });
 
-describe("helpDocsRender — spec 079 FR-006 base inheritance before anything is authored", () => {
+describe("helpDocsRender — spec 080 FR-006 base inheritance before anything is authored", () => {
   it("renderWelcomeHtm returns the base page verbatim when nothing has been authored yet", () => {
     const base = "<html><body><h1>Hand-authored</h1></body></html>";
     expect(renderWelcomeHtm(baseInput(), base)).toBe(base);
@@ -525,7 +525,7 @@ describe("helpDocsRender — spec 079 FR-006 base inheritance before anything is
   });
 });
 
-describe("extractWelcomeImageRefs (spec 079 contracts/engine-api.md)", () => {
+describe("extractWelcomeImageRefs (spec 080 contracts/engine-api.md)", () => {
   it("returns distinct relative <img src> targets in document order", () => {
     const html =
       '<html><body><img src="desktop.png"><p><IMG SRC=\'phone.png\' alt=x></p>' +

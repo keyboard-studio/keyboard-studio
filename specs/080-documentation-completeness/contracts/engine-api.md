@@ -1,4 +1,4 @@
-# Contract: Engine documentation APIs (spec 079)
+# Contract: Engine documentation APIs (spec 080)
 
 New/changed exports of `@keyboard-studio/engine`. All functions are pure and
 deterministic unless noted. Types referenced are defined in

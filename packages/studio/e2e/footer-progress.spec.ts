@@ -165,4 +165,44 @@ test.describe("footer progress row (spec 057 US4/US6)", () => {
       page.getByRole("heading", { name: /identify your language/i }),
     ).toBeVisible({ timeout: 15_000 });
   });
+
+  // spec 079 T067: the two-tier journey strip (journey-strip-contract.md).
+  //
+  // NOTE (honesty over false-green, per this task's own instructions): this
+  // covers the STRUCTURAL half of the contract's test matrix — that the
+  // active step's own marks are QUESTION-tier while every other manifest
+  // step stays a single SECTION-tier mark, using the SAME identity-lite walk
+  // the test above already drives, since building a full new walk into
+  // Accents & marks / Invisible characters (multi-station expand/collapse,
+  // an upstream edit's badge-and-notice, a badge clearing after a mechanism
+  // is assigned) needs fixture and timing work this pass didn't have budget
+  // for. Those five scenarios are NOT covered by this test; T067 stays
+  // unticked in tasks.md until they are.
+  test("the active step's marks are question-tier; every other step stays one section mark", async ({
+    page,
+  }) => {
+    await driveIdentityLite(page, {
+      english: FIXTURE.english,
+      autonym: FIXTURE.autonym,
+      script: FIXTURE.targetScript,
+    });
+    await pickBaseKeyboard(page, FIXTURE.baseKeyboardId);
+    await expect(footer(page)).toBeVisible({ timeout: 20_000 });
+
+    // "identity" is the step the author is still walking through (its own
+    // questions are still resolving into the record) — SOME of its marks
+    // are QUESTION tier, and none of the OTHER manifest steps (e.g. the
+    // upcoming "characters" stage) render as a question-tier mark.
+    const questionMarks = footer(page).locator('[data-progress-dot-tier="question"]');
+    const sectionMarks = footer(page).locator('[data-progress-dot-tier="section"]');
+    await expect(questionMarks.first()).toBeVisible({ timeout: 10_000 });
+    expect(await sectionMarks.count()).toBeGreaterThan(0);
+
+    // Every mark stays reachable by keyboard, regardless of tier (§6) — a
+    // section mark is still Tab-focusable and named.
+    const firstSection = sectionMarks.first();
+    await firstSection.focus();
+    await expect(firstSection).toBeFocused();
+    expect(await firstSection.getAttribute("aria-label")).toBeTruthy();
+  });
 });

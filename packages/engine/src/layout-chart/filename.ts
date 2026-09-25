@@ -1,6 +1,6 @@
 /**
  * filename — the deterministic `ks-layout-<platform>-<layer>.svg` naming
- * convention for generated layout charts (spec 079 T047, FR-015).
+ * convention for generated layout charts (spec 080 T047, FR-015).
  */
 
 import type { LayoutChartPlatform } from "@keyboard-studio/contracts";
@@ -52,7 +52,7 @@ const LAYOUT_CHART_PLATFORMS: readonly LayoutChartPlatform[] = ["desktop", "phon
 /**
  * The platform encoded in a `ks-layout-<platform>-...` filename, or
  * `undefined` when `filename` does not carry the reserved prefix followed by
- * a recognized platform segment. Lets a caller (spec 079 T051's welcome-folder
+ * a recognized platform segment. Lets a caller (spec 080 T051's welcome-folder
  * grouping) sort carried files by platform without re-deriving this naming
  * convention.
  */

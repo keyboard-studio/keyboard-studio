@@ -1,4 +1,4 @@
-# Contract: Standard help-site header (spec 079, US1 / FR-003)
+# Contract: Standard help-site header (spec 080, US1 / FR-003)
 
 The exact header block a non-inherited `source/help/<id>.php` MUST begin with.
 Format verified against the corpus (e.g. `release/a/ahom_star/source/help/ahom_star.php`,

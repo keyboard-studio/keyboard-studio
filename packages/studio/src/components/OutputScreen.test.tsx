@@ -337,10 +337,10 @@ describe("OutputScreen — output-time touch-layout staleness gate", () => {
     expect(screen.queryByText(/touch step/i)).toBeNull();
   });
 
-  // spec 079 FR-018 regression: the documentation checklist is informational.
+  // spec 080 FR-018 regression: the documentation checklist is informational.
   // With every prose member still on its placeholder (no Phase F answers, no
   // HISTORY proposal decision), BOTH output surfaces stay enabled.
-  it("documentation placeholders never gate download or submit (spec 079 FR-018)", () => {
+  it("documentation placeholders never gate download or submit (spec 080 FR-018)", () => {
     renderWithReadyOutput();
     const checklist = screen.getByTestId("documentation-checklist");
     const placeholderRows = ["readme-md", "history-md", "readme-htm", "welcome-htm", "help-php"];

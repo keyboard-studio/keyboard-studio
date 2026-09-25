@@ -504,6 +504,12 @@ combination.
   the output form was set to the ready-made-character form), the system
   MUST mark the affected station(s) as requiring reconfirmation before the
   designer can proceed past them again.
+  **Amendment (spec 079).** Generalised. The reconfirmation behaviour applies
+  to *saved* answers (079 FR-012) whether or not the series was completed,
+  and only to the answers whose evidence actually changed (079 FR-010), with
+  a reason naming the change (079 FR-013). The designer's position in the
+  series is not moved by a flag (079 FR-004). It is the pattern every step
+  now follows (079 FR-010…FR-014).
 - **FR-024**: The marks series MUST NOT be presented, at any station, as a
   single up-front question asked before the alphabet is confirmed; every
   station's content MUST be derived from the alphabet already confirmed at

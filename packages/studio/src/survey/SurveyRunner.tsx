@@ -23,8 +23,9 @@ import {
   useStepWalkStore,
   peekStepCursor,
   peekAnswerDraft,
-  type AnswerDraft,
 } from "../stores/stepWalkStore.ts";
+import { useSurveyAnswerStore, type SavedAnswer } from "../stores/surveyAnswerStore.ts";
+import { useRecordQuestionAnswers } from "../lib/questionRecorder.ts";
 import type { StepWalkPositions } from "../lib/stepWalk.ts";
 import {
   secondaryButton,
@@ -134,6 +135,17 @@ function buildIndex(questions: FlowQuestion[]): Map<string, FlowQuestion> {
 // ---------------------------------------------------------------------------
 // Answer -> SurveyAnswer
 // ---------------------------------------------------------------------------
+
+/**
+ * The recorded `AnswerType` for a question — the same mapping `toSurveyAnswer`
+ * applies, so a saved answer and its recorded entry agree on type.
+ */
+function answerTypeFor(question: FlowQuestion): SurveyAnswer["answerType"] {
+  if (question.type === "multi_select") return "char-list";
+  if (question.type === "bool") return "boolean";
+  if (question.type === "select" || question.type === "radio") return "select";
+  return "text";
+}
 
 function toSurveyAnswer(
   questionId: string,
@@ -306,7 +318,7 @@ export interface SurveyRunnerProps {
   getSeedOptions?: (questionId: string) => FlowOption[] | undefined;
   /**
    * Called at render to optionally override the current question's static
-   * `required` flag — spec 079 FR-009's adaptive description proposal waives
+   * `required` flag — spec 080 FR-009's adaptive description proposal waives
    * `pf_welcome_paragraph`'s `required` exactly when it was also seeded from
    * the base (getSeedValue above), so accept/edit/replace is a single action
    * (SC-005) instead of being blocked by a "required" gate on a field that
@@ -435,9 +447,10 @@ export function SurveyRunner({
   // way to say the same thing that could disagree.
   const walkStepId = useSurveySessionStore((s) => s.activeStepId);
   const publishStepWalk = useStepWalkStore((s) => s.publishStepWalk);
-  const setStepCursor = useStepWalkStore((s) => s.setStepCursor);
-  const setAnswerDraft = useStepWalkStore((s) => s.setAnswerDraft);
-  const externalCursor = useStepWalkStore((s) => s.cursors[walkStepId]);
+  const setPosition = useSurveyAnswerStore((s) => s.setPosition);
+  const setStepAnswers = useSurveyAnswerStore((s) => s.setStepAnswers);
+  const recordQuestionAnswers = useRecordQuestionAnswers();
+  const externalCursor = useSurveyAnswerStore((s) => s.steps[walkStepId]?.position ?? undefined);
 
   // The walk: every question this run has visited, in order, plus WHICH ONE is
   // showing. One state object rather than two so the index can never point past
@@ -449,7 +462,7 @@ export function SurveyRunner({
   // blanked-answer bug that caused. Moving an index instead keeps them.
   const [walk, setWalk] = useState<{ stack: AnswerStackEntry[]; cursor: number }>(() => {
     // Replay source, in precedence order:
-    //   1. this step's IN-PROGRESS answers (stores/stepWalkStore.ts) — what the
+    //   1. this step's SAVED answers (stores/surveyAnswerStore.ts) — what the
     //      author has typed on this visit but not yet submitted. Highest
     //      precedence because it is the most recent thing they did, and because
     //      recovering it is the whole point: a tab switch destroys this
@@ -571,32 +584,47 @@ export function SurveyRunner({
     [stack, liveValues],
   );
 
-  const answerDraft: AnswerDraft = useMemo(() => {
-    const draft: Record<string, string | string[]> = {};
+  // Every answer the walk holds, saved as given (spec 079 FR-001): the field's
+  // raw value — the shape `buildResumeStack` replays — with the type it will be
+  // recorded as. Each question is its own screen (screenId = question id), and
+  // no SurveyRunner answer depends on an earlier step's evidence.
+  const savedAnswers = useMemo(() => {
+    const saved: Record<string, Omit<SavedAnswer, "savedAt">> = {};
     stack.forEach((entry, i) => {
       const value = liveValues[i];
       // Only answered entries: an undefined value carries no information a
       // replay could use, and storing it would make `buildResumeStack` treat an
       // untouched question as deliberately blank.
-      if (value !== undefined) draft[entry.questionId] = value;
+      if (value === undefined) return;
+      const q = index.get(entry.questionId);
+      saved[entry.questionId] = {
+        value,
+        answerType: q !== undefined ? answerTypeFor(q) : "text",
+        origin: "confirmed",
+        stage: "draft",
+        evidenceKey: null,
+        screenId: entry.questionId,
+      };
     });
-    return draft;
-  }, [stack, liveValues]);
+    return saved;
+  }, [stack, liveValues, index]);
 
   useEffect(() => {
     publishStepWalk(walkStepId, positions);
-    setAnswerDraft(walkStepId, answerDraft);
+    // The walk defines this step's answer set: replacing it drops the answers of
+    // a tail a changed answer invalidated, so they are never replayed.
+    setStepAnswers(walkStepId, savedAnswers);
     // "" is the completed-flow sentinel (no entry to be at) — never publish it
     // as a position, or the footer would mark a stop that does not exist.
-    if (currentQId !== "") setStepCursor(walkStepId, currentQId);
+    if (currentQId !== "") setPosition(walkStepId, currentQId);
   }, [
     walkStepId,
     positions,
-    answerDraft,
+    savedAnswers,
     currentQId,
     publishStepWalk,
-    setAnswerDraft,
-    setStepCursor,
+    setStepAnswers,
+    setPosition,
   ]);
 
   // Honour a cursor written while this runner is already mounted — a footer dot
@@ -649,7 +677,7 @@ export function SurveyRunner({
   // Tier-B catalog string and interpolates `{{token}}`s itself (see above).
   const dynamicOptions = getSeedOptionsRef.current?.(currentQId);
   const hasDynamicOptions = dynamicOptions !== undefined && dynamicOptions.length > 0;
-  // spec 079 FR-009: `undefined` means "use the question's own static
+  // spec 080 FR-009: `undefined` means "use the question's own static
   // `required`" — only a defined override (true or false) replaces it.
   const requiredOverride = getRequiredOverrideRef.current?.(currentQId);
   const displayQ: FlowQuestion =
@@ -712,6 +740,15 @@ export function SurveyRunner({
       const phase = flow.phase as SurveyPhaseResult["phase"];
       onComplete({ phase, answers });
       return;
+    }
+
+    // Record this question's answer on its own Next (spec 079 R-04/T031). The
+    // step's FINAL Next is excluded — that flows through the end-of-flow branch
+    // above and onComplete, so step completion records it (the keyboard-effect
+    // diff attaches at that boundary, not here).
+    const recordedAnswer = toSurveyAnswer(currentQId, currentQ, committedValue);
+    if (recordedAnswer !== null) {
+      recordQuestionAnswers(currentQId, [recordedAnswer]);
     }
 
     // Notify the caller that this answer has been committed. Fires synchronously

@@ -188,7 +188,7 @@ describe("buildKpsContent — the parts this feature does NOT own (contract §2)
     const kps = buildKpsContent("bm_sil", { displayName: "Bambara" }, KMN);
     expect(kps).toContain("<FollowKeyboardVersion/>");
     expect(kps).toContain("<ReadMeFile>readme.htm</ReadMeFile>");
-    // spec 079 FR-002: the folder convention, in the corpus's backslash form.
+    // spec 080 FR-002: the folder convention, in the corpus's backslash form.
     expect(kps).toContain("<WelcomeFile>welcome\\welcome.htm</WelcomeFile>");
     expect(kps.startsWith('<?xml version="1.0" encoding="utf-8"?>')).toBe(true);
   });
@@ -205,9 +205,9 @@ function fileNames(kps: string): string[] {
   return [...kps.matchAll(/<Name>([^<]*)<\/Name>\s*<FileType>/g)].map((m) => m[1] ?? "");
 }
 
-// spec 079 FR-002 / FR-006 (T011): the welcome page ships in the `welcome\`
+// spec 080 FR-002 / FR-006 (T011): the welcome page ships in the `welcome\`
 // folder with its images, each listed backslash-relative — the corpus form.
-describe("buildKpsContent — the welcome folder (spec 079 FR-002, FR-006)", () => {
+describe("buildKpsContent — the welcome folder (spec 080 FR-002, FR-006)", () => {
   it("lists welcome\\welcome.htm and names it as the <WelcomeFile>; never the flat welcome.htm", () => {
     const kps = buildKpsContent("bm_sil", { displayName: "Bambara" }, KMN);
     expect(fileNames(kps)).toContain("welcome\\welcome.htm");

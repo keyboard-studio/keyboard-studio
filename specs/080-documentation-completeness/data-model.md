@@ -1,4 +1,4 @@
-# Data Model: Documentation completeness (spec 079)
+# Data Model: Documentation completeness (spec 080)
 
 **Date**: 2026-09-10 | **Source**: [spec.md](spec.md) Key Entities + [research.md](research.md)
 

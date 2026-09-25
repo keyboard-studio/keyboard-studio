@@ -1,7 +1,7 @@
 // Check 5.7 — KM_LINT_README_TARGETS_MISMATCH
 // Criteria (criteria.json "5.7-readme-targets-match-kmn"): "Targets listed in
 // README.md match those in the `.kmn`." Fires naming each extra (in README,
-// not in `.kmn`) or missing (in `.kmn`, not in README) platform (spec 079
+// not in `.kmn`) or missing (in `.kmn`, not in README) platform (spec 080
 // US7-2).
 
 import type { DocLintInput, LintFinding } from "@keyboard-studio/contracts";

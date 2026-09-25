@@ -32,6 +32,7 @@ import {
   type DiscoveryAxisVector,
   type MarkInputOrder,
   type MechanismAssignment,
+  type SurveyAnswer,
   type SurveyPhaseResult,
   type SurveySession,
   type TouchAssignment,
@@ -39,6 +40,7 @@ import {
 import { computeStalenessFromManifest } from "../dashboard/completeness.ts";
 import { resetPhaseBDraftDecisions } from "./phaseBDraftStore.ts";
 import type { Step } from "../steps/types.ts";
+import { STEP_ORDER } from "../steps/stepOrder.ts";
 import { isSequenceAssignmentForChar } from "../editors/assignLoop/patternIds.ts";
 import { promoteKeyAtAddressToHandSet } from "../editors/assignLoop/touchBehavior.ts";
 
@@ -461,6 +463,15 @@ export interface WorkingCopyState {
   /** Phase results captured so far, in completion order (A → B → … → F). */
   phaseResults: SurveyPhaseResult[];
   /**
+   * Who owns which answers inside each phase slot (spec 079 D-4, R-08). Several
+   * steps record into phase C; each step's list lives under its own id, and
+   * `phaseResults[p].answers` is DERIVED as their concatenation in manifest
+   * order (`"legacy"` first). A step re-recording replaces only its own list,
+   * so Convenience letters can no longer erase what Invisible characters
+   * recorded. Studio-only: the contracts `SurveyPhaseResult` is untouched.
+   */
+  phaseAnswersByStep: PhaseAnswersByStep;
+  /**
    * IR-derived axis baseline, set before Phase A from the recognized patterns.
    * Updating this re-derives the session.
    */
@@ -708,7 +719,7 @@ export interface WorkingCopyState {
    * unconditionally instead would change the reducer's skip-path default
    * (`?? "base-plus-mark"`, steps/reducer.ts), which is a separate decision.
    */
-  recordPhase: (result: SurveyPhaseResult) => void;
+  recordPhase: (result: SurveyPhaseResult, opts?: { stepId?: string }) => void;
   /**
    * Record a Phase C result carrying the given assignments, replacing any
    * prior Phase C assignments (last-wins semantics) and preserving every other
@@ -1088,6 +1099,51 @@ function resolveInstantiationCase(
 
 const INITIAL_SURVEY = remerge({}, []);
 
+// ---------------------------------------------------------------------------
+// Per-step phase answers (spec 079 D-4, R-08)
+// ---------------------------------------------------------------------------
+
+/** Answers recorded into each phase, keyed by the step that recorded them. */
+export type PhaseAnswersByStep = Record<string, Record<string, SurveyAnswer[]>>;
+
+/** Owner id for answers whose recording step is unknown (pre-079 data, no stepId). */
+export const LEGACY_ANSWER_OWNER = "legacy";
+
+/** Owner order: `"legacy"` first, then manifest order, then anything unknown. */
+function ownerRank(owner: string): number {
+  if (owner === LEGACY_ANSWER_OWNER) return -1;
+  const i = STEP_ORDER.indexOf(owner);
+  return i === -1 ? STEP_ORDER.length : i;
+}
+
+/** The phase entry's `answers`: every owner's list concatenated in owner order. */
+export function concatPhaseAnswers(owners: Record<string, SurveyAnswer[]>): SurveyAnswer[] {
+  return Object.keys(owners)
+    .sort((a, b) => ownerRank(a) - ownerRank(b))
+    .flatMap((owner) => owners[owner] ?? []);
+}
+
+function sameAnswerList(a: readonly SurveyAnswer[], b: readonly SurveyAnswer[]): boolean {
+  return a === b || JSON.stringify(a) === JSON.stringify(b);
+}
+
+/**
+ * The owner map for `phase`, trusted only while it still describes the stored
+ * answers. Anything that replaced `phaseResults` wholesale (a reset, a genuine
+ * re-instantiation, a restored pre-079 snapshot) leaves the sidecar out of step;
+ * the stored answers are then adopted under `"legacy"` rather than invented.
+ */
+function ownersOf(
+  sidecar: PhaseAnswersByStep,
+  stored: SurveyPhaseResult | undefined,
+  phase: string,
+): Record<string, SurveyAnswer[]> {
+  const storedAnswers = stored?.answers ?? [];
+  const owners = sidecar[phase];
+  if (owners !== undefined && sameAnswerList(concatPhaseAnswers(owners), storedAnswers)) return owners;
+  return storedAnswers.length > 0 ? { [LEGACY_ANSWER_OWNER]: storedAnswers } : {};
+}
+
 /**
  * The store's data fields only — actions excluded. This is the single source of
  * truth for "what is the serializable shape of a working copy": `INITIAL_STATE`
@@ -1152,6 +1208,7 @@ const INITIAL_STATE: WorkingCopyData = {
   undoStack: [],
   // survey slots
   ...INITIAL_SURVEY,
+  phaseAnswersByStep: {},
   desktopLocked: false,
   sequenceFlaggedChars: [],
   touchLayoutJson: null,
@@ -1373,14 +1430,26 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
 
   // -- surveyResultsStore actions --------------------------------------------
 
-  recordPhase: (result) => {
+  recordPhase: (result, opts) => {
     const prev = get().phaseResults;
     const idx = prev.findIndex((p) => p.phase === result.phase);
-    const next =
-      idx === -1
-        ? [...prev, result]
-        : prev.map((p, i) => (i === idx ? { ...p, ...result } : p));
-    set(remerge(get().irAxes, next));
+    // spec 079 D-4: the recording step replaces only ITS answers in the slot;
+    // every other field keeps the shallow-merge semantics documented above.
+    const owner = opts?.stepId ?? LEGACY_ANSWER_OWNER;
+    const owners = {
+      ...ownersOf(get().phaseAnswersByStep, prev[idx], result.phase),
+      [owner]: result.answers,
+    };
+    const merged: SurveyPhaseResult = {
+      ...(idx === -1 ? {} : prev[idx]),
+      ...result,
+      answers: concatPhaseAnswers(owners),
+    };
+    const next = idx === -1 ? [...prev, merged] : prev.map((p, i) => (i === idx ? merged : p));
+    set({
+      ...remerge(get().irAxes, next),
+      phaseAnswersByStep: { ...get().phaseAnswersByStep, [result.phase]: owners },
+    });
   },
 
   recordAssignments: (assignments) => {
