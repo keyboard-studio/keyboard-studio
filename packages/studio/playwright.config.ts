@@ -16,8 +16,9 @@
 //   copy-edit to start), and manually/locally for the rest.
 //
 // Browser binaries: run `npx playwright install` once before running E2E.
-// E2E specs live under packages/studio/e2e/. Live/skipped status per spec is
-// tracked in docs/tooling.md "Spec status"; see each spec header for details.
+// E2E specs live under packages/studio/e2e/. Which specs are live and which are
+// skipped is listed in docs/tooling.md ("Spec status"); each skipped spec carries
+// its un-skip recipe in its header.
 
 import { defineConfig } from "playwright/test";
 

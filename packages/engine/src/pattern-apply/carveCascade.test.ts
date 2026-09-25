@@ -12,21 +12,14 @@ import type {
   IRRule,
   RawKmnFragment,
 } from "@keyboard-studio/contracts";
+import { charStore, irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 
 function makeRule(nodeId: string): IRRule {
-  return {
-    nodeId,
-    context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
-    output: [{ kind: "char", value: "a" }],
-  };
-}
-
-function makeGroup(nodeId: string, name: string, rules: IRRule[]): IRGroup {
-  return { nodeId, name, usingKeys: true, rules, readonly: false };
+  return vkeyRule({ nodeId, output: "a" });
 }
 
 function makeStore(nodeId: string, name: string): IRStore {
-  return { nodeId, name, items: [{ kind: "char", value: "1" }], isSystem: false };
+  return charStore({ nodeId, name, chars: "1" });
 }
 
 function makeRaw(nodeId: string, groupNodeId?: string): RawKmnFragment {
@@ -45,29 +38,13 @@ function makeIR(opts?: {
   raw?: RawKmnFragment[];
   comments?: IRComment[];
 }): KeyboardIR {
-  return {
-    origin: "imported",
-    header: {
-      keyboardId: "test",
-      name: "Test",
-      bcp47: ["en"],
-      copyright: "(c) test",
-      version: "1.0",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores: opts?.stores ?? [],
-    groups: opts?.groups ?? [],
-    comments: opts?.comments ?? [],
-    raw: opts?.raw ?? [],
-    recognizedPatterns: [],
-  };
+  return makeTestIR({ ...opts, header: { bcp47: ["en"], copyright: "(c) test" } });
 }
 
 describe("resolveCarveCascade", () => {
   it("cascades a deleted group's own rules into deletedRuleIds without them being separately listed", () => {
     const ir = makeIR({
-      groups: [makeGroup("g0", "main", [makeRule("r0"), makeRule("r1")])],
+      groups: [irGroup({ nodeId: "g0", rules: [makeRule("r0"), makeRule("r1")] })],
     });
     const cascade = resolveCarveCascade(ir, new Set(["g0"]));
     expect(cascade.deletedGroupIds.has("g0")).toBe(true);
@@ -77,7 +54,7 @@ describe("resolveCarveCascade", () => {
 
   it("resolves an individually deleted rule without touching its surviving group", () => {
     const ir = makeIR({
-      groups: [makeGroup("g0", "main", [makeRule("r0"), makeRule("r1")])],
+      groups: [irGroup({ nodeId: "g0", rules: [makeRule("r0"), makeRule("r1")] })],
     });
     const cascade = resolveCarveCascade(ir, new Set(["r0"]));
     expect(cascade.deletedGroupIds.size).toBe(0);
@@ -96,7 +73,7 @@ describe("resolveCarveCascade", () => {
 
   it("returns empty sets for an empty deletion set", () => {
     const ir = makeIR({
-      groups: [makeGroup("g0", "main", [makeRule("r0")])],
+      groups: [irGroup({ nodeId: "g0", rules: [makeRule("r0")] })],
       stores: [makeStore("s0", "a")],
       raw: [makeRaw("f0")],
     });
@@ -111,8 +88,8 @@ describe("resolveCarveCascade", () => {
   it("cascades a deleted group into its group-owned RawKmnFragment nodes; other groups' fragments survive", () => {
     const ir = makeIR({
       groups: [
-        makeGroup("g0", "main", [makeRule("r0")]),
-        makeGroup("g1", "other", [makeRule("r1")]),
+        irGroup({ nodeId: "g0", rules: [makeRule("r0")] }),
+        irGroup({ nodeId: "g1", name: "other", rules: [makeRule("r1")] }),
       ],
       raw: [makeRaw("f0", "g0"), makeRaw("f1", "g1"), makeRaw("f2")],
     });
@@ -126,7 +103,7 @@ describe("resolveCarveCascade", () => {
 
   it("cascades comments anchored to a deleted node (leading and trailing); freestanding and surviving-anchor comments do not cascade", () => {
     const ir = makeIR({
-      groups: [makeGroup("g0", "main", [makeRule("r0"), makeRule("r1")])],
+      groups: [irGroup({ nodeId: "g0", rules: [makeRule("r0"), makeRule("r1")] })],
       comments: [
         { nodeId: "c0", text: "docs r0", anchor: "leading", anchorRef: { kind: "rule", nodeId: "r0" } },
         { nodeId: "c1", text: "inline r0", anchor: "trailing", anchorRef: { kind: "rule", nodeId: "r0" } },
@@ -145,7 +122,7 @@ describe("resolveCarveCascade", () => {
 
   it("a whole-group deletion cascades through to comments anchored to the group's own rules", () => {
     const ir = makeIR({
-      groups: [makeGroup("g0", "main", [makeRule("r0")])],
+      groups: [irGroup({ nodeId: "g0", rules: [makeRule("r0")] })],
       comments: [
         { nodeId: "c0", text: "docs r0", anchor: "leading", anchorRef: { kind: "rule", nodeId: "r0" } },
         { nodeId: "cg", text: "docs g0", anchor: "leading", anchorRef: { kind: "group", nodeId: "g0" } },

@@ -403,7 +403,7 @@ describe("buildManifestStepGraph — C8/C9 (T032)", () => {
 
   // T025 (spec 035 polish): the generic tests above cover touch_seed_source only
   // via aggregate/loop assertions. Pin the fork by name — mirrors the spec-018
-  // "track is branch-defining: fork -> project_name" test in trackRouting.test.ts
+  // "track is branch-defining: fork -> project_name" case in manifestProjection.test.ts
   // — so a regression in the mechanisms/touch_seed_source/touch wiring fails a
   // test that names the nodes, not just a count.
   //

@@ -15,13 +15,14 @@ import { describe, it, expect } from "vitest";
 import { applyDesktopModifications } from "./applyDesktopModifications.js";
 import { BLANK_KEY_ID, BLANK_KEY_SP } from "./touch-mechanism-shared.js";
 import { isSpacerKeyClass, type TouchLayoutIR, type TouchKeyIR } from "@keyboard-studio/contracts";
+import { touchKey } from "@keyboard-studio/contracts/fixtures";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
 // ---------------------------------------------------------------------------
 
 function makeKey(id: string, overrides: Partial<TouchKeyIR> = {}): TouchKeyIR {
-  return { nodeId: `node_${id}`, id, text: id.toLowerCase(), output: id.toLowerCase(), ...overrides };
+  return touchKey({ id, text: id.toLowerCase(), output: id.toLowerCase(), ...overrides });
 }
 
 function makeLayout(

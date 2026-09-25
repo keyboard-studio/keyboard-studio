@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { checkKeysPerRow } from "./check-18-3-keys-per-row.js";
 import type { TouchLayoutIR } from "@keyboard-studio/contracts";
+import { touchLayout } from "@keyboard-studio/contracts/fixtures";
 
 const PATH = "source/test.keyman-touch-layout";
 
@@ -9,17 +10,7 @@ function makeIR(platform: "phone" | "tablet" | "desktop", keyCount: number): Tou
     nodeId: `k-${i}`,
     id: `K_${i}`,
   }));
-  return {
-    platforms: [
-      {
-        id: platform,
-        layers: [
-          { id: "default", rows: [{ keys }] },
-        ],
-      },
-    ],
-    nodeIds: [],
-  };
+  return touchLayout({ platform, keys });
 }
 
 /**
@@ -46,17 +37,7 @@ function makeIRWithSpacers(
     id: `K_SP_${i}`,
     sp: spacerSp,
   }));
-  return {
-    platforms: [
-      {
-        id: platform,
-        layers: [
-          { id: "default", rows: [{ keys: [...normalKeys, ...spacerKeys] }] },
-        ],
-      },
-    ],
-    nodeIds: [],
-  };
+  return touchLayout({ platform, keys: [...normalKeys, ...spacerKeys] });
 }
 
 describe("checkKeysPerRow (18.3 KM_WARN_TOUCH_KEYS_PER_ROW)", () => {

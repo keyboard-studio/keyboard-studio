@@ -23,12 +23,9 @@ import { screen, fireEvent, act, cleanup } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { PhaseFStepFactoryComponent } from "../editors/adapters/flowStepOptions.tsx";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 
 afterEach(() => {
   cleanup();
-  useSurveySessionStore.getState().reset();
-  useWorkingCopyStore.getState().reset();
 });
 
 const CONTACT = "info@bafutliteracy.org";

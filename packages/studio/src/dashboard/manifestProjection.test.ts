@@ -15,6 +15,8 @@
 // use — so this test cannot drift into a second, divergent list.
 
 import { describe, it, expect } from "vitest";
+import { formatIRPath } from "@keyboard-studio/contracts";
+import type { IRPath } from "@keyboard-studio/contracts";
 
 import {
   buildManifestProjection,
@@ -29,6 +31,7 @@ import { buildManifestStepGraph } from "./buildStepGraph.ts";
 import { buildFlowSources } from "./renderedNodeSet.ts";
 import { manifest } from "../steps/manifest.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
+import { CARVE_WRITES, ADD_GALLERY_WRITES, TOUCH_WRITES } from "../steps/editorMutate.ts";
 
 describe("buildManifestProjection — §2.5 map-projection (FR-010)", () => {
   const projection = buildManifestProjection();
@@ -183,5 +186,105 @@ describe("attachDrillDowns — registry-keyed drill-downs (FR-004 / SC-003)", ()
     // the union of all buckets must retain every flow title, in flows order.
     const titles = Object.values(drillDowns).flatMap((list) => list.map((d) => d.title));
     expect(titles.sort()).toEqual(flows.map((f) => f.title).sort());
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Editor-step map nodes (specs 018, 021): each declared editor step resolves as
+// exactly one node, and the step-graph node surfaces the declared contract
+// (writePaths/inputPaths) verbatim. The declarations themselves are owned by
+// tests/survey/questions/f/editorStepContracts.test.ts; this checks the graph
+// and projection carry them.
+// ---------------------------------------------------------------------------
+
+interface MapNodeCase {
+  id: string;
+  writes: readonly IRPath[];
+  /** The literal formatted write paths, so a changed containment set is visible here. */
+  writePaths: readonly string[];
+  inputPaths: readonly string[];
+  lock?: "physical" | "touch";
+}
+
+const MAP_NODE_CASES: readonly MapNodeCase[] = [
+  {
+    id: "track",
+    writes: [],
+    writePaths: [],
+    inputPaths: ["header.bcp47", "header.name"],
+  },
+  {
+    id: "carve",
+    writes: CARVE_WRITES,
+    writePaths: ["groups[]", "stores[]", "raw[]"],
+    inputPaths: [],
+  },
+  {
+    id: "mechanisms",
+    writes: ADD_GALLERY_WRITES,
+    writePaths: ["groups[]", "stores[]"],
+    inputPaths: [],
+    lock: "physical",
+  },
+  {
+    id: "touch",
+    writes: TOUCH_WRITES,
+    writePaths: ["touchLayout.platforms[].layers[].rows[].keys[]", "touchLayout.nodeIds[]"],
+    inputPaths: [],
+    lock: "touch",
+  },
+];
+
+describe.each(MAP_NODE_CASES)("map node $id", ({ id, writes, writePaths, inputPaths, lock }) => {
+  const stepGraph = buildManifestStepGraph();
+  const projection = buildManifestProjection();
+
+  it("resolves as exactly one step-graph node and one projected stub node on the spine", () => {
+    expect(manifest.filter((s) => s.id === id)).toHaveLength(1);
+    expect(stepGraph.nodes.filter((n) => n.id === id)).toHaveLength(1);
+    const projected = projection.nodes.filter((n) => n.id === id);
+    expect(projected).toHaveLength(1);
+    expect(projected[0]!.kind).toBe("stub");
+    expect(stepGraph.nodes.find((n) => n.id === id)!.spine).toBe(true);
+  });
+
+  it("carries its declared writes and inputs", () => {
+    const node = stepGraph.nodes.find((n) => n.id === id)!;
+    expect(node.writePaths).toEqual(writes.map(formatIRPath));
+    expect(node.writePaths).toEqual(writePaths);
+    expect(node.inputPaths).toEqual(inputPaths);
+    expect(node.lock).toBe(lock);
+  });
+});
+
+// The mechanisms -> touch_seed_source fork is pinned by name in buildStepGraph.test.ts.
+it("track is branch-defining: spine -> characters, fork -> project_name (the copy-track side-trail)", () => {
+  const from = buildManifestStepGraph().edges.filter((e) => e.from === "track");
+  expect(from.find((e) => e.kind === "spine")?.to).toBe("characters");
+  expect(from.find((e) => e.kind === "fork")?.to).toBe("project_name");
+});
+
+// The two side-trails (spine:false) fork off the spine and join back; in the
+// rendered projection their edges are dashed "default" edges, never "linear".
+describe.each([
+  { id: "project_name", joinTarget: "characters" },
+  { id: "touch_seed_source", joinTarget: "touch" },
+])("side-trail $id", ({ id, joinTarget }) => {
+  const stepGraph = buildManifestStepGraph();
+  const projection = buildManifestProjection();
+
+  it(`is spine:false and forks in, then joins ${joinTarget}, with no spine edge of its own`, () => {
+    const node = stepGraph.nodes.find((n) => n.id === id)!;
+    expect(node.spine).toBe(false);
+    expect(node.joinTarget).toBe(joinTarget);
+    expect(stepGraph.edges.some((e) => e.kind === "join" && e.from === id && e.to === joinTarget)).toBe(true);
+    expect(stepGraph.edges.some((e) => e.kind === "fork" && e.to === id)).toBe(true);
+    expect(stepGraph.edges.some((e) => e.kind === "spine" && (e.from === id || e.to === id))).toBe(false);
+  });
+
+  it("renders only dashed default edges in the projection", () => {
+    const rendered = projection.edges.filter((e) => e.from === id || e.to === id);
+    expect(rendered.length).toBeGreaterThan(0);
+    for (const e of rendered) expect(e.kind).toBe("default");
   });
 });

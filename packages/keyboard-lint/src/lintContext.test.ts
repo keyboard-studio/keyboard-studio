@@ -6,7 +6,8 @@
 
 import { describe, it, expect } from "vitest";
 import { lintWithContext } from "./lintContext.js";
-import type { VirtualFS, TouchLayoutIR, KeyboardIR, ToleranceReport, DocLintInput } from "@keyboard-studio/contracts";
+import type { VirtualFS, TouchLayoutIR, ToleranceReport, DocLintInput } from "@keyboard-studio/contracts";
+import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 
 const KEYBOARD_ID = "test";
 
@@ -67,26 +68,6 @@ describe("lintWithContext — 18.6 touch coverage wiring", () => {
 // context-presence guard at the lintWithContext call site, matching the
 // existing 18.6 gating shape above.
 
-function makeKeyboardIR(): KeyboardIR {
-  return {
-    origin: "imported",
-    header: {
-      keyboardId: "test",
-      name: "Test",
-      bcp47: [],
-      copyright: "",
-      version: "1.0",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores: [],
-    groups: [],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  };
-}
-
 const TOLERANCE_REPORT: ToleranceReport = {
   findings: [
     {
@@ -104,7 +85,7 @@ const TOLERANCE_REPORT: ToleranceReport = {
 describe("lintWithContext — 19.x context tolerance wiring", () => {
   it("emits no KM_WARN_CONTEXT_NOT_TOLERANT findings when toleranceReport is absent", async () => {
     const findings = await lintWithContext(makeEmptyFS(), KEYBOARD_ID, {
-      keyboardIR: makeKeyboardIR(),
+      keyboardIR: makeTestIR(),
     });
     expect(findings.find((f) => f.code === "KM_WARN_CONTEXT_NOT_TOLERANT")).toBeUndefined();
   });
@@ -118,7 +99,7 @@ describe("lintWithContext — 19.x context tolerance wiring", () => {
 
   it("emits KM_WARN_CONTEXT_NOT_TOLERANT when both keyboardIR and toleranceReport are present", async () => {
     const findings = await lintWithContext(makeEmptyFS(), KEYBOARD_ID, {
-      keyboardIR: makeKeyboardIR(),
+      keyboardIR: makeTestIR(),
       toleranceReport: TOLERANCE_REPORT,
     });
     const toleranceFindings = findings.filter((f) => f.code === "KM_WARN_CONTEXT_NOT_TOLERANT");

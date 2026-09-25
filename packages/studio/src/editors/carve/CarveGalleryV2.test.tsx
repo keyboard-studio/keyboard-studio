@@ -17,7 +17,7 @@
 // test can inject a `reason: 'cross-script-latin'` row directly rather than
 // reconstructing a real non-Latin bcp47/langtags scenario.
 
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { describe, it, expect, afterEach, vi } from 'vitest';
 import { cleanup, fireEvent, screen, within } from '@testing-library/react';
 import { render } from '../../test/renderWithI18n.tsx';
 import type { IRRule, IRGroup, IRStore, KeyboardIR, RemovalCapability, PlacementWorklist } from '@keyboard-studio/contracts';
@@ -70,10 +70,6 @@ afterEach(() => {
   cleanup();
   collectCharContributorsMock.mockReset();
   neededCharsResult.set(null);
-});
-
-beforeEach(() => {
-  useWorkingCopyStore.getState().reset();
 });
 
 // ---------------------------------------------------------------------------

@@ -463,9 +463,6 @@ function textOf(zip: Record<string, Uint8Array>, path: string): string {
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
   vi.setSystemTime(DAY_ONE);
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-  useDecisionLogStore.getState().reset();
   resetDecisionEntryIds();
 });
 

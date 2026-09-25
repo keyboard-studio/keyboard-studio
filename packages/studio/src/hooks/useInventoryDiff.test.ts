@@ -12,7 +12,7 @@
 //   9. Opaque fragment: a char produced only via a fragment's producedOutput
 //      sketch lands in alreadyProduced, not lettersToAdd.
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { renderHook, act } from "@testing-library/react";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
@@ -23,10 +23,6 @@ import type { IRGroup, IRStore, RawKmnFragment } from "@keyboard-studio/contract
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function resetStore() {
-  useWorkingCopyStore.getState().reset();
-}
 
 /**
  * Build an IRGroup that emits the given characters as individual {kind:"char"}
@@ -65,9 +61,6 @@ function setInventory(chars: string[]) {
     confirmedInventory: chars,
   });
 }
-
-beforeEach(resetStore);
-afterEach(resetStore);
 
 // ---------------------------------------------------------------------------
 // 1. baseIr null — fallback to full inventory
@@ -264,7 +257,7 @@ describe("useInventoryDiff — memoization", () => {
       // here — instantiateFromBase idempotence guard keys on base.id, but we
       // want to force a new IR. Use a different keyboard id via the store reset
       // + re-instantiate cycle.)
-      resetStore();
+      useWorkingCopyStore.getState().reset();
       seedBaseWithChars(["a", "e", "ŋ"]); // base now produces ŋ too
       setInventory(["a", "e", "ŋ", "ɓ"]);
     });

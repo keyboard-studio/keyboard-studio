@@ -17,6 +17,8 @@ import {
   type WorkingCopySnapshot,
 } from "./persistWorkingCopy.ts";
 import { DRAFT_VERSION } from "./draftPersistence.ts";
+import { makeScaffoldedIR } from "../test/irFixtures.ts";
+import { irGroup } from "@keyboard-studio/contracts/fixtures";
 
 // ---------------------------------------------------------------------------
 // sessionStorage stub (jsdom provides it but let's ensure clean isolation)
@@ -24,10 +26,6 @@ import { DRAFT_VERSION } from "./draftPersistence.ts";
 
 beforeEach(() => {
   sessionStorage.clear();
-  // Use the store's own reset action for full isolation. (A bare setState is a
-  // partial merge — it would only patch the enumerated keys and leave any field
-  // a prior test left dirty, e.g. `ir` / `removalCapabilities`, uncleared.)
-  useWorkingCopyStore.getState().reset();
 });
 
 afterEach(() => {
@@ -37,26 +35,6 @@ afterEach(() => {
 // ---------------------------------------------------------------------------
 // Helper — minimal KeyboardIR-like object
 // ---------------------------------------------------------------------------
-
-function makeMinimalIr() {
-  return {
-    origin: "scaffolded" as const,
-    header: {
-      keyboardId: "test",
-      name: "test",
-      bcp47: [],
-      copyright: "",
-      version: "10.0",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores: [],
-    groups: [],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  };
-}
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -80,7 +58,7 @@ describe("persistWorkingCopy", () => {
   });
 
   it("round-trips a string VFS entry verbatim", () => {
-    const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+    const ir = makeScaffoldedIR();
     const vfs = createVirtualFS([
       { path: "source/test.kmn", content: "c Test keyboard\nstore(&NAME) 'Test'\n", isBinary: false },
     ]);
@@ -132,7 +110,7 @@ describe("persistWorkingCopy", () => {
   });
 
   it("round-trips a binary VFS entry byte-for-byte (the Base64 critical case)", () => {
-    const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+    const ir = makeScaffoldedIR();
 
     // Fake .ico: 16 bytes with varied values including 0x00 and 0xFF.
     const fakeIco = new Uint8Array([0x00, 0x01, 0x7F, 0x80, 0xFF, 0xFE, 0x0A, 0x0D,
@@ -209,7 +187,7 @@ describe("persistWorkingCopy", () => {
   // emits zero artifacts — so resuming a draft of any keyboard with an icon
   // produced no .kmx, no .js, and a blank preview.
   it("round-trips byte content even when the entry's isBinary flag was never set", () => {
-    const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+    const ir = makeScaffoldedIR();
 
     const fakeIco = new Uint8Array([0x00, 0x00, 0x01, 0x00, 0x80, 0x81, 0xFF, 0xFE]);
 
@@ -258,7 +236,7 @@ describe("persistWorkingCopy", () => {
   });
 
   it("clears the snapshot key after rehydration (consume-and-clear)", () => {
-    const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+    const ir = makeScaffoldedIR();
     const vfs = createVirtualFS([]);
     useWorkingCopyStore.setState({
       instantiationMode: "adapt-existing",
@@ -304,31 +282,15 @@ describe("persistWorkingCopy", () => {
       context: [{ kind: "vkey" as const, vkey: "K_A", modifiers: [] }],
       output: [{ kind: "char" as const, char: "a" }],
     };
-    const irWithRemovable = {
-      origin: "scaffolded" as const,
-      header: {
-        keyboardId: "test",
-        name: "Test",
-        bcp47: [],
-        copyright: "",
-        version: "10.0",
-        targets: [],
-        storeDirectives: [],
-      },
-      stores: [],
+    const irWithRemovable = makeScaffoldedIR({
+      header: { name: "Test" },
       groups: [
-        {
+        irGroup({
           nodeId: "group-main",
-          name: "main",
-          usingKeys: true,
-          readonly: false,
-          rules: [removableRule],
-        },
+          rules: [removableRule] as unknown as import("@keyboard-studio/contracts").IRRule[],
+        }),
       ],
-      comments: [],
-      raw: [],
-      recognizedPatterns: [],
-    } as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+    });
 
     // Phase B result so session.axes is non-empty after merge.
     const testPhaseResults: import("@keyboard-studio/contracts").SurveyPhaseResult[] = [
@@ -398,25 +360,12 @@ describe("persistWorkingCopy", () => {
       output: [{ kind: "char" as const, char: "a" }],
     };
     const makeIr = (rules: unknown[]) =>
-      ({
-        origin: "scaffolded" as const,
-        header: {
-          keyboardId: "test",
-          name: "Test",
-          bcp47: [],
-          copyright: "",
-          version: "10.0",
-          targets: [],
-          storeDirectives: [],
-        },
-        stores: [],
+      makeScaffoldedIR({
+        header: { name: "Test" },
         groups: [
-          { nodeId: "group-main", name: "main", usingKeys: true, readonly: false, rules },
+          irGroup({ nodeId: "group-main", rules: rules as import("@keyboard-studio/contracts").IRRule[] }),
         ],
-        comments: [],
-        raw: [],
-        recognizedPatterns: [],
-      }) as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+      });
 
     const baseIr = makeIr([removableRule]); // base retains the removable rule
     const carveIr = makeIr([]); // carve working IR has had it removed
@@ -453,7 +402,7 @@ describe("persistWorkingCopy", () => {
   });
 
   it("round-trips Set fields as Sets (not arrays) after rehydration", () => {
-    const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+    const ir = makeScaffoldedIR();
     const vfs = createVirtualFS([]);
 
     useWorkingCopyStore.setState({
@@ -509,7 +458,7 @@ describe("persistWorkingCopy", () => {
 
   describe("deletedTouchKeyIds round-trip", () => {
     it("round-trips through sessionStorage snapshot/rehydrate", () => {
-      const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+      const ir = makeScaffoldedIR();
       const vfs = createVirtualFS([
         { path: "source/test.kmn", content: "c test\n", isBinary: false },
       ]);
@@ -557,7 +506,7 @@ describe("persistWorkingCopy", () => {
     it("snapshotWorkingCopyData serializes the Set as a plain string[]", () => {
       useWorkingCopyStore.getState().instantiateFromBase(
         { id: "kbd", displayName: "Kbd", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
-        { vfs: createVirtualFS(), ir: makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR },
+        { vfs: createVirtualFS(), ir: makeScaffoldedIR() },
       );
       useWorkingCopyStore.getState().deleteTouchKey("phone:default:U_0063");
 
@@ -567,7 +516,7 @@ describe("persistWorkingCopy", () => {
     });
 
     it("prepareWorkingCopySnapshot tolerates a pre-existing snapshot missing the field", () => {
-      const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+      const ir = makeScaffoldedIR();
       const legacySnapshot = {
         instantiationMode: "new-from-base",
         baseKeyboard: { id: "kbd", displayName: "Kbd", languages: [] },
@@ -612,7 +561,7 @@ describe("persistWorkingCopy", () => {
     });
 
     it("round-trip through sessionStorage snapshot/rehydrate", () => {
-      const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+      const ir = makeScaffoldedIR();
       const vfs = createVirtualFS([]);
 
       useWorkingCopyStore.getState().instantiateFromBase(
@@ -642,7 +591,7 @@ describe("persistWorkingCopy", () => {
     it("snapshotWorkingCopyData serializes both fields as plain JSON-safe data", () => {
       useWorkingCopyStore.getState().instantiateFromBase(
         { id: "kbd", displayName: "Kbd", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
-        { vfs: createVirtualFS(), ir: makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR },
+        { vfs: createVirtualFS(), ir: makeScaffoldedIR() },
       );
       useWorkingCopyStore.getState().commitKeyEdit({
         address: "phone:default:K_A",
@@ -659,7 +608,7 @@ describe("persistWorkingCopy", () => {
     });
 
     it("prepareWorkingCopySnapshot tolerates a pre-058 snapshot missing both fields, without clobbering store defaults", () => {
-      const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+      const ir = makeScaffoldedIR();
       const legacySnapshot = {
         instantiationMode: "new-from-base",
         baseKeyboard: { id: "kbd", displayName: "Kbd", languages: [] },
@@ -693,7 +642,7 @@ describe("persistWorkingCopy", () => {
     it("a rehydrated pre-058 snapshot loads without clobbering the store defaults", () => {
       // Write a raw pre-058-shaped envelope straight into sessionStorage —
       // simulating a draft saved by an older build, before these fields existed.
-      const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+      const ir = makeScaffoldedIR();
       const legacySnapshot = {
         instantiationMode: "new-from-base",
         baseKeyboard: { id: "kbd", displayName: "Kbd", languages: [] },
@@ -731,7 +680,7 @@ describe("persistWorkingCopy", () => {
   });
 
   describe("base-VFS serialization cache (efficiency)", () => {
-    const ir = makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR;
+    const ir = makeScaffoldedIR();
     const base = { id: "cache_kbd", displayName: "Cache Test", languages: ["en"] } as import("@keyboard-studio/contracts").BaseKeyboard;
 
     it("reuses the SAME baseVfsEntries array across calls while baseVfs is unchanged (no re-serialization)", () => {

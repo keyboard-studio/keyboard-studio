@@ -11,22 +11,18 @@
 // since routing in this flow is per-module (`definition.next`), and this
 // module cannot rewrite a DIFFERENT module's `next` field.
 //
-// TWO flow nodes live in this one file (both registered in registry.f.ts):
-//   - `pf_history_entry` (default export): the confirm/edit/dismiss choice.
-//   - `pf_history_entry_bullets` (named export `bulletsModule`): reached only
-//     when "edit" is chosen — free-text bullet editing, one bullet per line.
-// Both converge back on `pf_more_detail_gate`.
+// The confirm/edit/dismiss choice. Its edit branch routes to the companion
+// module `pf_history_entry_bullets.ts` (own file so the registry-wide
+// question-module contract suite can see it as a default export). Both
+// converge back on `pf_more_detail_gate`.
 //
 // DEFERRED WIRING SEAM (mirrors pf_welcome_paragraph.ts's `prefill`/
 // `requiredWhen`): `QuestionModule` (survey/types.ts) has no store-write hook,
 // and a question module must not import stores/ (depcruise
-// `question-modules-no-bypass-mutate-seam`). This module therefore exposes
-// PURE, named helpers beyond the locked contract —
-// `deriveHistoryEntryState` and `applyHistoryEntryAction` — for a
-// flow-assembly caller (flowStepOptions.tsx's `phaseFOptions`, the same seam
-// `prefill`/`requiredWhen` document) to call with live working-copy context
-// and thread into `setHistoryEntryState`. That wiring is NOT done in this
-// file; see this cycle's handoff notes for the exact call sites.
+// `question-modules-no-bypass-mutate-seam`). Pure helpers
+// `deriveHistoryEntryState` / `applyHistoryEntryAction` live in
+// lib/historyEntryState.ts for a flow-assembly caller (flowStepOptions.tsx's
+// `phaseFOptions`) to call with live working-copy context.
 
 import type { FlowQuestion, QuestionModule, ValidationResult } from "../../types.ts";
 
@@ -127,51 +123,6 @@ const mod: QuestionModule = {
   specRef: "specs/076-documentation-completeness",
 };
 export default mod;
-
-// ---------------------------------------------------------------------------
-// pf_history_entry_bullets — free-text bullet editing (edit branch only)
-// ---------------------------------------------------------------------------
-
-export const bulletsDefinition = {
-  id: "pf_history_entry_bullets",
-  prompt: "Edit the HISTORY entry's bullet points, one per line.",
-  help_text:
-    "Each line becomes one bullet under the entry's heading. Leave a line as " +
-    "we drafted it, reword it, remove it, or add your own — whatever is here " +
-    "when you continue is what ships.",
-  type: "text" as const,
-  required: false,
-  next: "pf_more_detail_gate",
-} satisfies FlowQuestion;
-
-export const bulletsFixtures: QuestionModule["fixtures"] = {
-  valid: [
-    { value: "Adapted from basic_kbdfr v1.3 via keyboard-studio.\nAdded 2 characters: é, è", note: "two edited bullets" },
-    { value: "", note: "blank is fine — falls back to the drafted bullets (see applyHistoryEntryAction)" },
-    { value: undefined, note: "undefined is fine (optional)" },
-  ],
-  invalid: [],
-};
-
-export const bulletsModule: QuestionModule = {
-  definition: bulletsDefinition,
-  fixtures: bulletsFixtures,
-  inputs: [],
-  writes: [],
-  specRef: "specs/076-documentation-completeness",
-};
-
-// ---------------------------------------------------------------------------
-// Pure model helpers (the deferred wiring seam — see module header)
-// ---------------------------------------------------------------------------
-
-/** Split a `pf_history_entry_bullets` answer into bullets: one per non-blank line. */
-export function parseEditedBullets(text: string): string[] {
-  return text
-    .split("\n")
-    .map((line) => line.trim())
-    .filter((line) => line.length > 0);
-}
 
 // `deriveHistoryEntryState` / `applyHistoryEntryAction` live in
 // lib/historyEntryState.ts: they need the engine's buildHistoryProposal, and

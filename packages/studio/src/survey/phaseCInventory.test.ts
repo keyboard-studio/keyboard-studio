@@ -7,9 +7,7 @@ import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { acceptedInvisibleChars, phaseCConfirmedInventory } from "./phaseCInventory.ts";
 
 beforeEach(() => {
-  usePhaseBDraftStore.getState().reset();
   resetPhaseBDraftDecisions();
-  useWorkingCopyStore.getState().reset();
 });
 
 describe("phaseCConfirmedInventory", () => {

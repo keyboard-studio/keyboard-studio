@@ -3,10 +3,12 @@ import {
   definition,
   validate,
   fixtures,
-  bulletsDefinition,
-  bulletsFixtures,
   HISTORY_ENTRY_ACTIONS,
 } from "../../../../src/survey/questions/f/pf_history_entry.ts";
+import {
+  definition as bulletsDefinition,
+  fixtures as bulletsFixtures,
+} from "../../../../src/survey/questions/f/pf_history_entry_bullets.ts";
 
 describe("pf_history_entry — definition", () => {
   it("has correct id and a conditional next: edit branches to the bullets screen, everything else falls through to the opt-in gate", () => {

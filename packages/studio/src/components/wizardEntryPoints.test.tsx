@@ -83,8 +83,6 @@ function seedWalkedSession(): void {
 
 beforeEach(() => {
   cleanup();
-  useSurveySessionStore.getState().reset();
-  useWorkingCopyStore.getState().reset();
   localStorage.clear();
 });
 

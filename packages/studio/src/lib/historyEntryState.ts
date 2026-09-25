@@ -12,7 +12,8 @@
 import type { HistoryEntryState, HistoryProposal, HistoryProposalStatus } from "@keyboard-studio/contracts";
 import { buildHistoryProposal } from "@keyboard-studio/engine";
 import type { HistoryProposalSeed } from "@keyboard-studio/engine";
-import { parseEditedBullets, type HistoryEntryAction } from "../survey/questions/f/pf_history_entry.ts";
+import { parseEditedBullets } from "../survey/questions/f/pf_history_entry_bullets.ts";
+import { type HistoryEntryAction } from "../survey/questions/f/pf_history_entry.ts";
 
 /**
  * Build or re-derive the stored `HistoryEntryState` for the current version.

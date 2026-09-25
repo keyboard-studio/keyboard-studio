@@ -56,10 +56,6 @@ vi.mock("./services.ts", () => ({
 // Helpers
 // ---------------------------------------------------------------------------
 
-function resetStore() {
-  useWorkingCopyStore.getState().reset();
-}
-
 function seedStore(opts: { withAssignments?: MechanismAssignment[] } = {}) {
   const vfs = createVirtualFS([
     { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
@@ -73,12 +69,10 @@ function seedStore(opts: { withAssignments?: MechanismAssignment[] } = {}) {
 }
 
 beforeEach(() => {
-  resetStore();
   vi.clearAllMocks();
 });
 
 afterEach(() => {
-  resetStore();
   vi.clearAllMocks();
 });
 
@@ -103,7 +97,7 @@ describe("serializeWorkingCopy — not-instantiated returns null", () => {
     // Zustand set is not directly accessible; use reset() and check null guard.
     // Since we cannot set individual slots via public API here, just test the
     // clean-slate case which is the primary guard.
-    resetStore();
+    useWorkingCopyStore.getState().reset();
     const result2 = await serializeWorkingCopy();
     expect(result2).toBeNull();
     void state; // suppress unused warning

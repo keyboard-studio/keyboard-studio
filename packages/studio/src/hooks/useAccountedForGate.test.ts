@@ -9,18 +9,12 @@
 // gates (a DIFFERENT hook, useInventoryCoverageGate(), read directly) are
 // unaffected by anything this hook computes.
 
-import { describe, it, expect, beforeEach, afterEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { seedInstantiatedWorkingCopy } from "../test/workingCopy.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import { createVirtualFS } from "@keyboard-studio/contracts";
-import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
-
-function resetStores() {
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-}
 
 function swapAssignment(target: string): MechanismAssignment {
   return {
@@ -32,20 +26,6 @@ function swapAssignment(target: string): MechanismAssignment {
   };
 }
 
-function seedInstantiatedWorkingCopy(inventory: string[]) {
-  const vfs = createVirtualFS([
-    { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
-  ]);
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir: makeTestIR([]) });
-  useWorkingCopyStore.getState().recordPhase({
-    phase: "B",
-    answers: [],
-    confirmedInventory: inventory,
-  });
-}
-
-beforeEach(resetStores);
-afterEach(resetStores);
 
 describe("useAccountedForGate", () => {
   it("counts every unimplemented character as unaccounted before any marks are recorded", async () => {

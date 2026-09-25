@@ -9,8 +9,12 @@
 //   • REGISTERED   — a key in its sub-registry (reserveRegistry) and in the merged
 //                    questionRegistry, with the key matching definition.id;
 //   • ON DISK      — its module file resolves at survey/questions/reserve/<id>.ts;
-//   • TEST-COVERED — a colocated spec exists in the mirrored tree
-//                    (tests/survey/questions/reserve/<id>.test.ts);
+//   • TEST-COVERED — run by the parametric reserve suite
+//                    (tests/survey/questions/reserve/reserveModules.test.ts, which
+//                    iterates reserveRegistry through the shared question-module
+//                    contract suite) AND declaring at least one valid fixture, so
+//                    that run is not vacuous. (Amendment 2026-09-23: this replaced
+//                    one mirror file per module — see spec 022's amendment note.)
 //   • REVIVABLE    — by re-adding its id to a flow YAML / flow-source (no code
 //                    change, no re-registration, no file restore — asserted
 //                    structurally: the registry entry + file + test all persist).
@@ -33,6 +37,8 @@ import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 
+import type { QuestionModule } from "../types.ts";
+import { RESERVE_QUESTION_MODULES } from "../../test/questionModuleContract.ts";
 import { questionRegistry } from "./registry.ts";
 import { reserveRegistry } from "./registry.reserve.ts";
 import {
@@ -53,18 +59,26 @@ import {
 // separately so the reserve folder's full 31-module coverage is genuinely detected.
 const PB_MARK_INPUT_ORDER = "pb_mark_input_order";
 
-// Resolve the on-disk module dir (./reserve/) and the mirrored test dir relative to
-// THIS file (packages/studio/src/survey/questions/noDeleteGuardrail.test.ts).
+// Resolve the on-disk module dir (./reserve/) and the parametric reserve suite
+// relative to THIS file (packages/studio/src/survey/questions/noDeleteGuardrail.test.ts).
 const thisDir = path.dirname(fileURLToPath(import.meta.url));
 const moduleDir = path.join(thisDir, "reserve");
-const testDir = path.resolve(thisDir, "../../../tests/survey/questions/reserve");
+const reserveSuitePath = path.resolve(thisDir, "../../../tests/survey/questions/reserve/reserveModules.test.ts");
 
 function modulePath(id: string): string {
   return path.join(moduleDir, `${id}.ts`);
 }
-function testPath(id: string): string {
-  return path.join(testDir, `${id}.test.ts`);
+
+/**
+ * TEST-COVERED predicate: the module is one the parametric reserve suite runs,
+ * and it declares at least one valid fixture for that run to exercise.
+ */
+function isTestCovered(mod: QuestionModule | undefined): boolean {
+  return mod !== undefined && mod.fixtures.valid.length > 0;
 }
+
+/** The modules the parametric reserve suite runs, keyed by id. */
+const suiteModules = new Map(RESERVE_QUESTION_MODULES.map((e) => [e.id, e.mod]));
 
 describe("spec 022 — no-delete library guardrail (demoted Phase A)", () => {
   it("covers exactly 30 demoted Phase A modules (15 identity + 15 provenance_*)", () => {
@@ -98,7 +112,7 @@ describe("spec 022 — no-delete library guardrail (demoted Phase A)", () => {
     ).toBe(true);
     expect(reserveRegistry[PB_MARK_INPUT_ORDER]?.definition.id).toBe(PB_MARK_INPUT_ORDER);
     expect(existsSync(modulePath(PB_MARK_INPUT_ORDER))).toBe(true);
-    expect(existsSync(testPath(PB_MARK_INPUT_ORDER))).toBe(true);
+    expect(isTestCovered(suiteModules.get(PB_MARK_INPUT_ORDER))).toBe(true);
   });
 
   it("FR-004/FR-005: every demoted id RESOLVES TO A MODULE ON DISK (survey/questions/reserve/<id>.ts)", () => {
@@ -110,11 +124,13 @@ describe("spec 022 — no-delete library guardrail (demoted Phase A)", () => {
     }
   });
 
-  it("FR-004/FR-005: every demoted id REMAINS TEST-COVERED (mirrored tests/survey/questions/reserve/<id>.test.ts)", () => {
+  it("FR-004/FR-005: every demoted id REMAINS TEST-COVERED (parametric reserve suite + at least one valid fixture)", () => {
+    expect(existsSync(reserveSuitePath), `parametric reserve suite missing: ${reserveSuitePath}`).toBe(true);
     for (const id of DEMOTED_PHASE_A) {
+      expect(suiteModules.has(id), `demoted module "${id}" is not run by the parametric reserve suite`).toBe(true);
       expect(
-        existsSync(testPath(id)),
-        `demoted module test coverage missing: ${testPath(id)}`,
+        isTestCovered(suiteModules.get(id)),
+        `demoted module "${id}" declares no valid fixture — the parametric suite would exercise nothing`,
       ).toBe(true);
     }
   });
@@ -164,7 +180,7 @@ describe("spec 022 — no-delete guardrail: RED on deletion/unregistration, GREE
   // Real sets, computed from the live registry + filesystem.
   const registered = new Set(DEMOTED_PHASE_A.filter((id) => Object.prototype.hasOwnProperty.call(reserveRegistry, id)));
   const onDisk = new Set(DEMOTED_PHASE_A.filter((id) => existsSync(modulePath(id))));
-  const covered = new Set(DEMOTED_PHASE_A.filter((id) => existsSync(testPath(id))));
+  const covered = new Set(DEMOTED_PHASE_A.filter((id) => isTestCovered(suiteModules.get(id))));
 
   it("baseline: the REAL sets produce NO violations (GREEN)", () => {
     expect(noDeleteViolations(DEMOTED_PHASE_A, registered, onDisk, covered)).toEqual({
@@ -204,5 +220,16 @@ describe("spec 022 — no-delete guardrail: RED on deletion/unregistration, GREE
     expect(v.uncovered).toEqual([VICTIM]);
     expect(covered.has(VICTIM)).toBe(true);
     expect(noDeleteViolations(DEMOTED_PHASE_A, registered, onDisk, covered).uncovered).toEqual([]);
+  });
+
+  it("SC-003: a demoted module whose fixtures are EMPTIED is no longer TEST-COVERED (RED)", () => {
+    const VICTIM = "region";
+    const real = suiteModules.get(VICTIM);
+    expect(isTestCovered(real)).toBe(true);
+    // Injected clone with no fixtures — the real module is untouched.
+    const emptied: QuestionModule = { ...real!, fixtures: { valid: [], invalid: [] } };
+    expect(isTestCovered(emptied)).toBe(false);
+    const injected = new Set(DEMOTED_PHASE_A.filter((id) => isTestCovered(id === VICTIM ? emptied : suiteModules.get(id))));
+    expect(noDeleteViolations(DEMOTED_PHASE_A, registered, onDisk, injected).uncovered).toEqual([VICTIM]);
   });
 });

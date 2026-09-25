@@ -22,14 +22,11 @@
 import { describe, it, expect } from "vitest";
 import { enumerateTouchMethodsForChar } from "./enumerateTouchMethodsForChar.js";
 import type { TouchLayoutIR, TouchKeyIR } from "@keyboard-studio/contracts";
+import { touchKey } from "@keyboard-studio/contracts/fixtures";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
 // ---------------------------------------------------------------------------
-
-function makeKey(id: string, overrides: Partial<TouchKeyIR> = {}): TouchKeyIR {
-  return { nodeId: `node_${id}`, id, ...overrides };
-}
 
 function makeLayout(
   phoneDefaultKeys: TouchKeyIR[],
@@ -60,7 +57,7 @@ function makeLayout(
 
 describe("enumerateTouchMethodsForChar", () => {
   it("finds a U_-id main key and marks it deletable with structured fields", () => {
-    const layout = makeLayout([makeKey("U_0061", { text: "a" })]);
+    const layout = makeLayout([touchKey({ id: "U_0061", text: "a" })]);
 
     const result = enumerateTouchMethodsForChar(layout, "a");
 
@@ -78,7 +75,7 @@ describe("enumerateTouchMethodsForChar", () => {
   });
 
   it("finds a main key whose char comes from `output` and marks it deletable", () => {
-    const layout = makeLayout([makeKey("K_X", { text: "a", output: "a" })]);
+    const layout = makeLayout([touchKey({ id: "K_X", text: "a", output: "a" })]);
 
     const result = enumerateTouchMethodsForChar(layout, "a");
 
@@ -86,7 +83,7 @@ describe("enumerateTouchMethodsForChar", () => {
   });
 
   it("marks a K_-id, text-only main key (plain letter key) as deletable (fix: was falsely non-deletable)", () => {
-    const layout = makeLayout([makeKey("K_A", { text: "a" })]);
+    const layout = makeLayout([touchKey({ id: "K_A", text: "a" })]);
 
     const result = enumerateTouchMethodsForChar(layout, "a");
 
@@ -98,9 +95,7 @@ describe("enumerateTouchMethodsForChar", () => {
 
   it("omits `host` (rather than leaking the raw id) for a host key with no text/output and a non-U_ id", () => {
     const layout = makeLayout([
-      makeKey("K_A", {
-        sk: [makeKey("U_00E1", { text: "á" })],
-      }),
+      touchKey({ id: "K_A", sk: [touchKey({ id: "U_00E1", text: "á" })] }),
     ]);
 
     const result = enumerateTouchMethodsForChar(layout, "á");
@@ -111,7 +106,7 @@ describe("enumerateTouchMethodsForChar", () => {
   });
 
   it("marks a main key with `nextlayer` as NOT deletable (layer-switch guard)", () => {
-    const layout = makeLayout([makeKey("K_A", { text: "a", nextlayer: "shift" })]);
+    const layout = makeLayout([touchKey({ id: "K_A", text: "a", nextlayer: "shift" })]);
 
     const result = enumerateTouchMethodsForChar(layout, "a");
 
@@ -122,9 +117,10 @@ describe("enumerateTouchMethodsForChar", () => {
 
   it("finds a longpress (sk[]) entry and sets host to the host key's display", () => {
     const layout = makeLayout([
-      makeKey("U_0061", {
+      touchKey({
+        id: "U_0061",
         text: "a",
-        sk: [makeKey("U_00E1", { text: "á" })],
+        sk: [touchKey({ id: "U_00E1", text: "á" })],
       }),
     ]);
 
@@ -145,9 +141,10 @@ describe("enumerateTouchMethodsForChar", () => {
 
   it("surfaces the sk sub-entry's own layerAnnotation when present (placement-priors v2)", () => {
     const layout = makeLayout([
-      makeKey("U_0065", {
+      touchKey({
+        id: "U_0065",
         text: "e",
-        sk: [makeKey("U_025B", { text: "ɛ", layerAnnotation: "rightalt" })],
+        sk: [touchKey({ id: "U_025B", text: "ɛ", layerAnnotation: "rightalt" })],
       }),
     ]);
 
@@ -169,9 +166,10 @@ describe("enumerateTouchMethodsForChar", () => {
 
   it("omits skLayerAnnotation when the sk sub-entry carries no layer annotation", () => {
     const layout = makeLayout([
-      makeKey("U_0061", {
+      touchKey({
+        id: "U_0061",
         text: "a",
-        sk: [makeKey("U_00E1", { text: "á" })],
+        sk: [touchKey({ id: "U_00E1", text: "á" })],
       }),
     ]);
 
@@ -182,9 +180,10 @@ describe("enumerateTouchMethodsForChar", () => {
 
   it("finds a multitap entry", () => {
     const layout = makeLayout([
-      makeKey("U_0065", {
+      touchKey({
+        id: "U_0065",
         text: "e",
-        multitap: [makeKey("U_00E9", { text: "é" })],
+        multitap: [touchKey({ id: "U_00E9", text: "é" })],
       }),
     ]);
 
@@ -205,9 +204,10 @@ describe("enumerateTouchMethodsForChar", () => {
 
   it("finds a flick entry and sets the `direction` field", () => {
     const layout = makeLayout([
-      makeKey("U_006E", {
+      touchKey({
+        id: "U_006E",
         text: "n",
-        flick: { ne: makeKey("U_00F1", { text: "ñ" }) },
+        flick: { ne: touchKey({ id: "U_00F1", text: "ñ" }) },
       }),
     ]);
 
@@ -229,7 +229,7 @@ describe("enumerateTouchMethodsForChar", () => {
 
   it("matches canonically — an NFD-stored key text matches an NFC query char", () => {
     const nfdA = "á"; // "á" as base + combining acute
-    const layout = makeLayout([makeKey("U_00E1", { text: nfdA })]);
+    const layout = makeLayout([touchKey({ id: "U_00E1", text: nfdA })]);
 
     const result = enumerateTouchMethodsForChar(layout, "á");
 
@@ -239,18 +239,19 @@ describe("enumerateTouchMethodsForChar", () => {
   });
 
   it("skips a main key whose id is K_BKSP even if it happens to match (defensive backspace filter)", () => {
-    const layout = makeLayout([makeKey("K_BKSP", { text: "a" })]);
+    const layout = makeLayout([touchKey({ id: "K_BKSP", text: "a" })]);
 
     expect(enumerateTouchMethodsForChar(layout, "a")).toEqual([]);
   });
 
   it("skips a longpress/multitap/flick sub-entry whose id is K_BKSP (defensive backspace filter)", () => {
     const layout = makeLayout([
-      makeKey("U_0061", {
+      touchKey({
+        id: "U_0061",
         text: "a",
-        sk: [makeKey("K_BKSP", { text: "b" })],
-        multitap: [makeKey("K_BKSP", { text: "c" })],
-        flick: { ne: makeKey("K_BKSP", { text: "d" }) },
+        sk: [touchKey({ id: "K_BKSP", text: "b" })],
+        multitap: [touchKey({ id: "K_BKSP", text: "c" })],
+        flick: { ne: touchKey({ id: "K_BKSP", text: "d" }) },
       }),
     ]);
 
@@ -260,17 +261,17 @@ describe("enumerateTouchMethodsForChar", () => {
   });
 
   it("returns an empty list when nothing produces the character", () => {
-    const layout = makeLayout([makeKey("U_0061", { text: "a" })]);
+    const layout = makeLayout([touchKey({ id: "U_0061", text: "a" })]);
 
     expect(enumerateTouchMethodsForChar(layout, "z")).toEqual([]);
   });
 
   it("lists every producing method across multiple platforms/layers", () => {
     const layout = makeLayout(
-      [makeKey("U_0061", { text: "a" })],
+      [touchKey({ id: "U_0061", text: "a" })],
       {
-        tabletPlatform: [makeKey("U_0061", { text: "a" })],
-        extraPhoneLayer: { id: "shift", keys: [makeKey("U_0061", { text: "a" })] },
+        tabletPlatform: [touchKey({ id: "U_0061", text: "a" })],
+        extraPhoneLayer: { id: "shift", keys: [touchKey({ id: "U_0061", text: "a" })] },
       },
     );
 

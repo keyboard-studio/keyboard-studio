@@ -44,13 +44,11 @@ function seedTrack2() {
 }
 
 beforeEach(() => {
-  useWorkingCopyStore.getState().reset();
   vi.clearAllMocks();
 });
 
 afterEach(() => {
   cleanup();
-  useWorkingCopyStore.getState().reset();
 });
 
 // ---------------------------------------------------------------------------

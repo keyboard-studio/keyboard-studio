@@ -1,31 +1,23 @@
 import { describe, it, expect } from "vitest";
 import { buildProducedSet } from "./producedSet.js";
-import { makeTestIR, charItems } from "../fixtures/keyboard-ir.js";
+import { makeTestIR } from "../fixtures/keyboard-ir.js";
 import type { IRGroup, IRRule, IRStore, RawKmnFragment } from "../keyboard-ir.js";
+import { charStore, irGroup, vkeyRule } from "../fixtures/ir-builders.js";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 function makeGroup(rules: IRRule[], name = "main"): IRGroup {
-  return { nodeId: `group#${name}`, name, usingKeys: true, readonly: false, rules };
+  return irGroup({ rules, name });
 }
 
 function makeRule(output: IRRule["output"]): IRRule {
-  return {
-    nodeId: `rule#${Math.random().toString(36).slice(2)}`,
-    context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
-    output,
-  };
+  return vkeyRule({ output });
 }
 
 function makeStore(name: string, chars: string): IRStore {
-  return {
-    nodeId: `store#${name}`,
-    name,
-    items: charItems(chars),
-    isSystem: false,
-  };
+  return charStore({ name, chars });
 }
 
 // ---------------------------------------------------------------------------

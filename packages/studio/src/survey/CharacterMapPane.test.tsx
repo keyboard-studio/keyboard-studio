@@ -151,9 +151,6 @@ function seedBaseProducing(produced: string[], bcp47 = "yo", languageName = "Yor
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-  usePhaseBDraftStore.getState().reset();
   getGroupsResult.set(twoGroupFixture());
   callCount.reset();
   unsupportedDisplays.set([]);
@@ -162,9 +159,6 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   vi.clearAllMocks();
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-  usePhaseBDraftStore.getState().reset();
 });
 
 // ---------------------------------------------------------------------------

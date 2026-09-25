@@ -1,25 +1,23 @@
 // Tests for pf_history_entry (spec 076 T043/T045, contracts/studio-surfaces.md §3).
 //
 // Coverage:
-//   - module shape (definition/id/routing, inputs/writes, bulletsModule)
-//   - validate() fixtures for both modules
+//   - module shape (definition/id/routing, inputs/writes)
+//   - validate() fixtures
 //   - deriveHistoryEntryState: first render, unchanged version, version
 //     change (heading/version + bullets re-derived, dateIso/status/
 //     editedBullets preserved)
 //   - applyHistoryEntryAction: confirm / dismiss / edit (with and without
 //     edited text)
-//   - parseEditedBullets
+//   - parseEditedBullets (companion module)
 
 import { describe, it, expect } from "vitest";
 import type { HistoryEntryState } from "@keyboard-studio/contracts";
 import type { HistoryProposalSeed } from "@keyboard-studio/engine";
-import mod, {
-  bulletsModule,
-  definition,
-  bulletsDefinition,
-  validate,
+import mod, { definition, validate } from "./pf_history_entry.ts";
+import bulletsMod, {
+  definition as bulletsDefinition,
   parseEditedBullets,
-} from "./pf_history_entry.ts";
+} from "./pf_history_entry_bullets.ts";
 import { applyHistoryEntryAction, deriveHistoryEntryState } from "../../../lib/historyEntryState.ts";
 
 const EMPTY_SEED: HistoryProposalSeed = {
@@ -57,11 +55,11 @@ describe("pf_history_entry — module shape", () => {
     expect(mod.specRef).toBe("specs/076-documentation-completeness");
   });
 
-  it("the bullets module routes straight to the opt-in gate", () => {
+  it("the bullets companion routes straight to the opt-in gate", () => {
     expect(bulletsDefinition.id).toBe("pf_history_entry_bullets");
     expect(bulletsDefinition.next).toBe("pf_more_detail_gate");
-    expect(bulletsModule.inputs).toEqual([]);
-    expect(bulletsModule.writes).toEqual([]);
+    expect(bulletsMod.inputs).toEqual([]);
+    expect(bulletsMod.writes).toEqual([]);
   });
 });
 

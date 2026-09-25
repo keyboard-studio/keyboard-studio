@@ -426,9 +426,6 @@ function expectPresentZero(summary: EditorActionSummary, key: keyof EditorAction
 }
 
 beforeEach(() => {
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-  useDecisionLogStore.getState().reset();
   resetDecisionEntryIds();
 });
 
