@@ -44,8 +44,6 @@ function walkToCharacters(): void {
 beforeEach(() => {
   vi.mocked(navigateTo).mockClear();
   clearPendingJump();
-  useSurveySessionStore.getState().reset();
-  useWorkingCopyStore.getState().reset();
   window.location.hash = "#trail";
 });
 

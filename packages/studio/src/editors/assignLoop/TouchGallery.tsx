@@ -484,7 +484,7 @@ export function describeUndoTarget(
  * Takes an optional i18n + resolves via msg()/resolveMessage() rather than a
  * bare `t` parameter — Lingui's macro tracks the specific binding introduced
  * by useLingui(), so a re-bound `t` parameter is a distinct binding the
- * extractor does not follow (see Inspector.tsx's storeBlurb for the same fix). */
+ * extractor does not follow (see resolveMessage in lib/i18nResolve.ts). */
 function touchMechanismLabel(
   target: string,
   m: MechanismRef,
@@ -988,8 +988,7 @@ interface TouchLayerBuilderSectionProps {
  * the per-method `t({id, message})` calls below stay traceable to a
  * same-scope `useLingui()` binding for Lingui's macro extractor — a `t`
  * passed in as a parameter is a distinct binding the extractor does not
- * follow (see `touchMechanismLabel`'s and Inspector.tsx's `storeBlurb`'s note
- * on the same constraint).
+ * follow (see `touchMechanismLabel`'s note on the same constraint).
  */
 function TouchLayerBuilderSection({
   method,
@@ -1112,7 +1111,7 @@ function TouchLayerBuilderSection({
 }
 
 // Chrome (option labels); built per-render via the optional-i18n +
-// msg()/resolveMessage() pattern (see Inspector.tsx's storeBlurb) rather than
+// msg()/resolveMessage() pattern (see lib/i18nResolve.ts) rather than
 // a bare `t` parameter — Lingui's macro tracks the specific binding
 // introduced by useLingui(), so a re-bound `t` parameter is a distinct
 // binding the extractor does not follow.

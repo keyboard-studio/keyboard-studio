@@ -5,29 +5,24 @@
 //      gid === "<outputStoreNodeId>#<i>"; non-char slots (nul/beep) produce no glyph.
 //   2. A simple `+ [K_A] > 'x'` rule still produces exactly one glyph with
 //      gid === rule.nodeId (no `#`).
-//   3. glyphsTriState: deleting one of N parallel-store glyphs yields 'partial'.
 //   4. CarveGlyph.capability resolves for both gid forms; defaults to
 //      'not-removable:unknown' when the map lacks the key.
 
 import { describe, it, expect } from 'vitest';
-import type { IRRule, IRGroup, IRStore, KeyboardIR, RemovalCapability, StoreItem } from '@keyboard-studio/contracts';
-import { groupToGlyphs, toRailNodes, glyphsTriState, storeCharChips } from './irToCarveNodes.ts';
+import type { IRRule, IRStore, RemovalCapability, StoreItem } from '@keyboard-studio/contracts';
+import { groupToGlyphs, toRailNodes, storeCharChips } from './irToCarveNodes.ts';
+import { charStore, irGroup, makeTestIR, vkeyRule } from '@keyboard-studio/contracts/fixtures';
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
 // ---------------------------------------------------------------------------
 
 function makeOutputStore(nodeId: string, name: string, items: StoreItem[]): IRStore {
-  return { nodeId, name, items, isSystem: false };
+  return charStore({ nodeId, name, items });
 }
 
 function makeInputStore(nodeId: string, name: string, chars: string[]): IRStore {
-  return {
-    nodeId,
-    name,
-    items: chars.map((c) => ({ kind: 'char' as const, value: c })),
-    isSystem: false,
-  };
+  return charStore({ nodeId, name, chars });
 }
 
 function makeVkeyInputStore(nodeId: string, name: string, vkeys: string[]): IRStore {
@@ -70,35 +65,7 @@ function makeBareParallelRule(
 }
 
 function makeSimpleRule(nodeId: string, vkey: string, char: string): IRRule {
-  return {
-    nodeId,
-    context: [{ kind: 'vkey', name: vkey, modifiers: [] }],
-    output: [{ kind: 'char', value: char }],
-  };
-}
-
-function makeGroup(nodeId: string, name: string, rules: IRRule[]): IRGroup {
-  return { nodeId, name, usingKeys: true, rules, readonly: false };
-}
-
-function makeIR(groups: IRGroup[], stores: IRStore[]): KeyboardIR {
-  return {
-    origin: 'imported',
-    header: {
-      keyboardId: 'test',
-      name: 'Test',
-      bcp47: [],
-      copyright: '',
-      version: '1.0',
-      targets: [],
-      storeDirectives: [],
-    },
-    stores,
-    groups,
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  };
+  return vkeyRule({ nodeId, vkey, output: char });
 }
 
 // Build a parallel-store IR with:
@@ -106,7 +73,7 @@ function makeIR(groups: IRGroup[], stores: IRStore[]): KeyboardIR {
 //   input store dkfX: [char 'a', char 'b', char 'c', char 'd']
 //   parallel rule: dk(003b) any(dkfX) > index(dktX, 2)
 //   simple rule: + [K_A] > 'x'
-function makeTestIR() {
+function makeParallelStoreIR() {
   const outputStoreNodeId = 'store#dkt';
   const inputStoreNodeId = 'store#dkf';
 
@@ -123,8 +90,8 @@ function makeTestIR() {
   const parallelRule = makeParallelRule('rule#dk', 0x003b, 'dkfX', 'dktX');
   const simpleRule = makeSimpleRule('rule#simple', 'K_A', 'x');
 
-  const group = makeGroup('group#main', 'main', [parallelRule, simpleRule]);
-  return makeIR([group], [outputStore, inputStore]);
+  const group = irGroup({ nodeId: 'group#main', rules: [parallelRule, simpleRule] });
+  return makeTestIR([group], [outputStore, inputStore]);
 }
 
 // ---------------------------------------------------------------------------
@@ -133,7 +100,7 @@ function makeTestIR() {
 
 describe('irToCarveNodes — parallel-store rule expansion', () => {
   it('groupToGlyphs produces one glyph per char output-store item with gid=<storeNodeId>#<i>', () => {
-    const ir = makeTestIR();
+    const ir = makeParallelStoreIR();
     const group = ir.groups[0]!;
     // Pass only the parallel rule's group (exclude simple rule for isolation)
     const parallelOnlyGroup = {
@@ -155,7 +122,7 @@ describe('irToCarveNodes — parallel-store rule expansion', () => {
   });
 
   it('nul/beep slots produce no glyph', () => {
-    const ir = makeTestIR();
+    const ir = makeParallelStoreIR();
     const group = ir.groups[0]!;
     const parallelOnlyGroup = {
       ...group,
@@ -171,7 +138,7 @@ describe('irToCarveNodes — parallel-store rule expansion', () => {
   });
 
   it('keys array includes the deadkey marker and the matched input char', () => {
-    const ir = makeTestIR();
+    const ir = makeParallelStoreIR();
     const group = ir.groups[0]!;
     const parallelOnlyGroup = {
       ...group,
@@ -192,7 +159,7 @@ describe('irToCarveNodes — parallel-store rule expansion', () => {
 
 describe('irToCarveNodes — simple rule gid contract', () => {
   it('simple vkey→char rule produces exactly one glyph with gid === rule.nodeId', () => {
-    const ir = makeTestIR();
+    const ir = makeParallelStoreIR();
     const group = ir.groups[0]!;
     const simpleOnlyGroup = {
       ...group,
@@ -210,59 +177,12 @@ describe('irToCarveNodes — simple rule gid contract', () => {
 });
 
 // ---------------------------------------------------------------------------
-// 3. glyphsTriState: partial when one of N parallel-store glyphs is deleted
-// ---------------------------------------------------------------------------
-
-describe('irToCarveNodes — glyphsTriState with parallel-store glyphs', () => {
-  it("deleting one of two parallel-store glyphs yields 'partial'", () => {
-    const ir = makeTestIR();
-    const group = ir.groups[0]!;
-    const parallelOnlyGroup = {
-      ...group,
-      rules: group.rules.filter((r) => r.nodeId === 'rule#dk'),
-    };
-    const glyphs = groupToGlyphs(parallelOnlyGroup, ir);
-    expect(glyphs).toHaveLength(2);
-
-    // Delete only the first glyph
-    const result = glyphsTriState(glyphs, (id) => id === 'store#dkt#0');
-    expect(result).toBe('partial');
-  });
-
-  it("deleting all parallel-store glyphs yields 'off'", () => {
-    const ir = makeTestIR();
-    const group = ir.groups[0]!;
-    const parallelOnlyGroup = {
-      ...group,
-      rules: group.rules.filter((r) => r.nodeId === 'rule#dk'),
-    };
-    const glyphs = groupToGlyphs(parallelOnlyGroup, ir);
-
-    const result = glyphsTriState(glyphs, () => true);
-    expect(result).toBe('off');
-  });
-
-  it("deleting no glyphs yields 'on'", () => {
-    const ir = makeTestIR();
-    const group = ir.groups[0]!;
-    const parallelOnlyGroup = {
-      ...group,
-      rules: group.rules.filter((r) => r.nodeId === 'rule#dk'),
-    };
-    const glyphs = groupToGlyphs(parallelOnlyGroup, ir);
-
-    const result = glyphsTriState(glyphs, () => false);
-    expect(result).toBe('on');
-  });
-});
-
-// ---------------------------------------------------------------------------
 // 4. toRailNodes — parallel-store group appears with per-slot glyphs
 // ---------------------------------------------------------------------------
 
 describe('irToCarveNodes — toRailNodes with parallel-store group', () => {
   it('the group node has glyphs with store#dkt#<i> gids (not bare rule.nodeId)', () => {
-    const ir = makeTestIR();
+    const ir = makeParallelStoreIR();
     const nodes = toRailNodes(ir);
 
     const groupNode = nodes.find((n) => n.nodeId === 'group#main');
@@ -286,7 +206,7 @@ describe('irToCarveNodes — toRailNodes with parallel-store group', () => {
 
 describe('irToCarveNodes — CarveGlyph.capability resolution', () => {
   it('standard rule tile resolves capability via rule.nodeId', () => {
-    const ir = makeTestIR();
+    const ir = makeParallelStoreIR();
     const group = ir.groups[0]!;
     const simpleOnlyGroup = {
       ...group,
@@ -303,7 +223,7 @@ describe('irToCarveNodes — CarveGlyph.capability resolution', () => {
   });
 
   it('slot tile resolves capability via output-store nodeId (not rule.nodeId)', () => {
-    const ir = makeTestIR();
+    const ir = makeParallelStoreIR();
     const group = ir.groups[0]!;
     const parallelOnlyGroup = {
       ...group,
@@ -324,7 +244,7 @@ describe('irToCarveNodes — CarveGlyph.capability resolution', () => {
   });
 
   it("defaults to 'not-removable:unknown' when the map lacks the key (standard rule)", () => {
-    const ir = makeTestIR();
+    const ir = makeParallelStoreIR();
     const group = ir.groups[0]!;
     const simpleOnlyGroup = {
       ...group,
@@ -337,7 +257,7 @@ describe('irToCarveNodes — CarveGlyph.capability resolution', () => {
   });
 
   it("defaults to 'not-removable:unknown' when the map lacks the output-store nodeId (slot tile)", () => {
-    const ir = makeTestIR();
+    const ir = makeParallelStoreIR();
     const group = ir.groups[0]!;
     const parallelOnlyGroup = {
       ...group,
@@ -352,7 +272,7 @@ describe('irToCarveNodes — CarveGlyph.capability resolution', () => {
   });
 
   it('toRailNodes threads capabilities into group glyphs', () => {
-    const ir = makeTestIR();
+    const ir = makeParallelStoreIR();
     const caps = new Map<string, RemovalCapability>([
       ['rule#simple', 'removable:simple'],
       ['store#dkt', 'removable:slot-fill'],
@@ -391,8 +311,8 @@ describe('irToCarveNodes — bare transliteration fan-out (Bamum shape)', () => 
     const inputStore = makeVkeyInputStore(inputStoreNodeId, 'defaultK', ['K_BKQUOTE', 'K_1', 'K_2']);
 
     const rule = makeBareParallelRule('rule#bamum', 'defaultK', 'defaultU');
-    const group = makeGroup('group#bamum', 'bamum', [rule]);
-    return makeIR([group], [outputStore, inputStore]);
+    const group = irGroup({ nodeId: 'group#bamum', name: 'bamum', rules: [rule] });
+    return makeTestIR([group], [outputStore, inputStore]);
   }
 
   it('expands into one glyph per char output-store slot (nul skipped)', () => {
@@ -446,7 +366,7 @@ describe('irToCarveNodes — bare transliteration fan-out (Bamum shape)', () => 
 
   // Regression: existing deadkey-variant tests must still produce ['‹dk›', inputChar].
   it('REGRESSION — deadkey shape still emits the deadkey marker in keys[0]', () => {
-    const ir = makeTestIR();
+    const ir = makeParallelStoreIR();
     const group = ir.groups[0]!;
     const parallelOnlyGroup = {
       ...group,
@@ -469,7 +389,7 @@ describe('irToCarveNodes — bare transliteration fan-out (Bamum shape)', () => 
 
 describe('irToCarveNodes — #523 storeCharChips chip ids equal fan-out glyph gids', () => {
   it('output-store chip ids are identical to the parallel-fan-out glyph gids', () => {
-    const ir = makeTestIR();
+    const ir = makeParallelStoreIR();
     const group = ir.groups[0]!;
     const parallelOnlyGroup = {
       ...group,
@@ -489,7 +409,7 @@ describe('irToCarveNodes — #523 storeCharChips chip ids equal fan-out glyph gi
   });
 
   it('the output store classifies as a coordinated drop (paired with dkfX) for every chip (#931 — nul-fill mode removed; the resolved index(dktX,2)/any(dkfX) pairing now splices both stores together)', () => {
-    const ir = makeTestIR();
+    const ir = makeParallelStoreIR();
     const outputStore = ir.stores.find((s) => s.name === 'dktX')!;
     const chips = storeCharChips(outputStore, ir);
 

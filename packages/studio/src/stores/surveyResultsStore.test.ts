@@ -1,7 +1,7 @@
 // Tests for survey-results state in workingCopyStore — persistence + re-merge semantics.
 // Zustand store is exercised via getState() (no React needed).
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore } from "./workingCopyStore.ts";
 
@@ -17,8 +17,6 @@ const phaseB: SurveyPhaseResult = {
 };
 
 describe("surveyResultsStore", () => {
-  beforeEach(() => useWorkingCopyStore.getState().reset());
-
   it("starts empty with a merged empty session", () => {
     const s = useWorkingCopyStore.getState();
     expect(s.phaseResults).toEqual([]);

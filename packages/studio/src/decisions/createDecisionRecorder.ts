@@ -82,7 +82,7 @@ export interface DecisionRecorderDeps {
   /** `null` before instantiation; one of the two literals once instantiated. */
   getInstantiationMode: () => InstantiatedMode | null;
   /**
-   * Same map `CarveGallery` reads to build its own rail — see
+   * Same map the carve gallery reads to build its rail nodes — see
    * `RecordBaseContributionDeps.getRemovalCapabilities` (recordBaseContribution.ts)
    * for why a starting count must be read against this rather than defaulted.
    */

@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-09-21",
+  "lastUpdated": "2026-09-25",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -429,7 +429,7 @@
     },
     "specs/022-qu-library-demote": {
       "title": "Feature Specification: Library demote — demote the orphaned non-identity Phase A to reserve/library under the no-delete guardrail",
-      "hash": "sha256:8d205176926eb787",
+      "hash": "sha256:281092c5d5993ddb",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

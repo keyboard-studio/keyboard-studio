@@ -44,7 +44,6 @@ import {
 } from "./MechanismGallery.tsx";
 import { usePositionalCharNav } from "./usePositionalCharNav.ts";
 import { useWorkingCopyStore, bindManifest } from "../../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useStepWalkStore } from "../../stores/stepWalkStore.ts";
 import { charToPositionToken } from "../../lib/stepWalk.ts";
 import {
@@ -316,16 +315,9 @@ beforeAll(installDialogShim);
 
 afterEach(() => {
   cleanup();
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
   vi.clearAllMocks();
   _mockStage = { kind: "idle" };
   _lastVfsTransform = undefined;
-});
-
-beforeEach(() => {
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
 });
 
 // ---------------------------------------------------------------------------
@@ -4379,7 +4371,7 @@ describe("MechanismGallery — RAlt layer targeting (S-08)", () => {
     // The author picks slot 1 = Ctrl, slot 2 = an alt-family token — the
     // exact "Ctrl+Alt" selection reported as not working. A mixed
     // generic-ctrl + chiral-alt rule is kmcmplib-invalid
-    // (KM_WARNING_KMCMP_4202659) and can never be delivered by a real
+    // (KM_WARN_KMCMP_4202659) and can never be delivered by a real
     // keypress either. The picker must emit the all-generic, functional
     // [CTRL ALT K_X] rule instead.
     // LALT must already be "in use" for the pool to offer it under the new

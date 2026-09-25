@@ -146,7 +146,7 @@ export interface ProjectWorkingCopyVfsInput {
   targetKeyboardId?: string;
   baseIr: KeyboardIR;
   deletedNodeIds: ReadonlySet<string>;
-  /** Individual rule nodeIds removed via glyph-level carving (GlyphCell clicks). */
+  /** Individual rule nodeIds (and store-slot ids) removed via character-level carving. */
   deletedItemIds?: ReadonlySet<string>;
   /**
    * Individually-deleted pre-existing touch methods (main key / longpress /

@@ -123,10 +123,8 @@ describe("stripDanglingAssetStores", () => {
 // .kvk and no .js at all — a silent build failure, which is why the reference is
 // dropped from the author's source rather than only from the preview compile.
 //
-// The severity these arrive at is OUR fallback, not upstream's: kmc-kmn does not
-// populate `severity`, so compiler/index.ts defaults it to "warning" even though
-// kmn_compiler_errors.h defines this one as SevError. See the severity caveat in
-// stripDanglingAssetStores.ts.
+// The diagnostic is kmcmplib's ERROR_CannotReadBitmapFile (SevError | 0x031), and
+// compile() now surfaces it at that severity (decoded from the message code).
 // ---------------------------------------------------------------------------
 
 const WITH_BITMAP = [
@@ -192,12 +190,15 @@ describe("dropUnbackedBitmapStore", () => {
     const before = await compile(vfs, "probe");
     expect(before.artifacts).toEqual([]);
     expect(before.diagnostics.some((d) => /bitmap or icon/i.test(d.message))).toBe(true);
-    // Nothing reaches error/fatal — which pins compiler/index.ts's
-    // `message.severity ?? "warning"` FALLBACK, not kmcmplib's own severity
-    // (upstream types this one SevError). That gap is why the zero-artifact
-    // build is silent, and why this test asserts on artifacts, not severity.
-    expect(before.diagnostics.every((d) => d.severity !== "error" && d.severity !== "fatal")).toBe(
-      true,
+    // ...at upstream's own severity: ERROR_CannotReadBitmapFile is SevError, so
+    // the zero-artifact build is a loud error, not a silent warning.
+    expect(before.success).toBe(false);
+    expect(before.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: `KM_ERROR_KMCMP_${0x502031}`,
+        severity: "error",
+        message: expect.stringMatching(/bitmap or icon/i),
+      }),
     );
 
     // After: artifacts.

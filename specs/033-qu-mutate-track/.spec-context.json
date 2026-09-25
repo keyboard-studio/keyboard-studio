@@ -196,5 +196,6 @@
       "what": "retroactive verification 2026-08-19: all 9 tasks (FR-001 through FR-008 plus the gate reassessment) checked against live code",
       "result": "shipped across commits 7ba08030 (P4b foundation), 6baa4ad6 (promote track/project_name to manifest steps), d4f787b2 (spec 028 Stage 5, deletes hand-coded fork); no code changes needed"
     }
-  ]
+  ],
+  "telemetryInstanceId": "b443f06a-3d5d-4eea-8a1e-b9153984266c"
 }

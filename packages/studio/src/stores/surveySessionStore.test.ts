@@ -10,7 +10,7 @@
 //       a later popHistory still returns to the prior distinct step (D-R4).
 //   (e) empty-history popHistory() is a no-op (activeStepId stays "identity").
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import {
   useSurveySessionStore,
   snapshotTraversal,
@@ -22,15 +22,7 @@ function getStore() {
   return useSurveySessionStore.getState();
 }
 
-function resetStore() {
-  useSurveySessionStore.getState().reset();
-}
-
 describe("surveySessionStore", () => {
-  beforeEach(() => {
-    resetStore();
-  });
-
   // (a) copy-track back-walk
   it("copy-track back-walk: popHistory from characters lands on project_name", () => {
     const store = getStore();
@@ -514,8 +506,6 @@ describe("surveySessionStore", () => {
 // ---------------------------------------------------------------------------
 
 describe("surveySessionStore — mark for later review", () => {
-  beforeEach(resetStore);
-
   it("starts empty and toggleMarkedForLaterDesktop adds then removes a character", () => {
     expect(getStore().markedForLaterDesktop).toEqual([]);
 

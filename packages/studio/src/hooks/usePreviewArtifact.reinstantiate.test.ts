@@ -90,11 +90,9 @@ const instantiatePayload = {
 };
 
 beforeEach(() => {
-  useWorkingCopyStore.getState().reset();
   hoisted.capturedOnInstantiate.current = null;
 });
 afterEach(() => {
-  useWorkingCopyStore.getState().reset();
   vi.clearAllMocks();
 });
 

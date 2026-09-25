@@ -5,26 +5,19 @@
 // not a sample," so this test sweeps every attested pair, not just one.
 
 import { describe, it, expect } from "vitest";
-import type { KeyboardIR } from "@keyboard-studio/contracts";
-import { createVirtualFS } from "@keyboard-studio/contracts";
 import { parse } from "../codec/parse.js";
-import { emit } from "../codec/emit.js";
-import { compile } from "../compiler/index.js";
 import { simulate } from "../simulator/index.js";
 import { computeContextTolerance } from "./context-tolerance.js";
 import { proposeContextVariants } from "../pattern-apply/context-variants.js";
 import { createContextToleranceMigrationRule } from "../facet-transform/migrations/context-tolerance.js";
+import {
+  kmnHeader,
+  ACUTE_KEY,
+  MEASUREMENT,
+  compileIr,
+} from "../pattern-apply/__fixtures__/contextTolerance.js";
 
-const HEADER = [
-  "store(&NAME) 'ContextToleranceSweep'",
-  "store(&VERSION) '14.0'",
-  "store(&KEYBOARDVERSION) '1.0'",
-  "store(&TARGETS) 'any'",
-  "store(&mnemoniclayout) '1'",
-  "",
-  "begin Unicode > use(main)",
-  "",
-].join("\n");
+const HEADER = kmnHeader("ContextToleranceSweep");
 
 // Three attested base+mark pairs (grave vowel -> its circumflex counterpart),
 // mirroring the real sil_yoruba8 shape (any(base) + any(key.act) >
@@ -45,23 +38,6 @@ const SWEEP_KMN = [
 ].join("\n");
 
 const BASE_VOWELS = ["à", "è", "ò"];
-const ACUTE_KEY = { vkey: "K_RBRKT", modifiers: [] as const };
-
-const MEASUREMENT = {
-  facetId: "context-tolerance",
-  dominantValue: "not-tolerant",
-  confidenceClass: "confident" as const,
-  consistency: 1,
-  exceptionSites: [],
-  evidenceSize: 1,
-};
-
-async function compileIr(ir: KeyboardIR) {
-  const vfs = createVirtualFS([
-    { path: `source/${ir.header.keyboardId}.kmn`, content: emit(ir), isBinary: false },
-  ]);
-  return compile(vfs, ir.header.keyboardId);
-}
 
 describe("context-tolerance inventory sweep (spec 062 SC-001 + SC-006, T023)", () => {
   it("SC-006: the report accounts for 100% of the keyboard's rules", async () => {

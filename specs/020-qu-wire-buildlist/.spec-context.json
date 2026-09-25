@@ -40,5 +40,6 @@
       "what": "retroactive verification 2026-08-19: all 23 tasks checked against live code",
       "result": "shipped via commit cb8a86d0 (PR #873); BuildListView/IntroChooser/pb_build_list oracle/drillDownDeclarations all confirmed present and matching; spec.md line-number citations are stale (file grew from later features) but functionally accurate - cosmetic only"
     }
-  ]
+  ],
+  "telemetryInstanceId": "84069c8f-cd97-41bf-8a73-92c815ad5e60"
 }

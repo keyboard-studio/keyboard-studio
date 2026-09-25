@@ -14,31 +14,24 @@ import {
   applyMutatePatch,
   MutatePatchContainmentError,
 } from "../../src/steps/mutateApply.ts";
+import { charStore, makeTestIR } from "@keyboard-studio/contracts/fixtures";
 
 // ---------------------------------------------------------------------------
 // Fixture — a minimal but structurally real KeyboardIR.
 // ---------------------------------------------------------------------------
 
 function makeIR(): KeyboardIR {
-  return {
+  return makeTestIR({
     origin: "scaffolded",
     header: {
       keyboardId: "kbd_test",
       name: "Original Name",
       bcp47: ["en"],
       copyright: "© Original",
-      version: "1.0",
       targets: ["desktop"],
-      storeDirectives: [],
     },
-    stores: [
-      { nodeId: "s0", name: "letters", items: [{ kind: "char", value: "a" }], isSystem: false },
-    ],
-    groups: [],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  };
+    stores: [charStore({ nodeId: "s0", name: "letters", chars: "a" })],
+  });
 }
 
 describe("applyMutatePatch — M1 purity", () => {

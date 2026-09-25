@@ -1,8 +1,8 @@
-# orth.mark-composition-posture — pb_mark_style currently asks the author to
-# CHOOSE precomposed vs combining, but for most of the inventory this is a
-# Unicode fact, not a preference: either an NFC precomposed form exists for a
-# base+mark pair or it does not. Compute the posture per pair; ask only about
-# the genuinely ambiguous residue (pairs where both forms are viable).
+# orth.mark-composition-posture — precomposed vs combining output is, for most
+# of the inventory, a Unicode fact rather than a preference: either an NFC
+# precomposed form exists for a base+mark pair or it does not. The posture is
+# computed per pair, and the S4 output-form station consumes it directly,
+# offering an open choice only when both forms are viable.
 
 id: orth.mark-composition-posture
 family: orth
@@ -11,10 +11,11 @@ description: >
   For each base+mark combination in the inventory: does a precomposed NFC
   form exist, is combining-sequence the only option, or are both viable?
   Aggregates to a keyboard-level posture (all-precomposed / all-combining /
-  mixed) that prefills pb_mark_style and drives the deadkey-vs-direct
-  mechanism proposal. Aligns with the nfd-latin pattern's outputForm question,
-  whose default rationale (pan-African characters without precomposed forms)
-  is exactly this facet computed by hand.
+  mixed) that the S4 output-form station consumes directly and that drives
+  the deadkey-vs-direct mechanism proposal. Aligns with the nfd-latin
+  pattern's outputForm question, whose default rationale (pan-African
+  characters without precomposed forms) is exactly this facet computed by
+  hand.
 valueType: enum
 values: [precomposed, combining, mixed]
 

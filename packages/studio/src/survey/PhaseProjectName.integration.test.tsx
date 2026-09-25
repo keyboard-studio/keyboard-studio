@@ -29,7 +29,6 @@ import { screen, fireEvent, act, cleanup } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { ProjectNameStepFactoryComponent } from "../editors/adapters/flowStepOptions.tsx";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
-import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { loadModularFlow } from "./loadModularFlow.ts";
 import { slugifyKeyboardId } from "@keyboard-studio/contracts";
 
@@ -40,8 +39,6 @@ import trackRaw from "../../../../content/flows/track.modular.yaml?raw";
 
 afterEach(() => {
   cleanup();
-  useSurveySessionStore.getState().reset();
-  useWorkingCopyStore.getState().reset();
 });
 
 // ---------------------------------------------------------------------------

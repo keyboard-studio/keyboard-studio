@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { computeInventoryDelta } from "./computeInventoryDelta.js";
-import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
+import { irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import type { IRGroup, IRRule, InventoryChar, RawKmnFragment } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
@@ -8,15 +8,11 @@ import type { IRGroup, IRRule, InventoryChar, RawKmnFragment } from "@keyboard-s
 // ---------------------------------------------------------------------------
 
 function makeGroup(rules: IRRule[], name = "main", usingKeys = true): IRGroup {
-  return { nodeId: `group#${name}`, name, usingKeys, readonly: false, rules };
+  return irGroup({ rules, name, usingKeys });
 }
 
 function makeRule(output: IRRule["output"]): IRRule {
-  return {
-    nodeId: `rule#${Math.random().toString(36).slice(2)}`,
-    context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
-    output,
-  };
+  return vkeyRule({ output });
 }
 
 // `inBaseOutput` is deliberately seeded `false` here regardless of which

@@ -14,54 +14,27 @@ import { applyCarveToVfs } from "./applyCarveToVfs.js";
 import { parse } from "../codec/parse.js";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { KeyboardIR, IRGroup, IRStore, IRRule } from "@keyboard-studio/contracts";
+import { charStore, irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
 // ---------------------------------------------------------------------------
 
 function makeStore(nodeId: string, name: string, isSystem = true): IRStore {
-  return {
-    nodeId,
-    name,
-    items: [{ kind: "char", value: "1" }],
-    isSystem,
-  };
+  return charStore({ nodeId, name, chars: "1", isSystem });
 }
 
 function makeRule(nodeId: string): IRRule {
-  return {
-    nodeId,
-    context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
-    output: [{ kind: "char", value: "a" }],
-  };
-}
-
-function makeGroup(nodeId: string, name: string, rules: IRRule[]): IRGroup {
-  return { nodeId, name, usingKeys: true, rules, readonly: false };
+  return vkeyRule({ nodeId, output: "a" });
 }
 
 function makeIR(groups: IRGroup[], stores: IRStore[] = []): KeyboardIR {
-  return {
-    origin: "imported",
-    header: {
-      keyboardId: "test",
-      name: "Test",
-      bcp47: [],
-      copyright: "",
-      version: "1.0",
-      targets: ["any"],
-      storeDirectives: [],
-    },
-    stores: [
-      makeStore("store#VERSION", "VERSION"),
-      makeStore("store#NAME", "NAME"),
-      ...stores,
-    ],
+  return makeTestIR(
     groups,
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  };
+    [makeStore("store#VERSION", "VERSION"), makeStore("store#NAME", "NAME"), ...stores],
+    [],
+    { header: { targets: ["any"] } },
+  );
 }
 
 function makeVfs(kmnContent = "c original\n") {
@@ -77,7 +50,7 @@ function makeVfs(kmnContent = "c original\n") {
 describe("applyCarveToVfs — no-op when deletedNodeIds is empty", () => {
   it("does not write to VFS when the deletion set is empty", () => {
     const vfs = makeVfs("c original\n");
-    const ir = makeIR([makeGroup("group#0", "main", [makeRule("rule#0")])]);
+    const ir = makeIR([irGroup({ nodeId: "group#0", rules: [makeRule("rule#0")] })]);
     const setSpy = vi.spyOn(vfs, "set");
 
     applyCarveToVfs(vfs, "test", ir, new Set());
@@ -90,7 +63,7 @@ describe("applyCarveToVfs — no-op when deletedNodeIds is empty", () => {
 
   it("returns empty warnings when deletion set is empty", () => {
     const vfs = makeVfs();
-    const ir = makeIR([makeGroup("group#0", "main", [makeRule("rule#0")])]);
+    const ir = makeIR([irGroup({ nodeId: "group#0", rules: [makeRule("rule#0")] })]);
     const result = applyCarveToVfs(vfs, "test", ir, new Set());
     expect(result.warnings).toHaveLength(0);
   });
@@ -99,8 +72,8 @@ describe("applyCarveToVfs — no-op when deletedNodeIds is empty", () => {
 describe("applyCarveToVfs — deletes a group", () => {
   it("removes the deleted group from the emitted .kmn", () => {
     const vfs = makeVfs();
-    const groupA = makeGroup("group#A", "main", [makeRule("rule#0")]);
-    const groupB = makeGroup("group#B", "extras", [makeRule("rule#1")]);
+    const groupA = irGroup({ nodeId: "group#A", rules: [makeRule("rule#0")] });
+    const groupB = irGroup({ nodeId: "group#B", name: "extras", rules: [makeRule("rule#1")] });
     const ir = makeIR([groupA, groupB]);
 
     applyCarveToVfs(vfs, "test", ir, new Set(["group#B"]));
@@ -113,8 +86,8 @@ describe("applyCarveToVfs — deletes a group", () => {
 
   it("does not mutate baseIr (group array is unchanged)", () => {
     const vfs = makeVfs();
-    const groupA = makeGroup("group#A", "main", [makeRule("rule#0")]);
-    const groupB = makeGroup("group#B", "extras", [makeRule("rule#1")]);
+    const groupA = irGroup({ nodeId: "group#A", rules: [makeRule("rule#0")] });
+    const groupB = irGroup({ nodeId: "group#B", name: "extras", rules: [makeRule("rule#1")] });
     const ir = makeIR([groupA, groupB]);
     const originalGroupCount = ir.groups.length;
 
@@ -135,7 +108,7 @@ describe("applyCarveToVfs — deletes a rule", () => {
       context: [{ kind: "vkey", name: "K_B", modifiers: [] }],
       output: [{ kind: "char", value: "b" }],
     };
-    const group = makeGroup("group#main", "main", [rule0, rule1]);
+    const group = irGroup({ nodeId: "group#main", rules: [rule0, rule1] });
     const ir = makeIR([group]);
 
     applyCarveToVfs(vfs, "test", ir, new Set(["rule#0"]));
@@ -153,7 +126,7 @@ describe("applyCarveToVfs — deletes a rule", () => {
     const vfs = makeVfs();
     const rule0 = makeRule("rule#0");
     const rule1 = makeRule("rule#1");
-    const group = makeGroup("group#main", "main", [rule0, rule1]);
+    const group = irGroup({ nodeId: "group#main", rules: [rule0, rule1] });
     const ir = makeIR([group]);
 
     applyCarveToVfs(vfs, "test", ir, new Set(["rule#0"]));
@@ -167,7 +140,7 @@ describe("applyCarveToVfs — deletes a store", () => {
   it("removes the deleted store from the emitted .kmn", () => {
     const vfs = makeVfs();
     const extraStore = makeStore("store#EXTRA", "EXTRA", false);
-    const ir = makeIR([makeGroup("group#main", "main", [makeRule("rule#0")])], [extraStore]);
+    const ir = makeIR([irGroup({ nodeId: "group#main", rules: [makeRule("rule#0")] })], [extraStore]);
 
     applyCarveToVfs(vfs, "test", ir, new Set(["store#EXTRA"]));
 
@@ -194,7 +167,7 @@ describe("applyCarveToVfs — fragment-bearing keyboards (gate-1 removed)", () =
       output: [{ kind: "char", value: "b" }],
     };
     const ir: KeyboardIR = {
-      ...makeIR([makeGroup("group#main", "main", [ruleA, ruleB])]),
+      ...makeIR([irGroup({ nodeId: "group#main", rules: [ruleA, ruleB] })]),
       raw: [
         {
           nodeId: "raw#0",
@@ -222,7 +195,7 @@ describe("applyCarveToVfs — fragment-bearing keyboards (gate-1 removed)", () =
   it("does not mutate baseIr when projecting a fragment-bearing keyboard", () => {
     const vfs = makeVfs();
     const ir: KeyboardIR = {
-      ...makeIR([makeGroup("group#main", "main", [makeRule("rule#0")])]),
+      ...makeIR([irGroup({ nodeId: "group#main", rules: [makeRule("rule#0")] })]),
       raw: [
         {
           nodeId: "raw#0",
@@ -243,7 +216,7 @@ describe("applyCarveToVfs — fragment-bearing keyboards (gate-1 removed)", () =
   it("fragment is removed from emitted .kmn when its nodeId is in deletedNodeIds", () => {
     const vfs = makeVfs();
     const ir: KeyboardIR = {
-      ...makeIR([makeGroup("group#main", "main", [makeRule("rule#0")])]),
+      ...makeIR([irGroup({ nodeId: "group#main", rules: [makeRule("rule#0")] })]),
       raw: [
         {
           nodeId: "raw#frag",
@@ -267,8 +240,8 @@ describe("applyCarveToVfs — safety gate: entry-group deletion", () => {
     const originalContent = "c original\n";
     const vfs = makeVfs(originalContent);
     // entryGroup is the first non-readonly group.
-    const entryGroup = makeGroup("group#entry", "main", [makeRule("rule#0")]);
-    const secondGroup = makeGroup("group#second", "extras", [makeRule("rule#1")]);
+    const entryGroup = irGroup({ nodeId: "group#entry", rules: [makeRule("rule#0")] });
+    const secondGroup = irGroup({ nodeId: "group#second", name: "extras", rules: [makeRule("rule#1")] });
     const ir = makeIR([entryGroup, secondGroup]);
     const setSpy = vi.spyOn(vfs, "set");
 
@@ -284,8 +257,8 @@ describe("applyCarveToVfs — safety gate: entry-group deletion", () => {
 
   it("allows deletion of a non-entry group without triggering the entry-group guard", () => {
     const vfs = makeVfs();
-    const entryGroup = makeGroup("group#entry", "main", [makeRule("rule#0")]);
-    const secondGroup = makeGroup("group#second", "extras", [makeRule("rule#1")]);
+    const entryGroup = irGroup({ nodeId: "group#entry", rules: [makeRule("rule#0")] });
+    const secondGroup = irGroup({ nodeId: "group#second", name: "extras", rules: [makeRule("rule#1")] });
     const ir = makeIR([entryGroup, secondGroup]);
 
     const { warnings } = applyCarveToVfs(vfs, "test", ir, new Set(["group#second"]));
@@ -315,7 +288,7 @@ describe("applyCarveToVfs — returns warnings", () => {
     // serve. The projection still succeeds via the legacy filter+emit path;
     // only an informational note is added, not a failure.
     const vfs = makeVfs();
-    const ir = makeIR([makeGroup("group#main", "main", [makeRule("rule#0")])]);
+    const ir = makeIR([irGroup({ nodeId: "group#main", rules: [makeRule("rule#0")] })]);
     const { warnings } = applyCarveToVfs(vfs, "test", ir, new Set(["rule#0"]));
     expect(warnings).toHaveLength(1);
     expect(warnings[0]).toContain("splice unavailable");

@@ -183,7 +183,7 @@ interface FlowGraphViewProps {
    *
    * OPTIONAL, AND ITS ABSENCE IS A CONTRACT. With no overlay this component
    * renders exactly the markup it rendered before the overlay existed — FR-024 is
-   * an identity, pinned by the snapshot in FlowGraphView.pathOverlay.test.tsx. So
+   * an identity, pinned by the snapshot in FlowGraphView.test.tsx. So
    * the overlay is an ADDITIONAL layer: it never restyles a node card or an edge
    * in the base render, because doing so would need a conditional inside markup
    * that has to stay byte-identical.

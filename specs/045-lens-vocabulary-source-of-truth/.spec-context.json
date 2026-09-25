@@ -332,5 +332,6 @@
       "step": "implement"
     }
   ],
-  "last_action": "all 13 tasks done - full gate green (typecheck/facet-index tests 283/283/facet-lint/facet-index-lint/depcruise); ready for review before commit"
+  "last_action": "all 13 tasks done - full gate green (typecheck/facet-index tests 283/283/facet-lint/facet-index-lint/depcruise); ready for review before commit",
+  "telemetryInstanceId": "67af77f8-500d-4cba-ba1b-5136ff4b02d9"
 }
