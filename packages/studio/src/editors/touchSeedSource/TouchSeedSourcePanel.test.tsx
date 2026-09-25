@@ -10,7 +10,8 @@
 //   - the draft-discard warning (R12) is shown ONLY on re-entry with a
 //     DIFFERENT selection than the recorded choice, while a touch draft exists
 //   - the live preview is now the REAL OSK (mocked here the same way
-//     TouchGallery.test.tsx mocks it — no iframe/KMW in jsdom), forced into
+//     the TouchGallery.*.test.tsx suites mock it, via
+//     ../../test/touchGallery/mocks.tsx — no iframe/KMW in jsdom), forced into
 //     mobile/touch mode, swapping its injected VFS content per selected card
 
 import { describe, it, expect, afterEach, vi } from "vitest";
@@ -44,7 +45,8 @@ vi.mock("../../lib/buildTouchLayoutJson.ts", async (importOriginal) => {
 
 // ---------------------------------------------------------------------------
 // Mock useKeyboardArtifact — capture the (baseKeyboard, scaffoldSpec,
-// vfsTransform) triple passed in, same pattern as TouchGallery.test.tsx. No
+// vfsTransform) triple passed in, same pattern as the TouchGallery.*.test.tsx
+// suites. No
 // real fetch/compile/WASM runs in jsdom.
 // ---------------------------------------------------------------------------
 
@@ -448,7 +450,8 @@ describe("TouchSeedSourcePanel — live preview (R4a)", () => {
 // ---------------------------------------------------------------------------
 // Real OSK live preview (spec 035 R4b amendment — supersedes the homemade
 // TouchLayoutPreview keycap grid). The OSK itself is mocked (no iframe/KMW in
-// jsdom, same pattern as TouchGallery.test.tsx); these tests assert the
+// jsdom, same pattern as the TouchGallery.*.test.tsx suites); these tests
+// assert the
 // wiring: forced tablet mode, no mode toggle, and the injected VFS
 // content swapping per the currently-selected card.
 // ---------------------------------------------------------------------------

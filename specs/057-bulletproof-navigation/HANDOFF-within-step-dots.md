@@ -88,7 +88,7 @@ derived from the rendered DOM (FR-062 holds).
 | `StudioShell.tsx`, `components/WelcomeScreen.tsx` | `useStepWalkStore.getState().reset()` on Start Over / "I'm new". |
 | `stores/surveySessionStore.ts`, `survey/IdentityLite.tsx` | `IdentityLiteResult` repointed at the new leaf; `IdentityLite.tsx` re-exports it so no call site moved. |
 | `test-setup.ts` | Global `beforeEach` reset of the walk store — a module-level store leaks between tests in one file otherwise (this caused 3 real failures, see §6). |
-| `decisions/progressDots.test.ts`, `lib/resolveLocation.test.ts`, `editors/assignLoop/MechanismGallery.test.tsx`, `components/StudioFooter.a11y.test.tsx` | New coverage appended. |
+| `decisions/progressDots.test.ts`, `lib/resolveLocation.test.ts`, `editors/assignLoop/MechanismGallery.progression.test.tsx`, `components/StudioFooter.a11y.test.tsx` | New coverage appended. |
 
 ---
 
