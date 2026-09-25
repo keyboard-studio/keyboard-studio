@@ -1,1 +1,7 @@
+<<<<<<< HEAD
 {"feature_directory":"specs/079-survey-answer-persistence"}
+=======
+{
+  "feature_directory": "specs/078-context-tolerance-wiring"
+}
+>>>>>>> origin/main

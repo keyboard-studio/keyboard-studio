@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "Dashboard Honest Flow Map",
+  "branch": "",
+  "currentStep": "specify",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-24T01:39:28.688Z"
+    }
+  ],
+  "telemetryInstanceId": "02b03b15-ed06-4124-a91b-764bbeb16804"
+}
