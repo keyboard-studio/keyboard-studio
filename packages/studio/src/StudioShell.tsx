@@ -54,6 +54,9 @@ import { findKmnPath } from "./lib/findKmnPath.ts";
 import { resolveBaseTouchJson } from "./lib/resolveBaseTouchJson.ts";
 import { selectUnmappedFindings } from "./lint/lintToQuestion.ts";
 import { LintSummary } from "./lint/index.ts";
+import { ContextToleranceNotice } from "./lint/ContextToleranceNotice.tsx";
+import { isContextToleranceEnabled } from "./flags/contextToleranceFlag.ts";
+import { useContextToleranceApply } from "./hooks/useContextToleranceApply.ts";
 import { getPatternLibraryService } from "./lib/services.ts";
 import { physicalAssignmentsOf } from "./lib/physicalAssignments.ts";
 import { FlowMapView } from "./dashboard/DashboardView.tsx";
@@ -1168,7 +1171,18 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
   // Use localBase (immediately updated on selection) to drive the pipeline.
   // Pass scaffoldSpec so Track 1 routes through scaffold() instead of fetchKeyboardSourceToVfs.
-  const { stage: artifactStage, retry } = useKeyboardArtifact(localBase, scaffoldSpec, workingCopyTransform, onInstantiate);
+  // spec 078: only this main-walk preview runs the context-tolerance analysis,
+  // and only behind the flag; every other useKeyboardArtifact caller is unchanged.
+  const contextToleranceEnabled = isContextToleranceEnabled();
+  const { stage: artifactStage, retry } = useKeyboardArtifact(localBase, scaffoldSpec, workingCopyTransform, onInstantiate, {
+    analyseContextTolerance: contextToleranceEnabled,
+  });
+  const contextTolerance = useWorkingCopyStore((s) => s.contextTolerance);
+  // spec 078 FR-005a: the recorded decision is applied by its own effect,
+  // never by the marks step; its stale/refused outcomes feed the notice.
+  const contextToleranceApplyNotes = useContextToleranceApply(contextToleranceEnabled);
+  const showContextTolerance =
+    contextToleranceEnabled && contextTolerance.status !== "idle" && contextTolerance.status !== "analysing";
 
   // ---------------------------------------------------------------------------
   // Single-instantiation effect (preview-before-commit).
@@ -1482,7 +1496,10 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
             onDiscard={handleDiscardDraft}
           />
         )}
-        {globalWarnings.length > 0 && (
+        {
+          // Always mounted, so content inserted later is announced (a live
+          // region inserted together with its content often is not); it only
+          // takes up space when it has something to say.
           // Rendered flush on "var(--bg)" — the same token the container above
           // paints and the one CharacterMapPane's own root implicitly sits on
           // (it sets no background of its own, so it shows through to the
@@ -1490,11 +1507,16 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           // to accidental non-override, so a future change to questionsPaneStyle's
           // background doesn't silently drag this along. No border/card fill/
           // padding-as-box — this is text on the character-map surface, not a
-          // card.
+          // card. The context-tolerance notice (spec 078) shares this live
+          // region rather than adding an announcer of its own (FR-014).
           <div
             role="status"
             aria-live="polite"
-            style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 12, background: "var(--bg)" }}
+            style={
+              globalWarnings.length > 0 || showContextTolerance
+                ? { display: "flex", flexDirection: "column", gap: 8, marginBottom: 12, background: "var(--bg)" }
+                : undefined
+            }
           >
             {globalWarnings.map((f, i) => (
               <div key={`${f.code}-${i}`} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
@@ -1509,8 +1531,11 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
                 )}
               </div>
             ))}
+            {showContextTolerance && (
+              <ContextToleranceNotice state={contextTolerance} applyNotes={contextToleranceApplyNotes} />
+            )}
           </div>
-        )}
+        }
         {globalNonWarnings.length > 0 && (
           <LintSummary findings={globalNonWarnings} />
         )}

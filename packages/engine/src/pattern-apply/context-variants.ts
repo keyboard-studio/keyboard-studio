@@ -39,6 +39,7 @@
 import type {
   ContextElement,
   ContextVariant,
+  IRComment,
   IRGroup,
   IRRule,
   IRStore,
@@ -60,11 +61,15 @@ import {
   splitRuleAtPlus,
 } from '../validator/context-tolerance.js';
 import { entryGroupOf, insertBlockBeforeTerminalRules } from './ir-insert.js';
-import { oneMarkShorterPair, type OneMarkShorterPair } from './mark-decomposition.js';
+import { markOrderNoteFor, oneMarkShorterPair, type OneMarkShorterPair } from './mark-decomposition.js';
 
-export const GENERATED_MARKER_PREFIX = 'generated_tolerance_';
-const BACKSPACE_UNWRAP_FROM_STORE = `${GENERATED_MARKER_PREFIX}bksp_unwrap_from`;
-const BACKSPACE_UNWRAP_TO_STORE = `${GENERATED_MARKER_PREFIX}bksp_unwrap_to`;
+// Named for what these rules DO (accept the canonically-decomposed form of a
+// context the keyboard already handles precomposed), not for the tool that
+// wrote them (FR-015) — the idempotency-stripping prefix checked before every
+// insertion (a re-run recognizes and replaces rather than duplicates, FR-011).
+export const GENERATED_MARKER_PREFIX = 'decomposed_accent_';
+const BACKSPACE_UNWRAP_FROM_STORE = `${GENERATED_MARKER_PREFIX}from`;
+const BACKSPACE_UNWRAP_TO_STORE = `${GENERATED_MARKER_PREFIX}to`;
 /**
  * Prefix shared by every backspace-unwrap variant's `sourceRuleId`/
  * `generatedMarker` (spec 062 US4: one precomposed-context rule plus one
@@ -77,11 +82,46 @@ const BACKSPACE_UNWRAP_TO_STORE = `${GENERATED_MARKER_PREFIX}bksp_unwrap_to`;
  * specifically needs to identify backspace-unwrap variants by id rather
  * than by that field's presence.
  */
-export const BACKSPACE_UNWRAP_RULE_PREFIX = `${GENERATED_MARKER_PREFIX}bksp_unwrap_rule`;
+export const BACKSPACE_UNWRAP_RULE_PREFIX = `${GENERATED_MARKER_PREFIX}bksp_unwrap`;
+
+// One plain-language comment per generated block, naming its origin and
+// purpose (FR-015) — never a per-rule stamp, and never a tool/spec-number
+// citation in text that gets emitted into the author's own `.kmn`.
+const DIACRITIC_BLOCK_COMMENT =
+  'Accept the accent typed as a separate character (decomposed text) as well as the joined form.';
+const BACKSPACE_BLOCK_COMMENT =
+  'Let backspace remove one accent mark at a time, whether the accented letter is stored as one ' +
+  'character or as a separate letter and mark.';
+
+/**
+ * What a generated variant's preview owes the author beyond the source diff
+ * itself (spec 078, research D9, FR-006): every rule it shadows or is
+ * shadowed by, whether its effect cannot be demonstrated in the simulator,
+ * and — for a two-mark composed unit — a note about mark order. Carried
+ * alongside `ContextVariant` rather than on it: `ContextVariant` is a locked
+ * contracts type (`packages/contracts/src/toleranceReport.ts`) this module
+ * must not change. Keyed by `ContextVariant.generatedMarker` on
+ * `ContextVariantsResult.disclosures`.
+ */
+export interface VariantDisclosure {
+  /** Every other rule on the same physical key this variant shadows or is shadowed by. */
+  shadows: { ruleId: string; relation: 'shadows' | 'shadowed-by'; fallback: boolean }[];
+  /**
+   * Set when this variant's effect cannot be demonstrated in this project's
+   * KeymanWeb-model simulator — currently only a backspace-unwrap site on a
+   * `&mnemoniclayout` keyboard (see `addBackspaceUnwrap`'s "KNOWN LIMITATION
+   * 1"). Absent otherwise.
+   */
+  unobservable?: 'mnemonic-backspace';
+  /** Set for a two-mark composed unit whose canonical mark order may not match typing order. */
+  markOrderNote?: string;
+}
 
 export interface ContextVariantsResult {
   ir: KeyboardIR;
   variants: ContextVariant[];
+  /** Per-variant author-facing disclosures, keyed by `ContextVariant.generatedMarker` (spec 078, research D9). */
+  disclosures: Record<string, VariantDisclosure>;
   /**
    * Author-facing notes on tolerance the generator deliberately did NOT add,
    * and why (FR-013: record what could not be made tolerant rather than
@@ -169,6 +209,60 @@ function findInsertionPoint(
   return { index: rules.length };
 }
 
+/**
+ * Every rule in `rules` — other than `excludeRuleId`, the source rule this
+ * variant fixes — whose key part resolves to `key` (research D9's shadowing
+ * disclosure). Unlike {@link findInsertionPoint}'s single early-exit fallback
+ * lookup, this returns every same-key rule, bare-context or not, so a
+ * non-fallback overlap is disclosed alongside the existing fallback case.
+ */
+function findAllSameKeyRules(
+  rules: IRRule[],
+  key: SimKeyInput,
+  storeChars: Map<string, string[]>,
+  excludeRuleId: string,
+): IRRule[] {
+  const found: IRRule[] = [];
+  for (const r of rules) {
+    if (r.nodeId === excludeRuleId) continue;
+    const split = splitRuleAtPlus(r);
+    if (split === undefined) continue; // match/nomatch — no key part to compare
+    const keyResolution = resolveKeyPartCandidates(split.keyPart, storeChars);
+    if (!('candidates' in keyResolution)) continue;
+    if (keyResolution.candidates.some((c) => sameKey(c.key, key))) found.push(r);
+  }
+  return found;
+}
+
+/**
+ * Build the `shadows` list for a batch of generated rules inserted at
+ * `insertionIndex` in `rules` (its ORIGINAL, pre-insertion order — the same
+ * array {@link findInsertionPoint} computed `insertionIndex` against). A
+ * same-key rule positioned before `insertionIndex` fires first and so
+ * shadows the new rule; one positioned at or after it fires after the new
+ * rule and so is shadowed by it — the bare-context fallback
+ * {@link findInsertionPoint} already special-cases always falls in this
+ * second bucket, by construction (it is always found at or after the
+ * insertion point), so it needs no separate case here.
+ */
+function shadowsDisclosureFor(
+  rules: IRRule[],
+  insertionIndex: number,
+  key: SimKeyInput,
+  storeChars: Map<string, string[]>,
+  excludeRuleId: string,
+): VariantDisclosure['shadows'] {
+  return findAllSameKeyRules(rules, key, storeChars, excludeRuleId).map((r) => {
+    const split = splitRuleAtPlus(r)!;
+    const originalIndex = rules.indexOf(r);
+    return {
+      ruleId: r.nodeId,
+      relation: originalIndex < insertionIndex ? ('shadows' as const) : ('shadowed-by' as const),
+      fallback: split.before.length === 0,
+    };
+  });
+}
+
 export function charsToOutput(text: string): IRRule['output'] {
   return [...text].map((ch) => ({ kind: 'char' as const, value: ch }));
 }
@@ -199,15 +293,21 @@ export async function proposeContextVariants(
     toleranceReport.findings.filter((f) => f.failingKeystrokes !== undefined).map((f) => f.ruleId),
   );
 
-  // Strip previously generated rules/stores first — idempotent re-run, and
-  // also the correct pre-fix baseline to compile for determining correct
-  // outputs.
+  // Strip previously generated rules/stores/comments first — idempotent
+  // re-run, and also the correct pre-fix baseline to compile for determining
+  // correct outputs.
   const strippedGroups: IRGroup[] = ir.groups.map((g) => ({
     ...g,
     rules: g.rules.filter((r) => !r.nodeId.startsWith(GENERATED_MARKER_PREFIX)),
   }));
   const strippedStores: IRStore[] = ir.stores.filter((s) => !s.name.startsWith(GENERATED_MARKER_PREFIX));
-  const strippedIr: KeyboardIR = { ...ir, groups: strippedGroups, stores: strippedStores };
+  const strippedComments: IRComment[] = ir.comments.filter((c) => !c.nodeId.startsWith(GENERATED_MARKER_PREFIX));
+  const strippedIr: KeyboardIR = {
+    ...ir,
+    groups: strippedGroups,
+    stores: strippedStores,
+    comments: strippedComments,
+  };
 
   if (gapRuleIds.size === 0) {
     return addBackspaceUnwrap(strippedIr);
@@ -228,11 +328,13 @@ export async function proposeContextVariants(
   }
 
   const variants: ContextVariant[] = [];
+  const disclosures: Record<string, VariantDisclosure> = {};
   // Per group, an ordered list of independent batches — one per source rule
   // that got a fix — each carrying its own key part so its insertion point
   // is computed against that specific key, not assumed shared across a
   // group's several distinct gap rules.
   const batchesByGroup = new Map<string, Array<{ key: SimKeyInput; rules: IRRule[] }>>();
+  const commentsByGroup = new Map<string, IRComment[]>();
 
   for (const group of strippedGroups) {
     for (const rule of group.rules) {
@@ -261,7 +363,8 @@ export async function proposeContextVariants(
 
       let variantIndex = 0;
       for (const { key, literal } of keyResolution.candidates) {
-        const { fallbackRuleId } = findInsertionPoint(group.rules, key, storeChars);
+        const { index: insertionIndex, fallbackRuleId } = findInsertionPoint(group.rules, key, storeChars);
+        const shadows = shadowsDisclosureFor(group.rules, insertionIndex, key, storeChars, rule.nodeId);
 
         const generatedForRule: IRRule[] = [];
         for (const candidate of decomposable) {
@@ -275,7 +378,6 @@ export async function proposeContextVariants(
             nodeId: marker,
             context: [...charsToContext(decomposed), { kind: 'raw', text: '+' }, ...literal],
             output: charsToOutput(precomposedOutput),
-            trailingComment: 'generated: context tolerance (spec 062)',
           });
           variants.push({
             sourceRuleId: rule.nodeId,
@@ -284,11 +386,22 @@ export async function proposeContextVariants(
             precomposedOutput,
             ...(fallbackRuleId !== undefined ? { precedesFallbackRuleId: fallbackRuleId } : {}),
           });
+          disclosures[marker] = { shadows };
         }
 
         if (generatedForRule.length > 0) {
           const existing = batchesByGroup.get(group.nodeId) ?? [];
           batchesByGroup.set(group.nodeId, [...existing, { key, rules: generatedForRule }]);
+          const comments = commentsByGroup.get(group.nodeId) ?? [];
+          commentsByGroup.set(group.nodeId, [
+            ...comments,
+            {
+              nodeId: `${generatedForRule[0]!.nodeId}_comment`,
+              text: DIACRITIC_BLOCK_COMMENT,
+              anchor: 'leading',
+              anchorRef: { kind: 'rule', nodeId: generatedForRule[0]!.nodeId },
+            },
+          ]);
         }
       }
     }
@@ -311,8 +424,13 @@ export async function proposeContextVariants(
     }
     return { ...group, rules };
   });
+  const newComments = [...strippedIr.comments, ...[...commentsByGroup.values()].flat()];
 
-  return addBackspaceUnwrap({ ...strippedIr, groups: newGroups }, variants);
+  return addBackspaceUnwrap(
+    { ...strippedIr, groups: newGroups, comments: newComments },
+    variants,
+    disclosures,
+  );
 }
 
 /**
@@ -430,7 +548,11 @@ export async function proposeContextVariants(
  * substitution). Closing that case for a grapheme-cluster-deleting host is
  * a follow-up, not silently claimed here.
  */
-function addBackspaceUnwrap(ir: KeyboardIR, existingVariants: ContextVariant[] = []): ContextVariantsResult {
+function addBackspaceUnwrap(
+  ir: KeyboardIR,
+  existingVariants: ContextVariant[] = [],
+  existingDisclosures: Record<string, VariantDisclosure> = {},
+): ContextVariantsResult {
   const units = new Set<string>();
   for (const store of ir.stores) {
     for (const item of store.items) {
@@ -449,10 +571,10 @@ function addBackspaceUnwrap(ir: KeyboardIR, existingVariants: ContextVariant[] =
 
   const pairs = [...units].map((unit) => oneMarkShorterPair(unit)).filter((p): p is OneMarkShorterPair => p !== undefined);
 
-  if (pairs.length === 0) return { ir, variants: existingVariants };
+  if (pairs.length === 0) return { ir, variants: existingVariants, disclosures: existingDisclosures };
 
   const entry = entryGroupOf(ir.groups);
-  if (entry === undefined) return { ir, variants: existingVariants };
+  if (entry === undefined) return { ir, variants: existingVariants, disclosures: existingDisclosures };
 
   // `[K_BKSP]` in a mnemonic layout is a hard kmcmplib error for any KeymanWeb
   // target (ERROR_VirtualKeysNotValidForMnemonicLayouts) — emitting it would
@@ -460,8 +582,19 @@ function addBackspaceUnwrap(ir: KeyboardIR, existingVariants: ContextVariant[] =
   // sil_yoruba8, which ships its own `+ [K_BKSP]` rules) still compile it, so
   // they keep the unwrap. See KNOWN LIMITATION 1 above for the runtime side.
   if (isMnemonicLayout(ir) && targetsIncludeWeb(ir)) {
-    return { ir, variants: existingVariants, notes: [BACKSPACE_UNWRAP_SKIPPED_MNEMONIC_WEB_NOTE] };
+    return {
+      ir,
+      variants: existingVariants,
+      disclosures: existingDisclosures,
+      notes: [BACKSPACE_UNWRAP_SKIPPED_MNEMONIC_WEB_NOTE],
+    };
   }
+
+  // Reaching here, a mnemonic layout keeps its unwrap (desktop-only — see the
+  // gate above) but it never fires in this project's KeymanWeb-model
+  // simulator (KNOWN LIMITATION 1) — every site generated below is disclosed
+  // as unobservable so the author is never shown a false simulated success.
+  const isMnemonic = isMnemonicLayout(ir);
 
   const bkspKey: ContextElement[] = [{ kind: 'vkey', name: 'K_BKSP', modifiers: [] }];
 
@@ -485,14 +618,12 @@ function addBackspaceUnwrap(ir: KeyboardIR, existingVariants: ContextVariant[] =
       ...bkspKey,
     ],
     output: [{ kind: 'index', storeRef: BACKSPACE_UNWRAP_TO_STORE, offset: 1 }],
-    trailingComment: 'generated: precomposed-context backspace unwrap (spec 062, US4)',
   };
 
   const decomposedRules: IRRule[] = pairs.map((p, i) => ({
     nodeId: `${BACKSPACE_UNWRAP_RULE_PREFIX}_decomposed_${i}`,
     context: [...charsToContext(p.nfd.join('')), { kind: 'raw', text: '+' }, ...bkspKey],
     output: charsToOutput(p.to),
-    trailingComment: 'generated: decomposed-context backspace unwrap (spec 062, US4)',
   }));
 
   const groups = ir.groups.map((g) =>
@@ -500,6 +631,16 @@ function addBackspaceUnwrap(ir: KeyboardIR, existingVariants: ContextVariant[] =
       ? { ...g, rules: insertBlockBeforeTerminalRules(g.rules, [...decomposedRules, precomposedRule]) }
       : g,
   );
+
+  const blockAnchor = decomposedRules[0] ?? precomposedRule;
+  const comments: IRComment[] = [
+    {
+      nodeId: `${BACKSPACE_UNWRAP_RULE_PREFIX}_comment`,
+      text: BACKSPACE_BLOCK_COMMENT,
+      anchor: 'leading',
+      anchorRef: { kind: 'rule', nodeId: blockAnchor.nodeId },
+    },
+  ];
 
   // No `precomposedOutput` — not a per-candidate output string in the
   // diacritic-variant sense (see this function's own doc for the two rule
@@ -513,8 +654,30 @@ function addBackspaceUnwrap(ir: KeyboardIR, existingVariants: ContextVariant[] =
     generatedMarker: r.nodeId,
   }));
 
+  // Per-pair mark-order note (research D9, mark-decomposition.ts's
+  // markOrderNoteFor) — attached to that pair's own decomposed-context rule,
+  // and aggregated onto the single shared precomposed-context rule, which
+  // covers every pair via its store pairing rather than one rule each.
+  const notesByPair = pairs.map((p) => markOrderNoteFor(p));
+  const disclosures: Record<string, VariantDisclosure> = { ...existingDisclosures };
+  for (let i = 0; i < pairs.length; i++) {
+    const disclosure: VariantDisclosure = { shadows: [] };
+    if (isMnemonic) disclosure.unobservable = 'mnemonic-backspace';
+    const note = notesByPair[i];
+    if (note !== undefined) disclosure.markOrderNote = note;
+    disclosures[decomposedRules[i]!.nodeId] = disclosure;
+  }
+  {
+    const aggregateNotes = notesByPair.filter((n): n is string => n !== undefined);
+    const disclosure: VariantDisclosure = { shadows: [] };
+    if (isMnemonic) disclosure.unobservable = 'mnemonic-backspace';
+    if (aggregateNotes.length > 0) disclosure.markOrderNote = aggregateNotes.join(' ');
+    disclosures[precomposedRule.nodeId] = disclosure;
+  }
+
   return {
-    ir: { ...ir, stores: [...ir.stores, fromStore, toStore], groups },
+    ir: { ...ir, stores: [...ir.stores, fromStore, toStore], groups, comments: [...ir.comments, ...comments] },
     variants: [...existingVariants, ...variants],
+    disclosures,
   };
 }

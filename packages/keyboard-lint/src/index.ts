@@ -2,7 +2,7 @@
 // Public API: the engine class, the lintWithContext helper, and individual check functions.
 
 export { KeyboardLintEngine } from "./lintEngine.js";
-export { lintWithContext } from "./lintContext.js";
+export { lintContextTolerance, lintWithContext } from "./lintContext.js";
 export type { LintContext } from "./lintContext.js";
 
 export { parseTouchLayout } from "./parsers/parseTouchLayout.js";

@@ -111,6 +111,9 @@ export type WorkingCopySnapshot = Omit<
   | "session"
   | "keyEditOverlay"
   | "touchEditorMode"
+  // Recomputed after every preview compile (spec 078); never stored.
+  | "contextTolerance"
+  | "contextToleranceOverlay"
 > & {
   baseVfsEntries: SerializedEntry[];
   deletedNodeIds: string[];
@@ -129,6 +132,12 @@ export type WorkingCopySnapshot = Omit<
   keyEditOverlay?: KeyEditOverlay;
   /** Optional for the same reason as `keyEditOverlay` above — see its comment. */
   touchEditorMode?: TouchEditorMode;
+  /**
+   * The applied context-tolerance fix (spec 078). Optional for the same
+   * reason as `keyEditOverlay`: older snapshots have no key, which reads as
+   * "no fix applied".
+   */
+  contextToleranceOverlay?: WorkingCopyData["contextToleranceOverlay"];
 };
 
 export function serializeEntry(entry: VirtualFSEntry): SerializedEntry {
@@ -257,6 +266,7 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     // key at all (R10.3).
     keyEditOverlay: s.keyEditOverlay,
     touchEditorMode: s.touchEditorMode,
+    contextToleranceOverlay: s.contextToleranceOverlay,
   };
 }
 
@@ -326,6 +336,7 @@ export function prepareWorkingCopySnapshot(snapshot: WorkingCopySnapshot): Parti
     // undefined — same idiom as deletedTouchKeyIds/sequenceFlaggedChars above.
     keyEditOverlay: snapshot.keyEditOverlay ?? { ops: [] },
     touchEditorMode: snapshot.touchEditorMode ?? "character",
+    contextToleranceOverlay: snapshot.contextToleranceOverlay ?? null,
   };
 }
 

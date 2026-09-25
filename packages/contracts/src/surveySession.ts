@@ -3,7 +3,7 @@
 
 import type { DiscoveryAxisVector } from "./axes";
 import type { AxisFill } from "./axisFill";
-import type { SurveyPhaseResult } from "./surveyPhaseResult";
+import type { MarksContextToleranceDecision, SurveyPhaseResult } from "./surveyPhaseResult";
 import type { MechanismAssignment } from "./assignmentMap";
 import { mergeAssignments } from "./assignmentMap";
 import type { ConfirmedAlphabet, OutputForm, PlacementWorklist } from "./confirmedAlphabet";
@@ -144,6 +144,12 @@ export interface SurveySession {
    * question, so existing literal `SurveySession` objects stay valid.
    */
   retainedConvenienceChars?: string[];
+  /**
+   * The context-tolerance station's decision (spec 078): last phase carrying
+   * one wins, mirroring `marksOutputForm`. **Additive optional** — absent
+   * until the station has been decided.
+   */
+  marksContextTolerance?: MarksContextToleranceDecision;
 }
 
 /**
@@ -235,6 +241,14 @@ export function mergePhaseResults(
     if (phase.marksOutputForm !== undefined) marksOutputForm = phase.marksOutputForm;
   }
 
+  // Context-tolerance station decision: same last-wins rule as marksOutputForm.
+  let marksContextTolerance: MarksContextToleranceDecision | undefined;
+  for (const phase of phaseResults) {
+    if (phase.marksContextTolerance !== undefined) {
+      marksContextTolerance = phase.marksContextTolerance;
+    }
+  }
+
   // Convenience-retained base characters: same dedupe/normalise rule as the
   // inventory and a separate `seen` set, but the PRESENCE rule differs from
   // attestedDigraphs' `length > 0` — an author who was asked and deliberately
@@ -260,6 +274,7 @@ export function mergePhaseResults(
     ...(marksWorklist !== undefined ? { marksWorklist } : {}),
     ...(marksOutputForm !== undefined ? { marksOutputForm } : {}),
     ...(convenienceAsked ? { retainedConvenienceChars } : {}),
+    ...(marksContextTolerance !== undefined ? { marksContextTolerance } : {}),
   };
 }
 

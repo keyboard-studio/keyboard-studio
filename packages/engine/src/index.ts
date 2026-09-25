@@ -109,6 +109,21 @@ export type {
 // bundlers like Vite. Keeping simulator off the main entry prevents the
 // browser-targeted SPA from following that import chain.
 
+// spec 078 — the context-tolerance overlay: accepted generated rules replayed
+// by the studio's synchronous VFS projection. Simulator-free; the analysis
+// that produces it lives behind the `./context-tolerance` subpath.
+export {
+  applyContextToleranceOverlay,
+  buildContextToleranceOverlay,
+  presentContextToleranceSites,
+  removeContextToleranceOverlay,
+} from "./pattern-apply/context-tolerance-overlay.js";
+export type {
+  ContextToleranceOverlay,
+  ContextToleranceOverlayBatch,
+  ContextToleranceOverlayResult,
+} from "./pattern-apply/context-tolerance-overlay.js";
+
 // Issue #234 — pattern recognizer public surface.
 export { recognizePatterns, classifyRemovalCapabilities } from "./recognizer/index.js";
 export type { RecognizerRule, MatchResult, RecognizeResult } from "./recognizer/index.js";

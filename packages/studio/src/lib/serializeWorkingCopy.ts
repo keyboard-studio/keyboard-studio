@@ -154,7 +154,7 @@ export async function projectWorkingCopyForOutput(
 ): Promise<ProjectWorkingCopyForOutputResult | null> {
   // 1. Read current working-copy store state.
   const state = useWorkingCopyStore.getState();
-  const { baseVfs, baseIr, baseKeyboard, deletedNodeIds, deletedItemIds, deletedTouchKeyIds, phaseResults, identity, touchLayoutJson, instantiationMode, attribution, baseLicenseText, baseHolderOverride, helpDocs, baseWelcomeHtmText, baseHelpPhpText } = state;
+  const { baseVfs, baseIr, baseKeyboard, deletedNodeIds, deletedItemIds, deletedTouchKeyIds, phaseResults, identity, touchLayoutJson, instantiationMode, attribution, baseLicenseText, baseHolderOverride, helpDocs, baseWelcomeHtmText, baseHelpPhpText, contextToleranceOverlay } = state;
 
   // Not-instantiated guard.
   if (baseVfs === null || baseIr === null || baseKeyboard === null) {
@@ -384,6 +384,8 @@ export async function projectWorkingCopyForOutput(
     // fallback above sets identityForProjection.displayName to this same value,
     // so they compare equal and the base's &NAME store is left byte-identical.
     baseDisplayName: baseKeyboard.displayName,
+    // spec 078: the same applied context-tolerance fix the preview replays.
+    contextToleranceOverlay: contextToleranceOverlay?.overlay ?? null,
   });
 
   // The projector's own report of what id the VFS actually ended up under is

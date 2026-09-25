@@ -138,3 +138,14 @@ export async function lintWithContext(
 
   return findings;
 }
+
+/**
+ * Run only the 19.x context-tolerance check against a precomputed report
+ * (spec 078). The studio's compile gate calls this after its own tolerance
+ * analysis instead of running the whole Layer C suite, so the result holds
+ * exactly the `KM_WARN_CONTEXT_NOT_TOLERANT` / `KM_HINT_CONTEXT_NOT_ANALYSED`
+ * findings and nothing else. Still engine-free: the caller supplies the report.
+ */
+export function lintContextTolerance(ir: KeyboardIR, report: ToleranceReport): LintFinding[] {
+  return checkContextTolerance(ir, report);
+}

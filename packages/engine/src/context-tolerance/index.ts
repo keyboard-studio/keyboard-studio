@@ -22,12 +22,24 @@ export {
   computeContextTolerance,
   type ToleranceClassification,
 } from '../validator/context-tolerance.js';
-export { proposeContextVariants, type ContextVariantsResult } from '../pattern-apply/context-variants.js';
+export {
+  proposeContextVariants,
+  type ContextVariantsResult,
+  type VariantDisclosure,
+} from '../pattern-apply/context-variants.js';
 export {
   buildContextToleranceOutputDiffPreview,
   createContextToleranceMigrationRule,
 } from '../facet-transform/migrations/context-tolerance.js';
-export { toleranceFingerprint } from '../pattern-apply/tolerance-fingerprint.js';
+export { toleranceFingerprint, toleranceSiteKeys } from '../pattern-apply/tolerance-fingerprint.js';
+export {
+  applyContextToleranceOverlay,
+  buildContextToleranceOverlay,
+  presentContextToleranceSites,
+  removeContextToleranceOverlay,
+  type ContextToleranceOverlay,
+  type ContextToleranceOverlayBatch,
+} from '../pattern-apply/context-tolerance-overlay.js';
 export { loadCharNames } from '../character-discovery/charNames.js';
 /** For `applyFacetTransform`'s injected behavioural verification. */
 export { simulate } from '../simulator/index.js';

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { oneMarkShorterPair } from "./mark-decomposition.js";
+import { markOrderNoteFor, oneMarkShorterPair } from "./mark-decomposition.js";
 
 describe("oneMarkShorterPair", () => {
   it("drops one mark from a single-mark composed unit, landing on the bare base", () => {
@@ -36,5 +36,28 @@ describe("oneMarkShorterPair", () => {
     // only precompose shin+dot or shin+dagesh+dot, never dagesh alone) —
     // recomposing to NFC stays 2 codepoints.
     expect(oneMarkShorterPair("שּׁ")).toBeUndefined();
+  });
+});
+
+describe("markOrderNoteFor (spec 078, research D9)", () => {
+  it("returns a note for a two-class stack (marks of different combining classes)", () => {
+    // U+1EC7 "e with circumflex and dot below" -> NFD [e, dot-below (ccc 220),
+    // circumflex (ccc 230)] -- two different classes, so canonical order does
+    // not depend on typing order.
+    const pair = oneMarkShorterPair("\u1EC7")!;
+    expect(markOrderNoteFor(pair)).toContain("\u1EC7");
+  });
+
+  it("returns undefined for a same-class two-mark stack", () => {
+    // U+1EBF "e with circumflex and acute" -> NFD [e, circumflex (230), acute
+    // (230)] -- same class, so canonical order preserves whichever order the
+    // marks are given.
+    const pair = oneMarkShorterPair("\u1EBF")!;
+    expect(markOrderNoteFor(pair)).toBeUndefined();
+  });
+
+  it("returns undefined for a single-mark unit", () => {
+    const pair = oneMarkShorterPair("\u00E0")!;
+    expect(markOrderNoteFor(pair)).toBeUndefined();
   });
 });

@@ -38,6 +38,7 @@ import type {
 } from "@keyboard-studio/contracts";
 import { useDecisionLogStore } from "./decisionLogStore.ts";
 import { recordSurveyAnswers, type ProposalLookup } from "./recordSurveyAnswers.ts";
+import { withContextToleranceProposal } from "./contextToleranceProposal.ts";
 import { recordEditorStep, type DeletionCounts } from "./recordEditorStep.ts";
 import {
   recordBaseContribution,
@@ -141,10 +142,15 @@ export function createDecisionRecorder(
       });
     }
 
+    // spec 078: a context-tolerance decision carries its own proposal (what
+    // the tool offered), so it resolves against this result, not a store.
+    const resolveProposal = isSurveyPhaseResult(result)
+      ? withContextToleranceProposal(result, deps.resolveProposal)
+      : deps.resolveProposal;
     const answerIds = isSurveyPhaseResult(result)
       ? recordSurveyAnswers(stepId, result, {
           append: log.append,
-          ...(deps.resolveProposal !== undefined ? { resolveProposal: deps.resolveProposal } : {}),
+          ...(resolveProposal !== undefined ? { resolveProposal } : {}),
         })
       : [];
 

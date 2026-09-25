@@ -69,13 +69,26 @@ export type DecisionProposalSource =
   | "base"
   | "identity"
   | "region"
-  | "derived-from-axis";
+  | "derived-from-axis"
+  /**
+   * A tool-computed finding the author acted on (spec 078) — e.g. the
+   * context-tolerance report. Also reused by spec 077 (see plan.md §Coordination
+   * with spec-077).
+   */
+  | "analysis";
 
 /** Agency plus, for a proposal, where the proposal came from. */
 export interface DecisionProvenance {
   agency: DecisionAgency;
   /** Omitted when `agency` is `"hand-set"` — an author's own value has no proposal source. */
   source?: DecisionProposalSource;
+  /**
+   * The tool's offer, kept when the author overrides it (spec 078) — e.g. a
+   * `"partial"` or `"decline"` context-tolerance decision records the
+   * originally-proposed `"accept"` value and site ids here even though
+   * `agency` is `"hand-set"`. Omitted when there was no proposal to override.
+   */
+  proposed?: { value: string; siteIds?: string[] };
 }
 
 /**

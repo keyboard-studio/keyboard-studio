@@ -40,6 +40,7 @@ import type {
   OutputForm,
   PlacementWorklist,
 } from "./confirmedAlphabet";
+import type { MarksContextToleranceDecision } from "./surveyPhaseResult";
 import type { DiacriticBehavior, Scale, ScriptClass } from "./axes";
 import type { StrategyId } from "./strategy";
 import type { KeyBudget, KeyBudgetBand } from "./keyBudget";
@@ -582,6 +583,16 @@ export const PlacementWorklistSchema = z.object({
 // SurveyPhaseResult/SurveySession as `marksOutputForm`.
 export const OutputFormSchema = z.enum(["ready-made", "base-plus-mark"]);
 
+// The context-tolerance station's decision (spec 078). Carried on
+// SurveyPhaseResult/SurveySession as `marksContextTolerance`.
+export const MarksContextToleranceDecisionSchema = z.object({
+  decision: z.enum(["accept", "partial", "decline"]),
+  acceptedSiteIds: z.array(z.string()),
+  proposedSiteIds: z.array(z.string()),
+  fingerprint: z.string(),
+  appliedFingerprint: z.string().optional(),
+});
+
 // The single authoritative key-budget determination (spec 052, keyBudget.ts).
 // The band ids are the PROGRAMMATIC form — axis A7's display strings are a
 // projection of these, never the other way round.
@@ -616,11 +627,17 @@ export const DecisionAgencySchema = z.enum(["base-derived", "tool-proposed", "ha
 
 export const DecisionProposalSourceSchema = z.enum([
   "langtags", "cldr", "corpus", "axis-fill", "base", "identity", "region", "derived-from-axis",
+  "analysis",
 ]);
 
 export const DecisionProvenanceSchema = z.object({
   agency: DecisionAgencySchema,
   source: DecisionProposalSourceSchema.optional(),
+  // The tool's offer, kept when the author overrode it (spec 078).
+  proposed: z.object({
+    value: z.string(),
+    siteIds: z.array(z.string()).optional(),
+  }).optional(),
 });
 
 export const EditorActionTypeSchema = z.enum(["gallery_edit", "mechanism_edit", "touch_edit"]);
@@ -843,6 +860,9 @@ type _PlacementWorklistGuard = Expect<
   AssignableTo<z.infer<typeof PlacementWorklistSchema>, PlacementWorklist>
 >;
 type _OutputFormGuard = Expect<AssignableTo<z.infer<typeof OutputFormSchema>, OutputForm>>;
+type _MarksContextToleranceDecisionGuard = Expect<
+  AssignableTo<z.infer<typeof MarksContextToleranceDecisionSchema>, MarksContextToleranceDecision>
+>;
 // KeyBudget (spec 052 FR-016) — the single key-budget determination. Its band
 // set is load-bearing: the A7 projection is total and bijective on exactly
 // these three members, so adding or renaming one without updating the schema
