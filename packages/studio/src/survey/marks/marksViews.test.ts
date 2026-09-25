@@ -12,7 +12,7 @@ import { describe, it, expect } from "vitest";
 import type { ConfirmedAlphabet } from "@keyboard-studio/contracts";
 import { groupMarkClasses, proposeAttachments } from "@keyboard-studio/engine";
 import type { SavedAnswer } from "../../steps/answerTypes.ts";
-import { reconciledAttachmentChecked, initialAttachmentChecked } from "./marksViews.ts";
+import { reconciledAttachmentChecked, initialAttachmentChecked, deriveMarksFlags } from "./marksViews.ts";
 import { marksAttachmentKey } from "../../steps/evidence.ts";
 
 const ACUTE = "́";
@@ -69,5 +69,39 @@ describe("reconciledAttachmentChecked (spec 079 US3 item 4)", () => {
     // Not the saved (false) value — the key mismatch means "reproposed", which
     // renders the proposal's own default (true, attested) until reconfirmed.
     expect(reconciled[ACUTE]?.["e"]).toBe(true);
+  });
+});
+
+describe("deriveMarksFlags attachment reasons (spec 079 US3)", () => {
+  const DIAERESIS = "̈";
+  const TWO_MARKS: ConfirmedAlphabet = {
+    bases: ["e", "u"],
+    marks: [ACUTE, DIAERESIS],
+    attestedStacks: [
+      { base: "e", marks: [ACUTE] },
+      { base: "u", marks: [DIAERESIS] },
+    ],
+    declaredRoles: {},
+  };
+
+  it("names the base-plus-mark combination, so two flags on one base are told apart", () => {
+    const classes = groupMarkClasses(TWO_MARKS);
+    const proposals = proposeAttachments(TWO_MARKS, classes);
+    const flags = deriveMarksFlags({
+      alphabet: TWO_MARKS,
+      proposals,
+      attachmentBases: ["e", "u"],
+      classes,
+      treatmentPrefills: [],
+      multiMarkStacks: [],
+      postureId: "",
+      // Attachment station already confirmed, nothing saved for the new rows:
+      // every offered row is newly relevant and flagged.
+      savedAnswers: {},
+      lastRecorded: { marks_attachment: "e0" },
+    });
+    const subjects = flags.filter((f) => f.screenId === "marks_attachment").map((f) => f.reason.subject);
+    expect(subjects).toEqual(expect.arrayContaining(["u" + ACUTE, "u" + DIAERESIS]));
+    expect(new Set(subjects).size).toBe(subjects.length);
   });
 });

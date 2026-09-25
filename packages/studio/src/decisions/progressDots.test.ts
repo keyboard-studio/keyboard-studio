@@ -379,6 +379,30 @@ describe("within-step walk dots — the active section's question marks", () => 
     expect(dots.filter((d) => d.id === "il_language_english")).toHaveLength(1);
   });
 
+  it("a walk stop and record entries grouped under its SCREEN id do not double up (marks stations)", () => {
+    // A marks station's answers carry their own question ids, but are grouped
+    // under the station's screen id — the id the walk publishes. The walk is
+    // authoritative for its screens, so each station renders once and there
+    // is exactly one "you are here".
+    const record = recordOf([
+      answerEntry("e1", "marks", "marks.attachment.u0301"),
+      answerEntry("e2", "marks", "marks.treatment.u0301"),
+      answerEntry("e3", "marks", "marks.attachment.u0308"),
+    ]);
+    const dots = buildProgressDots({
+      record,
+      ctx: ctxWith({ traversal: traversal({ activeStepId: "marks", history: [] }) }),
+      lookupQuestionLabel: stubLabel,
+      recordedScreenOf: { e1: "ms_series_s1", e2: "ms_series_s1", e3: "ms_series_s2" },
+      stepWalks: { marks: [{ id: "ms_series_s1", done: true }, { id: "ms_series_s2", done: true }] },
+      stepCursors: { marks: "ms_series_s2" },
+    });
+    const marksDots = dots.filter((d) => d.location.step === "marks");
+    expect(marksDots.map((d) => d.id)).toEqual(["ms_series_s1", "ms_series_s2"]);
+    expect(dots.filter((d) => d.kind === "current")).toHaveLength(1);
+    expect(currentDot(dots)?.id).toBe("ms_series_s2");
+  });
+
   it("collapses a character walk to ONE section mark for the gallery, even while active", () => {
     const dots = buildProgressDots({
       record: recordOf([]),
@@ -535,6 +559,33 @@ describe("badges (§3c) — from selectWorkToDo() fixtures", () => {
     expect(s1?.badge).toEqual(["reproposed"]);
     const s2 = dots.find((d) => d.id === "ms_series_s2");
     expect(s2?.badge).toBeUndefined();
+  });
+
+  it("several work items of one kind give ONE badge kind, on a question mark and on a section mark", () => {
+    const item = (screenId: string, answerId: string): WorkItem => ({
+      kind: "reproposed",
+      stepId: "marks",
+      screenId,
+      answerId,
+      reason: { code: "evidence-added", subject: "x", sourceStepId: "characters" },
+    });
+    const workToDo = { marks: [item("ms_series_s1", "a1"), item("ms_series_s1", "a2"), item("ms_series_s2", "a3")] };
+    const active = buildProgressDots({
+      record: recordOf([]),
+      ctx: ctxWith({ traversal: traversal({ activeStepId: "marks", history: [] }) }),
+      lookupQuestionLabel: stubLabel,
+      stepWalks: { marks: [{ id: "ms_series_s1", done: true }, { id: "ms_series_s2", done: false }] },
+      stepCursors: { marks: "ms_series_s2" },
+      workToDo,
+    });
+    expect(active.find((d) => d.id === "ms_series_s1")?.badge).toEqual(["reproposed"]);
+    const collapsed = buildProgressDots({
+      record: recordOf([answerEntry("e1", "marks", "ms_series_s1")]),
+      ctx: ctxWith(),
+      lookupQuestionLabel: stubLabel,
+      workToDo,
+    });
+    expect(sectionFor(collapsed, "marks")?.badge).toEqual(["reproposed"]);
   });
 
   it("a badge on a collapsed (non-active) section shows that SOME question inside has work", () => {

@@ -180,7 +180,9 @@ export function deriveMarksFlags(input: MarksFlagInput): FlaggedMarksAnswer[] {
       const key = marksAttachmentKey(alphabet, proposal.mark, base);
       considerFlag(out, answerId, "marks_attachment", savedAnswers[answerId], key, lastRecorded, () => ({
         code: hasChar(alphabet, proposal.mark) && hasChar(alphabet, base) ? "evidence-added" : "evidence-removed",
-        subject: base,
+        // The combination, not the bare base: one base carries a row per mark,
+        // and each flag must name its own (same form as a stack's subject).
+        subject: base + proposal.mark,
         sourceStepId: SOURCE_STEP_ID,
       }));
     }

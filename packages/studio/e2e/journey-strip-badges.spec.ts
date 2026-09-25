@@ -145,6 +145,9 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
     await page.setViewportSize({ width: 480, height: 720 });
     await startToCharacters(page);
     await buildOneCharacterList(page, "é");
+    // buildOneCharacterList stops on carve; accept it with nothing discarded.
+    await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
+    await page.getByTestId("carve-continue").click();
     // "é" on basic_kbdfr is a real new character to place (unlike carve.spec's
     // marks-free "᙮" fixture, which empty-diffs) — drive whatever the gallery
     // actually presents rather than assuming the empty-diff exit.
@@ -228,14 +231,58 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
       '[data-progress-dot-tier="question"][aria-label*="work waiting"]',
     );
     await expect(badgedQuestionMark.first()).toBeVisible({ timeout: 10_000 });
+    // Each station renders once (walk and record never double up), so the
+    // row has exactly one "you are here".
+    await expect(footer(page).locator('[data-progress-dot-kind="current"]')).toHaveCount(1);
+    // The same Next badged the later gallery too — without moving the author.
+    await expect(
+      footer(page).locator('button[aria-label^="Mechanisms"][aria-label*="work waiting: assign a key"]'),
+    ).toHaveCount(1);
 
-    // Resolving every flagged station (re-confirming each proposal) clears
-    // the badge once the work is done.
+    // Next is blocked while an EARLIER station is flagged (FR-013) — the
+    // re-entry lands on the saved position, past the flagged attachment rows.
+    await expect(page.getByTestId("marks-continue")).toBeDisabled();
+
+    // Each flag names its own base+mark combination, so no two links share an
+    // accessible name (WCAG 2.4.4) — "ü" is told apart from "ú".
+    const flagLinks = page.getByTestId("flagged-answers-list").getByRole("button");
+    const names = await flagLinks.allTextContents();
+    expect(names.length).toBeGreaterThan(0);
+    expect(new Set(names).size).toBe(names.length);
+
+    // Resolve the way an author would: follow the first flag back to its
+    // station, then re-confirm every station forward (each Continue re-stamps
+    // that station's answers with the current evidence). That clears the
+    // badge once the work is done.
+    await flagLinks.first().click();
+    await expect(page.getByTestId("marks-continue")).toBeEnabled({ timeout: 10_000 });
     await driveMarksSeries(page);
     await drivePunctuationStep(page);
     await driveInvisiblesStep(page);
     await driveConvenienceStep(page);
     await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
     await expect(marksButton(page)).not.toHaveAttribute("aria-label", /work waiting/i);
+  });
+
+  test("the Mechanisms 'assign a key' badge shows on arrival at the gallery and clears once every key is assigned (US3 scenario 5)", async ({
+    page,
+  }) => {
+    // Jumping to the badge from an earlier stage is refused like any other
+    // upcoming-stage jump (journey-strip-contract.md §5: the badge does not
+    // bypass the gate), so this walks forward to the gallery itself.
+    await startToCharacters(page);
+    await buildOneCharacterList(page, "é");
+    await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
+    await page.getByTestId("carve-continue").click();
+
+    const mechanismsMark = footer(page).locator('button[aria-label^="Mechanisms"]');
+    await expect(mechanismsMark).toHaveCount(1, { timeout: 15_000 });
+    await expect(mechanismsMark).toHaveAttribute("aria-label", /work waiting: assign a key/);
+
+    await driveMechanismsGallery(page);
+
+    // Past the gallery with every character placed: the badge is gone.
+    await expect(mechanismsMark).toHaveCount(1, { timeout: 15_000 });
+    await expect(mechanismsMark).not.toHaveAttribute("aria-label", /work waiting/);
   });
 });

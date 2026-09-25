@@ -313,12 +313,16 @@ function stepScreens(
   lookupQuestionLabel: (questionId: string) => string | undefined,
   i18n: I18n | undefined,
 ): StepScreen[] {
+  // The walk is authoritative for the screens it names: drop record entries
+  // it covers, whether matched by question id or by the screen id they were
+  // recorded under (a marks station groups several question ids under its
+  // own screen id — matching only question ids double-rendered each station).
   const walkIds = new Set((walkPositions ?? []).map((p) => p.id));
   const groups = groupEntriesByScreen(
     stepId,
     entries.filter((e) => !walkIds.has(e.questionId) && !DOTLESS_QUESTION_IDS.has(e.questionId)),
     recordedScreenOf,
-  );
+  ).filter((group) => !walkIds.has(group.screenId));
   const screens: StepScreen[] = groups.map((source) => ({
     id: source.screenId,
     location: { route: "survey", step: stepId as StepId, question: source.questionId },
@@ -359,7 +363,7 @@ function collapsedWalkDot(
   const location: Location = { route: "survey", step: stepId as StepId };
   const allDone = positions.every((p) => p.done);
   const kind: ProgressDotKind = isActiveStep ? "current" : allDone ? "completed" : "upcoming";
-  const badge = workToDo !== undefined && workToDo.length > 0 ? workToDo.map((i) => i.kind) : undefined;
+  const badge = badgeKinds(workToDo);
   return {
     kind,
     tier: "section",
@@ -406,10 +410,14 @@ function badgeForScreen(
   workToDo: readonly WorkItem[] | undefined,
 ): readonly WorkKind[] | undefined {
   if (workToDo === undefined) return undefined;
-  const kinds = workToDo
-    .filter((item) => item.kind === "reproposed" && item.screenId === screenId)
-    .map((item) => item.kind);
-  return kinds.length > 0 ? kinds : undefined;
+  return badgeKinds(workToDo.filter((item) => item.kind === "reproposed" && item.screenId === screenId));
+}
+
+/** A mark's badge: each work KIND once (§3c — the accessible name carries one
+ * suffix per kind, not one per item), `undefined` when there is no work. */
+function badgeKinds(items: readonly WorkItem[] | undefined): readonly WorkKind[] | undefined {
+  if (items === undefined || items.length === 0) return undefined;
+  return [...new Set(items.map((item) => item.kind))];
 }
 
 // ---------------------------------------------------------------------------
@@ -446,7 +454,7 @@ function buildSectionMark(
   workToDo: readonly WorkItem[] | undefined,
   stepStatus: StepStatus | undefined,
 ): ProgressDot | null {
-  const badge = workToDo !== undefined && workToDo.length > 0 ? workToDo.map((i) => i.kind) : undefined;
+  const badge = badgeKinds(workToDo);
   const passedReason =
     stepStatus?.kind === "not-asked" ? notAskedPassedMessage(stepStatus.reason, i18n) : undefined;
 
