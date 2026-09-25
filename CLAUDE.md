@@ -60,12 +60,14 @@ validation lives in `engine/src/validator`.
 
 ## Source of truth
 
-- **[spec.md](spec.md)** — the v1.3.1 spec. Authoritative for scope, schema, validator layering,
+- **[spec.md](spec.md)** — the v2.0.0 spec. Authoritative for scope, schema, validator layering,
   team boundaries, and resolved decisions. Amendment history: v1.1.0 KeyboardIR import
   (2026-06-08); v1.1.1 placement priors (2026-06-11); v1.2.0 hybrid workflow + scoped gallery
   (2026-06-13, see [docs/workflow-model.md](docs/workflow-model.md)); v1.3.0 working-copy spine +
   two authoring tracks (2026-06-14); v1.3.1 defaults-first — §3c "Defaults are the product",
-  propose-then-confirm everywhere, "no default is a defect" (2026-06-15).
+  propose-then-confirm everywhere, "no default is a defect" (2026-06-15); v2.0.0 **major** —
+  per-key touch provenance on `TouchKeyIR` + `IRPath` typed paths (§5a), §7.7 typed
+  assignment-map contract, functional phase labels + A–G crosswalk (Decision 15) (2026-06-26).
 - **[docs/spec-signoff.md](docs/spec-signoff.md)** — review-cycle log and decision summary
   (D1–D9). Read this to see *why* a spec section reads the way it does before proposing changes.
 - **[README.md](README.md)** — external-facing description. Keep it accurate and lean; the

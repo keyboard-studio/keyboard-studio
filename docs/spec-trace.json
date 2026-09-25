@@ -866,6 +866,14 @@
       "implements": [],
       "decisions": [],
       "notes": ""
+    },
+    "specs/080-documentation-completeness": {
+      "title": "Feature Specification: Documentation completeness — every package ships its full documentation set",
+      "hash": "sha256:f6fd6d97d6da3009",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
     }
   }
 }

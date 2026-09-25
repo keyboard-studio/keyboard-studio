@@ -91,8 +91,11 @@ export function isSourceFile(path: string): boolean {
  * Chunked so a large font/icon does not overflow the argument stack of
  * `String.fromCharCode`. Uses the platform `btoa` (present in browsers and
  * Node ≥ 16).
+ *
+ * Exported so the managed-PR (Option B) client can reuse the same encoding
+ * for the base64 `sourceFiles` entries it POSTs to the oauth-backend proxy.
  */
-function bytesToBase64(bytes: Uint8Array): string {
+export function bytesToBase64(bytes: Uint8Array): string {
   let binary = "";
   const chunk = 0x8000;
   for (let i = 0; i < bytes.length; i += chunk) {

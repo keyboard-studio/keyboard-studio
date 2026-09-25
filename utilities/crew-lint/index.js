@@ -50,6 +50,12 @@ const lines = (abs) => read(abs).split("\n");
 
 const BINARY_EXT = new Set([".png", ".jpg", ".jpeg", ".gif", ".webp", ".ico", ".pdf"]);
 
+// Directories that can never hold crew docs but can hold arbitrarily deep (or
+// cyclic, via pnpm's symlinked store) trees: a stale agent worktree under
+// .claude/worktrees/ with its own node_modules once sent this walk into
+// "Maximum call stack size exceeded" on every local `pnpm lint`.
+const SKIP_DIRS = new Set(["node_modules", "worktrees", ".git"]);
+
 /** Recursively list files under `dir` (absolute), skipping obvious binaries. */
 function walk(dir) {
   if (!existsSync(dir)) return [];
@@ -58,6 +64,8 @@ function walk(dir) {
     a.name < b.name ? -1 : 1,
   )) {
     const abs = path.join(dir, ent.name);
+    // Never follow links: a symlinked directory is how a cycle gets in.
+    if (ent.isSymbolicLink() || SKIP_DIRS.has(ent.name)) continue;
     if (ent.isDirectory()) {
       out.push(...walk(abs));
     } else if (!BINARY_EXT.has(path.extname(ent.name).toLowerCase())) {

@@ -317,6 +317,19 @@ export interface SurveyRunnerProps {
    */
   getSeedOptions?: (questionId: string) => FlowOption[] | undefined;
   /**
+   * Called at render to optionally override the current question's static
+   * `required` flag — spec 080 FR-009's adaptive description proposal waives
+   * `pf_welcome_paragraph`'s `required` exactly when it was also seeded from
+   * the base (getSeedValue above), so accept/edit/replace is a single action
+   * (SC-005) instead of being blocked by a "required" gate on a field that
+   * already has something in it. Returns `undefined` to use the question's
+   * own static `required` value — the common case for every other question.
+   * Mirrors `getSeedOptions`'s shape: a dynamic override of one static field,
+   * evaluated at render (not just at seed time), since `required` must stay
+   * correct even if the author clears the seeded value.
+   */
+  getRequiredOverride?: (questionId: string) => boolean | undefined;
+  /**
    * Called at render to optionally override the current question's next target
    * based on state no static `next`/condition can see — e.g. routing
    * il_language_code to il_language_region only when the picked language is
@@ -371,6 +384,7 @@ export function SurveyRunner({
   getSeedProvenance,
   getFieldWarning,
   getSeedOptions,
+  getRequiredOverride,
   getNextOverride,
   onEntryResolved,
   advanceOnSelect,
@@ -396,6 +410,8 @@ export function SurveyRunner({
   getFieldWarningRef.current = getFieldWarning;
   const getSeedOptionsRef = useRef(getSeedOptions);
   getSeedOptionsRef.current = getSeedOptions;
+  const getRequiredOverrideRef = useRef(getRequiredOverride);
+  getRequiredOverrideRef.current = getRequiredOverride;
   const getNextOverrideRef = useRef(getNextOverride);
   getNextOverrideRef.current = getNextOverride;
   const onEntryResolvedRef = useRef(onEntryResolved);
@@ -660,9 +676,17 @@ export function SurveyRunner({
   // question is handed to QuestionField as-is — it resolves the active-locale
   // Tier-B catalog string and interpolates `{{token}}`s itself (see above).
   const dynamicOptions = getSeedOptionsRef.current?.(currentQId);
+  const hasDynamicOptions = dynamicOptions !== undefined && dynamicOptions.length > 0;
+  // spec 080 FR-009: `undefined` means "use the question's own static
+  // `required`" — only a defined override (true or false) replaces it.
+  const requiredOverride = getRequiredOverrideRef.current?.(currentQId);
   const displayQ: FlowQuestion =
-    dynamicOptions !== undefined && dynamicOptions.length > 0
-      ? { ...currentQ, options: dynamicOptions }
+    hasDynamicOptions || requiredOverride !== undefined
+      ? {
+          ...currentQ,
+          ...(hasDynamicOptions ? { options: dynamicOptions } : {}),
+          ...(requiredOverride !== undefined ? { required: requiredOverride } : {}),
+        }
       : currentQ;
   const stepNum = cursor + 1;
 

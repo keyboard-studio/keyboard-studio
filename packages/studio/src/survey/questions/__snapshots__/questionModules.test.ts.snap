@@ -146,6 +146,10 @@ exports[`live question modules > f/pf_font_guidance.ts > definition contract 1`]
 
 exports[`live question modules > f/pf_further_reading.ts > definition contract 1`] = `"text | optional | next pf_project_url | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
 
+exports[`live question modules > f/pf_history_entry.ts > definition contract 1`] = `"radio | optional | next [value == 'edit' -> pf_history_entry_bullets; (default) -> pf_more_detail_gate] | options [confirm, edit, dismiss] | prompt | help_text | validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > f/pf_history_entry_bullets.ts > definition contract 1`] = `"text | optional | next pf_more_detail_gate | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
 exports[`live question modules > f/pf_known_limitations.ts > definition contract 1`] = `"text | optional | next pf_further_reading | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
 
 exports[`live question modules > f/pf_more_detail_gate.ts > definition contract 1`] = `"bool | required | next [value == 'true' -> pf_doc_language; (default) -> pf_credits] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
@@ -162,7 +166,7 @@ exports[`live question modules > f/pf_script_glossary.ts > definition contract 1
 
 exports[`live question modules > f/pf_troubleshooting.ts > definition contract 1`] = `"text | optional | next pf_related_keyboards | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
 
-exports[`live question modules > f/pf_usage_tip_1.ts > definition contract 1`] = `"text | optional | next pf_more_detail_gate | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+exports[`live question modules > f/pf_usage_tip_1.ts > definition contract 1`] = `"text | optional | next pf_history_entry | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
 
 exports[`live question modules > f/pf_usage_tip_2.ts > definition contract 1`] = `"text | optional | next pf_scope_variety | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
 

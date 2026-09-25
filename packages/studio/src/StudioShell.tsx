@@ -51,6 +51,7 @@ import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
 import { OSKFrame } from "./components/OSKFrame.tsx";
 import { OskModeToggle, type OskMode } from "./components/OskModeToggle.tsx";
 import { useValidator } from "./hooks/useValidator.ts";
+import { useDocumentationFindings } from "./hooks/useDocumentationFindings.ts";
 import { findKmnPath } from "./lib/findKmnPath.ts";
 import { resolveBaseTouchJson } from "./lib/resolveBaseTouchJson.ts";
 import { selectUnmappedFindings } from "./lint/lintToQuestion.ts";
@@ -916,7 +917,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       createStudioDecisionRecorder({
         getWorkingCopyState: () => useWorkingCopyStore.getState(),
         snapshotter: snapshotterRef.current,
-        // spec 079 R-04: the answer store learns which screen each entry was
+        // spec 080 R-04: the answer store learns which screen each entry was
         // recorded on (journey-strip grouping) and each screen's last hash
         // (FR-040 "a Next with no change records nothing").
         onScreenRecorded: (stepId, screenId, entryIds, hash) => {
@@ -1236,7 +1237,19 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     const raw = baseVfs.get(path)?.content ?? null;
     return typeof raw === "string" ? raw : null;
   }, [baseVfs]);
-  const { findings } = useValidator(kmnSource);
+  const { findings: validatorFindingsOnly } = useValidator(kmnSource);
+  // spec 080 FR-019 (research R7): the Layer C documentation checks ride the
+  // SAME findings array — a memoised synchronous hook, no second timer (D3) —
+  // so they render, publish, and classify exactly like every other finding.
+  // Warning-severity by the Layer C ceiling, so they can never block (FR-018).
+  const documentationFindings = useDocumentationFindings();
+  const findings = useMemo(
+    () =>
+      documentationFindings.length === 0
+        ? validatorFindingsOnly
+        : [...validatorFindingsOnly, ...documentationFindings],
+    [validatorFindingsOnly, documentationFindings],
+  );
   // spec-014 US5/T034 — publish the SINGLE debounced `useValidator` findings to
   // the store so the sibling `StudioShell` can feed C4 spine-prefix shippability
   // the REAL Layer-A findings WITHOUT a second `useValidator`/debounce (V3 /
@@ -1298,7 +1311,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     // against the walk that published it (stores/stepWalkStore.ts).
     useStepWalkStore.getState().reset();
     // Saved answers and within-step positions belong to the abandoned project
-    // (spec 079 FR-033: one of the only two reset sites).
+    // (spec 080 FR-033: one of the only two reset sites).
     useSurveyAnswerStore.getState().reset();
     snapshotterRef.current.reset();
     pendingArtifactRef.current = null;
@@ -1770,7 +1783,7 @@ export function StudioShell() {
   // ---------------------------------------------------------------------------
   const decisionRecord = useDecisionLogStore((s) => s.record);
   const decisionDroppedCount = useDecisionLogStore((s) => s.droppedCount);
-  // spec 079 FR-068 (T065): each step's current `StepStatus`, read here (the
+  // spec 080 FR-068 (T065): each step's current `StepStatus`, read here (the
   // `decisions-layer` depcruise rule forbids `decisions/ -> stores/`) and
   // passed down so a `not-asked` step's stage group can read "passed —
   // {reason}" instead of either rendering nothing or a fabricated answer —
