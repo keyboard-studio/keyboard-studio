@@ -149,20 +149,6 @@ function setHtmlLang(htmlText: string, lang: string | undefined): string {
   return htmlText.replace(/<html\b/i, `<html lang="${escaped}"`);
 }
 
-/**
- * Wrap `bodyHtml` in a `<div lang="…">` when `lang` is non-blank, otherwise
- * return it unwrapped. Used for fresh help.php productions: the help site's
- * own `header.php` already supplies an outer `<html>` / `<body>` frame, so
- * the page fragment must not nest another full document inside it. The `lang`
- * attribute satisfies FR-006 on a content-root element rather than on
- * `<html>` itself (spec 080 decision B).
- */
-function wrapBodyFragmentWithLang(bodyHtml: string, lang: string | undefined): string {
-  const value = nonBlank(lang);
-  if (value === undefined) return bodyHtml;
-  return `<div lang="${escapeHtml(value)}">${bodyHtml}</div>`;
-}
-
 /** Insert `addition` just before `</body>` when present, else append below (shared by {@link mergeWithBase} and the FR-006/T051 image-only append path). */
 function insertBeforeClosingBody(html: string, addition: string): string {
   const closingBodyIdx = html.toLowerCase().lastIndexOf("</body>");
@@ -403,9 +389,13 @@ export function renderWelcomeHtm(
  * page when one was fetched (FR-013); a base page keeps its own header and is
  * never given a second one. Inherits the base page verbatim even before
  * anything is authored (FR-006). A FRESH page (no base help text) opens with
- * the standard help-site header (spec 080 FR-003) above the same body
- * welcome.htm renders — the header is the one permitted difference between
- * the two on the help side (spec 080 FR-004).
+ * the standard help-site header (spec 080 FR-003) above the same *inner* body
+ * welcome.htm renders — without wrapping `<html>`/`<body>` tags (criteria.md
+ * §11.4 / keymanapp/keyboards#3877: the site's `header.php` owns the document
+ * chrome, so a nested document is non-compliant). `<html lang>` (spec 061
+ * FR-006) therefore applies to welcome.htm and to inherited help pages that
+ * already carry an `<html>` element; a fresh help page has no `<html>` to
+ * annotate.
  */
 export function renderHelpPhp(
   input: HelpDocsRenderInput,
@@ -424,7 +414,12 @@ export function renderHelpPhp(
 
   const bodyHtml = renderDocBodyHtml(answers, description);
   if (baseHelpPhpText !== null) {
+    // Inherited page may already be a full document (older bases) or a
+    // header-plus-fragment (criteria-compliant). setHtmlLang is a no-op when
+    // there is no `<html>` tag.
     return setHtmlLang(mergeWithBase(baseHelpPhpText, bodyHtml), primaryBcp47);
   }
-  return `${helpSiteHeader(displayName)}${wrapBodyFragmentWithLang(bodyHtml, primaryBcp47)}`;
+  // Fresh page: header + body fragment only — never nest a document inside
+  // the site's `header.php` chrome (criterion 11.4).
+  return `${helpSiteHeader(displayName)}${bodyHtml}`;
 }

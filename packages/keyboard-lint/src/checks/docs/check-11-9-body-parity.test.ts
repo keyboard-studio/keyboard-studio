@@ -8,10 +8,10 @@ function makeInput(members: DocLintInput["members"]) {
 }
 
 describe("checkBodyParity (11.9 KM_LINT_PHP_HTM_BODY_MISMATCH)", () => {
-  it("passes when bodies are identical", () => {
+  it("passes when bodies are identical (welcome document vs help fragment)", () => {
     const members = {
       "welcome-htm": "<html><body><p>Welcome to Test</p></body></html>",
-      "help-php": "<?php\n  $pagename = 'Test Help';\n?>\n<html><body><p>Welcome to Test</p></body></html>",
+      "help-php": "<?php\n  $pagename = 'Test Help';\n?>\n<p>Welcome to Test</p>",
     };
     expect(checkBodyParity(makeInput(members))).toEqual([]);
   });
@@ -20,7 +20,7 @@ describe("checkBodyParity (11.9 KM_LINT_PHP_HTM_BODY_MISMATCH)", () => {
     const members = {
       "welcome-htm":
         '<html><body><p>Welcome to Test</p><h2>Keyboard Layout</h2><p><img src="a.svg"></p></body></html>',
-      "help-php": "<html><body><p>Welcome to Test</p></body></html>",
+      "help-php": "<p>Welcome to Test</p>",
     };
     expect(checkBodyParity(makeInput(members))).toEqual([]);
   });
@@ -28,7 +28,7 @@ describe("checkBodyParity (11.9 KM_LINT_PHP_HTM_BODY_MISMATCH)", () => {
   it("fires when the bodies genuinely differ", () => {
     const members = {
       "welcome-htm": "<html><body><p>Welcome to Test</p></body></html>",
-      "help-php": "<html><body><p>Something totally different.</p></body></html>",
+      "help-php": "<p>Something totally different.</p>",
     };
     const findings = checkBodyParity(makeInput(members));
     expect(findings).toHaveLength(1);

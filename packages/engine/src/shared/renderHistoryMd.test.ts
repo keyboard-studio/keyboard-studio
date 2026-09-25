@@ -156,6 +156,21 @@ describe("renderHistoryMd — confirmed/edited entry", () => {
     );
   });
 
+  it("keeps a leading Change History title above the new ATX entry (preamble-aware insert)", () => {
+    const entry = confirmedEntry(["Adapted from basic_kbdfr v1.3 via keyboard-studio."]);
+    const baseHistoryText =
+      "# French Basic Change History\n\n1.0 (2020-01-01)\n---------------\n* Initial release.\n";
+    const rendered = renderHistoryMd(entry, {
+      version: "1.1",
+      dateIso: "2026-06-18",
+      adaptedFrom: null,
+      baseHistoryText,
+    });
+    expect(rendered).toBe(
+      `# French Basic Change History\n\n## 1.1 (2026-06-18)\n* Adapted from basic_kbdfr v1.3 via keyboard-studio.\n\n1.0 (2020-01-01)\n---------------\n* Initial release.\n`,
+    );
+  });
+
   it("injects 'Adapted from' first even when the author's edited bullets omit it", () => {
     const entry = confirmedEntry([], {
       status: "edited",

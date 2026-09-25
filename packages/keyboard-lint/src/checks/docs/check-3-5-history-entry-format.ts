@@ -1,10 +1,8 @@
 // Check 3.5 — KM_LINT_HISTORY_ENTRY_FORMAT
 // Criteria (criteria.json "3.5-history-entry-format"): "Each entry follows
-// `<version> (<YYYY-MM-DD>)` format ... and bullet items." The tool's own
-// generators (scaffolder generateStubs, output/adapt-staging stageAdaptHistory)
-// emit ATX `## <version> (<YYYY-MM-DD>)` headings followed by `*`/`-` bullets —
-// that is the shape checked here, not the criteria prose's hyphen-underline
-// wording (which predates the generator).
+// `<version> (<YYYY-MM-DD>)` format ... and bullet items." Accepts both the
+// tool's ATX `## <version> (<YYYY-MM-DD>)` generator shape and the criteria
+// prose's setext/hyphen-underline shape used by many corpus bases.
 
 import type { DocLintInput, LintFinding } from "@keyboard-studio/contracts";
 import { docMemberPath, parseHistoryEntries } from "./_shared.js";
@@ -35,7 +33,7 @@ export function checkHistoryEntryFormat(input: DocLintInput): LintFinding[] {
       layer: "C",
       message: `HISTORY.md entr${plural ? "ies" : "y"} not in "<version> (<YYYY-MM-DD>)" plus bullet-list format: ${headings}.`,
       location: { file: path, line: 1 },
-      hint: `Format each HISTORY.md entry as "## <version> (<YYYY-MM-DD>)" followed by one or more "* " or "- " bullet lines.`,
+      hint: `Format each HISTORY.md entry as "## <version> (<YYYY-MM-DD>)" (or the same text underlined with hyphens) followed by one or more "* " or "- " bullet lines.`,
     },
   ];
 }

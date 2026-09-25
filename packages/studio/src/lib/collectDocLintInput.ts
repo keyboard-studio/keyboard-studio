@@ -21,7 +21,7 @@ import {
   parseTargetTokens,
   parseTouchLayout,
   docMemberPath,
-  kvksShiftTokenToHelpLayerId,
+  kvksShiftTokenToLayerId,
 } from "@keyboard-studio/engine";
 import { runDocChecks } from "@keymanapp/keyboard-lint";
 
@@ -100,12 +100,13 @@ export function kpsCopyright(kpsText: string | null | undefined): string | undef
 }
 
 /**
- * The `.kvks` shift-state token as a help-page layer id (`data-states`).
- * Delegates to the engine's {@link kvksShiftTokenToHelpLayerId} so studio and
- * the layout-chart path share one grammar for run-together tokens like `SRA`.
+ * The `.kvks` shift-state token as a layer id shared by layout charts and
+ * Layer C `data-states` checks. Delegates to the engine's
+ * {@link kvksShiftTokenToLayerId} (touch/fallback vocabulary) so studio and
+ * the chart path share one grammar for run-together tokens like `SRA`.
  */
 export function kvksLayerId(shift: string): string {
-  return kvksShiftTokenToHelpLayerId(shift);
+  return kvksShiftTokenToLayerId(shift);
 }
 
 /** Desktop + touch layer ids for criterion 11.6; malformed inputs contribute nothing. */
