@@ -46,7 +46,68 @@
       "kind": "start",
       "by": "extension",
       "at": "2026-09-24T22:55:07.844Z"
+    },
+    {
+      "step": "implement",
+      "substep": "run-tests",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-25T01:13:49.405Z"
     }
   ],
-  "telemetryInstanceId": "e3963a54-193e-4377-b386-8058b4a9a8a6"
+  "telemetryInstanceId": "e3963a54-193e-4377-b386-8058b4a9a8a6",
+  "verified": [
+    {
+      "what": "engine suite",
+      "command": "cd packages/engine && npx vitest run",
+      "result": "4149 pass, 2 skipped, 1 pre-existing corpus-drift failure (recognizer/integration NCAPS)"
+    },
+    {
+      "what": "studio suite",
+      "command": "cd packages/studio && npx vitest run",
+      "result": "452 files / 6670 pass"
+    },
+    {
+      "what": "contracts + keyboard-lint suites",
+      "command": "npx vitest run (each package)",
+      "result": "807 pass; 126 pass"
+    },
+    {
+      "what": "e2e context tolerance",
+      "command": "VITE_KM_CONTEXT_TOLERANCE=1 npx playwright test e2e/context-tolerance.spec.ts",
+      "result": "5/5 pass (US1 x2, accept, partial, decline)"
+    },
+    {
+      "what": "corpus harness (FR-012)",
+      "command": "node utilities/nfd-tolerance-corpus/run.mjs --fail-on-regressed",
+      "result": "0 regressed; 33/62 gap keyboards fixed (53%)"
+    },
+    {
+      "what": "typecheck + lint",
+      "command": "pnpm -r typecheck; eslint; depcruise; 9 checkers",
+      "result": "all green (crew-lint not runnable locally)"
+    },
+    {
+      "what": "SC-003 on sil_yoruba8",
+      "command": "npx vitest run src/pattern-apply/context-tolerance-overlay.test.ts",
+      "result": "5 accent keys correct on decomposed input; joined byte-identical"
+    }
+  ],
+  "decisions": [
+    {
+      "decision": "Apply path uses a persisted overlay replayed by projectWorkingCopyVfs (owner-approved)",
+      "why": "store.ir is never emitted into the artifact; see research §10 A1"
+    }
+  ],
+  "concerns": [
+    {
+      "note": "{\"concern\": \"T049 content sign-off of drafted strings is open\", \"severity\": \"P2\"}"
+    },
+    {
+      "note": "{\"concern\": \"T054 flag retirement deferred: CI corpus gate has not run on the pinned corpus (branch not pushed) and strings unsigned\", \"severity\": \"P2\"}"
+    },
+    {
+      "note": "{\"concern\": \"Harness cold-start can time out (60s Vite SSR invoke); CI step may flake\", \"severity\": \"P2\"}"
+    }
+  ]
 }
