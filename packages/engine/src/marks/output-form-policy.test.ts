@@ -33,6 +33,22 @@ describe("resolveOutputFormProposal (FR-013..FR-016)", () => {
     expect(proposal.form).toBe("base-plus-mark");
   });
 
+  it("readyMadeUnavailable is SET on row 1 (some pair has no ready-made form)", () => {
+    // Row 1 fires precisely on `anyPairLacksReadyMade`, so the station must be
+    // able to see that "ready-made" is not a selectable answer at all.
+    expect(resolveOutputFormProposal([pair(true), pair(false)], false).readyMadeUnavailable).toBe(
+      true,
+    );
+    expect(resolveOutputFormProposal([pair(false)], true).readyMadeUnavailable).toBe(true);
+  });
+
+  it("readyMadeUnavailable is CLEAR on rows 2 and 3 (every pair composes)", () => {
+    // Row 2 (open choice) and row 3 (ready-made default) both only run when
+    // every pair has a ready-made form, so the override stays available.
+    expect(resolveOutputFormProposal([pair(true)], true).readyMadeUnavailable).toBe(false);
+    expect(resolveOutputFormProposal([pair(true)], false).readyMadeUnavailable).toBe(false);
+  });
+
   it("SC-005: no explanation contains 'Unicode' or 'normalization' (any case)", () => {
     const cases = [
       resolveOutputFormProposal([pair(false)], false),
