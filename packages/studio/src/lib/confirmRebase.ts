@@ -46,7 +46,8 @@
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type { BaseKeyboard, RemovalCapability, VirtualFS, KeyboardIR } from "@keyboard-studio/contracts";
-import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { useWorkingCopyStore, type IdentityPatch } from "../stores/workingCopyStore.ts";
+import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 
 /** User-facing wording for the rebase confirm dialog — the single source of truth for the string. */
 export const REBASE_CONFIRM_MESSAGE =
@@ -125,6 +126,37 @@ export function confirmRebaseTo(newBaseId: string): boolean {
  * Returns true when instantiation proceeded, false when it was skipped (mock
  * engine path or user cancelled the rebase confirm).
  */
+/**
+ * The identity a new Track 1 working copy starts with: the language the
+ * identity step composed, and the base's own display name.
+ *
+ * Without it the copy starts with `identity: null`, and on the adapt track it
+ * stays that way — project_name is the only other writer before output, and
+ * adapt skips it. Every `identity.bcp47` reader then works without the
+ * author's language: the carve needed set never consults the language's
+ * exemplars, and the package descriptor falls back to `und`.
+ *
+ * The display name is the base's own, which both projection paths already
+ * treat as "not an edit" (the `.kmn` name store stays byte-identical) and
+ * which the descriptor would otherwise fall back to anyway. No keyboard id is
+ * seeded: choosing one is the author's act, and every id reader checks for
+ * its absence. The copy track's project_name commit replaces the whole seed.
+ *
+ * Returns undefined when the identity step recorded no language tag, so the
+ * copy starts with no overlay exactly as before.
+ */
+export function identitySeedFromSession(base: BaseKeyboard): IdentityPatch | undefined {
+  const result = useSurveySessionStore.getState().identityResult;
+  const bcp47 = result?.bcp47.trim() ?? "";
+  if (bcp47 === "") return undefined;
+  const languageName = result?.english.trim() ?? "";
+  return {
+    displayName: base.displayName,
+    bcp47,
+    ...(languageName !== "" ? { languageName } : {}),
+  };
+}
+
 export function instantiateFromBaseIfConfirmed(
   base: BaseKeyboard,
   { vfs, ir, removalCapabilities }: { vfs: VirtualFS | null; ir: KeyboardIR | null; removalCapabilities?: Map<string, RemovalCapability> },
@@ -135,10 +167,12 @@ export function instantiateFromBaseIfConfirmed(
     return false;
   }
   if (!options?.skipConfirm && !confirmRebaseIfEdited()) return false;
+  const identitySeed = identitySeedFromSession(base);
   useWorkingCopyStore.getState().instantiateFromBase(base, {
     vfs,
     ir,
     ...(removalCapabilities !== undefined ? { removalCapabilities } : {}),
+    ...(identitySeed !== undefined ? { identitySeed } : {}),
   });
   return true;
 }
