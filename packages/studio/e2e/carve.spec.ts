@@ -3,9 +3,8 @@
 //
 // Proves the full AC2 chain for the carve feature: importing a keyboard with
 // recognized patterns, discarding a CHARACTER in the v2 character-first carve
-// gallery (CarveGalleryV2.tsx — the live carve gallery; v1's rule/node "Rail"
-// view, CarveGallery.tsx, is retained but commented out in carveAdapter.tsx
-// for rollback and is no longer reachable), confirming the live working-copy
+// gallery (CarveGalleryV2.tsx — the carve gallery; v1's rule/node "Rail"
+// view has been removed), confirming the live working-copy
 // IR reflects the cascade deletion via the window.__ksE2E__ hook, then
 // confirming the emitted .kmn genuinely omits the deleted rules' distinguishing
 // output token.
@@ -98,9 +97,8 @@ const KMN_ZIP_PATH = `source/${BASE_KEYBOARD_ID}.kmn`;
  * "UNVERIFIED against v2's actual render") and RemovalBanner's dismiss
  * control + region both pass. v1's Rail-only surfaces (carve-card buttons,
  * sticky SectionHeader, GlyphCell's cross-reference chips, "Hide info panel")
- * were already retired from this list as dead code (CarveGalleryV2 is
- * unconditional; v1 is commented out in carveAdapter.tsx). Nothing left to
- * exclude on this screen.
+ * were already retired from this list as dead code (v1 has since been
+ * removed). Nothing left to exclude on this screen.
  */
 const KNOWN_CONTRAST_DEBT: readonly string[] = [];
 
@@ -205,8 +203,8 @@ test.describe("Carve gallery (v2) — discard one character, verify IR + emitted
     // The deletion is recorded in the deletedItemIds overlay (asserted via
     // getDeletedItemIds(), NOT getDeletedNodeIds() — CarveGalleryV2's
     // cascadeDelete routes whole-rule deletes through the item channel by
-    // design; getDeletedNodeIds() only reflects v1 CarveGallery's deleteNode
-    // path and stays empty here — see e2eHook.ts's getDeletedItemIds doc).
+    // design; getDeletedNodeIds() only reflects the store's whole-node
+    // deleteNode path and stays empty here — see e2eHook.ts's getDeletedItemIds doc).
     // ---------------------------------------------------------------------
     await expect
       .poll(

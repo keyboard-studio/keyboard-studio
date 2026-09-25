@@ -31,7 +31,7 @@ import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 
 
 // Chrome (badge labels); built per-render via the optional-i18n +
-// msg()/resolveMessage() pattern (see Inspector.tsx's storeBlurb) rather than
+// msg()/resolveMessage() pattern (see lib/i18nResolve.ts) rather than
 // taking `t` as a bare function parameter — Lingui's macro tracks the
 // specific binding introduced by useLingui(), so a re-bound `t` parameter is
 // a distinct binding the extractor does not follow.

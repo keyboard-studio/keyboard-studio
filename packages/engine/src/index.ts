@@ -400,12 +400,10 @@ export { resolveKeyAddress } from "./pattern-apply/index.js";
 export type { AddressableLayoutLike, ResolvedKeyLocation } from "./pattern-apply/index.js";
 
 // spec 063 T060 — re-derivation resilience (FR-033b): `resolveSubKeyEntry`
-// lets a studio-side correlation pass (keyEditOrphanReport.ts) resolve an
-// orphaned setSubKey/removeSubKey's sub-entry against the layout the
-// overlay was originally authored against, the same way `resolveKeyAddress`
-// resolves the main key; `declaredOperationOutput` answers the cheap,
-// layout-free half of "what character did this operation carry" for the
-// three op kinds that author `output` directly.
+// resolves a setSubKey/removeSubKey's sub-entry against a layout the same
+// way `resolveKeyAddress` resolves the main key; `declaredOperationOutput`
+// answers the cheap, layout-free half of "what character did this operation
+// carry" for the three op kinds that author `output` directly.
 export { resolveSubKeyEntry, declaredOperationOutput } from "./pattern-apply/index.js";
 
 // spec 063 T095/T097 — the `suppress` compound derivation (FR-029b). The

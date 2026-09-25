@@ -53,7 +53,7 @@ export interface KsE2EHook {
    * routes BOTH whole-rule deletes and store-slot drops through this ITEM
    * channel (deletedItemIds), never deletedNodeIds (see workingCopyStore.ts's
    * cascadeDelete doc comment) — so a V2 discard is asserted here, not via
-   * getDeletedNodeIds(), which only reflects v1 CarveGallery's deleteNode path.
+   * getDeletedNodeIds(), which only reflects the store's whole-node deleteNode path.
    */
   getDeletedItemIds: () => string[];
   /**

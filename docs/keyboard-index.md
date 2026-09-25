@@ -52,6 +52,8 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Övdalsk | `elfdalian` | `ovd` | Craig Cornelius | `../keyboards/experimental/e/elfdalian` |
 | தமிழ்99 \| Tamil99 | `ekwtamil99uni` | `ta` | Mugunth, Umar, K. Sethu | `../keyboards/release/e/ekwtamil99uni` |
 | Enggano | `enggano` | `eno` | Mary Dalrymple | `../keyboards/release/e/enggano` |
+| Dane-Z̲aa Z̲áágéʔ | `fv_dane_zaa_zaage` | `bea` | Clarissa Forbes | `../keyboards/release/fv/fv_dane_zaa_zaage` |
+| X̱aayda-X̱aad Kil | `fv_hlgaagilda_xaayda_kil` | `hax` | (c) 2008-2024 FirstVoices, SIL International. Portions (c) 2006 Chris Harvey | `../keyboards/release/fv/fv_hlgaagilda_xaayda_kil` |
 | ᓀᐦᐃᔭᐍᐏᐣ (Plains Cree) | `fv_plains_cree` | `crk` | (c) 2015-2025 FirstVoices, SIL Global, 2015 First Peoples' Cultural Foundation | `../keyboards/release/fv/fv_plains_cree` |
 | ᑐᑊᘁᗕᑋᗸ (Southern Carrier) | `fv_southern_carrier` | `caf-Cans` | (c) 2015-2024 FirstVoices, SIL International, 2015 First Peoples' Cultural Foundation | `../keyboards/release/fv/fv_southern_carrier` |
 | Galaxie Greek (Mnemonic) | `galaxie_greek_mnemonic` | `grc-Grek`, `el` | Hampton Keathley | `../keyboards/release/g/galaxie_greek_mnemonic` |
@@ -73,6 +75,7 @@ Fields and parsing mirror [packages/engine/src/base-browser/kps-parser.ts](../pa
 | Gurmukhi Phonetic (ITRANS) | `itrans_gurmukhi` | `pa`, `sd-Guru` | Shree Devi Kumar | `../keyboards/release/itrans/itrans_gurmukhi` |
 | Odia/Oriya Phonetic (ITRANS) | `itrans_odia` | `or`, `bdv`, `bfw`, `dso`, `gbj`, `gdb`, `hoc-Orya`, `jun`, `kff-Orya`, `kxv-Orya`, `kyw-Orya`, `pci-Orya`, `peg`, `sat-Orya`, `spv`, `srb-Orya` | Shree Devi Kumar | `../keyboards/release/itrans/itrans_odia` |
 | Ibọnọ Chwerty | `ibono_chwerty` | `ibn` | Rogers Katelem Edeh | `../keyboards/release/i/ibono_chwerty` |
+| Korean RR | `korean_rr` | `ko` | © 2010-2023 SIL International | `../keyboards/release/k/korean_rr` |
 | Kayah [Myanmar] (SIL) | `sil_kayah_mymr` | `kyu-Mymr` | © SIL Global | `../keyboards/release/sil/sil_kayah_mymr` |
 | Khmer Angkor | `khmer_angkor` | `km` | Makara Sok | `../keyboards/release/k/khmer_angkor` |
 | Komono (Côte d'Ivoire) | `komono_ci` | `kqg` | Kirk Rogers | `../keyboards/release/k/komono_ci` |

@@ -131,10 +131,6 @@ vi.mock("./editors/panels/BaseResolution.tsx", () => ({
   BaseResolution: () => <div data-testid="stage-base" />,
 }));
 
-vi.mock("./editors/carve/CarveGallery.tsx", () => ({
-  CarveGallery: () => <div data-testid="stage-carve" />,
-}));
-
 vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => ({
   MechanismGallery: () => <div data-testid="stage-mechanisms" />,
 }));
@@ -331,14 +327,14 @@ afterEach(() => {
 /**
  * Drives the REAL top-bar `CurrentKeyboardIndicator` dropdown, exactly as an
  * author would: open the trigger, click the target project's option row.
- * The trigger's accessible name is fixed ("Keyboard", from
- * `aria-labelledby` -> `LABEL_ID`'s "Keyboard" label, per ARIA's
- * `aria-labelledby`-overrides-content-name rule) regardless of which
- * project is currently active, so this query is stable across the switch
- * this test performs twice (A->B and, in the mirror test, B->A).
+ * The trigger's accessible name is "Keyboard <current project>" (its
+ * `aria-labelledby` names the "Keyboard" label span, then the trigger
+ * itself), so it always STARTS with "Keyboard" whichever project is
+ * currently active — the prefix match keeps this query stable across the
+ * switch this test performs twice (A->B and, in the mirror test, B->A).
  */
 function switchViaTopBarDropdown(targetProjectLabel: string): void {
-  const trigger = screen.getByRole("button", { name: "Keyboard" });
+  const trigger = screen.getByRole("button", { name: /^Keyboard\b/ });
   fireEvent.click(trigger);
   const targetOption = screen.getByRole("option", { name: targetProjectLabel });
   fireEvent.click(targetOption);

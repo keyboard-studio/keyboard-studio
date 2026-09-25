@@ -222,7 +222,9 @@ describe("_createOracle with a live mock WASM handle", () => {
 
   it("drops oracle-inapplicable file-existence diagnostics (bitmap/icon)", async () => {
     // The text-only oracle can never open a referenced packaging asset, so
-    // ERROR_CannotReadBitmapFile (wire code 0x502031 = 5251121) fires for
+    // ERROR_CannotReadBitmapFile (wire code 0x502031 = 5251121; the real
+    // handle resolves it to its symbolic name, the numeric form is kept here
+    // for a table-less handle) fires for
     // every base that names a &BITMAP — pure noise here. Other passthrough
     // findings from the same run must survive the filter.
     const { handle } = mockHandle([

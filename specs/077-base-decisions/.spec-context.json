@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "Base-keyboard decisions with knowledgeable consent",
+  "branch": "077-base-decisions",
+  "currentStep": "specify",
+  "status": "specified",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-09-23T07:48:34.365Z"
+    }
+  ],
+  "telemetryInstanceId": "8f9d1ff7-f341-43b1-97ed-0ecf24233266"
+}

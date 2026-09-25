@@ -20,7 +20,7 @@ import { execFileSync } from "node:child_process";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { resolveBaselineRef, readCatalogAtRef } from "./git-baseline.js";
 
@@ -183,6 +183,58 @@ describe("resolveBaselineRef", () => {
     const work = initRepo("main"); // exactly one commit, no remote
 
     expect(resolveBaselineRef(work)).toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // Regression: this function used to pass `--depth=1` unconditionally. On a
+  // developer's FULL clone that does not "fetch less" -- it CONVERTS the clone
+  // into a shallow one, permanently, and silently, because `pnpm lint` runs it
+  // with stdio ignored. A shallow main then breaks every ancestry question
+  // asked of the repo afterwards. These two pin both halves: never shallow a
+  // full clone, and still shallow-fetch when the clone already is one (CI).
+  // -------------------------------------------------------------------------
+  it("leaves a FULL clone full -- never converts it into a shallow one", () => {
+    saveEnv();
+    clearEnv();
+    const origin = initRepo("main");
+    writeFileSync(join(origin, "second.txt"), "second");
+    commit(origin, "second");
+    writeFileSync(join(origin, "third.txt"), "third");
+    commit(origin, "third");
+
+    const work = tempDir("git-baseline-work-");
+    git(["init", "-q", "-b", "main"], work);
+    writeFileSync(join(work, "own.txt"), "own");
+    commit(work, "own init");
+    git(["remote", "add", "origin", origin], work);
+
+    expect(resolveBaselineRef(work)).toBe("origin/main");
+
+    // The decisive assertion: the clone is still complete.
+    expect(git(["rev-parse", "--is-shallow-repository"], work).trim()).toBe("false");
+    // ...and the fetched branch carries its real history, not a single graft.
+    expect(git(["rev-list", "--count", "origin/main"], work).trim()).toBe("3");
+  });
+
+  it("still resolves the baseline when the clone is ALREADY shallow (the CI shape)", () => {
+    saveEnv();
+    clearEnv();
+    const origin = initRepo("main");
+    writeFileSync(join(origin, "second.txt"), "second");
+    commit(origin, "second");
+
+    // `--depth` is honoured for a local source only over file://; given a
+    // plain path git makes a hardlink clone and ignores depth entirely.
+    // pathToFileURL handles the Windows drive-letter form for us.
+    const originUrl = pathToFileURL(origin).href;
+    const parent = tempDir("git-baseline-shallow-");
+    git(["clone", "-q", "--depth=1", "-b", "main", originUrl, "work"], parent);
+    const work = join(parent, "work");
+    expect(git(["rev-parse", "--is-shallow-repository"], work).trim()).toBe("true");
+
+    expect(resolveBaselineRef(work)).toBe("origin/main");
+    // Still shallow: the fix did not turn CI's cheap fetch into a full one.
+    expect(git(["rev-parse", "--is-shallow-repository"], work).trim()).toBe("true");
   });
 });
 

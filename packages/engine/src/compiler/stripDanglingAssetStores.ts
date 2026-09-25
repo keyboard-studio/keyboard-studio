@@ -6,15 +6,11 @@
 // reading" and produces zero artifacts. A live OSK preview does not need any of
 // these packaging assets, so a missing one must not break the preview.
 //
-// SEVERITY CAVEAT. These read as `warning` in this repo's compile() output, but
-// that is OUR fallback, not kmcmplib's severity model: upstream
-// kmn_compiler_errors.h defines ERROR_CannotReadBitmapFile = SevError | 0x031
-// (and most of this class likewise — see codeMap.ts's per-code table, where
-// only KMW_EMBEDJS/KMW_HELPFILE are genuinely Warn). kmc-kmn's
-// CompilerMessageSpec does not populate a `severity` field on the message
-// objects it hands our callback, so compiler/index.ts's
-// `message.severity ?? "warning"` fills one in. Do not treat the observed
-// `warning` label as upstream's classification when doing Layer-A fidelity work.
+// Severity: compile() decodes kmcmplib's severity from the message code, so
+// most of this class surfaces as `error` — upstream kmn_compiler_errors.h
+// defines ERROR_CannotReadBitmapFile = SevError | 0x031, and likewise the rest
+// except KMW_EMBEDJS/KMW_HELPFILE, which are genuinely Warn (see codeMap.ts's
+// per-code table).
 //
 // Two categories of stores are stripped:
 //
@@ -124,9 +120,8 @@ function removeHeaderStoreLines(
  * package, it is a package that does not build. kmcmplib reports "Cannot open the
  * bitmap or icon file for reading" and then emits ZERO artifacts, so the reference
  * has to go rather than be left for the author (or the keyboards-repo CI) to
- * discover as an empty build. The zero-artifact outcome is what matters here; the
- * diagnostic's severity is NOT the `warning` this repo surfaces — see the
- * severity caveat at the top of this file.
+ * discover as an empty build. The zero-artifact outcome is what matters here (the
+ * diagnostic itself is error-severity — see the note at the top of this file).
  *
  * The icon is the right store to treat this way because it is the one purely
  * cosmetic packaging asset: a keyboard with no icon is a complete, working

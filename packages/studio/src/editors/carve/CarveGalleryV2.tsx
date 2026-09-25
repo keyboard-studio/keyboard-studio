@@ -1,13 +1,11 @@
-// CarveGalleryV2 — character-first carve gallery. v2 is now the
-// default/live carve gallery, rendered unconditionally by carveAdapter.tsx.
-// The former rule/node "Rail" view (v1, CarveGallery.tsx) is retained but
-// commented out in carveAdapter.tsx for rollback.
+// CarveGalleryV2 — character-first carve gallery, rendered by carveAdapter.tsx.
+// It replaced the former rule/node "Rail" view (v1), which has been removed.
 //
 // Shows every character the keyboard can type in one panel; the author
 // discards CHARACTERS, not rules. Toggling a character resolves its
 // contributors (irToCharacterView.ts, built on collectCharContributors) and
-// cascades through the SAME workingCopyStore actions v1 (CarveGallery.tsx)
-// already uses (cascadeDelete/cascadeRestore) — no new write path.
+// cascades through the shared workingCopyStore actions
+// (cascadeDelete/cascadeRestore) — no gallery-specific write path.
 
 import { useState, useMemo, useCallback } from 'react';
 import type { ReactNode } from 'react';
@@ -34,6 +32,9 @@ interface CarveGalleryV2Props {
 }
 
 type GroupBy = 'category' | 'source';
+
+/** Names the scrollable character-details region (see the aside below). */
+const DETAILS_HEADING_ID = 'carve-details-heading';
 
 const GROUP_HINTS: Record<string, string> = {
   'basic-letter': 'Plain A-Z letters, typed directly.',
@@ -283,8 +284,8 @@ interface RecommendedGroupCardProps {
  * grid below uses. Two instances mount side by side in the tree (never
  * merged into one): the primary "Suggested to discard" group, and the
  * secondary, optional "Latin alphabet (optional)" group for
- * `reason: 'cross-script-latin'` rows (post-#526 split — see CarveGalleryV2's
- * header comment and RemovalBanner.tsx, this card's predecessor).
+ * `reason: 'cross-script-latin'` rows (post-#526 split, inherited from the v1
+ * gallery's removal banner, this card's predecessor).
  */
 function RecommendedGroupCard({
   testId, toggleAllTestId, regionAriaLabel, topBorderColor, chipBackground, chipColor, heading, body,
@@ -432,13 +433,13 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   const confirmedInventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
   // Target-language display name (e.g. "Russian"), sourced the same way Phase A's
   // identity resolution already populates it — used only for the optional
-  // cross-script-Latin group's "...for a {name}-only keyboard" copy (RemovalBanner).
+  // cross-script-Latin group's "...for a {name}-only keyboard" copy.
   const identityDisplayName = useWorkingCopyStore((s) => s.identity?.displayName);
   const isItemDeleted = useWorkingCopyStore((s) => s.isItemDeleted);
   // Subscribed PURELY to force a re-render when the set mutates —
   // isItemDeleted above is a stable `(id) => get().deletedItemIds.has(id)`
   // reference, so Zustand's Object.is comparison never re-renders on its
-  // own. Mirrors CarveGallery.tsx's identical subscription.
+  // own.
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
   const cascadeDelete = useWorkingCopyStore((s) => s.cascadeDelete);
   const cascadeRestore = useWorkingCopyStore((s) => s.cascadeRestore);
@@ -456,10 +457,10 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     [confirmedInventory],
   );
 
-  // Shared needed-set derivation — the SAME hook and call-site
-  // shape as CarveGallery.tsx (the rule/node Rail view), so the two carve
-  // surfaces never compute a different "needed" answer for the same working
-  // copy. See useCarveNeededSet's header doc for the full rationale.
+  // Shared needed-set derivation — the SAME hook the pre-carve convenience
+  // question uses, so the two surfaces never compute a different "needed"
+  // answer for the same working copy. See useCarveNeededSet's header doc for
+  // the full rationale.
   const {
     neededSet: orthographyNeededSet,
     form: carveNormalizationForm,
@@ -469,10 +470,13 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   } = useCarveNeededSet();
 
   // Base characters the author chose to KEEP at the pre-carve convenience
-  // question — mirrors CarveGallery.tsx's identical retainedSet union (see
-  // that file's comment for the full rationale). useCarveNeededSet
-  // deliberately excludes these (see its header doc), so the gallery unions
-  // them on top at this call site, same as CarveGallery does.
+  // question — letters their orthography does not use but they still need for
+  // borrowed words, email addresses, and web addresses. They are not part of
+  // the orthography (deliberately absent from confirmedInventory, see
+  // SurveyPhaseResult.retainedConvenienceChars), but for carve's purposes they
+  // are needed: shielding them here is the whole point of having asked.
+  // useCarveNeededSet deliberately excludes these (see its header doc), so the
+  // gallery unions them on top at this call site.
   const retainedConvenienceChars = useWorkingCopyStore((s) => s.session.retainedConvenienceChars);
   const retainedSet = useMemo(
     () => new Set((retainedConvenienceChars ?? []).map((ch) => ch.normalize(carveNormalizationForm))),
@@ -527,15 +531,15 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     return map;
   }, [cells, recommended]);
 
-  // Post-#526 split (RemovalBanner's prior home): cross-script-Latin rows
-  // never drive the primary "Suggested to discard" group — they get their
+  // Post-#526 split (inherited from the v1 removal banner): cross-script-Latin
+  // rows never drive the primary "Suggested to discard" group — they get their
   // own optional, low-priority group instead of being suppressed or mixed in.
   const primaryRows = useMemo(() => recommended.filter((r) => r.reason !== 'cross-script-latin'), [recommended]);
   const optionalLatinRows = useMemo(() => recommended.filter((r) => r.reason === 'cross-script-latin'), [recommended]);
 
   // "...for a {descriptor} keyboard" — descriptor is the display name +
   // "-only" when available (e.g. "Russian-only"), else the neutral
-  // "single-script" fallback. Mirrors RemovalBanner's identical computation.
+  // "single-script" fallback.
   const keyboardDescriptor = identityDisplayName !== undefined && identityDisplayName.length > 0
     ? `${identityDisplayName}-only`
     : 'single-script';
@@ -569,9 +573,8 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
 
   const [selectedCh, setSelectedCh] = useState<string | null>(null);
   const [groupBy, setGroupBy] = useState<GroupBy>('category');
-  // Optional-Latin card starts collapsed — same default RemovalBanner used
-  // for this section, since it is deliberately lower-priority than the
-  // primary suggested-to-discard card above it.
+  // Optional-Latin card starts collapsed, since it is deliberately
+  // lower-priority than the primary suggested-to-discard card above it.
   const [latinOpen, setLatinOpen] = useState(false);
 
   const toggleCell = useCallback((cell: CharacterCell) => {
@@ -750,10 +753,37 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
 
       {/* Two-panel body */}
       <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
-        {/* Left aside — Character details */}
-        <div style={{ width: 290, flexShrink: 0, borderRight: '1px solid var(--app-border)', padding: 18, overflowY: 'auto' }}>
-          <div style={{ font: '600 10.5px/1 var(--app-font)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--app-text-subtle)', marginBottom: 12 }}>
-            Character details
+        {/* Left aside — Character details.
+            role="region" + tabIndex={0}: this panel is a SCROLL CONTAINER
+            (overflowY: auto) whose content is read-only (#1619 AC2: no
+            discard/restore control lives here), so it has no focusable
+            descendant a keyboard user could Tab to and then scroll from.
+            Whenever the details overflow the pane (a short viewport, a
+            taller top bar, a character with several ways to type it) it was
+            reachable by pointer only: WCAG 2.1.1, axe's
+            `scrollable-region-focusable`. Same fix as KmnSourceView.tsx: a
+            named region a keyboard user deliberately enters to scroll. The
+            name comes from the panel's own visible heading (aria-labelledby,
+            so Label in Name holds), and that heading is now in the lingui
+            catalog. ks-focus-ring gives the tab stop the app-wide visible
+            focus treatment.
+            `jsx-a11y/no-noninteractive-tabindex` is a heuristic about
+            interactive widgets with no notion of scroll containers; it and
+            the WCAG requirement genuinely disagree here, hence the scoped
+            disable (block form: the rule reports on the tabIndex attribute
+            line, which a next-line directive above the tag does not reach). */}
+        {/* eslint-disable jsx-a11y/no-noninteractive-tabindex */}
+        <div
+          role="region"
+          aria-labelledby={DETAILS_HEADING_ID}
+          tabIndex={0}
+          className="ks-focus-ring"
+          data-testid="carve-details"
+          style={{ width: 290, flexShrink: 0, borderRight: '1px solid var(--app-border)', padding: 18, overflowY: 'auto' }}
+        >
+          {/* eslint-enable jsx-a11y/no-noninteractive-tabindex */}
+          <div id={DETAILS_HEADING_ID} style={{ font: '600 10.5px/1 var(--app-font)', letterSpacing: '.12em', textTransform: 'uppercase', color: 'var(--app-text-subtle)', marginBottom: 12 }}>
+            <Trans id="carve.details.heading">Character details</Trans>
           </div>
           {selectedCell === undefined ? (
             <p style={{ fontSize: 13, color: 'var(--app-text-muted)' }}>No characters to show.</p>

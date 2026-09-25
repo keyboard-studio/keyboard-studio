@@ -16,7 +16,7 @@ import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 
 // neededCharsForLanguage does a real CLDR lookup when unmocked (see the same
-// stub in CarveGallery.test.tsx). These tests leave identity unset, so it is
+// stub in CarveGalleryV2.test.tsx). These tests leave identity unset, so it is
 // never called — the stub only guarantees that stays true.
 vi.mock("../../lib/services.ts", () => ({
   neededCharsForLanguage: async () => null,

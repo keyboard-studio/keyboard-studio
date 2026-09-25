@@ -47,6 +47,7 @@
   "dependencies": {
     "@keyboard-studio/contracts": "workspace:*",
     "@keyboard-studio/llm": "workspace:*",
+    "@keymanapp/developer-utils": "19.0.240-alpha",
     "@keymanapp/kmc-kmn": "19.0.240-alpha",
     "@keymanapp/kmc-package": "19.0.240-alpha",
     "eventemitter3": "^5.0.4",

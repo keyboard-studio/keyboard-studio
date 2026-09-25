@@ -40,8 +40,19 @@ function git(args, cwd) {
  * rather than "what this branch's own parent commit looked like" -- the
  * question that matters is whether MERGING this branch would revert
  * translations currently on the base branch, not what the branch's own
- * history says. That also sidesteps needing merge-base or deep history: a
- * shallow fetch of just the base branch's tip is enough.
+ * history says. That also sidesteps needing merge-base or deep history: just
+ * the base branch's tip is enough.
+ *
+ * `--depth=1` is applied ONLY when the clone is ALREADY shallow (CI: the
+ * Actions checkout is shallow by default, so the flag costs nothing and
+ * saves a full history download). Against a developer's full clone it does
+ * the opposite of what it looks like: `git fetch --depth=1` CONVERTS a
+ * complete clone into a shallow one, permanently, until someone runs
+ * `--unshallow` -- and since this runs from `pnpm lint` with stdio ignored,
+ * it did so silently. A shallow main then breaks every ancestry question
+ * asked of the repo afterwards (`merge-base` returns nothing,
+ * `--is-ancestor` says no, `main..branch` counts the whole history as
+ * unique) with no error to explain why.
  *
  * @param {string} cwd  repo root
  * @returns {string|null} a resolvable ref, or null if none could be found
@@ -54,7 +65,19 @@ function resolveBaselineRef(cwd) {
   // back to "main" for a direct push or a local run.
   const baseBranch = process.env.GITHUB_BASE_REF || "main";
   try {
-    execFileSync("git", ["fetch", "--quiet", "--depth=1", "origin", baseBranch], {
+    // See the note above: shallow-fetch only a clone that is already shallow.
+    // `--is-shallow-repository` is plumbing (git >= 2.15) and prints exactly
+    // "true"/"false"; if it throws, treat the clone as full -- the safe side,
+    // since a plain fetch never damages a shallow clone either.
+    let alreadyShallow = false;
+    try {
+      alreadyShallow = git(["rev-parse", "--is-shallow-repository"], cwd).trim() === "true";
+    } catch {
+      alreadyShallow = false;
+    }
+    const depthArgs = alreadyShallow ? ["--depth=1"] : [];
+
+    execFileSync("git", ["fetch", "--quiet", ...depthArgs, "origin", baseBranch], {
       cwd,
       stdio: "ignore",
       timeout: GIT_TIMEOUT_MS,

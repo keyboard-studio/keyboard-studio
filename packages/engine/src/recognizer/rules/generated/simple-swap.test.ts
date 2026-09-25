@@ -8,32 +8,11 @@ import { rule as generatedSimpleSwap } from "./simple-swap.js";
 import { s01Recognizer } from "../s01-simple-swap.js";
 import type { IRGroup } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
-
-function baseId(patternId: string): string {
-  return patternId.split("#")[0] ?? patternId;
-}
+import { s01Rule } from "../__fixtures__/recognizerIr.js";
 
 function suffixId(patternId: string): string {
   return patternId.split("#")[1] ?? "";
 }
-
-// ---------------------------------------------------------------------------
-// Shared IR builders (same fixtures as s01-simple-swap.test.ts)
-// ---------------------------------------------------------------------------
-
-function s01Rule(
-  nodeId: string,
-  vkey: string,
-  modifiers: string[],
-  charOut: string,
-): import("@keyboard-studio/contracts").IRRule {
-  return {
-    nodeId,
-    context: [{ kind: "vkey", name: vkey, modifiers }],
-    output: [{ kind: "char", value: charOut }],
-  };
-}
-
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -84,6 +63,13 @@ describe("generated/simple-swap round-trip vs s01Recognizer", () => {
     expect(gen.slotValues["keystrokeCharacterMap"]).toBe(
       ref.slotValues["keystrokeCharacterMap"],
     );
+
+    // ...and its content: one map line per rule, in rule order, U+ encoded
+    expect(ref.slotValues["keystrokeCharacterMap"]!.split("\n")).toEqual([
+      "+ [K_Q] > U+025B",
+      "+ [SHIFT K_Q] > U+0190",
+      "+ [K_C] > U+0254",
+    ]);
   });
 
   it("mixed group (1 S-01 + 1 deadkey-output): both rules own only the S-01 rule", () => {
@@ -151,6 +137,12 @@ describe("generated/simple-swap round-trip vs s01Recognizer", () => {
 
     // ownedNodes sets per group must match
     expect(sortedNodeIds(genMatches)).toEqual(sortedNodeIds(refMatches));
+
+    // The hand-written rule keys each group's match and lifted Pattern by the
+    // kebab-case base id
+    const refIds = refMatches.map((m) => m.patternId).sort();
+    expect(refIds).toEqual(["simple-swap#main", "simple-swap#shift"]);
+    expect(refMatches.map((m) => s01Recognizer.lift(m).id).sort()).toEqual(refIds);
   });
 
   it("RAlt variant counts as S-01: both rules recognize it", () => {
@@ -222,10 +214,23 @@ describe("generated/simple-swap round-trip vs s01Recognizer", () => {
 });
 
 // ---------------------------------------------------------------------------
-// lift() smoke tests (generated rule)
+// lift() smoke tests
 // ---------------------------------------------------------------------------
 
 describe("generated/simple-swap lift()", () => {
+  it("hand-written s01Recognizer.lift keeps the match id and surfaces the map as the first question's default", () => {
+    const match = {
+      patternId: "simple-swap#main",
+      ownedNodes: [{ kind: "rule" as const, nodeId: "rule#0" }],
+      slotValues: { keystrokeCharacterMap: "+ [K_Q] > U+025B" },
+    };
+    const pattern = s01Recognizer.lift(match);
+    expect(pattern.id).toBe("simple-swap#main");
+    expect(pattern.origin).toBe("recognized");
+    expect(pattern.strategyId).toBe("S-01");
+    expect(pattern.questions[0]!.default).toBe("+ [K_Q] > U+025B");
+  });
+
   it("lift returns a Pattern with origin=recognized and strategyId=S-01", () => {
     const match = {
       patternId: "simple_swap#main",

@@ -945,5 +945,6 @@
       "summary": "One shared useCasePairCompanion hook + CasePairProposalBanner now serve all three placement mechanisms, and touch placements can finally name their layer - the engine appliers target slotValues.layer (absent === default) and touch refs derive it from the placed letter case."
     }
   },
-  "last_action": "55/55 tasks done - gates green (typecheck, 6858 tests, lint); T047/T055 manual browser walkthrough completed and verified against real compiled output"
+  "last_action": "55/55 tasks done - gates green (typecheck, 6858 tests, lint); T047/T055 manual browser walkthrough completed and verified against real compiled output",
+  "telemetryInstanceId": "f4f41bb7-ee26-4fd0-b55a-8b9dbeac51ed"
 }

@@ -5,13 +5,12 @@
 //      gid === "<outputStoreNodeId>#<i>"; non-char slots (nul/beep) produce no glyph.
 //   2. A simple `+ [K_A] > 'x'` rule still produces exactly one glyph with
 //      gid === rule.nodeId (no `#`).
-//   3. glyphsTriState: deleting one of N parallel-store glyphs yields 'partial'.
 //   4. CarveGlyph.capability resolves for both gid forms; defaults to
 //      'not-removable:unknown' when the map lacks the key.
 
 import { describe, it, expect } from 'vitest';
 import type { IRRule, IRGroup, IRStore, KeyboardIR, RemovalCapability, StoreItem } from '@keyboard-studio/contracts';
-import { groupToGlyphs, toRailNodes, glyphsTriState, storeCharChips } from './irToCarveNodes.ts';
+import { groupToGlyphs, toRailNodes, storeCharChips } from './irToCarveNodes.ts';
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -206,53 +205,6 @@ describe('irToCarveNodes — simple rule gid contract', () => {
     expect(glyphs[0]!.ch).toBe('x');
     // gid must NOT contain `#` (it's a bare nodeId)
     expect(glyphs[0]!.gid).not.toMatch(/#\d+$/);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// 3. glyphsTriState: partial when one of N parallel-store glyphs is deleted
-// ---------------------------------------------------------------------------
-
-describe('irToCarveNodes — glyphsTriState with parallel-store glyphs', () => {
-  it("deleting one of two parallel-store glyphs yields 'partial'", () => {
-    const ir = makeTestIR();
-    const group = ir.groups[0]!;
-    const parallelOnlyGroup = {
-      ...group,
-      rules: group.rules.filter((r) => r.nodeId === 'rule#dk'),
-    };
-    const glyphs = groupToGlyphs(parallelOnlyGroup, ir);
-    expect(glyphs).toHaveLength(2);
-
-    // Delete only the first glyph
-    const result = glyphsTriState(glyphs, (id) => id === 'store#dkt#0');
-    expect(result).toBe('partial');
-  });
-
-  it("deleting all parallel-store glyphs yields 'off'", () => {
-    const ir = makeTestIR();
-    const group = ir.groups[0]!;
-    const parallelOnlyGroup = {
-      ...group,
-      rules: group.rules.filter((r) => r.nodeId === 'rule#dk'),
-    };
-    const glyphs = groupToGlyphs(parallelOnlyGroup, ir);
-
-    const result = glyphsTriState(glyphs, () => true);
-    expect(result).toBe('off');
-  });
-
-  it("deleting no glyphs yields 'on'", () => {
-    const ir = makeTestIR();
-    const group = ir.groups[0]!;
-    const parallelOnlyGroup = {
-      ...group,
-      rules: group.rules.filter((r) => r.nodeId === 'rule#dk'),
-    };
-    const glyphs = groupToGlyphs(parallelOnlyGroup, ir);
-
-    const result = glyphsTriState(glyphs, () => false);
-    expect(result).toBe('on');
   });
 });
 
