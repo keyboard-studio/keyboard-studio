@@ -3,7 +3,7 @@
   "specName": "Survey answers persist per question — navigation never undoes a decision",
   "branch": "km/079-survey-answer-persistence",
   "currentStep": "implement",
-  "status": "implementing",
+  "status": "implemented",
   "history": [
     {
       "step": "specify",
@@ -673,8 +673,31 @@
       "kind": "complete",
       "by": "extension",
       "at": "2026-09-25T02:23:30.757Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T077",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-25T03:02:56.889Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "task": "T078",
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-25T03:02:56.889Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-25T03:02:56.889Z"
     }
   ],
   "telemetryInstanceId": "88610f36-f96c-42cf-a336-7b22bf44b45f",
-  "currentTask": "T077"
+  "currentTask": "T078"
 }

@@ -208,8 +208,8 @@ cleanly. Closes FR-030, FR-032, FR-053, SC-004.
 - [X] T074 [P] Land the amendment notes from spec.md "Amendments to existing specs" in `specs/057-bulletproof-navigation/spec.md` (FR-042/FR-049 grain, FR-042 recording per Next, badge state, FR-007 narrowing), `specs/053-decision-audit/spec.md` (capture boundary per Next) and `specs/071-marks-question-series/spec.md` (FR-023 generalised), each citing spec 079; then run `node utilities/spec-trace check` and `acknowledge` the changed units
 - [X] T075 [P] Record the R-09 / plan risk 1 open point (FR-068 "not asked" is not in the decision record; a record entry would need an additive `DecisionPayload` kind, a contracts change) in the PR body for 053/055 owner review — do not change contracts
 - [X] T076 [P] Verify plan risk 2 in `studio/src/decisions/createDecisionRecorder.test.ts`: an intermediate marks station's entries carry `{state: "none"}` and the final station's entries carry the whole series' diff; and `DecisionTrailView` renders an intermediate entry as confirmed, not applied (spec FR-008 multi-screen steps)
-- [ ] T077 Run the full quickstart.md manual walk (US1-US4, #1795/#1789, #1796) in `pnpm dev` and note results in the PR body
-- [ ] T078 Final gates: `pnpm build`, `pnpm typecheck`, `pnpm test`, `pnpm lint` (incl. both i18n tiers), `pnpm --filter @keyboard-studio/studio test:e2e footer-progress decision-deeplink`; reconcile the AC checkboxes of #1787, #1789, #1795 and #1796 per the CLAUDE.md issue closure policy (`closes` only for fully verified issues)
+- [X] T077 Run the full quickstart.md manual walk (US1-US4, #1795/#1789, #1796) in `pnpm dev` and note results in the PR body
+- [X] T078 Final gates: `pnpm build`, `pnpm typecheck`, `pnpm test`, `pnpm lint` (incl. both i18n tiers), `pnpm --filter @keyboard-studio/studio test:e2e footer-progress decision-deeplink`; reconcile the AC checkboxes of #1787, #1789, #1795 and #1796 per the CLAUDE.md issue closure policy (`closes` only for fully verified issues)
 
 **Checkpoint**: commit `docs(spec): 079 polish — classification closed, amendments landed` (spec 079 T072-T078).
 
