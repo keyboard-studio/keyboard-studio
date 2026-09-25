@@ -312,8 +312,8 @@ describe("CharScrollStrip — 'mark for later review' blue flag (mechanism-galle
 
 describe("CharScrollStrip — current-chip selection (aria-pressed + accessible name)", () => {
   // This strip is the sole replacement for the removed per-gallery character-
-  // heading card (see the file-header comment above); MechanismGallery.test.tsx
-  // and TouchGallery.test.tsx locate "the current character" via the shared
+  // heading card (see the file-header comment above); MechanismGallery.*.test.tsx
+  // and TouchGallery.*.test.tsx locate "the current character" via the shared
   // getCurrentCharChip()/expectCurrentChar() helpers
   // (../../../test/currentCharChip.ts). These tests exercise those helpers
   // directly against the component they key off, so a change to the chip's

@@ -136,12 +136,12 @@ lowercase case-pair's RAlt layer rather than an unrelated combo (see the comment
 |---|---|
 | `propose` returns `false` and raises nothing for caseless / self-mapping / multi-char-expansion input | `casePairCompanion.test.ts` |
 | `propose` uses the identity bcp47 (`tr`: `i` → `İ`) | `casePairCompanion.test.ts` |
-| Physical confirm: CAPS quad vs. append branches | `MechanismGallery.test.tsx` (existing cases must still pass) |
-| Physical: mnemonic layout raises nothing | `MechanismGallery.test.tsx` (existing) |
-| Combo confirm records the parallel ref; trigger/indicator unchanged | `MechanismGallery.test.tsx`, `SequenceBuilderPanel.test.tsx` |
+| Physical confirm: CAPS quad vs. append branches | `MechanismGallery.casePair.test.tsx` (existing cases must still pass) |
+| Physical: mnemonic layout raises nothing | `MechanismGallery.casePair.test.tsx` (existing) |
+| Combo confirm records the parallel ref; trigger/indicator unchanged | `MechanismGallery.casePair.test.tsx`, `SequenceBuilderPanel.test.tsx` |
 | Multi-char sequence content raises nothing | `SequenceBuilderPanel.test.tsx` |
 | Touch confirm records `layer: "shift"` for the counterpart | `TouchGallery.test.tsx` |
-| RAlt-layer confirm records a `PATTERN_RALT`/`S-08` assignment with `altgrKeyList` = `[SHIFT RALT <vkey>]` | `MechanismGallery.test.tsx` |
-| RAlt-layer: "already produced" suppresses a redundant proposal | `MechanismGallery.test.tsx` |
-| Confirm applies to the raising placement when a character has multiple mechanisms | `MechanismGallery.test.tsx` |
-| Stale base (removed before confirm) records nothing | `MechanismGallery.test.tsx` |
+| RAlt-layer confirm records a `PATTERN_RALT`/`S-08` assignment with `altgrKeyList` = `[SHIFT RALT <vkey>]` | `MechanismGallery.suggestions.test.tsx` |
+| RAlt-layer: "already produced" suppresses a redundant proposal | `MechanismGallery.suggestions.test.tsx` |
+| Confirm applies to the raising placement when a character has multiple mechanisms | `MechanismGallery.casePair.test.tsx` |
+| Stale base (removed before confirm) records nothing | `MechanismGallery.casePair.test.tsx` |

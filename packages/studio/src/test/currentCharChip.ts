@@ -11,8 +11,8 @@
 // `Go to ${toUPlusNotation(char)} ${char}` (see that file's header comment).
 //
 // These helpers centralize the new lookup so it isn't re-derived at each of
-// the ~45 call sites across MechanismGallery.test.tsx and
-// TouchGallery.test.tsx — see CharScrollStrip.tsx's own file header for the
+// the ~45 call sites across the MechanismGallery.*.test.tsx and
+// TouchGallery.*.test.tsx suites — see CharScrollStrip.tsx's own file header for the
 // testid/aria-label scheme these rely on.
 import { screen, within } from "@testing-library/react";
 import { expect } from "vitest";

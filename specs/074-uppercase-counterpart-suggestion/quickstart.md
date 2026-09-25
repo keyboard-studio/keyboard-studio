@@ -57,7 +57,7 @@ pnpm --filter @keyboard-studio/studio test src/editors/assignLoop/casePairCompan
 ## 4. Studio: all three mechanisms raise the proposal — SC-001, SC-003, SC-005
 
 ```
-pnpm --filter @keyboard-studio/studio test src/editors/assignLoop/MechanismGallery.test.tsx
+pnpm --filter @keyboard-studio/studio test src/editors/assignLoop/MechanismGallery.casePair.test.tsx
 pnpm --filter @keyboard-studio/studio test src/editors/assignLoop/SequenceBuilderPanel.test.tsx
 pnpm --filter @keyboard-studio/studio test src/editors/assignLoop/TouchGallery.test.tsx
 ```

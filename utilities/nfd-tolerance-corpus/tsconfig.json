@@ -1,0 +1,66 @@
+{
+  // NOTE: `paths` is NOT merged across `extends` — a base's map is replaced
+  // wholesale. This tool needs BOTH the shared contracts mappings (kept in
+  // step with ../tsconfig.contracts-paths.json) and the engine simulator's
+  // vendored-Keyman mappings (kept in step with
+  // ../../packages/engine/tsconfig.json), so both sets are spelled out here
+  // rather than inherited. The subpath exports each need their own entry:
+  // without them a specifier like `@keyboard-studio/contracts/dev-log`
+  // (reached transitively via packages/engine) matches no pattern, falls
+  // through to node_modules, and takes its types from `dist/` — which a clean
+  // checkout has not built, so the typecheck fails there (TS7016/TS2307)
+  // while passing on a machine that happens to have built contracts. They are
+  // ordered longest-first to mirror vite.config.ts, where the alias list is
+  // prefix-matched and the order is load-bearing.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "target": "ES2022",
+    "allowImportingTsExtensions": true,
+    "strict": true,
+    "noEmit": true,
+    "declaration": false,
+    "declarationMap": false,
+    "types": ["node"],
+    "paths": {
+      "@keyboard-studio/contracts/dev-log": [
+        "../../packages/contracts/src/utils/devLog.ts"
+      ],
+      "@keyboard-studio/contracts/criteria": [
+        "../../packages/contracts/src/criteriaData.ts"
+      ],
+      "@keyboard-studio/contracts/fixtures": [
+        "../../packages/contracts/src/fixtures/index.ts"
+      ],
+      "@keyboard-studio/contracts/mocks": [
+        "../../packages/contracts/src/mocks/index.ts"
+      ],
+      "@keyboard-studio/contracts": ["../../packages/contracts/src/index.ts"],
+      "@keymanapp/common-types": [
+        "../../packages/engine/src/simulator/vendor/keyman/common/types/main.ts"
+      ],
+      "@keymanapp/keyman-version": [
+        "../../packages/engine/src/simulator/vendor/stubs/keyman-version.ts"
+      ],
+      "keyman/engine/keyboard": [
+        "../../packages/engine/src/simulator/vendor/keyman/engine/keyboard/index.ts"
+      ],
+      "keyman/engine/keyboard/*": [
+        "../../packages/engine/src/simulator/vendor/keyman/engine/keyboard/*"
+      ],
+      "keyman/engine/js-processor": [
+        "../../packages/engine/src/simulator/vendor/keyman/engine/js-processor/index.ts"
+      ],
+      "keyman/engine/js-processor/*": [
+        "../../packages/engine/src/simulator/vendor/keyman/engine/js-processor/*"
+      ],
+      "keyman/common/web-utils": [
+        "../../packages/engine/src/simulator/vendor/keyman/common/web-utils/index.ts"
+      ],
+      "keyman/common/web-utils/*": [
+        "../../packages/engine/src/simulator/vendor/keyman/common/web-utils/*"
+      ]
+    }
+  }
+}

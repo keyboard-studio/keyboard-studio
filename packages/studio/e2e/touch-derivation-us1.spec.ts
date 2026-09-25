@@ -47,10 +47,10 @@
 // e2e/helpers/surveyFlow.ts (updated for the 036 glottolog language-identify
 // flow). Everything downstream of the prelude (carve targets, seed-source
 // default, touch-gallery walk, ZIP assertions) was traced to source and
-// cross-checked against MechanismGallery.test.tsx / TouchGallery.test.tsx /
-// applyDesktopModificationsToRawJson.ts; the bambara fixture's
-// codec-cleanliness + phone-platform shipping were confirmed via vitest
-// probes against packages/engine/src.
+// cross-checked against the MechanismGallery.*.test.tsx /
+// TouchGallery.*.test.tsx suites / applyDesktopModificationsToRawJson.ts; the
+// bambara fixture's codec-cleanliness + phone-platform shipping were confirmed
+// via vitest probes against packages/engine/src.
 
 import { test, expect, type Page } from "playwright/test";
 import { expectNoSeriousAxeViolations } from "./helpers/axe";
@@ -89,7 +89,7 @@ const SURVIVOR_CHAR = "ɔ";
 /** M (>=1) placed letter — added in Phase B (not produced by bambara at all),
  *  decomposable (e + U+0301) so MechanismGallery's §3c default (deadkey,
  *  base letter pre-filled "e", trigger key "K_COLON") leaves Apply already
- *  enabled with zero field edits (mirrors MechanismGallery.test.tsx's
+ *  enabled with zero field edits (mirrors MechanismGallery.methods.test.tsx's
  *  "defaults to the deadkey method" case for "á"). deriveDesktopModifications
  *  extracts hostKey "K_E" from the resulting S-02 assignment's baseLetters
  *  slot (extractMechanismHostKey.ts), landing "é" as a longpress (sk[])
