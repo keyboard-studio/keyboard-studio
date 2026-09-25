@@ -62,7 +62,7 @@ describe("TouchGallery — vfsTransform inject-only-when-real-edits", () => {
     seedStore({ withInventory: ["ä"] });
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // With charTouch empty (no edits at all), the path must be absent.
@@ -98,7 +98,7 @@ describe("TouchGallery — vfsTransform inject-only-when-real-edits", () => {
     });
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     const vfs = runTransform("basic_kbdus");
@@ -115,7 +115,7 @@ describe("TouchGallery — vfsTransform inject-only-when-real-edits", () => {
     seedStore({ withInventory: ["a"] });
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // The old "Keep it as is?" confirm prompt is gone.
@@ -146,7 +146,7 @@ describe("TouchGallery — vfsTransform inject-only-when-real-edits", () => {
     seedStore({ withInventory: ["a", "中"] });
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // Entry parity with MechanismGallery: land directly on the one
@@ -174,7 +174,7 @@ describe("TouchGallery — vfsTransform inject-only-when-real-edits", () => {
     seedStore({ withInventory: ["a", "中"] });
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     expectCurrentChar("中");
@@ -206,7 +206,7 @@ describe("TouchGallery — vfsTransform inject-only-when-real-edits", () => {
     );
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // Before any edit: path must be absent.
@@ -260,7 +260,7 @@ describe("TouchGallery — vfsTransform inject-only-when-real-edits", () => {
     );
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // Baseline: no real edits → path absent, spy not called.
@@ -326,7 +326,7 @@ describe("TouchGallery — R11 emission: mods non-empty emits even with zero con
     seedWithDesktopAssignment("x", swapAssignment);
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // Zero Phase E edits made — charTouch stays empty for the whole test —
@@ -419,7 +419,7 @@ describe("TouchGallery — seed-source-aware detection reads the shipped layout 
     seedWithShippedTouchLayout({ shippedChar: "€", desktopAssignment: swapAssignment });
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // Inventory is ["x", "€"] — collated for display (spec 047's
@@ -495,7 +495,7 @@ describe("TouchGallery — detectionSeedLayout/layoutForLintAndGate fallback on 
     useSurveySessionStore.getState().setTouchSeedSource("import-adapt");
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // Fallback path taken: the gallery still renders the character card for

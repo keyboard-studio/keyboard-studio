@@ -46,7 +46,7 @@ describe("TouchGallery — abugida gate and empty-hostkey guard on the longpress
     useWorkingCopyStore.getState().setIrAxes({ scriptClass: "abugida" });
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     expect(screen.queryByText(/Suggested: long-press/i)).toBeNull();
@@ -62,7 +62,7 @@ describe("TouchGallery — abugida gate and empty-hostkey guard on the longpress
     seedStore({ withInventory: ["ӝ"] });
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     expect(screen.queryByText(/Suggested: long-press/i)).toBeNull();
@@ -76,7 +76,7 @@ describe("TouchGallery — abugida gate and empty-hostkey guard on the longpress
     useWorkingCopyStore.getState().setIrAxes({ scriptClass: "alphabetic" });
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     expect(screen.queryByText(/Suggested: long-press/i)).not.toBeNull();
@@ -96,7 +96,7 @@ describe("TouchGallery — abugida gate and empty-hostkey guard on the longpress
     useWorkingCopyStore.getState().setIrAxes({ scriptClass: "alphabetic" });
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     const card = screen.getByRole("note", {
@@ -198,7 +198,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     // Inventory holds only the a-family accents the language uses.
     seedStore({ withInventory: ["ă", "à", "á", "À", "Á"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
     // "ă" (breve) sorts after à/á/À/Á under the collated walk — jump to it
     // directly rather than relying on mount's first-uncovered default.
@@ -218,7 +218,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
   it("CHANGE 5: the proposal banner renders at the TOP — before the Configured chip row, in the same region the accepted bulk box later occupies", async () => {
     seedStore({ withInventory: ["ă", "à", "á", "À", "Á"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await acceptSuggestion();
@@ -250,7 +250,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     // The language uses à á and their capitals, but NOT â ä ã å etc.
     seedStore({ withInventory: ["ă", "à", "á", "À", "Á"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await acceptSuggestion();
@@ -286,7 +286,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
   it("the batch appears as ONE bulk box (not per-sibling chips) and deletes them all at once", async () => {
     seedStore({ withInventory: ["ă", "à", "á", "À", "Á"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
     gotoChar("ă");
 
@@ -345,7 +345,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     });
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // The summary box is present on first paint, driven by the persisted group.
@@ -358,7 +358,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
   it("Decline discards the proposal and places nothing", async () => {
     seedStore({ withInventory: ["ă", "à", "á"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
     gotoChar("ă");
 
@@ -395,7 +395,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     seedWithDesktopAssignment("ă", swapAssignment);
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
     expect(screen.queryByText(/Suggested: replace/i)).not.toBeNull();
 
@@ -420,7 +420,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     seedWithDesktopAssignment("ă", swapAssignment);
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
     await acceptSuggestion();
 
@@ -447,7 +447,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     // siblings here — so the bulk proposal (offering á/À) already covers it.
     seedStore({ withInventory: ["à", "á", "À"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
     // The collated walk puts "á" (acute) ahead of "à" (grave), so jump to "à"
     // rather than relying on mount's first-uncovered default — "à" is the char
@@ -492,7 +492,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
   it("CHANGE 4: confirming the bulk proposal (which already placed the uppercase) never subsequently raises the simple companion", async () => {
     seedStore({ withInventory: ["à", "á", "À"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
     // Collated walk order puts "á" first — see the deny/fallback test above.
     gotoChar("à");
@@ -514,7 +514,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     // banner.
     seedStore({ withInventory: ["à", "á", "À"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
     // Collated walk order puts "á" first — see the deny/fallback test above.
     gotoChar("à");
@@ -564,7 +564,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     });
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
     gotoChar("ă");
 
@@ -581,7 +581,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
   it("removing the base chip after confirm removes ONLY the base, not the whole batch", async () => {
     seedStore({ withInventory: ["ă", "à", "À"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
     gotoChar("ă");
 
@@ -613,7 +613,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
   it("clears an OPEN proposal when the base chip is removed before confirming", async () => {
     seedStore({ withInventory: ["ă", "à"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
     gotoChar("ă");
 
@@ -666,7 +666,7 @@ describe("TouchGallery — longpress accelerator (sibling accents)", () => {
     });
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
     gotoChar("è");
 
@@ -705,8 +705,7 @@ describe("TouchGallery — corpus longpress-host tie-breaker (placement-priors v
       ],
     };
     await act(async () => {
-      render(
-        <TouchGallery onComplete={vi.fn()} onBack={vi.fn()} placementMap={placementMap} />,
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} placementMap={placementMap} />, { withStepNav: true },
       );
     });
 
@@ -726,7 +725,7 @@ describe("TouchGallery — corpus longpress-host tie-breaker (placement-priors v
     };
     await act(async () => {
       render(
-        <TouchGallery onComplete={vi.fn()} onBack={vi.fn()} placementMap={placementMap} />,
+        <TouchGallery onComplete={vi.fn()} onBack={vi.fn()} placementMap={placementMap} />, { withStepNav: true },
       );
     });
 
@@ -761,7 +760,7 @@ describe("TouchGallery — corpus longpress-host tie-breaker (placement-priors v
     };
     await act(async () => {
       render(
-        <TouchGallery onComplete={vi.fn()} onBack={vi.fn()} placementMap={placementMap} />,
+        <TouchGallery onComplete={vi.fn()} onBack={vi.fn()} placementMap={placementMap} />, { withStepNav: true },
       );
     });
 
@@ -786,7 +785,7 @@ describe("TouchGallery — corpus longpress-host tie-breaker (placement-priors v
     };
     await act(async () => {
       render(
-        <TouchGallery onComplete={vi.fn()} onBack={vi.fn()} placementMap={placementMap} />,
+        <TouchGallery onComplete={vi.fn()} onBack={vi.fn()} placementMap={placementMap} />, { withStepNav: true },
       );
     });
 
@@ -798,7 +797,7 @@ describe("TouchGallery — corpus longpress-host tie-breaker (placement-priors v
   it("no suggestion when placementMap is absent (unchanged baseline behavior)", async () => {
     seedStore({ withInventory: ["中"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     expect(screen.queryByText(/Suggested: long-press/i)).toBeNull();

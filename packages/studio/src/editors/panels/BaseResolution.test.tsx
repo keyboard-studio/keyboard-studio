@@ -109,7 +109,10 @@ function ControlledBaseResolution({
 function renderControlled(overrides: ControlledOverrides = {}) {
   const onPreview = overrides.onPreview ?? vi.fn();
   const onConfirm = overrides.onConfirm ?? vi.fn();
-  render(<ControlledBaseResolution {...overrides} onPreview={onPreview} onConfirm={onConfirm} />);
+  render(
+    <ControlledBaseResolution {...overrides} onPreview={onPreview} onConfirm={onConfirm} />,
+    { withStepNav: true },
+  );
   return { onPreview, onConfirm };
 }
 
@@ -135,14 +138,13 @@ describe("BaseResolution — search bar at the top", () => {
     expect(screen.getByTestId("search-scope-all").getAttribute("aria-pressed")).toBe("false");
   });
 
-  it("renders the Back button at the top, BEFORE the search combobox", async () => {
+  it("renders Back in the footer nav group (spec 081)", async () => {
     const onBack = vi.fn();
     renderControlled({ onBack });
-    const input = await waitForCombobox();
+    await waitForCombobox();
+    const nav = screen.getByRole("group", { name: "Step navigation" });
     const back = screen.getByTestId("base-back");
-    expect(
-      back.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    expect(nav.contains(back)).toBe(true);
     fireEvent.click(back);
     expect(onBack).toHaveBeenCalledTimes(1);
   });

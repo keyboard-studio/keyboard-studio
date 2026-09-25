@@ -110,7 +110,7 @@ describe("MechanismGallery — kbgen suggestion gated on the current char's prod
 
     await act(async () => {
       render(
-        <MechanismGallery selectedBaseKeyboard={basicKbdus} placementMap={placementMap} />,
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} placementMap={placementMap} />, { withStepNav: true }
       );
     });
 
@@ -197,7 +197,7 @@ describe("MechanismGallery — kbgen suggestion gated on the current char's prod
 
     await act(async () => {
       render(
-        <MechanismGallery selectedBaseKeyboard={basicKbdus} placementMap={placementMap} />,
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} placementMap={placementMap} />, { withStepNav: true }
       );
     });
 
@@ -253,7 +253,7 @@ describe("MechanismGallery — kbgen suggestion row text (S-01 keycap convention
 
     await act(async () => {
       render(
-        <MechanismGallery selectedBaseKeyboard={basicKbdus} placementMap={placementMap} />,
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} placementMap={placementMap} />, { withStepNav: true }
       );
     });
 
@@ -287,7 +287,7 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
           selectedBaseKeyboard={basicKbdus}
           onBack={onBack}
           placementMap={corpusBackedQwerty}
-        />,
+        />, { withStepNav: true }
       );
     });
 
@@ -349,7 +349,7 @@ describe("MechanismGallery — kbgen suggestion persistence across Back navigati
         <MechanismGallery
           selectedBaseKeyboard={basicKbdus}
           placementMap={corpusBackedQwerty}
-        />,
+        />, { withStepNav: true }
       );
     });
 
@@ -420,7 +420,7 @@ describe("MechanismGallery — kbgen suggestion row — uppercase case-pair fall
         <MechanismGallery
           selectedBaseKeyboard={basicKbdus}
           placementMap={ffHookPlacementMap}
-        />,
+        />, { withStepNav: true }
       );
     });
 
@@ -440,7 +440,7 @@ describe("MechanismGallery — kbgen suggestion row — uppercase case-pair fall
         <MechanismGallery
           selectedBaseKeyboard={basicKbdus}
           placementMap={ffHookPlacementMap}
-        />,
+        />, { withStepNav: true }
       );
     });
 
@@ -475,7 +475,7 @@ describe("MechanismGallery — kbgen suggestion row — uppercase case-pair fall
         <MechanismGallery
           selectedBaseKeyboard={basicKbdus}
           placementMap={ffHookPlacementMap}
-        />,
+        />, { withStepNav: true }
       );
     });
 
@@ -523,7 +523,7 @@ describe("MechanismGallery — kbgen suggestion row — uppercase case-pair fall
         <MechanismGallery
           selectedBaseKeyboard={basicKbdus}
           placementMap={capsPlacementMap}
-        />,
+        />, { withStepNav: true }
       );
     });
 
@@ -576,7 +576,7 @@ describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, 
         <MechanismGallery
           selectedBaseKeyboard={basicKbdus}
           placementMap={ffRankedPlacementMap}
-        />,
+        />, { withStepNav: true }
       );
     });
 
@@ -611,7 +611,7 @@ describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, 
         <MechanismGallery
           selectedBaseKeyboard={basicKbdus}
           placementMap={ffRankedPlacementMap}
-        />,
+        />, { withStepNav: true }
       );
     });
 
@@ -644,7 +644,7 @@ describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, 
         <MechanismGallery
           selectedBaseKeyboard={basicKbdus}
           placementMap={ffRankedPlacementMap}
-        />,
+        />, { withStepNav: true }
       );
     });
 
@@ -669,7 +669,7 @@ describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, 
         <MechanismGallery
           selectedBaseKeyboard={basicKbdus}
           placementMap={ffRankedPlacementMap}
-        />,
+        />, { withStepNav: true }
       );
     });
 
@@ -693,7 +693,7 @@ describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, 
         <MechanismGallery
           selectedBaseKeyboard={basicKbdus}
           placementMap={ffRankedPlacementMap}
-        />,
+        />, { withStepNav: true }
       );
     });
 
@@ -752,7 +752,7 @@ describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, 
         <MechanismGallery
           selectedBaseKeyboard={basicKbdus}
           placementMap={ffRankedPlacementMap}
-        />,
+        />, { withStepNav: true }
       );
     });
 
@@ -805,7 +805,7 @@ describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, 
         <MechanismGallery
           selectedBaseKeyboard={basicKbdus}
           placementMap={ffRankedPlacementMap}
-        />,
+        />, { withStepNav: true }
       );
     });
 
@@ -862,7 +862,7 @@ describe("MechanismGallery — ranked suggestion row (S-02 deadkey + S-08 RAlt, 
         <MechanismGallery
           selectedBaseKeyboard={basicKbdus}
           placementMap={ffRankedPlacementMap}
-        />,
+        />, { withStepNav: true }
       );
     });
 
@@ -921,7 +921,7 @@ describe("MechanismGallery — suggestion row suppressed by non-chip coverage", 
         <MechanismGallery
           selectedBaseKeyboard={basicKbdus}
           placementMap={ffRankedPlacementMap}
-        />,
+        />, { withStepNav: true }
       );
     });
 
@@ -955,7 +955,7 @@ describe("MechanismGallery — suggestion row suppressed by non-chip coverage", 
         <MechanismGallery
           selectedBaseKeyboard={basicKbdus}
           placementMap={ffRankedPlacementMap}
-        />,
+        />, { withStepNav: true }
       );
     });
 
@@ -983,7 +983,7 @@ describe("MechanismGallery — case-pair companion (ralt-layer, from suggestion 
         <MechanismGallery
           selectedBaseKeyboard={basicKbdus}
           placementMap={ffHookPlacementMap}
-        />,
+        />, { withStepNav: true }
       );
     });
 
@@ -1004,7 +1004,7 @@ describe("MechanismGallery — case-pair companion (ralt-layer, from suggestion 
         <MechanismGallery
           selectedBaseKeyboard={basicKbdus}
           placementMap={ffHookPlacementMap}
-        />,
+        />, { withStepNav: true }
       );
     });
 
@@ -1046,7 +1046,7 @@ describe("MechanismGallery — case-pair companion (ralt-layer, from suggestion 
         <MechanismGallery
           selectedBaseKeyboard={basicKbdus}
           placementMap={ffHookPlacementMap}
-        />,
+        />, { withStepNav: true }
       );
     });
 
@@ -1067,7 +1067,7 @@ describe("MechanismGallery — case-pair companion (ralt-layer, from suggestion 
         <MechanismGallery
           selectedBaseKeyboard={basicKbdus}
           placementMap={ffHookPlacementMap}
-        />,
+        />, { withStepNav: true }
       );
     });
 

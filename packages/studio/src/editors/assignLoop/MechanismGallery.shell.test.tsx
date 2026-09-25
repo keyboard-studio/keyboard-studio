@@ -42,7 +42,7 @@
 // ../../test/mechanismGallery/harness.ts.
 
 import { describe, it, expect, vi } from "vitest";
-import { screen, fireEvent, act, waitFor } from "@testing-library/react";
+import { screen, fireEvent, act, waitFor, within } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import { MechanismGallery } from "./MechanismGallery.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
@@ -70,12 +70,12 @@ installMechanismGalleryHooks();
 
 describe("MechanismGallery — no base keyboard", () => {
   it("renders the no-base-selected prompt when selectedBaseKeyboard is null", () => {
-    render(<MechanismGallery selectedBaseKeyboard={null} />);
+    render(<MechanismGallery selectedBaseKeyboard={null} />, { withStepNav: true });
     expect(screen.getByText(/No base keyboard selected/i)).toBeTruthy();
   });
 
   it("does NOT render a status line or Add key button when base is null", () => {
-    render(<MechanismGallery selectedBaseKeyboard={null} />);
+    render(<MechanismGallery selectedBaseKeyboard={null} />, { withStepNav: true });
     expect(screen.queryByRole("status")).toBeNull();
     expect(screen.queryByRole("button", { name: /Add key for/i })).toBeNull();
   });
@@ -87,18 +87,29 @@ describe("MechanismGallery — no base keyboard", () => {
 
 describe("MechanismGallery — no inventory", () => {
   it("renders the survey prompt when inventory is empty and base is set", () => {
-    render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+    render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     expect(screen.getByText(/No inventory confirmed yet/i)).toBeTruthy();
   });
 
   it("renders a Back button inside the no-inventory guard when onBack is provided", () => {
     const onBack = vi.fn();
-    render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onBack={onBack} />);
+    render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onBack={onBack} />, { withStepNav: true });
     // The guard path renders a Back button when onBack is given.
     const btn = screen.getByRole("button", { name: /← back/i });
     expect(btn).toBeTruthy();
     fireEvent.click(btn);
     expect(onBack).toHaveBeenCalledOnce();
+  });
+
+  // T034 publisher-ownership: GalleryEmptyState publishes its own Back; the
+  // gallery itself must not also publish while the empty state is shown (a
+  // second live publisher for the same step logs a stepNavStore error).
+  it("shows exactly one Back button in the footer nav, under the empty-state's own handle", () => {
+    const onBack = vi.fn();
+    render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onBack={onBack} />, { withStepNav: true });
+    const nav = screen.getByTestId("step-nav");
+    expect(within(nav).getAllByRole("button", { name: /Back/i }).length).toBe(1);
+    expect(within(nav).getByTestId("gallery-empty-back")).toBeTruthy();
   });
 });
 
@@ -110,7 +121,7 @@ describe("MechanismGallery — current character display", () => {
   it("shows the first character from lettersToAdd as the current target", async () => {
     seedInventory(["á", "é"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     // The "Add a key" eyebrow still renders above the CharScrollStrip.
     expect(screen.getByText("Add a key")).toBeTruthy();
@@ -121,7 +132,7 @@ describe("MechanismGallery — current character display", () => {
   it("renders the coverage status line with initial 0-of-N count", async () => {
     seedInventory(["á", "é"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     // Scoped by name: "á" is decomposable-accented, so the deadkey method's
     // pre-filled base-letter box also renders its own (unrelated) status
@@ -140,7 +151,7 @@ describe("MechanismGallery — preview loading state", () => {
     setMockStage({ kind: "fetching" });
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     expect(screen.getByText(/Fetching keyboard source/i)).toBeTruthy();
   });
@@ -149,7 +160,7 @@ describe("MechanismGallery — preview loading state", () => {
     setMockStage({ kind: "compiling", isWarmCompile: true });
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     expect(screen.getByText(/Compiling/i)).toBeTruthy();
   });
@@ -158,7 +169,7 @@ describe("MechanismGallery — preview loading state", () => {
     setMockStage({ kind: "compiling", isWarmCompile: false });
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     expect(screen.getByText(/loading WASM/i)).toBeTruthy();
   });
@@ -169,7 +180,7 @@ describe("MechanismGallery — preview error state", () => {
     setMockStage({ kind: "error", step: "fetch", message: "Network timeout" });
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     expect(screen.getByText(/Network timeout/i)).toBeTruthy();
     expect(screen.getByText(/Preview failed/i)).toBeTruthy();
@@ -179,7 +190,7 @@ describe("MechanismGallery — preview error state", () => {
     setMockStage({ kind: "error", step: "compile", message: "WASM crash" });
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     expect(screen.getByRole("button", { name: /retry/i })).toBeTruthy();
   });
@@ -198,7 +209,7 @@ describe("MechanismGallery — preview ready state", () => {
     setMockStage(readyStage);
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     expect(screen.getByTestId("osk-frame")).toBeTruthy();
     expect(screen.getByTestId("osk-frame").getAttribute("data-stage")).toBe("ready");
@@ -212,7 +223,7 @@ describe("MechanismGallery — preview ready state", () => {
     setMockStage(stageWithWarnings);
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     expect(screen.getByText(/Apply warnings/i)).toBeTruthy();
     expect(screen.getByText(/unknown patternId "foo"/i)).toBeTruthy();
@@ -222,7 +233,7 @@ describe("MechanismGallery — preview ready state", () => {
     setMockStage(readyStage);
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     expect(screen.queryByText(/Apply warnings/i)).toBeNull();
   });
@@ -236,7 +247,7 @@ describe("MechanismGallery — heading", () => {
   it("renders 'Mechanism Gallery' as the main heading", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     expect(screen.getByRole("heading", { level: 1, name: /Mechanism Gallery/i })).toBeTruthy();
   });
@@ -244,7 +255,7 @@ describe("MechanismGallery — heading", () => {
   it("renders 'Desktop' as a subheading label in the header area", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     // "Desktop" is rendered as a <span> sibling to the <h1> (not inside it).
     expect(screen.getByText(/^Desktop$/i)).toBeTruthy();
@@ -279,7 +290,7 @@ describe("MechanismGallery — vfsTransform passed to useKeyboardArtifact", () =
     // Let patterns load fully inside act so the async filterFor + getById chain
     // completes and patternMap is populated before assertions run.
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
       // Flush remaining microtasks (filterFor / getById promises).
       await new Promise((r) => setTimeout(r, 0));
     });
@@ -298,7 +309,7 @@ describe("MechanismGallery — intro splash", () => {
     seedInventory(["á"], { intro: true });
 
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
       await new Promise((r) => setTimeout(r, 0));
     });
 
@@ -324,12 +335,28 @@ describe("MechanismGallery — intro splash", () => {
     seedInventory(["á"]); // default: marks the intro seen
 
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
       await new Promise((r) => setTimeout(r, 0));
     });
 
     expect(screen.queryByText(/Welcome to the Mechanism Gallery/i)).toBeNull();
     expect(screen.getAllByRole("status").length).toBeGreaterThan(0);
+  });
+
+  // T034 publisher-ownership: GalleryIntroSplash publishes its own Back /
+  // "Get started"; the gallery itself must not also publish while the splash
+  // is shown (a second live publisher for the same step logs a
+  // stepNavStore error).
+  it("shows exactly one Back button in the footer nav, under the splash's own handle", async () => {
+    const onBack = vi.fn();
+    seedInventory(["á"], { intro: true });
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onBack={onBack} />, { withStepNav: true });
+      await new Promise((r) => setTimeout(r, 0));
+    });
+    const nav = screen.getByTestId("step-nav");
+    expect(within(nav).getAllByRole("button", { name: /Back/i }).length).toBe(1);
+    expect(within(nav).getByTestId("gallery-intro-back")).toBeTruthy();
   });
 });
 
@@ -347,7 +374,7 @@ describe("MechanismGallery — import-derived markInputOrder provenance", () => 
     useWorkingCopyStore.getState().setIrAxes({ markInputOrder: "postfix" });
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     await waitFor(() => {
       expect(useWorkingCopyStore.getState().axisFills).toContainEqual({
@@ -361,7 +388,7 @@ describe("MechanismGallery — import-derived markInputOrder provenance", () => 
   it("publishes no import-derived fill when markInputOrder is absent", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     await waitFor(() => {
       expect(

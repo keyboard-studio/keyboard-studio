@@ -43,7 +43,7 @@ describe("MechanismGallery — advance after apply", () => {
   it("advances to the next character after Apply and then Next are clicked", async () => {
     seedInventory(["á", "é"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     // "á" defaults to the pre-enabled deadkey method (§3c) — apply directly.
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
@@ -63,7 +63,7 @@ describe("MechanismGallery — advance after apply", () => {
   it("updates the coverage status after adding a character", async () => {
     seedInventory(["á", "é"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
 
@@ -89,7 +89,7 @@ describe("MechanismGallery — mark for later review", () => {
   it("marking the current character records no MechanismAssignment", async () => {
     seedInventory(["á", "é"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     fireEvent.click(
       screen.getByRole("button", { name: /Mark U\+00E1 á for later review/i }),
@@ -105,7 +105,7 @@ describe("MechanismGallery — mark for later review", () => {
   it("toggles the marked state and reflects it via aria-pressed and the button label", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     const markBtn = screen.getByRole("button", {
       name: /Mark U\+00E1 á for later review/i,
@@ -131,7 +131,7 @@ describe("MechanismGallery — mark for later review", () => {
   it("marking the current character enables Next/Done without changing the coverage count", async () => {
     seedInventory(["á", "é"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
 
     // Coverage starts at 0 of 2. Scoped by name — see the note in "renders
@@ -187,7 +187,7 @@ describe("MechanismGallery — Done state (positional: last char's forward butto
   it("the only (and therefore last) character's forward button already reads Done, disabled until a method is applied", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     // idx 0 === lettersToAdd.length - 1 for a single-char list, so the
     // forward button reads "Done" from the very first render — there is no
@@ -211,7 +211,7 @@ describe("MechanismGallery — Done state (positional: last char's forward butto
         <MechanismGallery
           selectedBaseKeyboard={basicKbdus}
           onComplete={onComplete}
-        />,
+        />, { withStepNav: true }
       );
     });
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
@@ -238,7 +238,7 @@ describe("MechanismGallery — Done state (positional: last char's forward butto
         <MechanismGallery
           selectedBaseKeyboard={basicKbdus}
           onComplete={onComplete}
-        />,
+        />, { withStepNav: true }
       );
     });
     const doneBtn = screen.getByRole("button", { name: "Done" });
@@ -267,7 +267,7 @@ describe("MechanismGallery — Done-blocked inline hint (no modal)", () => {
   it("never renders a <dialog> element, even while characters remain unimplemented", async () => {
     seedInventory(["á", "é"]);
     const { container } = await act(async () =>
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />),
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />, { withStepNav: true }),
     );
     expect(container.querySelector("dialog")).toBeNull();
 
@@ -279,7 +279,7 @@ describe("MechanismGallery — Done-blocked inline hint (no modal)", () => {
   it("shows an inline hint naming the unaccounted characters, and hides it once every character is marked", async () => {
     seedInventory(["á", "é"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />, { withStepNav: true });
     });
 
     const hint = screen.getByRole("status", {
@@ -310,7 +310,7 @@ describe("MechanismGallery — Done-blocked inline hint (no modal)", () => {
     seedInventory(["á", "é"]);
     const { container } = await act(async () =>
       render(
-        <MechanismGallery selectedBaseKeyboard={basicKbdus} onBack={onBack} onComplete={vi.fn()} />,
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onBack={onBack} onComplete={vi.fn()} />, { withStepNav: true }
       ),
     );
     // Mark "á" so Next is enabled, then advance to "é" without implementing it.
@@ -343,7 +343,7 @@ describe("MechanismGallery — added chip row", () => {
   it("shows a chip for each covered character", async () => {
     seedInventory(["á", "é"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
@@ -364,7 +364,7 @@ describe("MechanismGallery — added chip row", () => {
   it("clicking a chip removes the assignment from the store", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
@@ -396,7 +396,7 @@ describe("MechanismGallery — Back button", () => {
   it("does not render a Back button when onBack is not provided", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     expect(screen.queryByRole("button", { name: /← back/i })).toBeNull();
   });
@@ -406,7 +406,7 @@ describe("MechanismGallery — Back button", () => {
     seedInventory(["á"]);
     await act(async () => {
       render(
-        <MechanismGallery selectedBaseKeyboard={basicKbdus} onBack={onBack} />,
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onBack={onBack} />, { withStepNav: true }
       );
     });
     const btn = screen.getByRole("button", { name: /← back/i });
@@ -435,7 +435,7 @@ describe("MechanismGallery — positional Back/Next navigation", () => {
     seedInventory(["á", "é", "í"]);
     await act(async () => {
       render(
-        <MechanismGallery selectedBaseKeyboard={basicKbdus} onBack={onBack} />,
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onBack={onBack} />, { withStepNav: true }
       );
     });
 
@@ -553,7 +553,7 @@ describe("MechanismGallery — edit after Done (auto-unlock on first edit)", () 
     seedInventory(["á"]);
     await act(async () => {
       render(
-        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />,
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />, { withStepNav: true }
       );
     });
 
@@ -580,7 +580,7 @@ describe("MechanismGallery — edit after Done (auto-unlock on first edit)", () 
     seedInventory(["á"]);
     await act(async () => {
       render(
-        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />,
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />, { withStepNav: true }
       );
     });
     act(() => {
@@ -600,7 +600,7 @@ describe("MechanismGallery — edit after Done (auto-unlock on first edit)", () 
     seedInventory(["á"]);
     await act(async () => {
       render(
-        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />,
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />, { withStepNav: true }
       );
     });
     act(() => {
@@ -630,7 +630,7 @@ describe("MechanismGallery — edit after Done (auto-unlock on first edit)", () 
     seedInventory(["á"]);
     await act(async () => {
       render(
-        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />,
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />, { withStepNav: true }
       );
     });
     act(() => {
@@ -658,7 +658,7 @@ describe("MechanismGallery — Back after marking the only character", () => {
           selectedBaseKeyboard={basicKbdus}
           onBack={onBack}
           onComplete={onComplete}
-        />,
+        />, { withStepNav: true }
       );
     });
 
@@ -744,7 +744,7 @@ describe("MechanismGallery — Done button forced visible when the whole invento
     const onComplete = vi.fn();
     await act(async () => {
       render(
-        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />,
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />, { withStepNav: true }
       );
     });
 
@@ -791,7 +791,7 @@ describe("MechanismGallery — Done button forced visible when the whole invento
     seedInventory(["y", "z"]);
 
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />, { withStepNav: true });
     });
 
     // Navigate to "z" — outside lettersToAdd (["y"]).
@@ -834,7 +834,7 @@ describe("MechanismGallery — Done button forced visible when the whole invento
     const onComplete = vi.fn();
     await act(async () => {
       render(
-        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />,
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />, { withStepNav: true }
       );
     });
 
@@ -920,7 +920,7 @@ describe("MechanismGallery — full-inventory coverage + desktop auto-lock (T008
 
     await act(async () => {
       render(
-        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />,
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />, { withStepNav: true }
       );
     });
 
@@ -980,7 +980,7 @@ describe("MechanismGallery — full-inventory coverage + desktop auto-lock (T008
 
     await act(async () => {
       render(
-        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />,
+        <MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={onComplete} />, { withStepNav: true }
       );
     });
 
@@ -1011,7 +1011,7 @@ describe("MechanismGallery — within-step walk position", () => {
   it("publishes one stop per walk character, with its code points in the label", async () => {
     seedInventory(["á", "é"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     const walk = useStepWalkStore.getState().walks[MECHANISMS_STEP_ID];
     expect(walk?.map((p) => p.id)).toEqual([charToPositionToken("á"), charToPositionToken("é")]);
@@ -1024,7 +1024,7 @@ describe("MechanismGallery — within-step walk position", () => {
   it("publishes the cursor as the author walks, so the footer marker tracks it", async () => {
     seedInventory(["á", "é"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     expect(useSurveyAnswerStore.getState().steps[MECHANISMS_STEP_ID]?.position).toBe(
       charToPositionToken("á"),
@@ -1051,7 +1051,7 @@ describe("MechanismGallery — within-step walk position", () => {
   it("resumes on the character the author was on after the unmount a tab switch causes", async () => {
     seedInventory(["á", "é", "í"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     // Mark-then-Next twice — see the "Skip this character" note above.
     await act(async () => {
@@ -1076,7 +1076,7 @@ describe("MechanismGallery — within-step walk position", () => {
     // component is destroyed and rebuilt.
     cleanup();
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     // Pre-fix: "á" — the first uncovered character, because nothing outlived the
     // component to say otherwise.
@@ -1086,7 +1086,7 @@ describe("MechanismGallery — within-step walk position", () => {
   it("honours a cursor written while mounted — activating a dot for this same stage", async () => {
     seedInventory(["á", "é", "í"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     expectCurrentChar("á");
     // A footer dot inside the step the author is already on: no route change, no
@@ -1101,7 +1101,7 @@ describe("MechanismGallery — within-step walk position", () => {
     seedInventory(["á"]);
     await act(async () => {
       useSurveyAnswerStore.getState().setPosition(MECHANISMS_STEP_ID, charToPositionToken("ω"));
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     expectCurrentChar("á");
   });
@@ -1112,7 +1112,7 @@ describe("MechanismGallery — within-step walk position", () => {
     useStepWalkStore.getState().reset();
     seedInventory(["á", "é"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     expectCurrentChar("á");
   });

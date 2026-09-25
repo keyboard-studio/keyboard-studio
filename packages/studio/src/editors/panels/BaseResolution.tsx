@@ -28,6 +28,7 @@ import { Badge, Button } from "../../ui/index.ts";
 import type { BadgeTone } from "../../ui/Badge.tsx";
 import { useBaseDocProfile } from "../../hooks/useBaseDocProfile.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 
 
 // Chrome (badge labels); built per-render via the optional-i18n +
@@ -211,6 +212,48 @@ export function BaseResolution({
     fontFamily: "var(--app-font)",
   };
 
+  // Back / Confirm now live in the footer (spec 081). Publish unconditionally,
+  // before the loading / error / empty early returns below — for THIS phase
+  // those states publish nothing (a Back there is a later task).
+  const showFooterNav = !loading && error === null && bases.length > 0;
+  usePublishStepNav(
+    !showFooterNav
+      ? {}
+      : {
+          ...(onBack !== undefined
+            ? {
+                back: {
+                  label: t({ id: "editor.baseResolution.backButton", message: "← Back" }),
+                  onClick: onBack,
+                  testId: "base-back",
+                },
+              }
+            : {}),
+          forward: {
+            label:
+              previewStatus === "loading"
+                ? t({ id: "editor.baseResolution.preparingPreview", message: "Preparing preview…" })
+                : t({ id: "editor.baseResolution.chooseThisKeyboard", message: "Choose this keyboard" }),
+            onClick: () => {
+              // spec 080 FR-008: commit the previewed base's doc-completeness
+              // classification to the working copy AT SELECTION — null when the
+              // profile hasn't resolved yet or resolved to "unknown" (never
+              // written as a "none" a caller could confuse with a real
+              // classification).
+              if (previewedBase !== null) {
+                const profile = docProfiles[previewedBase.id];
+                setBaseDocProfile(
+                  profile !== undefined && profile.level !== "unknown" ? profile : null,
+                );
+              }
+              onConfirm();
+            },
+            testId: "base-confirm",
+            disabled: previewedBase === null || previewStatus !== "ready",
+          },
+        },
+  );
+
   if (loading) return <div role="status" style={{ color: "var(--app-text-muted)", fontFamily: "var(--app-font)" }}><Trans id="base.picker.loading">Loading base keyboards...</Trans></div>;
   if (error !== null) return <div style={{ color: "var(--danger)", fontFamily: "var(--app-font)" }}>{error}</div>;
   if (bases.length === 0)
@@ -222,19 +265,6 @@ export function BaseResolution({
 
   return (
     <div data-testid="base-picker" style={{ color: "var(--app-text)", fontFamily: "var(--app-font)" }}>
-      {/* Back — at the top with the search bar, not below the suggestion cards. */}
-      {onBack !== undefined && (
-        <Button
-          variant="back"
-          data-testid="base-back"
-          onClick={onBack}
-          // marginTop:0 overrides the back variant's legacy bottom-of-panel
-          // margin now that the button sits at the top with the search bar.
-          style={{ marginTop: 0, marginBottom: 12 }}
-        >
-          <Trans id="editor.baseResolution.backButton">&larr; Back</Trans>
-        </Button>
-      )}
       <h2 style={heading}><Trans id="editor.baseResolution.heading">Choose a starting keyboard</Trans></h2>
       <p style={subtle}>
         <Trans id="editor.baseResolution.intro">
@@ -289,49 +319,6 @@ export function BaseResolution({
           scopeIds={searchScope === "suggested" ? suggestedIds : undefined}
           onSearchAll={() => setSearchScope("all")}
         />
-        {/*
-          The single commit button for the step. Enabled ONLY once the
-          preview has compiled successfully (previewStatus === "ready") —
-          disabled while idle, loading, AND on error. This means an author can
-          only commit a keyboard they have actually been able to preview/test,
-          which makes the confirm-while-loading -> subsequent-compile-error
-          race structurally unreachable: there is no path from "clicked
-          confirm" to "advanced onto a base whose compile then fails".
-        */}
-        <Button
-          variant="secondary"
-          data-testid="base-confirm"
-          disabled={previewedBase === null || previewStatus !== "ready"}
-          onClick={() => {
-            // spec 080 FR-008: commit the previewed base's doc-completeness
-            // classification to the working copy AT SELECTION — null when the
-            // profile hasn't resolved yet or resolved to "unknown" (never
-            // written as a "none" a caller could confuse with a real
-            // classification).
-            if (previewedBase !== null) {
-              const profile = docProfiles[previewedBase.id];
-              setBaseDocProfile(
-                profile !== undefined && profile.level !== "unknown" ? profile : null,
-              );
-            }
-            onConfirm();
-          }}
-          style={{
-            marginTop: 10,
-            padding: "8px 18px",
-            background: previewedBase === null ? "transparent" : "var(--app-accent)",
-            border: "1px solid var(--app-border)",
-            borderRadius: 6,
-            color: previewedBase === null ? "var(--app-text-subtle)" : "var(--app-text)",
-            fontSize: 13,
-            cursor: previewedBase === null || previewStatus !== "ready" ? "not-allowed" : "pointer",
-            fontFamily: "var(--app-font)",
-          }}
-        >
-          {previewStatus === "loading"
-            ? t({ id: "editor.baseResolution.preparingPreview", message: "Preparing preview…" })
-            : t({ id: "editor.baseResolution.chooseThisKeyboard", message: "Choose this keyboard" })}
-        </Button>
       </div>
 
       <div style={{ borderTop: "1px solid var(--app-border)", paddingTop: 16 }}>

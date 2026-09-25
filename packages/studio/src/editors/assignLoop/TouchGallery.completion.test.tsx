@@ -166,7 +166,7 @@ describe("TouchGallery — touch base-direct signal (a) is LIVE, not frozen (P1 
     useSurveySessionStore.getState().setTouchSeedSource("import-adapt");
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     expectCurrentChar("中");
@@ -254,7 +254,7 @@ describe("TouchGallery — Done button forced visible when the whole inventory i
 
     const onComplete = vi.fn();
     await act(async () => {
-      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     expectCurrentChar("x");
@@ -286,7 +286,7 @@ describe("TouchGallery — Done button forced visible when the whole inventory i
     seedShippedPlusSwapped({ shippedChar: "€", swappedChar: "x", extraUncoveredChar: "w" });
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // Navigate to "€" — detected-only, outside touchLettersToAdd.
@@ -316,7 +316,7 @@ describe("TouchGallery — Done button forced visible when the whole inventory i
 
     const onComplete = vi.fn();
     await act(async () => {
-      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     expectCurrentChar("中");
@@ -366,7 +366,7 @@ describe("TouchGallery — mark for later review", () => {
     // "中"/"日" have suggestion kind = "none" (see back-navigation suite above).
     seedStore({ withInventory: ["中", "日"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
     fireEvent.click(
       screen.getByRole("button", { name: /Mark U\+4E2D 中 for later review/i }),
@@ -384,7 +384,7 @@ describe("TouchGallery — mark for later review", () => {
   it("marking does not change the coverage count, and enables Next without treating the character as configured", async () => {
     seedStore({ withInventory: ["中", "日"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     expect(screen.getByRole("status").getAttribute("aria-label")).toBe(
@@ -431,7 +431,7 @@ describe("TouchGallery — mark for later review", () => {
     const onComplete = vi.fn();
     seedStore({ withInventory: ["a"] });
     await act(async () => {
-      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />, { withStepNav: true });
     });
     fireEvent.click(screen.getByTestId("touch-continue"));
     expect(onComplete).toHaveBeenCalledOnce();
@@ -452,7 +452,7 @@ describe("TouchGallery — FR-008 completion gate refusal (uncovered char)", () 
     const onComplete = vi.fn();
 
     await act(async () => {
-      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // "中" is the only (and therefore last) character. Mark-aware
@@ -480,7 +480,7 @@ describe("TouchGallery — FR-008 completion gate refusal (uncovered char)", () 
     const onComplete = vi.fn();
 
     await act(async () => {
-      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />, { withStepNav: true });
     });
     expect(screen.getByRole("alert")).toBeTruthy();
 
@@ -510,7 +510,7 @@ describe("TouchGallery — FR-008 completion gate refusal (uncovered char)", () 
     const onComplete = vi.fn();
 
     await act(async () => {
-      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />, { withStepNav: true });
     });
     expect(screen.getByRole("alert")).toBeTruthy();
 
@@ -544,7 +544,7 @@ describe("TouchGallery — no modal, ever", () => {
     // panel's own Done control directly.
     seedStore({ withInventory: ["a"] });
     const { container } = await act(async () =>
-      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />),
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />, { withStepNav: true }),
     );
     fireEvent.click(screen.getByTestId("touch-continue"));
     expect(onComplete).toHaveBeenCalledOnce();
@@ -554,7 +554,7 @@ describe("TouchGallery — no modal, ever", () => {
   it("does NOT render a dialog even while the completion gate refuses (Done is disabled instead)", async () => {
     seedStore({ withInventory: ["中"] });
     const { container } = await act(async () =>
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />),
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true }),
     );
     expect(screen.getByRole("alert")).toBeTruthy();
     expect(container.querySelector("dialog")).toBeNull();
@@ -569,7 +569,7 @@ describe("TouchGallery — no modal, ever", () => {
   it("the ← back to previous character control never renders a dialog, even while the current character remains uncovered", async () => {
     seedStore({ withInventory: ["中", "日"] });
     const { container } = await act(async () =>
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />),
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true }),
     );
     // Mark "中" (so Next is enabled) and advance without covering it.
     fireEvent.click(

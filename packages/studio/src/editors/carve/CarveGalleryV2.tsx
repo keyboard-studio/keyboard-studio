@@ -25,6 +25,7 @@ import { DiscardIcon, ChevronIcon } from '../assignLoop/parts/carveShared.tsx';
 import { RemovedDropdown } from '../assignLoop/parts/StatusBar.tsx';
 import type { RemovedItem } from '../assignLoop/parts/StatusBar.tsx';
 import { useCarveNeededSet } from '../../hooks/useCarveNeededSet.ts';
+import { usePublishStepNav } from '../../hooks/usePublishStepNav.ts';
 
 interface CarveGalleryV2Props {
   onComplete: () => void;
@@ -648,6 +649,31 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     [cellsByCh, cells, selectedCh],
   );
 
+  // Back / Skip / Continue now live in the footer (spec 081). Publish
+  // unconditionally, before the `!ir` loading return below — for THIS phase
+  // the loading state publishes nothing (a Back there is a later task).
+  // Literal English labels are kept as-is for now (localisation is a later
+  // task).
+  usePublishStepNav(
+    !ir
+      ? {}
+      : {
+          ...(onBack !== undefined
+            ? { back: { label: '← Back', onClick: onBack, testId: 'carve-back' } }
+            : {}),
+          secondary: {
+            label: 'Skip',
+            onClick: () => { keepAll(); onComplete(); },
+            testId: 'carve-skip',
+          },
+          forward: {
+            label: 'Continue →',
+            onClick: onComplete,
+            testId: 'carve-continue',
+          },
+        },
+  );
+
   if (!ir) {
     return (
       <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--app-bg)', color: 'var(--app-text)' }}>
@@ -663,14 +689,6 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     <div data-testid="carve-gallery" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--app-bg)', color: 'var(--app-text)' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 22px', borderBottom: '1px solid var(--app-border)', flexShrink: 0 }}>
-        {onBack !== undefined && (
-          <button
-            onClick={onBack}
-            style={{ font: '600 13px var(--app-font)', cursor: 'pointer', color: 'var(--app-text-muted)', background: 'transparent', border: 'none', padding: '4px 0', whiteSpace: 'nowrap' }}
-          >
-            ← Back
-          </button>
-        )}
         <div style={{ flex: 1 }}>
           <h1 style={{ margin: 0, font: "500 23px/1.1 'Playfair Display', serif", color: 'var(--app-text)' }}>
             Everything this keyboard can type
@@ -679,19 +697,6 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
             Every printable character your base keyboard can produce, in one panel. Click any character to discard it — nothing is deleted until you continue.
           </p>
         </div>
-        <button
-          onClick={() => { keepAll(); onComplete(); }}
-          style={{ font: '600 13px var(--app-font)', cursor: 'pointer', color: 'var(--app-text-muted)', background: 'transparent', border: '1px solid var(--app-border-strong)', borderRadius: 8, padding: '7px 13px', whiteSpace: 'nowrap', marginRight: 6 }}
-        >
-          Skip
-        </button>
-        <button
-          data-testid="carve-continue"
-          onClick={onComplete}
-          style={{ font: '600 13px var(--app-font)', cursor: 'pointer', color: 'var(--app-text-on-accent)', background: 'var(--app-accent)', border: 'none', borderRadius: 8, padding: '9px 18px' }}
-        >
-          Continue →
-        </button>
       </div>
 
       {/* Status strip */}

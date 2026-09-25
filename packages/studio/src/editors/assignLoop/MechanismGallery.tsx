@@ -56,6 +56,7 @@
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import {
+  useId,
   useState,
   useEffect,
   useCallback,
@@ -151,6 +152,8 @@ import {
 import { GalleryPreviewPane } from "./PreviewPane.tsx";
 import { KeyPickerField } from "./KeyPickerField.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
+import { PublishStepNav } from "../../hooks/usePublishStepNav.ts";
+import type { StepNavSpec } from "../../stores/stepNavStore.ts";
 import { usePositionalCharNav, nearestSurvivingChar, indexOfChar } from "./usePositionalCharNav.ts";
 import { useCharCycleKeys } from "./useCharCycleKeys.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
@@ -189,7 +192,6 @@ import {
   TEXT_DIM,
   TEXT_MAIN,
   FONT,
-  galleryGhostBtn as ghostBtn,
   galleryInputStyle as inputStyle,
   galleryForwardBtnStyle as forwardBtnStyle,
   gallerySelectMenuStyle,
@@ -692,9 +694,9 @@ const VALID_DEADKEY_TRIGGER_KEYS: ReadonlySet<string> = new Set(
 // SelectMenus); the base-key picker itself uses KeyPickerField, which carries
 // its own internal style.
 
-// ghostBtn, inputStyle, headerBtnStyle, configStyle, and cardStyle are
+// inputStyle, headerBtnStyle, configStyle, and cardStyle are
 // imported (aliased) from ../../lib/galleryTheme.ts — shared byte-for-byte
-// with SequenceBuilderPanel.tsx (and, for ghostBtn/headerBtnStyle/
+// with SequenceBuilderPanel.tsx (and, for headerBtnStyle/
 // configStyle/cardStyle, TouchGallery.tsx) rather than redefined here. The
 // page-level wrapper style (pageStyle) is no longer imported directly here —
 // it's used via GalleryEmptyState.tsx (the no-base-keyboard/no-inventory
@@ -1461,6 +1463,9 @@ export function MechanismGallery({
   worklist,
 }: MechanismGalleryProps) {
   const { t, i18n } = useLingui();
+  // Id for the "Done is blocked" hint (spec 081) — referenced by the footer's
+  // forward button via aria-describedby only while the hint is mounted.
+  const unaccountedHintId = useId();
   const deadkeyBaseLetterResolveOptions = useMemo(
     () => buildDeadkeyBaseLetterResolveOptions(i18n),
     [i18n],
@@ -3914,6 +3919,9 @@ export function MechanismGallery({
                       message: "Next character →",
                     })
                   : doneLabel,
+                testId: hasAnotherCharAfterCurrent
+                  ? "mechanisms-next-char"
+                  : "mechanisms-continue",
                 ariaLabel: hasAnotherCharAfterCurrent
                   ? t({
                       id: "editor.assignLoop.nextCharacterAriaLabel",
@@ -3940,6 +3948,41 @@ export function MechanismGallery({
               };
             })()
           : null;
+
+  // ---------------------------------------------------------------------------
+  // Footer nav spec (spec 081) — Back and the single forwardButton computed
+  // above render in the footer rather than the body. This is the gallery's
+  // main per-character render; the guards above (no base keyboard, no
+  // inventory, intro splash) publish for themselves and never reach here.
+  // ---------------------------------------------------------------------------
+
+  const stepNavSpec: StepNavSpec = {
+    ...(onBack !== undefined || currentIdx > 0
+      ? {
+          back: {
+            label: t({ id: "editor.assignLoop.backButton", message: "← Back" }),
+            onClick: handleBack,
+            testId: "mechanisms-back",
+          },
+        }
+      : {}),
+    ...(forwardButton !== null
+      ? {
+          forward: {
+            label: forwardButton.label,
+            onClick: forwardButton.onClick ?? (() => {}),
+            testId: forwardButton.testId ?? "mechanisms-continue",
+            disabled: forwardButton.disabled,
+            ...(forwardButton.ariaLabel !== undefined
+              ? { ariaLabel: forwardButton.ariaLabel }
+              : {}),
+            ...(unaccountedChars.length > 0
+              ? { ariaDescribedBy: unaccountedHintId }
+              : {}),
+          },
+        }
+      : {}),
+  };
 
   // ---------------------------------------------------------------------------
   // Left pane content
@@ -4034,81 +4077,6 @@ export function MechanismGallery({
           </p>
         )}
 
-        {/* Top toolbar row — Back (left) + a right-aligned forward cluster
-              (right), on the same horizontal level. Back is positional
-              (handleBack) rather than a history stack, so it survives
-              remount; it is rendered whenever onBack is available (to escape
-              the phase from the first character) or the current character
-              isn't first (interior/last positions always have a previous
-              character to return to). The right-aligned cluster holds the
-              previous-character button (rendered whenever currentChar !==
-              null and not locked; disabled on the first character, since
-              there is nowhere further back to step) immediately to the left
-              of the primary forward action — exactly one of the locked
-              forward-escape, the empty-diff Done completion, or the
-              per-character Next/Done advance button. The cluster itself
-              carries marginLeft: "auto" (rather than each button) so it holds
-              position whether or not Back is present. */}
-        {(onBack !== undefined ||
-          currentIdx > 0 ||
-          (locked && onComplete !== undefined) ||
-          lettersToAdd.length === 0 ||
-          currentChar !== null) && (
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              width: "100%",
-            }}
-          >
-            {(onBack !== undefined || currentIdx > 0) && (
-              <button
-                type="button"
-                onClick={handleBack}
-                style={{ ...ghostBtn, fontSize: 13 }}
-              >
-                <Trans id="editor.assignLoop.backButton">&larr; Back</Trans>
-              </button>
-            )}
-
-            {/* Right-aligned forward cluster: the primary forward action.
-                  The old "Previous character" button that lived here has
-                  been replaced by the CharScrollStrip below (any character,
-                  not just the immediately-previous one, is now reachable by
-                  clicking its chip). */}
-            <div
-              style={{
-                marginLeft: "auto",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-              }}
-            >
-              {/* Single button driven by the forwardButton spec computed
-                    above — exactly one of the locked forward-escape, the
-                    empty-diff Done completion, or the per-character
-                    Next/Done advance is ever non-null. */}
-              {forwardButton !== null && (
-                <button
-                  type="button"
-                  onClick={forwardButton.onClick}
-                  disabled={forwardButton.disabled}
-                  {...(forwardButton.testId !== undefined
-                    ? { "data-testid": forwardButton.testId }
-                    : {})}
-                  {...(forwardButton.ariaLabel !== undefined
-                    ? { "aria-label": forwardButton.ariaLabel }
-                    : {})}
-                  style={forwardButton.style}
-                >
-                  {forwardButton.label}
-                </button>
-              )}
-            </div>
-          </div>
-        )}
-
         {/* Proactive "Done is blocked" hint (mechanism-gallery-progression) —
               replaces the old ConfirmDialog leave-warning modal. Rendered
               whenever any lettersToAdd character is neither implemented nor
@@ -4117,9 +4085,12 @@ export function MechanismGallery({
               aria-live="polite" rides the same convention as the coverage
               status line above (D3 note: this is not a validation cycle, no
               debounce involved either way) — no new timer, updates on the
-              same re-render that recomputes unaccountedChars. */}
+              same re-render that recomputes unaccountedChars. Its id is
+              referenced by the footer forward button's aria-describedby
+              (spec 081) only while this hint is mounted. */}
         {unaccountedChars.length > 0 && (
           <p
+            id={unaccountedHintId}
             role="status"
             aria-live="polite"
             style={{ margin: 0, fontSize: 12, color: TEXT_DIM }}
@@ -4945,6 +4916,8 @@ export function MechanismGallery({
 
   return (
     <>
+      {/* Back / forward render in the footer (spec 081). */}
+      <PublishStepNav spec={stepNavSpec} />
       <AssignLoopShell
         headingText={t({
           id: "editor.assignLoop.mechanismGalleryHeading",

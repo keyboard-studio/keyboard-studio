@@ -245,6 +245,7 @@ import { useTouchKeyDiagnostics } from "../../hooks/useValidatorFindings.ts";
 import { GalleryPreviewPane } from "./PreviewPane.tsx";
 import { KeyPickerField } from "./KeyPickerField.tsx";
 import { GalleryIntroSplash } from "./IntroSplash.tsx";
+import { PublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import { usePositionalCharNav, nearestSurvivingChar, indexOfChar } from "./usePositionalCharNav.ts";
 import { useCharCycleKeys } from "./useCharCycleKeys.ts";
 import { AssignLoopShell } from "./AssignLoopShell.tsx";
@@ -278,7 +279,6 @@ import {
   BG_CARD,
   galleryGhostBtn as ghostBtn,
   gallerySelectMenuStyle,
-  galleryHeaderBtnStyle as headerBtnStyle,
   galleryCardHeaderRowStyle as cardHeaderRowStyle,
   galleryHeaderTitleBtnStyle as headerTitleBtnStyle,
   galleryConfigStyle as configStyle,
@@ -518,7 +518,7 @@ function touchMechanismLabel(
 }
 
 
-// ghostBtn, headerBtnStyle, configStyle, and cardStyle are imported
+// ghostBtn, configStyle, and cardStyle are imported
 // (aliased) from ../../lib/galleryTheme.ts — shared byte-for-byte with
 // MechanismGallery.tsx rather than redefined here. The page-level wrapper
 // style (pageStyle) is no longer imported directly here — it's used via
@@ -1737,6 +1737,11 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   const modeTabRefs = useRef<Map<TouchEditorMode, HTMLButtonElement>>(
     new Map(),
   );
+
+  // Id for the completion-gate hint (`completionGateNotice`), referenced by
+  // the published forward action's `ariaDescribedBy` only while the
+  // uncovered-chars half of that notice is actually mounted (spec 081).
+  const unaccountedTouchHintId = useId();
 
   // Abugida-safe gate input (km-domain ruling) — mirrors MechanismGallery's
   // own `axes` selector (see that file, near its `baseIr` selector).
@@ -5770,11 +5775,13 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   const completionGateNotice = (
     <>
       {unaccountedTouchMessage !== null && (
-        <ErrorText tone="warning">
-          <Trans id="editor.assignLoop.touch.cannotFinishYet">
-            Cannot finish yet — {unaccountedTouchMessage}.
-          </Trans>
-        </ErrorText>
+        <div id={unaccountedTouchHintId}>
+          <ErrorText tone="warning">
+            <Trans id="editor.assignLoop.touch.cannotFinishYet">
+              Cannot finish yet — {unaccountedTouchMessage}.
+            </Trans>
+          </ErrorText>
+        </div>
       )}
       {orphanedEditsAcknowledged && keyModeOverlayReplay.orphaned.length > 0 && (
         <div role="alert" data-testid="touch-orphaned-key-edits-notice">
@@ -5898,84 +5905,53 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           on the seed touch layout (touchLettersToAdd is empty), so the walk
           has nothing to step through and currentChar stays null. Mirrors
           MechanismGallery's "No new characters to add" empty-diff panel, but
-          (unlike that gallery) still needs its OWN Back/Done row here: the
-          per-char block's toolbar below never renders while currentChar is
-          null, and handleBack/handleNext are gated on `list.includes` (empty
-          touchLettersToAdd), so this panel calls onBack/handleContinue
-          directly rather than going through those.
+          (unlike that gallery) still needs its OWN Back/Done nav here: the
+          per-char block's forward spec below never renders while currentChar
+          is null, and handleBack/handleNext are gated on `list.includes`
+          (empty touchLettersToAdd), so this panel's published nav calls
+          onBack/handleContinue directly rather than going through those.
+          Its Back and Done buttons live in the footer (spec 081).
           `&& currentChar === null` (pre-existing gap, fixed here): totalChars
           (touchLettersToAdd.length) being 0 does not mean currentChar stays
           null forever — the SHOW-ALL CharScrollStrip can still set it via
           handleSelectDisplayChar (e.g. inspecting a detected-but-walk-excluded
           character), independently of the walk. Without this guard, that
-          selection left THIS panel mounted (rendering its own
+          selection left THIS panel mounted (publishing its own
           `data-testid="touch-continue"` Done button unconditionally)
           alongside the per-char block below's OWN `touchForwardButton`
-          (same testid), which can ALSO render once `currentChar !== null` —
-          two elements sharing one test id. The per-char block's
+          (same testid), which can ALSO publish once `currentChar !== null` —
+          two publishers for the same step. The per-char block's
           `touchForwardButton` already reproduces this panel's Done affordance
           whenever `allCovered` is true (see its own doc comment), so gating
           this panel to `currentChar === null` loses no coverage: once a
           selection sets `currentChar`, the per-char block becomes the single
           source for the forward action. */}
       {totalChars === 0 && currentChar === null && (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 12,
-          }}
-        >
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              width: "100%",
+        <>
+          <PublishStepNav
+            spec={{
+              back: {
+                label: t({ id: "editor.assignLoop.backButton", message: "← Back" }),
+                onClick: onBack,
+                testId: "touch-back",
+                ariaLabel: t({
+                  id: "editor.assignLoop.touch.backToMechanismsPhaseCAriaLabel",
+                  message: "Back to mechanisms",
+                }),
+              },
+              forward: {
+                label: t({ id: "editor.assignLoop.doneButton", message: "Done" }),
+                onClick: handleContinue,
+                testId: "touch-continue",
+              },
             }}
-          >
-            <button
-              type="button"
-              onClick={onBack}
-              aria-label={t({
-                id: "editor.assignLoop.touch.backToMechanismsPhaseCAriaLabel",
-                message: "Back to mechanisms",
-              })}
-              style={ghostBtn}
-            >
-              <Trans id="editor.assignLoop.backButton">&larr; Back</Trans>
-            </button>
-            <div style={{ marginLeft: "auto" }}>
-              <button
-                type="button"
-                data-testid="touch-continue"
-                onClick={handleContinue}
-                style={{
-                  padding: "9px 20px",
-                  background: "var(--app-success)",
-                  border: "none",
-                  borderRadius: 6,
-                  // NOT --app-text-on-accent: that pairs with --app-accent,
-                  // not --app-success -- light theme's --app-success only
-                  // reaches 3.35:1 with white (1.4.3, #1477).
-                  // --app-text-on-success covers both themes; see colors.css.
-                  color: "var(--app-text-on-success)",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                  fontFamily: FONT,
-                }}
-              >
-                {t({ id: "editor.assignLoop.doneButton", message: "Done" })}
-              </button>
-            </div>
-          </div>
+          />
           <p style={{ margin: 0, fontSize: 14, color: TEXT_DIM }}>
             <Trans id="editor.assignLoop.noNewCharacters">
               No new characters to add.
             </Trans>
           </p>
-        </div>
+        </>
       )}
 
       {/* Per-char UI */}
@@ -6001,99 +5977,57 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
             </Trans>
           </p>
 
-          {/* Top toolbar row — Back (left) + the primary forward action
-              (right), on the same horizontal level; it carries marginLeft:
-              "auto" so it holds position. The old "Previous character"
-              button that used to sit in this cluster has been replaced by
-              the CharScrollStrip below (any character, not just the
-              immediately-previous one, is reachable via its chips). */}
-          <div
-            style={{
-              display: "flex",
-              flexDirection: "row",
-              alignItems: "center",
-              width: "100%",
+          {/* Back and the primary forward action live in the footer (spec
+              081). usePositionalCharNav's handleBack is a no-op when
+              currentIdx === -1, which is exactly the state a
+              detected/already-covered character selected via the SHOW-ALL
+              CharScrollStrip (handleSelectDisplayChar) produces, so Back is
+              published only when currentChar is in touchLettersToAdd — a
+              live-but-dead Back would look active but do nothing. The
+              forward slot mirrors MechanismGallery's forwardButton gating:
+              currentChar can now be a detected/already-covered character
+              selected the same way, and the walk's own Next/Done isn't a
+              "global Next" for that inspection, so `touchForwardButton` (see
+              its own doc comment above) is null in exactly that case;
+              otherwise (including the TOP-PRIORITY allCovered case) it
+              carries the label/handler/disabled state to publish. */}
+          <PublishStepNav
+            spec={{
+              ...(currentChar !== null && touchLettersToAdd.includes(currentChar)
+                ? {
+                    back: {
+                      label: t({ id: "editor.assignLoop.backButton", message: "← Back" }),
+                      onClick: handleBack,
+                      testId: "touch-back",
+                      ariaLabel:
+                        currentIdx <= 0
+                          ? t({
+                              id: "editor.assignLoop.touch.backToMechanismsPhaseCAriaLabel",
+                              message: "Back to mechanisms",
+                            })
+                          : t({
+                              id: "editor.assignLoop.touch.backToPreviousCharacterAriaLabel",
+                              message: "Back to previous character",
+                            }),
+                    },
+                  }
+                : {}),
+              ...(touchForwardButton !== null
+                ? {
+                    forward: {
+                      label: touchForwardButton.label,
+                      onClick: touchForwardButton.onClick,
+                      testId: "touch-continue",
+                      disabled: touchForwardButton.disabled,
+                      ariaLabel: touchForwardButton.ariaLabel,
+                      ...(unaccountedTouchMessage !== null
+                        ? { ariaDescribedBy: unaccountedTouchHintId }
+                        : {}),
+                    },
+                  }
+                : {}),
             }}
-          >
-            {/* HIDE this button entirely (rather than render it disabled)
-                when currentChar is outside touchLettersToAdd — mirrors the
-                forward button's gating a few lines below. usePositionalCharNav's
-                handleBack is a no-op when currentIdx === -1, which is exactly
-                the state a detected/already-covered character selected via the
-                SHOW-ALL CharScrollStrip (handleSelectDisplayChar) produces: a
-                visible-but-dead Back button would look live but do nothing. */}
-            {currentChar !== null && touchLettersToAdd.includes(currentChar) && (
-              <button
-                type="button"
-                onClick={handleBack}
-                aria-label={
-                  currentIdx <= 0
-                    ? t({
-                        id: "editor.assignLoop.touch.backToMechanismsPhaseCAriaLabel",
-                        message: "Back to mechanisms",
-                      })
-                    : t({
-                        id: "editor.assignLoop.touch.backToPreviousCharacterAriaLabel",
-                        message: "Back to previous character",
-                      })
-                }
-                style={ghostBtn}
-              >
-                <Trans id="editor.assignLoop.backButton">&larr; Back</Trans>
-              </button>
-            )}
-            <div
-              style={{
-                marginLeft: "auto",
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-              }}
-            >
-              {/* HIDE this button entirely (rather than render it disabled)
-                  when currentChar is outside touchLettersToAdd AND the whole
-                  inventory isn't yet fully covered — mirrors
-                  MechanismGallery's forwardButton gating: currentChar can now
-                  be a detected/already-covered character selected via the
-                  SHOW-ALL CharScrollStrip (handleSelectDisplayChar), and the
-                  walk's own Next/Done isn't a "global Next" for that
-                  inspection — a disabled render would look like the walk is
-                  stuck rather than simply "you're inspecting a character
-                  outside this step's coverage". `touchForwardButton` (see its
-                  own doc comment above) is null in exactly that case;
-                  otherwise (including the TOP-PRIORITY allCovered case) it
-                  carries the label/handler/disabled state to render. */}
-              {touchForwardButton !== null && (
-                <button
-                  type="button"
-                  data-testid="touch-continue"
-                  onClick={touchForwardButton.onClick}
-                  disabled={touchForwardButton.disabled}
-                  aria-label={touchForwardButton.ariaLabel}
-                  style={{
-                    padding: "9px 20px",
-                    background: !touchForwardButton.disabled
-                      ? "var(--app-success)"
-                      : "var(--app-surface-2)",
-                    border: "none",
-                    borderRadius: 6,
-                    // NOT --app-text-on-accent: that pairs with --app-accent,
-                    // not --app-success -- light theme's --app-success only
-                    // reaches 3.35:1 with white (1.4.3, #1477).
-                    // --app-text-on-success covers both themes; see
-                    // colors.css.
-                    color: !touchForwardButton.disabled ? "var(--app-text-on-success)" : TEXT_DIM,
-                    fontSize: 13,
-                    fontWeight: 600,
-                    cursor: !touchForwardButton.disabled ? "pointer" : "not-allowed",
-                    fontFamily: FONT,
-                  }}
-                >
-                  {touchForwardButton.label}
-                </button>
-              )}
-            </div>
-          </div>
+          />
 
           {/* FR-008 completion gate message — shared with the key-mode pane
               (T120) via `completionGateNotice`, which also carries the
@@ -6694,45 +6628,32 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
         height: "100%",
       }}
     >
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-          gap: 8,
+      {/* Back and Continue live in the footer (spec 081). */}
+      <PublishStepNav
+        spec={{
+          back: {
+            label: t({ id: "editor.assignLoop.touch.keyMode.backButton", message: "← Back" }),
+            onClick: onBack,
+            testId: "touch-key-mode-back",
+            ariaLabel: t({
+              id: "editor.assignLoop.touch.keyMode.backAriaLabel",
+              message: "Back to mechanisms",
+            }),
+          },
+          forward: {
+            label: t({
+              id: "editor.assignLoop.touch.keyMode.continueButton",
+              message: "Continue",
+            }),
+            onClick: handleContinue,
+            testId: "touch-key-mode-continue",
+            disabled: unaccountedTouchChars.length > 0,
+            ...(unaccountedTouchMessage !== null
+              ? { ariaDescribedBy: unaccountedTouchHintId }
+              : {}),
+          },
         }}
-      >
-        <button
-          type="button"
-          onClick={onBack}
-          aria-label={t({
-            id: "editor.assignLoop.touch.keyMode.backAriaLabel",
-            message: "Back to mechanisms",
-          })}
-          data-testid="touch-key-mode-back"
-          style={ghostBtn}
-        >
-          <Trans id="editor.assignLoop.touch.keyMode.backButton">
-            ← Back
-          </Trans>
-        </button>
-        <button
-          type="button"
-          onClick={handleContinue}
-          disabled={unaccountedTouchChars.length > 0}
-          data-testid="touch-key-mode-continue"
-          style={{
-            ...headerBtnStyle,
-            width: "auto",
-            color: unaccountedTouchChars.length > 0 ? TEXT_DIM : headerBtnStyle.color,
-            cursor: unaccountedTouchChars.length > 0 ? "not-allowed" : "pointer",
-          }}
-        >
-          <Trans id="editor.assignLoop.touch.keyMode.continueButton">
-            Continue
-          </Trans>
-        </button>
-      </div>
+      />
 
       {/* T120 (FR-036e): the SAME gate feedback the character pane shows —
           coverage refusal and the orphaned-key-edit notice. Either mode

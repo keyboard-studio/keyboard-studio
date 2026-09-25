@@ -9,6 +9,13 @@
 //   through to the `onBack` prop at the walk's start. Omit `back` when there is
 //   nowhere to go.
 // - Pass `ariaDescribedBy` only while the referenced hint is mounted.
+//
+// A component that renders ANOTHER publisher in some of its states (a gallery
+// whose early returns render GalleryIntroSplash / GalleryEmptyState, PhaseB
+// whose manual path renders SurveyRunner) must not call the hook at its top
+// level: that would be a second live publisher for the step. It renders
+// `<PublishStepNav spec={...} />` in the branches it owns instead, so exactly
+// one publisher is mounted per screen.
 
 import { createContext, useContext, useId, useLayoutEffect, useRef } from "react";
 import {
@@ -62,4 +69,13 @@ export function usePublishStepNav(spec: StepNavSpec): void {
   });
 
   useLayoutEffect(() => () => useStepNavStore.getState().clear(stepId, owner), [stepId, owner]);
+}
+
+/**
+ * The hook as an element, for a component that publishes from only some of its
+ * render branches (see the header). Renders nothing.
+ */
+export function PublishStepNav({ spec }: { spec: StepNavSpec }): null {
+  usePublishStepNav(spec);
+  return null;
 }
