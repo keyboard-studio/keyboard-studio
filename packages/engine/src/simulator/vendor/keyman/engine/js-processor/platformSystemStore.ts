@@ -6,7 +6,7 @@
  */
 
 
-import { SystemStore, SystemStoreIDs, type KeyboardHarness } from 'keyman/engine/keyboard';
+import { SystemStore, SystemStoreIDs, type KeyboardHarness } from '../keyboard/index.js';
 
 /**
  * Handles checks against the current platform.

@@ -143,4 +143,32 @@ export interface SurveyPhaseResult {
    * NFC-normalised).
    */
   retainedConvenienceChars?: string[];
+  /**
+   * The context-tolerance station's decision (spec 078): whether the author
+   * accepted, partially accepted, or declined the tool's proposed context/
+   * mnemonic-fallback variant sites. **Additive** — this is the marks series'
+   * only write for the station (FR-005a); `undefined` for phases that do not
+   * run it. Last phase carrying one wins in {@link mergePhaseResults} (mirrors
+   * `marksOutputForm`).
+   */
+  marksContextTolerance?: MarksContextToleranceDecision;
+}
+
+/**
+ * The context-tolerance station's decision (spec 078 data-model.md "Tolerance
+ * decision"). `fingerprint` is the digest of the fixable rule ids at decision
+ * time (`toleranceFingerprint`); `appliedFingerprint` is set by the apply
+ * effect only after a successful write, so a stale re-run (rules changed since
+ * the decision) is detectable by comparing the two.
+ */
+export interface MarksContextToleranceDecision {
+  decision: "accept" | "partial" | "decline";
+  /** `[]` for `decline`; all of `proposedSiteIds` for `accept`. */
+  acceptedSiteIds: string[];
+  /** What the tool offered. */
+  proposedSiteIds: string[];
+  /** Digest of the fixable rule ids at decision time. */
+  fingerprint: string;
+  /** Set by the apply effect after a successful write. */
+  appliedFingerprint?: string;
 }

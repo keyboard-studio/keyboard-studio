@@ -39,6 +39,12 @@ import type { DecisionEntryInput } from "./decisionLogStore.ts";
 export interface AnswerProposal {
   value: string | readonly string[] | boolean;
   source: DecisionProposalSource;
+  /**
+   * The offer to keep on the record when the author overrides it
+   * (`DecisionProvenance.proposed`, spec 078). Absent for proposals whose
+   * override needs no trace of what was offered.
+   */
+  keepOnOverride?: NonNullable<DecisionProvenance["proposed"]>;
 }
 
 /** Looks up the proposal for a question id, or `undefined` when none is known. */
@@ -72,7 +78,8 @@ function valuesEqual(
  *   suggesting something, it is inherited content;
  * - a proposal that DIFFERS ⇒ the author overrode it, so the recorded value is
  *   theirs: `"hand-set"`, with no source. Naming the rejected proposal's source
- *   here would read as if the proposal were what shipped;
+ *   here would read as if the proposal were what shipped. When the proposal
+ *   asks for it (`keepOnOverride`), the offer rides along as `proposed`;
  * - no proposal ⇒ `"hand-set"` (see the module header).
  */
 export function deriveAnswerProvenance(
@@ -80,7 +87,11 @@ export function deriveAnswerProvenance(
   proposal: AnswerProposal | undefined,
 ): DecisionProvenance {
   if (proposal === undefined) return { agency: "hand-set" };
-  if (!valuesEqual(recorded, proposal.value)) return { agency: "hand-set" };
+  if (!valuesEqual(recorded, proposal.value)) {
+    return proposal.keepOnOverride !== undefined
+      ? { agency: "hand-set", proposed: proposal.keepOnOverride }
+      : { agency: "hand-set" };
+  }
   return proposal.source === "base"
     ? { agency: "base-derived", source: "base" }
     : { agency: "tool-proposed", source: proposal.source };

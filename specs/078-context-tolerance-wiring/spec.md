@@ -40,6 +40,12 @@ The studio knows the keyboard's output form, knows which rules break on the
 other form, and knows how to fix them. Asking nothing and doing nothing is the
 defect §3c names.
 
+## Clarifications
+
+### Session 2026-09-24
+
+- Q: Should the own-form write-back choice (spec 062 US3) be surfaced in this feature? → A: No — echo-only. Story 4 is removed; the engine mechanism stays built but unexposed.
+
 ## User Scenarios & Testing *(mandatory)*
 
 ### User Story 1 - The author is told their keyboard breaks on decomposed text (Priority: P1)
@@ -141,40 +147,17 @@ confirm the decision reads as declined with the finding still visible.
 
 ---
 
-### User Story 4 - The author chooses what the keyboard writes back (Priority: P4)
+### User Story 4 - The author chooses what the keyboard writes back — **removed (echo-only)**
 
-As a keyboard author, I want to decide whether the tolerant path echoes the
-form it found (the default) or rewrites the touched cluster to my keyboard's
-own form, and to be warned before committing that the second choice rewrites
-text the keyboard did not type.
-
-**Why this priority**: Spec 062 US3 specifies this choice, and the engine
-implements it. The default (echo) is safe for FieldWorks. The choice is a
-refinement, and whether to expose it at all in this feature is open (see the
-clarification below).
-
-**Independent Test**: Toggle the setting, confirm the preview switches to an
-output-diff that names the rewrite consequence, and confirm the emitted bytes
-differ as spec 062 US3 describes.
-
-**Acceptance Scenarios**:
-
-1. **Given** the default, **When** the author confirms, **Then** no output-diff
-   warning is shown and generated rules echo the form found.
-2. **Given** the author selects "write back my keyboard's own form", **When** the
-   preview refreshes, **Then** it discloses that the keyboard will rewrite
-   characters it did not type, before confirmation is possible.
-
-[NEEDS CLARIFICATION: Should the own-form write-back choice (spec 062 US3) be
-surfaced in this feature, or should this feature ship echo-only and leave US3's
-surface to a later spec? The owner's stated intent recorded in the follow-up
-issue is "equivalent input, no change to output", which reads as echo-only.
-Crew review (2026-09-23): the linguist and the upstream-parity reviewer both
-recommend **echo-only** — the only cited host (FieldWorks) is one where own-form
-is actively harmful, no author population needing own-form has been named, and
-upstream has no precedent for a keyboard deliberately rewriting text the user
-did not type. If echo-only is chosen, Story 4 is removed and the engine's US3
-mechanism stays built but unexposed.]
+**Resolved 2026-09-24 (owner):** this feature ships **echo-only**. The
+generated tolerant path always echoes the form it found; no own-form
+write-back choice is surfaced. Spec 062 US3's own-form mechanism
+(`contextToleranceWriteBack: "own-form"`) stays built in the engine but is
+unexposed; any future exposure is a separate spec. Rationale: the owner's
+stated intent is "equivalent input, no change to output"; the only cited host
+(FieldWorks) is one where own-form is actively harmful; and upstream has no
+precedent for a keyboard deliberately rewriting text the user did not type
+(crew review 2026-09-23, linguist and upstream-parity reviewers).
 
 ---
 
@@ -298,7 +281,7 @@ mechanism stays built but unexposed.]
   differs, re-raises the proposal; an identical fingerprint does not. This is
   new state and is what FR-009 and the "author edits rules after accepting"
   edge case are judged against.
-- **Write-back policy**: echo (default) or own-form; see Story 4.
+- **Write-back policy**: fixed at echo for this feature (Story 4 resolution); not author-selectable.
 
 ## Success Criteria *(mandatory)*
 
@@ -348,9 +331,8 @@ mechanism stays built but unexposed.]
 - Whether spec 071's series runs on the import track was not verified during
   review. If some flow skips the series, the plan must name where the decision
   point goes for that flow.
-- Spec 062's write-back default (echo) stands. Whether the own-form alternative
-  is exposed at all in this feature is the open clarification in Story 4; the
-  spec is complete under either answer.
+- Spec 062's write-back default (echo) stands and is the only policy this
+  feature exposes (Story 4 resolved echo-only, 2026-09-24).
 - Both authoring tracks reach the decision point; a scaffolded keyboard whose
   mark model already produced tolerant rules simply reports clean.
 - The analysis is behavioural and compiles the keyboard; it therefore runs where

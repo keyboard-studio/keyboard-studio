@@ -15,6 +15,7 @@ import {
 } from "@keyboard-studio/engine";
 import type {
   CommitResult,
+  FacetMigrationRule,
   ProposeOptions,
   SourceFacetMeasurement,
   TransformProposal,
@@ -32,8 +33,15 @@ export interface UseFacetTransform {
     request: TransformRequest,
     options?: ProposeOptions,
   ) => TransformProposal | TransformRefusal | null;
-  /** Run the confirmed transform through the gate; on commit, write the store. */
-  commit: (proposal: TransformProposal) => Promise<CommitResult | null>;
+  /**
+   * Run the confirmed transform through the gate; on commit, write the store.
+   * `ruleOverride` stands in for the registry lookup when the rule had to be
+   * built from an async-computed result (context tolerance, spec 078).
+   */
+  commit: (
+    proposal: TransformProposal,
+    options?: { ruleOverride?: FacetMigrationRule },
+  ) => Promise<CommitResult | null>;
 }
 
 export function useFacetTransform(): UseFacetTransform {
@@ -49,9 +57,13 @@ export function useFacetTransform(): UseFacetTransform {
   );
 
   const commit = useCallback<UseFacetTransform["commit"]>(
-    async (proposal) => {
+    async (proposal, options) => {
       if (ir === null) return null;
-      const result = await applyFacetTransform(ir, proposal);
+      const result = await applyFacetTransform(
+        ir,
+        proposal,
+        options?.ruleOverride !== undefined ? { ruleOverride: options.ruleOverride } : {},
+      );
       if (result.status === "committed") {
         // Overlay-preserving write + FR-013 axis re-seed when the produced set changed.
         commitFacetTransform(result.nextIr, result.producedSetChanged);

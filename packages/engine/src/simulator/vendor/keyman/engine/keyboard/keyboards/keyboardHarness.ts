@@ -1,8 +1,8 @@
 // @ts-nocheck
 import { JSKeyboard } from "./jsKeyboard.js";
 import { Codes } from "../codes.js";
-import { DeviceSpec } from 'keyman/common/web-utils';
-import { Keyboard } from './keyboard.js';
+import { DeviceSpec } from '../../../common/web-utils/index.js';
+import { type Keyboard } from './keyboard.js';
 
 /**
  * Defines members of the top-level `keyman` global object necessary to guarantee

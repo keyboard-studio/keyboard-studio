@@ -13,7 +13,7 @@
 
 ## Requirement Completeness
 
-- [ ] No [NEEDS CLARIFICATION] markers remain — one open: Story 4, whether the own-form write-back choice ships in this feature
+- [x] No [NEEDS CLARIFICATION] markers remain (Story 4 resolved 2026-09-24: echo-only, removed from scope)
 - [x] Requirements are testable and unambiguous
 - [x] Success criteria are measurable
 - [x] Success criteria are technology-agnostic (no implementation details)

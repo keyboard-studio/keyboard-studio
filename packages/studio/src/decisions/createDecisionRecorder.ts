@@ -39,6 +39,7 @@ import type {
 } from "@keyboard-studio/contracts";
 import { useDecisionLogStore } from "./decisionLogStore.ts";
 import { recordSurveyAnswers, type ProposalLookup } from "./recordSurveyAnswers.ts";
+import { withContextToleranceProposal } from "./contextToleranceProposal.ts";
 import { recordEditorStep, type DeletionCounts } from "./recordEditorStep.ts";
 import {
   recordBaseContribution,
@@ -188,11 +189,15 @@ export function createDecisionRecorder(deps: DecisionRecorderDeps): DecisionReco
       });
   }
 
-  function appendAnswers(stepId: string, answers: readonly SurveyAnswer[]): string[] {
+  function appendAnswers(
+    stepId: string,
+    answers: readonly SurveyAnswer[],
+    resolveProposal: ProposalLookup | undefined = deps.resolveProposal,
+  ): string[] {
     const log = useDecisionLogStore.getState();
     return recordSurveyAnswers(stepId, { answers: [...answers] }, {
       append: log.append,
-      ...(deps.resolveProposal !== undefined ? { resolveProposal: deps.resolveProposal } : {}),
+      ...(resolveProposal !== undefined ? { resolveProposal } : {}),
     });
   }
 
@@ -228,8 +233,13 @@ export function createDecisionRecorder(deps: DecisionRecorderDeps): DecisionReco
 
     // Answers already recorded at an earlier Next are identical revisits here
     // and append nothing, so completion is idempotent (spec 079 R-04).
+    // spec 078: a context-tolerance decision carries its own proposal (what
+    // the tool offered), so it resolves against this result, not a store.
     const answers = isSurveyPhaseResult(result) ? result.answers : [];
-    const answerIds = answers.length > 0 ? appendAnswers(stepId, answers) : [];
+    const answerIds =
+      answers.length > 0
+        ? appendAnswers(stepId, answers, isSurveyPhaseResult(result) ? withContextToleranceProposal(result, deps.resolveProposal) : undefined)
+        : [];
     if (answerIds.length > 0) {
       const screenId = deps.resolveCompletionScreen?.(stepId) ?? stepId;
       deps.onScreenRecorded?.(stepId, screenId, answerIds, answersHash(answers));

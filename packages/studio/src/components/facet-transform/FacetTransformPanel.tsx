@@ -11,7 +11,7 @@
 // No transform is silent (FR-002): commit fires only from the explicit Confirm
 // button, and the parent wires it to `useFacetTransform().commit`.
 
-import { useState } from "react";
+import { useId, useState, type ReactNode } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { TransformProposal, UserDisposition } from "@keyboard-studio/engine";
 
@@ -20,13 +20,26 @@ export interface FacetTransformPanelProps {
   /** Called with the (possibly disposition-edited) proposal on explicit confirm. */
   onConfirm: (proposal: TransformProposal) => void;
   onCancel: () => void;
+  /** Replaces the generic "Switch facet: from → to" heading and impact line. */
+  heading?: ReactNode;
+  /** Replaces the generic "Confirm and apply" label. */
+  confirmLabel?: ReactNode;
+  /** Replaces the generic "Cancel" label. */
+  cancelLabel?: ReactNode;
+  /** Extra preview content (e.g. per-site disclosures), shown above the site controls. */
+  children?: ReactNode;
 }
 
 export function FacetTransformPanel({
   proposal,
   onConfirm,
   onCancel,
+  heading,
+  confirmLabel,
+  cancelLabel,
+  children,
 }: FacetTransformPanelProps): JSX.Element {
+  const idPrefix = useId();
   // Local per-site disposition state (partial acceptance, FR-012).
   const [dispositions, setDispositions] = useState<Record<string, UserDisposition>>(
     () => Object.fromEntries(proposal.affectedSites.map((s) => [s.siteId, s.userDisposition])),
@@ -57,14 +70,18 @@ export function FacetTransformPanel({
       aria-label={t({ id: "facetTransform.ariaLabel", message: "Facet transform proposal" })}
     >
       <header>
-        <h3>
-          <Trans id="facetTransform.heading">
-            Switch {facetId}: {fromValue} → {toValue}
-          </Trans>
-        </h3>
-        <p className="impact-class">
-          <Trans id="facetTransform.impact">Impact: {impactClass}</Trans>
-        </p>
+        {heading ?? (
+          <>
+            <h3>
+              <Trans id="facetTransform.heading">
+                Switch {facetId}: {fromValue} → {toValue}
+              </Trans>
+            </h3>
+            <p className="impact-class">
+              <Trans id="facetTransform.impact">Impact: {impactClass}</Trans>
+            </p>
+          </>
+        )}
       </header>
 
       {/* Provenance chip — rendered ONLY when a non-default house target fired. */}
@@ -181,27 +198,38 @@ export function FacetTransformPanel({
         </ul>
       )}
 
+      {children}
+
       {/* Per-site disposition controls (FR-005 / FR-012). */}
       {proposal.affectedSites.length > 0 && (
         <fieldset className="affected-sites">
           <legend><Trans id="facetTransform.exceptionSites">Exception sites</Trans></legend>
-          {proposal.affectedSites.map((site) => (
-            <div key={site.siteId} className="site-row">
-              <span className="site-framing">{site.framing ?? site.siteId}</span>
-              <label>
-                <input
-                  type="checkbox"
-                  checked={dispositions[site.siteId] === "accepted"}
-                  onChange={(e) =>
-                    setDisposition(site.siteId, e.target.checked ? "accepted" : "pending")
-                  }
-                />
-                {site.defaultDisposition === "preserve"
-                  ? t({ id: "facetTransform.site.convertToo", message: "Convert this site too" })
-                  : t({ id: "facetTransform.site.applyFix", message: "Apply this fix" })}
-              </label>
-            </div>
-          ))}
+          {proposal.affectedSites.map((site, i) => {
+            // Each tick's accessible name carries the site's own framing, not
+            // just the shared action text, so the ticks are distinguishable.
+            const framingId = `${idPrefix}-site-${i}-framing`;
+            const actionId = `${idPrefix}-site-${i}-action`;
+            return (
+              <div key={site.siteId} className="site-row">
+                <span className="site-framing" id={framingId}>{site.framing ?? site.siteId}</span>
+                <label>
+                  <input
+                    type="checkbox"
+                    aria-labelledby={`${actionId} ${framingId}`}
+                    checked={dispositions[site.siteId] === "accepted"}
+                    onChange={(e) =>
+                      setDisposition(site.siteId, e.target.checked ? "accepted" : "pending")
+                    }
+                  />
+                  <span id={actionId}>
+                    {site.defaultDisposition === "preserve"
+                      ? t({ id: "facetTransform.site.convertToo", message: "Convert this site too" })
+                      : t({ id: "facetTransform.site.applyFix", message: "Apply this fix" })}
+                  </span>
+                </label>
+              </div>
+            );
+          })}
         </fieldset>
       )}
 
@@ -234,10 +262,10 @@ export function FacetTransformPanel({
 
       <footer className="actions">
         <button type="button" onClick={handleConfirm}>
-          <Trans id="facetTransform.confirm">Confirm and apply</Trans>
+          {confirmLabel ?? <Trans id="facetTransform.confirm">Confirm and apply</Trans>}
         </button>
         <button type="button" onClick={onCancel}>
-          <Trans id="facetTransform.cancel">Cancel</Trans>
+          {cancelLabel ?? <Trans id="facetTransform.cancel">Cancel</Trans>}
         </button>
       </footer>
     </section>

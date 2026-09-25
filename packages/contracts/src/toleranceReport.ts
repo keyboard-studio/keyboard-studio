@@ -34,6 +34,13 @@ export interface RuleToleranceFinding {
    */
   failingKeystrokes?: SimKeyInput[];
   /**
+   * The text before the keystroke, in its joined (precomposed) form — the
+   * other half of the reproducible case. Present with `failingKeystrokes`.
+   * The decomposed case is this text's canonical decomposition. Optional and
+   * additive (spec 078): reports produced before it existed omit it.
+   */
+  precedingText?: string;
+  /**
    * The two observed outputs that differed. Raw codepoints only — naming
    * them by codepoint + Unicode name (FR-012) is a rendering concern for the
    * consumer, not stored here.

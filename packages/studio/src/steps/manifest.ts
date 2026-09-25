@@ -27,6 +27,7 @@ import { irPath } from "@keyboard-studio/contracts";
 import type { Step } from "./types.ts";
 import { CharactersStep } from "../survey/CharactersStep.tsx";
 import { MarksSeriesStep } from "../survey/marks/MarksSeriesStep.tsx";
+import { CONTEXT_TOLERANCE_WRITES } from "./contextToleranceWrites.ts";
 import { PunctuationStep } from "../survey/punctuation/PunctuationStep.tsx";
 import { InvisiblesStep } from "../survey/invisibles/InvisiblesStep.tsx";
 import { ConvenienceCharsStep } from "../survey/convenience/ConvenienceCharsStep.tsx";
@@ -137,7 +138,9 @@ export const manifest: readonly Step[] = [
     title: "Accents & marks",
     spine: true,
     inputs: [],
-    writes: [],
+    // spec 078: the step's own write is the context-tolerance decision; these
+    // are the paths the separate apply effect commits the accepted rules to.
+    writes: [...CONTEXT_TOLERANCE_WRITES],
     component: MarksSeriesStep,
     specRef: ["specs/071-marks-question-series", "specs/052-marks-treatment-question"],
     evidence: {

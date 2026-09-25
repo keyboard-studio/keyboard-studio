@@ -5,7 +5,7 @@
  * Implementation of default rules
  */
 
-import { ModifierKeyConstants } from '@keymanapp/common-types';
+import { ModifierKeyConstants } from '../../common/types/main.js';
 import { Codes } from './codes.js';
 import { type KeyEvent } from './keyEvent.js';
 // VENDORED ANNOTATION: changed to `import type` for ESM compatibility in Node vitest context

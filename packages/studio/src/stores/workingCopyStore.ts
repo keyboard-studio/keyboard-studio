@@ -22,11 +22,12 @@
 
 import { create } from "zustand";
 import type {
-  Attribution, AxisFill, BaseKeyboard, HelpDocsAnswers, KeyboardIR, LintFinding, RemovalCapability, VirtualFS,
+  Attribution, AxisFill, BaseKeyboard, HelpDocsAnswers, KeyboardIR, LintFinding, RemovalCapability, ToleranceReport, VirtualFS,
   WelcomeConvention, WelcomeFolderImage, HistoryEntryState, ChartPreference,
   BaseDocumentationProfile } from "@keyboard-studio/contracts";
 import { detectMarkInputOrderFromImport, renameTouchKey, deriveFacets } from "@keyboard-studio/engine";
-import type { KeyEditOperation, KeyEditOverlay } from "@keyboard-studio/engine";
+import type { ContextToleranceOverlay, KeyEditOperation, KeyEditOverlay } from "@keyboard-studio/engine";
+import type { ContextVariantsResult, ToleranceClassification } from "@keyboard-studio/engine/context-tolerance";
 import {
   mergePhaseResults,
   type DiscoveryAxisVector,
@@ -179,6 +180,53 @@ export interface CommitTouchKeyRenameOutcome {
  * fresh working copy straight into `"key"` mode is a later task (T073).
  */
 export type TouchEditorMode = "character" | "key";
+
+/**
+ * The context-tolerance analysis for the working copy (spec 078). Recomputed
+ * after every preview compile reaches `ready`, never on the preview's critical
+ * path; `runId` is the compile run it belongs to, so a superseded run's result
+ * is discarded. Derived UI state: not persisted.
+ *
+ * - `idle`: the flag is off, or no compile has finished yet.
+ * - `ready`: `findings` are the 19.x Layer C findings; `fixableRuleIds` are the
+ *   gap rules the generator produced a fix for (FR-010 refusals excluded);
+ *   `fingerprint` digests those rules (research D7); `classification` is
+ *   `classifyToleranceFinding` per rule id, so renderers need not re-derive it
+ *   (a site whose applied fix is present reads `made-tolerant`); `siteKeys`
+ *   maps each fixable rule id to its position-independent site key; and
+ *   `analysedIr` is the keyboard analysed (the compiled one, minus any applied
+ *   fix), which rule ids refer to.
+ * - `failed`: the analysis threw. Rendered as could-not-check, never as clean.
+ */
+export type ContextToleranceState =
+  | { status: "idle" }
+  | { status: "analysing"; runId: number }
+  | {
+      status: "ready";
+      runId: number;
+      report: ToleranceReport;
+      findings: LintFinding[];
+      classification: Record<string, ToleranceClassification>;
+      proposal: ContextVariantsResult;
+      analysedIr: KeyboardIR;
+      fixableRuleIds: string[];
+      siteKeys: Record<string, string>;
+      fingerprint: string;
+    }
+  | { status: "failed"; runId: number; reason: string };
+
+/**
+ * An applied context-tolerance decision (spec 078): the verified generated
+ * rules, recorded once so the synchronous VFS projection can replay them into
+ * the preview and the download. `fingerprint` and `acceptedSiteIds` are the
+ * decision it was built for; a different decision re-applies. Persisted with
+ * the working copy.
+ */
+export interface AppliedContextTolerance {
+  fingerprint: string;
+  acceptedSiteIds: string[];
+  overlay: ContextToleranceOverlay;
+}
 
 // ---------------------------------------------------------------------------
 // Instantiation mode — spec §8 v1.3.0, two authoring tracks.
@@ -582,6 +630,12 @@ export interface WorkingCopyState {
    */
   validatorFindings: LintFinding[];
 
+  // -- Context tolerance slice (spec 078) ---------------------------------------
+  /** See {@link ContextToleranceState}. Derived UI state, not persisted. */
+  contextTolerance: ContextToleranceState;
+  /** See {@link AppliedContextTolerance}. `null` when no fix is applied. */
+  contextToleranceOverlay: AppliedContextTolerance | null;
+
   // -- Default-fill provenance slice (#890) --------------------------------------
   /**
    * Provenance for phase-gated axis values that were filled by the §7.2
@@ -972,6 +1026,16 @@ export interface WorkingCopyState {
    */
   setValidatorFindings: (findings: LintFinding[]) => void;
 
+  /**
+   * Publish the context-tolerance analysis state (spec 078). No-op when the
+   * incoming state is reference-equal to the stored one, like
+   * {@link setValidatorFindings}. Never starts a timer or async work.
+   */
+  setContextTolerance: (next: ContextToleranceState) => void;
+
+  /** Record (or clear, with `null`) the applied context-tolerance fix (spec 078). */
+  setContextToleranceOverlay: (next: AppliedContextTolerance | null) => void;
+
   // -- Default-fill provenance actions (#890) ----------------------------------
 
   /**
@@ -1171,6 +1235,8 @@ export type WorkingCopyData = Omit<
   | "setHistoryEntryState" | "setChartPreference" | "setBaseDocProfile" | "setBaselineDocFindings"
   | "markStale" | "clearStale"
   | "setValidatorFindings"
+  | "setContextTolerance"
+  | "setContextToleranceOverlay"
   | "setAxisFills"
   | "commitKeyEdit" | "undoKeyEdit" | "commitTouchKeyRename" | "setTouchEditorMode"
 >;
@@ -1222,6 +1288,9 @@ const INITIAL_STATE: WorkingCopyData = {
   staleSteps: new Set<string>(),
   // validator findings slice (US5, T034) — default empty (structural proxy)
   validatorFindings: [],
+  // context tolerance slice (spec 078) — no analysis yet
+  contextTolerance: { status: "idle" },
+  contextToleranceOverlay: null,
   // default-fill provenance slice (#890) — default empty (no pre-fill run yet)
   axisFills: [],
 };
@@ -1852,6 +1921,14 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
 
   setValidatorFindings: (findings) =>
     set((s) => (s.validatorFindings === findings ? s : { validatorFindings: findings })),
+
+  // -- Context tolerance actions (spec 078) ------------------------------------
+
+  setContextTolerance: (next) =>
+    set((s) => (s.contextTolerance === next ? s : { contextTolerance: next })),
+
+  setContextToleranceOverlay: (next) =>
+    set((s) => (s.contextToleranceOverlay === next ? s : { contextToleranceOverlay: next })),
 
   // -- Default-fill provenance actions (#890) ----------------------------------
 

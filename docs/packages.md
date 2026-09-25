@@ -38,12 +38,29 @@ member's tier and placeholder state), with `decision-audit/historyProposal.ts` b
 HISTORY proposal and `base-browser/classifyBaseDocumentation.ts` classifying a base's
 documentation (none / minimal / full).
 
+The root entry stays simulator-free. Two subpaths carry the simulator:
+
+- `@keyboard-studio/engine/simulator` is the Node entry (`simulator/node.ts`). It installs the
+  `vm`-sandbox keyboard loader.
+- `@keyboard-studio/engine/context-tolerance` is the browser-safe entry the studio lazy-imports
+  (spec 078). It installs the `new Function` loader (`simulator/browserKeyboardLoader.ts`) and
+  exposes the context-tolerance analysis, the fix generator, the fingerprint and site keys, and
+  the Unicode-name table.
+
+The loader seam is `simulator/keyboardLoader.ts`. The vendored KeymanWeb sources address each
+other by relative path, so no alias is needed to resolve them. The depcruise rule
+`context-tolerance-browser-safe` keeps the Node loader out of the browser entry. The
+context-tolerance overlay (`pattern-apply/context-tolerance-overlay.ts`) is exported from the
+root entry, because the studio replays it inside its synchronous VFS projection.
+
 ### `@keymanapp/keyboard-lint`
 
 Layer C hygiene lint engine (`lintEngine.ts`, `checks/`, `parsers/`). `checks/docs/` holds the
 thirteen documentation criteria codes (spec 080 FR-019) as pure string-level checks over a
 `DocLintInput`, gated in `lintContext.ts` and runnable standalone via `runDocChecks`; the
-package stays contracts-only.
+package stays contracts-only. Its first production caller outside documentation is
+`lintContextTolerance(ir, report)` (spec 078), a narrow entry that runs only check 19.x over a
+report the studio computed; keyboard-lint itself still never imports the engine.
 
 ### `@keyboard-studio/llm`
 

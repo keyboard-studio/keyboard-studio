@@ -48,6 +48,26 @@ every file — strip that line to recover the verbatim upstream source.
   `import type { TextStore }` (top-level `import type` form) for reliable esbuild
   type-elision in the Node ESM vitest context.
 
+## Uniform browser-safety edits (spec 078 — not annotated per site)
+
+Like the `// @ts-nocheck` line, these two edits are applied uniformly and are
+disclosed here once rather than at each site. Reverse them on a re-sync.
+
+- **Bare specifiers → relative paths.** Every `@keymanapp/common-types`,
+  `keyman/engine/keyboard`, `keyman/engine/js-processor`,
+  `keyman/common/web-utils` and `@keymanapp/keyman-version` import now names
+  the vendored file by relative path (`.../index.js`, `common/types/main.js`,
+  `stubs/keyman-version.js`). Those specifiers used to resolve only through
+  tsconfig `paths` and vitest aliases. tsc copies them into `dist/` verbatim,
+  so no browser bundler (and no plain Node import of `dist/`) could resolve
+  them. The aliases are gone.
+- **`type` modifiers on type-only imports and re-exports.** Under the engine's
+  `verbatimModuleSyntax`, an `import { T }` or `export { T } from` naming a
+  type-only symbol survives into the emitted JS, and ESM then fails at load
+  time (for example, "does not provide an export named 'TouchLayoutPlatform'").
+  Each such binding found by the type checker now carries an inline `type`
+  modifier. There are 67 of them across 21 files.
+
 ## New files (not vendored — written for this project)
 
 - `keyman/common/types/main.ts` — minimal re-export shim for

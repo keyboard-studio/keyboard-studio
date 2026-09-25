@@ -5,7 +5,8 @@
  * and an array of SimKeyInput events, and returns a SimulationResult with the
  * final text output and a per-step trace.
  *
- * Designed for Node/vitest use only. Does NOT import any DOM-dependent modules.
+ * Host-neutral: the keyboard loader is installed by the host entry (see
+ * keyboardLoader.ts). Does NOT import any DOM-dependent modules.
  * See blueprint §3, §4, §5, §7 for implementation details.
  */
 
@@ -21,9 +22,9 @@ import type {
 } from '@keyboard-studio/contracts';
 import type { Pattern } from '@keyboard-studio/contracts';
 
-import { loadKeyboardInterface } from './nodeKeyboardLoader.js';
+import { loadKeyboardInterface } from './keyboardLoader.js';
 
-// Vendored Keyman engine imports — paths resolved via tsconfig paths + Vite alias.
+// Vendored Keyman engine imports (relative paths, so any bundler resolves them).
 import { Codes } from './vendor/keyman/engine/keyboard/codes.js';
 import { KeyEvent } from './vendor/keyman/engine/keyboard/keyEvent.js';
 import { SyntheticTextStore } from './vendor/keyman/engine/keyboard/syntheticTextStore.js';
@@ -174,8 +175,8 @@ export function simulate(
 ): SimulationResult {
   const scriptSrc = extractJsSource(compiled);
 
-  // Load the keyboard via the Node vm sandbox. The returned JSKeyboardInterface
-  // already has activeKeyboard set (blueprint §3, nodeKeyboardLoader pattern).
+  // Load the keyboard via the installed loader. The returned JSKeyboardInterface
+  // already has activeKeyboard set (blueprint §3).
   const kbdInterface = loadKeyboardInterface(scriptSrc, NO_OP_STORE_SERIALIZER);
   const keyboard = kbdInterface.activeKeyboard;
 

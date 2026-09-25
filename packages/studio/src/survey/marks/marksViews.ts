@@ -40,7 +40,11 @@ export type MarksStationId =
   | "marks_attachment"
   | "marks_treatment"
   | "marks_output_form"
-  | "marks_stacking";
+  | "marks_stacking"
+  // spec 078: after output form and stacking (tolerance is the mark model's
+  // fifth consumer). Shown only behind the flag, while the analysis is running
+  // or when it found fixable rules.
+  | "marks_context_tolerance";
 
 /** Attachment answers: per mark, per base — checked = reachable on the keyboard. */
 export type AttachmentChecked = Record<string, Record<string, boolean>>;

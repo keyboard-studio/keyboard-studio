@@ -326,6 +326,42 @@ export function splitRuleAtPlus(
   return undefined;
 }
 
+/**
+ * True when `storeName` has at least one `deadkey` item alongside its
+ * `char` items (FR-010: "a store mixing characters and deadkeys under one
+ * reference"). `buildStoreCharIndex` only ever returns a store's `char`
+ * items, so any caller resolving candidates through it already drops a
+ * mixed store's deadkey members silently — this makes that shape refuse
+ * loudly instead.
+ */
+function storeHasDeadkeyItem(ir: KeyboardIR, storeName: string): boolean {
+  return ir.stores.some((s) => s.name === storeName && s.items.some((i) => i.kind === 'deadkey'));
+}
+
+/**
+ * Refuse (return a reason for) a rule whose own output contains an `index()`
+ * element the store-pairing analysis could not resolve to one of this rule's
+ * own context positions — FR-010's "context-indexed output" hazard. Reuses
+ * `analyzeStores`'s whole-IR pairing graph (`unresolvedIndexOutputNames`,
+ * `pairSets`), the same signal the preceding-context check below applies to
+ * `beforeEl`'s own store name, but checked here against every store this
+ * rule's OUTPUT actually indexes into — a rule's `index()` target need not
+ * be the same store named in its own preceding context at all.
+ */
+function unsafeOutputIndexReason(rule: IRRule, storeAnalysis: ReturnType<typeof analyzeStores>): string | undefined {
+  for (const el of rule.output) {
+    if (el.kind !== 'index') continue;
+    if (storeAnalysis.unresolvedIndexOutputNames.has(el.storeRef)) {
+      return `store "${el.storeRef}" has an unresolved index() output pairing`;
+    }
+    const pairSet = storeAnalysis.pairSets.get(el.storeRef);
+    if (pairSet !== undefined && pairSet.size > 2) {
+      return `store "${el.storeRef}" is paired via index() with more than one other store`;
+    }
+  }
+  return undefined;
+}
+
 /** A rule that needs the behavioural simulate() comparison to reach a verdict. */
 interface PendingSimulation {
   base: { ruleId: string; location: { file: string; line: number } };
@@ -359,6 +395,19 @@ function resolveRuleStatically(
   }
   const { before, keyPart } = split;
 
+  // Context-indexed output (FR-010): a rule whose OWN output indexes into a
+  // store the pairing analysis could not resolve to one of THIS rule's
+  // context positions — the same unsafe-pairing signal used below for the
+  // preceding-context store, but checked here against every store this
+  // rule's output actually indexes into. A rule can reference an index()
+  // target that has nothing to do with its own `before` element at all (an
+  // out-of-range offset, or one that resolves to a non-`any()` position), and
+  // the check below only ever inspected `beforeEl`'s own store name.
+  const outputHazard = unsafeOutputIndexReason(rule, storeAnalysis);
+  if (outputHazard !== undefined) {
+    return { finding: { ...base, status: 'not-analysed', notAnalysedReason: outputHazard } };
+  }
+
   if (before.length === 0) {
     // No preceding context — nothing for normalization to disagree about.
     return { finding: { ...base, status: 'tolerant' } };
@@ -374,6 +423,34 @@ function resolveRuleStatically(
   }
 
   const beforeEl = before[0]!;
+
+  // A store mixing character and deadkey items under one any()/notany()
+  // reference (FR-010): `buildStoreCharIndex` only ever sees that store's
+  // `char` items, so resolving candidates from it would silently pretend the
+  // store's deadkey members do not exist rather than fail loudly.
+  if (beforeEl.kind === 'any' || beforeEl.kind === 'notany') {
+    if (storeHasDeadkeyItem(ir, beforeEl.storeRef)) {
+      return {
+        finding: {
+          ...base,
+          status: 'not-analysed',
+          notAnalysedReason: `store "${beforeEl.storeRef}" mixes characters and deadkeys; not analysed`,
+        },
+      };
+    }
+  }
+  if (keyPart.length === 1 && keyPart[0]!.kind === 'any') {
+    const keyStoreRef = (keyPart[0] as { storeRef: string }).storeRef;
+    if (storeHasDeadkeyItem(ir, keyStoreRef)) {
+      return {
+        finding: {
+          ...base,
+          status: 'not-analysed',
+          notAnalysedReason: `store "${keyStoreRef}" mixes characters and deadkeys; not analysed`,
+        },
+      };
+    }
+  }
 
   // Store-pairing safety (spec's "stores used with paired index()" edge case).
   // A clean 1:1 pairing (e.g. `any(base) + any(key) > index(acute,1)`) is the
@@ -473,6 +550,7 @@ function simulatePending(compiled: CompileResult, pending: PendingSimulation): R
         ...pending.base,
         status: 'not-analysed',
         failingKeystrokes: [pending.key],
+        precedingText: candidate,
         precomposedOutput,
         decomposedOutput,
       };
@@ -537,4 +615,19 @@ export async function computeContextTolerance(ir: KeyboardIR): Promise<Tolerance
   }
 
   return report;
+}
+
+/** How a finding reads to the author (spec 078, research D5). */
+export type ToleranceClassification = 'tolerant' | 'made-tolerant' | 'gap' | 'not-analysed';
+
+/**
+ * Classify one finding. `ToleranceStatus` has no gap member: a rule whose
+ * two forms were simulated and disagreed is reported `not-analysed` carrying
+ * `failingKeystrokes` and no reason, while a rule the analysis genuinely
+ * could not check carries a `notAnalysedReason`. This splits the two.
+ */
+export function classifyToleranceFinding(f: RuleToleranceFinding): ToleranceClassification {
+  if (f.status !== 'not-analysed') return f.status;
+  if (f.notAnalysedReason === undefined && f.failingKeystrokes !== undefined) return 'gap';
+  return 'not-analysed';
 }

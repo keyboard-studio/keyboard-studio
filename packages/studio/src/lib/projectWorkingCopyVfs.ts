@@ -89,7 +89,9 @@ import {
   propagateDesktopLayersToTouch,
   collectLayerCombosInUse,
   applyIdentityToKps,
+  applyContextToleranceOverlay,
 } from "@keyboard-studio/engine";
+import type { ContextToleranceOverlay } from "@keyboard-studio/engine";
 import type { PackageDescriptorIdentity } from "@keyboard-studio/engine";
 import { applyCarveMutate, applyAddGalleryMutate } from "../steps/editorMutate.ts";
 import { isMutateSeamEnabled } from "../flags/mutateFlag.ts";
@@ -204,6 +206,11 @@ export interface ProjectWorkingCopyVfsInput {
    * the exact value it fell back to.
    */
   baseDisplayName?: string;
+  /**
+   * The applied context-tolerance fix (spec 078): verified generated rules,
+   * replayed by step 2.7. Absent or `null` when no fix is applied.
+   */
+  contextToleranceOverlay?: ContextToleranceOverlay | null;
 }
 
 /**
@@ -288,6 +295,7 @@ export function projectWorkingCopyVfs(
     identity,
     touchLayoutJson,
     baseDisplayName,
+    contextToleranceOverlay = null,
   } = input;
 
   const warnings: string[] = [];
@@ -590,6 +598,30 @@ export function projectWorkingCopyVfs(
             `[project-working-copy] desktop-to-touch layer propagation skipped: ${msg}`,
           );
         }
+      }
+    }
+  }
+
+  // Step 2.7: Context-tolerance projection (spec 078). Replays the author's
+  // accepted fix: the generated rules were computed and verified once, by
+  // hooks/useContextToleranceApply.ts, because generating them compiles and
+  // simulates; here they are only inserted, synchronously, before the rule
+  // each batch was verified against. After carve and assignments (so the
+  // anchors reflect the keyboard as the author left it), before identity and
+  // the id rename (so the path still resolves under the pre-rename id).
+  // A batch whose anchor is gone is skipped with a warning, never misplaced.
+  if (contextToleranceOverlay !== null && contextToleranceOverlay.batches.length > 0) {
+    const kmnPathForTolerance = `source/${keyboardId}.kmn`;
+    const kmnTextForTolerance = readVfsText(vfs, kmnPathForTolerance);
+    if (kmnTextForTolerance !== undefined) {
+      try {
+        const parsedForTolerance = parseKmn(kmnTextForTolerance, keyboardId).ir;
+        const replay = applyContextToleranceOverlay(parsedForTolerance, contextToleranceOverlay);
+        vfs.set(kmnPathForTolerance, emitKmn(replay.ir), false);
+        warnings.push(...replay.warnings.map((w) => `[project-working-copy] ${w}`));
+      } catch (err: unknown) {
+        const msg = err instanceof Error ? err.message : String(err);
+        warnings.push(`[project-working-copy] context-tolerance projection skipped: ${msg}`);
       }
     }
   }

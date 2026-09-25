@@ -15,6 +15,7 @@ import { findTouchLayoutPath } from "../lib/findTouchLayoutPath.ts";
 import { readVfsText } from "../lib/vfsText.ts";
 import { computeBaselineDocFindings } from "../lib/collectDocLintInput.ts";
 import { recoverFromStaleChunk } from "../crash/staleChunk.ts";
+import { analyseContextTolerance } from "../lib/contextToleranceAnalysis.ts";
 
 interface EngineModule {
   compile: (fs: VirtualFS, keyboardId: string) => Promise<CompileResult>;
@@ -334,6 +335,16 @@ export type OnInstantiateCallback = (
   opts: { vfs: VirtualFS; ir: KeyboardIR | null; removalCapabilities: Map<string, RemovalCapability> },
 ) => void;
 
+/** Optional behaviour for {@link useKeyboardArtifact}. */
+export interface KeyboardArtifactOptions {
+  /**
+   * Run the context-tolerance analysis after each compile reaches `ready`
+   * (spec 078) and publish it to `workingCopyStore.contextTolerance`. Only
+   * StudioShell's main-walk preview passes this, behind the flag.
+   */
+  analyseContextTolerance?: boolean;
+}
+
 export interface KeyboardArtifactResult {
   stage: Stage;
   retry: () => void;
@@ -373,8 +384,13 @@ export function useKeyboardArtifact(
   scaffoldSpec?: ScaffoldSpec | null,
   vfsTransform?: VfsTransform | null,
   onInstantiate?: OnInstantiateCallback | null,
+  options?: KeyboardArtifactOptions,
 ): KeyboardArtifactResult {
   const [stage, setStageRaw] = useState<Stage>({ kind: "idle" });
+  // Read at launch time rather than threaded through runCompile's deps, so
+  // toggling it never restarts a compile.
+  const analyseToleranceRef = useRef(options?.analyseContextTolerance === true);
+  analyseToleranceRef.current = options?.analyseContextTolerance === true;
 
   /**
    * Records a crash breadcrumb on every Stage transition (spec 060 FR-045).
@@ -447,6 +463,37 @@ export function useKeyboardArtifact(
       setTransformVersion((v) => v + 1);
     }
   }, [vfsTransform]);
+
+  /**
+   * Context-tolerance follow-on task (spec 078 FR-001). Launched after the
+   * `ready` stage is set and never awaited: the preview is already showing
+   * before the analysis begins, and the analysis never joins the compile's
+   * Promise.all or adds a timer (D3). Every await is followed by a runId
+   * check inside analyseContextTolerance; a superseded run's result is
+   * dropped.
+   */
+  const launchContextTolerance = useCallback((thisRunId: number, parsedIr: KeyboardIR | null) => {
+    // Analyse what the preview actually compiled: the IR parsed from the
+    // projected .kmn. The store's working IR is never emitted into the
+    // artifact (see projectWorkingCopyVfs), so it can lag what the author runs.
+    const { ir: workingIr, setContextTolerance, contextToleranceOverlay } = useWorkingCopyStore.getState();
+    const ir = parsedIr ?? workingIr;
+    if (ir === null) return;
+    const isCurrent = (): boolean => runId.current === thisRunId;
+    setContextTolerance({ status: "analysing", runId: thisRunId });
+    analyseContextTolerance(ir, isCurrent, contextToleranceOverlay).then(
+      (result) => {
+        if (result === null || !isCurrent()) return;
+        useWorkingCopyStore.getState().setContextTolerance({ status: "ready", runId: thisRunId, ...result });
+      },
+      (err: unknown) => {
+        if (!isCurrent()) return;
+        const reason = err instanceof Error ? err.message : String(err);
+        devLog.warn("[useKeyboardArtifact] context-tolerance analysis failed:", err);
+        useWorkingCopyStore.getState().setContextTolerance({ status: "failed", runId: thisRunId, reason });
+      },
+    );
+  }, []);
 
   // Separate compile step, callable independently for the recompile() path.
   // `warnings` carries any scaffold warnings from the preceding fetch step;
@@ -625,7 +672,8 @@ export function useKeyboardArtifact(
       readyStage.keyboardCssUrls = prevKeyboardCssBlobUrls.current;
     }
     setStage(readyStage);
-  }, [scaffoldSpec?.keyboardId, onInstantiate]);
+    if (analyseToleranceRef.current) launchContextTolerance(thisRunId, parsedIr);
+  }, [scaffoldSpec?.keyboardId, onInstantiate, launchContextTolerance]);
 
   const run = useCallback(async (kb: BaseKeyboard, thisRunId: number) => {
     // Reset so transform changes during this fetch do not trigger a premature

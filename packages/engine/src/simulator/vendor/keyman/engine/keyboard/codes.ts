@@ -5,7 +5,7 @@
  * Keyboard key codes and modifier bitmasks.
  */
 
-import { ModifierKeyConstants, USVirtualKeyCodes } from '@keymanapp/common-types';
+import { ModifierKeyConstants, USVirtualKeyCodes } from '../../common/types/main.js';
 
 export const Codes = {
   modifierCodes: {

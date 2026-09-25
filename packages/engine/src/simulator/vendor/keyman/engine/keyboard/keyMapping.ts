@@ -5,7 +5,7 @@
 ***/
 
 import { KeyEvent } from "./keyEvent.js";
-import { KeyEventSpec } from "./keyEvent.js";
+import { type KeyEventSpec } from "./keyEvent.js";
 
 class KeyMap {
   [keycode: string]: number;

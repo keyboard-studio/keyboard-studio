@@ -33,12 +33,13 @@
 // onComplete with a SurveyPhaseResult carrying `marksWorklist`; the manifest
 // reducer path (StepHost.handleComplete → recordPhase) owns the session merge.
 
-import { useEffect, useMemo, useRef, type ComponentType } from "react";
+import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import type {
   AttestedStack,
   ConfirmedAlphabet,
+  MarksContextToleranceDecision,
   SurveyAnswer,
   SurveyPhaseResult,
 } from "@keyboard-studio/contracts";
@@ -100,6 +101,14 @@ import { AttachmentStation } from "./AttachmentStation.tsx";
 import { MarkTreatmentStation } from "./MarkTreatmentStation.tsx";
 import { OutputFormStation } from "./OutputFormStation.tsx";
 import { StackingStation } from "./StackingStation.tsx";
+import { ContextToleranceStation, type ContextToleranceDecisionInput, type SiteDisclosure } from "./ContextToleranceStation.tsx";
+import { buildContextToleranceProposal } from "./contextToleranceProposal.ts";
+import { isContextToleranceEnabled } from "../../flags/contextToleranceFlag.ts";
+import {
+  CONTEXT_TOLERANCE_QUESTION_ID,
+  CONTEXT_TOLERANCE_SITES_QUESTION_ID,
+  SITE_ID_SEPARATOR,
+} from "../../decisions/contextToleranceProposal.ts";
 import {
   ACCENT,
   TEXT_MAIN,
@@ -190,15 +199,36 @@ export function classNeedsTreatmentScreen(
  * cost nothing extra to repeat here; this is what stops the stacking answers
  * (F-1) and every other station's answers from being discarded on completion.
  */
+/**
+ * The survey answers a context-tolerance decision records (spec 078 FR-007):
+ * the outcome, plus the accepted rule ids when only some were accepted.
+ * Provenance is derived at record time (decisions/contextToleranceProposal.ts).
+ */
+export function contextToleranceAnswers(decision: MarksContextToleranceDecision): SurveyAnswer[] {
+  const answers: SurveyAnswer[] = [
+    { questionId: CONTEXT_TOLERANCE_QUESTION_ID, answerType: "select", value: decision.decision },
+  ];
+  if (decision.decision === "partial") {
+    answers.push({
+      questionId: CONTEXT_TOLERANCE_SITES_QUESTION_ID,
+      answerType: "text",
+      value: decision.acceptedSiteIds.join(SITE_ID_SEPARATOR),
+    });
+  }
+  return answers;
+}
+
 function seriesResult(
   worklist = makeEmptyPlacementWorklist(),
   outputForm?: OutputForm,
   computedAxes?: MarksComputedAxes,
   answers: SurveyAnswer[] = [],
+  contextTolerance?: MarksContextToleranceDecision,
 ): SurveyPhaseResult {
   return {
     phase: "C",
-    answers,
+    answers: contextTolerance !== undefined ? [...answers, ...contextToleranceAnswers(contextTolerance)] : answers,
+    ...(contextTolerance !== undefined ? { marksContextTolerance: contextTolerance } : {}),
     marksWorklist: worklist,
     ...(outputForm !== undefined ? { marksOutputForm: outputForm } : {}),
     // spec 052 US4: the recorded treatment finally reaches strategy selection.
@@ -232,6 +262,11 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
   const importedOrder = useWorkingCopyStore((s) => s.session.axes.markInputOrder);
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
   const surveyContext = useSurveySessionStore((s) => s.surveyContext);
+  // spec 078: the context-tolerance analysis (published by the compile gate)
+  // and the decision a previous pass through this series recorded.
+  const toleranceEnabled = isContextToleranceEnabled();
+  const tolerance = useWorkingCopyStore((s) => s.contextTolerance);
+  const priorTolerance = useWorkingCopyStore((s) => s.session.marksContextTolerance);
 
   const saveAnswer = useSurveyAnswerStore((s) => s.saveAnswer);
   const setPosition = useSurveyAnswerStore((s) => s.setPosition);
@@ -600,7 +635,68 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
     });
   }
 
-  // --- visible stations, in series order (at most FOUR — FR-018/SC-003) ---
+  // --- context tolerance (spec 078) ---
+  // The station's proposal, built from the latest analysis. `null` when there
+  // is nothing to propose (flag off, no analysis yet, failed, or no fixable
+  // rule; could-not-check items stay in the notice, not here).
+  const toleranceProposal = useMemo(() => {
+    if (!toleranceEnabled || tolerance.status !== "ready" || tolerance.fixableRuleIds.length === 0) return null;
+    const fixable = new Set(tolerance.fixableRuleIds);
+    const addedRuleCount = tolerance.proposal.variants.filter((v) => fixable.has(v.sourceRuleId)).length;
+    return buildContextToleranceProposal({
+      fixableRuleIds: tolerance.fixableRuleIds,
+      findings: tolerance.report.findings,
+      addedRuleCount,
+      siteIds: tolerance.siteKeys,
+      text: {
+        siteFraming: (line, key) =>
+          t({ id: "marks.contextTolerance.station.site.label", message: `The ${key} key (rule on line ${line})` }),
+        description: (added, sites) =>
+          t({
+            id: "marks.contextTolerance.station.description",
+            message: plural(added, {
+              one: `Adds # rule. Afterwards these ${sites} keys give the same result whether the accent is joined to the letter or stored as a separate character.`,
+              other: `Adds # rules. Afterwards these ${sites} keys give the same result whether the accent is joined to the letter or stored as a separate character.`,
+            }),
+          }),
+      },
+    });
+  }, [toleranceEnabled, tolerance, t]);
+  const toleranceDisclosures = useMemo<Record<string, SiteDisclosure>>(() => {
+    if (tolerance.status !== "ready") return {};
+    const byMarker = tolerance.proposal.disclosures ?? {};
+    const out: Record<string, SiteDisclosure> = {};
+    for (const v of tolerance.proposal.variants) {
+      const d = byMarker[v.generatedMarker];
+      if (d === undefined) continue;
+      // Keyed by site id, which is the rule's site key.
+      const acc = (out[tolerance.siteKeys[v.sourceRuleId] ?? v.sourceRuleId] ??= { shadows: [] });
+      for (const sh of d.shadows) {
+        if (!acc.shadows.some((x) => x.ruleId === sh.ruleId && x.relation === sh.relation)) acc.shadows.push(sh);
+      }
+      if (d.unobservable !== undefined) acc.unobservable = d.unobservable;
+      if (d.markOrderNote !== undefined) acc.markOrderNote = d.markOrderNote;
+    }
+    return out;
+  }, [tolerance]);
+  const toleranceRuleLines = useMemo<Record<string, number>>(
+    () =>
+      tolerance.status === "ready"
+        ? Object.fromEntries(tolerance.report.findings.map((f) => [f.ruleId, f.location.line]))
+        : {},
+    [tolerance],
+  );
+  const toleranceFingerprint = tolerance.status === "ready" ? tolerance.fingerprint : undefined;
+  const [toleranceDecision, setToleranceDecision] = useState<ContextToleranceDecisionInput | null>(null);
+  // A decision taken against rules that have since changed no longer applies.
+  useEffect(() => {
+    setToleranceDecision((d) => (d !== null && d.fingerprint !== toleranceFingerprint ? null : d));
+  }, [toleranceFingerprint]);
+  const showToleranceStation =
+    toleranceEnabled && (tolerance.status === "analysing" || toleranceProposal !== null);
+
+  // --- visible stations, in series order (at most FOUR — FR-018/SC-003,
+  // plus spec 078's flag-gated context-tolerance station) ---
   const needsTreatmentScreen = classes.some((c) => classNeedsTreatmentScreen(c, proposals));
   const visibleStations: MarksStationId[] = useMemo(() => {
     const stations: MarksStationId[] = [];
@@ -608,8 +704,9 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
     if (needsTreatmentScreen) stations.push("marks_treatment");
     if (hasDecidablePairs(posture)) stations.push("marks_output_form");
     if (stackingEvidence) stations.push("marks_stacking");
+    if (showToleranceStation) stations.push("marks_context_tolerance");
     return stations;
-  }, [proposals, needsTreatmentScreen, posture, stackingEvidence]);
+  }, [proposals, needsTreatmentScreen, posture, stackingEvidence, showToleranceStation]);
 
   // spec 079 FR-004/FR-023: the author's position inside the series lives in
   // the answer store, not local state — leaving and returning (or an
@@ -761,7 +858,7 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
     }
   }
 
-  function complete(): void {
+  function complete(toleranceOverride?: ContextToleranceDecisionInput): void {
     if (completedRef.current) return;
     completedRef.current = true;
     // Assemble the FR-020 handoff. The stacking answer constrains the stack
@@ -796,7 +893,34 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
     // spec 079 R-04: every station's answers, not only the final one — the
     // decision log already no-ops on an identical repeat.
     const answers = visibleStations.flatMap((stationId) => answersForStation(stationId));
-    onComplete(seriesResult(worklist, outputForm, computedAxes, answers));
+    onComplete(seriesResult(worklist, outputForm, computedAxes, answers, resolvedToleranceDecision(toleranceOverride)));
+  }
+
+  /**
+   * The context-tolerance decision to report (spec 078). A decision taken on
+   * this pass wins. Otherwise a prior decision still valid for the current
+   * rules is carried forward unchanged (keeping its `appliedFingerprint`), so
+   * the phase result keeps it (FR-009). No analysis, or an author who moved
+   * on while it was still running, records nothing.
+   */
+  function resolvedToleranceDecision(
+    override?: ContextToleranceDecisionInput,
+  ): MarksContextToleranceDecision | undefined {
+    if (!toleranceEnabled) return undefined;
+    // The station completes the series in the same event that records its
+    // decision, before the state update lands, so it passes it explicitly.
+    const taken = override ?? toleranceDecision;
+    if (taken !== null) {
+      // Re-confirming the same outcome keeps the prior apply marker.
+      const same =
+        priorTolerance !== undefined &&
+        priorTolerance.fingerprint === taken.fingerprint &&
+        priorTolerance.decision === taken.decision &&
+        priorTolerance.acceptedSiteIds.join(SITE_ID_SEPARATOR) === taken.acceptedSiteIds.join(SITE_ID_SEPARATOR);
+      return same ? priorTolerance : taken;
+    }
+    if (priorTolerance !== undefined && priorTolerance.fingerprint === toleranceFingerprint) return priorTolerance;
+    return undefined;
   }
 
   /**
@@ -907,10 +1031,14 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
           });
         }
         break;
+      case "marks_context_tolerance":
+        // spec 078: the decision rides the phase result (marksContextTolerance
+        // and its answers), recorded with its own provenance at completion.
+        break;
     }
   }
 
-  function handleContinue(): void {
+  function handleContinue(toleranceOverride?: ContextToleranceDecisionInput): void {
     // FR-013: Next is blocked while a flagged EARLIER station is unresolved.
     // Flags on the CURRENT station are resolved by this very Continue
     // (confirmStation below), so they never block it.
@@ -927,7 +1055,7 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
       // Stamp the final station as the position before completing, so the
       // entries step completion records are attributed to it.
       setPosition(STEP_ID, activeStation);
-      complete();
+      complete(toleranceOverride);
     }
   }
 
@@ -997,6 +1125,30 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
         />
       )}
 
+      {activeStation === "marks_context_tolerance" && toleranceProposal === null && (
+        <p data-testid="context-tolerance-checking" style={mutedParaFlush}>
+          <Trans id="marks.contextTolerance.station.checking">
+            Checking whether your keys also work when the letter and its accent are stored as separate characters.
+            You can continue; the result will appear with the other messages.
+          </Trans>
+        </p>
+      )}
+
+      {activeStation === "marks_context_tolerance" && toleranceProposal !== null && toleranceFingerprint !== undefined && (
+        <ContextToleranceStation
+          proposal={toleranceProposal}
+          disclosures={toleranceDisclosures}
+          ruleLines={toleranceRuleLines}
+          fingerprint={toleranceFingerprint}
+          {...(priorTolerance !== undefined ? { prior: priorTolerance } : {})}
+          onDecide={(decision) => {
+            setToleranceDecision(decision);
+            // Confirm (or decline) is the station's last interaction: move on.
+            handleContinue(decision);
+          }}
+        />
+      )}
+
       {activeStation === "marks_stacking" && (
         <StackingStation
           multiMarkStacks={multiMarkStacks}
@@ -1043,7 +1195,7 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
         <button
           type="button"
           data-testid="marks-continue"
-          onClick={handleContinue}
+          onClick={() => handleContinue()}
           disabled={nextGate.blocked}
           style={primaryButton(nextGate.blocked)}
         >

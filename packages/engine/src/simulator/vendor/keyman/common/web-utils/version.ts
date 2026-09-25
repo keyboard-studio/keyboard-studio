@@ -1,5 +1,5 @@
 // @ts-nocheck
-import KEYMAN_VERSION from "@keymanapp/keyman-version";
+import KEYMAN_VERSION from "../../../stubs/keyman-version.js";
 
 // Dotted-decimal version
 export class Version {

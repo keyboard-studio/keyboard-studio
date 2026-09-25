@@ -2,10 +2,10 @@
 /*
  * Keyman is copyright (C) SIL Global. MIT License.
  */
-import { LexicalModelTypes } from '@keymanapp/common-types';
+import { type LexicalModelTypes } from '../../../common/types/main.js';
 import { Transcription } from './transcription.js';
-import { VariableStores } from '../variableStore.js';
-import { SystemStoreDictionary } from '../systemStore.js';
+import { type VariableStores } from '../variableStore.js';
+import { type SystemStoreDictionary } from '../systemStore.js';
 
 /**
  * Represents the commands and state changes that result from a matched keyboard rule.

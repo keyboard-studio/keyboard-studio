@@ -2,9 +2,9 @@
 /*
  * Keyman is copyright (C) SIL Global. MIT License.
  */
-import { DeviceSpec } from 'keyman/common/web-utils';
+import { DeviceSpec } from '../../../common/web-utils/index.js';
 import { ActiveKey, ActiveLayout, ActiveSubKey } from './activeLayout.js';
-import { StateKeyMap } from './stateKeyMap.js';
+import { type StateKeyMap } from './stateKeyMap.js';
 import { KeyEvent } from '../keyEvent.js';
 import { TextStore } from '../textStore.js';
 import { NotifyEventCode } from './keyboardLoaderBase.js';

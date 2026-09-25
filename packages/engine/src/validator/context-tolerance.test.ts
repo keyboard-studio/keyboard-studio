@@ -35,6 +35,7 @@ describe("computeContextTolerance (spec 062, US2)", () => {
     expect(gapFinding).toBeDefined();
     expect(gapFinding?.status).toBe("not-analysed");
     expect(gapFinding?.failingKeystrokes).toEqual([{ vkey: "K_RBRKT", modifiers: [] }]);
+    expect(gapFinding?.precedingText).toBe("à"); // U+00E0, the precomposed candidate that diverged
     expect(gapFinding?.precomposedOutput).toBe("â");
     expect(gapFinding?.decomposedOutput).not.toBe(gapFinding?.precomposedOutput);
     expect(report.findings.length + report.notAnalysedCount).toBe(

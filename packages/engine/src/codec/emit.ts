@@ -120,7 +120,7 @@ function fmtStoreItem(item: StoreItem): string {
 // Rule emitter
 // ---------------------------------------------------------------------------
 
-function emitRule(rule: IRRule, groupUsingKeys: boolean): string {
+export function emitRule(rule: IRRule, groupUsingKeys: boolean): string {
   const ctx = rule.context.map(fmtContextElement).join(" ");
   const out = rule.output.map(fmtOutputElement).join(" ");
 

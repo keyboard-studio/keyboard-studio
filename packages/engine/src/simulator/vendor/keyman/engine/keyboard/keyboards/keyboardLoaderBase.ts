@@ -1,9 +1,9 @@
 // @ts-nocheck
 import { KeyboardHarness } from "./keyboardHarness.js";
 import { KeyboardProperties } from "./keyboardProperties.js";
-import { KeyboardLoadErrorBuilder, StubBasedErrorBuilder, UriBasedErrorBuilder } from './keyboardLoadError.js';
+import { type KeyboardLoadErrorBuilder, StubBasedErrorBuilder, UriBasedErrorBuilder } from './keyboardLoadError.js';
 import { Codes } from '../codes.js';
-import { Keyboard } from './keyboard.js';
+import { type Keyboard } from './keyboard.js';
 
 export enum NotifyEventCode {
   FocusEvent = 0,

@@ -14,7 +14,7 @@ import { parse } from "../../packages/engine/src/codec/parse.js";
 import { compile } from "../../packages/engine/src/compiler/index.js";
 import { stripDanglingAssetStores } from "../../packages/engine/src/compiler/stripDanglingAssetStores.js";
 import { proposeContextVariants } from "../../packages/engine/src/pattern-apply/context-variants.js";
-import { simulate } from "../../packages/engine/src/simulator/index.js";
+import { simulate } from "../../packages/engine/src/simulator/node.js";
 import {
   buildStoreCharIndex,
   computeContextTolerance,

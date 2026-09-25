@@ -3,7 +3,7 @@
  * Keyman is copyright (C) SIL Global. MIT License.
  */
 
-import { LexicalModelTypes } from '@keymanapp/common-types';
+import { type LexicalModelTypes } from '../types/main.js';
 
 // Also relies on string-extensions provided by the web-utils package.
 

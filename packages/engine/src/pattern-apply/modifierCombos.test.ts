@@ -20,8 +20,8 @@ import {
 } from "./modifierCombos.js";
 import type { KeyboardIR, IRGroup, IRRule } from "@keyboard-studio/contracts";
 import { validateWithOracle } from "../validator/oracle.js";
-import { Layouts } from "keyman/engine/keyboard";
-import { ModifierKeyConstants } from "@keymanapp/common-types";
+import { Layouts } from "../simulator/vendor/keyman/engine/keyboard/index.js";
+import { ModifierKeyConstants } from "../simulator/vendor/keyman/common/types/main.js";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers

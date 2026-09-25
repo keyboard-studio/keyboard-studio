@@ -116,6 +116,9 @@ export type WorkingCopySnapshot = Omit<
   | "session"
   | "keyEditOverlay"
   | "touchEditorMode"
+  // Recomputed after every preview compile (spec 078); never stored.
+  | "contextTolerance"
+  | "contextToleranceOverlay"
   | "baseWelcomeImages"
   | "phaseAnswersByStep"
 > & {
@@ -149,6 +152,12 @@ export type WorkingCopySnapshot = Omit<
   keyEditOverlay?: KeyEditOverlay;
   /** Optional for the same reason as `keyEditOverlay` above — see its comment. */
   touchEditorMode?: TouchEditorMode;
+  /**
+   * The applied context-tolerance fix (spec 078). Optional for the same
+   * reason as `keyEditOverlay`: older snapshots have no key, which reads as
+   * "no fix applied".
+   */
+  contextToleranceOverlay?: WorkingCopyData["contextToleranceOverlay"];
   /**
    * Optional (spec 079 D-4): which step recorded which phase answers. A
    * snapshot written before this field existed has none, and the store then
@@ -336,6 +345,7 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     // key at all (R10.3).
     keyEditOverlay: s.keyEditOverlay,
     touchEditorMode: s.touchEditorMode,
+    contextToleranceOverlay: s.contextToleranceOverlay,
     phaseAnswersByStep: s.phaseAnswersByStep,
   };
 }
@@ -417,6 +427,7 @@ export function prepareWorkingCopySnapshot(snapshot: WorkingCopySnapshot): Parti
     // undefined — same idiom as deletedTouchKeyIds/sequenceFlaggedChars above.
     keyEditOverlay: snapshot.keyEditOverlay ?? { ops: [] },
     touchEditorMode: snapshot.touchEditorMode ?? "character",
+    contextToleranceOverlay: snapshot.contextToleranceOverlay ?? null,
     // spec 079 D-4: absent on a pre-079 snapshot. `{}` is safe — the store
     // adopts each phase's stored answers under "legacy" when the sidecar does
     // not describe them.

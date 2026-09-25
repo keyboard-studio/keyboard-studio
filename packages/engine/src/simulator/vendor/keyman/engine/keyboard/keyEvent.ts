@@ -7,7 +7,7 @@
 // a key event.  The most straightforward way to integrate Web OSK events on other platforms is to have
 // other platforms recognize and utilize this type.
 
-import { type DeviceSpec } from "keyman/common/web-utils";
+import { type DeviceSpec } from "../../common/web-utils/index.js";
 
 import { Codes } from './codes.js';
 import { DefaultOutputRules } from "./defaultOutputRules.js";
