@@ -33,10 +33,6 @@ afterEach(() => {
 });
 
 // ---------------------------------------------------------------------------
-// Helper — minimal KeyboardIR-like object
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -732,7 +728,7 @@ describe("persistWorkingCopy", () => {
     function instantiate() {
       useWorkingCopyStore.getState().instantiateFromBase(
         { id: "kbd", displayName: "Kbd", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
-        { vfs: createVirtualFS(), ir: makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR },
+        { vfs: createVirtualFS(), ir: makeScaffoldedIR() },
       );
       const wc = useWorkingCopyStore.getState();
       wc.setBaseReadmeMdText("# Base\n");
@@ -830,7 +826,7 @@ describe("persistWorkingCopy", () => {
     function instantiate() {
       useWorkingCopyStore.getState().instantiateFromBase(
         { id: "kbd", displayName: "Kbd", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
-        { vfs: createVirtualFS(), ir: makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR },
+        { vfs: createVirtualFS(), ir: makeScaffoldedIR() },
       );
     }
 
@@ -864,7 +860,7 @@ describe("persistWorkingCopy", () => {
       useWorkingCopyStore.getState().setChartPreference("keep-base-images");
       useWorkingCopyStore.getState().instantiateFromBase(
         { id: "other", displayName: "Other", languages: [] } as import("@keyboard-studio/contracts").BaseKeyboard,
-        { vfs: createVirtualFS(), ir: makeMinimalIr() as unknown as import("@keyboard-studio/contracts").KeyboardIR },
+        { vfs: createVirtualFS(), ir: makeScaffoldedIR() },
       );
       expect(useWorkingCopyStore.getState().historyEntryState).toBeNull();
       expect(useWorkingCopyStore.getState().chartPreference).toBeNull();
