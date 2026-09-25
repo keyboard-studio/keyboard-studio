@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "Qu Characters Step",
+  "branch": "",
+  "currentStep": "specify",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-24T01:36:37.834Z"
+    }
+  ],
+  "telemetryInstanceId": "ca29bd3a-1a57-4360-9f1e-573653b395e1"
+}

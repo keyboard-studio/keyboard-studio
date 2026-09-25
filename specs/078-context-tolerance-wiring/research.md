@@ -93,7 +93,7 @@ Recorded in 062's tasks.md "Follow-ups" and in code comments:
    end-user-reachable path is tracked as separate follow-up work, not an
    oversight."
 
-## 3. Where the delivered code stops (issue #1756)
+## 3. Where the delivered code stops (issue #1756; tracking epic #1814)
 
 Issue #1756, "feat(studio): wire spec 062 context tolerance to a user-reachable
 path", filed 2026-09-09, verified the gap against `main` at `d663e6ba`. Re-verified

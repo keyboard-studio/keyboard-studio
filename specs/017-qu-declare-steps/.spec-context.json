@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "Qu Declare Steps",
+  "branch": "",
+  "currentStep": "specify",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-24T01:36:10.754Z"
+    }
+  ],
+  "telemetryInstanceId": "ae934c0f-359e-45d3-b965-16109aba82c2"
+}

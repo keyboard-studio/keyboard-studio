@@ -30,18 +30,8 @@ see below.
 ## Commands
 
 Package manager is **pnpm 9**, Node **≥ 22.19.0** (hard floor — an older Node makes `lingui`
-subcommands exit 0 having done nothing). Run from the repo root unless noted.
-
-| Task | Command |
-|------|---------|
-| Install | `pnpm install` |
-| Build everything | `pnpm build` |
-| Typecheck | `pnpm typecheck` |
-| Test everything | `pnpm test` |
-| Lint / format | `pnpm lint` · `pnpm format` |
-| Run the studio SPA | `pnpm dev` |
-| Search the spec corpus | `pnpm run spec-search "<query>"` |
-| One package's tests | `pnpm --filter @keyboard-studio/engine test` |
+subcommands exit 0 having done nothing). Run from the repo root unless noted; scripts are in
+the root `package.json`.
 
 Two things that will bite you:
 
@@ -61,11 +51,8 @@ Full list: [docs/tooling.md](docs/tooling.md#what-pnpm-lint-actually-runs).
 
 ## Repository status
 
-Day-1 contract is locked; the engine and studio are built out. Packages: `contracts` (the
-dependency root — types, service interfaces, criteria catalog, zod schemas), `engine` (codec,
-scaffolder, output, validator, compiler, simulator, recognizer, and more), `keyboard-lint`
-(Layer C), `llm`, `glottolog`, `studio` (React + Vite SPA). Per-package detail:
-[docs/packages.md](docs/packages.md).
+Day-1 contract is locked; the engine and studio are built out. `contracts` is the dependency
+root. Per-package detail: [docs/packages.md](docs/packages.md).
 
 **Check a package's actual exports before referencing it** — some spec targets are not realised
 as written. Notably the `@keymanapp/kmn-validator` package has not been extracted; Layer A/B
@@ -227,7 +214,9 @@ not silently empty the gallery.
 ## KM crew
 
 A specialist pipeline coordinated by **`/km-lead`**. Agent definitions live in
-`.claude/agents/km-*.md`; slash-command entry points in `.claude/commands/km-*.md`. **The full
+`.claude/agents/km-*.md`. The only slash commands are `/km-lead`, `/km-triage`, and
+`/km-archivist` (`.claude/commands/`); the per-role commands are archived under
+`.claude/archive/commands/`. **The full
 roster — who does what, when to invoke each — is
 [.claude/agents/km-README.md](.claude/agents/km-README.md).**
 
@@ -240,10 +229,9 @@ file.
 the **main session's** context; the main session then adopts the lead role, plans the work, and
 spawns all other specialists as Agent subagents. It is not itself a subagent.
 
-Use `/km-lead` when starting any coordinated team task. For brief one-off tasks where the main
-session needs to temporarily act as a single specialist, you may invoke that individual skill —
-but when running a team task through km-lead, **always use the other roles as Agent
-`subagent_type`s, never as skills**.
+Use `/km-lead` when starting any coordinated team task. For brief one-off tasks that need a
+single specialist, spawn that role as an Agent `subagent_type` — the other roles are
+**always** Agent subagents, never skills.
 
 km-lead writes a `dispatch_plan` YAML block before every cycle so the user can see what's about
 to fire, then calls the Agent tool to execute it in the same response. Independent specialists in
