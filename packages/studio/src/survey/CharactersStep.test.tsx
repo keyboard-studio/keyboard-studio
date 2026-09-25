@@ -327,9 +327,9 @@ describe("CharactersStep — Phase B draft alphabet lifecycle (spec 057 FR-007)"
     expect(usePhaseBDraftStore.getState().chars).toEqual(["é", "ŋ", "ɔ"]);
   });
 
-  it("a prefill -> build-list confirm on CHANGED evidence clears it (the intended reset)", () => {
+  it("a prefill -> build-list confirm on CHANGED evidence resets, but carries the author's own picks over (spec 079 US3 T059 — was a full clear before)", () => {
     seedSessionStore(); // substage "prefill"
-    seedAlphabet(["é", "ŋ"]);
+    seedAlphabet(["é", "ŋ"]); // both via add() — author provenance
     // Built for another language: the stamp no longer matches.
     usePhaseBDraftStore.getState().setAlphabetEvidenceKey("xx-Latn|Latn|Latn|basic_kbdus");
 
@@ -338,7 +338,8 @@ describe("CharactersStep — Phase B draft alphabet lifecycle (spec 057 FR-007)"
 
     fireEvent.click(screen.getByTestId("prefill-confirm"));
 
-    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+    // Both fit the new evidence's script (Latn), so neither is flagged.
+    expect(usePhaseBDraftStore.getState().chars).toEqual(["é", "ŋ"]);
   });
 
   it("stepping back to prefill and forward again with UNCHANGED evidence keeps it (spec 079 FR-020 — was a clear before)", () => {
@@ -520,22 +521,96 @@ describe("CharactersStep — prefill routes keep the alphabet (spec 079 US2)", (
     ["script", { identityResult: { ...fakeIdentity, prefill: { ...fakeIdentity.prefill, script: "Cyrl" } } }],
     ["variant", { identityResult: { ...fakeIdentity, targetScriptRaw: "fonipa" } }],
     ["base", { localBase: { ...fakeBase, id: "basic_kbdfr" } }],
-  ])("(T039) a changed %s takes the changed branch: fresh alphabet, old punctuation seeds cleared, new stamp", (_what, patch) => {
+  ])(
+    "(T039/T059) a changed %s takes the changed branch: proposal chars cleared, old punctuation seeds cleared, new stamp, author addition carried over (R-07)",
+    (_what, patch) => {
+      seedSessionStore();
+      useSurveySessionStore.setState({ charactersSubStage: "B" });
+      seedBuiltDraft();
+
+      render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
+      fireEvent.click(screen.getByTestId("phaseB-back"));
+      act(() => useSurveySessionStore.setState(patch));
+      fireEvent.click(screen.getByTestId("prefill-confirm"));
+
+      const s = usePhaseBDraftStore.getState();
+      // The proposal chars ("a", "b") are gone with the reset; the author's own
+      // addition ("ŋ") is carried over regardless of fit (R-07 step 6 — nothing
+      // authored is ever dropped by a shape change).
+      expect(s.chars).toEqual(["ŋ"]);
+      expect(s.provenance["ŋ"]).toBe("author");
+      expect(s.alphabetEvidenceKey).toBeDefined();
+      expect(s.alphabetEvidenceKey).not.toBe(CURRENT_KEY);
+      expect(s.seededProposals).not.toContain("punctuation:tl");
+      // Removals are author decisions, not evidence — they stay sticky.
+      expect(s.rejected).toEqual(["c"]);
+    },
+  );
+});
+
+// ---------------------------------------------------------------------------
+// (i) Spec 079 US3 T047/T059 (FR-015, R-07 steps 1, 6-7) — a script change
+// carries every author addition over: one that still fits the new script is
+// kept with nothing to flag; one that does not is ALSO kept, but recorded as
+// a `characters.addition.<char>` answer stamped to the OLD evidence so
+// `characterFlags.ts`/`FlaggedAnswersList` renders it `reproposed{outside-
+// script}` until the author reconfirms it on a later build-list Done.
+// ---------------------------------------------------------------------------
+
+describe("CharactersStep — script-change carry-over (spec 079 US3 T047/T059)", () => {
+  /** A built alphabet with a removed proposal and a Latin-only author addition. */
+  function seedBuiltDraftWithLatinAddition(): void {
+    const draft = usePhaseBDraftStore.getState();
+    draft.seedProposals(["a", "b", "c"], "cldr", "alphabet:tl");
+    usePhaseBDraftStore.getState().remove("c"); // removing a proposal -> rejected
+    usePhaseBDraftStore.getState().add("ŋ"); // Latin-script author addition
+    usePhaseBDraftStore.getState().setAlphabetEvidenceKey(CURRENT_KEY);
+    useSurveySessionStore.setState({ discoveryMethod: "build-list" });
+  }
+
+  it("keeps an author addition that still fits the new script, unflagged, and re-applies the removal — nothing is dropped", () => {
     seedSessionStore();
     useSurveySessionStore.setState({ charactersSubStage: "B" });
-    seedBuiltDraft();
+    seedBuiltDraftWithLatinAddition();
 
     render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
     fireEvent.click(screen.getByTestId("phaseB-back"));
-    act(() => useSurveySessionStore.setState(patch));
+    // Base changes (still Latin script) — the addition fits.
+    act(() => useSurveySessionStore.setState({ localBase: { ...fakeBase, id: "basic_kbdfr" } }));
     fireEvent.click(screen.getByTestId("prefill-confirm"));
 
     const s = usePhaseBDraftStore.getState();
-    expect(s.chars).toEqual([]);
-    expect(s.alphabetEvidenceKey).toBeDefined();
-    expect(s.alphabetEvidenceKey).not.toBe(CURRENT_KEY);
-    expect(s.seededProposals).not.toContain("punctuation:tl");
-    // Removals are author decisions, not evidence — they stay sticky.
-    expect(s.rejected).toEqual(["c"]);
+    expect(s.chars).toEqual(["ŋ"]);
+    expect(s.rejected).toEqual(["c"]); // the removal survives
+    expect(useSurveyAnswerStore.getState().steps["characters"]?.answers ?? {}).toEqual({});
+  });
+
+  it("keeps an author addition OUTSIDE the new script, flagged outside-script, stamped to the old evidence", () => {
+    seedSessionStore();
+    useSurveySessionStore.setState({ charactersSubStage: "B" });
+    seedBuiltDraftWithLatinAddition();
+
+    render(<CharactersStep onComplete={vi.fn()} onBack={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("phaseB-back"));
+    act(() =>
+      useSurveySessionStore.setState({
+        identityResult: {
+          ...fakeIdentity,
+          bcp47: "tl-Cyrl",
+          prefill: { ...fakeIdentity.prefill, script: "Cyrl" },
+        },
+      }),
+    );
+    fireEvent.click(screen.getByTestId("prefill-confirm"));
+
+    const s = usePhaseBDraftStore.getState();
+    expect(s.chars).toEqual(["ŋ"]); // kept, not dropped
+
+    const answers = useSurveyAnswerStore.getState().steps["characters"]?.answers ?? {};
+    const saved = answers["characters.addition.ŋ"];
+    expect(saved).toBeDefined();
+    expect(saved?.value).toBe("ŋ");
+    expect(saved?.evidenceKey).toBe(CURRENT_KEY); // the OLD (pre-change) key
+    expect(saved?.evidenceKey).not.toBe(s.alphabetEvidenceKey); // != the new key -> reproposed
   });
 });

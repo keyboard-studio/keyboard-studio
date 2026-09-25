@@ -47,6 +47,8 @@ import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
 import { useStepWalkStore } from "../stores/stepWalkStore.ts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
+import { useReproposalNoticeStore } from "../stores/reproposalNoticeStore.ts";
+import { useWorkToDo } from "../hooks/useWorkToDo.ts";
 import { stepPositionIds } from "../lib/stepWalk.ts";
 import { manifest } from "../steps/manifest.ts";
 import { questionRegistry } from "../survey/questions/registry.ts";
@@ -147,6 +149,19 @@ export function StudioFooter() {
     [activeStepId, history, selectedTrack, visited, hasProject, walks],
   );
 
+  // spec 079 R-10/T062: which step's mark(s) show a "work waiting" badge,
+  // and each not-asked step's status (FR-068's "passed — {reason}"). Both
+  // come from the surveyAnswerStore-derived hooks; `decisions/progressDots.ts`
+  // itself stays store-free (the `decisions-layer` boundary), receiving these
+  // as plain data exactly like `record`/`ctx` above.
+  const workToDo = useWorkToDo();
+  const stepStatuses = useMemo(() => {
+    const out: Record<string, (typeof answerSteps)[string]["status"]> = {};
+    for (const [stepId, step] of Object.entries(answerSteps)) out[stepId] = step.status;
+    return out;
+  }, [answerSteps]);
+  const recordedScreenOf = useSurveyAnswerStore((s) => s.recordedScreenOf);
+
   const dots = useMemo(
     () =>
       buildProgressDots({
@@ -155,9 +170,12 @@ export function StudioFooter() {
         i18n,
         stepWalks: walks,
         stepCursors: cursors,
+        recordedScreenOf,
+        workToDo,
+        stepStatuses,
         ...(currentQuestion !== undefined ? { currentQuestion } : {}),
       }),
-    [record, ctx, i18n, walks, cursors, currentQuestion],
+    [record, ctx, i18n, walks, cursors, recordedScreenOf, workToDo, stepStatuses, currentQuestion],
   );
 
   // ---------------------------------------------------------------------------
@@ -166,6 +184,22 @@ export function StudioFooter() {
   // stays exactly where they were; this just says why the click did nothing.
   // ---------------------------------------------------------------------------
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
+
+  // ---------------------------------------------------------------------------
+  // FR-016 non-blocking notice (spec 079 T064, journey-strip-contract.md §9).
+  // Rides the SAME role="status" span as the jump-refusal message above — no
+  // second aria-live region, no new timer. `components/StepHost.tsx` raises
+  // it, pinned to the step the author just landed on; it clears here on the
+  // NEXT navigation away from that step (R-13), never on the transition that
+  // raised it.
+  // ---------------------------------------------------------------------------
+  const noticeMessage = useReproposalNoticeStore((s) => s.message);
+  const noticeStepId = useReproposalNoticeStore((s) => s.stepId);
+  const clearNotice = useReproposalNoticeStore((s) => s.clear);
+  useEffect(() => {
+    if (noticeStepId !== null && noticeStepId !== activeStepId) clearNotice();
+  }, [activeStepId, noticeStepId, clearNotice]);
+  const reproposalNotice = noticeStepId === activeStepId ? noticeMessage : null;
 
   function handleActivate(dot: ProgressDotData): void {
     const outcome = jumpToLocation(dot.location);
@@ -252,6 +286,22 @@ export function StudioFooter() {
       )}
 
       <div
+        // spec 079 T062/T063: keyed on the active step. The two-tier strip
+        // collapses/expands a section's whole set of children every time the
+        // author moves between steps — a heavier structural change than
+        // spec 057's single-tier row ever made (that row only ever APPENDED
+        // dots; nothing changed KIND wholesale for many children at once).
+        // Keying the row on `activeStepId` forces a full remount of every
+        // mark on that transition, which is the one guarantee this feature
+        // actually needs: no mark published while a step was active (and
+        // whose underlying data a NON-active step's own async effects may
+        // still be settling — e.g. a step's walk-publish effect committing
+        // slightly out of step with this row's own re-render) can ever
+        // survive as a stale sibling once the author has moved on. Losing
+        // DOM-node identity (and therefore focus) across an ACTIVE STEP
+        // change is an acceptable trade — the author's focus was already
+        // moving to the new step's own content at that exact moment.
+        key={activeStepId}
         ref={rowRef}
         style={{
           display: "flex",
@@ -283,7 +333,7 @@ export function StudioFooter() {
       </div>
 
       <span role="status" aria-live="polite" style={{ flexShrink: 0, color: CSS_TEXT_MUTED, maxWidth: "25%" }}>
-        {statusMessage}
+        {statusMessage ?? reproposalNotice}
       </span>
     </footer>
   );

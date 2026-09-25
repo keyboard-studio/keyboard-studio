@@ -33,6 +33,7 @@ import {
   marksPromotedKey,
   marksStackingAllowedKey,
   marksStackKey as marksStackEvidenceKey,
+  reconcile,
 } from "../../steps/evidence.ts";
 
 export type MarksStationId =
@@ -56,6 +57,39 @@ export function initialAttachmentChecked(proposals: readonly AttachmentProposal[
     const row: Record<string, boolean> = {};
     for (const [base, state] of Object.entries(proposal.states)) {
       row[base] = state === "attested";
+    }
+    out[proposal.mark] = row;
+  }
+  return out;
+}
+
+/**
+ * S1 attachment checkboxes, RECONCILED against saved answers: per mark, per
+ * offered base, the saved value if its key still matches the current
+ * alphabet, else the proposal's own default (attested = checked). This is
+ * `MarksSeriesStep.tsx`'s actual rendered attachment state — lifted here
+ * (spec 079 US3 parity fix) so `hooks/useWorkToDo.ts`'s badge computation
+ * (which feeds `treatmentPrefills` and therefore the marks_treatment flags)
+ * reads the SAME reconciled view the step renders, not
+ * `initialAttachmentChecked`'s raw proposal default. The two disagreed
+ * whenever the author had overturned an attachment: the step showed the
+ * overturned value, but the hook silently used the original proposal,
+ * so a badge could claim a class needed reconfirming (or not) based on a
+ * fictional attachment state the author had already changed.
+ */
+export function reconciledAttachmentChecked(
+  alphabet: ConfirmedAlphabet,
+  proposals: readonly AttachmentProposal[],
+  savedAnswers: Readonly<Record<string, SavedAnswer>>,
+): AttachmentChecked {
+  const out: AttachmentChecked = {};
+  for (const proposal of proposals) {
+    const row: Record<string, boolean> = {};
+    for (const [base, state] of Object.entries(proposal.states)) {
+      const answerId = `marks_attachment.${proposal.mark}|${base}`;
+      const key = marksAttachmentKey(alphabet, proposal.mark, base);
+      const view = reconcile(savedAnswers[answerId], key, state === "attested");
+      row[base] = view.value;
     }
     out[proposal.mark] = row;
   }

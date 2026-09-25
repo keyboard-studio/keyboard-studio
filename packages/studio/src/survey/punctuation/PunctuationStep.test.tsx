@@ -751,3 +751,99 @@ describe("PunctuationStep — alreadyConfirmed is scoped to the current evidence
     expect(usePhaseBDraftStore.getState().chars).toEqual(expect.arrayContaining(HI_TIER));
   });
 });
+
+// ---------------------------------------------------------------------------
+// spec 079 US3 T048 — a tag change re-proposes a genuinely new candidate
+// while a removal for an unchanged mark survives (FR-052).
+// ---------------------------------------------------------------------------
+
+describe("PunctuationStep — shape change: tag change re-proposes, removals survive (spec 079 US3 T048)", () => {
+  beforeEach(() => {
+    useSurveyAnswerStore.getState().reset();
+    useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: "hi", language_name: "Hindi" });
+  });
+
+  it("a resolved-tag change proposes a new candidate the old tag lacked, while a removed mark stays removed", async () => {
+    mocks.inventory = hindiInventory();
+    const first = render(<PunctuationStep onComplete={vi.fn()} />);
+    await screen.findByTestId("cldr-punctuation-group");
+
+    fireEvent.click(screen.getByRole("button", { name: /Remove !/ }));
+    expect(usePhaseBDraftStore.getState().rejected).toContain("!");
+    first.unmount();
+
+    // A new resolved tag (e.g. a more specific locale) with one candidate
+    // ("…") the original tag never had.
+    mocks.inventory = { ...hindiInventory([...HI_TIER, "…"]), resolvedTag: "hi-IN" };
+    render(<PunctuationStep onComplete={vi.fn()} />);
+
+    await waitFor(() => {
+      expect(usePhaseBDraftStore.getState().seededProposals).toContain("punctuation:hi-IN");
+    });
+    // Genuinely new candidate: proposed.
+    expect(usePhaseBDraftStore.getState().punctuation).toContain("…");
+    // Unchanged mark, never removed: still there.
+    expect(usePhaseBDraftStore.getState().punctuation).toContain("?");
+    // The removal survives — never re-proposed by the new tag.
+    expect(usePhaseBDraftStore.getState().punctuation).not.toContain("!");
+    expect(usePhaseBDraftStore.getState().rejected).toContain("!");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 079 US3 T079/T080 — the confirmed-inventory flag: a stale confirmation
+// (made against different evidence) shows a reason cue and the shared list,
+// clears on the next Done, and the Next gate never blocks a single-screen step.
+// ---------------------------------------------------------------------------
+
+describe("PunctuationStep — flagged stale confirmation (spec 079 US3 T079/T080)", () => {
+  beforeEach(() => {
+    useSurveyAnswerStore.getState().reset();
+    useSurveySessionStore.getState().setSurveyContext({ bcp47_tag: "hi", language_name: "Hindi" });
+  });
+
+  function confirmedFor(key: string | null): void {
+    useWorkingCopyStore.getState().recordPhase({ phase: "C", answers: [], confirmedInventory: ["!"] });
+    useSurveyAnswerStore.getState().saveAnswer("punctuation", "punctuation.inventory", {
+      value: ["!"],
+      answerType: "char-list",
+      origin: "confirmed",
+      stage: "confirmed",
+      evidenceKey: key,
+      screenId: "punctuation",
+    });
+    usePhaseBDraftStore.getState().add("!");
+  }
+
+  it("shows a reason cue and the flagged-answers list when confirmed on other evidence, and Done is not blocked", async () => {
+    confirmedFor("ewo|");
+    mocks.inventory = hindiInventory();
+    render(<PunctuationStep onComplete={vi.fn()} />);
+
+    await screen.findByTestId("cldr-punctuation-group");
+    expect(screen.getByTestId("flagged-answers-list")).toBeTruthy();
+    expect((screen.getByTestId("punctuation-done") as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("clears the flag on the next Done — re-stamped with the current evidence key", async () => {
+    confirmedFor("ewo|");
+    mocks.inventory = hindiInventory();
+    const onComplete = vi.fn();
+    render(<PunctuationStep onComplete={onComplete} />);
+    await screen.findByTestId("cldr-punctuation-group");
+
+    fireEvent.click(screen.getByTestId("punctuation-done"));
+
+    const saved = useSurveyAnswerStore.getState().steps["punctuation"]?.answers["punctuation.inventory"];
+    expect(saved?.evidenceKey).toBe("hi|");
+  });
+
+  it("a confirmation with no recorded key (pre-079) is never flagged", async () => {
+    confirmedFor(null);
+    mocks.inventory = hindiInventory();
+    render(<PunctuationStep onComplete={vi.fn()} />);
+
+    await screen.findByTestId("authored-punctuation-chip");
+    expect(screen.queryByTestId("flagged-answers-list")).toBeNull();
+  });
+});

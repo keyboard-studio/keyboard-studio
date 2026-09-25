@@ -1,11 +1,23 @@
-// progressDots.test — the row derivation matrix (spec 057 T047, T065).
+// progressDots.test — the two-tier row derivation matrix (spec 057 T047,
+// T065; spec 079 journey-strip-contract.md, T053).
+//
+// REWRITE NOTE (T053, per journey-strip-contract.md §10): the pre-079 version
+// of this file asserted a FLAT row — one dot per record entry, active step or
+// not, with no section/question distinction. That shape is no longer what
+// `buildProgressDots` returns: a step the author is NOT currently in now
+// collapses to exactly ONE section mark (journey-strip-contract.md §2), so
+// every assertion that expected several individually-addressable dots for a
+// non-active step (e.g. "one dot per survey-answer entry, in record order",
+// "a revised question ... has exactly one dot", "editor-action entries never
+// earn a dot", "the truncated record" case, "row growth" appending a second
+// completed dot for a non-active step) has been REWRITTEN below to assert the
+// collapsed section mark's `fill` state instead of counting individual dots.
+// Nothing about WHICH steps are collapsed vs. expanded is new test surface —
+// it is exactly journey-strip-contract.md §2's rule, applied to the same
+// fixtures the old flat tests used.
 //
 // Uses the REAL `manifest` array (steps/manifest.ts) rather than a hand-rolled
-// fixture graph: test files are excluded from the depcruise `decisions-layer`
-// boundary (`.dependency-cruiser.cjs`'s exclude pattern), and
-// resolveLocation.test.ts already sets the precedent of importing it directly
-// for the same reason — the fixture stays honest about real step ids/order
-// without this file needing its own second manifest.
+// fixture graph — same precedent as before this rewrite.
 
 import { describe, it, expect } from "vitest";
 import type { DecisionEntry, DecisionRecord } from "@keyboard-studio/contracts";
@@ -13,14 +25,13 @@ import { PRE_IDENTITY_STEP_ID } from "@keyboard-studio/contracts";
 import { manifest } from "../steps/manifest.ts";
 import type { TraversalSnapshot } from "../stores/surveySessionStore.ts";
 import type { ResolveContext } from "../lib/resolveLocation.ts";
+import type { WorkItem } from "../steps/workToDo.ts";
 import { buildProgressDots, type ProgressDot } from "./progressDots.ts";
 
 // ---------------------------------------------------------------------------
 // Fixtures
 // ---------------------------------------------------------------------------
 
-/** A traversal snapshot carrying only what resolveLocation reads — same
- * narrowing idiom resolveLocation.test.ts's own `traversal()` helper uses. */
 function traversal(partial: {
   activeStepId: string;
   history?: readonly string[];
@@ -111,138 +122,120 @@ function currentDot(dots: readonly ProgressDot[]): ProgressDot | undefined {
   return dots.find((d) => d.kind === "current");
 }
 
+function sectionFor(dots: readonly ProgressDot[], stepId: string): ProgressDot | undefined {
+  return dots.find((d) => d.tier === "section" && d.id === stepId);
+}
+
 // ---------------------------------------------------------------------------
-// Completed dots
+// Section marks — one per manifest step, collapsed unless it's the active one
+// (journey-strip-contract.md §2, §4)
 // ---------------------------------------------------------------------------
 
-describe("completed dots — from the decision record", () => {
-  it("one dot per survey-answer entry, in record order", () => {
+describe("section marks — one per non-active manifest step", () => {
+  it("a non-active step's record entries collapse to ONE full section mark", () => {
     const record = recordOf([
       answerEntry("e1", "identity", "il_language_english"),
       answerEntry("e2", "identity", "il_language_autonym"),
     ]);
-    const dots = buildProgressDots({
-      record,
-      ctx: ctxWith(),
-      lookupQuestionLabel: stubLabel,
-    });
-    expect(completedIds(dots)).toEqual(["il_language_english", "il_language_autonym"]);
+    const dots = buildProgressDots({ record, ctx: ctxWith(), lookupQuestionLabel: stubLabel });
+    const identitySections = dots.filter((d) => d.location.step === "identity");
+    expect(identitySections).toHaveLength(1);
+    expect(identitySections[0]).toMatchObject({ tier: "section", fill: "full", kind: "completed" });
   });
 
-  it("a revised question — collapsed by effectiveEntries — has exactly one dot", () => {
+  it("a revised question — collapsed by effectiveEntries upstream — still yields one mark", () => {
     const record = recordOf([
       answerEntry("e1", "identity", "il_language_english"),
-      // e2 supersedes e1: same question, revised once.
       answerEntry("e2", "identity", "il_language_english", "e1"),
     ]);
-    const dots = buildProgressDots({
-      record,
-      ctx: ctxWith(),
-      lookupQuestionLabel: stubLabel,
-    });
-    expect(completedIds(dots)).toEqual(["il_language_english"]);
+    const dots = buildProgressDots({ record, ctx: ctxWith(), lookupQuestionLabel: stubLabel });
+    expect(dots.filter((d) => d.location.step === "identity")).toHaveLength(1);
   });
 
-  it("PRE_IDENTITY_STEP_ID entries produce no dot — there is no step to jump to", () => {
+  it("PRE_IDENTITY_STEP_ID entries contribute nothing — there is no step to jump to", () => {
     const record = recordOf([
       answerEntry("e1", PRE_IDENTITY_STEP_ID, "some_pre_identity_question"),
       answerEntry("e2", "identity", "il_language_english"),
     ]);
-    const dots = buildProgressDots({
-      record,
-      ctx: ctxWith(),
-      lookupQuestionLabel: stubLabel,
-    });
-    expect(completedIds(dots)).toEqual(["il_language_english"]);
+    const dots = buildProgressDots({ record, ctx: ctxWith(), lookupQuestionLabel: stubLabel });
+    expect(dots.some((d) => d.location.step === PRE_IDENTITY_STEP_ID)).toBe(false);
+    expect(sectionFor(dots, "identity")).toMatchObject({ fill: "full" });
   });
 
-  it("editor-action and base-contribution entries never earn a completed dot of their own", () => {
+  it("editor-action entries never earn a mark of their own — the section reflects survey answers only", () => {
     const record = recordOf([
       answerEntry("e1", "identity", "il_language_english"),
       editorEntry("e2", "carve"),
     ]);
-    const dots = buildProgressDots({
-      record,
-      ctx: ctxWith(),
-      lookupQuestionLabel: stubLabel,
-    });
-    expect(completedIds(dots)).toEqual(["il_language_english"]);
+    const dots = buildProgressDots({ record, ctx: ctxWith(), lookupQuestionLabel: stubLabel });
+    // "carve" is ahead of "characters" (the fixture's active step) with no
+    // survey-answer entries of its own: it still gets ONE section mark (every
+    // manifest step does, §2), but as an upcoming stage, not as "completed
+    // because an editor-action happened there".
+    expect(sectionFor(dots, "carve")).toMatchObject({ kind: "upcoming", fill: "none" });
   });
 
-  it("a truncated record yields dots only for the entries that survived — nothing fabricated", () => {
-    // "Truncated" here means exactly what 053 FR-011 means: some entries are
-    // simply absent from `entries`. There is no special-case code for this in
-    // progressDots.ts — the derivation just iterates what's there, which IS
-    // the guarantee (no dot is invented for a missing entry).
+  it("a truncated record yields a section mark only for the step that survived", () => {
     const record = recordOf([answerEntry("e2", "identity", "il_language_autonym")]);
-    const dots = buildProgressDots({
-      record,
-      ctx: ctxWith(),
-      lookupQuestionLabel: stubLabel,
-    });
-    expect(completedIds(dots)).toEqual(["il_language_autonym"]);
+    const dots = buildProgressDots({ record, ctx: ctxWith(), lookupQuestionLabel: stubLabel });
+    expect(sectionFor(dots, "identity")).toMatchObject({ fill: "full" });
   });
 
-  it("label comes from the injected lookup, falling back to the raw id", () => {
+  it("a section mark's label is always the STAGE label, from the injected lookup's fallback chain", () => {
     const record = recordOf([answerEntry("e1", "identity", "il_language_english")]);
-    const dots = buildProgressDots({
-      record,
-      ctx: ctxWith(),
-      lookupQuestionLabel: () => undefined,
-    });
-    expect(dots[0]?.label).toBe("il_language_english");
+    const dots = buildProgressDots({ record, ctx: ctxWith(), lookupQuestionLabel: () => undefined });
+    // stageLabel's own English fallback for "identity" when no i18n is given.
+    expect(sectionFor(dots, "identity")?.label).toBe("Identity");
   });
 
-  it("row growth: reaching an optional question appends its dot, nothing else changes", () => {
-    const before = recordOf([answerEntry("e1", "identity", "il_language_english")]);
-    const after = recordOf([
-      answerEntry("e1", "identity", "il_language_english"),
-      answerEntry("e2", "characters", "some_optional_question"),
-    ]);
-    const ctx = ctxWith();
-    const beforeDots = buildProgressDots({ record: before, ctx, lookupQuestionLabel: stubLabel });
-    const afterDots = buildProgressDots({ record: after, ctx, lookupQuestionLabel: stubLabel });
-    expect(completedIds(beforeDots)).toEqual(["il_language_english"]);
-    expect(completedIds(afterDots)).toEqual(["il_language_english", "some_optional_question"]);
+  it("no section or question mark's label is ever a raw answer id (§4)", () => {
+    const record = recordOf([answerEntry("e1", "identity", "il_language_english")]);
+    const dots = buildProgressDots({ record, ctx: ctxWith(), lookupQuestionLabel: () => undefined });
+    expect(dots.some((d) => d.label === "il_language_english")).toBe(false);
+  });
+
+  it("every manifest step up to and including 'help' earns exactly one mark on this author's path", () => {
+    const dots = buildProgressDots({ record: recordOf([]), ctx: ctxWith(), lookupQuestionLabel: stubLabel });
+    // "adapt" skips project_name (FR-049a) — every OTHER on-path step has a mark.
+    const onPathIds = manifest
+      .filter((s) => s.id !== "project_name" && s.id !== "package")
+      .map((s) => s.id);
+    for (const id of onPathIds) {
+      expect(dots.some((d) => d.id === id || d.location.step === id)).toBe(true);
+    }
+    expect(dots.some((d) => d.id === "project_name")).toBe(false);
   });
 });
 
 // ---------------------------------------------------------------------------
-// Upcoming dots — path-scoping, growth, tail re-projection
+// Upcoming dots — path-scoping, growth, tail re-projection (unchanged
+// semantics, now expressed as section marks)
 // ---------------------------------------------------------------------------
 
-describe("upcoming dots — the projected remaining path", () => {
+describe("upcoming section marks — the projected remaining path", () => {
   it("nothing off-path: the adapt track never shows project_name, greyed out or otherwise", () => {
     const dots = buildProgressDots({
       record: recordOf([]),
       ctx: ctxWith({
-        traversal: traversal({
-          activeStepId: "track",
-          history: ["identity", "choose_base"],
-          selectedTrack: "adapt",
-        }),
+        traversal: traversal({ activeStepId: "track", history: ["identity", "choose_base"], selectedTrack: "adapt" }),
       }),
       lookupQuestionLabel: stubLabel,
     });
-    expect(upcomingIds(dots)).not.toContain("project_name");
+    expect(dots.some((d) => d.id === "project_name")).toBe(false);
   });
 
   it("row growth: project_name appears the instant the track resolves to copy", () => {
     const dots = buildProgressDots({
       record: recordOf([]),
       ctx: ctxWith({
-        traversal: traversal({
-          activeStepId: "track",
-          history: ["identity", "choose_base"],
-          selectedTrack: "copy",
-        }),
+        traversal: traversal({ activeStepId: "track", history: ["identity", "choose_base"], selectedTrack: "copy" }),
       }),
       lookupQuestionLabel: stubLabel,
     });
-    expect(upcomingIds(dots)).toContain("project_name");
+    expect(dots.some((d) => d.id === "project_name")).toBe(true);
   });
 
-  it("the reserved `package` step never earns an upcoming dot", () => {
+  it("the reserved `package` step never earns a mark", () => {
     const dots = buildProgressDots({
       record: recordOf([]),
       ctx: ctxWith({
@@ -254,29 +247,21 @@ describe("upcoming dots — the projected remaining path", () => {
       }),
       lookupQuestionLabel: stubLabel,
     });
-    expect(upcomingIds(dots)).not.toContain("package");
+    expect(dots.some((d) => d.id === "package")).toBe(false);
   });
 
-  it("upcoming dots are in manifest order and carry a beyond-gate resolution", () => {
-    const dots = buildProgressDots({
-      record: recordOf([]),
-      ctx: ctxWith(),
-      lookupQuestionLabel: stubLabel,
-    });
+  it("upcoming sections are in manifest order and carry a beyond-gate resolution", () => {
+    const dots = buildProgressDots({ record: recordOf([]), ctx: ctxWith(), lookupQuestionLabel: stubLabel });
     const upcoming = dots.filter((d) => d.kind === "upcoming");
     expect(upcoming.length).toBeGreaterThan(0);
     for (const dot of upcoming) {
       expect(dot.resolution).toMatchObject({ kind: "degraded", reason: "beyond-gate" });
+      expect(dot.fill).toBe("none");
     }
-    // Manifest order, starting right after "characters" (the fixture's
-    // current position): marks, convenience, carve, mechanisms, ...
     expect(upcoming[0]?.id).toBe("marks");
   });
 
   it("tail re-projection: a bypassed off-spine fork drops out once the current position passes it", () => {
-    // touch_seed_source sits between mechanisms and touch. A walk that goes
-    // straight from mechanisms to touch (bypassing the fork) should not keep
-    // advertising it as upcoming once "touch" is current.
     const dots = buildProgressDots({
       record: recordOf([]),
       ctx: ctxWith({
@@ -288,42 +273,18 @@ describe("upcoming dots — the projected remaining path", () => {
       }),
       lookupQuestionLabel: stubLabel,
     });
-    expect(upcomingIds(dots)).not.toContain("touch_seed_source");
-  });
-
-  it("tail re-projection never removes a completed dot — only the not-yet-reached look-ahead changes", () => {
-    const record = recordOf([
-      answerEntry("e1", "identity", "il_language_english"),
-      answerEntry("e2", "characters", "il_language_autonym"),
-    ]);
-    const dots = buildProgressDots({
-      record,
-      ctx: ctxWith({
-        traversal: traversal({
-          activeStepId: "touch",
-          history: ["identity", "choose_base", "track", "characters", "marks", "convenience", "carve", "mechanisms"],
-          selectedTrack: "adapt",
-        }),
-      }),
-      lookupQuestionLabel: stubLabel,
-    });
-    expect(completedIds(dots)).toEqual(["il_language_english", "il_language_autonym"]);
-    expect(upcomingIds(dots)).not.toContain("touch_seed_source");
+    expect(dots.some((d) => d.id === "touch_seed_source")).toBe(false);
   });
 });
 
 // ---------------------------------------------------------------------------
-// The current dot (US6, T063)
+// The current dot (US6, T063) — unchanged fallback for a step with no screens
 // ---------------------------------------------------------------------------
 
 describe("the current dot", () => {
-  it("is stage-accurate by default — no shared store exposes the live question", () => {
-    const dots = buildProgressDots({
-      record: recordOf([]),
-      ctx: ctxWith(),
-      lookupQuestionLabel: stubLabel,
-    });
-    const current = dots.find((d) => d.kind === "current");
+  it("is stage-accurate by default when the active step publishes no screens", () => {
+    const dots = buildProgressDots({ record: recordOf([]), ctx: ctxWith(), lookupQuestionLabel: stubLabel });
+    const current = currentDot(dots);
     expect(current).toBeDefined();
     expect(current?.id).toBe("characters");
     expect(current?.location).toEqual({ route: "survey", step: "characters" });
@@ -336,7 +297,7 @@ describe("the current dot", () => {
       lookupQuestionLabel: stubLabel,
       currentQuestion: "il_language_english",
     });
-    const current = dots.find((d) => d.kind === "current");
+    const current = currentDot(dots);
     expect(current?.id).toBe("il_language_english");
     expect(current?.label).toBe("label:il_language_english");
   });
@@ -351,27 +312,17 @@ describe("the current dot", () => {
   });
 
   it("resolves reachable — the author IS at the current position by construction", () => {
-    const dots = buildProgressDots({
-      record: recordOf([]),
-      ctx: ctxWith(),
-      lookupQuestionLabel: stubLabel,
-    });
-    const current = dots.find((d) => d.kind === "current");
-    expect(current?.resolution.kind).toBe("reachable");
+    const dots = buildProgressDots({ record: recordOf([]), ctx: ctxWith(), lookupQuestionLabel: stubLabel });
+    expect(currentDot(dots)?.resolution.kind).toBe("reachable");
   });
 });
 
 // ---------------------------------------------------------------------------
-// Within-step walks — one dot per QUESTION / CHARACTER inside a stage
-//
-// The defect: a stage with a dozen internal stops was a single dot, so there was
-// no way back into the middle of it, and the current-position marker went no
-// finer than the stage. See progressDots.ts's header ("THE CURRENT QUESTION
-// ARCHITECTURE GAP — NOW CLOSED") and lib/stepWalk.ts.
+// Within-step walks — the ACTIVE step expands into one question mark per stop
 // ---------------------------------------------------------------------------
 
-describe("within-step walk dots", () => {
-  it("renders one dot per stop instead of a single stage dot for the current step", () => {
+describe("within-step walk dots — the active section's question marks", () => {
+  it("renders one QUESTION mark per stop for the active step, not a single section mark", () => {
     const dots = buildProgressDots({
       record: recordOf([]),
       ctx: ctxWith(),
@@ -385,16 +336,17 @@ describe("within-step walk dots", () => {
       },
       stepCursors: { characters: "some_optional_question" },
     });
-    // The three stops, not one "Characters" dot.
-    expect(completedIds(dots)).toEqual(["il_language_english", "il_language_autonym"]);
+    const characterMarks = dots.filter((d) => d.location.step === "characters");
+    expect(characterMarks.every((d) => d.tier === "question")).toBe(true);
+    expect(completedIds(dots)).toEqual(
+      expect.arrayContaining(["il_language_english", "il_language_autonym"]),
+    );
     expect(currentDot(dots)?.id).toBe("some_optional_question");
-    expect(dots.some((d) => d.id === "characters")).toBe(false);
+    // No section mark for "characters" while it's expanded.
+    expect(dots.some((d) => d.tier === "section" && d.id === "characters")).toBe(false);
   });
 
-  it("an unanswered stop inside a REACHED step is reachable, unlike an upcoming stage", () => {
-    // Both render as the same hollow square (FR-046), but only one of them is a
-    // live jump target — the step is already reached, so its stops are
-    // addressable and activating one must not refuse.
+  it("an unanswered stop inside the ACTIVE (reached) step is reachable, unlike an upcoming section", () => {
     const dots = buildProgressDots({
       record: recordOf([]),
       ctx: ctxWith(),
@@ -409,19 +361,14 @@ describe("within-step walk dots", () => {
     });
     const unanswered = dots.find((d) => d.id === "il_language_english");
     expect(unanswered?.kind).toBe("upcoming");
+    expect(unanswered?.tier).toBe("question");
     expect(unanswered?.resolution.kind).toBe("reachable");
-    // …whereas a stage still ahead refuses, as it always did.
-    const stage = dots.find((d) => d.id === "marks");
-    expect(stage?.resolution).toMatchObject({ kind: "degraded", reason: "beyond-gate" });
+    const section = sectionFor(dots, "marks");
+    expect(section?.resolution).toMatchObject({ kind: "degraded", reason: "beyond-gate" });
   });
 
-  it("a walk does not duplicate the same step's record dot for the same question", () => {
-    // Answers are recorded at step completion, so a REVISITED step has both a
-    // record entry and a live walk for the same question. Only one dot may result.
-    const record = recordOf([
-      answerEntry("e1", "characters", "il_language_english"),
-      answerEntry("e2", "identity", "il_language_autonym"),
-    ]);
+  it("a walk stop and a record entry for the same question do not double up", () => {
+    const record = recordOf([answerEntry("e1", "characters", "il_language_english")]);
     const dots = buildProgressDots({
       record,
       ctx: ctxWith(),
@@ -430,15 +377,37 @@ describe("within-step walk dots", () => {
       stepCursors: { characters: "il_language_english" },
     });
     expect(dots.filter((d) => d.id === "il_language_english")).toHaveLength(1);
-    // The OTHER step's record dot is untouched — suppression is per question.
-    expect(dots.some((d) => d.id === "il_language_autonym")).toBe(true);
+  });
+
+  it("collapses a character walk to ONE section mark for the gallery, even while active", () => {
+    const dots = buildProgressDots({
+      record: recordOf([]),
+      ctx: ctxWith({
+        traversal: traversal({
+          activeStepId: "mechanisms",
+          history: ["identity", "choose_base", "track", "characters", "marks", "convenience", "carve"],
+          selectedTrack: "adapt",
+        }),
+        stepPositions: { mechanisms: ["u00e1", "u00e9", "u00ed"] },
+      }),
+      lookupQuestionLabel: stubLabel,
+      stepWalks: {
+        mechanisms: [
+          { id: "u00e1", label: "á (U+00E1)", done: true },
+          { id: "u00e9", label: "é (U+00E9)", done: false },
+          { id: "u00ed", label: "í (U+00ED)", done: false },
+        ],
+      },
+      stepCursors: { mechanisms: "u00e9" },
+    });
+    const mechanismsDots = dots.filter((d) => d.location.step === "mechanisms");
+    expect(mechanismsDots).toHaveLength(1);
+    expect(mechanismsDots[0]).toMatchObject({ tier: "section", id: "mechanisms", label: "Mechanisms" });
+    expect(mechanismsDots[0]?.location.question).toBeUndefined();
+    expect(currentDot(dots)?.id).toBe("mechanisms");
   });
 
   it("keeps a step's record dots for questions its CURRENT walk does not name", () => {
-    // A stage can be walked by two flows in sequence — `characters` runs PhaseA's
-    // prefill confirmations and then PhaseB — and the second publish REPLACES the
-    // first in the store. Suppressing per step would make the earlier flow's dots
-    // vanish as the author moved forward. Suppression is per question, so they stay.
     const record = recordOf([
       answerEntry("e1", "characters", "il_language_autonym"),
       answerEntry("e2", "characters", "il_language_english"),
@@ -447,20 +416,23 @@ describe("within-step walk dots", () => {
       record,
       ctx: ctxWith(),
       lookupQuestionLabel: stubLabel,
-      // Only the SECOND question is in the live walk.
       stepWalks: { characters: [{ id: "il_language_english", done: true }] },
       stepCursors: { characters: "il_language_english" },
     });
-    expect(dots.filter((d) => d.id === "il_language_autonym")).toHaveLength(1);
+    // The record-derived screen has no `recordedScreenOf` mapping, so its id
+    // is the step's fallback bucket key, not the raw question id (§4) — find
+    // it by its JUMP target (`location.question`, still the real question)
+    // instead of by `id`.
+    const autonymMark = dots.find((d) => d.location.step === "characters" && d.location.question === "il_language_autonym");
+    expect(autonymMark).toBeDefined();
     expect(dots.filter((d) => d.id === "il_language_english")).toHaveLength(1);
-    // Record-then-walk: the earlier flow's question precedes the walk's stops.
-    const ids = dots.map((d) => d.id);
-    expect(ids.indexOf("il_language_autonym")).toBeLessThan(ids.indexOf("il_language_english"));
+    const characterMarks = dots.filter((d) => d.location.step === "characters");
+    expect(characterMarks.findIndex((d) => d === autonymMark)).toBeLessThan(
+      characterMarks.findIndex((d) => d.id === "il_language_english"),
+    );
   });
 
   it("a cursor stored for a step the author is NOT in marks no dot current", () => {
-    // Two "you are here" markers in one row would be worse than none. A stored
-    // cursor for another step describes where a jump WOULD land, not position.
     const dots = buildProgressDots({
       record: recordOf([]),
       ctx: ctxWith(),
@@ -472,156 +444,9 @@ describe("within-step walk dots", () => {
     expect(currentDot(dots)?.id).toBe("characters");
   });
 
-  it("falls back to the stage dot when the active step's walk names no reachable cursor", () => {
-    const dots = buildProgressDots({
-      record: recordOf([]),
-      ctx: ctxWith(),
-      lookupQuestionLabel: stubLabel,
-      stepWalks: { characters: [{ id: "il_language_english", done: true }] },
-      // A cursor naming a stop that is not in the walk.
-      stepCursors: { characters: "some_optional_question" },
-    });
-    expect(currentDot(dots)?.id).toBe("characters");
-  });
-
-  it("collapses a character walk to ONE dot for the gallery, and keeps question stops individual", () => {
-    // Author's call, 2026-08-05: a gallery is one stop in the journey, not one
-    // per letter — each gallery has its own in-page navigation to the character
-    // the author wants, which is what the per-letter dots were duplicating.
-    const dots = buildProgressDots({
-      record: recordOf([]),
-      ctx: ctxWith({
-        traversal: traversal({
-          activeStepId: "mechanisms",
-          history: ["identity", "choose_base", "track", "characters", "marks", "convenience", "carve"],
-          selectedTrack: "adapt",
-        }),
-        // A character has no questionRegistry entry; the walk is what makes it
-        // addressable (see ResolveContext.stepPositions).
-        stepPositions: {
-          mechanisms: ["u00e1", "u00e9", "u00ed"],
-          identity: ["il_language_english"],
-        },
-      }),
-      lookupQuestionLabel: stubLabel,
-      stepWalks: {
-        mechanisms: [
-          { id: "u00e1", label: "á (U+00E1)", done: true },
-          { id: "u00e9", label: "é (U+00E9)", done: false },
-          { id: "u00ed", label: "í (U+00ED)", done: false },
-        ],
-        identity: [{ id: "il_language_english", done: true }],
-      },
-      stepCursors: { mechanisms: "u00e9" },
-    });
-
-    // Exactly one dot for the whole gallery, labelled as the STAGE.
-    const mechanismsDots = dots.filter((d) => d.location.step === "mechanisms");
-    expect(mechanismsDots).toHaveLength(1);
-    expect(mechanismsDots[0]?.id).toBe("mechanisms");
-    expect(mechanismsDots[0]?.label).toBe("Mechanisms");
-    // It addresses the step, not a character inside it — landing there hands
-    // over to the gallery's own navigation.
-    expect(mechanismsDots[0]?.location.question).toBeUndefined();
-    // It is the current position, and it is jumpable.
-    expect(currentDot(dots)?.id).toBe("mechanisms");
-    expect(currentDot(dots)?.resolution.kind).toBe("reachable");
-    // No character token survives anywhere in the row.
-    expect(dots.some((d) => /^u[0-9a-f]{4}/.test(d.id))).toBe(false);
-
-    // A QUESTION walk is untouched — still one dot per question, still labelled
-    // by the resolver.
-    expect(dots.find((d) => d.id === "il_language_english")?.label).toBe(
-      "label:il_language_english",
-    );
-  });
-
-  it("collapses a character walk whose characters are all done to a single completed dot", () => {
-    const dots = buildProgressDots({
-      record: recordOf([]),
-      ctx: ctxWith({
-        traversal: traversal({
-          activeStepId: "help",
-          history: [
-            "identity", "choose_base", "track", "characters",
-            "marks", "convenience", "carve", "mechanisms", "touch",
-          ],
-          selectedTrack: "adapt",
-        }),
-        stepPositions: { mechanisms: ["u00e1", "u00e9"] },
-      }),
-      lookupQuestionLabel: stubLabel,
-      stepWalks: { mechanisms: [{ id: "u00e1", done: true }, { id: "u00e9", done: true }] },
-    });
-    const mechanismsDots = dots.filter((d) => d.location.step === "mechanisms");
-    expect(mechanismsDots).toHaveLength(1);
-    expect(mechanismsDots[0]?.kind).toBe("completed");
-  });
-
-  it("does not collapse a walk that mixes question ids with character tokens", () => {
-    // Not a shape any publisher emits — pinned so a future one that did could
-    // not silently lose its questions to the gallery rule.
-    const dots = buildProgressDots({
-      record: recordOf([]),
-      ctx: ctxWith({
-        traversal: traversal({ activeStepId: "characters", history: ["identity", "choose_base", "track"] }),
-        stepPositions: { characters: ["u00e1", "il_language_english"] },
-      }),
-      lookupQuestionLabel: stubLabel,
-      stepWalks: {
-        characters: [
-          { id: "u00e1", label: "á (U+00E1)", done: true },
-          { id: "il_language_english", done: false },
-        ],
-      },
-      // Cursor on one of the two stops, so the walk marks its own current dot
-      // rather than the step also contributing a stage-granular one.
-      stepCursors: { characters: "il_language_english" },
-    });
-    expect(dots.filter((d) => d.location.step === "characters")).toHaveLength(2);
-  });
-
-  it("orders the row by manifest position, not by which source produced each dot", () => {
-    // The pre-walk implementation concatenated record order, then the current
-    // dot, then the look-ahead. With a stage contributing many dots that
-    // interleaves wrongly — a later stage's recorded answers would sit ahead of
-    // an earlier stage's character stops.
-    const record = recordOf([
-      // Recorded LAST but belongs to a LATER stage than the walk below.
-      answerEntry("e1", "help", "some_optional_question"),
-      answerEntry("e2", "identity", "il_language_english"),
-    ]);
-    const dots = buildProgressDots({
-      record,
-      ctx: ctxWith({
-        traversal: traversal({
-          activeStepId: "mechanisms",
-          history: ["identity", "choose_base", "track", "characters", "marks", "convenience", "carve"],
-          selectedTrack: "adapt",
-        }),
-        stepPositions: { mechanisms: ["u00e1"] },
-      }),
-      lookupQuestionLabel: stubLabel,
-      stepWalks: { mechanisms: [{ id: "u00e1", label: "á", done: false }] },
-      stepCursors: { mechanisms: "u00e1" },
-    });
-    const order = dots.map((d) => d.id);
-    // The gallery's walk is one dot now (id === the step), but the ordering
-    // invariant is the same one: identity's recorded answer sits ahead of the
-    // mechanisms stage, which sits ahead of help's.
-    expect(order.indexOf("il_language_english")).toBeLessThan(order.indexOf("mechanisms"));
-    expect(order.indexOf("mechanisms")).toBeLessThan(order.indexOf("some_optional_question"));
-  });
-
   it("keeps a record dot whose step is not in this build, so its reason still surfaces", () => {
-    // FR-013: a renamed step in a restored draft must be explainable on
-    // activation, not silently dropped from the row.
     const record = recordOf([answerEntry("e1", "retired_step", "il_language_english")]);
-    const dots = buildProgressDots({
-      record,
-      ctx: ctxWith(),
-      lookupQuestionLabel: stubLabel,
-    });
+    const dots = buildProgressDots({ record, ctx: ctxWith(), lookupQuestionLabel: stubLabel });
     const orphan = dots.find((d) => d.location.step === "retired_step");
     expect(orphan).toBeDefined();
     expect(orphan?.resolution).toMatchObject({ reason: "step-not-in-build" });
@@ -629,59 +454,255 @@ describe("within-step walk dots", () => {
 });
 
 // ---------------------------------------------------------------------------
-// il_language_code — the confirmation question now earns its own dot
-// (author's call, 2026-08-05)
+// §4 screen grouping: an Invisibles-style multi-answer Next collapses to ONE
+// question mark, and an entry with no recordedScreenOf mapping falls back to
+// one mark per step.
 // ---------------------------------------------------------------------------
 
-describe("il_language_code — the confirmation question, now earns a dot", () => {
-  it("earns a dot from the decision record", () => {
+describe("screen grouping (§4) — one mark per screen, not per recorded answer", () => {
+  it("several entries sharing a recordedScreenOf mapping collapse to ONE question mark on the active step", () => {
     const record = recordOf([
-      answerEntry("e1", "identity", "il_language_english"),
-      answerEntry("e2", "identity", "il_language_code"),
+      answerEntry("e1", "invisibles", "invisibles.u2068"),
+      answerEntry("e2", "invisibles", "invisibles.u2069"),
+      answerEntry("e3", "invisibles", "invisibles.u200e"),
+    ]);
+    const dots = buildProgressDots({
+      record,
+      ctx: ctxWith({ traversal: traversal({ activeStepId: "invisibles", history: [] }) }),
+      lookupQuestionLabel: () => undefined,
+      recordedScreenOf: { e1: "invisibles-next", e2: "invisibles-next", e3: "invisibles-next" },
+    });
+    const invisiblesMarks = dots.filter((d) => d.location.step === "invisibles");
+    expect(invisiblesMarks).toHaveLength(1);
+    expect(invisiblesMarks[0]?.tier).toBe("question");
+    expect(invisiblesMarks[0]?.label).not.toMatch(/invisibles\.u2068/);
+  });
+
+  it("entries with NO recordedScreenOf mapping fall back to one mark for the step", () => {
+    const record = recordOf([
+      answerEntry("e1", "invisibles", "invisibles.u2068"),
+      answerEntry("e2", "invisibles", "invisibles.u2069"),
+    ]);
+    const dots = buildProgressDots({
+      record,
+      ctx: ctxWith({ traversal: traversal({ activeStepId: "invisibles", history: [] }) }),
+      lookupQuestionLabel: () => undefined,
+      // No recordedScreenOf entry at all — the pre-`screenId` degrade path.
+    });
+    expect(dots.filter((d) => d.location.step === "invisibles")).toHaveLength(1);
+  });
+
+  it("a non-active step's grouped screens still collapse to one section mark, fully filled", () => {
+    const record = recordOf([
+      answerEntry("e1", "invisibles", "invisibles.u2068"),
+      answerEntry("e2", "invisibles", "invisibles.u2069"),
     ]);
     const dots = buildProgressDots({
       record,
       ctx: ctxWith(),
-      lookupQuestionLabel: stubLabel,
+      lookupQuestionLabel: () => undefined,
+      recordedScreenOf: { e1: "invisibles-next", e2: "invisibles-next" },
     });
-    expect(completedIds(dots)).toEqual(["il_language_english", "il_language_code"]);
+    expect(sectionFor(dots, "invisibles")).toMatchObject({ fill: "full" });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §3c badges — from selectWorkToDo() fixtures
+// ---------------------------------------------------------------------------
+
+describe("badges (§3c) — from selectWorkToDo() fixtures", () => {
+  it("a reproposed item lands on the matching QUESTION mark when its step is active", () => {
+    const dots = buildProgressDots({
+      record: recordOf([]),
+      ctx: ctxWith({ traversal: traversal({ activeStepId: "marks", history: [] }) }),
+      lookupQuestionLabel: stubLabel,
+      stepWalks: { marks: [{ id: "ms_series_s1", done: true }, { id: "ms_series_s2", done: false }] },
+      stepCursors: { marks: "ms_series_s2" },
+      workToDo: {
+        marks: [
+          {
+            kind: "reproposed",
+            stepId: "marks",
+            screenId: "ms_series_s1",
+            answerId: "a1",
+            reason: { code: "evidence-added", subject: "x", sourceStepId: "characters" },
+          } satisfies WorkItem,
+        ],
+      },
+    });
+    const s1 = dots.find((d) => d.id === "ms_series_s1");
+    expect(s1?.badge).toEqual(["reproposed"]);
+    const s2 = dots.find((d) => d.id === "ms_series_s2");
+    expect(s2?.badge).toBeUndefined();
   });
 
-  it("earns a dot from a published walk too — both sources", () => {
+  it("a badge on a collapsed (non-active) section shows that SOME question inside has work", () => {
+    const dots = buildProgressDots({
+      record: recordOf([answerEntry("e1", "marks", "ms_series_s1")]),
+      ctx: ctxWith(), // active step: characters
+      lookupQuestionLabel: stubLabel,
+      workToDo: {
+        marks: [
+          {
+            kind: "reproposed",
+            stepId: "marks",
+            screenId: "ms_series_s1",
+            answerId: "a1",
+            reason: { code: "evidence-added", subject: "x", sourceStepId: "characters" },
+          },
+        ],
+      },
+    });
+    expect(sectionFor(dots, "marks")?.badge).toEqual(["reproposed"]);
+  });
+
+  it("an unassigned-mechanisms badge lands on the collapsed gallery mark", () => {
     const dots = buildProgressDots({
       record: recordOf([]),
       ctx: ctxWith({
-        traversal: traversal({ activeStepId: "identity", history: [] }),
+        traversal: traversal({
+          activeStepId: "carve",
+          history: ["identity", "choose_base", "track", "characters", "marks", "convenience"],
+          selectedTrack: "adapt",
+        }),
+        stepPositions: { mechanisms: ["u00e1"] },
       }),
       lookupQuestionLabel: stubLabel,
-      stepWalks: {
-        identity: [
-          { id: "il_language_english", done: true },
-          { id: "il_language_code", done: true },
-        ],
-      },
-      stepCursors: { identity: "il_language_english" },
+      stepWalks: { mechanisms: [{ id: "u00e1", done: false }] },
+      workToDo: { mechanisms: [{ kind: "unassigned", stepId: "mechanisms", count: 3 }] },
     });
-    expect(dots.some((d) => d.id === "il_language_code")).toBe(true);
-    expect(dots.some((d) => d.id === "il_language_english")).toBe(true);
+    const mechanisms = dots.find((d) => d.location.step === "mechanisms");
+    expect(mechanisms?.badge).toEqual(["unassigned"]);
   });
 
-  it("shows il_language_code as current while the author is on it", () => {
+  it("a now-applicable badge on a not-asked step carries the FR-068 passed reason too", () => {
+    const dots = buildProgressDots({
+      record: recordOf([]),
+      ctx: ctxWith(),
+      lookupQuestionLabel: stubLabel,
+      workToDo: { convenience: [{ kind: "now-applicable", stepId: "convenience", reason: { code: "now-applicable", subject: "convenience-no-surplus", sourceStepId: "convenience" } }] },
+      stepStatuses: {
+        convenience: {
+          kind: "not-asked",
+          reason: { code: "convenience-no-surplus" },
+          evidenceKey: "k1",
+        },
+      },
+    });
+    const convenience = sectionFor(dots, "convenience");
+    expect(convenience?.badge).toEqual(["now-applicable"]);
+    expect(convenience?.passedReason).toMatch(/passed/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// §5 jump rules — the collapsed-section EXCEPTION (badged -> earliest work
+// item; unbadged -> the saved position). This is the exact computation
+// `dot.location` carries into `jumpToLocation` — StudioFooter's own click/
+// keyboard handling is identical for every mark regardless of badge (see
+// components/ProgressDot.tsx), so pinning the LOCATION here is what actually
+// proves §5, rather than re-testing generic button activation at the
+// component layer.
+// ---------------------------------------------------------------------------
+
+describe("§5 jump target — badged collapsed section vs. unbadged", () => {
+  it("an UNBADGED collapsed section jumps to the author's saved position, not the step bare", () => {
+    const dots = buildProgressDots({
+      record: recordOf([answerEntry("e1", "marks", "ms_series_s1")]),
+      ctx: ctxWith(), // active step: characters; marks is behind it
+      lookupQuestionLabel: stubLabel,
+      stepCursors: { marks: "ms_series_s2" },
+    });
+    const marks = sectionFor(dots, "marks");
+    expect(marks?.badge).toBeUndefined();
+    expect(marks?.location).toEqual({ route: "survey", step: "marks", question: "ms_series_s2" });
+  });
+
+  it("an unbadged collapsed section with NO saved position jumps to the bare step", () => {
+    const dots = buildProgressDots({
+      record: recordOf([answerEntry("e1", "marks", "ms_series_s1")]),
+      ctx: ctxWith(),
+      lookupQuestionLabel: stubLabel,
+      // No stepCursors entry for "marks" at all.
+    });
+    const marks = sectionFor(dots, "marks");
+    expect(marks?.location).toEqual({ route: "survey", step: "marks" });
+  });
+
+  it("a BADGED collapsed section jumps to the EARLIEST work item's screen — NOT the saved position", () => {
+    const dots = buildProgressDots({
+      record: recordOf([
+        answerEntry("e1", "marks", "ms_series_s1"),
+        answerEntry("e2", "marks", "ms_series_s2"),
+      ]),
+      ctx: ctxWith(),
+      lookupQuestionLabel: stubLabel,
+      // The author's own saved position is s2 (further along than the flagged
+      // s1) — §5 is explicit that a badge is a deliberate EXCEPTION to "jump
+      // to the last position", precisely because the point of the badge is to
+      // surface work the author has not seen yet.
+      stepCursors: { marks: "ms_series_s2" },
+      workToDo: {
+        marks: [
+          {
+            kind: "reproposed",
+            stepId: "marks",
+            screenId: "ms_series_s1",
+            answerId: "a1",
+            reason: { code: "evidence-added", subject: "x", sourceStepId: "characters" },
+          },
+        ],
+      },
+    });
+    const marks = sectionFor(dots, "marks");
+    expect(marks?.badge).toEqual(["reproposed"]);
+    expect(marks?.location).toEqual({ route: "survey", step: "marks", question: "ms_series_s1" });
+  });
+
+  it("a badge with no screen-bearing work item (unassigned mechanisms) still jumps to the gallery step", () => {
     const dots = buildProgressDots({
       record: recordOf([]),
       ctx: ctxWith({
-        traversal: traversal({ activeStepId: "identity", history: [] }),
+        traversal: traversal({
+          activeStepId: "carve",
+          history: ["identity", "choose_base", "track", "characters", "marks", "convenience"],
+          selectedTrack: "adapt",
+        }),
+        stepPositions: { mechanisms: ["u00e1"] },
       }),
       lookupQuestionLabel: stubLabel,
-      stepWalks: {
-        identity: [
-          { id: "il_language_english", done: true },
-          { id: "il_language_code", done: false },
+      stepWalks: { mechanisms: [{ id: "u00e1", done: false }] },
+      workToDo: { mechanisms: [{ kind: "unassigned", stepId: "mechanisms", count: 3 }] },
+    });
+    const mechanisms = dots.find((d) => d.location.step === "mechanisms");
+    expect(mechanisms?.badge).toEqual(["unassigned"]);
+    expect(mechanisms?.location).toEqual({ route: "survey", step: "mechanisms" });
+  });
+
+  it("a question mark's own jump target never changes because of its badge (§5 row 2)", () => {
+    const dots = buildProgressDots({
+      record: recordOf([]),
+      ctx: ctxWith({ traversal: traversal({ activeStepId: "marks", history: [] }) }),
+      lookupQuestionLabel: stubLabel,
+      stepWalks: { marks: [{ id: "ms_series_s1", done: true }, { id: "ms_series_s2", done: false }] },
+      stepCursors: { marks: "ms_series_s2" },
+      workToDo: {
+        marks: [
+          {
+            kind: "reproposed",
+            stepId: "marks",
+            screenId: "ms_series_s1",
+            answerId: "a1",
+            reason: { code: "evidence-added", subject: "x", sourceStepId: "characters" },
+          },
         ],
       },
-      stepCursors: { identity: "il_language_code" },
     });
-    expect(currentDot(dots)?.id).toBe("il_language_code");
+    const badged = dots.find((d) => d.id === "ms_series_s1");
+    const unbadged = dots.find((d) => d.id === "ms_series_s2");
+    expect(badged?.location).toEqual({ route: "survey", step: "marks", question: "ms_series_s1" });
+    expect(unbadged?.location).toEqual({ route: "survey", step: "marks", question: "ms_series_s2" });
   });
 });
 
@@ -690,14 +711,12 @@ describe("il_language_code — the confirmation question, now earns a dot", () =
 // ---------------------------------------------------------------------------
 
 describe("jumping back (T065, FR-063)", () => {
-  it("the marker moves, and the dots ahead of the landing point are still present", () => {
+  it("the marker moves, and the sections ahead of the landing point are still present and full", () => {
     const record = recordOf([
       answerEntry("e1", "identity", "il_language_english"),
       answerEntry("e2", "characters", "il_language_autonym"),
     ]);
 
-    // Before the jump: the author is on "touch"; everything between
-    // "characters" and "touch" is in history (already walked).
     const before = buildProgressDots({
       record,
       ctx: ctxWith({
@@ -709,14 +728,9 @@ describe("jumping back (T065, FR-063)", () => {
       }),
       lookupQuestionLabel: stubLabel,
     });
-    expect(before.find((d) => d.kind === "current")?.id).toBe("touch");
-    expect(upcomingIds(before)).not.toContain("marks");
-    expect(upcomingIds(before)).not.toContain("carve");
+    expect(currentDot(before)?.id).toBe("touch");
+    expect(sectionFor(before, "marks")).toMatchObject({ fill: "full" });
 
-    // jumpToStep truncates `history` back to before the landing point
-    // (surveySessionStore.ts's own jumpToStep docstring) — simulated here by
-    // constructing the POST-jump traversal directly, the same shape
-    // jumpToLocation.ts would leave behind.
     const after = buildProgressDots({
       record,
       ctx: ctxWith({
@@ -729,16 +743,11 @@ describe("jumping back (T065, FR-063)", () => {
       lookupQuestionLabel: stubLabel,
     });
 
-    // The marker moved back to "characters".
-    expect(after.find((d) => d.kind === "current")?.id).toBe("characters");
-    // The stages that used to be "reached" (behind the OLD position) are
-    // ahead again — dots ahead of the landing point are still present.
+    expect(currentDot(after)?.location.step).toBe("characters");
     expect(upcomingIds(after)).toEqual(
       expect.arrayContaining(["marks", "convenience", "carve", "mechanisms"]),
     );
-    // The completed QUESTION dots (from the record, never from history) are
-    // untouched by the jump — this is what FR-063 actually protects.
-    expect(completedIds(after)).toEqual(completedIds(before));
-    expect(completedIds(after)).toEqual(["il_language_english", "il_language_autonym"]);
+    // identity's own answer, recorded and behind the new position, is untouched.
+    expect(sectionFor(after, "identity")).toMatchObject({ fill: "full" });
   });
 });

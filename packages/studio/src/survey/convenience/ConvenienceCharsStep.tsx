@@ -25,6 +25,14 @@
 // manifest reducer path (StepHost.handleComplete -> recordPhase) owns the
 // session merge. The carve gallery then unions the merged list into its
 // needed-set (see CarveGalleryV2's retainedSet).
+//
+// spec 079 US3 (T079/T080): this step never shows a `reproposed` "needs
+// reconfirming" flag — see `./convenienceFlags.ts` for why (in short: a
+// per-candidate `offeredKey` is either the SAME "offered" key or `null`,
+// never a stale one, so there is nothing for `reconcile()` to classify as
+// `reproposed`). The `not-asked` -> `applies` transition (FR-067) is a
+// DIFFERENT, already-wired signal (`hooks/useWorkToDo.ts`'s `notAsked` map),
+// not a per-answer flag.
 
 import { useEffect, useMemo, useRef, type ComponentType } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";

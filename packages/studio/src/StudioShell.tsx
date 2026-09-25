@@ -1770,6 +1770,17 @@ export function StudioShell() {
   // ---------------------------------------------------------------------------
   const decisionRecord = useDecisionLogStore((s) => s.record);
   const decisionDroppedCount = useDecisionLogStore((s) => s.droppedCount);
+  // spec 079 FR-068 (T065): each step's current `StepStatus`, read here (the
+  // `decisions-layer` depcruise rule forbids `decisions/ -> stores/`) and
+  // passed down so a `not-asked` step's stage group can read "passed —
+  // {reason}" instead of either rendering nothing or a fabricated answer —
+  // same store-boundary pattern as `decisionRecord`/`resolveCtx` above.
+  const trailAnswerSteps = useSurveyAnswerStore((s) => s.steps);
+  const trailStepStatuses = useMemo(() => {
+    const out: Record<string, (typeof trailAnswerSteps)[string]["status"]> = {};
+    for (const [stepId, step] of Object.entries(trailAnswerSteps)) out[stepId] = step.status;
+    return out;
+  }, [trailAnswerSteps]);
   const impactDeps = useMemo(
     () => ({
       getWorkingIR: () => useWorkingCopyStore.getState().ir,
@@ -1907,6 +1918,7 @@ export function StudioShell() {
           // is possible. Read at render time — a pure, store-free computation
           // that resolves no impact (FR-036 is about impact, not location).
           resolveCtx={liveResolveContext()}
+          stepStatuses={trailStepStatuses}
         />
       );
       break;

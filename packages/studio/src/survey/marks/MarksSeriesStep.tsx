@@ -90,7 +90,7 @@ import {
   marksPromotedKey,
   marksStackingAllowedKey,
 } from "../../steps/evidence.ts";
-import { deriveMarksFlags, type FlaggedMarksAnswer, type MarksStationId } from "./marksViews.ts";
+import { deriveMarksFlags, reconciledAttachmentChecked, type FlaggedMarksAnswer, type MarksStationId } from "./marksViews.ts";
 import { reproposalCueMessage } from "../reproposalReason.ts";
 import { FlaggedAnswersList } from "../../components/FlaggedAnswersList.tsx";
 import { useFlaggedNextGate } from "../../hooks/useFlaggedNextGate.ts";
@@ -289,20 +289,13 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
 
   // --- S1 attachment: derived from the store via reconcile(), never useState ---
 
-  const attachmentChecked: AttachmentChecked = useMemo(() => {
-    const out: AttachmentChecked = {};
-    for (const proposal of proposals) {
-      const row: Record<string, boolean> = {};
-      for (const [base, state] of Object.entries(proposal.states)) {
-        const answerId = `marks_attachment.${proposal.mark}|${base}`;
-        const key = marksAttachmentKey(gate.alphabet, proposal.mark, base);
-        const view = reconcile(savedAnswers[answerId], key, state === "attested");
-        row[base] = view.value;
-      }
-      out[proposal.mark] = row;
-    }
-    return out;
-  }, [proposals, savedAnswers, gate.alphabet]);
+  // spec 079 US3 parity fix: this is the SAME `reconciledAttachmentChecked`
+  // `hooks/useWorkToDo.ts` calls for the badge computation, so the two can
+  // never disagree about which attachments are actually checked.
+  const attachmentChecked: AttachmentChecked = useMemo(
+    () => reconciledAttachmentChecked(gate.alphabet, proposals, savedAnswers),
+    [proposals, savedAnswers, gate.alphabet],
+  );
 
   // The case-expanded attachment map is what "reachable" means downstream: US1
   // asked only about lowercase bases, so every checked cased base additively

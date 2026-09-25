@@ -13,6 +13,7 @@
 
 import type { ConfirmedAlphabet } from "@keyboard-studio/contracts";
 import { confirmedAlphabetKey } from "@keyboard-studio/contracts";
+import { scriptOf, scriptExtensionsOf } from "@keyboard-studio/engine";
 import type {
   AnswerView,
   EvidenceKey,
@@ -47,6 +48,33 @@ export function alphabetKey(e: AlphabetEvidence): EvidenceKey {
  * confirm and the pre-079 draft restore so the two can never disagree.
  * Structural parameter types: steps/ may not import survey/ or stores/.
  */
+/** Script codes that never disqualify a character from a target script —
+ * common (digits/punctuation), inherited (combining marks), unknown and
+ * "no script needed" all ride along with whatever base they attach to. */
+const SCRIPT_NEUTRAL = new Set(["Zyyy", "Zinh", "Zzzz", "Zxxx"]);
+
+function codepointFitsScript(cp: number, targetScript: string): boolean {
+  const extensions = scriptExtensionsOf(cp);
+  if (extensions !== undefined) return extensions.includes(targetScript);
+  const primary = scriptOf(cp);
+  return SCRIPT_NEUTRAL.has(primary) || primary === targetScript;
+}
+
+/**
+ * Whether every codepoint of `grapheme` belongs to (or rides neutrally with)
+ * `targetScript` — an ISO 15924 short code, e.g. `identity.prefill.script`
+ * (spec 079 T059/FR-015). Used to classify a carried-over author addition
+ * after a script change as kept-and-current vs. kept-and-flagged
+ * (`outside-script`); it is never used to block the add itself — R-07 keeps
+ * every author addition, fitting or not.
+ */
+export function graphemeFitsScript(grapheme: string, targetScript: string): boolean {
+  return [...grapheme].every((ch) => {
+    const cp = ch.codePointAt(0);
+    return cp === undefined ? true : codepointFitsScript(cp, targetScript);
+  });
+}
+
 export function alphabetKeyOf(
   identity: { bcp47: string; targetScriptRaw: string; prefill: { script: string } },
   base: { id: string },

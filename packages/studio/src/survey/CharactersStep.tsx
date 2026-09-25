@@ -15,13 +15,15 @@
 import { useEffect, useRef, type ComponentType } from "react";
 import type { SurveyPhaseResult } from "@keyboard-studio/contracts";
 import type { EditorStepProps } from "../steps/types.ts";
-import { alphabetKeyOf } from "../steps/evidence.ts";
+import { alphabetKeyOf, graphemeFitsScript } from "../steps/evidence.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore, draftConfirmedAlphabet } from "../stores/phaseBDraftStore.ts";
 import type { IdentityLiteResult } from "./identityLiteResult.ts";
 import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
-import { peekStepCursor } from "../stores/stepWalkStore.ts";
+import { useStepWalkStore, peekStepCursor } from "../stores/stepWalkStore.ts";
+import type { StepWalkPositions } from "../lib/stepWalk.ts";
+import { ADDITION_ANSWER_PREFIX } from "./characterFlags.ts";
 import { useValidatorFindings } from "../hooks/useValidatorFindings.ts";
 import { Prefill, PhaseB } from "./index.ts";
 
@@ -67,14 +69,45 @@ const PUNCTUATION_SEED_PREFIXES = ["punctuation:", "punctuation-base:"] as const
  *   cleared the stamp but not the previous project's draft — so it resets
  *   too. A draft saved before spec 079 is stamped on restore instead
  *   (lib/draftPersistence.ts `loadDraft`), so it is never mistaken for one.
+ *
+ * A REAL change is a carry-over reset (spec 079 US3 T059, R-07 steps 1-7),
+ * so nothing the author already decided is silently dropped:
+ *   1. snapshot the author's own additions (provenance "author") before
+ *      `reset()` wipes `picks`/`provenance` — proposal-origin characters are
+ *      re-seeded by the normal proposal path (IntroChooser / seedProposals),
+ *      not carried here;
+ *   2-3. reset, then clear the punctuation seed keys tied to the old
+ *      evidence (unchanged from before this task);
+ *   4. re-seeding for the NEW evidence happens the normal way once PhaseB
+ *      re-renders against the fresh (empty) draft;
+ *   5. `rejected` is untouched by `reset()` (phaseBDraftStore.ts), so a
+ *      removal the author made of a PROPOSED character is re-applied for
+ *      free — nothing here needs to replay it;
+ *   6-7. every author addition is re-added regardless of fit (`draft.add`
+ *      never drops one); an addition whose codepoints no longer belong to
+ *      the new target script is ALSO saved as a `characters.addition.<ch>`
+ *      answer stamped with the OLD key, so `reconcile()`/`characterFlags.ts`
+ *      renders it `reproposed{outside-script}` until the author reconfirms
+ *      or removes it (T080).
  */
 function confirmPrefill(identity: IdentityLiteResult, base: BaseKeyboard): void {
   const draft = usePhaseBDraftStore.getState();
   const key = alphabetKeyOf(identity, base);
-  const stamp = draft.alphabetEvidenceKey;
-  if (draft.chars.length > 0 && stamp === key) return;
+  const oldKey = draft.alphabetEvidenceKey;
+  if (draft.chars.length > 0 && oldKey === key) return;
+
+  // A real shape change only when there was a built alphabet to carry over —
+  // a first build (no stamp yet) or an already-empty draft has nothing to
+  // snapshot.
+  const authorAdditions =
+    oldKey !== undefined && draft.chars.length > 0
+      ? Object.entries(draft.provenance)
+          .filter(([, origin]) => origin === "author")
+          .map(([grapheme]) => grapheme)
+      : [];
+
   draft.reset();
-  if (stamp !== undefined) {
+  if (oldKey !== undefined) {
     usePhaseBDraftStore.setState({
       seededProposals: usePhaseBDraftStore
         .getState()
@@ -82,6 +115,23 @@ function confirmPrefill(identity: IdentityLiteResult, base: BaseKeyboard): void 
     });
   }
   usePhaseBDraftStore.getState().setAlphabetEvidenceKey(key);
+
+  if (authorAdditions.length === 0) return;
+  const targetScript = identity.prefill.script;
+  const saveAnswer = useSurveyAnswerStore.getState().saveAnswer;
+  for (const grapheme of authorAdditions) {
+    usePhaseBDraftStore.getState().add(grapheme);
+    if (!graphemeFitsScript(grapheme, targetScript)) {
+      saveAnswer(CHARACTERS_STEP_ID, `${ADDITION_ANSWER_PREFIX}${grapheme}`, {
+        value: grapheme,
+        answerType: "char-list",
+        origin: "confirmed",
+        stage: "confirmed",
+        evidenceKey: oldKey ?? null,
+        screenId: "build-list",
+      });
+    }
+  }
 }
 
 /**
@@ -149,6 +199,25 @@ const CharactersStep: ComponentType<EditorStepProps> = ({
     if (discoveryMethod === "manual") return;
     setPosition(CHARACTERS_STEP_ID, discoveryMethod === null ? "intro" : discoveryMethod);
   }, [charactersSubStage, discoveryMethod, setPosition]);
+
+  // R-11/T061: publish this step's coarse screens as its walk, so the footer
+  // gets a question mark per screen the way marks' stations do. While
+  // discoveryMethod === "manual" nothing is published here — SurveyRunner
+  // publishes the finer per-question walk for that sub-flow under this same
+  // step id, and a second publisher here would race it.
+  const publishStepWalk = useStepWalkStore((s) => s.publishStepWalk);
+  useEffect(() => {
+    if (discoveryMethod === "manual") return;
+    const stops: StepWalkPositions =
+      charactersSubStage === "prefill"
+        ? [{ id: "prefill", done: false }]
+        : [
+            { id: "prefill", done: true },
+            { id: "intro", done: discoveryMethod !== null },
+            ...(discoveryMethod === "build-list" ? [{ id: "build-list", done: false }] : []),
+          ];
+    publishStepWalk(CHARACTERS_STEP_ID, stops);
+  }, [publishStepWalk, charactersSubStage, discoveryMethod]);
 
   // Guard: prefill requires both identity and base (unreachable once the step
   // is properly entered, but matches today's null fallback).

@@ -31,7 +31,12 @@ import type { SurveyContext, FlowDef } from "./types.ts";
 import { buildPlacementSeeds } from "./placementSeeds.ts";
 import { useSurveySessionStore, type DiscoveryMethod } from "../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../stores/phaseBDraftStore.ts";
+import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import { useRecordQuestionAnswers } from "../lib/questionRecorder.ts";
+import { useFlaggedNextGate } from "../hooks/useFlaggedNextGate.ts";
+import { deriveCharacterFlags, ADDITION_ANSWER_PREFIX, CHARACTERS_BUILD_LIST_SCREEN_ID } from "./characterFlags.ts";
+import { reproposalCueMessage } from "./reproposalReason.ts";
+import { FlaggedAnswersList } from "../components/FlaggedAnswersList.tsx";
 import { useGlyphFontStack } from "./useGlyphFontStack.ts";
 import {
   nfcDedup,
@@ -719,7 +724,7 @@ interface BuildListViewProps {
 }
 
 function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const chars = usePhaseBDraftStore((s) => s.chars);
   const setAll = usePhaseBDraftStore((s) => s.setAll);
   const selectedFont = usePhaseBDraftStore((s) => s.selectedFont);
@@ -727,7 +732,36 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
   const provenance = usePhaseBDraftStore((s) => s.provenance);
   const exemplarDigraphs = usePhaseBDraftStore((s) => s.exemplarDigraphs);
   const removeChar = usePhaseBDraftStore((s) => s.remove);
-  const doneDisabled = chars.length === 0;
+  const alphabetEvidenceKey = usePhaseBDraftStore((s) => s.alphabetEvidenceKey);
+
+  // spec 079 US3 T059/T080: carried-over additions that landed outside the
+  // new script after a shape change, flagged until reconfirmed. Same
+  // derivation `hooks/useWorkToDo.ts` reads for the journey-strip badge
+  // (survey/characterFlags.ts), so the in-page cue and the badge can never
+  // disagree.
+  const charactersAnswers = useSurveyAnswerStore((s) => s.steps.characters?.answers);
+  const saveCharacterAnswer = useSurveyAnswerStore((s) => s.saveAnswer);
+  const flaggedAnswers = useMemo(
+    () => deriveCharacterFlags(charactersAnswers ?? {}, alphabetEvidenceKey ?? ""),
+    [charactersAnswers, alphabetEvidenceKey],
+  );
+  const flaggedWorkItems = useMemo(
+    () =>
+      flaggedAnswers.map((f) => ({
+        kind: "reproposed" as const,
+        stepId: "characters",
+        screenId: f.screenId,
+        answerId: f.answerId,
+        reason: f.reason,
+      })),
+    [flaggedAnswers],
+  );
+  // Build-list is a single screen, so nothing ever precedes it — the shared
+  // gate never blocks Done here; it is still used (rather than a bespoke
+  // check) so there is exactly one gate implementation across every step
+  // that surfaces flags (T080).
+  const nextGate = useFlaggedNextGate(flaggedWorkItems, [CHARACTERS_BUILD_LIST_SCREEN_ID], CHARACTERS_BUILD_LIST_SCREEN_ID);
+  const doneDisabled = chars.length === 0 || nextGate.blocked;
 
   // Chip removal goes through the store's per-character remove(), not setAll,
   // so removing a PROPOSED character is recorded as a rejection and never
@@ -859,6 +893,19 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
       {/* The character grid has moved to the right pane —
           see CharacterMapPane.tsx, rendered by StudioShell's SurveyView. */}
 
+      {/* spec 079 US3 T080: flagged carried-over additions, with a cue per
+          item plus the shared jump list. */}
+      {flaggedAnswers.length > 0 && (
+        <div role="status" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {flaggedAnswers.map((f) => (
+            <p key={f.answerId} style={{ margin: 0, fontSize: 13, color: ERROR_RED }}>
+              {reproposalCueMessage(f.reason, i18n)}
+            </p>
+          ))}
+          <FlaggedAnswersList stepId="characters" items={flaggedWorkItems} />
+        </div>
+      )}
+
       {/* Footer: Done */}
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <button
@@ -866,6 +913,21 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
           data-testid="phase-b-done"
           disabled={doneDisabled}
           onClick={() => {
+            // spec 079 US3 T080/FR-041: re-stamp every flagged addition with
+            // the CURRENT evidence key on Done — the author has seen the
+            // alphabet (and this cue) in full, so this is the confirm/keep
+            // action that clears the flag, mirroring marks' station Next.
+            for (const f of flaggedAnswers) {
+              const grapheme = f.answerId.slice(ADDITION_ANSWER_PREFIX.length);
+              saveCharacterAnswer("characters", f.answerId, {
+                value: grapheme,
+                answerType: "char-list",
+                origin: "confirmed",
+                stage: "confirmed",
+                evidenceKey: alphabetEvidenceKey ?? null,
+                screenId: CHARACTERS_BUILD_LIST_SCREEN_ID,
+              });
+            }
             // Record both cases (spec 047 FR-009): augment the captured
             // inventory with each cased letter's locale-correct counterpart via
             // the engine's caseCounterpart, deduped. A null counterpart

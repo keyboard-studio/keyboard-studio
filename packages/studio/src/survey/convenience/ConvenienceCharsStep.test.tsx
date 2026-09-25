@@ -351,3 +351,44 @@ describe("ConvenienceCharsStep — the question", () => {
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+// spec 079 US3 T048/T079 — a shape change (a new surplus letter appears)
+// proposes it pre-checked while an earlier un-tick survives; there is
+// structurally no `reproposed` flag to show (see ./convenienceFlags.ts).
+// ---------------------------------------------------------------------------
+
+describe("ConvenienceCharsStep — shape change: new surplus proposed, un-ticks kept, no flags (spec 079 US3 T048/T079)", () => {
+  it("a newly-surplus letter is proposed pre-checked while an earlier un-tick survives", async () => {
+    seedWorkingCopy(["a", "A", "q", "Q"], ["a"]); // one surplus pair initially
+    const first = render(<ConvenienceCharsStep onComplete={vi.fn()} />);
+    await screen.findByTestId("convenience-chars");
+    fireEvent.click(screen.getByLabelText("Keep q Q"));
+    expect((screen.getByLabelText("Keep q Q") as HTMLInputElement).checked).toBe(false);
+    first.unmount();
+
+    // Shape change: the base now also has an 'x'/'X' surplus pair.
+    seedWorkingCopy(["a", "A", "q", "Q", "x", "X"], ["a"]);
+    render(<ConvenienceCharsStep onComplete={vi.fn()} />);
+    await screen.findByTestId("convenience-chars");
+
+    // Existing un-tick survives.
+    expect((screen.getByLabelText("Keep q Q") as HTMLInputElement).checked).toBe(false);
+    // New candidate proposed, checked by default (defaults are the product).
+    expect((screen.getByLabelText("Keep x X") as HTMLInputElement).checked).toBe(true);
+  });
+
+  it("never shows a flagged-answers list — there is no `reproposed` state for this step's per-answer design", async () => {
+    seedWorkingCopy(["a", "A", "q", "Q"], ["a"]);
+    const first = render(<ConvenienceCharsStep onComplete={vi.fn()} />);
+    await screen.findByTestId("convenience-chars");
+    fireEvent.click(screen.getByLabelText("Keep q Q"));
+    first.unmount();
+
+    seedWorkingCopy(["a", "A", "q", "Q", "x", "X"], ["a"]);
+    render(<ConvenienceCharsStep onComplete={vi.fn()} />);
+    await screen.findByTestId("convenience-chars");
+
+    expect(screen.queryByTestId("flagged-answers-list")).toBeNull();
+  });
+});

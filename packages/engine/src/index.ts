@@ -630,5 +630,7 @@ export {
   getEffectiveFacet,
   setFacetOverride,
   clearFacetOverride,
+  scriptOf,
+  scriptExtensionsOf,
 } from "./facets/index.js";
 export type { InventoryDelta } from "./inventory/computeInventoryDelta.js";

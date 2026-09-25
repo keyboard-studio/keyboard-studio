@@ -91,3 +91,43 @@ export function selectWorkToDo(input: WorkToDoInput): Record<StepId, WorkItem[]>
 
   return out;
 }
+
+/** A stable identity for one `WorkItem`, for delta comparison — never persisted. */
+function workItemKey(item: WorkItem): string {
+  switch (item.kind) {
+    case "reproposed":
+      return `reproposed:${item.stepId}:${item.screenId}:${item.answerId}`;
+    case "unassigned":
+      return `unassigned:${item.stepId}:${item.count}`;
+    case "now-applicable":
+      return `now-applicable:${item.stepId}`;
+    default: {
+      const _exhaustive: never = item;
+      return _exhaustive;
+    }
+  }
+}
+
+/**
+ * The `WorkItem`s present in `after` but not in `before` (spec 079 FR-016,
+ * R-13). Pure — the FR-016 notice's "compute before and after the commit"
+ * requirement, without either snapshot needing to be a store read itself
+ * (both are `selectWorkToDo()`/`useWorkToDo()` outputs handed in already
+ * computed, per this module's own header).
+ */
+export function diffWorkToDo(
+  before: Readonly<Record<StepId, WorkItem[]>>,
+  after: Readonly<Record<StepId, WorkItem[]>>,
+): WorkItem[] {
+  const beforeKeys = new Set<string>();
+  for (const items of Object.values(before)) {
+    for (const item of items) beforeKeys.add(workItemKey(item));
+  }
+  const delta: WorkItem[] = [];
+  for (const items of Object.values(after)) {
+    for (const item of items) {
+      if (!beforeKeys.has(workItemKey(item))) delta.push(item);
+    }
+  }
+  return delta;
+}

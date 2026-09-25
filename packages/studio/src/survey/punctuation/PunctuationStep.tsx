@@ -58,6 +58,10 @@ import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { usePhaseBDraftStore, type DraftProvenance } from "../../stores/phaseBDraftStore.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
 import { punctuationKey } from "../../steps/evidence.ts";
+import { derivePunctuationFlags } from "./punctuationFlags.ts";
+import { useFlaggedNextGate } from "../../hooks/useFlaggedNextGate.ts";
+import { reproposalCueMessage } from "../reproposalReason.ts";
+import { FlaggedAnswersList } from "../../components/FlaggedAnswersList.tsx";
 import { useSourcedExemplars } from "../useSourcedExemplars.ts";
 import { charactersInTier } from "../../lib/services.ts";
 import { containsFormatChar, harvestChars, isFormatChar } from "../charNormUtils.ts";
@@ -225,7 +229,7 @@ const groupCaption = { margin: "0 0 8px 0", fontSize: 11, color: TEXT_DIM } as c
 const PunctuationStep: ComponentType<EditorStepProps> = (
   { onComplete, onBack }: EditorStepProps,
 ) => {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const surveyContext = useSurveySessionStore((s) => s.surveyContext);
   const bcp47 = surveyContext.bcp47_tag;
   const languageName = surveyContext.language_name;
@@ -243,6 +247,9 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
   const confirmedForKey = useSurveyAnswerStore(
     (s) => s.steps[PUNCTUATION_STEP_ID]?.answers[PUNCTUATION_INVENTORY_ANSWER_ID]?.evidenceKey,
+  );
+  const punctuationInventoryAnswer = useSurveyAnswerStore(
+    (s) => s.steps[PUNCTUATION_STEP_ID]?.answers[PUNCTUATION_INVENTORY_ANSWER_ID],
   );
   const saveAnswer = useSurveyAnswerStore((s) => s.saveAnswer);
 
@@ -271,6 +278,29 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
       (confirmedForKey === undefined || confirmedForKey === null || confirmedForKey === evidenceKey),
     [phaseResults, confirmedForKey, evidenceKey],
   );
+
+  // spec 079 US3 T079/T080: the SAME derivation `hooks/useWorkToDo.ts` reads
+  // for the journey-strip badge (survey/punctuation/punctuationFlags.ts), so
+  // the in-page cue and the badge can never disagree.
+  const flaggedAnswers = useMemo(
+    () => derivePunctuationFlags(punctuationInventoryAnswer, evidenceKey),
+    [punctuationInventoryAnswer, evidenceKey],
+  );
+  const flaggedWorkItems = useMemo(
+    () =>
+      flaggedAnswers.map((f) => ({
+        kind: "reproposed" as const,
+        stepId: PUNCTUATION_STEP_ID,
+        screenId: f.screenId,
+        answerId: f.answerId,
+        reason: f.reason,
+      })),
+    [flaggedAnswers],
+  );
+  // Punctuation is a single screen, so nothing ever precedes it — the shared
+  // gate never blocks Done here; used anyway so there is exactly one gate
+  // implementation across every step that surfaces flags (T080).
+  const nextGate = useFlaggedNextGate(flaggedWorkItems, [PUNCTUATION_STEP_ID], PUNCTUATION_STEP_ID);
 
   const [inputVal, setInputVal] = useState("");
   // Non-punctuation characters the type-in box declined, shown (not silently
@@ -771,14 +801,28 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
         )}
       </section>
 
-      {/* Footer: Done — always enabled; zero punctuation is a valid answer. */}
+      {/* spec 079 US3 T080: the confirmed inventory was made against
+          different evidence — a cue plus the shared jump list. */}
+      {flaggedAnswers.length > 0 && (
+        <div role="status" style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {flaggedAnswers.map((f) => (
+            <p key={f.answerId} style={{ margin: 0, fontSize: 13, color: ERROR_RED }}>
+              {reproposalCueMessage(f.reason, i18n)}
+            </p>
+          ))}
+          <FlaggedAnswersList stepId="punctuation" items={flaggedWorkItems} />
+        </div>
+      )}
+
+      {/* Footer: Done — otherwise always enabled; zero punctuation is a valid answer. */}
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <button
           type="button"
           data-testid="punctuation-done"
+          disabled={nextGate.blocked}
           onClick={complete}
           className="ks-focus-ring ks-hit-target"
-          style={primaryButton(false)}
+          style={primaryButton(nextGate.blocked)}
         >
           {punctuation.length === 0
             ? t({ id: "survey.punctuation.doneButtonNone", message: "Continue without punctuation" })

@@ -36,6 +36,11 @@
 // Editors are pure (Article IV / G2): completion is reported via onComplete;
 // the manifest reducer path (StepHost.handleComplete -> recordPhase) owns the
 // session merge.
+//
+// spec 079 US3 (T079/T080): this step never shows a `reproposed`
+// "needs reconfirming" flag — see `../invisiblesFlags.ts` for why (in short:
+// `carriedOver` guarantees a decided candidate is never dropped, so there is
+// only "proposed"/"current", never a stale confirmation to surface).
 
 import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";

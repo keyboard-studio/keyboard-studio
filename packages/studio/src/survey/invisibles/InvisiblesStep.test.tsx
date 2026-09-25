@@ -208,6 +208,45 @@ describe("InvisiblesStep — leave and return (spec 079 FR-051, D-4)", () => {
   });
 });
 
+// ---------------------------------------------------------------------------
+// spec 079 US3 T048/T079 — a shape change (writing direction becomes RTL)
+// proposes new bidi candidates while keeping the earlier decision, and there
+// is structurally no `reproposed` flag to show (see ../invisiblesFlags.ts).
+// ---------------------------------------------------------------------------
+
+describe("InvisiblesStep — shape change: new candidates proposed, decisions kept, no flags (spec 079 US3 T048/T079)", () => {
+  it("a writing-direction change to RTL proposes the bidi candidates while an earlier LTR decision survives", () => {
+    const first = render(<InvisiblesStep onComplete={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("invisible-candidate-200c")); // an always-offered candidate
+    expect(usePhaseBDraftStore.getState().invisibleDecisions["U+200C"]).toBe("accepted");
+    first.unmount();
+
+    // Shape change: the author is now known to be RTL — new bidi candidates
+    // become relevant.
+    useSurveySessionStore.getState().setSurveyContext({ script_family: "rtl" });
+    render(<InvisiblesStep onComplete={vi.fn()} />);
+
+    // The earlier decision survives untouched.
+    expect(usePhaseBDraftStore.getState().invisibleDecisions["U+200C"]).toBe("accepted");
+    expect(screen.getByTestId("invisible-candidate-200c").getAttribute("aria-checked")).toBe("true");
+    // The bidi group is now expanded with its candidates newly offered,
+    // defaulting to unchecked (proposed, not "reproposed" — nothing was ever
+    // decided about them before).
+    expect(screen.getByTestId("invisible-candidate-200e").getAttribute("aria-checked")).toBe("false");
+  });
+
+  it("never shows a flagged-answers list or reason cue — there is no `reproposed` state for this step's per-answer design", () => {
+    const first = render(<InvisiblesStep onComplete={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("invisible-candidate-200c"));
+    first.unmount();
+
+    useSurveySessionStore.getState().setSurveyContext({ script_family: "rtl" });
+    render(<InvisiblesStep onComplete={vi.fn()} />);
+
+    expect(screen.queryByTestId("flagged-answers-list")).toBeNull();
+  });
+});
+
 describe("InvisiblesStep — the bidi group and writing direction", () => {
   it("collapses the direction controls under the collapsed note when the author is not right-to-left, and can expand them", () => {
     render(<InvisiblesStep onComplete={vi.fn()} />);
