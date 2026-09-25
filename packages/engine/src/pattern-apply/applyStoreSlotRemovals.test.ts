@@ -37,7 +37,7 @@ import { collectCharContributors } from "./collectCharContributors.js";
 import { parseSlotId } from "./slotId.js";
 import { parse } from "../codec/parse.js";
 import { emit } from "../codec/emit.js";
-import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
+import { charStore, irGroup, makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import type { KeyboardIR, IRStore, IRGroup, IRRule, StoreItem } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
@@ -46,17 +46,12 @@ import type { KeyboardIR, IRStore, IRGroup, IRRule, StoreItem } from "@keyboard-
 
 /** Output store with a mix of char, nul items. */
 function makeOutputStore(nodeId: string, name: string, items: StoreItem[]): IRStore {
-  return { nodeId, name, items, isSystem: false };
+  return charStore({ nodeId, name, items });
 }
 
 /** Input store (char-only items). */
 function makeInputStore(nodeId: string, name: string, chars: string[]): IRStore {
-  return {
-    nodeId,
-    name,
-    items: chars.map((c) => ({ kind: "char" as const, value: c })),
-    isSystem: false,
-  };
+  return charStore({ nodeId, name, chars });
 }
 
 /**
@@ -81,7 +76,7 @@ function makeParallelStoreGroup(
     ],
     output: [{ kind: "index", storeRef: outputStoreName, offset: 2 }],
   };
-  return { nodeId: groupNodeId, name: "main", usingKeys: true, rules: [rule], readonly: false };
+  return irGroup({ nodeId: groupNodeId, rules: [rule] });
 }
 
 /**

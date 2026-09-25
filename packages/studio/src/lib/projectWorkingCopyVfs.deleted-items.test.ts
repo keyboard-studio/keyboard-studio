@@ -12,33 +12,24 @@
 
 import { describe, it, expect } from "vitest";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
+import { irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import type { IRGroup, IRRule, KeyboardIR } from "@keyboard-studio/contracts";
 import { parseKmn } from "@keyboard-studio/engine";
 import { projectWorkingCopyVfs } from "./projectWorkingCopyVfs.js";
+import { stubKmnVfs } from "../test/workingCopy.ts";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers — mirrored from applyCarveToVfs.test.ts shapes
 // ---------------------------------------------------------------------------
 
 function makeRule(nodeId: string, vkey: string, char: string): IRRule {
-  return {
-    nodeId,
-    context: [{ kind: "vkey", name: vkey, modifiers: [] }],
-    output: [{ kind: "char", value: char }],
-  };
+  return vkeyRule({ nodeId, vkey, output: char });
 }
 
 function makeGroup(nodeId: string, name: string, rules: IRRule[]): IRGroup {
-  return { nodeId, name, usingKeys: true, rules, readonly: false };
+  return irGroup({ nodeId, name, rules });
 }
 
-
-function makeVfs(keyboardId: string) {
-  return createVirtualFS([
-    { path: `source/${keyboardId}.kmn`, content: "c stub\n", isBinary: false },
-  ]);
-}
 
 // Real .kmn fixtures for the warning-free carve assertions: parsing gives every
 // node a resolvable source span, so the splice-first carve path runs (the same
@@ -127,7 +118,7 @@ describe("projectWorkingCopyVfs deleted-items end-to-end — real engine, no moc
     const rule1 = makeRule("rule#1", "K_B", "b");
     const entryGroup = makeGroup("group#main", "main", [rule0, rule1]);
     const ir = makeTestIR([entryGroup]);
-    const vfs = makeVfs("test_kb");
+    const vfs = stubKmnVfs("test_kb");
 
     projectWorkingCopyVfs({
       vfs,
@@ -187,7 +178,7 @@ describe("projectWorkingCopyVfs deleted-items end-to-end — real engine, no moc
     const rule1 = makeRule("rule#1", "K_B", "b");
     const entryGroup = makeGroup("group#main", "main", [rule0, rule1]);
     const ir = makeTestIR([entryGroup]);
-    const vfs = makeVfs("test_kb");
+    const vfs = stubKmnVfs("test_kb");
 
     projectWorkingCopyVfs({
       vfs,
@@ -257,7 +248,7 @@ describe("projectWorkingCopyVfs deleted-items + fragment-bearing keyboard — re
     (entryGroup.rules[0] as IRRule).sourceLine = 30;
     (entryGroup.rules[1] as IRRule).sourceLine = 35;
 
-    const vfs = makeVfs("test_kb");
+    const vfs = stubKmnVfs("test_kb");
 
     const { warnings } = projectWorkingCopyVfs({
       vfs,
@@ -306,7 +297,7 @@ describe("projectWorkingCopyVfs deleted-items + fragment-bearing keyboard — re
       reason: "call/return",
       groupNodeId: "group#main",
     });
-    const vfs = makeVfs("test_kb");
+    const vfs = stubKmnVfs("test_kb");
 
     projectWorkingCopyVfs({
       vfs,

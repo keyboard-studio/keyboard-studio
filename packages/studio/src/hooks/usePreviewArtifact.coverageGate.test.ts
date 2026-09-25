@@ -21,12 +21,12 @@
 // unconditionally, so the test isolates the coverage-gate fold rather than
 // driving the real async compile pipeline.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { seedInstantiatedWorkingCopy } from "../test/workingCopy.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
-import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
 import type { Stage } from "./useKeyboardArtifact.ts";
 
@@ -48,11 +48,6 @@ vi.mock("./useKeyboardArtifact.ts", async (importOriginal) => ({
   }),
 }));
 
-function resetStore() {
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-}
-
 function swapAssignment(target: string): MechanismAssignment {
   return {
     scope: "individual",
@@ -63,34 +58,17 @@ function swapAssignment(target: string): MechanismAssignment {
   };
 }
 
-function seedInstantiatedWorkingCopy(inventory: string[]) {
-  const vfs = createVirtualFS([
-    { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
-  ]);
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir: makeTestIR([]) });
-  // spec 064: canDownload folds in the attribution gates alongside coverage, so a
-  // fixture meant to isolate COVERAGE has to satisfy attribution — otherwise the
-  // "becomes emittable" assertion would fail on an unrelated gate.
-  useWorkingCopyStore.getState().setAttribution({
-    authorName: "Alice Example",
-    copyrightHolder: "Alice Example",
-  });
-  useWorkingCopyStore.getState().recordPhase({
-    phase: "B",
-    answers: [],
-    confirmedInventory: inventory,
-  });
-}
+// Coverage fixtures here are attributed: canDownload folds in the attribution
+// gates alongside coverage (spec 064), so a fixture meant to isolate COVERAGE
+// has to satisfy attribution or "becomes emittable" would fail on an unrelated gate.
 
-beforeEach(resetStore);
 afterEach(() => {
-  resetStore();
   vi.clearAllMocks();
 });
 
 describe("usePreviewArtifact — canDownload folds in inventory coverage (P0)", () => {
   it("is NOT emittable (canDownload === false) while an inventory character has no desktop mechanism, even though compile is ready and the working copy is instantiated", async () => {
-    seedInstantiatedWorkingCopy(["á", "é"]);
+    seedInstantiatedWorkingCopy(["á", "é"], { attributed: true });
     // Only "á" gets a physical mechanism — "é" is left unimplemented.
     useWorkingCopyStore.getState().recordAssignments([swapAssignment("á")]);
 
@@ -104,7 +82,7 @@ describe("usePreviewArtifact — canDownload folds in inventory coverage (P0)", 
   });
 
   it("becomes emittable (canDownload === true) once every inventory character has a physical mechanism", async () => {
-    seedInstantiatedWorkingCopy(["á", "é"]);
+    seedInstantiatedWorkingCopy(["á", "é"], { attributed: true });
     useWorkingCopyStore.getState().recordAssignments([swapAssignment("á"), swapAssignment("é")]);
 
     const { usePreviewArtifact } = await import("./usePreviewArtifact.ts");
@@ -116,7 +94,7 @@ describe("usePreviewArtifact — canDownload folds in inventory coverage (P0)", 
   });
 
   it("handleDownload refuses to serialize (sets downloadError, never proceeds) even if invoked while coverage is blocked", async () => {
-    seedInstantiatedWorkingCopy(["á", "é"]);
+    seedInstantiatedWorkingCopy(["á", "é"], { attributed: true });
     useWorkingCopyStore.getState().recordAssignments([swapAssignment("á")]);
 
     const { usePreviewArtifact } = await import("./usePreviewArtifact.ts");
@@ -140,7 +118,7 @@ describe("usePreviewArtifact — canDownload folds in inventory coverage (P0)", 
   // submit gate.
   // -------------------------------------------------------------------------
   it("canDownload stays false when every uncovered character has been marked for later review", async () => {
-    seedInstantiatedWorkingCopy(["á", "é"]);
+    seedInstantiatedWorkingCopy(["á", "é"], { attributed: true });
     // Only "á" gets a physical mechanism — "é" is left unimplemented, but
     // marked for later review (the exact authoring action MechanismGallery's
     // "Mark for later review" toggle performs).

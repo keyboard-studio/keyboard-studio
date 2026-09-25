@@ -23,14 +23,13 @@
 // `en/messages.json` catalog — so this test exercises the exact interpolation
 // path that broke, not a hand-rolled English string.
 
-import { describe, it, expect, vi, beforeEach, beforeAll, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeAll, afterEach } from "vitest";
 import { screen, fireEvent, cleanup } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { seedInstantiatedWorkingCopy } from "../../test/workingCopy.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
-import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
-import { makeTestIR, basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { installDialogShim } from "../../test/dialogShim.ts";
 
 // jsdom does not implement HTMLDialogElement.showModal()/close() — shared
@@ -46,22 +45,6 @@ vi.mock("./flowStepOptions.tsx", async (importOriginal) => ({
   PhaseFStepFactoryComponent: () => null,
 }));
 
-function resetStores() {
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-}
-
-function seedInstantiatedWorkingCopy(inventory: string[]) {
-  const vfs = createVirtualFS([
-    { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
-  ]);
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, { vfs, ir: makeTestIR([]) });
-  useWorkingCopyStore.getState().recordPhase({
-    phase: "B",
-    answers: [],
-    confirmedInventory: inventory,
-  });
-}
 
 function swapAssignment(target: string): MechanismAssignment {
   return {
@@ -73,10 +56,8 @@ function swapAssignment(target: string): MechanismAssignment {
   };
 }
 
-beforeEach(resetStores);
 afterEach(() => {
   cleanup();
-  resetStores();
   vi.clearAllMocks();
 });
 

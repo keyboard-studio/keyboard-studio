@@ -146,8 +146,6 @@ function seedSessionStore() {
 
 afterEach(() => {
   cleanup();
-  useSurveySessionStore.getState().reset();
-  useWorkingCopyStore.getState().reset();
   mockPrefillConfirmRef.current = null;
   mockPrefillBackRef.current = null;
   mockPhaseBCompleteRef.current = null;

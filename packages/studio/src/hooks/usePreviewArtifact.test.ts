@@ -17,7 +17,7 @@
 // effect does not throw; assert on the hook's returned baseKeyboard value
 // synchronously at mount, before any async compile settles.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { renderHook } from "@testing-library/react";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import { createVirtualFS } from "@keyboard-studio/contracts";
@@ -38,13 +38,7 @@ vi.mock("@keyboard-studio/engine", async (importOriginal) => ({
   detectMarkInputOrderFromImport: vi.fn(() => undefined),
 }));
 
-function resetStore() {
-  useWorkingCopyStore.getState().reset();
-}
-
-beforeEach(resetStore);
 afterEach(() => {
-  resetStore();
   vi.clearAllMocks();
 });
 

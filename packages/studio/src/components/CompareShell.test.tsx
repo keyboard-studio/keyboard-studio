@@ -83,8 +83,6 @@ beforeEach(() => {
   keyboardArtifactCalls.length = 0;
   instantiateSpy.mockClear();
   useWorkingCopyTransformSpy.mockClear();
-  useWorkingCopyStore.getState().reset();
-  useViewStateStore.getState().reset();
   mockStage.current = {
     kind: "ready",
     compileResult: { success: true, artifacts: [], diagnostics: [], compileMs: 0, isWarmCompile: true },

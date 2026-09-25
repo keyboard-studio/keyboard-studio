@@ -1,12 +1,12 @@
+// pb_standard_letters: its mutate() seam (spec-014 M2-M5). Fixtures, definition
+// shape and the generic invariants run in
+// src/survey/questions/questionModules.test.ts.
+
 import { describe, it, expect } from "vitest";
 import { makeTestIR, makeCharStore } from "@keyboard-studio/contracts/fixtures";
 import { irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
 import { applyMutatePatch } from "../../../../src/steps/mutateApply.ts";
-import mod, { validate, fixtures, mutate } from "../../../../src/survey/questions/b/pb_standard_letters.ts";
-
-// ---------------------------------------------------------------------------
-// T010 / US1 — mutate() output tests (spec-014 mutate-seam M2–M5)
-// ---------------------------------------------------------------------------
+import mod, { mutate } from "../../../../src/survey/questions/b/pb_standard_letters.ts";
 
 describe("pb_standard_letters — mutate() writes stores[] only", () => {
   it("appends a script-group store, preserving existing stores (M2/SC-002)", () => {
@@ -49,33 +49,5 @@ describe("pb_standard_letters — mutate() writes stores[] only", () => {
 
   it("declared writes is exactly [stores[]]", () => {
     expect(mod.writes).toEqual([irPath("stores", ARRAY_INDEX)]);
-  });
-});
-
-describe("pb_standard_letters — validate() valid fixtures", () => {
-  for (const { value, note } of fixtures.valid) {
-    it(`accepts ${JSON.stringify(value)}${note ? ` (${note})` : ""}`, () => {
-      expect(validate(value)).toEqual({ ok: true });
-    });
-  }
-});
-
-describe("pb_standard_letters — validate() invalid fixtures", () => {
-  for (const { value, note, expectedCode } of fixtures.invalid) {
-    it(`rejects ${JSON.stringify(value)}${note ? ` (${note})` : ""}`, () => {
-      const result = validate(value);
-      expect(result.ok).toBe(false);
-      if (expectedCode !== undefined && result.ok === false) {
-        expect(result.code).toBe(expectedCode);
-      }
-    });
-  }
-});
-
-describe("pb_standard_letters — validate() edge cases", () => {
-  it("rejects undefined", () => {
-    const r = validate(undefined);
-    expect(r.ok).toBe(false);
-    if (r.ok === false) expect(r.code).toBe("required");
   });
 });

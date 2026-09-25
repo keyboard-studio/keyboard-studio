@@ -18,7 +18,7 @@
 
 import { describe, it, expect, vi } from "vitest";
 import { renderHook } from "@testing-library/react";
-import type { TouchKeyIR, TouchLayoutIR } from "@keyboard-studio/contracts";
+import type { TouchLayoutIR } from "@keyboard-studio/contracts";
 import { touchKeyAddress } from "@keyboard-studio/engine";
 import type { KeyGridAnnotationCounts, KeyGridCellViewModel } from "./keyGridViewModel.ts";
 import {
@@ -27,6 +27,7 @@ import {
   useKeyCommands,
   type AddKeyAfterOutcome,
 } from "./useKeyCommands.ts";
+import { touchKey, touchLayout } from "@keyboard-studio/contracts/fixtures";
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -49,17 +50,6 @@ function makeCell(id: string, overrides: Partial<KeyGridCellViewModel> = {}): Ke
   };
 }
 
-function makeTouchKey(id: string, overrides: Partial<TouchKeyIR> = {}): TouchKeyIR {
-  return { nodeId: `node_${id}`, id, ...overrides };
-}
-
-function makeLayout(keys: readonly TouchKeyIR[]): TouchLayoutIR {
-  return {
-    platforms: [{ id: "phone", layers: [{ id: "default", rows: [{ keys: [...keys] }] }] }],
-    nodeIds: [],
-  };
-}
-
 // ---------------------------------------------------------------------------
 // buildAddKeyAfterOutcome — the pure decision
 // ---------------------------------------------------------------------------
@@ -67,7 +57,7 @@ function makeLayout(keys: readonly TouchKeyIR[]): TouchLayoutIR {
 describe("buildAddKeyAfterOutcome", () => {
   it("proposes U_FFFD (never T_new_<n>) with no rule required", () => {
     const anchor = makeCell("K_A");
-    const layout = makeLayout([makeTouchKey("K_A")]);
+    const layout = touchLayout({ keys: [touchKey({ id: "K_A" })] });
 
     const outcome = buildAddKeyAfterOutcome(anchor, layout);
 
@@ -81,7 +71,7 @@ describe("buildAddKeyAfterOutcome", () => {
 
   it("builds an 'add' op positioned AFTER the anchor, addressed at it, with no authored geometry", () => {
     const anchor = makeCell("K_A");
-    const layout = makeLayout([makeTouchKey("K_A")]);
+    const layout = touchLayout({ keys: [touchKey({ id: "K_A" })] });
 
     const outcome = buildAddKeyAfterOutcome(anchor, layout);
     if (!outcome.ok) throw new Error("expected ok outcome");
@@ -100,7 +90,7 @@ describe("buildAddKeyAfterOutcome", () => {
     // "second unassigned added key" edge case (spec.md Edge Cases: "Adding a
     // key that collides with an existing id in the same layer... Must be
     // rejected at edit time").
-    const layout = makeLayout([makeTouchKey("K_A"), makeTouchKey("U_FFFD")]);
+    const layout = touchLayout({ keys: [touchKey({ id: "K_A" }), touchKey({ id: "U_FFFD" })] });
 
     const outcome = buildAddKeyAfterOutcome(anchor, layout);
 
@@ -114,8 +104,8 @@ describe("buildAddKeyAfterOutcome", () => {
         {
           id: "phone",
           layers: [
-            { id: "default", rows: [{ keys: [makeTouchKey("K_A")] }] },
-            { id: "shift", rows: [{ keys: [makeTouchKey("U_FFFD")] }] },
+            { id: "default", rows: [{ keys: [touchKey({ id: "K_A" })] }] },
+            { id: "shift", rows: [{ keys: [touchKey({ id: "U_FFFD" })] }] },
           ],
         },
       ],
@@ -129,7 +119,7 @@ describe("buildAddKeyAfterOutcome", () => {
 
   it("rejects defensively when the anchor's address does not parse", () => {
     const anchor = makeCell("K_A", { address: "not-a-valid-address" });
-    const layout = makeLayout([makeTouchKey("K_A")]);
+    const layout = touchLayout({ keys: [touchKey({ id: "K_A" })] });
 
     const outcome = buildAddKeyAfterOutcome(anchor, layout);
 
@@ -165,7 +155,7 @@ describe("useKeyCommands", () => {
 
   it("Insert (no modifiers) invokes onAddKeyAfter with the same outcome buildAddKeyAfterOutcome computes", () => {
     const anchor = makeCell("K_A");
-    const layout = makeLayout([makeTouchKey("K_A")]);
+    const layout = touchLayout({ keys: [touchKey({ id: "K_A" })] });
     const { result, onAddKeyAfter } = renderHost(anchor, layout);
 
     const preventDefault = vi.fn();
@@ -185,7 +175,7 @@ describe("useKeyCommands", () => {
 
   it("the command descriptor's run() invokes onAddKeyAfter with the SAME outcome Insert produces — one implementation, two routes", () => {
     const anchor = makeCell("K_A");
-    const layout = makeLayout([makeTouchKey("K_A")]);
+    const layout = touchLayout({ keys: [touchKey({ id: "K_A" })] });
     const { result, onAddKeyAfter } = renderHost(anchor, layout);
 
     const addCommand = result.current.commands.find((c) => c.id === "add-key-after");
@@ -214,7 +204,7 @@ describe("useKeyCommands", () => {
     "ignores Insert when %s is held (reserved for a future binding)",
     (modifier) => {
       const anchor = makeCell("K_A");
-      const layout = makeLayout([makeTouchKey("K_A")]);
+      const layout = touchLayout({ keys: [touchKey({ id: "K_A" })] });
       const { result, onAddKeyAfter } = renderHost(anchor, layout);
 
       const preventDefault = vi.fn();
@@ -235,7 +225,7 @@ describe("useKeyCommands", () => {
 
   it("ignores a non-Insert key", () => {
     const anchor = makeCell("K_A");
-    const layout = makeLayout([makeTouchKey("K_A")]);
+    const layout = touchLayout({ keys: [touchKey({ id: "K_A" })] });
     const { result, onAddKeyAfter } = renderHost(anchor, layout);
 
     result.current.handleKeyDown({
@@ -251,7 +241,7 @@ describe("useKeyCommands", () => {
   });
 
   it("Insert is a no-op when nothing is selected, and the command is disabled", () => {
-    const layout = makeLayout([makeTouchKey("K_A")]);
+    const layout = touchLayout({ keys: [touchKey({ id: "K_A" })] });
     const { result, onAddKeyAfter } = renderHost(null, layout);
 
     const addCommand = result.current.commands.find((c) => c.id === "add-key-after");
@@ -271,7 +261,7 @@ describe("useKeyCommands", () => {
 
   it("the command descriptor is enabled when a key is selected", () => {
     const anchor = makeCell("K_A");
-    const layout = makeLayout([makeTouchKey("K_A")]);
+    const layout = touchLayout({ keys: [touchKey({ id: "K_A" })] });
     const { result } = renderHost(anchor, layout);
 
     const addCommand = result.current.commands.find((c) => c.id === "add-key-after");
@@ -327,7 +317,7 @@ describe("useKeyCommands — T111's keyboard routes", () => {
 
   it("ContextMenu opens the command menu with NO anchor — a keyboard invocation has no pointer position", () => {
     const anchor = makeCell("K_A");
-    const layout = makeLayout([makeTouchKey("K_A")]);
+    const layout = touchLayout({ keys: [touchKey({ id: "K_A" })] });
     const { result, onOpenCommandMenu } = renderHost(anchor, layout);
 
     const { preventDefault } = press(result, "ContextMenu");
@@ -339,7 +329,7 @@ describe("useKeyCommands — T111's keyboard routes", () => {
 
   it("Shift+F10 is the second, equivalent route to the same menu", () => {
     const anchor = makeCell("K_A");
-    const layout = makeLayout([makeTouchKey("K_A")]);
+    const layout = touchLayout({ keys: [touchKey({ id: "K_A" })] });
     const { result, onOpenCommandMenu } = renderHost(anchor, layout);
 
     press(result, "F10", { shiftKey: true });
@@ -349,7 +339,7 @@ describe("useKeyCommands — T111's keyboard routes", () => {
 
   it("bare F10 is NOT claimed — only Shift+F10 is the menu binding", () => {
     const anchor = makeCell("K_A");
-    const layout = makeLayout([makeTouchKey("K_A")]);
+    const layout = touchLayout({ keys: [touchKey({ id: "K_A" })] });
     const { result, onOpenCommandMenu } = renderHost(anchor, layout);
 
     const { preventDefault } = press(result, "F10");
@@ -360,7 +350,7 @@ describe("useKeyCommands — T111's keyboard routes", () => {
 
   it("Ctrl+Enter follows the selected key's nextlayer, and claims the event so the native <button> activation cannot also re-select", () => {
     const anchor = makeCell("K_A", { nextlayer: "shift" });
-    const layout = makeLayout([makeTouchKey("K_A")]);
+    const layout = touchLayout({ keys: [touchKey({ id: "K_A" })] });
     const { result, onFollowNextLayer } = renderHost(anchor, layout);
 
     const { preventDefault } = press(result, "Enter", { ctrlKey: true });
@@ -372,7 +362,7 @@ describe("useKeyCommands — T111's keyboard routes", () => {
 
   it("Ctrl+Enter does nothing for a key that switches nowhere", () => {
     const anchor = makeCell("K_A");
-    const layout = makeLayout([makeTouchKey("K_A")]);
+    const layout = touchLayout({ keys: [touchKey({ id: "K_A" })] });
     const { result, onFollowNextLayer } = renderHost(anchor, layout);
 
     press(result, "Enter", { ctrlKey: true });
@@ -382,7 +372,7 @@ describe("useKeyCommands — T111's keyboard routes", () => {
 
   it("plain Enter is NOT claimed — FR-020b gives it to the inspector, a different surface", () => {
     const anchor = makeCell("K_A", { nextlayer: "shift" });
-    const layout = makeLayout([makeTouchKey("K_A")]);
+    const layout = touchLayout({ keys: [touchKey({ id: "K_A" })] });
     const { result, onFollowNextLayer } = renderHost(anchor, layout);
 
     const { preventDefault } = press(result, "Enter");
@@ -393,7 +383,7 @@ describe("useKeyCommands — T111's keyboard routes", () => {
 
   it("does NOT claim Alt+ArrowRight — useGridNav.ts claims arrows regardless of modifiers, so an Alt+Arrow binding here would double-fire (see module doc)", () => {
     const anchor = makeCell("K_A", { nextlayer: "shift" });
-    const layout = makeLayout([makeTouchKey("K_A")]);
+    const layout = touchLayout({ keys: [touchKey({ id: "K_A" })] });
     const { result, onFollowNextLayer, onOpenCommandMenu, onAddKeyAfter } =
       renderHost(anchor, layout);
 
@@ -406,7 +396,7 @@ describe("useKeyCommands — T111's keyboard routes", () => {
   });
 
   it("neither route fires when nothing is selected", () => {
-    const layout = makeLayout([makeTouchKey("K_A")]);
+    const layout = touchLayout({ keys: [touchKey({ id: "K_A" })] });
     const { result, onOpenCommandMenu, onFollowNextLayer } = renderHost(null, layout);
 
     press(result, "ContextMenu");
@@ -418,7 +408,7 @@ describe("useKeyCommands — T111's keyboard routes", () => {
 
   it("exposes both commands as descriptors carrying their keybinding hints", () => {
     const anchor = makeCell("K_A", { nextlayer: "shift" });
-    const layout = makeLayout([makeTouchKey("K_A")]);
+    const layout = touchLayout({ keys: [touchKey({ id: "K_A" })] });
     const { result } = renderHost(anchor, layout);
 
     const menu = result.current.commands.find((c) => c.id === "open-command-menu");
@@ -434,7 +424,7 @@ describe("useKeyCommands — T111's keyboard routes", () => {
 
   it("keeps 'follow next layer' in the list but DISABLED for a key with no nextlayer — discoverable, not omitted", () => {
     const anchor = makeCell("K_A");
-    const layout = makeLayout([makeTouchKey("K_A")]);
+    const layout = touchLayout({ keys: [touchKey({ id: "K_A" })] });
     const { result } = renderHost(anchor, layout);
 
     const follow = result.current.commands.find((c) => c.id === "follow-next-layer");
@@ -444,7 +434,7 @@ describe("useKeyCommands — T111's keyboard routes", () => {
 
   it("a descriptor's run() is the SAME implementation the keyboard route uses", () => {
     const anchor = makeCell("K_A", { nextlayer: "shift" });
-    const layout = makeLayout([makeTouchKey("K_A")]);
+    const layout = touchLayout({ keys: [touchKey({ id: "K_A" })] });
     const { result, onOpenCommandMenu, onFollowNextLayer } = renderHost(anchor, layout);
 
     result.current.commands.find((c) => c.id === "open-command-menu")?.run();

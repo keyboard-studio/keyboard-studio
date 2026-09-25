@@ -1,0 +1,181 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`live question modules > a/il_author_email.ts > definition contract 1`] = `"text | optional | next il_copyright_holder | format email | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > a/il_author_name.ts > definition contract 1`] = `"text | required | next il_author_email | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > a/il_copyright_holder.ts > definition contract 1`] = `"short_text | optional | next null | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > a/il_language_autonym.ts > definition contract 1`] = `"autocomplete | required | next il_language_code | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > a/il_language_code.ts > definition contract 1`] = `"autocomplete | optional | next il_target_script | options_source @langtags_iso639 | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > a/il_language_english.ts > definition contract 1`] = `"autocomplete | required | next [ctx.ilRegionAmbiguous == 'true' -> il_language_region; (default) -> il_language_autonym] | options_source @langtags_names | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > a/il_language_region.ts > definition contract 1`] = `"autocomplete | optional | next il_language_autonym | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > a/il_script_not_supported.ts > definition contract 1`] = `"notice | optional | next null | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > a/il_target_script.ts > definition contract 1`] = `"select | required | next [value == 'Ethi' or value == 'Hani' or value == 'Hang' -> il_script_not_supported; (default) -> il_author_name] | options [Latn, romanization-Latn, fonipa, Arab, Hebr, Deva, Cyrl, Grek, Geor, Armn, Ethi, Hani, Hang, other] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_additional_methods.ts > definition contract 1`] = `"radio | optional | next [value == 'text-sample' -> pb_text_sample; value == 'linguist' -> pb_linguist_confirm; value == 'picker' -> pb_picker_confirm; (default) -> null] | options [text-sample, linguist, picker, done] | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_azerty_qz_swap.ts > definition contract 1`] = `"radio | optional | next pb_spare_keys_azerty | options [follow-azerty, follow-qwerty, no-preference] | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_char_count.ts > definition contract 1`] = `"radio | required | next [ctx.routing_group == 'qwerty-qwertz' -> pb_latin_qwerty_branch; ctx.routing_group == 'azerty' -> pb_latin_azerty_branch; (default) -> pb_contact_language] | options [tiny, small, medium, large] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_co_installed_keyboards.ts > definition contract 1`] = `"text | optional | next pb_discovery_intro | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_contact_language.ts > definition contract 1`] = `"text | optional | next pb_legacy_encoding | advisory true | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_digit_set.ts > definition contract 1`] = `"radio | required | next pb_char_count | options [western, native, both] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_discovery_intro.ts > definition contract 1`] = `"radio | required | next [value == 'text-sample' -> pb_text_sample; value == 'linguist' -> pb_linguist_confirm; value == 'picker' -> pb_picker_confirm; (default) -> pb_routing_branch] | options [manual, text-sample, linguist, picker] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_existing_keyboards.ts > definition contract 1`] = `"text | optional | next pb_co_installed_keyboards | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_indic_conjuncts.ts > definition contract 1`] = `"bool | required | next [value == 'true' -> pb_indic_virama; (default) -> pb_indic_vowels_separate] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_indic_nukta_detail.ts > definition contract 1`] = `"text | optional | next pb_indic_vowels_onset | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_indic_nukta_gate.ts > definition contract 1`] = `"bool | required | next [value == 'true' -> pb_indic_nukta_detail; (default) -> pb_indic_vowels_onset] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_indic_pre_base_vowels.ts > definition contract 1`] = `"bool | required | next pb_indic_nukta_gate | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_indic_virama.ts > definition contract 1`] = `"text | optional | next pb_indic_vowels_separate | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_indic_vowels_onset.ts > definition contract 1`] = `"bool | required | next [value == 'true' -> pb_indic_vowels_onset_list; (default) -> pb_special_letters] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_indic_vowels_onset_list.ts > definition contract 1`] = `"text | optional | next pb_special_letters | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_indic_vowels_separate.ts > definition contract 1`] = `"radio | required | next pb_indic_pre_base_vowels | options [attached-marks, full-letters, mixed] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_latin_azerty_branch.ts > definition contract 1`] = `"radio | optional | next pb_azerty_qz_swap | options [keep-french, digits-unshifted, no-preference] | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_latin_digraphs_gate.ts > definition contract 1`] = `"bool | required | next [value == 'true' -> pb_latin_digraphs_list; (default) -> pb_punctuation_gate] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_latin_digraphs_list.ts > definition contract 1`] = `"text | optional | next pb_punctuation_gate | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_latin_qwerty_branch.ts > definition contract 1`] = `"radio | optional | next pb_spare_keys_qwerty | options [many-bases, few-bases, not-applicable] | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_legacy_encoding.ts > definition contract 1`] = `"radio | optional | next pb_use_case | advisory true | options [yes-legacy, no-unicode, not-sure] | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_linguist_confirm.ts > definition contract 1`] = `"bool | required | next [value == 'true' -> pb_routing_branch; (default) -> pb_routing_branch] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_non_roman_branch.ts > definition contract 1`] = `"radio | optional | next [value == 'indic' -> pb_indic_conjuncts; value == 'sea' -> pb_sea_medials; value == 'rtl' -> pb_rtl_direction_confirm; value == 'syllabic' -> pb_syllabic_note; value == 'alpha-nonlatin' -> pb_special_letters; (default) -> pb_other_free_entry] | options [indic, sea, rtl, syllabic, alpha-nonlatin, other] | prompt | help_text | no validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_other_free_entry.ts > definition contract 1`] = `"text | optional | next pb_special_letters | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_picker_confirm.ts > definition contract 1`] = `"multi_select | optional | next pb_routing_branch | options_source @picker_candidates_seeded | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_punctuation_gate.ts > definition contract 1`] = `"bool | required | next [value == 'true' -> pb_punctuation_list; (default) -> pb_digit_set] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_punctuation_list.ts > definition contract 1`] = `"text | optional | next pb_digit_set | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_routing_branch.ts > definition contract 1`] = `"notice | required (absent) | next [ctx.routing_group == 'non-roman' -> pb_non_roman_branch; (default) -> pb_standard_letters] | engine_resolved true | no prompt | no help_text | no validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_rtl_direction_confirm.ts > definition contract 1`] = `"bool | required | next pb_rtl_short_vowels | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_rtl_short_vowels.ts > definition contract 1`] = `"radio | required | next pb_rtl_special_letters | options [always, sometimes, never] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_rtl_special_letters.ts > definition contract 1`] = `"text | optional | next pb_special_letters | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_sea_medials.ts > definition contract 1`] = `"bool | required | next pb_sea_stacked_consonants | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_sea_stacked_consonants.ts > definition contract 1`] = `"bool | required | next pb_special_letters | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_spare_keys_azerty.ts > definition contract 1`] = `"text | optional | next pb_contact_language | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_spare_keys_qwerty.ts > definition contract 1`] = `"text | optional | next pb_contact_language | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_special_letters.ts > definition contract 1`] = `"bool | required | next [value == 'true' -> pb_special_letters_list; (default) -> pb_punctuation_gate] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_special_letters_list.ts > definition contract 1`] = `"text | optional | next pb_special_letters_notes | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_special_letters_notes.ts > definition contract 1`] = `"text | optional | next pb_latin_digraphs_gate | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_standard_letters.ts > definition contract 1`] = `"radio | required | next [value == 'other-alphabet' -> pb_non_roman_branch; value == 'extended-latin' -> pb_typing_approach; (default) -> pb_special_letters] | options [basic-az, extended-latin, other-alphabet, other] | prompt | help_text | validate | no blank fixture | inputs [header.bcp47] | writes [stores[]]"`;
+
+exports[`live question modules > b/pb_syllabic_finals_detail.ts > definition contract 1`] = `"text | optional | next pb_special_letters | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_syllabic_finals_gate.ts > definition contract 1`] = `"bool | required | next [value == 'true' -> pb_syllabic_finals_detail; (default) -> pb_special_letters] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_syllabic_grid.ts > definition contract 1`] = `"bool | required | next pb_syllabic_finals_gate | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_syllabic_note.ts > definition contract 1`] = `"radio | required | next pb_syllabic_grid | options [one-char-per-syllable, combine-parts, mixed] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_text_sample.ts > definition contract 1`] = `"text | required | next pb_text_sample_review | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_text_sample_review.ts > definition contract 1`] = `"bool | required | next [value == 'true' -> pb_routing_branch; (default) -> pb_routing_branch] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_typing_approach.ts > definition contract 1`] = `"radio | required | next [(default) -> pb_special_letters] | options [phonetic, lookalike, modifier-base, direct] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/pb_use_case.ts > definition contract 1`] = `"radio | optional | next pb_additional_methods | advisory true | options [literacy, messaging, official, general] | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/q_ip1_keep_strategies.ts > definition contract 1`] = `"radio | required | next null | options [keep, propose, discard] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/q_ip2_keep_device_targets.ts > definition contract 1`] = `"radio | required | next null | options [keep, propose, discard] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/q_ip3_keep_script_conventions.ts > definition contract 1`] = `"radio | required | next null | options [keep, propose, discard] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/q_sa1_target_script_spread.ts > definition contract 1`] = `"radio | required | next null | options [keep, reconsider] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/q_sa2_base_script_mismatch.ts > definition contract 1`] = `"radio | required | next null | options [retarget, keep-base] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/q_sa3_latin_flavor.ts > definition contract 1`] = `"radio | required | next null | options [plain, extended, ipa] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/q_tp1_confidence_threshold.ts > definition contract 1`] = `"radio | required | next null | options [0.6, 0.8, 0.95] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/q_tp2_fallback_tier_prefill.ts > definition contract 1`] = `"radio | required | next null | options [allow, ask] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > b/q_tp3_orthography_join.ts > definition contract 1`] = `"radio | required | next null | options [join, decline] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > f/pf_canonical_order.ts > definition contract 1`] = `"short_text | optional | next pf_script_glossary | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > f/pf_contact_info.ts > definition contract 1`] = `"text | optional | next null | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > f/pf_credits.ts > definition contract 1`] = `"text | optional | next pf_contact_info | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > f/pf_design_rationale.ts > definition contract 1`] = `"text | optional | next [ctx.routing_group == 'non-roman' -> pf_canonical_order; (default) -> pf_example_words] | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > f/pf_doc_language.ts > definition contract 1`] = `"radio | optional | next pf_font_guidance | options [english, target, bilingual] | prompt | help_text | validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > f/pf_example_words.ts > definition contract 1`] = `"text | optional | next pf_troubleshooting | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > f/pf_font_guidance.ts > definition contract 1`] = `"text | optional | next pf_usage_tip_2 | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > f/pf_further_reading.ts > definition contract 1`] = `"text | optional | next pf_project_url | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > f/pf_known_limitations.ts > definition contract 1`] = `"text | optional | next pf_further_reading | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > f/pf_more_detail_gate.ts > definition contract 1`] = `"bool | required | next [value == 'true' -> pf_doc_language; (default) -> pf_credits] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > f/pf_project_url.ts > definition contract 1`] = `"text | optional | next pf_credits | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > f/pf_provenance_basis.ts > definition contract 1`] = `"text | optional | next pf_design_rationale | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > f/pf_related_keyboards.ts > definition contract 1`] = `"text | optional | next pf_known_limitations | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > f/pf_scope_variety.ts > definition contract 1`] = `"text | optional | next pf_provenance_basis | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > f/pf_script_glossary.ts > definition contract 1`] = `"text | optional | next pf_example_words | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > f/pf_troubleshooting.ts > definition contract 1`] = `"text | optional | next pf_related_keyboards | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > f/pf_usage_tip_1.ts > definition contract 1`] = `"text | optional | next pf_more_detail_gate | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > f/pf_usage_tip_2.ts > definition contract 1`] = `"text | optional | next pf_scope_variety | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > f/pf_usage_tip_3.ts > definition contract 1`] = `"text | optional | next pf_usage_tip_4 | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > f/pf_usage_tip_4.ts > definition contract 1`] = `"text | optional | next pf_usage_tip_5 | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > f/pf_usage_tip_5.ts > definition contract 1`] = `"text | optional | next pf_credits | prompt | help_text | no validate | blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > f/pf_welcome_paragraph.ts > definition contract 1`] = `"text | required | next pf_usage_tip_1 | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;
+
+exports[`live question modules > g/project_display_name.ts > definition contract 1`] = `"short_text | required | next project_keyboard_id | prompt | help_text | validate | no blank fixture | inputs [header.bcp47] | writes [header.name]"`;
+
+exports[`live question modules > g/project_keyboard_id.ts > definition contract 1`] = `"short_text | required | next null | prompt | help_text | validate | no blank fixture | inputs [header.bcp47] | writes [header.keyboardId]"`;
+
+exports[`live question modules > g/track_choice.ts > definition contract 1`] = `"radio | required | next null | options [copy, adapt] | prompt | help_text | validate | no blank fixture | inputs [] | writes []"`;

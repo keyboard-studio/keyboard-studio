@@ -20,6 +20,7 @@ import { describe, it, expect, afterEach, vi, beforeEach } from "vitest";
 import { screen, fireEvent, act, cleanup } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "../stores/workingCopyStore";
+import { seedInstantiatedWorkingCopy } from "../test/workingCopy.ts";
 import { TOUCH_STEP_ID } from "../steps/reducer";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
@@ -166,41 +167,22 @@ function renderOutputScreen() {
   return render(<OutputScreen />);
 }
 
-/**
- * Seed an instantiated working copy — the normal end-of-flow state.
- *
- * Note for OutputScreen tests: seeding is by itself enough to give the screen a
- * base. `usePreviewArtifact` lazy-inits its `baseKeyboard` from this store, and
- * since spec 058 an instantiated working copy puts the left pane in its
- * "shipping" variant, which has NO picker to click (re-basing from the ship-it
- * screen was the defect that change removed). So the seeded OutputScreen tests
- * below deliberately do not click "base-picker" — the tests that still do are
- * exercising the cold-arrival path, where the picker is the only route.
- */
-function seedInstantiatedWorkingCopy() {
-  const vfs = createVirtualFS([
-    { path: "source/basic_kbdus.kmn", content: "c test\n", isBinary: false },
-  ]);
-  useWorkingCopyStore.getState().instantiateFromBase(basicKbdus, {
-    vfs,
-    ir: makeTestIR([]),
-  });
-  // spec 064 D5/D6: download is gated on attribution, because a redistributable
-  // package with no rights holder is incomplete. A fully instantiated working
-  // copy therefore has one — the dedicated no-attribution case is asserted
-  // separately below.
-  useWorkingCopyStore.getState().setAttribution({
-    authorName: "Alice Example",
-    copyrightHolder: "Alice Example",
-  });
-}
+// Note for the seeded OutputScreen tests: seeding is by itself enough to give
+// the screen a base. `usePreviewArtifact` lazy-inits its `baseKeyboard` from
+// this store, and since spec 058 an instantiated working copy puts the left
+// pane in its "shipping" variant, which has NO picker to click (re-basing
+// from the ship-it screen was the defect that change removed). So the seeded
+// OutputScreen tests below deliberately do not click "base-picker" — the
+// tests that still do are exercising the cold-arrival path, where the picker
+// is the only route. They seed with attribution because download is gated on
+// it (spec 064 D5/D6); the dedicated no-attribution case is asserted
+// separately below.
 
 // ---------------------------------------------------------------------------
 // Setup / teardown
 // ---------------------------------------------------------------------------
 
 beforeEach(() => {
-  useWorkingCopyStore.getState().reset();
   mockStage.current = {
     kind: "ready",
     compileResult: { success: true, artifacts: [], diagnostics: [], compileMs: 0, isWarmCompile: true },
@@ -223,7 +205,7 @@ afterEach(() => {
 
 describe("OutputScreen — route-split AC", () => {
   it("renders the Download .zip button after base is picked", () => {
-    seedInstantiatedWorkingCopy();
+    seedInstantiatedWorkingCopy(undefined, { attributed: true });
     mockSerializeResult.current = {
       bytes: EMPTY_ZIP_BYTES,
       warnings: [],
@@ -268,7 +250,7 @@ describe("OutputScreen — route-split AC", () => {
 
 describe("OutputScreen — output-time touch-layout staleness gate", () => {
   function renderWithReadyOutput() {
-    seedInstantiatedWorkingCopy();
+    seedInstantiatedWorkingCopy(undefined, { attributed: true });
     mockSerializeResult.current = {
       bytes: EMPTY_ZIP_BYTES,
       warnings: [],
@@ -362,7 +344,7 @@ describe("OutputScreen — output-time touch-layout staleness gate", () => {
 
 describe("OutputScreen — projection warnings", () => {
   it("does NOT render a warning region when serializeWorkingCopy returns no warnings", async () => {
-    seedInstantiatedWorkingCopy();
+    seedInstantiatedWorkingCopy(undefined, { attributed: true });
     mockSerializeResult.current = {
       bytes: EMPTY_ZIP_BYTES,
       warnings: [],
@@ -382,7 +364,7 @@ describe("OutputScreen — projection warnings", () => {
   });
 
   it("renders the warning region with each warning string when warnings are returned", async () => {
-    seedInstantiatedWorkingCopy();
+    seedInstantiatedWorkingCopy(undefined, { attributed: true });
     mockSerializeResult.current = {
       bytes: EMPTY_ZIP_BYTES,
       warnings: [
@@ -406,7 +388,7 @@ describe("OutputScreen — projection warnings", () => {
   });
 
   it("warning region has aria-live='polite' (non-blocking)", async () => {
-    seedInstantiatedWorkingCopy();
+    seedInstantiatedWorkingCopy(undefined, { attributed: true });
     mockSerializeResult.current = {
       bytes: EMPTY_ZIP_BYTES,
       warnings: ["[serialize] something"],
@@ -425,7 +407,7 @@ describe("OutputScreen — projection warnings", () => {
   });
 
   it("warning region is cleared on a subsequent clean download", async () => {
-    seedInstantiatedWorkingCopy();
+    seedInstantiatedWorkingCopy(undefined, { attributed: true });
 
     // First download — with warnings.
     mockSerializeResult.current = {
@@ -465,12 +447,12 @@ describe("OutputScreen — projection warnings", () => {
 // ---------------------------------------------------------------------------
 
 // Helper: render OutputScreen with a base in place, so the identity-warn banner
-// (inside {baseKeyboard !== null}) renders. seedInstantiatedWorkingCopy() both
+// (inside {baseKeyboard !== null}) renders. seedInstantiatedWorkingCopy(undefined, { attributed: true }) both
 // supplies that base (lazy-init from the store — see its docstring) and keeps
 // identity = null via instantiateFromBase's idempotence guard, which is what
 // makes showIdentityWarn true.
 function renderOutputWithBasePicked() {
-  seedInstantiatedWorkingCopy();
+  seedInstantiatedWorkingCopy(undefined, { attributed: true });
   renderOutputScreen();
 }
 
@@ -529,7 +511,7 @@ describe("OutputScreen — identity-unset warning banner", () => {
 
 describe("OutputScreen — download filename", () => {
   it("names the download <keyboardId>-<version>.zip", async () => {
-    seedInstantiatedWorkingCopy();
+    seedInstantiatedWorkingCopy(undefined, { attributed: true });
     mockSerializeResult.current = {
       bytes: EMPTY_ZIP_BYTES,
       warnings: [],
@@ -616,7 +598,7 @@ describe("OutputScreen — attribution gate", () => {
   });
 
   it("enables download once attribution is present", () => {
-    seedInstantiatedWorkingCopy(); // seeds attribution
+    seedInstantiatedWorkingCopy(undefined, { attributed: true }); // seeds attribution
     render(<OutputScreen />);
     expect((screen.getByTestId("emit-download") as HTMLButtonElement).disabled).toBe(false);
     expect(screen.queryByTestId("attribution-required")).toBeNull();
@@ -634,7 +616,7 @@ describe("OutputScreen — unreadable base copyright notice (D5)", () => {
   const UNREADABLE = { reason: "template_placeholder", line: "Copyright (c) YYYY ______" };
 
   function seedWithUnreadableLicense() {
-    seedInstantiatedWorkingCopy(); // attribution present, so D5 is the ONLY blocker
+    seedInstantiatedWorkingCopy(undefined, { attributed: true }); // attribution present, so D5 is the ONLY blocker
     useWorkingCopyStore.getState().setLicenseUnparseable(UNREADABLE);
   }
 
@@ -685,7 +667,7 @@ describe("OutputScreen — unreadable base copyright notice (D5)", () => {
   });
 
   it("does not show the block when the base notice was readable", () => {
-    seedInstantiatedWorkingCopy();
+    seedInstantiatedWorkingCopy(undefined, { attributed: true });
     render(<OutputScreen />);
     expect(screen.queryByTestId("license-unreadable")).toBeNull();
     expect((screen.getByTestId("emit-download") as HTMLButtonElement).disabled).toBe(false);

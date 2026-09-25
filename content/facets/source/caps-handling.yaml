@@ -41,10 +41,10 @@ metrics:
 
 transformImpactClass: behavior-preserving
 houseTargetPolicy:
-  inputs: [pb_capitals_marks]
+  # pb_capitals_marks (the former sole input) was retired by spec 071 and has
+  # been deleted; only the default row remains until a live input exists.
+  inputs: []
   rules:
-    - when: "pb_capitals_marks indicates capitals are typed with marks"
-      target: any-index-fold
     - when: default
       target: no-caps-rules
 invertibility: lossless

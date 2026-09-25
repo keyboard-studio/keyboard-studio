@@ -1,12 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { assertSemanticEquivalence } from "./keyboardIRRoundTrip.js";
 import { makeTestIR, charItems } from "./fixtures/keyboard-ir.js";
+import { charStore, irGroup, vkeyRule } from "./fixtures/ir-builders.js";
 import type {
   IRGroup,
   IRRule,
   IRStore,
-  ContextElement,
-  OutputElement,
   KeyboardIR,
 } from "./keyboard-ir.js";
 
@@ -14,45 +13,18 @@ import type {
 // Helpers
 // ---------------------------------------------------------------------------
 
-function makeGroup(
-  rules: IRRule[],
-  name = "main",
-  usingKeys = true,
-): IRGroup {
-  return { nodeId: `g#${name}`, name, usingKeys, readonly: false, rules };
-}
-
-function makeRule(
-  context: ContextElement[],
-  output: OutputElement[],
-  id = `r#${Math.random().toString(36).slice(2)}`,
-): IRRule {
-  return { nodeId: id, context, output };
+function makeGroup(rules: IRRule[], name = "main", usingKeys = true): IRGroup {
+  return irGroup({ nodeId: `g#${name}`, name, usingKeys, rules });
 }
 
 /** Rule: K_A -> "a" */
 function ruleKA(): IRRule {
-  return makeRule(
-    [{ kind: "vkey", name: "K_A", modifiers: [] }],
-    [{ kind: "char", value: "a" }],
-  );
+  return vkeyRule({ output: "a" });
 }
 
 /** Rule: K_B -> "b" */
 function ruleKB(): IRRule {
-  return makeRule(
-    [{ kind: "vkey", name: "K_B", modifiers: [] }],
-    [{ kind: "char", value: "b" }],
-  );
-}
-
-function makeStore(name: string, chars: string): IRStore {
-  return {
-    nodeId: `store#${name}`,
-    name,
-    items: charItems(chars),
-    isSystem: false,
-  };
+  return vkeyRule({ vkey: "K_B", output: "b" });
 }
 
 // ---------------------------------------------------------------------------
@@ -81,8 +53,8 @@ describe("assertSemanticEquivalence", () => {
   // ---------------------------------------------------------------------------
 
   it("reports equivalent when stores appear in different declaration order", () => {
-    const storeA = makeStore("aaa", "abc");
-    const storeZ = makeStore("zzz", "xyz");
+    const storeA = charStore({ name: "aaa", chars: "abc" });
+    const storeZ = charStore({ name: "zzz", chars: "xyz" });
     const irA = makeTestIR([makeGroup([ruleKA()])], [storeA, storeZ]);
     const irB = makeTestIR([makeGroup([ruleKA()])], [storeZ, storeA]);
     const result = assertSemanticEquivalence(irA, irB);
@@ -94,14 +66,8 @@ describe("assertSemanticEquivalence", () => {
   // ---------------------------------------------------------------------------
 
   it("reports equivalent when modifier flags are in different order", () => {
-    const ruleA = makeRule(
-      [{ kind: "vkey", name: "K_A", modifiers: ["SHIFT", "CTRL"] }],
-      [{ kind: "char", value: "A" }],
-    );
-    const ruleB = makeRule(
-      [{ kind: "vkey", name: "K_A", modifiers: ["CTRL", "SHIFT"] }],
-      [{ kind: "char", value: "A" }],
-    );
+    const ruleA = vkeyRule({ modifiers: ["SHIFT", "CTRL"], output: "A" });
+    const ruleB = vkeyRule({ modifiers: ["CTRL", "SHIFT"], output: "A" });
     const irA = makeTestIR([makeGroup([ruleA])]);
     const irB = makeTestIR([makeGroup([ruleB])]);
     const result = assertSemanticEquivalence(irA, irB);
@@ -131,16 +97,8 @@ describe("assertSemanticEquivalence", () => {
   // ---------------------------------------------------------------------------
 
   it("reports not-equivalent when a rule output differs", () => {
-    const ruleAv1 = makeRule(
-      [{ kind: "vkey", name: "K_A", modifiers: [] }],
-      [{ kind: "char", value: "a" }],
-      "r#rule0",
-    );
-    const ruleAv2 = makeRule(
-      [{ kind: "vkey", name: "K_A", modifiers: [] }],
-      [{ kind: "char", value: "x" }], // different output
-      "r#rule0",
-    );
+    const ruleAv1 = vkeyRule({ nodeId: "r#rule0", output: "a" });
+    const ruleAv2 = vkeyRule({ nodeId: "r#rule0", output: "x" }); // different output
     const irA = makeTestIR([makeGroup([ruleAv1])]);
     const irB = makeTestIR([makeGroup([ruleAv2])]);
     const result = assertSemanticEquivalence(irA, irB);
@@ -262,8 +220,8 @@ describe("assertSemanticEquivalence", () => {
   // ---------------------------------------------------------------------------
 
   it("reports not-equivalent when store content differs", () => {
-    const irA = makeTestIR([makeGroup([ruleKA()])], [makeStore("alpha", "abc")]);
-    const irB = makeTestIR([makeGroup([ruleKA()])], [makeStore("alpha", "xyz")]);
+    const irA = makeTestIR([makeGroup([ruleKA()])], [charStore({ name: "alpha", chars: "abc" })]);
+    const irB = makeTestIR([makeGroup([ruleKA()])], [charStore({ name: "alpha", chars: "xyz" })]);
     const result = assertSemanticEquivalence(irA, irB);
     expect(result.equivalent).toBe(false);
     const storeDiff = result.differences.find((d) => d.path.includes("alpha"));
@@ -271,7 +229,7 @@ describe("assertSemanticEquivalence", () => {
   });
 
   it("reports not-equivalent when store is present in one IR only", () => {
-    const irA = makeTestIR([makeGroup([ruleKA()])], [makeStore("extra", "abc")]);
+    const irA = makeTestIR([makeGroup([ruleKA()])], [charStore({ name: "extra", chars: "abc" })]);
     const irB = makeTestIR([makeGroup([ruleKA()])], []);
     const result = assertSemanticEquivalence(irA, irB);
     expect(result.equivalent).toBe(false);
@@ -347,16 +305,8 @@ describe("assertSemanticEquivalence", () => {
   // ---------------------------------------------------------------------------
 
   it("reports not-equivalent when rule order within a group changes", () => {
-    const r1 = makeRule(
-      [{ kind: "vkey", name: "K_A", modifiers: [] }],
-      [{ kind: "char", value: "a" }],
-      "r#fixed-1",
-    );
-    const r2 = makeRule(
-      [{ kind: "vkey", name: "K_B", modifiers: [] }],
-      [{ kind: "char", value: "b" }],
-      "r#fixed-2",
-    );
+    const r1 = vkeyRule({ nodeId: "r#fixed-1", output: "a" });
+    const r2 = vkeyRule({ nodeId: "r#fixed-2", vkey: "K_B", output: "b" });
     const irA = makeTestIR([makeGroup([r1, r2])]);
     const irB = makeTestIR([makeGroup([r2, r1])]);
     const result = assertSemanticEquivalence(irA, irB);

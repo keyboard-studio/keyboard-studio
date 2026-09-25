@@ -9,7 +9,7 @@
 import { describe, it, expect } from "vitest";
 import { suggestMissingCharacters, neededCharsForLanguage, isCharCoveredForLocale } from "./suggestMissing.js";
 import type { CldrFullLoader } from "./cldr.js";
-import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
+import { irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import type { IRGroup, IRRule } from "@keyboard-studio/contracts";
 
 // ---------------------------------------------------------------------------
@@ -30,15 +30,11 @@ function makeLoader(
 const nullLoader: CldrFullLoader = async (_locale) => null;
 
 function makeGroup(rules: IRRule[], name = "main"): IRGroup {
-  return { nodeId: `group#${name}`, name, usingKeys: true, readonly: false, rules };
+  return irGroup({ rules, name });
 }
 
 function makeRule(output: IRRule["output"]): IRRule {
-  return {
-    nodeId: `rule#${Math.random().toString(36).slice(2)}`,
-    context: [{ kind: "vkey", name: "K_A", modifiers: [] }],
-    output,
-  };
+  return vkeyRule({ output });
 }
 
 /**

@@ -285,7 +285,6 @@ function expectCaptured(impact: DecisionImpact | null) {
 
 describe("identity stage — a metadata-only change is shown, and shown jointly", () => {
   beforeEach(() => {
-    useDecisionLogStore.getState().reset();
     resetDecisionEntryIds();
   });
 

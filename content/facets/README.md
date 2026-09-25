@@ -64,12 +64,12 @@ derivations:                        # ordered best-first; at least one
     sourceStatus: planned           # available | planned
     notes: optional free text
   - kind: asked
-    source: "question:pb_mark_style"
+    source: "question:pb_typing_approach"
     sourceStatus: available
 
 consumers:                          # what this facet feeds — the load-bearing field
   prefills:                         # survey question ids this facet can prefill
-    - pb_mark_style                 # (lint: must be real question ids)
+    - pb_typing_approach            # (lint: must be real question ids)
   proposes:                         # non-question proposal sites, "namespace:slug"
     - "axis:A4"
     - "mechanism-gallery:deadkey-vs-direct"
