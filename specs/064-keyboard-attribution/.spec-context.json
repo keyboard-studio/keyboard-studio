@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "Keyboard Attribution",
+  "branch": "",
+  "currentStep": "specify",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-24T01:36:56.630Z"
+    }
+  ],
+  "telemetryInstanceId": "ed58a1a2-f643-41c0-9742-5d0f497b9386"
+}

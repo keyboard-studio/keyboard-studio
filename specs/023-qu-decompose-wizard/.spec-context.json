@@ -1,0 +1,17 @@
+{
+  "workflow": "speckit",
+  "specName": "Qu Decompose Wizard",
+  "branch": "",
+  "currentStep": "specify",
+  "status": "completed",
+  "history": [
+    {
+      "step": "specify",
+      "substep": null,
+      "kind": "complete",
+      "by": "extension",
+      "at": "2026-09-24T01:38:47.989Z"
+    }
+  ],
+  "telemetryInstanceId": "1c798d8e-e6c8-42a2-90e6-7be50008312c"
+}
