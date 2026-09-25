@@ -727,7 +727,10 @@ test.describe("spec 034 US3 (T028): durable draft survives reload, Back stays co
     // scrollTop/compareSelection/trail state only — so it is not the
     // mechanism here.)
     const carveGallery = page.getByTestId("carve-gallery");
-    await carveGallery.getByRole("button", { name: "← Back" }).click();
+    // spec 081: Back/forward moved from the panel body into the footer's
+    // step-nav group, so this is scoped by the step's own testId (carve-back),
+    // not by role/name inside the (now-body-only) carve-gallery panel.
+    await page.getByTestId("carve-back").click();
     await expect(carveGallery).toHaveCount(0);
 
     // Back walks the restored history stack one entry at a time, and the

@@ -590,3 +590,47 @@ describe("TouchGallery — no modal, ever", () => {
     expect(container.querySelector("dialog")).toBeNull();
   });
 });
+
+// ---------------------------------------------------------------------------
+// spec 081 US2 scenario 7 — the footer Done's press-twice orphaned-edit
+// notice (FR-036e/T120) survives the move into StepNavCluster unchanged: one
+// press states the orphaned edits, a second, explicit press proceeds.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — footer Done press-twice on orphaned key edits", () => {
+  it("the first press shows the orphaned-edit notice instead of completing; the second press proceeds", async () => {
+    // A single uncovered char, marked for later review (clears the FR-008
+    // coverage gate the same way the "marking the uncovered char" test above
+    // does), keeps the per-character pane mounted with a live `touch-continue`
+    // Done button — the all-caught-up empty-inventory panel above renders no
+    // completion-gate notice at all, so it cannot exercise this path.
+    seedStore({ withInventory: ["中"] });
+    useWorkingCopyStore.getState().commitKeyEdit({
+      kind: "set",
+      // Never resolves against any layout, so replay reports it as orphaned
+      // (FR-033a) rather than applying or throwing (keyEditOps.test.ts).
+      address: "not-an-address",
+      fields: { text: "x" },
+    });
+    const onComplete = vi.fn();
+
+    await act(async () => {
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />, { withStepNav: true });
+    });
+
+    fireEvent.click(
+      screen.getByRole("button", { name: /Mark U\+4E2D 中 for later review/i }),
+    );
+
+    const group = screen.getByRole("group", { name: "Step navigation" });
+    const doneBtn = screen.getByTestId("touch-continue");
+    expect(group.contains(doneBtn)).toBe(true);
+
+    fireEvent.click(doneBtn);
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(screen.getByTestId("touch-orphaned-key-edits-notice")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("touch-continue"));
+    expect(onComplete).toHaveBeenCalledOnce();
+  });
+});

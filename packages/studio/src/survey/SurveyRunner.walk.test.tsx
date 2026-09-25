@@ -251,3 +251,25 @@ describe("SurveyRunner — publishes its walk", () => {
     expect(screen.getByText("First question")).toBeTruthy();
   });
 });
+
+// ---------------------------------------------------------------------------
+// spec 081 US2 scenario 5 — the footer Next's disabled state and its progress
+// description survive the move into StepNavCluster unchanged.
+// ---------------------------------------------------------------------------
+
+describe("SurveyRunner — footer Next carries the progress description", () => {
+  it("is disabled on an incomplete required question, and describes progress via aria-describedby", () => {
+    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />, { withStepNav: true });
+
+    const group = screen.getByRole("group", { name: "Step navigation" });
+    const nextBtn = screen.getByTestId("survey-advance");
+    expect(group.contains(nextBtn)).toBe(true);
+    // q1 is required and unanswered — same gating as before the footer move.
+    expect((nextBtn as HTMLButtonElement).disabled).toBe(true);
+
+    const describedById = nextBtn.getAttribute("aria-describedby");
+    expect(describedById).toBeTruthy();
+    const description = document.getElementById(describedById!);
+    expect(description?.textContent).toMatch(/Step 1 of ~3/);
+  });
+});
