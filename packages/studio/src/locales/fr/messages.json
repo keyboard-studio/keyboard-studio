@@ -867,6 +867,7 @@
   "footer.dot.current.ariaLabel": "{label} — vous êtes ici",
   "footer.dot.partial.ariaLabel": "{label} — partly answered",
   "footer.dot.question.unanswered.ariaLabel": "{label} — no answer yet",
+  "footer.dot.skipped.ariaLabel": "",
   "footer.dot.upcoming.ariaLabel": "{label} — pas encore atteint",
   "footer.notice.reproposal.body": "{0, plural, one {# question in {steps} will need reconfirming — look for the work-to-do marks below.} other {# questions in {steps} will need reconfirming — look for the work-to-do marks below.}}",
   "footer.project.label": "Projet : {name}",

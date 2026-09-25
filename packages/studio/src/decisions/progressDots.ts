@@ -103,7 +103,8 @@ export type ProgressDotKind = "completed" | "current" | "upcoming";
 export type MarkTier = "section" | "question";
 
 /** "Has a response" (journey-strip-contract.md §3) — independent of `kind`. */
-export type MarkFill = "full" | "partial" | "none";
+/** `skipped` — an optional screen passed blank: greyed, not hollow. */
+export type MarkFill = "full" | "partial" | "none" | "skipped";
 
 /** One mark in the footer's journey row (data-model.md "ProgressDot", extended
  * by journey-strip-contract.md §3 for the two-tier strip). */
@@ -154,6 +155,11 @@ export interface ProgressDotsInput {
   /** Each step's current `StepStatus` (spec 079 `surveyAnswerStore`) — drives
    * FR-068's "passed — {reason}" statement for a `not-asked` step. */
   readonly stepStatuses?: Readonly<Record<string, StepStatus>>;
+  /** Steps whose OUTCOME is in hand however many of their screens were left
+   * blank — e.g. `characters` once the keyboard has letters, where the optional
+   * text boxes on the way there may stay empty. A satisfied step's collapsed
+   * section mark is full; its per-screen question marks are unaffected. */
+  readonly satisfiedSteps?: ReadonlySet<string>;
 }
 
 // ---------------------------------------------------------------------------
@@ -295,6 +301,8 @@ interface StepScreen {
   readonly location: Location;
   readonly label: string;
   readonly done: boolean;
+  /** Optional and passed blank — see StepWalkPosition.skipped. */
+  readonly skipped: boolean;
   readonly isCursor: boolean;
 }
 
@@ -328,6 +336,7 @@ function stepScreens(
     location: { route: "survey", step: stepId as StepId, question: source.questionId },
     label: screenMarkLabel(source, stepId, lookupQuestionLabel, i18n),
     done: true, // a record entry IS a settled answer.
+    skipped: false,
     isCursor: source.screenId === cursorId,
   }));
 
@@ -340,6 +349,7 @@ function stepScreens(
       // StepWalkPosition.label for why the precedence lives here.
       label: position.label ?? lookupQuestionLabel(position.id) ?? stageLabel(stepId, i18n),
       done: position.done,
+      skipped: position.skipped === true && !position.done,
       isCursor: position.id === cursorId,
     });
   }
@@ -388,13 +398,17 @@ function buildActiveStepMarks(
 ): { marks: ProgressDot[]; markedCurrent: boolean } {
   let markedCurrent = false;
   const marks = screens.map((screen) => {
-    const kind: ProgressDotKind = screen.isCursor ? "current" : screen.done ? "completed" : "upcoming";
+    const kind: ProgressDotKind = screen.isCursor
+      ? "current"
+      : screen.done || screen.skipped
+        ? "completed"
+        : "upcoming";
     if (kind === "current") markedCurrent = true;
     const badge = badgeForScreen(screen.id, workToDo);
     return {
       kind,
       tier: "question" as const,
-      fill: screen.done ? ("full" as const) : ("none" as const),
+      fill: screen.done ? ("full" as const) : screen.skipped ? ("skipped" as const) : ("none" as const),
       ...(badge !== undefined ? { badge } : {}),
       id: screen.id,
       location: screen.location,
@@ -426,9 +440,12 @@ function badgeKinds(items: readonly WorkItem[] | undefined): readonly WorkKind[]
 
 function aggregateFill(screens: readonly StepScreen[]): MarkFill {
   if (screens.length === 0) return "none";
+  // A skipped optional screen is settled for the section: it neither fills the
+  // mark on its own nor holds an otherwise-answered section below full.
   const doneCount = screens.filter((s) => s.done).length;
-  if (doneCount === screens.length) return "full";
-  if (doneCount === 0) return "none";
+  const settledCount = doneCount + screens.filter((s) => s.skipped).length;
+  if (doneCount === 0) return settledCount === screens.length ? "skipped" : "none";
+  if (settledCount === screens.length) return "full";
   return "partial";
 }
 
@@ -453,13 +470,14 @@ function buildSectionMark(
   stepCursor: string | undefined,
   workToDo: readonly WorkItem[] | undefined,
   stepStatus: StepStatus | undefined,
+  satisfied: boolean,
 ): ProgressDot | null {
   const badge = badgeKinds(workToDo);
   const passedReason =
     stepStatus?.kind === "not-asked" ? notAskedPassedMessage(stepStatus.reason, i18n) : undefined;
 
   if (screens.length > 0) {
-    const fill = aggregateFill(screens);
+    const fill = satisfied ? "full" : aggregateFill(screens);
     const location = sectionJumpLocation(stepId, badge, workToDo, stepCursor);
     return {
       kind: fill === "none" ? "upcoming" : "completed",
@@ -590,6 +608,7 @@ export function buildProgressDots(input: ProgressDotsInput): readonly ProgressDo
   const recordedScreenOf = input.recordedScreenOf ?? {};
   const workToDo = input.workToDo ?? {};
   const stepStatuses = input.stepStatuses ?? {};
+  const satisfiedSteps = input.satisfiedSteps ?? new Set<string>();
   const activeStepId = ctx.traversal.activeStepId;
 
   // Record entries per step, in record order (effectiveEntries collapses
@@ -679,6 +698,7 @@ export function buildProgressDots(input: ProgressDotsInput): readonly ProgressDo
       cursors[step.id],
       stepWorkToDo,
       stepStatuses[step.id],
+      satisfiedSteps.has(step.id),
     );
     if (mark !== null) row.push(mark);
   }

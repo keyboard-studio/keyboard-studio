@@ -161,6 +161,13 @@ export function StudioFooter() {
     return out;
   }, [answerSteps]);
   const recordedScreenOf = useSurveyAnswerStore((s) => s.recordedScreenOf);
+  // Characters is judged by its outcome — the keyboard has letters — not by
+  // whether every optional box on the way was filled.
+  const hasLetters = useWorkingCopyStore((s) => s.session.confirmedInventory.length > 0);
+  const satisfiedSteps = useMemo(
+    () => new Set<string>(hasLetters ? ["characters"] : []),
+    [hasLetters],
+  );
 
   const dots = useMemo(
     () =>
@@ -173,9 +180,21 @@ export function StudioFooter() {
         recordedScreenOf,
         workToDo,
         stepStatuses,
+        satisfiedSteps,
         ...(currentQuestion !== undefined ? { currentQuestion } : {}),
       }),
-    [record, ctx, i18n, walks, cursors, recordedScreenOf, workToDo, stepStatuses, currentQuestion],
+    [
+      record,
+      ctx,
+      i18n,
+      walks,
+      cursors,
+      recordedScreenOf,
+      workToDo,
+      stepStatuses,
+      satisfiedSteps,
+      currentQuestion,
+    ],
   );
 
   // ---------------------------------------------------------------------------

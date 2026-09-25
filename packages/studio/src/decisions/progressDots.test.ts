@@ -802,3 +802,78 @@ describe("jumping back (T065, FR-063)", () => {
     expect(sectionFor(after, "identity")).toMatchObject({ fill: "full" });
   });
 });
+
+describe("optional screens left blank, and outcome-satisfied steps", () => {
+  const pastCharacters = (): ResolveContext =>
+    ctxWith({
+      traversal: traversal({
+        activeStepId: "marks",
+        history: ["identity", "choose_base", "track", "characters"],
+      }),
+    });
+
+  it("a skipped optional stop on the active step is a greyed 'skipped' mark, not a hollow one", () => {
+    const dots = buildProgressDots({
+      record: recordOf([]),
+      ctx: ctxWith(),
+      lookupQuestionLabel: stubLabel,
+      stepWalks: {
+        characters: [
+          { id: "il_language_english", done: true },
+          { id: "some_optional_question", done: false, skipped: true },
+          { id: "il_language_autonym", done: false },
+        ],
+      },
+      stepCursors: { characters: "il_language_autonym" },
+    });
+    const skipped = dots.find((d) => d.id === "some_optional_question");
+    expect(skipped?.fill).toBe("skipped");
+    expect(skipped?.kind).toBe("completed");
+  });
+
+  it("skipped optional stops do not hold an otherwise-answered section below full", () => {
+    const dots = buildProgressDots({
+      record: recordOf([]),
+      ctx: pastCharacters(),
+      lookupQuestionLabel: stubLabel,
+      stepWalks: {
+        characters: [
+          { id: "il_language_english", done: true },
+          { id: "some_optional_question", done: false, skipped: true },
+        ],
+      },
+    });
+    expect(sectionFor(dots, "characters")?.fill).toBe("full");
+  });
+
+  it("a section whose every stop was skipped reads 'skipped', not empty", () => {
+    const dots = buildProgressDots({
+      record: recordOf([]),
+      ctx: pastCharacters(),
+      lookupQuestionLabel: stubLabel,
+      stepWalks: {
+        characters: [{ id: "some_optional_question", done: false, skipped: true }],
+      },
+    });
+    expect(sectionFor(dots, "characters")?.fill).toBe("skipped");
+  });
+
+  it("a satisfied step's section is full even when its screens were left blank", () => {
+    const input = {
+      record: recordOf([]),
+      ctx: pastCharacters(),
+      lookupQuestionLabel: stubLabel,
+      stepWalks: {
+        characters: [
+          { id: "prefill", done: true },
+          { id: "intro", done: true },
+          { id: "build-list", done: false },
+        ],
+      },
+    };
+    expect(sectionFor(buildProgressDots(input), "characters")?.fill).toBe("partial");
+    const satisfied = buildProgressDots({ ...input, satisfiedSteps: new Set(["characters"]) });
+    expect(sectionFor(satisfied, "characters")?.fill).toBe("full");
+    expect(sectionFor(satisfied, "characters")?.kind).toBe("completed");
+  });
+});
