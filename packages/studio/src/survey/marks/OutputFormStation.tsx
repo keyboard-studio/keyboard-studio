@@ -15,6 +15,7 @@
 import { Trans, useLingui } from "@lingui/react/macro";
 import { composeStack } from "@keyboard-studio/contracts";
 import type { OutputForm, OutputFormProposal, PosturePair } from "@keyboard-studio/engine";
+import { prefixCombiningMark } from "../../lib/irToCarveNodes.ts";
 import {
   ACCENT,
   BORDER,
@@ -31,6 +32,12 @@ export interface OutputFormStationProps {
   /** The current answer (defaults to the proposal's form). */
   value: OutputForm;
   onChange: (next: OutputForm) => void;
+  /**
+   * The marks S2 resolved to `own-key`, in alphabet order. The proposal already
+   * reads this as `hasOwnKeyMark`; the station states it back to the author as
+   * a premise instead of asking them to remember the previous screen.
+   */
+  ownKeyMarks: string[];
 }
 
 /**
@@ -108,33 +115,74 @@ function useFormLabel(): Record<OutputForm, string> {
   return {
     "ready-made": t({
       id: "survey.marks.outputForm.formLabel.readyMade",
-      message: "One ready-made character per accented letter",
+      message: "One unit per accented letter",
     }),
     "base-plus-mark": t({
       id: "survey.marks.outputForm.formLabel.basePlusMark",
-      message: "Letter plus mark, built as you type",
+      message: "A letter and a mark, kept separate",
     }),
   };
 }
 
-/** Per-option consequence text for the FR-016 open choice (plain language). */
+/**
+ * Per-option consequence text, in terms of the two behaviours this decision
+ * actually controls: what backspace does, and how the text behaves when it is
+ * searched or compared. Used by the FR-016 open choice for both options, and
+ * by the notice branch whenever the author has overridden the proposal.
+ */
 function useFormConsequence(): Record<OutputForm, string> {
   const { t } = useLingui();
   return {
     "base-plus-mark": t({
       id: "survey.marks.outputForm.formConsequence.basePlusMark",
       message:
-        "Backspace peels one mark off at a time, and typing a mark key after any allowed letter adds the mark.",
+        "Backspace clears the mark first and the plain letter next, and searching or comparing text matches the letter as a letter followed by its mark.",
     }),
     "ready-made": t({
       id: "survey.marks.outputForm.formConsequence.readyMade",
       message:
-        "Each accented letter is a single unit — backspace removes the whole letter in one step.",
+        "Backspace clears the whole accented letter in one press, and searching or comparing text matches the letter as a single unit.",
     }),
   };
 }
 
-export function OutputFormStation({ posture, proposal, value, onChange }: OutputFormStationProps) {
+/**
+ * The S2 outcome, stated back as a premise (not re-derived): whether any mark
+ * got a key of its own, and — when the list is short enough to be useful —
+ * which ones. One line, deliberately not a recap panel.
+ */
+function S2Premise({ ownKeyMarks }: { ownKeyMarks: string[] }) {
+  const { t } = useLingui();
+  const NAMEABLE = 3;
+  const text =
+    ownKeyMarks.length === 0
+      ? t({
+          id: "survey.marks.outputForm.premise.none",
+          message: "From the previous question — no mark has a key of its own.",
+        })
+      : ownKeyMarks.length <= NAMEABLE
+        ? t({
+            id: "survey.marks.outputForm.premise.named",
+            message: `From the previous question — marks with a key of their own: ${{ marks: ownKeyMarks.map((m) => prefixCombiningMark(m, true)).join(" ") }}.`,
+          })
+        : t({
+            id: "survey.marks.outputForm.premise.counted",
+            message: `From the previous question — ${{ count: ownKeyMarks.length }} of your marks have a key of their own.`,
+          });
+  return (
+    <p data-testid="output-form-premise" style={{ ...mutedParaFlush, margin: "0 0 10px 0", fontSize: 12 }}>
+      {text}
+    </p>
+  );
+}
+
+export function OutputFormStation({
+  posture,
+  proposal,
+  value,
+  onChange,
+  ownKeyMarks,
+}: OutputFormStationProps) {
   const { t } = useLingui();
   const formLabel = useFormLabel();
   const formConsequence = useFormConsequence();
@@ -142,7 +190,7 @@ export function OutputFormStation({ posture, proposal, value, onChange }: Output
   const other: OutputForm = value === "ready-made" ? "base-plus-mark" : "ready-made";
   const sectionAriaLabel = t({
     id: "survey.marks.outputForm.sectionAriaLabel",
-    message: "How accented letters are produced",
+    message: "How accented letters behave when you backspace or search",
   });
 
   if (proposal.presentedAs === "open-choice") {
@@ -156,8 +204,11 @@ export function OutputFormStation({ posture, proposal, value, onChange }: Output
     return (
       <section data-testid="marks-output-form" aria-label={sectionAriaLabel}>
         <h3 style={sectionHeading}>
-          <Trans id="survey.marks.outputForm.heading">How should your keyboard produce accented letters?</Trans>
+          <Trans id="survey.marks.outputForm.heading">
+            How should accented letters behave when you backspace or search?
+          </Trans>
         </h3>
+        <S2Premise ownKeyMarks={ownKeyMarks} />
         <p style={mutedParaFlush}>{proposal.explanation}</p>
         <div
           role="radiogroup"
@@ -200,11 +251,22 @@ export function OutputFormStation({ posture, proposal, value, onChange }: Output
     );
   }
 
+  // Notice branch. The heading line and the paragraph under it are both keyed
+  // off `value`, never off `proposal` alone: once the author overrides, the
+  // policy's explanation describes the form they just left, so the per-form
+  // consequence takes over. The two can therefore never disagree.
+  const noticeExplanation =
+    value === proposal.form ? proposal.explanation : formConsequence[value];
+
   return (
     <section data-testid="marks-output-form" aria-label={sectionAriaLabel}>
       <h3 style={sectionHeading}>
-        <Trans id="survey.marks.outputForm.heading">How should your keyboard produce accented letters?</Trans>
+        <Trans id="survey.marks.outputForm.heading">
+          How should accented letters behave when you backspace or search?
+        </Trans>
       </h3>
+
+      <S2Premise ownKeyMarks={ownKeyMarks} />
 
       <div
         style={{
@@ -218,23 +280,36 @@ export function OutputFormStation({ posture, proposal, value, onChange }: Output
         <p style={{ margin: 0, fontSize: 14, fontWeight: 600, color: TEXT_MAIN }}>
           {formLabel[value]}
         </p>
-        <p style={{ ...mutedParaFlush, margin: "6px 0 0 0" }}>{proposal.explanation}</p>
+        <p style={{ ...mutedParaFlush, margin: "6px 0 0 0" }}>{noticeExplanation}</p>
       </div>
 
       {pair !== undefined && <BackspacePreview pair={pair} form={value} />}
 
+      {/* Row 1 of the policy fires precisely because some pair has no
+          single-character form, so "one unit per accented letter" is not an
+          available answer — say why instead of offering a button that would
+          select an unrealisable form. */}
       <div style={{ marginTop: 10 }}>
-        <button
-          type="button"
-          data-testid="output-form-change"
-          onClick={() => onChange(other)}
-          style={secondaryButton}
-        >
-          {t({
-            id: "survey.marks.outputForm.useInsteadButton",
-            message: `Use ${{ formLabel: formLabel[other].toLowerCase() }} instead`,
-          })}
-        </button>
+        {proposal.readyMadeUnavailable ? (
+          <p data-testid="output-form-change-unavailable" style={{ ...mutedParaFlush, margin: 0, fontSize: 12 }}>
+            <Trans id="survey.marks.outputForm.changeUnavailable">
+              Some of your accented letters have no single-character form, so there is no
+              other way for your keyboard to behave here.
+            </Trans>
+          </p>
+        ) : (
+          <button
+            type="button"
+            data-testid="output-form-change"
+            onClick={() => onChange(other)}
+            style={secondaryButton}
+          >
+            {t({
+              id: "survey.marks.outputForm.useInsteadButton",
+              message: `Use ${{ formLabel: formLabel[other].toLowerCase() }} instead`,
+            })}
+          </button>
+        )}
       </div>
     </section>
   );
