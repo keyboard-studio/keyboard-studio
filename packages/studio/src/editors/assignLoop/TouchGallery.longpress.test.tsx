@@ -84,10 +84,10 @@ describe("TouchGallery — abugida gate and empty-hostkey guard on the longpress
 
   // -------------------------------------------------------------------------
   // Style — the suggestion card is GREEN, not red (product decision). Mirrors
-  // MechanismGallery.test.tsx's identical guard ("renders the suggestion row
-  // in the green family, not ERROR_RED/ERROR_BG") for the sibling gallery —
-  // this card previously shipped with ERROR_RED text on an ERROR_BG card
-  // (ambient "not yet implemented" styling) even though it is a
+  // MechanismGallery.suggestions.test.tsx's identical guard ("renders the
+  // suggestion row in the green family, not ERROR_RED/ERROR_BG") for the
+  // sibling gallery — this card previously shipped with ERROR_RED text on an
+  // ERROR_BG card (ambient "not yet implemented" styling) even though it is a
   // proposal/affordance the author can accept or deny, not an error state.
   // -------------------------------------------------------------------------
 

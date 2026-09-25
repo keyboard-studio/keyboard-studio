@@ -74,7 +74,7 @@ This is also the dependency order: P4b's union replacement **cannot** begin unti
 ### Boundaries + verification
 
 - [x] T015 [US1] Add the editor boundary rule to `.dependency-cruiser.cjs` per [contracts/boundaries.contract.md](contracts/boundaries.contract.md): **allow** `editors/ → stores/` and `editors/ → lib/`; **forbid** `editors/ → dashboard/`. Keep `ui-is-a-leaf` green (B1, B2).
-- [x] T016 [P] [US1] Run the existing gallery/panel suites against the moved+adapted components **unchanged** — `CarveGallery`, `MechanismGallery.test`, `TouchGallery.test`, `BaseResolution.test`, `TrackOneIdentityPanel.test`, `GalleryIntroSplash.test`. All must pass with no edits to assertions (SC-002).
+- [x] T016 [P] [US1] Run the existing gallery/panel suites against the moved+adapted components **unchanged** — `CarveGallery`, `MechanismGallery.*.test`, `TouchGallery.*.test`, `BaseResolution.test`, `TrackOneIdentityPanel.test`, `GalleryIntroSplash.test`. All must pass with no edits to assertions (SC-002).
 - [x] T017 [US1] depcruise probe test (B3): temporarily add an `editors/ → dashboard/` import, confirm `pnpm depcruise` goes red, remove it, confirm green. Document in PR.
 
 **Checkpoint**: galleries + panels are enumerable editor-steps, behavior byte-identical, `SurveyStage` still drives ordering. US1 independently shippable.

@@ -530,7 +530,7 @@ describe("TouchGallery — FR-008 completion gate refusal (uncovered char)", () 
 
 // ---------------------------------------------------------------------------
 // No modal — replaces the old ConfirmDialog leave-warning contract
-// (mechanism-gallery-progression; see MechanismGallery.test.tsx's matching
+// (mechanism-gallery-progression; see MechanismGallery.progression.test.tsx's matching
 // "Done-blocked inline hint (no modal)" suite). TouchGallery renders no
 // <dialog> element at all now; Done is simply disabled while
 // `unaccountedTouchChars` is non-empty, with the FR-008 alert explaining why.

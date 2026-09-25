@@ -8,8 +8,9 @@
 // than one test file's `beforeAll` (as several do) is harmless.
 //
 // Centralizes what used to be pasted verbatim into each test file; see
-// MechanismGallery.test.tsx / TouchGallery.test.tsx / PhaseFGate.test.tsx for
-// the call sites. (ConfirmDialog.test.tsx carries its own pre-existing copy
+// mechanismGallery/mocks.tsx and touchGallery/harness.ts (the shared setup
+// behind the MechanismGallery.*.test.tsx and TouchGallery.*.test.tsx suites)
+// and PhaseFGate.test.tsx for the call sites. (ConfirmDialog.test.tsx carries its own pre-existing copy
 // of this shim, outside this cleanup's scope.)
 export function installDialogShim(): void {
   HTMLDialogElement.prototype.showModal ??= function (this: HTMLDialogElement) {

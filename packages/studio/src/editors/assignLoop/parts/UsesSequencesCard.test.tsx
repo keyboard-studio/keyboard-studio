@@ -8,8 +8,8 @@
 // hand-built props — it is deliberately isolated (no store, no gallery). The
 // integration gap this isolation would otherwise leave (proving each gallery
 // actually wires this component to REAL store-backed assignments, not a
-// constant) is closed separately in MechanismGallery.test.tsx and
-// TouchGallery.test.tsx's own "UsesSequencesCard (integration)" suites.
+// constant) is closed separately in MechanismGallery.charStrip.test.tsx and
+// TouchGallery.methods.test.tsx's own "UsesSequencesCard (integration)" suites.
 
 import { describe, it, expect, afterEach } from "vitest";
 import { cleanup, screen, within } from "@testing-library/react";

@@ -129,7 +129,7 @@ packages/studio/src/editors/assignLoop/
 ├── TouchGallery.tsx                # EDIT — editingLayer; case-derived layer on refs (FR-006);
 │                                   #        raise the shift-layer proposal (FR-005)
 ├── touchBehavior.ts                # EDIT — casePairTouchLayer(), TouchLayerId
-├── MechanismGallery.test.tsx       # EDIT — existing companion cases must pass unchanged (SC-005)
+├── MechanismGallery.casePair.test.tsx # EDIT — existing companion cases must pass unchanged (SC-005)
 ├── SequenceBuilderPanel.test.tsx   # EDIT — parallel combo + multi-char-content suppression
 └── TouchGallery.test.tsx           # EDIT — layer on refs, shift-layer proposal
 
@@ -174,7 +174,7 @@ independent of step 2 and can run concurrently with it.
 
 | Risk | Mitigation |
 |---|---|
-| The extraction silently changes physical-key behavior (SC-005) | Existing `MechanismGallery.test.tsx` companion cases must pass **without edits**; the CAPS-quad branch moves verbatim, not re-derived. |
+| The extraction silently changes physical-key behavior (SC-005) | Existing `MechanismGallery.casePair.test.tsx` companion cases must pass **without edits**; the CAPS-quad branch moves verbatim, not re-derived. |
 | Touch-layer change regresses existing touch output | Absent `layer` ≡ `"default"` is the contract; the entire pre-existing applier test suite is the floor, and no existing fixture may be edited to make it pass. |
 | A second casing path creeps in | `useCasePairCompanion.propose` owns the `caseCounterpart` call; callers cannot pass a counterpart in. Reviewable as "zero new `toUpperCase()` on the proposal path". |
 | i18n id churn orphans translations | Reuse the shipped `editor.assignLoop.companion.*` ids with their current English messages; new mechanism wording is additive ids. |
