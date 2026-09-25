@@ -9,6 +9,7 @@ import {
   parseKeySpec,
   comboToTouchLayerId,
   comboToKvksShiftToken,
+  kvksShiftTokenToHelpLayerId,
   collectModifierTokensInUse,
   collectLayerCombosInUse,
   buildComboKeyMap,
@@ -387,6 +388,31 @@ describe("comboToKvksShiftToken", () => {
   it("returns null for a bare/combined NCAPS combo too — same restriction as CAPS", () => {
     expect(comboToKvksShiftToken(["NCAPS"])).toBeNull();
     expect(comboToKvksShiftToken(["RALT", "NCAPS"])).toBeNull();
+  });
+});
+
+describe("kvksShiftTokenToHelpLayerId", () => {
+  it("maps the empty / whitespace shift to default", () => {
+    expect(kvksShiftTokenToHelpLayerId("")).toBe("default");
+    expect(kvksShiftTokenToHelpLayerId("   ")).toBe("default");
+  });
+
+  it("maps single fragments", () => {
+    expect(kvksShiftTokenToHelpLayerId("S")).toBe("shift");
+    expect(kvksShiftTokenToHelpLayerId("RA")).toBe("rightalt");
+    expect(kvksShiftTokenToHelpLayerId("LC")).toBe("leftctrl");
+  });
+
+  it("tokenises run-together .kvks tokens (SRA, not space-separated)", () => {
+    // Help-site order: alt before shift.
+    expect(kvksShiftTokenToHelpLayerId("SRA")).toBe("rightalt-shift");
+    expect(kvksShiftTokenToHelpLayerId("SCA")).toBe("ctrl-alt-shift");
+    expect(kvksShiftTokenToHelpLayerId("SRC")).toBe("rightctrl-shift");
+  });
+
+  it("passes an unrecognised token through lower-cased", () => {
+    // Avoid letters that are themselves KVKS fragments (C/S/A/…).
+    expect(kvksShiftTokenToHelpLayerId("XYZ")).toBe("xyz");
   });
 });
 

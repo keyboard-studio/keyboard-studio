@@ -87,6 +87,7 @@ export {
   parseKeySpec,
   comboToTouchLayerId,
   comboToKvksShiftToken,
+  kvksShiftTokenToHelpLayerId,
   collectModifierTokensInUse,
   collectLayerCombosInUse,
   buildComboKeyMap,

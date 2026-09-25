@@ -1,19 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { checkHistoryOrder } from "./check-3-3-history-order.js";
-import type { DocLintInput } from "@keyboard-studio/contracts";
-import { CLEAN_DOC_LINT_INPUT } from "./fixtures/clean.js";
+import { withMembers } from "./fixtures/clean.js";
 
-function makeInput(historyMd: string | undefined): DocLintInput {
-  const membersWithout = Object.fromEntries(
-    Object.entries(CLEAN_DOC_LINT_INPUT.members).filter(([k]) => k !== "history-md"),
-  ) as DocLintInput["members"];
-  return {
-    ...CLEAN_DOC_LINT_INPUT,
-    members:
-      historyMd !== undefined
-        ? { ...CLEAN_DOC_LINT_INPUT.members, "history-md": historyMd }
-        : membersWithout,
-  };
+function makeInput(historyMd: string | undefined) {
+  return withMembers({ "history-md": historyMd === undefined ? null : historyMd });
 }
 
 describe("checkHistoryOrder (3.3 KM_LINT_HISTORY_ORDER)", () => {

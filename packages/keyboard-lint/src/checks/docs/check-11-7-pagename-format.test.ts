@@ -1,20 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { checkPagenameFormat } from "./check-11-7-pagename-format.js";
-import type { DocLintInput } from "@keyboard-studio/contracts";
-import { CLEAN_DOC_LINT_INPUT } from "./fixtures/clean.js";
+import { withMembers } from "./fixtures/clean.js";
 
-function makeInput(helpPhp: string | undefined, displayName: string): DocLintInput {
-  const membersWithout = Object.fromEntries(
-    Object.entries(CLEAN_DOC_LINT_INPUT.members).filter(([k]) => k !== "help-php"),
-  ) as DocLintInput["members"];
-  return {
-    ...CLEAN_DOC_LINT_INPUT,
-    displayName,
-    members:
-      helpPhp !== undefined
-        ? { ...CLEAN_DOC_LINT_INPUT.members, "help-php": helpPhp }
-        : membersWithout,
-  };
+function makeInput(helpPhp: string | undefined, displayName: string) {
+  return withMembers(
+    { "help-php": helpPhp === undefined ? null : helpPhp },
+    { displayName },
+  );
 }
 
 describe("checkPagenameFormat (11.7 KM_LINT_PHP_PAGENAME_FORMAT)", () => {

@@ -1,18 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { checkHistoryStaleFileRefs } from "./check-3-7-history-stale-refs.js";
-import type { DocLintInput } from "@keyboard-studio/contracts";
+import { withMembers } from "./fixtures/clean.js";
 
-function makeInput(historyMd: string | undefined, deletedFilenames: string[]): DocLintInput {
-  return {
-    keyboardId: "test_kbd",
-    keyboardVersion: "1.0",
-    targets: [],
-    layerIds: [],
-    displayName: "Test",
-    copyrightHolders: {},
-    members: historyMd !== undefined ? { "history-md": historyMd } : {},
-    deletedFilenames,
-  };
+function makeInput(historyMd: string | undefined, deletedFilenames: string[]) {
+  return withMembers(
+    { "history-md": historyMd === undefined ? null : historyMd },
+    { deletedFilenames },
+  );
 }
 
 describe("checkHistoryStaleFileRefs (3.7 KM_LINT_HISTORY_STALE_FILE_REFS)", () => {

@@ -4,7 +4,7 @@
 // checks (thirteen codes). Used by bijection.test.ts and available to any
 // individual check test that wants a known-good baseline.
 
-import type { DocLintInput } from "@keyboard-studio/contracts";
+import type { DocLintInput, DocMemberId } from "@keyboard-studio/contracts";
 
 export const CLEAN_DOC_LINT_INPUT: DocLintInput = {
   keyboardId: "test_kbd",
@@ -33,3 +33,38 @@ export const CLEAN_DOC_LINT_INPUT: DocLintInput = {
   deletedFilenames: ["old-icon.ico"],
   baseHistoryMdText: "## 1.0 (2024-01-01)\n* Initial release.\n",
 };
+
+/**
+ * Spread {@link CLEAN_DOC_LINT_INPUT} with member overrides. Pass `null` for a
+ * member id to omit it (the check-under-test treats absence as "not shipped").
+ * Extra top-level DocLintInput fields (layerIds, targets, …) merge on top.
+ */
+export function withMembers(
+  memberOverrides: { [K in DocMemberId]?: string | null },
+  extra: Omit<Partial<DocLintInput>, "members"> = {},
+): DocLintInput {
+  const members: DocLintInput["members"] = { ...CLEAN_DOC_LINT_INPUT.members };
+  for (const key of Object.keys(memberOverrides) as DocMemberId[]) {
+    const value = memberOverrides[key];
+    if (value === null) {
+      delete members[key];
+    } else if (value !== undefined) {
+      members[key] = value;
+    }
+  }
+  return { ...CLEAN_DOC_LINT_INPUT, ...extra, members };
+}
+
+/**
+ * Spread {@link CLEAN_DOC_LINT_INPUT} with arbitrary top-level overrides,
+ * including a full `members` replacement when the test needs an empty or
+ * hand-built member map.
+ */
+export function withDocLintInput(overrides: Partial<DocLintInput> = {}): DocLintInput {
+  return {
+    ...CLEAN_DOC_LINT_INPUT,
+    ...overrides,
+    members: overrides.members ?? CLEAN_DOC_LINT_INPUT.members,
+    copyrightHolders: overrides.copyrightHolders ?? CLEAN_DOC_LINT_INPUT.copyrightHolders,
+  };
+}

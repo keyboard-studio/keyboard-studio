@@ -1,18 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { checkReadmeTargets } from "./check-5-7-readme-targets.js";
-import type { DocLintInput } from "@keyboard-studio/contracts";
+import { withMembers } from "./fixtures/clean.js";
 
-function makeInput(readmeMd: string | undefined, targets: string[]): DocLintInput {
-  return {
-    keyboardId: "test_kbd",
-    keyboardVersion: "1.0",
-    targets,
-    layerIds: [],
-    displayName: "Test",
-    copyrightHolders: {},
-    members: readmeMd !== undefined ? { "readme-md": readmeMd } : {},
-    deletedFilenames: [],
-  };
+function makeInput(readmeMd: string | undefined, targets: string[]) {
+  return withMembers(
+    { "readme-md": readmeMd === undefined ? null : readmeMd },
+    { targets },
+  );
 }
 
 const README_WIN_MAC = "# Test\n\ndesc\n\n## Supported Platforms\n- windows\n- mac\n";

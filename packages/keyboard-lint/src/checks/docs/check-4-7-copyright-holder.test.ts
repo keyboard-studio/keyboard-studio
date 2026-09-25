@@ -1,18 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { checkCopyrightHolder } from "./check-4-7-copyright-holder.js";
 import type { DocLintInput } from "@keyboard-studio/contracts";
+import { withDocLintInput } from "./fixtures/clean.js";
 
-function makeInput(copyrightHolders: DocLintInput["copyrightHolders"]): DocLintInput {
-  return {
-    keyboardId: "test_kbd",
-    keyboardVersion: "1.0",
-    targets: [],
-    layerIds: [],
-    displayName: "Test",
-    copyrightHolders,
-    members: {},
-    deletedFilenames: [],
-  };
+function makeInput(copyrightHolders: DocLintInput["copyrightHolders"]) {
+  return withDocLintInput({ copyrightHolders, members: {} });
 }
 
 describe("checkCopyrightHolder (4.7 KM_LINT_COPYRIGHT_HOLDER_INCONSISTENT)", () => {

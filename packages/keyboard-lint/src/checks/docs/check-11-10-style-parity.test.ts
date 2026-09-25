@@ -1,18 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { checkStyleParity } from "./check-11-10-style-parity.js";
 import type { DocLintInput } from "@keyboard-studio/contracts";
+import { withDocLintInput } from "./fixtures/clean.js";
 
-function makeInput(members: DocLintInput["members"]): DocLintInput {
-  return {
-    keyboardId: "test_kbd",
-    keyboardVersion: "1.0",
-    targets: [],
-    layerIds: [],
-    displayName: "Test",
-    copyrightHolders: {},
-    members,
-    deletedFilenames: [],
-  };
+function makeInput(members: DocLintInput["members"]) {
+  return withDocLintInput({ members });
 }
 
 describe("checkStyleParity (11.10 KM_LINT_PHP_HTM_STYLE_MISMATCH)", () => {

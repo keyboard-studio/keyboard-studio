@@ -101,6 +101,15 @@ describe("buildHistoryProposal", () => {
     expect(proposal.bullets).toEqual(["Removed 5 keys."]);
   });
 
+  it("uses singular nouns when the count is 1", () => {
+    expect(buildHistoryProposal(emptySeed({ charactersAdded: ["ŋ"] }), "1.0", "2026-06-18").bullets).toEqual([
+      "Added 1 character: ŋ.",
+    ]);
+    expect(buildHistoryProposal(emptySeed({ keysRemoved: 1 }), "1.0", "2026-06-18").bullets).toEqual([
+      "Removed 1 key.",
+    ]);
+  });
+
   it("renders combining marks on a dotted-circle carrier", () => {
     const nukta = "\u093C"; // Devanagari nukta (Mn)
     const seed = emptySeed({ charactersAdded: ["a", nukta, "é"] });

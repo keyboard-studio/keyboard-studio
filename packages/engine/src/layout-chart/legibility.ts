@@ -11,11 +11,13 @@
  * one that legitimately produces nothing vs. one this chart simply omitted).
  */
 
+import { DOTTED_CIRCLE } from "@keyboard-studio/contracts";
+import { isCombiningMarkChar } from "../character-discovery/characterMap.js";
+
+export { DOTTED_CIRCLE };
+
 /** How one key's output text is rendered on the chart. */
 export type KeyLegibilityKind = "normal" | "combining" | "no-glyph" | "empty";
-
-/** Dotted-circle combining-mark carrier (FR-016). */
-export const DOTTED_CIRCLE = "◌";
 
 /** Generic fallback font stack every chart `<text>` element carries (FR-016). */
 export const FALLBACK_FONT_STACK = "Noto Sans, Arial, sans-serif";
@@ -31,10 +33,6 @@ export const EMPTY_KEYCAP_CLASS = "ks-keycap-empty";
 
 /** Label CSS class for the smaller monospace `U+XXXX` no-glyph label. */
 export const NO_GLYPH_LABEL_CLASS = "ks-key-label-noglyph";
-
-// Unicode general categories Mn (nonspacing mark), Mc (spacing combining
-// mark), Me (enclosing mark) — FR-016's "combining mark" set.
-const COMBINING_MARK_RE = /\p{M}/u;
 
 /** One named script-block range in the coverage table. */
 export interface ScriptCoverageRange {
@@ -120,7 +118,7 @@ export function classifyKeyLegibility(output: string | undefined): KeyLegibility
   const first = [...text][0] ?? "";
   const codePoint = first.codePointAt(0) ?? 0;
 
-  if (COMBINING_MARK_RE.test(first)) {
+  if (isCombiningMarkChar(first)) {
     return {
       kind: "combining",
       displayText: `${DOTTED_CIRCLE}${text}`,

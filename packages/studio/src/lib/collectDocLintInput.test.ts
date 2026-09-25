@@ -64,7 +64,9 @@ describe("layer ids (criterion 11.6 input)", () => {
     expect(kvksLayerId("")).toBe("default");
     expect(kvksLayerId("S")).toBe("shift");
     expect(kvksLayerId("RA")).toBe("rightalt");
-    expect(kvksLayerId("S RA")).toBe("shift-rightalt");
+    // Real .kvks tokens are run-together (SRA), not space-separated; help-site
+    // order puts shift last (rightalt-shift, never shift-rightalt).
+    expect(kvksLayerId("SRA")).toBe("rightalt-shift");
     const ids = collectLayerIds(KVKS, null);
     expect(ids).toContain("default");
     expect(ids).toContain("shift");

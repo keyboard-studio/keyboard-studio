@@ -1,23 +1,19 @@
 import { describe, it, expect } from "vitest";
 import { checkHistoryCumulative } from "./check-3-4-history-cumulative.js";
-import type { DocLintInput } from "@keyboard-studio/contracts";
+import { withMembers } from "./fixtures/clean.js";
 
 const BASE_HISTORY = "## 1.0 (2024-01-01)\n* Initial release.\n";
 
-function makeInput(opts: { historyMd?: string; baseHistoryMdText?: string }): DocLintInput {
-  const input: DocLintInput = {
-    keyboardId: "test_kbd",
-    keyboardVersion: "1.2",
-    targets: [],
-    layerIds: [],
-    displayName: "Test",
-    copyrightHolders: {},
-    members: opts.historyMd !== undefined ? { "history-md": opts.historyMd } : {},
-    deletedFilenames: [],
-  };
-  return opts.baseHistoryMdText !== undefined
-    ? { ...input, baseHistoryMdText: opts.baseHistoryMdText }
-    : input;
+function makeInput(opts: { historyMd?: string; baseHistoryMdText?: string }) {
+  const input = withMembers({
+    "history-md": opts.historyMd === undefined ? null : opts.historyMd,
+  });
+  if (opts.baseHistoryMdText !== undefined) {
+    return { ...input, baseHistoryMdText: opts.baseHistoryMdText };
+  }
+  // CLEAN carries a base HISTORY by default — drop it so "no base" cases stay honest.
+  const { baseHistoryMdText: _omit, ...rest } = input;
+  return rest;
 }
 
 describe("checkHistoryCumulative (3.4 KM_LINT_HISTORY_TRUNCATED)", () => {

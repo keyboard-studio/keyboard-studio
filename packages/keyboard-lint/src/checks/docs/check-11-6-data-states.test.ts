@@ -1,20 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { checkDataStatesComplete } from "./check-11-6-data-states.js";
-import type { DocLintInput } from "@keyboard-studio/contracts";
-import { CLEAN_DOC_LINT_INPUT } from "./fixtures/clean.js";
+import { withMembers } from "./fixtures/clean.js";
 
-function makeInput(helpPhp: string | undefined, layerIds: string[]): DocLintInput {
-  const membersWithout = Object.fromEntries(
-    Object.entries(CLEAN_DOC_LINT_INPUT.members).filter(([k]) => k !== "help-php"),
-  ) as DocLintInput["members"];
-  return {
-    ...CLEAN_DOC_LINT_INPUT,
-    layerIds,
-    members:
-      helpPhp !== undefined
-        ? { ...CLEAN_DOC_LINT_INPUT.members, "help-php": helpPhp }
-        : membersWithout,
-  };
+function makeInput(helpPhp: string | undefined, layerIds: string[]) {
+  return withMembers(
+    { "help-php": helpPhp === undefined ? null : helpPhp },
+    { layerIds },
+  );
 }
 
 describe("checkDataStatesComplete (11.6 KM_LINT_PHP_DATA_STATES_INCOMPLETE)", () => {

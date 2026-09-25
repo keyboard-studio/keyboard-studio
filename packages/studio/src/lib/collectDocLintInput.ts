@@ -16,7 +16,13 @@
 
 import type { DocLintInput, DocMemberId, LintFinding } from "@keyboard-studio/contracts";
 import { DOC_MEMBER_IDS } from "@keyboard-studio/contracts";
-import { parseKvks, parseTargetTokens, parseTouchLayout, docMemberPath } from "@keyboard-studio/engine";
+import {
+  parseKvks,
+  parseTargetTokens,
+  parseTouchLayout,
+  docMemberPath,
+  kvksShiftTokenToHelpLayerId,
+} from "@keyboard-studio/engine";
 import { runDocChecks } from "@keymanapp/keyboard-lint";
 
 export interface CollectDocLintInputArgs {
@@ -94,29 +100,12 @@ export function kpsCopyright(kpsText: string | null | undefined): string | undef
 }
 
 /**
- * The `.kvks` shift-state tokens as help-page layer ids (`data-states`):
- * the unshifted layer is `default`; every other shift string is lower-cased
- * with its modifier letters spelled out the way the help site names layers
- * (`S` -> `shift`, `RA` -> `rightalt`, ...). Unknown tokens pass through
- * lower-cased so a genuinely unusual layer is never flagged as phantom.
+ * The `.kvks` shift-state token as a help-page layer id (`data-states`).
+ * Delegates to the engine's {@link kvksShiftTokenToHelpLayerId} so studio and
+ * the layout-chart path share one grammar for run-together tokens like `SRA`.
  */
-const KVKS_MODIFIER_NAMES: Record<string, string> = {
-  s: "shift",
-  c: "ctrl",
-  lc: "leftctrl",
-  rc: "rightctrl",
-  a: "alt",
-  la: "leftalt",
-  ra: "rightalt",
-};
-
 export function kvksLayerId(shift: string): string {
-  const trimmed = shift.trim();
-  if (trimmed === "") return "default";
-  return trimmed
-    .split(/\s+/)
-    .map((tok) => KVKS_MODIFIER_NAMES[tok.toLowerCase()] ?? tok.toLowerCase())
-    .join("-");
+  return kvksShiftTokenToHelpLayerId(shift);
 }
 
 /** Desktop + touch layer ids for criterion 11.6; malformed inputs contribute nothing. */

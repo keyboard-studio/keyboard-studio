@@ -13,7 +13,8 @@
 // only builds the proposal the author is shown and may confirm or edit.
 
 import type { HistoryProposal } from "@keyboard-studio/contracts";
-import { DOTTED_CIRCLE } from "../layout-chart/legibility.js";
+import { DOTTED_CIRCLE } from "@keyboard-studio/contracts";
+import { isCombiningMarkChar } from "../character-discovery/characterMap.js";
 import { HISTORY_INITIAL_RELEASE_BULLET, adaptedFromBullet } from "../shared/renderHistoryMd.js";
 
 /** Seeds sourced from the decision record (R6) — no new journal. */
@@ -35,14 +36,10 @@ export function historyEntryHeading(version: string, dateIso: string): string {
 // character-discovery batch doesn't produce an unreadable one-line bullet.
 const INLINE_LIST_CAP = 10;
 
-// Same Mn/Mc/Me set the layout-chart carrier uses (FR-016): a bare combining
-// mark must not attach to the preceding comma/space in a HISTORY.md bullet.
-const COMBINING_MARK_RE = /\p{M}/u;
-
 /** Isolate a combining mark on a dotted-circle carrier for inline HISTORY text. */
 function formatCharacterForHistory(ch: string): string {
   const first = [...ch][0] ?? "";
-  if (COMBINING_MARK_RE.test(first)) return `${DOTTED_CIRCLE}${ch}`;
+  if (isCombiningMarkChar(first)) return `${DOTTED_CIRCLE}${ch}`;
   return ch;
 }
 
@@ -52,6 +49,10 @@ function formatList(items: readonly string[]): string {
   const shown = formatted.slice(0, INLINE_LIST_CAP);
   const remaining = formatted.length - INLINE_LIST_CAP;
   return `${shown.join(", ")}, and ${remaining} more`;
+}
+
+function plural(count: number, singular: string, pluralForm: string): string {
+  return count === 1 ? singular : pluralForm;
 }
 
 /**
@@ -75,15 +76,17 @@ export function buildHistoryProposal(
     bullets.push(adaptedFromBullet(seed.base.id, seed.base.version));
   }
   if (seed.charactersAdded.length > 0) {
+    const n = seed.charactersAdded.length;
     bullets.push(
-      `Added ${seed.charactersAdded.length} characters: ${formatList(seed.charactersAdded)}.`,
+      `Added ${n} ${plural(n, "character", "characters")}: ${formatList(seed.charactersAdded)}.`,
     );
   }
   if (seed.mechanismsAssigned.length > 0) {
     bullets.push(`Assigned mechanisms: ${formatList(seed.mechanismsAssigned)}.`);
   }
   if (seed.keysRemoved > 0) {
-    bullets.push(`Removed ${seed.keysRemoved} keys.`);
+    const n = seed.keysRemoved;
+    bullets.push(`Removed ${n} ${plural(n, "key", "keys")}.`);
   }
   if (bullets.length === 0) {
     bullets.push(HISTORY_INITIAL_RELEASE_BULLET);

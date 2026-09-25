@@ -1,18 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { checkHistoryEntryFormat } from "./check-3-5-history-entry-format.js";
-import type { DocLintInput } from "@keyboard-studio/contracts";
+import { withMembers } from "./fixtures/clean.js";
 
-function makeInput(historyMd: string | undefined): DocLintInput {
-  return {
-    keyboardId: "test_kbd",
-    keyboardVersion: "1.0",
-    targets: [],
-    layerIds: [],
-    displayName: "Test",
-    copyrightHolders: {},
-    members: historyMd !== undefined ? { "history-md": historyMd } : {},
-    deletedFilenames: [],
-  };
+function makeInput(historyMd: string | undefined) {
+  return withMembers({ "history-md": historyMd === undefined ? null : historyMd });
 }
 
 describe("checkHistoryEntryFormat (3.5 KM_LINT_HISTORY_ENTRY_FORMAT)", () => {

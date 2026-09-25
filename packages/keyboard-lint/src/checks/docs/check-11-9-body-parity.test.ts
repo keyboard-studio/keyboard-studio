@@ -1,18 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { checkBodyParity } from "./check-11-9-body-parity.js";
 import type { DocLintInput } from "@keyboard-studio/contracts";
+import { withDocLintInput } from "./fixtures/clean.js";
 
-function makeInput(members: DocLintInput["members"]): DocLintInput {
-  return {
-    keyboardId: "test_kbd",
-    keyboardVersion: "1.0",
-    targets: [],
-    layerIds: [],
-    displayName: "Test",
-    copyrightHolders: {},
-    members,
-    deletedFilenames: [],
-  };
+function makeInput(members: DocLintInput["members"]) {
+  return withDocLintInput({ members });
 }
 
 describe("checkBodyParity (11.9 KM_LINT_PHP_HTM_BODY_MISMATCH)", () => {
