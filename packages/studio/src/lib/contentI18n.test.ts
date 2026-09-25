@@ -215,14 +215,22 @@ describe("activateContentLocale", () => {
   });
 
   it("resolves (never rejects) for a locale with no committed content catalogs yet", async () => {
-    // content/i18n/fr does not exist yet (T030 — Crowdin activation — is not
-    // done), so this dynamic import genuinely fails; activateContentLocale
-    // must swallow that per catalog type, matching activateLocale's own
+    // Use a locale that is not in content/i18n/ — French catalogs are
+    // committed (and Crowdin may fill them), so "fr" no longer exercises
+    // the missing-chunk path. activateContentLocale must swallow a failed
+    // dynamic import per catalog type, matching activateLocale's own
     // never-block-on-a-missing-chunk contract in ./i18n.ts.
-    await expect(activateContentLocale("fr")).resolves.toBeUndefined();
+    const missingLocale = "zz";
+    await expect(activateContentLocale(missingLocale)).resolves.toBeUndefined();
     // The English fallback still holds afterwards.
     expect(
-      resolveContentString("patterns", "capslock_variant", "title", "CapsLock variant", i18nFor("fr")),
+      resolveContentString(
+        "patterns",
+        "capslock_variant",
+        "title",
+        "CapsLock variant",
+        i18nFor(missingLocale),
+      ),
     ).toBe("CapsLock variant");
   });
 
