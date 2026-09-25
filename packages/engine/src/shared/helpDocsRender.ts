@@ -389,9 +389,13 @@ export function renderWelcomeHtm(
  * page when one was fetched (FR-013); a base page keeps its own header and is
  * never given a second one. Inherits the base page verbatim even before
  * anything is authored (FR-006). A FRESH page (no base help text) opens with
- * the standard help-site header (spec 079 FR-003) above the same body
- * welcome.htm renders — the header is the one permitted difference between
- * the two on the help side (spec 079 FR-004).
+ * the standard help-site header (spec 079 FR-003) above the same *inner* body
+ * welcome.htm renders — without wrapping `<html>`/`<body>` tags (criteria.md
+ * §11.4 / keymanapp/keyboards#3877: the site's `header.php` owns the document
+ * chrome, so a nested document is non-compliant). `<html lang>` (spec 061
+ * FR-006) therefore applies to welcome.htm and to inherited help pages that
+ * already carry an `<html>` element; a fresh help page has no `<html>` to
+ * annotate.
  */
 export function renderHelpPhp(
   input: HelpDocsRenderInput,
@@ -410,7 +414,12 @@ export function renderHelpPhp(
 
   const bodyHtml = renderDocBodyHtml(answers, description);
   if (baseHelpPhpText !== null) {
+    // Inherited page may already be a full document (older bases) or a
+    // header-plus-fragment (criteria-compliant). setHtmlLang is a no-op when
+    // there is no `<html>` tag.
     return setHtmlLang(mergeWithBase(baseHelpPhpText, bodyHtml), primaryBcp47);
   }
-  return `${helpSiteHeader(displayName)}${setHtmlLang(buildFreshHtmlDoc(bodyHtml, primaryBcp47), primaryBcp47)}`;
+  // Fresh page: header + body fragment only — never nest a document inside
+  // the site's `header.php` chrome (criterion 11.4).
+  return `${helpSiteHeader(displayName)}${bodyHtml}`;
 }

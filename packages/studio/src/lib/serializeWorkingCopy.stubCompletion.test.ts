@@ -169,14 +169,19 @@ describe("output projection regenerates help docs from helpDocs (spec 061)", () 
     const header = `<?php\n  $pagename = '${basicKbdus.displayName} Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n`;
     expect(help.startsWith(header)).toBe(true);
     expect(help.match(/\$pagename =/g)).toHaveLength(1);
+    // Fresh help.php is a body fragment (criterion 11.4: no </body></html>).
+    expect(help).not.toMatch(/<\/body>/i);
+    expect(help).not.toMatch(/<\/html>/i);
     // spec 079 FR-004: the welcome page's layout section (the generated charts)
-    // is the ONE permitted welcome-side difference; strip it before comparing.
-    const welcomeSansLayout = readVfsText(projected!.vfs, "source/welcome/welcome.htm")!.replace(
-      /\n?<h2>Keyboard Layout<\/h2>[\s\S]*?(?=<\/body>)/,
-      "",
-    );
-    expect(help.slice(header.length)).toBe(welcomeSansLayout);
-    expect(welcomeSansLayout).not.toBe(readVfsText(projected!.vfs, "source/welcome/welcome.htm"));
+    // is the ONE permitted welcome-side difference; strip it and the document
+    // chrome before comparing the shared inner body.
+    const welcome = readVfsText(projected!.vfs, "source/welcome/welcome.htm")!;
+    const welcomeSansLayout = welcome.replace(/\n?<h2>Keyboard Layout<\/h2>[\s\S]*?(?=<\/body>)/, "");
+    const welcomeBody = welcomeSansLayout
+      .replace(/^<html[^>]*><body>/, "")
+      .replace(/<\/body><\/html>$/, "");
+    expect(help.slice(header.length)).toBe(welcomeBody);
+    expect(welcomeSansLayout).not.toBe(welcome);
   });
 
   it("regenerates from a REVISED answer on the next production (FR-010/SC-004)", async () => {

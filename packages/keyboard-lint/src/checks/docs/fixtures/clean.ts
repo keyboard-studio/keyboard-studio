@@ -28,7 +28,7 @@ export const CLEAN_DOC_LINT_INPUT: DocLintInput = {
     "readme-htm": "<html><body><h1>Test Keyboard</h1><p>A test keyboard.</p></body></html>",
     "welcome-htm": "<html><body><p>Welcome to Test Keyboard</p></body></html>",
     "help-php":
-      "<?php\n  $pagename = 'Test Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n<html><body><p>Welcome to Test Keyboard</p></body></html>",
+      "<?php\n  $pagename = 'Test Keyboard Help';\n  $pagetitle = $pagename;\n  require_once('header.php');\n?>\n<p>Welcome to Test Keyboard</p>",
   },
   deletedFilenames: ["old-icon.ico"],
   baseHistoryMdText: "## 1.0 (2024-01-01)\n* Initial release.\n",

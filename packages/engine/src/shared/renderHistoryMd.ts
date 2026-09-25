@@ -16,6 +16,12 @@
 // output-only. Both must stay byte-identical to what this module renders —
 // keep the three in sync if the ATX heading convention ever changes.
 //
+// New entries always use ATX (`## <version> (<date>)`) — the tool's own
+// generator convention. Inherited bases may use setext/hyphen-underline
+// headings (criteria.md §3.5 / corpus); those are preserved verbatim below
+// the new entry. A leading title / "Change History" preamble is kept *above*
+// the new entry so we don't bury `# … Change History` under the adapt line.
+//
 // `buildHistoryProposal` (../decision-audit/historyProposal.ts) is the
 // separate seam that builds the proposal an author is shown; this module
 // only renders a stored decision (or its absence) into file text.
@@ -39,10 +45,76 @@ function renderEntry(version: string, dateIso: string, bullets: readonly string[
   return `${heading(version, dateIso)}\n${bullets.map((b) => `* ${b}\n`).join("")}`;
 }
 
-/** Append `baseHistoryText` verbatim below `entryText`, separated by exactly one blank line (criterion 3.4). No-op when there is nothing to preserve. */
+/**
+ * Find the line index of the first HISTORY entry heading in `lines`.
+ * Mirrors keyboard-lint's docs parser: ATX `## …` or setext
+ * (`<version> (<date>)` + `---` underline). Kept local because keyboard-lint
+ * cannot be imported from the engine (`lint-not-to-engine` is the reverse
+ * dep; this is the producer side of the same fact).
+ */
+function firstHistoryEntryLineIndex(lines: readonly string[]): number {
+  const setextUnderline = /^-{3,}\s*$/;
+  const entryHeading = /^(\S+)\s+\(([^)]*)\)\s*$/;
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? "";
+    if (/^##\s+/.test(line)) return i;
+    const trimmed = line.trim();
+    if (
+      trimmed !== "" &&
+      entryHeading.test(trimmed) &&
+      i + 1 < lines.length &&
+      setextUnderline.test(lines[i + 1] ?? "")
+    ) {
+      return i;
+    }
+  }
+  return -1;
+}
+
+/**
+ * Split a base HISTORY.md into the leading preamble (title block before the
+ * first entry) and the remainder starting at that entry. Empty/`null` base →
+ * empty halves.
+ */
+export function splitHistoryPreamble(text: string): { preamble: string; rest: string } {
+  if (text === "") return { preamble: "", rest: "" };
+  const nl = text.includes("\r\n") ? "\r\n" : text.includes("\r") ? "\r" : "\n";
+  const lines = text.split(/\r\n|\r|\n/);
+  const first = firstHistoryEntryLineIndex(lines);
+  if (first <= 0) {
+    // No entry, or entry starts at line 0 — nothing to keep above the new entry.
+    return first === 0 ? { preamble: "", rest: text } : { preamble: text, rest: "" };
+  }
+  return {
+    preamble: lines.slice(0, first).join(nl),
+    rest: lines.slice(first).join(nl),
+  };
+}
+
+/**
+ * Place `entryText` into a base HISTORY.md: after any leading preamble, above
+ * the base's own entries (criterion 3.4 cumulative; title stays on top).
+ * Separators are exactly one blank line between blocks.
+ */
 function withBaseText(entryText: string, baseHistoryText: string | null): string {
   if (baseHistoryText === null || baseHistoryText === "") return entryText;
-  return `${entryText}\n${baseHistoryText}`;
+
+  const { preamble, rest } = splitHistoryPreamble(baseHistoryText);
+  const entry = entryText.endsWith("\n") ? entryText : `${entryText}\n`;
+
+  if (preamble === "" && rest === "") {
+    return entry;
+  }
+  if (preamble === "") {
+    // No title — new entry on top, base entries below (legacy behaviour).
+    return `${entry}\n${rest === "" ? baseHistoryText : rest}`;
+  }
+
+  const preambleBlock = preamble.endsWith("\n") ? preamble : `${preamble}\n`;
+  if (rest === "") {
+    return `${preambleBlock}\n${entry}`;
+  }
+  return `${preambleBlock}\n${entry}\n${rest}`;
 }
 
 export interface RenderHistoryMdOptions {
@@ -52,7 +124,7 @@ export interface RenderHistoryMdOptions {
   dateIso: string;
   /** Set when this production is a Track 2 adaptation; drives the injected attribution bullet. */
   adaptedFrom: { id: string; version: string } | null;
-  /** The base's own HISTORY.md text (Track 2), preserved verbatim below the new entry. `null` when there is none. */
+  /** The base's own HISTORY.md text (Track 2), preserved below the new entry (after any preamble). `null` when there is none. */
   baseHistoryText: string | null;
 }
 
@@ -71,8 +143,8 @@ export interface RenderHistoryMdOptions {
  *   change) paired with the entry's own stored `proposal.dateIso` (R12); the
  *   "Adapted from" bullet is injected first whenever `opts.adaptedFrom` is
  *   set, unless the bullets already contain it verbatim (FR-012 / criterion
- *   19.2, no duplication); the base text is preserved verbatim below
- *   (criterion 3.4).
+ *   19.2, no duplication); the base text is preserved below
+ *   (criterion 3.4), with any leading title kept above the new entry.
  */
 export function renderHistoryMd(
   entry: HistoryEntryState | null,

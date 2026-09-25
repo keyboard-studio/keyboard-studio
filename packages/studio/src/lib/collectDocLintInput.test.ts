@@ -60,13 +60,14 @@ describe("holder / notice parsing", () => {
 });
 
 describe("layer ids (criterion 11.6 input)", () => {
-  it("maps .kvks shift states to help-site layer names and adds touch layers", () => {
+  it("maps .kvks shift states to touch/fallback layer names and adds touch layers", () => {
     expect(kvksLayerId("")).toBe("default");
     expect(kvksLayerId("S")).toBe("shift");
     expect(kvksLayerId("RA")).toBe("rightalt");
-    // Real .kvks tokens are run-together (SRA), not space-separated; help-site
-    // order puts shift last (rightalt-shift, never shift-rightalt).
+    // Real .kvks tokens are run-together (SRA), not space-separated; same
+    // ids as comboToTouchLayerId / the no-.kvks chart fallback.
     expect(kvksLayerId("SRA")).toBe("rightalt-shift");
+    expect(kvksLayerId("SCA")).toBe("shift-ctrl-alt");
     const ids = collectLayerIds(KVKS, null);
     expect(ids).toContain("default");
     expect(ids).toContain("shift");

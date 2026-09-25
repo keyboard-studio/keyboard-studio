@@ -85,11 +85,17 @@ describe("helpDocsRender — spec 079 FR-003 standard help-site header (US1)", (
     expect(helpSiteHeader("Two\nLines")).toContain("$pagename = 'Two Lines Keyboard Help';");
   });
 
-  it("a fresh help page begins with the header, then the same body as the welcome page (US1-1)", () => {
+  it("a fresh help page begins with the header, then the shared body without nested html/body (US1-1 / criterion 11.4)", () => {
     const input = baseInput({ displayName: "Hausa Basic", answers: answersWith(), primaryBcp47: "ha" });
     const help = renderHelpPhp(input, null);
     expect(help.startsWith(HAUSA_HEADER)).toBe(true);
-    expect(help.slice(HAUSA_HEADER.length)).toBe(renderWelcomeHtm(input, null));
+    // Body equals welcome.htm's inner body — not a nested <html><body> document
+    // (criteria.md §11.4: help.php must not close </body></html>).
+    const welcome = renderWelcomeHtm(input, null);
+    const welcomeBody = welcome.replace(/^<html[^>]*><body>/, "").replace(/<\/body><\/html>$/, "");
+    expect(help.slice(HAUSA_HEADER.length)).toBe(welcomeBody);
+    expect(help).not.toMatch(/<\/body>/i);
+    expect(help).not.toMatch(/<\/html>/i);
     expect(help.match(/\$pagename =/g)).toHaveLength(1);
   });
 
@@ -231,10 +237,13 @@ describe("helpDocsRender — welcome.htm / help.php sections (US3/US4)", () => {
     expect(withoutOptIn).not.toContain("Additional Detail");
   });
 
-  it("sets <html lang> to the primary BCP47 tag (FR-006)", () => {
+  it("sets <html lang> on welcome.htm; fresh help.php has no <html> to annotate (FR-006 / criterion 11.4)", () => {
     const input = baseInput({ answers: answersWith(), primaryBcp47: "pid" });
     expect(renderWelcomeHtm(input, null)).toContain('<html lang="pid">');
-    expect(renderHelpPhp(input, null)).toContain('<html lang="pid">');
+    const help = renderHelpPhp(input, null);
+    expect(help).not.toMatch(/<html\b/i);
+    expect(help).not.toMatch(/<\/body>/i);
+    expect(help).not.toMatch(/<\/html>/i);
   });
 
   it("never embeds a version number or copyright year (FR-007)", () => {
@@ -245,12 +254,14 @@ describe("helpDocsRender — welcome.htm / help.php sections (US3/US4)", () => {
     }
   });
 
-  it("the help page body after the header equals the welcome page (spec 079 FR-004)", () => {
+  it("the help page body after the header equals the welcome page's inner body (spec 079 FR-004)", () => {
     const input = baseInput({ answers: answersWith({ usageTips: ["Tip one."] }), primaryBcp47: "pid" });
     const help = renderHelpPhp(input, null);
     const header = helpSiteHeader("Piaroa");
     expect(help.startsWith(header)).toBe(true);
-    expect(help.slice(header.length)).toBe(renderWelcomeHtm(input, null));
+    const welcome = renderWelcomeHtm(input, null);
+    const welcomeBody = welcome.replace(/^<html[^>]*><body>/, "").replace(/<\/body><\/html>$/, "");
+    expect(help.slice(header.length)).toBe(welcomeBody);
   });
 });
 
@@ -338,11 +349,12 @@ describe("helpDocsRender — README (FR-004/FR-008)", () => {
 describe("helpDocsRender — cross-file parity (FR-005/SC-005)", () => {
   // The help page's standard help-site header (spec 079 FR-003) is the one
   // permitted difference on the help side (spec 079 FR-004), so strip it too.
+  // Fresh help.php is a body fragment (criterion 11.4); welcome.htm is a full
+  // document — strip the chrome so the shared inner body compares equal.
   const stripDoc = (html: string): string =>
     html
       .replace(/^<\?php\n[\s\S]*?\?>\n/, "")
-      .replace(/^<html[^>]*><body>/, "")
-      .replace(/<\/body><\/html>$/, "");
+      .replace(/<\/?(?:html|head|body)\b[^>]*>/gi, "");
 
   // A sampled set of answer combinations, not just one — FR-005 is a
   // structural guarantee (buildDocSections shared by both callers), so this

@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   docMemberPath,
   parseHistoryEntries,
+  splitHistoryPreamble,
   compareVersions,
   parseReadmePlatforms,
   parsePagename,
@@ -41,6 +42,38 @@ describe("parseHistoryEntries", () => {
     expect(entries[0]?.bullets).toEqual(["Initial release.", "Second bullet."]);
   });
 
+  it("parses setext/hyphen-underline headings (criteria.md §3.5 / corpus)", () => {
+    const text =
+      "1.1 (2019-02-02)\n---------------\n* Fixed something.\n\n1.0 (2018-01-01)\n---------------\n* Initial release.\n";
+    const entries = parseHistoryEntries(text);
+    expect(entries).toHaveLength(2);
+    expect(entries[0]).toMatchObject({
+      headingRaw: "1.1 (2019-02-02)",
+      version: "1.1",
+      date: "2019-02-02",
+      dateValid: true,
+      bullets: ["Fixed something."],
+    });
+    expect(entries[1]).toMatchObject({ version: "1.0", bullets: ["Initial release."] });
+  });
+
+  it("parses a mix of ATX and setext entries in one file", () => {
+    const text =
+      "## 1.2 (2024-03-01)\n* Tool adapt entry.\n\n1.0 (2020-01-01)\n---------------\n* Initial release.\n";
+    const entries = parseHistoryEntries(text);
+    expect(entries).toHaveLength(2);
+    expect(entries[0]?.version).toBe("1.2");
+    expect(entries[1]?.version).toBe("1.0");
+  });
+
+  it("ignores a leading title preamble — entries start at the first real heading", () => {
+    const text =
+      "# EuroLatin (SIL) Change History\n\n## 1.0 (2020-01-01)\n* Initial release.\n";
+    const entries = parseHistoryEntries(text);
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.version).toBe("1.0");
+  });
+
   it("flags a heading that doesn't match <version> (<date>)", () => {
     const entries = parseHistoryEntries("## Version 1.2\n* Added shift layer.\n");
     expect(entries[0]?.version).toBeNull();
@@ -57,8 +90,31 @@ describe("parseHistoryEntries", () => {
     expect(entries[0]?.bullets).toEqual([]);
   });
 
-  it("returns [] for text with no ## headings", () => {
+  it("returns [] for text with no ## or setext headings", () => {
     expect(parseHistoryEntries("no headings here\n")).toEqual([]);
+  });
+});
+
+describe("splitHistoryPreamble", () => {
+  it("returns an empty preamble when the file starts with an entry", () => {
+    const text = "## 1.0 (2024-01-01)\n* Initial release.\n";
+    expect(splitHistoryPreamble(text)).toEqual({ preamble: "", rest: text });
+  });
+
+  it("keeps an ATX title above the first entry", () => {
+    const text = "# Change History\n\n## 1.0 (2024-01-01)\n* Initial release.\n";
+    const { preamble, rest } = splitHistoryPreamble(text);
+    expect(preamble).toBe("# Change History\n");
+    expect(rest).toBe("## 1.0 (2024-01-01)\n* Initial release.\n");
+  });
+
+  it("keeps a setext title above the first setext entry", () => {
+    const text =
+      "EuroLatin (SIL) Change History\n==============================\n\n1.0 (2020-01-01)\n---------------\n* Initial release.\n";
+    const { preamble, rest } = splitHistoryPreamble(text);
+    expect(preamble).toContain("EuroLatin (SIL) Change History");
+    expect(preamble).toContain("==============================");
+    expect(rest.startsWith("1.0 (2020-01-01)")).toBe(true);
   });
 });
 
@@ -149,6 +205,12 @@ describe("stripPhpHeader / stripKeyboardLayoutSection / normalizeDocBody", () =>
     const a = "<html><body><p>Hi</p></body></html>";
     const b = "  <html><body><p>Hi</p></body></html>  \n";
     expect(normalizeDocBody(a)).toBe(normalizeDocBody(b));
+  });
+
+  it("treats a full welcome document and a help body fragment as the same body", () => {
+    const welcome = "<html><body><p>Hi</p></body></html>";
+    const help = "<?php\n  $pagename = 'X';\n?>\n<p>Hi</p>";
+    expect(normalizeDocBody(welcome)).toBe(normalizeDocBody(help));
   });
 });
 

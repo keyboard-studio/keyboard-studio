@@ -429,14 +429,17 @@ export function comboToKvksShiftToken(tokens: readonly ModifierToken[]): string 
 }
 
 /**
- * Inverse of {@link comboToKvksShiftToken} for help-site `data-states` layer
- * ids: parse a run-together `.kvks` `shift="…"` token (e.g. `"SRA"`) into the
- * help-site name (`"rightalt-shift"`). Longer fragments match first so `RA`
- * is not read as `R`+`A`. Fragments join in help-site order — ctrl family,
- * then alt family, with shift last — matching live help pages
- * (`rightalt-shift`, never `shift-rightalt`). An empty / whitespace-only
- * token is `"default"`; a string with no recognised fragments passes through
- * lower-cased so an unusual layer is never flagged as phantom.
+ * Inverse of {@link comboToKvksShiftToken} for layer ids shared by layout
+ * charts, Layer C `data-states` checks, and the no-`.kvks` fallback path:
+ * parse a run-together `.kvks` `shift="…"` token (e.g. `"SRA"`) into the same
+ * id {@link comboToTouchLayerId} would produce for that combo
+ * (`"rightalt-shift"`). Longer fragments match first so `RA` is not read as
+ * `R`+`A`. An empty / whitespace-only token is `"default"`; a string with no
+ * recognised fragments passes through lower-cased so an unusual layer is
+ * never flagged as phantom.
+ *
+ * One helper, one naming convention — chart filenames no longer change
+ * depending on whether a `.kvks` file happened to be present.
  */
 const KVKS_SHIFT_TOKEN_RE = /LC|RC|LA|RA|S|C|A/g;
 
@@ -450,28 +453,7 @@ const KVKS_TOKEN_TO_MODIFIER: Record<string, ModifierToken> = {
   LA: "LALT",
 };
 
-/** Help-site `data-states` join order: ctrl, then alt, shift last. */
-const HELP_LAYER_PRECEDENCE_ORDER: readonly ModifierToken[] = [
-  "LCTRL",
-  "RCTRL",
-  "CTRL",
-  "LALT",
-  "RALT",
-  "ALT",
-  "SHIFT",
-];
-
-const HELP_LAYER_FRAGMENT: Partial<Record<ModifierToken, string>> = {
-  SHIFT: "shift",
-  CTRL: "ctrl",
-  RCTRL: "rightctrl",
-  LCTRL: "leftctrl",
-  ALT: "alt",
-  RALT: "rightalt",
-  LALT: "leftalt",
-};
-
-export function kvksShiftTokenToHelpLayerId(shift: string): string {
+export function kvksShiftTokenToLayerId(shift: string): string {
   const trimmed = shift.trim();
   if (trimmed === "") return "default";
 
@@ -482,11 +464,11 @@ export function kvksShiftTokenToHelpLayerId(shift: string): string {
   }
   if (matched.length === 0) return trimmed.toLowerCase();
 
-  const ordered = [...new Set(matched)].sort(
-    (a, b) => HELP_LAYER_PRECEDENCE_ORDER.indexOf(a) - HELP_LAYER_PRECEDENCE_ORDER.indexOf(b),
-  );
-  return ordered.map((t) => HELP_LAYER_FRAGMENT[t]!).join("-");
+  return comboToTouchLayerId([...new Set(matched)]) ?? "default";
 }
+
+/** @deprecated Alias — prefer {@link kvksShiftTokenToLayerId}. */
+export const kvksShiftTokenToHelpLayerId = kvksShiftTokenToLayerId;
 
 // ---------------------------------------------------------------------------
 // IR scanning — generalized from scaffoldTouchLayout.ts's classifyModifiers
