@@ -52,6 +52,7 @@ import {
 import { advance, STEPS_WITH_APPLY_COMPLETION } from "../steps/advance.ts";
 import { navigateTo } from "../lib/navigate.ts";
 import { QuestionRecorderContext, type ScreenRecorder } from "../lib/questionRecorder.ts";
+import { JumpContext, type JumpToScreen } from "../lib/jumpContext.ts";
 import { peekPendingJump, clearPendingJump, jumpToLocation } from "../lib/jumpToLocation.ts";
 import type { Location } from "../lib/location.ts";
 import { UnsupportedScriptStub } from "./UnsupportedScriptStub.tsx";
@@ -196,6 +197,17 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
   const recordScreen: ScreenRecorder = useCallback(
     (screenId, answers) => recordQuestionAnswers?.(activeStepId, screenId, answers),
     [recordQuestionAnswers, activeStepId],
+  );
+
+  // spec 079 US3: lets a step (via `components/FlaggedAnswersList.tsx`)
+  // trigger a jump without importing `jumpToLocation.ts` itself — see
+  // `lib/jumpContext.ts`'s header for why that import must not happen from
+  // anything `steps/manifest.ts` reaches (a `no-circular` violation).
+  const jumpToScreen: JumpToScreen = useCallback(
+    (stepId, screenId) => {
+      jumpToLocation({ route: "survey", step: stepId as typeof activeStepId, question: screenId });
+    },
+    [],
   );
 
   // ---------------------------------------------------------------------------
@@ -480,11 +492,13 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
 
   const content = (
     <QuestionRecorderContext.Provider value={recordScreen}>
-      <Component
-        onComplete={handleComplete}
-        {...(canGoBack ? { onBack: handleBack } : {})}
-        {...(ctx !== undefined ? { ctx } : {})}
-      />
+      <JumpContext.Provider value={jumpToScreen}>
+        <Component
+          onComplete={handleComplete}
+          {...(canGoBack ? { onBack: handleBack } : {})}
+          {...(ctx !== undefined ? { ctx } : {})}
+        />
+      </JumpContext.Provider>
     </QuestionRecorderContext.Provider>
   );
 

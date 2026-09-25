@@ -18,7 +18,7 @@
 // reconstructing a real non-Latin bcp47/langtags scenario.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { cleanup, fireEvent, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
 import { render } from '../../test/renderWithI18n.tsx';
 import type { IRRule, IRGroup, IRStore, KeyboardIR, RemovalCapability, PlacementWorklist } from '@keyboard-studio/contracts';
 import { createVirtualFS } from '@keyboard-studio/contracts';
@@ -438,6 +438,64 @@ describe('CarveGalleryV2 — suggested-to-discard group', () => {
     fireEvent.click(screen.getByTestId('carve-v2-suggested-toggle-all'));
     expect(useWorkingCopyStore.getState().isItemDeleted('r-shiftc')).toBe(false);
     expect(screen.getByTestId('carve-v2-suggested-toggle-all').textContent).toMatch(/Discard all/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// 8b. retainedConvenienceChars absent === "not-asked" — spec 079 R-09, T052.
+// No carve code change: CarveGalleryV2.tsx already maps
+// `retainedConvenienceChars ?? []`, so an absent value (never asked, or
+// judged `not-applicable`) and an explicit `[]` (asked, kept nothing) must
+// read identically, and a retained letter must never be proposed for removal.
+// ---------------------------------------------------------------------------
+
+describe('CarveGalleryV2 — retainedConvenienceChars absent vs. answered-empty (spec 079 R-09, T052)', () => {
+  it('an absent retainedConvenienceChars yields the same needed set as an answered-empty step', async () => {
+    mockFixtureContributors();
+    neededCharsResult.set(new Set(['a']));
+
+    // Absent: Convenience letters was never asked (e.g. a `not-asked` pass —
+    // carve never reads surveyAnswerStore's status, only this session field).
+    renderGalleryV2(makeFixtureIR());
+    await screen.findByTestId('carve-v2-suggested-group');
+    const absentLabels = within(screen.getByTestId('carve-v2-suggested-group'))
+      .getAllByRole('button')
+      .map((b) => b.getAttribute('aria-label'))
+      .sort();
+    cleanup();
+    useWorkingCopyStore.getState().reset();
+
+    // Answered-empty: the author was actually asked and kept nothing.
+    const vfs = createVirtualFS();
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir: makeFixtureIR(), removalCapabilities: new Map() });
+    useWorkingCopyStore.getState().recordPhase({ phase: 'C', answers: [], retainedConvenienceChars: [] });
+    render(<CarveGalleryV2 onComplete={vi.fn()} />);
+    await screen.findByTestId('carve-v2-suggested-group');
+    const emptyLabels = within(screen.getByTestId('carve-v2-suggested-group'))
+      .getAllByRole('button')
+      .map((b) => b.getAttribute('aria-label'))
+      .sort();
+
+    expect(emptyLabels).toEqual(absentLabels);
+  });
+
+  it('does not propose removing a letter the author retained for convenience', async () => {
+    mockFixtureContributors();
+    neededCharsResult.set(new Set(['a']));
+    renderGalleryV2(makeFixtureIR());
+
+    // Baseline: 'C' is surplus and recommended for removal.
+    await screen.findByTestId('carve-v2-suggested-group');
+    expect(within(screen.getByTestId('carve-v2-suggested-group')).getByRole('button', { name: 'C — U+0043' })).not.toBeNull();
+
+    // The author kept 'C' at the convenience question.
+    act(() => {
+      useWorkingCopyStore.getState().recordPhase({ phase: 'C', answers: [], retainedConvenienceChars: ['C'] });
+    });
+
+    // 'C' is no longer a removal candidate, so the suggested group — which
+    // had exactly one row — is gone entirely.
+    await waitFor(() => expect(screen.queryByTestId('carve-v2-suggested-group')).toBeNull());
   });
 });
 

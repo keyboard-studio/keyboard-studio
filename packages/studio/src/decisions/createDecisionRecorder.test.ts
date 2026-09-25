@@ -15,6 +15,11 @@ import {
 } from "./createDecisionRecorder.ts";
 import { resetDecisionEntryIds, useDecisionLogStore } from "./decisionLogStore.ts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
+import { createSourceSnapshotter } from "./snapshotSource.ts";
+import { DecisionEntryRow } from "./DecisionEntryRow.tsx";
+import { createElement } from "react";
+import { fireEvent, screen } from "@testing-library/react";
+import { render } from "../test/renderWithI18n.tsx";
 
 const NONE: DecisionImpact = { state: "none" };
 
@@ -181,5 +186,105 @@ describe("step completion", () => {
 
     await vi.waitFor(() => expect(onScreenRecorded).toHaveBeenCalledTimes(1));
     expect(onScreenRecorded).toHaveBeenCalledWith("help", "help", expect.any(Array), expect.any(String));
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Plan risk 2 (spec 079 T076): recording at an intermediate Next makes every
+// Next a capture boundary. Driven through the REAL source snapshotter over a
+// fake projection, so the impacts are what the diff actually yields — not a
+// stubbed return value.
+// ---------------------------------------------------------------------------
+
+describe("multi-screen step capture boundaries (plan risk 2)", () => {
+  const BASE_KMN = "store(&NAME) 'test'\nbegin Unicode > use(main)\ngroup(main) using keys\n";
+  const GUARDED_KMN = `${BASE_KMN}+ [K_A] > 'a'\n`;
+
+  function marksAnswer(questionId: string, value: string[] | string): SurveyAnswer {
+    return Array.isArray(value)
+      ? { questionId, answerType: "char-list", value }
+      : { questionId, answerType: "select", value };
+  }
+
+  it("an intermediate marks station carries {state:'none'}; the final station carries the whole series' diff", async () => {
+    let kmn = BASE_KMN;
+    const snapshotter = createSourceSnapshotter({
+      readProjectedFiles: async () => ({
+        entries: [{ path: "source/test.kmn", content: kmn, encoding: "utf-8" } as never],
+      }),
+    });
+    const { record } = makeRecorder({ snapshotter });
+
+    // An earlier step's boundary establishes the baseline (first capture is null).
+    record({ stepId: "characters", result: { phase: "B", answers: [answer("alphabet", "a")] } });
+    await vi.waitFor(() => expect(entries()).toHaveLength(1));
+
+    // Intermediate station: the IR is untouched until the series completes.
+    record.recordQuestionAnswers("marks", "marks_attachment", [
+      marksAnswer("marks.marks_attachment.́", ["a"]),
+    ]);
+    await vi.waitFor(() => {
+      const e = entries().find((x) => x.stepId === "marks");
+      expect(e?.impact).toEqual({ state: "none" });
+    });
+
+    // Final station: completion applies the series' keyboard effect.
+    kmn = GUARDED_KMN;
+    record({
+      stepId: "marks",
+      result: {
+        phase: "C",
+        answers: [
+          marksAnswer("marks.marks_attachment.́", ["a"]),
+          marksAnswer("marks.marks_output_form.form", "composed"),
+        ],
+      },
+    });
+    await vi.waitFor(() => {
+      const finalEntry = entries().find(
+        (x) => x.payload.kind === "survey-answer" && x.payload.questionId === "marks.marks_output_form.form",
+      );
+      expect(finalEntry?.impact?.state).toBe("captured");
+    });
+
+    const marksEntries = entries().filter((x) => x.stepId === "marks");
+    // The intermediate entry was not re-appended by completion (identical value).
+    expect(marksEntries).toHaveLength(2);
+    const [intermediate, final] = marksEntries;
+    expect(intermediate!.impact).toEqual({ state: "none" });
+    const captured = final!.impact as Extract<DecisionImpact, { state: "captured" }>;
+    expect(captured.magnitude).toEqual({ added: 1, removed: 0 });
+  });
+
+  it("the trail renders the intermediate entry as confirmed-with-no-change, not as an applied diff", () => {
+    const intermediate = {
+      entryId: "m1",
+      stepId: "marks",
+      payload: {
+        kind: "survey-answer" as const,
+        questionId: "marks.marks_attachment.́",
+        answerType: "char-list" as const,
+        value: ["a"],
+      },
+      provenance: { agency: "hand-set" as const },
+      recordedAt: 1,
+      supersedes: null,
+      impact: { state: "none" as const },
+    };
+    render(
+      createElement(
+        "ul",
+        null,
+        createElement(DecisionEntryRow, {
+          entry: intermediate,
+          superseded: false,
+          resolveImpact: () => intermediate.impact,
+        }),
+      ),
+    );
+    fireEvent.click(screen.getByTestId("decision-entry-expand"));
+    const region = screen.getByTestId("decision-entry-impact");
+    expect(region.textContent).toMatch(/changed nothing/i);
+    expect(region.textContent).not.toContain("@@");
   });
 });

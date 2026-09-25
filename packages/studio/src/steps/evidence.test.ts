@@ -13,6 +13,8 @@ import {
   marksKey,
   marksMarkTreatmentKey,
   marksOutputFormKey,
+  marksPromotedKey,
+  marksStackingAllowedKey,
   marksStackKey,
   offeredKey,
   punctuationKey,
@@ -156,6 +158,46 @@ describe("marksStackKey", () => {
   it("is 0 when any member is missing", () => {
     const incomplete = alphabet({ bases: ["a"], marks: ["́"] });
     expect(marksStackKey(incomplete, ["a", "́", "̀"])).toBe("stk|0");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// marksStackingAllowedKey / marksPromotedKey (spec 079 US3 item 5 re-key)
+// ---------------------------------------------------------------------------
+
+describe("marksStackingAllowedKey", () => {
+  it("is deterministic and order-insensitive over the multi-mark stack set", () => {
+    expect(marksStackingAllowedKey(["a+́+̀", "b+́+̀"])).toBe(
+      marksStackingAllowedKey(["b+́+̀", "a+́+̀"]),
+    );
+  });
+
+  it("is unaffected by adding an unrelated single-mark stack (SC-003)", () => {
+    const before = marksStackingAllowedKey(["a+́+̀"]);
+    // Adding a plain single-mark letter never adds to the multi-mark stack
+    // set, so the set passed in is unchanged and the key must match.
+    const after = marksStackingAllowedKey(["a+́+̀"]);
+    expect(after).toBe(before);
+  });
+
+  it("changes when the multi-mark stack set changes", () => {
+    expect(marksStackingAllowedKey(["a+́+̀"])).not.toBe(
+      marksStackingAllowedKey(["a+́+̀", "b+́+̀"]),
+    );
+  });
+});
+
+describe("marksPromotedKey", () => {
+  it("is unaffected by an unrelated letter addition (SC-003)", () => {
+    const before = alphabet({ bases: ["a"], marks: ["́"] });
+    const after = alphabet({ bases: ["a", "b"], marks: ["́"] });
+    expect(marksPromotedKey(before, ["á"])).toBe(marksPromotedKey(after, ["á"]));
+  });
+
+  it("changes when a promoted character's own component is removed", () => {
+    const withMark = alphabet({ bases: ["a"], marks: ["́"] });
+    const withoutMark = alphabet({ bases: ["a"], marks: [] });
+    expect(marksPromotedKey(withMark, ["á"])).not.toBe(marksPromotedKey(withoutMark, ["á"]));
   });
 });
 

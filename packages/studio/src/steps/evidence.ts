@@ -68,7 +68,10 @@ export function marksKey(alphabet: ConfirmedAlphabet | undefined): EvidenceKey {
   return confirmedAlphabetKey(alphabet);
 }
 
-function hasChar(alphabet: ConfirmedAlphabet, ch: string): boolean {
+/** Whether `ch` (a base or a mark) is present anywhere in `alphabet`. Exported
+ * for the two per-answer keys below whose key depends on the SAVED value's own
+ * components, not just the alphabet as a whole (spec 079 US3 item 5). */
+export function hasChar(alphabet: ConfirmedAlphabet, ch: string): boolean {
   return alphabet.bases.includes(ch) || alphabet.marks.includes(ch);
 }
 
@@ -109,6 +112,32 @@ export function marksOutputFormKey(postureId: string): EvidenceKey {
 /** Input order depends on which marks are typed on a key of their own. */
 export function marksInputOrderKey(ownKeyMarks: readonly string[]): EvidenceKey {
   return `ord|${sortedJoin(ownKeyMarks)}`;
+}
+
+/**
+ * `marks_stacking.allowed`'s key (spec 079 US3 item 5): keyed over the SET of
+ * attested multi-mark stacks, not the whole alphabet (`marksKey`) — so adding
+ * an unrelated single-mark letter never flags this answer (SC-003). Callers
+ * pass `stackKey(s)` for each attested stack with `marks.length >= 2`.
+ */
+export function marksStackingAllowedKey(multiMarkStackKeys: readonly string[]): EvidenceKey {
+  return `stkallow|${sortedJoin(multiMarkStackKeys)}`;
+}
+
+/**
+ * `marks_treatment.promoted`'s key (spec 079 US3 item 5): keyed over the
+ * presence of each CURRENTLY SAVED promoted character's own components (base +
+ * combining marks via NFD), not the whole alphabet. An unrelated letter
+ * addition leaves every existing promotion's components' presence unchanged,
+ * so the key is stable; removing a component flips its presence bit, which is
+ * what should re-propose (prune) that one promotion.
+ */
+export function marksPromotedKey(alphabet: ConfirmedAlphabet, promoted: readonly string[]): EvidenceKey {
+  const perChar = promoted.map((c) => {
+    const present = [...c.normalize("NFD")].every((ch) => hasChar(alphabet, ch));
+    return `${c}:${present ? 1 : 0}`;
+  });
+  return `promoted|${sortedJoin(perChar)}`;
 }
 
 // ---------------------------------------------------------------------------

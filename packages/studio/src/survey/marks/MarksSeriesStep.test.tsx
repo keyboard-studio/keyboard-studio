@@ -8,7 +8,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { screen, cleanup, act, fireEvent, within } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
-import type { SurveyAnswer, SurveyPhaseResult } from "@keyboard-studio/contracts";
+import type { ConfirmedAlphabet, SurveyAnswer, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { MarksSeriesStep, computeMarksGate } from "./MarksSeriesStep.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
@@ -1202,5 +1202,193 @@ describe("MarksSeriesStep — spec 079 persistence (T023, T024, T083)", () => {
     const checkboxAfter = within(attachmentStationAfter).getAllByRole("checkbox")[0] as HTMLInputElement;
     expect(checkboxAfter.checked).toBe(!wasChecked);
     expect(recorder).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 079 US3 — targeted re-proposal, flags, gate (T045, T046, T058, T082)
+// ---------------------------------------------------------------------------
+
+function seedFullAlphabet(alphabet: ConfirmedAlphabet): void {
+  useWorkingCopyStore.getState().recordPhase({ phase: "B", answers: [], alphabet });
+}
+
+describe("MarksSeriesStep — US3 targeted re-proposal (T045, T046, T058, T082)", () => {
+  const TWO_BASE_ALPHABET: ConfirmedAlphabet = {
+    bases: ["e", "a"],
+    marks: [ACUTE],
+    attestedStacks: [
+      { base: "e", marks: [ACUTE] },
+      { base: "a", marks: [ACUTE] },
+    ],
+    declaredRoles: {},
+  };
+
+  it("adding one base letter flags only that base's attachment answers; everything else stays unflagged (SC-003)", () => {
+    seedFullAlphabet(TWO_BASE_ALPHABET);
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    // Confirm the attachment station once, so its screen counts as "already
+    // confirmed" (the flag rule's item-4(b) condition) and move to treatment.
+    // `markScreenRecorded` is what a real StepHost's `onScreenRecorded` wiring
+    // calls on Next; this bare-component test simulates that directly since it
+    // renders outside StepHost's QuestionRecorderContext wiring.
+    fireEvent.click(screen.getByTestId("marks-continue"));
+    useSurveyAnswerStore.getState().markScreenRecorded("marks", "marks_attachment", "h1");
+    cleanup();
+
+    // Add a third base, attested for the same mark.
+    seedFullAlphabet({
+      ...TWO_BASE_ALPHABET,
+      bases: ["e", "a", "b"],
+      attestedStacks: [...TWO_BASE_ALPHABET.attestedStacks, { base: "b", marks: [ACUTE] }],
+    });
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+
+    // Position was saved at "marks_treatment" (or later); the earlier,
+    // now-flagged attachment screen surfaces through FlaggedAnswersList, and
+    // Next is blocked until it is resolved (FR-013) — the author's position
+    // is NOT moved back to it (FR-004).
+    const list = screen.getByTestId("flagged-answers-list");
+    expect(within(list).getAllByRole("button")).toHaveLength(1);
+    expect(list.textContent).toContain("b");
+    expect((screen.getByTestId("marks-continue") as HTMLButtonElement).disabled).toBe(true);
+
+    // The author's position was NOT moved (FR-004): still on/after treatment,
+    // not bounced back to the attachment station.
+    expect(screen.queryByTestId("marks-attachment")).toBeNull();
+  });
+
+  it("explicit input order survives an unrelated evidence change while still applicable (FR-012)", () => {
+    seedFullAlphabet(TWO_BASE_ALPHABET);
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    useSurveyAnswerStore.getState().saveAnswer("marks", "marks_treatment.input_order", {
+      value: "prefix",
+      answerType: "select",
+      origin: "overturned",
+      stage: "confirmed",
+      evidenceKey: "ord|", // no own-key marks in this fixture
+      screenId: "marks_treatment",
+    });
+    cleanup();
+    // An unrelated letter addition: ownKeyMarks is still empty (no mark earns
+    // its own key here), so the order key is unchanged and the explicit
+    // choice is neither flagged nor reset.
+    seedFullAlphabet({
+      ...TWO_BASE_ALPHABET,
+      bases: ["e", "a", "b"],
+      attestedStacks: [...TWO_BASE_ALPHABET.attestedStacks, { base: "b", marks: [ACUTE] }],
+    });
+    const saved = useSurveyAnswerStore.getState().steps.marks?.answers["marks_treatment.input_order"];
+    expect(saved?.value).toBe("prefix");
+  });
+
+  it("add-then-remove a letter before revisiting shows no flags and the original answers (FR-014)", () => {
+    seedFullAlphabet(TWO_BASE_ALPHABET);
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    fireEvent.click(screen.getByTestId("marks-continue"));
+    cleanup();
+
+    // Add, then remove again — back to the original evidence.
+    seedFullAlphabet({
+      ...TWO_BASE_ALPHABET,
+      bases: ["e", "a", "b"],
+      attestedStacks: [...TWO_BASE_ALPHABET.attestedStacks, { base: "b", marks: [ACUTE] }],
+    });
+    seedFullAlphabet(TWO_BASE_ALPHABET);
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+
+    expect(screen.queryByTestId("flagged-answers-list")).toBeNull();
+    expect((screen.getByTestId("marks-continue") as HTMLButtonElement).disabled).toBe(false);
+  });
+
+  it("a flagged answer shows its catalog reason", () => {
+    seedFullAlphabet(TWO_BASE_ALPHABET);
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    fireEvent.click(screen.getByTestId("marks-continue"));
+    useSurveyAnswerStore.getState().markScreenRecorded("marks", "marks_attachment", "h1");
+    cleanup();
+    seedFullAlphabet({
+      ...TWO_BASE_ALPHABET,
+      bases: ["e", "a", "b"],
+      attestedStacks: [...TWO_BASE_ALPHABET.attestedStacks, { base: "b", marks: [ACUTE] }],
+    });
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    expect(screen.getByTestId("flagged-answers-list").textContent).toMatch(/you added/i);
+  });
+
+  it("confirming a station re-stamps its answers' evidence key, clearing the flag (FR-041)", () => {
+    seedFullAlphabet(TWO_BASE_ALPHABET);
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    fireEvent.click(screen.getByTestId("marks-continue")); // confirms attachment
+    useSurveyAnswerStore.getState().markScreenRecorded("marks", "marks_attachment", "h1");
+    cleanup();
+    seedFullAlphabet({
+      ...TWO_BASE_ALPHABET,
+      bases: ["e", "a", "b"],
+      attestedStacks: [...TWO_BASE_ALPHABET.attestedStacks, { base: "b", marks: [ACUTE] }],
+    });
+    // Jump straight back to the attachment station and confirm it again.
+    useSurveyAnswerStore.getState().setPosition("marks", "marks_attachment");
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    expect(screen.getByTestId("marks-attachment")).toBeTruthy();
+    fireEvent.click(screen.getByTestId("marks-continue"));
+    const answer = useSurveyAnswerStore.getState().steps.marks?.answers["marks_attachment.́|b"];
+    expect(answer?.stage).toBe("confirmed");
+    cleanup();
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    expect(screen.queryByTestId("flagged-answers-list")).toBeNull();
+  });
+
+  it("removing the last diacritic keeps the saved answers and shows no work-to-do; restoring it renders them unflagged (T082, data-model.md §3 inactive/kept)", () => {
+    seedFullAlphabet({ bases: ["e"], marks: [ACUTE], attestedStacks: [{ base: "e", marks: [ACUTE] }], declaredRoles: {} });
+    const onComplete = vi.fn();
+    act(() => {
+      render(<MarksSeriesStep onComplete={onComplete} />);
+    });
+    // Walk to completion so every station's answers are saved.
+    while (!onComplete.mock.calls.length) {
+      fireEvent.click(screen.getByTestId("marks-continue"));
+    }
+    const savedBefore = useSurveyAnswerStore.getState().steps.marks?.answers ?? {};
+    expect(Object.keys(savedBefore).length).toBeGreaterThan(0);
+    cleanup();
+
+    // Remove the last diacritic entirely — the series gate now skips.
+    seedFullAlphabet({ bases: ["e"], marks: [], attestedStacks: [], declaredRoles: {} });
+    const onCompleteAfterRemoval = vi.fn();
+    act(() => {
+      render(<MarksSeriesStep onComplete={onCompleteAfterRemoval} />);
+    });
+    expect(onCompleteAfterRemoval).toHaveBeenCalledTimes(1);
+    // Answers are KEPT in the store, not cleared.
+    expect(useSurveyAnswerStore.getState().steps.marks?.answers).toEqual(savedBefore);
+    cleanup();
+
+    // Restore the diacritic: every original answer renders unflagged again.
+    seedFullAlphabet({ bases: ["e"], marks: [ACUTE], attestedStacks: [{ base: "e", marks: [ACUTE] }], declaredRoles: {} });
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+    expect(screen.queryByTestId("flagged-answers-list")).toBeNull();
   });
 });

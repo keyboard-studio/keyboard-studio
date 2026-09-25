@@ -81,14 +81,20 @@ import { useSurveyAnswerStore, type SavedAnswer } from "../../stores/surveyAnswe
 import { useRecordQuestionAnswers } from "../../lib/questionRecorder.ts";
 import {
   reconcile,
-  marksKey,
   marksAttachmentKey,
   marksClassTreatmentKey,
   marksMarkTreatmentKey,
   marksStackKey as marksStackEvidenceKey,
   marksOutputFormKey,
   marksInputOrderKey,
+  marksPromotedKey,
+  marksStackingAllowedKey,
 } from "../../steps/evidence.ts";
+import { deriveMarksFlags, type FlaggedMarksAnswer, type MarksStationId } from "./marksViews.ts";
+import { reproposalCueMessage } from "../reproposalReason.ts";
+import { FlaggedAnswersList } from "../../components/FlaggedAnswersList.tsx";
+import { useFlaggedNextGate } from "../../hooks/useFlaggedNextGate.ts";
+import { useStepWalkStore } from "../../stores/stepWalkStore.ts";
 import { lowercaseBaseView, casedBaseCount } from "../charNormUtils.ts";
 import { AttachmentStation } from "./AttachmentStation.tsx";
 import { MarkTreatmentStation } from "./MarkTreatmentStation.tsx";
@@ -133,28 +139,23 @@ export function computeMarksGate(alphabet: ConfirmedAlphabet | undefined): Marks
  * The rendered stations, in series order. FOUR, down from five (spec 052
  * FR-018/SC-003): the mark input-order question is folded into
  * `marks_treatment` rather than occupying a station of its own.
+ *
+ * Canonical definition moved to `marksViews.ts` (spec 079 US3), which needs it
+ * too and must not fork it; re-exported here so nothing importing it from this
+ * module has to change.
  */
-export type MarksStationId =
-  | "marks_attachment"
-  | "marks_treatment"
-  | "marks_output_form"
-  | "marks_stacking";
+export type { MarksStationId } from "./marksViews.ts";
 
 /** Attachment answers: per mark, per base — checked = reachable on the keyboard. */
 export type AttachmentChecked = Record<string, Record<string, boolean>>;
 
-/** Initial S1 state from the proposals: attested pre-checked, everything else unchecked. */
-export function initialAttachmentChecked(proposals: AttachmentProposal[]): AttachmentChecked {
-  const out: AttachmentChecked = {};
-  for (const proposal of proposals) {
-    const row: Record<string, boolean> = {};
-    for (const [base, state] of Object.entries(proposal.states)) {
-      row[base] = state === "attested";
-    }
-    out[proposal.mark] = row;
-  }
-  return out;
-}
+/**
+ * Initial S1 state from the proposals: attested pre-checked, everything else
+ * unchecked. Moved to `marksViews.ts` (spec 079) so `hooks/useWorkToDo.ts` can
+ * derive the SAME default attachment view for its badge computation without
+ * importing this component module; re-exported here unchanged.
+ */
+export { initialAttachmentChecked } from "./marksViews.ts";
 
 /**
  * A class needs an on-screen S2 confirmation only when there is a genuine
@@ -221,9 +222,12 @@ const STEP_ID = "marks";
  * don't recompute on every render (the alternative, `?? {}`, is a fresh
  * object literal each render). */
 const EMPTY_ANSWERS: Record<string, SavedAnswer> = {};
+/** Stable empty-lastRecorded reference for a not-yet-visited step, same reason
+ * as {@link EMPTY_ANSWERS}. */
+const EMPTY_LAST_RECORDED: Record<string, string> = {};
 
 const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: EditorStepProps) => {
-  const { t } = useLingui();
+  const { t, i18n } = useLingui();
   const alphabet = useWorkingCopyStore((s) => s.session.alphabet);
   const importedOrder = useWorkingCopyStore((s) => s.session.axes.markInputOrder);
   const baseIr = useWorkingCopyStore((s) => s.baseIr);
@@ -391,9 +395,14 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
     markTreatment[mark] = view.value as MarkTreatment;
   }
 
-  const promotedKey = marksKey(gate.alphabet);
+  // spec 079 US3 item 5: keyed over the SAVED promoted list's own components'
+  // presence, not the whole alphabet (`marksKey`) — an unrelated letter
+  // addition must not flag every promotion (SC-003).
+  const savedPromotedAnswer = savedAnswers["marks_treatment.promoted"];
+  const savedPromoted = (savedPromotedAnswer?.value as string[] | undefined) ?? [];
+  const promotedKey = marksPromotedKey(gate.alphabet, savedPromoted);
   const promotedView = reconcile(
-    savedAnswers["marks_treatment.promoted"],
+    savedPromotedAnswer,
     promotedKey,
     [] as string[],
     (saved) => prunePromotions(gate.alphabet, saved, expandedAttachments),
@@ -437,7 +446,10 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
       answerType: "char-list",
       origin: nextPromoted.length === 0 ? "confirmed" : "overturned",
       stage: "draft",
-      evidenceKey: promotedKey,
+      // Keyed off the value being saved NOW, not the stale `promotedKey`
+      // (which reflects the previously-saved list) — see marksPromotedKey's
+      // doc for why the key depends on the value itself (spec 079 US3 item 5).
+      evidenceKey: marksPromotedKey(gate.alphabet, nextPromoted),
       screenId: "marks_treatment",
     });
   }
@@ -466,7 +478,11 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
   const seededOrder: MarkInputOrder = prefilledFromImport
     ? (importedOrder as MarkInputOrder)
     : "postfix";
-  const orderKey = marksInputOrderKey(ownKeyMarks);
+  // spec 079 US3 item 5 / FR-012: an explicitly set order is carried forward
+  // via `adjust` while still applicable, and treated as `inactive` (kept, no
+  // flag) rather than `reproposed` once no mark has a key of its own to order
+  // — `currentKey = null` is `reconcile()`'s inactive signal.
+  const orderKey = hasOwnKeyMark ? marksInputOrderKey(ownKeyMarks) : null;
   const savedOrder = savedAnswers["marks_treatment.input_order"];
   const orderExplicitlySet = savedOrder !== undefined;
   const orderView = reconcile(savedOrder, orderKey, seededOrder, (saved) => saved as MarkInputOrder);
@@ -536,7 +552,9 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
   }, [proposals]);
   const stackingEvidence = multiMarkStacks.length > 0 || marksOverlap;
 
-  const stackingKey = marksKey(gate.alphabet);
+  // spec 079 US3 item 5: keyed over the SET of attested multi-mark stacks, not
+  // the whole alphabet (`marksKey`) — SC-003.
+  const stackingKey = marksStackingAllowedKey(multiMarkStacks.map((s) => stackKey(s)));
   const stackingProposal = multiMarkStacks.length > 0;
   const stackingAllowedView = reconcile(
     savedAnswers["marks_stacking.allowed"],
@@ -598,6 +616,48 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
       ? Math.max(visibleStations.indexOf(savedPosition as MarksStationId), 0)
       : 0;
   const currentStation = visibleStations[Math.min(stationIndex, visibleStations.length - 1)];
+
+  // spec 079 US3: which saved answers are flagged, and why — the ONE
+  // computation `FlaggedAnswersList`, the in-page cue and `useWorkToDo`
+  // (hooks/useWorkToDo.ts) all read, so they can never disagree (item 3).
+  const lastRecorded = marksStepAnswers?.lastRecorded ?? EMPTY_LAST_RECORDED;
+  const flaggedAnswers: FlaggedMarksAnswer[] = useMemo(
+    () =>
+      deriveMarksFlags({
+        alphabet: gate.alphabet,
+        proposals,
+        attachmentBases,
+        classes,
+        treatmentPrefills,
+        multiMarkStacks,
+        postureId,
+        savedAnswers,
+        lastRecorded,
+      }),
+    [gate.alphabet, proposals, attachmentBases, classes, treatmentPrefills, multiMarkStacks, postureId, savedAnswers, lastRecorded],
+  );
+  const flaggedWorkItems = useMemo(
+    () =>
+      flaggedAnswers.map((f) => ({
+        kind: "reproposed" as const,
+        stepId: STEP_ID,
+        screenId: f.screenId,
+        answerId: f.answerId,
+        reason: f.reason,
+      })),
+    [flaggedAnswers],
+  );
+  const nextGate = useFlaggedNextGate(flaggedWorkItems, visibleStations, currentStation ?? null);
+
+  // R-11: publish this series' stations as its walk, so the footer's
+  // per-station question marks (spec 079 T061) exist.
+  const publishStepWalk = useStepWalkStore((s) => s.publishStepWalk);
+  useEffect(() => {
+    publishStepWalk(
+      STEP_ID,
+      visibleStations.map((id) => ({ id, done: lastRecorded[id] !== undefined })),
+    );
+  }, [publishStepWalk, visibleStations, lastRecorded]);
 
   // S0 skip: never render — stay TRANSPARENT in the direction of travel. On a
   // forward entry, complete immediately (empty worklist → mechanism gallery).
@@ -725,7 +785,123 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
     onComplete(seriesResult(worklist, outputForm, computedAxes, answers));
   }
 
+  /**
+   * spec 079 US3 item 6 (FR-041): re-save every answer shown on `stationId`
+   * with its CURRENT evidence key and `stage: "confirmed"` — this is what
+   * clears a flag on confirm/overturn. `markScreenRecorded` (fired by
+   * `recordScreen` below) only flips an already-`draft` answer to
+   * `"confirmed"`; it does not touch `evidenceKey`, so an untouched
+   * `reproposed` answer would otherwise stay flagged forever once its screen
+   * is re-confirmed.
+   */
+  function confirmStation(stationId: MarksStationId): void {
+    switch (stationId) {
+      case "marks_attachment":
+        for (const proposal of proposals) {
+          for (const base of attachmentBases.filter((b) => b in proposal.states)) {
+            const key = marksAttachmentKey(gate.alphabet, proposal.mark, base);
+            const value = attachmentChecked[proposal.mark]?.[base] ?? false;
+            const proposedValue = proposal.states[base] === "attested";
+            saveAnswer(STEP_ID, `marks_attachment.${proposal.mark}|${base}`, {
+              value,
+              answerType: "boolean",
+              origin: value === proposedValue ? "confirmed" : "overturned",
+              stage: "confirmed",
+              evidenceKey: key,
+              screenId: "marks_attachment",
+            });
+          }
+        }
+        break;
+      case "marks_treatment":
+        for (const prefill of treatmentPrefills) {
+          const markClass = classes.find((c) => c.id === prefill.classId);
+          const key = marksClassTreatmentKey(markClass?.marks ?? []);
+          const value = classTreatment[prefill.classId] ?? prefill.recommended;
+          saveAnswer(STEP_ID, `marks_treatment.class.${prefill.classId}`, {
+            value,
+            answerType: "select",
+            origin: value === prefill.recommended ? "confirmed" : "overturned",
+            stage: "confirmed",
+            evidenceKey: key,
+            screenId: "marks_treatment",
+          });
+        }
+        for (const [mark, value] of Object.entries(markTreatment)) {
+          const markClass = classes.find((c) => c.marks.includes(mark));
+          const key = marksMarkTreatmentKey(gate.alphabet, mark, markClass?.id ?? "");
+          saveAnswer(STEP_ID, `marks_treatment.mark.${mark}`, {
+            value,
+            answerType: "select",
+            origin: "confirmed",
+            stage: "confirmed",
+            evidenceKey: key,
+            screenId: "marks_treatment",
+          });
+        }
+        {
+          const key = marksPromotedKey(gate.alphabet, promoted);
+          saveAnswer(STEP_ID, "marks_treatment.promoted", {
+            value: promoted,
+            answerType: "char-list",
+            origin: promoted.length === 0 ? "confirmed" : "overturned",
+            stage: "confirmed",
+            evidenceKey: key,
+            screenId: "marks_treatment",
+          });
+        }
+        if (orderKey !== null) {
+          saveAnswer(STEP_ID, "marks_treatment.input_order", {
+            value: inputOrder,
+            answerType: "select",
+            origin: inputOrder === seededOrder ? "confirmed" : "overturned",
+            stage: "confirmed",
+            evidenceKey: orderKey,
+            screenId: "marks_treatment",
+          });
+        }
+        break;
+      case "marks_output_form":
+        saveAnswer(STEP_ID, "marks_output_form.form", {
+          value: outputForm,
+          answerType: "select",
+          origin: outputForm === outputFormProposal.form ? "confirmed" : "overturned",
+          stage: "confirmed",
+          evidenceKey: outputFormKey,
+          screenId: "marks_output_form",
+        });
+        break;
+      case "marks_stacking":
+        saveAnswer(STEP_ID, "marks_stacking.allowed", {
+          value: stackingAllowed,
+          answerType: "boolean",
+          origin: stackingAllowed === stackingProposal ? "confirmed" : "overturned",
+          stage: "confirmed",
+          evidenceKey: stackingKey,
+          screenId: "marks_stacking",
+        });
+        for (const stack of multiMarkStacks) {
+          const key = stackKey(stack);
+          const evidenceKey = marksStackEvidenceKey(gate.alphabet, stack.marks);
+          saveAnswer(STEP_ID, `marks_stacking.stack.${key}`, {
+            value: stacksConfirmed[key] ?? true,
+            answerType: "boolean",
+            origin: "confirmed",
+            stage: "confirmed",
+            evidenceKey,
+            screenId: "marks_stacking",
+          });
+        }
+        break;
+    }
+  }
+
   function handleContinue(): void {
+    // FR-013: Next is blocked while a flagged EARLIER station is unresolved.
+    // Flags on the CURRENT station are resolved by this very Continue
+    // (confirmStation below), so they never block it.
+    if (nextGate.blocked) return;
+    confirmStation(activeStation);
     const nextIndex = stationIndex + 1;
     if (nextIndex < visibleStations.length) {
       // Intermediate station: record its own answers now (R-04) and move on.
@@ -816,12 +992,45 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
         />
       )}
 
+      {/* spec 079 US3: a flag that appeared ON this station (a newly-relevant
+          question on an already-confirmed screen) gets its cue here; earlier
+          stations' flags are listed below instead (FlaggedAnswersList), since
+          jumping "back into" the currently-rendered station makes no sense. */}
+      {flaggedAnswers
+        .filter((f) => f.screenId === activeStation)
+        .map((f) => (
+          <p
+            key={f.answerId}
+            data-testid={`marks-flag-${f.answerId}`}
+            role="status"
+            style={{ ...mutedParaFlush, color: ACCENT, fontSize: 13 }}
+          >
+            {reproposalCueMessage(f.reason, i18n)}
+          </p>
+        ))}
+
+      <FlaggedAnswersList
+        stepId="marks"
+        items={nextGate.flaggedBefore
+          .filter((w): w is Extract<typeof w, { kind: "reproposed" }> => w.kind === "reproposed")
+          .map((w) => ({ answerId: w.answerId, screenId: w.screenId, reason: w.reason }))}
+      />
+
+      {nextGate.blocked && (
+        <p role="status" style={{ ...mutedParaFlush, color: ACCENT, fontSize: 13 }}>
+          <Trans id="survey.flagged.blocked">
+            Resolve the flagged answer above before continuing.
+          </Trans>
+        </p>
+      )}
+
       <div style={{ display: "flex", justifyContent: "flex-end" }}>
         <button
           type="button"
           data-testid="marks-continue"
           onClick={handleContinue}
-          style={primaryButton(false)}
+          disabled={nextGate.blocked}
+          style={primaryButton(nextGate.blocked)}
         >
           <Trans id="survey.marks.series.continueButton">Continue</Trans>
         </button>
