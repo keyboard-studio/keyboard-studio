@@ -610,6 +610,16 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
       : 0;
   const currentStation = visibleStations[Math.min(stationIndex, visibleStations.length - 1)];
 
+  // The footer reads the store's position as this step's cursor. On first
+  // entry it is null, and after an edit that hides the saved station it names
+  // a screen that no longer exists — both fall back to a station here, so
+  // write that fallback back or the footer rings the wrong station.
+  useEffect(() => {
+    if (currentStation !== undefined && savedPosition !== currentStation) {
+      setPosition(STEP_ID, currentStation);
+    }
+  }, [currentStation, savedPosition, setPosition]);
+
   // spec 079 US3: which saved answers are flagged, and why — the ONE
   // computation `FlaggedAnswersList`, the in-page cue and `useWorkToDo`
   // (hooks/useWorkToDo.ts) all read, so they can never disagree (item 3).

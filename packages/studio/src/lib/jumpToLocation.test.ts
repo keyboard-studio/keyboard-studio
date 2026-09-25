@@ -11,6 +11,7 @@ import { createVirtualFS } from "@keyboard-studio/contracts";
 import { basicKbdus, makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
+import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import {
   clearPendingJump,
   consumePendingJump,
@@ -46,6 +47,7 @@ beforeEach(() => {
   clearPendingJump();
   useSurveySessionStore.getState().reset();
   useWorkingCopyStore.getState().reset();
+  useSurveyAnswerStore.getState().reset();
   window.location.hash = "#trail";
 });
 
@@ -178,5 +180,23 @@ describe("degrade", () => {
     // ancestor" means, and it is why a degrade is not a refusal.
     expect(useSurveySessionStore.getState().activeStepId).toBe("choose_base");
     expect(peekPendingJump()).toBeNull();
+  });
+});
+
+describe("saved positions", () => {
+  it("a step's own saved position arrives even though the step publishes no walk while unmounted", () => {
+    seedProject();
+    walkToCharacters();
+    // Characters saves a sub-screen id as its position; it is neither a flow
+    // question nor in a published walk once the step has unmounted.
+    useSurveyAnswerStore.getState().setPosition("characters", "build-list");
+    useSurveySessionStore.getState().advance("marks");
+
+    const outcome = jumpToLocation({ route: "survey", step: "characters", question: "build-list" });
+
+    expect(outcome).toEqual({
+      kind: "arrived",
+      at: { route: "survey", step: "characters", question: "build-list" },
+    });
   });
 });

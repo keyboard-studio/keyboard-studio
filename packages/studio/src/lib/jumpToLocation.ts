@@ -126,8 +126,27 @@ export function liveResolveContext(): ResolveContext {
     // (a gallery's characters). Without this a footer dot naming a character
     // would resolve `question-not-in-build` and refuse itself — see
     // ResolveContext.stepPositions.
-    stepPositions: stepPositionIds(useStepWalkStore.getState().walks),
+    stepPositions: withSavedPositions(stepPositionIds(useStepWalkStore.getState().walks)),
   };
+}
+
+/**
+ * A step's own saved position is addressable even while its walk is not
+ * published (a step publishes only while mounted). The footer's collapsed
+ * section jumps to exactly that position (journey-strip-contract.md §5), so
+ * without this it would degrade to the bare step with a false
+ * "question-not-in-build" reason.
+ */
+function withSavedPositions(
+  positions: Readonly<Record<string, readonly string[]>>,
+): Readonly<Record<string, readonly string[]>> {
+  const out: Record<string, readonly string[]> = { ...positions };
+  for (const [stepId, step] of Object.entries(useSurveyAnswerStore.getState().steps)) {
+    if (step.position === null) continue;
+    const ids = out[stepId] ?? [];
+    if (!ids.includes(step.position)) out[stepId] = [...ids, step.position];
+  }
+  return out;
 }
 
 /**

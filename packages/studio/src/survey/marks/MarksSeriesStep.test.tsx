@@ -1164,6 +1164,28 @@ describe("MarksSeriesStep — spec 079 persistence (T023, T024, T083)", () => {
     expect(finalIds).toEqual(expect.arrayContaining(treatmentIds));
   });
 
+  it("first entry writes the station it renders to the store, so the footer rings that station", () => {
+    seedFixture();
+    expect(useSurveyAnswerStore.getState().steps["marks"]?.position ?? null).toBeNull();
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+
+    expect(screen.getByTestId("marks-attachment")).toBeTruthy();
+    expect(useSurveyAnswerStore.getState().steps["marks"]?.position).toBe("marks_attachment");
+  });
+
+  it("a saved station that is no longer visible is replaced in the store by the station rendered", () => {
+    seedFixture();
+    useSurveyAnswerStore.getState().setPosition("marks", "marks_no_longer_visible");
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />);
+    });
+
+    expect(screen.getByTestId("marks-attachment")).toBeTruthy();
+    expect(useSurveyAnswerStore.getState().steps["marks"]?.position).toBe("marks_attachment");
+  });
+
   it("T083: a position parked via setPosition before mount (what jumpToLocation does) lands on that station with its saved answers", () => {
     seedFixture();
     act(() => {
