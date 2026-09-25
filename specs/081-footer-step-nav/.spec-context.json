@@ -3,8 +3,8 @@
   "specName": "081-footer-step-nav",
   "branch": "081-footer-step-nav",
   "selectedAt": "2026-09-25T20:14:15.564Z",
-  "currentStep": "plan",
-  "status": "planned",
+  "currentStep": "tasks",
+  "status": "ready-to-implement",
   "history": [
     {
       "step": "specify",
@@ -19,6 +19,13 @@
       "kind": "start",
       "by": "extension",
       "at": "2026-09-25T20:31:05.654Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-09-25T20:50:31.909Z"
     }
   ],
   "telemetryInstanceId": "aec2ed41-12ce-42de-91fe-f2d70e38939f"
