@@ -206,6 +206,9 @@ const CharactersStep: ComponentType<EditorStepProps> = ({
   // publishes the finer per-question walk for that sub-flow under this same
   // step id, and a second publisher here would race it.
   const publishStepWalk = useStepWalkStore((s) => s.publishStepWalk);
+  // The build list is done once it holds letters — not when every optional
+  // box on it has been filled.
+  const hasDraftLetters = usePhaseBDraftStore((s) => s.chars.length > 0);
   useEffect(() => {
     if (discoveryMethod === "manual") return;
     const stops: StepWalkPositions =
@@ -214,10 +217,10 @@ const CharactersStep: ComponentType<EditorStepProps> = ({
         : [
             { id: "prefill", done: true },
             { id: "intro", done: discoveryMethod !== null },
-            ...(discoveryMethod === "build-list" ? [{ id: "build-list", done: false }] : []),
+            ...(discoveryMethod === "build-list" ? [{ id: "build-list", done: hasDraftLetters }] : []),
           ];
     publishStepWalk(CHARACTERS_STEP_ID, stops);
-  }, [publishStepWalk, charactersSubStage, discoveryMethod]);
+  }, [publishStepWalk, charactersSubStage, discoveryMethod, hasDraftLetters]);
 
   // Guard: prefill requires both identity and base (unreachable once the step
   // is properly entered, but matches today's null fallback).
