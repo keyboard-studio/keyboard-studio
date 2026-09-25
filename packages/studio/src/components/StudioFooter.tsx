@@ -297,7 +297,7 @@ export function StudioFooter() {
           and in Tab order. Keyed on the step, so a step change remounts it and
           focus never carries over from the previous step's buttons. It never
           shrinks; the project label and then the dot row give way first. */}
-      <StepNavCluster key={activeStepId} stepId={activeStepId} />
+      <StepNavCluster key={`nav-${activeStepId}`} stepId={activeStepId} />
 
       {/* Omitted entirely, not placeholdered, while the project has no name —
           see the module header. The dot row simply takes the full width. */}
@@ -338,7 +338,7 @@ export function StudioFooter() {
         // DOM-node identity (and therefore focus) across an ACTIVE STEP
         // change is an acceptable trade — the author's focus was already
         // moving to the new step's own content at that exact moment.
-        key={activeStepId}
+        key={`dots-${activeStepId}`}
         ref={rowRef}
         data-testid="progress-dot-row"
         style={{
