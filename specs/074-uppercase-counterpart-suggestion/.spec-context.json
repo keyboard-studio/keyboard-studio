@@ -560,7 +560,7 @@
       "status": "DONE",
       "did": "Added 2 new MechanismGallery cases: shared banner role/aria-label + exactly-two-controls (FR-011), and confirm targeting the raising swap when one char carries two swaps (FR-008). The contract's stale-base case already exists in the shipping suite - noted rather than duplicated",
       "files": [
-        "packages/studio/src/editors/assignLoop/MechanismGallery.test.tsx"
+        "packages/studio/src/editors/assignLoop/MechanismGallery.casePair.test.tsx"
       ]
     },
     "T023": {
@@ -574,7 +574,7 @@
       "status": "DONE",
       "did": "Added 4 S-02 cases: dead-key apply raises a proposal, confirm keeps trigger/deadkeyName/accentChar and case-shifts baseLetters/accentedForms, dismiss records nothing, caseless output raises nothing",
       "files": [
-        "packages/studio/src/editors/assignLoop/MechanismGallery.test.tsx"
+        "packages/studio/src/editors/assignLoop/MechanismGallery.casePair.test.tsx"
       ]
     },
     "T025": {
@@ -582,7 +582,7 @@
       "did": "Added 3 onApplied-seam cases in SequenceBuilderPanel.test.tsx (payload by identity, no payload on dedup no-op, multi-char content passed verbatim) plus 4 end-to-end S-03 cases in MechanismGallery.test.tsx where the banner actually lives",
       "files": [
         "packages/studio/src/editors/assignLoop/SequenceBuilderPanel.test.tsx",
-        "packages/studio/src/editors/assignLoop/MechanismGallery.test.tsx"
+        "packages/studio/src/editors/assignLoop/MechanismGallery.casePair.test.tsx"
       ]
     },
     "T026": {
@@ -758,7 +758,7 @@
   "verified": [
     {
       "what": "SC-005 regression gate - the shipping physical-key companion is behaviour-preserved by the extraction",
-      "command": "pnpm --filter @keyboard-studio/studio test src/editors/assignLoop/MechanismGallery.test.tsx",
+      "command": "pnpm --filter @keyboard-studio/studio test src/editors/assignLoop/MechanismGallery.casePair.test.tsx",
       "result": "PASS - all 145 pre-existing cases pass with a zero-deletion diff (pure append); no existing companion case was edited",
       "warnings": []
     },
@@ -879,7 +879,7 @@
     "FR-001": {
       "tests": [
         "casePairCompanion.test.ts",
-        "MechanismGallery.test.tsx::case-pair companion proposal",
+        "MechanismGallery.casePair.test.tsx::case-pair companion proposal",
         "TouchGallery.test.tsx::shift-layer case-pair proposal"
       ]
     },
@@ -890,13 +890,13 @@
     },
     "FR-003": {
       "tests": [
-        "MechanismGallery.test.tsx::case-pair companion proposal"
+        "MechanismGallery.casePair.test.tsx::case-pair companion proposal"
       ]
     },
     "FR-004": {
       "tests": [
-        "MechanismGallery.test.tsx::S-02 parallel-combo proposal",
-        "MechanismGallery.test.tsx::S-03 parallel-combo proposal",
+        "MechanismGallery.casePair.test.tsx::S-02 parallel-combo proposal",
+        "MechanismGallery.casePair.test.tsx::S-03 parallel-combo proposal",
         "SequenceBuilderPanel.test.tsx::onApplied case-pair seam"
       ]
     },
@@ -913,30 +913,30 @@
     },
     "FR-007": {
       "tests": [
-        "MechanismGallery.test.tsx::records nothing additional when the companion prompt is declined",
+        "MechanismGallery.casePair.test.tsx::records nothing additional when the companion prompt is declined",
         "TouchGallery.test.tsx::dismissing records nothing"
       ]
     },
     "FR-008": {
       "tests": [
-        "MechanismGallery.test.tsx::companion proposal identity tracking (P1/P2 regression)",
-        "MechanismGallery.test.tsx::confirming applies to the RAISING swap"
+        "MechanismGallery.casePair.test.tsx::companion proposal identity tracking (P1/P2 regression)",
+        "MechanismGallery.casePair.test.tsx::confirming applies to the RAISING swap"
       ]
     },
     "FR-009": {
       "tests": [
         "casePairCompanion.test.ts::locale (FR-009)",
-        "MechanismGallery.test.tsx::companion proposal bcp47 plumbing"
+        "MechanismGallery.casePair.test.tsx::companion proposal bcp47 plumbing"
       ]
     },
     "FR-010": {
       "tests": [
-        "MechanismGallery.test.tsx::does not show the companion prompt when the keyboard is mnemonic"
+        "MechanismGallery.casePair.test.tsx::does not show the companion prompt when the keyboard is mnemonic"
       ]
     },
     "FR-011": {
       "tests": [
-        "MechanismGallery.test.tsx::shared case-pair affordance (spec 074)"
+        "MechanismGallery.casePair.test.tsx::shared case-pair affordance (spec 074)"
       ]
     }
   },
