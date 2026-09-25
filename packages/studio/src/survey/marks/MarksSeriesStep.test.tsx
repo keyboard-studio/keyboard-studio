@@ -5,7 +5,7 @@
 // back-nav entry (transparent in both directions). A marked alphabet renders
 // the series shell.
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
 import { screen, cleanup, act, fireEvent, within } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import type { ConfirmedAlphabet, SurveyAnswer, SurveyPhaseResult } from "@keyboard-studio/contracts";
@@ -35,11 +35,6 @@ function seedAlphabet(marks: string[], bases: string[] = ["e"]): void {
     },
   });
 }
-
-beforeEach(() => {
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-});
 
 afterEach(() => {
   cleanup();

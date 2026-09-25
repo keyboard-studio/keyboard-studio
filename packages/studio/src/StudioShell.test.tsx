@@ -22,570 +22,52 @@
 // sequence of mocked buttons that lead up to it.
 
 import { describe, it, expect, afterEach, beforeEach, vi } from "vitest";
-import { useState, useEffect } from "react";
 import { screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { render } from "./test/renderWithI18n.tsx";
 import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
 import { useStartOverStore } from "./stores/startOverStore.ts";
 import { useStepWalkStore } from "./stores/stepWalkStore.ts";
-import { usePhaseBDraftStore, resetPhaseBDraftDecisions } from "./stores/phaseBDraftStore.ts";
+import { resetPhaseBDraftDecisions } from "./stores/phaseBDraftStore.ts";
 import { consumePendingWelcomeLocation, jumpToLocation } from "./lib/jumpToLocation.ts";
-import type { OnInstantiateCallback, Stage } from "./hooks/useKeyboardArtifact.ts";
+import type { Stage } from "./hooks/useKeyboardArtifact.ts";
 
 // ---------------------------------------------------------------------------
-// vi.hoisted — must precede vi.mock() calls
+// Shallow stubs for every child component plus the heavy hooks (shared
+// harness: test/studioShellMocks/, one module per mocked child). Each stub
+// renders a unique data-testid and one button per callback; tests drive the
+// wizard by clicking through them.
 // ---------------------------------------------------------------------------
 
-const {
-  mockIdentityCompleteRef,
-  mockBaseResolvedRef,
-  mockCarveDoneRef,
-  mockCarveBackRef,
-  mockPhaseBDoneRef,
-  mockPhaseBBackRef,
-  mockMechDoneRef,
-  mockMechBackRef,
-  mockPhaseFDoneRef,
-  mockPhaseFBackRef,
-  mockTouchECompleteRef,
-  mockTouchEAssignmentsRef,
-  mockTouchEBackRef,
-} = vi.hoisted(() => {
-  // These refs are updated by mock components so the latest callback is always
-  // available to the test when it fires a button click.
-  const mockIdentityCompleteRef = { current: null as null | ((...args: unknown[]) => void) };
-  const mockBaseResolvedRef = { current: null as null | ((...args: unknown[]) => void) };
-  const mockPrefillConfirmRef = { current: null as null | (() => void) };
-  const mockCarveDoneRef = { current: null as null | (() => void) };
-  const mockCarveBackRef = { current: null as null | (() => void) };
-  const mockPhaseBDoneRef = { current: null as null | ((...args: unknown[]) => void) };
-  const mockPhaseBBackRef = { current: null as null | (() => void) };
-  const mockMechDoneRef = { current: null as null | (() => void) };
-  const mockMechBackRef = { current: null as null | (() => void) };
-  const mockPhaseFDoneRef = { current: null as null | ((...args: unknown[]) => void) };
-  const mockPhaseFBackRef = { current: null as null | (() => void) };
-  // TouchGallery mock: ref holds the onComplete callback so tests can fire it
-  // with arbitrary assignments, and ref holds the assignments to emit.
-  const mockTouchECompleteRef = { current: null as null | ((a: unknown[]) => void) };
-  // Tests set this before clicking e-complete to control the emitted assignments.
-  const mockTouchEAssignmentsRef = { current: [] as unknown[] };
-  // onBack callback ref.
-  const mockTouchEBackRef = { current: null as null | (() => void) };
-  return {
-    mockIdentityCompleteRef,
-    mockBaseResolvedRef,
-    mockPrefillConfirmRef,
-    mockCarveDoneRef,
-    mockCarveBackRef,
-    mockPhaseBDoneRef,
-    mockPhaseBBackRef,
-    mockMechDoneRef,
-    mockMechBackRef,
-    mockPhaseFDoneRef,
-    mockPhaseFBackRef,
-    mockTouchECompleteRef,
-    mockTouchEAssignmentsRef,
-    mockTouchEBackRef,
-  };
-});
-
-// Re-export under the names the test body uses.
-// (vi.hoisted returns won't shadow module scope, so we alias here.)
-const _mockIdentityCompleteRef = mockIdentityCompleteRef;
-const _mockBaseResolvedRef = mockBaseResolvedRef;
-const _mockCarveDoneRef = mockCarveDoneRef;
-const _mockCarveBackRef = mockCarveBackRef;
-const _mockPhaseBDoneRef = mockPhaseBDoneRef;
-const _mockPhaseBBackRef = mockPhaseBBackRef;
-const _mockMechDoneRef = mockMechDoneRef;
-const _mockMechBackRef = mockMechBackRef;
-const _mockPhaseFDoneRef = mockPhaseFDoneRef;
-const _mockPhaseFBackRef = mockPhaseFBackRef;
-const _mockTouchECompleteRef = mockTouchECompleteRef;
-const _mockTouchEAssignmentsRef = mockTouchEAssignmentsRef;
-const _mockTouchEBackRef = mockTouchEBackRef;
-
-// ---------------------------------------------------------------------------
-// Mock child survey components — shallow stubs that record callbacks.
-// ---------------------------------------------------------------------------
-
-// Mock survey/FlowStepHost.tsx — used directly by factory components for
-// track, project_name, and phase_f_helpdocs (spec 029 convergence).
-// Branches on flow.flow_id to emit the same testids as the old wrapper stubs.
-vi.mock("./survey/FlowStepHost.tsx", () => {
-  const fakePhaseResult = { phase: "B" as const, answers: [], confirmedInventory: [] };
-
-  return {
-    FlowStepHost: ({
-      flow,
-      onComplete,
-      onBack,
-    }: {
-      flow: { flow_id: string };
-      onComplete: (result: unknown) => void;
-      onBack?: () => void;
-    }) => {
-      if (flow.flow_id === "track") {
-        return (
-          <div data-testid="stage-track">
-            <button
-              type="button"
-              data-testid="track-copy"
-              onClick={() =>
-                onComplete({
-                  phase: "G",
-                  answers: [{ questionId: "track_choice", answerType: "select", value: "copy" }],
-                  confirmedInventory: [],
-                })
-              }
-            >
-              track-copy
-            </button>
-            <button
-              type="button"
-              data-testid="track-adapt"
-              onClick={() =>
-                onComplete({
-                  phase: "G",
-                  answers: [{ questionId: "track_choice", answerType: "select", value: "adapt" }],
-                  confirmedInventory: [],
-                })
-              }
-            >
-              track-adapt
-            </button>
-            {onBack !== undefined && (
-              <button type="button" data-testid="track-back" onClick={onBack}>
-                track-back
-              </button>
-            )}
-          </div>
-        );
-      }
-      if (flow.flow_id === "project_name") {
-        return (
-          <div data-testid="stage-project-name">
-            <button
-              type="button"
-              data-testid="project-name-next"
-              onClick={() =>
-                onComplete({
-                  phase: "G",
-                  answers: [
-                    { questionId: "project_display_name", answerType: "text", value: "Test Keyboard" },
-                    { questionId: "project_keyboard_id", answerType: "text", value: "test_keyboard" },
-                  ],
-                  confirmedInventory: [],
-                })
-              }
-            >
-              project-name-next
-            </button>
-            {onBack !== undefined && (
-              <button type="button" data-testid="project-name-back" onClick={onBack}>
-                project-name-back
-              </button>
-            )}
-          </div>
-        );
-      }
-      if (flow.flow_id === "phase_f_helpdocs") {
-        _mockPhaseFDoneRef.current = onComplete;
-        _mockPhaseFBackRef.current = onBack ?? null;
-        return (
-          <div data-testid="stage-F">
-            <button
-              type="button"
-              data-testid="phaseF-complete"
-              onClick={() => onComplete(fakePhaseResult)}
-            >
-              phaseF-complete
-            </button>
-            {onBack !== undefined && (
-              <button type="button" data-testid="phaseF-back" onClick={onBack}>
-                phaseF-back
-              </button>
-            )}
-          </div>
-        );
-      }
-      return <div data-testid={`flow-stub-${flow.flow_id}`} />;
-    },
-  };
-});
-
-vi.mock("./survey/index.ts", () => {
-  // Minimal fake IdentityLiteResult for the mock to emit.
-  const fakeIdentity = {
-    autonym: "English",
-    english: "English",
-    languageSubtag: "en",
-    targetScriptRaw: "Latn",
-    bcp47: "en-Latn",
-    supported: true,
-    prefill: { script: "Latn", scriptClass: "alphabetic", routingGroup: "qwerty-qwertz" },
-  };
-  const fakePhaseResult = { phase: "B" as const, answers: [], confirmedInventory: [] };
-
-  return {
-    IdentityLite: ({ onComplete }: { onComplete: (result: unknown, identity: unknown) => void }) => {
-      _mockIdentityCompleteRef.current = onComplete;
-      return (
-        <div data-testid="stage-identity">
-          <button
-            type="button"
-            data-testid="identity-complete"
-            onClick={() => onComplete(fakePhaseResult, fakeIdentity)}
-          >
-            identity-complete
-          </button>
-        </div>
-      );
-    },
-    Prefill: ({ onConfirm, onBack }: { onConfirm: () => void; onBack?: () => void }) => {
-      return (
-        <div data-testid="stage-prefill">
-          <button type="button" data-testid="prefill-confirm" onClick={onConfirm}>
-            prefill-confirm
-          </button>
-          {onBack !== undefined && (
-            <button type="button" data-testid="prefill-back" onClick={onBack}>
-              prefill-back
-            </button>
-          )}
-        </div>
-      );
-    },
-    PhaseB: ({ onComplete, onBack }: { onComplete: (r: unknown) => void; onBack?: () => void }) => {
-      _mockPhaseBDoneRef.current = onComplete;
-      _mockPhaseBBackRef.current = onBack ?? null;
-      return (
-        <div data-testid="stage-B">
-          <button type="button" data-testid="phaseB-complete" onClick={() => onComplete(fakePhaseResult)}>
-            phaseB-complete
-          </button>
-          {onBack !== undefined && (
-            <button type="button" data-testid="phaseB-back" onClick={onBack}>
-              phaseB-back
-            </button>
-          )}
-        </div>
-      );
-    },
-    // PhaseA re-exported as a no-op (not used in the wizard path under test)
-    PhaseA: () => <div data-testid="stage-A" />,
-    SurveyRunner: () => <div data-testid="survey-runner" />,
-    extractIdentityLite: (r: unknown) => r,
-    extractIdentity: () => ({}),
-    extractProvenance: () => ({}),
-    buildPrefillRows: () => [],
-  };
-});
-
-// BaseResolution mock — preview-before-commit contract. Two separate buttons
-// mirror the two real user actions (a suggestion-card click fires onPreview;
-// the "Choose this keyboard" button fires onConfirm) as two SEPARATE click
-// events, not one — the real BaseResolutionAdapter's onConfirm closes over
-// the store's localBase from ITS OWN render, so a preview must be allowed to
-// flush (and the adapter re-render with the new onConfirm closure) before
-// confirm fires, exactly as two distinct user clicks would.
-vi.mock("./editors/panels/BaseResolution.tsx", () => ({
-  BaseResolution: ({
-    onPreview,
-    onConfirm,
-    previewedBase,
-    onBack,
-  }: {
-    onPreview: (base: unknown) => void;
-    onConfirm: () => void;
-    previewedBase: unknown;
-    previewStatus: string;
-    onBack?: () => void;
-  }) => {
-    _mockBaseResolvedRef.current = onConfirm;
-    const fakeBase = {
-      id: "basic_kbdus",
-      path: "release/b/basic_kbdus",
-      script: "Latn",
-      displayName: "English (US)",
-      targets: ["windows"],
-      version: "1.0",
-    };
-    return (
-      <div data-testid="stage-base">
-        <button type="button" data-testid="base-preview" onClick={() => onPreview(fakeBase)}>
-          base-preview
-        </button>
-        <button
-          type="button"
-          data-testid="base-confirm"
-          disabled={previewedBase === null}
-          onClick={onConfirm}
-        >
-          base-confirm
-        </button>
-        {onBack !== undefined && (
-          <button type="button" data-testid="base-back" onClick={onBack}>
-            base-back
-          </button>
-        )}
-      </div>
-    );
-  },
-}));
-
-// Mocks CarveGalleryV2, the carve gallery carveAdapter.tsx renders.
-vi.mock("./editors/carve/CarveGalleryV2.tsx", () => ({
-  CarveGalleryV2: ({ onComplete, onBack }: { onComplete: () => void; onBack?: () => void }) => {
-    _mockCarveDoneRef.current = onComplete;
-    _mockCarveBackRef.current = onBack ?? null;
-    return (
-      <div data-testid="stage-carve">
-        <button type="button" data-testid="carve-complete" onClick={onComplete}>
-          carve-complete
-        </button>
-        {onBack !== undefined && (
-          <button type="button" data-testid="carve-back" onClick={onBack}>
-            carve-back
-          </button>
-        )}
-      </div>
-    );
-  },
-}));
-
-vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => ({
-  MechanismGallery: ({ onComplete, onBack }: { onComplete: () => void; onBack?: () => void }) => {
-    _mockMechDoneRef.current = onComplete;
-    _mockMechBackRef.current = onBack ?? null;
-    return (
-      <div data-testid="stage-mechanisms">
-        <button type="button" data-testid="mechanisms-complete" onClick={onComplete}>
-          mechanisms-complete
-        </button>
-        {onBack !== undefined && (
-          <button type="button" data-testid="mechanisms-back" onClick={onBack}>
-            mechanisms-back
-          </button>
-        )}
-      </div>
-    );
-  },
-}));
-
-vi.mock("./editors/assignLoop/TouchGallery.tsx", () => ({
-  TouchGallery: ({ onComplete, onBack }: { onComplete: (a: unknown[]) => void; onBack: () => void }) => {
-    _mockTouchECompleteRef.current = onComplete;
-    _mockTouchEBackRef.current = onBack;
-    return (
-      <div data-testid="stage-E">
-        <button
-          type="button"
-          data-testid="e-complete"
-          onClick={() => onComplete(_mockTouchEAssignmentsRef.current)}
-        >
-          Continue
-        </button>
-        <button
-          type="button"
-          data-testid="e-back"
-          onClick={onBack}
-        >
-          Back
-        </button>
-      </div>
-    );
-  },
-}));
-
-// TouchSeedSourcePanel mock (spec 035 T014/T012) — registerEditorSteps.ts now
-// renders this for the "touch_seed_source" step (the "touch" step keeps the
-// TouchGallery mock above, unchanged). Two confirm buttons let R11 emission
-// tests pick either fork choice; each mirrors the real component's behavior
-// of setting surveySessionStore.touchSeedSource BEFORE calling onComplete.
-vi.mock("./editors/touchSeedSource/TouchSeedSourcePanel.tsx", () => ({
-  TouchSeedSourcePanel: ({
-    onComplete,
-    onBack,
-  }: {
-    onComplete: (result: unknown) => void;
-    onBack?: () => void;
-  }) => {
-    const setTouchSeedSource = useSurveySessionStore((s) => s.setTouchSeedSource);
-    return (
-      <div data-testid="stage-seed-source">
-        <button
-          type="button"
-          data-testid="seed-source-complete"
-          onClick={() => {
-            setTouchSeedSource("import-adapt");
-            onComplete(undefined);
-          }}
-        >
-          seed-source-complete
-        </button>
-        <button
-          type="button"
-          data-testid="seed-source-reseed-complete"
-          onClick={() => {
-            setTouchSeedSource("reseed-from-desktop");
-            onComplete(undefined);
-          }}
-        >
-          seed-source-reseed-complete
-        </button>
-        {onBack !== undefined && (
-          <button type="button" data-testid="seed-source-back" onClick={onBack}>
-            seed-source-back
-          </button>
-        )}
-      </div>
-    );
-  },
-}));
-
-vi.mock("./components/UnsupportedScriptStub.tsx", () => ({
-  UnsupportedScriptStub: ({ script }: { script: string }) => (
-    <div data-testid="stage-unsupported">{script}</div>
-  ),
-}));
-
-vi.mock("./editors/panels/TrackStep.tsx", () => ({
-  TrackStep: ({ onNext, onBack }: { onNext: (t: "copy" | "adapt") => void; onBack?: () => void }) => (
-    <div data-testid="stage-track">
-      <button type="button" data-testid="track-copy" onClick={() => onNext("copy")}>
-        track-copy
-      </button>
-      <button type="button" data-testid="track-adapt" onClick={() => onNext("adapt")}>
-        track-adapt
-      </button>
-      {onBack !== undefined && (
-        <button type="button" data-testid="track-back" onClick={onBack}>
-          track-back
-        </button>
-      )}
-    </div>
-  ),
-}));
-
-vi.mock("./editors/panels/ProjectNameStep.tsx", () => ({
-  ProjectNameStep: ({
-    onNext,
-    onBack,
-  }: {
-    onNext: (displayName: string, keyboardId: string) => void;
-    onBack?: () => void;
-  }) => (
-    <div data-testid="stage-project-name">
-      <button
-        type="button"
-        data-testid="project-name-next"
-        onClick={() => onNext("Test Keyboard", "test_keyboard")}
-      >
-        project-name-next
-      </button>
-      {onBack !== undefined && (
-        <button type="button" data-testid="project-name-back" onClick={onBack}>
-          project-name-back
-        </button>
-      )}
-    </div>
-  ),
-}));
-
-vi.mock("./components/OSKFrame.tsx", () => ({
-  OSKFrame: () => <div data-testid="osk-frame" />,
-}));
-
-vi.mock("./components/OskModeToggle.tsx", () => ({
-  OskModeToggle: () => <div data-testid="osk-toggle" />,
-}));
-
-// ---------------------------------------------------------------------------
-// Mock heavy hooks so WASM / VFS are never touched.
-// ---------------------------------------------------------------------------
-
-// Opt-in controllable useKeyboardArtifact mock (precedent:
-// StudioShell.previewCommitGating.test.tsx's `hoisted`/`settleFor`). By
-// default every test still gets the original static `{ kind: "idle" }` stage
-// with onInstantiate never firing — nothing here changes unless a test
-// explicitly drives `artifactHoisted.onInstantiateRef.current` /
-// `artifactHoisted.stageSetters` (see the "resume draft banner" describe
-// block's F1/P1 regression test below).
-const artifactHoisted = vi.hoisted(() => ({
-  onInstantiateRef: { current: null as OnInstantiateCallback | null },
-  stageSetters: [] as Array<(s: Stage) => void>,
-}));
-
-vi.mock("./hooks/useKeyboardArtifact.ts", () => ({
-  useKeyboardArtifact: (
-    _base: unknown,
-    _spec: unknown,
-    _transform: unknown,
-    onInstantiate: OnInstantiateCallback | null | undefined,
-  ) => {
-    artifactHoisted.onInstantiateRef.current = onInstantiate ?? null;
-    const [stage, setStage] = useState<Stage>({ kind: "idle" });
-    useEffect(() => {
-      artifactHoisted.stageSetters.push(setStage);
-      return () => {
-        artifactHoisted.stageSetters = artifactHoisted.stageSetters.filter((f) => f !== setStage);
-      };
-    }, []);
-    return { stage, retry: vi.fn(), recompile: vi.fn() };
-  },
-}));
-
-vi.mock("./hooks/useWorkingCopyTransform.ts", () => ({
-  useWorkingCopyTransform: () => null,
-}));
-
-vi.mock("./lib/confirmRebase.ts", () => ({
-  instantiateFromBaseIfConfirmed: vi.fn(),
-  // BaseResolutionAdapter's onConfirm calls confirmRebaseTo synchronously
-  // (F1 fix) before advancing; every scenario here starts from a fresh,
-  // uninstantiated working copy, so mocking it to always allow keeps these
-  // tests exercising the same flows as before the fix.
-  confirmRebaseTo: vi.fn(() => true),
-}));
-
-// Mock buildTouchLayoutJson so Defect B tests never call real engine code.
-// Returns a deterministic JSON string that includes the assignment info.
-vi.mock("./lib/buildTouchLayoutJson.ts", () => ({
-  buildTouchLayoutJson: (
-    _baseIr: unknown,
-    assignments: Array<{ target: string; mechanisms: Array<{ patternId: string; slotValues?: Record<string, string> }> }>,
-  ) => ({
-    json: JSON.stringify({ _mock: true, assignments }),
-    warnings: [],
-  }),
-}));
-
-// Shallow stubs for CompareScreen and OutputScreen — routing tests assert on
-// the marker divs, not the internal pipeline.
-vi.mock("./components/CompareScreen.tsx", () => ({
-  CompareScreen: () => <div data-testid="compare-screen-root">compare-screen</div>,
-}));
-
-vi.mock("./components/OutputScreen.tsx", () => ({
-  OutputScreen: () => <div data-testid="output-screen-root">output-screen</div>,
-}));
-
-vi.mock("./components/WelcomeScreen.tsx", () => ({
-  WelcomeScreen: () => <div data-testid="welcome-screen-root">welcome-screen</div>,
-}));
-
-// Shallow stub for DashboardView — only rendered in dev/VITE_SHOW_FLOWMAP builds.
-vi.mock("./dashboard/DashboardView.tsx", () => ({
-  FlowMapView: () => <div data-testid="flow-map-view">flow-map</div>,
-}));
-
+vi.mock("./survey/FlowStepHost.tsx", () => import("./test/studioShellMocks/FlowStepHost.tsx"));
+vi.mock("./survey/index.ts", () => import("./test/studioShellMocks/surveyIndex.tsx"));
+vi.mock("./editors/panels/BaseResolution.tsx", () => import("./test/studioShellMocks/BaseResolution.tsx"));
+vi.mock("./editors/carve/CarveGalleryV2.tsx", () => import("./test/studioShellMocks/CarveGalleryV2.tsx"));
+vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => import("./test/studioShellMocks/MechanismGallery.tsx"));
+vi.mock("./editors/assignLoop/TouchGallery.tsx", () => import("./test/studioShellMocks/TouchGallery.tsx"));
+vi.mock("./editors/touchSeedSource/TouchSeedSourcePanel.tsx", () =>
+  import("./test/studioShellMocks/TouchSeedSourcePanel.tsx"),
+);
+vi.mock("./components/UnsupportedScriptStub.tsx", () => import("./test/studioShellMocks/UnsupportedScriptStub.tsx"));
+vi.mock("./components/OSKFrame.tsx", () => import("./test/studioShellMocks/OSKFrame.tsx"));
+vi.mock("./components/OskModeToggle.tsx", () => import("./test/studioShellMocks/OskModeToggle.tsx"));
+vi.mock("./components/CompareScreen.tsx", () => import("./test/studioShellMocks/CompareScreen.tsx"));
+vi.mock("./components/OutputScreen.tsx", () => import("./test/studioShellMocks/OutputScreen.tsx"));
+vi.mock("./components/WelcomeScreen.tsx", () => import("./test/studioShellMocks/WelcomeScreen.tsx"));
+vi.mock("./dashboard/DashboardView.tsx", () => import("./test/studioShellMocks/DashboardView.tsx"));
+// Controllable: static idle by default; the "resume draft banner" F1/P1
+// regression test below settles it through `artifactHoisted`.
+vi.mock("./hooks/useKeyboardArtifact.ts", () => import("./test/studioShellMocks/useKeyboardArtifact.ts"));
+vi.mock("./hooks/useWorkingCopyTransform.ts", () => import("./test/studioShellMocks/useWorkingCopyTransform.ts"));
+vi.mock("./lib/confirmRebase.ts", () => import("./test/studioShellMocks/confirmRebase.ts"));
+// Echoes the assignments into the JSON, so Defect B tests never call real engine code.
+vi.mock("./lib/buildTouchLayoutJson.ts", () => import("./test/studioShellMocks/buildTouchLayoutJson.ts"));
 // Spy on navigateTo so the done-stage routing test can assert it was called
 // without actually mutating window.location.
-vi.mock("./lib/navigate.ts", () => ({
-  navigateTo: vi.fn(),
-}));
+vi.mock("./lib/navigate.ts", () => import("./test/studioShellMocks/navigate.ts"));
+
+import { artifactHoisted } from "./test/studioShellMocks/useKeyboardArtifact.ts";
+import { touchEAssignments } from "./test/studioShellMocks/TouchGallery.tsx";
 
 // ---------------------------------------------------------------------------
 // Import the component under test — AFTER all vi.mock() declarations.
@@ -717,34 +199,12 @@ async function advanceToF() {
 beforeEach(() => {
   artifactHoisted.onInstantiateRef.current = null;
   artifactHoisted.stageSetters = [];
-  // Spec 057 (FR-072): every test in this file starts from a fresh wizard, and
-  // now has to SAY so.
-  //
-  // It used to be inherited from the defect: `SurveyView`'s mount effect reset
-  // the survey-session store, so every `render()` here silently started at
-  // "identity" no matter where the previous test had left the module-level
-  // singleton. Deleting that reset (D-1) is what makes a tab round trip
-  // preserve the author's position — and it also removes the per-test reset
-  // these suites were leaning on without stating.
-  //
-  // Resetting here is the honest replacement: test isolation is the test
-  // file's job, not a side effect of a component's mount.
-  useSurveySessionStore.getState().reset();
 });
 
 afterEach(() => {
   cleanup();
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-  // The footer's visibility gate reads this store (FR-040's revised rule — a
-  // published walk means the journey has started), so a walk left behind by a
-  // previous test would decide a later test's footer for it.
-  useStepWalkStore.getState().reset();
-  // Spec 079 R-07: the prefill confirm no longer wipes the draft alphabet when
-  // its evidence key is unchanged — which is every test here — so an alphabet
-  // (and its stamp) left by one test would reach the next. Same reasoning as
-  // the survey-session reset above: isolation is this file's job.
-  usePhaseBDraftStore.getState().reset();
+  // Spec 079 R-07: alphabetEvidenceKey / sticky decisions survive store.reset();
+  // global test-setup only calls reset(), so clear them here.
   resetPhaseBDraftDecisions();
   vi.clearAllMocks();
   // The first-visit gate reads ks.visited / the ks.studio.draft key from
@@ -1863,7 +1323,7 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
       mechanisms: [{ patternId: "longpress_alternates", slotValues: { hostKey: "K_A", char: "ä" } }],
       source: "user" as const,
     };
-    _mockTouchEAssignmentsRef.current = [longpressAssignment];
+    touchEAssignments.current = [longpressAssignment];
 
     // Navigate through the fork, then fire the TouchGallery complete button.
     await advanceToMechanisms();
@@ -1897,7 +1357,7 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
 
     // baseIr is null — store is not seeded. handlePhaseEComplete must call
     // setTouchLayoutJson(null) rather than attempting to build a layout.
-    _mockTouchEAssignmentsRef.current = [];
+    touchEAssignments.current = [];
 
     await advanceToMechanisms();
     fireEvent.click(screen.getByTestId("mechanisms-complete"));
@@ -1932,7 +1392,7 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
     });
 
     // Empty assignments — no real touch edits were made.
-    _mockTouchEAssignmentsRef.current = [];
+    touchEAssignments.current = [];
 
     await advanceToMechanisms();
     fireEvent.click(screen.getByTestId("mechanisms-complete"));
@@ -1966,7 +1426,7 @@ describe("SurveyView — handlePhaseEComplete applies assignments to output (Def
     });
 
     // Zero Phase E edits — the row that would emit nothing under import-adapt.
-    _mockTouchEAssignmentsRef.current = [];
+    touchEAssignments.current = [];
 
     await advanceToMechanisms();
     fireEvent.click(screen.getByTestId("mechanisms-complete"));

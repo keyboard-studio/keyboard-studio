@@ -17,10 +17,9 @@
 //
 // This is a NEW, separate file from StudioShell.test.tsx (which already has
 // 40+ tests and doesn't touch this gating behavior at all) specifically so
-// that suite stays undisturbed. The mock preamble below is copied from
-// StudioShell.test.tsx's proven-working import-graph closure (heavy hooks /
-// WASM / VFS kept out of the picture) — CharacterMapPane itself is
-// deliberately left UNMOCKED (unlike StudioShell.test.tsx's other survey
+// that suite stays undisturbed. It mounts through the same shared mock
+// harness as StudioShell.test.tsx (heavy hooks / WASM / VFS kept out of the
+// picture). CharacterMapPane itself is deliberately left UNMOCKED (unlike StudioShell.test.tsx's other survey
 // children) because exercising the pane-swap means the real
 // CharacterMapPane must actually mount; its own short-circuit branch (no
 // baseIr) renders deterministically without touching lib/services.
@@ -28,190 +27,36 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { render } from "./test/renderWithI18n.tsx";
-import { useWorkingCopyStore } from "./stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
-import { usePhaseBDraftStore } from "./stores/phaseBDraftStore.ts";
 
 // ---------------------------------------------------------------------------
-// Mock child survey components — shallow stubs (identical shape to
-// StudioShell.test.tsx) so we can drive the wizard to the "characters" step
-// without touching WASM/VFS/CLDR.
+// Shared StudioShell harness (test/studioShellMocks/) so we can drive the
+// wizard to the "characters" step without touching WASM/VFS/CLDR. The
+// carve/mechanisms/touch stubs are never reached (the tests stop at
+// "characters"), but StudioShell.tsx imports those modules statically, so they
+// must resolve to something lightweight.
 // ---------------------------------------------------------------------------
 
-vi.mock("./survey/FlowStepHost.tsx", () => ({
-  FlowStepHost: ({
-    flow,
-    onComplete,
-    onBack,
-  }: {
-    flow: { flow_id: string };
-    onComplete: (result: unknown) => void;
-    onBack?: () => void;
-  }) => {
-    if (flow.flow_id === "track") {
-      return (
-        <div data-testid="stage-track">
-          <button
-            type="button"
-            data-testid="track-adapt"
-            onClick={() =>
-              onComplete({
-                phase: "G",
-                answers: [{ questionId: "track_choice", answerType: "select", value: "adapt" }],
-                confirmedInventory: [],
-              })
-            }
-          >
-            track-adapt
-          </button>
-          {onBack !== undefined && (
-            <button type="button" data-testid="track-back" onClick={onBack}>
-              track-back
-            </button>
-          )}
-        </div>
-      );
-    }
-    return <div data-testid={`flow-stub-${flow.flow_id}`} />;
-  },
-}));
-
-vi.mock("./survey/index.ts", () => {
-  const fakeIdentity = {
-    autonym: "English",
-    english: "English",
-    languageSubtag: "en",
-    targetScriptRaw: "Latn",
-    bcp47: "en-Latn",
-    supported: true,
-    prefill: { script: "Latn", scriptClass: "alphabetic", routingGroup: "qwerty-qwertz" },
-  };
-  const fakePhaseResult = { phase: "B" as const, answers: [], confirmedInventory: [] };
-
-  return {
-    IdentityLite: ({ onComplete }: { onComplete: (result: unknown, identity: unknown) => void }) => (
-      <div data-testid="stage-identity">
-        <button
-          type="button"
-          data-testid="identity-complete"
-          onClick={() => onComplete(fakePhaseResult, fakeIdentity)}
-        >
-          identity-complete
-        </button>
-      </div>
-    ),
-    Prefill: () => <div data-testid="stage-prefill">stage-prefill</div>,
-    PhaseB: () => <div data-testid="stage-B">stage-B</div>,
-    PhaseA: () => <div data-testid="stage-A" />,
-    SurveyRunner: () => <div data-testid="survey-runner" />,
-    extractIdentityLite: (r: unknown) => r,
-    extractIdentity: () => ({}),
-    extractProvenance: () => ({}),
-    buildPrefillRows: () => [],
-  };
-});
-
-vi.mock("./editors/panels/BaseResolution.tsx", () => ({
-  BaseResolution: ({
-    onPreview,
-    onConfirm,
-    previewedBase,
-  }: {
-    onPreview: (base: unknown) => void;
-    onConfirm: () => void;
-    previewedBase: unknown;
-    previewStatus: string;
-  }) => {
-    const fakeBase = {
-      id: "basic_kbdus",
-      path: "release/b/basic_kbdus",
-      script: "Latn",
-      displayName: "English (US)",
-      targets: ["windows"],
-      version: "1.0",
-    };
-    return (
-      <div data-testid="stage-base">
-        <button type="button" data-testid="base-preview" onClick={() => onPreview(fakeBase)}>
-          base-preview
-        </button>
-        <button
-          type="button"
-          data-testid="base-confirm"
-          disabled={previewedBase === null}
-          onClick={onConfirm}
-        >
-          base-confirm
-        </button>
-      </div>
-    );
-  },
-}));
-
-// Carve/mechanisms/touch stubs — never reached by the gating tests below
-// (they stop at "characters"), but StudioShell.tsx imports these modules
-// statically, so they must resolve to something lightweight.
-// Mocks CarveGalleryV2, the carve gallery carveAdapter.tsx renders.
-vi.mock("./editors/carve/CarveGalleryV2.tsx", () => ({
-  CarveGalleryV2: () => <div data-testid="stage-carve" />,
-}));
-vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => ({
-  MechanismGallery: () => <div data-testid="stage-mechanisms" />,
-}));
-vi.mock("./editors/assignLoop/TouchGallery.tsx", () => ({
-  TouchGallery: () => <div data-testid="stage-E" />,
-}));
-vi.mock("./editors/touchSeedSource/TouchSeedSourcePanel.tsx", () => ({
-  TouchSeedSourcePanel: () => <div data-testid="stage-seed-source" />,
-}));
-vi.mock("./components/UnsupportedScriptStub.tsx", () => ({
-  UnsupportedScriptStub: ({ script }: { script: string }) => (
-    <div data-testid="stage-unsupported">{script}</div>
-  ),
-}));
-vi.mock("./editors/panels/TrackStep.tsx", () => ({
-  TrackStep: () => <div data-testid="stage-track-legacy" />,
-}));
-vi.mock("./editors/panels/ProjectNameStep.tsx", () => ({
-  ProjectNameStep: () => <div data-testid="stage-project-name" />,
-}));
-
-vi.mock("./components/OSKFrame.tsx", () => ({
-  OSKFrame: () => <div data-testid="osk-frame" />,
-}));
-vi.mock("./components/OskModeToggle.tsx", () => ({
-  OskModeToggle: () => <div data-testid="osk-toggle" />,
-}));
-
-vi.mock("./hooks/useKeyboardArtifact.ts", () => ({
-  useKeyboardArtifact: () => ({ stage: { kind: "idle" }, retry: vi.fn(), recompile: vi.fn() }),
-}));
-vi.mock("./hooks/useWorkingCopyTransform.ts", () => ({
-  useWorkingCopyTransform: () => null,
-}));
-vi.mock("./lib/confirmRebase.ts", () => ({
-  instantiateFromBaseIfConfirmed: vi.fn(),
-  // BaseResolutionAdapter's onConfirm calls confirmRebaseTo synchronously
-  // (F1 fix) before advancing; this suite's working copy starts uninstantiated
-  // in every scenario, so mocking it to always allow preserves prior behavior.
-  confirmRebaseTo: vi.fn(() => true),
-}));
-vi.mock("./lib/buildTouchLayoutJson.ts", () => ({
-  buildTouchLayoutJson: () => ({ json: "{}", warnings: [] }),
-}));
-
-vi.mock("./components/CompareScreen.tsx", () => ({
-  CompareScreen: () => <div data-testid="compare-screen-root">compare-screen</div>,
-}));
-vi.mock("./components/OutputScreen.tsx", () => ({
-  OutputScreen: () => <div data-testid="output-screen-root">output-screen</div>,
-}));
-vi.mock("./dashboard/DashboardView.tsx", () => ({
-  FlowMapView: () => <div data-testid="flow-map-view">flow-map</div>,
-}));
-vi.mock("./lib/navigate.ts", () => ({
-  navigateTo: vi.fn(),
-}));
+vi.mock("./survey/FlowStepHost.tsx", () => import("./test/studioShellMocks/FlowStepHost.tsx"));
+vi.mock("./survey/index.ts", () => import("./test/studioShellMocks/surveyIndex.tsx"));
+vi.mock("./editors/panels/BaseResolution.tsx", () => import("./test/studioShellMocks/BaseResolution.tsx"));
+vi.mock("./editors/carve/CarveGalleryV2.tsx", () => import("./test/studioShellMocks/CarveGalleryV2.tsx"));
+vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => import("./test/studioShellMocks/MechanismGallery.tsx"));
+vi.mock("./editors/assignLoop/TouchGallery.tsx", () => import("./test/studioShellMocks/TouchGallery.tsx"));
+vi.mock("./editors/touchSeedSource/TouchSeedSourcePanel.tsx", () =>
+  import("./test/studioShellMocks/TouchSeedSourcePanel.tsx"),
+);
+vi.mock("./components/UnsupportedScriptStub.tsx", () => import("./test/studioShellMocks/UnsupportedScriptStub.tsx"));
+vi.mock("./components/OSKFrame.tsx", () => import("./test/studioShellMocks/OSKFrame.tsx"));
+vi.mock("./components/OskModeToggle.tsx", () => import("./test/studioShellMocks/OskModeToggle.tsx"));
+vi.mock("./hooks/useKeyboardArtifact.ts", () => import("./test/studioShellMocks/idleKeyboardArtifact.ts"));
+vi.mock("./hooks/useWorkingCopyTransform.ts", () => import("./test/studioShellMocks/useWorkingCopyTransform.ts"));
+vi.mock("./lib/confirmRebase.ts", () => import("./test/studioShellMocks/confirmRebase.ts"));
+vi.mock("./lib/buildTouchLayoutJson.ts", () => import("./test/studioShellMocks/buildTouchLayoutJson.ts"));
+vi.mock("./components/CompareScreen.tsx", () => import("./test/studioShellMocks/CompareScreen.tsx"));
+vi.mock("./components/OutputScreen.tsx", () => import("./test/studioShellMocks/OutputScreen.tsx"));
+vi.mock("./dashboard/DashboardView.tsx", () => import("./test/studioShellMocks/DashboardView.tsx"));
+vi.mock("./lib/navigate.ts", () => import("./test/studioShellMocks/navigate.ts"));
 
 // ---------------------------------------------------------------------------
 // Import the component under test — AFTER all vi.mock() declarations.
@@ -237,9 +82,6 @@ function advanceToCharactersStep(): void {
 
 afterEach(() => {
   cleanup();
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-  usePhaseBDraftStore.getState().reset();
   vi.clearAllMocks();
   localStorage.clear();
 });

@@ -1,10 +1,11 @@
-// Colocated vitest spec for primary_script.
+// primary_script: its mutate() seam (spec-014 M2-M5). Fixtures, definition shape and the
+// generic invariants run in reserveModules.test.ts.
 
 import { describe, it, expect } from "vitest";
 import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 import { irPath } from "@keyboard-studio/contracts";
 import { applyMutatePatch } from "../../../../src/steps/mutateApply.ts";
-import mod, { validate, fixtures, mutate } from "../../../../src/survey/questions/reserve/primary_script.ts";
+import mod, { validate, mutate } from "../../../../src/survey/questions/reserve/primary_script.ts";
 
 // ---------------------------------------------------------------------------
 // T010 / US1 — mutate() output tests (spec-014 mutate-seam M2–M5)
@@ -80,42 +81,7 @@ describe("primary_script — mutate() writes header.bcp47 only", () => {
   });
 });
 
-describe("primary_script — validate() valid fixtures", () => {
-  for (const { value, note } of fixtures.valid) {
-    it(`accepts ${JSON.stringify(value)}${note ? ` (${note})` : ""}`, () => {
-      expect(validate(value)).toEqual({ ok: true });
-    });
-  }
-});
-
-describe("primary_script — validate() invalid fixtures", () => {
-  for (const { value, note, expectedCode } of fixtures.invalid) {
-    it(`rejects ${JSON.stringify(value)}${note ? ` (${note})` : ""}`, () => {
-      const result = validate(value);
-      expect(result.ok).toBe(false);
-      if (expectedCode !== undefined && result.ok === false) {
-        expect(result.code).toBe(expectedCode);
-      }
-    });
-  }
-});
-
-describe("primary_script — validate() edge cases", () => {
-  it("accepts all 35 valid option values", () => {
-    // 28 original + 7 RTL scripts added in PR #870:
-    // Thaa, Nkoo, Adlm, Syrc, Mand, Samr, Rohg
-    const allValues = [
-      "Latn", "Arab", "Hebr", "Thaa", "Nkoo", "Adlm", "Syrc", "Mand", "Samr", "Rohg",
-      "Deva", "Beng", "Taml", "Telu", "Knda", "Mlym",
-      "Guru", "Gujr", "Orya", "Sinh", "Thai", "Khmr", "Mymr", "Laoo", "Ethi",
-      "Hang", "Hani", "Geor", "Armn", "Cyrl", "Grek", "Tibt", "Cans", "Cher",
-      "Other",
-    ];
-    for (const v of allValues) {
-      expect(validate(v), `expected ${v} to be valid`).toEqual({ ok: true });
-    }
-  });
-
+describe("primary_script — validate()", () => {
   it("rejects lowercase script codes", () => {
     const r = validate("latn");
     expect(r.ok).toBe(false);

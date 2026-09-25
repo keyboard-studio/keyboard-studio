@@ -5,8 +5,5 @@
 export { makeMockVirtualFS, scaffoldedFS } from "./mockVirtualFS";
 export { mockBaseBrowser } from "./mockBaseBrowser";
 export { mockPatternLibrary, mockPatternByIdSync } from "./mockPatternLibrary";
-export { mockValidator } from "./mockValidator";
-export { mockCompiler } from "./mockCompiler";
 export { mockScaffolder } from "./mockScaffolder";
-export { mockLintEngine } from "./mockLintEngine";
 export { mockOutputService } from "./mockOutputService";

@@ -1,26 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { checkContextTolerance } from "./check-19-x-context-tolerance.js";
-import type { KeyboardIR, ToleranceReport } from "@keyboard-studio/contracts";
-
-function makeIR(): KeyboardIR {
-  return {
-    origin: "imported",
-    header: {
-      keyboardId: "test",
-      name: "Test",
-      bcp47: [],
-      copyright: "",
-      version: "1.0",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores: [],
-    groups: [],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  };
-}
+import type { ToleranceReport } from "@keyboard-studio/contracts";
+import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 
 const LOCATION = { file: "test", line: 3 };
 
@@ -32,7 +13,7 @@ const DECOMPOSED = "á";
 
 describe("checkContextTolerance (19.x KM_WARN_CONTEXT_NOT_TOLERANT / KM_HINT_CONTEXT_NOT_ANALYSED)", () => {
   it("returns [] when the report is absent, and does not throw", () => {
-    expect(checkContextTolerance(makeIR(), undefined)).toEqual([]);
+    expect(checkContextTolerance(makeTestIR(), undefined)).toEqual([]);
   });
 
   it("returns [] for a clean report (all rules tolerant)", () => {
@@ -40,7 +21,7 @@ describe("checkContextTolerance (19.x KM_WARN_CONTEXT_NOT_TOLERANT / KM_HINT_CON
       findings: [{ ruleId: "r1", location: LOCATION, status: "tolerant" }],
       notAnalysedCount: 0,
     };
-    expect(checkContextTolerance(makeIR(), report)).toEqual([]);
+    expect(checkContextTolerance(makeTestIR(), report)).toEqual([]);
   });
 
   it("returns [] for a report where every gap has already been made tolerant", () => {
@@ -48,7 +29,7 @@ describe("checkContextTolerance (19.x KM_WARN_CONTEXT_NOT_TOLERANT / KM_HINT_CON
       findings: [{ ruleId: "r1", location: LOCATION, status: "made-tolerant" }],
       notAnalysedCount: 0,
     };
-    expect(checkContextTolerance(makeIR(), report)).toEqual([]);
+    expect(checkContextTolerance(makeTestIR(), report)).toEqual([]);
   });
 
   it("emits KM_WARN_CONTEXT_NOT_TOLERANT for a diagnosed gap, naming the rule's location and both outputs", () => {
@@ -65,7 +46,7 @@ describe("checkContextTolerance (19.x KM_WARN_CONTEXT_NOT_TOLERANT / KM_HINT_CON
       ],
       notAnalysedCount: 0,
     };
-    const findings = checkContextTolerance(makeIR(), report);
+    const findings = checkContextTolerance(makeTestIR(), report);
     expect(findings).toHaveLength(1);
     const finding = findings[0]!;
     expect(finding.code).toBe("KM_WARN_CONTEXT_NOT_TOLERANT");
@@ -90,7 +71,7 @@ describe("checkContextTolerance (19.x KM_WARN_CONTEXT_NOT_TOLERANT / KM_HINT_CON
       ],
       notAnalysedCount: 1,
     };
-    const findings = checkContextTolerance(makeIR(), report);
+    const findings = checkContextTolerance(makeTestIR(), report);
     expect(findings).toHaveLength(1);
     const finding = findings[0]!;
     expect(finding.code).toBe("KM_HINT_CONTEXT_NOT_ANALYSED");

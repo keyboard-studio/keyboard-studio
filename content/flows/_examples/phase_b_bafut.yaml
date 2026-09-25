@@ -31,24 +31,12 @@ answers:
   - questionId: pb_standard_letters
     value: "extended-latin"
 
-  - questionId: pb_accent_marks_gate
-    value: "true"
-
-  - questionId: pb_diacritic_select
-    value: "U+0301, U+0300, U+0304, U+0302"
-
-  # Bafut vowels can carry two marks simultaneously:
-  # e.g. high-falling tone = acute + circumflex on same vowel
-  - questionId: pb_stacking_marks
-    value: "true"
-
-  # Most toned forms lack precomposed ready-made characters;
-  # combining marks are necessary and preferred by the community.
-  - questionId: pb_mark_style
-    value: "combining"
-
-  - questionId: pb_capitals_marks
-    value: "keep"
+  # Tone marks (U+0301, U+0300, U+0304, U+0302; two can stack on one vowel,
+  # and combining marks are preferred because most toned forms have no
+  # precomposed character) are no longer answered in this flow: the spec 071
+  # marks question series collects them after the alphabet picker. The five
+  # Phase B marks questions this example used to answer here were retired by
+  # spec 071 and have been deleted.
 
   # Community preference: press a look-alike key (n -> ŋ, o -> ɔ, e -> ɛ).
   # This is shape-based, so per §7.1 it maps to A3: weak (phonetic intuition is

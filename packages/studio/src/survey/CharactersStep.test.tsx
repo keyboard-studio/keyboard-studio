@@ -151,10 +151,7 @@ function seedSessionStore() {
 
 afterEach(() => {
   cleanup();
-  useSurveySessionStore.getState().reset();
-  useWorkingCopyStore.getState().reset();
-  useSurveyAnswerStore.getState().reset();
-  usePhaseBDraftStore.getState().reset();
+  // alphabetEvidenceKey / sticky decisions survive store.reset().
   resetPhaseBDraftDecisions();
   mockPrefillConfirmRef.current = null;
   mockPrefillBackRef.current = null;

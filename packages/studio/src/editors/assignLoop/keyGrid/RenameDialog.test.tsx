@@ -57,6 +57,7 @@ import {
   type RenameDialogConfirmResult,
 } from "./RenameDialog.tsx";
 import type { KeyGridAnnotationCounts, KeyGridCellViewModel } from "./keyGridViewModel.ts";
+import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
 
 afterEach(() => {
   cleanup();
@@ -119,23 +120,14 @@ function makeBinding(
  * correspond to any test's `ruleIndex`; they exist only to satisfy the type.
  */
 function makeMinimalIr(): KeyboardIR {
-  return {
-    origin: "imported",
+  return makeTestIR({
     header: {
       keyboardId: "rename_dialog_fixture",
       name: "RenameDialog Fixture",
       bcp47: ["und"],
-      copyright: "",
-      version: "1.0",
       targets: ["any"],
-      storeDirectives: [],
     },
-    stores: [],
-    groups: [],
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  };
+  });
 }
 
 // --- FIXTURE A: impact summary, including the flick-as-object regression ---

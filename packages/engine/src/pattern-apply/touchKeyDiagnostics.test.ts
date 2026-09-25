@@ -42,6 +42,7 @@ import {
 import type { KeyEditOverlay, RemoveKeyOp, SuppressKeyOp } from "./keyEditOps.js";
 import { resolveKeyAddress } from "./keyEditOps.js";
 import { parseTouchKeyAddress, touchKeyAddress } from "./touchKeyAddress.js";
+import { touchLayout } from "@keyboard-studio/contracts/fixtures";
 
 // ---------------------------------------------------------------------------
 // Small local helpers
@@ -49,19 +50,6 @@ import { parseTouchKeyAddress, touchKeyAddress } from "./touchKeyAddress.js";
 
 function key(id: string, extra: Partial<Omit<TouchKeyIR, "nodeId" | "id">> = {}): TouchKeyIR {
   return { nodeId: `n-${id}`, id, ...extra };
-}
-
-/** One platform ("phone"), one or more layers, one row each. */
-function makeLayout(layers: ReadonlyArray<{ id: string; keys: readonly TouchKeyIR[] }>): TouchLayoutIR {
-  return {
-    platforms: [
-      {
-        id: "phone",
-        layers: layers.map((l) => ({ id: l.id, rows: [{ keys: [...l.keys] }] })),
-      },
-    ],
-    nodeIds: [],
-  };
 }
 
 function emptyRuleIndex(opaqueFragmentCount = 0): TouchKeyRuleIndex {
@@ -104,9 +92,9 @@ function ruleIndexWithBinding(
 
 describe("findHalfDoneSuppressions", () => {
   it("reports 'still live': non-interactive sp, non-sentinel id, still wired to a rule", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       { id: "default", keys: [key("T_STUCK", { sp: 10 })] },
-    ]);
+    ] });
     const ruleIndex = ruleIndexWithBinding("T_STUCK", "produces");
 
     const findings = findHalfDoneSuppressions(layout, ruleIndex);
@@ -124,9 +112,9 @@ describe("findHalfDoneSuppressions", () => {
   });
 
   it("reports 'still live' for a WIRED-but-not-producing binding too (guard/suppress/transitions/opaque all count as wired)", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       { id: "default", keys: [key("T_STUCK", { sp: 9 })] },
-    ]);
+    ] });
     const ruleIndex = ruleIndexWithBinding("T_STUCK", "guard");
 
     const findings = findHalfDoneSuppressions(layout, ruleIndex);
@@ -138,9 +126,9 @@ describe("findHalfDoneSuppressions", () => {
   });
 
   it("reports 'invisible dead key': producing sp class, but the id was already neutralized to a sentinel", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       { id: "default", keys: [key("T_BLANK", { sp: 0 })] },
-    ]);
+    ] });
     const ruleIndex = emptyRuleIndex();
 
     const findings = findHalfDoneSuppressions(layout, ruleIndex);
@@ -155,7 +143,7 @@ describe("findHalfDoneSuppressions", () => {
   });
 
   it("treats an absent sp the same as sp:0 for the 'invisible dead key' branch", () => {
-    const layout = makeLayout([{ id: "default", keys: [key("T_SPACER")] }]);
+    const layout = touchLayout({ layers: [{ id: "default", keys: [key("T_SPACER")] }] });
     const findings = findHalfDoneSuppressions(layout, emptyRuleIndex());
 
     expect(findings).toHaveLength(1);
@@ -164,7 +152,7 @@ describe("findHalfDoneSuppressions", () => {
   });
 
   it("also fires on sp:8 (deadkey-styled, interactive) for the 'invisible dead key' branch", () => {
-    const layout = makeLayout([{ id: "default", keys: [key("T_NUL", { sp: 8 })] }]);
+    const layout = touchLayout({ layers: [{ id: "default", keys: [key("T_NUL", { sp: 8 })] }] });
     const findings = findHalfDoneSuppressions(layout, emptyRuleIndex());
 
     expect(findings).toHaveLength(1);
@@ -173,7 +161,7 @@ describe("findHalfDoneSuppressions", () => {
   });
 
   it("downgrades 'invisible dead key' to a hint when the IR carries an opaque fragment", () => {
-    const layout = makeLayout([{ id: "default", keys: [key("T_BLANK", { sp: 0 })] }]);
+    const layout = touchLayout({ layers: [{ id: "default", keys: [key("T_BLANK", { sp: 0 })] }] });
     const findings = findHalfDoneSuppressions(layout, emptyRuleIndex(1));
 
     expect(findings).toHaveLength(1);
@@ -181,7 +169,7 @@ describe("findHalfDoneSuppressions", () => {
   });
 
   it("does NOT downgrade 'still live' under an opaque fragment (the positive rule find is unaffected)", () => {
-    const layout = makeLayout([{ id: "default", keys: [key("T_STUCK", { sp: 9 })] }]);
+    const layout = touchLayout({ layers: [{ id: "default", keys: [key("T_STUCK", { sp: 9 })] }] });
     const findings = findHalfDoneSuppressions(layout, ruleIndexWithBinding("T_STUCK", "produces", 1));
 
     expect(findings).toHaveLength(1);
@@ -189,11 +177,11 @@ describe("findHalfDoneSuppressions", () => {
   });
 
   it("FR-029e: a WELL-FORMED suppression (non-interactive sp + reserved sentinel id) is never reported", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       { id: "default", keys: [key("T_BLANK", { sp: 9, text: " " })] },
       { id: "symbol", keys: [key("T_SPACER", { sp: 10 })] },
       { id: "shift", keys: [key("T_NUL", { sp: 9 })] },
-    ]);
+    ] });
     // Even if a rule somehow existed for the sentinel id, the well-formed
     // branch (sp non-interactive AND id a sentinel) still short-circuits.
     const ruleIndex = ruleIndexWithBinding("T_BLANK", "produces");
@@ -204,13 +192,13 @@ describe("findHalfDoneSuppressions", () => {
   });
 
   it("does not report an ordinary producing key with a real id and a real rule", () => {
-    const layout = makeLayout([{ id: "default", keys: [key("T_REAL", { sp: 0 })] }]);
+    const layout = touchLayout({ layers: [{ id: "default", keys: [key("T_REAL", { sp: 0 })] }] });
     const findings = findHalfDoneSuppressions(layout, ruleIndexWithBinding("T_REAL", "produces"));
     expect(findings).toHaveLength(0);
   });
 
   it("does not report a non-interactive key carrying a non-sentinel id that has NO binding at all", () => {
-    const layout = makeLayout([{ id: "default", keys: [key("T_UNUSED", { sp: 10 })] }]);
+    const layout = touchLayout({ layers: [{ id: "default", keys: [key("T_UNUSED", { sp: 10 })] }] });
     const findings = findHalfDoneSuppressions(layout, emptyRuleIndex());
     expect(findings).toHaveLength(0);
   });
@@ -222,9 +210,9 @@ describe("findHalfDoneSuppressions", () => {
 
 describe("findLayerSwitchActiveMismatches", () => {
   it("proposes sp:2 when nextlayer names the key's OWN containing layer, and reports when sp disagrees", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       { id: "shift", keys: [key("T_SHIFT", { sp: 1, nextlayer: "shift" })] },
-    ]);
+    ] });
     const findings = findLayerSwitchActiveMismatches(layout);
 
     expect(findings).toHaveLength(1);
@@ -245,9 +233,9 @@ describe("findLayerSwitchActiveMismatches", () => {
   });
 
   it("proposes sp:1 when nextlayer names a DIFFERENT layer, and reports when sp disagrees", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       { id: "default", keys: [key("T_SHIFT", { sp: 2, nextlayer: "shift" })] },
-    ]);
+    ] });
     const findings = findLayerSwitchActiveMismatches(layout);
 
     expect(findings).toHaveLength(1);
@@ -256,9 +244,9 @@ describe("findLayerSwitchActiveMismatches", () => {
   });
 
   it("treats an absent sp as sp:0 for comparison, so a bare frame key with nextlayer elsewhere still mismatches", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       { id: "default", keys: [key("T_SHIFT", { nextlayer: "shift" })] },
-    ]);
+    ] });
     const findings = findLayerSwitchActiveMismatches(layout);
 
     expect(findings).toHaveLength(1);
@@ -267,28 +255,28 @@ describe("findLayerSwitchActiveMismatches", () => {
   });
 
   it("does not report when sp:2 correctly matches the layer it switches to", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       { id: "shift", keys: [key("T_SHIFT", { sp: 2, nextlayer: "shift" })] },
-    ]);
+    ] });
     expect(findLayerSwitchActiveMismatches(layout)).toHaveLength(0);
   });
 
   it("does not report when sp:1 correctly matches a frame key pointing elsewhere", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       { id: "default", keys: [key("T_SHIFT", { sp: 1, nextlayer: "shift" })] },
-    ]);
+    ] });
     expect(findLayerSwitchActiveMismatches(layout)).toHaveLength(0);
   });
 
   it("skips a key with no nextlayer entirely, regardless of sp", () => {
-    const layout = makeLayout([{ id: "default", keys: [key("T_A", { sp: 0 })] }]);
+    const layout = touchLayout({ layers: [{ id: "default", keys: [key("T_A", { sp: 0 })] }] });
     expect(findLayerSwitchActiveMismatches(layout)).toHaveLength(0);
   });
 
   it("exempts a SUPPRESSED layer-switch key (sp 9/10) even though it would otherwise mismatch", () => {
-    const layout = makeLayout([
+    const layout = touchLayout({ layers: [
       { id: "default", keys: [key("T_SHIFT", { sp: 10, nextlayer: "shift" })] },
-    ]);
+    ] });
     expect(findLayerSwitchActiveMismatches(layout)).toHaveLength(0);
   });
 });

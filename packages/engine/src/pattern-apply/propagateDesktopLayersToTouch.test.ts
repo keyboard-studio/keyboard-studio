@@ -10,6 +10,7 @@ import { applyAssignments } from "./applyAssignments.js";
 import { loadPatterns, getById } from "../pattern-library/index.js";
 import { parse as parseKmn } from "../codec/index.js";
 import type { KeyboardIR, IRGroup, IRRule, MechanismAssignment } from "@keyboard-studio/contracts";
+import { irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers
@@ -21,35 +22,15 @@ function freshId(prefix: string): string {
 }
 
 function makeMinimalIR(groups: IRGroup[]): KeyboardIR {
-  return {
-    origin: "imported",
-    header: {
-      keyboardId: "test_kb",
-      name: "Test KB",
-      bcp47: [],
-      copyright: "",
-      version: "1.0",
-      targets: [],
-      storeDirectives: [],
-    },
-    stores: [],
-    groups,
-    comments: [],
-    raw: [],
-    recognizedPatterns: [],
-  };
+  return makeTestIR(groups, [], [], { header: { keyboardId: "test_kb", name: "Test KB" } });
 }
 
 function makeRule(vkey: string, modifiers: string[], output: string): IRRule {
-  return {
-    nodeId: freshId("rule"),
-    context: [{ kind: "vkey", name: vkey, modifiers }],
-    output: [{ kind: "char", value: output }],
-  };
+  return vkeyRule({ nodeId: freshId("rule"), vkey, modifiers, output });
 }
 
 function makeGroup(rules: IRRule[]): IRGroup {
-  return { nodeId: freshId("group"), name: "main", usingKeys: true, rules, readonly: false };
+  return irGroup({ nodeId: freshId("group"), rules });
 }
 
 function makeAltgrAssignment(target: string, keySpec: string): MechanismAssignment {

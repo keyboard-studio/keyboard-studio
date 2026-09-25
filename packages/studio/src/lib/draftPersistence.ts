@@ -17,7 +17,7 @@
 // never the 300ms validator/WASM-oracle debounce cycle and never a second
 // validation path — see the comment on installDraftAutosave below.
 
-import type { DeclaredRole } from "@keyboard-studio/contracts";
+import { AnswerTypeSchema, type DeclaredRole } from "@keyboard-studio/contracts";
 import {
   prepareWorkingCopySnapshot,
   snapshotWorkingCopyData,
@@ -936,16 +936,6 @@ function restorePhaseBDraftSnapshot(raw: unknown): PhaseBDraftSnapshot {
   };
 }
 
-const ANSWER_TYPES: ReadonlySet<string> = new Set([
-  "char-list",
-  "char-single",
-  "key-name",
-  "store-content",
-  "boolean",
-  "select",
-  "text",
-]);
-
 /** One stored answer, or `null` when any field is malformed — never a guess. */
 function restoreSavedAnswer(raw: unknown): SavedAnswer | null {
   if (!isPlainRecord(raw)) return null;
@@ -955,7 +945,8 @@ function restoreSavedAnswer(raw: unknown): SavedAnswer | null {
     typeof value === "boolean" ||
     (Array.isArray(value) && value.every((v) => typeof v === "string"));
   if (!valueOk) return null;
-  if (typeof answerType !== "string" || !ANSWER_TYPES.has(answerType)) return null;
+  // Bound to AnswerTypeSchema so a new AnswerType can't silently desync here.
+  if (!AnswerTypeSchema.safeParse(answerType).success) return null;
   if (origin !== "proposed" && origin !== "confirmed" && origin !== "overturned") return null;
   if (stage !== "draft" && stage !== "confirmed") return null;
   if (evidenceKey !== null && typeof evidenceKey !== "string") return null;

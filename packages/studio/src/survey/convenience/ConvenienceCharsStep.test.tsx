@@ -6,11 +6,11 @@
 // S0). When there IS something to ask, everything arrives pre-checked and the
 // author's unchecks are what shape the emitted retained list.
 
-import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
+import { describe, expect, it, vi, afterEach } from "vitest";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import type { IRGroup, IRRule, SurveyPhaseResult } from "@keyboard-studio/contracts";
-import { makeTestIR } from "@keyboard-studio/contracts/fixtures";
+import { irGroup, makeTestIR, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 import { ConvenienceCharsStep, computeConvenienceGate } from "./ConvenienceCharsStep.tsx";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
@@ -103,15 +103,11 @@ describe("computeConvenienceGate", () => {
 // ---------------------------------------------------------------------------
 
 function rule(nodeId: string, vkey: string, char: string): IRRule {
-  return {
-    nodeId,
-    context: [{ kind: "vkey", name: vkey, modifiers: [] }],
-    output: [{ kind: "char", value: char }],
-  };
+  return vkeyRule({ nodeId, vkey, output: char });
 }
 
 function group(rules: IRRule[]): IRGroup {
-  return { nodeId: "g-main", name: "main", usingKeys: true, rules, readonly: false };
+  return irGroup({ nodeId: "g-main", rules });
 }
 
 /**
@@ -146,12 +142,6 @@ function seedInstantiatedNoAlphabet(): void {
   const ir = makeTestIR([group([rule("r-0", "K_0", "a")])]);
   useWorkingCopyStore.setState({ ir, instantiationMode: "adapt-existing" });
 }
-
-beforeEach(() => {
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-  useSurveyAnswerStore.getState().reset();
-});
 
 afterEach(() => {
   cleanup();

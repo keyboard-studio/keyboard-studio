@@ -83,11 +83,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
-  useDecisionLogStore.getState().reset();
-  useStepWalkStore.getState().reset();
-  useSurveyAnswerStore.getState().reset();
+  // No reset() on this store — global test-setup only clears stores with reset().
   useReproposalNoticeStore.getState().clear();
   window.location.hash = "";
 });

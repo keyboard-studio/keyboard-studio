@@ -8,9 +8,8 @@
 // minimum so a stale local runtime doesn't surface a false test failure (#510).
 import { webcrypto } from "node:crypto";
 import { File as NodeFile, Blob as NodeBlob } from "node:buffer";
-import { beforeEach } from "vitest";
-import { useStepWalkStore } from "./stores/stepWalkStore.ts";
-import { useSurveyAnswerStore } from "./stores/surveyAnswerStore.ts";
+import { beforeEach, vi } from "vitest";
+import type { StateCreator } from "zustand";
 
 if (!globalThis.crypto) {
   globalThis.crypto = webcrypto as unknown as Crypto;
@@ -30,20 +29,47 @@ if (typeof globalThis.File.prototype.text !== "function") {
   globalThis.Blob = NodeBlob as unknown as typeof Blob;
 }
 
-// The within-step walk store (stores/stepWalkStore.ts) is module-level, so it
-// outlives a `render()` the way the real app's does — which is the point in
-// production and cross-test pollution here: one test's cursor and answer draft
-// would become the next test's ARRIVAL POSITION and replay source, silently
-// mounting a flow on a different question than the test set up.
+// The studio's zustand stores (stores/*.ts, decisions/decisionLogStore.ts) are
+// module-level, so they outlive a `render()` the way the real app's do. That
+// is the point in production and cross-test pollution here: one test's working
+// copy, survey traversal, Phase B draft or within-step walk cursor would become
+// the next test's starting state, silently mounting a flow somewhere other than
+// where the test set it up.
 //
-// Reset globally rather than per suite because any test that renders anything
-// containing a SurveyRunner or an assignment-loop gallery publishes into it,
-// which is a much wider set of files than the ones that mean to exercise it —
-// making this an opt-out that would be forgotten rather than an opt-in.
+// Reset globally rather than per suite because any test that renders a
+// SurveyView, a SurveyRunner or an assignment-loop gallery publishes into
+// these stores, which is a much wider set of files than the ones that mean to
+// exercise them. An opt-in reset would be forgotten; this one is automatic.
+//
+// The stores are NOT imported here. A module this setup file imports is loaded
+// before the test file registers its vi.mock() calls, so it keeps the REAL
+// versions of everything it imports: workingCopyStore would ignore a test's
+// @keyboard-studio/engine mock, for instance. Instead, zustand's `create` is
+// wrapped to record every store as the test file's own module graph creates
+// it (mocks and all), and before each test every recorded store that exposes a
+// `reset()` action is reset through it. A store the file never loads is never
+// touched.
+const createdStores = vi.hoisted(() => new Set<{ getState: () => unknown }>());
+
+vi.mock("zustand", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("zustand")>();
+  const track = <S extends { getState: () => unknown }>(store: S): S => {
+    createdStores.add(store);
+    return store;
+  };
+  // Both call shapes: create(initializer) and the curried create<T>()(initializer).
+  const create = (initializer?: StateCreator<unknown>) =>
+    initializer === undefined
+      ? (init: StateCreator<unknown>) => track(actual.create(init))
+      : track(actual.create(initializer));
+  return { ...actual, create: create as unknown as typeof actual.create };
+});
+
 beforeEach(() => {
-  useStepWalkStore.getState().reset();
-  // spec 079: positions and saved answers moved here from stepWalkStore.
-  useSurveyAnswerStore.getState().reset();
+  for (const store of createdStores) {
+    const { reset } = store.getState() as { reset?: unknown };
+    if (typeof reset === "function") reset();
+  }
 });
 
 /**

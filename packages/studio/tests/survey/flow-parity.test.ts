@@ -9,7 +9,7 @@
 // Deliberately NOT asserted here — removed as churn that protects no functionality:
 //   - Hardcoded question-ID order arrays (`.map(q => q.id)).toEqual([...])`). Order
 //     that actually matters is covered insertion-tolerantly by indexOf assertions in
-//     IdentityLite.us1.test.ts and by buildStepGraph reachability; a pinned array
+//     IdentityLite.test.ts and by buildStepGraph reachability; a pinned array
 //     breaks on every legitimate reorder or insertion without catching a real defect.
 //   - `toMatchSnapshot` projections (a 621-line snapshot that churned on any field
 //     edit). Question presence/reachability is enforced by the per-question registry
@@ -185,7 +185,7 @@ describe("flow-parity: phase_f_helpdocs — questions[]", () => {
 
 // ---------------------------------------------------------------------------
 // identity_lite structural integrity (T017)
-// Order + derivation are covered insertion-tolerantly in IdentityLite.us1.test.ts;
+// Order + derivation are covered insertion-tolerantly in IdentityLite.test.ts;
 // here we keep the routing-shape invariants (gate / terminal / branch / options)
 // that are unique to this harness.
 // ---------------------------------------------------------------------------

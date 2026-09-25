@@ -78,325 +78,44 @@ import { useWorkingCopyStore } from "../../src/stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../src/stores/surveySessionStore.ts";
 
 // ---------------------------------------------------------------------------
-// vi.hoisted — refs for mock component callbacks (must precede vi.mock)
+// Mock child survey components — the shared StudioShell harness
+// (src/test/studioShellMocks/), the same stubs StudioShell.test.tsx mounts.
+// The track, project_name and phase_f_helpdocs flows go through the
+// FlowStepHost stub (spec 029); see that module for what each emits.
 // ---------------------------------------------------------------------------
 
-const mockRefs = vi.hoisted(() => ({
-  identityComplete: { current: null as null | ((...args: unknown[]) => void) },
-  baseResolved: { current: null as null | ((...args: unknown[]) => void) },
-  carveDone: { current: null as null | (() => void) },
-  carveBack: { current: null as null | (() => void) },
-  phaseBDone: { current: null as null | ((...args: unknown[]) => void) },
-  phaseBBack: { current: null as null | (() => void) },
-  mechDone: { current: null as null | (() => void) },
-  mechBack: { current: null as null | (() => void) },
-  phaseFDone: { current: null as null | ((...args: unknown[]) => void) },
-  phaseFBack: { current: null as null | (() => void) },
-  touchEComplete: { current: null as null | ((a: unknown[]) => void) },
-  touchEAssignments: { current: [] as unknown[] },
-  touchEBack: { current: null as null | (() => void) },
-}));
-
-// ---------------------------------------------------------------------------
-// Fake data emitted by mock survey components
-// ---------------------------------------------------------------------------
-
-const fakeIdentity = {
-  autonym: "English",
-  english: "English",
-  languageSubtag: "en",
-  targetScriptRaw: "Latn",
-  bcp47: "en-Latn",
-  supported: true,
-  prefill: { script: "Latn", scriptClass: "alphabetic", routingGroup: "qwerty-qwertz" },
-};
-const fakePhaseResult = { phase: "B" as const, answers: [], confirmedInventory: [] };
-const fakeBase = {
-  id: "basic_kbdus",
-  path: "release/b/basic_kbdus",
-  script: "Latn",
-  displayName: "English (US)",
-  targets: ["windows"],
-  version: "1.0",
-};
-
-// ---------------------------------------------------------------------------
-// Mock child survey components — identical stubs to StudioShell.test.tsx
-// (spec 029 re-instrumentation: PhaseTrack/PhaseProjectName/PhaseF stubs removed
-// from survey/index.ts mock; those three flows now live through FlowStepHost
-// mocked below. All other stubs unchanged.)
-// ---------------------------------------------------------------------------
-
-// Mock survey/FlowStepHost.tsx — the new seam for the three converged flows.
-// The factory (makeFlowStepComponent) imports FlowStepHost from this direct path.
-// Branches on props.flow.flow_id (real flow loaded by factory via loadModularFlow;
-// flow_id comes from the YAML: "track", "project_name", "phase_f_helpdocs").
-//
-// track:
-//   Renders track-copy / track-adapt buttons that call props.onComplete with a
-//   SurveyPhaseResult carrying track_choice. The factory's extract→onCommit then
-//   fires setSelectedTrack (+setScaffoldSpec(null) on adapt) BEFORE the host
-//   advance — reproducing the recorded storeMutations.
-// project_name:
-//   Renders project-name-next button that calls props.onComplete with answers
-//   project_display_name="Test Keyboard" + project_keyboard_id="test_keyboard"
-//   so the factory extract yields {displayName,keyboardId} and onCommit fires
-//   setScaffoldSpec + setIdentity.
-// phase_f_helpdocs:
-//   Renders phaseF-complete button calling props.onComplete(fakePhaseResult).
-//   No factory onCommit — PhaseF had no pre-onComplete store writes.
-
-vi.mock("../../src/survey/FlowStepHost.tsx", () => ({
-  FlowStepHost: ({
-    flow,
-    onComplete,
-    onBack,
-  }: {
-    flow: { flow_id: string };
-    onComplete: (result: unknown) => void;
-    onBack?: () => void;
-  }) => {
-    if (flow.flow_id === "track") {
-      return (
-        <div data-testid="stage-track">
-          <button
-            type="button"
-            data-testid="track-copy"
-            onClick={() =>
-              onComplete({
-                phase: "G",
-                answers: [{ questionId: "track_choice", answerType: "select", value: "copy" }],
-                confirmedInventory: [],
-              })
-            }
-          >
-            track-copy
-          </button>
-          <button
-            type="button"
-            data-testid="track-adapt"
-            onClick={() =>
-              onComplete({
-                phase: "G",
-                answers: [{ questionId: "track_choice", answerType: "select", value: "adapt" }],
-                confirmedInventory: [],
-              })
-            }
-          >
-            track-adapt
-          </button>
-          {onBack !== undefined && (
-            <button type="button" data-testid="track-back" onClick={onBack}>
-              track-back
-            </button>
-          )}
-        </div>
-      );
-    }
-    if (flow.flow_id === "project_name") {
-      return (
-        <div data-testid="stage-project-name">
-          <button
-            type="button"
-            data-testid="project-name-next"
-            onClick={() =>
-              onComplete({
-                phase: "G",
-                answers: [
-                  { questionId: "project_display_name", answerType: "text", value: "Test Keyboard" },
-                  { questionId: "project_keyboard_id", answerType: "text", value: "test_keyboard" },
-                ],
-                confirmedInventory: [],
-              })
-            }
-          >
-            project-name-next
-          </button>
-          {onBack !== undefined && (
-            <button type="button" data-testid="project-name-back" onClick={onBack}>
-              project-name-back
-            </button>
-          )}
-        </div>
-      );
-    }
-    if (flow.flow_id === "phase_f_helpdocs") {
-      return (
-        <div data-testid="stage-F">
-          <button
-            type="button"
-            data-testid="phaseF-complete"
-            onClick={() =>
-              onComplete({ phase: "B", answers: [], confirmedInventory: [] })
-            }
-          >
-            phaseF-complete
-          </button>
-          {onBack !== undefined && (
-            <button type="button" data-testid="phaseF-back" onClick={onBack}>
-              phaseF-back
-            </button>
-          )}
-        </div>
-      );
-    }
-    // Fallback for any other flow_id (should not occur in golden-walk walks).
-    return <div data-testid={`flow-stub-${flow.flow_id}`} />;
-  },
-}));
-
-vi.mock("../../src/survey/index.ts", () => ({
-  IdentityLite: ({ onComplete }: { onComplete: (result: unknown, identity: unknown) => void }) => {
-    mockRefs.identityComplete.current = onComplete;
-    return (
-      <div data-testid="stage-identity">
-        <button
-          type="button"
-          data-testid="identity-complete"
-          onClick={() => onComplete(fakePhaseResult, fakeIdentity)}
-        >
-          identity-complete
-        </button>
-      </div>
-    );
-  },
-  Prefill: ({ onConfirm, onBack }: { onConfirm: () => void; onBack?: () => void }) => (
-    <div data-testid="stage-prefill">
-      <button type="button" data-testid="prefill-confirm" onClick={onConfirm}>
-        prefill-confirm
-      </button>
-      {onBack !== undefined && (
-        <button type="button" data-testid="prefill-back" onClick={onBack}>
-          prefill-back
-        </button>
-      )}
-    </div>
-  ),
-  PhaseB: ({ onComplete, onBack }: { onComplete: (r: unknown) => void; onBack?: () => void }) => {
-    mockRefs.phaseBDone.current = onComplete;
-    mockRefs.phaseBBack.current = onBack ?? null;
-    return (
-      <div data-testid="stage-B">
-        <button type="button" data-testid="phaseB-complete" onClick={() => onComplete(fakePhaseResult)}>
-          phaseB-complete
-        </button>
-        {onBack !== undefined && (
-          <button type="button" data-testid="phaseB-back" onClick={onBack}>
-            phaseB-back
-          </button>
-        )}
-      </div>
-    );
-  },
-  PhaseA: () => <div data-testid="stage-A" />,
-  SurveyRunner: () => <div data-testid="survey-runner" />,
-  extractIdentityLite: (r: unknown) => r,
-  extractIdentity: () => ({}),
-  extractProvenance: () => ({}),
-  buildPrefillRows: () => [],
-}));
-
-// BaseResolution mock — preview-before-commit contract. A suggestion-card
-// click fires onPreview (setLocalBase, does not advance); the "Choose this
-// keyboard" button fires onConfirm (setBaseConfirmed(true), then advances).
-// Two separate testids/clicks reproduce the two real user actions.
-vi.mock("../../src/editors/panels/BaseResolution.tsx", () => ({
-  BaseResolution: ({
-    onPreview,
-    onConfirm,
-    previewedBase,
-    onBack,
-  }: {
-    onPreview: (base: unknown) => void;
-    onConfirm: () => void;
-    previewedBase: unknown;
-    previewStatus: string;
-    onBack?: () => void;
-  }) => {
-    mockRefs.baseResolved.current = onConfirm;
-    return (
-      <div data-testid="stage-base">
-        <button type="button" data-testid="base-preview" onClick={() => onPreview(fakeBase)}>
-          base-preview
-        </button>
-        <button
-          type="button"
-          data-testid="base-confirm"
-          disabled={previewedBase === null}
-          onClick={onConfirm}
-        >
-          base-confirm
-        </button>
-        {onBack !== undefined && (
-          <button type="button" data-testid="base-back" onClick={onBack}>
-            base-back
-          </button>
-        )}
-      </div>
-    );
-  },
-}));
-
-// Mocks CarveGalleryV2 (v2, the live carve gallery) — v1's CarveGallery.tsx
-// is retained but commented out in carveAdapter.tsx for rollback.
-vi.mock("../../src/editors/carve/CarveGalleryV2.tsx", () => ({
-  CarveGalleryV2: ({ onComplete, onBack }: { onComplete: () => void; onBack?: () => void }) => {
-    mockRefs.carveDone.current = onComplete;
-    mockRefs.carveBack.current = onBack ?? null;
-    return (
-      <div data-testid="stage-carve">
-        <button type="button" data-testid="carve-complete" onClick={onComplete}>
-          carve-complete
-        </button>
-        {onBack !== undefined && (
-          <button type="button" data-testid="carve-back" onClick={onBack}>
-            carve-back
-          </button>
-        )}
-      </div>
-    );
-  },
-}));
-
-vi.mock("../../src/editors/assignLoop/MechanismGallery.tsx", () => ({
-  MechanismGallery: ({ onComplete, onBack }: { onComplete: () => void; onBack?: () => void }) => {
-    mockRefs.mechDone.current = onComplete;
-    mockRefs.mechBack.current = onBack ?? null;
-    return (
-      <div data-testid="stage-mechanisms">
-        <button type="button" data-testid="mechanisms-complete" onClick={onComplete}>
-          mechanisms-complete
-        </button>
-        {onBack !== undefined && (
-          <button type="button" data-testid="mechanisms-back" onClick={onBack}>
-            mechanisms-back
-          </button>
-        )}
-      </div>
-    );
-  },
-}));
-
-vi.mock("../../src/editors/assignLoop/TouchGallery.tsx", () => ({
-  TouchGallery: ({ onComplete, onBack }: { onComplete: (a: unknown[]) => void; onBack: () => void }) => {
-    mockRefs.touchEComplete.current = onComplete;
-    mockRefs.touchEBack.current = onBack;
-    return (
-      <div data-testid="stage-E">
-        <button
-          type="button"
-          data-testid="e-complete"
-          onClick={() => onComplete(mockRefs.touchEAssignments.current)}
-        >
-          Continue
-        </button>
-        <button type="button" data-testid="e-back" onClick={onBack}>
-          Back
-        </button>
-      </div>
-    );
-  },
-}));
+vi.mock("../../src/survey/FlowStepHost.tsx", () => import("../../src/test/studioShellMocks/FlowStepHost.tsx"));
+vi.mock("../../src/survey/index.ts", () => import("../../src/test/studioShellMocks/surveyIndex.tsx"));
+vi.mock("../../src/editors/panels/BaseResolution.tsx", () =>
+  import("../../src/test/studioShellMocks/BaseResolution.tsx"),
+);
+vi.mock("../../src/editors/carve/CarveGalleryV2.tsx", () =>
+  import("../../src/test/studioShellMocks/CarveGalleryV2.tsx"),
+);
+vi.mock("../../src/editors/assignLoop/MechanismGallery.tsx", () =>
+  import("../../src/test/studioShellMocks/MechanismGallery.tsx"),
+);
+vi.mock("../../src/editors/assignLoop/TouchGallery.tsx", () =>
+  import("../../src/test/studioShellMocks/TouchGallery.tsx"),
+);
+vi.mock("../../src/components/UnsupportedScriptStub.tsx", () =>
+  import("../../src/test/studioShellMocks/UnsupportedScriptStub.tsx"),
+);
+vi.mock("../../src/components/OSKFrame.tsx", () => import("../../src/test/studioShellMocks/OSKFrame.tsx"));
+vi.mock("../../src/components/OskModeToggle.tsx", () => import("../../src/test/studioShellMocks/OskModeToggle.tsx"));
+vi.mock("../../src/components/OutputScreen.tsx", () => import("../../src/test/studioShellMocks/OutputScreen.tsx"));
+vi.mock("../../src/dashboard/DashboardView.tsx", () => import("../../src/test/studioShellMocks/DashboardView.tsx"));
+vi.mock("../../src/hooks/useKeyboardArtifact.ts", () =>
+  import("../../src/test/studioShellMocks/idleKeyboardArtifact.ts"),
+);
+vi.mock("../../src/hooks/useWorkingCopyTransform.ts", () =>
+  import("../../src/test/studioShellMocks/useWorkingCopyTransform.ts"),
+);
+vi.mock("../../src/lib/confirmRebase.ts", () => import("../../src/test/studioShellMocks/confirmRebase.ts"));
+vi.mock("../../src/lib/buildTouchLayoutJson.ts", () =>
+  import("../../src/test/studioShellMocks/buildTouchLayoutJson.ts"),
+);
+vi.mock("../../src/lib/navigate.ts", () => import("../../src/test/studioShellMocks/navigate.ts"));
 
 // Mock the touch_seed_source chooser (spec 035 T014) — registerEditorSteps.ts
 // now renders TouchSeedSourcePanel for this step (the "touch" step keeps the
@@ -441,62 +160,6 @@ vi.mock("../../src/editors/touchSeedSource/TouchSeedSourcePanel.tsx", () => ({
 vi.mock("../../src/lib/services.ts", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../../src/lib/services.ts")>()),
   sourcedExemplars: async () => null,
-}));
-
-vi.mock("../../src/components/UnsupportedScriptStub.tsx", () => ({
-  UnsupportedScriptStub: ({ script }: { script: string }) => (
-    <div data-testid="stage-unsupported">{script}</div>
-  ),
-}));
-
-vi.mock("../../src/components/OSKFrame.tsx", () => ({
-  OSKFrame: () => <div data-testid="osk-frame" />,
-}));
-
-vi.mock("../../src/components/OskModeToggle.tsx", () => ({
-  OskModeToggle: () => <div data-testid="osk-toggle" />,
-}));
-
-vi.mock("../../src/hooks/useKeyboardArtifact.ts", () => ({
-  useKeyboardArtifact: () => ({ stage: { kind: "idle" }, retry: vi.fn(), recompile: vi.fn() }),
-}));
-
-vi.mock("../../src/hooks/useWorkingCopyTransform.ts", () => ({
-  useWorkingCopyTransform: () => null,
-}));
-
-vi.mock("../../src/lib/confirmRebase.ts", () => ({
-  instantiateFromBaseIfConfirmed: vi.fn(),
-  // BaseResolutionAdapter's onConfirm calls confirmRebaseTo synchronously
-  // (F1 fix) before advancing; this suite's working copy starts uninstantiated
-  // in every walk, so mocking it to always allow preserves prior behavior.
-  confirmRebaseTo: vi.fn(() => true),
-}));
-
-vi.mock("../../src/lib/buildTouchLayoutJson.ts", () => ({
-  buildTouchLayoutJson: (
-    _baseIr: unknown,
-    assignments: Array<{ target: string; mechanisms: Array<{ patternId: string; slotValues?: Record<string, string> }> }>,
-  ) => ({
-    json: JSON.stringify({ _mock: true, assignments }),
-    warnings: [],
-  }),
-}));
-
-vi.mock("../../src/components/PreviewScreen.tsx", () => ({
-  PreviewScreen: () => <div data-testid="preview-screen-root">preview-screen</div>,
-}));
-
-vi.mock("../../src/components/OutputScreen.tsx", () => ({
-  OutputScreen: () => <div data-testid="output-screen-root">output-screen</div>,
-}));
-
-vi.mock("../../src/dashboard/DashboardView.tsx", () => ({
-  FlowMapView: () => <div data-testid="flow-map-view">flow-map</div>,
-}));
-
-vi.mock("../../src/lib/navigate.ts", () => ({
-  navigateTo: vi.fn(),
 }));
 
 // ---------------------------------------------------------------------------
@@ -808,8 +471,6 @@ async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Pro
 
 afterEach(() => {
   cleanup();
-  useSurveySessionStore.getState().reset();
-  useWorkingCopyStore.getState().reset();
   vi.clearAllMocks();
 });
 

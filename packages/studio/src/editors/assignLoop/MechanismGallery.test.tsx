@@ -44,7 +44,6 @@ import {
 } from "./MechanismGallery.tsx";
 import { usePositionalCharNav } from "./usePositionalCharNav.ts";
 import { useWorkingCopyStore, bindManifest } from "../../stores/workingCopyStore.ts";
-import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useStepWalkStore } from "../../stores/stepWalkStore.ts";
 import { useSurveyAnswerStore } from "../../stores/surveyAnswerStore.ts";
 import { charToPositionToken } from "../../lib/stepWalk.ts";
@@ -317,16 +316,9 @@ beforeAll(installDialogShim);
 
 afterEach(() => {
   cleanup();
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
   vi.clearAllMocks();
   _mockStage = { kind: "idle" };
   _lastVfsTransform = undefined;
-});
-
-beforeEach(() => {
-  useWorkingCopyStore.getState().reset();
-  useSurveySessionStore.getState().reset();
 });
 
 // ---------------------------------------------------------------------------

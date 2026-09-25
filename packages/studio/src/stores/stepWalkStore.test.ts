@@ -8,14 +8,9 @@
 // no-change publish is a genuine no-op" is what makes those call sites safe, and
 // it is asserted by state IDENTITY, which is the only thing a subscriber sees.
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { useStepWalkStore, peekStepCursor, peekAnswerDraft } from "./stepWalkStore.ts";
 import { useSurveyAnswerStore } from "./surveyAnswerStore.ts";
-
-beforeEach(() => {
-  useStepWalkStore.getState().reset();
-  useSurveyAnswerStore.getState().reset();
-});
 
 describe("publishStepWalk", () => {
   it("stores a step's stops", () => {

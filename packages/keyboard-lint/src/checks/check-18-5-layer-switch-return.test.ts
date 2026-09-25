@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { checkLayerSwitchReturn } from "./check-18-5-layer-switch-return.js";
 import type { TouchLayoutIR } from "@keyboard-studio/contracts";
+import { touchLayout } from "@keyboard-studio/contracts/fixtures";
 
 const PATH = "source/test.keyman-touch-layout";
 
@@ -12,30 +13,12 @@ function makeIR(symbolsHasExit: boolean): TouchLayoutIR {
       ? [{ nodeId: "k-exit", id: "K_BACK", nextlayer: "default" }]
       : []),
   ];
-  return {
-    platforms: [
-      {
-        id: "phone",
-        layers: [
-          {
-            id: "default",
-            rows: [
-              {
-                keys: [
-                  { nodeId: "k-switch", id: "K_SYM", nextlayer: "symbols" },
-                ],
-              },
-            ],
-          },
-          {
-            id: "symbols",
-            rows: [{ keys: symbolsKeys }],
-          },
-        ],
-      },
+  return touchLayout({
+    layers: [
+      { id: "default", keys: [{ nodeId: "k-switch", id: "K_SYM", nextlayer: "symbols" }] },
+      { id: "symbols", rows: [{ keys: symbolsKeys }] },
     ],
-    nodeIds: [],
-  };
+  });
 }
 
 describe("checkLayerSwitchReturn (18.5 KM_WARN_LAYER_SWITCH_NO_RETURN)", () => {

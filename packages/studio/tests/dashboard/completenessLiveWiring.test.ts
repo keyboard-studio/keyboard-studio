@@ -21,7 +21,7 @@
 //   specs/014-mutate-seam-touch-propagation/spec.md (US5 AC-3, SC-009)
 //   specs/014-mutate-seam-touch-propagation/contracts/flag-and-validator.contract.md (V1/V3)
 
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect } from "vitest";
 import { useWorkingCopyStore } from "../../src/stores/workingCopyStore.ts";
 import { runCompleteness } from "../../src/dashboard/completeness.ts";
 import type { Step, EditorStep } from "../../src/steps/types.ts";
@@ -67,10 +67,6 @@ const MANIFEST: Step[] = [
 
 // Working copy with both lock gates fully applied (structural proxy clean).
 const WC_BOTH_LOCKED = { desktopLocked: true, touchLayoutJson: "{}" };
-
-beforeEach(() => {
-  useWorkingCopyStore.getState().reset();
-});
 
 describe("T034 live-wiring — SurveyView → store → runCompleteness", () => {
   it("defaults to empty findings (structural proxy / flag-off byte-identical)", () => {
