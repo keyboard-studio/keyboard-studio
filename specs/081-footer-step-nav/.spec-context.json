@@ -507,5 +507,34 @@
       "why": "axe scrollable-region-focusable after the nav moved to the footer; an unconditional tabIndex would add a Tab stop on every step",
       "rejected": "unconditional tabIndex=0"
     }
+  ],
+  "verified": [
+    {
+      "what": "km-qc review of spec 081 diff",
+      "result": "PASS 98/100, no P0/P1"
+    },
+    {
+      "what": "km-frontend review: hook ref/useLayoutEffect ordering, store sameSpec, publisher rules, gating parity (Mechanism/Touch/SurveyRunner/Marks)",
+      "result": "APPROVE, no P0"
+    },
+    {
+      "what": "Survey pane Tab stop scoped to panes with no focusable content (km-frontend P1 fixed)",
+      "result": "pass",
+      "command": "vitest SurveyQuestionsPane + StudioShell/components/tests/steps 451/451; e2e light-theme-a11y past Prefill, footer-progress, tab-roundtrip"
+    },
+    {
+      "what": "Full e2e compared with an origin/main worktree",
+      "result": "no spec 081 regressions remain; 9 failures are pre-existing"
+    }
+  ],
+  "concerns": [
+    {
+      "note": "MechanismGallery/TouchGallery keep an internal ForwardButtonSpec mapped into StepNavSpec; an intentional seam, could use a one-line contract note",
+      "kind": "P2"
+    },
+    {
+      "note": "stepNavStore.test.ts relies on the global test-setup store reset instead of resetting locally",
+      "kind": "P2"
+    }
   ]
 }
