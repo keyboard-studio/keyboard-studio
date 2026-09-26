@@ -1521,7 +1521,20 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       }}
     >
       {/* Left pane: survey questions (StepHost renders pane content) */}
-      <section aria-label="Survey questions" style={questionsPaneStyle}>
+      {/* Focusable because it scrolls (WCAG 2.1.1, axe scrollable-region-focusable).
+          Since spec 081 moved the step nav to the footer, a step with no body
+          controls (Prefill) leaves this pane with nothing else to focus, so the
+          keyboard could not scroll it. `jsx-a11y/no-noninteractive-tabindex`
+          has no notion of scroll containers (same trade as KmnSourceView); the
+          aria-label makes this a named region, not a stray tab stop. */}
+      {/* eslint-disable jsx-a11y/no-noninteractive-tabindex */}
+      <section
+        aria-label="Survey questions"
+        tabIndex={0}
+        className="ks-focus-ring"
+        style={questionsPaneStyle}
+      >
+        {/* eslint-enable jsx-a11y/no-noninteractive-tabindex */}
         {cloudResume !== null && (
           <ResumeDraftBanner
             meta={cloudResume}
