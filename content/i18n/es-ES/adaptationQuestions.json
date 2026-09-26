@@ -1,0 +1,11 @@
+{
+  "content.adaptationQuestion.q_ip1_keep_strategies.provenanceLabel": "",
+  "content.adaptationQuestion.q_ip2_keep_device_targets.provenanceLabel": "",
+  "content.adaptationQuestion.q_ip3_keep_script_conventions.provenanceLabel": "",
+  "content.adaptationQuestion.q_sa1_target_script_spread.provenanceLabel": "",
+  "content.adaptationQuestion.q_sa2_base_script_mismatch.provenanceLabel": "",
+  "content.adaptationQuestion.q_sa3_latin_flavor.provenanceLabel": "",
+  "content.adaptationQuestion.q_tp1_confidence_threshold.provenanceLabel": "",
+  "content.adaptationQuestion.q_tp2_fallback_tier_prefill.provenanceLabel": "",
+  "content.adaptationQuestion.q_tp3_orthography_join.provenanceLabel": ""
+}
