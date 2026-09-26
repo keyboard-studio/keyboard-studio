@@ -70,7 +70,7 @@
   "content.pattern.nfd_latin.question.combiningMarks.prompt": "Énumérez les accents utilisés dans votre langue (les accents seuls, et non les lettres accentuées). Si vous n'êtes pas sûr, laissez ce champ vide : le clavier prendra automatiquement en charge les accents latins courants.\n",
   "content.pattern.nfd_latin.question.outputForm.option.auto.label": "Laissons le clavier décider pour chaque caractère",
   "content.pattern.nfd_latin.question.outputForm.option.separate.label": "Veillez à toujours conserver la lettre de base et les signes comme des éléments distincts.",
-  "content.pattern.nfd_latin.question.outputForm.option.single-char.label": "Un seul personnage prêt à l'emploi, s'il en existe un",
+  "content.pattern.nfd_latin.question.outputForm.option.single-char.label": "Un seul caractère prêt à l'emploi, s'il en existe un",
   "content.pattern.nfd_latin.question.outputForm.prompt": "Lorsque le clavier génère une lettre accentuée qui existe également sous la forme d'un caractère prêt à l'emploi, quelle forme doit-il afficher ?\n",
   "content.pattern.nfd_latin.title": "Empiler les accents dans le bon ordre",
   "content.pattern.sea_stack_reorder.description": "Les écritures d’Asie du Sud-Est (khmer, birman, laotien) utilisent des consonnes en indice pour former des groupes de consonnes. Les indices sont saisis après la consonne de base, mais doivent être enregistrés avant les signes vocaliques afin d’apparaître sous la consonne de base. Ce modèle gère le réordonnancement des indices, des voyelles et des marques de ton afin de respecter l'ordre canonique Unicode des syllabes dans ces écritures. Le thaï n'utilise pas de marqueur d'indice de type « coeng » et est donc exclu de ce modèle.\n",
