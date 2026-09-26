@@ -17,9 +17,12 @@
 //               offers exactly c p q v x.
 //   add one   — add q from the Loanword letters section before Done. q is then
 //               part of the alphabet, so the question offers only c p v x.
+//   add all   — "Add all loanword letters" before Done. Every basic-Latin
+//               letter is then needed, so the question is skipped.
 //
-// Both use driveConvenienceStep's strict "shown" mode: if the gate stops
-// opening, the walk fails here instead of passing straight through to carve.
+// All three use driveConvenienceStep's strict modes: if the gate stops
+// opening (or stops skipping), the walk fails here instead of passing straight
+// through to carve.
 //
 // Run (see playwright.config.ts header):
 //   cd packages/studio && npx playwright test convenience-loanwords.spec.ts
@@ -71,7 +74,10 @@ async function reachBafutAlphabet(page: Page): Promise<void> {
 }
 
 /** From the alphabet screen, press Done and walk the steps between it and the convenience question. */
-async function continueToConvenience(page: Page): Promise<void> {
+async function continueToConvenience(
+  page: Page,
+  expectConvenience: "shown" | "skipped" = "shown",
+): Promise<void> {
   const done = page.getByTestId("phase-b-done");
   await expect(done).toBeEnabled();
   await done.click();
@@ -79,7 +85,7 @@ async function continueToConvenience(page: Page): Promise<void> {
   await driveMarksSeries(page);
   await drivePunctuationStep(page);
   await driveInvisiblesStep(page);
-  await driveConvenienceStep(page, { expect: "shown" });
+  await driveConvenienceStep(page, { expect: expectConvenience });
 }
 
 /** The letters the convenience question offers, read from its checkbox labels ("Keep c C"). */
@@ -121,5 +127,22 @@ test.describe("Convenience letters: loanword-only letters", () => {
 
     await continueToConvenience(page);
     expect(await offeredLetters(page)).toEqual(LOANWORD_SURPLUS.filter((ch) => ch !== "q"));
+  });
+
+  test("add all: with every loanword letter added, the question is skipped", async ({ page }) => {
+    await reachBafutAlphabet(page);
+
+    const toggleAll = page.getByTestId("alphabet-loanwords-toggle-all");
+    await expect(toggleAll).toHaveText("Add all loanword letters");
+    await toggleAll.click();
+    await expect(toggleAll).toHaveText("Remove all loanword letters");
+    for (const ch of LOANWORD_SURPLUS) {
+      const chip = page
+        .getByTestId("alphabet-loanwords")
+        .getByRole("button", { name: new RegExp(`^${ch} ${ch.toUpperCase()} `) });
+      await expect(chip).toHaveAttribute("aria-pressed", "true");
+    }
+
+    await continueToConvenience(page, "skipped");
   });
 });

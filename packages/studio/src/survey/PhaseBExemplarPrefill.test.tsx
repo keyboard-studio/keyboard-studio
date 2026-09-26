@@ -456,7 +456,7 @@ describe("loanword letters section", () => {
     await acceptExemplarsAndContinue();
 
     const section = await screen.findByTestId("alphabet-loanwords");
-    const chips = [...section.querySelectorAll("button")];
+    const chips = [...section.querySelectorAll("button[aria-pressed]")];
     // h is already a main-tier letter, so it is not offered again.
     expect(chips.map((b) => b.getAttribute("aria-label")).sort()).toEqual([
       "c C (U+0063)",
@@ -489,6 +489,46 @@ describe("loanword letters section", () => {
     expect(usePhaseBDraftStore.getState().chars).not.toContain("c");
     expect(usePhaseBDraftStore.getState().chars).not.toContain("C");
     expect(usePhaseBDraftStore.getState().rejected).not.toContain("c");
+  });
+
+  it("adds every loanword letter and its case pair with one click, then offers to remove them all", async () => {
+    getSourcedExemplars.set(bafutInventory());
+    renderPhaseB();
+    await acceptExemplarsAndContinue();
+
+    const toggleAll = await screen.findByTestId("alphabet-loanwords-toggle-all");
+    expect(toggleAll.textContent).toBe("Add all loanword letters");
+    fireEvent.click(toggleAll);
+
+    const chars = usePhaseBDraftStore.getState().chars;
+    for (const ch of ["c", "C", "p", "P", "q", "Q", "v", "V", "x", "X", "ʼ"]) expect(chars).toContain(ch);
+    // Nothing is added twice, and h (already a main-tier letter) is untouched.
+    expect(new Set(chars).size).toBe(chars.length);
+    expect(chars.filter((c) => c === "h")).toHaveLength(1);
+    const section = screen.getByTestId("alphabet-loanwords");
+    for (const chip of section.querySelectorAll("button[aria-pressed]")) {
+      expect(chip.getAttribute("aria-pressed")).toBe("true");
+    }
+    expect(toggleAll.textContent).toBe("Remove all loanword letters");
+
+    fireEvent.click(toggleAll);
+    const after = usePhaseBDraftStore.getState().chars;
+    for (const ch of ["c", "C", "p", "q", "v", "x", "ʼ"]) expect(after).not.toContain(ch);
+    expect(after).toContain("h");
+    expect(toggleAll.textContent).toBe("Add all loanword letters");
+  });
+
+  it("Add all completes a partial selection without toggling the letters already added", async () => {
+    getSourcedExemplars.set(bafutInventory());
+    renderPhaseB();
+    await acceptExemplarsAndContinue();
+
+    fireEvent.click(await screen.findByRole("button", { name: "q Q (U+0071)" }));
+    fireEvent.click(screen.getByTestId("alphabet-loanwords-toggle-all"));
+
+    const chars = usePhaseBDraftStore.getState().chars;
+    for (const ch of ["c", "p", "q", "Q", "v", "x", "ʼ"]) expect(chars).toContain(ch);
+    expect(new Set(chars).size).toBe(chars.length);
   });
 
   it("renders nothing when the inventory has no auxiliary tier", async () => {
