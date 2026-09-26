@@ -15,6 +15,7 @@
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties } from "react";
+import { SurveyQuestionsPane } from "./components/SurveyQuestionsPane.tsx";
 import { useResizablePanes } from "./hooks/useResizablePanes.ts";
 import { ResizeHandle } from "./components/ResizeHandle.tsx";
 import type { BaseKeyboard, DecisionEntry, Pattern, VirtualFS, KeyboardIR, RemovalCapability } from "@keyboard-studio/contracts";
@@ -1521,20 +1522,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       }}
     >
       {/* Left pane: survey questions (StepHost renders pane content) */}
-      {/* Focusable because it scrolls (WCAG 2.1.1, axe scrollable-region-focusable).
-          Since spec 081 moved the step nav to the footer, a step with no body
-          controls (Prefill) leaves this pane with nothing else to focus, so the
-          keyboard could not scroll it. `jsx-a11y/no-noninteractive-tabindex`
-          has no notion of scroll containers (same trade as KmnSourceView); the
-          aria-label makes this a named region, not a stray tab stop. */}
-      {/* eslint-disable jsx-a11y/no-noninteractive-tabindex */}
-      <section
-        aria-label="Survey questions"
-        tabIndex={0}
-        className="ks-focus-ring"
-        style={questionsPaneStyle}
-      >
-        {/* eslint-enable jsx-a11y/no-noninteractive-tabindex */}
+      <SurveyQuestionsPane label="Survey questions" style={questionsPaneStyle}>
         {cloudResume !== null && (
           <ResumeDraftBanner
             meta={cloudResume}
@@ -1586,7 +1574,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           <LintSummary findings={globalNonWarnings} />
         )}
         {stepHost}
-      </section>
+      </SurveyQuestionsPane>
 
       {/* Drag handle */}
       <ResizeHandle onPointerDown={onPointerDown} />

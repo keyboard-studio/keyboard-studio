@@ -72,6 +72,7 @@ argument (see the `startOverStore` note).
 
 - `render(ui, { withStepNav: true })` renders `ui`, then `<StepNavCluster
   stepId={STANDALONE_STEP_ID} />`, inside the i18n wrapper.
-- `src/test-setup.ts` runs `useStepNavStore.getState().reset()` in `afterEach`.
+- `src/test-setup.ts` resets `useStepNavStore` before each test, through its generic
+  `beforeEach` that calls `reset()` on every zustand store a test file loads.
 - Tests that mount StepHost render the real `StudioFooter` (or `StepNavCluster` keyed on the
   active step) next to it.

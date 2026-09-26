@@ -500,5 +500,12 @@
     }
   ],
   "telemetryInstanceId": "aec2ed41-12ce-42de-91fe-f2d70e38939f",
-  "currentTask": "T058"
+  "currentTask": "T058",
+  "decisions": [
+    {
+      "decision": "The survey questions pane is a Tab stop only when it has no focusable descendant",
+      "why": "axe scrollable-region-focusable after the nav moved to the footer; an unconditional tabIndex would add a Tab stop on every step",
+      "rejected": "unconditional tabIndex=0"
+    }
+  ]
 }
