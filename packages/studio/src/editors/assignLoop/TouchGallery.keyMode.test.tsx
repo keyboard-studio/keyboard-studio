@@ -95,7 +95,7 @@ describe("TouchGallery — mode selector as an APG tabs pattern (T072, FR-035)",
   it("renders a tablist with two tabs, 'By character' selected by default", async () => {
     seedStore({ withInventory: ["ä"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     const tablist = screen.getByTestId("touch-mode-tabs");
@@ -111,7 +111,7 @@ describe("TouchGallery — mode selector as an APG tabs pattern (T072, FR-035)",
   it("clicking the 'By key' tab switches to the editable schematic grid, labelled 'for editing', with the live preview gone; clicking back returns to the character walk and brings it back", async () => {
     seedStore({ withInventory: ["ä"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // Character mode's own per-char surface is showing.
@@ -153,7 +153,7 @@ describe("TouchGallery — mode selector as an APG tabs pattern (T072, FR-035)",
   it("ArrowRight on the tablist moves AND selects the next tab (APG automatic activation)", async () => {
     seedStore({ withInventory: ["ä"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await act(async () => {
@@ -183,7 +183,7 @@ describe("TouchGallery — mode selector as an APG tabs pattern (T072, FR-035)",
   it("switching modes twice loses nothing from the by-character draft (FR-036a/b spot check)", async () => {
     seedStore({ withInventory: ["中", "日"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // Configure "中" via long-press K_A.
@@ -216,7 +216,7 @@ describe("TouchGallery — one shared, derived set of progress figures (T075, FR
   it("reports the same 'characters still unplaced' / 'keys with no letter' figures the propose gate reads, and both move together off ONE commit — they cannot independently disagree", async () => {
     seedKeyModeFixture({ inventory: ["ñ"], includeBrokenKey: true });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     expect(screen.getByTestId("touch-progress-unplaced").textContent).toBe(
@@ -251,7 +251,7 @@ describe("TouchGallery — one shared, derived set of progress figures (T075, FR
   it("the figures are visible — and read the same values — in both modes", async () => {
     seedKeyModeFixture({ inventory: ["ñ"], includeBrokenKey: true });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     const beforeUnplaced = screen.getByTestId("touch-progress-unplaced").textContent;
@@ -290,7 +290,7 @@ describe("TouchGallery — either mode completes the step (T120, FR-036e)", () =
     seedKeyModeFixture({ inventory: ["a"], includeBrokenKey: false, coveringCharKey: "a" });
     const onComplete = vi.fn();
     await act(async () => {
-      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await act(async () => {
@@ -310,7 +310,7 @@ describe("TouchGallery — either mode completes the step (T120, FR-036e)", () =
     seedKeyModeFixture({ inventory: ["ñ"], includeBrokenKey: true });
     const onComplete = vi.fn();
     await act(async () => {
-      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await act(async () => {
@@ -353,7 +353,7 @@ describe("TouchGallery — either mode completes the step (T120, FR-036e)", () =
     seedKeyModeFixture({ inventory: ["ñ"], includeBrokenKey: true });
     const onComplete = vi.fn();
     await act(async () => {
-      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await act(async () => {
@@ -376,7 +376,7 @@ describe("TouchGallery — either mode completes the step (T120, FR-036e)", () =
     seedKeyModeFixture({ inventory: ["a"], includeBrokenKey: true, coveringCharKey: "a" });
     const onComplete = vi.fn();
     await act(async () => {
-      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={onComplete} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await act(async () => {
@@ -406,7 +406,7 @@ describe("TouchGallery — undo affordance states what it will undo (T076, FR-03
   it("reads 'Nothing to undo' and is disabled when the shared stack is empty", async () => {
     seedStore({ withInventory: ["ä"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     const undoBtn = screen.getByTestId(
@@ -419,7 +419,7 @@ describe("TouchGallery — undo affordance states what it will undo (T076, FR-03
   it("names a deleted touch method (character-mode work) when that is the top of the stack", async () => {
     seedStore({ withInventory: ["ä"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await act(async () => {
@@ -440,7 +440,7 @@ describe("TouchGallery — undo affordance states what it will undo (T076, FR-03
   it("names the key edit (key-mode work) instead, once that becomes the top of the stack after a mode switch — a silent cross-mode undo would read as a defect", async () => {
     seedStore({ withInventory: ["ä"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await act(async () => {
@@ -476,7 +476,7 @@ describe("TouchGallery — undo affordance states what it will undo (T076, FR-03
   it("clicking Undo pops the shared stack via the store's existing undoDelete", async () => {
     seedStore({ withInventory: ["ä"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await act(async () => {
@@ -527,7 +527,7 @@ describe("TouchGallery — undo affordance states what it will undo (T076, FR-03
     async ({ opKind, op }) => {
       seedStore({ withInventory: ["ä"] });
       await act(async () => {
-        render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+        render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
       });
 
       await act(async () => {

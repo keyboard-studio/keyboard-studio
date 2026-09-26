@@ -59,6 +59,7 @@ describe("identity-lite attribution capture (spec 064 US1)", () => {
         resume={completedThrough("Latn")}
         authorSeed={{ name: "Alice Example", email: "alice@example.org" }}
       />,
+      { withStepNav: true },
     );
     expect(screen.getByText("Who should be credited as the author of this keyboard?")).toBeTruthy();
     expect((screen.getAllByRole("textbox")[0] as HTMLInputElement).value).toBe("");
@@ -72,6 +73,7 @@ describe("identity-lite attribution capture (spec 064 US1)", () => {
         resume={completedThrough("Latn")}
         authorSeed={{ name: "Alice Example", email: "alice@example.org" }}
       />,
+      { withStepNav: true },
     );
     type("Alice Example");
     finish();
@@ -97,6 +99,7 @@ describe("identity-lite attribution capture (spec 064 US1)", () => {
         resume={completedThrough("Latn")}
         authorSeed={{ name: "Alice Example", email: "alice@example.org" }}
       />,
+      { withStepNav: true },
     );
     type("Alice Example");
     finish();
@@ -121,6 +124,7 @@ describe("identity-lite attribution capture (spec 064 US1)", () => {
         resume={completedThrough("Latn")}
         authorSeed={{ name: "Alice Example", email: "alice@example.org" }}
       />,
+      { withStepNav: true },
     );
     type("Alice Example");
     finish(); // -> il_author_email, blank (resume does not re-seed)
@@ -144,13 +148,14 @@ describe("identity-lite attribution capture (spec 064 US1)", () => {
         resume={completedThrough("Latn")}
         authorSeed={{ name: null, email: null }}
       />,
+      { withStepNav: true },
     );
     const box = screen.getAllByRole("textbox")[0] as HTMLInputElement;
     expect(box.value).toBe("");
   });
 
   it("works with no authorSeed at all (guest)", () => {
-    render(<IdentityLite onComplete={vi.fn()} resume={completedThrough("Latn")} />);
+    render(<IdentityLite onComplete={vi.fn()} resume={completedThrough("Latn")} />, { withStepNav: true });
     const box = screen.getAllByRole("textbox")[0] as HTMLInputElement;
     expect(box.value).toBe("");
   });
@@ -165,6 +170,7 @@ describe("identity-lite attribution capture (spec 064 US1)", () => {
         resume={completedThrough("Ethi")}
         authorSeed={{ name: "Alice Example", email: "alice@example.org" }}
       />,
+      { withStepNav: true },
     );
     expect(screen.queryByText("Who holds the copyright, if not you?")).toBeNull();
     expect(screen.queryByDisplayValue("Alice Example")).toBeNull();
@@ -178,6 +184,7 @@ describe("identity-lite attribution capture (spec 064 US1)", () => {
         resume={completedThrough("Ethi")}
         authorSeed={{ name: "Alice Example" }}
       />,
+      { withStepNav: true },
     );
     finish();
     expect(onComplete).toHaveBeenCalledTimes(1);

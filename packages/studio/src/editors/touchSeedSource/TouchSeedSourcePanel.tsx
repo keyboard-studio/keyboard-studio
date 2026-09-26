@@ -60,8 +60,9 @@ import { useKeyboardArtifact } from "../../hooks/useKeyboardArtifact.ts";
 import type { ScaffoldSpec, VfsTransform } from "../../hooks/useKeyboardArtifact.ts";
 import { OSKFrame } from "../../components/OSKFrame.tsx";
 import { ASSIGN_LOOP_LEFT_PANE_PCT } from "../assignLoop/AssignLoopShell.tsx";
+import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import {
-  BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
+  BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT,
 } from "../../lib/galleryTheme.ts";
 
 /** No desktop work to replay when there is no baseIr yet (mirrors TouchGallery's EMPTY_MODS). */
@@ -137,17 +138,6 @@ const pageStyle: CSSProperties = {
   overflowY: "auto",
 };
 
-const ghostBtn: CSSProperties = {
-  padding: "8px 18px",
-  background: "transparent",
-  border: `1px solid ${BORDER}`,
-  borderRadius: 6,
-  color: TEXT_DIM,
-  fontSize: 13,
-  cursor: "pointer",
-  fontFamily: "inherit",
-};
-
 const previewCardStyle: CSSProperties = {
   background: BG_CARD,
   border: `1px solid ${BORDER}`,
@@ -209,22 +199,6 @@ const choiceCardStyle = (active: boolean): CSSProperties => ({
   textAlign: "left",
   cursor: "pointer",
   width: "100%",
-  fontFamily: FONT,
-});
-
-const confirmBtnStyle = (warn: boolean): CSSProperties => ({
-  padding: "10px 24px",
-  background: warn ? "var(--app-danger)" : BLUE_ACTION,
-  border: "none",
-  borderRadius: 6,
-  // --app-text-on-accent only pairs safely with BLUE_ACTION (--app-accent);
-  // for the warn branch, --app-danger needs --app-text-on-danger instead --
-  // navy's on-accent value falls to 4.35:1 against --app-danger's fill
-  // (1.4.3, #1477). See colors.css for why the two danger tokens differ.
-  color: warn ? "var(--app-text-on-danger)" : "var(--app-text-on-accent)",
-  fontSize: 14,
-  fontWeight: 600,
-  cursor: "pointer",
   fontFamily: FONT,
 });
 
@@ -381,6 +355,27 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
     onComplete(undefined);
   }
 
+  // Back / Confirm now live in the footer (spec 081).
+  usePublishStepNav({
+    ...(onBack !== undefined
+      ? {
+          back: {
+            label: t({ id: "editor.assignLoop.backButton", message: "← Back" }),
+            onClick: onBack,
+            testId: "seed-source-back",
+            ariaLabel: t({ id: "editor.assignLoop.touch.backToMechanismsPhaseCAriaLabel", message: "Back to mechanisms" }),
+          },
+        }
+      : {}),
+    forward: {
+      label: showDraftWarning
+        ? t({ id: "editor.touchSeed.discardAndConfirmButton", message: "Discard touch edits & confirm" })
+        : t({ id: "editor.touchSeed.confirmButton", message: "Confirm" }),
+      onClick: handleConfirm,
+      testId: "seed-source-confirm",
+    },
+  });
+
   return (
     <div style={pageStyle}>
       {/* No maxWidth cap here (previously 1100px). This is a full-layout step
@@ -391,18 +386,6 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
           A hard cap here was squeezing the OSK preview noticeably smaller
           than that main preview on ordinary desktop widths. */}
       <div style={{ width: "100%" }}>
-        {onBack !== undefined && (
-          <button
-            type="button"
-            onClick={onBack}
-            aria-label={t({ id: "editor.assignLoop.touch.backToMechanismsPhaseCAriaLabel", message: "Back to mechanisms" })}
-            data-testid="seed-source-back"
-            style={ghostBtn}
-          >
-            <Trans id="editor.assignLoop.backButton">&larr; Back</Trans>
-          </button>
-        )}
-
         <h1
           style={{
             marginTop: 24,
@@ -496,17 +479,6 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
                 </Trans>
               </p>
             )}
-
-            <button
-              type="button"
-              data-testid="seed-source-confirm"
-              onClick={handleConfirm}
-              style={confirmBtnStyle(showDraftWarning)}
-            >
-              {showDraftWarning
-                ? t({ id: "editor.touchSeed.discardAndConfirmButton", message: "Discard touch edits & confirm" })
-                : t({ id: "editor.touchSeed.confirmButton", message: "Confirm" })}
-            </button>
           </div>
 
           {/* Right column — live OSK preview, matching the currently-selected

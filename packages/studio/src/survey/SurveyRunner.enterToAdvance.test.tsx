@@ -48,7 +48,7 @@ afterEach(cleanup);
 
 describe("SurveyRunner Enter-to-advance (#536)", () => {
   it("advances to the next step when Enter is pressed in a text field", () => {
-    render(<SurveyRunner flow={TEXT_FLOW} onComplete={vi.fn()} />);
+    render(<SurveyRunner flow={TEXT_FLOW} onComplete={vi.fn()} />, { withStepNav: true });
     expect(screen.getByText("First question")).toBeTruthy();
 
     fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter" });
@@ -58,7 +58,7 @@ describe("SurveyRunner Enter-to-advance (#536)", () => {
 
   it("Shift+Enter in a textarea inserts a newline instead of advancing", () => {
     const onComplete = vi.fn();
-    render(<SurveyRunner flow={TEXT_FLOW} onComplete={onComplete} />);
+    render(<SurveyRunner flow={TEXT_FLOW} onComplete={onComplete} />, { withStepNav: true });
     // Advance to the textarea (q-two, type "text").
     fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter" });
     const textarea = screen.getByRole("textbox");
@@ -73,7 +73,7 @@ describe("SurveyRunner Enter-to-advance (#536)", () => {
 
   it("plain Enter in a textarea advances (finishes) the flow", () => {
     const onComplete = vi.fn();
-    render(<SurveyRunner flow={TEXT_FLOW} onComplete={onComplete} />);
+    render(<SurveyRunner flow={TEXT_FLOW} onComplete={onComplete} />, { withStepNav: true });
     fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter" }); // to q-two
 
     fireEvent.keyDown(screen.getByRole("textbox"), { key: "Enter" }); // finish
@@ -82,7 +82,7 @@ describe("SurveyRunner Enter-to-advance (#536)", () => {
   });
 
   it("Enter targeted at the Next button does not advance via the container handler", () => {
-    render(<SurveyRunner flow={TEXT_FLOW} onComplete={vi.fn()} />);
+    render(<SurveyRunner flow={TEXT_FLOW} onComplete={vi.fn()} />, { withStepNav: true });
 
     fireEvent.keyDown(screen.getByTestId("survey-advance"), { key: "Enter" });
 
@@ -92,7 +92,7 @@ describe("SurveyRunner Enter-to-advance (#536)", () => {
   });
 
   it("Enter with a combobox row highlighted selects the row without double-advancing", async () => {
-    render(<SurveyRunner flow={COMBO_FLOW} onComplete={vi.fn()} advanceOnSelect />);
+    render(<SurveyRunner flow={COMBO_FLOW} onComplete={vi.fn()} advanceOnSelect />, { withStepNav: true });
     const combobox = screen.getByRole("combobox");
     fireEvent.focus(combobox);
     fireEvent.keyDown(combobox, { key: "ArrowDown" }); // highlight "Alpha"

@@ -53,7 +53,7 @@ function typeInto(value: string): void {
  */
 function walkToContactField(ctx: Record<string, string | undefined>): string {
   useSurveySessionStore.getState().setSurveyContext(ctx);
-  render(<PhaseFStepFactoryComponent onComplete={() => {}} />);
+  render(<PhaseFStepFactoryComponent onComplete={() => {}} />, { withStepNav: true });
 
   // 1. pf_welcome_paragraph — required, so it must be filled to advance.
   typeInto("A keyboard for typing Bafut.");
@@ -105,7 +105,7 @@ describe("Phase F — pf_contact_info pre-fill (end to end)", () => {
         onComplete={() => {
           completed = true;
         }}
-      />,
+      />, { withStepNav: true },
     );
 
     typeInto("A keyboard for typing Bafut.");

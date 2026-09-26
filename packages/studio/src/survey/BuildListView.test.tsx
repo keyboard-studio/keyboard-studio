@@ -82,7 +82,7 @@ async function renderBuildListView(
   onComplete: (r: SurveyPhaseResult) => void = vi.fn(),
   onBack: () => void = vi.fn(),
 ) {
-  render(<PhaseB context={context} onComplete={onComplete} onBack={onBack} />);
+  render(<PhaseB context={context} onComplete={onComplete} onBack={onBack} />, { withStepNav: true });
   // IntroChooser is shown first; "build-list" is pre-selected.
   const continueBtn = screen.getByRole("button", { name: /continue/i });
   await act(async () => {
@@ -233,7 +233,7 @@ describe("BuildListView — end-to-end onComplete", () => {
       <PhaseB
         context={{ bcp47_tag: "yo" }}
         onComplete={onComplete}
-      />,
+      />, { withStepNav: true },
     );
     // Navigate to BuildListView.
     await act(async () => {

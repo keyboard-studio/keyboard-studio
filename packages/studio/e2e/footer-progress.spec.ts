@@ -103,7 +103,7 @@ test.describe("footer progress row (spec 057 US4/US6)", () => {
     // ---- An upcoming dot behind a gate is refused with a reason ------------
     // (FR-045, US4 scenario 9) — clicking a far-future stage must not skip
     // the walk's own gates. "help" (Phase F) is many stages ahead here.
-    const helpDot = footer(page).locator('button[aria-label*="Help"]').first();
+    const helpDot = footer(page).getByTestId("progress-dot-row").locator('button[aria-label*="Help"]').first();
     if (await helpDot.isVisible({ timeout: 2_000 }).catch(() => false)) {
       await helpDot.click();
       await expect(footer(page).getByRole("status")).toHaveText(/not yet reached/i, {

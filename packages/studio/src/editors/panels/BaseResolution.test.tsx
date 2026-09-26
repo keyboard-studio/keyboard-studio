@@ -30,8 +30,13 @@ beforeAll(() => {
 
 // Service mock — both BaseResolution and the embedded BaseKeyboardPicker load
 // bases via getBaseBrowserService().listAll().
+// `listAll` is overridable per test so the loading / error / empty states can
+// be reached (spec 081 FR-015); it resolves the sample catalog by default.
+const listAllOverride = vi.hoisted(() => ({ current: null as null | (() => Promise<BaseKeyboard[]>) }));
 vi.mock("../../lib/services.ts", () => ({
-  getBaseBrowserService: () => ({ listAll: () => Promise.resolve(sampleBaseKeyboards) }),
+  getBaseBrowserService: () => ({
+    listAll: () => (listAllOverride.current ?? (() => Promise.resolve(sampleBaseKeyboards)))(),
+  }),
   // spec 080 FR-008: defaults every base to "unknown" (no badge) unless a
   // test overrides it — see the "documentation badge" describe block below.
   getBaseDocProfile: vi.fn().mockResolvedValue({
@@ -63,6 +68,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  listAllOverride.current = null;
   _resetCorpusCacheForTesting();
   vi.clearAllMocks();
   useWorkingCopyStore.setState({ baseDocProfile: null });
@@ -109,7 +115,10 @@ function ControlledBaseResolution({
 function renderControlled(overrides: ControlledOverrides = {}) {
   const onPreview = overrides.onPreview ?? vi.fn();
   const onConfirm = overrides.onConfirm ?? vi.fn();
-  render(<ControlledBaseResolution {...overrides} onPreview={onPreview} onConfirm={onConfirm} />);
+  render(
+    <ControlledBaseResolution {...overrides} onPreview={onPreview} onConfirm={onConfirm} />,
+    { withStepNav: true },
+  );
   return { onPreview, onConfirm };
 }
 
@@ -135,14 +144,13 @@ describe("BaseResolution — search bar at the top", () => {
     expect(screen.getByTestId("search-scope-all").getAttribute("aria-pressed")).toBe("false");
   });
 
-  it("renders the Back button at the top, BEFORE the search combobox", async () => {
+  it("renders Back in the footer nav group (spec 081)", async () => {
     const onBack = vi.fn();
     renderControlled({ onBack });
-    const input = await waitForCombobox();
+    await waitForCombobox();
+    const nav = screen.getByRole("group", { name: "Step navigation" });
     const back = screen.getByTestId("base-back");
-    expect(
-      back.compareDocumentPosition(input) & Node.DOCUMENT_POSITION_FOLLOWING,
-    ).toBeTruthy();
+    expect(nav.contains(back)).toBe(true);
     fireEvent.click(back);
     expect(onBack).toHaveBeenCalledTimes(1);
   });
@@ -151,6 +159,52 @@ describe("BaseResolution — search bar at the top", () => {
     renderControlled();
     await waitForCombobox();
     expect(screen.queryByTestId("base-back")).toBeNull();
+  });
+});
+
+// spec 081 FR-015 / A-4: the loading, error and empty screens used to render no
+// Back at all, trapping an author who reached them by moving forward. Each now
+// publishes the same Back as the loaded state, and no Confirm (there is
+// nothing to confirm).
+describe("BaseResolution — Back in every render state (spec 081 FR-015)", () => {
+  function expectWorkingBack(onBack: ReturnType<typeof vi.fn>) {
+    const nav = screen.getByRole("group", { name: "Step navigation" });
+    const back = screen.getByTestId("base-back");
+    expect(nav.contains(back)).toBe(true);
+    expect(back.textContent).toBe("← Back");
+    expect(screen.queryByTestId("base-confirm")).toBeNull();
+    fireEvent.click(back);
+    expect(onBack).toHaveBeenCalledTimes(1);
+  }
+
+  it("the loading state offers Back", () => {
+    listAllOverride.current = () => new Promise<BaseKeyboard[]>(() => {});
+    const onBack = vi.fn();
+    renderControlled({ onBack });
+    expect(screen.getByText("Loading base keyboards...")).toBeTruthy();
+    expectWorkingBack(onBack);
+  });
+
+  it("the error state offers Back", async () => {
+    listAllOverride.current = () => Promise.reject(new Error("offline"));
+    const onBack = vi.fn();
+    renderControlled({ onBack });
+    await waitFor(() => screen.getByText("Could not load base keyboards."));
+    expectWorkingBack(onBack);
+  });
+
+  it("the empty-catalog state offers Back", async () => {
+    listAllOverride.current = () => Promise.resolve([]);
+    const onBack = vi.fn();
+    renderControlled({ onBack });
+    await waitFor(() => screen.getByText(/No base keyboards found/));
+    expectWorkingBack(onBack);
+  });
+
+  it("publishes nothing in the loading state when there is nowhere to go back to", () => {
+    listAllOverride.current = () => new Promise<BaseKeyboard[]>(() => {});
+    renderControlled();
+    expect(screen.queryByRole("group", { name: "Step navigation" })).toBeNull();
   });
 });
 

@@ -48,6 +48,7 @@ import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
 import { useStepWalkStore } from "../stores/stepWalkStore.ts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import { useReproposalNoticeStore } from "../stores/reproposalNoticeStore.ts";
+import { useStepNavStore, hasSlots } from "../stores/stepNavStore.ts";
 import { useWorkToDo } from "../hooks/useWorkToDo.ts";
 import { stepPositionIds } from "../lib/stepWalk.ts";
 import { manifest } from "../steps/manifest.ts";
@@ -61,6 +62,7 @@ import {
   type ProgressDot as ProgressDotData,
 } from "../decisions/progressDots.ts";
 import { ProgressDot } from "./ProgressDot.tsx";
+import { StepNavCluster } from "./StepNavCluster.tsx";
 import { CSS_BORDER, CSS_SURFACE, CSS_TEXT, CSS_TEXT_MUTED } from "../ui/theme.ts";
 
 export function StudioFooter() {
@@ -256,12 +258,17 @@ export function StudioFooter() {
   // the module header for why this is no longer `projectLabel !== null`.
   // Welcome is covered because `WelcomeScreen` resets the walk store and no
   // working copy is open there.
-  const journeyStarted = Object.keys(walks).length > 0 || projectLabel !== null;
+  // Spec 081 FR-021: a step that publishes Back / forward buttons needs the
+  // footer up to reach them, whatever else is true.
+  const activeHasNav = useStepNavStore((s) => hasSlots(s.entries[activeStepId]?.spec));
+  const journeyStarted =
+    Object.keys(walks).length > 0 || projectLabel !== null || activeHasNav;
   if (!journeyStarted) return null;
 
   return (
     <footer
       aria-label={t({ id: "footer.ariaLabel", message: "Project and progress" })}
+      className="ks-studio-footer"
       style={{
         display: "flex",
         alignItems: "center",
@@ -269,8 +276,9 @@ export function StudioFooter() {
         // Narrow: FR-040 forbids materially reducing the walk's vertical
         // space. Fixed height rather than content-driven, so the row never
         // grows the footer taller than this budget regardless of dot count —
-        // overflow is handled horizontally (below), not vertically.
-        height: 40,
+        // overflow is handled horizontally (below), not vertically. The height
+        // itself is on `.ks-studio-footer` (index.css): 40 px, or 52 px under a
+        // coarse pointer (spec 081 FR-020a), which an inline style cannot say.
         flexShrink: 0,
         padding: "0 12px",
         background: CSS_SURFACE,
@@ -285,12 +293,22 @@ export function StudioFooter() {
         boxSizing: "border-box",
       }}
     >
+      {/* Spec 081: the active step's Back / Skip / forward, first in the DOM
+          and in Tab order. Keyed on the step, so a step change remounts it and
+          focus never carries over from the previous step's buttons. It never
+          shrinks; the project label and then the dot row give way first. */}
+      <StepNavCluster key={`nav-${activeStepId}`} stepId={activeStepId} />
+
       {/* Omitted entirely, not placeholdered, while the project has no name —
           see the module header. The dot row simply takes the full width. */}
       {projectLabel !== null && (
         <span
+          className="ks-studio-footer-project"
           style={{
-            flexShrink: 0,
+            // First to give way when space runs short (spec 081 FR-022):
+            // ellipsis here, then hidden outright at narrow widths (index.css).
+            flexShrink: 1,
+            minWidth: 0,
             fontWeight: 600,
             color: CSS_TEXT,
             whiteSpace: "nowrap",
@@ -320,13 +338,18 @@ export function StudioFooter() {
         // DOM-node identity (and therefore focus) across an ACTIVE STEP
         // change is an acceptable trade — the author's focus was already
         // moving to the new step's own content at that exact moment.
-        key={activeStepId}
+        key={`dots-${activeStepId}`}
         ref={rowRef}
+        data-testid="progress-dot-row"
         style={{
           display: "flex",
           alignItems: "center",
           flex: 1,
-          minWidth: 0,
+          // Right-aligned after the nav cluster and label. Shrinks after the
+          // label does, down to a viewport that still shows the current mark
+          // (spec 081 FR-022); below that it scrolls, as before.
+          marginLeft: "auto",
+          minWidth: 48,
           // FR-047's overflow degrade: horizontal scroll rather than wrap or
           // silent truncation. Every mark stays reachable — by mouse drag,
           // by trackpad/wheel, or simply by Tab (focusing an off-screen

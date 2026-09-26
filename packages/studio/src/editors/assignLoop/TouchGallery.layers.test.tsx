@@ -213,7 +213,7 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
   it("renders a layer builder for #1 longpress, defaulting to the base layer (no slots, add available)", async () => {
     seedStore({ withInventory: ["ä"], ir: irWithShiftAndRaltLayers });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await openChooser(/long.press on a key/i);
@@ -231,7 +231,7 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
   it("renders a layer builder for #2 swipe/flick, defaulting to the base layer (no slots, add available)", async () => {
     seedStore({ withInventory: ["ä"], ir: irWithShiftAndRaltLayers });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await openChooser(/swipe a key \(flick\)/i);
@@ -247,7 +247,7 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
   it("renders the layer builder for #3 multitap too, defaulting to the base layer", async () => {
     seedStore({ withInventory: ["ä"], ir: irWithShiftAndRaltLayers });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await openChooser(/tap multiple times \(multitap\)/i);
@@ -264,7 +264,7 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
   it("renders the layer builder for #4 replace too, defaulting to the base layer", async () => {
     seedStore({ withInventory: ["ä"], ir: irWithShiftAndRaltLayers });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await openChooser(/replace a key/i);
@@ -281,7 +281,7 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
   it("slot 1 options reflect ONLY the combos the desktop keyboard actually uses", async () => {
     seedStore({ withInventory: ["ä"], ir: irWithShiftAndRaltLayers });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await openChooser(/long.press on a key/i);
@@ -303,7 +303,7 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
   it("a token appearing in no combo at all is never offered, even mid-build", async () => {
     seedStore({ withInventory: ["ä"], ir: irWithTwoShiftCombos });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await openChooser(/long.press on a key/i);
@@ -335,7 +335,7 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
   it("hides the add button once the selection has no legal extension toward any combo in D", async () => {
     seedStore({ withInventory: ["ä"], ir: irWithShiftDeadEnd });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await openChooser(/long.press on a key/i);
@@ -360,7 +360,7 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
   it("canApply blocks Apply on a partial combo, and applying a completed multi-token combo routes to that combined layer", async () => {
     seedStore({ withInventory: ["ä"], ir: irWithShiftRaltComboOnly });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await openChooser(/long.press on a key/i);
@@ -419,7 +419,7 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
   it("applying with a single-token layer selection (backward-compat with the single-select picker) routes the mechanism to that layer", async () => {
     seedStore({ withInventory: ["ä"], ir: irWithShiftAndRaltLayers });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await openChooser(/long.press on a key/i);
@@ -462,7 +462,7 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
   it("applying flick with a single-token layer selection routes the mechanism to that layer", async () => {
     seedStore({ withInventory: ["ä"], ir: irWithShiftAndRaltLayers });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await openChooser(/swipe a key \(flick\)/i);
@@ -510,7 +510,7 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
   it("canApply blocks flick's Apply on a partial combo, and applying a completed multi-token combo routes to that combined layer", async () => {
     seedStore({ withInventory: ["ä"], ir: irWithShiftRaltComboOnly });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await openChooser(/swipe a key \(flick\)/i);
@@ -575,7 +575,7 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
   it("canApply blocks multitap's Apply on a partial combo, and applying a completed multi-token combo routes to that combined layer", async () => {
     seedStore({ withInventory: ["ä"], ir: irWithShiftRaltComboOnly });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await openChooser(/tap multiple times \(multitap\)/i);
@@ -633,7 +633,7 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
   it("canApply blocks replace's Apply on a partial combo, and applying a completed multi-token combo routes to that combined layer", async () => {
     seedStore({ withInventory: ["ä"], ir: irWithShiftRaltComboOnly });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await openChooser(/replace a key/i);
@@ -693,7 +693,7 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
   it("multitap applies on the untouched default (base) layer when the builder is left alone", async () => {
     seedStore({ withInventory: ["ä"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await openChooser(/tap multiple times \(multitap\)/i);
@@ -723,7 +723,7 @@ describe("TouchGallery — touch layer BUILDER (all four methods)", () => {
   it("replace applies on the untouched default (base) layer when the builder is left alone", async () => {
     seedStore({ withInventory: ["ä"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await openChooser(/replace a key/i);
@@ -775,7 +775,7 @@ describe("TouchGallery — uppercase current char (spec 074 FR-006 layer-picker 
     // trivially (it must use SHIFT to produce them on desktop too).
     seedStore({ withInventory: ["Á"], ir: irWithShiftAndRaltLayers });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     const denyBtn =
@@ -831,7 +831,7 @@ describe("TouchGallery — uppercase current char (spec 074 FR-006 layer-picker 
   it("shows the not-yet-valid note when the case-derived SHIFT seed is not itself a combo the desktop uses, and Apply re-enables once the seeded slot is removed", async () => {
     seedStore({ withInventory: ["Á"], ir: irWithoutShiftCombo });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     const denyBtn =
@@ -928,7 +928,7 @@ describe("TouchGallery — case-pair proposal on a non-default touch layer", () 
   it("offers the capital on the combo-plus-SHIFT layer when editing the RAlt layer", async () => {
     seedStore({ withInventory: ["θ"], ir: irWithRaltAndShiftRalt });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await denyAnySuggestion();
@@ -971,7 +971,7 @@ describe("TouchGallery — case-pair proposal on a non-default touch layer", () 
     // propose a placement onto a layer that isn't there.
     seedStore({ withInventory: ["θ"], ir: irWithShiftAndRaltLayers });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await denyAnySuggestion();
@@ -994,7 +994,7 @@ describe("TouchGallery — case-pair proposal on a non-default touch layer", () 
     // because the shift layer always exists (scaffolder's fixed buckets).
     seedStore({ withInventory: ["θ"], ir: irWithoutShiftCombo });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await denyAnySuggestion();
@@ -1048,7 +1048,7 @@ describe("TouchGallery — case-pair proposal on a non-default touch layer", () 
     // asymmetry is deliberate and both call sites must honour it.
     seedStore({ withInventory: ["ă"], ir: irWithoutShiftCombo });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await acceptSuggestion();
@@ -1073,7 +1073,7 @@ describe("TouchGallery — case-pair proposal on a non-default touch layer", () 
     // default IR; the case-pair half is what is asserted here.)
     seedStore({ withInventory: ["Ă"], ir: irWithShiftAndRaltLayers });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await acceptSuggestion();
@@ -1093,7 +1093,7 @@ describe("TouchGallery — case-pair proposal on a non-default touch layer", () 
     // compound Accept case becomes real and needs its own coverage here.
     seedStore({ withInventory: ["ă"], ir: irWithRaltAndShiftRalt });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     const acceptBtn = () =>

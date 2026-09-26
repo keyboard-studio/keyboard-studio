@@ -33,7 +33,7 @@ describe("TouchGallery — empty inventory guard", () => {
   it("renders the no-inventory prompt when confirmedInventory is empty", async () => {
     seedStore();
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
     // With empty inventory the component renders a guard message and no OSK.
     expect(screen.getByText(/No characters in inventory yet/i)).toBeTruthy();
@@ -49,7 +49,7 @@ describe("TouchGallery — heading", () => {
   it("renders 'Touch Gallery' as the main heading with 'Touch' subheading", async () => {
     seedStore({ withInventory: ["ä"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
     // The h1 contains both "Touch Gallery" and the "Touch" span as a child.
     const h1 = screen.getByRole("heading", { level: 1 });
@@ -67,7 +67,7 @@ describe("TouchGallery — intro splash", () => {
     seedStore({ withInventory: ["ä"], intro: true });
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // Intro is visible; the per-character gallery is not yet shown.
@@ -89,10 +89,55 @@ describe("TouchGallery — intro splash", () => {
     seedStore({ withInventory: ["ä"] });
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     expect(screen.queryByText(/Welcome to the Touch Gallery/i)).toBeNull();
     expect(screen.queryAllByText(/Touch mapping/i).length).toBeGreaterThan(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Nav publisher ownership (spec 081 T034) — TouchGallery must not publish its
+// own step nav while it renders GalleryIntroSplash or GalleryEmptyState;
+// those already publish theirs. Exactly one Back handle should reach the
+// footer in either state.
+// ---------------------------------------------------------------------------
+
+describe("TouchGallery — nav publisher ownership", () => {
+  it("splash state: exactly one Back, using the splash's own handle", async () => {
+    seedStore({ withInventory: ["ä"], intro: true });
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, {
+        withStepNav: true,
+      });
+    });
+
+    expect(screen.getByTestId("gallery-intro-back")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: /back/i })).toHaveLength(1);
+    expect(errorSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining("a second component tried to publish"),
+    );
+    errorSpy.mockRestore();
+  });
+
+  it("empty-inventory state: exactly one Back, using the empty state's own handle", async () => {
+    seedStore();
+    const errorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, {
+        withStepNav: true,
+      });
+    });
+
+    expect(screen.getByTestId("gallery-empty-back")).toBeTruthy();
+    expect(screen.getAllByRole("button", { name: /back/i })).toHaveLength(1);
+    expect(errorSpy).not.toHaveBeenCalledWith(
+      expect.stringContaining("a second component tried to publish"),
+    );
+    errorSpy.mockRestore();
   });
 });

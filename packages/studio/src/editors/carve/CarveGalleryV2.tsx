@@ -25,6 +25,7 @@ import { DiscardIcon, ChevronIcon } from '../assignLoop/parts/carveShared.tsx';
 import { RemovedDropdown } from '../assignLoop/parts/StatusBar.tsx';
 import type { RemovedItem } from '../assignLoop/parts/StatusBar.tsx';
 import { useCarveNeededSet } from '../../hooks/useCarveNeededSet.ts';
+import { usePublishStepNav } from '../../hooks/usePublishStepNav.ts';
 
 interface CarveGalleryV2Props {
   onComplete: () => void;
@@ -648,10 +649,46 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     [cellsByCh, cells, selectedCh],
   );
 
+  // Back / Skip / Continue live in the footer (spec 081). Publish
+  // unconditionally, before the `!ir` loading return below. Back is offered in
+  // the loading state too (FR-015): the author reached it by moving forward.
+  // Skip and Continue wait for the IR — there is nothing to keep or carve yet.
+  // The nav ids are the ones Carve v1 used, restored so their existing
+  // translations come back (FR-044).
+  const backAction =
+    onBack !== undefined
+      ? {
+          back: {
+            label: t({ id: 'editor.carve.backButton', message: '← Back' }),
+            onClick: onBack,
+            testId: 'carve-back',
+          },
+        }
+      : {};
+  usePublishStepNav(
+    !ir
+      ? backAction
+      : {
+          ...backAction,
+          secondary: {
+            label: t({ id: 'editor.carve.skipButton', message: 'Skip' }),
+            onClick: () => { keepAll(); onComplete(); },
+            testId: 'carve-skip',
+          },
+          forward: {
+            label: t({ id: 'editor.carve.continueButton', message: 'Continue →' }),
+            onClick: onComplete,
+            testId: 'carve-continue',
+          },
+        },
+  );
+
   if (!ir) {
     return (
       <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--app-bg)', color: 'var(--app-text)' }}>
-        <p style={{ fontSize: 14, color: 'var(--app-text-muted)' }}>Loading keyboard…</p>
+        <p style={{ fontSize: 14, color: 'var(--app-text-muted)' }}>
+          {t({ id: 'editor.carve.loadingKeyboard', message: 'Loading keyboard…' })}
+        </p>
       </div>
     );
   }
@@ -663,14 +700,6 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     <div data-testid="carve-gallery" style={{ height: '100%', display: 'flex', flexDirection: 'column', background: 'var(--app-bg)', color: 'var(--app-text)' }}>
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, padding: '14px 22px', borderBottom: '1px solid var(--app-border)', flexShrink: 0 }}>
-        {onBack !== undefined && (
-          <button
-            onClick={onBack}
-            style={{ font: '600 13px var(--app-font)', cursor: 'pointer', color: 'var(--app-text-muted)', background: 'transparent', border: 'none', padding: '4px 0', whiteSpace: 'nowrap' }}
-          >
-            ← Back
-          </button>
-        )}
         <div style={{ flex: 1 }}>
           <h1 style={{ margin: 0, font: "500 23px/1.1 'Playfair Display', serif", color: 'var(--app-text)' }}>
             Everything this keyboard can type
@@ -679,19 +708,6 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
             Every printable character your base keyboard can produce, in one panel. Click any character to discard it — nothing is deleted until you continue.
           </p>
         </div>
-        <button
-          onClick={() => { keepAll(); onComplete(); }}
-          style={{ font: '600 13px var(--app-font)', cursor: 'pointer', color: 'var(--app-text-muted)', background: 'transparent', border: '1px solid var(--app-border-strong)', borderRadius: 8, padding: '7px 13px', whiteSpace: 'nowrap', marginRight: 6 }}
-        >
-          Skip
-        </button>
-        <button
-          data-testid="carve-continue"
-          onClick={onComplete}
-          style={{ font: '600 13px var(--app-font)', cursor: 'pointer', color: 'var(--app-text-on-accent)', background: 'var(--app-accent)', border: 'none', borderRadius: 8, padding: '9px 18px' }}
-        >
-          Continue →
-        </button>
       </div>
 
       {/* Status strip */}

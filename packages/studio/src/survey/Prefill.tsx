@@ -14,8 +14,6 @@ import type { BaseKeyboard } from "@keyboard-studio/contracts";
 import type { IdentityLiteResult } from "./IdentityLite.tsx";
 import type { FiredQuestion } from "../adaptation/firing.ts";
 import {
-  secondaryButton,
-  primaryButton,
   surveyCard,
   surveyPageColumn,
   phaseHeading,
@@ -27,6 +25,7 @@ import { CSS_TEXT_SUBTLE } from "../ui/theme.ts";
 import { handleEnterToAdvance } from "./enterToAdvance.ts";
 import { resolveMessage } from "../lib/i18nResolve.ts";
 import { resolveContentString } from "../lib/contentI18n.ts";
+import { usePublishStepNav } from "../hooks/usePublishStepNav.ts";
 
 /** One labelled confirmation row in the prefill summary. */
 export interface PrefillRow {
@@ -120,8 +119,26 @@ export interface PrefillProps {
 }
 
 export function Prefill({ identity, base, onConfirm, onBack }: PrefillProps) {
-  const { i18n } = useLingui();
+  const { t, i18n } = useLingui();
   const rows = buildPrefillRows(identity, base, i18n);
+
+  // Back / Confirm render in the footer (spec 081).
+  usePublishStepNav({
+    ...(onBack !== undefined
+      ? {
+          back: {
+            label: t({ id: "survey.prefill.backButton", message: "← Back" }),
+            onClick: onBack,
+            testId: "prefill-back",
+          },
+        }
+      : {}),
+    forward: {
+      label: t({ id: "survey.prefill.confirmButton", message: "Confirm and continue" }),
+      onClick: onConfirm,
+      testId: "prefill-confirm",
+    },
+  });
 
   // Enter-to-advance (issue #536): this step is a pure confirmation screen
   // (no free-text field to disambiguate against), so plain Enter anywhere in
@@ -188,32 +205,6 @@ export function Prefill({ identity, base, onConfirm, onBack }: PrefillProps) {
             confirmed later from your base keyboard and the documentation step.
           </Trans>
         </p>
-      </div>
-
-      {/* Nav row (epic #533): ghost Back left, flex:1 spacer, primary Confirm
-          right — the same shape as SurveyRunner's nav row below its card. */}
-      <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 22 }}>
-        {onBack !== undefined && (
-          <button
-            type="button"
-            data-testid="prefill-back"
-            onClick={onBack}
-            className="ks-focus-ring ks-hit-target"
-            style={secondaryButton}
-          >
-            <Trans id="survey.prefill.backButton">← Back</Trans>
-          </button>
-        )}
-        <div aria-hidden="true" style={{ flex: 1 }} />
-        <button
-          type="button"
-          data-testid="prefill-confirm"
-          onClick={onConfirm}
-          className="ks-focus-ring ks-hit-target"
-          style={primaryButton(false)}
-        >
-          <Trans id="survey.prefill.confirmButton">Confirm and continue</Trans>
-        </button>
       </div>
     </div>
   );

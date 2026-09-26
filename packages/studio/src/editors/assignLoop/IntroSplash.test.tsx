@@ -21,7 +21,7 @@ function renderSplash(overrides: Partial<Parameters<typeof GalleryIntroSplash>[0
     onStart: vi.fn(),
     ...overrides,
   };
-  render(<GalleryIntroSplash {...props} />);
+  render(<GalleryIntroSplash {...props} />, { withStepNav: true });
   return props;
 }
 
@@ -47,6 +47,13 @@ describe("GalleryIntroSplash", () => {
     const backBtn = screen.getByRole("button", { name: /back to the previous step/i });
     fireEvent.click(backBtn);
     expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it("puts Back and Get started in the footer nav under their handles", () => {
+    renderSplash({ onBack: vi.fn() });
+    const nav = screen.getByRole("group", { name: "Step navigation" });
+    expect(nav.contains(screen.getByTestId("gallery-intro-back"))).toBe(true);
+    expect(nav.contains(screen.getByTestId("gallery-intro-start"))).toBe(true);
   });
 
   it("omits the Back button when onBack is not provided", () => {

@@ -38,6 +38,7 @@ import { deriveCharacterFlags, ADDITION_ANSWER_PREFIX, CHARACTERS_BUILD_LIST_SCR
 import { reproposalCueMessage } from "./reproposalReason.ts";
 import { FlaggedAnswersList } from "../components/FlaggedAnswersList.tsx";
 import { useGlyphFontStack } from "./useGlyphFontStack.ts";
+import { usePublishStepNav } from "../hooks/usePublishStepNav.ts";
 import {
   nfcDedup,
   harvestChars,
@@ -774,6 +775,63 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
   // an author who typed their whole alphabet by hand has nothing to confirm.
   const hasProposedChars = Object.values(provenance).some((p) => p !== "author");
 
+  function handleDone(): void {
+    // spec 079 US3 T080/FR-041: re-stamp every flagged addition with
+    // the CURRENT evidence key on Done — the author has seen the
+    // alphabet (and this cue) in full, so this is the confirm/keep
+    // action that clears the flag, mirroring marks' station Next.
+    for (const f of flaggedAnswers) {
+      const grapheme = f.answerId.slice(ADDITION_ANSWER_PREFIX.length);
+      saveCharacterAnswer("characters", f.answerId, {
+        value: grapheme,
+        answerType: "char-list",
+        origin: "confirmed",
+        stage: "confirmed",
+        evidenceKey: alphabetEvidenceKey ?? null,
+        screenId: CHARACTERS_BUILD_LIST_SCREEN_ID,
+      });
+    }
+    // Record both cases (spec 047 FR-009): augment the captured
+    // inventory with each cased letter's locale-correct counterpart via
+    // the engine's caseCounterpart, deduped. A null counterpart
+    // (caseless script, or a multi-character expansion like ß→SS)
+    // contributes nothing (FR-010).
+    const derivedUppercases = chars
+      .map((c) => caseCounterpart(c, context.bcp47_tag)?.counterpart)
+      .filter((u): u is string => u != null);
+    onComplete({
+      phase: "B",
+      answers: [],
+      confirmedInventory: nfcDedup(chars, derivedUppercases),
+      // Alongside the inventory, never inside it: the cluster's own
+      // letters are already in `chars`, so a keyboard needs no extra
+      // key for "dz" — this is the record that d+z also form a unit.
+      ...(exemplarDigraphs.length > 0 ? { attestedDigraphs: exemplarDigraphs } : {}),
+    });
+  }
+
+  // Back / Done render in the footer (spec 081); this screen is the step's
+  // only publisher while it is shown.
+  usePublishStepNav({
+    back: {
+      label: t({ id: "survey.phaseB.buildList.backButton", message: "Back" }),
+      onClick: onBack,
+      testId: "phase-b-back",
+    },
+    forward: {
+      label: t({
+        id: "survey.phaseB.buildList.doneButton",
+        message: plural(chars.length, {
+          one: "Done (# character)",
+          other: "Done (# characters)",
+        }),
+      }),
+      onClick: handleDone,
+      testId: "phase-b-done",
+      disabled: doneDisabled,
+    },
+  });
+
   return (
     <div
       style={{
@@ -785,15 +843,6 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
         color: TEXT_MAIN,
       }}
     >
-      {/* Back */}
-      <button
-        type="button"
-        onClick={onBack}
-        style={{ alignSelf: "flex-start", ...secondaryButton }}
-      >
-        <Trans id="survey.phaseB.buildList.backButton">Back</Trans>
-      </button>
-
       {/* Heading — swaps once something has been PROPOSED into the draft
           (spec 044 FR-016c): the author's job changes from producing an
           alphabet to checking one. The confirm action itself is unchanged, and
@@ -905,59 +954,6 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
           <FlaggedAnswersList stepId="characters" items={flaggedWorkItems} />
         </div>
       )}
-
-      {/* Footer: Done */}
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <button
-          type="button"
-          data-testid="phase-b-done"
-          disabled={doneDisabled}
-          onClick={() => {
-            // spec 079 US3 T080/FR-041: re-stamp every flagged addition with
-            // the CURRENT evidence key on Done — the author has seen the
-            // alphabet (and this cue) in full, so this is the confirm/keep
-            // action that clears the flag, mirroring marks' station Next.
-            for (const f of flaggedAnswers) {
-              const grapheme = f.answerId.slice(ADDITION_ANSWER_PREFIX.length);
-              saveCharacterAnswer("characters", f.answerId, {
-                value: grapheme,
-                answerType: "char-list",
-                origin: "confirmed",
-                stage: "confirmed",
-                evidenceKey: alphabetEvidenceKey ?? null,
-                screenId: CHARACTERS_BUILD_LIST_SCREEN_ID,
-              });
-            }
-            // Record both cases (spec 047 FR-009): augment the captured
-            // inventory with each cased letter's locale-correct counterpart via
-            // the engine's caseCounterpart, deduped. A null counterpart
-            // (caseless script, or a multi-character expansion like ß→SS)
-            // contributes nothing (FR-010).
-            const derivedUppercases = chars
-              .map((c) => caseCounterpart(c, context.bcp47_tag)?.counterpart)
-              .filter((u): u is string => u != null);
-            onComplete({
-              phase: "B",
-              answers: [],
-              confirmedInventory: nfcDedup(chars, derivedUppercases),
-              // Alongside the inventory, never inside it: the cluster's own
-              // letters are already in `chars`, so a keyboard needs no extra
-              // key for "dz" — this is the record that d+z also form a unit.
-              ...(exemplarDigraphs.length > 0 ? { attestedDigraphs: exemplarDigraphs } : {}),
-            });
-          }}
-          className="ks-focus-ring ks-hit-target"
-          style={primaryButton(doneDisabled)}
-        >
-          {t({
-            id: "survey.phaseB.buildList.doneButton",
-            message: plural(chars.length, {
-              one: "Done (# character)",
-              other: "Done (# characters)",
-            }),
-          })}
-        </button>
-      </div>
     </div>
   );
 }
@@ -1450,6 +1446,25 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
     onChoose(selected as DiscoveryMethod);
   }
 
+  // Back / Continue render in the footer (spec 081); this screen is the
+  // step's only publisher while it is shown.
+  usePublishStepNav({
+    ...(onBack !== undefined
+      ? {
+          back: {
+            label: t({ id: "survey.phaseB.intro.backButton", message: "Back" }),
+            onClick: onBack,
+            testId: "phase-b-intro-back",
+          },
+        }
+      : {}),
+    forward: {
+      label: t({ id: "survey.phaseB.intro.continueButton", message: "Continue" }),
+      onClick: handleContinue,
+      testId: "phase-b-intro-next",
+    },
+  });
+
   return (
     <div
       style={{
@@ -1486,28 +1501,6 @@ function IntroChooser({ context, onChoose, onBack }: IntroChooserProps) {
         onChange={(v) => setSelected(v as IntroChoice)}
         ariaLabelledby="discovery-method-label"
       />
-
-      <div style={{ display: "flex", gap: 8 }}>
-        {onBack !== undefined && (
-          <button
-            type="button"
-            onClick={onBack}
-            className="ks-focus-ring ks-hit-target"
-            style={secondaryButton}
-          >
-            <Trans id="survey.phaseB.intro.backButton">Back</Trans>
-          </button>
-        )}
-        <button
-          type="button"
-          data-testid="phase-b-intro-next"
-          onClick={handleContinue}
-          className="ks-focus-ring ks-hit-target"
-          style={primaryButton(false)}
-        >
-          <Trans id="survey.phaseB.intro.continueButton">Continue</Trans>
-        </button>
-      </div>
     </div>
   );
 }

@@ -13,7 +13,7 @@
 // synthesizing a click.
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { cleanup, screen } from "@testing-library/react";
+import { act, cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { makeBaseKeyboard } from "@keyboard-studio/contracts";
 import { render } from "../test/renderWithI18n.tsx";
@@ -23,6 +23,7 @@ import { useDecisionLogStore } from "../decisions/decisionLogStore.ts";
 import { useStepWalkStore } from "../stores/stepWalkStore.ts";
 import { useSurveyAnswerStore } from "../stores/surveyAnswerStore.ts";
 import { useReproposalNoticeStore } from "../stores/reproposalNoticeStore.ts";
+import { useStepNavStore, type StepNavSpec } from "../stores/stepNavStore.ts";
 import { charToPositionToken } from "../lib/stepWalk.ts";
 import { StudioFooter } from "./StudioFooter.tsx";
 
@@ -631,5 +632,139 @@ describe("StudioFooter — §5 jump target (badged vs. unbadged collapsed sectio
     await user.keyboard(" ");
 
     expect(useSurveyAnswerStore.getState().steps["marks"]?.position).toBe(SAVED_POSITION);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Spec 081: the active step's Back / Skip / forward buttons, published through
+// stepNavStore and rendered first in the footer (FR-002, FR-030, FR-034, FR-052).
+// ---------------------------------------------------------------------------
+
+const noop = (): void => {};
+
+function publishNav(spec: StepNavSpec, stepId = "characters"): void {
+  useStepNavStore.getState().publish(stepId, "test-owner", spec);
+}
+
+const FULL_SPEC: StepNavSpec = {
+  back: { label: "← Back", onClick: noop, testId: "demo-back" },
+  secondary: { label: "Skip", onClick: noop, testId: "demo-skip" },
+  forward: { label: "Continue →", onClick: noop, testId: "demo-continue" },
+};
+
+describe("StudioFooter — step nav cluster (spec 081)", () => {
+  it("renders a group named 'Step navigation' holding the published buttons", () => {
+    publishNav(FULL_SPEC);
+    render(<StudioFooter />);
+    const group = screen.getByRole("group", { name: "Step navigation" });
+    expect(group.getAttribute("data-testid")).toBe("step-nav");
+    expect(group.querySelectorAll("button")).toHaveLength(3);
+  });
+
+  it("orders back, secondary, forward, then the project label, then the dot row", () => {
+    publishNav(FULL_SPEC);
+    const { container } = render(<StudioFooter />);
+    const footer = container.querySelector("footer")!;
+    const order = [
+      screen.getByTestId("demo-back"),
+      screen.getByTestId("demo-skip"),
+      screen.getByTestId("demo-continue"),
+      screen.getByText(/^Project: French$/),
+      screen.getByTestId("progress-dot-row"),
+    ];
+    for (let i = 1; i < order.length; i++) {
+      const relation = order[i - 1]!.compareDocumentPosition(order[i]!);
+      expect(relation & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+    expect(footer.contains(order[0]!)).toBe(true);
+  });
+
+  it("renders only the slots that are present, with no placeholder", () => {
+    publishNav({ forward: FULL_SPEC.forward! });
+    render(<StudioFooter />);
+    const group = screen.getByRole("group", { name: "Step navigation" });
+    expect(group.querySelectorAll("button")).toHaveLength(1);
+    expect(screen.queryByTestId("demo-back")).toBeNull();
+  });
+
+  it("renders no group for an empty spec", () => {
+    publishNav({});
+    render(<StudioFooter />);
+    expect(screen.queryByRole("group", { name: "Step navigation" })).toBeNull();
+  });
+
+  it("renders no group for an entry published under another step", () => {
+    publishNav(FULL_SPEC, "identity");
+    render(<StudioFooter />);
+    expect(screen.queryByTestId("step-nav")).toBeNull();
+  });
+
+  it("passes disabled and aria-describedby through to the button", () => {
+    publishNav({
+      forward: {
+        label: "Continue →",
+        onClick: noop,
+        testId: "demo-continue",
+        disabled: true,
+        ariaDescribedBy: "demo-hint",
+      },
+    });
+    render(<StudioFooter />);
+    const forward = screen.getByTestId("demo-continue") as HTMLButtonElement;
+    expect(forward.disabled).toBe(true);
+    expect(forward.getAttribute("aria-describedby")).toBe("demo-hint");
+  });
+
+  it("Tab reaches the nav buttons before any dot", async () => {
+    publishNav(FULL_SPEC);
+    const user = userEvent.setup();
+    render(<StudioFooter />);
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByTestId("demo-back"));
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByTestId("demo-skip"));
+    await user.tab();
+    expect(document.activeElement).toBe(screen.getByTestId("demo-continue"));
+    await user.tab();
+    const row = screen.getByTestId("progress-dot-row");
+    expect(row.contains(document.activeElement)).toBe(true);
+  });
+
+  it("keeps exactly one role=status region and adds no other live region", () => {
+    publishNav(FULL_SPEC);
+    const { container } = render(<StudioFooter />);
+    expect(screen.getAllByRole("status")).toHaveLength(1);
+    expect(container.querySelectorAll("[aria-live]")).toHaveLength(1);
+  });
+
+  it("a STEP change remounts the cluster, so focus is not carried into the next step (FR-032)", async () => {
+    const user = userEvent.setup();
+    publishNav({ forward: FULL_SPEC.forward! }, "characters");
+    render(<StudioFooter />);
+    const outgoing = screen.getByTestId("demo-continue");
+    await user.click(outgoing);
+    expect(document.activeElement).toBe(outgoing);
+
+    act(() => {
+      publishNav(
+        { forward: { label: "Continue →", onClick: noop, testId: "demo-continue" } },
+        "punctuation",
+      );
+      useSurveySessionStore.setState({ activeStepId: "punctuation" });
+    });
+
+    const incoming = screen.getByTestId("demo-continue");
+    expect(incoming).not.toBe(outgoing);
+    expect(outgoing.isConnected).toBe(false);
+    expect(document.activeElement).not.toBe(incoming);
+  });
+
+  it("shows the footer when only a nav cluster is published (FR-021)", () => {
+    seedNothing();
+    useSurveySessionStore.setState({ activeStepId: "identity", history: [] });
+    publishNav({ forward: FULL_SPEC.forward! }, "identity");
+    const { container } = render(<StudioFooter />);
+    expect(container.querySelector("footer")).not.toBeNull();
+    expect(screen.getByTestId("demo-continue")).toBeTruthy();
   });
 });

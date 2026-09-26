@@ -19,7 +19,8 @@
 
 import { describe, it, expect, afterEach, vi } from 'vitest';
 import { act, cleanup, fireEvent, screen, waitFor, within } from '@testing-library/react';
-import { render } from '../../test/renderWithI18n.tsx';
+import { render, i18n } from '../../test/renderWithI18n.tsx';
+import { messages as frMessages } from '../../locales/fr/messages.json?lingui';
 import type { IRRule, IRGroup, IRStore, KeyboardIR, RemovalCapability, PlacementWorklist } from '@keyboard-studio/contracts';
 import { createVirtualFS } from '@keyboard-studio/contracts';
 import { basicKbdus } from '@keyboard-studio/contracts/fixtures';
@@ -755,5 +756,76 @@ describe('CarveGalleryV2 — leave and return (spec 079 FR-051, T029)', () => {
     expect(
       screen.getByRole('button', { name: 'a — U+0061, discarded' }).getAttribute('aria-pressed'),
     ).toBe('true');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 081 — Carve's nav in the footer: a Back in the loading state (FR-015,
+// A-4), and the nav + loading strings localised under the restored Carve v1
+// catalog ids (FR-044, US5 scenario 4).
+// ---------------------------------------------------------------------------
+
+describe('CarveGalleryV2 — footer nav (spec 081)', () => {
+  afterEach(() => {
+    i18n.activate('en');
+  });
+
+  it('the loading state offers a working Back, and no Skip or Continue', () => {
+    useWorkingCopyStore.getState().reset();
+    const onBack = vi.fn();
+    render(<CarveGalleryV2 onComplete={vi.fn()} onBack={onBack} />, { withStepNav: true });
+
+    expect(screen.getByText('Loading keyboard…')).not.toBeNull();
+    const nav = screen.getByRole('group', { name: 'Step navigation' });
+    const back = screen.getByTestId('carve-back');
+    expect(nav.contains(back)).toBe(true);
+    expect(screen.queryByTestId('carve-skip')).toBeNull();
+    expect(screen.queryByTestId('carve-continue')).toBeNull();
+    fireEvent.click(back);
+    expect(onBack).toHaveBeenCalledTimes(1);
+  });
+
+  it('the loading state publishes nothing when there is nowhere to go back to', () => {
+    useWorkingCopyStore.getState().reset();
+    render(<CarveGalleryV2 onComplete={vi.fn()} />, { withStepNav: true });
+    expect(screen.queryByRole('group', { name: 'Step navigation' })).toBeNull();
+  });
+
+  it('renders Back, Skip and Continue in the footer once the keyboard has loaded', () => {
+    mockFixtureContributors();
+    const vfs = createVirtualFS();
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir: makeFixtureIR(), removalCapabilities: new Map() });
+    render(<CarveGalleryV2 onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
+
+    const nav = screen.getByRole('group', { name: 'Step navigation' });
+    expect(within(nav).getByTestId('carve-back').textContent).toBe('← Back');
+    expect(within(nav).getByTestId('carve-skip').textContent).toBe('Skip');
+    expect(within(nav).getByTestId('carve-continue').textContent).toBe('Continue →');
+  });
+
+  it('shows the French nav labels under the fr locale', () => {
+    mockFixtureContributors();
+    const vfs = createVirtualFS();
+    useWorkingCopyStore.getState().instantiateFromExisting(basicKbdus, { vfs, ir: makeFixtureIR(), removalCapabilities: new Map() });
+    i18n.load('fr', frMessages);
+    act(() => {
+      i18n.activate('fr');
+    });
+    render(<CarveGalleryV2 onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
+
+    expect(screen.getByTestId('carve-back').textContent).toBe('← Retour');
+    expect(screen.getByTestId('carve-skip').textContent).toBe('Passer');
+    expect(screen.getByTestId('carve-continue').textContent).toBe('Continuer →');
+  });
+
+  it('shows the French loading text under the fr locale', () => {
+    useWorkingCopyStore.getState().reset();
+    i18n.load('fr', frMessages);
+    act(() => {
+      i18n.activate('fr');
+    });
+    render(<CarveGalleryV2 onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
+    expect(screen.getByText('Chargement du clavier…')).not.toBeNull();
+    expect(screen.getByTestId('carve-back').textContent).toBe('← Retour');
   });
 });

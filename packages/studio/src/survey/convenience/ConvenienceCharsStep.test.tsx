@@ -153,7 +153,7 @@ describe("ConvenienceCharsStep — not-applicable (computed, never rendered)", (
     // genuinely no-surplus base, known evidence.
     seedWorkingCopy(["a", "A"], ["a"]);
     const onComplete = vi.fn();
-    render(<ConvenienceCharsStep onComplete={onComplete} />);
+    render(<ConvenienceCharsStep onComplete={onComplete} />, { withStepNav: true });
 
     await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
     expect(screen.queryByTestId("convenience-chars")).toBeNull();
@@ -166,7 +166,7 @@ describe("ConvenienceCharsStep — not-applicable (computed, never rendered)", (
   it("writes a not-asked status with reason and evidence key, and appends no decision entry (FR-065)", async () => {
     seedWorkingCopy(["a", "A"], ["a"]);
     const onComplete = vi.fn();
-    render(<ConvenienceCharsStep onComplete={onComplete} />);
+    render(<ConvenienceCharsStep onComplete={onComplete} />, { withStepNav: true });
 
     await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1));
     const result = onComplete.mock.calls[0]?.[0] as SurveyPhaseResult;
@@ -190,7 +190,7 @@ describe("ConvenienceCharsStep — not-applicable (computed, never rendered)", (
     useSurveySessionStore.getState().advance("carve");
     useSurveySessionStore.getState().popHistory();
 
-    render(<ConvenienceCharsStep onComplete={onComplete} onBack={onBack} />);
+    render(<ConvenienceCharsStep onComplete={onComplete} onBack={onBack} />, { withStepNav: true });
 
     await waitFor(() => expect(onBack).toHaveBeenCalledTimes(1));
     expect(onComplete).not.toHaveBeenCalled();
@@ -201,7 +201,7 @@ describe("ConvenienceCharsStep — unknown evidence (FR-064: renders, never skip
   it("renders the gap explanation instead of skipping when no orthography signal exists yet", async () => {
     seedInstantiatedNoAlphabet();
     const onComplete = vi.fn();
-    render(<ConvenienceCharsStep onComplete={onComplete} />);
+    render(<ConvenienceCharsStep onComplete={onComplete} />, { withStepNav: true });
 
     await screen.findByTestId("convenience-chars");
     expect(screen.getByTestId("convenience-unknown-notice")).not.toBeNull();
@@ -213,7 +213,7 @@ describe("ConvenienceCharsStep — unknown evidence (FR-064: renders, never skip
   it("is completable: Continue finishes the step with nothing retained", async () => {
     seedInstantiatedNoAlphabet();
     const onComplete = vi.fn();
-    render(<ConvenienceCharsStep onComplete={onComplete} />);
+    render(<ConvenienceCharsStep onComplete={onComplete} />, { withStepNav: true });
     await screen.findByTestId("convenience-chars");
 
     fireEvent.click(screen.getByTestId("convenience-continue"));
@@ -228,13 +228,22 @@ describe("ConvenienceCharsStep — unknown evidence (FR-064: renders, never skip
     seedInstantiatedNoAlphabet();
     const onComplete = vi.fn();
     const onBack = vi.fn();
-    render(<ConvenienceCharsStep onComplete={onComplete} onBack={onBack} />);
+    render(<ConvenienceCharsStep onComplete={onComplete} onBack={onBack} />, { withStepNav: true });
     await screen.findByTestId("convenience-chars");
 
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
 
     expect(onBack).toHaveBeenCalledTimes(1);
     expect(onComplete).not.toHaveBeenCalled();
+  });
+
+  it("renders no Back at all when there is nowhere to go back to (spec 081 FR-015)", async () => {
+    seedInstantiatedNoAlphabet();
+    render(<ConvenienceCharsStep onComplete={vi.fn()} />, { withStepNav: true });
+    await screen.findByTestId("convenience-chars");
+
+    expect(screen.queryByTestId("convenience-back")).toBeNull();
+    expect(screen.getByTestId("convenience-continue")).toBeTruthy();
   });
 });
 
@@ -243,7 +252,7 @@ describe("ConvenienceCharsStep — the question", () => {
   async function renderQuestion(): Promise<ReturnType<typeof vi.fn>> {
     seedTwoSurplusPairs();
     const onComplete = vi.fn();
-    render(<ConvenienceCharsStep onComplete={onComplete} />);
+    render(<ConvenienceCharsStep onComplete={onComplete} />, { withStepNav: true });
     await screen.findByTestId("convenience-chars");
     expect(onComplete).not.toHaveBeenCalled();
     return onComplete;
@@ -307,7 +316,7 @@ describe("ConvenienceCharsStep — the question", () => {
     seedTwoSurplusPairs();
     const onComplete = vi.fn();
     const onBack = vi.fn();
-    render(<ConvenienceCharsStep onComplete={onComplete} onBack={onBack} />);
+    render(<ConvenienceCharsStep onComplete={onComplete} onBack={onBack} />, { withStepNav: true });
     await screen.findByTestId("convenience-chars");
 
     fireEvent.click(screen.getByRole("button", { name: "Back" }));
@@ -330,7 +339,7 @@ describe("ConvenienceCharsStep — the question", () => {
     cleanup();
     // Same evidence: same base/orthography seed as renderQuestion's setup.
     const onComplete = vi.fn();
-    render(<ConvenienceCharsStep onComplete={onComplete} />);
+    render(<ConvenienceCharsStep onComplete={onComplete} />, { withStepNav: true });
     await screen.findByTestId("convenience-chars");
 
     const boxes = screen.getAllByRole("checkbox");
@@ -351,7 +360,7 @@ describe("ConvenienceCharsStep — the question", () => {
 describe("ConvenienceCharsStep — shape change: new surplus proposed, un-ticks kept, no flags (spec 079 US3 T048/T079)", () => {
   it("a newly-surplus letter is proposed pre-checked while an earlier un-tick survives", async () => {
     seedWorkingCopy(["a", "A", "q", "Q"], ["a"]); // one surplus pair initially
-    const first = render(<ConvenienceCharsStep onComplete={vi.fn()} />);
+    const first = render(<ConvenienceCharsStep onComplete={vi.fn()} />, { withStepNav: true });
     await screen.findByTestId("convenience-chars");
     fireEvent.click(screen.getByLabelText("Keep q Q"));
     expect((screen.getByLabelText("Keep q Q") as HTMLInputElement).checked).toBe(false);
@@ -359,7 +368,7 @@ describe("ConvenienceCharsStep — shape change: new surplus proposed, un-ticks 
 
     // Shape change: the base now also has an 'x'/'X' surplus pair.
     seedWorkingCopy(["a", "A", "q", "Q", "x", "X"], ["a"]);
-    render(<ConvenienceCharsStep onComplete={vi.fn()} />);
+    render(<ConvenienceCharsStep onComplete={vi.fn()} />, { withStepNav: true });
     await screen.findByTestId("convenience-chars");
 
     // Existing un-tick survives.
@@ -370,13 +379,13 @@ describe("ConvenienceCharsStep — shape change: new surplus proposed, un-ticks 
 
   it("never shows a flagged-answers list — there is no `reproposed` state for this step's per-answer design", async () => {
     seedWorkingCopy(["a", "A", "q", "Q"], ["a"]);
-    const first = render(<ConvenienceCharsStep onComplete={vi.fn()} />);
+    const first = render(<ConvenienceCharsStep onComplete={vi.fn()} />, { withStepNav: true });
     await screen.findByTestId("convenience-chars");
     fireEvent.click(screen.getByLabelText("Keep q Q"));
     first.unmount();
 
     seedWorkingCopy(["a", "A", "q", "Q", "x", "X"], ["a"]);
-    render(<ConvenienceCharsStep onComplete={vi.fn()} />);
+    render(<ConvenienceCharsStep onComplete={vi.fn()} />, { withStepNav: true });
     await screen.findByTestId("convenience-chars");
 
     expect(screen.queryByTestId("flagged-answers-list")).toBeNull();

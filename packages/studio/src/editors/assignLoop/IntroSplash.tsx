@@ -7,12 +7,17 @@
 // body / bullets / start aria-label vary between galleries; everything else
 // (layout, card chrome, "Get started" button) is shared here so a third gallery
 // can reuse it without copying the markup.
+//
+// Its Back and "Get started" buttons live in the footer (spec 081). The splash
+// publishes them itself and is the step's only publisher while it is shown —
+// the host gallery publishes only from its own main render.
 
 import type { CSSProperties, ReactNode } from "react";
-import { Trans } from "@lingui/react/macro";
+import { useLingui } from "@lingui/react/macro";
 import {
-  BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT, BLUE_ACTION,
+  BG_PAGE, BG_CARD, BORDER, ACCENT, TEXT_DIM, TEXT_MAIN, FONT,
 } from "../../lib/galleryTheme.ts";
+import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 
 export interface GalleryIntroSplashProps {
   /** Small uppercase label above the title, e.g. "Getting started · Desktop". */
@@ -43,17 +48,6 @@ const pageStyle: CSSProperties = {
   overflowY: "auto",
 };
 
-const ghostBtn: CSSProperties = {
-  padding: "8px 18px",
-  background: "transparent",
-  border: `1px solid ${BORDER}`,
-  borderRadius: 6,
-  color: TEXT_DIM,
-  fontSize: 13,
-  cursor: "pointer",
-  fontFamily: "inherit",
-};
-
 export function GalleryIntroSplash({
   eyebrow,
   title,
@@ -64,23 +58,32 @@ export function GalleryIntroSplash({
   onBack,
   backAriaLabel,
 }: GalleryIntroSplashProps) {
+  const { t } = useLingui();
+  usePublishStepNav({
+    ...(onBack !== undefined
+      ? {
+          back: {
+            label: t({ id: "editor.assignLoop.backButton", message: "← Back" }),
+            onClick: onBack,
+            testId: "gallery-intro-back",
+            ...(backAriaLabel !== undefined ? { ariaLabel: backAriaLabel } : {}),
+          },
+        }
+      : {}),
+    // FR-006: "Get started" is this screen's primary forward action.
+    forward: {
+      label: t({ id: "editor.assignLoop.getStartedButton", message: "Get started →" }),
+      onClick: onStart,
+      testId: "gallery-intro-start",
+      ariaLabel: startAriaLabel,
+    },
+  });
   return (
     <div style={pageStyle}>
       <div style={{ maxWidth: 600, margin: "0 auto" }}>
-        {onBack !== undefined && (
-          <button
-            type="button"
-            onClick={onBack}
-            {...(backAriaLabel !== undefined ? { "aria-label": backAriaLabel } : {})}
-            style={ghostBtn}
-          >
-            <Trans id="editor.assignLoop.backButton">&larr; Back</Trans>
-          </button>
-        )}
-
         <div
           style={{
-            marginTop: 40,
+            marginTop: 16,
             background: BG_CARD,
             border: `1px solid ${BORDER}`,
             borderRadius: 12,
@@ -141,26 +144,6 @@ export function GalleryIntroSplash({
               <li key={i}>{b}</li>
             ))}
           </ul>
-          <button
-            type="button"
-            onClick={onStart}
-            aria-label={startAriaLabel}
-            style={{
-              alignSelf: "flex-start",
-              marginTop: 4,
-              padding: "10px 24px",
-              background: BLUE_ACTION,
-              border: "none",
-              borderRadius: 6,
-              color: "var(--app-text-on-accent)",
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: "pointer",
-              fontFamily: FONT,
-            }}
-          >
-            <Trans id="editor.assignLoop.getStartedButton">Get started &rarr;</Trans>
-          </button>
         </div>
       </div>
     </div>

@@ -63,7 +63,7 @@ describe("Phase F — pf_welcome_paragraph adaptive description proposal (spec 0
       baseWelcomeHtmText: WELCOME_HTML,
       baseHelpPhpText: null,
     });
-    render(<PhaseFStepFactoryComponent onComplete={() => {}} />);
+    render(<PhaseFStepFactoryComponent onComplete={() => {}} />, { withStepNav: true });
 
     // Prefilled — the propose half of propose-then-confirm.
     expect(descriptionField().value).toBe(EXPECTED_PREFILL);
@@ -90,7 +90,7 @@ describe("Phase F — pf_welcome_paragraph adaptive description proposal (spec 0
       baseWelcomeHtmText: WELCOME_HTML,
       baseHelpPhpText: null,
     });
-    render(<PhaseFStepFactoryComponent onComplete={() => {}} />);
+    render(<PhaseFStepFactoryComponent onComplete={() => {}} />, { withStepNav: true });
 
     expect(descriptionField().value).toBe(EXPECTED_PREFILL);
     act(() => {
@@ -103,7 +103,7 @@ describe("Phase F — pf_welcome_paragraph adaptive description proposal (spec 0
   it("net-new (Track 1 / no instantiation recorded): stays required, unfilled — Next is DISABLED with no typing", () => {
     // Default reset() state: instantiationMode is null (matches Track 1 /
     // net-new, which never sets instantiationMode to "adapt-existing").
-    render(<PhaseFStepFactoryComponent onComplete={() => {}} />);
+    render(<PhaseFStepFactoryComponent onComplete={() => {}} />, { withStepNav: true });
 
     expect(descriptionField().value).toBe("");
     expect(nextButton().disabled).toBe(true);
@@ -122,7 +122,7 @@ describe("Phase F — pf_welcome_paragraph adaptive description proposal (spec 0
       baseWelcomeHtmText: null,
       baseHelpPhpText: null,
     });
-    render(<PhaseFStepFactoryComponent onComplete={() => {}} />);
+    render(<PhaseFStepFactoryComponent onComplete={() => {}} />, { withStepNav: true });
 
     expect(descriptionField().value).toBe("");
     expect(nextButton().disabled).toBe(true);
@@ -135,7 +135,7 @@ describe("Phase F — pf_welcome_paragraph adaptive description proposal (spec 0
       baseWelcomeHtmText: WELCOME_HTML,
       baseHelpPhpText: null,
     });
-    render(<PhaseFStepFactoryComponent onComplete={() => {}} />);
+    render(<PhaseFStepFactoryComponent onComplete={() => {}} />, { withStepNav: true });
 
     expect(descriptionField().value).toBe("");
     expect(nextButton().disabled).toBe(true);

@@ -78,6 +78,7 @@ describe("FlowStepHost — title render", () => {
         context={{}}
         onComplete={vi.fn()}
       />,
+      { withStepNav: true },
     );
 
     const heading = screen.getByRole("heading", { level: 2 });
@@ -101,6 +102,7 @@ describe("FlowStepHost — back button", () => {
         onComplete={vi.fn()}
         onBack={onBack}
       />,
+      { withStepNav: true },
     );
 
     // SurveyRunner only renders Back when onBack !== undefined OR stack.length > 1;
@@ -119,6 +121,7 @@ describe("FlowStepHost — back button", () => {
         context={{}}
         onComplete={vi.fn()}
       />,
+      { withStepNav: true },
     );
 
     expect(screen.queryByTestId("survey-back")).toBeNull();
@@ -140,6 +143,7 @@ describe("FlowStepHost — completion path", () => {
         context={{}}
         onComplete={onComplete}
       />,
+      { withStepNav: true },
     );
 
     const input = screen.getByRole("textbox");
@@ -177,6 +181,7 @@ describe("FlowStepHost — getSeedValue plumbing", () => {
         onComplete={vi.fn()}
         getSeedValue={getSeedValue}
       />,
+      { withStepNav: true },
     );
 
     expect(getSeedValue).toHaveBeenCalledWith("q1");
@@ -201,6 +206,7 @@ describe("FlowStepHost — onAnswerCommit plumbing", () => {
         onComplete={vi.fn()}
         onAnswerCommit={onAnswerCommit}
       />,
+      { withStepNav: true },
     );
 
     const q1Input = screen.getByRole("textbox");
@@ -228,6 +234,7 @@ describe("FlowStepHost — onAnswerCommit plumbing", () => {
           context={{}}
           onComplete={vi.fn()}
         />,
+        { withStepNav: true },
       ),
     ).not.toThrow();
   });
@@ -253,6 +260,7 @@ describe("FlowStepHost — findingsByQuestionId plumbing", () => {
         context={{}}
         onComplete={vi.fn()}
       />,
+      { withStepNav: true },
     );
 
     // Omitted — no lint chip rendered, matching the guard pattern used for

@@ -82,7 +82,14 @@ async function switchTo(page: Page, mode: "character" | "key"): Promise<void> {
  * is the one way this spec could lie.
  */
 async function assignCharacterToAKey(page: Page): Promise<void> {
-  await page.getByTestId("touch-key-mode-continue").focus();
+  // spec 081 moved Continue into the footer's step-nav group, so it is no
+  // longer DOM-adjacent to the grid — Tab from it now lands in the footer's
+  // own project/dot-row content, not the grid. touch-key-assign.spec.ts
+  // (SC-004) already tabs in from "touch-key-mode-find-toggle" for the same
+  // reason (spec 065 inserted the layer selector / add / remove / find-key
+  // commands between Continue and the grid); mirror that known-adjacent
+  // element here instead of the relocated Continue button.
+  await page.getByTestId("touch-key-mode-find-toggle").focus();
   await page.keyboard.press("Tab");
   await expect(page.locator('[role="gridcell"]:focus')).toBeVisible();
 

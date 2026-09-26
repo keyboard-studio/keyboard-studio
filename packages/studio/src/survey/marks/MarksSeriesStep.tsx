@@ -33,7 +33,7 @@
 // onComplete with a SurveyPhaseResult carrying `marksWorklist`; the manifest
 // reducer path (StepHost.handleComplete → recordPhase) owns the session merge.
 
-import { useEffect, useMemo, useRef, useState, type ComponentType } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ComponentType } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import type {
@@ -96,6 +96,7 @@ import { reproposalCueMessage } from "../reproposalReason.ts";
 import { FlaggedAnswersList } from "../../components/FlaggedAnswersList.tsx";
 import { useFlaggedNextGate } from "../../hooks/useFlaggedNextGate.ts";
 import { useStepWalkStore } from "../../stores/stepWalkStore.ts";
+import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import { lowercaseBaseView, casedBaseCount } from "../charNormUtils.ts";
 import { AttachmentStation } from "./AttachmentStation.tsx";
 import { MarkTreatmentStation } from "./MarkTreatmentStation.tsx";
@@ -115,8 +116,6 @@ import {
   FONT,
   phaseHeadingFlush,
   mutedParaFlush,
-  secondaryButton,
-  primaryButton,
 } from "../surveyStyles.ts";
 
 // ---------------------------------------------------------------------------
@@ -760,6 +759,35 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
   );
   const nextGate = useFlaggedNextGate(flaggedWorkItems, visibleStations, currentStation ?? null);
 
+  // Back / Continue render in the footer (spec 081). Called unconditionally,
+  // before the S0/no-station early returns below, so a skipped or
+  // not-yet-open station publishes nothing rather than stale buttons.
+  // `handleStationBack` / `handleContinue` are hoisted function declarations
+  // (defined further down), so referencing them here is safe.
+  const blockedHintId = useId();
+  usePublishStepNav(
+    gate.skip || currentStation === undefined
+      ? {}
+      : {
+          ...(stationIndex > 0 || onBack !== undefined
+            ? {
+                back: {
+                  label: t({ id: "survey.marks.series.backButton", message: "Back" }),
+                  onClick: handleStationBack,
+                  testId: "marks-back",
+                },
+              }
+            : {}),
+          forward: {
+            label: t({ id: "survey.marks.series.continueButton", message: "Continue" }),
+            onClick: handleContinue,
+            testId: "marks-continue",
+            disabled: nextGate.blocked,
+            ...(nextGate.blocked ? { ariaDescribedBy: blockedHintId } : {}),
+          },
+        },
+  );
+
   // R-11: publish this series' stations as its walk, so the footer's
   // per-station question marks (spec 079 T061) exist.
   const publishStepWalk = useStepWalkStore((s) => s.publishStepWalk);
@@ -1072,11 +1100,6 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
       data-testid="marks-series"
       style={{ display: "flex", flexDirection: "column", gap: 16, maxWidth: 640, fontFamily: FONT, color: TEXT_MAIN, padding: 16, overflow: "auto" }}
     >
-      {(stationIndex > 0 || onBack !== undefined) && (
-        <button type="button" onClick={handleStationBack} style={{ alignSelf: "flex-start", ...secondaryButton }}>
-          <Trans id="survey.marks.series.backButton">Back</Trans>
-        </button>
-      )}
       <h2 style={{ ...phaseHeadingFlush, color: ACCENT }}>
         <Trans id="survey.marks.series.heading">Accents &amp; marks</Trans>
       </h2>
@@ -1184,24 +1207,12 @@ const MarksSeriesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }:
       />
 
       {nextGate.blocked && (
-        <p role="status" style={{ ...mutedParaFlush, color: ACCENT, fontSize: 13 }}>
+        <p id={blockedHintId} role="status" style={{ ...mutedParaFlush, color: ACCENT, fontSize: 13 }}>
           <Trans id="survey.flagged.blocked">
             Resolve the flagged answer above before continuing.
           </Trans>
         </p>
       )}
-
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <button
-          type="button"
-          data-testid="marks-continue"
-          onClick={() => handleContinue()}
-          disabled={nextGate.blocked}
-          style={primaryButton(nextGate.blocked)}
-        >
-          <Trans id="survey.marks.series.continueButton">Continue</Trans>
-        </button>
-      </div>
     </div>
   );
 };

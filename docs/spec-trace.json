@@ -1,6 +1,6 @@
 {
   "specVersion": "2.0.0",
-  "lastUpdated": "2026-09-25",
+  "lastUpdated": "2026-09-26",
   "specFile": "spec.md",
   "sections": {
     "§1": {
@@ -878,6 +878,14 @@
     "specs/080-documentation-completeness": {
       "title": "Feature Specification: Documentation completeness — every package ships its full documentation set",
       "hash": "sha256:f6fd6d97d6da3009",
+      "status": "unreviewed",
+      "implements": [],
+      "decisions": [],
+      "notes": ""
+    },
+    "specs/081-footer-step-nav": {
+      "title": "Feature Specification: Survey progress buttons live in the footer",
+      "hash": "sha256:63147ac7ca822373",
       "status": "unreviewed",
       "implements": [],
       "decisions": [],

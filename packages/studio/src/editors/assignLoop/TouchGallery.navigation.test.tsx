@@ -48,7 +48,7 @@ describe("TouchGallery — back navigation", () => {
     const onBack = vi.fn();
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={onBack} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={onBack} />, { withStepNav: true });
     });
 
     // idx 0 has no prior position, so Back calls onBack immediately.
@@ -67,7 +67,7 @@ describe("TouchGallery — back navigation", () => {
     const onBack = vi.fn();
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={onBack} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={onBack} />, { withStepNav: true });
     });
 
     // Accept the suggestion for "ä" — this calls handleUseSuggestion (longpress)
@@ -115,7 +115,7 @@ describe("TouchGallery — back navigation", () => {
     const onBack = vi.fn();
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={onBack} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={onBack} />, { withStepNav: true });
     });
 
     // The guard renders a Back button that calls onBack directly.
@@ -138,7 +138,7 @@ describe("TouchGallery — back navigation", () => {
     const onComplete = vi.fn();
 
     await act(async () => {
-      render(<TouchGallery onComplete={onComplete} onBack={onBack} />);
+      render(<TouchGallery onComplete={onComplete} onBack={onBack} />, { withStepNav: true });
     });
 
     // --- Configure "中" (idx 0): pick a host key, Apply, then Next → "日" (idx 1). ---
@@ -242,7 +242,7 @@ describe("TouchGallery — character-scroll-strip navigation", () => {
   it("renders the char-scroll-strip with one chip per inventory character", async () => {
     seedStore({ withInventory: ["中", "日", "月"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     expect(screen.getByTestId("char-scroll-strip")).toBeTruthy();
@@ -254,7 +254,7 @@ describe("TouchGallery — character-scroll-strip navigation", () => {
   it("renders the char-scroll-strip ABOVE the per-char editing block, matching MechanismGallery's real placement (regression guard)", async () => {
     seedStore({ withInventory: ["中", "日", "月"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     const strip = screen.getByTestId("char-scroll-strip");
@@ -276,7 +276,7 @@ describe("TouchGallery — character-scroll-strip navigation", () => {
     // "a" must render before "A", and "e" before "E".
     seedStore({ withInventory: ["A", "a", "E", "e"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     const strip = screen.getByTestId("char-scroll-strip");
@@ -307,7 +307,7 @@ describe("TouchGallery — character-scroll-strip navigation", () => {
     const onBack = vi.fn();
     seedStore({ withInventory: ["中", "日", "月"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={onBack} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={onBack} />, { withStepNav: true });
     });
 
     // Advance to "日" (idx 1) via Mark-then-Next — "月" stays untouched.
@@ -334,7 +334,7 @@ describe("TouchGallery — character-scroll-strip navigation", () => {
   it("clicking a later character's chip moves forward to it too — the old prev-only button could never do this", async () => {
     seedStore({ withInventory: ["中", "日", "月"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // Starting on "中" (idx 0) — jump straight to "月" (idx 2, the last
@@ -368,7 +368,7 @@ describe("TouchGallery — character-scroll-strip producer badge (integration)",
     // block), so the chooser shows directly with nothing to Accept/Deny first.
     seedStore({ withInventory: ["中"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     const stripBefore = screen.getByTestId("char-scroll-strip");
@@ -449,7 +449,7 @@ describe("TouchGallery — character-scroll-strip compose marker (integration)",
     });
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     const strip = screen.getByTestId("char-scroll-strip");
@@ -485,7 +485,7 @@ describe("TouchGallery — character-scroll-strip compose marker (integration)",
     });
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     const strip = screen.getByTestId("char-scroll-strip");
@@ -507,7 +507,7 @@ describe("TouchGallery — draft persistence across unmount/remount", () => {
 
     // First mount — accept the suggested method for "ä".
     const { unmount } = await act(async () =>
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />),
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true }),
     );
 
     // "ä" is decomposable and not in the default layout, so the suggestion is
@@ -533,7 +533,7 @@ describe("TouchGallery — draft persistence across unmount/remount", () => {
 
     // Remount — a new TouchGallery instance should rehydrate from the draft.
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // The "Configured" chip row should show "ä" (it was persisted). Query
@@ -578,7 +578,7 @@ describe("TouchGallery — Back survives a remount", () => {
 
     const onBack = vi.fn();
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={onBack} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={onBack} />, { withStepNav: true });
     });
 
     // "ä" is already configured, so the current-character sync lands on "ö".

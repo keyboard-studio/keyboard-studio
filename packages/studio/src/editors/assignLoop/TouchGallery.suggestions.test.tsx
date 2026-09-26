@@ -95,7 +95,7 @@ describe("TouchGallery — suggestion card gated on the current char's producer 
     });
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     const strip = screen.getByTestId("char-scroll-strip");
@@ -128,7 +128,7 @@ describe("TouchGallery — accepting a suggestion stays on the same character", 
     // "ä" is decomposable and not in the default layout → longpress suggestion.
     seedStore({ withInventory: ["ä"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     const acceptBtn = screen.queryAllByRole("button").find(
@@ -197,7 +197,7 @@ describe("TouchGallery — suggestion card variants", () => {
     seedWithDesktopAssignment("x", swapAssignment);
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // Suggestion card should say "replace".
@@ -245,7 +245,7 @@ describe("TouchGallery — suggestion card variants", () => {
     seedWithDesktopAssignment("á", deadkeyAssignment);
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // Suggestion card should mention "long-press" for á.
@@ -273,7 +273,7 @@ describe("TouchGallery — suggestion card variants", () => {
     seedWithDesktopAssignment("€", layerSwitchAssignment);
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // The suggestion names the extracted host key ("4", from K_4) — not the
@@ -315,7 +315,7 @@ describe("TouchGallery — suggestion card variants", () => {
     seedWithDesktopAssignment("á", deadkeyAssignment, ["中"]);
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // Suggestion card shows for "á".
@@ -404,7 +404,7 @@ describe("TouchGallery — suggestion suppressed when the char already has a tou
     seedWithDesktopAssignment("x", swapAssignment);
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // No suggestion card at all — "x" already has a working method.
@@ -437,7 +437,7 @@ describe("TouchGallery — suggestion suppressed when the char already has a tou
     seedWithDesktopAssignment("x", swapAssignment);
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     expect(screen.queryByText(/Suggested: replace/i)).not.toBeNull();
@@ -458,7 +458,7 @@ describe("TouchGallery — no suggestion goes straight to chooser", () => {
     seedStore({ withInventory: ["中"] });
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // The old green "Set how … is reached on touch" prompt + "Choose method"
