@@ -1393,6 +1393,33 @@ describe("MarksSeriesStep — US3 targeted re-proposal (T045, T046, T058, T082)"
     expect(screen.queryByTestId("marks-attachment")).toBeNull();
   });
 
+  it("the blocked footer Continue is described by the in-body 'why blocked' hint (spec 081 FR-033)", () => {
+    seedFullAlphabet(TWO_BASE_ALPHABET);
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
+    });
+    fireEvent.click(screen.getByTestId("marks-continue"));
+    useSurveyAnswerStore.getState().markScreenRecorded("marks", "marks_attachment", "h1");
+    cleanup();
+    seedFullAlphabet({
+      ...TWO_BASE_ALPHABET,
+      bases: ["e", "a", "b"],
+      attestedStacks: [...TWO_BASE_ALPHABET.attestedStacks, { base: "b", marks: [ACUTE] }],
+    });
+    act(() => {
+      render(<MarksSeriesStep onComplete={vi.fn()} />, { withStepNav: true });
+    });
+
+    const cont = screen.getByTestId("marks-continue") as HTMLButtonElement;
+    expect(cont.disabled).toBe(true);
+    const hintId = cont.getAttribute("aria-describedby");
+    expect(hintId).toBeTruthy();
+    const hint = document.getElementById(hintId!);
+    expect(hint?.textContent).toMatch(/Resolve the flagged answer above before continuing/);
+    // The hint stays in the step body, not in the footer group (FR-016).
+    expect(screen.getByRole("group", { name: "Step navigation" }).contains(hint)).toBe(false);
+  });
+
   it("explicit input order survives an unrelated evidence change while still applicable (FR-012)", () => {
     seedFullAlphabet(TWO_BASE_ALPHABET);
     act(() => {

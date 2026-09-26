@@ -212,23 +212,25 @@ export function BaseResolution({
     fontFamily: "var(--app-font)",
   };
 
-  // Back / Confirm now live in the footer (spec 081). Publish unconditionally,
-  // before the loading / error / empty early returns below — for THIS phase
-  // those states publish nothing (a Back there is a later task).
-  const showFooterNav = !loading && error === null && bases.length > 0;
-  usePublishStepNav(
-    !showFooterNav
+  // Back / Confirm live in the footer (spec 081). Publish unconditionally,
+  // before the loading / error / empty early returns below. Back is offered in
+  // every state — the loading, error and empty screens have nothing to confirm,
+  // but the author reached them by moving forward and must be able to leave
+  // (FR-015). Confirm only exists once there is a catalog to pick from.
+  const showConfirm = !loading && error === null && bases.length > 0;
+  usePublishStepNav({
+    ...(onBack !== undefined
+      ? {
+          back: {
+            label: t({ id: "editor.baseResolution.backButton", message: "← Back" }),
+            onClick: onBack,
+            testId: "base-back",
+          },
+        }
+      : {}),
+    ...(!showConfirm
       ? {}
       : {
-          ...(onBack !== undefined
-            ? {
-                back: {
-                  label: t({ id: "editor.baseResolution.backButton", message: "← Back" }),
-                  onClick: onBack,
-                  testId: "base-back",
-                },
-              }
-            : {}),
           forward: {
             label:
               previewStatus === "loading"
@@ -251,8 +253,8 @@ export function BaseResolution({
             testId: "base-confirm",
             disabled: previewedBase === null || previewStatus !== "ready",
           },
-        },
-  );
+        }),
+  });
 
   if (loading) return <div role="status" style={{ color: "var(--app-text-muted)", fontFamily: "var(--app-font)" }}><Trans id="base.picker.loading">Loading base keyboards...</Trans></div>;
   if (error !== null) return <div style={{ color: "var(--danger)", fontFamily: "var(--app-font)" }}>{error}</div>;

@@ -236,6 +236,15 @@ describe("ConvenienceCharsStep — unknown evidence (FR-064: renders, never skip
     expect(onBack).toHaveBeenCalledTimes(1);
     expect(onComplete).not.toHaveBeenCalled();
   });
+
+  it("renders no Back at all when there is nowhere to go back to (spec 081 FR-015)", async () => {
+    seedInstantiatedNoAlphabet();
+    render(<ConvenienceCharsStep onComplete={vi.fn()} />, { withStepNav: true });
+    await screen.findByTestId("convenience-chars");
+
+    expect(screen.queryByTestId("convenience-back")).toBeNull();
+    expect(screen.getByTestId("convenience-continue")).toBeTruthy();
+  });
 });
 
 describe("ConvenienceCharsStep — the question", () => {

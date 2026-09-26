@@ -305,6 +305,32 @@ describe("MechanismGallery — Done-blocked inline hint (no modal)", () => {
     });
   });
 
+  it("the disabled footer forward button is described by the hint, and loses the reference once the hint unmounts (spec 081 FR-033, R-09)", async () => {
+    seedInventory(["á"]);
+    await act(async () => {
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} onComplete={vi.fn()} />, { withStepNav: true });
+    });
+
+    const group = screen.getByRole("group", { name: "Step navigation" });
+    const forward = group.querySelector("button[aria-describedby]") as HTMLButtonElement;
+    expect(forward).not.toBeNull();
+    expect(forward.disabled).toBe(true);
+    const hint = document.getElementById(forward.getAttribute("aria-describedby")!);
+    expect(hint?.textContent).toMatch(/still needs? an assignment or a mark/);
+    expect(group.contains(hint)).toBe(false);
+
+    fireEvent.click(screen.getByRole("button", { name: /Mark U\+00E1 á for later review/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByText(/still needs? an assignment or a mark/i)).toBeNull();
+    });
+    // No dangling IDREF once the hint is gone (axe aria-valid-attr-value).
+    for (const btn of screen.getByRole("group", { name: "Step navigation" }).querySelectorAll("button")) {
+      const ref = btn.getAttribute("aria-describedby");
+      if (ref !== null) expect(document.getElementById(ref)).not.toBeNull();
+    }
+  });
+
   it("the ← back button navigates freely while characters remain unimplemented (no modal, no block)", async () => {
     const onBack = vi.fn();
     seedInventory(["á", "é"]);

@@ -141,17 +141,17 @@ states each offer a working Back; French Carve shows `← Retour` / `Passer` / `
 
 ### US4: keyboard and screen reader
 
-- [ ] T043 [P] [US4] Add focus tests to `src/components/StudioFooter.a11y.test.tsx` and the SurveyRunner tests: pressing footer Next keeps focus on the same `<button>` across a question change, including the Next → Finish relabel and the case where Back disappears on question 1 (R-10); a step change remounts the cluster so focus does not carry over (FR-032); a disabled forward button's `aria-describedby` resolves to the in-body hint text for marks, mechanisms and touch (FR-033, US4 scenario 2)
+- [X] T043 [P] [US4] Add focus tests to `src/components/StudioFooter.a11y.test.tsx` and the SurveyRunner tests: pressing footer Next keeps focus on the same `<button>` across a question change, including the Next → Finish relabel and the case where Back disappears on question 1 (R-10); a step change remounts the cluster so focus does not carry over (FR-032); a disabled forward button's `aria-describedby` resolves to the in-body hint text for marks, mechanisms and touch (FR-033, US4 scenario 2)
 
 ### US5: back everywhere, localised
 
-- [ ] T044 [US5] Give the loading, error and empty states of `src/editors/panels/BaseResolution.tsx` a published Back that behaves like the loaded state's Back, and add a test for each state (FR-015, A-4)
-- [ ] T045 [US5] Give the loading state of `src/editors/carve/CarveGalleryV2.tsx` a published Back, and add a test (FR-015, A-4)
-- [ ] T046 [US5] In `src/survey/convenience/ConvenienceCharsStep.tsx`, publish `back` only when `onBack` is defined, and add a test that no `convenience-back` is rendered without it (FR-015, A-3)
-- [ ] T047 [US5] Localise Carve in `src/editors/carve/CarveGalleryV2.tsx` with the `t` macro under the restored ids `editor.carve.backButton` (`← Back`), `editor.carve.skipButton` (`Skip`), `editor.carve.continueButton` (`Continue →`) and `editor.carve.loadingKeyboard` (`Loading keyboard…`). Restore the fr values from `git show 1dbb5266^:packages/studio/src/locales/fr/messages.json` (`← Retour`, `Passer`, `Continuer →`, `Chargement du clavier…`). Then run `i18n-catalog-sort` and `i18n-catalog-lint` over `src/locales/{en,fr}/messages.json` (FR-043 to FR-045; the loading-id refinement in plan.md is awaiting reviewer sign-off). Add a French-locale Carve test (US5 scenario 4)
-- [ ] T048 [US4] Run the rule 12 keyboard walk ([docs/accessibility.md](../../docs/accessibility.md)) on both tracks' golden paths using the Playwright CLI, recording whether the in-body "why blocked" hint is noticeable from the footer (FR-042, FR-054)
-- [ ] T049 [US4] Record dated evidence in `specs/056-ada-accessibility/wcag-2.2-aa-tracker.md` for rows 2.4.3, 2.4.11, 2.5.8, 3.2.3 and 3.2.4 (naming the T005, T040, T043 tests and the T048 walk), and annotate rows 1.4.10 and 2.4.1. Flip a row to `pass` only with named evidence (FR-035)
-- [ ] T050 Run the studio unit suite, e2e and `pnpm lint`, then commit `feat(studio): footer nav a11y, back in every state, Carve i18n (spec 081 T043-T050)` and push
+- [X] T044 [US5] Give the loading, error and empty states of `src/editors/panels/BaseResolution.tsx` a published Back that behaves like the loaded state's Back, and add a test for each state (FR-015, A-4)
+- [X] T045 [US5] Give the loading state of `src/editors/carve/CarveGalleryV2.tsx` a published Back, and add a test (FR-015, A-4)
+- [X] T046 [US5] In `src/survey/convenience/ConvenienceCharsStep.tsx`, publish `back` only when `onBack` is defined, and add a test that no `convenience-back` is rendered without it (FR-015, A-3)
+- [X] T047 [US5] Localise Carve in `src/editors/carve/CarveGalleryV2.tsx` with the `t` macro under the restored ids `editor.carve.backButton` (`← Back`), `editor.carve.skipButton` (`Skip`), `editor.carve.continueButton` (`Continue →`) and `editor.carve.loadingKeyboard` (`Loading keyboard…`). Restore the fr values from `git show 1dbb5266^:packages/studio/src/locales/fr/messages.json` (`← Retour`, `Passer`, `Continuer →`, `Chargement du clavier…`). Then run `i18n-catalog-sort` and `i18n-catalog-lint` over `src/locales/{en,fr}/messages.json` (FR-043 to FR-045; the loading-id refinement in plan.md is awaiting reviewer sign-off). Add a French-locale Carve test (US5 scenario 4)
+- [X] T048 [US4] Run the rule 12 keyboard walk ([docs/accessibility.md](../../docs/accessibility.md)) on both tracks' golden paths using the Playwright CLI, recording whether the in-body "why blocked" hint is noticeable from the footer (FR-042, FR-054)
+- [X] T049 [US4] Record dated evidence in `specs/056-ada-accessibility/wcag-2.2-aa-tracker.md` for rows 2.4.3, 2.4.11, 2.5.8, 3.2.3 and 3.2.4 (naming the T005, T040, T043 tests and the T048 walk), and annotate rows 1.4.10 and 2.4.1. Flip a row to `pass` only with named evidence (FR-035)
+- [X] T050 Run the studio unit suite, e2e and `pnpm lint`, then commit `feat(studio): footer nav a11y, back in every state, Carve i18n (spec 081 T043-T050)` and push
 
 **Checkpoint**: US4 and US5 verified. SC-008 and SC-009 are met.
 

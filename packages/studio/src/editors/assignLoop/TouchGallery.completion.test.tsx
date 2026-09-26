@@ -566,6 +566,19 @@ describe("TouchGallery — no modal, ever", () => {
     expect(screen.getByLabelText(/Host key for long-press/i)).toBeTruthy();
   });
 
+  it("the disabled footer Done is described by the in-body completion-gate notice (spec 081 FR-033)", async () => {
+    seedStore({ withInventory: ["中"] });
+    await act(async () => {
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
+    });
+    const done = screen.getByRole("button", { name: "Done" }) as HTMLButtonElement;
+    expect(screen.getByRole("group", { name: "Step navigation" }).contains(done)).toBe(true);
+    expect(done.disabled).toBe(true);
+    const hint = document.getElementById(done.getAttribute("aria-describedby")!);
+    expect(hint?.textContent).toMatch(/Cannot finish yet/);
+    expect(screen.getByRole("group", { name: "Step navigation" }).contains(hint)).toBe(false);
+  });
+
   it("the ← back to previous character control never renders a dialog, even while the current character remains uncovered", async () => {
     seedStore({ withInventory: ["中", "日"] });
     const { container } = await act(async () =>

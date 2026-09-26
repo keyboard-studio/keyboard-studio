@@ -13,7 +13,7 @@
 // synthesizing a click.
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { cleanup, screen } from "@testing-library/react";
+import { act, cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { makeBaseKeyboard } from "@keyboard-studio/contracts";
 import { render } from "../test/renderWithI18n.tsx";
@@ -735,6 +735,28 @@ describe("StudioFooter — step nav cluster (spec 081)", () => {
     const { container } = render(<StudioFooter />);
     expect(screen.getAllByRole("status")).toHaveLength(1);
     expect(container.querySelectorAll("[aria-live]")).toHaveLength(1);
+  });
+
+  it("a STEP change remounts the cluster, so focus is not carried into the next step (FR-032)", async () => {
+    const user = userEvent.setup();
+    publishNav({ forward: FULL_SPEC.forward! }, "characters");
+    render(<StudioFooter />);
+    const outgoing = screen.getByTestId("demo-continue");
+    await user.click(outgoing);
+    expect(document.activeElement).toBe(outgoing);
+
+    act(() => {
+      publishNav(
+        { forward: { label: "Continue →", onClick: noop, testId: "demo-continue" } },
+        "punctuation",
+      );
+      useSurveySessionStore.setState({ activeStepId: "punctuation" });
+    });
+
+    const incoming = screen.getByTestId("demo-continue");
+    expect(incoming).not.toBe(outgoing);
+    expect(outgoing.isConnected).toBe(false);
+    expect(document.activeElement).not.toBe(incoming);
   });
 
   it("shows the footer when only a nav cluster is published (FR-021)", () => {

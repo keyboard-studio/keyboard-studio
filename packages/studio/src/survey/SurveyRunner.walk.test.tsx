@@ -18,6 +18,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { screen, fireEvent, cleanup, act } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { render } from "../test/renderWithI18n.tsx";
 import React from "react";
 
@@ -271,5 +272,60 @@ describe("SurveyRunner — footer Next carries the progress description", () => 
     expect(describedById).toBeTruthy();
     const description = document.getElementById(describedById!);
     expect(description?.textContent).toMatch(/Step 1 of ~3/);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// spec 081 US4 scenario 3 / R-10 — focus across a question change. The footer
+// buttons keep stable slot keys, so a within-step cursor change re-renders the
+// SAME <button> and the pressed button keeps focus: through the Next -> Finish
+// relabel, and when Back appears or disappears around it.
+// ---------------------------------------------------------------------------
+
+const FOCUS_FLOW: FlowDef = {
+  flow_id: "focus-test",
+  phase: "A",
+  questions: [
+    { id: "f1", type: "short_text", prompt: "Focus one", required: false, next: "f2" },
+    { id: "f2", type: "short_text", prompt: "Focus two", required: false, next: null },
+  ],
+};
+
+describe("SurveyRunner — footer Next keeps focus across a question change (R-10)", () => {
+  it("the pressed Next stays focused, relabelled to Finish, as Back appears beside it", async () => {
+    const user = userEvent.setup();
+    render(<SurveyRunner flow={FOCUS_FLOW} onComplete={vi.fn()} />, { withStepNav: true });
+    const next = screen.getByTestId("survey-advance");
+    expect(next.textContent).toBe("Next");
+    expect(screen.queryByTestId("survey-back")).toBeNull();
+
+    await user.click(next);
+
+    expect(screen.getByText("Focus two")).toBeTruthy();
+    expect(screen.getByTestId("survey-advance")).toBe(next);
+    expect(next.textContent).toBe("Finish");
+    expect(screen.getByTestId("survey-back")).toBeTruthy();
+    expect(document.activeElement).toBe(next);
+  });
+
+  it("the focused forward button survives Back disappearing on the first question", async () => {
+    const user = userEvent.setup();
+    render(<SurveyRunner flow={FOCUS_FLOW} onComplete={vi.fn()} />, { withStepNav: true });
+    const next = screen.getByTestId("survey-advance");
+    await user.click(next);
+    expect(screen.getByTestId("survey-back")).toBeTruthy();
+    expect(document.activeElement).toBe(next);
+
+    // Walk back to question 1 without touching the footer (a dot jump does
+    // this), so only the Back slot unmounts.
+    act(() => {
+      useSurveyAnswerStore.getState().setPosition("identity", "f1");
+    });
+
+    expect(screen.getByText("Focus one")).toBeTruthy();
+    expect(screen.queryByTestId("survey-back")).toBeNull();
+    expect(screen.getByTestId("survey-advance")).toBe(next);
+    expect(next.textContent).toBe("Next");
+    expect(document.activeElement).toBe(next);
   });
 });

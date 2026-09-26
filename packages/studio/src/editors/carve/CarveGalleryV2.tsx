@@ -649,25 +649,34 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     [cellsByCh, cells, selectedCh],
   );
 
-  // Back / Skip / Continue now live in the footer (spec 081). Publish
-  // unconditionally, before the `!ir` loading return below — for THIS phase
-  // the loading state publishes nothing (a Back there is a later task).
-  // Literal English labels are kept as-is for now (localisation is a later
-  // task).
+  // Back / Skip / Continue live in the footer (spec 081). Publish
+  // unconditionally, before the `!ir` loading return below. Back is offered in
+  // the loading state too (FR-015): the author reached it by moving forward.
+  // Skip and Continue wait for the IR — there is nothing to keep or carve yet.
+  // The nav ids are the ones Carve v1 used, restored so their existing
+  // translations come back (FR-044).
+  const backAction =
+    onBack !== undefined
+      ? {
+          back: {
+            label: t({ id: 'editor.carve.backButton', message: '← Back' }),
+            onClick: onBack,
+            testId: 'carve-back',
+          },
+        }
+      : {};
   usePublishStepNav(
     !ir
-      ? {}
+      ? backAction
       : {
-          ...(onBack !== undefined
-            ? { back: { label: '← Back', onClick: onBack, testId: 'carve-back' } }
-            : {}),
+          ...backAction,
           secondary: {
-            label: 'Skip',
+            label: t({ id: 'editor.carve.skipButton', message: 'Skip' }),
             onClick: () => { keepAll(); onComplete(); },
             testId: 'carve-skip',
           },
           forward: {
-            label: 'Continue →',
+            label: t({ id: 'editor.carve.continueButton', message: 'Continue →' }),
             onClick: onComplete,
             testId: 'carve-continue',
           },
@@ -677,7 +686,9 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   if (!ir) {
     return (
       <div style={{ height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--app-bg)', color: 'var(--app-text)' }}>
-        <p style={{ fontSize: 14, color: 'var(--app-text-muted)' }}>Loading keyboard…</p>
+        <p style={{ fontSize: 14, color: 'var(--app-text-muted)' }}>
+          {t({ id: 'editor.carve.loadingKeyboard', message: 'Loading keyboard…' })}
+        </p>
       </div>
     );
   }

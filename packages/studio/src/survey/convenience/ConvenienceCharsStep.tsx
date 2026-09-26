@@ -203,18 +203,22 @@ const ConvenienceCharsStep: ComponentType<EditorStepProps> = (
 
   const keptCount = candidates.length - unchecked.size;
 
-  // Back / Continue render in the footer (spec 081). Mirrors today's
-  // rendering: Back is published whenever the step itself renders, whatever
-  // `onBack` is (the "only when onBack is defined" fix is T046, not here).
+  // Back / Continue render in the footer (spec 081). Back is published only
+  // when there is somewhere to go back to — an inert Back that does nothing
+  // when pressed is worse than none (FR-015).
   usePublishStepNav(
     gate === null || gate.kind === "not-applicable"
       ? {}
       : {
-          back: {
-            label: t({ id: "survey.convenience.backButton", message: "Back" }),
-            onClick: () => onBack?.(),
-            testId: "convenience-back",
-          },
+          ...(onBack !== undefined
+            ? {
+                back: {
+                  label: t({ id: "survey.convenience.backButton", message: "Back" }),
+                  onClick: onBack,
+                  testId: "convenience-back",
+                },
+              }
+            : {}),
           forward: {
             label: unknown
               ? t({ id: "survey.convenience.unknownEvidence.continueButton", message: "Continue" })
