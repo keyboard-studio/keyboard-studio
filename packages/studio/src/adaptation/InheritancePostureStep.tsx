@@ -7,7 +7,7 @@
 // that facet (the en-masse lever, FR-005).
 //
 // Follows the Prefill.tsx component pattern (dark palette, provenance chip, back/
-// confirm buttons). Every resolution is recorded via recordConfirmation (FR-007 /
+// confirm buttons published to the studio footer, spec 081). Every resolution is recorded via recordConfirmation (FR-007 /
 // SC-006): confirmed when the author kept the default posture, overridden when
 // they changed it. An individual proposal-site override elsewhere stays LOCAL and
 // does not mutate the PostureEntry (posture.ts guarantees this) — this step
@@ -20,7 +20,7 @@ import type { MessageDescriptor } from "@lingui/core";
 import type { InheritancePosture, PostureEntry, PostureFacet } from "./posture.ts";
 import { recordConfirmation } from "./confirmationEvents.ts";
 import type { AdaptationEvidence } from "./evidence.ts";
-import { secondaryButton, primaryButton } from "../survey/surveyStyles.ts";
+import { usePublishStepNav } from "../hooks/usePublishStepNav.ts";
 
 /**
  * The catalog/survey question id each governed facet resolves. The `script`
@@ -120,6 +120,25 @@ export function InheritancePostureStep({
     onConfirm({ baseId: posture.baseId, entries: resolvedEntries });
   }
 
+  // Spec 081: Back and "Confirm and continue" live in the studio footer. No
+  // Back when there is nowhere to go (FR-015).
+  usePublishStepNav({
+    ...(onBack !== undefined
+      ? {
+          back: {
+            label: t({ id: "adaptation.posture.backButton", message: "← Back" }),
+            onClick: onBack,
+            testId: "posture-back",
+          },
+        }
+      : {}),
+    forward: {
+      label: t({ id: "adaptation.posture.confirmButton", message: "Confirm and continue" }),
+      onClick: confirm,
+      testId: "posture-confirm",
+    },
+  });
+
   return (
     <div
       style={{
@@ -178,22 +197,6 @@ export function InheritancePostureStep({
             </p>
           </fieldset>
         ))}
-      </div>
-
-      <div style={{ display: "flex", gap: 8 }}>
-        {onBack !== undefined && (
-          <button type="button" data-testid="posture-back" onClick={onBack} style={secondaryButton}>
-            <Trans id="adaptation.posture.backButton">← Back</Trans>
-          </button>
-        )}
-        <button
-          type="button"
-          data-testid="posture-confirm"
-          onClick={confirm}
-          style={primaryButton(false)}
-        >
-          <Trans id="adaptation.posture.confirmButton">Confirm and continue</Trans>
-        </button>
       </div>
     </div>
   );

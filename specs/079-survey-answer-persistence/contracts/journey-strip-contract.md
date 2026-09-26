@@ -179,6 +179,12 @@ Unchanged mechanism, extended to two tiers:
 - Every mark (section and question) stays reachable by Tab regardless of scroll position (native
   focus-scroll, unchanged).
 
+> **Amendment (spec 081 FR-020a, 2026-09-26).** The footer height is now fixed at 40 px under a
+> fine pointer and at 52 px under a coarse pointer, so a footer nav button's 44 px hit target
+> fits (`.ks-studio-footer` in `packages/studio/src/index.css`). The never-grow-vertically rule
+> above is unchanged: the height is still fixed and never driven by content. See
+> [spec 081](../../081-footer-step-nav/spec.md) (FR-020, FR-020a).
+
 ## 7. Rename note (implementation detail, not a contract requirement)
 
 `ProgressDot`/`ProgressDotKind` may be renamed to `JourneyMark`/reflect the two tiers, or kept as-is

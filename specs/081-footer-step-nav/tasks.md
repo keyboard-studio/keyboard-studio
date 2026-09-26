@@ -167,17 +167,17 @@ finds its buttons in the footer.
 
 ### US6: fit
 
-- [ ] T051 [US6] Script quickstart §5 with the Playwright CLI: open the touch per-character gallery at widths 1600, 1024, 768, 530 and 375 under fine and coarse pointers, and assert height `=== 40` (fine) and `<= 52` (coarse), no nav button with `scrollWidth > clientWidth`, the current dot inside the row viewport, and at 375 px a hidden project label and no page horizontal scroll. Record the results in the commit message. If a check fails, fix the degrade order in `src/components/StudioFooter.tsx` (FR-020 to FR-024, SC-006, SC-007)
-- [ ] T052 [P] [US6] Add an amendment note to §6 of `specs/079-survey-answer-persistence/contracts/journey-strip-contract.md`: a fixed 40 px under a fine pointer and up to 52 px under a coarse pointer, citing spec 081 FR-020a
+- [X] T051 [US6] Script quickstart §5 with the Playwright CLI: open the touch per-character gallery at widths 1600, 1024, 768, 530 and 375 under fine and coarse pointers, and assert height `=== 40` (fine) and `<= 52` (coarse), no nav button with `scrollWidth > clientWidth`, the current dot inside the row viewport, and at 375 px a hidden project label and no page horizontal scroll. Record the results in the commit message. If a check fails, fix the degrade order in `src/components/StudioFooter.tsx` (FR-020 to FR-024, SC-006, SC-007)
+- [X] T052 [P] [US6] Add an amendment note to §6 of `specs/079-survey-answer-persistence/contracts/journey-strip-contract.md`: a fixed 40 px under a fine pointer and up to 52 px under a coarse pointer, citing spec 081 FR-020a
 
 ### US7: inheritance posture
 
-- [ ] T053 [P] [US7] Row 18: migrate `src/adaptation/InheritancePostureStep.tsx` (Back and "Confirm and continue", keeping its existing handles or adding `inheritance-back` / `inheritance-confirm`) and move `src/adaptation/InheritancePostureStep.test.tsx` to `withStepNav`
+- [X] T053 [P] [US7] Row 18: migrate `src/adaptation/InheritancePostureStep.tsx` (Back and "Confirm and continue", keeping its existing handles or adding `inheritance-back` / `inheritance-confirm`) and move `src/adaptation/InheritancePostureStep.test.tsx` to `withStepNav`
 
 ### Follow-ups
 
-- [ ] T054 File the follow-up issues with `gh issue create`, each referencing #1778: `maint(studio): delete dead TrackStep and ProjectNameStep panels` (FR-007); `feat(studio): skip link or primary-action shortcut to the footer nav` (FR-031, tracker 2.4.1); and, only if the T048 walk found the hint not noticeable, `feat(studio): visible cue next to a disabled footer forward button` (FR-042)
-- [ ] T055 Commit `feat(studio): footer fit, inheritance posture nav, 079 §6 amendment (spec 081 T051-T055)` and push
+- [X] T054 File the follow-up issues with `gh issue create`, each referencing #1778: `maint(studio): delete dead TrackStep and ProjectNameStep panels` (FR-007); `feat(studio): skip link or primary-action shortcut to the footer nav` (FR-031, tracker 2.4.1); and, only if the T048 walk found the hint not noticeable, `feat(studio): visible cue next to a disabled footer forward button` (FR-042)
+- [X] T055 Commit `feat(studio): footer fit, inheritance posture nav, 079 §6 amendment (spec 081 T051-T055)` and push
 
 ---
 
