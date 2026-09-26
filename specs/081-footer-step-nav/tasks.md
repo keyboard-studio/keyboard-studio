@@ -183,8 +183,8 @@ finds its buttons in the footer.
 
 ## Phase 6: Polish and cross-cutting
 
-- [ ] T056 Run `node utilities/spec-trace check` and acknowledge the intended drift in `specs/081-footer-step-nav/*` and the 079 contract
-- [ ] T057 Run the whole [quickstart.md](quickstart.md) (§1 to §7) as a final pass, and `pnpm lint` from the repo root
+- [X] T056 Run `node utilities/spec-trace check` and acknowledge the intended drift in `specs/081-footer-step-nav/*` and the 079 contract
+- [X] T057 Run the whole [quickstart.md](quickstart.md) (§1 to §7) as a final pass, and `pnpm lint` from the repo root
 - [ ] T058 Reconcile #1778's acceptance-criteria checkboxes against the shipped diff (CLAUDE.md issue closure policy), then hand off to `km-archivist` to open the PR against `main` with `refs #1778` or `closes #1778`. Do not merge
 
 ---
