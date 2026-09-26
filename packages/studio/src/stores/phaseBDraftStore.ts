@@ -539,8 +539,9 @@ export const usePhaseBDraftStore = create<PhaseBDraftState>((set, get) => ({
   setSelectedFont: (font) => set({ selectedFont: font }),
 
   seedFromProposal: (inv, bcp47) => {
-    // The main tier only — the alphabet. The auxiliary/punctuation/numbers
-    // tiers reach the author through their own 047 breakdown sections.
+    // The main tier only — the alphabet. The auxiliary (loanword) tier is
+    // offered, unselected, in BuildListView's Loanwords section; punctuation
+    // and numbers reach the author through their own steps and sections.
     const mainChars = inv.characters.filter((c) => c.tier === "main").map((c) => c.char);
     // 047's case derivation: the sources attest lowercase, but an alphabet
     // without its uppercase half is not one the author can accept and move on

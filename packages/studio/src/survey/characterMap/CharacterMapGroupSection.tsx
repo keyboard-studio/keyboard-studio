@@ -205,7 +205,7 @@ export function CharacterMapGroupSection({
               // the mark fine. A standalone mark must always show the
               // dotted circle, never a box.
               const glyphRenders = cell.isCombiningMark || isGlyphSupported(display);
-              // Yellow "your base keyboard already types this" affordance,
+              // Dashed "your base keyboard already types this" affordance,
               // shown until the author selects the glyph into the alphabet.
               const isBaseOutput = !selected && baseProduced.has(cell.char.normalize("NFC"));
               // Accessible name carries the base-output fact (never colour
@@ -239,7 +239,7 @@ export function CharacterMapGroupSection({
                   aria-label={cellAriaLabel}
                   style={
                     isBaseOutput
-                      ? { ...charChip(false, zoom), border: `1px solid ${BASE_OUTPUT_BORDER}` }
+                      ? { ...charChip(false, zoom), border: BASE_OUTPUT_BORDER }
                       : charChip(selected, zoom)
                   }
                 >

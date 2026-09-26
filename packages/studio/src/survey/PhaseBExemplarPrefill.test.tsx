@@ -425,3 +425,117 @@ describe("proposed-vs-authored affordance (obligation P5, FR-017)", () => {
     expect(usePhaseBDraftStore.getState().rejected).toContain("ŋ");
   });
 });
+
+// ---------------------------------------------------------------------------
+// The loanword (auxiliary) tier — shown, never pre-selected
+// ---------------------------------------------------------------------------
+
+/** Bafut's shape: main letters incl. a {gh} cluster, auxiliary [c h ʼ p q v x]. */
+function bafutInventory(): SourcedInventory {
+  const base = inventory(["a", "b", "g", "h", "ŋ"], "sldr", "unconfirmed");
+  return {
+    ...base,
+    resolvedTag: "bfd",
+    characters: [
+      ...base.characters,
+      ...["c", "h", "ʼ", "p", "q", "v", "x"].map((char) => ({
+        char,
+        tier: "auxiliary" as const,
+        source: "sldr" as const,
+        confidence: "unconfirmed" as const,
+      })),
+    ],
+    digraphs: ["gh"],
+  };
+}
+
+describe("loanword letters section", () => {
+  it("lists the auxiliary letters, unselected, and leaves them out of the seeded alphabet", async () => {
+    getSourcedExemplars.set(bafutInventory());
+    renderPhaseB();
+    await acceptExemplarsAndContinue();
+
+    const section = await screen.findByTestId("alphabet-loanwords");
+    const chips = [...section.querySelectorAll("button[aria-pressed]")];
+    // h is already a main-tier letter, so it is not offered again.
+    expect(chips.map((b) => b.getAttribute("aria-label")).sort()).toEqual([
+      "c C (U+0063)",
+      "p P (U+0070)",
+      "q Q (U+0071)",
+      "v V (U+0076)",
+      "x X (U+0078)",
+      "ʼ (U+02BC)",
+    ]);
+    for (const chip of chips) expect(chip.getAttribute("aria-pressed")).toBe("false");
+    const chars = usePhaseBDraftStore.getState().chars;
+    for (const ch of ["c", "p", "q", "v", "x", "ʼ"]) expect(chars).not.toContain(ch);
+    expect(chars).toContain("h");
+  });
+
+  it("adds a loanword letter with its case pair, and takes both out again", async () => {
+    getSourcedExemplars.set(bafutInventory());
+    renderPhaseB();
+    await acceptExemplarsAndContinue();
+
+    const chip = await screen.findByRole("button", { name: "c C (U+0063)" });
+    fireEvent.click(chip);
+    expect(chip.getAttribute("aria-pressed")).toBe("true");
+    expect(usePhaseBDraftStore.getState().chars).toEqual(expect.arrayContaining(["c", "C"]));
+    // Added by the author, so taking it out is an edit, not a rejected proposal.
+    expect(usePhaseBDraftStore.getState().provenance["c"]).toBe("author");
+
+    fireEvent.click(chip);
+    expect(chip.getAttribute("aria-pressed")).toBe("false");
+    expect(usePhaseBDraftStore.getState().chars).not.toContain("c");
+    expect(usePhaseBDraftStore.getState().chars).not.toContain("C");
+    expect(usePhaseBDraftStore.getState().rejected).not.toContain("c");
+  });
+
+  it("adds every loanword letter and its case pair with one click, then offers to remove them all", async () => {
+    getSourcedExemplars.set(bafutInventory());
+    renderPhaseB();
+    await acceptExemplarsAndContinue();
+
+    const toggleAll = await screen.findByTestId("alphabet-loanwords-toggle-all");
+    expect(toggleAll.textContent).toBe("Add all loanword letters");
+    fireEvent.click(toggleAll);
+
+    const chars = usePhaseBDraftStore.getState().chars;
+    for (const ch of ["c", "C", "p", "P", "q", "Q", "v", "V", "x", "X", "ʼ"]) expect(chars).toContain(ch);
+    // Nothing is added twice, and h (already a main-tier letter) is untouched.
+    expect(new Set(chars).size).toBe(chars.length);
+    expect(chars.filter((c) => c === "h")).toHaveLength(1);
+    const section = screen.getByTestId("alphabet-loanwords");
+    for (const chip of section.querySelectorAll("button[aria-pressed]")) {
+      expect(chip.getAttribute("aria-pressed")).toBe("true");
+    }
+    expect(toggleAll.textContent).toBe("Remove all loanword letters");
+
+    fireEvent.click(toggleAll);
+    const after = usePhaseBDraftStore.getState().chars;
+    for (const ch of ["c", "C", "p", "q", "v", "x", "ʼ"]) expect(after).not.toContain(ch);
+    expect(after).toContain("h");
+    expect(toggleAll.textContent).toBe("Add all loanword letters");
+  });
+
+  it("Add all completes a partial selection without toggling the letters already added", async () => {
+    getSourcedExemplars.set(bafutInventory());
+    renderPhaseB();
+    await acceptExemplarsAndContinue();
+
+    fireEvent.click(await screen.findByRole("button", { name: "q Q (U+0071)" }));
+    fireEvent.click(screen.getByTestId("alphabet-loanwords-toggle-all"));
+
+    const chars = usePhaseBDraftStore.getState().chars;
+    for (const ch of ["c", "p", "q", "Q", "v", "x", "ʼ"]) expect(chars).toContain(ch);
+    expect(new Set(chars).size).toBe(chars.length);
+  });
+
+  it("renders nothing when the inventory has no auxiliary tier", async () => {
+    getSourcedExemplars.set(inventory(["a", "ŋ", "ɔ"]));
+    renderPhaseB();
+    await acceptExemplarsAndContinue();
+    await screen.findByTestId("phase-b-heading");
+    expect(screen.queryByTestId("alphabet-loanwords")).toBeNull();
+  });
+});
