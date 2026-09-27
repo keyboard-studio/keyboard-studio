@@ -116,6 +116,7 @@ import {
 } from "../../hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "../../hooks/useWorkingCopyTransform.ts";
 import { useInventoryDiff } from "../../hooks/useInventoryDiff.ts";
+import { useLoanwordSet } from "../../hooks/useLoanwordSet.ts";
 import type { PlacementSeedEntry } from "../../survey/placementSeeds.ts";
 import {
   getRankedSuggestionsForChar,
@@ -1488,11 +1489,7 @@ export function MechanismGallery({
   const rawInventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
   // Loanword-tier letters the author added: needed, but placed after the
   // alphabet's own letters (survey/collation.ts loanwordsLast).
-  const sessionLoanwordChars = useWorkingCopyStore((s) => s.session.loanwordChars);
-  const loanwordSet = useMemo(
-    () => new Set(sessionLoanwordChars ?? []),
-    [sessionLoanwordChars],
-  );
+  const loanwordSet = useLoanwordSet();
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
   const axes = useWorkingCopyStore(
     useShallow((s) => s.session.axes as Partial<DiscoveryAxisVector>),

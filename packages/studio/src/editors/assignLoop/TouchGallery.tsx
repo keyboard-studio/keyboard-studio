@@ -150,6 +150,7 @@ import {
   resolveTouchSeedSource,
 } from "../../lib/touchEmission.ts";
 import { useInventoryDiff } from "../../hooks/useInventoryDiff.ts";
+import { useLoanwordSet } from "../../hooks/useLoanwordSet.ts";
 import { ErrorText } from "../../ui/index.ts";
 import {
   useWorkingCopyStore,
@@ -1783,11 +1784,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   const rawInventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
   // Loanword-tier letters the author added: needed, but placed after the
   // alphabet's own letters (survey/collation.ts loanwordsLast).
-  const sessionLoanwordChars = useWorkingCopyStore((s) => s.session.loanwordChars);
-  const loanwordSet = useMemo(
-    () => new Set(sessionLoanwordChars ?? []),
-    [sessionLoanwordChars],
-  );
+  const loanwordSet = useLoanwordSet();
 
   // Collated display/walk order (spec 047 FR-007's default-ICU comparator,
   // reused — not reinvented; see survey/collation.ts and MechanismGallery's
