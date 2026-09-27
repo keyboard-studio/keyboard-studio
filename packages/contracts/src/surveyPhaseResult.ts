@@ -93,6 +93,27 @@ export interface SurveyPhaseResult {
    */
   attestedDigraphs?: string[];
   /**
+   * Letters the author added from the exemplar AUXILIARY (loanword) tier:
+   * characters the language's sources list for borrowed words, which are not
+   * part of its alphabet (Bafut's c p q v x).
+   *
+   * **Part of `confirmedInventory`, NOT part of `alphabet`.** They are needed
+   * — carve and the convenience question must never offer them for removal,
+   * and the inventory is what makes them so — but they are not the
+   * language's own letters, so the alphabet model (and everything built on
+   * it: the marks series, the placement worklist) leaves them out. This list
+   * is the record that tells them apart: placement proposes them after the
+   * alphabet's letters, and the galleries label them as loanword letters.
+   * Case pairs are included.
+   *
+   * **Additive** — `undefined` for phases that run no character discovery.
+   * The build-list screen always emits it (`[]` when none were added), so a
+   * re-run replaces rather than keeps stale letters. Merged across phases by
+   * {@link mergePhaseResults} (deduped union, first-appearance order,
+   * NFC-normalised).
+   */
+  loanwordChars?: string[];
+  /**
    * Three-store confirmed alphabet (bases / marks / attested stacks, spec 071).
    * **Additive** — the canonical model behind `confirmedInventory`, which is
    * derived from it via `deriveConfirmedInventory` (confirmedAlphabet.ts) and

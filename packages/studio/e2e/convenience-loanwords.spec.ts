@@ -16,7 +16,9 @@
 //               the loanword letters unselected, and the convenience question
 //               offers exactly c p q v x.
 //   add one   — add q from the Loanword letters section before Done. q is then
-//               part of the alphabet, so the question offers only c p v x.
+//               a recorded loanword letter (needed, not in the alphabet), so
+//               the question offers only c p v x, and key placement tags q
+//               and lists it after the alphabet's letters.
 //   add all   — "Add all loanword letters" before Done. Every basic-Latin
 //               letter is then needed, so the question is skipped.
 //
@@ -118,7 +120,7 @@ test.describe("Convenience letters: loanword-only letters", () => {
     await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 20_000 });
   });
 
-  test("add one: a loanword letter added to the alphabet is not offered", async ({ page }) => {
+  test("add one: a loanword letter the author added is not offered, and is placed last as a loanword", async ({ page }) => {
     await reachBafutAlphabet(page);
 
     const q = page.getByTestId("alphabet-loanwords").getByRole("button", { name: /^q Q / });
@@ -127,6 +129,23 @@ test.describe("Convenience letters: loanword-only letters", () => {
 
     await continueToConvenience(page);
     expect(await offeredLetters(page)).toEqual(LOANWORD_SURPLUS.filter((ch) => ch !== "q"));
+
+    // Through carve to key placement: q is tagged as a loanword letter and
+    // comes after every alphabet letter in the character strip.
+    await page.getByTestId("convenience-continue").click();
+    await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 20_000 });
+    await page.getByTestId("carve-continue").click();
+    await page.getByRole("button", { name: "Start the mechanism gallery" }).click({ timeout: 30_000 });
+    await expect(page.getByTestId("char-scroll-loanword-0071")).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByTestId("char-scroll-loanword-0061")).toHaveCount(0);
+    const stripOrder = await page
+      .locator('[data-testid^="char-scroll-chip-"]')
+      .evaluateAll((els) => els.map((el) => el.getAttribute("data-testid") ?? ""));
+    const qIndex = stripOrder.indexOf("char-scroll-chip-0071");
+    const aIndex = stripOrder.indexOf("char-scroll-chip-0061");
+    expect(qIndex).toBeGreaterThan(-1);
+    expect(aIndex).toBeGreaterThan(-1);
+    expect(qIndex).toBeGreaterThan(aIndex);
   });
 
   test("add all: with every loanword letter added, the question is skipped", async ({ page }) => {

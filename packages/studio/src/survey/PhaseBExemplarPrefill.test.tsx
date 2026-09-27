@@ -472,7 +472,7 @@ describe("loanword letters section", () => {
     expect(chars).toContain("h");
   });
 
-  it("adds a loanword letter with its case pair, and takes both out again", async () => {
+  it("adds a loanword letter with its case pair beside the alphabet, and takes both out again", async () => {
     getSourcedExemplars.set(bafutInventory());
     renderPhaseB();
     await acceptExemplarsAndContinue();
@@ -480,14 +480,15 @@ describe("loanword letters section", () => {
     const chip = await screen.findByRole("button", { name: "c C (U+0063)" });
     fireEvent.click(chip);
     expect(chip.getAttribute("aria-pressed")).toBe("true");
-    expect(usePhaseBDraftStore.getState().chars).toEqual(expect.arrayContaining(["c", "C"]));
-    // Added by the author, so taking it out is an edit, not a rejected proposal.
-    expect(usePhaseBDraftStore.getState().provenance["c"]).toBe("author");
+    const state = usePhaseBDraftStore.getState();
+    expect(state.loanwordChars).toEqual(["c", "C"]);
+    // Beside the alphabet, never in it.
+    expect(state.chars).not.toContain("c");
+    expect(state.bases).not.toContain("c");
 
     fireEvent.click(chip);
     expect(chip.getAttribute("aria-pressed")).toBe("false");
-    expect(usePhaseBDraftStore.getState().chars).not.toContain("c");
-    expect(usePhaseBDraftStore.getState().chars).not.toContain("C");
+    expect(usePhaseBDraftStore.getState().loanwordChars).toEqual([]);
     expect(usePhaseBDraftStore.getState().rejected).not.toContain("c");
   });
 
@@ -498,13 +499,14 @@ describe("loanword letters section", () => {
 
     const toggleAll = await screen.findByTestId("alphabet-loanwords-toggle-all");
     expect(toggleAll.textContent).toBe("Add all loanword letters");
+    const charsBefore = [...usePhaseBDraftStore.getState().chars];
     fireEvent.click(toggleAll);
 
-    const chars = usePhaseBDraftStore.getState().chars;
-    for (const ch of ["c", "C", "p", "P", "q", "Q", "v", "V", "x", "X", "ʼ"]) expect(chars).toContain(ch);
-    // Nothing is added twice, and h (already a main-tier letter) is untouched.
-    expect(new Set(chars).size).toBe(chars.length);
-    expect(chars.filter((c) => c === "h")).toHaveLength(1);
+    const { loanwordChars, chars } = usePhaseBDraftStore.getState();
+    expect([...loanwordChars].sort()).toEqual(["C", "P", "Q", "V", "X", "c", "p", "q", "v", "x", "ʼ"].sort());
+    // The alphabet is untouched, and h (already a main-tier letter) is not a loanword.
+    expect(chars).toEqual(charsBefore);
+    expect(loanwordChars).not.toContain("h");
     const section = screen.getByTestId("alphabet-loanwords");
     for (const chip of section.querySelectorAll("button[aria-pressed]")) {
       expect(chip.getAttribute("aria-pressed")).toBe("true");
@@ -512,9 +514,8 @@ describe("loanword letters section", () => {
     expect(toggleAll.textContent).toBe("Remove all loanword letters");
 
     fireEvent.click(toggleAll);
-    const after = usePhaseBDraftStore.getState().chars;
-    for (const ch of ["c", "C", "p", "q", "v", "x", "ʼ"]) expect(after).not.toContain(ch);
-    expect(after).toContain("h");
+    expect(usePhaseBDraftStore.getState().loanwordChars).toEqual([]);
+    expect(usePhaseBDraftStore.getState().chars).toEqual(charsBefore);
     expect(toggleAll.textContent).toBe("Add all loanword letters");
   });
 
@@ -526,9 +527,45 @@ describe("loanword letters section", () => {
     fireEvent.click(await screen.findByRole("button", { name: "q Q (U+0071)" }));
     fireEvent.click(screen.getByTestId("alphabet-loanwords-toggle-all"));
 
-    const chars = usePhaseBDraftStore.getState().chars;
-    for (const ch of ["c", "p", "q", "Q", "v", "x", "ʼ"]) expect(chars).toContain(ch);
-    expect(new Set(chars).size).toBe(chars.length);
+    const { loanwordChars } = usePhaseBDraftStore.getState();
+    for (const ch of ["c", "p", "q", "Q", "v", "x", "ʼ"]) expect(loanwordChars).toContain(ch);
+    expect(new Set(loanwordChars).size).toBe(loanwordChars.length);
+  });
+
+  it("a loanword letter the author typed into the alphabet shows as added and is not duplicated", async () => {
+    getSourcedExemplars.set(bafutInventory());
+    renderPhaseB();
+    await acceptExemplarsAndContinue();
+
+    usePhaseBDraftStore.getState().add("q");
+    const chip = await screen.findByRole("button", { name: "q Q (U+0071)" });
+    await waitFor(() => expect(chip.getAttribute("aria-pressed")).toBe("true"));
+    fireEvent.click(screen.getByTestId("alphabet-loanwords-toggle-all"));
+    expect(usePhaseBDraftStore.getState().loanwordChars).not.toContain("q");
+  });
+
+  it("Done records loanword letters in the inventory, never in the alphabet", async () => {
+    getSourcedExemplars.set(bafutInventory());
+    const { onComplete } = renderPhaseB();
+    await acceptExemplarsAndContinue();
+
+    fireEvent.click(await screen.findByRole("button", { name: "x X (U+0078)" }));
+    fireEvent.click(screen.getByTestId("phase-b-done"));
+
+    const result = onComplete.mock.calls[0]?.[0] as import("@keyboard-studio/contracts").SurveyPhaseResult;
+    expect(result.loanwordChars).toEqual(["x", "X"]);
+    expect(result.confirmedInventory).toEqual(expect.arrayContaining(["x", "X", "a", "b"]));
+  });
+
+  it("Done records an empty loanword list when none were added", async () => {
+    getSourcedExemplars.set(bafutInventory());
+    const { onComplete } = renderPhaseB();
+    await acceptExemplarsAndContinue();
+
+    fireEvent.click(await screen.findByTestId("phase-b-done"));
+    const result = onComplete.mock.calls[0]?.[0] as import("@keyboard-studio/contracts").SurveyPhaseResult;
+    expect(result.loanwordChars).toEqual([]);
+    expect(result.confirmedInventory).not.toContain("x");
   });
 
   it("renders nothing when the inventory has no auxiliary tier", async () => {

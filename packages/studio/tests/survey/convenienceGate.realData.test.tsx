@@ -161,6 +161,27 @@ describe("Convenience letters gate, real data: loanword-only letters are surplus
   });
 });
 
+describe("Convenience letters gate, real data: recorded loanword letters", () => {
+  it("does not offer a letter recorded as a loanword letter, which stays out of the alphabet", async () => {
+    seed("bfd", BAFUT_BASES);
+    // What build-list Done records for a loanword letter: in the inventory and
+    // in loanwordChars, never in alphabet.bases.
+    useWorkingCopyStore.getState().recordPhase({
+      phase: "B",
+      answers: [],
+      alphabet: { bases: BAFUT_BASES, marks: [], attestedStacks: [], declaredRoles: {} },
+      confirmedInventory: [...BAFUT_BASES, "q", "Q"],
+      loanwordChars: ["q", "Q"],
+    });
+    expect(useWorkingCopyStore.getState().session.alphabet?.bases).not.toContain("q");
+    render(<ConvenienceCharsStep onComplete={vi.fn()} />);
+
+    await screen.findByTestId("convenience-chars");
+    expect(screen.queryByLabelText("Keep q Q")).toBeNull();
+    expect(screen.getAllByRole("checkbox")).toHaveLength(BAFUT_SURPLUS.length - 1);
+  });
+});
+
 describe("Convenience letters gate, real data: stays shut when there is no surplus", () => {
   it("completes without rendering for English on basic_kbdus, recording no-surplus", async () => {
     seed("en", [..."abcdefghijklmnopqrstuvwxyz"]);

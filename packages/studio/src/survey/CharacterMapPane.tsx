@@ -109,9 +109,17 @@ export function CharacterMapPane({
   const bcp47 = surveyContext.bcp47_tag;
   const languageName = surveyContext.language_name;
 
-  const chars = usePhaseBDraftStore((s) => s.chars);
+  const alphabetChars = usePhaseBDraftStore((s) => s.chars);
+  const loanwordChars = usePhaseBDraftStore((s) => s.loanwordChars);
   const addChar = usePhaseBDraftStore((s) => s.add);
   const removeChar = usePhaseBDraftStore((s) => s.remove);
+  const removeLoanword = usePhaseBDraftStore((s) => s.removeLoanword);
+  // What the map shows as selected: the alphabet plus the loanword letters the
+  // author added beside it. Both are characters the keyboard will type.
+  const chars = useMemo(
+    () => (loanwordChars.length === 0 ? alphabetChars : [...alphabetChars, ...loanwordChars]),
+    [alphabetChars, loanwordChars],
+  );
   const acceptInvisible = usePhaseBDraftStore((s) => s.acceptInvisible);
   const glyphFontStack = useGlyphFontStack();
   const isGlyphSupported = useFontSupportChecker(glyphFontStack);
@@ -319,7 +327,12 @@ export function CharacterMapPane({
     // mirrors this — removing a letter there removes both cases too.
     const pair = casePairOf(nfc, bcp47);
     if (wasSelected) {
-      for (const p of pair) if (chars.includes(p)) removeChar(p);
+      // A loanword letter leaves the loanword list; an alphabet letter leaves
+      // the alphabet. Either way the map's selection clears.
+      for (const p of pair) {
+        if (loanwordChars.includes(p)) removeLoanword(p);
+        else if (alphabetChars.includes(p)) removeChar(p);
+      }
     } else {
       // Add the counterpart(s) first, then the clicked char, so lastPick (used
       // by the visible-decomposition announcement) reflects the clicked char.

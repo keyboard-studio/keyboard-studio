@@ -717,8 +717,11 @@ function AlphabetBreakdown({ bcp47 }: AlphabetBreakdownProps) {
 // alphabet — and they are not counted as needed anywhere else either (the
 // engine's needed set leaves the auxiliary tier out). This section is where
 // the author sees them and decides: each chip toggles the letter (with its
-// case pair) in or out of the SAME draft the right-pane character map edits.
-// A letter the author leaves out stays surplus, so the convenience question
+// case pair) in or out of the draft's `loanwordChars` — a list beside the
+// alphabet, not in it. Done folds that list into `confirmedInventory`, so an
+// added letter is needed, but the alphabet model never sees it: loanword
+// letters are placed after the alphabet's own and labelled as loanwords. A
+// letter the author leaves out stays surplus, so the convenience question
 // and carve can ask about it later.
 //
 // Letters the main tier already carries (Bafut's h, via its {gh} cluster) are
@@ -738,7 +741,9 @@ function LoanwordsSection({ bcp47 }: { bcp47?: string | undefined }) {
   const { t } = useLingui();
   const { inventory } = useSourcedExemplars(bcp47);
   const chars = usePhaseBDraftStore((s) => s.chars);
-  const add = usePhaseBDraftStore((s) => s.add);
+  const loanwordChars = usePhaseBDraftStore((s) => s.loanwordChars);
+  const addLoanword = usePhaseBDraftStore((s) => s.addLoanword);
+  const removeLoanword = usePhaseBDraftStore((s) => s.removeLoanword);
   const remove = usePhaseBDraftStore((s) => s.remove);
 
   const loanwords = useMemo(() => {
@@ -751,15 +756,23 @@ function LoanwordsSection({ bcp47 }: { bcp47?: string | undefined }) {
 
   if (loanwords.length === 0) return null;
 
-  const allAdded = loanwords.every((ch) => chars.includes(ch));
+  // A letter counts as added when it is a loanword letter OR the author has
+  // already put it in the alphabet (typed it, or picked it in the map).
+  const isAdded = (ch: string): boolean => loanwordChars.includes(ch) || chars.includes(ch);
+  const allAdded = loanwords.every(isAdded);
 
-  /** Add or remove one loanword letter together with its case pair. */
+  /**
+   * Add or remove one loanword letter together with its case pair. Adding
+   * goes to the loanword list; removing takes the letter out of whichever
+   * list holds it, so the chip always reflects what the keyboard will type.
+   */
   const setLetter = (ch: string, on: boolean): void => {
-    const current = usePhaseBDraftStore.getState().chars;
+    const state = usePhaseBDraftStore.getState();
     for (const c of casePairOf(ch, bcp47)) {
-      const present = current.includes(c.normalize("NFC"));
-      if (on && !present) add(c);
-      else if (!on && present) remove(c);
+      const nfc = c.normalize("NFC");
+      if (on) addLoanword(nfc);
+      else if (state.loanwordChars.includes(nfc)) removeLoanword(nfc);
+      else if (state.chars.includes(nfc)) remove(nfc);
     }
   };
 
@@ -804,7 +817,7 @@ function LoanwordsSection({ bcp47 }: { bcp47?: string | undefined }) {
       <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
         {loanwords.map((ch) => {
           const pair = casePairOf(ch, bcp47);
-          const selected = chars.includes(ch);
+          const selected = isAdded(ch);
           const letters = pair.join(" ");
           const { title } = codepointLabel(ch);
           return (
@@ -858,6 +871,7 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
   const setSelectedFont = usePhaseBDraftStore((s) => s.setSelectedFont);
   const provenance = usePhaseBDraftStore((s) => s.provenance);
   const exemplarDigraphs = usePhaseBDraftStore((s) => s.exemplarDigraphs);
+  const loanwordChars = usePhaseBDraftStore((s) => s.loanwordChars);
   const removeChar = usePhaseBDraftStore((s) => s.remove);
   const alphabetEvidenceKey = usePhaseBDraftStore((s) => s.alphabetEvidenceKey);
 
@@ -1069,7 +1083,12 @@ function BuildListView({ context, onComplete, onBack }: BuildListViewProps) {
             onComplete({
               phase: "B",
               answers: [],
-              confirmedInventory: nfcDedup(chars, derivedUppercases),
+              // Loanword letters are needed, so they are in the inventory, but
+              // they stay out of the alphabet (the stores behind `chars`).
+              confirmedInventory: nfcDedup(nfcDedup(chars, derivedUppercases), loanwordChars),
+              // Always emitted, `[]` included: recordPhase merges per field,
+              // so an omitted field would keep a previous run's letters.
+              loanwordChars,
               // Alongside the inventory, never inside it: the cluster's own
               // letters are already in `chars`, so a keyboard needs no extra
               // key for "dz" — this is the record that d+z also form a unit.
@@ -1453,6 +1472,9 @@ export function PhaseB({ context = {}, onComplete, onBack, findingsByQuestionId,
     onComplete({
       ...result,
       confirmedInventory: extractInventory(result.answers),
+      // The manual path offers no loanword letters; clear any a previous
+      // build-list run recorded (recordPhase merges per field).
+      loanwordChars: [],
     });
   }
 

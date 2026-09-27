@@ -123,6 +123,13 @@ export interface CharScrollStripProps {
    * exercising something other than marks) simply omits it.
    */
   markedSet?: ReadonlySet<string>;
+  /**
+   * The session's loanword-tier letters (`session.loanwordChars`): kept for
+   * borrowed words, not part of the alphabet. A chip in this set shows a small
+   * "loanword" tag and gets an appended accessible-name clause (never the tag
+   * alone). Optional (defaults to empty).
+   */
+  loanwordSet?: ReadonlySet<string>;
 }
 
 /** Stable empty-set fallback for the two optional pre-augment set props above — avoids allocating a new Set every render when a caller omits them. */
@@ -145,6 +152,7 @@ export function CharScrollStrip({
   baseDirectSet = EMPTY_CHAR_SET,
   preAugmentSessionAwareSet = EMPTY_CHAR_SET,
   markedSet = EMPTY_CHAR_SET,
+  loanwordSet = EMPTY_CHAR_SET,
 }: CharScrollStripProps) {
   const { t } = useLingui();
   const chipRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
@@ -453,12 +461,19 @@ export function CharScrollStrip({
             id: "editor.assignLoop.charScroll.chipAriaLabel",
             message: `Go to ${{ notation: toUPlusNotation(c) }} ${{ char: c }}`,
           });
-          const chipAriaLabel = isMarked
+          const isLoanword = loanwordSet.has(c.normalize("NFC"));
+          const markedLabel = isMarked
             ? `${chipBaseAriaLabel} ${t({
                 id: "editor.assignLoop.charScroll.chipMarkedClause",
                 message: "marked for later review",
               })}`
             : chipBaseAriaLabel;
+          const chipAriaLabel = isLoanword
+            ? `${markedLabel} ${t({
+                id: "editor.assignLoop.charScroll.chipLoanwordClause",
+                message: "loanword letter",
+              })}`
+            : markedLabel;
           return (
             <button
               key={c}
@@ -585,6 +600,17 @@ export function CharScrollStrip({
                   </span>
                 )}
               </span>
+              {isLoanword && (
+                // Decorative — the button's aria-label above already carries
+                // the appended "loanword letter" clause.
+                <span
+                  data-testid={`char-scroll-loanword-${hex}`}
+                  aria-hidden="true"
+                  style={{ fontSize: 9, lineHeight: 1, color: TEXT_DIM }}
+                >
+                  {t({ id: "editor.assignLoop.charScroll.loanwordTag", message: "loanword" })}
+                </span>
+              )}
             </button>
           );
         })}

@@ -208,7 +208,7 @@ import {
 import { FindPanel, type FindPanelResult } from "./keyGrid/FindPanel.tsx";
 import { useModeContextCarry } from "./keyGrid/useModeContextCarry.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
-import { collateInventory } from "../../survey/collation.ts";
+import { collateInventory, loanwordsLast } from "../../survey/collation.ts";
 import { nfcDedup } from "../../survey/charNormUtils.ts";
 import {
   promoteOnManualEdit,
@@ -1776,6 +1776,13 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
 
   // Character inventory — same source MechanismGallery uses.
   const rawInventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
+  // Loanword-tier letters the author added: needed, but placed after the
+  // alphabet's own letters (survey/collation.ts loanwordsLast).
+  const sessionLoanwordChars = useWorkingCopyStore((s) => s.session.loanwordChars);
+  const loanwordSet = useMemo(
+    () => new Set(sessionLoanwordChars ?? []),
+    [sessionLoanwordChars],
+  );
 
   // Collated display/walk order (spec 047 FR-007's default-ICU comparator,
   // reused — not reinvented; see survey/collation.ts and MechanismGallery's
@@ -1810,8 +1817,8 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // through NFC unchanged (NFC(x) is not always length 1), so this never
   // folds two GENUINELY different characters together.
   const inventory = useMemo(
-    () => collateInventory(nfcDedup([], rawInventory)),
-    [rawInventory],
+    () => collateInventory(nfcDedup([], rawInventory), loanwordSet),
+    [rawInventory, loanwordSet],
   );
   // Stable primitive proxy for `inventory` — declared up here (rather than
   // beside the currentChar-sync effect) so detectedChars/touchLettersToAdd
@@ -3744,13 +3751,19 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   const touchLettersToAdd = useMemo(() => {
     const unplacedSet = new Set(keyGridProgress.unplacedChars);
     const returnedSet = new Set(returnedToWorklistChars);
-    return lowercaseFirst(
-      inventory.filter(
-        (c) =>
-          !detectedChars.has(c) ||
-          desktopSuggestionTargets.has(c) ||
-          (returnedSet.has(c) && unplacedSet.has(c)),
+    // lowercaseFirst is a stable sort across the WHOLE list, which would
+    // interleave loanword letters back among the alphabet's uppercase half;
+    // partition them to the end afterwards so they stay last.
+    return loanwordsLast(
+      lowercaseFirst(
+        inventory.filter(
+          (c) =>
+            !detectedChars.has(c) ||
+            desktopSuggestionTargets.has(c) ||
+            (returnedSet.has(c) && unplacedSet.has(c)),
+        ),
       ),
+      loanwordSet,
     );
     // inventoryKey/unplacedCharsKey/returnedToWorklistKey are the stable
     // primitive proxies for `inventory`/`keyGridProgress.unplacedChars`/
@@ -3762,6 +3775,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
     inventoryKey,
     unplacedCharsKey,
     returnedToWorklistKey,
+    loanwordSet,
   ]);
   const touchLettersToAddKey = touchLettersToAdd.join("\0");
 
@@ -5891,6 +5905,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
           baseDirectSet={touchBaseDirectSet}
           preAugmentSessionAwareSet={directTouchProducedSet}
           markedSet={markedTouchSet}
+          loanwordSet={loanwordSet}
         />
       )}
 

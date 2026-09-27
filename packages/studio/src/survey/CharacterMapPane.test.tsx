@@ -388,6 +388,32 @@ describe("CharacterMapPane — data path", () => {
     expect(screen.queryByRole("button", { name: /from your base keyboard/ })).toBeNull();
   });
 
+  it("shows a loanword letter as selected, and clicking it removes it from the loanword list only", async () => {
+    seedBaseAndLanguage();
+    getGroupsResult.set([
+      {
+        block: "Latin",
+        tier: "main",
+        script: "Latn",
+        usedByBase: false,
+        cells: [
+          { char: "a", isCombiningMark: false },
+          { char: "q", isCombiningMark: false },
+        ],
+      },
+    ]);
+    usePhaseBDraftStore.getState().add("a");
+    usePhaseBDraftStore.getState().addLoanword("q");
+    usePhaseBDraftStore.getState().addLoanword("Q");
+    render(<CharacterMapPane />);
+    const qCell = await screen.findByRole("button", { name: /Remove q \(U\+0071\)/ });
+    expect(qCell.getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.click(qCell);
+    expect(usePhaseBDraftStore.getState().loanwordChars).toEqual([]);
+    expect(usePhaseBDraftStore.getState().chars).toEqual(["a"]);
+  });
+
   it("shows only letters, numerals, and marks; excludes symbols and separators (spec 047)", async () => {
     seedBaseAndLanguage();
     getGroupsResult.set([

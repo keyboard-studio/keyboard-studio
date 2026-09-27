@@ -1481,6 +1481,13 @@ export function MechanismGallery({
     (s) => s.unflagCharForSequence,
   );
   const rawInventory = useWorkingCopyStore((s) => s.session.confirmedInventory);
+  // Loanword-tier letters the author added: needed, but placed after the
+  // alphabet's own letters (survey/collation.ts loanwordsLast).
+  const sessionLoanwordChars = useWorkingCopyStore((s) => s.session.loanwordChars);
+  const loanwordSet = useMemo(
+    () => new Set(sessionLoanwordChars ?? []),
+    [sessionLoanwordChars],
+  );
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
   const axes = useWorkingCopyStore(
     useShallow((s) => s.session.axes as Partial<DiscoveryAxisVector>),
@@ -1566,8 +1573,8 @@ export function MechanismGallery({
   // (NFC(x) is not always length 1), so this never folds two genuinely
   // different characters together.
   const inventory = useMemo(
-    () => collateInventory(nfcDedup([], rawInventory)),
-    [rawInventory],
+    () => collateInventory(nfcDedup([], rawInventory), loanwordSet),
+    [rawInventory, loanwordSet],
   );
 
   // This session's physical (desktop) assignments — feeds baseProducedSet
@@ -1664,8 +1671,8 @@ export function MechanismGallery({
         return !marks.every((m) => productiveMarks.has(m));
       });
     }
-    return collateInventory(filtered);
-  }, [inventoryLettersToAdd, worklist]);
+    return collateInventory(filtered, loanwordSet);
+  }, [inventoryLettersToAdd, worklist, loanwordSet]);
 
   // Read Phase C assignments directly (not the merged session.assignments view)
   // so multiple methods per character are preserved.
@@ -4158,6 +4165,7 @@ export function MechanismGallery({
             baseDirectSet={baseOnlyProducedSet}
             preAugmentSessionAwareSet={baseProducedSet}
             markedSet={markedDesktopSet}
+            loanwordSet={loanwordSet}
           />
         )}
 
