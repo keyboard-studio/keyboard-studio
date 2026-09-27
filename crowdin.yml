@@ -83,6 +83,12 @@ files:
     # entry here, same as en/fr — skipping it would reproduce this exact
     # fr -> fr-FR directory mismatch. Adding a locale that's genuinely
     # region-qualified from the start (pt-BR) needs no mapping entry at all.
+    #
+    # Either way, a new locale also needs lingui.config.ts locales,
+    # SUPPORTED_LOCALES (packages/studio/src/lib/i18n.ts), and
+    # CONFIGURED_LOCALES in utilities/i18n-prune-unconfigured-locales in the
+    # same commit (drift test enforces this) — otherwise the download workflow
+    # prunes the new locale right back off (#1844).
     languages_mapping:
       locale:
         en: "en"

@@ -16,6 +16,10 @@ const catalogDir =
 
 export default defineConfig({
   sourceLocale: "en",
+  // Adding a locale here means adding it in the same commit to
+  // SUPPORTED_LOCALES (src/lib/i18n.ts), both languages_mapping blocks in
+  // crowdin.yml, and CONFIGURED_LOCALES in
+  // utilities/i18n-prune-unconfigured-locales (drift test enforces this).
   locales: ["en", "fr"],
   // Sort by message ID, not by message text (Lingui's default is `"message"`).
   // Value order interleaves unrelated areas — a new `editor.*` string lands
