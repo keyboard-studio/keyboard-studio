@@ -48,6 +48,7 @@ import { devLog } from "@keyboard-studio/contracts/dev-log";
 import type { BaseKeyboard, RemovalCapability, VirtualFS, KeyboardIR } from "@keyboard-studio/contracts";
 import { useWorkingCopyStore, type IdentityPatch } from "../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../stores/surveySessionStore.ts";
+import { identityLanguagePatch } from "./identityLanguagePatch.ts";
 
 /** User-facing wording for the rebase confirm dialog — the single source of truth for the string. */
 export const REBASE_CONFIRM_MESSAGE =
@@ -149,11 +150,11 @@ export function identitySeedFromSession(base: BaseKeyboard): IdentityPatch | und
   const result = useSurveySessionStore.getState().identityResult;
   const bcp47 = result?.bcp47.trim() ?? "";
   if (bcp47 === "") return undefined;
-  const languageName = result?.english.trim() ?? "";
+  // Language overlay via the shared composition rule (identityLanguagePatch)
+  // — never re-derived here.
   return {
     displayName: base.displayName,
-    bcp47,
-    ...(languageName !== "" ? { languageName } : {}),
+    ...identityLanguagePatch(result),
   };
 }
 
