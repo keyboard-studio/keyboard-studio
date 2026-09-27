@@ -27,6 +27,7 @@ import {
   type AdaptiveDescriptionContext,
 } from "../../lib/adaptiveDescription.ts";
 import { deriveHistoryEntryState, applyHistoryEntryAction } from "../../lib/historyEntryState.ts";
+import { identityLanguagePatch } from "../../lib/identityLanguagePatch.ts";
 import { isHistoryEntryAction } from "../../survey/questions/f/pf_history_entry.ts";
 import { buildHistoryProposalSeed } from "../../decisions/historyProposalSeed.ts";
 
@@ -239,19 +240,13 @@ export const projectNameOptions: FlowStepOptions<ProjectNamePayload> = {
     // in surveySessionStore.identityResult and never crossed over, so the
     // descriptor had no author tag to write even in principle.
     //
-    // `bcp47` is consumed WHOLE (research D-03). The identity-lite series already
-    // composed language + region + script into one tag; re-deriving it here would
-    // be a second composition rule that could disagree with the first. An empty
-    // string (author left the language code blank) is omitted rather than written,
-    // so the descriptor writer applies its own `und` placeholder instead of
-    // declaring a blank tag.
-    const bcp47 = deps.identityResult?.bcp47.trim() ?? "";
-    const languageName = deps.identityResult?.english.trim() ?? "";
+    // Language overlay via the shared composition rule (identityLanguagePatch):
+    // `bcp47` is consumed WHOLE (research D-03) and empties are omitted, in
+    // exactly one place — shared with confirmRebase's identitySeedFromSession.
     deps.setIdentity({
       keyboardId: extracted.keyboardId,
       displayName: extracted.displayName,
-      ...(bcp47 !== "" ? { bcp47 } : {}),
-      ...(languageName !== "" ? { languageName } : {}),
+      ...identityLanguagePatch(deps.identityResult),
     });
   },
 };

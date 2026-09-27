@@ -887,8 +887,10 @@ export interface WorkingCopyState {
    * Track 1 — copy a base, NEW identity (spec §8 v1.3.0).
    *
    * Sets baseKeyboard, baseVfs, baseIr, and seeds the carve working IR from
-   * baseIr. Resets identity to null (a fresh copy starts with no identity overlay
-   * until the user completes Phase A). Clears all edit layers (deletedNodeIds,
+   * baseIr. Resets identity to `opts.identitySeed`, or to null without one (a
+   * fresh copy has no author-chosen name or id until Phase A completes; the seed
+   * carries only what the identity step already knows — the language). Clears
+   * all edit layers (deletedNodeIds,
    * undoStack, phaseResults / assignments) so a fresh copy starts clean.
    * Sets instantiationMode = "new-from-base".
    *
@@ -900,7 +902,19 @@ export interface WorkingCopyState {
    */
   instantiateFromBase: (
     base: BaseKeyboard,
-    opts: { vfs: VirtualFS; ir: KeyboardIR; removalCapabilities?: Map<string, RemovalCapability> },
+    opts: {
+      vfs: VirtualFS;
+      ir: KeyboardIR;
+      removalCapabilities?: Map<string, RemovalCapability>;
+      /**
+       * The identity the new copy starts with. The app passes the language
+       * the identity step composed (see `identitySeedFromSession`), so every
+       * `identity.bcp47` reader has the author's language from the start. The
+       * adapt track needs this: it skips project_name, the only other Track 1
+       * writer before output.
+       */
+      identitySeed?: IdentityPatch;
+    },
   ) => void;
 
   /**
@@ -1704,7 +1718,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
 
   // -- Instantiation actions (spec §8 v1.3.0) ----------------------------------
 
-  instantiateFromBase: (base, { vfs, ir, removalCapabilities }) => {
+  instantiateFromBase: (base, { vfs, ir, removalCapabilities, identitySeed }) => {
     // Three-case resolution (redundant re-fire / first instantiate / genuine
     // switch) is shared with instantiateFromExisting — see
     // resolveInstantiationCase for the full explanation.
@@ -1747,8 +1761,9 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       baseKeyboard: base,
       baseVfs: vfs,
       baseIr: ir,
-      // Reset identity: fresh copy has no overlay until Phase A completes.
-      identity: null,
+      // Reset identity to the caller's seed (the identity step's language), or
+      // to no overlay at all until Phase A completes.
+      identity: identitySeed ?? null,
       // Seed the carve working IR from the base IR; clear any prior carve state.
       ir,
       removalCapabilities: removalCapabilities ?? new Map(),
