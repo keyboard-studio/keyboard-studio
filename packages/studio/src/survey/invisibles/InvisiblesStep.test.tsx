@@ -44,7 +44,7 @@ afterEach(() => {
 describe("InvisiblesStep — always renders (FR-020)", () => {
   it("renders the step, heading, continue and back even when nothing is relevant, with the none-needed note", () => {
     const onBack = vi.fn();
-    const { container } = render(<InvisiblesStep onComplete={vi.fn()} onBack={onBack} />);
+    const { container } = render(<InvisiblesStep onComplete={vi.fn()} onBack={onBack} />, { withStepNav: true });
     expect(container.firstChild).not.toBeNull();
     expect(screen.getByTestId("invisibles-step")).toBeTruthy();
     expect(screen.getByTestId("invisibles-heading").textContent).toContain("Invisible characters");
@@ -55,7 +55,7 @@ describe("InvisiblesStep — always renders (FR-020)", () => {
   });
 
   it("omits Back only when onBack is not supplied; the fixed five are still offered by name", () => {
-    render(<InvisiblesStep onComplete={vi.fn()} />);
+    render(<InvisiblesStep onComplete={vi.fn()} />, { withStepNav: true });
     expect(screen.queryByTestId("invisibles-back")).toBeNull();
     for (const hex of ["200d", "200c", "200b", "00ad", "2060"]) {
       expect(screen.getByTestId(`invisible-candidate-${hex}`)).toBeTruthy();
@@ -68,7 +68,7 @@ describe("InvisiblesStep — always renders (FR-020)", () => {
 
 describe("InvisiblesStep — checkbox toggles bound to invisibleDecisions", () => {
   it("each candidate is a role=checkbox whose aria-checked follows the store; toggling accepts then declines", () => {
-    render(<InvisiblesStep onComplete={vi.fn()} />);
+    render(<InvisiblesStep onComplete={vi.fn()} />, { withStepNav: true });
     const zwnj = screen.getByTestId("invisible-candidate-200c");
     expect(zwnj.getAttribute("role")).toBe("checkbox");
     expect(zwnj.getAttribute("aria-checked")).toBe("false");
@@ -83,7 +83,7 @@ describe("InvisiblesStep — checkbox toggles bound to invisibleDecisions", () =
   });
 
   it("every candidate has an accessible name and a need statement wired through aria-labelledby/aria-describedby", () => {
-    render(<InvisiblesStep onComplete={vi.fn()} />);
+    render(<InvisiblesStep onComplete={vi.fn()} />, { withStepNav: true });
     const row = screen.getByTestId("invisible-candidate-00ad");
     const labelId = row.getAttribute("aria-labelledby")!;
     const needId = row.getAttribute("aria-describedby")!;
@@ -96,7 +96,7 @@ describe("InvisiblesStep — the result (FR-014, FR-018, FR-024)", () => {
   it("accepted characters reach phaseCConfirmedInventory() and never enter chars or controls", () => {
     usePhaseBDraftStore.getState().add("!");
     const onComplete = vi.fn();
-    render(<InvisiblesStep onComplete={onComplete} />);
+    render(<InvisiblesStep onComplete={onComplete} />, { withStepNav: true });
     fireEvent.click(screen.getByTestId("invisible-candidate-200c"));
     fireEvent.click(screen.getByTestId("invisibles-continue"));
 
@@ -110,7 +110,7 @@ describe("InvisiblesStep — the result (FR-014, FR-018, FR-024)", () => {
 
   it("carries one boolean answer per offered candidate, so a declined offer is false rather than absent", () => {
     const onComplete = vi.fn();
-    render(<InvisiblesStep onComplete={onComplete} />);
+    render(<InvisiblesStep onComplete={onComplete} />, { withStepNav: true });
     fireEvent.click(screen.getByTestId("invisible-candidate-200d"));
     // Decline explicitly by toggling twice.
     fireEvent.click(screen.getByTestId("invisible-candidate-200b"));
@@ -133,7 +133,7 @@ describe("InvisiblesStep — the result (FR-014, FR-018, FR-024)", () => {
 
   it("a second Continue click never completes twice", () => {
     const onComplete = vi.fn();
-    render(<InvisiblesStep onComplete={onComplete} />);
+    render(<InvisiblesStep onComplete={onComplete} />, { withStepNav: true });
     fireEvent.click(screen.getByTestId("invisibles-continue"));
     fireEvent.click(screen.getByTestId("invisibles-continue"));
     expect(onComplete).toHaveBeenCalledTimes(1);
@@ -149,7 +149,7 @@ describe("InvisiblesStep — carry-over of code-point entries (FR-017)", () => {
     expect(usePhaseBDraftStore.getState().controls).toEqual(["⁡", "‌"]);
 
     const onComplete = vi.fn();
-    render(<InvisiblesStep onComplete={onComplete} />);
+    render(<InvisiblesStep onComplete={onComplete} />, { withStepNav: true });
 
     expect(usePhaseBDraftStore.getState().chars).toEqual(["!"]);
     expect(usePhaseBDraftStore.getState().controls).toEqual([]);
@@ -169,13 +169,13 @@ describe("InvisiblesStep — carry-over of code-point entries (FR-017)", () => {
 
 describe("InvisiblesStep — leave and return (spec 079 FR-051, D-4)", () => {
   it("an accepted candidate survives an unmount/remount with the same evidence", () => {
-    const first = render(<InvisiblesStep onComplete={vi.fn()} />);
+    const first = render(<InvisiblesStep onComplete={vi.fn()} />, { withStepNav: true });
     fireEvent.click(screen.getByTestId("invisible-candidate-200c"));
     expect(usePhaseBDraftStore.getState().invisibleDecisions["U+200C"]).toBe("accepted");
     expect(screen.getByTestId("invisible-candidate-200c").getAttribute("aria-checked")).toBe("true");
 
     first.unmount();
-    render(<InvisiblesStep onComplete={vi.fn()} />);
+    render(<InvisiblesStep onComplete={vi.fn()} />, { withStepNav: true });
 
     expect(usePhaseBDraftStore.getState().invisibleDecisions["U+200C"]).toBe("accepted");
     expect(screen.getByTestId("invisible-candidate-200c").getAttribute("aria-checked")).toBe("true");
@@ -184,7 +184,7 @@ describe("InvisiblesStep — leave and return (spec 079 FR-051, D-4)", () => {
   it("the phase-C answer slot still holds invisibles' own answers after convenience records into the same phase (D-4/R-08)", () => {
     const recordPhase = useWorkingCopyStore.getState().recordPhase;
     const onComplete = vi.fn();
-    render(<InvisiblesStep onComplete={onComplete} />);
+    render(<InvisiblesStep onComplete={onComplete} />, { withStepNav: true });
     fireEvent.click(screen.getByTestId("invisible-candidate-200d"));
     fireEvent.click(screen.getByTestId("invisibles-continue"));
     const invisiblesResult = lastResult(onComplete);
@@ -213,7 +213,7 @@ describe("InvisiblesStep — leave and return (spec 079 FR-051, D-4)", () => {
 
 describe("InvisiblesStep — shape change: new candidates proposed, decisions kept, no flags (spec 079 US3 T048/T079)", () => {
   it("a writing-direction change to RTL proposes the bidi candidates while an earlier LTR decision survives", () => {
-    const first = render(<InvisiblesStep onComplete={vi.fn()} />);
+    const first = render(<InvisiblesStep onComplete={vi.fn()} />, { withStepNav: true });
     fireEvent.click(screen.getByTestId("invisible-candidate-200c")); // an always-offered candidate
     expect(usePhaseBDraftStore.getState().invisibleDecisions["U+200C"]).toBe("accepted");
     first.unmount();
@@ -221,7 +221,7 @@ describe("InvisiblesStep — shape change: new candidates proposed, decisions ke
     // Shape change: the author is now known to be RTL — new bidi candidates
     // become relevant.
     useSurveySessionStore.getState().setSurveyContext({ script_family: "rtl" });
-    render(<InvisiblesStep onComplete={vi.fn()} />);
+    render(<InvisiblesStep onComplete={vi.fn()} />, { withStepNav: true });
 
     // The earlier decision survives untouched.
     expect(usePhaseBDraftStore.getState().invisibleDecisions["U+200C"]).toBe("accepted");
@@ -233,12 +233,12 @@ describe("InvisiblesStep — shape change: new candidates proposed, decisions ke
   });
 
   it("never shows a flagged-answers list or reason cue — there is no `reproposed` state for this step's per-answer design", () => {
-    const first = render(<InvisiblesStep onComplete={vi.fn()} />);
+    const first = render(<InvisiblesStep onComplete={vi.fn()} />, { withStepNav: true });
     fireEvent.click(screen.getByTestId("invisible-candidate-200c"));
     first.unmount();
 
     useSurveySessionStore.getState().setSurveyContext({ script_family: "rtl" });
-    render(<InvisiblesStep onComplete={vi.fn()} />);
+    render(<InvisiblesStep onComplete={vi.fn()} />, { withStepNav: true });
 
     expect(screen.queryByTestId("flagged-answers-list")).toBeNull();
   });
@@ -246,7 +246,7 @@ describe("InvisiblesStep — shape change: new candidates proposed, decisions ke
 
 describe("InvisiblesStep — the bidi group and writing direction", () => {
   it("collapses the direction controls under the collapsed note when the author is not right-to-left, and can expand them", () => {
-    render(<InvisiblesStep onComplete={vi.fn()} />);
+    render(<InvisiblesStep onComplete={vi.fn()} />, { withStepNav: true });
     const bidi = screen.getByTestId("invisibles-bidi-group");
     expect(within(bidi).getByText(/right-to-left scripts/)).toBeTruthy();
     expect(screen.queryByTestId("invisible-candidate-200e")).toBeNull();
@@ -258,7 +258,7 @@ describe("InvisiblesStep — the bidi group and writing direction", () => {
 
   it("shows the direction controls expanded for a right-to-left author", () => {
     markRtl();
-    render(<InvisiblesStep onComplete={vi.fn()} />);
+    render(<InvisiblesStep onComplete={vi.fn()} />, { withStepNav: true });
     expect(screen.queryByTestId("invisibles-bidi-expand")).toBeNull();
     expect(screen.getByTestId("invisible-candidate-200f")).toBeTruthy();
     expect(screen.getByText(/RIGHT-TO-LEFT MARK/)).toBeTruthy();

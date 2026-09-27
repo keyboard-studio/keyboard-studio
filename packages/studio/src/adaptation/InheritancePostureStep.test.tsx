@@ -39,6 +39,7 @@ describe("InheritancePostureStep", () => {
     const posture = buildPosture(evidence(), "base_x");
     render(
       <InheritancePostureStep posture={posture} provenanceTier="content-derived" onConfirm={vi.fn()} />,
+      { withStepNav: true },
     );
     for (const facet of GOVERNED_FACETS) {
       for (const p of ["keep", "propose", "discard"]) {
@@ -53,6 +54,7 @@ describe("InheritancePostureStep", () => {
     const onConfirm = vi.fn();
     render(
       <InheritancePostureStep posture={posture} provenanceTier="content-derived" onConfirm={onConfirm} />,
+      { withStepNav: true },
     );
     fireEvent.click(screen.getByTestId("posture-confirm"));
 
@@ -67,6 +69,7 @@ describe("InheritancePostureStep", () => {
     const onConfirm = vi.fn();
     render(
       <InheritancePostureStep posture={posture} provenanceTier="content-derived" onConfirm={onConfirm} />,
+      { withStepNav: true },
     );
 
     fireEvent.click(screen.getByTestId("posture-input-strategies-discard"));
@@ -86,5 +89,26 @@ describe("InheritancePostureStep", () => {
     const strategies = resolved.entries.find((e) => e.facet === "input-strategies")!;
     expect(strategies.posture).toBe("discard");
     expect(strategies.source).toBe("overridden");
+  });
+
+  it("publishes Back and Confirm to the footer nav, not the body (spec 081 row 18)", () => {
+    const posture = buildPosture(evidence(), "base_x");
+    const onBack = vi.fn();
+    const { rerender } = render(
+      <InheritancePostureStep posture={posture} provenanceTier="content-derived" onConfirm={vi.fn()} onBack={onBack} />,
+      { withStepNav: true },
+    );
+    const nav = screen.getByTestId("step-nav");
+    expect(nav.contains(screen.getByTestId("posture-back"))).toBe(true);
+    expect(nav.contains(screen.getByTestId("posture-confirm"))).toBe(true);
+    expect(screen.getAllByTestId("posture-confirm")).toHaveLength(1);
+    fireEvent.click(screen.getByTestId("posture-back"));
+    expect(onBack).toHaveBeenCalledTimes(1);
+
+    rerender(
+      <InheritancePostureStep posture={posture} provenanceTier="content-derived" onConfirm={vi.fn()} />,
+    );
+    expect(screen.queryByTestId("posture-back")).toBeNull();
+    expect(screen.getByTestId("step-nav").contains(screen.getByTestId("posture-confirm"))).toBe(true);
   });
 });

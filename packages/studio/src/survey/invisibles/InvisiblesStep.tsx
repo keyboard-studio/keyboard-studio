@@ -48,6 +48,7 @@ import { plural } from "@lingui/core/macro";
 import type { SurveyAnswer, SurveyPhaseResult } from "@keyboard-studio/contracts";
 import { parseUPlusNotation } from "@keyboard-studio/contracts";
 import type { EditorStepProps } from "../../steps/types.ts";
+import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { usePhaseBDraftStore } from "../../stores/phaseBDraftStore.ts";
@@ -71,7 +72,6 @@ import {
   mutedParaFlush,
   sectionHeading,
   secondaryButton,
-  primaryButton,
 } from "../surveyStyles.ts";
 
 export type WritingDirection = "rtl" | "ltr" | "unknown";
@@ -258,6 +258,36 @@ const InvisiblesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: 
     onComplete({ phase: "C", answers, confirmedInventory: phaseCConfirmedInventory() });
   }
 
+  // Back / Continue render in the footer (spec 081).
+  usePublishStepNav({
+    ...(onBack !== undefined
+      ? {
+          back: {
+            label: t({ id: "survey.invisibles.backButton", message: "Back" }),
+            onClick: onBack,
+            testId: "invisibles-back",
+          },
+        }
+      : {}),
+    forward: {
+      label:
+        acceptedCount === 0
+          ? t({
+              id: "survey.invisibles.continueButtonNone",
+              message: "Continue without invisible characters",
+            })
+          : t({
+              id: "survey.invisibles.continueButton",
+              message: plural(acceptedCount, {
+                one: "Continue (# invisible character)",
+                other: "Continue (# invisible characters)",
+              }),
+            }),
+      onClick: complete,
+      testId: "invisibles-continue",
+    },
+  });
+
   return (
     <div
       data-testid="invisibles-step"
@@ -270,17 +300,6 @@ const InvisiblesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: 
         color: TEXT_MAIN,
       }}
     >
-      {onBack !== undefined && (
-        <button
-          type="button"
-          data-testid="invisibles-back"
-          onClick={onBack}
-          style={{ alignSelf: "flex-start", ...secondaryButton }}
-        >
-          <Trans id="survey.invisibles.backButton">Back</Trans>
-        </button>
-      )}
-
       <h2 style={phaseHeadingFlush} data-testid="invisibles-heading">
         <Trans id="survey.invisibles.heading">Invisible characters</Trans>
       </h2>
@@ -367,29 +386,6 @@ const InvisiblesStep: ComponentType<EditorStepProps> = ({ onComplete, onBack }: 
           </ul>
         )}
       </section>
-
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <button
-          type="button"
-          data-testid="invisibles-continue"
-          onClick={complete}
-          className="ks-focus-ring ks-hit-target"
-          style={primaryButton(false)}
-        >
-          {acceptedCount === 0
-            ? t({
-                id: "survey.invisibles.continueButtonNone",
-                message: "Continue without invisible characters",
-              })
-            : t({
-                id: "survey.invisibles.continueButton",
-                message: plural(acceptedCount, {
-                  one: "Continue (# invisible character)",
-                  other: "Continue (# invisible characters)",
-                }),
-              })}
-        </button>
-      </div>
     </div>
   );
 };

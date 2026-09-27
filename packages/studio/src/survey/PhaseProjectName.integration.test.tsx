@@ -109,7 +109,7 @@ describe("ProjectNameStepFactoryComponent — displayName->slug seed chain (real
         ?.value as string | undefined;
     });
 
-    render(<ProjectNameStepFactoryComponent onComplete={onComplete} onBack={vi.fn()} />);
+    render(<ProjectNameStepFactoryComponent onComplete={onComplete} onBack={vi.fn()} />, { withStepNav: true });
 
     // Step 1: project_display_name question renders with the seeded value.
     // The SurveyRunner seeds the field via getSeedValue on first arrival.
@@ -162,7 +162,7 @@ describe("ProjectNameStepFactoryComponent — displayName->slug seed chain (real
 
     const onComplete = vi.fn();
 
-    render(<ProjectNameStepFactoryComponent onComplete={onComplete} onBack={vi.fn()} />);
+    render(<ProjectNameStepFactoryComponent onComplete={onComplete} onBack={vi.fn()} />, { withStepNav: true });
 
     // Edit the display name before advancing.
     const displayNameInput = screen.getByRole("textbox");
@@ -222,7 +222,7 @@ describe("ProjectNameStepFactoryComponent — displayName->slug seed chain (real
     });
 
     const onComplete = vi.fn();
-    render(<ProjectNameStepFactoryComponent onComplete={onComplete} onBack={vi.fn()} />);
+    render(<ProjectNameStepFactoryComponent onComplete={onComplete} onBack={vi.fn()} />, { withStepNav: true });
 
     const displayNameInput = screen.getByRole("textbox");
     expect((displayNameInput as HTMLInputElement).value).toBe(autonym);
@@ -258,7 +258,7 @@ describe("ProjectNameStepFactoryComponent — displayName->slug seed chain (real
       <ProjectNameStepFactoryComponent
         onComplete={vi.fn()}
         onBack={onBack}
-      />,
+      />, { withStepNav: true },
     );
 
     // Back button is present on the first question.

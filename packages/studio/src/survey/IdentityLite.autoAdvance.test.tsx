@@ -57,7 +57,7 @@ afterEach(cleanup);
 
 describe("IdentityLite auto-advance seed race (PR #1050 regression)", () => {
   it("no-region language: auto-advance seeds Q2 with the recorded local name, not the English fallback", async () => {
-    render(<IdentityLite onComplete={vi.fn()} />);
+    render(<IdentityLite onComplete={vi.fn()} />, { withStepNav: true });
     await waitFor(() => {
       expect(screen.getByRole<HTMLInputElement>("combobox").placeholder).toMatch(/Type your language/);
     });
@@ -83,7 +83,7 @@ describe("IdentityLite auto-advance seed race (PR #1050 regression)", () => {
   });
 
   it("Q3 code dropdown offers the resolved language's candidate code forms", async () => {
-    render(<IdentityLite onComplete={vi.fn()} />);
+    render(<IdentityLite onComplete={vi.fn()} />, { withStepNav: true });
     await waitFor(() => {
       expect(screen.getByRole<HTMLInputElement>("combobox").placeholder).toMatch(/Type your language/);
     });

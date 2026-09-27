@@ -124,6 +124,7 @@ import {
 import { Badge, Button, Checkbox, Notice, RadioGroup } from "../../../ui/index.ts";
 import type { RadioOption } from "../../../ui/index.ts";
 import { BG_CARD, BORDER, TEXT_DIM, TEXT_MAIN, FONT } from "../../../lib/galleryTheme.ts";
+import { FOCUSABLE_SELECTOR } from "../../../lib/focusableSelector.ts";
 import { resolveMessage } from "../../../lib/i18nResolve.ts";
 import type { KeyGridCellViewModel } from "./keyGridViewModel.ts";
 
@@ -381,13 +382,9 @@ export interface RemoveKeyDialogCollateralWarning {
 
 // ---------------------------------------------------------------------------
 // Focus management helpers (ARIA APG dialog pattern; docs/accessibility.md).
-// Duplicated from RenameDialog.tsx rather than shared — that file has the
-// same small trap inline and this package has not yet extracted a common
-// hook; extracting one is out of this task's scope.
+// The focusable selector is shared via lib/focusableSelector.ts (same trap
+// in RenameDialog, FamilyApplyDialog, the anchored popovers, SurveyQuestionsPane).
 // ---------------------------------------------------------------------------
-
-const FOCUSABLE_SELECTOR =
-  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 // ---------------------------------------------------------------------------
 // Props

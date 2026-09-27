@@ -37,7 +37,7 @@ describe("MechanismGallery — Apply lives in the open method card", () => {
   it("puts Apply in the open card, and only there", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
 
     // "á" decomposes to a + U+0301, so the §3c default method is deadkey — its
@@ -53,7 +53,7 @@ describe("MechanismGallery — Apply lives in the open method card", () => {
   it("follows the author into whichever card they open", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     expect(screen.getByTestId("mechanism-apply-deadkey")).toBeTruthy();
 
@@ -70,7 +70,7 @@ describe("MechanismGallery — Apply lives in the open method card", () => {
   it("offers no Apply on the sequence card — the right-pane builder owns that", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
 
     fireEvent.click(screen.getByText(/Type a sequence/i));
@@ -85,7 +85,7 @@ describe("MechanismGallery — sequence method chooser", () => {
   it("shows the 'Type a sequence' option for any character", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     expect(screen.getByText(/Type a sequence/i)).toBeTruthy();
   });
@@ -93,7 +93,7 @@ describe("MechanismGallery — sequence method chooser", () => {
   it("selecting 'Type a sequence' swaps the right pane's live preview for the sequence builder", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     // "á" decomposes to a + U+0301, so the §3c default method is deadkey and
     // the live preview (OSKFrame mock) is showing (visible, not hidden).
@@ -119,7 +119,7 @@ describe("MechanismGallery — sequence method chooser", () => {
   it("does NOT unmount/recreate the OSKFrame when toggling the sequence method (KMW reinit is expensive/unsafe — see OSKFrame.tsx's own doc comment)", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     const oskFrameBefore = screen.getByTestId("osk-frame");
 
@@ -135,7 +135,7 @@ describe("MechanismGallery — sequence method chooser", () => {
   it("the builder's own Apply is disabled until Content and Indicator both resolve", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     fireEvent.click(screen.getByText(/Type a sequence/i));
     const applyBtn = screen.getByTestId("sequences-apply");
@@ -150,7 +150,7 @@ describe("MechanismGallery — sequence method chooser", () => {
   it("Cancel returns to the live preview without recording anything", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     fireEvent.click(screen.getByText(/Type a sequence/i));
     fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "a" } });
@@ -172,7 +172,7 @@ describe("MechanismGallery — sequence method chooser", () => {
     // enabled without further input — the author just confirms.
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     const triggerSelect = screen.getByLabelText(/Trigger key for deadkey/i);
     expect(triggerSelect).toBeTruthy();
@@ -183,7 +183,7 @@ describe("MechanismGallery — sequence method chooser", () => {
   it("defaults to the swap method for a plain (non-accented) character", async () => {
     seedInventory(["z"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     expect(screen.getByLabelText(/Physical key for Assign to a key/i)).toBeTruthy();
   });
@@ -206,7 +206,7 @@ describe("MechanismGallery — abugida script-class gate on the deadkey default"
     useWorkingCopyStore.getState().setIrAxes({ scriptClass: "abugida" });
     seedInventory([CONSONANT_VIRAMA]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     expect(screen.queryByLabelText(/Trigger key for deadkey/i)).toBeNull();
     expect(screen.getByLabelText(/Physical key for Assign to a key/i)).toBeTruthy();
@@ -216,7 +216,7 @@ describe("MechanismGallery — abugida script-class gate on the deadkey default"
     useWorkingCopyStore.getState().setIrAxes({ scriptClass: "alphabetic" });
     seedInventory([CONSONANT_VIRAMA]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     expect(screen.getByLabelText(/Trigger key for deadkey/i)).toBeTruthy();
   });
@@ -224,7 +224,7 @@ describe("MechanismGallery — abugida script-class gate on the deadkey default"
   it("still auto-defaults to the deadkey method when scriptClass is undefined (fail-open)", async () => {
     seedInventory([CONSONANT_VIRAMA]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     expect(screen.getByLabelText(/Trigger key for deadkey/i)).toBeTruthy();
   });
@@ -243,7 +243,7 @@ describe("MechanismGallery — abugida script-class gate on the deadkey default"
     useWorkingCopyStore.getState().setIrAxes({ scriptClass: "abjad" });
     seedInventory([BET_DAGESH]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     expect(screen.getByLabelText(/Trigger key for deadkey/i)).toBeTruthy();
   });
@@ -258,7 +258,7 @@ describe("MechanismGallery — deadkey method chooser", () => {
     // S-02 deadkey is now always offered (not restricted to decomposable chars).
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     expect(screen.getByText(/Tap a trigger key, then a letter/i)).toBeTruthy();
   });
@@ -267,7 +267,7 @@ describe("MechanismGallery — deadkey method chooser", () => {
     // S-02 is always shown — deadkey is not restricted to accented chars.
     seedInventory(["a"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     expect(screen.getByText(/Tap a trigger key, then a letter/i)).toBeTruthy();
   });
@@ -275,7 +275,7 @@ describe("MechanismGallery — deadkey method chooser", () => {
   it("switching to deadkey method exposes the trigger-key selector", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
     expect(screen.getByLabelText(/Trigger key for deadkey/i)).toBeTruthy();
@@ -284,7 +284,7 @@ describe("MechanismGallery — deadkey method chooser", () => {
   it("deadkey Add key button is enabled immediately (trigger key has a default)", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
     const addBtn = screen.getByRole("button", { name: /Apply method for á/i });
@@ -300,7 +300,7 @@ describe("MechanismGallery — apply (sequence)", () => {
   it("the builder's Apply records a real multi_char_sequence assignment, not a bare flag", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     fireEvent.click(screen.getByText(/Type a sequence/i));
     fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "a" } });
@@ -323,7 +323,7 @@ describe("MechanismGallery — apply (sequence)", () => {
   it("Apply returns the right pane to the live preview (mirrors every other method's Apply)", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     fireEvent.click(screen.getByText(/Type a sequence/i));
     fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "a" } });
@@ -337,7 +337,7 @@ describe("MechanismGallery — apply (sequence)", () => {
   it("a recorded sequence appears in the 'Sequences' row, not the 'Added' row", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     fireEvent.click(screen.getByText(/Type a sequence/i));
     fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "a" } });
@@ -357,7 +357,7 @@ describe("MechanismGallery — apply (sequence)", () => {
   it("a recorded sequence does not change the coverage count", async () => {
     seedInventory(["á", "é"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     fireEvent.click(screen.getByText(/Type a sequence/i));
     fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "a" } });
@@ -376,7 +376,7 @@ describe("MechanismGallery — apply (sequence)", () => {
   it("a recorded sequence enables Next for the current character", async () => {
     seedInventory(["á", "é"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     fireEvent.click(screen.getByText(/Type a sequence/i));
     fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "a" } });
@@ -392,7 +392,7 @@ describe("MechanismGallery — apply (sequence)", () => {
   it("the per-char 'Sequence recorded' badge's remove control strips the recorded assignment", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     fireEvent.click(screen.getByText(/Type a sequence/i));
     fireEvent.change(screen.getByTestId("sequences-content"), { target: { value: "a" } });
@@ -427,7 +427,7 @@ describe("MechanismGallery — apply (sequence)", () => {
     // chip-row controls (Added / Sequences) under test from that third control.
     seedInventory(["á", "é"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
 
     // Apply a real mechanism (swap) for á.
@@ -507,7 +507,7 @@ describe("MechanismGallery — coexistence with a separately-recorded sequence a
     ]);
 
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
 
     // Not counted as covered — the "Added characters" chip row never renders
@@ -561,7 +561,7 @@ describe("MechanismGallery — coexistence with a separately-recorded sequence a
     ]);
 
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
 
     // Mechanism-covered: the "Added" chip row DOES render for "ŋ" — the
@@ -596,7 +596,7 @@ describe("MechanismGallery — apply (deadkey)", () => {
   it("clicking Apply method with deadkey method records patternId deadkey_single_tap", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     fireEvent.click(screen.getByText(/Tap a trigger key, then a letter/i));
     fireEvent.click(screen.getByRole("button", { name: /Apply method for á/i }));
@@ -618,7 +618,7 @@ describe("MechanismGallery — per-method delete badge", () => {
   it("applying two different methods to one char yields two per-method badges", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
 
     // --- Apply first method: deadkey (pre-filled base letter 'a' from á → NFD) ---
@@ -643,7 +643,7 @@ describe("MechanismGallery — per-method delete badge", () => {
   it("clicking one per-method badge removes only that method (the other remains)", async () => {
     seedInventory(["á"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
 
     // Apply deadkey method.
@@ -695,7 +695,7 @@ describe("MechanismGallery — combined Assign-to-a-key card (S-01/S-08 merge)",
     instantiateWorkingCopy();
     seedInventory(["θ"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -725,7 +725,7 @@ describe("MechanismGallery — combined Assign-to-a-key card (S-01/S-08 merge)",
     instantiateWorkingCopy();
     seedInventory(["ε"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -749,7 +749,7 @@ describe("MechanismGallery — combined Assign-to-a-key card (S-01/S-08 merge)",
     instantiateWorkingCopy();
     seedInventory(["ε"]);
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
 
     fireEvent.click(screen.getByText(/Assign to a key/i));
@@ -786,7 +786,7 @@ describe("MechanismGallery — sequence builder accepts real click+type (user-ev
     seedInventory(["á"]);
     const user = userEvent.setup();
     await act(async () => {
-      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />);
+      render(<MechanismGallery selectedBaseKeyboard={basicKbdus} />, { withStepNav: true });
     });
     fireEvent.click(screen.getByText(/Type a sequence/i));
 

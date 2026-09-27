@@ -53,6 +53,7 @@ import {
   glyphCategory,
 } from "@keyboard-studio/engine";
 import type { EditorStepProps } from "../../steps/types.ts";
+import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 import { useSurveySessionStore } from "../../stores/surveySessionStore.ts";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { usePhaseBDraftStore, type DraftProvenance } from "../../stores/phaseBDraftStore.ts";
@@ -81,7 +82,6 @@ import {
   mutedParaFlush,
   sectionHeading,
   divider,
-  secondaryButton,
   primaryButton,
   charChip,
   chipGlyph,
@@ -466,6 +466,34 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
   // nothing typed; a format character is content, and is handed off above.
   const addDisabled = !Array.from(inputVal).some((c) => !ASCII_WHITESPACE.has(c));
 
+  // Back / Done render in the footer (spec 081).
+  usePublishStepNav({
+    ...(onBack !== undefined
+      ? {
+          back: {
+            label: t({ id: "survey.punctuation.backButton", message: "Back" }),
+            onClick: onBack,
+            testId: "punctuation-back",
+          },
+        }
+      : {}),
+    forward: {
+      label:
+        punctuation.length === 0
+          ? t({ id: "survey.punctuation.doneButtonNone", message: "Continue without punctuation" })
+          : t({
+              id: "survey.punctuation.doneButton",
+              message: plural(punctuation.length, {
+                one: "Done (# mark)",
+                other: "Done (# marks)",
+              }),
+            }),
+      onClick: complete,
+      testId: "punctuation-done",
+      disabled: nextGate.blocked,
+    },
+  });
+
   return (
     <div
       data-testid="punctuation-step"
@@ -478,18 +506,6 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
         color: TEXT_MAIN,
       }}
     >
-      {/* Back */}
-      {onBack !== undefined && (
-        <button
-          type="button"
-          data-testid="punctuation-back"
-          onClick={onBack}
-          style={{ alignSelf: "flex-start", ...secondaryButton }}
-        >
-          <Trans id="survey.punctuation.backButton">Back</Trans>
-        </button>
-      )}
-
       <h2 style={phaseHeadingFlush} data-testid="punctuation-heading">
         <Trans id="survey.punctuation.heading">Choose your punctuation</Trans>
       </h2>
@@ -813,28 +829,6 @@ const PunctuationStep: ComponentType<EditorStepProps> = (
           <FlaggedAnswersList stepId="punctuation" items={flaggedWorkItems} />
         </div>
       )}
-
-      {/* Footer: Done — otherwise always enabled; zero punctuation is a valid answer. */}
-      <div style={{ display: "flex", justifyContent: "flex-end" }}>
-        <button
-          type="button"
-          data-testid="punctuation-done"
-          disabled={nextGate.blocked}
-          onClick={complete}
-          className="ks-focus-ring ks-hit-target"
-          style={primaryButton(nextGate.blocked)}
-        >
-          {punctuation.length === 0
-            ? t({ id: "survey.punctuation.doneButtonNone", message: "Continue without punctuation" })
-            : t({
-                id: "survey.punctuation.doneButton",
-                message: plural(punctuation.length, {
-                  one: "Done (# mark)",
-                  other: "Done (# marks)",
-                }),
-              })}
-        </button>
-      </div>
     </div>
   );
 };

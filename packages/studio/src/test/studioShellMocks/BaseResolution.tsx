@@ -6,7 +6,11 @@
 // the adapter re-render with the new closure) before confirm fires, exactly as
 // two distinct user clicks would.
 
+// Nav buttons publish to the footer under the real components' handles, the
+// way the real step does (spec 081); only in-page choices render in the body.
+
 import { fakeBase } from "./fakes.ts";
+import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 
 export function BaseResolution({
   onPreview,
@@ -20,19 +24,15 @@ export function BaseResolution({
   previewStatus: string;
   onBack?: () => void;
 }) {
+  usePublishStepNav({
+    ...(onBack !== undefined ? { back: { label: "base-back", onClick: onBack, testId: "base-back" } } : {}),
+    forward: { label: "base-confirm", onClick: onConfirm, testId: "base-confirm", disabled: previewedBase === null },
+  });
   return (
     <div data-testid="stage-base">
       <button type="button" data-testid="base-preview" onClick={() => onPreview(fakeBase)}>
         base-preview
       </button>
-      <button type="button" data-testid="base-confirm" disabled={previewedBase === null} onClick={onConfirm}>
-        base-confirm
-      </button>
-      {onBack !== undefined && (
-        <button type="button" data-testid="base-back" onClick={onBack}>
-          base-back
-        </button>
-      )}
     </div>
   );
 }

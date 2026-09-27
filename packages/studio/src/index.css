@@ -40,6 +40,29 @@ html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); f
   }
 }
 
+/* Studio footer frame (spec 081 FR-020 / FR-020a). A fixed height, never
+ * content-driven: 40 px under a fine pointer, and 52 px under a coarse one so a
+ * nav button's 44 px `.ks-hit-target` fits without growing the strip. A class
+ * rather than an inline style because the pointer query cannot be inline. */
+.ks-studio-footer {
+  height: 40px;
+}
+
+@media (pointer: coarse) {
+  .ks-studio-footer {
+    height: 52px;
+  }
+}
+
+/* The project label is the first thing the footer gives up (spec 081 FR-022):
+ * it ellipsizes as the strip narrows, and below this width it is hidden so the
+ * nav buttons and the current dot keep their room. */
+@media (max-width: 479px) {
+  .ks-studio-footer-project {
+    display: none;
+  }
+}
+
 /* Crash surfaces (spec 060 FR-071 – FR-073, spec 056 WCAG 1.4.3) -----------
  *
  * `.crash-notice` and `.crash-recovery` are the two crash surfaces. They

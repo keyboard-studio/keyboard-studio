@@ -185,7 +185,7 @@ async function renderTouchGalleryInKeyMode(
   onBack: () => void = vi.fn(),
 ): Promise<void> {
   await act(async () => {
-    render(<TouchGallery onComplete={onComplete} onBack={onBack} />);
+    render(<TouchGallery onComplete={onComplete} onBack={onBack} />, { withStepNav: true });
   });
   await act(async () => {
     fireEvent.click(screen.getByTestId("touch-mode-tab-key"));

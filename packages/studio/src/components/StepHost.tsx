@@ -58,6 +58,7 @@ import { advance, STEPS_WITH_APPLY_COMPLETION } from "../steps/advance.ts";
 import { navigateTo } from "../lib/navigate.ts";
 import { QuestionRecorderContext, type ScreenRecorder } from "../lib/questionRecorder.ts";
 import { JumpContext, type JumpToScreen } from "../lib/jumpContext.ts";
+import { StepNavContext } from "../hooks/usePublishStepNav.ts";
 import { peekPendingJump, clearPendingJump, jumpToLocation } from "../lib/jumpToLocation.ts";
 import type { Location } from "../lib/location.ts";
 import { UnsupportedScriptStub } from "./UnsupportedScriptStub.tsx";
@@ -546,11 +547,16 @@ export function StepHost({ reducerDeps, onStartOver, ctx }: StepHostProps): Reac
   const content = (
     <QuestionRecorderContext.Provider value={recordScreen}>
       <JumpContext.Provider value={jumpToScreen}>
-        <Component
-          onComplete={handleComplete}
-          {...(canGoBack ? { onBack: handleBack } : {})}
-          {...(ctx !== undefined ? { ctx } : {})}
-        />
+        {/* Spec 081: tags the step's footer nav with this step's id, so a late
+            publish from an outgoing step can never render on the incoming one.
+            A provider, not a DOM node — the direct-parent contract holds. */}
+        <StepNavContext.Provider value={resolvedStep.id}>
+          <Component
+            onComplete={handleComplete}
+            {...(canGoBack ? { onBack: handleBack } : {})}
+            {...(ctx !== undefined ? { ctx } : {})}
+          />
+        </StepNavContext.Provider>
       </JumpContext.Provider>
     </QuestionRecorderContext.Provider>
   );

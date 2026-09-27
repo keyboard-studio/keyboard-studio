@@ -9,9 +9,16 @@ import { mergeClassNames } from "./classNames.ts";
 
 export type ButtonVariant = "primary" | "secondary" | "back";
 
+export type ButtonSize = "default" | "compact";
+
 export type ButtonProps = React.ButtonHTMLAttributes<HTMLButtonElement> & {
   /** Visual treatment. Defaults to "secondary". */
   variant?: ButtonVariant;
+  /**
+   * "compact" fits the 40 px footer (spec 081): tighter padding, no wrapping,
+   * no shrinking, and no `back` top margin. Defaults to "default".
+   */
+  size?: ButtonSize;
 };
 
 // Border is split into borderWidth/borderStyle/borderColor (rather than the
@@ -63,8 +70,19 @@ const STYLE_BACK: React.CSSProperties = {
   fontFamily: FONT,
 };
 
+// Layered over the variant style. About 26 px tall under a fine pointer, which
+// clears WCAG 2.5.8's 24 px; under a coarse pointer `.ks-hit-target` still lifts
+// it to 44 px, which the 52 px coarse footer holds (index.css).
+const STYLE_COMPACT: React.CSSProperties = {
+  padding: "4px 12px",
+  fontSize: 13,
+  whiteSpace: "nowrap",
+  flexShrink: 0,
+};
+
 export function Button({
   variant = "secondary",
+  size = "default",
   disabled = false,
   style,
   className,
@@ -79,6 +97,11 @@ export function Button({
     baseStyle = STYLE_BACK;
   } else {
     baseStyle = {};
+  }
+
+  if (size === "compact") {
+    const { marginTop: _dropped, ...rest } = baseStyle;
+    baseStyle = { ...rest, ...STYLE_COMPACT };
   }
 
   return (

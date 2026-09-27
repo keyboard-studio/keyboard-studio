@@ -11,14 +11,18 @@
 // the inner message column stays capped at 560px unconditionally, which is a
 // no-op when the wrapper itself is already 560px, so no site's rendered
 // width changes.
+//
+// Its Back button lives in the footer (spec 081): this screen publishes it and
+// is the step's only publisher while it is shown — the host gallery publishes
+// only from its own main render. The page is a dead end, so there is no forward.
 
 import type { ReactNode } from "react";
-import { Trans } from "@lingui/react/macro";
+import { useLingui } from "@lingui/react/macro";
 import {
   galleryPageStyle as pageStyle,
-  galleryGhostBtn as ghostBtn,
   TEXT_DIM,
 } from "../../../lib/galleryTheme.ts";
+import { usePublishStepNav } from "../../../hooks/usePublishStepNav.ts";
 
 export interface GalleryEmptyStateProps {
   /** Outer content wrapper max-width in px. MechanismGallery's guards use 780 (default); TouchGallery's uses 560. */
@@ -37,19 +41,22 @@ export function GalleryEmptyState({
   backAriaLabel,
   message,
 }: GalleryEmptyStateProps) {
+  const { t } = useLingui();
+  usePublishStepNav(
+    onBack === undefined
+      ? {}
+      : {
+          back: {
+            label: t({ id: "editor.assignLoop.backButton", message: "← Back" }),
+            onClick: onBack,
+            testId: "gallery-empty-back",
+            ...(backAriaLabel !== undefined ? { ariaLabel: backAriaLabel } : {}),
+          },
+        },
+  );
   return (
     <div style={{ ...pageStyle, padding: "24px 32px" }}>
       <div style={{ maxWidth: wrapperMaxWidth, margin: "0 auto" }}>
-        {onBack !== undefined && (
-          <button
-            type="button"
-            onClick={onBack}
-            style={ghostBtn}
-            {...(backAriaLabel !== undefined ? { "aria-label": backAriaLabel } : {})}
-          >
-            <Trans id="editor.assignLoop.backButton">&larr; Back</Trans>
-          </button>
-        )}
         <div
           style={{
             maxWidth: 560,

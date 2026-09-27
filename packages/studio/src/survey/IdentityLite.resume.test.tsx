@@ -125,7 +125,7 @@ describe("toResumeAnswers", () => {
 describe("IdentityLite — resume", () => {
   // spec 064 US1: the last question is now the copyright holder, not the script.
   it("mounts on the LAST question (copyright holder) with the answer restored", () => {
-    render(<IdentityLite onComplete={vi.fn()} resume={COMPLETED} />);
+    render(<IdentityLite onComplete={vi.fn()} resume={COMPLETED} />, { withStepNav: true });
     expect(screen.getByText("Who holds the copyright, if not you?")).toBeTruthy();
     expect(
       screen.queryByText("What is your language called in your own language?"),
@@ -137,7 +137,7 @@ describe("IdentityLite — resume", () => {
   });
 
   it("Back from the resumed last question restores the prior answer", () => {
-    render(<IdentityLite onComplete={vi.fn()} resume={COMPLETED} />);
+    render(<IdentityLite onComplete={vi.fn()} resume={COMPLETED} />, { withStepNav: true });
     fireEvent.click(screen.getByTestId("survey-back"));
     // Flow order: english → autonym → code → target_script → author name →
     // author email → copyright holder (spec 064 US1). Back from the last
@@ -149,7 +149,7 @@ describe("IdentityLite — resume", () => {
   it("Finish on a resumed flow re-completes with the same extracted identity", () => {
     const onComplete =
       vi.fn<[SurveyPhaseResult, IdentityLiteResult], void>();
-    render(<IdentityLite onComplete={onComplete} resume={COMPLETED} />);
+    render(<IdentityLite onComplete={onComplete} resume={COMPLETED} />, { withStepNav: true });
     fireEvent.click(screen.getByTestId("survey-advance"));
     expect(onComplete).toHaveBeenCalledTimes(1);
     const [result, identity] = onComplete.mock.calls[0]!;
@@ -176,7 +176,7 @@ describe("IdentityLite — resume", () => {
   });
 
   it("without resume, mounts on the first question as before", () => {
-    render(<IdentityLite onComplete={vi.fn()} />);
+    render(<IdentityLite onComplete={vi.fn()} />, { withStepNav: true });
     // il_language_english (English-name picker) is the first question in the
     // reordered flow (spec 030 FR-009).
     expect(
@@ -187,7 +187,7 @@ describe("IdentityLite — resume", () => {
   it("resuming a region-ambiguous run preserves the region on Finish (no drop)", () => {
     const onComplete =
       vi.fn<[SurveyPhaseResult, IdentityLiteResult], void>();
-    render(<IdentityLite onComplete={onComplete} resume={COMPLETED_AMBIGUOUS} />);
+    render(<IdentityLite onComplete={onComplete} resume={COMPLETED_AMBIGUOUS} />, { withStepNav: true });
     // Mounts on the last question; Finish without touching anything must not
     // silently drop il_language_region (langtags is unloaded at replay time).
     fireEvent.click(screen.getByTestId("survey-advance"));

@@ -94,7 +94,7 @@ describe("BaseResolutionAdapter — suggest target sourced from surveySessionSto
   it("declared-language identityResult surfaces the language-match badge", async () => {
     useSurveySessionStore.getState().setIdentityResult(makeIdentityResult({}));
 
-    render(<BaseResolutionAdapter onComplete={() => {}} />);
+    render(<BaseResolutionAdapter onComplete={() => {}} />, { withStepNav: true });
 
     await waitFor(() => {
       expect(screen.getByText("Already supports your language")).toBeDefined();
@@ -104,7 +104,7 @@ describe("BaseResolutionAdapter — suggest target sourced from surveySessionSto
   it("identityResult === null falls back to script-only target without crashing", async () => {
     useSurveySessionStore.getState().setIdentityResult(null);
 
-    render(<BaseResolutionAdapter onComplete={() => {}} />);
+    render(<BaseResolutionAdapter onComplete={() => {}} />, { withStepNav: true });
 
     await waitFor(() => {
       expect(screen.getByText("Matches your script")).toBeDefined();
@@ -117,7 +117,7 @@ describe("BaseResolutionAdapter — suggest target sourced from surveySessionSto
       makeIdentityResult({ bcp47: "" }),
     );
 
-    render(<BaseResolutionAdapter onComplete={() => {}} />);
+    render(<BaseResolutionAdapter onComplete={() => {}} />, { withStepNav: true });
 
     await waitFor(() => {
       expect(screen.getByText("Matches your script")).toBeDefined();
@@ -133,7 +133,7 @@ describe("BaseResolutionAdapter — suggest target sourced from surveySessionSto
       }),
     );
 
-    render(<BaseResolutionAdapter onComplete={() => {}} />);
+    render(<BaseResolutionAdapter onComplete={() => {}} />, { withStepNav: true });
 
     await waitFor(() => {
       expect(screen.getByText("Matches your script")).toBeDefined();
@@ -157,7 +157,7 @@ describe("BaseResolutionAdapter — preview vs commit", () => {
     useSurveySessionStore.getState().setIdentityResult(makeIdentityResult({}));
     const onComplete = vi.fn();
 
-    render(<BaseResolutionAdapter onComplete={onComplete} />);
+    render(<BaseResolutionAdapter onComplete={onComplete} />, { withStepNav: true });
 
     const card = await waitFor(() => screen.getByTestId("base-card-sil_euro_latin"));
     fireEvent.click(card);
@@ -185,7 +185,7 @@ describe("BaseResolutionAdapter — preview vs commit", () => {
     useSurveySessionStore.setState({ setBaseConfirmed: setBaseConfirmedSpy });
 
     const onComplete = vi.fn();
-    render(<BaseResolutionAdapter onComplete={onComplete} />);
+    render(<BaseResolutionAdapter onComplete={onComplete} />, { withStepNav: true });
 
     const card = await waitFor(() => screen.getByTestId("base-card-sil_euro_latin"));
     fireEvent.click(card);
@@ -245,7 +245,7 @@ const IDENTITY_PHASE_RESULT = {
 
 describe("IdentityLiteAdapter — resume from identityPhaseResult", () => {
   it("first visit (no stored phase result) starts the flow at question 1", () => {
-    render(<IdentityLiteAdapter onComplete={() => {}} />);
+    render(<IdentityLiteAdapter onComplete={() => {}} />, { withStepNav: true });
     // il_language_english (English-name picker) is the first question in the
     // reordered flow (spec 030 FR-009).
     expect(
@@ -256,7 +256,7 @@ describe("IdentityLiteAdapter — resume from identityPhaseResult", () => {
   it("re-entry with a stored phase result resumes on the flow's last question", () => {
     useSurveySessionStore.getState().setIdentityPhaseResult(IDENTITY_PHASE_RESULT);
 
-    render(<IdentityLiteAdapter onComplete={() => {}} />);
+    render(<IdentityLiteAdapter onComplete={() => {}} />, { withStepNav: true });
 
     // spec 064 US1: the flow's last question is now the copyright holder.
     expect(screen.getByText("Who holds the copyright, if not you?")).toBeDefined();
@@ -279,7 +279,7 @@ describe("IdentityLiteAdapter — resume from identityPhaseResult", () => {
       atCompletion = { ...useSurveySessionStore.getState() };
     });
 
-    render(<IdentityLiteAdapter onComplete={onComplete} />);
+    render(<IdentityLiteAdapter onComplete={onComplete} />, { withStepNav: true });
     // Resumed on the last question with its answer restored — Finish directly.
     fireEvent.click(screen.getByTestId("survey-advance"));
 

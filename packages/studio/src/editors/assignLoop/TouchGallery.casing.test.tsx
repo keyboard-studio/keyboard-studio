@@ -126,7 +126,7 @@ describe("TouchGallery — shift-layer case-pair proposal (spec 074 US3)", () =>
   it("a lowercase placement raises a proposal whose confirm records the capital on the shift layer", async () => {
     seedStore({ withInventory: ["θ"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await applyLongpressOn("K_A");
@@ -156,7 +156,7 @@ describe("TouchGallery — shift-layer case-pair proposal (spec 074 US3)", () =>
   it("dismissing records nothing", async () => {
     seedStore({ withInventory: ["θ"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await applyLongpressOn("K_A");
@@ -174,7 +174,7 @@ describe("TouchGallery — shift-layer case-pair proposal (spec 074 US3)", () =>
   it("a caseless letter raises no proposal", async () => {
     seedStore({ withInventory: ["中"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await applyLongpressOn("K_A");
@@ -186,7 +186,7 @@ describe("TouchGallery — shift-layer case-pair proposal (spec 074 US3)", () =>
   it("raises no redundant proposal once the capital is already on that host key's shift layer", async () => {
     seedStore({ withInventory: ["θ"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // First apply: propose, then confirm — Θ now sits on K_A's shift layer.
@@ -208,7 +208,7 @@ describe("TouchGallery — shift-layer case-pair proposal (spec 074 US3)", () =>
   it("still proposes when the capital exists on a DIFFERENT host key's shift layer", async () => {
     seedStore({ withInventory: ["θ"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await applyLongpressOn("K_A");
@@ -227,7 +227,7 @@ describe("TouchGallery — shift-layer case-pair proposal (spec 074 US3)", () =>
   it("does not consult or write suggestionResolved — that set governs the placement card, not this proposal", async () => {
     seedStore({ withInventory: ["θ"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     const before =
@@ -250,7 +250,7 @@ describe("TouchGallery — shift-layer case-pair proposal (spec 074 US3)", () =>
   it("stale-guard: confirming a proposal whose raising mechanism ref vanished via chip removal records nothing", async () => {
     seedStore({ withInventory: ["θ"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     await applyLongpressOn("K_A");
@@ -308,7 +308,7 @@ describe("TouchGallery — suggestion Accept carries an explicit layer (spec 074
   it("accepting the longpress suggestion for a lowercase decomposable letter (ă) records layer: default", async () => {
     seedStore({ withInventory: ["ă"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     const acceptBtn =
@@ -332,7 +332,7 @@ describe("TouchGallery — suggestion Accept carries an explicit layer (spec 074
   it("accepting the longpress suggestion for the uppercase counterpart (Ă) records layer: shift, not a silent default", async () => {
     seedStore({ withInventory: ["Ă"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     const acceptBtn =
@@ -373,7 +373,7 @@ describe("TouchGallery — suggestion Accept carries an explicit layer (spec 074
     seedWithDesktopAssignment("ă", swapAssignment);
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     expect(screen.queryByText(/Suggested: replace/i)).not.toBeNull();
@@ -460,7 +460,7 @@ describe("TouchGallery — host-key label casing in the UI (spec 074 FR-013)", (
   it("renders the configured-mechanism chip in lowercase for a default-layer mechanism", async () => {
     seedStore({ withInventory: ["中"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     const select = screen.queryByRole("button", { name: /host key/i });
@@ -485,7 +485,7 @@ describe("TouchGallery — host-key label casing in the UI (spec 074 FR-013)", (
   it("renders the placement-suggestion text in lowercase for a lowercase placement", async () => {
     seedStore({ withInventory: ["ä"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // "ä" is decomposable-accented and derives host key K_A (touchBehavior's

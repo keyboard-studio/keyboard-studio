@@ -28,8 +28,6 @@ import { useSurveyAnswerStore, type SavedAnswer } from "../stores/surveyAnswerSt
 import { useRecordQuestionAnswers } from "../lib/questionRecorder.ts";
 import type { StepWalkPositions } from "../lib/stepWalk.ts";
 import {
-  secondaryButton,
-  primaryButton,
   surveyCard,
   FONT,
   TEXT_MAIN,
@@ -42,6 +40,7 @@ import {
 import { CSS_TEXT_SUBTLE } from "../ui/theme.ts";
 import { handleEnterToAdvance } from "./enterToAdvance.ts";
 import { WARNING } from "../ui/theme.ts";
+import { usePublishStepNav } from "../hooks/usePublishStepNav.ts";
 
 // ---------------------------------------------------------------------------
 // Condition evaluator
@@ -667,7 +666,81 @@ export function SurveyRunner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalCursor]);
 
-  if (currentQ === undefined || currentQId === "") {
+  // Dynamic datalist options (spec 030 US2): when the caller supplies non-empty
+  // options for this question (e.g. the resolved entry's local names), they
+  // override the static options; the field still accepts free text. The raw
+  // question is handed to QuestionField as-is — it resolves the active-locale
+  // Tier-B catalog string and interpolates `{{token}}`s itself (see above).
+  //
+  // Computed BEFORE the "survey complete" early return below, and guarded for
+  // currentQ === undefined, so usePublishStepNav (which must run unconditionally
+  // before any early return) can derive its spec from the same values the render
+  // below uses.
+  const dynamicOptions = currentQ !== undefined ? getSeedOptionsRef.current?.(currentQId) : undefined;
+  const hasDynamicOptions = dynamicOptions !== undefined && dynamicOptions.length > 0;
+  // spec 080 FR-009: `undefined` means "use the question's own static
+  // `required`" — only a defined override (true or false) replaces it.
+  const requiredOverride = currentQ !== undefined ? getRequiredOverrideRef.current?.(currentQId) : undefined;
+  const displayQ: FlowQuestion | undefined =
+    currentQ === undefined
+      ? undefined
+      : hasDynamicOptions || requiredOverride !== undefined
+        ? {
+            ...currentQ,
+            ...(hasDynamicOptions ? { options: dynamicOptions } : {}),
+            ...(requiredOverride !== undefined ? { required: requiredOverride } : {}),
+          }
+        : currentQ;
+  const stepNum = cursor + 1;
+
+  const canGoBack = cursor > 0 || onBack !== undefined;
+
+  const value = currentValue ?? currentEntry?.value;
+  const isNotice = displayQ?.type === "notice";
+  const canAdvance =
+    displayQ !== undefined &&
+    (isNotice || ((!displayQ.required || hasValue(value)) && hasValidFormat(value, displayQ.format)));
+  // Derive the next question id once so that both the button label and handleNext
+  // share the same result — avoids a second advanceThrough call that would cause
+  // a brief button-label flicker when value changes mid-render.
+  const nextIdForCurrent =
+    currentQ !== undefined
+      ? advanceThrough(currentQ, value, context, index, getNextOverrideRef.current)
+      : null;
+  const isLastQuestion = nextIdForCurrent === null;
+
+  // SurveyRunner is the sole nav publisher for every question flow it drives —
+  // identity-lite, PhaseA, track, project name, PhaseB manual/text sample, and
+  // PhaseF help docs all render it; none of those wrappers publish (spec 081).
+  // Called unconditionally, before the "survey complete" early return, with an
+  // empty spec in that state — it renders no buttons today, so publishing none
+  // keeps that behaviour unchanged.
+  usePublishStepNav(
+    currentQ === undefined
+      ? {}
+      : {
+          ...(canGoBack
+            ? {
+                back: {
+                  label: t({ id: "survey.surveyRunner.backButton", message: "Back" }),
+                  onClick: handleBack,
+                  testId: "survey-back",
+                },
+              }
+            : {}),
+          forward: {
+            label: isLastQuestion
+              ? t({ id: "survey.surveyRunner.finishButton", message: "Finish" })
+              : t({ id: "survey.surveyRunner.nextButton", message: "Next" }),
+            onClick: handleNext,
+            disabled: !canAdvance,
+            testId: "survey-advance",
+            ariaDescribedBy: progressDescId,
+          },
+        },
+  );
+
+  if (currentQ === undefined || currentQId === "" || displayQ === undefined) {
     return (
       <div
         style={{
@@ -680,39 +753,6 @@ export function SurveyRunner({
       </div>
     );
   }
-
-  // Dynamic datalist options (spec 030 US2): when the caller supplies non-empty
-  // options for this question (e.g. the resolved entry's local names), they
-  // override the static options; the field still accepts free text. The raw
-  // question is handed to QuestionField as-is — it resolves the active-locale
-  // Tier-B catalog string and interpolates `{{token}}`s itself (see above).
-  const dynamicOptions = getSeedOptionsRef.current?.(currentQId);
-  const hasDynamicOptions = dynamicOptions !== undefined && dynamicOptions.length > 0;
-  // spec 080 FR-009: `undefined` means "use the question's own static
-  // `required`" — only a defined override (true or false) replaces it.
-  const requiredOverride = getRequiredOverrideRef.current?.(currentQId);
-  const displayQ: FlowQuestion =
-    hasDynamicOptions || requiredOverride !== undefined
-      ? {
-          ...currentQ,
-          ...(hasDynamicOptions ? { options: dynamicOptions } : {}),
-          ...(requiredOverride !== undefined ? { required: requiredOverride } : {}),
-        }
-      : currentQ;
-  const stepNum = cursor + 1;
-
-  const canGoBack = cursor > 0 || onBack !== undefined;
-
-  const value = currentValue ?? currentEntry?.value;
-  const isNotice = displayQ.type === "notice";
-  const canAdvance =
-    isNotice ||
-    ((!displayQ.required || hasValue(value)) && hasValidFormat(value, displayQ.format));
-  // Derive the next question id once so that both the button label and handleNext
-  // share the same result — avoids a second advanceThrough call that would cause
-  // a brief button-label flicker when value changes mid-render.
-  const nextIdForCurrent = advanceThrough(currentQ, value, context, index, getNextOverrideRef.current);
-  const isLastQuestion = nextIdForCurrent === null;
 
   // Advance past the current question with an EXPLICIT committed value. Shared by
   // the Next button (handleNext, committing the live field value) and the
@@ -1067,56 +1107,6 @@ export function SurveyRunner({
           );
         })()}
       </div>
-
-      {/* Navigation (epic #533): the primary button dims via opacity when
-          disabled (rather than swapping to the disabled background/text
-          colors), and sits at the row's right edge behind a flex:1 spacer —
-          Back (when present) stays pinned left. */}
-      {(() => {
-        const nextButtonStyle: React.CSSProperties = {
-          ...primaryButton(false),
-          transition: "background 120ms ease",
-          ...(!canAdvance ? { opacity: 0.5, cursor: "not-allowed" } : {}),
-        };
-
-        const backButtonEl = canGoBack ? (
-          <button
-            type="button"
-            data-testid="survey-back"
-            onClick={handleBack}
-            className="ks-focus-ring ks-hit-target"
-            style={secondaryButton}
-          >
-            <Trans id="survey.surveyRunner.backButton">Back</Trans>
-          </button>
-        ) : null;
-
-        const nextButtonEl = (
-          <button
-            type="button"
-            data-testid="survey-advance"
-            onClick={handleNext}
-            disabled={!canAdvance}
-            aria-describedby={progressDescId}
-            className="ks-focus-ring ks-hit-target"
-            style={nextButtonStyle}
-          >
-            {isLastQuestion ? (
-              <Trans id="survey.surveyRunner.finishButton">Finish</Trans>
-            ) : (
-              <Trans id="survey.surveyRunner.nextButton">Next</Trans>
-            )}
-          </button>
-        );
-
-        return (
-          <div style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 22 }}>
-            {backButtonEl}
-            <div aria-hidden="true" style={{ flex: 1 }} />
-            {nextButtonEl}
-          </div>
-        );
-      })()}
     </div>
   );
 }

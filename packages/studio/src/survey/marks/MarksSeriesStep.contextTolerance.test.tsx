@@ -87,7 +87,7 @@ function walkToStation(): void {
 function renderSeries() {
   const onComplete = vi.fn();
   act(() => {
-    render(<MarksSeriesStep onComplete={onComplete} />);
+    render(<MarksSeriesStep onComplete={onComplete} />, { withStepNav: true });
   });
   return onComplete;
 }

@@ -27,6 +27,7 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { screen, fireEvent, cleanup, act } from "@testing-library/react";
 import { render } from "./test/renderWithI18n.tsx";
+import { ActiveStepNav } from "./test/ActiveStepNav.tsx";
 import { useSurveySessionStore } from "./stores/surveySessionStore.ts";
 
 // ---------------------------------------------------------------------------
@@ -70,7 +71,7 @@ import { SurveyView } from "./StudioShell.tsx";
 // ---------------------------------------------------------------------------
 
 function advanceToCharactersStep(): void {
-  fireEvent.click(screen.getByTestId("identity-complete")); // identity -> base
+  fireEvent.click(screen.getByTestId("survey-advance")); // identity -> base
   fireEvent.click(screen.getByTestId("base-preview")); // preview (separate click)
   fireEvent.click(screen.getByTestId("base-confirm")); // commit -> track
   fireEvent.click(screen.getByTestId("track-adapt")); // track -> characters (prefill substage)
@@ -93,7 +94,7 @@ afterEach(() => {
 describe("SurveyView — right pane gating on the characters step", () => {
   it("discoveryMethod is null (default): OSK preview pane renders, character map does NOT", async () => {
     await act(async () => {
-      render(<SurveyView baseKeyboard={null} />);
+      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
     });
 
     advanceToCharactersStep();
@@ -110,7 +111,7 @@ describe("SurveyView — right pane gating on the characters step", () => {
 
   it("discoveryMethod === 'manual': OSK preview pane renders, character map does NOT", async () => {
     await act(async () => {
-      render(<SurveyView baseKeyboard={null} />);
+      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
     });
 
     advanceToCharactersStep();
@@ -124,7 +125,7 @@ describe("SurveyView — right pane gating on the characters step", () => {
 
   it("discoveryMethod === 'build-list' on the characters step: CharacterMapPane renders instead of the OSK preview", async () => {
     await act(async () => {
-      render(<SurveyView baseKeyboard={null} />);
+      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
     });
 
     advanceToCharactersStep();
@@ -143,13 +144,13 @@ describe("SurveyView — right pane gating on the characters step", () => {
 
   it("build-list set BEFORE reaching characters (IntroChooser ordering) still gates correctly once the step becomes active", async () => {
     await act(async () => {
-      render(<SurveyView baseKeyboard={null} />);
+      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
     });
 
     // Set discoveryMethod pre-emptively while still on "track" — activeRightPane
     // for the track step is "preview" (default), so showCharacterMap must stay
     // false even though discoveryMethod is already "build-list".
-    fireEvent.click(screen.getByTestId("identity-complete"));
+    fireEvent.click(screen.getByTestId("survey-advance"));
     fireEvent.click(screen.getByTestId("base-preview"));
     fireEvent.click(screen.getByTestId("base-confirm"));
     act(() => {
@@ -165,7 +166,7 @@ describe("SurveyView — right pane gating on the characters step", () => {
 
   it("reverting discoveryMethod to null while still on characters reverts the pane back to OSK preview", async () => {
     await act(async () => {
-      render(<SurveyView baseKeyboard={null} />);
+      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
     });
 
     advanceToCharactersStep();

@@ -100,6 +100,7 @@ import {
 } from "@keyboard-studio/contracts";
 import { Button, Checkbox, Notice } from "../../../ui/index.ts";
 import { BG_CARD, BORDER, TEXT_DIM, TEXT_MAIN, FONT } from "../../../lib/galleryTheme.ts";
+import { FOCUSABLE_SELECTOR } from "../../../lib/focusableSelector.ts";
 import { codepointLabel } from "../../../survey/codepointLabel.ts";
 
 // ---------------------------------------------------------------------------
@@ -281,13 +282,9 @@ export function buildFamilyApplyOps(
 
 // ---------------------------------------------------------------------------
 // Focus management helpers (ARIA APG dialog pattern; docs/accessibility.md).
-// Duplicated from RenameDialog.tsx/RemoveKeyDialog.tsx rather than shared —
-// those files have the same small trap inline and this package has not yet
-// extracted a common hook; extracting one is out of this task's scope.
+// The focusable selector is shared via lib/focusableSelector.ts (same trap
+// in RenameDialog, RemoveKeyDialog, the anchored popovers, SurveyQuestionsPane).
 // ---------------------------------------------------------------------------
-
-const FOCUSABLE_SELECTOR =
-  'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 // ---------------------------------------------------------------------------
 // Props

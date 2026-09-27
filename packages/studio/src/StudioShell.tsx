@@ -15,6 +15,7 @@
 
 import { devLog } from "@keyboard-studio/contracts/dev-log";
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type CSSProperties } from "react";
+import { SurveyQuestionsPane } from "./components/SurveyQuestionsPane.tsx";
 import { useResizablePanes } from "./hooks/useResizablePanes.ts";
 import { ResizeHandle } from "./components/ResizeHandle.tsx";
 import type { BaseKeyboard, DecisionEntry, Pattern, VirtualFS, KeyboardIR, RemovalCapability } from "@keyboard-studio/contracts";
@@ -44,6 +45,7 @@ import { parseLocation } from "./lib/location.ts";
 import { liveResolveContext, setPendingWelcomeLocation } from "./lib/jumpToLocation.ts";
 import { readPaneSplitPct, useViewStateStore } from "./stores/viewStateStore.ts";
 import { useStepWalkStore } from "./stores/stepWalkStore.ts";
+import { useStepNavStore } from "./stores/stepNavStore.ts";
 import { useSurveyAnswerStore } from "./stores/surveyAnswerStore.ts";
 import { useProjectSwitchStore } from "./stores/projectSwitchStore.ts";
 import { useKeyboardArtifact, type OnInstantiateCallback } from "./hooks/useKeyboardArtifact.ts";
@@ -1324,6 +1326,8 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     // from the previous project's inventory — a cursor is only meaningful
     // against the walk that published it (stores/stepWalkStore.ts).
     useStepWalkStore.getState().reset();
+    // Footer nav buttons belong to the abandoned project's steps (spec 081).
+    useStepNavStore.getState().reset();
     // Saved answers and within-step positions belong to the abandoned project
     // (spec 080 FR-033: one of the only two reset sites).
     useSurveyAnswerStore.getState().reset();
@@ -1518,7 +1522,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
       }}
     >
       {/* Left pane: survey questions (StepHost renders pane content) */}
-      <section aria-label="Survey questions" style={questionsPaneStyle}>
+      <SurveyQuestionsPane label="Survey questions" style={questionsPaneStyle}>
         {cloudResume !== null && (
           <ResumeDraftBanner
             meta={cloudResume}
@@ -1570,7 +1574,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           <LintSummary findings={globalNonWarnings} />
         )}
         {stepHost}
-      </section>
+      </SurveyQuestionsPane>
 
       {/* Drag handle */}
       <ResizeHandle onPointerDown={onPointerDown} />

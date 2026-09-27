@@ -67,7 +67,7 @@ afterEach(cleanup);
 
 /** Select Hausa at Q1 and click through Q2 (autonym) to land on il_language_code. */
 async function reachLanguageCode(): Promise<void> {
-  render(<IdentityLite onComplete={vi.fn()} />);
+  render(<IdentityLite onComplete={vi.fn()} />, { withStepNav: true });
 
   const q1 = await screen.findByRole<HTMLInputElement>("combobox");
   fireEvent.focus(q1);

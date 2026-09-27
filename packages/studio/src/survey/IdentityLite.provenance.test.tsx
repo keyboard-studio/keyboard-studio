@@ -105,7 +105,7 @@ import { IdentityLite } from "./IdentityLite.tsx";
 afterEach(cleanup);
 
 async function renderReady(): Promise<HTMLElement> {
-  const { container } = render(<IdentityLite onComplete={vi.fn()} />);
+  const { container } = render(<IdentityLite onComplete={vi.fn()} />, { withStepNav: true });
   // Wait until the name picker has finished its one-time langtags load (its
   // placeholder flips from "Loading languages..." once loaded).
   await waitFor(() => {

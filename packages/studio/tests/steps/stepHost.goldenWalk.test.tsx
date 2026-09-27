@@ -123,30 +123,31 @@ vi.mock("../../src/lib/navigate.ts", () => import("../../src/test/studioShellMoc
 // oracle needs: the panel's onComplete carries no SurveyPhaseResult shape and
 // the step is not in STEPS_WITH_APPLY_COMPLETION, so the only recorded effect
 // is the "advance" session mutation (matches __fixtures__/goldenWalk/*.json).
-vi.mock("../../src/editors/touchSeedSource/TouchSeedSourcePanel.tsx", () => ({
-  TouchSeedSourcePanel: ({
-    onComplete,
-    onBack,
-  }: {
-    onComplete: (result: unknown) => void;
-    onBack?: () => void;
-  }) => (
-    <div data-testid="stage-seed-source">
-      <button
-        type="button"
-        data-testid="seed-source-complete"
-        onClick={() => onComplete(undefined)}
-      >
-        seed-source-complete
-      </button>
-      {onBack !== undefined && (
-        <button type="button" data-testid="seed-source-back" onClick={onBack}>
-          seed-source-back
-        </button>
-      )}
-    </div>
-  ),
-}));
+vi.mock("../../src/editors/touchSeedSource/TouchSeedSourcePanel.tsx", async () => {
+  // Publishes to the footer, as the real panel does (spec 081).
+  const { usePublishStepNav } = await import("../../src/hooks/usePublishStepNav.ts");
+  return {
+    TouchSeedSourcePanel: ({
+      onComplete,
+      onBack,
+    }: {
+      onComplete: (result: unknown) => void;
+      onBack?: () => void;
+    }) => {
+      usePublishStepNav({
+        ...(onBack !== undefined
+          ? { back: { label: "seed-source-back", onClick: onBack, testId: "seed-source-back" } }
+          : {}),
+        forward: {
+          label: "seed-source-confirm",
+          onClick: () => onComplete(undefined),
+          testId: "seed-source-confirm",
+        },
+      });
+      return <div data-testid="stage-seed-source" />;
+    },
+  };
+});
 
 // The punctuation step (spec 075) seeds the resolved locale's CLDR punctuation
 // tier into the confirmed inventory on arrival. Track 1 carries a real BCP47
@@ -167,8 +168,20 @@ vi.mock("../../src/lib/services.ts", async (importOriginal) => ({
 // ---------------------------------------------------------------------------
 
 import { SurveyView } from "../../src/StudioShell.tsx";
+import { ActiveStepNav } from "../../src/test/ActiveStepNav.tsx";
 import { navigateTo } from "../../src/lib/navigate.ts";
 import * as ReducerModule from "../../src/steps/reducer.ts";
+
+// Every step's Back / forward buttons render in the footer (spec 081), which
+// StudioShell mounts beside SurveyView; this mounts its nav cluster the same way.
+function renderSurveyWithNav() {
+  return render(
+    <>
+      <SurveyView baseKeyboard={null} />
+      <ActiveStepNav />
+    </>,
+  );
+}
 
 // ---------------------------------------------------------------------------
 // Fixture types
@@ -404,18 +417,18 @@ async function driveSteps(recorder: ReturnType<typeof createRecorder>, steps: St
  * on a FRESH walk because touchSeedSource starts null — advance("mechanisms")
  * routes into the fork instead of straight to "touch". The fork step renders
  * the mocked TouchSeedSourcePanel stub (T014, registerEditorSteps.ts) — driven
- * via its own "seed-source-complete" testid — before the real "touch" step
- * (still the TouchGallery mock, "e-complete").
+ * via its own "seed-source-confirm" testid — before the real "touch" step
+ * (still the TouchGallery mock, "touch-continue").
  */
 async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Promise<void> {
   await driveSteps(recorder, [
-    { stepId: "identity", testId: "identity-complete" },
+    { stepId: "identity", testId: "survey-advance" },
     { stepId: "choose_base", testIds: ["base-preview", "base-confirm"] },
     { stepId: "track", testId: "track-copy" },
-    { stepId: "project_name", testId: "project-name-next" },
+    { stepId: "project_name", testId: "survey-advance" },
     { stepId: "characters/prefill", testId: "prefill-confirm" },
     // marks skips transparently inside this window, landing on punctuation.
-    { stepId: "characters/B", testId: "phaseB-complete", settleFor: "punctuation-done" },
+    { stepId: "characters/B", testId: "phase-b-done", settleFor: "punctuation-done" },
     // The punctuation page (between marks and convenience) has no skip gate —
     // the walk accepts it empty. The convenience skip that follows it is async
     // (see StepAction.settleFor), so wait for carve's own control to exist
@@ -424,12 +437,12 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
     // The invisible-characters step (spec 075) ALWAYS renders — no skip gate —
     // so it is a real stop on every walk; accepted empty. The async
     // convenience skip that follows it is absorbed by this window instead.
-    { stepId: "invisibles", testId: "invisibles-continue", settleFor: "carve-complete" },
-    { stepId: "carve", testId: "carve-complete" },
-    { stepId: "mechanisms", testId: "mechanisms-complete" },
-    { stepId: "touch_seed_source", testId: "seed-source-complete", async: true },
-    { stepId: "touch", testId: "e-complete", async: true },
-    { stepId: "help", testId: "phaseF-complete", async: true },
+    { stepId: "invisibles", testId: "invisibles-continue", settleFor: "carve-continue" },
+    { stepId: "carve", testId: "carve-continue" },
+    { stepId: "mechanisms", testId: "mechanisms-continue" },
+    { stepId: "touch_seed_source", testId: "seed-source-confirm", async: true },
+    { stepId: "touch", testId: "touch-continue", async: true },
+    { stepId: "help", testId: "survey-advance", async: true },
   ]);
 }
 
@@ -444,24 +457,24 @@ async function driveCopyTrack(recorder: ReturnType<typeof createRecorder>): Prom
  */
 async function driveAdaptTrack(recorder: ReturnType<typeof createRecorder>): Promise<void> {
   await driveSteps(recorder, [
-    { stepId: "identity", testId: "identity-complete" },
+    { stepId: "identity", testId: "survey-advance" },
     { stepId: "choose_base", testIds: ["base-preview", "base-confirm"] },
     { stepId: "track", testId: "track-adapt" },
     { stepId: "characters/prefill", testId: "prefill-confirm" },
     // marks skips transparently inside this window, landing on punctuation.
-    { stepId: "characters/B", testId: "phaseB-complete", settleFor: "punctuation-done" },
+    { stepId: "characters/B", testId: "phase-b-done", settleFor: "punctuation-done" },
     // See driveCopyTrack — the ungated punctuation page, accepted empty, whose
     // window absorbs the async convenience skip.
     { stepId: "punctuation", testId: "punctuation-done", settleFor: "invisibles-continue" },
     // The invisible-characters step (spec 075) ALWAYS renders — no skip gate —
     // so it is a real stop on every walk; accepted empty. The async
     // convenience skip that follows it is absorbed by this window instead.
-    { stepId: "invisibles", testId: "invisibles-continue", settleFor: "carve-complete" },
-    { stepId: "carve", testId: "carve-complete" },
-    { stepId: "mechanisms", testId: "mechanisms-complete" },
-    { stepId: "touch_seed_source", testId: "seed-source-complete", async: true },
-    { stepId: "touch", testId: "e-complete", async: true },
-    { stepId: "help", testId: "phaseF-complete", async: true },
+    { stepId: "invisibles", testId: "invisibles-continue", settleFor: "carve-continue" },
+    { stepId: "carve", testId: "carve-continue" },
+    { stepId: "mechanisms", testId: "mechanisms-continue" },
+    { stepId: "touch_seed_source", testId: "seed-source-confirm", async: true },
+    { stepId: "touch", testId: "touch-continue", async: true },
+    { stepId: "help", testId: "survey-advance", async: true },
   ]);
 }
 
@@ -513,7 +526,7 @@ describe("golden-walk: copy-track (T003)", () => {
 
   it("records the copy-track traversal and matches the committed fixture", async () => {
     await act(async () => {
-      render(<SurveyView baseKeyboard={null} />);
+      renderSurveyWithNav();
     });
 
     await driveCopyTrack(recorder);
@@ -542,7 +555,7 @@ describe("golden-walk: adapt-track (T004)", () => {
 
   it("records the adapt-track traversal and matches the committed fixture", async () => {
     await act(async () => {
-      render(<SurveyView baseKeyboard={null} />);
+      renderSurveyWithNav();
     });
 
     await driveAdaptTrack(recorder);

@@ -67,7 +67,7 @@ const CONTEXT = { bcp47_tag: "ewo", language_name: "Ewondo" };
 
 function renderPhaseB(): { onComplete: ReturnType<typeof vi.fn> } {
   const onComplete = vi.fn();
-  render(<PhaseB context={CONTEXT} onComplete={onComplete} />);
+  render(<PhaseB context={CONTEXT} onComplete={onComplete} />, { withStepNav: true });
   return { onComplete };
 }
 
@@ -295,6 +295,22 @@ describe("heading swap (obligation P1c, FR-016c)", () => {
     expect(onComplete).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("phase-b-done"));
     expect(onComplete).toHaveBeenCalledTimes(1);
+  });
+
+  // spec 081 US2 scenario 4: a zero-character draft's footer Done stays
+  // disabled, exactly as the in-page Done was before the footer move.
+  it("spec 081 US2/4: the footer Done is disabled while the draft has zero characters", async () => {
+    getSourcedExemplars.set(null);
+    renderPhaseB();
+    await exemplarRadio();
+    fireEvent.click(screen.getByTestId("phase-b-intro-next"));
+    await waitFor(() => expect(screen.getByTestId("phase-b-done")).toBeTruthy());
+    expect(usePhaseBDraftStore.getState().chars).toEqual([]);
+
+    const group = screen.getByRole("group", { name: "Step navigation" });
+    const doneBtn = screen.getByTestId("phase-b-done");
+    expect(group.contains(doneBtn)).toBe(true);
+    expect((doneBtn as HTMLButtonElement).disabled).toBe(true);
   });
 });
 

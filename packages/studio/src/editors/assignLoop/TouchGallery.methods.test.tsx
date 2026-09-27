@@ -83,7 +83,7 @@ describe("TouchGallery — UsesSequencesCard (integration)", () => {
     seedWithDesktopAssignment("n", sequenceAssignment);
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // "n" is a plain Latin letter — detected via the OS-default physical
@@ -108,7 +108,7 @@ describe("TouchGallery — UsesSequencesCard (integration)", () => {
   it("control: renders no uses-sequences-card for a character with no recorded using-sequence anywhere in Phase C", async () => {
     seedStore({ withInventory: ["中"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
     expectCurrentChar("中");
     expect(screen.queryByTestId("uses-sequences-card")).toBeNull();
@@ -126,7 +126,7 @@ describe("TouchGallery — physical-key type-to-select in an open key picker", (
   it("pressing A while the long-press host-key picker is open selects K_A", async () => {
     seedStore({ withInventory: ["中"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // Suggestion kind "none" for "中" (no desktop assignment / touch layout /
@@ -154,7 +154,7 @@ describe("TouchGallery — multiple methods per character", () => {
     // directly and there is nothing to Accept/Deny first.
     seedStore({ withInventory: ["中"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // Apply method 1: long-press K_A (the chooser's default active method).
@@ -233,7 +233,7 @@ describe("TouchGallery — Apply lives in the open method card", () => {
     // to chooser" describe block above.
     seedStore({ withInventory: ["中"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     expect(screen.getByTestId("touch-apply-longpress")).toBeTruthy();
@@ -252,7 +252,7 @@ describe("TouchGallery — Apply lives in the open method card", () => {
   it("follows the author into whichever card they open", async () => {
     seedStore({ withInventory: ["中"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
     expect(screen.getByTestId("touch-apply-longpress")).toBeTruthy();
 
@@ -294,7 +294,7 @@ describe("TouchGallery — Apply lives in the open method card", () => {
     }));
     seedStore({ withInventory: ["中"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     const hostKeySelect = screen.getByRole("button", { name: /host key/i });
@@ -318,7 +318,7 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
     // derives hostKey K_A automatically so Accept records the mechanism directly.
     seedStore({ withInventory: ["ä", "ö"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     const acceptBtn = screen.queryAllByRole("button").find(
@@ -375,7 +375,7 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
     // "中" has no suggestion — the chooser shows directly.
     seedStore({ withInventory: ["中"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     const applyIdenticalLongpress = async () => {
@@ -437,7 +437,7 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
     });
 
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // Mount lands directly on "中" (the walk's only entry) — it has no
@@ -491,7 +491,7 @@ describe("TouchGallery — prior-QC P1 finding: dedupe / revisit invariants", ()
       suggestionResolvedChars: ["a"],
     });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     // "a" is excluded from the walk (entry-parity fix — detected, no Phase C
@@ -540,7 +540,7 @@ describe("TouchGallery — custom host-key option", () => {
   it("selecting 'Enter my own character...' reveals a custom text input", async () => {
     seedStore({ withInventory: ["中"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
     const hostKeySelect = screen.getByRole("button", { name: /host key for long-press/i });
     await changeSelectMenu(hostKeySelect, CUSTOM_KEY_OPTION_VALUE);
@@ -552,7 +552,7 @@ describe("TouchGallery — custom host-key option", () => {
   it("a custom literal character resolves to a vkey and Apply records it as slotValues.hostKey", async () => {
     seedStore({ withInventory: ["中"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
     const hostKeySelect = screen.getByRole("button", { name: /host key for long-press/i });
     await changeSelectMenu(hostKeySelect, CUSTOM_KEY_OPTION_VALUE);
@@ -574,7 +574,7 @@ describe("TouchGallery — custom host-key option", () => {
   it("custom U+ notation resolves through to the mapped key", async () => {
     seedStore({ withInventory: ["中"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
     const hostKeySelect = screen.getByRole("button", { name: /host key for long-press/i });
     await changeSelectMenu(hostKeySelect, CUSTOM_KEY_OPTION_VALUE);
@@ -595,7 +595,7 @@ describe("TouchGallery — custom host-key option", () => {
   it("an unmappable custom character shows an error and blocks Apply", async () => {
     seedStore({ withInventory: ["中"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
     const hostKeySelect = screen.getByRole("button", { name: /host key for long-press/i });
     await changeSelectMenu(hostKeySelect, CUSTOM_KEY_OPTION_VALUE);
@@ -612,7 +612,7 @@ describe("TouchGallery — custom host-key option", () => {
   it("invalid U+ notation blocks Apply", async () => {
     seedStore({ withInventory: ["中"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
     const hostKeySelect = screen.getByRole("button", { name: /host key for long-press/i });
     await changeSelectMenu(hostKeySelect, CUSTOM_KEY_OPTION_VALUE);
@@ -627,7 +627,7 @@ describe("TouchGallery — custom host-key option", () => {
   it("the host-key custom-character input carries no placeholder attribute (Fix 1 — guidance moved out of the box)", async () => {
     seedStore({ withInventory: ["中"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
     const hostKeySelect = screen.getByRole("button", { name: /host key for long-press/i });
     await changeSelectMenu(hostKeySelect, CUSTOM_KEY_OPTION_VALUE);
@@ -638,7 +638,7 @@ describe("TouchGallery — custom host-key option", () => {
   it("shows the shared custom-input help line only once host-key custom mode is active", async () => {
     seedStore({ withInventory: ["中"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
     expect(
       screen.queryByText("Type a character directly, or a Unicode value like U+00E9."),
@@ -653,7 +653,7 @@ describe("TouchGallery — custom host-key option", () => {
   it("reflects a literal custom host-key character bidirectionally (char → U+ → vkey)", async () => {
     seedStore({ withInventory: ["中"] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
     const hostKeySelect = screen.getByRole("button", { name: /host key for long-press/i });
     await changeSelectMenu(hostKeySelect, CUSTOM_KEY_OPTION_VALUE);
@@ -699,7 +699,7 @@ describe("TouchGallery — Existing methods color model (produced vs. used)", ()
 
     seedStore({ withInventory: [targetChar] });
     await act(async () => {
-      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />);
+      render(<TouchGallery onComplete={vi.fn()} onBack={vi.fn()} />, { withStepNav: true });
     });
 
     let row: HTMLElement;

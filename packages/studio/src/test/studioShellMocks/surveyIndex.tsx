@@ -3,49 +3,34 @@
 // inert.
 
 import { fakeIdentity, fakePhaseResult } from "./fakes.ts";
+import { usePublishStepNav } from "../../hooks/usePublishStepNav.ts";
 
 export function IdentityLite({ onComplete }: { onComplete: (result: unknown, identity: unknown) => void }) {
-  return (
-    <div data-testid="stage-identity">
-      <button
-        type="button"
-        data-testid="identity-complete"
-        onClick={() => onComplete(fakePhaseResult, fakeIdentity)}
-      >
-        identity-complete
-      </button>
-    </div>
-  );
+  // Stands in for IdentityLite's SurveyRunner, so it publishes under SurveyRunner's handle.
+  usePublishStepNav({
+    forward: {
+      label: "survey-advance",
+      onClick: () => onComplete(fakePhaseResult, fakeIdentity),
+      testId: "survey-advance",
+    },
+  });
+  return <div data-testid="stage-identity" />;
 }
 
 export function Prefill({ onConfirm, onBack }: { onConfirm: () => void; onBack?: () => void }) {
-  return (
-    <div data-testid="stage-prefill">
-      <button type="button" data-testid="prefill-confirm" onClick={onConfirm}>
-        prefill-confirm
-      </button>
-      {onBack !== undefined && (
-        <button type="button" data-testid="prefill-back" onClick={onBack}>
-          prefill-back
-        </button>
-      )}
-    </div>
-  );
+  usePublishStepNav({
+    ...(onBack !== undefined ? { back: { label: "prefill-back", onClick: onBack, testId: "prefill-back" } } : {}),
+    forward: { label: "prefill-confirm", onClick: onConfirm, testId: "prefill-confirm" },
+  });
+  return <div data-testid="stage-prefill" />;
 }
 
 export function PhaseB({ onComplete, onBack }: { onComplete: (r: unknown) => void; onBack?: () => void }) {
-  return (
-    <div data-testid="stage-B">
-      <button type="button" data-testid="phaseB-complete" onClick={() => onComplete(fakePhaseResult)}>
-        phaseB-complete
-      </button>
-      {onBack !== undefined && (
-        <button type="button" data-testid="phaseB-back" onClick={onBack}>
-          phaseB-back
-        </button>
-      )}
-    </div>
-  );
+  usePublishStepNav({
+    ...(onBack !== undefined ? { back: { label: "phase-b-back", onClick: onBack, testId: "phase-b-back" } } : {}),
+    forward: { label: "phase-b-done", onClick: () => onComplete(fakePhaseResult), testId: "phase-b-done" },
+  });
+  return <div data-testid="stage-B" />;
 }
 
 export const PhaseA = () => <div data-testid="stage-A" />;

@@ -165,7 +165,12 @@ test.describe("journey strip — grain, badges, jump, overflow (spec 079 US3)", 
     await expect(current).toBeVisible({ timeout: 15_000 });
     // Every mark — not just the current one — stays reachable by Tab
     // regardless of scroll position (native focus-scroll).
-    const row = footer(page).locator('[role="button"], button').first();
+    // Scoped to the dot row: the footer's first button is now the step's Back
+    // (spec 081), not a dot.
+    const row = footer(page)
+      .getByTestId("progress-dot-row")
+      .locator('[role="button"], button')
+      .first();
     expect(await row.isVisible()).toBe(true);
 
     await driveHelpPhase(page);

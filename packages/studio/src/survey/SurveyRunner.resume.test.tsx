@@ -64,7 +64,7 @@ const RESUME = {
 
 describe("SurveyRunner — resumeAnswers", () => {
   it("mounts on the LAST question with its answer restored, not question 1", () => {
-    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} resumeAnswers={RESUME} />);
+    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} resumeAnswers={RESUME} />, { withStepNav: true });
     expect(screen.getByText("Third question")).toBeTruthy();
     expect(screen.queryByText("First question")).toBeNull();
     // Restored answer keeps Finish enabled.
@@ -74,7 +74,7 @@ describe("SurveyRunner — resumeAnswers", () => {
   });
 
   it("Back walks the replayed stack to the previous question with its value", () => {
-    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} resumeAnswers={RESUME} />);
+    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} resumeAnswers={RESUME} />, { withStepNav: true });
     fireEvent.click(screen.getByTestId("survey-back"));
     expect(screen.getByText("Second question")).toBeTruthy();
     const input = screen.getByRole("textbox") as HTMLInputElement | HTMLTextAreaElement;
@@ -83,7 +83,7 @@ describe("SurveyRunner — resumeAnswers", () => {
 
   it("finishing a resumed flow reports the full replayed answer set", () => {
     const onComplete = vi.fn<[SurveyPhaseResult], void>();
-    render(<SurveyRunner flow={FLOW} onComplete={onComplete} resumeAnswers={RESUME} />);
+    render(<SurveyRunner flow={FLOW} onComplete={onComplete} resumeAnswers={RESUME} />, { withStepNav: true });
     fireEvent.click(screen.getByTestId("survey-advance"));
     expect(onComplete).toHaveBeenCalledTimes(1);
     const result = onComplete.mock.calls[0]![0];
@@ -95,7 +95,7 @@ describe("SurveyRunner — resumeAnswers", () => {
   });
 
   it("mounts on question 1 as usual when resumeAnswers is absent", () => {
-    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />);
+    render(<SurveyRunner flow={FLOW} onComplete={vi.fn()} />, { withStepNav: true });
     expect(screen.getByText("First question")).toBeTruthy();
   });
 });
