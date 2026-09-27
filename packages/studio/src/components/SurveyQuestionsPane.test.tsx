@@ -58,4 +58,46 @@ describe("SurveyQuestionsPane", () => {
     );
     expect(pane().getAttribute("tabindex")).toBe("0");
   });
+
+  it("is a Tab stop when mixed content overflows, even with its own controls", async () => {
+    // One early control + lengthy read-only tail: Tab would jump from the
+    // control straight to the footer, stranding the tail for keyboard users
+    // (arrows on a focused control do not scroll the pane). jsdom reports no
+    // layout (scrollHeight/clientHeight are 0), so overflow is mocked and a
+    // DOM mutation re-runs the check, mirroring a real content change.
+    render(
+      <SurveyQuestionsPane label="Survey questions" style={{}}>
+        <button type="button">Pick</button>
+        <p>Long read-only content below the control…</p>
+      </SurveyQuestionsPane>,
+    );
+    const el = pane();
+    expect(el.hasAttribute("tabindex")).toBe(false);
+
+    Object.defineProperties(el, {
+      scrollHeight: { value: 2000, configurable: true },
+      clientHeight: { value: 600, configurable: true },
+    });
+    await act(async () => {
+      el.appendChild(document.createElement("p"));
+    });
+    expect(el.getAttribute("tabindex")).toBe("0");
+  });
+
+  it("stays out of Tab order when its controls fit without scrolling", async () => {
+    render(
+      <SurveyQuestionsPane label="Survey questions" style={{}}>
+        <button type="button">Pick</button>
+      </SurveyQuestionsPane>,
+    );
+    const el = pane();
+    Object.defineProperties(el, {
+      scrollHeight: { value: 600, configurable: true },
+      clientHeight: { value: 600, configurable: true },
+    });
+    await act(async () => {
+      el.appendChild(document.createElement("p"));
+    });
+    expect(el.hasAttribute("tabindex")).toBe(false);
+  });
 });

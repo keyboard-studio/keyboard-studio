@@ -295,8 +295,10 @@ export function StudioFooter() {
     >
       {/* Spec 081: the active step's Back / Skip / forward, first in the DOM
           and in Tab order. Keyed on the step, so a step change remounts it and
-          focus never carries over from the previous step's buttons. It never
-          shrinks; the project label and then the dot row give way first. */}
+          focus never carries over from the previous step's buttons. The
+          buttons never shrink, wrap or clip; at constrained widths the cluster
+          itself scrolls horizontally (StepNavCluster) while the project label
+          and then the dot row give way first. */}
       <StepNavCluster key={`nav-${activeStepId}`} stepId={activeStepId} />
 
       {/* Omitted entirely, not placeholdered, while the project has no name —

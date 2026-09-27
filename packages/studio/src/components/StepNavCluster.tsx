@@ -28,7 +28,27 @@ export function StepNavCluster({ stepId }: { stepId: string }) {
       role="group"
       aria-label={t({ id: "footer.nav.groupLabel", message: "Step navigation" })}
       data-testid="step-nav"
-      style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        // Narrow-width degrade (spec 081 FR-022, SC-007): the cluster yields
+        // BEFORE the dots do, but its buttons never shrink, wrap or clip —
+        // each keeps `flexShrink: 0` / `nowrap` from the compact Button, so
+        // excess width scrolls inside the cluster instead of spilling under
+        // the footer's `overflow: hidden` where a long label (e.g. the French
+        // touch-seed "Abandonner les modifications tactiles et confirmer" at
+        // 375 px) would be clipped and unclickable. `minWidth: 0` lets the
+        // flex item shrink below its content size so the scroll can engage;
+        // focusing an off-screen button scrolls it into view natively, and
+        // Tab order (nav before dots) is unchanged. No vertical growth: the
+        // row stays one line tall within the 40/52 px footer frame.
+        flexShrink: 1,
+        minWidth: 0,
+        flexWrap: "nowrap",
+        overflowX: "auto",
+        overflowY: "hidden",
+      }}
     >
       {SLOT_VARIANTS.map(([slot, variant]) => {
         const action: NavAction | undefined = spec[slot];

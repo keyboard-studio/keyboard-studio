@@ -715,6 +715,32 @@ describe("StudioFooter — step nav cluster (spec 081)", () => {
     expect(forward.getAttribute("aria-describedby")).toBe("demo-hint");
   });
 
+  it("keeps a long nav label reachable by scrolling inside the cluster (spec 081 FR-022)", () => {
+    // The 375 px French touch-seed case: Back plus "Abandonner les
+    // modifications tactiles et confirmer" plus the 48 px dot minimum exceeds
+    // the footer, which hides overflow. The cluster yields (shrinks + scrolls
+    // internally) instead of letting the button clip under the footer box.
+    publishNav({
+      back: { label: "← Back", onClick: noop, testId: "demo-back" },
+      forward: {
+        label: "Abandonner les modifications tactiles et confirmer",
+        onClick: noop,
+        testId: "demo-confirm",
+      },
+    });
+    render(<StudioFooter />);
+    const group = screen.getByRole("group", { name: "Step navigation" });
+    expect(group.style.flexShrink).toBe("1");
+    expect(group.style.minWidth).toBe("0");
+    expect(group.style.overflowX).toBe("auto");
+    expect(group.style.overflowY).toBe("hidden");
+    // The buttons themselves never compress: the compact treatment keeps
+    // `nowrap` + `flexShrink: 0`, so labels stay complete and operable.
+    const forward = screen.getByTestId("demo-confirm") as HTMLButtonElement;
+    expect(forward.style.whiteSpace).toBe("nowrap");
+    expect(forward.style.flexShrink).toBe("0");
+  });
+
   it("Tab reaches the nav buttons before any dot", async () => {
     publishNav(FULL_SPEC);
     const user = userEvent.setup();

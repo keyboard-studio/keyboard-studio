@@ -104,7 +104,10 @@ describe("Convenience letters gate, real data: opens for a surplus-letter orthog
   it("carries the kept letters into carve's needed set, and only those", async () => {
     seed("sm", SAMOAN_BASES);
     const onComplete = vi.fn();
-    render(<ConvenienceCharsStep onComplete={onComplete} />);
+    // withStepNav (spec 081 FR-051): Continue now renders in the footer's nav
+    // cluster, not the step body — same harness ConvenienceCharsStep.test.tsx
+    // uses for every nav assertion.
+    render(<ConvenienceCharsStep onComplete={onComplete} />, { withStepNav: true });
     await screen.findByTestId("convenience-chars");
 
     // Keep everything except q/Q.
