@@ -400,10 +400,16 @@ export async function suggestMissingCharacters(args: {
  *
  * Unlike suggestMissingCharacters's `main`/`auxiliary` fields (which are
  * filtered to non-ASCII \p{L} "specials" — the letter-suggestion audience),
- * this returns the RAW exemplar sets (ExemplarResult.used + .auxiliary),
- * which for most scripts already include the ASCII range (e.g. Latin
- * "a-z") — the full inventory a language actually needs, not just the
- * gap-filling suggestions.
+ * this returns the RAW exemplar sets (main, punctuation, numbers), which for
+ * most scripts already include the ASCII range (e.g. Latin "a-z") — the full
+ * inventory a language actually needs, not just the gap-filling suggestions.
+ *
+ * The AUXILIARY (loanword) tier is deliberately NOT included. For most
+ * CLDR/SLDR locales it lists the whole basic-Latin alphabet, so counting it
+ * as needed made every base letter look needed: the convenience question
+ * never had a surplus to ask about, and carve never proposed trimming a
+ * loanword-only letter. Loanword letters are needed only once the author
+ * adds them to the alphabet, which the studio offers in their own section.
  *
  * Returns null on the same confidence-gate conditions suggestMissingCharacters
  * uses for its first four gates — und/script-only tag, ISO 639-3 private-use
@@ -420,7 +426,8 @@ export async function neededCharsForLanguage(args: {
   const { bcp47, loader } = args;
 
   // Offline path (the authoring path): the sourced inventory already carries
-  // all four tiers, so the union is just its character list.
+  // every tier, so the needed set is its character list minus the auxiliary
+  // tier (see above).
   if (loader === undefined) {
     await loadExemplarSource();
     const inv = sourceExemplars(bcp47);
@@ -438,9 +445,6 @@ export async function neededCharsForLanguage(args: {
   if (pair === null) return null;
 
   const needed = new Set(parseUnicodeSet(pair.main).used);
-  if (pair.auxiliary !== null) {
-    for (const ch of parseUnicodeSet(pair.auxiliary).used) needed.add(ch);
-  }
   // Punctuation + numbers exemplar tiers (#525 fix — over-removal): locale
   // punctuation (French "« »") and locale digits (Persian Eastern-Arabic-Indic
   // "۰۱۲…") are needed characters too, not just the letter tiers, so they

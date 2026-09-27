@@ -425,3 +425,154 @@ describe("proposed-vs-authored affordance (obligation P5, FR-017)", () => {
     expect(usePhaseBDraftStore.getState().rejected).toContain("ŋ");
   });
 });
+
+// ---------------------------------------------------------------------------
+// The loanword (auxiliary) tier — shown, never pre-selected
+// ---------------------------------------------------------------------------
+
+/** Bafut's shape: main letters incl. a {gh} cluster, auxiliary [c h ʼ p q v x]. */
+function bafutInventory(): SourcedInventory {
+  const base = inventory(["a", "b", "g", "h", "ŋ"], "sldr", "unconfirmed");
+  return {
+    ...base,
+    resolvedTag: "bfd",
+    characters: [
+      ...base.characters,
+      ...["c", "h", "ʼ", "p", "q", "v", "x"].map((char) => ({
+        char,
+        tier: "auxiliary" as const,
+        source: "sldr" as const,
+        confidence: "unconfirmed" as const,
+      })),
+    ],
+    digraphs: ["gh"],
+  };
+}
+
+describe("loanword letters section", () => {
+  it("lists the auxiliary letters, unselected, and leaves them out of the seeded alphabet", async () => {
+    getSourcedExemplars.set(bafutInventory());
+    renderPhaseB();
+    await acceptExemplarsAndContinue();
+
+    const section = await screen.findByTestId("alphabet-loanwords");
+    const chips = [...section.querySelectorAll("button[aria-pressed]")];
+    // h is already a main-tier letter, so it is not offered again.
+    expect(chips.map((b) => b.getAttribute("aria-label")).sort()).toEqual([
+      "c C (U+0063)",
+      "p P (U+0070)",
+      "q Q (U+0071)",
+      "v V (U+0076)",
+      "x X (U+0078)",
+      "ʼ (U+02BC)",
+    ]);
+    for (const chip of chips) expect(chip.getAttribute("aria-pressed")).toBe("false");
+    const chars = usePhaseBDraftStore.getState().chars;
+    for (const ch of ["c", "p", "q", "v", "x", "ʼ"]) expect(chars).not.toContain(ch);
+    expect(chars).toContain("h");
+  });
+
+  it("adds a loanword letter with its case pair beside the alphabet, and takes both out again", async () => {
+    getSourcedExemplars.set(bafutInventory());
+    renderPhaseB();
+    await acceptExemplarsAndContinue();
+
+    const chip = await screen.findByRole("button", { name: "c C (U+0063)" });
+    fireEvent.click(chip);
+    expect(chip.getAttribute("aria-pressed")).toBe("true");
+    const state = usePhaseBDraftStore.getState();
+    expect(state.loanwordChars).toEqual(["c", "C"]);
+    // Beside the alphabet, never in it.
+    expect(state.chars).not.toContain("c");
+    expect(state.bases).not.toContain("c");
+
+    fireEvent.click(chip);
+    expect(chip.getAttribute("aria-pressed")).toBe("false");
+    expect(usePhaseBDraftStore.getState().loanwordChars).toEqual([]);
+    expect(usePhaseBDraftStore.getState().rejected).not.toContain("c");
+  });
+
+  it("adds every loanword letter and its case pair with one click, then offers to remove them all", async () => {
+    getSourcedExemplars.set(bafutInventory());
+    renderPhaseB();
+    await acceptExemplarsAndContinue();
+
+    const toggleAll = await screen.findByTestId("alphabet-loanwords-toggle-all");
+    expect(toggleAll.textContent).toBe("Add all loanword letters");
+    const charsBefore = [...usePhaseBDraftStore.getState().chars];
+    fireEvent.click(toggleAll);
+
+    const { loanwordChars, chars } = usePhaseBDraftStore.getState();
+    expect([...loanwordChars].sort()).toEqual(["C", "P", "Q", "V", "X", "c", "p", "q", "v", "x", "ʼ"].sort());
+    // The alphabet is untouched, and h (already a main-tier letter) is not a loanword.
+    expect(chars).toEqual(charsBefore);
+    expect(loanwordChars).not.toContain("h");
+    const section = screen.getByTestId("alphabet-loanwords");
+    for (const chip of section.querySelectorAll("button[aria-pressed]")) {
+      expect(chip.getAttribute("aria-pressed")).toBe("true");
+    }
+    expect(toggleAll.textContent).toBe("Remove all loanword letters");
+
+    fireEvent.click(toggleAll);
+    expect(usePhaseBDraftStore.getState().loanwordChars).toEqual([]);
+    expect(usePhaseBDraftStore.getState().chars).toEqual(charsBefore);
+    expect(toggleAll.textContent).toBe("Add all loanword letters");
+  });
+
+  it("Add all completes a partial selection without toggling the letters already added", async () => {
+    getSourcedExemplars.set(bafutInventory());
+    renderPhaseB();
+    await acceptExemplarsAndContinue();
+
+    fireEvent.click(await screen.findByRole("button", { name: "q Q (U+0071)" }));
+    fireEvent.click(screen.getByTestId("alphabet-loanwords-toggle-all"));
+
+    const { loanwordChars } = usePhaseBDraftStore.getState();
+    for (const ch of ["c", "p", "q", "Q", "v", "x", "ʼ"]) expect(loanwordChars).toContain(ch);
+    expect(new Set(loanwordChars).size).toBe(loanwordChars.length);
+  });
+
+  it("a loanword letter the author typed into the alphabet shows as added and is not duplicated", async () => {
+    getSourcedExemplars.set(bafutInventory());
+    renderPhaseB();
+    await acceptExemplarsAndContinue();
+
+    usePhaseBDraftStore.getState().add("q");
+    const chip = await screen.findByRole("button", { name: "q Q (U+0071)" });
+    await waitFor(() => expect(chip.getAttribute("aria-pressed")).toBe("true"));
+    fireEvent.click(screen.getByTestId("alphabet-loanwords-toggle-all"));
+    expect(usePhaseBDraftStore.getState().loanwordChars).not.toContain("q");
+  });
+
+  it("Done records loanword letters in the inventory, never in the alphabet", async () => {
+    getSourcedExemplars.set(bafutInventory());
+    const { onComplete } = renderPhaseB();
+    await acceptExemplarsAndContinue();
+
+    fireEvent.click(await screen.findByRole("button", { name: "x X (U+0078)" }));
+    fireEvent.click(screen.getByTestId("phase-b-done"));
+
+    const result = onComplete.mock.calls[0]?.[0] as import("@keyboard-studio/contracts").SurveyPhaseResult;
+    expect(result.loanwordChars).toEqual(["x", "X"]);
+    expect(result.confirmedInventory).toEqual(expect.arrayContaining(["x", "X", "a", "b"]));
+  });
+
+  it("Done records an empty loanword list when none were added", async () => {
+    getSourcedExemplars.set(bafutInventory());
+    const { onComplete } = renderPhaseB();
+    await acceptExemplarsAndContinue();
+
+    fireEvent.click(await screen.findByTestId("phase-b-done"));
+    const result = onComplete.mock.calls[0]?.[0] as import("@keyboard-studio/contracts").SurveyPhaseResult;
+    expect(result.loanwordChars).toEqual([]);
+    expect(result.confirmedInventory).not.toContain("x");
+  });
+
+  it("renders nothing when the inventory has no auxiliary tier", async () => {
+    getSourcedExemplars.set(inventory(["a", "ŋ", "ɔ"]));
+    renderPhaseB();
+    await acceptExemplarsAndContinue();
+    await screen.findByTestId("phase-b-heading");
+    expect(screen.queryByTestId("alphabet-loanwords")).toBeNull();
+  });
+});

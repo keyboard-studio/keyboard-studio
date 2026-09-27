@@ -110,6 +110,15 @@ export interface SurveySession {
    */
   attestedDigraphs?: string[];
   /**
+   * Deduped union of all phases' `loanwordChars` — the exemplar loanword-tier
+   * letters the author added. Also in `confirmedInventory` (they are needed)
+   * but never in `alphabet` (they are not the language's own letters). See
+   * {@link SurveyPhaseResult.loanwordChars}.
+   *
+   * **Additive optional** — absent when no phase recorded any.
+   */
+  loanwordChars?: string[];
+  /**
    * Store-wise merged three-store alphabet across all phases (spec 046):
    * deduped union of `bases` (NFC-normalised) and `marks` (compared/deduped
    * as-authored — combining marks are not independently normalisable the
@@ -220,6 +229,15 @@ export function mergePhaseResults(
     (p) => p.attestedDigraphs
   );
 
+  // Loanword-tier letters: a separate list, and ALSO folded into the flat
+  // inventory, so a phase that records one without listing it in its own
+  // inventory still leaves it needed (see SurveyPhaseResult.loanwordChars).
+  const { values: loanwordChars } = nfcDedupUnion(
+    phaseResults,
+    (p) => p.loanwordChars
+  );
+  for (const g of loanwordChars) pushInventory(g);
+
   // Three-store alphabet (spec 046): store-wise deduped union across phases;
   // stacks dedupe on their exact ordered shape; declared roles are last-wins.
   const alphabet = mergeAlphabets(phaseResults.map((p) => p.alphabet));
@@ -270,6 +288,7 @@ export function mergePhaseResults(
     assignments,
     confirmedInventory,
     ...(attestedDigraphs.length > 0 ? { attestedDigraphs } : {}),
+    ...(loanwordChars.length > 0 ? { loanwordChars } : {}),
     ...(alphabet !== undefined ? { alphabet } : {}),
     ...(marksWorklist !== undefined ? { marksWorklist } : {}),
     ...(marksOutputForm !== undefined ? { marksOutputForm } : {}),

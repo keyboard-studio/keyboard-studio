@@ -642,12 +642,12 @@ describe("neededCharsForLanguage — returns the full exemplar set (not just mis
     expect(result!.has("é")).toBe(true);
   });
 
-  it("includes auxiliary (loanword-tier) characters alongside main", async () => {
+  it("excludes auxiliary (loanword-tier) characters: they are needed only once the author adds them", async () => {
     const loader = makeLoader("[ẹ]", "[ü]");
     const result = await neededCharsForLanguage({ bcp47: "yo", loader });
     expect(result).not.toBeNull();
     expect(result!.has("ẹ")).toBe(true);
-    expect(result!.has("ü")).toBe(true);
+    expect(result!.has("ü")).toBe(false);
   });
 
   it("returns an empty auxiliary contribution (not null) when CLDR has no auxiliary set", async () => {
@@ -687,11 +687,11 @@ describe("neededCharsForLanguage — returns the full exemplar set (not just mis
     expect(result!.has("۲")).toBe(true);
   });
 
-  it("returns only main+auxiliary when punctuation/numbers tiers are absent from CLDR", async () => {
+  it("returns only main when punctuation/numbers tiers are absent from CLDR", async () => {
     const loader = makeLoader("[ẹ]", "[ü]");
     const result = await neededCharsForLanguage({ bcp47: "yo", loader });
     expect(result).not.toBeNull();
-    expect(result!.size).toBe(2);
+    expect(result!.size).toBe(1);
   });
 });
 
@@ -830,14 +830,23 @@ describe("spec 044 — offline sourcing path (no loader)", () => {
   });
 });
 
-describe("spec 044 — all four tiers reach the needed set", () => {
+describe("spec 044 — main, punctuation and numbers tiers reach the needed set", () => {
   it("includes locale punctuation and locale digits, not just letters", async () => {
     const needed = await neededCharsForLanguage({ bcp47: "ewo" });
     expect(needed).not.toBeNull();
     expect(needed!.has("ŋ")).toBe(true); // main
-    expect(needed!.has("x")).toBe(true); // auxiliary
     expect(needed!.has("?")).toBe(true); // punctuation
     expect(needed!.has("7")).toBe(true); // numbers
+  });
+
+  it("leaves the auxiliary (loanword) tier out", async () => {
+    // Bafut's auxiliary tier is [c h ʼ p q v x]. h is still needed: the main
+    // tier's {gh} cluster contributes it as a main-tier letter.
+    const needed = await neededCharsForLanguage({ bcp47: "bfd" });
+    expect(needed).not.toBeNull();
+    expect(needed!.has("b")).toBe(true);
+    expect(needed!.has("h")).toBe(true);
+    for (const ch of ["c", "ʼ", "p", "q", "v", "x"]) expect(needed!.has(ch)).toBe(false);
   });
 
   it("surfaces Persian's own digits rather than only ASCII ones", async () => {

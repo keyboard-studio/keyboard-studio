@@ -923,6 +923,9 @@ function restorePhaseBDraftSnapshot(raw: unknown): PhaseBDraftSnapshot {
     // clusters' constituent letters are the alphabet; the clusters are a note
     // about it.
     exemplarDigraphs: stringArray(pb.exemplarDigraphs),
+    // Loanword-tier letters: also kept out of `chars`, for the same reason —
+    // they are needed, but they are not the alphabet.
+    loanwordChars: stringArray(pb.loanwordChars),
     rejected: stringArray(pb.rejected),
     proposalConfidence: stringEntries(pb.proposalConfidence),
     exemplarMethodDeclined: pb.exemplarMethodDeclined === true,

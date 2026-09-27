@@ -540,3 +540,32 @@ describe("mergePhaseResults — retainedConvenienceChars (pre-carve convenience 
     expect(session.retainedConvenienceChars).toEqual(["q"]);
   });
 });
+
+describe("mergePhaseResults — loanwordChars (exemplar loanword tier)", () => {
+  it("is absent when no phase recorded any", () => {
+    const session = mergePhaseResults({}, [{ phase: "B", answers: [], loanwordChars: [] }]);
+    expect(session.loanwordChars).toBeUndefined();
+  });
+
+  it("unions across phases and also lands in confirmedInventory", () => {
+    const session = mergePhaseResults({}, [
+      { phase: "B", answers: [], confirmedInventory: ["a", "b"], loanwordChars: ["q", "Q"] },
+      { phase: "C", answers: [], loanwordChars: ["Q", "x"] },
+    ]);
+    expect(session.loanwordChars).toEqual(["q", "Q", "x"]);
+    expect(session.confirmedInventory).toEqual(["a", "b", "q", "Q", "x"]);
+  });
+
+  it("stays out of the alphabet", () => {
+    const session = mergePhaseResults({}, [
+      {
+        phase: "B",
+        answers: [],
+        alphabet: { bases: ["a", "b"], marks: [], attestedStacks: [], declaredRoles: {} },
+        loanwordChars: ["q"],
+      },
+    ]);
+    expect(session.alphabet?.bases).toEqual(["a", "b"]);
+    expect(session.confirmedInventory).toContain("q");
+  });
+});

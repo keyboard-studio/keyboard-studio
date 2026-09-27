@@ -388,6 +388,32 @@ describe("CharacterMapPane — data path", () => {
     expect(screen.queryByRole("button", { name: /from your base keyboard/ })).toBeNull();
   });
 
+  it("shows a loanword letter as selected, and clicking it removes it from the loanword list only", async () => {
+    seedBaseAndLanguage();
+    getGroupsResult.set([
+      {
+        block: "Latin",
+        tier: "main",
+        script: "Latn",
+        usedByBase: false,
+        cells: [
+          { char: "a", isCombiningMark: false },
+          { char: "q", isCombiningMark: false },
+        ],
+      },
+    ]);
+    usePhaseBDraftStore.getState().add("a");
+    usePhaseBDraftStore.getState().addLoanword("q");
+    usePhaseBDraftStore.getState().addLoanword("Q");
+    render(<CharacterMapPane />);
+    const qCell = await screen.findByRole("button", { name: /Remove q \(U\+0071\)/ });
+    expect(qCell.getAttribute("aria-pressed")).toBe("true");
+
+    fireEvent.click(qCell);
+    expect(usePhaseBDraftStore.getState().loanwordChars).toEqual([]);
+    expect(usePhaseBDraftStore.getState().chars).toEqual(["a"]);
+  });
+
   it("shows only letters, numerals, and marks; excludes symbols and separators (spec 047)", async () => {
     seedBaseAndLanguage();
     getGroupsResult.set([
@@ -417,7 +443,7 @@ describe("CharacterMapPane — data path", () => {
     expect(within(group).queryByRole("button", { name: /\(U\+00A0\)/ })).toBeNull(); // NBSP separator
   });
 
-  it("shows the yellow base-output legend note when the base produces glyphs", async () => {
+  it("shows the dashed-outline base-output legend note when the base produces glyphs", async () => {
     seedBaseProducing(["a"]);
     getGroupsResult.set([
       { block: "Latin", tier: "main", script: "Latn", usedByBase: false, cells: [{ char: "a", isCombiningMark: false }] },
@@ -425,7 +451,7 @@ describe("CharacterMapPane — data path", () => {
     render(<CharacterMapPane />);
     await waitFor(() => {
       expect(
-        screen.getByText(/Characters outlined in yellow are available in your chosen base keyboard/i),
+        screen.getByText(/Characters with a dashed outline are on your base keyboard/i),
       ).toBeTruthy();
     });
   });
@@ -440,7 +466,7 @@ describe("CharacterMapPane — data path", () => {
       expect(screen.getByLabelText("Latin characters (main)")).toBeTruthy();
     });
     expect(
-      screen.queryByText(/Characters outlined in yellow are available in your chosen base keyboard/i),
+      screen.queryByText(/Characters with a dashed outline are on your base keyboard/i),
     ).toBeNull();
   });
 

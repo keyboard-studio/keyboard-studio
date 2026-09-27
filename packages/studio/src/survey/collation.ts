@@ -63,11 +63,29 @@ function isBareCombiningMark(char: string): boolean {
  * every existing invariant that depends on the walk/inventory array's
  * CONTENTS (coverage denominators, membership checks) is unaffected.
  */
-export function collateInventory(chars: readonly string[]): string[] {
+export function collateInventory(
+  chars: readonly string[],
+  loanwords?: ReadonlySet<string>,
+): string[] {
   const letters: string[] = [];
   const marks: string[] = [];
   for (const c of chars) {
     (isBareCombiningMark(c) ? marks : letters).push(c);
   }
-  return [...collate(letters), ...marks.sort(codePointCompare)];
+  return [...loanwordsLast(collate(letters), loanwords), ...marks.sort(codePointCompare)];
+}
+
+/**
+ * Move loanword letters (the session's `loanwordChars`, NFC) after every other
+ * entry, keeping each group's own order. Loanword letters are kept for
+ * borrowed words rather than being part of the alphabet, so placement offers
+ * them after the alphabet's own letters. A stable partition: it changes order
+ * only, never membership, and is a no-op without a non-empty set.
+ */
+export function loanwordsLast(chars: readonly string[], loanwords?: ReadonlySet<string>): string[] {
+  if (loanwords === undefined || loanwords.size === 0) return [...chars];
+  const own: string[] = [];
+  const borrowed: string[] = [];
+  for (const c of chars) (loanwords.has(c.normalize("NFC")) ? borrowed : own).push(c);
+  return [...own, ...borrowed];
 }
