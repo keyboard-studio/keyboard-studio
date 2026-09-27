@@ -15,10 +15,7 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-
-/** Elements that take focus by Tab without a tabindex of their own. */
-const FOCUSABLE =
-  'a[href], button:not([disabled]), input:not([disabled]):not([type="hidden"]), select:not([disabled]), textarea:not([disabled]), iframe, [contenteditable]:not([contenteditable="false"]), [tabindex]:not([tabindex="-1"])';
+import { FOCUSABLE_SELECTOR } from "../lib/focusableSelector.ts";
 
 export function SurveyQuestionsPane({
   label,
@@ -38,7 +35,7 @@ export function SurveyQuestionsPane({
     // The pane's own tabindex is on the pane, not a descendant, so it never
     // counts itself.
     const update = () =>
-      setNeedsTabStop(pane.querySelector(FOCUSABLE) === null);
+      setNeedsTabStop(pane.querySelector(FOCUSABLE_SELECTOR) === null);
     update();
     const observer = new MutationObserver(update);
     observer.observe(pane, {

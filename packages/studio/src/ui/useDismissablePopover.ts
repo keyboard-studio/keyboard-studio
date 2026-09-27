@@ -16,6 +16,7 @@
 import { useEffect } from "react";
 import type { CSSProperties, RefObject } from "react";
 import { BG_CARD, BORDER } from "./theme.ts";
+import { FOCUSABLE_SELECTOR } from "../lib/focusableSelector.ts";
 
 export interface UseDismissablePopoverOptions {
   /** Element wrapping BOTH the trigger and the panel — a pointerdown outside it closes. */
@@ -62,7 +63,7 @@ export function useDismissablePopover(
     if (panelRef === undefined || triggerRef === undefined) return;
     if (open) {
       const firstFocusable = panelRef.current?.querySelector<HTMLElement>(
-        "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])",
+        FOCUSABLE_SELECTOR,
       );
       firstFocusable?.focus();
     } else {
