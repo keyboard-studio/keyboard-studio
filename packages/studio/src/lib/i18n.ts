@@ -13,6 +13,10 @@ import { storageAvailable } from "./storageGuard.ts";
 import { activateContentLocale } from "./contentI18n.ts";
 import { pushBreadcrumb } from "../crash/breadcrumbs.ts";
 
+// Adding a locale here means adding it in the same commit to lingui.config.ts
+// locales, both languages_mapping blocks in crowdin.yml, and
+// CONFIGURED_LOCALES in utilities/i18n-prune-unconfigured-locales (drift
+// test enforces this).
 export const SUPPORTED_LOCALES = { en: "English", fr: "Français" } as const;
 export type Locale = keyof typeof SUPPORTED_LOCALES;
 export const DEFAULT_LOCALE: Locale = "en";

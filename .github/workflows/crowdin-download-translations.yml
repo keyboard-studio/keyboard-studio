@@ -77,6 +77,17 @@
 # existing origin tip when present (else fresh), skip everything when nothing
 # changed, and skip PR creation when one is already open for that branch
 # (`create_pull_request()` does the same open-PR check before creating).
+#
+# PRUNE STEP AND WHY IT SITS NEXT TO NORMALIZE: the download writes one
+# directory per target language in the Crowdin project, including languages
+# nobody configured here. The moment someone starts an es-ES translation in
+# Crowdin, the sync commits es-ES catalogs that fail `pnpm lint` at
+# utilities/i18n-catalog-lint as orphans (PR #1842, issue #1844). So after
+# normalize/sort and before commit, utilities/i18n-prune-unconfigured-locales
+# deletes every locale directory that is not a configured locale. Adding a
+# locale for real means updating that script's allowlist in the same change
+# (its drift test enforces the four-place lockstep); until then the download
+# silently drops it instead of failing the sync PR.
 
 name: Crowdin download translations
 
@@ -169,6 +180,12 @@ jobs:
       # around to run the fixer. Idempotent: no diff when order is already right.
       - name: "Keep Tier A catalogs in message-id order"
         run: node utilities/i18n-catalog-sort/index.js
+
+      # Drops downloaded catalogs for locales the app does not support (#1844:
+      # es-ES arrived unconfigured and failed i18n-catalog-lint as an orphan).
+      # Idempotent: no diff when every directory on disk is configured.
+      - name: "Drop catalogs for unconfigured locales (#1844)"
+        run: node utilities/i18n-prune-unconfigured-locales/index.js
 
       # Replaces the crowdin/github-action's own push_translations +
       # create_pull_request steps (see the NORMALIZE STEP note in the file

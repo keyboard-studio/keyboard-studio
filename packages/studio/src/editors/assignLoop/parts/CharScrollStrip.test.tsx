@@ -789,3 +789,30 @@ describe("CharScrollStrip — full-codepoint testid keying (no first-codepoint c
     expect(onSelectChar).not.toHaveBeenCalledWith(eAcute);
   });
 });
+
+describe("CharScrollStrip — loanword letters", () => {
+  it("tags a loanword letter and appends a clause to its accessible name", () => {
+    render(
+      <CharScrollStrip
+        chars={["a", "q"]}
+        currentChar="a"
+        onSelectChar={vi.fn()}
+        assignments={[]}
+        modality="physical"
+        loanwordSet={new Set(["q"])}
+      />,
+    );
+
+    expect(screen.getByTestId("char-scroll-loanword-0071").textContent).toBe("loanword");
+    expect(screen.queryByTestId("char-scroll-loanword-0061")).toBeNull();
+    expect(screen.getByTestId("char-scroll-chip-0071").getAttribute("aria-label")).toMatch(/loanword letter$/);
+    expect(screen.getByTestId("char-scroll-chip-0061").getAttribute("aria-label")).not.toMatch(/loanword/);
+  });
+
+  it("renders no tag when loanwordSet is omitted", () => {
+    render(
+      <CharScrollStrip chars={["q"]} currentChar="q" onSelectChar={vi.fn()} assignments={[]} modality="physical" />,
+    );
+    expect(screen.queryByTestId("char-scroll-loanword-0071")).toBeNull();
+  });
+});

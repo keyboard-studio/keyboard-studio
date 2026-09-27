@@ -490,9 +490,34 @@ export async function driveInvisiblesStep(page: Page): Promise<void> {
  * (carve — see steps/manifest.ts), and only clicks Continue if the
  * convenience screen is the one that actually showed.
  */
-export async function driveConvenienceStep(page: Page): Promise<void> {
+export async function driveConvenienceStep(
+  page: Page,
+  options?: {
+    /**
+     * What the walk EXPECTS the gate to do. Omit for the lenient default above
+     * (click Continue if the screen showed, otherwise carry on) — the standard
+     * walks rely on it. Pass it when the walk is built so the outcome is known:
+     *
+     *   - "shown": the screen must render. Fails if carve arrives instead, so
+     *     a gate that stopped opening turns the walk red rather than letting
+     *     it pass through carve unnoticed. Does NOT click Continue — the
+     *     caller asserts on the offered letters first, then continues.
+     *   - "skipped": the screen must not render; carve must arrive directly.
+     */
+    expect?: "shown" | "skipped";
+  },
+): Promise<void> {
   const continueBtn = page.getByTestId("convenience-continue");
   const carveGallery = page.getByTestId("carve-gallery");
+  if (options?.expect === "shown") {
+    await expect(page.getByTestId("convenience-chars")).toBeVisible({ timeout: 20_000 });
+    return;
+  }
+  if (options?.expect === "skipped") {
+    await expect(carveGallery).toBeVisible({ timeout: 20_000 });
+    await expect(continueBtn).toHaveCount(0);
+    return;
+  }
   await Promise.race([
     continueBtn.waitFor({ state: "visible", timeout: 20_000 }),
     carveGallery.waitFor({ state: "visible", timeout: 20_000 }),

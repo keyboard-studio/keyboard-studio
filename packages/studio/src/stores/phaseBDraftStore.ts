@@ -138,6 +138,21 @@ export interface PhaseBDraftState {
   exemplarDigraphs: string[];
 
   /**
+   * Letters the author added from the exemplar loanword (auxiliary) tier,
+   * with their case pairs, NFC. A sibling of `chars`, never inside it: these
+   * are not picks, so they never reach the alphabet stores. Build-list Done
+   * emits them as `loanwordChars` and folds them into `confirmedInventory`,
+   * which keeps them needed without making them alphabet letters.
+   */
+  loanwordChars: string[];
+
+  /** Add a loanword letter (NFC). No-op when it is already a loanword or an alphabet letter. */
+  addLoanword: (c: string) => void;
+
+  /** Remove a loanword letter (NFC). An edit, never a rejection. */
+  removeLoanword: (c: string) => void;
+
+  /**
    * Proposed characters the author removed. STICKY: `seedFromProposal` and
    * `seedProposals` must never re-propose these, so declining a suggestion
    * once is not undone by a later re-derivation, a step revisit, a locale
@@ -474,6 +489,7 @@ export const usePhaseBDraftStore = create<PhaseBDraftState>((set, get) => ({
   lastPick: null,
   provenance: {},
   exemplarDigraphs: [],
+  loanwordChars: [],
   rejected: [],
   proposalConfidence: {},
   exemplarMethodDeclined: false,
@@ -538,9 +554,23 @@ export const usePhaseBDraftStore = create<PhaseBDraftState>((set, get) => ({
 
   setSelectedFont: (font) => set({ selectedFont: font }),
 
+  addLoanword: (c) => {
+    const nfc = c.normalize("NFC");
+    if (nfc.length === 0) return;
+    const { loanwordChars, chars } = get();
+    if (loanwordChars.includes(nfc) || chars.includes(nfc)) return;
+    set({ loanwordChars: [...loanwordChars, nfc] });
+  },
+
+  removeLoanword: (c) => {
+    const nfc = c.normalize("NFC");
+    set({ loanwordChars: get().loanwordChars.filter((x) => x !== nfc) });
+  },
+
   seedFromProposal: (inv, bcp47) => {
-    // The main tier only — the alphabet. The auxiliary/punctuation/numbers
-    // tiers reach the author through their own 047 breakdown sections.
+    // The main tier only — the alphabet. The auxiliary (loanword) tier is
+    // offered, unselected, in BuildListView's Loanwords section; punctuation
+    // and numbers reach the author through their own steps and sections.
     const mainChars = inv.characters.filter((c) => c.tier === "main").map((c) => c.char);
     // 047's case derivation: the sources attest lowercase, but an alphabet
     // without its uppercase half is not one the author can accept and move on
@@ -618,6 +648,7 @@ export const usePhaseBDraftStore = create<PhaseBDraftState>((set, get) => ({
       lastPick: null,
       provenance: {},
       exemplarDigraphs: [],
+      loanwordChars: [],
       proposalConfidence: {},
       // `rejected`, `exemplarMethodDeclined`, `seededProposals`,
       // `invisibleDecisions` and `alphabetEvidenceKey` deliberately SURVIVE a
@@ -738,6 +769,11 @@ export interface PhaseBDraftSnapshot {
    * not picks and must not reach the alphabet.
    */
   exemplarDigraphs?: string[];
+  /**
+   * Loanword-tier letters the author added. Absent in older snapshots.
+   * Restored directly, like `exemplarDigraphs` — they are not picks.
+   */
+  loanwordChars?: string[];
   /** Proposals the author removed. Absent in pre-044 snapshots. */
   rejected?: string[];
   /** Per-source confidence of the proposals seeded. Absent in pre-044 snapshots. */
@@ -761,6 +797,7 @@ export function snapshotPhaseBDraft(): PhaseBDraftSnapshot {
     declaredRoles: s.declaredRoles,
     provenance: s.provenance,
     exemplarDigraphs: s.exemplarDigraphs,
+    loanwordChars: s.loanwordChars,
     rejected: s.rejected,
     proposalConfidence: s.proposalConfidence,
     exemplarMethodDeclined: s.exemplarMethodDeclined,
@@ -787,6 +824,7 @@ export function applyPhaseBDraftSnapshot(snapshot: PhaseBDraftSnapshot): void {
     declaredRoles: snapshot.declaredRoles ?? {},
     provenance: snapshot.provenance ?? {},
     exemplarDigraphs: snapshot.exemplarDigraphs ?? [],
+    loanwordChars: snapshot.loanwordChars ?? [],
     rejected: snapshot.rejected ?? [],
     proposalConfidence: snapshot.proposalConfidence ?? {},
     exemplarMethodDeclined: snapshot.exemplarMethodDeclined ?? false,

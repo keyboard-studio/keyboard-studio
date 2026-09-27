@@ -213,6 +213,7 @@ describe("phaseBDraftStore — snapshotPhaseBDraft/applyPhaseBDraftSnapshot roun
       provenance: { a: "author", b: "author", "ɛ": "author" },
       // No proposal was seeded, so no source attested any `{..}` cluster.
       exemplarDigraphs: [],
+      loanwordChars: [],
       rejected: [],
       proposalConfidence: {},
       exemplarMethodDeclined: false,
@@ -893,5 +894,53 @@ describe("phaseBDraftStore — alphabetEvidenceKey (spec 079 R-07)", () => {
 
     applyPhaseBDraftSnapshot({ chars: ["a"], selectedFont: DEFAULT_PHASE_B_FONT });
     expect(usePhaseBDraftStore.getState().alphabetEvidenceKey).toBeUndefined();
+  });
+});
+
+describe("phaseBDraftStore — loanword letters beside the alphabet", () => {
+  beforeEach(() => {
+    usePhaseBDraftStore.getState().reset();
+  });
+
+  it("addLoanword keeps letters out of chars and the alphabet stores", () => {
+    usePhaseBDraftStore.getState().add("a");
+    usePhaseBDraftStore.getState().addLoanword("q");
+    const s = usePhaseBDraftStore.getState();
+    expect(s.loanwordChars).toEqual(["q"]);
+    expect(s.chars).toEqual(["a"]);
+    expect(s.bases).not.toContain("q");
+    expect(draftConfirmedAlphabet().bases).not.toContain("q");
+  });
+
+  it("addLoanword is a no-op for a duplicate or an existing alphabet letter", () => {
+    usePhaseBDraftStore.getState().add("x");
+    usePhaseBDraftStore.getState().addLoanword("x");
+    usePhaseBDraftStore.getState().addLoanword("q");
+    usePhaseBDraftStore.getState().addLoanword("q");
+    expect(usePhaseBDraftStore.getState().loanwordChars).toEqual(["q"]);
+  });
+
+  it("removeLoanword is an edit, not a rejection", () => {
+    usePhaseBDraftStore.getState().addLoanword("q");
+    usePhaseBDraftStore.getState().removeLoanword("q");
+    expect(usePhaseBDraftStore.getState().loanwordChars).toEqual([]);
+    expect(usePhaseBDraftStore.getState().rejected).not.toContain("q");
+  });
+
+  it("reset clears the loanword list", () => {
+    usePhaseBDraftStore.getState().addLoanword("q");
+    usePhaseBDraftStore.getState().reset();
+    expect(usePhaseBDraftStore.getState().loanwordChars).toEqual([]);
+  });
+
+  it("round-trips through a snapshot without reaching chars", () => {
+    usePhaseBDraftStore.getState().add("a");
+    usePhaseBDraftStore.getState().addLoanword("q");
+    usePhaseBDraftStore.getState().addLoanword("Q");
+    const snapshot = snapshotPhaseBDraft();
+    usePhaseBDraftStore.getState().reset();
+    applyPhaseBDraftSnapshot(snapshot);
+    expect(usePhaseBDraftStore.getState().loanwordChars).toEqual(["q", "Q"]);
+    expect(usePhaseBDraftStore.getState().chars).toEqual(["a"]);
   });
 });

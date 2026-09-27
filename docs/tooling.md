@@ -311,6 +311,9 @@ Live and passing:
   ([evidence](../specs/057-bulletproof-navigation/evidence/gating-red.md))
 - [decision-deeplink.spec.ts](../packages/studio/e2e/decision-deeplink.spec.ts) and
   [footer-progress.spec.ts](../packages/studio/e2e/footer-progress.spec.ts)
+- [convenience-loanwords.spec.ts](../packages/studio/e2e/convenience-loanwords.spec.ts) — Bafut
+  copy-track walk; the convenience question must offer its loanword-only letters (strict
+  `driveConvenienceStep`). Manual/local only, not in the CI `e2e` job
 
 Skipped, each with an un-skip recipe at the top of its file:
 
