@@ -8,6 +8,7 @@ export * from "./attribution";
 export * from "./axes";
 export * from "./axisFill";
 export * from "./baseKeyboard";
+export * from "./carveDisposition";
 export * from "./compileResult";
 export * from "./confirmedAlphabet";
 export * from "./copyright";

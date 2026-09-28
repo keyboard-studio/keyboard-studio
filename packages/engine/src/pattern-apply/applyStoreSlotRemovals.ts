@@ -106,7 +106,7 @@
 // Untouched stores keep the same object reference; groups/comments/raw are passed
 // through by reference.
 
-import type { KeyboardIR, IRStore, ContextElement } from "@keyboard-studio/contracts";
+import type { KeyboardIR, IRStore, ContextElement, OutputElement } from "@keyboard-studio/contracts";
 import { parseSlotId } from "./slotId.js";
 import { isPlusSeparator } from "../shared/rule-shape.js";
 
@@ -341,7 +341,9 @@ function isEditOnlyTriggerRule(context: ContextElement[]): boolean {
 /**
  * True when `output` is the bare `context` guard keyword — kmcmplib's
  * "reproduce the match unchanged" no-op (parsed as `{kind:"raw",
- * text:"context"}`; distinct from the numbered `context(N)` context-position
+ * text:"context"}` by older codec versions and as `{kind:"context", offset:0}`
+ * since 076 FR-004 typed output-position context references; distinct from the
+ * numbered `context(N)` context-position
  * element, a different construct). A rule with this output emits NOTHING —
  * it exists purely to eat a combination so a more general rule doesn't fire
  * (e.g. Cameroon's `any(diablock) + [RALT K_C] > context` guards a
@@ -350,8 +352,11 @@ function isEditOnlyTriggerRule(context: ContextElement[]): boolean {
  * an edit-only-trigger store — see {@link StoreSlotEditMode}
  * `matchTableOnly`.
  */
-function isBareContextGuardOutput(output: { kind: string; text?: string }[]): boolean {
-  return output.length === 1 && output[0]?.kind === "raw" && output[0].text?.trim().toLowerCase() === "context";
+function isBareContextGuardOutput(output: OutputElement[]): boolean {
+  if (output.length !== 1) return false;
+  const el = output[0];
+  return (el?.kind === "raw" && el.text?.trim().toLowerCase() === "context") ||
+         (el?.kind === "context" && el.offset === 0);
 }
 
 /**
@@ -361,7 +366,7 @@ function isBareContextGuardOutput(output: { kind: string; text?: string }[]): bo
  * any() ONLY inside such rules, and never itself an index()/outs() output
  * target, is never actually produced anywhere in the IR.
  */
-function ruleAddsNoNewContent(rule: { context: ContextElement[]; output: { kind: string; text?: string }[] }): boolean {
+function ruleAddsNoNewContent(rule: { context: ContextElement[]; output: OutputElement[] }): boolean {
   return isEditOnlyTriggerRule(rule.context) || isBareContextGuardOutput(rule.output);
 }
 

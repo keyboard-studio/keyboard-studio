@@ -99,6 +99,8 @@ function fmtOutputElement(el: OutputElement): string {
     case "char":    return fmtCodepoint(el.value);
     case "deadkey": return fmtDk(el.id);
     case "beep":    return "beep";
+    case "nul":     return "nul";
+    case "context": return el.offset === 0 ? "context" : `context(${el.offset})`;
     case "index":   return `index(${el.storeRef}, ${el.offset})`;
     case "outs":    return `outs(${el.storeRef})`;
     case "useGroup": return `use(${el.groupName})`;

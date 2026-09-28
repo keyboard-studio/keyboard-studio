@@ -511,15 +511,18 @@ function parseContextElements(
       elements.push({ kind: "notany", storeRef: notAnyRef });
       continue;
     }
-    // context(N)
+    // context(N) in context position — 076 FR-004: N greater than one is a
+    // typed indexed-context reference. Degenerate offsets (0, and 1 in
+    // context position) cannot be modelled faithfully, so the rule goes
+    // opaque (INDEXED_CONTEXT) rather than fabricating a meaning.
     const ctxOffset = parseContext(tok);
     if (ctxOffset !== null) {
       if (ctxOffset > 1) {
-        opaqueOut.reason = OPAQUE_REASONS.INDEXED_CONTEXT;
-        return null;
+        elements.push({ kind: "context", offset: ctxOffset });
+        continue;
       }
-      elements.push({ kind: "context", offset: ctxOffset });
-      continue;
+      opaqueOut.reason = OPAQUE_REASONS.INDEXED_CONTEXT;
+      return null;
     }
     // index(store, N) in context position
     const idxCtx = parseIndex(tok);
@@ -631,6 +634,35 @@ function parseOutputElementsCore(
     // beep keyword
     if (tok.toLowerCase() === "beep") {
       elements.push({ kind: "beep" });
+      continue;
+    }
+    // nul keyword — typed suppression marker (076 FR-004). Case-insensitive
+    // like beep; a bare token only (splitTokens never yields `nul` glued to
+    // neighbours except inside quotes/parens, which don't reach this branch).
+    if (tok.toLowerCase() === "nul") {
+      elements.push({ kind: "nul" });
+      continue;
+    }
+    // context / context(N) in output position — typed context references
+    // (076 FR-004). Bare `context` re-emits the whole matched context and is
+    // represented as offset 0; `context(N)` (N >= 1) the Nth character of the
+    // matched context. `context(0)` is malformed: strict mode opaques the
+    // rule, lenient mode keeps a raw placeholder (never bails).
+    if (tok.toLowerCase() === "context") {
+      elements.push({ kind: "context", offset: 0 });
+      continue;
+    }
+    const ctxOutOffset = parseContext(tok);
+    if (ctxOutOffset !== null) {
+      if (ctxOutOffset < 1) {
+        if (mode === "strict") {
+          opaqueOut.reason = OPAQUE_REASONS.INDEXED_CONTEXT;
+          return null;
+        }
+        elements.push({ kind: "raw", text: tok });
+        continue;
+      }
+      elements.push({ kind: "context", offset: ctxOutOffset });
       continue;
     }
     // index(store, N)

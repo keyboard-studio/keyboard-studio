@@ -16,6 +16,7 @@ import {
   EditorActionSummarySchema,
   DecisionImpactSchema,
   DecisionEntrySchema,
+  IRRuleOwnershipSchema,
   toPattern,
 } from "./schemas";
 import { samplePatterns } from "./fixtures/patterns";
@@ -455,5 +456,51 @@ describe("Decision-record numeric regression pins", () => {
 
   it("DECISION_DIFF_CONTEXT_LINES stays 3", () => {
     expect(DECISION_DIFF_CONTEXT_LINES).toBe(3);
+  });
+});
+
+// -----------------------------------------------------------------------------
+// IRRuleOwnershipSchema (spec 076 FR-002) — the additive optional ownership
+// slice of IRRule. Runtime complement of the _IRRuleOwnershipKeysGuard
+// compile-time key-set pin in schemas.ts: these tests prove the schema accepts
+// each marker alone, rejects both together (mutual exclusivity), and never
+// drops a marker at a parse boundary (zod's default strip behaviour).
+// -----------------------------------------------------------------------------
+
+describe("IRRuleOwnershipSchema (spec 076 FR-002)", () => {
+  it("accepts a rule owned by a pattern alone", () => {
+    const parsed = IRRuleOwnershipSchema.parse({ ownedByPattern: "pattern-1" });
+    expect(parsed.ownedByPattern).toBe("pattern-1");
+    expect(parsed.ownedByBehaviour).toBeUndefined();
+  });
+
+  it("accepts a rule owned by a behaviour alone", () => {
+    const parsed = IRRuleOwnershipSchema.parse({ ownedByBehaviour: "carve-suppression" });
+    expect(parsed.ownedByBehaviour).toBe("carve-suppression");
+    expect(parsed.ownedByPattern).toBeUndefined();
+  });
+
+  it("accepts a rule with neither marker", () => {
+    expect(IRRuleOwnershipSchema.parse({}).ownedByBehaviour).toBeUndefined();
+  });
+
+  it("rejects a rule carrying both markers (mutually exclusive)", () => {
+    const result = IRRuleOwnershipSchema.safeParse({
+      ownedByPattern: "pattern-1",
+      ownedByBehaviour: "carve-suppression",
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toHaveLength(1);
+      expect(result.error.issues[0]?.path).toEqual(["ownedByBehaviour"]);
+      expect(result.error.issues[0]?.message).toMatch(/mutually exclusive/);
+    }
+  });
+
+  it("ownership markers survive a JSON round-trip through the schema", () => {
+    const parsed = IRRuleOwnershipSchema.parse(
+      JSON.parse(JSON.stringify({ ownedByBehaviour: "carve-suppression" })),
+    );
+    expect(parsed).toEqual({ ownedByBehaviour: "carve-suppression" });
   });
 });

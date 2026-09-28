@@ -1,115 +1,147 @@
 {
-  "workflow": "speckit",
-  "specName": "Rule behaviours — managing reorder, blocking, and context rules as intents",
-  "branch": "km/issue-1802-spec",
-  "currentStep": "implement",
-  "status": "implementing",
-  "history": [
-    {
-      "step": "plan",
-      "substep": null,
-      "kind": "start",
-      "by": "extension",
-      "at": "2026-09-28T21:17:43.426Z"
-    },
-    {
-      "step": "tasks",
-      "substep": "generate",
-      "kind": "complete",
-      "by": "ai",
-      "at": "2026-09-28T21:19:50.884Z"
-    },
-    {
-      "step": "tasks",
-      "substep": null,
-      "kind": "complete",
-      "by": "ai",
-      "at": "2026-09-28T21:19:52.068Z"
-    },
-    {
-      "step": "tasks",
-      "substep": null,
-      "kind": "start",
-      "by": "extension",
-      "at": "2026-09-28T21:19:52.666Z"
-    },
-    {
-      "step": "implement",
-      "substep": null,
-      "kind": "start",
-      "by": "extension",
-      "at": "2026-09-28T21:25:40.964Z"
-    }
-  ],
-  "coverage": {
-    "FR-004": {
-      "title": "Codec types nul/context/context(N) and models begin entry points",
-      "tasks": [
-        "T002",
-        "T005",
-        "T006"
-      ]
-    },
-    "FR-005-amendment": {
-      "title": "swallowUndefined skip-set: carved combos minus allow-host and suppression-covered",
-      "tasks": [
-        "T014"
-      ]
-    },
-    "FR-019": {
-      "title": "Every carved combination carries a disposition via the two-tier choice",
-      "tasks": [
-        "T009",
-        "T010",
-        "T016"
-      ]
-    },
-    "FR-020": {
-      "title": "Shape-driven suppression verb table; loud rides A6; no per-carve loudness",
-      "tasks": [
-        "T008",
-        "T009"
-      ]
-    },
-    "FR-021": {
-      "title": "Suppression rules carry ownedByBehaviour; un-carve restores; import lifts as behaviour-owned",
-      "tasks": [
-        "T003",
-        "T009",
-        "T012",
-        "T013"
-      ]
-    },
-    "FR-022": {
-      "title": "Dispositions persist as carve-decision metadata; recompile never re-prompts",
-      "tasks": [
-        "T004",
-        "T010"
-      ]
-    },
-    "FR-023": {
-      "title": "Studio demonstrates alternatives with two-sided tradeoff copy; host selector; review panel",
-      "tasks": [
-        "T011",
-        "T017",
-        "T018",
-        "T019",
-        "T020"
-      ]
-    },
-    "SC-008": {
-      "title": "End-to-end carve suppression success criterion",
-      "tasks": [
-        "T008",
-        "T022",
-        "T023"
-      ]
-    }
+ "workflow": "speckit",
+ "specName": "Rule behaviours \u2014 managing reorder, blocking, and context rules as intents",
+ "branch": "km/issue-1802-spec",
+ "currentStep": "implement",
+ "status": "implementing",
+ "history": [
+  {
+   "step": "plan",
+   "substep": null,
+   "kind": "start",
+   "by": "extension",
+   "at": "2026-09-28T21:17:43.426Z"
   },
-  "step_summaries": {
-    "tasks": {
-      "summary": "24 tasks in 4 phases: Setup, Foundational (codec+types), US6 engine+studio, Polish",
-      "key_finding": "Behaviours-step test pane and touch strip do not exist yet; their tasks anchor to the 076 studio phase location"
-    }
+  {
+   "step": "tasks",
+   "substep": "generate",
+   "kind": "complete",
+   "by": "ai",
+   "at": "2026-09-28T21:19:50.884Z"
+  },
+  {
+   "step": "tasks",
+   "substep": null,
+   "kind": "complete",
+   "by": "ai",
+   "at": "2026-09-28T21:19:52.068Z"
+  },
+  {
+   "step": "tasks",
+   "substep": null,
+   "kind": "start",
+   "by": "extension",
+   "at": "2026-09-28T21:19:52.666Z"
+  },
+  {
+   "step": "implement",
+   "substep": null,
+   "kind": "start",
+   "by": "extension",
+   "at": "2026-09-28T21:25:40.964Z"
+  },
+  {
+   "step": "implement",
+   "substep": "T001",
+   "kind": "complete",
+   "by": "ai",
+   "at": "2026-09-28T22:20:00Z",
+   "note": "Baseline green: pnpm -r build OK; engine suite 3299 passed (2 environmental failures fixed: fetch-sldr data missing, wasmLoader 30s timeout on slow VM \u2014 passes at 120s). Studio suite OOM-killed on 7GB VM at collection by 27 test files importing the 500KB+ langtags generated index; baseline rerun excluding those in progress."
+  },
+  {
+   "step": "implement",
+   "substep": "T004",
+   "kind": "complete",
+   "by": "ai",
+   "at": "2026-09-28T22:25:00Z",
+   "note": "CarveDisposition type + zod schema + package export; contracts suite 35 files / 803 tests green."
+  },
+  {
+   "step": "implement",
+   "substep": "T003",
+   "kind": "complete",
+   "by": "ai",
+   "at": "2026-09-28T22:28:00Z",
+   "note": "ownedByBehaviour additive optional on IRRule; zod .refine enforces mutual exclusivity with ownedByPattern; contracts suite green."
+  },
+  {
+   "step": "implement",
+   "substep": "T002",
+   "kind": "complete",
+   "by": "ai",
+   "at": "2026-09-28T22:52:00Z",
+   "note": "Typed nul/context/context(N) parsing in parse.ts; degenerate offsets go opaque; 19 tests; codec suite 246 passed."
   }
+ ],
+ "coverage": {
+  "FR-004": {
+   "title": "Codec types nul/context/context(N) and models begin entry points",
+   "tasks": [
+    "T002",
+    "T005",
+    "T006"
+   ]
+  },
+  "FR-005-amendment": {
+   "title": "swallowUndefined skip-set: carved combos minus allow-host and suppression-covered",
+   "tasks": [
+    "T014"
+   ]
+  },
+  "FR-019": {
+   "title": "Every carved combination carries a disposition via the two-tier choice",
+   "tasks": [
+    "T009",
+    "T010",
+    "T016"
+   ]
+  },
+  "FR-020": {
+   "title": "Shape-driven suppression verb table; loud rides A6; no per-carve loudness",
+   "tasks": [
+    "T008",
+    "T009"
+   ]
+  },
+  "FR-021": {
+   "title": "Suppression rules carry ownedByBehaviour; un-carve restores; import lifts as behaviour-owned",
+   "tasks": [
+    "T003",
+    "T009",
+    "T012",
+    "T013"
+   ]
+  },
+  "FR-022": {
+   "title": "Dispositions persist as carve-decision metadata; recompile never re-prompts",
+   "tasks": [
+    "T004",
+    "T010"
+   ]
+  },
+  "FR-023": {
+   "title": "Studio demonstrates alternatives with two-sided tradeoff copy; host selector; review panel",
+   "tasks": [
+    "T011",
+    "T017",
+    "T018",
+    "T019",
+    "T020"
+   ]
+  },
+  "SC-008": {
+   "title": "End-to-end carve suppression success criterion",
+   "tasks": [
+    "T008",
+    "T022",
+    "T023"
+   ]
+  }
+ },
+ "step_summaries": {
+  "tasks": {
+   "summary": "24 tasks in 4 phases: Setup, Foundational (codec+types), US6 engine+studio, Polish",
+   "key_finding": "Behaviours-step test pane and touch strip do not exist yet; their tasks anchor to the 076 studio phase location"
+  }
+ }
 }

@@ -270,6 +270,8 @@ function outputElementKey(el: OutputElement): string {
     case "char":    return `char:${el.value}`;
     case "deadkey": return `dk:${el.id}`;
     case "beep":    return "beep";
+    case "nul":     return "nul";
+    case "context": return `ctx:${el.offset}`;
     case "index":   return `index:${el.storeRef}:${el.offset}`;
     case "outs":    return `outs:${el.storeRef}`;
     case "useGroup": return `useGroup:${el.groupName}`;
