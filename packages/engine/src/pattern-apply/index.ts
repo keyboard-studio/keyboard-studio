@@ -348,9 +348,12 @@ export {
   compileCarveSuppression,
   restoreCarveSuppression,
   CARVE_SUPPRESSION_OWNER,
+  slotGuardNodeIdPrefix,
 } from "./carveSuppression.js";
 export type {
   SuppressionRestoration,
   CompileCarveSuppressionOptions,
   CompileCarveSuppressionResult,
 } from "./carveSuppression.js";
+export { isInSwallowSet } from "./swallowSet.js";
+export type { SwallowCombo } from "./swallowSet.js";

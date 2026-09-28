@@ -69,13 +69,15 @@ import type {
 // ---------------------------------------------------------------------------
 
 interface SuppressionRestoration {
-  /** "rewritten" for block dispositions (and derived arming rewrites); "removed" for allow-host. */
-  kind: "rewritten" | "removed";
+  /** "rewritten" for block dispositions (and derived arming rewrites); "removed" for allow-host; "guard" for T013 synthesized slot guards. */
+  kind: "rewritten" | "removed" | "guard";
   groupNodeId: string;
-  /** Index in group.rules where the carved rule lived. */
+  /** Index in group.rules where the carved rule lived (for "guard": the insertion index). */
   index: number;
-  /** The original rule, verbatim, for restoration on un-carve. */
-  originalRule: IRRule;
+  /** The original rule, verbatim, for restoration on un-carve. Absent for "guard". */
+  originalRule?: IRRule;
+  /** The synthesized guard's nodeId, for removal on un-carve. Set only for "guard". */
+  synthesizedNodeId?: string;
   /** True when the rewrite was derived (deadkey-arming rule), not disposition-driven. */
   derived?: boolean;
 }
@@ -262,7 +264,7 @@ describe("compileCarveSuppression — verb per LHS shape (FR-020)", () => {
     expect(armRewritten.output).toEqual([{ kind: "nul" }]);
     expect(armRewritten.ownedByBehaviour).toBe("carve-suppression");
     // The restoration set records the derived rewrite.
-    const armRestoration = result.restorations.find((r) => r.originalRule.nodeId === "arm");
+    const armRestoration = result.restorations.find((r) => r.originalRule?.nodeId === "arm");
     expect(armRestoration).toBeDefined();
     expect(armRestoration!.kind).toBe("rewritten");
     expect(armRestoration!.derived).toBe(true);
@@ -450,7 +452,7 @@ describe("compileCarveSuppression — dispositions (FR-019)", () => {
     // …but the removal is recorded for un-carve.
     expect(result.restorations).toHaveLength(1);
     expect(result.restorations[0]!.kind).toBe("removed");
-    expect(result.restorations[0]!.originalRule.nodeId).toBe("r2");
+    expect(result.restorations[0]!.originalRule!.nodeId).toBe("r2");
   });
 
   it("mixed dispositions: block rewrites, allow-host removes, others untouched", () => {
@@ -610,5 +612,204 @@ describe("compileCarveSuppression — composition guarantees", () => {
 
     expect(snapshot(second.ir)).toBe(snapshot(first.ir));
     expect(second.restorations).toEqual([]);
+  });
+});
+
+describe("store-slot guard rules (T013)", () => {
+  // Deadkey fan-out pair (Cameroon pattern): the paired rule consumes the
+  // input store via any() and emits from the output store via index().
+  const deadkeySlotIR = (): KeyboardIR => ({
+    nodeId: "kbd",
+    stores: [
+      charStore({ nodeId: "store#dkf003b", name: "dkf003b", chars: ["e", "E"] }),
+      charStore({ nodeId: "store#dkt003b", name: "dkt003b", chars: ["é", "É"] }),
+    ],
+    groups: [
+      {
+        nodeId: "group#main",
+        rules: [
+          charRule({ nodeId: "lead", context: "z", output: "z" }),
+          charRule({
+            nodeId: "paired",
+            context: [
+              { kind: "deadkey", id: 3 },
+              { kind: "any", storeRef: "dkf003b" },
+            ],
+            output: [{ kind: "index", storeRef: "dkt003b", offset: 2 }],
+          }),
+        ],
+      },
+    ],
+  });
+
+  const blockSlot1 = { comboId: "store#dkt003b#1", disposition: "block" as const };
+
+  it("synthesizes a guard immediately ahead of the paired rule with the carved selector char", () => {
+    const ir = deadkeySlotIR();
+    const result = compileCarveSuppression(ir, [blockSlot1]);
+
+    const rules = result.ir.groups[0]!.rules;
+    expect(rules.map((r) => r.nodeId)).toEqual([
+      "lead",
+      "gen-carve-guard-store#dkt003b-1-paired-0",
+      "paired",
+    ]);
+
+    const guard = rules[1]!;
+    // Slot 1 of dkt003b is "É"; its pair-set peer dkf003b holds "E" at the
+    // same index, so the guard substitutes "E" into the paired rule's LHS.
+    expect(guard.context).toEqual([
+      { kind: "deadkey", id: 3 },
+      { kind: "char", value: "E" },
+    ]);
+    // Deadkey + char context → the context verb (context-bearing
+    // suppression is `context`, never `nul`).
+    expect(guard.output).toEqual([{ kind: "context", offset: 0 }]);
+    expect(guard.ownedByBehaviour).toBe("carve-suppression");
+    // The paired rule itself is untouched.
+    expect(rules[2]!.output).toEqual([{ kind: "index", storeRef: "dkt003b", offset: 2 }]);
+  });
+
+  it("records a guard restoration carrying the synthesized nodeId", () => {
+    const result = compileCarveSuppression(deadkeySlotIR(), [blockSlot1]);
+    expect(result.restorations).toEqual([
+      {
+        kind: "guard",
+        groupNodeId: "group#main",
+        index: 1,
+        synthesizedNodeId: "gen-carve-guard-store#dkt003b-1-paired-0",
+      },
+    ]);
+  });
+
+  it("reproduces the full LHS through the trigger for `+` rules", () => {
+    // any(word) + [K_X] > index(word, 1): index offset 1 resolves to the
+    // any() once the synthetic `+` separator is excluded.
+    const ir: KeyboardIR = {
+      nodeId: "kbd",
+      stores: [charStore({ nodeId: "store#word", name: "word", chars: ["a", "b"] })],
+      groups: [
+        {
+          nodeId: "group#main",
+          rules: [
+            charRule({
+              nodeId: "paired",
+              context: [
+                { kind: "any", storeRef: "word" },
+                { kind: "raw", text: "+" },
+                { kind: "vkey", name: "K_X", modifiers: [] },
+              ],
+              output: [{ kind: "index", storeRef: "word", offset: 1 }],
+            }),
+          ],
+        },
+      ],
+    };
+
+    const result = compileCarveSuppression(ir, [
+      { comboId: "store#word#0", disposition: "block" },
+    ]);
+
+    const rules = result.ir.groups[0]!.rules;
+    expect(rules).toHaveLength(2);
+    const guard = rules[0]!;
+    expect(guard.context).toEqual([
+      { kind: "char", value: "a" },
+      { kind: "raw", text: "+" },
+      { kind: "vkey", name: "K_X", modifiers: [] },
+    ]);
+    expect(guard.ownedByBehaviour).toBe("carve-suppression");
+  });
+
+  it("allow-host on a slot emits no guard and records no restoration", () => {
+    const ir = deadkeySlotIR();
+    const result = compileCarveSuppression(ir, [
+      { comboId: "store#dkt003b#1", disposition: "allow-host" },
+    ]);
+    expect(result.ir).toEqual(ir);
+    expect(result.restorations).toEqual([]);
+  });
+
+  it("never touches stores — interior nul padding stays forbidden", () => {
+    const ir = deadkeySlotIR();
+    const result = compileCarveSuppression(ir, [blockSlot1]);
+    // The compiler synthesizes guard RULES; store contents are byte-identical.
+    expect(result.ir.stores).toEqual(ir.stores);
+    const allItems = result.ir.stores.flatMap((s) => s.items);
+    expect(allItems).not.toContainEqual(expect.objectContaining({ kind: "nul" }));
+  });
+
+  it("restore removes synthesized guards — the exact inverse (FR-021)", () => {
+    const ir = deadkeySlotIR();
+    const result = compileCarveSuppression(ir, [blockSlot1]);
+    const restored = restoreCarveSuppression(result.ir, result.restorations);
+    expect(restored).toEqual(ir);
+  });
+
+  it("appends beep to the guard output when loud", () => {
+    const result = compileCarveSuppression(deadkeySlotIR(), [blockSlot1], { loud: true });
+    const guard = result.ir.groups[0]!.rules[1]!;
+    expect(guard.output).toEqual([{ kind: "context", offset: 0 }, { kind: "beep" }]);
+  });
+
+  it("does not mutate the input IR", () => {
+    const ir = deadkeySlotIR();
+    const before = structuredClone(ir);
+    compileCarveSuppression(ir, [blockSlot1]);
+    expect(ir).toEqual(before);
+  });
+
+  it("ignores slot ids for missing stores or out-of-range indices", () => {
+    const ir = deadkeySlotIR();
+    const result = compileCarveSuppression(ir, [
+      { comboId: "store#nope#0", disposition: "block" },
+      { comboId: "store#dkt003b#99", disposition: "block" },
+    ]);
+    expect(result.ir).toEqual(ir);
+    expect(result.restorations).toEqual([]);
+  });
+
+  it("treats a rule nodeId that parses as a slot id as a rule, not a slot", () => {
+    const ir: KeyboardIR = {
+      nodeId: "kbd",
+      stores: [],
+      groups: [
+        {
+          nodeId: "group#main",
+          rules: [
+            charRule({
+              nodeId: "rule#7",
+              context: [{ kind: "vkey", name: "K_X", modifiers: [] }],
+              output: "y",
+            }),
+          ],
+        },
+      ],
+    };
+    // "rule#7" parses as <storeNodeId>#<index> but is a real rule nodeId —
+    // rule dispositions take precedence.
+    const result = compileCarveSuppression(ir, [
+      { comboId: "rule#7", disposition: "block" },
+    ]);
+    const rules = result.ir.groups[0]!.rules;
+    expect(rules).toHaveLength(1);
+    expect(rules[0]!.output).toEqual([{ kind: "nul" }]);
+    expect(result.restorations[0]!.kind).toBe("rewritten");
+  });
+
+  it("skips already-owned paired rules as guard anchors", () => {
+    const ir = deadkeySlotIR();
+    const paired = ir.groups[0]!.rules[1]!;
+    paired.ownedByBehaviour = "swallow-undefined";
+    const result = compileCarveSuppression(ir, [blockSlot1]);
+    expect(result.ir).toEqual(ir);
+    expect(result.restorations).toEqual([]);
+  });
+
+  it("recompile is idempotent — no duplicate guards", () => {
+    const first = compileCarveSuppression(deadkeySlotIR(), [blockSlot1]);
+    const second = compileCarveSuppression(first.ir, [blockSlot1]);
+    expect(second.restorations).toEqual([]);
+    expect(second.ir).toEqual(first.ir);
   });
 });

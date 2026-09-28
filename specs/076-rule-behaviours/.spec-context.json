@@ -143,6 +143,14 @@
    "by": "ai",
    "at": "2026-09-28T23:27:00Z",
    "note": "layout_family surfaced in carve gallery; persisted via survey answer store; wired to likelyHostLayouts; 20 tests green."
+  },
+  {
+   "step": "implement",
+   "substep": "T014",
+   "kind": "complete",
+   "by": "ai",
+   "at": "2026-09-28T23:36:00Z",
+   "note": "swallowSet.ts isInSwallowSet: allow-host false, behaviour-owned covered false, else true; 13 tests; pattern-apply 1059 green."
   }
  ],
  "coverage": {

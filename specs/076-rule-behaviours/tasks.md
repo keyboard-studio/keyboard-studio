@@ -44,8 +44,8 @@ One user story (US6, P1). Organized Setup → Foundational → US6 → Polish, w
 
 **Wave 2 — extends Wave 1:**
 
-- [ ] **T013** [US6] Guard-rule synthesis for store-slot carves: reproduce context up to the trigger, place immediately ahead of the paired `any()`/`index()` rule, ownership-marked; interior `nul` store padding stays forbidden (scenario 5) · `packages/engine/src/pattern-apply/carveSuppression.ts`
-- [ ] **T014** [US6] `swallowUndefined` skip-set predicate: carved combos enter the swallow set except `allow-host` dispositions and combos covered by suppression-owned rules (FR-005 amendment; stub-enumeration tests, full FR-005 not built here) · `packages/engine/src/pattern-apply/carveSuppression.ts`
+- [x] **T013** [US6] Guard-rule synthesis for store-slot carves: reproduce context up to the trigger, place immediately ahead of the paired `any()`/`index()` rule, ownership-marked; interior `nul` store padding stays forbidden (scenario 5) · `packages/engine/src/pattern-apply/carveSuppression.ts` — DONE 2026-09-28: `compileSlotGuards` pass reads selector char from pre-carve store, synthesizes one guard per `any()` occurrence (LHS with `any()` replaced by carved char), deterministic nodeIds, idempotent; allow-host slot = no-op; stores never touched; restore removes guards by nodeId. 12 tests; pattern-apply 1046 green. COMPOSITION CONSTRAINT (documented): T015 must pass the PRE-removal IR to the compiler.
+- [x] **T014** [US6] `swallowUndefined` skip-set predicate: carved combos enter the swallow set except `allow-host` dispositions and combos covered by suppression-owned rules (FR-005 amendment; stub-enumeration tests, full FR-005 not built here) · `packages/engine/src/pattern-apply/carveSuppression.ts` — DONE 2026-09-28: new `swallowSet.ts` with `isInSwallowSet` — allow-host → false, behaviour-owned covered → false, else true (fail-safe; no-disposition → in). 13 stub-enumeration tests; pattern-apply 1059 green.
 
 **⟶ Wait for Wave 2 to finish, then:**
 
