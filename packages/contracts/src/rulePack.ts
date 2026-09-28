@@ -5,10 +5,11 @@
 // `.kmn` snippets (FR-005): every behaviour carries structured `parameters`
 // (plain data) alongside the compiled KMN rule texts kept for auditability.
 //
-// `ownedByBehaviour` does not exist in the KeyboardIR yet (076 is
-// unimplemented), so this module defines the pack's behaviour records as its
-// own versioned JSON schema. The kind set is CLOSED — no new kinds may be
-// added without a spec amendment.
+// `ownedByBehaviour` now exists on the KeyboardIR (`IRRule` / `IRStore` in
+// keyboard-ir.ts, stamped by rule-pack install per 082 FR-015); this module
+// still defines the pack's behaviour records as their own versioned JSON
+// schema because the pack is the portable artifact, not the IR. The kind set
+// is CLOSED — no new kinds may be added without a spec amendment.
 //
 // Versioning: `packVersion` is a literal. Bump it (and add a migration) when
 // the schema changes incompatibly; readers reject unknown versions loudly.

@@ -10,9 +10,10 @@
 // sibling workstream, so the one-line re-export
 // (`export { exportPack, importPack, RulePackImportError } from
 // "./rulePacks/index.js"`) lands separately once that file is committed.
-// Until then, import from this barrel directly in node contexts; the studio
-// panel validates via @keyboard-studio/contracts and serializes with an
-// identical canonical form (see its canonicalPackJson).
+// Until then, import from the `@keyboard-studio/engine/rulePacks` subpath
+// (exported from the package map); the studio panel validates via
+// @keyboard-studio/contracts and serializes with an identical canonical
+// form (see its canonicalPackJson).
 
 import {
   validateRulePack,
@@ -22,6 +23,14 @@ import {
 
 export type { RulePack, RulePackIssue };
 export { validateRulePack };
+export {
+  installPack,
+  uninstallPack,
+  isPackInstalled,
+  RulePackInstallError,
+  type InstallPackResult,
+  type UninstallPackResult,
+} from "./install.js";
 
 /** Thrown by {@link importPack} and {@link exportPack} on invalid input. */
 export class RulePackImportError extends Error {

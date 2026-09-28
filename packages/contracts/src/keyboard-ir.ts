@@ -266,6 +266,13 @@ export interface IRStore {
   /** True for system/compiler-directive stores (&NAME, &COPYRIGHT, etc.). */
   isSystem: boolean;
   /**
+   * Ownership marker for stores synthesized by a rule-pack install
+   * (spec 082 FR-015; sibling of {@link IRRule.ownedByBehaviour}). Format
+   * `"<packId>/<behaviourId>"`. Lets uninstall remove exactly the stores the
+   * install added, never a pre-existing same-named store.
+   */
+  ownedByBehaviour?: string;
+  /**
    * Set when the source line carried a `$keyman[web|only]:` prefix.
    * Preserved structurally so the codec can round-trip per-target stores.
    */
@@ -310,6 +317,15 @@ export interface IRRule {
   trailingComment?: string;
   /** ID of the Pattern that owns this node; set by the pattern recognizer. */
   ownedByPattern?: string;
+  /**
+   * Ownership marker for rules compiled from a rule-pack behaviour
+   * (spec 082 FR-015; 076 FR-002). Format `"<packId>/<behaviourId>"`, e.g.
+   * `"cameroon-diacritic-blocking/cameroon_diacritic_blocking"`; set by
+   * rule-pack install (`packages/engine/src/rulePacks/install.ts`), never by
+   * the codec parser. Lets a rule be recompiled, removed, and displayed by
+   * owner. Mutually exclusive with {@link ownedByPattern} on one rule.
+   */
+  ownedByBehaviour?: string;
   /**
    * Set for group-transition rules of the form `match > use(g)` or
    * `nomatch > use(g)`. Preserved structurally so the codec can round-trip
