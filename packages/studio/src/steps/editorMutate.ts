@@ -18,8 +18,11 @@
 
 import type { IRPath, KeyboardIR } from "@keyboard-studio/contracts";
 import { irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
-import { carveFilterIr, applyStoreSlotRemovals, parseSlotId } from "@keyboard-studio/engine";
+import { carveFilterIr, applyStoreSlotRemovals, parseSlotId, collectTaintedContributors } from "@keyboard-studio/engine";
 import { applyMutatePatch } from "./mutateApply.ts";
+
+/** Shared empty carved-character set for the `carveChars` default parameter. */
+const EMPTY_CARVE_CHARS: ReadonlySet<string> = new Set();
 
 /**
  * The carve write surface — the IR arrays carve deletions may rewrite.
@@ -57,6 +60,32 @@ function partitionItemIds(
 }
 
 /**
+ * Issue #1809, ruling §1: ONE aggregated carved set R, one nomination pass.
+ *
+ * The carve gallery discards characters one toggle at a time and unions the
+ * per-character contributor records into the incremental `deletedItemIds`
+ * set — but that union is NOT equivalent to a single aggregated-R pass for
+ * whole-rule "no rows left" deletion and fully-tainted literal outputs (a
+ * rule whose rows are tainted by two different carved characters is only
+ * nominated by the aggregated pass). Every IR-projection consumer must run
+ * this union so all of them consume the same pruned result.
+ *
+ * Returns a new set: `deletedItemIds` ∪ the aggregated pass's slot and
+ * whole-rule ids. The aggregated pass's slot ids are always a subset of the
+ * incremental union's (slot taint is per-slot), so this only ever ADDS
+ * whole-rule nominations.
+ */
+export function unionAggregatedCarveIds(
+  baseIr: KeyboardIR,
+  deletedItemIds: ReadonlySet<string>,
+  carveChars: ReadonlySet<string>,
+): Set<string> {
+  if (carveChars.size === 0) return new Set(deletedItemIds);
+  const aggregated = collectTaintedContributors(baseIr, carveChars);
+  return new Set([...deletedItemIds, ...aggregated.storeSlotIds, ...aggregated.ruleNodeIds]);
+}
+
+/**
  * Build the carve patch (the carve-affected IR arrays) from `baseIr` and the
  * current carve overlay. Slot-item nul-rewrites are applied first
  * (applyStoreSlotRemovals), then whole-node deletions (carveFilterIr); the
@@ -65,19 +94,25 @@ function partitionItemIds(
  * Always derived from `baseIr` so the patch is a pure function of the overlay
  * (idempotent + reversible). Returns `{}` (the empty, no-op patch) when there
  * are no deletions of any kind — keepAll/restoreAll collapse to this.
+ *
+ * `carveChars` (issue #1809, ruling §1): the aggregated carved character set;
+ * the single aggregated-R pass is unioned over the incremental
+ * `deletedItemIds` union (see {@link unionAggregatedCarveIds}).
  */
 export function buildCarvePatch(
   baseIr: KeyboardIR,
   deletedNodeIds: ReadonlySet<string>,
   deletedItemIds: ReadonlySet<string>,
+  carveChars: ReadonlySet<string> = EMPTY_CARVE_CHARS,
 ): Partial<KeyboardIR> {
-  const { slotIds, wholeNodeItemIds } = partitionItemIds(baseIr, deletedItemIds);
+  const effectiveItemIds = unionAggregatedCarveIds(baseIr, deletedItemIds, carveChars);
+  const { slotIds, wholeNodeItemIds } = partitionItemIds(baseIr, effectiveItemIds);
 
   if (deletedNodeIds.size === 0 && slotIds.size === 0 && wholeNodeItemIds.size === 0) {
     return {};
   }
 
-  const slotIr = applyStoreSlotRemovals(baseIr, slotIds).ir;
+  const slotIr = applyStoreSlotRemovals(baseIr, slotIds, { carveNotAnyHygiene: true }).ir;
   const allWholeNodeIds = new Set([...deletedNodeIds, ...wholeNodeItemIds]);
   const filtered = carveFilterIr(slotIr, allWholeNodeIds);
 
@@ -99,14 +134,17 @@ export function buildCarvePatch(
  * @param baseIr          The source-of-truth carve IR. Never mutated.
  * @param deletedNodeIds  Whole-node carve deletions (group/rule/store/raw nodeIds).
  * @param deletedItemIds  Glyph-level carve item ids (store slots + bare node ids).
+ * @param carveChars      Issue #1809, ruling §1: the aggregated carved character
+ *                        set; unioned over `deletedItemIds` (see buildCarvePatch).
  * @returns A fresh KeyboardIR with carve deletions applied.
  */
 export function applyCarveMutate(
   baseIr: KeyboardIR,
   deletedNodeIds: ReadonlySet<string>,
   deletedItemIds: ReadonlySet<string>,
+  carveChars: ReadonlySet<string> = EMPTY_CARVE_CHARS,
 ): KeyboardIR {
-  const patch = buildCarvePatch(baseIr, deletedNodeIds, deletedItemIds);
+  const patch = buildCarvePatch(baseIr, deletedNodeIds, deletedItemIds, carveChars);
   return applyMutatePatch(baseIr, patch, CARVE_WRITES);
 }
 

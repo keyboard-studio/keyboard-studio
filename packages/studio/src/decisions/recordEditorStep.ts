@@ -38,6 +38,9 @@ import {
 } from "@keyboard-studio/contracts";
 import { applyCarveMutate } from "../steps/editorMutate.ts";
 import { occupiedHostKeys } from "../lib/occupiedHostKeys.ts";
+
+/** Shared empty carved-character set for the optional `getCarveChars` dep. */
+const EMPTY_RECORD_CARVE_CHARS: ReadonlySet<string> = new Set();
 import { extractMechanismHostKey } from "../lib/extractMechanismHostKey.ts";
 import type { DecisionEntryInput } from "./decisionLogStore.ts";
 
@@ -98,6 +101,11 @@ export interface RecordEditorStepDeps {
   getDeletedNodeIds: () => ReadonlySet<string>;
   /** Ids of the carved-away store-slot items, for the carve projection. */
   getDeletedItemIds: () => ReadonlySet<string>;
+  /**
+   * Issue #1809, ruling §1: the aggregated carved character set, for the
+   * single aggregated-R pass. Optional — absent behaves like an empty set.
+   */
+  getCarveChars?: () => ReadonlySet<string>;
 }
 
 /**
@@ -158,13 +166,18 @@ function assignmentTargets(result: unknown): string[] {
  */
 function countNewlyOccupiedKeys(
   assignments: readonly MechanismAssignment[],
-  deps: Pick<RecordEditorStepDeps, "getBaseIr" | "getDeletedNodeIds" | "getDeletedItemIds">,
+  deps: Pick<RecordEditorStepDeps, "getBaseIr" | "getDeletedNodeIds" | "getDeletedItemIds" | "getCarveChars">,
 ): number | undefined {
   const baseIr = deps.getBaseIr();
   if (baseIr === null) return undefined;
 
   const before = occupiedHostKeys(
-    applyCarveMutate(baseIr, deps.getDeletedNodeIds(), deps.getDeletedItemIds()),
+    applyCarveMutate(
+      baseIr,
+      deps.getDeletedNodeIds(),
+      deps.getDeletedItemIds(),
+      deps.getCarveChars?.() ?? EMPTY_RECORD_CARVE_CHARS,
+    ),
   );
   const after = new Set(before);
   for (const assignment of assignments) {
@@ -201,6 +214,7 @@ export function observeEditorStep(
     | "getBaseIr"
     | "getDeletedNodeIds"
     | "getDeletedItemIds"
+    | "getCarveChars"
   >,
 ): EditorStepObservation | null {
   const actionType = EDITOR_ACTION_STEPS[stepId];

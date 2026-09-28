@@ -111,6 +111,7 @@ export type WorkingCopySnapshot = Omit<
   | "deletedNodeIds"
   | "deletedItemIds"
   | "deletedTouchKeyIds"
+  | "carveChars"
   | "staleSteps"
   | "removalCapabilities"
   | "session"
@@ -126,6 +127,8 @@ export type WorkingCopySnapshot = Omit<
   deletedNodeIds: string[];
   deletedItemIds: string[];
   deletedTouchKeyIds: string[];
+  /** Issue #1809: the aggregated-R carve character set, serialized. Absent in pre-change drafts; restores as empty. */
+  carveChars: string[];
   staleSteps: string[];
   /**
    * Optional (spec 080 US2): the base's welcome-folder images, Base64-encoded
@@ -328,6 +331,7 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     deletedNodeIds: [...s.deletedNodeIds],
     deletedItemIds: [...s.deletedItemIds],
     deletedTouchKeyIds: [...s.deletedTouchKeyIds],
+    carveChars: [...s.carveChars],
     undoStack: s.undoStack,
     phaseResults: s.phaseResults,
     irAxes: s.irAxes,
@@ -408,6 +412,8 @@ export function prepareWorkingCopySnapshot(snapshot: WorkingCopySnapshot): Parti
     // Tolerate snapshots saved before this field existed (dev-branch drafts):
     // an absent value must not clobber the store default with undefined.
     deletedTouchKeyIds: new Set(snapshot.deletedTouchKeyIds ?? []),
+    // Issue #1809: tolerate snapshots saved before carveChars existed.
+    carveChars: new Set(snapshot.carveChars ?? []),
     undoStack: snapshot.undoStack,
     phaseResults: snapshot.phaseResults,
     irAxes: snapshot.irAxes,

@@ -2140,7 +2140,7 @@ export function isSimpleRemovableRule(rule: IRRule): boolean {
  * case-pair fold below (FR-014) so a folded survivor row's `contributors`
  * cascade EVERY case-group member's producers, not just the survivor's own.
  *
- * Without this, `cascadeDelete(contributors.ruleNodeIds, contributors.storeSlotIds)`
+ * Without this, `cascadeDelete(contributors.ruleNodeIds, contributors.storeSlotIds, chars)`
  * on a folded row (e.g. the `a`+`A` pair, survivor `a`) only removed the
  * lowercase's rules/slots, silently leaving the uppercase producer intact
  * (#526 diagnosed bug — `handleRemoveSelectedRecommended` in CarveGalleryV2.tsx
@@ -2236,7 +2236,7 @@ function mergeCharContributors(records: readonly CharContributors[]): CharContri
 /** A single recommended-removal character for the carve gallery's suggestion groups. */
 export interface RecommendedRemovalChar {
   ch: string;
-  /** Contributor info for removal — pass straight to cascadeDelete(contributors.ruleNodeIds, contributors.storeSlotIds). */
+  /** Contributor info for removal — pass straight to cascadeDelete(contributors.ruleNodeIds, contributors.storeSlotIds, chars). */
   contributors: CharContributors;
   /**
    * All members of this row's case group, sorted by code point, present ONLY when this

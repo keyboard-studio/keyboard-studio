@@ -65,7 +65,7 @@ export type { ApplyDesktopModificationsToRawJsonResult } from "./applyDesktopMod
 export { propagateDesktopLayersToTouch } from "./propagateDesktopLayersToTouch.js";
 export type { PropagateDesktopLayersToTouchResult } from "./propagateDesktopLayersToTouch.js";
 
-export { collectCharContributors, sliceContributorDescriptors } from "./collectCharContributors.js";
+export { collectCharContributors, collectTaintedContributors, sliceContributorDescriptors } from "./collectCharContributors.js";
 export type { CharContributors, ContributorDescriptor, SlicedContributorDescriptors } from "./collectCharContributors.js";
 
 export { collectCompositionMethod } from "./collectCompositionMethod.js";

@@ -2,7 +2,7 @@
 
 import { describe, it, expect } from 'vitest';
 import type { KeyboardIR, IRRule, IRStore } from '@keyboard-studio/contracts';
-import { collectCharContributors } from './collectCharContributors.js';
+import { collectCharContributors, collectTaintedContributors } from './collectCharContributors.js';
 import { irGroup, makeTestIR } from '@keyboard-studio/contracts/fixtures';
 
 // ---------------------------------------------------------------------------
@@ -308,12 +308,16 @@ describe('collectCharContributors', () => {
   // "Remove everywhere" (#525 v2) — any()-consumed INPUT store occurrences
   // ---------------------------------------------------------------------------
 
-  it('finds a char in an any()-consumed INPUT store (Cameroon dkf-shaped: dk(X) any(dkf) > index(dkt,2))', () => {
+  it('deadkey fan-out: selector side is NEVER taint-tested (issue #1809, ruling §3)', () => {
+    // Cameroon dkf-shaped: dk(X) any(dkf) > index(dkt,2). Per ruling §3, the
+    // selector side (any(dkf)) is never taint-tested — only the produced side
+    // (index(dkt)) is. 'a' is at index 0 of dkf003b (sid-dkf, selector — NOT
+    // nominated). 'à' is at index 0 of dkt003b (sid-dkt, produced — tainted by
+    // 'a' via NFD, so nominated).
     const ir = makeCameroonIR();
-    // 'a' is at index 0 of the INPUT store dkf003b (sid-dkf), and at index 0
-    // of the OUTPUT store dkt003b (as 'à', not 'a' — so only the input slot matches).
     const result = collectCharContributors(ir, 'a');
-    expect(result.storeSlotIds).toContain('sid-dkf#0');
+    expect(result.storeSlotIds).not.toContain('sid-dkf#0');
+    expect(result.storeSlotIds).toContain('sid-dkt#0');
   });
 
   it('finds a char in an any()-consumed INPUT store that is ALSO the output store name (self-paired idiom)', () => {
@@ -336,7 +340,12 @@ describe('collectCharContributors', () => {
     expect(result.storeSlotIds).toEqual(['sid-word#0']);
   });
 
-  it('does NOT collect a char that only appears in a notany() context store', () => {
+  it('collects a char in a notany() context store for carve-scoped hygiene (issue #1809)', () => {
+    // Ruling §3: removing a carved char from a `notany()` store is behavior-
+    // neutral under carve's closed model — pruned for hygiene only. The
+    // carve-scoped exception nominates the slot; the general `notany-widens`
+    // block in applyStoreSlotRemovals is preserved (opt-in via
+    // `carveNotAnyHygiene`).
     const store = makeStore('sid-excl', 'exclSet', [
       { kind: 'char', value: 'a' }, { kind: 'char', value: 'b' },
     ]);
@@ -349,7 +358,7 @@ describe('collectCharContributors', () => {
       groups: [irGroup({ nodeId: 'g1', rules: [rule] })],
     });
     const result = collectCharContributors(ir, 'a');
-    expect(result.storeSlotIds).toHaveLength(0);
+    expect(result.storeSlotIds).toEqual(['sid-excl#0']);
     expect(result.ruleNodeIds).toHaveLength(0);
   });
 
@@ -384,10 +393,15 @@ describe('collectCharContributors', () => {
       groups: [irGroup({ nodeId: 'g1', rules: [rule] })],
     });
     const result = collectCharContributors(ir, 'à');
-    // Nominated for removal — dropping "à" must take this unwrap row with it
-    // (and, via applyStoreSlotRemovals' pairing graph, its coordinated
-    // comp-dia partner).
-    expect(result.storeSlots).toEqual([{ slotId: 'sid-composed#0', role: 'input' }]);
+    // Nominated for removal — dropping "à" must take this unwrap row with it.
+    // Ruling §3 (deconstruction pairs prune both aligned stores if either
+    // text side is tainted): the (a) branch nominates the coordinated
+    // comp-dia partner explicitly (the pairing graph in
+    // applyStoreSlotRemovals would drop it lockstep anyway).
+    expect(result.storeSlots).toEqual([
+      { slotId: 'sid-composed#0', role: 'input' },
+      { slotId: 'sid-compdia#0', role: 'input' },
+    ]);
     // ...but never as a producing method, and never as a whole-rule delete:
     // the rule's other rows serve other characters.
     expect(result.descriptors.every((d) => d.producedRole === 'used')).toBe(true);
@@ -455,10 +469,12 @@ describe('collectCharContributors — role-tagged storeSlots (spec 051)', () => 
     }
   });
 
-  it('tags an any()-consumed input-store slot as "input"', () => {
-    // 'a' lives only in dkf003b, the any() context source.
+  it('ruling §4: carved char tainting the produced side nominates the output slot, never the deadkey selector', () => {
+    // 'a' taints 'à' (NFD('a') ⊑ NFD('à')) in dkt003b#0. Ruling §4: the
+    // deadkey fan-out selector side (dkf003b) is never taint-tested; the
+    // produced side (dkt003b#0) is nominated with role "output".
     const result = collectCharContributors(makeCameroonIR(), 'a');
-    expect(result.storeSlots).toEqual([{ slotId: 'sid-dkf#0', role: 'input' }]);
+    expect(result.storeSlots).toEqual([{ slotId: 'sid-dkt#0', role: 'output' }]);
   });
 
   it('tags an index()-targeted output-store slot as "output"', () => {
@@ -646,6 +662,9 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
     });
     const result = collectCharContributors(ir, 'á');
     expect(result.descriptors).toEqual([
+      // Ruling §8: the fan-out rule produces tainted 'á' via a deadkey
+      // context — rendered as the minimal keystroke descriptor alongside.
+      { kind: 'keystroke', producedChar: 'á', producedRole: 'produced' },
       {
         kind: 'deadkey',
         producedChar: 'á',
@@ -702,13 +721,21 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
     expect(deadkeyDescriptor?.inputSequence).toBeUndefined();
   });
 
-  it('kind "deadkey": an input-side-only match leaves mark/base absent (not cheaply derivable from that side alone), and is tagged producedRole "used"', () => {
+  it('kind "deadkey": carving a base char that taints the produced side yields the produced descriptor (ruling §4)', () => {
     const result = collectCharContributors(makeCameroonIR(), 'a');
-    // 'a' lives only in the any()-consumed input store dkf003b#0 — this is the
-    // §0 "Input-store occurrence" case: 'a' is USED as a deadkey base by the
-    // fan-out rule, never itself PRODUCED by it.
+    // 'a' taints 'à' (NFD('a') ⊑ NFD('à')); ruling §4 never tests the selector
+    // side, so only the produced 'à' descriptor is emitted — no "used"
+    // descriptor for the selector-side 'a'.
     expect(result.descriptors).toEqual([
-      { kind: 'deadkey', producedChar: 'a', producedRole: 'used' },
+      {
+        kind: 'deadkey',
+        producedChar: 'à',
+        producedRole: 'produced',
+        mark: 'SEMICOLON',
+        base: 'a',
+        inputSequence: ['SEMICOLON', 'a'],
+        output: 'à',
+      },
     ]);
   });
 
@@ -800,6 +827,9 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
     });
     const result = collectCharContributors(ir, 'a');
     expect(result.descriptors).toEqual([
+      // Ruling §8: the rule produces tainted 'a' via index() — the minimal
+      // keystroke descriptor is emitted alongside the store-slot descriptor.
+      { kind: 'keystroke', producedChar: 'a', producedRole: 'produced' },
       {
         kind: 'store-slot',
         producedChar: 'a',
@@ -834,7 +864,10 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
     });
     const result = collectCharContributors(ir, 'a');
     expect(result.storeSlots).toEqual([{ slotId: 'sid-tbl#0', role: 'input' }]);
+    // Ruling §8: fully-tainted literal output 'a' → whole-rule delete (the
+    // keystroke descriptor), alongside the backspace-aligned store-slot.
     expect(result.descriptors).toEqual([
+      { kind: 'keystroke', producedChar: 'a', producedRole: 'produced' },
       { kind: 'store-slot', producedChar: 'a', producedRole: 'used' },
     ]);
     // No `inputKeystroke: 'Backspace'` — pressing Backspace is not a way to
@@ -859,6 +892,9 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
     });
     const result = collectCharContributors(ir, 'a');
     expect(result.descriptors).toEqual([
+      // Ruling §8: the rule produces tainted 'a' via index() — the minimal
+      // keystroke descriptor is emitted alongside the store-slot descriptor.
+      { kind: 'keystroke', producedChar: 'a', producedRole: 'produced' },
       {
         kind: 'store-slot',
         producedChar: 'a',
@@ -898,10 +934,12 @@ describe('collectCharContributors — descriptors (structured fields)', () => {
       groups: [irGroup({ nodeId: 'g1', rules: [rule] })],
     });
     const result = collectCharContributors(ir, 'a');
+    // producedChar is the full output "ab" (what the rule actually produces),
+    // not just the tainted part — the taint model (§2) replaces exact matching.
     expect(result.descriptors).toEqual([
       {
         kind: 'blocked',
-        producedChar: 'a',
+        producedChar: 'ab',
         producedRole: 'produced',
         blockedReasonCode: 'multi-char-output',
       },
@@ -1029,12 +1067,23 @@ describe('collectCharContributors — produced vs. used (rule-level production g
     });
   }
 
-  it('canonical example: target "A" (input-only) gets a "used" contributor — the rule outputs "Â", not "A"', () => {
+  it('canonical example: carving "A" taints produced "Â" (ruling §4) — output slot nominated, never the deadkey selector', () => {
     const ir = makeDeadkeyCombineIR();
     const result = collectCharContributors(ir, 'A');
-    expect(result.storeSlots).toEqual([{ slotId: 'sid-bases#0', role: 'input' }]);
+    // NFD('A') ⊑ NFD('Â'); ruling §4: the deadkey fan-out selector side is
+    // never taint-tested, so the produced slot is nominated with role
+    // "output", not the input slot.
+    expect(result.storeSlots).toEqual([{ slotId: 'sid-combined#0', role: 'output' }]);
     expect(result.descriptors).toEqual([
-      { kind: 'deadkey', producedChar: 'A', producedRole: 'used' },
+      {
+        kind: 'deadkey',
+        producedChar: 'Â',
+        producedRole: 'produced',
+        mark: 'Shift+6',
+        base: 'A',
+        inputSequence: ['Shift+6', 'A'],
+        output: 'Â',
+      },
     ]);
   });
 
@@ -1113,15 +1162,22 @@ describe('collectCharContributors — produced vs. used (rule-level production g
     expect(result.descriptors.some((d) => d.producedRole === 'used')).toBe(false);
   });
 
-  it('a rule where C is only input and the output is a DIFFERENT char still tags C "used" (unchanged behavior)', () => {
-    // Regression guard: the gate must not over-suppress — a rule that
-    // genuinely never produces C keeps tagging its input-side occurrence
-    // "used", exactly as before this fix.
+  it('ruling §4: carving "E" taints produced "Ê" — output slot nominated, never the deadkey selector', () => {
+    // NFD('E') ⊑ NFD('Ê'), so 'E' is not input-only in this fixture; ruling §4
+    // nominates the produced side (sid-combined#1), never the selector.
     const ir = makeDeadkeyCombineIR();
     const result = collectCharContributors(ir, 'E');
-    expect(result.storeSlots).toEqual([{ slotId: 'sid-bases#1', role: 'input' }]);
+    expect(result.storeSlots).toEqual([{ slotId: 'sid-combined#1', role: 'output' }]);
     expect(result.descriptors).toEqual([
-      { kind: 'deadkey', producedChar: 'E', producedRole: 'used' },
+      {
+        kind: 'deadkey',
+        producedChar: 'Ê',
+        producedRole: 'produced',
+        mark: 'Shift+6',
+        base: 'E',
+        inputSequence: ['Shift+6', 'E'],
+        output: 'Ê',
+      },
     ]);
   });
 
@@ -1159,18 +1215,244 @@ describe('collectCharContributors — produced vs. used (rule-level production g
     expect(result.descriptors.some((d) => d.producedRole === 'produced')).toBe(false);
 
     // The rule's OTHER any()-input occurrence of 'a' (keys2#1, non-backspace)
-    // IS attributed as "used" — the §0 gate no longer wrongly suppresses this
-    // legitimate blue row now that `ruleProducesChar` correctly reports this
-    // rule does NOT produce 'a'. The backspace-aligned OUTPUT slot (tbl2#0)
-    // joins it as a removal target, also "used": reachable only by pressing
+    // is KEPT by the input-side producer guard (ruling §5): its aligned
+    // output tbl2#1='b' is a kept char solely produced here, so pruning the
+    // input would strand 'b'. The backspace-aligned OUTPUT slot (tbl2#0)
+    // is nominated as a removal target, "used": reachable only by pressing
     // Backspace, so a deconstruction row rather than a method.
     expect(result.storeSlots).toEqual([
-      { slotId: 'sid-keys#1', role: 'input' },
       { slotId: 'sid-tbl#0', role: 'input' },
     ]);
     expect(result.descriptors).toEqual([
       { kind: 'store-slot', producedChar: 'a', producedRole: 'used' },
-      { kind: 'store-slot', producedChar: 'a', producedRole: 'used' },
     ]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue #1809 regressions — km-lead binding ruling (2026-09-28)
+// ---------------------------------------------------------------------------
+
+describe('collectCharContributors — issue #1809 regressions', () => {
+  // Helper: build a deconstruction pair IR (any(composed) + BKSP > index(comp-dia))
+  function makeDeconstructionIR(
+    composedVals: string[],
+    compDiaVals: string[],
+  ): KeyboardIR {
+    const composed = makeStore('sid-composed', 'composed', composedVals.map((v) => ({ kind: 'char', value: v }) as const));
+    const compDia = makeStore('sid-compdia', 'comp-dia', compDiaVals.map((v) => ({ kind: 'char', value: v }) as const));
+    const rule = makeRule('r-deconstruct',
+      [
+        { kind: 'any', storeRef: 'composed' },
+        { kind: 'raw', text: '+' },
+        { kind: 'vkey', name: 'K_BKSP', modifiers: [] },
+      ],
+      [{ kind: 'index', storeRef: 'comp-dia', offset: 1 }],
+    );
+    return makeTestIR({
+      stores: [composed, compDia],
+      groups: [irGroup({ nodeId: 'g1', rules: [rule] })],
+    });
+  }
+
+  it('carve U+0308 → ä→a backspace row pruned, store rows dropped lockstep', () => {
+    // NFD(ä)=⟨U+0061,U+0308⟩ ∋ U+0308 (ruling §9). Use 'é' (e + U+0301 acute,
+    // no diaeresis) for the untainted row.
+    const ir = makeDeconstructionIR(['ä', 'é'], ['a', 'e']);
+    const result = collectTaintedContributors(ir, new Set(['\u0308']));
+    // The tainted row (index 0) is nominated from the composed (input) side.
+    expect(result.storeSlotIds).toContain('sid-composed#0');
+    // The untainted row (index 1) is NOT nominated.
+    expect(result.storeSlotIds).not.toContain('sid-composed#1');
+    expect(result.storeSlotIds).not.toContain('sid-compdia#1');
+  });
+
+  it('carve U+0308 → ṻ→ū backspace row pruned', () => {
+    // NFD(ṻ)=⟨U+0075,U+0304,U+0308⟩ ∋ U+0308 (ruling §9). Backspace peels the
+    // diaeresis, leaving ū=⟨U+0075,U+0304⟩.
+    const ir = makeDeconstructionIR(['ṻ'], ['ū']);
+    const result = collectTaintedContributors(ir, new Set(['\u0308']));
+    expect(result.storeSlotIds).toContain('sid-composed#0');
+  });
+
+  it('carve r → ṝ→ṛ row pruned (no transitive step needed)', () => {
+    // NFD(ṝ)=⟨U+0072,U+0323,U+0304⟩ ∋ r (input tainted) and
+    // NFD(ṛ)=⟨U+0072,U+0323⟩ ∋ r (output tainted) — ruling §8.
+    const ir = makeDeconstructionIR(['ṝ'], ['ṛ']);
+    const result = collectTaintedContributors(ir, new Set(['r']));
+    expect(result.storeSlotIds).toContain('sid-composed#0');
+  });
+
+  it('carve q → dkf003b/dkt003b deadkey fan-out rows KEPT (selector never tested)', () => {
+    // Ruling §3: deadkey fan-out selector side is never taint-tested. Carving
+    // 'q' must not nominate the selector rows (sid-dkf#0, sid-dkf#1) even
+    // though 'q' appears in the selector store. The produced side (dkt) is
+    // tested normally — this test asserts only the selector suppression.
+    const dkf = makeStore('sid-dkf', 'dkf003b', [
+      { kind: 'char', value: 'q' }, { kind: 'char', value: 'w' },
+    ]);
+    const dkt = makeStore('sid-dkt', 'dkt003b', [
+      { kind: 'char', value: 'q' }, { kind: 'char', value: 'w' },
+    ]);
+    const triggerRule = makeRule('r-trigger',
+      [{ kind: 'vkey', name: 'K_SEMICOLON', modifiers: [] }],
+      [{ kind: 'deadkey', id: 0x003b }],
+    );
+    const fanOutRule = makeRule('r-fanout',
+      [{ kind: 'deadkey', id: 0x003b }, { kind: 'any', storeRef: 'dkf003b' }],
+      [{ kind: 'index', storeRef: 'dkt003b', offset: 2 }],
+    );
+    const ir = makeTestIR({
+      stores: [dkf, dkt],
+      groups: [irGroup({ nodeId: 'g1', rules: [triggerRule, fanOutRule] })],
+    });
+    const result = collectTaintedContributors(ir, new Set(['q']));
+    expect(result.storeSlotIds).not.toContain('sid-dkf#0');
+    expect(result.storeSlotIds).not.toContain('sid-dkf#1');
+  });
+
+  it('referenced single-case cased pair: output-side taint prunes, input-side-only requires producer guard', () => {
+    // Ruling §3: Cased pairs — output-side taint ⇒ prune (lockstep).
+    // Input-side-only taint ⇒ prune only if producer guard confirms kept
+    // output remains producible elsewhere.
+    const lc = makeStore('sid-lc', 'lc', [
+      { kind: 'char', value: 'æ' }, { kind: 'char', value: 'b' },
+    ]);
+    const uc = makeStore('sid-uc', 'uc', [
+      { kind: 'char', value: 'Æ' }, { kind: 'char', value: 'B' },
+    ]);
+    // Reference the pair via a rule so it's not "unreferenced".
+    const rule = makeRule('r-case',
+      [{ kind: 'any', storeRef: 'lc' }],
+      [{ kind: 'index', storeRef: 'uc', offset: 1 }],
+    );
+    const ir = makeTestIR({
+      stores: [lc, uc],
+      groups: [irGroup({ nodeId: 'g1', rules: [rule] })],
+    });
+    const result = collectTaintedContributors(ir, new Set(['Æ']));
+    // Output-side taint ('Æ' in uc) ⇒ prune lockstep (ruling §3: cased pairs,
+    // output taint prunes).
+    expect(result.storeSlotIds).toContain('sid-uc#0');
+  });
+
+  it('system store: zero nominations and zero system-store warnings', () => {
+    // Ruling §4: system stores are never nominated. The `store.isSystem` flag
+    // is the guard (not name prefix).
+    const sysStore = makeStore('sid-sys', '&SYSTEM', [
+      { kind: 'char', value: 'a' }, { kind: 'char', value: 'b' },
+    ]);
+    // Mark as system (makeStore may not set isSystem; set it directly).
+    (sysStore as { isSystem: boolean }).isSystem = true;
+    const ir = makeTestIR({
+      stores: [sysStore],
+      groups: [],
+    });
+    const result = collectTaintedContributors(ir, new Set(['a']));
+    expect(result.storeSlotIds).toHaveLength(0);
+    expect(result.ruleNodeIds).toHaveLength(0);
+  });
+
+  it('sole-producer guard: kept char whose only producer is a tainted row → row kept (blocked, not deleted)', () => {
+    // Ruling §8: "a kept, still-typeable character must never lose a production
+    // method". Carve 'a' (R={'a'}). Rule outputs 'ab' — 'a' is tainted, 'b' is
+    // kept. 'b' has no other producer, so the rule must NOT be nominated for
+    // whole-rule deletion; it is marked blocked instead, preserving 'b'.
+    const rule = makeRule('r-ab',
+      [{ kind: 'vkey', name: 'K_A', modifiers: [] }],
+      [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'b' }],
+    );
+    const ir = makeTestIR({
+      groups: [irGroup({ nodeId: 'g1', rules: [rule] })],
+    });
+    const result = collectTaintedContributors(ir, new Set(['a']));
+    // Not nominated for deletion (would strand 'b').
+    expect(result.ruleNodeIds).not.toContain('r-ab');
+    // Marked blocked with the multi-char-output reason (in descriptors).
+    expect(result.descriptors.some((d) => d.kind === 'blocked' && (d as { blockedReasonCode?: string }).blockedReasonCode === 'multi-char-output')).toBe(true);
+  });
+
+  it('deconstruction: output-side-only taint nominates the output slot (ruling §3)', () => {
+    // Every prior deconstruction test tainted the composed (input) side; here
+    // ONLY the output side is tainted. Carve U+0301: comp-dia 'é'
+    // (NFD(é)=⟨e,U+0301⟩ ∋ U+0301) is tainted while composed 'e' is clean.
+    // The lockstep drop of the composed row is applyStoreSlotRemovals' job
+    // (pairing graph) — nomination itself stays surgical per slot.
+    const ir = makeDeconstructionIR(['e'], ['é']);
+    const result = collectTaintedContributors(ir, new Set(['\u0301']));
+    expect(result.storeSlotIds).toContain('sid-compdia#0');
+    expect(result.storeSlotIds).not.toContain('sid-composed#0');
+  });
+
+  it('multi-codepoint carved grapheme: carving é taints precomposed and decomposed items, spares bare e (ruling §2)', () => {
+    // Ruling §2: NFD('é')=⟨e,U+0301⟩ is a contiguous subsequence of
+    // NFD('é') and NFD('e'+U+0301), but not of NFD('e').
+    const s = makeStore('sid-s', 's', [
+      { kind: 'char', value: 'é' },      // precomposed U+00E9
+      { kind: 'char', value: 'é' }, // decomposed e + U+0301
+      { kind: 'char', value: 'e' },        // bare e — must be spared
+    ]);
+    const rule = makeRule('r-any',
+      [{ kind: 'any', storeRef: 's' }, { kind: 'vkey', name: 'K_E', modifiers: [] }],
+      [{ kind: 'char', value: 'x' }],
+    );
+    const ir = makeTestIR({
+      stores: [s],
+      groups: [irGroup({ nodeId: 'g1', rules: [rule] })],
+    });
+    const result = collectTaintedContributors(ir, new Set(['é']));
+    expect(result.storeSlotIds).toContain('sid-s#0');
+    expect(result.storeSlotIds).toContain('sid-s#1');
+    expect(result.storeSlotIds).not.toContain('sid-s#2');
+  });
+
+  it('cased pair input-side-only taint: pruned when the kept output remains producible elsewhere (ruling §3)', () => {
+    // Carve 'æ' (input side tainted, output 'Æ' kept). 'Æ' stays producible
+    // through the independent r-x rule, so the producer guard passes and the
+    // tainted input row is pruned.
+    const lc = makeStore('sid-lc', 'lc', [
+      { kind: 'char', value: 'æ' }, { kind: 'char', value: 'b' },
+    ]);
+    const uc = makeStore('sid-uc', 'uc', [
+      { kind: 'char', value: 'Æ' }, { kind: 'char', value: 'B' },
+    ]);
+    const pairRule = makeRule('r-case',
+      [{ kind: 'any', storeRef: 'lc' }],
+      [{ kind: 'index', storeRef: 'uc', offset: 1 }],
+    );
+    const otherProducer = makeRule('r-x',
+      [{ kind: 'vkey', name: 'K_X', modifiers: [] }],
+      [{ kind: 'char', value: 'Æ' }],
+    );
+    const ir = makeTestIR({
+      stores: [lc, uc],
+      groups: [irGroup({ nodeId: 'g1', rules: [pairRule, otherProducer] })],
+    });
+    const result = collectTaintedContributors(ir, new Set(['æ']));
+    expect(result.storeSlotIds).toContain('sid-lc#0');
+    // The kept output side is not itself tainted — never nominated.
+    expect(result.storeSlotIds).not.toContain('sid-uc#0');
+  });
+
+  it('cased pair input-side-only taint: kept when the tainted row is the sole producer of the kept output (ruling §3)', () => {
+    // Same pair, but 'Æ' has no other producer: pruning the row would strand
+    // a kept, still-typeable character, so the row is kept (ruling §8).
+    const lc = makeStore('sid-lc', 'lc', [
+      { kind: 'char', value: 'æ' }, { kind: 'char', value: 'b' },
+    ]);
+    const uc = makeStore('sid-uc', 'uc', [
+      { kind: 'char', value: 'Æ' }, { kind: 'char', value: 'B' },
+    ]);
+    const pairRule = makeRule('r-case',
+      [{ kind: 'any', storeRef: 'lc' }],
+      [{ kind: 'index', storeRef: 'uc', offset: 1 }],
+    );
+    const ir = makeTestIR({
+      stores: [lc, uc],
+      groups: [irGroup({ nodeId: 'g1', rules: [pairRule] })],
+    });
+    const result = collectTaintedContributors(ir, new Set(['æ']));
+    expect(result.storeSlotIds).not.toContain('sid-lc#0');
+    expect(result.storeSlotIds).not.toContain('sid-uc#0');
   });
 });
