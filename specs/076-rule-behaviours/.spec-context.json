@@ -95,6 +95,54 @@
    "by": "ai",
    "at": "2026-09-28T23:07:00Z",
    "note": "7 FR-004 round-trip tests (typed forms, loud forms, two-entry-group); ownedByBehaviour excluded from round-trip comparison like ownedByPattern, documented + pinned."
+  },
+  {
+   "step": "implement",
+   "substep": "T008",
+   "kind": "complete",
+   "by": "ai",
+   "at": "2026-09-28T23:13:00Z",
+   "note": "30 failing TDD tests for compileCarveSuppression; contract specifies signatures, verb table, ownership, un-carve inverse."
+  },
+  {
+   "step": "implement",
+   "substep": "T011",
+   "kind": "complete",
+   "by": "ai",
+   "at": "2026-09-28T23:19:00Z",
+   "note": "referenceHostLayouts.ts: 5 hosts, key+modifier lookup, likelyHostLayouts per FR-023/A3.1 order; 17 tests green."
+  },
+  {
+   "step": "implement",
+   "substep": "T009",
+   "kind": "complete",
+   "by": "ai",
+   "at": "2026-09-28T23:19:00Z",
+   "note": "compileCarveSuppression: 30/30 T008 tests pass; pattern-apply suite 1037 green. Open: allow-host deadkey semantics need ruling (currently removes; block rewrites)."
+  },
+  {
+   "step": "implement",
+   "substep": "T012",
+   "kind": "complete",
+   "by": "ai",
+   "at": "2026-09-28T23:20:00Z",
+   "note": "recognizer lifts ownedByBehaviour rules as behaviour-owned via marker-only guards + recognizePatterns backstop; 6 tests; suites green."
+  },
+  {
+   "step": "implement",
+   "substep": "T010",
+   "kind": "complete",
+   "by": "ai",
+   "at": "2026-09-28T23:22:00Z",
+   "note": "carveDispositions in workingCopyStore with provenance pre-fill, no-overwrite recompile, prune on un-carve; 27 tests green."
+  },
+  {
+   "step": "implement",
+   "substep": "T025",
+   "kind": "complete",
+   "by": "ai",
+   "at": "2026-09-28T23:27:00Z",
+   "note": "layout_family surfaced in carve gallery; persisted via survey answer store; wired to likelyHostLayouts; 20 tests green."
   }
  ],
  "coverage": {

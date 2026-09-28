@@ -344,3 +344,13 @@ export type {
   SetLayerSwitchSpFix,
 } from "./touchKeyDiagnostics.js";
 
+export {
+  compileCarveSuppression,
+  restoreCarveSuppression,
+  CARVE_SUPPRESSION_OWNER,
+} from "./carveSuppression.js";
+export type {
+  SuppressionRestoration,
+  CompileCarveSuppressionOptions,
+  CompileCarveSuppressionResult,
+} from "./carveSuppression.js";

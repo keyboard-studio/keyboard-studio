@@ -829,3 +829,28 @@ describe('CarveGalleryV2 — footer nav (spec 081)', () => {
     expect(screen.getByTestId('carve-back').textContent).toBe('← Retour');
   });
 });
+
+// ---------------------------------------------------------------------------
+// T025 — the layout_family question is surfaced in the main flow (carve
+// gallery), structurally separate from per-row disposition controls.
+// ---------------------------------------------------------------------------
+
+describe('CarveGalleryV2 — layout_family question (T025)', () => {
+  it('renders the layout_family question section in the gallery', () => {
+    mockFixtureContributors();
+    renderGalleryV2(makeFixtureIR());
+    expect(screen.getByTestId('layout-family-question')).not.toBeNull();
+    expect(
+      screen.getByText('Which physical keyboard layout does your community use?'),
+    ).not.toBeNull();
+  });
+
+  it('the gallery section is outside the per-character rows', () => {
+    mockFixtureContributors();
+    renderGalleryV2(makeFixtureIR());
+    const section = screen.getByTestId('layout-family-question');
+    // The section is a direct gallery-level band, not nested inside any
+    // character row/group card.
+    expect(section.closest('[data-testid="carve-gallery"]')).not.toBeNull();
+  });
+});

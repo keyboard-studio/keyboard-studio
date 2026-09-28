@@ -339,6 +339,12 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     staleSteps: [...s.staleSteps],
     validatorFindings: s.validatorFindings,
     axisFills: s.axisFills,
+    // Closed-keyboard card + carve dispositions (076 FR-005/FR-022, issue
+    // #1802): plain JSON-safe data, straight passthrough like axisFills
+    // above. The read side is the tolerant half: a snapshot written before
+    // these fields existed reads as "card unanswered, no decisions".
+    closedKeyboardCard: s.closedKeyboardCard,
+    carveDispositions: s.carveDispositions,
     // Both fields are plain JSON-safe data (spec 063 T058) — straight
     // passthrough on write. The read side (prepareWorkingCopySnapshot, below)
     // is the tolerant half: it falls back when a pre-058 snapshot has neither
@@ -422,6 +428,11 @@ export function prepareWorkingCopySnapshot(snapshot: WorkingCopySnapshot): Parti
     staleSteps: new Set(snapshot.staleSteps),
     validatorFindings: snapshot.validatorFindings,
     axisFills: snapshot.axisFills,
+    // Tolerate snapshots saved before these fields existed (076 FR-022):
+    // an absent value must not clobber the store defaults with undefined —
+    // same idiom as deletedTouchKeyIds/sequenceFlaggedChars above.
+    closedKeyboardCard: snapshot.closedKeyboardCard ?? null,
+    carveDispositions: snapshot.carveDispositions ?? [],
     // Tolerate snapshots saved before these fields existed (spec 063 T058 /
     // R10.3): an absent value must not clobber the store defaults with
     // undefined — same idiom as deletedTouchKeyIds/sequenceFlaggedChars above.

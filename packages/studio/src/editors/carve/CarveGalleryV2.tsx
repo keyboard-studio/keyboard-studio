@@ -26,6 +26,7 @@ import { RemovedDropdown } from '../assignLoop/parts/StatusBar.tsx';
 import type { RemovedItem } from '../assignLoop/parts/StatusBar.tsx';
 import { useCarveNeededSet } from '../../hooks/useCarveNeededSet.ts';
 import { usePublishStepNav } from '../../hooks/usePublishStepNav.ts';
+import { LayoutFamilyQuestion } from './LayoutFamilyQuestion.tsx';
 
 interface CarveGalleryV2Props {
   onComplete: () => void;
@@ -765,6 +766,13 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
           </label>
         </fieldset>
         <RemovedDropdown list={removedList} onRestore={restoreRemovedItem} onRestoreAll={restoreAll} />
+      </div>
+
+      {/* layout_family question — T025 (spec 076 FR-023, amendment A3.1).
+          Gallery-level setting driving likely-host resolution; structurally
+          separate from the per-row disposition controls (T016, later). */}
+      <div style={{ padding: '12px 22px', borderBottom: '1px solid var(--app-border)', background: 'var(--app-surface)', flexShrink: 0 }}>
+        <LayoutFamilyQuestion bcp47={identityBcp47} />
       </div>
 
       {/* Two-panel body */}
