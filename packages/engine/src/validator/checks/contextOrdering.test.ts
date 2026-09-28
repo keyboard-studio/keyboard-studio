@@ -247,4 +247,102 @@ describe("checkContextOrdering", () => {
     const findings = checkContextOrdering(source);
     expect(findings.some((f) => f.code === "KM_ERROR_VIRTUAL_KEY_IN_CONTEXT")).toBe(true);
   });
+
+  // -----------------------------------------------------------------------
+  // 076 T007 — `nul` must not share the output with text-bearing output.
+  // -----------------------------------------------------------------------
+
+  // Failing cases — KM_ERROR_NUL_WITH_TEXT_OUTPUT
+  it("rejects nul combined with a quoted string in the output", () => {
+    const findings = checkContextOrdering('+ [K_A] > "x" nul');
+    const hit = findings.find((f) => f.code === "KM_ERROR_NUL_WITH_TEXT_OUTPUT");
+    expect(hit).toBeDefined();
+    expect(hit?.severity).toBe("error");
+    expect(hit?.layer).toBe("A");
+  });
+
+  it("rejects the contradiction regardless of order (nul before the text)", () => {
+    const findings = checkContextOrdering('+ [K_A] > nul "x"');
+    expect(findings.some((f) => f.code === "KM_ERROR_NUL_WITH_TEXT_OUTPUT")).toBe(true);
+  });
+
+  it("rejects nul with text output on a rule with text context", () => {
+    const findings = checkContextOrdering('"a" + [K_A] > "x" nul');
+    expect(findings.some((f) => f.code === "KM_ERROR_NUL_WITH_TEXT_OUTPUT")).toBe(true);
+  });
+
+  it("rejects nul combined with a U+XXXX literal in the output", () => {
+    const findings = checkContextOrdering("+ [K_A] > U+0041 nul");
+    expect(findings.some((f) => f.code === "KM_ERROR_NUL_WITH_TEXT_OUTPUT")).toBe(true);
+  });
+
+  it("rejects nul combined with a deadkey output", () => {
+    const findings = checkContextOrdering("+ [K_A] > nul dk(acute)");
+    expect(findings.some((f) => f.code === "KM_ERROR_NUL_WITH_TEXT_OUTPUT")).toBe(true);
+  });
+
+  it("rejects nul combined with an index() store reference", () => {
+    const findings = checkContextOrdering("+ [K_A] > index(s, 1) nul");
+    expect(findings.some((f) => f.code === "KM_ERROR_NUL_WITH_TEXT_OUTPUT")).toBe(true);
+  });
+
+  it("rejects nul combined with an outs() store reference", () => {
+    const findings = checkContextOrdering("+ [K_A] > nul outs(s)");
+    expect(findings.some((f) => f.code === "KM_ERROR_NUL_WITH_TEXT_OUTPUT")).toBe(true);
+  });
+
+  it("reports the finding at the nul token with an accurate column", () => {
+    // `+ [K_A] > "x" nul`: the `>` is at index 8, output starts at 9, and
+    // `nul` starts at output offset 5 → column 9 + 5 + 1 = 15.
+    const findings = checkContextOrdering('+ [K_A] > "x" nul');
+    const hit = findings.find((f) => f.code === "KM_ERROR_NUL_WITH_TEXT_OUTPUT");
+    expect(hit?.location).toMatchObject({ line: 1, column: 15 });
+  });
+
+  it("reports the finding on the correct line in multi-line source", () => {
+    const source = ['+ [K_A] > "a"', '+ [K_B] > "b" nul', '+ [K_C] > nul'].join("\n");
+    const findings = checkContextOrdering(source);
+    const hits = findings.filter((f) => f.code === "KM_ERROR_NUL_WITH_TEXT_OUTPUT");
+    expect(hits).toHaveLength(1);
+    expect(hits[0]?.location.line).toBe(2);
+  });
+
+  // Passing cases — legal `nul` outputs
+  it("accepts nul alone in the output (suppression)", () => {
+    expect(checkContextOrdering("+ [K_A] > nul")).toEqual([]);
+  });
+
+  it("accepts nul beep in the output (loud suppression, FR-020)", () => {
+    expect(checkContextOrdering("+ [K_A] > nul beep")).toEqual([]);
+  });
+
+  it("accepts context in the output (FR-009 soft suppression on text context)", () => {
+    expect(checkContextOrdering('"a" + [K_A] > context')).toEqual([]);
+  });
+
+  it("does not mistake a quoted \"nul\" string for the suppression keyword", () => {
+    // The output text "nul" is text-bearing; there is no `nul` keyword here.
+    expect(checkContextOrdering('+ [K_A] > "nul"')).toEqual([]);
+  });
+
+  it("does not mistake a deadkey named nul for the suppression keyword", () => {
+    // dk(nul) is a deadkey output (text-bearing) with no standalone `nul`.
+    expect(checkContextOrdering("+ [K_A] > dk(nul)")).toEqual([]);
+  });
+
+  it("does not flag an empty quoted string beside nul", () => {
+    // "" produces nothing, so there is no contradiction.
+    expect(checkContextOrdering('+ [K_A] > "" nul')).toEqual([]);
+  });
+
+  it("does not treat context re-emission as text-bearing (documented boundary)", () => {
+    // `context` re-emits matched context; per the conservative boundary it is
+    // not text-bearing for this check, so `> context nul` is not flagged.
+    expect(checkContextOrdering("+ [K_A] > context nul")).toEqual([]);
+  });
+
+  it("still flags the contradiction when the rule has a trailing comment", () => {
+    const findings = checkContextOrdering('+ [K_A] > "x" nul c trailing note');
+    expect(findings.some((f) => f.code === "KM_ERROR_NUL_WITH_TEXT_OUTPUT")).toBe(true);
+  });
 });

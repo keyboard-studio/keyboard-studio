@@ -6,6 +6,11 @@ import { stripCommentSource } from "./_shared.js";
 //   1. `nul` must be the first token in context if present.
 //   2. if()/platform()/baselayout() must appear before other content tokens.
 //   3. No virtual keys [K_X] are allowed in context.
+//
+// Plus the 076 output-side extension (FR-009/FR-014/FR-020, T007): `nul` in
+// the output (RHS after >) must not share the rule with text-bearing output
+// elements — `> "x" nul` is a contradiction and a compiler error, while
+// `> nul` and `> nul beep` remain legal.
 
 // Matches virtual keys: [K_SOMETHING] (only K_ prefixed names are virtual keys)
 const VIRTUAL_KEY_RE = /\[[^\]]*\bK_[A-Za-z0-9_]+[^\]]*\]/g;
@@ -119,20 +124,53 @@ function blankParenContents(ctx: string): string {
 }
 
 /**
+ * Blank every quoted string literal in `str` with spaces of equal length
+ * (length-preserving, so match indices stay accurate). Quote-aware: a quote
+ * character of the other kind inside a literal does not toggle the state.
+ */
+function blankQuoted(str: string): string {
+  const out = str.split("");
+  let inDouble = false;
+  let inSingle = false;
+  for (let i = 0; i < str.length; i++) {
+    const ch = str[i];
+    if (ch === '"' && !inSingle) { inDouble = !inDouble; out[i] = " "; continue; }
+    if (ch === "'" && !inDouble) { inSingle = !inSingle; out[i] = " "; continue; }
+    if (inDouble || inSingle) out[i] = " ";
+  }
+  return out.join("");
+}
+
+// Matches a NON-EMPTY quoted string literal — text-bearing output. An empty
+// literal (""/'') produces nothing, so it does not count.
+const NONEMPTY_QUOTED_RE = /"[^"]+"|'[^']+'/;
+
+// Matches text-bearing output tokens on output text whose quoted strings and
+// paren contents have been blanked: U+XXXX codepoint literals, dk()/deadkey()
+// outputs, and index()/outs() store references. Store references are treated
+// as text-bearing conservatively — this layer cannot resolve what a store
+// holds, and a `nul` beside any of them is still a contradiction worth
+// flagging. Deliberately NOT matched: `context`/`context(N)` (re-emits the
+// matched context; `> context` is the FR-009-legal soft-suppression form),
+// `beep` (`> nul beep` is the FR-020-legal loud-suppression form), and
+// `use(...)` (control flow, not text production).
+const OUTPUT_TEXT_TOKEN_RE = /\bU\+[0-9A-Fa-f]{1,6}\b|\b(?:dk|deadkey|index|outs)\s*\(/gi;
+
+/**
  * Extract the context (LHS before the rule separator `+`) from a rule line.
  * Returns null unless the line is a key rule — i.e. it has BOTH a context/key
  * separator `+` and, after it, an unquoted `>` rule separator. Requiring the
  * `>` confirmation stops a non-rule line with irregular spacing (e.g.
  * `store(x) "a" +"b"`) from being mis-scanned as a rule.
  * Lines starting with `+` have no context (empty LHS).
+ *
+ * Also returns the raw output text (`out`, everything after the `>`) and its
+ * start offset (`outStart`) so output-side scans can report accurate columns.
  */
-function extractContext(line: string): { ctx: string; ctxStart: number } | null {
-  const trimmed = line.trimStart();
-  if (trimmed.startsWith("+")) {
-    // No context — output side only, nothing to check.
-    return null;
-  }
-
+function extractContext(line: string): { ctx: string; ctxStart: number; out: string; outStart: number } | null {
+  // Note: lines starting with `+` (empty LHS, e.g. `+ [K_A] > "a"`) flow
+  // through the uniform scan below — the leading `+` is the context/key
+  // separator, the context is empty, and the output-side check still applies.
   // Single quote/paren-aware scan that must find, in order:
   //   (a) the context/key separator `+`, then
   //   (b) an unquoted, depth-0 `>` rule separator after it.
@@ -167,8 +205,14 @@ function extractContext(line: string): { ctx: string; ctxStart: number } | null 
       // ctxStart records the leading-whitespace width dropped by trim() so the
       // caller can re-offset finding columns back to the original line (an
       // indented rule's context otherwise reports a column shifted left).
+      // outStart is the raw offset of the output text for the same purpose.
       const rawCtx = line.slice(0, sepIndex);
-      return { ctx: rawCtx.trim(), ctxStart: rawCtx.length - rawCtx.trimStart().length };
+      return {
+        ctx: rawCtx.trim(),
+        ctxStart: rawCtx.length - rawCtx.trimStart().length,
+        out: line.slice(i + 1),
+        outStart: i + 1,
+      };
     }
   }
   // No separator, or no `>` after it — not a key rule.
@@ -187,7 +231,34 @@ export function checkContextOrdering(source: string): LintFinding[] {
     const line = lines[lineIdx] ?? "";
     const extracted = extractContext(line);
     if (!extracted) continue;
-    const { ctx, ctxStart } = extracted;
+    const { ctx, ctxStart, out, outStart } = extracted;
+
+    // --- Output-side check (076 FR-009/FR-014 extension, FR-020): `nul` must
+    // not share the output with text-bearing output elements. `nul` means
+    // "output nothing", so `> "x" nul` / `> nul "x"` is a contradiction and a
+    // compiler error. `> nul` alone (suppression) and `> nul beep` (loud
+    // suppression) remain legal. See OUTPUT_TEXT_TOKEN_RE for the deliberate
+    // boundary: context/context(N), beep, and use() are not text-bearing.
+    // Runs for every rule line, including bare `+` rules with empty context.
+    // Blank quotes (recording text first) and paren contents so a quoted
+    // "nul", a deadkey named `nul` in dk(nul), or `nul` inside a call is never
+    // mistaken for the standalone suppression keyword. Both passes are
+    // length-preserving, so the match index is the accurate column.
+    const hasQuotedText = NONEMPTY_QUOTED_RE.test(out);
+    const outBlanked = blankParenContents(blankQuoted(out));
+    OUTPUT_TEXT_TOKEN_RE.lastIndex = 0;
+    const hasTextOutput = hasQuotedText || OUTPUT_TEXT_TOKEN_RE.test(outBlanked);
+    const nulOutMatch = NUL_RE.exec(outBlanked);
+    if (nulOutMatch && hasTextOutput) {
+      findings.push({
+        code: "KM_ERROR_NUL_WITH_TEXT_OUTPUT",
+        severity: "error",
+        layer: "A",
+        message: `"nul" (suppress output) cannot be combined with text-producing output in the same rule`,
+        location: { file: "", line: lineIdx + 1, column: outStart + nulOutMatch.index + 1 },
+      });
+    }
+
     if (!ctx) continue;
 
     // --- Rule 3: no virtual keys [K_X] in context ---

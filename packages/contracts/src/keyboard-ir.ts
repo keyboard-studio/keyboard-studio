@@ -261,6 +261,26 @@ export interface IRHeader {
    * ANSI keyboards at import time without altering the stores array.
    */
   encoding?: "Unicode" | "ANSI";
+  /**
+   * The set of `begin` entry points, modelled for fidelity (spec 076 FR-004).
+   * `main` is the group named in the `begin <encoding> > use(<group>)`
+   * directive — the parser keeps it (first directive wins, mirroring
+   * `encoding`) so the emitter reuses it instead of rebuilding a single
+   * entry from the first non-readonly group. `newContext` / `postKeystroke`
+   * record the presence of the reserved entry groups. Together with
+   * {@link IRHeader.encoding} this is the full entry-point set.
+   * `NewContext` and `PostKeystroke` groups are `readonly` and MUST NOT be
+   * used as reorder hooks — they are modelled for fidelity only.
+   * Absent when the keyboard was constructed in-memory (scaffolded).
+   */
+  entryPoints?: {
+    /** Group named in `begin <encoding> > use(<group>)`. */
+    main?: string;
+    /** The source declared a `group(NewContext)` entry group. */
+    newContext?: boolean;
+    /** The source declared a `group(PostKeystroke)` entry group. */
+    postKeystroke?: boolean;
+  };
 }
 
 /** A single KMN store declaration. */

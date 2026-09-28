@@ -20,9 +20,9 @@ One user story (US6, P1). Organized Setup → Foundational → US6 → Polish, w
 
 **Wave 2 — depends on Wave 1:**
 
-- [ ] **T005** [US6] Codec emits typed `nul` / `context` canonically and models the `begin` entry-point set on the IR header (`NewContext`/`PostKeystroke` readonly, never reorder hooks) (FR-004) · `packages/engine/src/codec/emit.ts`
-- [ ] **T006** [US6] FR-004 round-trip fixtures: every typed form plus a two-entry-group keyboard, parse→emit identity · `packages/engine/src/codec/` fixtures + tests — NOTE (T003 follow-up): `keyboardIRRoundTrip.ts` excludes `ownedByPattern` from round-trip comparison as recognition metadata; decide whether `ownedByBehaviour` gets the same exclusion here
-- [ ] **T007** [US6] Compiler error on `nul` with text-bearing context output (extends FR-009/FR-014) · existing output-position validation next to FR-009
+- [x] **T005** [US6] Codec emits typed `nul` / `context` canonically and models the `begin` entry-point set on the IR header (`NewContext`/`PostKeystroke` readonly, never reorder hooks) (FR-004) · `packages/engine/src/codec/emit.ts` — DONE 2026-09-28: `entryPoints {main,newContext,postKeystroke}` on IRHeader; begin entry-group captured first-wins; NewContext/PostKeystroke parsed readonly; emit reuses modelled entry; canonical nul/context emit confirmed; 15 tests in entrypoints.test.ts
+- [x] **T006** [US6] FR-004 round-trip fixtures: every typed form plus a two-entry-group keyboard, parse→emit identity · `packages/engine/src/codec/` fixtures + tests — DONE 2026-09-28: 7 round-trip tests in roundtrip-fr004.test.ts (all typed forms, loud forms, two-entry-group); ownedByBehaviour exclusion decision: YES, same as ownedByPattern (pipeline-assigned metadata, not stable across import/emit), documented + 2 pinning tests
+- [x] **T007** [US6] Compiler error on `nul` with text-bearing context output (extends FR-009/FR-014) · existing output-position validation next to FR-009 — DONE 2026-09-28: Layer A check #8 (`contextOrdering.ts`) emits `KM_ERROR_NUL_WITH_TEXT_OUTPUT` when output contains both standalone `nul` and a text-bearing element; `context`/`beep`/`use()` excluded; 17 tests, validator suite 371 green. FOLLOW-UP for T009–T012: FR-014's LHS variant (`"x" + [K_A] > nul` → error) not yet implemented — needs coordination with the suppression compiler since it generates such rules; store-interior `nul` padding also deferred there.
 
 ## Phase 3: User Story 6 — carved combinations: allow host fallback or block (P1)
 

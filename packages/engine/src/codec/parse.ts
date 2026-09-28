@@ -846,6 +846,18 @@ function parseGroupLine(text: string): { name: string; usingKeys: boolean } | nu
   return { name: m[1] ?? "", usingKeys };
 }
 
+/**
+ * True for the reserved `begin` entry-point group names (spec 076 FR-004).
+ * These groups are entered by the engine on new-context / post-keystroke
+ * events, never via `use()`; they are modelled for fidelity only —
+ * `readonly`, never reorder hooks. Matched case-insensitively; KMN group
+ * names are matched case-insensitively by the compiler.
+ */
+function isReservedEntryGroup(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower === "newcontext" || lower === "postkeystroke";
+}
+
 // ---------------------------------------------------------------------------
 // Begin directive parser
 // ---------------------------------------------------------------------------
@@ -886,12 +898,14 @@ export function parse(text: string, keyboardId: string): ParseResult {
   }
 
   // Parse state.
-  // TODO: capture the `begin <encoding> > use(<group>)` entry group once
-  // multi-group keyboards are supported; v1 assumes the single "main" group.
   let headerParsed = false; // true after we see `begin`
   let currentGroup: IRGroup | null = null;
   // Encoding from the first `begin` directive; stored in IRHeader.encoding.
   let beginEncoding: "Unicode" | "ANSI" | undefined;
+  // Entry group from the first `begin <encoding> > use(<group>)` directive;
+  // stored in IRHeader.entryPoints.main (spec 076 FR-004). First wins,
+  // mirroring the encoding rule above.
+  let beginEntryGroup: string | undefined;
 
   // Track "pending leading comments" — comments that haven't been anchored yet.
   let pendingComments: Array<{ text: string; line: number }> = [];
@@ -948,6 +962,9 @@ export function parse(text: string, keyboardId: string): ParseResult {
         // loop. Use a local variable captured by the closure below.
         if (beginEncoding === undefined) {
           beginEncoding = parsed.encoding as "Unicode" | "ANSI";
+          // The entry group travels with the encoding: first begin directive
+          // wins for both, so a multi-begin keyboard keeps its declared entry.
+          beginEntryGroup = parsed.entryGroup || undefined;
         }
         flushCommentsFreestanding();
         break;
@@ -1015,7 +1032,9 @@ export function parse(text: string, keyboardId: string): ParseResult {
           name: parsed.name,
           usingKeys: parsed.usingKeys,
           rules: [],
-          readonly: false,
+          // Reserved entry-point groups (NewContext / PostKeystroke) are
+          // fidelity-only: readonly, never reorder hooks (spec 076 FR-004).
+          readonly: isReservedEntryGroup(parsed.name),
           sourceLine: tok.line,
         };
         groups.push(currentGroup);
@@ -1182,6 +1201,19 @@ export function parse(text: string, keyboardId: string): ParseResult {
   // We keep this as an empty array since per-store reconstruction happens from stores[].
   const storeDirectives: string[] = [];
 
+  // FR-004: model the begin entry-point set on the header. The entry group
+  // comes from the first `begin <encoding> > use(<group>)` directive (no
+  // longer dropped on parse); the reserved-group flags are derived from the
+  // parsed groups. Absent entirely when there is nothing to model (e.g. a
+  // fragment-only parse with no begin directive and no reserved groups).
+  const entryPoints: NonNullable<IRHeader["entryPoints"]> = {};
+  if (beginEntryGroup !== undefined) entryPoints.main = beginEntryGroup;
+  for (const g of groups) {
+    const lower = g.name.toLowerCase();
+    if (lower === "newcontext") entryPoints.newContext = true;
+    if (lower === "postkeystroke") entryPoints.postKeystroke = true;
+  }
+
   const header: IRHeader = {
     keyboardId,
     name,
@@ -1191,6 +1223,7 @@ export function parse(text: string, keyboardId: string): ParseResult {
     targets,
     storeDirectives,
     ...(beginEncoding !== undefined ? { encoding: beginEncoding } : {}),
+    ...(Object.keys(entryPoints).length > 0 ? { entryPoints } : {}),
   };
 
   // ---------------------------------------------------------------------------
