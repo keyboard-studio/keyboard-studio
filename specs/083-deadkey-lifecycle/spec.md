@@ -68,7 +68,7 @@ An author wants `dk(003b)` to be called something meaningful. Rename changes the
 **Acceptance Scenarios**:
 
 1. **Given** a deadkey with referencing rules and stores, **When** it is renamed, **Then** the trigger rule, fan-out rules, and both lookup stores are rewritten in one atomic mutation — no dangling references (§10 validator confirms).
-2. **Given** a pre-FR-004 codebase, **When** the author attempts a named rename, **Then** the action is unavailable with a note that named ids need the FR-004 codec closure; numeric renames still work.
+2. **Given** a pre-FR-004 codebase, **When** the author gives a deadkey a name, **Then** the name is recorded as metadata on the deadkey (visible in the inventory, surviving round-trip) and promoted to the real `dk(name)` id by mechanical migration once FR-004 lands; the numeric id keeps working throughout.
 3. **Given** a rename onto an existing id, **When** the author confirms, **Then** they chose explicitly between renaming theirs, merging, or replacing — the collision is never silent.
 
 ---
@@ -124,6 +124,7 @@ No lifecycle action silently overwrites another deadkey's identity. Minting, ren
 ## Design decisions
 
 - **Id/trigger decoupling.** The id is assigned once at define time and is stable for the deadkey's life. The trigger key is retargetable metadata. The old codepoint-derived id scheme is grandfathered: existing deadkeys keep their ids, and the define action must not mint ids that collide with them.
+- **Both naming conventions are legitimate.** Some authors use codepoint-derived ids (`dk(003b)` — the id points at the trigger key's letter); others name their deadkeys (`acute`, `grave`, `circum`). The feature privileges neither. The define flow accepts an optional author-chosen name from day one, stored as round-tripping metadata; the inventory shows id and name together; when FR-004 closes the codec, the stored name becomes the real `dk(name)` id by mechanical migration — the author is never asked twice.
 - **Explicit over silent, everywhere.** Merge, replace, and repoint are always author-confirmed. This applies to the S-02 path too, which becomes a client of the define action.
 - **Disclosure, not verdict.** Trigger-key choice (define and retarget) shows per-host-layout consequences with symmetric tradeoff copy per the 1802 A2 principle. The prompt asks the author the one question only they can answer — do their typists expect something on this key?
 - **Demonstration.** Every lifecycle action is provable in the simulator before the author moves on: define → type trigger+base; rename → old sequences unchanged; delete → trigger key's new behaviour; retarget → new trigger works, old trigger released.
