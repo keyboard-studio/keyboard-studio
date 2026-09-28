@@ -172,3 +172,50 @@ describe("validateRulePack", () => {
     }
   });
 });
+
+describe("additive FR-018 fields (backwards compatible with packVersion 1.0)", () => {
+  it("accepts behaviour parameters carrying familyId/familyName and preserves them", () => {
+    const pack = validPack();
+    pack.behaviours[0]!.parameters = {
+      ...pack.behaviours[0]!.parameters,
+      familyId: "diacritic-blocking-hardware",
+      familyName: "Diacritic blocking (hardware)",
+    };
+    const result = validateRulePack(pack);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.pack.behaviours[0]!.parameters.familyId).toBe(
+        "diacritic-blocking-hardware",
+      );
+      expect(result.pack.behaviours[0]!.parameters.familyName).toBe(
+        "Diacritic blocking (hardware)",
+      );
+    }
+  });
+
+  it("accepts demo pairs carrying the verified flag", () => {
+    const pack = validPack();
+    pack.behaviours[0]!.demoPairs = [
+      { input: "type 5 then grave", expectedOutput: "5", verified: true },
+      { input: "type a then grave", expectedOutput: "à", verified: false },
+    ];
+    const result = validateRulePack(pack);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.pack.behaviours[0]!.demoPairs[0]!.verified).toBe(true);
+      expect(result.pack.behaviours[0]!.demoPairs[1]!.verified).toBe(false);
+    }
+  });
+
+  it("accepts legacy 1.0 packs with neither family fields nor the verified flag", () => {
+    // The pre-FR-018 shape: no familyId/familyName in parameters, no
+    // verified on pairs. Must keep validating unchanged.
+    const legacy = JSON.parse(JSON.stringify(validPack())) as RulePack;
+    const result = validateRulePack(legacy);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect("familyId" in result.pack.behaviours[0]!.parameters).toBe(false);
+      expect("verified" in result.pack.behaviours[0]!.demoPairs[0]!).toBe(false);
+    }
+  });
+});

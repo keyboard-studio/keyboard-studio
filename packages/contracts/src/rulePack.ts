@@ -53,12 +53,21 @@ export interface DemoPair {
   expectedOutput: string;
   /** Optional author note, e.g. the host-layout condition the pair assumes. */
   note?: string;
+  /**
+   * True when the pair was recorded from the Track A demo pane — recording
+   * implies the demo ran green, so the pair is proven. Manually added pairs
+   * carry false (or omit the flag). Optional for backwards compatibility
+   * with "1.0" packs exported before the flag existed; absent means
+   * unverified.
+   */
+  verified?: boolean;
 }
 
 export const DemoPairSchema = z.object({
   input: z.string().min(1, "demo pair input description must not be empty"),
   expectedOutput: z.string().min(1, "demo pair expected output must not be empty"),
   note: z.string().optional(),
+  verified: z.boolean().optional(),
 });
 
 /**
@@ -112,6 +121,19 @@ const RAW_KMN_PARAMETER_KEYS = new Set([
 ]);
 
 /**
+ * Reserved parameter keys written by family-aware exporters (spec 082
+ * FR-018): when a pack is built from family-level rule selection (see the
+ * rule builder's `families` prop), the source rule family's id and name are
+ * recorded here so the pack round-trips the grouping. Ordinary packs omit
+ * them. This is an additive, optional convention only — `parameters` is an
+ * open record, so schema version "1.0" files exported before families
+ * existed validate unchanged, and packs carrying these keys validate on
+ * readers that predate families (the keys are inert plain data).
+ */
+export const FAMILY_ID_PARAMETER_KEY = "familyId";
+export const FAMILY_NAME_PARAMETER_KEY = "familyName";
+
+/**
  * One behaviour record in a pack: a closed-kind intent with structured
  * parameters, provenance, the compiled KMN rule texts (auditability only),
  * and canned demo pairs.
@@ -125,6 +147,10 @@ export interface BehaviourRecord {
    * Structured parameters as plain data (character classes, store refs,
    * table rows). MUST be non-empty and MUST NOT be a raw KMN snippet
    * stashed under a text key (FR-005).
+   *
+   * Family-aware exporters additionally record the source rule family here
+   * under {@link FAMILY_ID_PARAMETER_KEY} / {@link FAMILY_NAME_PARAMETER_KEY}
+   * (spec 082 FR-018); both are optional and inert to older readers.
    */
   parameters: Record<string, unknown>;
   /** Per-idiom provenance (FR-006). */

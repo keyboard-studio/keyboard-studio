@@ -59,6 +59,25 @@ describe("rulePacks export/import", () => {
     expect(behavioursIdx).toBeLessThan(descriptionIdx);
   });
 
+  it("round-trips a pack carrying family parameters and verified pairs (FR-018, additive)", () => {
+    const pack = makePack();
+    pack.behaviours[0]!.parameters = {
+      ...pack.behaviours[0]!.parameters,
+      familyId: "diacritic-blocking-hardware",
+      familyName: "Diacritic blocking (hardware)",
+    };
+    pack.behaviours[0]!.demoPairs = [
+      { input: "type 5 then grave", expectedOutput: "5", verified: true },
+    ];
+    const json = exportPack(pack);
+    const back = importPack(json);
+    expect(back).toEqual(pack);
+    expect(back.behaviours[0]!.parameters.familyId).toBe("diacritic-blocking-hardware");
+    expect(back.behaviours[0]!.demoPairs[0]!.verified).toBe(true);
+    // Canonical form is stable: re-export is byte-identical.
+    expect(exportPack(back)).toBe(json);
+  });
+
   it("exportPack throws RulePackImportError for an invalid pack", () => {
     const pack = makePack();
     pack.behaviours[0]!.demoPairs = [];
