@@ -83,12 +83,14 @@ describe("M5 — all step ids are unique", () => {
 // M2 — spine order
 //
 // FR-012: Identity → choose_base → track → Characters → Marks → Carve →
-//         Mechanisms → (lock:physical on mechanisms) →
+//         Rules → Mechanisms → (lock:physical on mechanisms) →
 //         touch carve+add → (lock:touch) → Help → Package
 //
 // track is a real spine step (P0 fix). project_name is spine:false (CYOA fork).
 // Sequences (S-03) build inline in the Mechanism Gallery's method chooser —
 // there is no separate "sequences" spine step.
+// Rules (spec 082) sits between carve and mechanisms: the before/after rule
+// demo + rule list/builder, after the author has shaped which keys exist.
 // ---------------------------------------------------------------------------
 
 const EXPECTED_SPINE_ORDER = [
@@ -101,6 +103,7 @@ const EXPECTED_SPINE_ORDER = [
   "invisibles",
   "convenience",
   "carve",
+  "rules",
   "mechanisms",
   "touch",
   "help",
@@ -134,8 +137,10 @@ describe("M2 — spine order matches FR-012", () => {
     assertStepOrder(spineSteps(manifest), "mechanisms", "touch");
   });
 
-  it("'carve' appears before 'mechanisms' on the spine", () => {
-    assertStepOrder(spineSteps(manifest), "carve", "mechanisms");
+  it("'carve' appears before 'rules' before 'mechanisms' on the spine (spec 082)", () => {
+    const spine = spineSteps(manifest);
+    assertStepOrder(spine, "carve", "rules");
+    assertStepOrder(spine, "rules", "mechanisms");
   });
 
   it("'characters' appears before 'carve' on the spine", () => {

@@ -485,6 +485,15 @@ export interface WorkingCopyState {
    */
   deletedNodeIds: Set<string>;
   /**
+   * Set of rule-family IDs the author has disabled via the rules step's
+   * "Disable group" toggle (spec 082 FR-018). Kept as a layer (not an eager
+   * IR mutation) so the toggle is O(1) and reversible. Disabled families'
+   * rules are excluded from the compiled output by the working-copy
+   * transform (useWorkingCopyTransform) — the toggle visibly takes effect
+   * on the next compile cycle.
+   */
+  disabledFamilyIds: Set<string>;
+  /**
    * Set of item IDs (individual characters / rules within a node) the user
    * has removed. Format: `"<nodeId>#<index>"` or `"<nodeId>#r<ruleIndex>"`.
    */
@@ -694,6 +703,11 @@ export interface WorkingCopyState {
   clearIR: () => void;
   /** Mark a node as deleted and push to undo stack. */
   deleteNode: (nodeId: string) => void;
+  /**
+   * Toggle a rule family's disabled state (spec 082 FR-018 "Disable group").
+   * Reversible: disabling adds the family ID, re-enabling removes it.
+   */
+  toggleFamilyDisabled: (familyId: string) => void;
   /** Pop the most recently deleted entry from the undo stack (node or item). */
   undoDelete: () => void;
   /** Restore a specific node by ID, removing all its undo stack entries. */
@@ -1235,6 +1249,7 @@ export type WorkingCopyData = Omit<
   | "setIR" | "setWorkingIR" | "commitFacetTransform" | "clearIR" | "deleteNode" | "undoDelete" | "restoreNode"
   | "isDeleted" | "deleteItem" | "restoreItem" | "isItemDeleted"
   | "deleteTouchKey" | "restoreTouchKey" | "isTouchKeyDeleted" | "keepAll" | "restoreAll"
+  | "toggleFamilyDisabled"
   | "cascadeDelete"
   | "cascadeRestore"
   | "recordPhase" | "recordAssignments"
@@ -1285,6 +1300,7 @@ const INITIAL_STATE: WorkingCopyData = {
   deletedNodeIds: new Set(),
   deletedItemIds: new Set(),
   deletedTouchKeyIds: new Set(),
+  disabledFamilyIds: new Set(),
   undoStack: [],
   // survey slots
   ...INITIAL_SURVEY,
@@ -1319,7 +1335,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   // -- irStore actions -------------------------------------------------------
 
   setIR: (ir) =>
-    set({ ir, deletedNodeIds: new Set(), deletedItemIds: new Set(), undoStack: [] }),
+    set({ ir, deletedNodeIds: new Set(), deletedItemIds: new Set(), disabledFamilyIds: new Set(), undoStack: [] }),
 
   // Overlay-preserving write for spec-014 mutate-seam incremental patches.
   // Deliberately writes ONLY `ir`, leaving deletedNodeIds/deletedItemIds/undoStack
@@ -1348,6 +1364,17 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       deletedNodeIds: new Set([...s.deletedNodeIds, nodeId]),
       undoStack: [...s.undoStack, { k: 'n', id: nodeId }],
     })),
+
+  toggleFamilyDisabled: (familyId) =>
+    set((s) => {
+      const next = new Set(s.disabledFamilyIds);
+      if (next.has(familyId)) {
+        next.delete(familyId);
+      } else {
+        next.add(familyId);
+      }
+      return { disabledFamilyIds: next };
+    }),
 
   undoDelete: () =>
     set((s) => {

@@ -33,6 +33,7 @@ type ActiveStepId =
   | "project_name"
   | "characters"
   | "carve"
+  | "rules"
   | "marks"
   | "punctuation"
   | "invisibles"
@@ -241,7 +242,13 @@ export function advance(
       return { next: nextSpineStepAfter("convenience") }; // carve
 
     case "carve":
-      return { next: nextSpineStepAfter("carve") }; // mechanisms
+      return { next: nextSpineStepAfter("carve") }; // rules
+
+    case "rules":
+      // The before/after rule demo (spec 082): a read-only view of the
+      // working copy's compiled rules — no reducer side effects, so absent
+      // from STEPS_WITH_APPLY_COMPLETION (same as convenience above).
+      return { next: nextSpineStepAfter("rules") }; // mechanisms
 
     case "mechanisms":
       // Spec 035 R4/R12: route into the off-spine seed-source fork — but only

@@ -59,6 +59,7 @@ export type StepId =
   | "invisibles"
   | "convenience"
   | "carve"
+  | "rules"
   | "mechanisms"
   | "touch_seed_source"
   | "touch"
@@ -116,7 +117,10 @@ export const PHASES: readonly PhaseDef[] = [
   {
     letter: "E",
     label: msg({ id: "phaseStepper.phase.e", message: "Enable" }),
-    stepIds: ["mechanisms", "touch_seed_source", "touch"],
+    // rules (spec 082): the before/after rule demo + rule list/builder sits
+    // between carve and mechanisms — it shows what the working copy's rules
+    // do before the author assigns mechanisms.
+    stepIds: ["rules", "mechanisms", "touch_seed_source", "touch"],
   },
   {
     letter: "F",

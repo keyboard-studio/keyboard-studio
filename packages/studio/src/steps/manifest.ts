@@ -37,6 +37,7 @@ import {
   trackStep,
   projectNameStep,
   carveStep,
+  rulesStep,
   mechanismsStep,
   touchSeedSourceStep,
   touchStep,
@@ -227,6 +228,9 @@ export const manifest: readonly Step[] = [
 
   // --- Carve (Phase D: remove unwanted base keys) ---
   carveStep,
+
+  // --- Rules (Phase E: before/after rule demo + rule list/builder) ---
+  rulesStep,
 
   // --- Mechanisms (Phase C: physical key assignment) ---
   // The reducer fires lockDesktop() when this step completes (R1).

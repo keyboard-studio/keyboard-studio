@@ -37,6 +37,10 @@ import {
   PhaseFStepFactoryComponent,
 } from "../editors/adapters/flowStepOptions.tsx";
 import { PhaseFGate } from "../editors/adapters/PhaseFGate.tsx";
+import { rulesStep } from "./rulesStep.ts";
+
+/** Re-exported for the manifest (spec 082 Track A). */
+export { rulesStep };
 
 // ---------------------------------------------------------------------------
 // Helper for common step structure
@@ -275,6 +279,7 @@ export const registeredEditorSteps: readonly EditorStep[] = [
   trackStep,
   projectNameStep,
   carveStep,
+  rulesStep,
   mechanismsStep,
   touchSeedSourceStep,
   touchStep,
