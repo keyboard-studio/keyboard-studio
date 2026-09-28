@@ -3,7 +3,7 @@
  *
  * Rule classifier, KMN highlighter, plain-language explainer, and inventory
  * summary over IR-owned rules. READ-ONLY ONLY: no editing affordances live
- * here; editable mode arrives behind the playground gates (FR-012).
+ * here; editable mode arrives behind the playground gates (FR-025).
  */
 export type { RuleKind } from "./classify.js";
 export {

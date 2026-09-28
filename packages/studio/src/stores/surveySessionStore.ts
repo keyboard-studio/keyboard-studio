@@ -101,6 +101,7 @@ export type ActiveStepId =
   | "project_name"
   | "characters"
   | "carve"
+  | "rules"
   | "marks"
   | "punctuation"
   | "invisibles"
