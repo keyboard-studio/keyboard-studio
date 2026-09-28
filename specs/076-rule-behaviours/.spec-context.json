@@ -2,8 +2,8 @@
   "workflow": "speckit",
   "specName": "Rule behaviours — managing reorder, blocking, and context rules as intents",
   "branch": "km/issue-1802-spec",
-  "currentStep": "tasks",
-  "status": "ready-to-implement",
+  "currentStep": "implement",
+  "status": "implementing",
   "history": [
     {
       "step": "plan",
@@ -32,6 +32,13 @@
       "kind": "start",
       "by": "extension",
       "at": "2026-09-28T21:19:52.666Z"
+    },
+    {
+      "step": "implement",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-09-28T21:25:40.964Z"
     }
   ],
   "coverage": {

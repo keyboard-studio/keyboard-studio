@@ -119,12 +119,12 @@ No Complexity Tracking needed — no violations.
 
 ### Slice 6 — Studio choice UI (FR-023)
 
-- `CarveGalleryV2` row: visible Allow/Block disposition control, pre-filled per slice 3 with provenance label; expanded row shows the host-consequence table (per-disposition output on the four reference hosts) with the caption that the layouts are examples and the studio cannot see the typists' machines.
+- `CarveGalleryV2` row: visible Allow/Block disposition control, pre-filled per slice 3 with provenance label; expanded row shows the host-consequence table (per-disposition output on the keyboard's likely hosts) with the caption that the shown layouts are the studio's best guess, not sight of the typists' machines.
 - Copy rule (A2): each option states its own risk; the prompt asks "do your typists expect a character on this key?"; the slogan "allow unpredictable / block predictable" must not appear. Copy lives under `behaviours.*` i18n keys; tests assert the banned slogan is absent.
 - Test pane: host-layout selector (US, US-International, AZERTY, QWERTZ, blocked) for carved combinations; Block row uniform "nothing" on every host; on KeymanWeb the loud Block case flashes rather than beeping.
 - "Review removed keys" panel: every carved combination with disposition and cross-host consequence, ending in the two-sided verdict line (allowed keys vary by computer; blocked keys are silent everywhere, dead keys if output was expected).
 - Touch strip: keycap consequence ("removed from the touch layout" by default; "kept, does nothing" under the keep-inert override).
-- Reference host data: new `referenceHostLayouts.ts` — static printable-layer maps for the four hosts, sourced and versioned (see [research.md](research.md) D-04). Sparse Latin overlays get the A2 banner; the per-row table still shows all four hosts.
+- Reference host data: new `referenceHostLayouts.ts` — static printable-layer maps for the five hosts, sourced and versioned, plus a `likelyHostLayouts(bcp47[])` resolver mapping language tags through a versioned region→layout table (default: the five reference hosts) — see [research.md](research.md) D-04. Sparse Latin overlays get the A2 banner; the per-row table shows the likely hosts.
 
 ### Slice 7 — Validation
 

@@ -22,7 +22,7 @@ Validation scenarios proving the feature works end-to-end. Each is runnable; exp
 
 8. **Pre-fill with provenance.** Accept the closed-keyboard card, carve a character on an Arabic base. Expect the row pre-filled to Block labelled "from closed-keyboard card". Decline the card on a sparse Latin overlay: rows pre-fill to Allow host.
 9. **No re-prompt.** Set a per-row override, trigger recompile (e.g. toggle an unrelated binding so `swallowUndefined` recomputes). Expect the override kept, no prompt shown.
-10. **Host selector.** In the test pane, select a carved combination; switch US → US-International → AZERTY → QWERTZ → blocked. Under Block every host shows nothing; under Allow host the outputs vary. On KeymanWeb the loud Block case flashes instead of beeping.
+10. **Host selector.** In the test pane, select a carved combination; switch through the keyboard's likely hosts, then blocked. Under Block every host shows nothing; under Allow host the outputs vary. On a keyboard with no language signal the five reference hosts appear. On KeymanWeb the loud Block case flashes instead of beeping.
 11. **Tradeoff copy.** Expand a gallery row: expect the host-consequence table, the caption that the four layouts are examples, the question "do your typists expect a character on this key?", each option stating its own risk — and assert the string "allow unpredictable / block predictable" appears nowhere.
 12. **Review panel.** Open "Review removed keys": expect every carved combo with disposition and cross-host consequence, ending in the two-sided verdict line. Touch strip shows the keycap consequence.
 

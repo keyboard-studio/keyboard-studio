@@ -36,7 +36,7 @@ One user story (US6, P1). Organized Setup → Foundational → US6 → Polish, w
 
 - [ ] **T009** [P] [US6] `compileCarveSuppression(ir, dispositions, { loud })`: verb table (FR-020), in-place rewrite at the rule's shadowing position, `ownedByBehaviour: "carve-suppression"` on every emitted rule (FR-019/FR-021) · `packages/engine/src/pattern-apply/carveSuppression.ts` (new)
 - [ ] **T010** [P] [US6] `workingCopyStore.carveDispositions`: pre-fill from closed-keyboard card state with provenance (card accepted→block, declined→allow-host, no state→FR-005 proposal rule with `bulk-default`), per-row override, recompile reads without re-prompting, un-carve deletes (FR-022) · `packages/studio/src/store/workingCopyStore.ts`
-- [ ] **T011** [P] [US6] Reference host-layout data module: US / US-International / AZERTY / QWERTZ printable-layer maps, source + extraction date recorded (FR-023) · `packages/studio/src/lib/referenceHostLayouts.ts` (new)
+- [ ] **T011** [P] [US6] Reference host-layout data module: US / US-International / AZERTY / QWERTZ / UK English printable-layer maps (UK English per A3 — AltGr+4 = € leak on a real `sil_cameroon_qwerty` deployment host), source + extraction date recorded; plus `likelyHostLayouts(bcp47[])` resolver — versioned region→layout mapping from the keyboard's language tags to likely typist hosts, defaulting to the five reference hosts with no language signal; module keyed by key+modifiers generally so the later `swallowUndefined` phase reuses it (FR-023) · `packages/studio/src/lib/referenceHostLayouts.ts` (new)
 - [ ] **T012** [P] [US6] Track 2 import recogniser lifts `ownedByBehaviour: "carve-suppression"` rules as behaviour-owned — marker alone, no shape heuristics; never author content nor carve targets (FR-021/FR-012) · `packages/engine/src/recognizer/` (+ tests)
 
 **⟶ Wait for Wave 1 to finish, then:**
@@ -53,7 +53,7 @@ One user story (US6, P1). Organized Setup → Foundational → US6 → Polish, w
 - [ ] **T015** [US6] Compose suppression into both carve paths — `applyCarveToVfs` and the studio `editorMutate` seam run filter → slot removals → suppression (byte-identical across paths) · `packages/engine/src/pattern-apply/applyCarveToVfs.ts`, `packages/studio/src/lib/projectWorkingCopyVfs.ts`
 - [ ] **T016** [P] [US6] Gallery row disposition control: visible Allow/Block, pre-filled with provenance label, overridable in place (A1) · `packages/studio/src/editors/carve/CarveGalleryV2.tsx`
 - [ ] **T017** [P] [US6] "Review removed keys" panel: every carved combination with disposition + cross-host consequence, ending in the two-sided verdict line · `packages/studio/src/editors/carve/ReviewRemovedKeys.tsx` (new)
-- [ ] **T018** [P] [US6] Test-pane host-layout selector (US, US-International, AZERTY, QWERTZ, blocked) for carved combinations; Block uniform "nothing"; KeymanWeb loud-Block flashes (FR-023) · Behaviours step test pane (076 plan phase 5 location)
+- [ ] **T018** [P] [US6] Test-pane host-layout selector for carved combinations, populated with the keyboard's likely hosts from `likelyHostLayouts` plus "blocked"; Block uniform "nothing"; KeymanWeb loud-Block flashes (FR-023) · Behaviours step test pane (076 plan phase 5 location)
 
 **⟶ Wait for Wave 3 to finish, then:**
 
@@ -62,7 +62,7 @@ One user story (US6, P1). Organized Setup → Foundational → US6 → Polish, w
 - [ ] **T019** [US6] Expanded row: host-consequence table per disposition, example-layouts caption, "do your typists expect a character on this key?", per-option risk copy; assert the slogan "allow unpredictable / block predictable" appears nowhere (A2, FR-023) · `packages/studio/src/editors/carve/CarveGalleryV2.tsx`
 - [ ] **T020** [US6] Touch strip keycap consequence ("removed from the touch layout" default; "kept, does nothing" under keep-inert override) (scenario 12) · Behaviours step touch strip (076 plan phase 5 location)
 
-**Checkpoint**: US6 is independently functional — carve on a non-Latin base yields owned, shape-correct suppression rules; rows pre-fill to Block; one row flips to Allow host and leaves the swallow sets; un-carve restores everything; the gallery demonstrates all four hosts.
+**Checkpoint**: US6 is independently functional — carve on a non-Latin base yields owned, shape-correct suppression rules; rows pre-fill to Block; one row flips to Allow host and leaves the swallow sets; un-carve restores everything; the gallery demonstrates the keyboard's likely hosts.
 
 ## Phase 4: Polish
 
