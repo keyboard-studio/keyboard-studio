@@ -5,11 +5,11 @@
 // This component is deliberately PRESENTATIONAL and READ-ONLY: it takes the
 // highlighted spans and explanation as props and offers no editing
 // affordances (no inputs, no contentEditable, no write-back path). Editable
-// mode arrives behind the playground gates (spec 082 FR-012), not here.
+// mode arrives behind the playground gates (spec 082 FR-025), not here.
 //
 // Also exports the rule-list filter contract the rules step consumes:
 // RuleFilter { showPlainOutput } — plain key→output rules are hidden by
-// default (DEFAULT_RULE_FILTER), per spec 082 FR-010/FR-011.
+// default (DEFAULT_RULE_FILTER), per spec 082 FR-023.
 
 import { useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
@@ -34,7 +34,7 @@ export interface RuleFilter {
   showPlainOutput: boolean;
 }
 
-/** Default filter: plain-output rules hidden (spec 082 FR-010/FR-011). */
+/** Default filter: plain-output rules hidden (spec 082 FR-023). */
 export const DEFAULT_RULE_FILTER: RuleFilter = { showPlainOutput: false };
 
 /** True when a rule of this kind passes the filter. */
