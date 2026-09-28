@@ -12,9 +12,8 @@
 //
 // Contracts with sibling workstreams:
 // - workstream 2 mounts this panel with { selectedRules, keyboardMeta,
-//   scriptKey, onExport }. `families` comes from kmAssist's `groupRules`;
-//   until it lands, RuleFamily below is a structural copy of the agreed
-//   shape (swap for the engine import when it lands).
+//   scriptKey, onExport }. `families` comes from kmAssist's `groupRules`
+//   (spec 082 FR-018), imported from the engine above.
 // - the Track A demo pane wires onRecordDemo; until then manual entry covers
 //   pair recording. Pairs recorded from the pane are verified (recording
 //   implies the demo ran green); manually added pairs are not, and saving
@@ -36,6 +35,7 @@ import {
 } from "@keyboard-studio/contracts";
 import {
   classifyRuleKind,
+  type RuleFamily,
   type RuleKind,
 } from "@keyboard-studio/engine/kmAssist";
 import {
@@ -49,25 +49,7 @@ import {
   TEXT_MAIN,
 } from "../../ui/theme.ts";
 
-/**
- * Structural copy of the RuleFamily type the sibling workstream is adding to
- * `@keyboard-studio/engine/kmAssist` alongside `groupRules(rules)` (spec 082
- * FR-018). The shape is identical to the agreed interface; when it lands,
- * delete this declaration and import the type from
- * "@keyboard-studio/engine/kmAssist" instead.
- */
-export interface RuleFamily {
-  id: string;
-  name: string;
-  guardStore?: string;
-  outputShape: string;
-  kind: RuleKind;
-  memberIds: string[];
-  count: number;
-  explanation: string;
-  sampleRuleTexts: string[];
-  patternSummary: string;
-}
+/* RuleFamily is imported from "@keyboard-studio/engine/kmAssist" above. */
 
 export interface RuleBuilderPanelProps {
   /** Rules selected in the rules step. */
