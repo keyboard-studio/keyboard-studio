@@ -36,13 +36,20 @@ export function humanizeId(id: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// Ownership reads (defensive — 076 fields land after this workstream)
+// Ownership reads
 // ---------------------------------------------------------------------------
 
-/** 076's `ownedByBehaviour` — not on IRRule yet; read without a type error either way. */
+/**
+ * The behaviour that owns a rule, from `IRRule.ownedByBehaviour`
+ * (`"<packId>/<behaviourId>"`, stamped by rule-pack install — spec 082
+ * FR-015). Returns the behaviour id (the displayable segment); a bare
+ * behaviour id with no pack prefix (the 076-literal form) is returned as-is.
+ */
 function ownedByBehaviourOf(rule: IRRule): string | undefined {
-  const v: unknown = (rule as { ownedByBehaviour?: unknown }).ownedByBehaviour;
-  return typeof v === "string" && v !== "" ? v : undefined;
+  const v = rule.ownedByBehaviour;
+  if (typeof v !== "string" || v === "") return undefined;
+  const slash = v.indexOf("/");
+  return slash === -1 ? v : v.slice(slash + 1);
 }
 
 /** A pack id, if a future pack-install path stamps one on the rule directly. */

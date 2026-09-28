@@ -59,6 +59,27 @@ describe("nameFiredRule", () => {
     expect(name).not.toMatch(/rule #?\d+/i);
   });
 
+  it("names the owning behaviour when the rule is pack-installed (FR-015 traceability)", () => {
+    const resolve: FiredRuleResolver = () =>
+      makeRule({
+        ownedByBehaviour: "cameroon-diacritic-blocking/cameroon_diacritic_blocking",
+      });
+    const { name, provenance } = nameFiredRule(fired, resolve);
+    expect(provenance).toBe("behaviour");
+    // The behaviour segment is humanized; the pack id is not shown.
+    expect(name).toContain("Cameroon diacritic blocking");
+    expect(name).not.toContain("cameroon-diacritic-blocking/");
+    expect(name).not.toMatch(/rule #?\d+/i);
+  });
+
+  it("handles a bare behaviour id with no pack prefix", () => {
+    const resolve: FiredRuleResolver = () =>
+      makeRule({ ownedByBehaviour: "mark_on_non_base" });
+    const { name, provenance } = nameFiredRule(fired, resolve);
+    expect(provenance).toBe("behaviour");
+    expect(name).toContain("Mark on non base");
+  });
+
   it("falls back to trace context/output when the trace is unresolvable", () => {
     const resolve: FiredRuleResolver = () => undefined;
     const { name, provenance } = nameFiredRule(fired, resolve);
