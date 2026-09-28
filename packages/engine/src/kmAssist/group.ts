@@ -602,3 +602,14 @@ export function groupRules(rules: IRRule[]): RuleFamily[] {
 
   return families;
 }
+
+/**
+ * Find the family containing a rule (by nodeId). Used by the demo trace
+ * to name the family alongside the fired rule.
+ */
+export function familyOfRule(
+  families: readonly RuleFamily[],
+  nodeId: string,
+): RuleFamily | undefined {
+  return families.find((f) => f.memberIds.includes(nodeId));
+}
