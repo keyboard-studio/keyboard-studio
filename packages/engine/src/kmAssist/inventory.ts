@@ -1,5 +1,5 @@
 /**
- * kmAssist inventory summary — spec 082 Track C read-only v1 (FR-011).
+ * kmAssist inventory summary — spec 082 Track C read-only v1 (FR-023).
  *
  * Read-only v1 exposes the working copy's confirmed inventory as data:
  * user store names (for `any()`/`index()`/`outs()` name completion) and the

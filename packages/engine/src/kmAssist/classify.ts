@@ -6,7 +6,7 @@
  *
  * Kind definitions (spec 082, Track C):
  * - "plain-output": a single key (possibly with modifiers) producing output.
- *   The rules-step filter hides these by default (FR-010/FR-011: the filter
+ *   The rules-step filter hides these by default (FR-023/FR-024: the filter
  *   hides plain key→output rules).
  * - "context": consumes prior context to condition output.
  * - "blocking": output is suppression-only (`nul`, bare `context`, `beep`).

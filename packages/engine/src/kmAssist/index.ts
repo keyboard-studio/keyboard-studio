@@ -24,3 +24,17 @@ export type { RuleFamily } from "./group.js";
 export { groupRules } from "./group.js";
 export type { RuleInventory } from "./inventory.js";
 export { summarizeInventory } from "./inventory.js";
+// --- spec 082 FR-019/FR-020/FR-022 additions (append-only) ---
+export type { ExplainContext } from "./explain.js";
+export {
+  analyzeDiacriticGuards,
+  proposeGuardStore,
+} from "./suggestGuards.js";
+export type {
+  DiacriticGuardAnalysis,
+  MissingGuard,
+  MissingGuardGroup,
+  OrthographyModel,
+  OverBroadGuard,
+} from "./suggestGuards.js";
+export { getCategory, getCCC, getName } from "./unicodeAdapter.js";
