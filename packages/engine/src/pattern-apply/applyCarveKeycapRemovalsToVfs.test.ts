@@ -10,6 +10,9 @@
 //   6. NFC: decomposed .kvks key text matches a precomposed carved char.
 //   7. collectCarvedKeycapTexts survivor guard — one of two producers carved
 //      → empty set; both carved → the char. Slot-id derivation included.
+//   8. Issue #1803: group-level carve derives its rules' characters (the
+//      .kmn-side cascade) and blanks them on every .kvks layer and in the
+//      touch layout; a char surviving via another group keeps its keycap.
 
 import { describe, it, expect, vi } from "vitest";
 import {
@@ -491,5 +494,128 @@ describe("collectCarvedKeycapTexts — derivation and survivor guard", () => {
     expect([
       ...collectCarvedKeycapTexts(ir, removalsOf({ wholeNodeIds: ["rule#e"] })),
     ]).toEqual(["é"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Issue #1803 — group-level carve must blank keycaps like the .kmn drops rules
+// ---------------------------------------------------------------------------
+
+/** Two-group IR: group#main keeps 'a'; group#extra produces q/Q/w. */
+function makeTwoGroupIr(extraRules?: IRRule[]): KeyboardIR {
+  return makeIR([
+    irGroup({
+      nodeId: "group#main",
+      rules: [vkeyRule({ nodeId: "rule#a", vkey: "K_A", output: "a" })],
+    }),
+    irGroup({
+      nodeId: "group#extra",
+      rules: extraRules ?? [
+        vkeyRule({ nodeId: "rule#q", vkey: "K_Q", output: "q" }),
+        vkeyRule({ nodeId: "rule#w", vkey: "K_W", output: "w" }),
+        vkeyRule({ nodeId: "rule#Q", vkey: "K_Q", modifiers: ["shift"], output: "Q" }),
+      ],
+    }),
+  ]);
+}
+
+const KVKS_TWO_LAYER = `<visualkeyboard>
+<header><version>10.0</version></header>
+<encoding name="unicode" fontname="Arial">
+<layer shift="">
+<key vkey="K_A">a</key>
+<key vkey="K_Q">q</key>
+<key vkey="K_W">w</key>
+</layer>
+<layer shift="S">
+<key vkey="K_Q">Q</key>
+</layer>
+</encoding>
+</visualkeyboard>`;
+
+describe("collectCarvedKeycapTexts — group-level carve (#1803)", () => {
+  it("derives characters from the deleted group's rules (the .kmn-side cascade)", () => {
+    const ir = makeTwoGroupIr();
+    expect([
+      ...collectCarvedKeycapTexts(ir, removalsOf({ wholeNodeIds: ["group#extra"] })),
+    ].sort()).toEqual(["Q", "q", "w"]);
+  });
+
+  it("a char also produced by a surviving group keeps its keycap", () => {
+    // 'q' is produced both by group#extra (deleted) and by a surviving rule
+    // in group#main — the survivor guard must keep it alive.
+    const ir = makeIR([
+      irGroup({
+        nodeId: "group#main",
+        rules: [
+          vkeyRule({ nodeId: "rule#a", vkey: "K_A", output: "a" }),
+          vkeyRule({ nodeId: "rule#q2", vkey: "K_Q", output: "q" }),
+        ],
+      }),
+      irGroup({
+        nodeId: "group#extra",
+        rules: [vkeyRule({ nodeId: "rule#q", vkey: "K_Q", output: "q" })],
+      }),
+    ]);
+    expect([
+      ...collectCarvedKeycapTexts(ir, removalsOf({ wholeNodeIds: ["group#extra"] })),
+    ]).toEqual([]);
+  });
+
+  it("a deleted group is not counted as its own survivor", () => {
+    // The survivor guard skips rules via the carve cascade, so group#extra's
+    // own deleted rules cannot resurrect their characters: the carved set is
+    // exactly the deleted group's characters.
+    const ir = makeTwoGroupIr();
+    expect([
+      ...collectCarvedKeycapTexts(ir, removalsOf({ wholeNodeIds: ["group#extra"] })),
+    ].sort()).toEqual(["Q", "q", "w"]);
+  });
+});
+
+describe("applyCarveKeycapRemovalsToVfs — group-level carve (#1803)", () => {
+  it("blanks the deleted group's keycaps on every .kvks layer, in place", () => {
+    const vfs = makeVfs([{ path: "source/test.kvks", content: KVKS_TWO_LAYER }]);
+    const ir = makeTwoGroupIr();
+
+    const { warnings } = applyCarveKeycapRemovalsToVfs(
+      vfs, "test", ir, removalsOf({ wholeNodeIds: ["group#extra"] }),
+    );
+
+    expect(warnings).toHaveLength(0);
+    const xml = vfs.get("source/test.kvks")?.content as string;
+    expect(xml).toContain('<key vkey="K_A">a</key>');
+    expect(xml).toContain('<key vkey="K_Q"></key>');
+    expect(xml).toContain('<key vkey="K_W"></key>');
+    // Shift layer cleared too — layer-agnostic scan.
+    expect(xml).not.toContain(">q</key>");
+    expect(xml).not.toContain(">Q</key>");
+    expect(xml).not.toContain(">w</key>");
+    expect(xml.match(/<layer\b/g)).toHaveLength(2);
+  });
+
+  it("blanks the deleted group's characters in the touch layout as well", () => {
+    const touchLayout = JSON.stringify({
+      tablet: {
+        layer: [
+          { id: "default", row: [{ id: 1, key: [{ id: "K_A", text: "a" }, { id: "K_Q", text: "q" }] }] },
+        ],
+      },
+    });
+    const vfs = makeVfs([{ path: "source/test.keyman-touch-layout", content: touchLayout }]);
+    const ir = makeTwoGroupIr();
+
+    applyCarveKeycapRemovalsToVfs(
+      vfs, "test", ir, removalsOf({ wholeNodeIds: ["group#extra"] }),
+    );
+
+    const data = JSON.parse(vfs.get("source/test.keyman-touch-layout")?.content as string);
+    const keys = data.tablet.layer[0].row[0].key as { id: string; text?: string }[];
+    expect(keys.find((k) => k.id === "K_A")?.text).toBe("a");
+    // Text-only K_ key: label blanked; the id stays K_Q because the .kmn rule
+    // behind it is carved away too, so there is no stale fallback emission.
+    const qKey = keys.find((k) => k.id === "K_Q");
+    expect(qKey?.text).toBe("");
+    expect(qKey?.id).toBe("K_Q");
   });
 });
