@@ -124,7 +124,7 @@ No Complexity Tracking needed — no violations.
 - Test pane: host-layout selector (US, US-International, AZERTY, QWERTZ, blocked) for carved combinations; Block row uniform "nothing" on every host; on KeymanWeb the loud Block case flashes rather than beeping.
 - "Review removed keys" panel: every carved combination with disposition and cross-host consequence, ending in the two-sided verdict line (allowed keys vary by computer; blocked keys are silent everywhere, dead keys if output was expected).
 - Touch strip: keycap consequence ("removed from the touch layout" by default; "kept, does nothing" under the keep-inert override).
-- Reference host data: new `referenceHostLayouts.ts` — static printable-layer maps for the five hosts, sourced and versioned, plus a `likelyHostLayouts(bcp47[])` resolver mapping language tags through a versioned region→layout table (default: the five reference hosts) — see [research.md](research.md) D-04. Sparse Latin overlays get the A2 banner; the per-row table shows the likely hosts.
+- Reference host data: new `referenceHostLayouts.ts` — static printable-layer maps for the five hosts, sourced and versioned, plus a `likelyHostLayouts` resolver honouring resolution order FR-023 (author's `layout_family` answer → bcp47 region→layout mapping → default five) — see [research.md](research.md) D-04/D-04b. Sparse Latin overlays get the A2 banner; the per-row table shows the likely hosts.
 
 ### Slice 7 — Validation
 
