@@ -1,0 +1,108 @@
+{
+  "workflow": "speckit",
+  "specName": "Rule behaviours — managing reorder, blocking, and context rules as intents",
+  "branch": "km/issue-1802-spec",
+  "currentStep": "tasks",
+  "status": "ready-to-implement",
+  "history": [
+    {
+      "step": "plan",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-09-28T21:17:43.426Z"
+    },
+    {
+      "step": "tasks",
+      "substep": "generate",
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-28T21:19:50.884Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "complete",
+      "by": "ai",
+      "at": "2026-09-28T21:19:52.068Z"
+    },
+    {
+      "step": "tasks",
+      "substep": null,
+      "kind": "start",
+      "by": "extension",
+      "at": "2026-09-28T21:19:52.666Z"
+    }
+  ],
+  "coverage": {
+    "FR-004": {
+      "title": "Codec types nul/context/context(N) and models begin entry points",
+      "tasks": [
+        "T002",
+        "T005",
+        "T006"
+      ]
+    },
+    "FR-005-amendment": {
+      "title": "swallowUndefined skip-set: carved combos minus allow-host and suppression-covered",
+      "tasks": [
+        "T014"
+      ]
+    },
+    "FR-019": {
+      "title": "Every carved combination carries a disposition via the two-tier choice",
+      "tasks": [
+        "T009",
+        "T010",
+        "T016"
+      ]
+    },
+    "FR-020": {
+      "title": "Shape-driven suppression verb table; loud rides A6; no per-carve loudness",
+      "tasks": [
+        "T008",
+        "T009"
+      ]
+    },
+    "FR-021": {
+      "title": "Suppression rules carry ownedByBehaviour; un-carve restores; import lifts as behaviour-owned",
+      "tasks": [
+        "T003",
+        "T009",
+        "T012",
+        "T013"
+      ]
+    },
+    "FR-022": {
+      "title": "Dispositions persist as carve-decision metadata; recompile never re-prompts",
+      "tasks": [
+        "T004",
+        "T010"
+      ]
+    },
+    "FR-023": {
+      "title": "Studio demonstrates alternatives with two-sided tradeoff copy; host selector; review panel",
+      "tasks": [
+        "T011",
+        "T017",
+        "T018",
+        "T019",
+        "T020"
+      ]
+    },
+    "SC-008": {
+      "title": "End-to-end carve suppression success criterion",
+      "tasks": [
+        "T008",
+        "T022",
+        "T023"
+      ]
+    }
+  },
+  "step_summaries": {
+    "tasks": {
+      "summary": "24 tasks in 4 phases: Setup, Foundational (codec+types), US6 engine+studio, Polish",
+      "key_finding": "Behaviours-step test pane and touch strip do not exist yet; their tasks anchor to the 076 studio phase location"
+    }
+  }
+}
