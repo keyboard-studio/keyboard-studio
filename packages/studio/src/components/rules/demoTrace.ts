@@ -6,7 +6,7 @@
 // the per-row host-consequence label for the blocking demonstration. No
 // React, no stores — unit-testable in isolation.
 
-import type { SimulationResult } from "@keyboard-studio/contracts";
+import type { IRRule, SimulationResult } from "@keyboard-studio/contracts";
 import {
   codePointsOf,
   describeDelta,

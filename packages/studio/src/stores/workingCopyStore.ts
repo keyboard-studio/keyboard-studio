@@ -40,6 +40,7 @@ import {
 } from "@keyboard-studio/contracts";
 import { computeStalenessFromManifest } from "../dashboard/completeness.ts";
 import { resetPhaseBDraftDecisions } from "./phaseBDraftStore.ts";
+import { useGuardIntentStore } from "./guardIntentStore.ts";
 import type { Step } from "../steps/types.ts";
 import { STEP_ORDER } from "../steps/stepOrder.ts";
 import { isSequenceAssignmentForChar } from "../editors/assignLoop/patternIds.ts";
@@ -1334,8 +1335,12 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
 
   // -- irStore actions -------------------------------------------------------
 
-  setIR: (ir) =>
-    set({ ir, deletedNodeIds: new Set(), deletedItemIds: new Set(), disabledFamilyIds: new Set(), undoStack: [] }),
+  setIR: (ir) => {
+    // Wholesale IR replacement — guard-intent dispositions reference node
+    // ids from the previous IR and would be stale.
+    useGuardIntentStore.getState().reset();
+    set({ ir, deletedNodeIds: new Set(), deletedItemIds: new Set(), disabledFamilyIds: new Set(), undoStack: [] });
+  },
 
   // Overlay-preserving write for spec-014 mutate-seam incremental patches.
   // Deliberately writes ONLY `ir`, leaving deletedNodeIds/deletedItemIds/undoStack

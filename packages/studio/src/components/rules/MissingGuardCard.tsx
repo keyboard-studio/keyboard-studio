@@ -46,6 +46,9 @@ export function MissingGuardCard({ group }: { group: MissingGuardGroup }) {
         i === groupIndex ? { ...g, rules: [...g.rules, ...synthesized] } : g,
       ),
     });
+    // Installing synthesized guard rules is the block-bundle install the
+    // intent store tracks (gates re-analysis of the same group).
+    useGuardIntentStore.getState().noteBlockBundleInstalled();
     setAddedCount(synthesized.length);
     setSkippedCount(skipped);
   };

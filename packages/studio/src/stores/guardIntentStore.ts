@@ -12,9 +12,10 @@
 // guard rule so the question is never asked again; dismissing a missing-
 // guard group hides that group.
 //
-// Session-scoped (in-memory): cross-session persistence of kept/dismissed
-// intent is a follow-up — the working-copy persistence snapshot is frozen
-// while FR-018's fields land, so this store deliberately doesn't touch it.
+// Durable: kept/dismissed dispositions are part of the working-copy draft
+// snapshot (persistWorkingCopy.ts) and survive resume. They reset when the
+// working copy's IR is replaced wholesale (setIR) — node ids from a previous
+// base keyboard would be stale.
 
 import { create } from "zustand";
 
@@ -35,6 +36,8 @@ interface GuardIntentState {
   noteBlockBundleInstalled: () => void;
   keepOverBroadGuard: (guardRuleId: string) => void;
   dismissMissingGroup: (groupKey: string) => void;
+  /** Wholesale reset — called when the working copy's IR is replaced. */
+  reset: () => void;
   /** Test helper — restore the pristine no-signal state. */
   resetForTest: () => void;
 }
@@ -61,7 +64,7 @@ export const useGuardIntentStore = create<GuardIntentState>((set) => ({
     set((s) => ({ keptGuardRuleIds: added(s.keptGuardRuleIds, guardRuleId) })),
   dismissMissingGroup: (groupKey) =>
     set((s) => ({ dismissedMissingGroups: added(s.dismissedMissingGroups, groupKey) })),
-  resetForTest: () =>
+  reset: () =>
     set({
       openedFamilyIds: new Set(),
       editedFamilyIds: new Set(),
@@ -69,6 +72,7 @@ export const useGuardIntentStore = create<GuardIntentState>((set) => ({
       keptGuardRuleIds: new Set(),
       dismissedMissingGroups: new Set(),
     }),
+  resetForTest: () => useGuardIntentStore.getState().reset(),
 }));
 
 /**

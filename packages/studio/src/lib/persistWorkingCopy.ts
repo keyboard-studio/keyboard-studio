@@ -60,6 +60,7 @@ import { classifyRemovalCapabilities } from "@keyboard-studio/engine";
 import type { KeyEditOverlay } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../stores/workingCopyStore.ts";
 import type { WorkingCopyData, TouchEditorMode } from "../stores/workingCopyStore.ts";
+import { useGuardIntentStore } from "../stores/guardIntentStore.ts";
 
 // ---------------------------------------------------------------------------
 // Key
@@ -122,6 +123,8 @@ export type WorkingCopySnapshot = Omit<
   | "baseWelcomeImages"
   | "phaseAnswersByStep"
   | "disabledFamilyIds"
+  | "keptGuardRuleIds"
+  | "dismissedMissingGroups"
 > & {
   baseVfsEntries: SerializedEntry[];
   deletedNodeIds: string[];
@@ -130,6 +133,13 @@ export type WorkingCopySnapshot = Omit<
   staleSteps: string[];
   /** spec 082 FR-018: disabled rule families (Set<string>) → string[]. */
   disabledFamilyIds: string[];
+  /**
+   * spec 082 FR-020/FR-022: durable guard-intent dispositions (Set<string>) →
+   * string[]. Keep on an over-broad question and dismissals of missing-guard
+   * groups survive draft resume so the author is never re-asked.
+   */
+  keptGuardRuleIds: string[];
+  dismissedMissingGroups: string[];
   /**
    * Optional (spec 080 US2): the base's welcome-folder images, Base64-encoded
    * through the same `serializeEntry` path as binary VFS entries. Absent from
@@ -332,6 +342,10 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     deletedItemIds: [...s.deletedItemIds],
     deletedTouchKeyIds: [...s.deletedTouchKeyIds],
     disabledFamilyIds: [...s.disabledFamilyIds],
+    // spec 082 FR-020/FR-022: the guard-intent store is separate from the
+    // working-copy store, so the snapshot reads it explicitly.
+    keptGuardRuleIds: [...useGuardIntentStore.getState().keptGuardRuleIds],
+    dismissedMissingGroups: [...useGuardIntentStore.getState().dismissedMissingGroups],
     undoStack: s.undoStack,
     phaseResults: s.phaseResults,
     irAxes: s.irAxes,
@@ -520,6 +534,13 @@ export function rehydrateWorkingCopyFromSession(): boolean {
     // into the ONE working-copy store (Article III — restore never
     // constructs a second working copy).
     useWorkingCopyStore.setState(prepareWorkingCopySnapshot(snapshot));
+    // spec 082 FR-020/FR-022: guard-intent dispositions live in their own
+    // store; restore them alongside. Tolerate pre-082 snapshots (absent →
+    // empty, never re-ask nothing).
+    useGuardIntentStore.setState({
+      keptGuardRuleIds: new Set(snapshot.keptGuardRuleIds ?? []),
+      dismissedMissingGroups: new Set(snapshot.dismissedMissingGroups ?? []),
+    });
 
     return true;
   } catch {
