@@ -19,6 +19,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Trans } from "@lingui/react/macro";
 import type {
   CompileResult,
+  IRRule,
   KeyboardIR,
   SimulationResult,
 } from "@keyboard-studio/contracts";
@@ -38,6 +39,7 @@ import {
   extractFiredRule,
   type DemoTraceRow,
 } from "./demoTrace.ts";
+import { familyOfRule, groupRules } from "./ruleFamilies.ts";
 import { buildFiredRuleResolver } from "./firedRuleMapping.ts";
 import { humanizeId } from "./ruleNaming.ts";
 import {
@@ -270,6 +272,14 @@ export function DemoPane(props: DemoPaneProps = {}) {
   );
 
   // --- Rows ---
+  const families = useMemo(
+    () => groupRules(ir?.groups.flatMap((g) => g.rules) ?? []),
+    [ir],
+  );
+  const familyNameFor = useCallback(
+    (rule: IRRule) => familyOfRule(families, rule.nodeId)?.name,
+    [families],
+  );
   const rows: DemoTraceRow[] = useMemo(() => {
     if (result === null) return [];
     return buildDemoTraceRows({
@@ -278,8 +288,9 @@ export function DemoPane(props: DemoPaneProps = {}) {
       resolveRule,
       hostLayout,
       patternTitle,
+      familyNameFor,
     });
-  }, [result, text, resolveRule, hostLayout, patternTitle]);
+  }, [result, text, resolveRule, hostLayout, patternTitle, familyNameFor]);
   const enrichmentPresent = result !== null && demoTraceHasFiredRules(result);
 
   const showTrace = artifactStatus === "ready" && rows.length > 0;

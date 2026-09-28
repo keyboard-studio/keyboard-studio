@@ -180,16 +180,23 @@ export function nameFiredRule(
 
 /**
  * The one-line trace caption for a keystroke, in author language:
- * `<owner> — matched <context>, <output>` (US-1's shape:
- * "Swallow mark after non-letter (card 2) — matched `5` + acute, re-emitted context").
+ * `<family> — <owner> — matched <context>, <output>` (US-1's shape:
+ * "Diacritic blocking — Swallow mark after non-letter (card 2) — matched `5` + acute,
+ * re-emitted context"). FR-018: the trace names the family as well as the fired rule.
+ * The family segment is omitted when the rule doesn't resolve or has no family.
  */
 export function firedRuleCaption(
   fired: FiredRuleTrace,
   resolveRule: FiredRuleResolver,
   patternTitle?: (patternId: string) => string | undefined,
+  familyNameFor?: (rule: IRRule) => string | undefined,
 ): string {
-  const { name } = nameFiredRule(fired, resolveRule, patternTitle);
-  const parts: string[] = [name];
+  const rule = resolveRule(fired);
+  const { name } = nameFiredRule(fired, () => rule, patternTitle);
+  const parts: string[] = [];
+  const family = rule !== undefined ? familyNameFor?.(rule) : undefined;
+  if (family !== undefined && family !== "") parts.push(family);
+  parts.push(name);
   if (fired.matchedContext !== undefined) parts.push(`matched ${fired.matchedContext}`);
   if (fired.emittedOutput !== undefined) parts.push(`emitted ${fired.emittedOutput}`);
   return parts.join(" — ");

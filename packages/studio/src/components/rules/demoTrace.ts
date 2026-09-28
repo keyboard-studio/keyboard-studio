@@ -61,6 +61,11 @@ export interface BuildDemoTraceRowsArgs {
   hostLayout: HostLayoutId;
   /** Synchronous pattern-title lookup (cached async resolution in the pane). */
   patternTitle?: (patternId: string) => string | undefined;
+  /**
+   * Family name for a resolved IR rule (FR-018: the trace names the family as
+   * well as the fired rule). Omitted in tests that don't build families.
+   */
+  familyNameFor?: (rule: IRRule) => string | undefined;
 }
 
 function vkeyLabelFor(key: DemoKey): string {
@@ -110,7 +115,7 @@ export function hostConsequenceFor({
  * cover the overlap and never throw on a ragged result.
  */
 export function buildDemoTraceRows(args: BuildDemoTraceRowsArgs): DemoTraceRow[] {
-  const { keys, result, resolveRule, hostLayout, patternTitle } = args;
+  const { keys, result, resolveRule, hostLayout, patternTitle, familyNameFor } = args;
   const enrichmentPresent = traceHasFiredRules(result.trace);
   const layoutLabel = hostLayoutById(hostLayout).label;
   const rows: DemoTraceRow[] = [];
@@ -124,7 +129,10 @@ export function buildDemoTraceRows(args: BuildDemoTraceRowsArgs): DemoTraceRow[]
     const deadkeyArmed = step.pendingDeadkeys.length > prevDeadkeys;
     const swallowed = after === before && !deadkeyArmed && !step.beep;
     const fired = extractFiredRule(step);
-    const firedCaption = fired !== undefined ? firedRuleCaption(fired, resolveRule, patternTitle) : null;
+    const firedCaption =
+      fired !== undefined
+        ? firedRuleCaption(fired, resolveRule, patternTitle, familyNameFor)
+        : null;
     const noRuleText = enrichmentPresent
       ? `No rule fired — ${swallowed ? "nothing was emitted" : deadkeyArmed ? "a deadkey was armed" : "the key fell through to default output"}.`
       : "Output only — the simulator did not name a rule for this keystroke.";

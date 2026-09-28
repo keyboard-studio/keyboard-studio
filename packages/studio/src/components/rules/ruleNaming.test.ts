@@ -90,6 +90,21 @@ describe("firedRuleCaption", () => {
       makeRule({ ownedByPattern: "latin_diacritics" });
     expect(firedRuleCaption(fired, resolve)).toContain("Latin diacritics");
   });
+
+  // FR-018: the trace names the family as well as the fired rule.
+  it("prefixes the family name when familyNameFor resolves", () => {
+    const resolve: FiredRuleResolver = () =>
+      makeRule({ ownedByPattern: "latin_diacritics" });
+    const caption = firedRuleCaption(fired, resolve, undefined, () => "Diacritic blocking");
+    expect(caption.startsWith("Diacritic blocking — ")).toBe(true);
+    expect(caption).toContain("Latin diacritics");
+  });
+
+  it("omits the family segment when the rule does not resolve", () => {
+    const resolve: FiredRuleResolver = () => undefined;
+    const caption = firedRuleCaption(fired, resolve, undefined, () => "Diacritic blocking");
+    expect(caption).not.toContain("Diacritic blocking");
+  });
 });
 
 describe("describeRuleShape", () => {
