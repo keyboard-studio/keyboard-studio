@@ -527,7 +527,7 @@ describe("MarksSeriesStep — S4 output-form station", () => {
     reachOutputForm();
     fireEvent.click(screen.getByTestId("output-form-change"));
     expect(screen.getByTestId("marks-output-form").textContent).toContain(
-      "A letter and a mark, kept separate",
+      "Backspace removes one mark at a time",
     );
   });
 
@@ -543,13 +543,13 @@ describe("MarksSeriesStep — S4 output-form station", () => {
     reachOutputForm();
     // Before the override: ready-made, with the ready-made explanation.
     expect(screen.getByTestId("marks-output-form").textContent).toContain(
-      "Backspace removes a whole accented letter in one step",
+      "Backspace will remove a whole accented letter in one press",
     );
 
     fireEvent.click(screen.getByTestId("output-form-change"));
     const text = screen.getByTestId("marks-output-form").textContent ?? "";
     // The chosen form and the paragraph under it agree...
-    expect(text).toContain("A letter and a mark, kept separate");
+    expect(text).toContain("Backspace removes one mark at a time");
     expect(text).toContain("Backspace clears the mark first and the plain letter next");
     // ...and the explanation of the form we just left is gone.
     expect(text).not.toContain("Backspace removes a whole accented letter in one step");
@@ -955,7 +955,7 @@ describe("MarksSeriesStep — S4 open choice (US4)", () => {
     // Recommended (base-plus-mark for a productive class) listed first + tagged.
     expect(station.textContent).toContain("recommended");
     const labels = station.querySelectorAll("label");
-    expect(labels[0]?.textContent).toContain("A letter and a mark, kept separate");
+    expect(labels[0]?.textContent).toContain("Backspace removes one mark at a time");
     // Both options carry a backspace preview.
     expect(station.querySelectorAll('[data-testid="backspace-preview"]')).toHaveLength(2);
     // SC-005 holds on the open-choice rendering too.
@@ -987,10 +987,10 @@ describe("MarksSeriesStep — S4 open choice (US4)", () => {
     reachStation("marks-output-form");
 
     // Override the open choice to ready-made (the non-recommended option).
-    const readyMade = screen.getByLabelText(/One unit per accented letter/) as HTMLInputElement;
+    const readyMade = screen.getByLabelText(/Backspace removes the whole letter at once/) as HTMLInputElement;
     fireEvent.click(readyMade);
     expect(
-      (screen.getByLabelText(/One unit per accented letter/) as HTMLInputElement).checked,
+      (screen.getByLabelText(/Backspace removes the whole letter at once/) as HTMLInputElement).checked,
     ).toBe(true);
 
     // Edit the alphabet: schwa + acute has no ready-made form, so the posture
@@ -1024,8 +1024,8 @@ describe("MarksSeriesStep — S4 open choice (US4)", () => {
     expect(screen.queryByTestId("output-form-change")).toBeNull();
     // ...and the answer reset to base-plus-mark rather than keeping the now
     // unrealisable ready-made.
-    expect(station.textContent).toContain("A letter and a mark, kept separate");
-    expect(station.textContent).not.toContain("One unit per accented letter");
+    expect(station.textContent).toContain("Backspace removes one mark at a time");
+    expect(station.textContent).not.toContain("Backspace removes the whole letter at once");
   });
 });
 
