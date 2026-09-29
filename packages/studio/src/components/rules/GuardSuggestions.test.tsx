@@ -138,4 +138,17 @@ describe("GuardSuggestions intent gating", () => {
     expect(screen.queryByTestId(`missing-guard-${missingGuardGroupKey(GROUP)}`)).toBeNull();
     expect(screen.getByTestId("overbroad-guard-guard-1")).toBeTruthy();
   });
+
+  it("a narrowed over-broad question never reappears (FR-022 durable disposition)", () => {
+    const intent = useGuardIntentStore.getState();
+    intent.noteFamilyCardOpened(diablockFamilyId());
+    intent.noteGuardNarrowed(GUARD.question, "exception-rule-1");
+    render(<GuardSuggestions />);
+    expect(screen.getByTestId("guard-suggestions")).toBeTruthy();
+    expect(screen.queryByTestId("overbroad-guard-guard-1")).toBeNull();
+    // The missing-guard card still shows.
+    expect(
+      screen.getByTestId(`missing-guard-${missingGuardGroupKey(GROUP)}`),
+    ).toBeTruthy();
+  });
 });

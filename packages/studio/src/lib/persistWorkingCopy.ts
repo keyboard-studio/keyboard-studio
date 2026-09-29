@@ -125,6 +125,7 @@ export type WorkingCopySnapshot = Omit<
   | "disabledFamilyIds"
   | "keptGuardRuleIds"
   | "dismissedMissingGroups"
+  | "narrowedGuardQuestions"
 > & {
   baseVfsEntries: SerializedEntry[];
   deletedNodeIds: string[];
@@ -140,6 +141,12 @@ export type WorkingCopySnapshot = Omit<
    */
   keptGuardRuleIds: string[];
   dismissedMissingGroups: string[];
+  /**
+   * spec 082 FR-022: over-broad-guard questions the author Narrowed
+   * (Set<string>) → string[]. Survives draft resume so a narrowed question
+   * is never re-asked.
+   */
+  narrowedGuardQuestions: string[];
   /**
    * Optional (spec 080 US2): the base's welcome-folder images, Base64-encoded
    * through the same `serializeEntry` path as binary VFS entries. Absent from
@@ -346,6 +353,7 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     // working-copy store, so the snapshot reads it explicitly.
     keptGuardRuleIds: [...useGuardIntentStore.getState().keptGuardRuleIds],
     dismissedMissingGroups: [...useGuardIntentStore.getState().dismissedMissingGroups],
+    narrowedGuardQuestions: [...useGuardIntentStore.getState().narrowedGuardQuestions],
     undoStack: s.undoStack,
     phaseResults: s.phaseResults,
     irAxes: s.irAxes,
@@ -540,6 +548,7 @@ export function rehydrateWorkingCopyFromSession(): boolean {
     useGuardIntentStore.setState({
       keptGuardRuleIds: new Set(snapshot.keptGuardRuleIds ?? []),
       dismissedMissingGroups: new Set(snapshot.dismissedMissingGroups ?? []),
+      narrowedGuardQuestions: new Set(snapshot.narrowedGuardQuestions ?? []),
     });
 
     return true;

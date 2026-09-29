@@ -6,38 +6,46 @@
 // orthography attests). Two actions:
 //   - Keep — dismisses the card and records the author's intent for that
 //     guard rule, so the question is never asked again;
-//   - Narrow — selects the guard's family for editing. Full narrowing UI
-//     (editing the guard's scope in place) is a follow-up; for now the
-//     button selects the family and says so honestly.
+//   - Narrow this guard — inserts a precise exception rule immediately
+//     BEFORE the over-broad guard rule (same group): the exception matches
+//     the same key chord — blocked character + the guard's exact
+//     vkey/modifiers — and emits the blocked character + the mark, so that
+//     one mark/key pair is allowed while the guard still blocks everything
+//     else. The shared guard store is never mutated. An Undo button reverses
+//     the Narrow (removes the exception rule, lifts the narrowed
+//     disposition so the question may surface again).
 
 import { useState } from "react";
 import { Trans } from "@lingui/react/macro";
 import type { OverBroadGuard } from "./guardAnalysis.ts";
-import { familyOfRule, groupRules } from "./ruleFamilies.ts";
-import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
+import { narrowOverBroadGuard, undoNarrow } from "./narrowGuard.ts";
 import { useGuardIntentStore } from "../../stores/guardIntentStore.ts";
-import { useRulesStepUiStore } from "../../stores/rulesStepUiStore.ts";
 
 export function OverBroadGuardCard({ guard }: { guard: OverBroadGuard }) {
   const keepOverBroadGuard = useGuardIntentStore((s) => s.keepOverBroadGuard);
-  const selectFamily = useRulesStepUiStore((s) => s.selectFamily);
-  const [narrowedFamilyName, setNarrowedFamilyName] = useState<string | null>(null);
+  const [narrowedRuleId, setNarrowedRuleId] = useState<string | null>(null);
   const [narrowStale, setNarrowStale] = useState(false);
+  const [undone, setUndone] = useState(false);
 
   const narrow = () => {
-    // Find the guard rule's family from the live working-copy IR.
-    const ir = useWorkingCopyStore.getState().ir;
-    const rules = ir?.groups.flatMap((g) => g.rules) ?? [];
-    const family = familyOfRule(groupRules(rules), guard.guardRuleId);
-    if (family !== undefined) {
-      selectFamily(family.id);
-      setNarrowedFamilyName(family.name);
+    const outcome = narrowOverBroadGuard(guard);
+    if (outcome !== null) {
+      setNarrowedRuleId(outcome.ruleId);
       setNarrowStale(false);
+      setUndone(false);
     } else {
-      // The guard rule isn't in any current family (stale analysis) —
-      // say so rather than failing silently.
-      setNarrowedFamilyName(null);
+      // The guard rule is gone or has an unrecognized shape (stale
+      // analysis) — say so rather than guessing.
+      setNarrowedRuleId(null);
       setNarrowStale(true);
+    }
+  };
+
+  const undo = () => {
+    const undoneRuleId = undoNarrow();
+    if (undoneRuleId !== null) {
+      setNarrowedRuleId(null);
+      setUndone(true);
     }
   };
 
@@ -65,21 +73,40 @@ export function OverBroadGuardCard({ guard }: { guard: OverBroadGuard }) {
         >
           <Trans id="rules.guard.overbroad.keep">Keep as is</Trans>
         </button>{" "}
-        <button
-          type="button"
-          data-testid={`overbroad-guard-narrow-${guard.guardRuleId}`}
-          onClick={narrow}
-        >
-          <Trans id="rules.guard.overbroad.narrow">Narrow this guard</Trans>
-        </button>
+        {narrowedRuleId === null ? (
+          <button
+            type="button"
+            data-testid={`overbroad-guard-narrow-${guard.guardRuleId}`}
+            onClick={narrow}
+          >
+            <Trans id="rules.guard.overbroad.narrow">Narrow this guard</Trans>
+          </button>
+        ) : (
+          <button
+            type="button"
+            data-testid={`overbroad-guard-undo-${guard.guardRuleId}`}
+            onClick={undo}
+          >
+            <Trans id="rules.guard.overbroad.undo">Undo narrow</Trans>
+          </button>
+        )}
       </div>
-      {narrowedFamilyName !== null && (
+      {narrowedRuleId !== null && (
         <p data-testid={`overbroad-guard-narrowed-${guard.guardRuleId}`}>
           <small>
             <Trans id="rules.guard.overbroad.narrowedNote">
-              The “{narrowedFamilyName}” family is now selected for editing. Full
-              in-place guard narrowing is a follow-up — edit the guard rule in the
-              rule builder for now.
+              Narrowed: {guard.markChar} (key {guard.markKey}) is now allowed after
+              “{guard.blockedChar}” — the guard still blocks it after everything
+              else. This won&apos;t be asked again.
+            </Trans>
+          </small>
+        </p>
+      )}
+      {undone && narrowedRuleId === null && (
+        <p data-testid={`overbroad-guard-undone-${guard.guardRuleId}`}>
+          <small>
+            <Trans id="rules.guard.overbroad.undoneNote">
+              Narrow undone — the exception rule was removed.
             </Trans>
           </small>
         </p>

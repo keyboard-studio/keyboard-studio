@@ -54,6 +54,8 @@ export function GuardSuggestions() {
   });
   const visibleOverBroad = analysis.overBroad.filter((guard) => {
     if (intent.keptGuardRuleIds.has(guard.guardRuleId)) return false;
+    // Narrowed questions are never re-asked (FR-022 durable disposition).
+    if (intent.narrowedGuardQuestions.has(guard.question)) return false;
     const familyId = familyIdForGuardRule(guard.guardRuleId);
     return (
       familyId !== undefined && guardIntentSignaledForFamily(intent, familyId)
