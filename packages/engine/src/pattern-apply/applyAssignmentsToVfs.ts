@@ -22,7 +22,8 @@ import type { ApplyAssignmentsResult } from "./applyAssignments.js";
  *                    e.g. `"tyv"` → `"source/tyv.kmn"`).
  * @param assignments Physical assignment map (touch entries are silently ignored).
  * @param getPattern  Resolver: returns the Pattern for a given id, or `undefined`.
- * @returns `{ kmn, warnings }` — the updated .kmn text and any diagnostic messages.
+ * @returns `{ kmn, warnings, conflicts }` — the updated .kmn text, any diagnostic
+ *          messages, and any explicit deadkey identity conflicts (spec 083 US6).
  *          A warning is added if the .kmn file does not exist in the VFS (the
  *          empty string is used as the base and injection proceeds normally so
  *          callers get a usable file even for brand-new keyboards).
@@ -49,7 +50,7 @@ export function applyAssignmentsToVfs(
     warnings.push(
       `[pattern-apply] "${kmnPath}" is marked binary — cannot apply text patches`
     );
-    return { kmn: "", warnings };
+    return { kmn: "", warnings, conflicts: [] };
   } else {
     kmnSource =
       typeof entry.content === "string"
@@ -66,5 +67,5 @@ export function applyAssignmentsToVfs(
   // Write updated content back to VFS.
   vfs.set(kmnPath, result.kmn, false);
 
-  return { kmn: result.kmn, warnings: allWarnings };
+  return { kmn: result.kmn, warnings: allWarnings, conflicts: result.conflicts };
 }

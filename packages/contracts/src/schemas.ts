@@ -22,11 +22,17 @@ import { makePattern } from "./pattern";
 import type { Criterion } from "./criteria";
 import type { RemovalCapability } from "./removalCapability";
 import type {
+  CarveDisposition,
+  CarveDispositionProvenance,
+  CarveDispositionValue,
+} from "./carveDisposition";
+import type {
   TouchKeyProvenance,
   TouchKeyIR,
   TouchLayoutIR,
   FacetProvenance,
   FacetValue,
+  IRRule,
   KeyboardIR,
 } from "./keyboard-ir";
 import type { AxisFill, AxisFillSource } from "./axisFill";
@@ -97,6 +103,27 @@ export const RemovalCapabilitySchema = z.enum([
   "not-removable:context-sensitive",
   "not-removable:unknown",
 ]);
+
+// ---------------------------------------------------------------------------
+// CarveDisposition (specs/076-rule-behaviours) — the author's
+// per-carved-combination allow/block choice, keyed by comboId.
+// ---------------------------------------------------------------------------
+
+export const CarveDispositionValueSchema = z.enum(["block", "allow-host"]);
+
+export const CarveDispositionProvenanceSchema = z.enum([
+  "closed-keyboard-card",
+  "closed-keyboard-card-declined",
+  "bulk-default",
+  "author-override",
+  "deadkey-requirement",
+]);
+
+export const CarveDispositionSchema = z.object({
+  comboId: z.string(),
+  disposition: CarveDispositionValueSchema,
+  provenance: CarveDispositionProvenanceSchema,
+});
 
 // ---------------------------------------------------------------------------
 // AxisFill (spec §7.2 script-class default-fill prior) — provenance primitive
@@ -858,6 +885,27 @@ export const DocLintInputSchema = z.object({
 });
 
 // ---------------------------------------------------------------------------
+// IRRule ownership (spec 076 FR-002) — the additive optional ownership slice
+// of IRRule. `ownedByBehaviour` is a sibling of the existing `ownedByPattern`,
+// not a replacement (a discriminated union would be a breaking IR change); the
+// two markers are mutually exclusive on one rule, enforced by the refinement
+// below. Deliberately scoped to the ownership slice rather than the whole
+// rule: the full rule surface is validated structurally elsewhere, and this
+// schema's job is the ownership contract + its drift guard.
+// ---------------------------------------------------------------------------
+
+export const IRRuleOwnershipSchema = z
+  .object({
+    ownedByPattern: z.string().optional(),
+    ownedByBehaviour: z.string().optional(),
+  })
+  .refine((data) => data.ownedByPattern === undefined || data.ownedByBehaviour === undefined, {
+    message:
+      "IRRule MUST NOT carry both ownedByPattern and ownedByBehaviour: the two ownership markers are mutually exclusive (spec 076 FR-002).",
+    path: ["ownedByBehaviour"],
+  });
+
+// ---------------------------------------------------------------------------
 // Compile-time drift guards.
 //
 // Each canonical schema's inferred type must stay assignable to the locked
@@ -881,6 +929,19 @@ type DeepStripUndefined<T> =
 
 type Expect<T extends true> = T;
 type AssignableTo<S, T> = [DeepStripUndefined<S>] extends [T] ? true : false;
+type Equal<X, Y> =
+  (<T>() => T extends X ? 1 : 2) extends <T>() => T extends Y ? 1 : 2 ? true : false;
+
+// IRRule ownership (spec 076 FR-002). Unlike the AssignableTo guards below,
+// this one pins the KEY SET: an `ownedBy*` field added to the IRRule interface
+// without updating IRRuleOwnershipSchema (or vice versa) fails the build here.
+// Key-set pinning is required because structural assignability ignores a
+// missing `?:` member in both directions — the documented limit of the
+// AssignableTo guards (see the TouchKeyIR note below). The runtime complement
+// is the "ownership fields survive a parse" suite in schemas.test.ts.
+type _IRRuleOwnershipKeysGuard = Expect<
+  Equal<keyof z.infer<typeof IRRuleOwnershipSchema>, Extract<keyof IRRule, `ownedBy${string}`>>
+>;
 
 // These aliases are intentionally unused at the value level — their declaration
 // is the assertion. A failure surfaces here as a constraint error on `Expect`.
@@ -892,6 +953,17 @@ type _TestVectorGuard = Expect<AssignableTo<z.infer<typeof TestVectorSchema>, Te
 type _DemoObjectGuard = Expect<AssignableTo<z.infer<typeof DemoObjectSchema>, DemoObject>>;
 type _CriterionGuard = Expect<AssignableTo<z.infer<typeof CriterionSchema>, Criterion>>;
 type _RemovalCapabilityGuard = Expect<AssignableTo<z.infer<typeof RemovalCapabilitySchema>, RemovalCapability>>;
+// CarveDisposition. Provenance is informational but the union is
+// closed, so pin all three members of the record.
+type _CarveDispositionGuard = Expect<
+  AssignableTo<z.infer<typeof CarveDispositionSchema>, CarveDisposition>
+>;
+type _CarveDispositionValueGuard = Expect<
+  AssignableTo<z.infer<typeof CarveDispositionValueSchema>, CarveDispositionValue>
+>;
+type _CarveDispositionProvenanceGuard = Expect<
+  AssignableTo<z.infer<typeof CarveDispositionProvenanceSchema>, CarveDispositionProvenance>
+>;
 // AxisFill (spec §7.2). `axis`/`value` are validated loosely (see
 // AxisFillSchema doc) so the guard only pins `source`, which is where real
 // drift (a renamed/added fill-source literal) would occur.

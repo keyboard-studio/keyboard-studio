@@ -33,6 +33,7 @@ import {
   checkRoundTrip,
   checkHeaderPreservation,
   checkOwnershipConsistency,
+  checkBehaviourNulOnTextContext,
 } from "./layer-a-prime.js";
 
 /**
@@ -65,6 +66,7 @@ export async function runImportFidelityEmitChecks(
     ...checkRoundTrip(ir),
     ...checkHeaderPreservation(ir, emitted),
     ...checkOwnershipConsistency(ir),
+    ...checkBehaviourNulOnTextContext(ir),
   ];
 }
 

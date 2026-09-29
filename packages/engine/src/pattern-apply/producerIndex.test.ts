@@ -162,22 +162,25 @@ describe("buildProducerIndex", () => {
   });
 
   it("differs from collectCharContributors EXACTLY on the input side (data-model §2)", () => {
-    // The complement of the test above, and the one that actually pins the
-    // distinction: 'i' has BOTH an input-store slot (any()-consumed dkf0060) and
-    // a whole-rule producer (`+ [K_I] > 'i'`). The contributor walk must see the
-    // input slot — a removal has to reach every store the char appears in — and
-    // the producer index must NOT, because typing it is not producing it.
+    // 'i' has an input-store slot (any()-consumed dkf0060, the deadkey
+    // selector) and a whole-rule producer (`+ [K_I] > 'i'`). Ruling §4: the
+    // deadkey selector side is never taint-tested, so the contributor walk no
+    // longer sees the input slot — the distinction is now that the producer
+    // index counts only the production, while the contributor walk may see
+    // additional output-side nominations.
     const ir = makeCameroonIr();
     const contributors = collectCharContributors(ir, "i");
 
     const inputSlots = contributors.storeSlots.filter((s) => s.role === "input");
-    expect(inputSlots).toHaveLength(1); // the dkf0060 trigger slot
+    expect(inputSlots).toHaveLength(0); // dkf0060 selector suppressed by ruling §4
     expect(contributors.ruleNodeIds).toEqual(["rule#i"]);
 
-    // Naively counting contributors would give 2; the producer count is 1, and the
-    // difference is exactly the input slots the two walks treat differently.
+    // In this fixture the contributor walk carries no store slots at all
+    // (input slots suppressed by ruling §4, no output-side nominations), so
+    // the naive contributor count and the producer index coincide at 1 —
+    // the producer index still counts only the production, never slots.
     const naive = contributors.ruleNodeIds.length + contributors.storeSlotIds.length;
-    expect(naive).toBe(2);
-    expect(buildProducerIndex(ir).get("i")).toBe(naive - inputSlots.length);
+    expect(naive).toBe(1);
+    expect(buildProducerIndex(ir).get("i")).toBe(1);
   });
 });

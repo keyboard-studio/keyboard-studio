@@ -7,11 +7,12 @@
 // cascades through the shared workingCopyStore actions
 // (cascadeDelete/cascadeRestore) — no gallery-specific write path.
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import type { ReactNode, CSSProperties } from 'react';
 import { Trans, useLingui } from "@lingui/react/macro";
-import { useWorkingCopyStore } from '../../stores/workingCopyStore.ts';
-import { recommendedRemovalChars, displayChar } from '../../lib/irToCarveNodes.ts';
+import { useWorkingCopyStore, bulkDispositionDefault } from '../../stores/workingCopyStore.ts';
+import { recommendedRemovalChars, displayChar, isSparseLatinOverlayTarget } from '../../lib/irToCarveNodes.ts';
+import type { CarveDispositionProvenance, CarveDispositionValue } from '@keyboard-studio/contracts';
 import type { RecommendedRemovalChar } from '../../lib/irToCarveNodes.ts';
 import {
   irToCharacterView, groupCharacterCells, characterCellIds, characterCellIsToggleable,
@@ -27,6 +28,10 @@ import type { RemovedItem } from '../assignLoop/parts/StatusBar.tsx';
 import { useCarveNeededSet } from '../../hooks/useCarveNeededSet.ts';
 import { usePublishStepNav } from '../../hooks/usePublishStepNav.ts';
 import { useIsNarrow } from '../../hooks/useViewport.ts';
+import { LayoutFamilyQuestion } from './LayoutFamilyQuestion.tsx';
+import { ReviewRemovedKeysDialog, resolveCarvedCombos } from './ReviewRemovedKeys.tsx';
+import { DISPOSITION_COPY } from "./carveDispositionCopy.ts";
+import { CarvedHostConsequences } from "./CarvedHostConsequences.tsx";
 
 interface CarveGalleryV2Props {
   onComplete: () => void;
@@ -278,6 +283,19 @@ interface RecommendedGroupCardProps {
    * regardless of this flag.
    */
   destructiveBulkButton?: boolean;
+  /**
+   * 076 FR-022 (T016): the FR-005 `sparseLatinOverlay` input for disposition
+   * pre-fill — forwarded to each row's DispositionControl so the bulk-default
+   * preview matches what the store's pre-fill writes.
+   */
+  sparseLatinOverlay: boolean;
+  /**
+   * Rule nodeIds whose rules carry deadkey context. The ruling forbids host
+   * fallback for deadkey carves ("deadkey carves never fall through"), so
+   * rows touching these combos offer no Allow option (see DispositionControl)
+   * and pre-fill to `block` with `deadkey-requirement` provenance.
+   */
+  deadkeyComboIds: ReadonlySet<string>;
 }
 
 /**
@@ -292,7 +310,7 @@ interface RecommendedGroupCardProps {
 function RecommendedGroupCard({
   testId, toggleAllTestId, regionAriaLabel, topBorderColor, chipBackground, chipColor, heading, body,
   rows, cellsByCh, isItemDeleted, onToggleRow, onBulkToggle, discardAllLabel, restoreAllLabel,
-  selectedCh, onSelectCh, collapsible, destructiveBulkButton,
+  selectedCh, onSelectCh, collapsible, destructiveBulkButton, sparseLatinOverlay, deadkeyComboIds,
 }: RecommendedGroupCardProps) {
   if (rows.length === 0) return null;
   const allDiscarded = rows.every((r) => isRowDiscarded(r, isItemDeleted));
@@ -409,15 +427,20 @@ function RecommendedGroupCard({
               const cell = cellsByCh.get(row.ch.normalize('NFC')) ?? synthesizeFallbackCell(row.ch, row.contributors);
               const discarded = isRowDiscarded(row, isItemDeleted);
               return (
-                <CharacterCellButton
-                  key={row.ch}
-                  cell={cell}
-                  discarded={discarded}
-                  isSelected={selectedCh === cell.ch}
-                  flag={discarded ? 'discarded' : 'suggested'}
-                  onSelect={() => onSelectCh(cell.ch)}
-                  onToggle={() => onToggleRow(row)}
-                />
+                <div key={row.ch} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <CharacterCellButton
+                    cell={cell}
+                    discarded={discarded}
+                    isSelected={selectedCh === cell.ch}
+                    flag={discarded ? 'discarded' : 'suggested'}
+                    onSelect={() => onSelectCh(cell.ch)}
+                    onToggle={() => onToggleRow(row)}
+                  />
+                  {/* 076 FR-022 (T016): per-row allow/block disposition, always
+                      visible — never silent. Structurally separate from the
+                      gallery-level layout_family question (T025) above. */}
+                  <DispositionControl comboIds={recommendedRowIds(row)} sparseLatinOverlay={sparseLatinOverlay} deadkeyComboIds={deadkeyComboIds} />
+                </div>
               );
             })}
           </div>
@@ -689,6 +712,147 @@ function CarveDetailsCard({
   );
 }
 
+// ---------------------------------------------------------------------------
+// Per-row Allow/Block disposition control (076 FR-022, T016,
+// amendments A1/A2).
+//
+// Every recommended (carve-candidate) row visibly exposes the allow/block
+// choice — the two-tier choice architecture's per-carve tier (the
+// closed-keyboard card is the bulk tier). The control reads the row's
+// dispositions from the working-copy store — pre-filled from the
+// closed-keyboard card / FR-005 proposal with provenance, never re-prompted
+// on recompile — and flips them in place; the store stamps `author-override`
+// provenance on flips.
+//
+// A row's contributors (rule nodeIds + store slot ids) are disposed as one
+// atomic unit: the row is already the atomic discard/restore unit (see
+// toggleRecommendedRow), so the disposition follows the same granularity.
+// Pre-fill and flips both write the full id set together, which is why mixed
+// per-combo values cannot arise through this UI; if they ever do (an
+// external write), the control falls back to the bulk-default display.
+// ---------------------------------------------------------------------------
+
+/**
+ * A1 required copy — symmetric risk statements, one per option. Each option
+ * states its OWN risk; the retired one-sided allow/block slogan (the version
+ * that framed Allow as unpredictable and Block as predictable) must never
+ * appear — a T016 test asserts its absence from the rendered gallery and
+ * this block. Defined in ./carveDispositionCopy.ts and re-exported here so
+ * existing imports keep working; T019's expanded row imports it from there.
+ */
+export { DISPOSITION_COPY } from "./carveDispositionCopy.ts";
+
+function DispositionControl({ comboIds, sparseLatinOverlay, deadkeyComboIds }: { comboIds: string[]; sparseLatinOverlay: boolean; deadkeyComboIds: ReadonlySet<string> }) {
+  const carveDispositions = useWorkingCopyStore((s) => s.carveDispositions);
+  const closedKeyboardCard = useWorkingCopyStore((s) => s.closedKeyboardCard);
+  const setCarveDisposition = useWorkingCopyStore((s) => s.setCarveDisposition);
+
+  // Ruling (A1–A3): deadkey carves never fall through. A row whose carved
+  // combinations include a deadkey-context rule offers NO Allow option — the
+  // choice is not the author's to make, and the control says so plainly
+  // rather than silently coercing. The engine enforces the same rule as a
+  // backstop for stale/external metadata (see carveSuppression.ts).
+  const deadkeyLocked = comboIds.some((id) => deadkeyComboIds.has(id));
+
+  // The same bulk default the store's pre-fill writes — used as the display
+  // fallback before pre-fill lands (first render) and for genuinely new
+  // combos, so the preview never disagrees with the stored value.
+  // Deadkey-locked rows always resolve to block (matching the pre-fill's
+  // `deadkey-requirement` provenance).
+  const bulkDefault = useMemo(
+    () => deadkeyLocked
+      ? { disposition: "block", provenance: "deadkey-requirement" } as const
+      : bulkDispositionDefault(closedKeyboardCard, sparseLatinOverlay),
+    [closedKeyboardCard, sparseLatinOverlay, deadkeyLocked],
+  );
+
+  const records = comboIds.map((id) => carveDispositions.find((d) => d.comboId === id));
+  const values = records.map((r) => r?.disposition);
+  const unanimous = values.length > 0 && values.every((v) => v !== undefined && v === values[0]);
+  const value: CarveDispositionValue = deadkeyLocked
+    ? "block"
+    : unanimous
+      ? (values[0] as CarveDispositionValue)
+      : bulkDefault.disposition;
+  const provenance: CarveDispositionProvenance = deadkeyLocked
+    ? "deadkey-requirement"
+    : unanimous
+      ? (records[0] as { provenance: CarveDispositionProvenance }).provenance
+      : bulkDefault.provenance;
+
+  const flip = (next: CarveDispositionValue) => {
+    // Deadkey-locked rows cannot be flipped to allow-host — the Allow button
+    // is disabled, but guard anyway (e.g. keyboard activation).
+    if (deadkeyLocked && next === "allow-host") return;
+    // Clicking the already-selected option is a no-op: it must not rewrite
+    // provenance to author-override when nothing changed.
+    if (unanimous && next === value) return;
+    for (const id of comboIds) setCarveDisposition(id, next);
+  };
+
+  const risk = value === 'allow-host' ? DISPOSITION_COPY.allowRisk : DISPOSITION_COPY.blockRisk;
+
+  return (
+    <div
+      data-testid="carve-disposition-control"
+      style={{
+        display: 'flex', flexDirection: 'column', gap: 4,
+        padding: '7px 8px', borderRadius: 8,
+        background: 'var(--app-surface-2)', border: '1px solid var(--app-border)',
+      }}
+    >
+      <div style={{ fontSize: 10, lineHeight: 1.35, color: 'var(--app-text-muted)' }}>
+        {DISPOSITION_COPY.prompt}
+      </div>
+      <div style={{ display: 'flex', gap: 4 }} role="group" aria-label={DISPOSITION_COPY.prompt}>
+        {(['allow-host', 'block'] as const).map((v) => {
+          const selected = value === v;
+          // Deadkey-locked rows: Allow is not offered at all (ruling: deadkey
+          // carves never fall through). Rendered visibly disabled with the
+          // reason, never silently hidden.
+          const disabled = deadkeyLocked && v === 'allow-host';
+          const label = v === 'allow-host' ? DISPOSITION_COPY.allowLabel : DISPOSITION_COPY.blockLabel;
+          return (
+            <button
+              key={v}
+              type="button"
+              aria-pressed={selected}
+              aria-disabled={disabled}
+              disabled={disabled}
+              title={disabled ? DISPOSITION_COPY.deadkeyNote : undefined}
+              onClick={() => flip(v)}
+              className="ks-focus-ring"
+              style={{
+                flex: 1, font: '600 11px var(--app-font)', cursor: disabled ? 'not-allowed' : 'pointer',
+                padding: '4px 6px', borderRadius: 6,
+                opacity: disabled ? 0.45 : 1,
+                // --app-text-on-accent pairs with --app-accent by design (that
+                // token exists for this pairing); both flip per theme together.
+                color: selected ? 'var(--app-text-on-accent)' : 'var(--app-text-muted)',
+                background: selected ? 'var(--app-accent)' : 'transparent',
+                border: `1px solid ${selected ? 'var(--app-accent)' : 'var(--app-border-strong)'}`,
+              }}
+            >
+              {label}
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ fontSize: 10, lineHeight: 1.35, color: 'var(--app-text-subtle)' }}>
+        {risk}
+      </div>
+      {deadkeyLocked && (
+        <div style={{ fontSize: 10, lineHeight: 1.35, color: 'var(--app-text-subtle)' }}>
+          {DISPOSITION_COPY.deadkeyNote}
+        </div>
+      )}
+      <div style={{ fontSize: 9.5, fontStyle: 'italic', color: 'var(--app-text-subtle)' }}>
+        {DISPOSITION_COPY.provenanceLabel[provenance]}
+      </div>
+    </div>
+  );
+}
+
 export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   const { t } = useLingui();
   const ir = useWorkingCopyStore((s) => s.ir);
@@ -706,6 +870,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   // own.
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
   const cascadeDelete = useWorkingCopyStore((s) => s.cascadeDelete);
+  const carveDispositions = useWorkingCopyStore((s) => s.carveDispositions);
   const cascadeRestore = useWorkingCopyStore((s) => s.cascadeRestore);
   const restoreAll = useWorkingCopyStore((s) => s.restoreAll);
   const keepAll = useWorkingCopyStore((s) => s.keepAll);
@@ -801,6 +966,36 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   const primaryRows = useMemo(() => recommended.filter((r) => r.reason !== 'cross-script-latin'), [recommended]);
   const optionalLatinRows = useMemo(() => recommended.filter((r) => r.reason === 'cross-script-latin'), [recommended]);
 
+  // 076 FR-022 (T016): the FR-005 `sparseLatinOverlay` input for disposition
+  // pre-fill — the target script is the only signal the gallery can read at
+  // carve time (see isSparseLatinOverlayTarget's doc).
+  const sparseLatinOverlay = isSparseLatinOverlayTarget(identityBcp47);
+  // Ruling (A1–A3): deadkey carves never fall through — rule nodeIds whose
+  // rules carry deadkey context. Rows touching these combos offer no Allow
+  // option and pre-fill to `block` with `deadkey-requirement` provenance.
+  const deadkeyComboIds = useMemo(() => {
+    const ids = new Set<string>();
+    if (!ir) return ids;
+    for (const group of ir.groups ?? []) {
+      for (const rule of group.rules ?? []) {
+        if (rule.context?.some((el) => el.kind === "deadkey")) ids.add(rule.nodeId);
+      }
+    }
+    return ids;
+  }, [ir]);
+  const prefillCarveDispositions = useWorkingCopyStore((s) => s.prefillCarveDispositions);
+  const closedKeyboardCard = useWorkingCopyStore((s) => s.closedKeyboardCard);
+  const recommendedComboIds = useMemo(() => recommended.flatMap(recommendedRowIds), [recommended]);
+  // Pre-fill per-carve dispositions for every carve-candidate row from the
+  // bulk default (closed-keyboard card / FR-005 proposal). The store writes
+  // ONLY for combos without an existing disposition, so re-running when the
+  // card is answered later fills genuinely new combos without ever
+  // re-prompting (FR-022: recompile never re-prompts).
+  useEffect(() => {
+    if (recommendedComboIds.length === 0) return;
+    prefillCarveDispositions(recommendedComboIds, { sparseLatinOverlay, deadkeyComboIds });
+  }, [recommendedComboIds, sparseLatinOverlay, deadkeyComboIds, closedKeyboardCard, prefillCarveDispositions]);
+
   // "...for a {descriptor} keyboard" — descriptor is the display name +
   // "-only" when available (e.g. "Russian-only"), else the neutral
   // "single-script" fallback.
@@ -811,10 +1006,12 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   const toggleRecommendedRow = useCallback((row: RecommendedRemovalChar) => {
     const ids = recommendedRowIds(row);
     if (ids.length === 0) return;
+    // Issue #1809 ruling §1: a paired row carves every case-group member.
+    const chars = row.caseGroup ?? [row.ch];
     if (isRowDiscarded(row, isItemDeleted)) {
-      cascadeRestore(ids);
+      cascadeRestore(ids, chars);
     } else {
-      cascadeDelete(row.contributors.ruleNodeIds, row.contributors.storeSlotIds);
+      cascadeDelete(row.contributors.ruleNodeIds, row.contributors.storeSlotIds, chars);
     }
   }, [isItemDeleted, cascadeDelete, cascadeRestore]);
 
@@ -822,16 +1019,18 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     if (discard) {
       const ruleNodeIds: string[] = [];
       const storeSlotIds: string[] = [];
+      const chars: string[] = [];
       for (const row of rows) {
         ruleNodeIds.push(...row.contributors.ruleNodeIds);
         storeSlotIds.push(...row.contributors.storeSlotIds);
+        chars.push(...(row.caseGroup ?? [row.ch]));
       }
       if (ruleNodeIds.length === 0 && storeSlotIds.length === 0) return;
-      cascadeDelete(ruleNodeIds, storeSlotIds);
+      cascadeDelete(ruleNodeIds, storeSlotIds, chars);
     } else {
       const ids = rows.flatMap(recommendedRowIds);
       if (ids.length === 0) return;
-      cascadeRestore(ids);
+      cascadeRestore(ids, rows.flatMap((row) => row.caseGroup ?? [row.ch]));
     }
   }, [cascadeDelete, cascadeRestore]);
 
@@ -840,6 +1039,13 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   // Optional-Latin card starts collapsed, since it is deliberately
   // lower-priority than the primary suggested-to-discard card above it.
   const [latinOpen, setLatinOpen] = useState(false);
+  // "Review removed keys" panel (T017, spec 076 FR-023): every carved
+  // combination with its disposition and cross-host consequence.
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const carvedCombos = useMemo(
+    () => (ir ? resolveCarvedCombos(ir, carveDispositions) : []),
+    [ir, carveDispositions],
+  );
 
   // --- Narrow details-card state (mobile adaptation, Phase 3) ---
   const isNarrow = useIsNarrow();
@@ -880,9 +1086,9 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   const toggleCell = useCallback((cell: CharacterCell) => {
     if (!characterCellIsToggleable(cell)) return;
     if (isCellDiscarded(cell, isItemDeleted)) {
-      cascadeRestore(characterCellIds(cell));
+      cascadeRestore(characterCellIds(cell), [cell.ch]);
     } else {
-      cascadeDelete(cell.contributors.ruleNodeIds, cell.contributors.storeSlotIds);
+      cascadeDelete(cell.contributors.ruleNodeIds, cell.contributors.storeSlotIds, [cell.ch]);
     }
   }, [isItemDeleted, cascadeDelete, cascadeRestore]);
 
@@ -890,8 +1096,10 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     const ruleNodeIds: string[] = [];
     const storeSlotIds: string[] = [];
     const restoreIds: string[] = [];
+    const chars: string[] = [];
     for (const cell of groupCells) {
       if (!characterCellIsToggleable(cell)) continue;
+      chars.push(cell.ch);
       if (discard) {
         ruleNodeIds.push(...cell.contributors.ruleNodeIds);
         storeSlotIds.push(...cell.contributors.storeSlotIds);
@@ -899,8 +1107,8 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
         restoreIds.push(...characterCellIds(cell));
       }
     }
-    if (discard) cascadeDelete(ruleNodeIds, storeSlotIds);
-    else cascadeRestore(restoreIds);
+    if (discard) cascadeDelete(ruleNodeIds, storeSlotIds, chars);
+    else cascadeRestore(restoreIds, chars);
   }, [cascadeDelete, cascadeRestore]);
 
   // --- Narrow details-card decision plumbing (mobile adaptation, Phase 3) ---
@@ -997,7 +1205,8 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     if (item.type !== 'item') return;
     const cell = cellsByCh.get(item.ch);
     if (cell === undefined) return;
-    cascadeRestore(characterCellIds(cell));
+    // Issue #1809 ruling §1: keep the aggregated-R carve set in sync.
+    cascadeRestore(characterCellIds(cell), [cell.ch]);
   }, [cellsByCh, cascadeRestore]);
 
   // cellsByCh (not cells) is the lookup here: selectedCh may be a
@@ -1154,6 +1363,31 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
           </label>
         </fieldset>
         <RemovedDropdown list={removedList} onRestore={restoreRemovedItem} onRestoreAll={restoreAll} />
+        {/* T017: opens the "Review removed keys" panel — every carved
+            combination with its Allow/Block disposition and the cross-host
+            consequence table. Disabled until something is carved. */}
+        <button
+          type="button"
+          data-testid="carve-review-removed-keys"
+          disabled={carvedCombos.length === 0}
+          onClick={() => setReviewOpen(true)}
+          className="ks-focus-ring"
+          style={{
+            font: '600 12.5px var(--app-font)', cursor: carvedCombos.length === 0 ? 'default' : 'pointer',
+            color: 'var(--app-accent-text)', background: 'transparent',
+            border: '1px solid var(--app-border-strong)', borderRadius: 8, padding: '6px 12px',
+            opacity: carvedCombos.length === 0 ? 0.5 : 1,
+          }}
+        >
+          Review removed keys ({carvedCombos.length})
+        </button>
+      </div>
+
+      {/* layout_family question — T025 (spec 076 FR-023, amendment A3.1).
+          Gallery-level setting driving likely-host resolution; structurally
+          separate from the per-row disposition controls (T016, later). */}
+      <div style={{ padding: '12px 22px', borderBottom: '1px solid var(--app-border)', background: 'var(--app-surface)', flexShrink: 0 }}>
+        <LayoutFamilyQuestion bcp47={identityBcp47} />
       </div>
 
       {/* Two-panel body — narrow viewports stack the details card above the
@@ -1277,6 +1511,28 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                   </span>
                 </div>
 
+                {/* T019 (076 FR-023): expanded host-consequence row for the
+                    selected carved combination — per-likely-host consequence
+                    table, HOST_GUESS_CAPTION, the expectation prompt, and
+                    each option's own risk (DISPOSITION_COPY). A combo exists
+                    in carvedCombos only while it has a disposition, and
+                    dispositions are created on carve and deleted on un-carve,
+                    so a non-empty match means this character is carved.
+                    Read-only: the Allow/Block control itself lives on the
+                    gallery row (T016). */}
+                {(() => {
+                  const ids = new Set(characterCellIds(cell));
+                  const combos = carvedCombos.filter((c) => ids.has(c.comboId));
+                  if (combos.length === 0) return null;
+                  return (
+                    <>
+                      {combos.map((combo) => (
+                        <CarvedHostConsequences key={combo.comboId} combo={combo} bcp47={identityBcp47} />
+                      ))}
+                    </>
+                  );
+                })()}
+
                 {/* Read-only from here down (#1619 AC2) — no discard/restore
                     control in this panel. Toggling a character happens only
                     by clicking its grid cell, a suggested-group card, or the
@@ -1318,6 +1574,8 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                 selectedCh={selectedCell?.ch}
                 onSelectCh={handleSelectCh}
                 destructiveBulkButton
+                sparseLatinOverlay={sparseLatinOverlay}
+                deadkeyComboIds={deadkeyComboIds}
               />
               <RecommendedGroupCard
                 testId="carve-v2-optional-latin-group"
@@ -1341,6 +1599,8 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                 selectedCh={selectedCell?.ch}
                 onSelectCh={handleSelectCh}
                 collapsible={{ open: latinOpen, onToggleOpen: () => setLatinOpen((v) => !v) }}
+                sparseLatinOverlay={sparseLatinOverlay}
+                deadkeyComboIds={deadkeyComboIds}
               />
           </>
 
@@ -1392,6 +1652,14 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
           })}
         </div>
       </div>
+      {/* T017 review panel — fixed overlay dialog, mounted at the gallery root. */}
+      {reviewOpen && (
+        <ReviewRemovedKeysDialog
+          combos={carvedCombos}
+          bcp47={identityBcp47}
+          onClose={() => setReviewOpen(false)}
+        />
+      )}
     </div>
   );
 }

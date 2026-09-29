@@ -8,7 +8,7 @@ import { makePattern } from "@keyboard-studio/contracts";
 import type { MatchResult } from "./types.js";
 import type { Pattern } from "@keyboard-studio/contracts";
 import { ruleRef, storeRef } from "./node-refs.js";
-import { toUPlus, storeItemsToCharString, formatVKeyModifiers, formatDkName } from "./utils.js";
+import { toUPlus, storeItemsToCharString, formatVKeyModifiers, formatDkName, isBehaviourOwned } from "./utils.js";
 import type {
   RecognizerRuleYaml,
   SlotMapping,
@@ -129,7 +129,8 @@ function findS01Clusters(ir: KeyboardIR): S01ClusterMatch[] {
     if (!groupPassesConstraints(group, true)) continue;
 
     const qualifying = group.rules.filter((rule) => {
-      if (rule.ownedByPattern !== undefined) return false;
+      // FR-021: behaviour-owned rules are never pattern candidates.
+      if (rule.ownedByPattern !== undefined || isBehaviourOwned(rule)) return false;
       if (!matchesSingleRole(rule)) return false;
 
       // Disqualify any rule that has deadkey, index, outs, beep, raw in output
@@ -185,7 +186,8 @@ function findS02Clusters(ir: KeyboardIR): S02ClusterMatch[] {
   for (const group of ir.groups) {
     if (!groupPassesConstraints(group, true)) continue;
     for (const rule of group.rules) {
-      if (rule.ownedByPattern !== undefined) continue;
+      // FR-021: behaviour-owned rules are never pattern candidates.
+      if (rule.ownedByPattern !== undefined || isBehaviourOwned(rule)) continue;
       if (!matchesTriggerRole(rule)) continue;
       const out = rule.output[0];
       if (out === undefined || out.kind !== "deadkey") continue;
@@ -201,7 +203,8 @@ function findS02Clusters(ir: KeyboardIR): S02ClusterMatch[] {
   const fanOutByDkId = new Map<number, { rule: IRRule; group: IRGroup }>();
   for (const group of ir.groups) {
     for (const rule of group.rules) {
-      if (rule.ownedByPattern !== undefined) continue;
+      // FR-021: behaviour-owned rules are never pattern candidates.
+      if (rule.ownedByPattern !== undefined || isBehaviourOwned(rule)) continue;
       if (!matchesFanOutRole(rule)) continue;
       const c0 = rule.context[0];
       if (c0 === undefined || c0.kind !== "deadkey") continue;

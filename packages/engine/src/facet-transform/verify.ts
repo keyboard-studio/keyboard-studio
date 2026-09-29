@@ -23,6 +23,7 @@ import { compile } from "../compiler/index.js";
 import { stripDanglingAssetStores } from "../compiler/stripDanglingAssetStores.js";
 import { generateCorpus } from "../validator/corpus.js";
 import { validateWithOracle } from "../validator/oracle.js";
+import { checkBehaviourNulOnTextContext } from "../validator/layer-a-prime.js";
 import { MIGRATION_RULES } from "./migrations/index.js";
 import type {
   CommitFailure,
@@ -280,7 +281,11 @@ async function compileRegressionGate(
     compileIr(candidate),
     validateWithOracle(emitForVerification(candidate)),
   ]);
-  const blocking = findings.filter((f) => f.severity === "error" || f.severity === "fatal");
+  // The oracle sees emitted text only; behaviour ownership lives in the IR,
+  // so the owned-rule suppression-verb check runs on the candidate directly.
+  const blocking = [...findings, ...checkBehaviourNulOnTextContext(candidate)].filter(
+    (f) => f.severity === "error" || f.severity === "fatal",
+  );
   if (!compiled.success || blocking.length > 0) {
     return {
       ok: false,

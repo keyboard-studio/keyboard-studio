@@ -132,8 +132,8 @@ deviations rather than inventing new ones.
   on raw `.kmn` text — e.g. `scaffold()` is `parse → scaffoldIR → emit`. Constructs the codec
   can't model are preserved as opaque `RawKmnFragment` nodes (type defined in
   `@keyboard-studio/contracts`; reasons catalogued in `engine/src/codec/opaque-reasons.ts`),
-  never silently dropped. A base the codec can't parse fails the whole scaffold (no try/catch
-  around `parse()`), so "codec-clean" matters when choosing a base.
+  never silently dropped. A starting point the codec can't parse fails the whole scaffold (no
+  try/catch around `parse()`), so "codec-clean" matters when choosing a keyboard to copy.
 - **Working-copy spine (spec v1.3.0).** A single persistent working copy is instantiated when the
   user picks a keyboard — Track 1 `instantiateFromBase` (copy/adapt) or Track 2
   `instantiateFromExisting` (import). Every step mutates that one copy; it is serialized only at
@@ -353,6 +353,12 @@ the governing `spec.md §X`** (or its extracted folder) rather than re-deriving 
 mirror-numbering convention applies only to sections being extracted; new features pick the next
 free `NNN` above the extracted-section range.
 
+**Open PRs claim numbers before `main` sees them.** The `before_specify` hook and
+`spec-number-lint` only scan folders already merged, so two in-flight specs can pick the same
+`NNN`. Before choosing one, check open PRs too:
+`gh pr list --state open --json number,title,headRefName`. Skip any number an open PR's title or
+branch already uses.
+
 **Drift split:** `utilities/spec-trace` owns textual drift of the spec corpus — the monolith's
 sections, the extracted feature specs, and `docs/architecture.md`; it hashes each unit and flags
 un-acknowledged changes (`node utilities/spec-trace check|report|acknowledge`).
@@ -364,6 +370,13 @@ spec-kit's "Spec Trace" community extension — it duplicates the existing utili
 - Windows environment: no emoji in console output (global CLAUDE.md rule). Use `[OK]`, `[ERROR]`,
   `[WARN]`.
 - File references in user-facing text use markdown links (`[spec.md](spec.md)`), not backticks.
+- **Keyboard vocabulary** (Keyman's terms; the full glossary is pending in issue 1810). The
+  **base keyboard** is the OS layout Keyman runs on top of, which supplies the fallback character
+  for every keystroke a Keyman keyboard doesn't handle. The keyboard Track 1 starts from is the
+  **copied keyboard**. The **starting point** is what the working copy was instantiated from: the
+  copied keyboard in Track 1, the current released version in Track 2. Never call the copied
+  keyboard the base keyboard. The code identifiers `baseIr`, `baseVfs` and `host*` predate this
+  and are known misnomers.
 - Don't cite specific GitHub issue numbers inside shipped code or comments — cross-link via
   commit messages and PR bodies (spec §18).
 - **Accessibility** (spec 056): studio UI code follows the house rules in

@@ -10,6 +10,8 @@
  *   - trailingComment on rules (not part of keyboard behaviour)
  *   - IRComment nodes (comments are opaque prose)
  *   - ownedByPattern (recognition metadata, not keyboard logic)
+ *   - ownedByBehaviour (behaviour-compiler metadata, not keyboard logic —
+ *     same exclusion rationale; spec 076 FR-002)
  *   - IRHeader.storeDirectives order where directives are
  *     semantically commutative (we do NOT reorder them — order IS preserved by
  *     the emitter, so we compare order-sensitive here)
@@ -163,6 +165,22 @@ function compareHeader(
     "file-level store directives differ (order is significant)",
     diffs,
   );
+  // entryPoints: the FR-004 begin entry-point set. The entry group name and
+  // the reserved-group presence flags are fidelity-critical: a keyboard with
+  // more than one entry group must round-trip without the emitter rebuilding
+  // a single entry.
+  compareScalar(
+    a.entryPoints?.main, b.entryPoints?.main,
+    p("entryPoints.main"), "begin entry group differs", diffs,
+  );
+  compareScalar(
+    a.entryPoints?.newContext ?? false, b.entryPoints?.newContext ?? false,
+    p("entryPoints.newContext"), "NewContext entry-point presence differs", diffs,
+  );
+  compareScalar(
+    a.entryPoints?.postKeystroke ?? false, b.entryPoints?.postKeystroke ?? false,
+    p("entryPoints.postKeystroke"), "PostKeystroke entry-point presence differs", diffs,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -270,6 +288,8 @@ function outputElementKey(el: OutputElement): string {
     case "char":    return `char:${el.value}`;
     case "deadkey": return `dk:${el.id}`;
     case "beep":    return "beep";
+    case "nul":     return "nul";
+    case "context": return `ctx:${el.offset}`;
     case "index":   return `index:${el.storeRef}:${el.offset}`;
     case "outs":    return `outs:${el.storeRef}`;
     case "useGroup": return `useGroup:${el.groupName}`;
@@ -326,9 +346,16 @@ function compareRule(
       "target-selector differs");
   }
 
-  // NOTE: trailingComment and ownedByPattern are intentionally NOT compared —
-  // trailing comments are opaque prose; ownedByPattern is recognition metadata
-  // assigned by the pattern recognizer, not stable across import/emit cycles.
+  // NOTE: trailingComment, ownedByPattern, and ownedByBehaviour are intentionally
+  // NOT compared — trailing comments are opaque prose; ownedByPattern is
+  // recognition metadata assigned by the pattern recognizer, not stable across
+  // import/emit cycles. ownedByBehaviour gets the same exclusion (spec 076
+  // FR-002, decided in T006): it is assigned by the behaviour compiler (e.g.
+  // "carve-suppression"), which runs after import — the codec neither parses
+  // it from KMN nor emits it, so it cannot survive an emit→re-parse cycle.
+  // The oracle compares keyboard logic, not pipeline-assigned ownership
+  // metadata. (The two markers are mutually exclusive on one rule, so a rule
+  // carries at most one of them.)
 }
 
 function compareRules(

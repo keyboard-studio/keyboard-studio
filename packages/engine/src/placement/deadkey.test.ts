@@ -216,7 +216,7 @@ describe("extractDeadkeyCandidates — skip-loudly reasons", () => {
 
   it("context()-bearing rules are skipped and counted", () => {
     const { candidates, skipCounts } = extract(
-      ['group(main) using keys', 'dk(200) context(1) > U+0301'].join("\n"),
+      ['group(main) using keys', "dk(200) 'a' context(2) > U+0301"].join("\n"),
     );
     expect(candidates).toEqual([]);
     expect(skipCounts.get(DEADKEY_SKIP_REASONS.CONTEXT_BEARING)).toBe(1);

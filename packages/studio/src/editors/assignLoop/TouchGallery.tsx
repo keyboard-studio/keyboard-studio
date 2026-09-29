@@ -1756,6 +1756,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // emission memos below can depend on stable primitives.
   const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
+  const carveChars = useWorkingCopyStore((s) => s.carveChars);
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
   const touchSeedSourceStored = useSurveySessionStore((s) => s.touchSeedSource);
 
@@ -1991,7 +1992,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
   // overlay or Phase C assignments actually change (the Set/array identities
   // are replaced immutably on every mutation, so a size/length-based key is a
   // cheap, correct proxy — same precedent as touchKey above).
-  const modsDepsKey = `${deletedNodeIds.size}:${deletedItemIds.size}:${phaseResults.length}`;
+  const modsDepsKey = `${deletedNodeIds.size}:${deletedItemIds.size}:${carveChars.size}:${phaseResults.length}`;
 
   // Desktop modifications to replay onto the touch seed (spec 035 R3) — carve
   // removals (Phase D) + Phase C individual letter placements. Fed to
@@ -2005,6 +2006,7 @@ export function TouchGallery({ onComplete, onBack, placementMap }: TouchGalleryP
       deletedNodeIds,
       deletedItemIds,
       phaseResults,
+      carveChars,
     );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseIr, modsDepsKey]);

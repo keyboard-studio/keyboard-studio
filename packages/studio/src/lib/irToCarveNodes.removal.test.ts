@@ -208,15 +208,19 @@ describe('recommendedRemovalChars', () => {
   });
 
   it("shields a surplus character whose CROSS-paired partner store's same-index item IS a needed character (coordinatedDropHitsNeededChar guard fires — the positive branch the self-paired `word`-store test above doesn't cover), but recommends a sibling surplus character whose partner slot is NOT needed (proves the guard discriminates rather than blanket-shielding)", () => {
-    // `dk(1) any(dkf) > index(dkt,2)` cross-pairs dkf<->dkt (mirrors the
-    // Cameroon `dk(003b) any(dkf003b) > index(dkt003b,2)` idiom): dkf[0]='a'
-    // aligns with dkt[0]='α', a needed char, so dropping dkf's slot 0 would
-    // coordinately drop a needed char — 'a' is shielded. dkf[1]='b' aligns
-    // with dkt[1]='β', NOT needed — 'b' is not shielded. A plain literal
-    // rule also emits 'a'/'b' directly so both enter the produced set
-    // (buildProducedSet only walks rule OUTPUT, never any()-context input
-    // stores) — the surplus-ness under test lives on the INPUT store slot,
-    // reached via collectCharContributors' any()-context scan.
+    // `any(dkf) > index(dkt,1)` cross-pairs dkf<->dkt (a non-deadkey fan-out:
+    // ruling §3 never taint-tests a DEADKEY selector side, so the guard's
+    // positive branch is exercised here with a plain any()-input rule). The
+    // engine's per-rule inputSlotKeptByProducerGuard already skips dkf#0 when
+    // reached via the pairing rule itself (it would kill sole-produced 'α'),
+    // so a SEPARATE consuming rule (`'r' + any(dkf) > 'x'`) nominates the
+    // input slot — the engine's guard doesn't apply (literal output), but the
+    // studio's per-store coordinatedDropHitsNeededChar guard fires because
+    // dropping dkf#0 coordinately drops dkt#0='α' (needed, sole-produced).
+    // dkf[1]='b' aligns with dkt[1]='β', NOT needed — 'b' is not shielded. A
+    // plain literal rule also emits 'a'/'b' directly so both enter the
+    // produced set (buildProducedSet only walks rule OUTPUT, never
+    // any()-context input stores).
     const ir = makeIR({
       stores: [
         { nodeId: 'store#dkf', name: 'dkf', items: [{ kind: 'char', value: 'a' }, { kind: 'char', value: 'b' }], isSystem: false } as IRStore,
@@ -227,7 +231,8 @@ describe('recommendedRemovalChars', () => {
         rules: [
           { nodeId: 'rule-lit-a', context: [{ kind: 'char', value: 'p' }], output: [{ kind: 'char', value: 'a' }] },
           { nodeId: 'rule-lit-b', context: [{ kind: 'char', value: 'q' }], output: [{ kind: 'char', value: 'b' }] },
-          { nodeId: 'rule-fanout', context: [{ kind: 'deadkey', id: 1 }, { kind: 'any', storeRef: 'dkf' }], output: [{ kind: 'index', storeRef: 'dkt', offset: 2 }] },
+          { nodeId: 'rule-pair', context: [{ kind: 'any', storeRef: 'dkf' }], output: [{ kind: 'index', storeRef: 'dkt', offset: 1 }] },
+          { nodeId: 'rule-use', context: [{ kind: 'char', value: 'r' }, { kind: 'any', storeRef: 'dkf' }], output: [{ kind: 'char', value: 'x' }] },
         ],
       })],
     });

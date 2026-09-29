@@ -233,11 +233,12 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
   // fallback when baseIr hasn't loaded yet.
   const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
+  const carveChars = useWorkingCopyStore((s) => s.carveChars);
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
-  const modsDepsKey = `${deletedNodeIds.size}:${deletedItemIds.size}:${phaseResults.length}`;
+  const modsDepsKey = `${deletedNodeIds.size}:${deletedItemIds.size}:${carveChars.size}:${phaseResults.length}`;
   const mods = useMemo<DesktopModifications>(() => {
     if (baseIr === null) return EMPTY_MODS;
-    return deriveDesktopModifications(baseIr, deletedNodeIds, deletedItemIds, phaseResults);
+    return deriveDesktopModifications(baseIr, deletedNodeIds, deletedItemIds, phaseResults, carveChars);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [baseIr, modsDepsKey]);
 

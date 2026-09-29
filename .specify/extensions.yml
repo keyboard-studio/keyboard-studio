@@ -31,8 +31,11 @@ hooks:
       3. `git fetch origin`.
       4. Derive the feature branch name with the SAME rule specify uses for the spec
          dir: scan `specs/` for the highest `NNN-` prefix, take the next number, and a
-         2-4 word short-name from the feature description -> `<NNN>-<short-name>`. If the
-         invoker passed an explicit branch/dir, use that slug instead.
+         2-4 word short-name from the feature description -> `<NNN>-<short-name>`. Open
+         PRs can claim numbers not yet on main: run
+         `gh pr list --state open --json number,title,headRefName` and skip past any NNN an
+         open PR's title or branch already uses. If the invoker passed an explicit
+         branch/dir, use that slug instead.
       5. Cut it fresh from origin/main: `git checkout -b <NNN-short-name> origin/main`.
          If already on that exact branch and it is based on latest origin/main, no-op.
       6. Report the branch name. All companion commits target it; main is never written

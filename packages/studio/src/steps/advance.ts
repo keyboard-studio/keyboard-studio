@@ -33,6 +33,7 @@ type ActiveStepId =
   | "project_name"
   | "characters"
   | "carve"
+  | "deadkeys"
   | "marks"
   | "punctuation"
   | "invisibles"
@@ -241,7 +242,14 @@ export function advance(
       return { next: nextSpineStepAfter("convenience") }; // carve
 
     case "carve":
-      return { next: nextSpineStepAfter("carve") }; // mechanisms
+      return { next: nextSpineStepAfter("carve") }; // deadkeys
+
+    case "deadkeys":
+      // Spec 083: the deadkeys surface saves every lifecycle edit to the
+      // working copy immediately — no reducer side effects, no
+      // applyStepCompletion. Absent from STEPS_WITH_APPLY_COMPLETION for
+      // that reason (same as convenience).
+      return { next: nextSpineStepAfter("deadkeys") }; // mechanisms
 
     case "mechanisms":
       // Spec 035 R4/R12: route into the off-spine seed-source fork — but only

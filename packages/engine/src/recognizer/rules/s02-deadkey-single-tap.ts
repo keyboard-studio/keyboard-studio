@@ -7,7 +7,7 @@ import type {
 import { makePattern } from "@keyboard-studio/contracts";
 import type { MatchResult, RecognizerRule } from "../types.js";
 import { ruleRef, storeRef } from "../node-refs.js";
-import { storeItemsToCharString, formatVKeyModifiers, formatDkName } from "../utils.js";
+import { storeItemsToCharString, formatVKeyModifiers, formatDkName, isBehaviourOwned } from "../utils.js";
 import { isDeadkeyOnlyOutput } from "../../shared/rule-shape.js";
 
 // A trigger is a rule whose output is a single deadkey.
@@ -118,7 +118,8 @@ function buildTriggerIndex(ir: KeyboardIR): Map<number, IRRule[]> {
   for (const group of ir.groups) {
     if (group.name === "deadkeys") continue;
     for (const rule of group.rules) {
-      if (rule.ownedByPattern !== undefined) continue;
+      // FR-021: behaviour-owned rules are never pattern candidates.
+      if (rule.ownedByPattern !== undefined || isBehaviourOwned(rule)) continue;
       if (!isTrigger(rule)) continue;
       const out = rule.output[0];
       if (out === undefined || out.kind !== "deadkey") continue;
@@ -134,7 +135,8 @@ function buildTriggerIndex(ir: KeyboardIR): Map<number, IRRule[]> {
 function buildBodyIndex(deadkeysGroup: IRGroup): Map<number, IRRule> {
   const bodyByDkId = new Map<number, IRRule>();
   for (const rule of deadkeysGroup.rules) {
-    if (rule.ownedByPattern !== undefined) continue;
+    // FR-021: behaviour-owned rules are never pattern candidates.
+    if (rule.ownedByPattern !== undefined || isBehaviourOwned(rule)) continue;
     if (!isBody(rule)) continue;
     const c0 = rule.context[0];
     if (c0 === undefined || c0.kind !== "deadkey") continue;
@@ -151,7 +153,8 @@ function buildFallbackIndex(
   const fallbacksByDkId = new Map<number, IRRule[]>();
   for (const dkId of bodyByDkId.keys()) {
     const fallbacks = deadkeysGroup.rules.filter(
-      (r) => r.ownedByPattern === undefined && isFallback(r, dkId),
+      // FR-021: behaviour-owned rules are never pattern candidates.
+      (r) => r.ownedByPattern === undefined && !isBehaviourOwned(r) && isFallback(r, dkId),
     );
     if (fallbacks.length > 0) fallbacksByDkId.set(dkId, fallbacks);
   }

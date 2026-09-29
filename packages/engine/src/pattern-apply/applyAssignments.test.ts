@@ -915,3 +915,230 @@ describe("applyAssignments — deadkey_single_tap (S-02) merge by triggerKey acr
     expect(kmn.match(/\+ \[K_QUOTE\] > dk\(acute\)/g) ?? []).toHaveLength(1);
   });
 });
+
+// ---------------------------------------------------------------------------
+// deadkey_single_tap cross-name trigger collision — spec 083 (issue #1849)
+// Phase 2: explicit-over-silent.
+//
+// The old merge grouped deadkey_single_tap refs by triggerKey alone and
+// silently merged refs that were actually DIFFERENT deadkeys (different
+// deadkeyName) sharing one trigger. New behavior: grouping is by
+// (triggerKey, deadkeyName).
+// - Same trigger + same name = one deadkey accumulating pairs (the S-02
+//   multi-char flow) — merges exactly as before, no conflict.
+// - Same trigger + different names = two deadkey identities colliding on one
+//   key. Each name-group still merges internally (no pairs lost), the KMN
+//   keeps both deadkeys' rules/stores (first-wins ordering preserved), and a
+//   `trigger-in-use` conflict is reported for the studio to surface.
+// ---------------------------------------------------------------------------
+
+describe("applyAssignments — deadkey_single_tap cross-name trigger collision (spec 083)", () => {
+  beforeAll(async () => {
+    await loadPatterns(REAL_CONTENT_DIR);
+  });
+
+  const BASE_KMN_DEADKEY =
+    "store(&VERSION) '10.0'\n" +
+    "store(&NAME) 'Test'\n" +
+    "store(&TARGETS) 'any'\n" +
+    "begin Unicode > use(main)\n" +
+    "\n" +
+    "group(main) using keys\n";
+
+  function makeCrossNameAssignment(
+    target: string,
+    slotValues: {
+      triggerKey: string;
+      deadkeyName: string;
+      baseLetters: string;
+      accentedForms: string;
+      accentChar: string;
+    },
+  ): MechanismAssignment {
+    return {
+      scope: "individual",
+      target,
+      modality: "physical",
+      mechanisms: [
+        {
+          patternId: "deadkey_single_tap",
+          strategyId: "S-02",
+          slotValues,
+        },
+      ],
+      source: "user",
+    };
+  }
+
+  function resolveDeadkeyPattern(id: string): Pattern | undefined {
+    const pattern = getById("deadkey_single_tap");
+    return id === pattern?.id ? pattern : undefined;
+  }
+
+  it("reports a trigger-in-use conflict when two different deadkeyNames share one triggerKey, keeping both deadkeys' pairs", () => {
+    const acuteRef = makeCrossNameAssignment("á", {
+      triggerKey: "K_QUOTE",
+      deadkeyName: "acute",
+      baseLetters: "a",
+      accentedForms: "á",
+      accentChar: "́",
+    });
+    const graveRef = makeCrossNameAssignment("è", {
+      triggerKey: "K_QUOTE",
+      deadkeyName: "grave",
+      baseLetters: "e",
+      accentedForms: "è",
+      accentChar: "`",
+    });
+
+    const { kmn, warnings, conflicts } = applyAssignments(
+      [acuteRef, graveRef],
+      resolveDeadkeyPattern,
+      BASE_KMN_DEADKEY,
+    );
+
+    expect(warnings).toEqual([]);
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0]?.kind).toBe("trigger-in-use");
+    expect(conflicts[0]?.keys).toEqual(["K_QUOTE"]);
+    expect(conflicts[0]?.names).toEqual(["acute", "grave"]);
+
+    // Non-lossy: both deadkeys' store pairs survived with their own pairs.
+    expect(kmn).toContain("store(dk_acute_bases)  'a'");
+    expect(kmn).toContain("store(dk_acute_output) 'á'");
+    expect(kmn).toContain("store(dk_grave_bases)  'e'");
+    expect(kmn).toContain("store(dk_grave_output) 'è'");
+
+    // Both trigger rules are present (first-wins ordering preserved — the
+    // second is unreachable at runtime, which is exactly what the conflict
+    // reports rather than silently merging).
+    expect(kmn).toContain("+ [K_QUOTE] > dk(acute)");
+    expect(kmn).toContain("+ [K_QUOTE] > dk(grave)");
+    expect(kmn.indexOf("+ [K_QUOTE] > dk(acute)")).toBeLessThan(
+      kmn.indexOf("+ [K_QUOTE] > dk(grave)"),
+    );
+  });
+
+  it("same-name refs on one trigger still merge with no conflict (existing S-02 pair-accumulation behavior)", () => {
+    const sourceRef = makeCrossNameAssignment("á", {
+      triggerKey: "K_QUOTE",
+      deadkeyName: "acute",
+      baseLetters: "a",
+      accentedForms: "á",
+      accentChar: "́",
+    });
+    const companionRef = makeCrossNameAssignment("Á", {
+      triggerKey: "K_QUOTE",
+      deadkeyName: "acute",
+      baseLetters: "A",
+      accentedForms: "Á",
+      accentChar: "́",
+    });
+
+    const { kmn, conflicts } = applyAssignments(
+      [sourceRef, companionRef],
+      resolveDeadkeyPattern,
+      BASE_KMN_DEADKEY,
+    );
+
+    expect(conflicts).toEqual([]);
+    expect(kmn).toContain("store(dk_acute_bases)  'aA'");
+    expect(kmn).toContain("store(dk_acute_output) 'áÁ'");
+    expect(
+      kmn.match(/\+ \[K_QUOTE\] > dk\(acute\)/g) ?? [],
+    ).toHaveLength(1);
+  });
+
+  it("merges within each name-group when one trigger carries two names with multiple refs each", () => {
+    const refs = [
+      makeCrossNameAssignment("á", {
+        triggerKey: "K_QUOTE",
+        deadkeyName: "acute",
+        baseLetters: "a",
+        accentedForms: "á",
+        accentChar: "́",
+      }),
+      makeCrossNameAssignment("é", {
+        triggerKey: "K_QUOTE",
+        deadkeyName: "acute",
+        baseLetters: "e",
+        accentedForms: "é",
+        accentChar: "́",
+      }),
+      makeCrossNameAssignment("à", {
+        triggerKey: "K_QUOTE",
+        deadkeyName: "grave",
+        baseLetters: "a",
+        accentedForms: "à",
+        accentChar: "`",
+      }),
+      makeCrossNameAssignment("è", {
+        triggerKey: "K_QUOTE",
+        deadkeyName: "grave",
+        baseLetters: "e",
+        accentedForms: "è",
+        accentChar: "`",
+      }),
+    ];
+
+    const { kmn, conflicts } = applyAssignments(
+      refs,
+      resolveDeadkeyPattern,
+      BASE_KMN_DEADKEY,
+    );
+
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0]?.kind).toBe("trigger-in-use");
+    // Within-name pair accumulation still happened — no pairs lost.
+    expect(kmn).toContain("store(dk_acute_bases)  'ae'");
+    expect(kmn).toContain("store(dk_acute_output) 'áé'");
+    expect(kmn).toContain("store(dk_grave_bases)  'ae'");
+    expect(kmn).toContain("store(dk_grave_output) 'àè'");
+  });
+
+  it("preserves first-wins ordering when refs of two names interleave: the first name's trigger rule still emits first", () => {
+    const refs = [
+      makeCrossNameAssignment("á", {
+        triggerKey: "K_QUOTE",
+        deadkeyName: "acute",
+        baseLetters: "a",
+        accentedForms: "á",
+        accentChar: "́",
+      }),
+      makeCrossNameAssignment("à", {
+        triggerKey: "K_QUOTE",
+        deadkeyName: "grave",
+        baseLetters: "a",
+        accentedForms: "à",
+        accentChar: "`",
+      }),
+      makeCrossNameAssignment("é", {
+        triggerKey: "K_QUOTE",
+        deadkeyName: "acute",
+        baseLetters: "e",
+        accentedForms: "é",
+        accentChar: "́",
+      }),
+    ];
+
+    const { kmn, conflicts } = applyAssignments(
+      refs,
+      resolveDeadkeyPattern,
+      BASE_KMN_DEADKEY,
+    );
+
+    expect(conflicts).toHaveLength(1);
+    expect(conflicts[0]?.kind).toBe("trigger-in-use");
+    // The merged acute group holds its first member's position — acute still
+    // wins the trigger at runtime even though a grave ref came between its
+    // two refs.
+    const acutePos = kmn.indexOf("+ [K_QUOTE] > dk(acute)");
+    const gravePos = kmn.indexOf("+ [K_QUOTE] > dk(grave)");
+    expect(acutePos).toBeGreaterThanOrEqual(0);
+    expect(gravePos).toBeGreaterThanOrEqual(0);
+    expect(acutePos).toBeLessThan(gravePos);
+    // And the interleaved acute refs still merged (no pairs lost).
+    expect(kmn).toContain("store(dk_acute_bases)  'ae'");
+    expect(kmn).toContain("store(dk_acute_output) 'áé'");
+  });
+});

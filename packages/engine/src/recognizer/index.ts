@@ -2,7 +2,8 @@ import type { KeyboardIR, IRRule } from "@keyboard-studio/contracts";
 import { s01Recognizer } from "./rules/s01-simple-swap.js";
 import { s02Recognizer } from "./rules/s02-deadkey-single-tap.js";
 import { simpleSwapRule, deadkeySingleTapRule } from "./rules/generated/index.js";
-import type { RecognizerRule, RecognizeResult } from "./types.js";
+import type { RecognizerRule, RecognizeResult, MatchResult } from "./types.js";
+import { isBehaviourOwned } from "./utils.js";
 
 const DEFAULT_RULES: RecognizerRule[] = [
   s01Recognizer,
@@ -31,13 +32,36 @@ export function recognizePatterns(
   // Track which rule nodeIds are covered (across all recognizer passes).
   const coveredRuleIds = new Set<string>();
 
+  // Node lookup for the FR-021 backstop below.
+  const ruleById = new Map<string, IRRule>();
+  for (const group of ir.groups) {
+    for (const irRule of group.rules) {
+      ruleById.set(irRule.nodeId, irRule);
+    }
+  }
+
   for (const rule of rules) {
     const matches = rule.match(ir);
     for (const match of matches) {
-      const pattern = rule.lift(match);
+      // FR-021 backstop: behaviour-owned rules are never pattern candidates —
+      // the `ownedByBehaviour` marker alone determines behaviour ownership (no
+      // shape heuristics). Strip them from ownedNodes BEFORE lift, so neither
+      // the Pattern nor the `ownedByPattern` stamp can claim them (FR-002
+      // mutual exclusivity). The per-matcher guards are the primary mechanism;
+      // this covers any custom RecognizerRule that doesn't filter itself. A
+      // match left with no owned nodes lifts nothing.
+      const ownedNodes = match.ownedNodes.filter((nodeRef) => {
+        if (nodeRef.kind !== "rule") return true;
+        const target = ruleById.get(nodeRef.nodeId);
+        return target === undefined || !isBehaviourOwned(target);
+      });
+      if (ownedNodes.length === 0) continue;
+      const filteredMatch: MatchResult = { ...match, ownedNodes };
+
+      const pattern = rule.lift(filteredMatch);
       ir.recognizedPatterns.push(pattern);
 
-      for (const nodeRef of match.ownedNodes) {
+      for (const nodeRef of filteredMatch.ownedNodes) {
         if (nodeRef.kind !== "rule") continue;
         coveredRuleIds.add(nodeRef.nodeId);
 

@@ -30,9 +30,16 @@ import {
   applyTouchKeycapRemovalsToRawJson,
   applyTouchKeycapRemovalsToVfs,
 } from "./applyTouchKeycapRemovalsToVfs.js";
+import { applyCarveKeycapRemovalsToVfs } from "./applyCarveKeycapRemovalsToVfs.js";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { TouchLayoutIR, TouchKeyIR } from "@keyboard-studio/contracts";
-import { touchKey, touchLayout } from "@keyboard-studio/contracts/fixtures";
+import {
+  irGroup,
+  makeTestIR,
+  touchKey,
+  touchLayout,
+  vkeyRule,
+} from "@keyboard-studio/contracts/fixtures";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers (mirrors applyDesktopModifications.test.ts's conventions)
@@ -54,7 +61,12 @@ function getKey(layout: TouchLayoutIR, keyId: string): TouchKeyIR | undefined {
 
 describe("applyTouchKeycapRemovalsToLayout", () => {
   it("blanks a main U_-id key: id neutralized, text/output cleared, key kept", () => {
-    const layout = touchLayout({ keys: [touchKey({ id: "U_0061", text: "a" }), touchKey({ id: "U_0062", text: "b" })] });
+    const layout = touchLayout({
+      keys: [
+        touchKey({ id: "U_0061", text: "a" }),
+        touchKey({ id: "U_0062", text: "b" }),
+      ],
+    });
 
     const { layout: next, warnings } = applyTouchKeycapRemovalsToLayout(
       layout,
@@ -72,9 +84,15 @@ describe("applyTouchKeycapRemovalsToLayout", () => {
   });
 
   it("blanks a plain K_<letter> text-only main key: id STILL neutralized, and a hosted sk[] not itself addressed survives", () => {
-    const layout = touchLayout({ keys: [
-      touchKey({ id: "K_A", text: "a", sk: [touchKey({ id: "U_00E1", text: "á" })] }),
-    ] });
+    const layout = touchLayout({
+      keys: [
+        touchKey({
+          id: "K_A",
+          text: "a",
+          sk: [touchKey({ id: "U_00E1", text: "á" })],
+        }),
+      ],
+    });
 
     const { layout: next, warnings } = applyTouchKeycapRemovalsToLayout(
       layout,
@@ -94,9 +112,18 @@ describe("applyTouchKeycapRemovalsToLayout", () => {
   });
 
   it("removes a longpress (sk[]) entry, leaving the main key untouched", () => {
-    const layout = touchLayout({ keys: [
-      touchKey({ id: "U_0061", text: "a", sk: [touchKey({ id: "U_00E1", text: "á" }), touchKey({ id: "U_00E2", text: "â" })] }),
-    ] });
+    const layout = touchLayout({
+      keys: [
+        touchKey({
+          id: "U_0061",
+          text: "a",
+          sk: [
+            touchKey({ id: "U_00E1", text: "á" }),
+            touchKey({ id: "U_00E2", text: "â" }),
+          ],
+        }),
+      ],
+    });
 
     const { layout: next } = applyTouchKeycapRemovalsToLayout(
       layout,
@@ -110,14 +137,16 @@ describe("applyTouchKeycapRemovalsToLayout", () => {
   });
 
   it("removes a multitap entry and a flick entry independently", () => {
-    const layout = touchLayout({ keys: [
-      touchKey({
-        id: "U_0065",
-        text: "e",
-        multitap: [touchKey({ id: "U_00E9", text: "é" })],
-        flick: { ne: touchKey({ id: "U_0301", text: "́" }) },
-      }),
-    ] });
+    const layout = touchLayout({
+      keys: [
+        touchKey({
+          id: "U_0065",
+          text: "e",
+          multitap: [touchKey({ id: "U_00E9", text: "é" })],
+          flick: { ne: touchKey({ id: "U_0301", text: "́" }) },
+        }),
+      ],
+    });
 
     const { layout: next } = applyTouchKeycapRemovalsToLayout(
       layout,
@@ -130,17 +159,24 @@ describe("applyTouchKeycapRemovalsToLayout", () => {
   });
 
   it("returns untouched platforms/layers/rows by reference (structural sharing)", () => {
-    const layout = touchLayout({ keys: [touchKey({ id: "U_0061", text: "a" })] });
+    const layout = touchLayout({
+      keys: [touchKey({ id: "U_0061", text: "a" })],
+    });
     const untouchedPlatform = { ...layout, platforms: [...layout.platforms] };
 
-    const { layout: next } = applyTouchKeycapRemovalsToLayout(layout, new Set(["nonexistent:address"]));
+    const { layout: next } = applyTouchKeycapRemovalsToLayout(
+      layout,
+      new Set(["nonexistent:address"]),
+    );
 
     expect(next).toBe(layout); // no address matched — no-op, same reference
     expect(untouchedPlatform.platforms[0]).toBe(layout.platforms[0]);
   });
 
   it("is idempotent — applying the same id twice yields the same result", () => {
-    const layout = touchLayout({ keys: [touchKey({ id: "U_0061", text: "a" })] });
+    const layout = touchLayout({
+      keys: [touchKey({ id: "U_0061", text: "a" })],
+    });
     const ids = new Set(["phone:default:U_0061"]);
 
     const once = applyTouchKeycapRemovalsToLayout(layout, ids);
@@ -171,7 +207,11 @@ describe("applyTouchKeycapRemovalsToRawJson", () => {
               {
                 id: 1,
                 key: [
-                  { id: "U_0061", text: "a", sk: [{ id: "U_00E1", text: "á" }] },
+                  {
+                    id: "U_0061",
+                    text: "a",
+                    sk: [{ id: "U_00E1", text: "á" }],
+                  },
                   { id: "U_0062", text: "b" },
                 ],
               },
@@ -190,7 +230,13 @@ describe("applyTouchKeycapRemovalsToRawJson", () => {
 
     expect(warnings).toEqual([]);
     const parsed = JSON.parse(json) as {
-      phone: { layer: Array<{ row: Array<{ key: Array<{ id: string; text?: string; sk?: unknown[] }> }> }> };
+      phone: {
+        layer: Array<{
+          row: Array<{
+            key: Array<{ id: string; text?: string; sk?: unknown[] }>;
+          }>;
+        }>;
+      };
     };
     const keys = parsed.phone.layer[0]!.row[0]!.key;
     expect(keys).toHaveLength(2); // key kept, never removed
@@ -211,7 +257,9 @@ describe("applyTouchKeycapRemovalsToRawJson", () => {
             row: [
               {
                 id: 1,
-                key: [{ id: "K_A", text: "a", sk: [{ id: "U_00E1", text: "á" }] }],
+                key: [
+                  { id: "K_A", text: "a", sk: [{ id: "U_00E1", text: "á" }] },
+                ],
               },
             ],
           },
@@ -226,7 +274,13 @@ describe("applyTouchKeycapRemovalsToRawJson", () => {
 
     expect(warnings).toEqual([]);
     const parsed = JSON.parse(json) as {
-      phone: { layer: Array<{ row: Array<{ key: Array<{ id: string; text?: string; sk?: unknown[] }> }> }> };
+      phone: {
+        layer: Array<{
+          row: Array<{
+            key: Array<{ id: string; text?: string; sk?: unknown[] }>;
+          }>;
+        }>;
+      };
     };
     const keys = parsed.phone.layer[0]!.row[0]!.key;
     expect(keys).toHaveLength(1); // key kept, never removed
@@ -243,7 +297,13 @@ describe("applyTouchKeycapRemovalsToRawJson", () => {
     );
 
     const parsed = JSON.parse(json) as {
-      phone: { layer: Array<{ row: Array<{ key: Array<{ id: string; text?: string; sk?: unknown[] }> }> }> };
+      phone: {
+        layer: Array<{
+          row: Array<{
+            key: Array<{ id: string; text?: string; sk?: unknown[] }>;
+          }>;
+        }>;
+      };
     };
     const keys = parsed.phone.layer[0]!.row[0]!.key;
     const mainKey = keys.find((k) => k.id === "U_0061")!;
@@ -254,7 +314,10 @@ describe("applyTouchKeycapRemovalsToRawJson", () => {
 
   it("is a byte-identical no-op when no id in the set resolves to anything", () => {
     const raw = rawLayout();
-    const { json, warnings } = applyTouchKeycapRemovalsToRawJson(raw, new Set(["nonexistent:address"]));
+    const { json, warnings } = applyTouchKeycapRemovalsToRawJson(
+      raw,
+      new Set(["nonexistent:address"]),
+    );
 
     expect(json).toBe(raw); // no reformatting when nothing changed
     expect(warnings).toEqual([]);
@@ -294,7 +357,11 @@ describe("applyTouchKeycapRemovalsToVfs", () => {
   function makeVfs(kmn?: string) {
     return createVirtualFS([
       { path: "source/test.kmn", content: kmn ?? "c test\n", isBinary: false },
-      { path: "source/test.keyman-touch-layout", content: touchJson, isBinary: false },
+      {
+        path: "source/test.keyman-touch-layout",
+        content: touchJson,
+        isBinary: false,
+      },
     ]);
   }
 
@@ -308,9 +375,16 @@ describe("applyTouchKeycapRemovalsToVfs", () => {
     );
 
     expect(warnings).toEqual([]);
-    const written = vfs.get("source/test.keyman-touch-layout")!.content as string;
+    const written = vfs.get("source/test.keyman-touch-layout")!
+      .content as string;
     const parsed = JSON.parse(written) as {
-      phone: { layer: Array<{ row: Array<{ key: Array<{ id: string; text?: string; sk?: unknown[] }> }> }> };
+      phone: {
+        layer: Array<{
+          row: Array<{
+            key: Array<{ id: string; text?: string; sk?: unknown[] }>;
+          }>;
+        }>;
+      };
     };
     const keys = parsed.phone.layer[0]!.row[0]!.key;
     expect(keys.find((k) => k.id === "U_0061")?.sk).toBeUndefined();
@@ -328,7 +402,9 @@ describe("applyTouchKeycapRemovalsToVfs", () => {
   });
 
   it("is a silent no-op when there is no .keyman-touch-layout file at all", () => {
-    const vfs = createVirtualFS([{ path: "source/test.kmn", content: "c test\n", isBinary: false }]);
+    const vfs = createVirtualFS([
+      { path: "source/test.kmn", content: "c test\n", isBinary: false },
+    ]);
 
     const { warnings } = applyTouchKeycapRemovalsToVfs(
       vfs,
@@ -343,7 +419,11 @@ describe("applyTouchKeycapRemovalsToVfs", () => {
   it("warns (and leaves the VFS untouched) on invalid JSON", () => {
     const vfs = createVirtualFS([
       { path: "source/test.kmn", content: "c test\n", isBinary: false },
-      { path: "source/test.keyman-touch-layout", content: "{not valid json", isBinary: false },
+      {
+        path: "source/test.keyman-touch-layout",
+        content: "{not valid json",
+        isBinary: false,
+      },
     ]);
 
     const { warnings } = applyTouchKeycapRemovalsToVfs(
@@ -353,7 +433,9 @@ describe("applyTouchKeycapRemovalsToVfs", () => {
     );
 
     expect(warnings).toHaveLength(1);
-    expect(vfs.get("source/test.keyman-touch-layout")!.content).toBe("{not valid json");
+    expect(vfs.get("source/test.keyman-touch-layout")!.content).toBe(
+      "{not valid json",
+    );
   });
 
   it("is idempotent across two applications on the same fresh VFS (desktop-cascade safety)", () => {
@@ -376,6 +458,89 @@ describe("applyTouchKeycapRemovalsToVfs", () => {
     // Applying the overlay a SECOND time on top of the already-blanked vfsA
     // (simulating a stale id that no longer resolves, e.g. after a desktop
     // carve neutralized the same key) must not throw or double-mutate.
-    expect(() => applyTouchKeycapRemovalsToVfs(vfsA, "test", ids)).not.toThrow();
+    expect(() =>
+      applyTouchKeycapRemovalsToVfs(vfsA, "test", ids),
+    ).not.toThrow();
+  });
+
+  it("consumes the shared carve-pruned result idempotently — a key the 1.5 cascade already removed resolves to nothing (issue #1809, ruling §7)", () => {
+    // Ruling §7 reconciliation: projectWorkingCopyVfs runs the carve keycap
+    // cascade (step 1.5, driven by the shared pruned slot set) BEFORE the
+    // per-touch-key overlay (step 1.6, driven by deletedTouchKeyIds). A key
+    // the cascade already removed must resolve to nothing here — never a
+    // double-removal or an error.
+    const cascadeTouchJson = JSON.stringify({
+      phone: {
+        layer: [
+          {
+            id: "default",
+            row: [
+              {
+                id: 1,
+                key: [
+                  { id: "U_00E4", text: "ä" },
+                  { id: "U_0062", text: "b" },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const vfs = createVirtualFS([
+      { path: "source/test.kmn", content: "c test\n", isBinary: false },
+      {
+        path: "source/test.keyman-touch-layout",
+        content: cascadeTouchJson,
+        isBinary: false,
+      },
+    ]);
+    const ir = makeTestIR(
+      [
+        irGroup({
+          nodeId: "g1",
+          rules: [vkeyRule({ nodeId: "r-ae", vkey: "K_E", output: "ä" })],
+        }),
+      ],
+      [],
+    );
+
+    // Step 1.5: the shared pruned result REMOVES the carved key from the
+    // touch layout (076 FR-023, T020 — removal is the default, not blanking).
+    const cascade = applyCarveKeycapRemovalsToVfs(vfs, "test", ir, {
+      slotIds: new Set<string>(),
+      wholeNodeIds: new Set(["r-ae"]),
+    });
+    expect(cascade.warnings).toEqual([]);
+    const afterCascade = vfs.get("source/test.keyman-touch-layout")!
+      .content as string;
+    expect(afterCascade).not.toBe(cascadeTouchJson);
+    const keys = (
+      JSON.parse(afterCascade) as {
+        phone: {
+          layer: Array<{
+            row: Array<{ key: Array<{ id: string; text?: string }> }>;
+          }>;
+        };
+      }
+    ).phone.layer[0]!.row[0]!.key;
+    // The carved key is gone entirely — no neutralized stub remains — and the
+    // sibling key survives untouched.
+    expect(keys.some((k) => k.id === "U_00E4")).toBe(false);
+    expect(keys.some((k) => k.id === "T_carved_00E4")).toBe(false);
+    expect(keys).toHaveLength(1);
+    expect(keys[0]!.id).toBe("U_0062");
+
+    // Step 1.6: the per-touch-key overlay addressing the PRE-cascade id
+    // resolves to nothing — byte-identical no-op, no warnings, no throw.
+    const { warnings } = applyTouchKeycapRemovalsToVfs(
+      vfs,
+      "test",
+      new Set(["phone:default:U_00E4"]),
+    );
+    expect(warnings).toEqual([]);
+    expect(vfs.get("source/test.keyman-touch-layout")!.content).toBe(
+      afterCascade,
+    );
   });
 });

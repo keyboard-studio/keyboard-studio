@@ -45,6 +45,7 @@ import type {
 } from "@keyboard-studio/contracts";
 import { effectiveMechanisms } from "@keyboard-studio/contracts";
 import type { Pattern } from "@keyboard-studio/contracts";
+import type { DeadkeyConflict } from "../deadkey-lifecycle/index.js";
 import { substituteSlots } from "./substitute.js";
 
 /**
@@ -58,6 +59,16 @@ export interface ApplyAssignmentsResult {
    * required slot, etc.). Empty array means everything applied cleanly.
    */
   warnings: string[];
+  /**
+   * Explicit deadkey identity conflicts detected during assignment resolution
+   * (spec 083 US6 — explicit-over-silent). Currently: `deadkey_single_tap`
+   * refs with different `deadkeyName` values sharing one trigger key. Each
+   * name-group still merges internally so no pairs are lost, but the
+   * collision is reported instead of silently merged; the studio must surface
+   * the merge / reassign / cancel choice. Empty array means no conflicts.
+   * Backward compatible: additive field, always present.
+   */
+  conflicts: DeadkeyConflict[];
 }
 
 // ---------------------------------------------------------------------------
@@ -437,6 +448,7 @@ export function applyAssignments(
   kmnSource: string
 ): ApplyAssignmentsResult {
   const warnings: string[] = [];
+  const conflicts: DeadkeyConflict[] = [];
 
   // Step 1: collect all physical MechanismRefs and deduplicate.
   const seen = new Map<string, MechanismRef>();
@@ -474,23 +486,41 @@ export function applyAssignments(
     seen.set(mechanismKey(merged), merged);
   }
 
-  // Merge multiple deadkey_single_tap refs that share the same triggerKey so
-  // they produce a single combined store(bases)/store(output) pair. Without this
-  // the second ref's stores overwrite the first's via the replace-by-name logic,
-  // silently dropping the first character's compose rule.
+  // Merge multiple deadkey_single_tap refs so they produce combined
+  // store(bases)/store(output) pairs instead of overwriting each other via the
+  // replace-by-name logic (which would silently drop compose rules).
+  //
+  // Grouping is by (triggerKey, deadkeyName), not by triggerKey alone:
+  // - Same trigger AND same name = one deadkey accumulating pairs (the S-02
+  //   multi-char flow: a source ref plus its case-pair companion). Merging is
+  //   correct pair accumulation, not a conflict (spec 083 US6: the conflict is
+  //   about *another* deadkey occupying the trigger).
+  // - Same trigger but DIFFERENT names = two distinct deadkey identities
+  //   colliding on one key. Each name-group still merges internally so no
+  //   pairs are lost, but a `trigger-in-use` conflict is appended to
+  //   `conflicts` instead of silently merging. The emitted KMN keeps both
+  //   deadkeys' rules and stores (first-wins ordering preserved): it may be
+  //   degraded — the second trigger rule is unreachable at runtime — but it
+  //   is non-lossy and the collision is explicit.
   const DEADKEY_PATTERN = "deadkey_single_tap";
   const deadkeyRefs = [...seen.values()].filter((r) => r.patternId === DEADKEY_PATTERN);
   if (deadkeyRefs.length > 1) {
-    // Group by triggerKey; only groups with >1 ref need merging.
-    const byTrigger = new Map<string, typeof deadkeyRefs>();
+    // Group by (triggerKey, deadkeyName); only groups with >1 ref need merging.
+    const byTriggerAndName = new Map<string, typeof deadkeyRefs>();
     for (const r of deadkeyRefs) {
-      const k = r.slotValues?.["triggerKey"] ?? "";
-      if (!byTrigger.has(k)) byTrigger.set(k, []);
-      byTrigger.get(k)!.push(r);
+      const k = `${r.slotValues?.["triggerKey"] ?? ""}::${r.slotValues?.["deadkeyName"] ?? ""}`;
+      if (!byTriggerAndName.has(k)) byTriggerAndName.set(k, []);
+      byTriggerAndName.get(k)!.push(r);
     }
-    for (const [, group] of byTrigger) {
+    // Merge each multi-ref group into one ref. The merged ref takes the
+    // position of the group's FIRST member in `seen` so first-wins ordering
+    // is preserved: with refs [acute, grave, acute], the merged acute group
+    // must still emit before grave (delete-then-append would wrongly let the
+    // second name win at runtime).
+    const mergedOfMember = new Map<string, MechanismRef>();
+    const firstMemberKeys = new Set<string>();
+    for (const [, group] of byTriggerAndName) {
       if (group.length <= 1) continue;
-      for (const r of group) seen.delete(mechanismKey(r));
       const first = group[0]!;
       const merged: MechanismRef = {
         ...first,
@@ -503,12 +533,86 @@ export function applyAssignments(
           accentChar: first.slotValues?.["accentChar"] ?? "",
         },
       };
-      seen.set(mechanismKey(merged), merged);
+      for (const r of group) mergedOfMember.set(mechanismKey(r), merged);
+      firstMemberKeys.add(mechanismKey(first));
+    }
+    if (mergedOfMember.size > 0) {
+      const emitted = new Set<MechanismRef>();
+      const reordered = new Map<string, MechanismRef>();
+      for (const [key, ref] of seen) {
+        const merged = mergedOfMember.get(key);
+        if (merged === undefined) {
+          reordered.set(key, ref);
+        } else if (firstMemberKeys.has(key) && !emitted.has(merged)) {
+          // First member's slot: emit the merged group here, in place.
+          reordered.set(mechanismKey(merged), merged);
+          emitted.add(merged);
+        }
+        // Non-first members of a merged group are dropped.
+      }
+      seen.clear();
+      for (const [key, ref] of reordered) seen.set(key, ref);
+    }
+
+    // First-wins at runtime: mergeGroupBlock PREPENDS each fragment's lines
+    // and Keyman fires the first matching rule, so the last-processed
+    // fragment's trigger rule would win. Reverse the deadkey refs among their
+    // own slots so the FIRST-assigned deadkey's trigger rule is emitted first
+    // and keeps working while the collision is unresolved. Non-deadkey refs
+    // keep their positions; only relative order within deadkey refs changes.
+    const deadkeyKeys = [...seen.keys()].filter(
+      (k) => seen.get(k)?.patternId === DEADKEY_PATTERN,
+    );
+    if (deadkeyKeys.length > 1) {
+      const reversedValues = deadkeyKeys
+        .map((k) => seen.get(k)!)
+        .reverse();
+      const swapped = new Map(
+        deadkeyKeys.map((k, i) => [k, reversedValues[i]!] as const),
+      );
+      const reordered = new Map<string, MechanismRef>();
+      for (const [key, ref] of seen) {
+        const replacement = swapped.get(key);
+        if (replacement !== undefined) {
+          reordered.set(mechanismKey(replacement), replacement);
+        } else {
+          reordered.set(key, ref);
+        }
+      }
+      seen.clear();
+      for (const [key, ref] of reordered) seen.set(key, ref);
+    }
+
+    // Cross-name trigger sharing: distinct deadkey identities on one key.
+    // Singles (never merged) count here too — the check runs over every
+    // surviving deadkey ref, not just the merged groups.
+    const namesByTrigger = new Map<string, Set<string>>();
+    for (const r of seen.values()) {
+      if (r.patternId !== DEADKEY_PATTERN) continue;
+      const trigger = r.slotValues?.["triggerKey"] ?? "";
+      const name = r.slotValues?.["deadkeyName"] ?? "";
+      if (!namesByTrigger.has(trigger)) namesByTrigger.set(trigger, new Set());
+      namesByTrigger.get(trigger)!.add(name);
+    }
+    for (const [trigger, names] of namesByTrigger) {
+      if (names.size <= 1) continue;
+      const sortedNames = [...names].sort();
+      conflicts.push({
+        kind: "trigger-in-use",
+        message:
+          `[pattern-apply] deadkey_single_tap refs with different deadkey names ` +
+          `(${sortedNames.map((n) => `"${n}"`).join(", ")}) share trigger key ` +
+          `"${trigger === "" ? "(none)" : trigger}": only the first trigger rule wins ` +
+          `at runtime. Both deadkeys' rules and stores were kept (no pairs lost); ` +
+          `the author must choose merge / reassign / cancel.`,
+        keys: trigger === "" ? [] : [trigger],
+        names: sortedNames,
+      });
     }
   }
 
   if (seen.size === 0) {
-    return { kmn: kmnSource, warnings };
+    return { kmn: kmnSource, warnings, conflicts };
   }
 
   // Step 2: resolve each unique ref to a substituted fragment.
@@ -577,7 +681,7 @@ export function applyAssignments(
   }
 
   if (allFragments.length === 0) {
-    return { kmn: kmnSource, warnings };
+    return { kmn: kmnSource, warnings, conflicts };
   }
 
   // Step 3: parse base .kmn, build existing-line set for idempotency.
@@ -648,5 +752,5 @@ export function applyAssignments(
     }
   }
 
-  return { kmn: serializeKmn(baseParsed), warnings };
+  return { kmn: serializeKmn(baseParsed), warnings, conflicts };
 }
