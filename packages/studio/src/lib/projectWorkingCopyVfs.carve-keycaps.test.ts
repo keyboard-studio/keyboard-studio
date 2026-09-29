@@ -3,8 +3,10 @@
 //
 // This file does NOT mock @keyboard-studio/engine — it exercises the real
 // applyCarveKeycapRemovalsToVfs pass so we observe the actual `.kvks` and
-// `.keyman-touch-layout` content after a carve, proving the layer files keep
-// their structure while the carved character's keycaps go blank.
+// `.keyman-touch-layout` content after a carve: the `.kvks` keeps its
+// structure with the carved character's keycaps blank, while the touch
+// layout REMOVES carved main keys by default (076 FR-023 T020) or keeps
+// them visibly inert under the keep-inert override.
 //
 // AC#1: A store-slot carve blanks the keycap labeled with that slot's char in
 //       both layer files; sibling keys and layer structure survive; baseIr is
@@ -165,20 +167,54 @@ describe("projectWorkingCopyVfs carve keycaps end-to-end — real engine, no moc
     expect(kvks).toContain('<key vkey="K_A">a</key>');
     expect(kvks.match(/<layer\b/g)).toHaveLength(1);
 
-    // .keyman-touch-layout: the é main key keeps its object with blank text;
-    // the é longpress entry is removed (property dropped when emptied); the
-    // sibling key is untouched.
+    // .keyman-touch-layout: the é main key is REMOVED (076 FR-023 T020
+    // default); the é longpress entry is removed (property dropped when
+    // emptied); the sibling key is untouched.
+    const touch = JSON.parse(
+      vfs.get("source/test_kb.keyman-touch-layout")?.content as string,
+    );
+    const keys = touch.tablet.layer[0].row[0].key;
+    expect(keys).toHaveLength(1);
+    expect(keys[0].text).toBe("a");
+    expect(keys[0].sk).toBeUndefined();
+
+    expect(ir).toEqual(irBefore);
+  });
+
+  it("AC#1b (T020): carveTouchKeepInert keeps the carved touch key visibly inert instead of removing it", () => {
+    const ir = makeFanOutIr();
+    const vfs = makeVfs("test_kb");
+
+    const { warnings } = projectWorkingCopyVfs({
+      vfs,
+      keyboardId: "test_kb",
+      baseIr: ir,
+      deletedNodeIds: new Set(),
+      deletedItemIds: new Set(["store#dkt#0"]), // carve the é slot
+      carveTouchKeepInert: new Set(["é"]),
+      assignments: [],
+      getPattern: () => undefined,
+      identity: null,
+    });
+
+    expect(warnings).toHaveLength(0);
+
+    // .kvks is unaffected by the touch override: the é keycap still blanks.
+    const kvks = vfs.get("source/test_kb.kvks")?.content as string;
+    expect(kvks).toContain('<key vkey="K_E"></key>');
+
+    // .keyman-touch-layout: the K_E main key is KEPT but inert — blank cap
+    // ("does nothing"), not removed. The é longpress entry is still removed
+    // (an invisible popup would still emit).
     const touch = JSON.parse(
       vfs.get("source/test_kb.keyman-touch-layout")?.content as string,
     );
     const keys = touch.tablet.layer[0].row[0].key;
     expect(keys).toHaveLength(2);
-    expect(keys[0].text).toBe("a");
-    expect(keys[0].sk).toBeUndefined();
     expect(keys[1].id).toBe("K_E");
     expect(keys[1].text).toBe("");
-
-    expect(ir).toEqual(irBefore);
+    expect(keys[1].output).toBeUndefined();
+    expect(keys[0].sk).toBeUndefined();
   });
 
   it("AC#2: an S-01 assignment of the carved char in the same projection re-populates the keycap (Step 3.5 wins)", () => {

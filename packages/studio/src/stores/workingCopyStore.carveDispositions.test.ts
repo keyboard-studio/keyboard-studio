@@ -245,6 +245,36 @@ describe("un-carve deletes carve dispositions", () => {
 });
 
 // ---------------------------------------------------------------------------
+// carveTouchKeepInert — T020 (076 FR-023) keep-inert overrides
+// ---------------------------------------------------------------------------
+
+describe("carveTouchKeepInert", () => {
+  it("starts empty (touch-layout removal is the default)", () => {
+    expect(store().carveTouchKeepInert).toEqual([]);
+  });
+
+  it("setCarveTouchKeepInert replaces wholesale and NFC-normalizes", () => {
+    const decomposed = "e" + String.fromCharCode(0x0301);
+    store().setCarveTouchKeepInert(["à", decomposed]);
+    expect(store().carveTouchKeepInert).toEqual(["à", "é"]);
+    store().setCarveTouchKeepInert([]);
+    expect(store().carveTouchKeepInert).toEqual([]);
+  });
+
+  it("un-carve clears keep-inert overrides alongside dispositions", () => {
+    store().setCarveTouchKeepInert(["é"]);
+    store().keepAll();
+    expect(store().carveTouchKeepInert).toEqual([]);
+    store().setCarveTouchKeepInert(["é"]);
+    store().restoreAll();
+    expect(store().carveTouchKeepInert).toEqual([]);
+    store().setCarveTouchKeepInert(["é"]);
+    store().setIR(makeTestIR());
+    expect(store().carveTouchKeepInert).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // getCarveDispositions — the compiler read path
 // ---------------------------------------------------------------------------
 
@@ -279,13 +309,15 @@ describe("getCarveDispositions", () => {
 // ---------------------------------------------------------------------------
 
 describe("carve dispositions persist with the working copy", () => {
-  it("round-trips the card decision and dispositions through snapshot/rehydrate", () => {
+  it("round-trips the card decision, dispositions, and keep-inert overrides through snapshot/rehydrate", () => {
     store().setClosedKeyboardCard("accepted");
     store().prefillCarveDispositions(["n1", "store2#0"], { sparseLatinOverlay: false });
     store().setCarveDisposition("n1", "allow-host");
+    store().setCarveTouchKeepInert(["é"]);
 
     const snapshot = snapshotWorkingCopyData();
     expect(snapshot.closedKeyboardCard).toBe("accepted");
+    expect(snapshot.carveTouchKeepInert).toEqual(["é"]);
     expect(snapshot.carveDispositions).toEqual([
       { comboId: "n1", disposition: "allow-host", provenance: "author-override" },
       { comboId: "store2#0", disposition: "block", provenance: "closed-keyboard-card" },
@@ -294,23 +326,27 @@ describe("carve dispositions persist with the working copy", () => {
     store().reset();
     expect(store().closedKeyboardCard).toBeNull();
     expect(store().carveDispositions).toEqual([]);
+    expect(store().carveTouchKeepInert).toEqual([]);
 
     useWorkingCopyStore.setState(prepareWorkingCopySnapshot(snapshot));
     expect(store().closedKeyboardCard).toBe("accepted");
+    expect(store().carveTouchKeepInert).toEqual(["é"]);
     expect(store().carveDispositions).toEqual([
       { comboId: "n1", disposition: "allow-host", provenance: "author-override" },
       { comboId: "store2#0", disposition: "block", provenance: "closed-keyboard-card" },
     ]);
   });
 
-  it("tolerates a pre-feature snapshot missing both fields", () => {
+  it("tolerates a pre-feature snapshot missing all three fields", () => {
     const snapshot = snapshotWorkingCopyData();
-    // A snapshot written before this feature existed has neither key.
+    // A snapshot written before this feature existed has none of these keys.
     const legacy = { ...snapshot };
     delete legacy.closedKeyboardCard;
     delete legacy.carveDispositions;
+    delete legacy.carveTouchKeepInert;
     const patch = prepareWorkingCopySnapshot(legacy);
     expect(patch.closedKeyboardCard).toBeNull();
     expect(patch.carveDispositions).toEqual([]);
+    expect(patch.carveTouchKeepInert).toEqual([]);
   });
 });

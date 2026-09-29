@@ -39,13 +39,17 @@ import type {
 } from "@keyboard-studio/contracts";
 import { parseSlotId } from "@keyboard-studio/engine";
 import {
-  DEADKEY,
   HOST_GUESS_CAPTION,
-  lookupHostOutput,
 } from "../../lib/referenceHostLayouts.ts";
 import type { HostLayoutId } from "../../lib/referenceHostLayouts.ts";
 import { useLikelyHostLayouts } from "../../lib/layoutFamily.ts";
 import type { HostLayoutRef } from "../../lib/layoutFamily.ts";
+// T019: the host-outcome lookup is shared with CarvedHostConsequences (the
+// expanded row) — one implementation of "what would this host produce",
+// never duplicated. (type-only import back: CarvedHostConsequences imports
+// only `type { CarvedCombo }` from this module, so there is no runtime
+// cycle.)
+import { hostOutcomeText } from "./CarvedHostConsequences.tsx";
 
 // ---------------------------------------------------------------------------
 // Carved-combo resolution: comboId -> display row
@@ -210,13 +214,9 @@ export interface ReviewRemovedKeysDialogProps {
 }
 
 function HostOutputCell({ hostId, combo }: { hostId: HostLayoutId; combo: CarvedCombo }) {
-  let text: string;
-  if (combo.key === undefined) {
-    text = "unknown";
-  } else {
-    const out = lookupHostOutput(hostId, combo.key, combo.modifiers);
-    text = out === undefined ? "unknown" : out === DEADKEY ? "deadkey" : out;
-  }
+  // T019: shared with CarvedHostConsequences — the lookup + unknown/deadkey
+  // handling live in hostOutcomeText, not here.
+  const text = hostOutcomeText(hostId, combo);
   const isUnknown = text === "unknown";
   return (
     <td

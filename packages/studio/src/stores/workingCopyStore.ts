@@ -590,6 +590,19 @@ export interface WorkingCopyState {
    */
   carveDispositions: CarveDisposition[];
 
+  /**
+   * Touch-layout keep-inert overrides, 076 FR-023 (T020): carved NFC
+   * characters the author wants kept — visibly inert, "does nothing" — in
+   * the touch layout instead of removed. Keyed by character (NFC); mirrors
+   * the keepInertTouchChars seam threaded from the bulk store through
+   * projectWorkingCopyVfs into applyCarveKeycapRemovalsToVfs. Empty means
+   * "remove carved keys from the touch layout" (the default).
+   */
+  carveTouchKeepInert: string[];
+
+  /** Set the keep-inert character set for carved touch keys (replaces wholesale). */
+  setCarveTouchKeepInert: (chars: string[]) => void;
+
   // -- Survey results (surveyResultsStore slots) --------------------------------
   /** Phase results captured so far, in completion order (A → B → … → F). */
   phaseResults: SurveyPhaseResult[];
@@ -1375,7 +1388,7 @@ export type WorkingCopyData = Omit<
   | "cascadeDelete"
   | "cascadeRestore"
   | "setClosedKeyboardCard" | "prefillCarveDispositions" | "setCarveDisposition"
-  | "pruneCarveDispositions" | "getCarveDispositions"
+  | "pruneCarveDispositions" | "getCarveDispositions" | "setCarveTouchKeepInert"
   | "recordPhase" | "recordAssignments"
   | "setIrAxes" | "lockDesktop" | "unlockDesktop"
   | "setTouchLayoutJson" | "setTouchDraft" | "markGalleryIntroSeen" | "reset"
@@ -1429,6 +1442,7 @@ const INITIAL_STATE: WorkingCopyData = {
   // card unanswered, no carve decisions yet
   closedKeyboardCard: null,
   carveDispositions: [],
+  carveTouchKeepInert: [],
   // survey slots
   ...INITIAL_SURVEY,
   phaseAnswersByStep: {},
@@ -1465,7 +1479,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     set({ ir, deletedNodeIds: new Set(), deletedItemIds: new Set(), undoStack: [],
       // Full IR replacement: stale carve deletions correctly must not carry
       // over — and neither may their carve-decision metadata (076 FR-022).
-      carveDispositions: [] }),
+      carveDispositions: [], carveTouchKeepInert: [] }),
 
   // Overlay-preserving write for spec-014 mutate-seam incremental patches.
   // Deliberately writes ONLY `ir`, leaving deletedNodeIds/deletedItemIds/undoStack
@@ -1621,6 +1635,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // No carve remains applied: no carve-decision metadata survives either
       // (076 FR-022 — un-carving deletes the metadata).
       carveDispositions: [],
+      carveTouchKeepInert: [],
     }),
 
   restoreAll: () => get().keepAll(),
@@ -1710,6 +1725,11 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       return { carveDispositions: pruned };
     });
   },
+
+  // 076 FR-023 (T020): wholesale replace; NFC-normalize so the engine seam
+  // comparison stays exact.
+  setCarveTouchKeepInert: (chars) =>
+    set({ carveTouchKeepInert: chars.map((c) => c.normalize("NFC")) }),
 
   getCarveDispositions: (comboIds) => {
     const { carveDispositions } = get();
@@ -2006,6 +2026,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // decisions yet — both are per-working-copy (076 FR-022).
       closedKeyboardCard: null,
       carveDispositions: [],
+      carveTouchKeepInert: [],
     });
   },
 
@@ -2081,6 +2102,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // decisions yet — both are per-working-copy (076 FR-022).
       closedKeyboardCard: null,
       carveDispositions: [],
+      carveTouchKeepInert: [],
     });
   },
 

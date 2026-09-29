@@ -34,6 +34,14 @@ export interface CarveKeycapRemovalInput {
    * character intent) but harmlessly accepted.
    */
   wholeNodeIds: ReadonlySet<string>;
+  /**
+   * 076 FR-023 (T020): carved characters (NFC texts) whose touch keys are
+   * KEPT INERT ("kept, does nothing") instead of the default "removed from
+   * the touch layout". The author's keep-inert override, keyed by carved
+   * character because touch matching is by keycap text. Empty/omitted =
+   * the removal default for every carved touch key.
+   */
+  keepInertTouchChars?: ReadonlySet<string>;
 }
 
 // ---------------------------------------------------------------------------
@@ -174,28 +182,20 @@ export function collectCarvedKeycapTexts(
 
 /**
  * Blank every keycap displaying a carved character across the `.kvks` and
- * `.keyman-touch-layout` VFS entries, keeping the files' layer/row/key
- * structure fully intact.
+ * `.keyman-touch-layout` VFS entries.
  *
  * - `.kvks`: every `<layer>` (any shift state) is scanned; a matching
  *   `<key>`'s text is cleared but the element is KEPT — removing it would
  *   let the OSK renderer fall back to the underlying layout's cap, which is
  *   exactly the visual degradation this pass prevents.
- * - `.keyman-touch-layout`: matching main keys get `text: ""` (the key stays,
- *   so rows never reflow) when the displayed text or `output` itself matches
- *   a carved character. A carved `output` value is additionally DELETED and
- *   the id neutralized to an inert `T_carved_*` id. Separately — and
- *   unconditionally, regardless of `text`/`output` — any main key whose id
- *   encodes a carved character (a `U_<HEX>` id, which emits its code point
- *   and re-labels purely off the id, independent of `text`) has that id
- *   neutralized to `T_carved_<HEX>`; a stale/mismatched `text` label is left
- *   untouched unless it separately matched a carved character. When
- *   `output` is present on a non-`U_` id (e.g. `K_X`), its id similarly
- *   becomes `T_carved_<id>` (with `output` gone, a `K_` id would otherwise
- *   fall back to its underlying .kmn rule and could silently emit a
- *   different character under a now-blank cap). Matching longpress /
- *   multitap / flick entries are REMOVED (an invisible popup entry would
- *   still emit), and the property is dropped when it empties.
+ * - `.keyman-touch-layout`: 076 FR-023 (T020) — a matching main key is
+ *   REMOVED from the touch layout by default ("removed from the touch
+ *   layout"). Under the author's keep-inert override
+ *   (`keepInertTouchChars`, per carved character), the key is KEPT but made
+ *   inert instead ("kept, does nothing"): `text: ""`, a carved `output`
+ *   deleted, and the id neutralized to an inert `T_carved_*` id. Matching
+ *   longpress / multitap / flick entries are REMOVED in both modes (an
+ *   invisible popup entry would still emit).
  *
  * Missing layer files are a silent no-op (many keyboards ship neither);
  * binary or malformed entries produce one warning each.
@@ -220,7 +220,7 @@ export function applyCarveKeycapRemovalsToVfs(
   const { kvksPath, touchPath } = resolveOskAssetPaths(vfs, keyboardId);
 
   clearKvksKeycaps(vfs, kvksPath, carved, warnings);
-  clearTouchKeycaps(vfs, touchPath, carved, warnings);
+  clearTouchKeycaps(vfs, touchPath, carved, warnings, removals.keepInertTouchChars);
 
   return { warnings };
 }
@@ -277,16 +277,25 @@ function clearKvksKeycaps(
 
 /**
  * Clear matching keycaps in the `.keyman-touch-layout` JSON across all
- * platforms and ALL layers. Main keys keep their object (`text: ""`, a
- * carved `output` deleted and the id neutralized to `T_carved_*`);
- * longpress/multitap/flick entries are removed. Writes back only when
- * something changed.
+ * platforms and ALL layers.
+ *
+ * 076 FR-023 (T020): a main key matching a carved character is REMOVED from
+ * the touch layout by default ("removed from the touch layout") — the key
+ * object is spliced out of its row. Under the keep-inert override
+ * (`keepInertTouchChars`, per carved character) the key is KEPT but made
+ * inert instead ("kept, does nothing"): `text: ""`, a carved `output`
+ * deleted, and the id neutralized to an inert `T_carved_*` id (a stale/
+ * mismatched `text` label is left alone — it was never carved). Matching
+ * longpress / multitap / flick entries are REMOVED in both modes (an
+ * invisible popup entry would still emit), and the property is dropped when
+ * it empties. Writes back only when something changed.
  */
 function clearTouchKeycaps(
   vfs: VirtualFS,
   touchPath: string,
   carved: ReadonlySet<string>,
   warnings: string[],
+  keepInertTouchChars?: ReadonlySet<string>,
 ): void {
   // Touch layout is optional — skip silently when absent or binary.
   const raw = readVfsText(vfs, touchPath);
@@ -350,8 +359,14 @@ function clearTouchKeycaps(
         const keys = (row as Record<string, unknown>)["key"];
         if (!Array.isArray(keys)) continue;
 
+        // 076 FR-023 (T020): carved main keys are removed from the touch
+        // layout by default; the key object is spliced out of the row.
+        const keptKeys: unknown[] = [];
         for (const key of keys) {
-          if (!key || typeof key !== "object") continue;
+          if (!key || typeof key !== "object") {
+            keptKeys.push(key);
+            continue;
+          }
           const keyObj = key as {
             id?: string;
             text?: string;
@@ -369,6 +384,24 @@ function clearTouchKeycaps(
           const outputMatches = mainKeyValueMatches(keyObj.output);
           const idIsCarved =
             typeof keyObj.id === "string" && carvedUnicodeIds.has(keyObj.id);
+          const mainMatched = textMatches || outputMatches || idIsCarved;
+
+          // Keep-inert applies only when EVERY carved character this key
+          // matches is overridden — a key emitting a non-overridden carved
+          // character is still removed.
+          let keepInert = mainMatched;
+          if (textMatches && !keepInertTouchChars?.has(text.normalize("NFC"))) keepInert = false;
+          if (outputMatches && !keepInertTouchChars?.has((keyObj.output as string).normalize("NFC"))) keepInert = false;
+          if (idIsCarved && !keepInertTouchChars?.has(carvedUnicodeIds.get(keyObj.id as string) as string)) keepInert = false;
+
+          if (mainMatched && !keepInert) {
+            // T020 default: the key leaves the touch layout entirely. Its
+            // popup entries die with it (they are carved matches too, and
+            // would still emit if kept).
+            changed = true;
+            continue;
+          }
+
           if (textMatches || outputMatches) {
             keyObj.text = "";
             changed = true;
@@ -378,9 +411,7 @@ function clearTouchKeycaps(
             // regardless of the .kmn rules — delete it, and neutralize the id
             // to an inert `T_carved_*` id so a `K_` id can't fall back to its
             // underlying .kmn rule and silently emit a different character
-            // under a now-blank cap (mirrors the U_-id neutralization below;
-            // the key element itself is always kept — never remove keys/rows/
-            // layers).
+            // under a now-blank cap (mirrors the U_-id neutralization below).
             delete keyObj.output;
             if (typeof keyObj.id === "string") {
               keyObj.id = keyObj.id.startsWith("U_")
@@ -397,6 +428,8 @@ function clearTouchKeycaps(
             keyObj.id = `T_carved_${(keyObj.id as string).slice(2)}`;
             changed = true;
           }
+
+          keptKeys.push(keyObj);
 
           // Popup entries: remove outright (no layout-stability concern).
           for (const prop of ["sk", "multitap"] as const) {
@@ -426,6 +459,13 @@ function clearTouchKeycaps(
               changed = true;
             }
           }
+        }
+        // T020: splice removed keys back into the row. keptKeys holds every
+        // key that survived (in original order); a shorter array means at
+        // least one carved key left the touch layout.
+        if (keptKeys.length !== keys.length) {
+          (row as Record<string, unknown>)["key"] = keptKeys;
+          changed = true;
         }
       }
     }

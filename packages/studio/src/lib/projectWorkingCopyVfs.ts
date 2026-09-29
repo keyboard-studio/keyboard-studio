@@ -166,6 +166,14 @@ export interface ProjectWorkingCopyVfsInput {
    */
   carveLoud?: boolean;
   /**
+   * Touch-layout keep-inert overrides, 076 FR-023 (T020): carved NFC
+   * characters to keep — visibly inert, "does nothing" — in the touch
+   * layout instead of removed. Threaded to the step-1.5 keycap projection
+   * as keepInertTouchChars. Omit or pass an empty set for the default
+   * ("removed from the touch layout").
+   */
+  carveTouchKeepInert?: ReadonlySet<string>;
+  /**
    * Individually-deleted pre-existing touch methods (main key / longpress /
    * multitap / flick), addressed by the `touchKeyAddress.ts` scheme. Applied
    * at step 1.6, after the carve keycap cascade. Omit or pass an empty set
@@ -306,6 +314,7 @@ export function projectWorkingCopyVfs(
     deletedTouchKeyIds = new Set<string>(),
     carveDispositions = [],
     carveLoud = false,
+    carveTouchKeepInert,
     keyEditOps = [],
     assignments,
     getPattern,
@@ -457,17 +466,24 @@ export function projectWorkingCopyVfs(
   }
   warnings.push(...carveResult.warnings);
 
-  // Step 1.5: Carve keycap projection — blank carved characters off the .kvks /
-  // .keyman-touch-layout keycaps IN PLACE (layer/row/key structure is never
-  // dropped), so the live preview's visual keyboard keeps its full layout with
-  // just the carved caps blank. Runs before Step 3.5 so a subsequent assignment
-  // label re-populates a blanked keycap, and before Step 4 so paths resolve
-  // against the pre-rename source/<keyboardId>.* filenames.
+  // Step 1.5: Carve keycap projection — blank carved characters off the .kvks
+  // keycaps IN PLACE (layer/row/key structure is never dropped), so the live
+  // preview's visual keyboard keeps its full layout with just the carved caps
+  // blank; on the .keyman-touch-layout a carved main key is REMOVED by
+  // default (076 FR-023, T020) unless listed in carveTouchKeepInert, in which
+  // case it is kept visibly inert ("does nothing"). Runs before Step 3.5 so a
+  // subsequent assignment label re-populates a blanked keycap, and before
+  // Step 4 so paths resolve against the pre-rename source/<keyboardId>.* filenames.
   if (hasCarveEdit) {
     try {
       const keycapRemovalResult = applyCarveKeycapRemovalsToVfs(vfs, keyboardId, baseIr, {
         slotIds,
         wholeNodeIds: allWholeNodeIds,
+        // exactOptionalPropertyTypes: only pass the seam when non-empty —
+        // an explicit undefined is not assignable to the optional field.
+        ...(carveTouchKeepInert !== undefined && carveTouchKeepInert.size > 0
+          ? { keepInertTouchChars: carveTouchKeepInert }
+          : {}),
       });
       warnings.push(...keycapRemovalResult.warnings);
     } catch (err: unknown) {

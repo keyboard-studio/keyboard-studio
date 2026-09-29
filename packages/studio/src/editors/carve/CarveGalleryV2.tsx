@@ -29,6 +29,8 @@ import { useCarveNeededSet } from '../../hooks/useCarveNeededSet.ts';
 import { usePublishStepNav } from '../../hooks/usePublishStepNav.ts';
 import { LayoutFamilyQuestion } from './LayoutFamilyQuestion.tsx';
 import { ReviewRemovedKeysDialog, resolveCarvedCombos } from './ReviewRemovedKeys.tsx';
+import { DISPOSITION_COPY } from "./carveDispositionCopy.ts";
+import { CarvedHostConsequences } from "./CarvedHostConsequences.tsx";
 
 interface CarveGalleryV2Props {
   onComplete: () => void;
@@ -465,22 +467,10 @@ function RecommendedGroupCard({
  * states its OWN risk; the retired one-sided allow/block slogan (the version
  * that framed Allow as unpredictable and Block as predictable) must never
  * appear — a T016 test asserts its absence from the rendered gallery and
- * this block. Exported for that test and for T019's expanded row, which
- * reuses these strings.
+ * this block. Defined in ./carveDispositionCopy.ts and re-exported here so
+ * existing imports keep working; T019's expanded row imports it from there.
  */
-export const DISPOSITION_COPY = {
-  prompt: 'Do your typists expect a character on this key?',
-  allowLabel: 'Allow',
-  blockLabel: 'Block',
-  allowRisk: 'Key does something, but output varies by computer.',
-  blockRisk: 'Key reliably does nothing, but becomes inaccessible/dead if typists expected a character.',
-  provenanceLabel: {
-    'closed-keyboard-card': 'from closed-keyboard card',
-    'closed-keyboard-card-declined': 'from closed-keyboard card',
-    'bulk-default': 'bulk default',
-    'author-override': 'your override',
-  } as Record<CarveDispositionProvenance, string>,
-};
+export { DISPOSITION_COPY } from "./carveDispositionCopy.ts";
 
 function DispositionControl({ comboIds, sparseLatinOverlay }: { comboIds: string[]; sparseLatinOverlay: boolean }) {
   const carveDispositions = useWorkingCopyStore((s) => s.carveDispositions);
@@ -1158,6 +1148,28 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                     {cell.inAlpha ? 'Yes' : 'No'}
                   </span>
                 </div>
+
+                {/* T019 (076 FR-023): expanded host-consequence row for the
+                    selected carved combination — per-likely-host consequence
+                    table, HOST_GUESS_CAPTION, the expectation prompt, and
+                    each option's own risk (DISPOSITION_COPY). A combo exists
+                    in carvedCombos only while it has a disposition, and
+                    dispositions are created on carve and deleted on un-carve,
+                    so a non-empty match means this character is carved.
+                    Read-only: the Allow/Block control itself lives on the
+                    gallery row (T016). */}
+                {(() => {
+                  const ids = new Set(characterCellIds(cell));
+                  const combos = carvedCombos.filter((c) => ids.has(c.comboId));
+                  if (combos.length === 0) return null;
+                  return (
+                    <>
+                      {combos.map((combo) => (
+                        <CarvedHostConsequences key={combo.comboId} combo={combo} bcp47={identityBcp47} />
+                      ))}
+                    </>
+                  );
+                })()}
 
                 {/* Read-only from here down (#1619 AC2) — no discard/restore
                     control in this panel. Toggling a character happens only

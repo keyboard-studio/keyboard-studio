@@ -233,6 +233,10 @@ export function useWorkingCopyTransform(
   // them again as a backstop. A6 loud/soft (FR-009) has no UI yet — the
   // suppression stage defaults to soft (loud: false).
   const getCarveDispositions = useWorkingCopyStore((s) => s.getCarveDispositions);
+  // 076 FR-023 (T020): keep-inert chars for carved touch keys ("kept, does
+  // nothing" instead of removed). The set is built inside the main useMemo;
+  // this array feeds a primitive-stable memo key below.
+  const carveTouchKeepInertChars = useWorkingCopyStore((s) => s.carveTouchKeepInert);
   const identity = useWorkingCopyStore((s) => s.identity);
   // Assignments: physical only (touch is projected via touchLayoutJson below).
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
@@ -319,6 +323,13 @@ export function useWorkingCopyTransform(
         getCarveDispositions([...deletedNodeIds, ...deletedItemIds]),
       ),
     [getCarveDispositions, deletedNodeIds, deletedItemIds],
+  );
+
+  // Keep-inert key (T020, FR-023) — primitive-stable so the main useMemo
+  // doesn't fire on reference churn. Sorted for order-independence.
+  const carveTouchKeepInertKey = useMemo(
+    () => JSON.stringify([...carveTouchKeepInertChars].sort()),
+    [carveTouchKeepInertChars],
   );
 
   // Identity display name + Track-1 rename id + bcp47.
@@ -413,6 +424,11 @@ export function useWorkingCopyTransform(
         deletedItemIds,
         deletedTouchKeyIds,
         ...(carveDispositions.length > 0 ? { carveDispositions } : {}),
+        // T020 (FR-023): keep-inert chars for carved touch keys. The store
+        // array is NFC-normalized at write time; the Set is the engine seam.
+        ...(carveTouchKeepInertChars.length > 0
+          ? { carveTouchKeepInert: new Set(carveTouchKeepInertChars) }
+          : {}),
         keyEditOps,
         assignments: effectiveAssignments,
         getPattern: (id) => patternMap?.get(id),
@@ -435,6 +451,7 @@ export function useWorkingCopyTransform(
     storeBaseDisplayName,
     deletedKey,
     carveDispositionsKey,
+    carveTouchKeepInertKey,
     assignmentsKey,
     identityDisplayName,
     identityKeyboardId,

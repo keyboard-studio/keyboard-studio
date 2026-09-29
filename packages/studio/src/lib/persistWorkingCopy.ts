@@ -345,6 +345,9 @@ export function snapshotWorkingCopyData(): WorkingCopySnapshot {
     // these fields existed reads as "card unanswered, no decisions".
     closedKeyboardCard: s.closedKeyboardCard,
     carveDispositions: s.carveDispositions,
+    // 076 FR-023 T020 keep-inert overrides: plain JSON-safe string array,
+    // same passthrough + tolerant-read idiom as the dispositions above.
+    carveTouchKeepInert: s.carveTouchKeepInert,
     // Both fields are plain JSON-safe data (spec 063 T058) — straight
     // passthrough on write. The read side (prepareWorkingCopySnapshot, below)
     // is the tolerant half: it falls back when a pre-058 snapshot has neither
@@ -433,6 +436,7 @@ export function prepareWorkingCopySnapshot(snapshot: WorkingCopySnapshot): Parti
     // same idiom as deletedTouchKeyIds/sequenceFlaggedChars above.
     closedKeyboardCard: snapshot.closedKeyboardCard ?? null,
     carveDispositions: snapshot.carveDispositions ?? [],
+    carveTouchKeepInert: snapshot.carveTouchKeepInert ?? [],
     // Tolerate snapshots saved before these fields existed (spec 063 T058 /
     // R10.3): an absent value must not clobber the store defaults with
     // undefined — same idiom as deletedTouchKeyIds/sequenceFlaggedChars above.
