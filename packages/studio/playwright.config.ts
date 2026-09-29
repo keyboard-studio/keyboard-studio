@@ -25,7 +25,7 @@
 // package expects — the CD lane ships chromium at a stable path that may lag
 // the pinned download. Absent the env var, behaviour is unchanged.
 
-import { defineConfig } from "playwright/test";
+import { defineConfig, devices } from "playwright/test";
 
 const chromiumExecutablePath = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH;
 
@@ -59,6 +59,32 @@ export default defineConfig({
       ]
     : "list",
   globalSetup: "./e2e/global-setup.ts",
+  // Mobile adaptation (Phase 6): two projects.
+  //
+  // - `desktop`: Desktop Chrome. No viewport override — Playwright's default
+  //   1280×720 stands, so existing desktop specs keep their viewport
+  //   assumptions. Runs every spec EXCEPT the mobile-* specs.
+  // - `mobile`: Pixel 7 (412×915 CSS px, touch, mobile). Runs ONLY the
+  //   mobile-* specs. 412px is under the 479px narrow breakpoint, so the
+  //   narrow-viewport branches activate.
+  //
+  // Run one lane at a time: `npx playwright test --project=desktop` or
+  // `--project=mobile`. CI runs the desktop lane (existing specs) as before;
+  // the mobile lane is planned as a separate non-blocking step — the ci.yml
+  // lane split is deferred (needs workflow scope), so mobile specs stay
+  // manual/local for now.
+  projects: [
+    {
+      name: "desktop",
+      use: { ...devices["Desktop Chrome"] },
+      testIgnore: /\/e2e\/mobile-[^/]*\.spec\.ts/,
+    },
+    {
+      name: "mobile",
+      use: { ...devices["Pixel 7"] },
+      testMatch: /\/e2e\/mobile-[^/]*\.spec\.ts/,
+    },
+  ],
   use: {
     baseURL: "http://localhost:5273",
     launchOptions: chromiumExecutablePath

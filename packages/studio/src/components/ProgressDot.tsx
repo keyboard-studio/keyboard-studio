@@ -29,6 +29,11 @@
 //
 // Hover is the shortcut, not the mechanism (Q8 resolved): the native `title`
 // attribute mirrors the accessible name (FR-044).
+//
+// `layout="row"` (the narrow-viewport journey contents, JourneyContents.tsx)
+// renders the SAME mark beside its visible label as one full-width row
+// button, because a phone has no hover to reveal what a bare dot is. The
+// shape vocabulary and accessible name are identical in both layouts.
 
 import type { CSSProperties } from "react";
 import { useLingui } from "@lingui/react/macro";
@@ -45,6 +50,8 @@ export interface ProgressDotProps {
    * component, not left to the caller to remember.
    */
   readonly onActivate: (dot: ProgressDotData) => void;
+  /** "dot" (default): the bare footer mark. "row": mark + visible label. */
+  readonly layout?: "dot" | "row";
 }
 
 /** Diameter in px, by TIER (journey-strip-contract.md §2 table). `current`
@@ -68,7 +75,7 @@ const BADGE_MESSAGE: Record<WorkKind, ReturnType<typeof msg>> = {
   }),
 };
 
-export function ProgressDot({ dot, onActivate }: ProgressDotProps) {
+export function ProgressDot({ dot, onActivate, layout = "dot" }: ProgressDotProps) {
   const { t, i18n } = useLingui();
   const baseSize = TIER_SIZE[dot.tier];
   const size = dot.kind === "current" ? baseSize + CURRENT_SIZE_BONUS : baseSize;
@@ -175,19 +182,88 @@ export function ProgressDot({ dot, onActivate }: ProgressDotProps) {
               border: `1px solid ${CSS_BORDER}`,
             };
 
+  const badgeNotch =
+    dot.badge !== undefined && dot.badge.length > 0 ? (
+      <span
+        aria-hidden="true"
+        data-progress-dot-badge=""
+        style={{
+          position: "absolute",
+          top: -2,
+          right: -2,
+          width: 0,
+          height: 0,
+          borderStyle: "solid",
+          borderWidth: "0 6px 6px 0",
+          borderColor: `transparent ${CSS_TEXT} transparent transparent`,
+        }}
+      />
+    ) : null;
+
+  const handleClick = () => {
+    // FR-061: the current marker is never a jump target to itself. Every
+    // OTHER dot's activation is handed to the caller, which routes it
+    // through jumpToLocation — the one jump implementation (FR-045).
+    if (dot.kind === "current") return;
+    onActivate(dot);
+  };
+
+  if (layout === "row") {
+    return (
+      <button
+        type="button"
+        aria-label={ariaLabel}
+        {...(dot.kind === "current" ? { "aria-current": "step" as const } : {})}
+        onClick={handleClick}
+        className="ks-focus-ring"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          width: "100%",
+          minHeight: "var(--app-touch-target)",
+          padding: dot.tier === "question" ? "0 12px 0 32px" : "0 12px",
+          border: "none",
+          borderRadius: 6,
+          background:
+            dot.kind === "current" ? "var(--app-accent-subtle)" : "transparent",
+          color: CSS_TEXT,
+          fontFamily: "var(--app-font)",
+          fontSize: dot.tier === "question" ? 14 : 15,
+          fontWeight: dot.kind === "current" || dot.tier === "section" ? 600 : 400,
+          textAlign: "left",
+          cursor: dot.kind === "current" ? "default" : "pointer",
+        }}
+        data-progress-dot-kind={dot.kind}
+        data-progress-dot-tier={dot.tier}
+        data-progress-dot-fill={dot.fill}
+      >
+        <span
+          aria-hidden="true"
+          style={{
+            ...shapeStyle,
+            position: "relative",
+            width: size,
+            height: size,
+            minWidth: size,
+            flexShrink: 0,
+            boxSizing: "content-box",
+          }}
+        >
+          {badgeNotch}
+        </span>
+        <span style={{ flex: 1, minWidth: 0 }}>{dot.label}</span>
+      </button>
+    );
+  }
+
   return (
     <button
       type="button"
       aria-label={ariaLabel}
       title={ariaLabel}
       {...(dot.kind === "current" ? { "aria-current": "step" as const } : {})}
-      onClick={() => {
-        // FR-061: the current marker is never a jump target to itself. Every
-        // OTHER dot's activation is handed to the caller, which routes it
-        // through jumpToLocation — the one jump implementation (FR-045).
-        if (dot.kind === "current") return;
-        onActivate(dot);
-      }}
+      onClick={handleClick}
       style={{
         ...shapeStyle,
         position: "relative",
@@ -215,22 +291,7 @@ export function ProgressDot({ dot, onActivate }: ProgressDotProps) {
       {/* §3c: a small filled triangular notch, top-right — a SHAPE cue for
           "work waiting", never colour alone. Presentational only; the badge
           is already named in the button's own accessible name above. */}
-      {dot.badge !== undefined && dot.badge.length > 0 && (
-        <span
-          aria-hidden="true"
-          data-progress-dot-badge=""
-          style={{
-            position: "absolute",
-            top: -2,
-            right: -2,
-            width: 0,
-            height: 0,
-            borderStyle: "solid",
-            borderWidth: "0 6px 6px 0",
-            borderColor: `transparent ${CSS_TEXT} transparent transparent`,
-          }}
-        />
-      )}
+      {badgeNotch}
     </button>
   );
 }

@@ -19,7 +19,9 @@ describe("initial values", () => {
     // A `persist`-wrapped store exposes `.persist`; this one must not, or the
     // Q9 lifetime (survives a tab switch, dies on reload) would be wrong in
     // the direction that needs explicit clearing code.
-    expect((useViewStateStore as unknown as { persist?: unknown }).persist).toBeUndefined();
+    expect(
+      (useViewStateStore as unknown as { persist?: unknown }).persist,
+    ).toBeUndefined();
   });
 });
 
@@ -32,7 +34,9 @@ describe("slot writes", () => {
   it("toggles a trail stage on and back off", () => {
     const { toggleTrailStage } = useViewStateStore.getState();
     toggleTrailStage("characters");
-    expect([...useViewStateStore.getState().trailCollapsedSteps]).toEqual(["characters"]);
+    expect([...useViewStateStore.getState().trailCollapsedSteps]).toEqual([
+      "characters",
+    ]);
     useViewStateStore.getState().toggleTrailStage("characters");
     expect([...useViewStateStore.getState().trailCollapsedSteps]).toEqual([]);
   });
@@ -84,7 +88,9 @@ describe("scrollTop keying", () => {
     });
     // Adding a pane must not shift an existing pane's restored offset.
     useViewStateStore.getState().setScrollTop("trail-list", 8);
-    expect(useViewStateStore.getState().scrollTop["survey-questions"]).toBe(120);
+    expect(useViewStateStore.getState().scrollTop["survey-questions"]).toBe(
+      120,
+    );
   });
 });
 

@@ -8,7 +8,7 @@
 // (cascadeDelete/cascadeRestore) — no gallery-specific write path.
 
 import { useState, useMemo, useCallback, useEffect } from 'react';
-import type { ReactNode } from 'react';
+import type { ReactNode, CSSProperties } from 'react';
 import { Trans, useLingui } from "@lingui/react/macro";
 import { useWorkingCopyStore, bulkDispositionDefault } from '../../stores/workingCopyStore.ts';
 import { recommendedRemovalChars, displayChar, isSparseLatinOverlayTarget } from '../../lib/irToCarveNodes.ts';
@@ -27,6 +27,7 @@ import { RemovedDropdown } from '../assignLoop/parts/StatusBar.tsx';
 import type { RemovedItem } from '../assignLoop/parts/StatusBar.tsx';
 import { useCarveNeededSet } from '../../hooks/useCarveNeededSet.ts';
 import { usePublishStepNav } from '../../hooks/usePublishStepNav.ts';
+import { useIsNarrow } from '../../hooks/useViewport.ts';
 import { LayoutFamilyQuestion } from './LayoutFamilyQuestion.tsx';
 import { ReviewRemovedKeysDialog, resolveCarvedCombos } from './ReviewRemovedKeys.tsx';
 import { DISPOSITION_COPY } from "./carveDispositionCopy.ts";
@@ -449,6 +450,268 @@ function RecommendedGroupCard({
   );
 }
 
+/**
+ * "How it's typed" block for a character cell — shared by the desktop
+ * details rail and the narrow-viewport details card (mobile adaptation
+ * Phase 3). Extracted verbatim from the rail's former inline IIFE so
+ * both surfaces render identical content: the hover-driven detail text now
+ * lives here, reachable by tap on narrow. `showLabel` lets the card's own
+ * disclosure button carry the label instead of rendering it twice.
+ */
+function HowItsTyped({ cell, showLabel = true }: { cell: CharacterCell; showLabel?: boolean }) {
+// TOTAL FLOOR: a producer is renderable
+// only when it has faithful STEPS or a resolvable
+// TRIGGER-KEY FLOOR (CharProducer.triggerFloor, computed
+// by charProducers). A producer with neither is dropped
+// entirely — the two former placeholder phrases ("Not
+// tied to a single key" / "Not shown — context-dependent")
+// have NO render path anywhere below.
+const ways = cell.waysToType.filter((w) => w.steps.length > 0 || w.triggerFloor !== undefined);
+const label = showLabel ? (
+  <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--app-text-subtle)', marginBottom: 6 }}>
+    How it's typed
+  </div>
+) : null;
+const renderWay = (way: CharacterCell['waysToType'][number]) => (
+  way.steps.length > 0
+    ? <KeySeq keys={way.steps} joiner="then" />
+    : <span style={{ fontSize: 12.5, color: 'var(--app-text-subtle)' }}>Typed with {way.triggerFloor}</span>
+);
+
+if (ways.length === 0) {
+  // No renderable producer at all. Three sources get their
+  // own honest message (none a banned phrase); every
+  // other zero-producer character shows no "way" line
+  // whatsoever.
+  //
+  // touch-only-key reaches here for the same reason it
+  // exists (spec §8): its only producer is a
+  // T_xxxx-triggered rule, which charProducers drops
+  // rather than leak a touch id as a desktop keystroke —
+  // so ways is empty and, without this branch, the
+  // character would render with no explanation of why no
+  // keys are shown.
+  if (cell.source === 'touch-only-key') {
+    return (
+      <>
+        {label}
+        <span style={{ fontSize: 12.5, color: 'var(--app-text-subtle)' }}>
+          Only on the touch keyboard — no desktop key types it
+        </span>
+      </>
+    );
+  }
+  if (cell.source === 'blocked-candidate') {
+    return (
+      <>
+        {label}
+        <span style={{ fontSize: 12.5, color: 'var(--app-text-subtle)' }}>
+          This keyboard blocks this combination — nothing types it
+        </span>
+      </>
+    );
+  }
+  if (cell.source !== 'advanced-rule') return null;
+  return (
+    <>
+      {label}
+      <span style={{ fontSize: 12.5, color: 'var(--app-text-subtle)' }}>
+        Produced by an advanced rule — the keystroke can't be shown
+      </span>
+    </>
+  );
+}
+
+// Single-line (unchanged feel) unless there's more than one
+// renderable producer OR the one producer carries a
+// condition to explain — a plain unconditional
+// single producer stays exactly as before, no "1 way"
+// label clutter.
+const showList = ways.length > 1 || (ways.length === 1 && ways[0]?.condition !== undefined);
+
+if (!showList) {
+  return (
+    <>
+      {label}
+      {renderWay(ways[0]!)}
+    </>
+  );
+}
+
+return (
+  <>
+    <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--app-text-subtle)', marginBottom: 6 }}>
+      How it's typed · {ways.length} {ways.length === 1 ? 'way' : 'ways'}
+    </div>
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      {ways.map((way, i) => (
+        <div key={i} style={{ padding: '6px 8px', borderRadius: 7, background: 'var(--app-surface-2)', border: '1px solid var(--app-border)' }}>
+          {renderWay(way)}
+          {way.condition !== undefined && (
+            <div style={{ fontSize: 11, color: 'var(--app-text-subtle)', marginTop: 4, fontStyle: 'italic' }}>
+              {way.condition}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  </>
+);
+}
+
+/**
+ * Narrow-viewport character-details card (mobile adaptation, Phase 3).
+ * Replaces the 290px details rail under 479px: a collapsible card pinned
+ * above the chip grid showing the selected character, Keep/Carve actions,
+ * and an expandable "How it's typed" section — the hover-driven detail text
+ * moved here so it is reachable by tap.
+ *
+ * The parent owns the card's expanded state and collapses it by default once
+ * the author has recorded a keep/carve disposition for the selected
+ * character; this component owns only the inner "How it's typed" disclosure
+ * (reset per selection via the parent's `key`).
+ */
+function CarveDetailsCard({
+  cell,
+  decided,
+  discarded,
+  open,
+  onToggleOpen,
+  onKeep,
+  onCarve,
+}: {
+  cell: CharacterCell | undefined;
+  /** Whether the author has recorded a keep/carve disposition for this character. */
+  decided: boolean;
+  /** Whether the character is currently discarded. */
+  discarded: boolean;
+  /** Card expanded state (parent-controlled). */
+  open: boolean;
+  onToggleOpen: () => void;
+  onKeep: () => void;
+  onCarve: () => void;
+}) {
+  const { t } = useLingui();
+  const [howTypedOpen, setHowTypedOpen] = useState(false);
+
+  const actionStyle = (primary: boolean): CSSProperties => ({
+    flex: 1,
+    cursor: 'pointer',
+    borderRadius: 8,
+    font: '600 13.5px var(--app-font)',
+    minHeight: 'var(--app-touch-target)',
+    padding: '10px 12px',
+    // Keep is the solid action, Carve the ghost (mockup) — discarding is
+    // reversible until Continue, so neither gets the destructive red fill.
+    color: primary ? 'var(--app-text-on-accent)' : 'var(--app-text-muted)',
+    background: primary ? 'var(--app-accent)' : 'transparent',
+    border: primary ? 'none' : '1px solid var(--app-border-strong)',
+  });
+
+  if (cell === undefined) {
+    return (
+      <div
+        data-testid="carve-details-card"
+        style={{
+          flexShrink: 0, borderBottom: '1px solid var(--app-border)',
+          background: 'var(--app-surface)', padding: '10px 14px',
+        }}
+      >
+        <p style={{ margin: 0, fontSize: 13, color: 'var(--app-text-muted)' }}>
+          <Trans id="carve.detailsCard.empty">No characters to show.</Trans>
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div
+      data-testid="carve-details-card"
+      style={{
+        flexShrink: 0, borderBottom: '1px solid var(--app-border)',
+        background: 'var(--app-surface)', padding: '6px 14px 10px',
+      }}
+    >
+      <button
+        type="button"
+        onClick={onToggleOpen}
+        aria-expanded={open}
+        aria-controls="carve-details-card-body"
+        aria-label={t({ id: 'carve.detailsCard.toggleLabel', message: `Details for ${characterDisplayName(cell.ch)}` })}
+        style={{
+          display: 'flex', alignItems: 'center', gap: 10, width: '100%',
+          background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
+          textAlign: 'left', minHeight: 'var(--app-touch-target)',
+        }}
+      >
+        <span aria-hidden="true" style={{ font: '400 24px/1 var(--app-font-glyph)', color: 'var(--app-text)', flexShrink: 0 }}>
+          {displayChar(cell.ch)}
+        </span>
+        <span style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
+          <span style={{ font: '600 14px var(--app-font)', color: 'var(--app-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {characterDisplayName(cell.ch)}
+          </span>
+          <span style={{ fontSize: 11, fontFamily: 'var(--app-font-mono)', color: 'var(--app-text-subtle)' }}>
+            {codepointLabel(cell.ch).title}
+          </span>
+        </span>
+        <span
+          aria-hidden="true"
+          style={{
+            font: '600 10.5px var(--app-font)', letterSpacing: '.04em', textTransform: 'uppercase',
+            padding: '3px 8px', borderRadius: 999, flexShrink: 0,
+            color: decided
+              ? (discarded ? 'var(--app-text-muted)' : 'var(--app-success-text)')
+              : 'var(--app-warning-text)',
+            background: 'var(--app-surface-2)', border: '1px solid var(--app-border-strong)',
+          }}
+        >
+          {decided
+            ? (discarded
+              ? <Trans id="carve.detailsCard.carvedBadge">carved</Trans>
+              : <Trans id="carve.detailsCard.keptBadge">kept</Trans>)
+            : <Trans id="carve.detailsCard.undecidedBadge">keep?</Trans>}
+        </span>
+        <span style={{ marginLeft: 'auto', display: 'inline-flex', color: 'var(--app-text-subtle)', flexShrink: 0 }}>
+          <ChevronIcon open={open} size={13} />
+        </span>
+      </button>
+
+      {open && (
+        <div id="carve-details-card-body" data-testid="carve-details-card-body" style={{ paddingBottom: 4 }}>
+          <button
+            type="button"
+            onClick={() => setHowTypedOpen((v) => !v)}
+            aria-expanded={howTypedOpen}
+            style={{
+              display: 'flex', alignItems: 'center', gap: 6, width: '100%',
+              background: 'transparent', border: 'none', padding: 0, cursor: 'pointer',
+              fontSize: 11, textTransform: 'uppercase', letterSpacing: '.08em',
+              color: 'var(--app-text-subtle)', minHeight: 'var(--app-touch-target)',
+            }}
+          >
+            <ChevronIcon open={howTypedOpen} size={12} />
+            <Trans id="carve.detailsCard.howTyped">How it's typed</Trans>
+          </button>
+          {howTypedOpen && (
+            <div style={{ margin: '2px 0 10px' }}>
+              <HowItsTyped cell={cell} showLabel={false} />
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="button" onClick={onKeep} style={actionStyle(true)}>
+              <Trans id="carve.detailsCard.keep">Keep</Trans>
+            </button>
+            <button type="button" onClick={onCarve} style={actionStyle(false)}>
+              <Trans id="carve.detailsCard.carve">Carve</Trans>
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Per-row Allow/Block disposition control (076 FR-022, T016,
 // amendments A1/A2).
@@ -784,6 +1047,42 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     [ir, carveDispositions],
   );
 
+  // --- Narrow details-card state (mobile adaptation, Phase 3) ---
+  const isNarrow = useIsNarrow();
+  /** Characters the author has explicitly kept or carved this session (NFC-normalized). */
+  const [decidedChs, setDecidedChs] = useState<ReadonlySet<string>>(() => new Set());
+  /** Card expanded state — parent-driven so a new selection can collapse it. */
+  const [detailsCardOpen, setDetailsCardOpen] = useState(true);
+
+  const recordDecision = useCallback((ch: string) => {
+    const key = ch.normalize('NFC');
+    setDecidedChs((prev) => {
+      if (prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.add(key);
+      return next;
+    });
+  }, []);
+
+  /**
+   * Narrow viewports: selecting a character opens the details card unless
+   * the author already recorded a keep/carve disposition for it — the card
+   * is collapsed by default once a disposition exists. Desktop keeps the
+   * always-visible rail, so this is a no-op there.
+   */
+  const handleSelectCh = useCallback((ch: string) => {
+    setSelectedCh(ch);
+    if (isNarrow) {
+      // `decidedChs` from this render's closure is current at event time.
+      setDetailsCardOpen(!decidedChs.has(ch.normalize('NFC')));
+    }
+  }, [isNarrow, decidedChs]);
+
+  /** Narrow viewports: a toggle both records the disposition and collapses the card. */
+  const collapseCardNarrow = useCallback(() => {
+    if (isNarrow) setDetailsCardOpen(false);
+  }, [isNarrow]);
+
   const toggleCell = useCallback((cell: CharacterCell) => {
     if (!characterCellIsToggleable(cell)) return;
     if (isCellDiscarded(cell, isItemDeleted)) {
@@ -811,6 +1110,66 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     if (discard) cascadeDelete(ruleNodeIds, storeSlotIds, chars);
     else cascadeRestore(restoreIds, chars);
   }, [cascadeDelete, cascadeRestore]);
+
+  // --- Narrow details-card decision plumbing (mobile adaptation, Phase 3) ---
+  // The card's Keep/Carve buttons need an EXPLICIT direction (not a toggle),
+  // and every toggle path records the author's disposition so the card can
+  // collapse by default once one exists.
+
+  /** Explicit keep-or-carve for one grid cell. Returns false when nothing was actionable. */
+  const setCellDiscarded = useCallback((cell: CharacterCell, discard: boolean): boolean => {
+    if (!characterCellIsToggleable(cell)) return false;
+    if (discard) {
+      cascadeDelete(cell.contributors.ruleNodeIds, cell.contributors.storeSlotIds);
+    } else {
+      cascadeRestore(characterCellIds(cell));
+    }
+    return true;
+  }, [cascadeDelete, cascadeRestore]);
+
+  /** Explicit keep-or-carve for one recommendation row (atomic case-pair semantics). */
+  const setRowDiscarded = useCallback((row: RecommendedRemovalChar, discard: boolean): boolean => {
+    const ids = recommendedRowIds(row);
+    if (ids.length === 0) return false;
+    if (discard) {
+      cascadeDelete(row.contributors.ruleNodeIds, row.contributors.storeSlotIds);
+    } else {
+      cascadeRestore(ids);
+    }
+    return true;
+  }, [cascadeDelete, cascadeRestore]);
+
+  // Narrow-aware wrappers: record the disposition and collapse the card.
+  // Desktop behavior is unchanged (collapseCardNarrow is a no-op there).
+  const toggleCellDecide = useCallback((cell: CharacterCell) => {
+    if (!characterCellIsToggleable(cell)) return;
+    toggleCell(cell);
+    recordDecision(cell.ch);
+    collapseCardNarrow();
+  }, [toggleCell, recordDecision, collapseCardNarrow]);
+
+  const toggleRowDecide = useCallback((row: RecommendedRemovalChar) => {
+    if (recommendedRowIds(row).length === 0) return;
+    toggleRecommendedRow(row);
+    recordDecision(row.ch);
+    collapseCardNarrow();
+  }, [toggleRecommendedRow, recordDecision, collapseCardNarrow]);
+
+  const toggleGroupDecide = useCallback((groupCells: CharacterCell[], discard: boolean) => {
+    toggleGroup(groupCells, discard);
+    for (const cell of groupCells) {
+      if (characterCellIsToggleable(cell)) recordDecision(cell.ch);
+    }
+    collapseCardNarrow();
+  }, [toggleGroup, recordDecision, collapseCardNarrow]);
+
+  const toggleRowsDecide = useCallback((rows: RecommendedRemovalChar[], discard: boolean) => {
+    toggleRecommendedRows(rows, discard);
+    for (const row of rows) {
+      if (recommendedRowIds(row).length > 0) recordDecision(row.ch);
+    }
+    collapseCardNarrow();
+  }, [toggleRecommendedRows, recordDecision, collapseCardNarrow]);
 
   // Kept / total / removed counts over EVERY cell.
   const { kept, total } = useMemo(() => {
@@ -857,6 +1216,36 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     () => (selectedCh !== null ? cellsByCh.get(selectedCh) : undefined) ?? cells[0],
     [cellsByCh, cells, selectedCh],
   );
+
+  // The recommendation row behind a reco selected cell (for the card's
+  // discarded state and Keep/Carve actions) — case-merged row semantics,
+  // mirroring RecommendedGroupCard's isRowDiscarded usage.
+  const selectedRow = useMemo(
+    () => (selectedCell?.reco === true
+      ? recommended.find((r) => r.ch.normalize('NFC') === selectedCell.ch.normalize('NFC'))
+      : undefined),
+    [selectedCell, recommended],
+  );
+  const selectedDiscarded = selectedRow !== undefined
+    ? isRowDiscarded(selectedRow, isItemDeleted)
+    : selectedCell !== undefined && isCellDiscarded(selectedCell, isItemDeleted);
+
+  /** Card Keep/Carve: explicit disposition for the selected character, then collapse. */
+  const decideSelected = useCallback((discard: boolean) => {
+    const cell = selectedCell;
+    if (cell === undefined) return;
+    let acted = false;
+    if (cell.reco) {
+      const row = recommended.find((r) => r.ch.normalize('NFC') === cell.ch.normalize('NFC'));
+      acted = row !== undefined ? setRowDiscarded(row, discard) : setCellDiscarded(cell, discard);
+    } else {
+      acted = setCellDiscarded(cell, discard);
+    }
+    if (acted) {
+      recordDecision(cell.ch);
+      setDetailsCardOpen(false);
+    }
+  }, [selectedCell, recommended, setRowDiscarded, setCellDiscarded, recordDecision]);
 
   // Back / Skip / Continue live in the footer (spec 081). Publish
   // unconditionally, before the `!ir` loading return below. Back is offered in
@@ -1001,8 +1390,22 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
         <LayoutFamilyQuestion bcp47={identityBcp47} />
       </div>
 
-      {/* Two-panel body */}
-      <div style={{ flex: 1, display: 'flex', minHeight: 0 }}>
+      {/* Two-panel body — narrow viewports stack the details card above the
+          grid (mobile adaptation, Phase 3); desktop keeps the rail. */}
+      <div style={{ flex: 1, display: 'flex', flexDirection: isNarrow ? 'column' : 'row', minHeight: 0 }}>
+        {isNarrow ? (
+          <CarveDetailsCard
+            key={selectedCell?.ch ?? 'none'}
+            cell={selectedCell}
+            decided={selectedCell !== undefined && decidedChs.has(selectedCell.ch.normalize('NFC'))}
+            discarded={selectedDiscarded}
+            open={detailsCardOpen}
+            onToggleOpen={() => setDetailsCardOpen((v) => !v)}
+            onKeep={() => decideSelected(false)}
+            onCarve={() => decideSelected(true)}
+          />
+        ) : (
+          <>
         {/* Left aside — Character details.
             role="region" + tabIndex={0}: this panel is a SCROLL CONTAINER
             (overflowY: auto) whose content is read-only (#1619 AC2: no
@@ -1059,106 +1462,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                 </div>
 
                 <div style={{ marginBottom: 12 }}>
-                  {(() => {
-                    // TOTAL FLOOR (#1399 follow-on): a producer is renderable
-                    // only when it has faithful STEPS or a resolvable
-                    // TRIGGER-KEY FLOOR (CharProducer.triggerFloor, computed
-                    // by charProducers). A producer with neither is dropped
-                    // entirely — the two former placeholder phrases ("Not
-                    // tied to a single key" / "Not shown — context-dependent")
-                    // have NO render path anywhere below.
-                    const ways = cell.waysToType.filter((w) => w.steps.length > 0 || w.triggerFloor !== undefined);
-                    const label = (
-                      <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--app-text-subtle)', marginBottom: 6 }}>
-                        How it's typed
-                      </div>
-                    );
-                    const renderWay = (way: CharacterCell['waysToType'][number]) => (
-                      way.steps.length > 0
-                        ? <KeySeq keys={way.steps} joiner="then" />
-                        : <span style={{ fontSize: 12.5, color: 'var(--app-text-subtle)' }}>Typed with {way.triggerFloor}</span>
-                    );
-
-                    if (ways.length === 0) {
-                      // No renderable producer at all. Three sources get their
-                      // own honest message (none a banned phrase); every
-                      // other zero-producer character shows no "way" line
-                      // whatsoever.
-                      //
-                      // touch-only-key reaches here for the same reason it
-                      // exists (spec §8): its only producer is a
-                      // T_xxxx-triggered rule, which charProducers drops
-                      // rather than leak a touch id as a desktop keystroke —
-                      // so ways is empty and, without this branch, the
-                      // character would render with no explanation of why no
-                      // keys are shown.
-                      if (cell.source === 'touch-only-key') {
-                        return (
-                          <>
-                            {label}
-                            <span style={{ fontSize: 12.5, color: 'var(--app-text-subtle)' }}>
-                              Only on the touch keyboard — no desktop key types it
-                            </span>
-                          </>
-                        );
-                      }
-                      if (cell.source === 'blocked-candidate') {
-                        return (
-                          <>
-                            {label}
-                            <span style={{ fontSize: 12.5, color: 'var(--app-text-subtle)' }}>
-                              This keyboard blocks this combination — nothing types it
-                            </span>
-                          </>
-                        );
-                      }
-                      if (cell.source !== 'advanced-rule') return null;
-                      return (
-                        <>
-                          {label}
-                          <span style={{ fontSize: 12.5, color: 'var(--app-text-subtle)' }}>
-                            Produced by an advanced rule — the keystroke can't be shown
-                          </span>
-                        </>
-                      );
-                    }
-
-                    // Single-line (unchanged feel) unless there's more than one
-                    // renderable producer OR the one producer carries a
-                    // condition to explain (#1399) — a plain unconditional
-                    // single producer stays exactly as before, no "1 way"
-                    // label clutter.
-                    const showList = ways.length > 1 || (ways.length === 1 && ways[0]?.condition !== undefined);
-
-                    if (!showList) {
-                      return (
-                        <>
-                          {label}
-                          {renderWay(ways[0]!)}
-                        </>
-                      );
-                    }
-
-                    return (
-                      <>
-                        <div style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--app-text-subtle)', marginBottom: 6 }}>
-                          How it's typed · {ways.length} {ways.length === 1 ? 'way' : 'ways'}
-                        </div>
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                          {ways.map((way, i) => (
-                            <div key={i} style={{ padding: '6px 8px', borderRadius: 7, background: 'var(--app-surface-2)', border: '1px solid var(--app-border)' }}>
-                              {renderWay(way)}
-                              {way.condition !== undefined && (
-                                <div style={{ fontSize: 11, color: 'var(--app-text-subtle)', marginTop: 4, fontStyle: 'italic' }}>
-                                  {way.condition}
-                                </div>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </>
-                    );
-                  })()}
+                  <HowItsTyped cell={cell} />
                 </div>
 
                 <div style={{ marginBottom: 12 }}>
@@ -1240,6 +1544,8 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
             );
           })()}
         </div>
+          </>
+        )}
 
         {/* Right main — grouped character grid */}
         <div style={{ flex: 1, overflowY: 'auto', padding: '18px 22px', display: 'flex', flexDirection: 'column', gap: 24 }}>
@@ -1261,12 +1567,12 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                 rows={primaryRows}
                 cellsByCh={cellsByCh}
                 isItemDeleted={isItemDeleted}
-                onToggleRow={toggleRecommendedRow}
-                onBulkToggle={(discard) => toggleRecommendedRows(primaryRows, discard)}
+                onToggleRow={toggleRowDecide}
+                onBulkToggle={(discard) => toggleRowsDecide(primaryRows, discard)}
                 discardAllLabel={(count) => t({ id: "carve.recommended.discardAll", message: `Discard all ${count}` })}
                 restoreAllLabel={t({ id: "carve.recommended.restoreAll", message: "Restore all" })}
                 selectedCh={selectedCell?.ch}
-                onSelectCh={setSelectedCh}
+                onSelectCh={handleSelectCh}
                 destructiveBulkButton
                 sparseLatinOverlay={sparseLatinOverlay}
                 deadkeyComboIds={deadkeyComboIds}
@@ -1286,12 +1592,12 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                 rows={optionalLatinRows}
                 cellsByCh={cellsByCh}
                 isItemDeleted={isItemDeleted}
-                onToggleRow={toggleRecommendedRow}
-                onBulkToggle={(discard) => toggleRecommendedRows(optionalLatinRows, discard)}
+                onToggleRow={toggleRowDecide}
+                onBulkToggle={(discard) => toggleRowsDecide(optionalLatinRows, discard)}
                 discardAllLabel={(count) => t({ id: "carve.recommended.discardAll", message: `Discard all ${count}` })}
                 restoreAllLabel={t({ id: "carve.recommended.restoreAll", message: "Restore all" })}
                 selectedCh={selectedCell?.ch}
-                onSelectCh={setSelectedCh}
+                onSelectCh={handleSelectCh}
                 collapsible={{ open: latinOpen, onToggleOpen: () => setLatinOpen((v) => !v) }}
                 sparseLatinOverlay={sparseLatinOverlay}
                 deadkeyComboIds={deadkeyComboIds}
@@ -1310,7 +1616,7 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                   <h2 style={{ margin: 0, font: '600 14px var(--app-font)', color: 'var(--app-text)' }}>{group.label}</h2>
                   <span style={{ fontSize: 12, color: 'var(--app-text-subtle)' }}>({group.cells.length})</span>
                   <button
-                    onClick={() => toggleGroup(group.cells, !allDiscarded)}
+                    onClick={() => toggleGroupDecide(group.cells, !allDiscarded)}
                     style={{
                       marginLeft: 'auto', font: '600 11.5px var(--app-font)', cursor: 'pointer',
                       color: 'var(--app-text-muted)', background: 'transparent',
@@ -1335,8 +1641,8 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
                         discarded={discarded}
                         isSelected={isSelected}
                         flag={flag}
-                        onSelect={() => setSelectedCh(cell.ch)}
-                        onToggle={() => toggleCell(cell)}
+                        onSelect={() => handleSelectCh(cell.ch)}
+                        onToggle={() => toggleCellDecide(cell)}
                       />
                     );
                   })}

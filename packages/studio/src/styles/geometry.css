@@ -1,20 +1,27 @@
 /* Radii, control sizing, layout constants, shadows (theme-invariant). */
 :root {
-  --app-radius:      8px;
-  --app-radius-sm:   6px;
-  --app-radius-lg:   12px;
+  --app-radius: 8px;
+  --app-radius-sm: 6px;
+  --app-radius-lg: 12px;
 
   /* Shared control conventions (issue #536) — moved here from index.css. */
-  --control-h:       34px;
-  --control-h-sm:    28px;
-  --control-h-lg:    40px;
+  --control-h: 34px;
+  --control-h-sm: 28px;
+  --control-h-lg: 40px;
 
-  --row-h:           40px;
-  --sidebar-w:       232px;
-  --topbar-h:        52px;
+  --row-h: 40px;
+  --sidebar-w: 232px;
+  --topbar-h: 52px;
 
-  --app-shadow-pop:  0 6px 24px rgba(24, 36, 46, .14), 0 1px 3px rgba(24, 36, 46, .10);
+  /* Minimum touch target (mobile adaptation, shared token — principle 8:
+     ONE token set, never doubled. Coarse-pointer branches and the
+     .ks-hit-target utility read this; desktop compact visuals are
+     untouched because the utility only applies under (pointer: coarse). */
+  --app-touch-target: 44px;
+
+  --app-shadow-pop:
+    0 6px 24px rgba(24, 36, 46, 0.14), 0 1px 3px rgba(24, 36, 46, 0.1);
   /* References --app-border so the bar shadow stays theme-correct even
      though this file itself doesn't vary by theme. */
-  --app-shadow-bar:  0 1px 0 var(--app-border);
+  --app-shadow-bar: 0 1px 0 var(--app-border);
 }

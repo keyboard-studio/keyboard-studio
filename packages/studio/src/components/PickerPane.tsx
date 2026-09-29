@@ -69,6 +69,14 @@ interface PickerPaneProps {
    * working copy in place.
    */
   changeBaseSlot?: ReactNode;
+  /**
+   * Narrow viewports: the pane stops being a percentage-width column. It takes
+   * the full width, drops its own heading/intro (the Output pane leads the
+   * page), and tucks everything behind a native disclosure. The "shipping"
+   * variant starts collapsed; the "full" (cold-arrival) variant starts open
+   * because the picker is the only way forward there.
+   */
+  narrow?: boolean;
 }
 
 /** The mode toggle's two buttons — the shared treatment plus pressed-state fill. */
@@ -154,50 +162,18 @@ export function PickerPane({
   kmnEditorSlot,
   variant = "full",
   changeBaseSlot,
+  narrow = false,
 }: PickerPaneProps) {
   const { t } = useLingui();
   const { baseKeyboard, pickerMode, handlePickerModeChange } = artifact;
   const shipping = variant === "shipping";
 
-  return (
-    <section
-      aria-label={
-        shipping
-          ? t({ id: "picker.pane.label.shipping", message: "Keyboard details pane" })
-          : t({ id: "picker.pane.label", message: "Picker pane" })
-      }
-      style={{
-        flexBasis: `calc(${leftPct}% - ${dividerWidth / 2}px)`,
-        flexShrink: 0,
-        flexGrow: 0,
-        display: "flex",
-        flexDirection: "column",
-        gap: 12,
-        minHeight: 0,
-        overflow: "auto",
-        padding: 24,
-        boxSizing: "border-box",
-      }}
-    >
-      <h1 style={{ margin: 0, fontSize: "1.4rem", letterSpacing: "-0.01em" }}>
-        {shipping ? (
-          <Trans id="picker.shipping.heading">Your keyboard</Trans>
-        ) : (
-          "Keyboard Studio"
-        )}
-      </h1>
-      <p style={{ margin: 0, color: "var(--app-text-subtle)", fontSize: 13 }}>
-        {shipping ? (
-          <Trans id="picker.shipping.intro">
-            Check the details below, then download or submit your keyboard from the right.
-          </Trans>
-        ) : (
-          <Trans id="picker.intro">
-            Pick a base keyboard to start; the right pane shows the compiled result.
-          </Trans>
-        )}
-      </p>
+  const sectionLabel = shipping
+    ? t({ id: "picker.pane.label.shipping", message: "Keyboard details pane" })
+    : t({ id: "picker.pane.label", message: "Picker pane" });
 
+  const body = (
+    <>
       {/* Mode toggle: open base vs. scaffold new. Full variant only. */}
       {shipping ? null : (
         <div
@@ -246,6 +222,72 @@ export function PickerPane({
       {baseKeyboard !== null && !shipping && pickerMode === "open" ? (
         <MetadataCard kb={baseKeyboard} />
       ) : null}
+    </>
+  );
+
+  if (narrow) {
+    return (
+      <section
+        aria-label={sectionLabel}
+        style={{ padding: "0 16px 16px", boxSizing: "border-box" }}
+      >
+        <details data-testid="picker-details-disclosure" open={!shipping}>
+          <summary
+            style={{
+              cursor: "pointer",
+              minHeight: 44,
+              display: "flex",
+              alignItems: "center",
+              fontWeight: 600,
+              fontSize: 14,
+              color: TEXT_MAIN,
+            }}
+          >
+            <Trans id="picker.narrow.detailsSummary">Keyboard details</Trans>
+          </summary>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12, paddingTop: 8 }}>
+            {body}
+          </div>
+        </details>
+      </section>
+    );
+  }
+
+  return (
+    <section
+      aria-label={sectionLabel}
+      style={{
+        flexBasis: `calc(${leftPct}% - ${dividerWidth / 2}px)`,
+        flexShrink: 0,
+        flexGrow: 0,
+        display: "flex",
+        flexDirection: "column",
+        gap: 12,
+        minHeight: 0,
+        overflow: "auto",
+        padding: 24,
+        boxSizing: "border-box",
+      }}
+    >
+      <h1 style={{ margin: 0, fontSize: "1.4rem", letterSpacing: "-0.01em" }}>
+        {shipping ? (
+          <Trans id="picker.shipping.heading">Your keyboard</Trans>
+        ) : (
+          "Keyboard Studio"
+        )}
+      </h1>
+      <p style={{ margin: 0, color: "var(--app-text-subtle)", fontSize: 13 }}>
+        {shipping ? (
+          <Trans id="picker.shipping.intro">
+            Check the details below, then download or submit your keyboard from the right.
+          </Trans>
+        ) : (
+          <Trans id="picker.intro">
+            Pick a base keyboard to start; the right pane shows the compiled result.
+          </Trans>
+        )}
+      </p>
+      {body}
     </section>
   );
 }

@@ -8,6 +8,8 @@ export interface OskChannelResult {
   engineReady: boolean;
   engineError: string | null;
   textValue: string;
+  /** Frame document's natural height (CONTENT_HEIGHT), or null until reported. */
+  contentHeight: number | null;
 }
 
 /**
@@ -27,6 +29,7 @@ export function useOskChannel(
   const [engineReady, setEngineReady] = useState(false);
   const [engineError, setEngineError] = useState<string | null>(null);
   const [textValue, setTextValue] = useState("");
+  const [contentHeight, setContentHeight] = useState<number | null>(null);
 
   // Keep the iframe ref stable in the listener closure without re-registering.
   const iframeRefRef = useRef(iframeRef);
@@ -61,6 +64,9 @@ export function useOskChannel(
         case "KEY_TAPPED":
           onKeyTapRef.current?.(event.data.keyId);
           break;
+        case "CONTENT_HEIGHT":
+          setContentHeight(event.data.height);
+          break;
       }
     }
 
@@ -79,5 +85,5 @@ export function useOskChannel(
     frame.contentWindow.postMessage(cmd, window.location.origin);
   }, []);
 
-  return { send, lastEvent, engineReady, engineError, textValue };
+  return { send, lastEvent, engineReady, engineError, textValue, contentHeight };
 }

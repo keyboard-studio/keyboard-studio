@@ -831,6 +831,160 @@ describe('CarveGalleryV2 — footer nav (spec 081)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Phase 3 (mobile adaptation) — narrow-viewport details card replaces
+// the 290px rail. Viewport width is stubbed per-test via `window.innerWidth`
+// (the geometry path needs no matchMedia stub — see useViewport.ts's
+// fallback) and restored to desktop afterwards. A real tap is focus+click:
+// `fireEvent.focusIn` drives the cell's onSelect, `fireEvent.click` its
+// onToggle, mirroring what a touch tap does to a <button>.
+// ---------------------------------------------------------------------------
+
+const NARROW_WIDTH = 390;
+const DESKTOP_WIDTH = 1024;
+
+function setViewportWidth(width: number): void {
+  Object.defineProperty(window, 'innerWidth', { value: width, configurable: true });
+}
+
+/** Render the fixture gallery at narrow width; returns the details card. */
+function renderNarrowCard() {
+  setViewportWidth(NARROW_WIDTH);
+  mockFixtureContributors();
+  renderGalleryV2(makeFixtureIR());
+  return screen.getByTestId('carve-details-card');
+}
+
+/** A real tap on a grid cell: focus (select) then click (toggle). */
+function tapCell(cell: HTMLElement): void {
+  // focusIn, not focus: React 17+ implements onFocus via the bubbling
+  // focusin event, which a raw non-bubbling focus event never reaches. A
+  // real device tap fires genuine focus + focusin, so this matches the
+  // browser; fireEvent.focus alone would silently skip onSelect.
+  fireEvent.focusIn(cell);
+  fireEvent.click(cell);
+}
+
+describe('CarveGalleryV2 — narrow details card (mobile, Phase 3)', () => {
+  afterEach(() => {
+    setViewportWidth(DESKTOP_WIDTH);
+  });
+
+  it('renders the card instead of the rail on narrow viewports, and the rail instead of the card on desktop', () => {
+    const card = renderNarrowCard();
+    expect(card).not.toBeNull();
+    expect(screen.queryByTestId('carve-details')).toBeNull();
+
+    cleanup();
+    setViewportWidth(DESKTOP_WIDTH);
+    mockFixtureContributors();
+    renderGalleryV2(makeFixtureIR());
+    expect(screen.getByTestId('carve-details')).not.toBeNull();
+    expect(screen.queryByTestId('carve-details-card')).toBeNull();
+  });
+
+  it('starts open for the undecided initial selection, showing the keep? badge and Keep/Carve actions', () => {
+    const card = renderNarrowCard();
+
+    expect(card.querySelector('[aria-expanded="true"]')).not.toBeNull();
+    expect(within(card).getByText('keep?')).not.toBeNull();
+    expect(within(card).getByRole('button', { name: 'Keep' })).not.toBeNull();
+    expect(within(card).getByRole('button', { name: 'Carve' })).not.toBeNull();
+    // The "How it's typed" disclosure starts collapsed (expandable).
+    const howTyped = within(card).getByRole('button', { name: "How it's typed" });
+    expect(howTyped.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it("the card's Carve button discards the selected character and collapses the card", () => {
+    const card = renderNarrowCard();
+
+    fireEvent.click(within(card).getByRole('button', { name: 'Carve' }));
+
+    // Cascade marks the contributor deleted (same write path as a cell tap).
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(true);
+    // Card collapses: actions gone, header still shows the character + carved badge.
+    expect(within(card).queryByRole('button', { name: 'Keep' })).toBeNull();
+    expect(within(card).queryByRole('button', { name: 'Carve' })).toBeNull();
+    expect(within(card).getByText('carved')).not.toBeNull();
+    expect(
+      within(card).getByRole('button', { name: 'Details for Character U+0061' }).getAttribute('aria-expanded'),
+    ).toBe('false');
+  });
+
+  it("the card's Keep button records a keep disposition and collapses the card", () => {
+    const card = renderNarrowCard();
+
+    fireEvent.click(within(card).getByRole('button', { name: 'Keep' }));
+
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(false);
+    expect(within(card).queryByRole('button', { name: 'Keep' })).toBeNull();
+    expect(within(card).getByText('kept')).not.toBeNull();
+  });
+
+  it('tapping a grid cell records the disposition and collapses the card; re-selecting it stays collapsed', () => {
+    const card = renderNarrowCard();
+    const cell = screen.getByRole('button', { name: 'a — U+0061' });
+
+    tapCell(cell);
+
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(true);
+    expect(within(card).queryByRole('button', { name: 'Keep' })).toBeNull();
+    expect(within(card).getByText('carved')).not.toBeNull();
+
+    // Expand the card manually, then tap the same (already-decided) cell:
+    // selection sees the recorded disposition and the card stays collapsed.
+    fireEvent.click(within(card).getByRole('button', { name: 'Details for Character U+0061' }));
+    expect(within(card).getByRole('button', { name: 'Keep' })).not.toBeNull();
+    tapCell(cell);
+
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(false);
+    expect(within(card).queryByRole('button', { name: 'Keep' })).toBeNull();
+  });
+
+  it('expanding "How it\'s typed" reveals the same keystroke content the rail shows', () => {
+    const card = renderNarrowCard();
+
+    const howTyped = within(card).getByRole('button', { name: "How it's typed" });
+    fireEvent.click(howTyped);
+
+    expect(howTyped.getAttribute('aria-expanded')).toBe('true');
+    const body = within(card).getByTestId('carve-details-card-body');
+    // HowItsTyped renders the KeySeq keycaps — the hover-driven detail text,
+    // now reachable by tap.
+    expect(body.querySelector('kbd')).not.toBeNull();
+  });
+
+  it('tapping another cell collapses the card again — every tap is a decision', () => {
+    const card = renderNarrowCard();
+
+    // Decide 'a' via the card (collapses), then tap undecided '1'.
+    fireEvent.click(within(card).getByRole('button', { name: 'Keep' }));
+    expect(within(card).queryByRole('button', { name: 'Keep' })).toBeNull();
+    tapCell(screen.getByRole('button', { name: '1 — U+0031' }));
+
+    // The tap selects '1', which remounts the card (keyed by character) —
+    // re-query; the `card` handle above points at the detached old node.
+    const cardAfter = screen.getByTestId('carve-details-card');
+    // '1' was toggled (discarded) by the tap AND the card collapsed — the
+    // tap is a decision, so the card stays a slim readout.
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-1')).toBe(true);
+    expect(within(cardAfter).queryByRole('button', { name: 'Keep' })).toBeNull();
+    expect(within(cardAfter).getByText('carved')).not.toBeNull();
+  });
+
+  it('desktop: tapping a grid cell leaves the rail visible (no card lifecycle)', () => {
+    setViewportWidth(DESKTOP_WIDTH);
+    mockFixtureContributors();
+    renderGalleryV2(makeFixtureIR());
+
+    fireEvent.click(screen.getByRole('button', { name: 'a — U+0061' }));
+
+    expect(useWorkingCopyStore.getState().isItemDeleted('r-a')).toBe(true);
+    expect(screen.getByTestId('carve-details')).not.toBeNull();
+    expect(screen.queryByTestId('carve-details-card')).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // T025 — the layout_family question is surfaced in the main flow (carve
 // gallery), structurally separate from per-row disposition controls.
 // ---------------------------------------------------------------------------
