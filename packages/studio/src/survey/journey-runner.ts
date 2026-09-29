@@ -552,6 +552,17 @@ export async function replayJourney(fixture: JourneyFixture): Promise<ReplayResu
           break;
         }
 
+        case "rules": {
+          // Read-only view over the working copy (spec 082 Track A): the
+          // demo pane simulates against the compiled artifact and the rule
+          // builder owns its own answers, so replaying the step is a
+          // pass-through — nothing to collect, nothing to apply. "rules"
+          // is absent from STEPS_WITH_APPLY_COMPLETION, mirroring the live
+          // completion path which fires no apply effect for this step.
+          result = undefined;
+          break;
+        }
+
         case "mechanisms": {
           collectEditorActionEvents(group, "mechanism_edit");
           // FR-015: no per-key decomposition — record an empty assignment set.
