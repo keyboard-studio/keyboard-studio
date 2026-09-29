@@ -31,6 +31,6 @@
 
 ## Notes
 
-- FR-001a was clarified on 2026-09-29: v1 assumes the union of physical keys (every key any likely base keyboard maps).
+- FR-001a was clarified on 2026-09-29: infer the likely underlying keyboards per country from a hardware origin mapping, falling back to the union of physical keys; FR-001b feeds the same mapping into base keyboard resolution.
 - The Terminology table's "Code today" column, and FR-017's reference to the codegen script, name existing identifiers on purpose. That anchors the #1810 renames. No new implementation is prescribed.
 - The terminology check against the #1810 glossary is a prerequisite for `/speckit-plan` (process note on #1810). The "template keyboard" term is flagged there as undecided.

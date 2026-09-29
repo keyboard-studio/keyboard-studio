@@ -43,7 +43,7 @@ The output picture combines four layers into one derived view:
 3. **Template keyboard**: what typists got before the author's changes.
 4. **Your keyboard**: what the author has defined, blocked or removed.
 
-A combo on a key the underlying keyboard does not have cannot leak, whatever the base keyboard data says. v1 does not know the typists' hardware, so it assumes every key exists (FR-001a) and labels leaks on keys that some boards lack.
+A combo on a key the underlying keyboard does not have cannot leak, whatever the base keyboard data says. The studio infers the typists' likely hardware from where the country's computers usually come from (FR-001a). Where it has no data, it assumes every key exists and labels leaks on keys that some boards lack.
 
 The **handling set** is the part of the picture that needs a decision: combos where your keyboard defines nothing and at least one likely base keyboard produces output.
 
@@ -129,7 +129,8 @@ The spec 040 fall-through facets use the likely base keyboards instead of a sing
 
 ### Edge Cases
 
-- **Missing physical key:** a base keyboard defines output on a key some underlying keyboards lack, for example UK English's 102nd key, which an ANSI board doesn't have. v1 keeps the combo in the handling set (FR-001a) and labels it as applying only where the key exists.
+- **Missing physical key:** a base keyboard defines output on a key some underlying keyboards lack, for example UK English's 102nd key, which an ANSI board doesn't have. If the country's likely hardware is all ANSI, the combo is not a leak. If there is no hardware data, the combo stays in the handling set, labelled as applying only where the key exists (FR-001a).
+- **Mixed hardware:** a country's computers come from several origins, for example both French and US imports. The likely underlying keyboards and base keyboards include all of them, and each leak says which ones it applies to.
 - **Likely base keyboards disagree:** UK English produces `€` on AltGr+4 and US English produces nothing. The combo is in the handling set because at least one leaks, and each base keyboard's output is shown separately.
 - **Context-dependent definitions:** your keyboard defines a combo only after a deadkey or other context. The combo counts as defined only where the rule is unconditional. Otherwise it is marked uncertain and shown as such, never silently treated as closed.
 - **Opaque rules:** a rule is preserved as an opaque fragment (`RawKmnFragment`), for example one with an `if()` or `platform()` guard, and it may define the combo. The combo is marked uncertain, never assumed undefined.
@@ -144,7 +145,8 @@ The spec 040 fall-through facets use the likely base keyboards instead of a sing
 ### Functional Requirements
 
 - **FR-001**: The system MUST derive the output picture for the desktop layout of your keyboard: every printable key that exists on the likely underlying keyboards, frame keys excluded (as 076 FR-005), on four modifier layers: none, Shift, AltGr, Shift+AltGr.
-- **FR-001a**: In v1, the underlying keyboard MUST be assumed to have every key any likely base keyboard maps (the union of ANSI and ISO keys, including the 102nd key `K_oE2`). Every such combo can therefore enter the handling set. The UI MUST say that a leak on a key some boards lack, such as the 102nd key, applies only where the typist's hardware has that key. Inferring or asking for the physical form factor is deferred. (Clarified 2026-09-29: assume the union.)
+- **FR-001a**: The likely underlying keyboards MUST be resolved per country from a versioned, source-cited **hardware origin** mapping. The mapping gives the physical layouts common in a country (ANSI, ISO or others), which usually follow where the country's computers come from; for example, a market supplied mainly with French laptops gets AZERTY on ISO hardware. The country comes from the same signals FR-004 uses (the region in the language tags, or the author's answer). A combo on a key absent from every likely underlying keyboard MUST NOT enter the handling set. When the mapping has no entry for the country, the underlying keyboard MUST be assumed to have every key any likely base keyboard maps (the union, including the 102nd key `K_oE2`), and the UI MUST say that a leak on such a key applies only where the typist's hardware has it. (Clarified 2026-09-29: assume the union; refined the same day: infer from hardware origin, with the union as fallback.)
+- **FR-001b**: The hardware origin mapping MUST also inform the likely base keyboards. Imported computers usually ship with the origin country's OS layout, so it contributes a region-level prior to the FR-004 resolution. It never overrides the author's `layout_family` answer (076 FR-023 order), and its provenance MUST be shown like the rest of the resolution.
 - **FR-002**: For each combo, the picture MUST classify your keyboard's handling as exactly one of:
   - **defined**, with the output kind: character, deadkey, suppressed (`nul`), re-emitted context, or beep;
   - **undefined**;
@@ -175,7 +177,8 @@ The spec 040 fall-through facets use the likely base keyboards instead of a sing
 - **Handling set**: the subset of the picture that leaks on at least one likely base keyboard. Each entry has the combo, per-base-keyboard outputs, newly-opened or already-leaking status, and the starting-point output for newly opened entries.
 - **Likely base keyboard set**: the resolved base keyboards with their provenance (answer, region or reference set). This already exists (076 FR-023).
 - **Base keyboard data**: per-base-keyboard, per-layer combo outputs for Windows, generated from the Keyman basic keyboards and versioned. This already exists (PR #1854).
-- **Underlying keyboard key set**: the physical keys that exist. In v1 it is assumed to be the union of every key the likely base keyboards map (FR-001a). Per-form-factor key sets (ANSI, ISO) are deferred.
+- **Underlying keyboard key set**: the physical keys of a hardware form factor (ANSI, ISO, others). This is new.
+- **Hardware origin mapping**: country to the physical layouts, and the OS layouts they ship with, that are common there, based on where computers come from. It is versioned and source-cited like the region-to-layout mapping in spec 076. This is new.
 
 ## Success Criteria *(mandatory)*
 
@@ -195,6 +198,7 @@ The spec 040 fall-through facets use the likely base keyboards instead of a sing
 - The five reference base keyboards (US, US-International, French AZERTY, German QWERTZ, UK English) are enough for v1. Adding more, such as Swiss or Belgian, means adding their basic keyboards to the codegen, with no spec change.
 - Already-leaking combos are handled mainly through the closed-keyboard behaviour (076 FR-005), and newly opened combos through per-combo carve dispositions (076 FR-022). This spec feeds both. It does not change how either asks the author.
 - The existing `layout_family` answer and language tags are the only signals for the likely set.
-- The typists' hardware is unknown, so v1 assumes every key exists (FR-001a). This slightly overstates leaks for typists on ANSI boards, and the UI labels the affected keys.
+- Where computers in a country usually come from is knowable and stable enough to record in a versioned mapping. Where it isn't known, the studio assumes every key exists (FR-001a). That slightly overstates leaks for typists on ANSI boards, and the UI labels the affected keys.
+- Sources for the hardware origin mapping, such as import and retail patterns or field reports, are chosen during planning, and each entry cites its source.
 - The live validator currently checks the starting point's source rather than your keyboard, a pre-existing issue found during this investigation. It is tracked separately and not addressed here.
 - Whether a block rule written for RALT also catches AltGr arriving as Ctrl+Alt on Windows is unverified. Planning MUST confirm it with a compiler or simulator test (FR-009).
