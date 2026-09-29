@@ -101,6 +101,17 @@ describe("DeadkeyDetailEditor", () => {
     expect(listDeadkeys(removed).find((d) => d.id === 0x3000)?.pairCount).toBe(1);
   });
 
+  it("accepts an astral pair character (one scalar, two UTF-16 units)", () => {
+    const { onCommitIr } = renderEditor(definedIr());
+    fireEvent.change(screen.getByLabelText(/Base character/), { target: { value: "e" } });
+    // U+1D4B6 — length 2 in UTF-16, one scalar.
+    fireEvent.change(screen.getByLabelText(/Accented character/), { target: { value: "\u{1D4B6}" } });
+    fireEvent.click(screen.getByRole("button", { name: "Add pair" }));
+    expect(onCommitIr).toHaveBeenCalledTimes(1);
+    const withPair = onCommitIr.mock.calls[0]![0] as KeyboardIR;
+    expect(listDeadkeys(withPair).find((d) => d.id === 0x3000)?.pairCount).toBe(2);
+  });
+
   it("renames the numeric id and follows to the new id", () => {
     const { onCommitIr, onRenamed } = renderEditor(definedIr());
     fireEvent.change(screen.getByLabelText(/New numeric id/), { target: { value: "3001" } });

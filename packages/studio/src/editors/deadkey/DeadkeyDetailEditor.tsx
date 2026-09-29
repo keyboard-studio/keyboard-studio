@@ -235,7 +235,9 @@ export function DeadkeyDetailEditor({
   const handleAddPair = () => {
     clearError();
     if (id === null || !info.baseStore || !info.outputStore) return;
-    if (newBase.length !== 1 || newAccented.length !== 1) {
+    // Scalar count, not UTF-16 length — an astral character is one scalar
+    // (mirrors the define form's accent validation).
+    if (Array.from(newBase).length !== 1 || Array.from(newAccented).length !== 1) {
       setSectionError("A pair is two single characters: the base letter and its accented form.");
       return;
     }
