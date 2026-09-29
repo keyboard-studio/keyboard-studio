@@ -64,10 +64,10 @@ export function TouchKeepInertControl({ rows, onChange }: TouchKeepInertControlP
   return (
     <section aria-label="Touch layout">
       <h3>
-        <Trans>Touch layout</Trans>
+        <Trans id="carve.touch-keep.heading">Touch layout</Trans>
       </h3>
       <p>
-        <Trans>
+        <Trans id="carve.touch-keep.body">
           On phones and tablets, carved keys are removed from the touch layout
           by default. You can keep any key instead — it stays visible but does
           nothing.
@@ -82,14 +82,14 @@ export function TouchKeepInertControl({ rows, onChange }: TouchKeepInertControlP
               aria-pressed={!row.keepInert}
               onClick={() => flip(row.char, false)}
             >
-              <Trans>Removed from the touch layout</Trans>
+              <Trans id="carve.touch-keep.removed">Removed from the touch layout</Trans>
             </button>{" "}
             <button
               type="button"
               aria-pressed={row.keepInert}
               onClick={() => flip(row.char, true)}
             >
-              <Trans>Kept, does nothing</Trans>
+              <Trans id="carve.touch-keep.kept">Kept, does nothing</Trans>
             </button>
           </li>
         ))}
