@@ -399,6 +399,35 @@ describe("serializeWorkingCopy — identity.keyboardId drives zip filename", () 
 });
 
 // ---------------------------------------------------------------------------
+// Keyman touch-layout schema conformance (KM04000)
+// ---------------------------------------------------------------------------
+
+describe("projectWorkingCopyForOutput — touch layout conforms to Keyman's schema", () => {
+  it("strips `output` and the provenance tag `p` from the projected layout, not the working copy", async () => {
+    const { projectWorkingCopyForOutput } = await import("./serializeWorkingCopy.ts");
+    const path = "source/basic_kbdus.keyman-touch-layout";
+    const layout = JSON.stringify({
+      tablet: {
+        layer: [
+          {
+            id: "shift",
+            row: [{ id: 1, key: [{ id: "K_Q", p: "base-derived", text: "Q", nextlayer: "default", output: "Q" }] }],
+          },
+        ],
+      },
+    });
+    const { vfs } = seedStore();
+    vfs.set(path, layout, false);
+
+    const projected = await projectWorkingCopyForOutput();
+
+    const key = JSON.parse(projected!.vfs.get(path)!.content as string).tablet.layer[0].row[0].key[0];
+    expect(key).toEqual({ id: "K_Q", text: "Q", nextlayer: "default" });
+    expect(vfs.get(path)!.content).toBe(layout);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Touch layout passthrough (regression guard — refactor must be behavior-preserving)
 // ---------------------------------------------------------------------------
 

@@ -84,6 +84,8 @@ export {
   OPAQUE_REASONS,
 } from "./codec/index.js";
 export type { ParseResult, OpaqueReason } from "./codec/index.js";
+export { conformTouchLayoutToKeymanSchema } from "./codec/index.js";
+export type { ConformTouchLayoutResult } from "./codec/index.js";
 
 // Issue #239 — .kmn.imported sidecar + import-attribution.
 export {
