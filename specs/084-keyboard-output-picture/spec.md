@@ -39,7 +39,7 @@ Today the studio shows the author only what your keyboard's rules produce. Spec 
 The output picture combines four layers into one derived view:
 
 1. **Underlying keyboard**: which physical keys exist, and so which combos a typist can press at all.
-2. **Base keyboard**: the fallback character each likely base keyboard produces on each combo.
+2. **Base keyboard**: the fallback character each likely base keyboard produces on each combo. Ideally it is the underlying keyboard's own layout, or the typist masks the keys with stickers.
 3. **Template keyboard**: what typists got before the author's changes.
 4. **Your keyboard**: what the author has defined, blocked or removed.
 
@@ -130,6 +130,7 @@ The spec 040 fall-through facets use the likely base keyboards instead of a sing
 ### Edge Cases
 
 - **Missing physical key:** a base keyboard defines output on a key some underlying keyboards lack, for example UK English's 102nd key, which an ANSI board doesn't have. If the country's likely hardware is all ANSI, the combo is not a leak. If there is no hardware data, the combo stays in the handling set, labelled as applying only where the key exists (FR-001a).
+- **Mismatched pair:** the author's answer says typists use a US base keyboard, but the country's computers are mostly French AZERTY hardware. Output follows the US base keyboard, and the picture flags that the keycaps won't match what's typed (FR-001c).
 - **Mixed hardware:** a country's computers come from several origins, for example both French and US imports. The likely underlying keyboards and base keyboards include all of them, and each leak says which ones it applies to.
 - **Likely base keyboards disagree:** UK English produces `€` on AltGr+4 and US English produces nothing. The combo is in the handling set because at least one leaks, and each base keyboard's output is shown separately.
 - **Context-dependent definitions:** your keyboard defines a combo only after a deadkey or other context. The combo counts as defined only where the rule is unconditional. Otherwise it is marked uncertain and shown as such, never silently treated as closed.
@@ -146,7 +147,8 @@ The spec 040 fall-through facets use the likely base keyboards instead of a sing
 
 - **FR-001**: The system MUST derive the output picture for the desktop layout of your keyboard: every printable key that exists on the likely underlying keyboards, frame keys excluded (as 076 FR-005), on four modifier layers: none, Shift, AltGr, Shift+AltGr.
 - **FR-001a**: The likely underlying keyboards MUST be resolved per country from a versioned, source-cited **hardware origin** mapping. The mapping gives the physical layouts common in a country (ANSI, ISO or others), which usually follow where the country's computers come from; for example, a market supplied mainly with French laptops gets AZERTY on ISO hardware. The country comes from the same signals FR-004 uses (the region in the language tags, or the author's answer). A combo on a key absent from every likely underlying keyboard MUST NOT enter the handling set. When the mapping has no entry for the country, the underlying keyboard MUST be assumed to have every key any likely base keyboard maps (the union, including the 102nd key `K_oE2`), and the UI MUST say that a leak on such a key applies only where the typist's hardware has it. (Clarified 2026-09-29: assume the union; refined the same day: infer from hardware origin, with the union as fallback.)
-- **FR-001b**: The hardware origin mapping MUST also inform the likely base keyboards. Imported computers usually ship with the origin country's OS layout, so it contributes a region-level prior to the FR-004 resolution. It never overrides the author's `layout_family` answer (076 FR-023 order), and its provenance MUST be shown like the rest of the resolution.
+- **FR-001b**: Underlying and base keyboards MUST be resolved as **pairs**. Ideally, the base keyboard selected in Keyman is the underlying keyboard's own layout (the one printed on the keycaps), or the typist masks the keys with stickers. The hardware origin mapping therefore yields (underlying keyboard, base keyboard) pairs, and by default each likely underlying keyboard is paired with its own layout. This pairing contributes a region-level prior to the FR-004 resolution. It never overrides the author's `layout_family` answer (076 FR-023 order), and its provenance MUST be shown like the rest of the resolution.
+- **FR-001c**: When a likely pair is mismatched, meaning the base keyboard is not the underlying keyboard's own layout (for example AZERTY hardware with a US base keyboard), the picture MUST still use the base keyboard's fallback for output, since that is what gets typed. It MUST also warn that the keycaps will not show what is typed, and suggest matching the base keyboard to the hardware or using stickers. A mismatch arises when the author's `layout_family` answer differs from the country's likely hardware.
 - **FR-002**: For each combo, the picture MUST classify your keyboard's handling as exactly one of:
   - **defined**, with the output kind: character, deadkey, suppressed (`nul`), re-emitted context, or beep;
   - **undefined**;
@@ -178,7 +180,7 @@ The spec 040 fall-through facets use the likely base keyboards instead of a sing
 - **Likely base keyboard set**: the resolved base keyboards with their provenance (answer, region or reference set). This already exists (076 FR-023).
 - **Base keyboard data**: per-base-keyboard, per-layer combo outputs for Windows, generated from the Keyman basic keyboards and versioned. This already exists (PR #1854).
 - **Underlying keyboard key set**: the physical keys of a hardware form factor (ANSI, ISO, others). This is new.
-- **Hardware origin mapping**: country to the physical layouts, and the OS layouts they ship with, that are common there, based on where computers come from. It is versioned and source-cited like the region-to-layout mapping in spec 076. This is new.
+- **Hardware origin mapping**: country to the (underlying keyboard, base keyboard) pairs common there, based on where computers come from. By default each base keyboard is the hardware's own layout. It is versioned and source-cited like the region-to-layout mapping in spec 076. This is new.
 
 ## Success Criteria *(mandatory)*
 
