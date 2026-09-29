@@ -175,9 +175,12 @@ describe("buildProducerIndex", () => {
     expect(inputSlots).toHaveLength(0); // dkf0060 selector suppressed by ruling §4
     expect(contributors.ruleNodeIds).toEqual(["rule#i"]);
 
-    // The producer index counts the production (1); the contributor walk sees
-    // the whole-rule nomination.
+    // In this fixture the contributor walk carries no store slots at all
+    // (input slots suppressed by ruling §4, no output-side nominations), so
+    // the naive contributor count and the producer index coincide at 1 —
+    // the producer index still counts only the production, never slots.
     const naive = contributors.ruleNodeIds.length + contributors.storeSlotIds.length;
+    expect(naive).toBe(1);
     expect(buildProducerIndex(ir).get("i")).toBe(1);
   });
 });
