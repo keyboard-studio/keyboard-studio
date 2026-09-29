@@ -42,6 +42,7 @@ import {
   ACCENT,
   BG_CARD,
   BORDER,
+  CSS_TEXT_ON_ACCENT,
   ERROR_BG,
   ERROR_TEXT,
   FONT_MONO,
@@ -336,7 +337,7 @@ const primaryButtonStyle: CSSProperties = {
   background: ACCENT,
   border: "none",
   borderRadius: 4,
-  color: "#fff",
+  color: CSS_TEXT_ON_ACCENT,
   cursor: "pointer",
   padding: "10px 16px",
 };

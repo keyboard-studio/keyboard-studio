@@ -15,10 +15,13 @@ import { useLingui } from "@lingui/react/macro";
 import { plural } from "@lingui/core/macro";
 import type { RuleKind, TokenSpan } from "@keyboard-studio/engine/kmAssist";
 import {
+  ACCENT,
   BG_CARD,
+  BG_INSET,
   CARD_BORDER,
   ERROR_TEXT,
   FONT_MONO,
+  REORDER_TEXT,
   TEXT_DIM,
   TEXT_MAIN,
   WARNING,
@@ -70,15 +73,15 @@ const KIND_LABEL: Record<RuleKind, string> = {
 
 const KIND_BADGE_COLOR: Record<RuleKind, string> = {
   "plain-output": TEXT_DIM,
-  context: "#2f6fed",
-  blocking: "#b3541e",
-  reorder: "#7a4fd0",
+  context: ACCENT,
+  blocking: WARNING,
+  reorder: REORDER_TEXT,
   opaque: WARNING,
 };
 
 const SPAN_COLOR: Record<TokenSpan["kind"], string | undefined> = {
-  "store-ref": "#2f6fed",
-  key: "#b3541e",
+  "store-ref": ACCENT,
+  key: WARNING,
   operator: TEXT_DIM,
   output: undefined,
   comment: TEXT_DIM,
@@ -150,7 +153,7 @@ export function KmRuleView({
           margin: 0,
           padding: 8,
           overflowX: "auto",
-          background: "rgba(0,0,0,0.04)",
+          background: BG_INSET,
           borderRadius: 4,
           color: TEXT_MAIN,
           fontFamily: FONT_MONO,
