@@ -326,10 +326,10 @@ describe("Off-spine step inventory", () => {
 // (implicit "pane").
 // ---------------------------------------------------------------------------
 
-const FULL_LAYOUT_IDS = ["carve", "mechanisms", "touch", "touch_seed_source"] as const;
+const FULL_LAYOUT_IDS = ["carve", "rules", "mechanisms", "touch", "touch_seed_source"] as const;
 
 describe("layout declarations (spec 024 Stage 0)", () => {
-  it("exactly four steps declare layout:'full'", () => {
+  it("exactly five steps declare layout:'full'", () => {
     const fullSteps = manifest.filter((s) => s.layout === "full");
     const fullIds = fullSteps.map((s) => s.id).sort();
     expect(fullIds).toEqual([...FULL_LAYOUT_IDS].sort());
@@ -338,6 +338,11 @@ describe("layout declarations (spec 024 Stage 0)", () => {
   it("carve declares layout:'full'", () => {
     const carve = manifest.find((s) => s.id === "carve");
     expect(carve?.layout).toBe("full");
+  });
+
+  it("rules declares layout:'full' (spec 082: the demo pane + rule builder need the full width)", () => {
+    const rules = manifest.find((s) => s.id === "rules");
+    expect(rules?.layout).toBe("full");
   });
 
   it("mechanisms declares layout:'full'", () => {

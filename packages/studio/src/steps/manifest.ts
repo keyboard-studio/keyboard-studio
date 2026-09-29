@@ -277,7 +277,7 @@ export function validateManifestShape(): void {
   // M2 — spine order.
   const expectedSpine = [
     "identity", "choose_base", "track", "characters",
-    "marks", "punctuation", "invisibles", "convenience", "carve", "mechanisms", "touch", "help", "package",
+    "marks", "punctuation", "invisibles", "convenience", "carve", "rules", "mechanisms", "touch", "help", "package",
   ];
   for (let i = 0; i < expectedSpine.length; i++) {
     const expected = expectedSpine[i];
@@ -321,18 +321,20 @@ export function validateManifestShape(): void {
 
   // Layout guard (spec 028 Stage 5, T016): layout:"full" is LOAD-BEARING —
   // StepHost reads step.layout to select full-screen vs two-pane chrome (R4).
-  // EXACTLY {carve, mechanisms, touch, touch_seed_source} must declare
+  // EXACTLY {carve, rules, mechanisms, touch, touch_seed_source} must declare
   // layout:"full"; all others must be "pane" or omit layout. A mismatched
   // layout would silently change the chrome. touch_seed_source joined this
   // set in the P0 fix for the panel's inline live OSK preview (spec 035
   // R4b follow-up) — without full-screen, StudioShell's persistent
   // right-pane OSKFrame co-mounted alongside the panel's own OSK.
-  const FULL_LAYOUT_IDS = new Set(["carve", "mechanisms", "touch", "touch_seed_source"]);
+  // rules joined in spec 082: the demo pane + rule builder need the full
+  // width, same as the carve and mechanisms galleries it sits between.
+  const FULL_LAYOUT_IDS = new Set(["carve", "rules", "mechanisms", "touch", "touch_seed_source"]);
   for (const step of manifest) {
     if (step.layout === "full") {
       if (!FULL_LAYOUT_IDS.has(step.id)) {
         throw new Error(
-          `[manifest] unexpected layout:"full" on step "${step.id}" — only carve/mechanisms/touch/touch_seed_source may be full-screen (spec 024 Stage 0)`,
+          `[manifest] unexpected layout:"full" on step "${step.id}" — only carve/rules/mechanisms/touch/touch_seed_source may be full-screen (spec 024 Stage 0)`,
         );
       }
     }
