@@ -199,7 +199,7 @@ export function DeadkeySurface({ onComplete, onBack }: DeadkeySurfaceProps) {
             </button>
           )}
         </span>
-        <button type="button" style={navPrimaryStyle} onClick={onComplete}>
+        <button type="button" style={navPrimaryStyle} onClick={onComplete} data-testid="deadkeys-continue">
           Continue →
         </button>
       </div>
