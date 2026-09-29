@@ -61,13 +61,8 @@ validation lives in `engine/src/validator`.
 ## Source of truth
 
 - **[spec.md](spec.md)** — the v2.0.0 spec. Authoritative for scope, schema, validator layering,
-  team boundaries, and resolved decisions. Amendment history: v1.1.0 KeyboardIR import
-  (2026-06-08); v1.1.1 placement priors (2026-06-11); v1.2.0 hybrid workflow + scoped gallery
-  (2026-06-13, see [docs/workflow-model.md](docs/workflow-model.md)); v1.3.0 working-copy spine +
-  two authoring tracks (2026-06-14); v1.3.1 defaults-first — §3c "Defaults are the product",
-  propose-then-confirm everywhere, "no default is a defect" (2026-06-15); v2.0.0 **major** —
-  per-key touch provenance on `TouchKeyIR` + `IRPath` typed paths (§5a), §7.7 typed
-  assignment-map contract, functional phase labels + A–G crosswalk (Decision 15) (2026-06-26).
+  team boundaries, and resolved decisions. Its amendment history is in spec.md itself; the hybrid
+  workflow is composed in [docs/workflow-model.md](docs/workflow-model.md).
 - **[docs/spec-signoff.md](docs/spec-signoff.md)** — review-cycle log and decision summary
   (D1–D9). Read this to see *why* a spec section reads the way it does before proposing changes.
 - **[README.md](README.md)** — external-facing description. Keep it accurate and lean; the
@@ -194,12 +189,6 @@ The `Pattern` TS interface in spec §5 is the Day-1 contract. Treat its field na
 **If a task seems to require schema-breaking changes, surface this to the user before editing —
 don't change the schema silently.**
 
-Runtime enforcement: the locked types are mirrored by zod schemas in
-`packages/contracts/src/schemas.ts`. Data-file boundaries parse through them — `criteria.json` in
-`criteriaData.ts`, pattern YAML in the engine loader — so malformed records fail loudly. The
-hand-written interfaces stay canonical; the schemas mirror them, and compile-time drift guards
-fail the build if the two diverge.
-
 ## Out of scope for v1 (do not implement)
 
 Spec §16. CJK and Ethiopic reorder patterns, LDML output, mobile-app integration, hosting,
@@ -254,23 +243,9 @@ When in doubt, branch. Pushing that branch needs no permission — see the caden
 
 ### Issue closure policy
 
-When a cycle lands work that touches a tracked issue (`#N`), the closing specialist — usually
-`km-archivist` at PR open, but also `/km-lead` for direct-to-main commits — must reconcile what
-shipped against the issue's acceptance-criteria checkboxes:
-
-1. **Enumerate the AC checkboxes.** `gh issue view N --json body` and walk the `- [ ]` list. If
-   the issue has no checkboxes, this policy does not apply.
-2. **Verify each one against the diff.** A checkbox is *done* only if the shipped change actually
-   satisfies it — not if "we meant to" or "it's covered by another PR". Run the relevant command,
-   read the relevant file, or call the relevant specialist (typically `km-verification`).
-3. **Check the boxes that are done.** `gh issue edit N --body "<updated>"` with the verified boxes
-   flipped. Leave a one-line note explaining which flipped and which didn't.
-4. **Pick the right closing keyword.** All boxes checked → `closes #N`. Some still open →
-   `refs #N`, and the issue stays open. Do not check boxes you haven't verified.
-
-An issue with half its checkboxes flipped is more honest than one closed prematurely or one left
-fully unchecked despite real progress. Partial closures are normal; **silent** partial closures
-are the bug.
+Before writing `closes #N` or `refs #N`, reconcile the issue's acceptance-criteria checkboxes
+against what actually shipped — the procedure is the `issue-closure` skill. Never check a box you
+haven't verified; **silent** partial closures are the bug.
 
 ## Spec-kit (spec-driven feature loop)
 
@@ -331,39 +306,16 @@ The branch-and-PR pair is therefore the failsafe: pushing a feature branch canno
 
 ### Section extraction — don't shred the architecture
 
-The monolithic `spec.md` is migrating into `specs/NNN-<slug>/` folders one numbered section at a
-time, where `NNN` mirrors the spec.md section number (e.g. `specs/007-strategy-selection/` for
-§7). **The extracted folder is authoritative for its section once landed; `spec.md` keeps a stub
-pointer.** Sections not yet extracted remain authoritative in `spec.md`. Extracted so far: §7
-(pilot), §8, §5 (Pattern schema).
+**The extracted `specs/NNN-<slug>/` folder is authoritative for its section once landed; `spec.md`
+keeps a stub pointer.** Only *feature / contract* sections extract — the **architecture-core**
+sections (§4, §5a, §9, §10, §11, §12/§13) stay authoritative in `spec.md`, composed in
+[docs/architecture.md](docs/architecture.md). Numbering rules, the extracted-so-far list, and the
+spec-trace vs. `/speckit-analyze` drift split are in the `spec-extraction` skill — load it before
+extracting a section or creating a new `specs/NNN`.
 
-Only *feature / contract* sections extract. The **architecture-core** sections — §4 (system
-overview), §5a (KeyboardIR spine), §9 (routing), §10 (validator layering), §11 (criteria model),
-§12/§13 (output + team boundaries) — describe how the whole tool composes; they are **not**
-features and stay authoritative in `spec.md`, composed in
-[docs/architecture.md](docs/architecture.md). (§8 Data flow was extracted before this rule; it is
-the meta-flow and is treated as architecture-core wherever its text lives.) The reference-only
-sections (§14, §17, §18, §19) are not planned for extraction.
-
-When deciding whether to extract: *feature/contract → `specs/NNN`; architecture/meta-flow → stays,
-composed in `docs/architecture.md`; reference → stays.*
-
-**New features still get their own `specs/NNN-<slug>/`** with a creation-order `NNN`, and **cite
-the governing `spec.md §X`** (or its extracted folder) rather than re-deriving scope. The
-mirror-numbering convention applies only to sections being extracted; new features pick the next
-free `NNN` above the extracted-section range.
-
-**Open PRs claim numbers before `main` sees them.** The `before_specify` hook and
-`spec-number-lint` only scan folders already merged, so two in-flight specs can pick the same
-`NNN`. Before choosing one, check open PRs too:
-`gh pr list --state open --json number,title,headRefName`. Skip any number an open PR's title or
-branch already uses.
-
-**Drift split:** `utilities/spec-trace` owns textual drift of the spec corpus — the monolith's
-sections, the extracted feature specs, and `docs/architecture.md`; it hashes each unit and flags
-un-acknowledged changes (`node utilities/spec-trace check|report|acknowledge`).
-`/speckit-analyze` owns per-feature `spec ↔ plan ↔ tasks` consistency. Do **not** install
-spec-kit's "Spec Trace" community extension — it duplicates the existing utility.
+**Open PRs claim numbers before `main` sees them** — `spec-number-lint` only scans merged folders,
+so check `gh pr list --state open --json number,title,headRefName` before picking an `NNN`. Do
+**not** install spec-kit's "Spec Trace" community extension — it duplicates `utilities/spec-trace`.
 
 ## Conventions
 
