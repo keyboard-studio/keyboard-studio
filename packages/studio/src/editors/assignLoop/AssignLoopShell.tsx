@@ -26,6 +26,10 @@ import { useLingui } from "@lingui/react/macro";
 import { BORDER, ACCENT, TEXT_DIM, FONT, galleryPageStyle as pageStyle } from "../../lib/galleryTheme.ts";
 import { useIsNarrow } from "../../hooks/useViewport.ts";
 import { PreviewSheet } from "../../components/PreviewSheet.tsx";
+import {
+  PreviewButton,
+  PREVIEW_BUTTON_CLEARANCE_PX,
+} from "../../components/PreviewButton.tsx";
 
 /**
  * The canonical left-pane share of a full-bleed two-pane gallery screen
@@ -107,6 +111,10 @@ export function AssignLoopShell({
     id: "assignLoopShell.showPreview",
     message: "Show keyboard preview",
   });
+  const previewButtonLabel = t({
+    id: "previewButton.label",
+    message: "Preview",
+  });
   const previewSheetLabel = t({
     id: "assignLoopShell.previewSheetLabel",
     message: "Keyboard preview",
@@ -179,45 +187,27 @@ export function AssignLoopShell({
         }}
       >
         {header}
-        <div
-          style={{
-            flex: 1,
-            overflowY: "auto",
-            minHeight: 0,
-            boxSizing: "border-box",
-          }}
-        >
-          {leftContent}
-        </div>
-        <div
-          style={{
-            flexShrink: 0,
-            borderTop: `1px solid ${BORDER}`,
-            padding: "8px 16px",
-            // Thumb-zone clearance above the app footer.
-            paddingBottom: "max(8px, env(safe-area-inset-bottom))",
-            background: "var(--app-bg)",
-          }}
-        >
-          <button
-            type="button"
-            onClick={() => setSheetOpen(true)}
-            data-testid="assign-loop-show-preview"
+        {/* The preview trigger floats over the scrolling card (shared with
+            the survey — see PreviewButton) instead of taking a bar of its
+            own, so the card keeps the height and the footer's forward
+            action stays reachable. */}
+        <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
+          <div
             style={{
-              width: "100%",
-              minHeight: "var(--app-touch-target)",
-              borderRadius: 8,
-              border: `1px solid ${BORDER}`,
-              background: "var(--app-accent-subtle)",
-              color: ACCENT,
-              fontFamily: FONT,
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: "pointer",
+              height: "100%",
+              overflowY: "auto",
+              boxSizing: "border-box",
+              paddingBottom: PREVIEW_BUTTON_CLEARANCE_PX,
             }}
           >
-            {showPreviewLabel}
-          </button>
+            {leftContent}
+          </div>
+          <PreviewButton
+            label={previewButtonLabel}
+            ariaLabel={showPreviewLabel}
+            onClick={() => setSheetOpen(true)}
+            testId="assign-loop-show-preview"
+          />
         </div>
         <PreviewSheet
           open={sheetOpen}

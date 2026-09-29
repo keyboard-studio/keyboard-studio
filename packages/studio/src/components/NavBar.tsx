@@ -4,11 +4,13 @@
 //
 // Extracted from StudioShell.tsx (mobile adaptation, Phase 1) so the
 // slim narrow-viewport variant is independently testable. The narrow branch
-// (< 479px) hides the center tab row — route navigation moves to
-// MobileTabBar at the bottom — and collapses the right zone into a single
-// "more options" disclosure. Desktop rendering is untouched.
+// (< 479px) is ONE row: the menu button (route links first, then the
+// right-zone controls) and, on the survey, the compact phase summary passed
+// in as `narrowCenter` in place of the wordmark. There is no bottom tab bar:
+// every vertical pixel below this row goes to the question and the journey
+// footer. Desktop rendering is untouched.
 
-import { useRef, useState } from "react";
+import { useRef, useState, type ReactNode } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import { msg } from "@lingui/core/macro";
 import { resolveMessage } from "../lib/i18nResolve.ts";
@@ -16,6 +18,7 @@ import { NAV_ITEMS } from "../lib/navItems.ts";
 import type { RouteId } from "../lib/navigate.ts";
 import { useStartOverStore } from "../stores/startOverStore.ts";
 import { useIsNarrow } from "../hooks/useViewport.ts";
+import { useJourneyContentsStore } from "../stores/journeyContentsStore.ts";
 import {
   useDismissablePopover,
   POPOVER_PANEL_STYLE,
@@ -52,6 +55,11 @@ export interface NavBarProps {
   unfinishedTouchCount: number;
   /** Routes back to the named gallery and switches to the #survey route. */
   onNavigateToUnfinishedGallery: (target: "mechanisms" | "touch") => void;
+  /**
+   * Narrow viewports only: content that replaces the wordmark in the single
+   * top row (the survey's compact phase summary). Ignored on desktop.
+   */
+  narrowCenter?: ReactNode;
 }
 
 export function NavBar({
@@ -61,15 +69,19 @@ export function NavBar({
   unfinishedDesktopCount,
   unfinishedTouchCount,
   onNavigateToUnfinishedGallery,
+  narrowCenter,
 }: NavBarProps) {
   const { i18n: activeI18n, t } = useLingui();
   const startOver = useStartOverStore((s) => s.handler);
-  // Mobile adaptation (Phase 1): on narrow viewports the bar slims
-  // to brand + a single overflow disclosure. The center tab row moves to
-  // MobileTabBar (bottom, thumb zone); the right-zone controls move into
-  // the overflow panel below. Desktop rendering is untouched.
+  // Mobile adaptation: on narrow viewports the bar slims to one row, the
+  // menu (route links + right-zone controls) plus the wordmark or the
+  // narrowCenter content. Desktop rendering is untouched.
   const isNarrow = useIsNarrow();
   const [overflowOpen, setOverflowOpen] = useState(false);
+  // The journey contents sheet (StudioFooter mounts it) is also reachable
+  // from this menu, so the table of contents is one tap from anywhere.
+  const contentsAvailable = useJourneyContentsStore((s) => s.available);
+  const openContents = useJourneyContentsStore((s) => s.setOpen);
   const overflowContainerRef = useRef<HTMLDivElement | null>(null);
   // Lightweight popover usage (SurveyResetButton precedent): Escape and
   // outside-pointerdown dismiss. Focus is deliberately left where the
@@ -121,6 +133,19 @@ export function NavBar({
           floor is what makes the bar wrap instead of overflowing into the
           tabs. `minHeight` keeps a wrapped second row from collapsing
           against the bar's bottom border. */}
+      {isNarrow && narrowCenter !== undefined ? (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            flex: "1 1 0",
+            minWidth: 0,
+            minHeight: 44,
+          }}
+        >
+          {narrowCenter}
+        </div>
+      ) : (
       <div
         style={{
           display: "flex",
@@ -150,12 +175,12 @@ export function NavBar({
             brand + overflow only (mobile adaptation, Phase 1). */}
         {!isNarrow && active !== "welcome" && <CurrentKeyboardIndicator />}
       </div>
+      )}
 
       {/* Center zone — tab links. flex: 0 0 auto — sized to its content, not
           stretched, which is what keeps it centered between the two flex:1
           side zones rather than left- or right-anchored.
-          Hidden on narrow viewports: route navigation moves to MobileTabBar
-          (bottom, thumb zone). */}
+          Hidden on narrow viewports: the same links head the menu panel. */}
       {!isNarrow && (
         <div
           style={{
@@ -216,10 +241,11 @@ export function NavBar({
           last so it can't crowd the controls beside it; it renders only
           while a survey is mounted (startOverStore publishes the handler
           from SurveyView, which exists on the #survey route alone).
-          Narrow viewports (mobile adaptation, Phase 1): the whole zone collapses into a
-          single 44px "more options" disclosure. The panel stacks the same
-          controls vertically — same set, same order, same welcome gates —
-          so nothing is lost, only re-homed. */}
+          Narrow viewports (mobile adaptation): the whole zone collapses into
+          a single 44px menu disclosure. The panel lists the route links first
+          (same NAV_ITEMS, same blocked-Output treatment), then stacks the
+          same controls vertically — same set, same order, same welcome
+          gates — so nothing is lost, only re-homed. */}
       {isNarrow ? (
         <div
           ref={overflowContainerRef}
@@ -236,8 +262,8 @@ export function NavBar({
             type="button"
             className="ks-focus-ring"
             aria-label={t({
-              id: "nav.overflow.label",
-              message: "More options",
+              id: "nav.menu.label",
+              message: "Menu",
             })}
             aria-expanded={overflowOpen}
             onClick={() => setOverflowOpen((v) => !v)}
@@ -255,7 +281,7 @@ export function NavBar({
               cursor: "pointer",
             }}
           >
-            <span aria-hidden="true">⋯</span>
+            <span aria-hidden="true">☰</span>
           </button>
           {overflowOpen && (
             <div
@@ -271,6 +297,91 @@ export function NavBar({
                 boxSizing: "border-box",
               }}
             >
+              <ul
+                aria-label={t({
+                  id: "nav.tabBar.ariaLabel",
+                  message: "Studio sections",
+                })}
+                style={{
+                  listStyle: "none",
+                  margin: "0 0 6px",
+                  padding: "0 0 6px",
+                  borderBottom: "1px solid var(--app-border)",
+                }}
+              >
+                {NAV_ITEMS.map(({ id, label }) => {
+                  const isActive = id === active;
+                  const isBlocked = id === "output" && outputBlocked;
+                  return (
+                    <li key={id}>
+                      <a
+                        href={`#${id}`}
+                        className="ks-focus-ring"
+                        aria-current={isActive ? "page" : undefined}
+                        aria-disabled={isBlocked ? "true" : undefined}
+                        title={isBlocked ? outputBlockedTitle : undefined}
+                        onClick={() => setOverflowOpen(false)}
+                        style={{
+                          display: "flex",
+                          alignItems: "center",
+                          minHeight: "var(--app-touch-target)",
+                          padding: "0 12px",
+                          borderRadius: 6,
+                          textDecoration: "none",
+                          fontSize: 15,
+                          fontWeight: isActive ? 700 : 500,
+                          fontFamily: "var(--app-font)",
+                          // Active: accent bar + weight, never colour alone.
+                          borderLeft: isActive
+                            ? "3px solid var(--app-accent)"
+                            : "3px solid transparent",
+                          background: isActive
+                            ? "var(--app-accent-subtle)"
+                            : "transparent",
+                          color: isBlocked
+                            ? "var(--app-text-disabled)"
+                            : isActive
+                              ? "var(--app-accent-text)"
+                              : "var(--app-text)",
+                        }}
+                      >
+                        {resolveMessage(activeI18n, label)}
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+              {contentsAvailable && (
+                <button
+                  type="button"
+                  className="ks-focus-ring"
+                  aria-haspopup="dialog"
+                  onClick={() => {
+                    setOverflowOpen(false);
+                    openContents(true);
+                  }}
+                  data-testid="nav-journey-contents"
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    minHeight: "var(--app-touch-target)",
+                    padding: "0 12px",
+                    margin: "0 0 6px",
+                    border: "none",
+                    borderRadius: 6,
+                    background: "transparent",
+                    color: "var(--app-text)",
+                    fontSize: 15,
+                    fontWeight: 500,
+                    fontFamily: "var(--app-font)",
+                    textAlign: "left",
+                    cursor: "pointer",
+                  }}
+                >
+                  <Trans id="journeyContents.menuItem">Contents</Trans>
+                </button>
+              )}
               {active !== "welcome" && (
                 <UnfinishedGalleryIndicator
                   desktopCount={unfinishedDesktopCount}

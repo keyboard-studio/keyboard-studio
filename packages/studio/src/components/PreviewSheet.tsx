@@ -44,6 +44,11 @@ export interface PreviewSheetProps {
   readonly children: ReactNode;
   /** Rendered as `data-testid` on the sheet element. */
   readonly testId?: string;
+  /**
+   * Drop the body's side gutter so the content (a keyboard) can span the
+   * sheet edge to edge. The content then owns its own text insets.
+   */
+  readonly flush?: boolean;
 }
 
 const BACKDROP_BG = "color-mix(in srgb, var(--sil-black) 50%, transparent)";
@@ -60,6 +65,7 @@ export function PreviewSheet({
   label,
   children,
   testId,
+  flush = false,
 }: PreviewSheetProps) {
   const { t } = useLingui();
   const { orientation, height } = useViewport();
@@ -268,7 +274,7 @@ export function PreviewSheet({
             flexGrow: 1,
             overflowY: "auto",
             minHeight: 0,
-            padding: 16,
+            padding: flush ? "8px 0 16px" : 16,
           }}
         >
           {children}

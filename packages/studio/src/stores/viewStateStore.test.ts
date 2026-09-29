@@ -11,8 +11,6 @@ describe("initial values", () => {
     expect(s.trailShowSuperseded).toBe(false);
     expect(s.paneSplitPct).toEqual({ survey: 45, compare: 40, output: 40 });
     expect(s.oskMode).toEqual({ survey: "desktop", compare: "desktop" });
-    expect(s.oskVisible).toEqual({ survey: true, compare: true });
-    expect(s.surveyPaneView).toBe("questions");
     expect(s.scrollTop).toEqual({});
     expect(s.compareSelection).toBeNull();
   });
@@ -59,24 +57,6 @@ describe("slot writes", () => {
       compare: "touch",
     });
   });
-
-  it("keeps per-surface OSK visibility independent (mobile adaptation)", () => {
-    useViewStateStore.getState().setOskVisible("survey", false);
-    expect(useViewStateStore.getState().oskVisible).toEqual({
-      survey: false,
-      compare: true,
-    });
-    useViewStateStore.getState().setOskVisible("survey", true);
-    expect(useViewStateStore.getState().oskVisible).toEqual({
-      survey: true,
-      compare: true,
-    });
-  });
-
-  it("sets the narrow survey pane view", () => {
-    useViewStateStore.getState().setSurveyPaneView("preview");
-    expect(useViewStateStore.getState().surveyPaneView).toBe("preview");
-  });
 });
 
 describe("paneSplitPct clamping on read", () => {
@@ -122,8 +102,6 @@ describe("reset (FR-052)", () => {
     s.setTrailShowSuperseded(true);
     s.setPaneSplitPct("compare", 70);
     s.setOskMode("survey", "tablet");
-    s.setOskVisible("survey", false);
-    s.setSurveyPaneView("preview");
     s.setScrollTop("trail-list", 300);
     s.setCompareSelection({
       baseKeyboard: { id: "kb", displayName: "KB" } as never,
@@ -138,8 +116,6 @@ describe("reset (FR-052)", () => {
     expect(after.trailShowSuperseded).toBe(false);
     expect(after.paneSplitPct).toEqual({ survey: 45, compare: 40, output: 40 });
     expect(after.oskMode).toEqual({ survey: "desktop", compare: "desktop" });
-    expect(after.oskVisible).toEqual({ survey: true, compare: true });
-    expect(after.surveyPaneView).toBe("questions");
     expect(after.scrollTop).toEqual({});
     expect(after.compareSelection).toBeNull();
   });

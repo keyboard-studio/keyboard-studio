@@ -72,7 +72,7 @@ test("OSK PreviewSheet mounts and unmounts the iframe", async ({ page }) => {
   await expectNoSeriousAxeViolations(page, "mobile OSK sheet lifecycle");
 });
 
-test("footer does not overlap the MobileTabBar", async ({ page }) => {
+test("the journey footer sits fully inside the visible viewport", async ({ page }) => {
   await page.goto("/");
   await page.waitForLoadState("networkidle");
 
@@ -80,18 +80,18 @@ test("footer does not overlap the MobileTabBar", async ({ page }) => {
     const footer = document.querySelector("footer");
     if (!footer) return { hasFooter: false, overlaps: false };
     const rect = footer.getBoundingClientRect();
-    // MobileTabBar sits at the viewport bottom; the footer must not paint
-    // underneath it.
+    // The footer carries Back / Next and the progress dots; it must never
+    // be pushed below the visible screen (the shell uses 100dvh for this).
     return {
       hasFooter: true,
-      overlaps: rect.bottom > window.innerHeight - 56,
+      overlaps: rect.bottom > window.innerHeight + 1,
       footerBottom: rect.bottom,
       viewportHeight: window.innerHeight,
     };
   });
 
   if (overlap.hasFooter) {
-    expect(overlap.overlaps, "footer must not sit under the tab bar").toBe(false);
+    expect(overlap.overlaps, "footer must be within the viewport").toBe(false);
   }
 
   await expectNoSeriousAxeViolations(page, "mobile footer");

@@ -62,11 +62,20 @@ import {
   type ProgressDot as ProgressDotData,
 } from "../decisions/progressDots.ts";
 import { ProgressDot } from "./ProgressDot.tsx";
+import { JourneyContents } from "./JourneyContents.tsx";
+import { useJourneyContentsStore } from "../stores/journeyContentsStore.ts";
+import { useIsNarrow } from "../hooks/useViewport.ts";
 import { StepNavCluster } from "./StepNavCluster.tsx";
 import { CSS_BORDER, CSS_SURFACE, CSS_TEXT, CSS_TEXT_MUTED } from "../ui/theme.ts";
 
 export function StudioFooter() {
   const { t, i18n } = useLingui();
+  // Narrow viewports: the dot row gives way to a "Contents" button that opens
+  // the same marks as a labelled, scrollable list (JourneyContents) — a
+  // phone has no hover to name a bare dot. Back / Next stay in the footer.
+  const isNarrow = useIsNarrow();
+  const setContentsAvailable = useJourneyContentsStore((s) => s.setAvailable);
+  const setContentsOpen = useJourneyContentsStore((s) => s.setOpen);
 
   // ---------------------------------------------------------------------------
   // Project label — the ONE precedence (FR-041). No fourth derivation.
@@ -222,11 +231,11 @@ export function StudioFooter() {
   }, [activeStepId, noticeStepId, clearNotice]);
   const reproposalNotice = noticeStepId === activeStepId ? noticeMessage : null;
 
-  function handleActivate(dot: ProgressDotData): void {
+  function handleActivate(dot: ProgressDotData): boolean {
     const outcome = jumpToLocation(dot.location);
     if (outcome.kind === "arrived") {
       setStatusMessage(null);
-      return;
+      return true;
     }
     // Both "refused" and "degraded" mean the gate held. A step-bearing
     // location NEVER resolves the resolver's own `kind:"unreachable"`
@@ -235,6 +244,7 @@ export function StudioFooter() {
     // the nearest reachable ancestor rather than the requested step. Either
     // way nothing skipped the gate; the reason is what the author needs.
     setStatusMessage(unreachableReasonLabel(outcome.reason, i18n));
+    return false;
   }
 
   // Auto-scroll the current mark into view on every dot-row change (FR-047:
@@ -263,6 +273,12 @@ export function StudioFooter() {
   const activeHasNav = useStepNavStore((s) => hasSlots(s.entries[activeStepId]?.spec));
   const journeyStarted =
     Object.keys(walks).length > 0 || projectLabel !== null || activeHasNav;
+  // Tell NavBar's menu whether there is a contents list to open.
+  const contentsAvailable = journeyStarted && isNarrow;
+  useEffect(() => {
+    setContentsAvailable(contentsAvailable);
+  }, [contentsAvailable, setContentsAvailable]);
+  useEffect(() => () => setContentsAvailable(false), [setContentsAvailable]);
   if (!journeyStarted) return null;
 
   return (
@@ -303,7 +319,7 @@ export function StudioFooter() {
 
       {/* Omitted entirely, not placeholdered, while the project has no name —
           see the module header. The dot row simply takes the full width. */}
-      {projectLabel !== null && (
+      {!isNarrow && projectLabel !== null && (
         <span
           className="ks-studio-footer-project"
           style={{
@@ -324,6 +340,42 @@ export function StudioFooter() {
         </span>
       )}
 
+      {isNarrow ? (
+        <>
+          <button
+            type="button"
+            className="ks-focus-ring"
+            aria-haspopup="dialog"
+            onClick={() => setContentsOpen(true)}
+            data-testid="journey-contents-open"
+            style={{
+              marginLeft: "auto",
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              minHeight: "var(--app-touch-target)",
+              padding: "0 12px",
+              flexShrink: 0,
+              border: `1px solid ${CSS_BORDER}`,
+              borderRadius: 8,
+              background: "transparent",
+              color: CSS_TEXT,
+              fontFamily: "var(--app-font)",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            <span aria-hidden="true">☰</span>
+            {t({ id: "journeyContents.open", message: "Contents" })}
+          </button>
+          <JourneyContents
+            dots={dots}
+            onActivate={handleActivate}
+            statusMessage={statusMessage ?? reproposalNotice}
+          />
+        </>
+      ) : (
       <div
         // spec 079 T062/T063: keyed on the active step. The two-tier strip
         // collapses/expands a section's whole set of children every time the
@@ -375,6 +427,7 @@ export function StudioFooter() {
           />
         ))}
       </div>
+      )}
 
       <span role="status" aria-live="polite" style={{ flexShrink: 0, color: CSS_TEXT_MUTED, maxWidth: "25%" }}>
         {statusMessage ?? reproposalNotice}

@@ -74,7 +74,7 @@ export function OSKFrame({
   const viewport = useViewport();
   const compactHeight =
     viewport.isNarrow || viewport.height <= BREAKPOINTS.shortHeightMax;
-  const frameHeightPx = compactHeight
+  const estimatedHeightPx = compactHeight
     ? Math.min(
         OSK_DESKTOP_HEIGHT_PX,
         Math.max(OSK_MIN_HEIGHT_PX, viewport.height - OSK_VIEWPORT_CHROME_PX),
@@ -91,6 +91,19 @@ export function OSKFrame({
   // re-fires these effects every render and spams the iframe with
   // duplicate SET_KEYBOARD messages.
   const { send, engineReady, textValue } = channel;
+  const contentHeight = channel.contentHeight ?? null;
+  // Once the frame reports its natural height (CONTENT_HEIGHT), size the
+  // iframe to it so the whole keyboard shows — a fixed estimate cropped the
+  // bottom rows at phone widths. Compact viewports use the reported height
+  // exactly (the containing pane or sheet scrolls if it is taller than the
+  // screen); desktop keeps its 560px frame as a floor, growing only for a
+  // taller layout (e.g. the tablet profile).
+  const frameHeightPx =
+    contentHeight === null
+      ? estimatedHeightPx
+      : compactHeight
+        ? contentHeight
+        : Math.max(OSK_DESKTOP_HEIGHT_PX, contentHeight);
 
   // The frame is a static document with no Lingui catalog of its own, so its
   // user-facing chrome is localized here and pushed in via SET_STRINGS. Keep
@@ -181,10 +194,16 @@ export function OSKFrame({
       style={{
         position: "relative",
         width: "100%",
-        minHeight: compactHeight ? OSK_MIN_HEIGHT_PX : 380,
-        borderRadius: 12,
+        minHeight:
+          contentHeight !== null ? undefined : compactHeight ? OSK_MIN_HEIGHT_PX : 380,
         overflow: "hidden",
-        border: "1px solid var(--app-border)",
+        // Phone widths: edge to edge like a real keyboard — no rounded card.
+        ...(viewport.isNarrow
+          ? {
+              borderTop: "1px solid var(--app-border)",
+              borderBottom: "1px solid var(--app-border)",
+            }
+          : { borderRadius: 12, border: "1px solid var(--app-border)" }),
         background: "var(--app-bg)",
       }}
     >

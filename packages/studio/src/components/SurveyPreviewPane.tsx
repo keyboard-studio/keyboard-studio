@@ -1,15 +1,13 @@
 // SurveyPreviewPane — the survey's right pane: live OSK preview (or, for the
 // Phase B build-list only, the interactive character map).
 //
-// Extracted from StudioShell's SurveyView (mobile adaptation, Phase 2)
-// so the OSK show/hide switch is independently testable — in particular the
-// proof that hiding the preview unmounts the OSK iframe.
+// Extracted from StudioShell's SurveyView (mobile adaptation, Phase 2).
 //
-// OSK visibility (principle 9) is author-controlled: the switch in the pane
-// header toggles `oskVisible`, and when it is false this component does NOT
-// render OSKFrame — unmounting destroys the iframe and unloads KeymanWeb,
-// showing remounts it through the normal init path. Host lifecycle only;
-// the engine, iframe internals, and postMessage channel are untouched.
+// OSK visibility (principle 9) is a host-lifecycle question, not a switch in
+// this pane: on desktop the pane is always beside the questions; on narrow
+// viewports it is rendered inside a PreviewSheet, so it (and its OSK iframe)
+// is mounted only while the author has the sheet open. `compact` is that
+// sheet layout: no side gutter, so the keyboard spans the full width.
 
 import type { CSSProperties } from "react";
 import { Trans } from "@lingui/react/macro";
@@ -18,16 +16,12 @@ import type { Stage } from "../hooks/useKeyboardArtifact.ts";
 import { TEXT_MAIN, FONT } from "../survey/surveyStyles.ts";
 import { OSKFrame } from "./OSKFrame.tsx";
 import { OskModeToggle, type OskMode } from "./OskModeToggle.tsx";
-import { OskVisibilitySwitch } from "./OskVisibilitySwitch.tsx";
 import { CharacterMapPane } from "../survey/CharacterMapPane.tsx";
 
 export interface SurveyPreviewPaneProps {
   localBase: BaseKeyboard | null;
   oskMode: OskMode;
   onOskModeChange: (mode: OskMode) => void;
-  /** Principle 9: false unmounts OSKFrame (iframe destroyed, KMW unloaded). */
-  oskVisible: boolean;
-  onOskVisibleChange: (visible: boolean) => void;
   /** Lifted from useKeyboardArtifact in the parent screen. */
   stage: Stage;
   /** Retry callback from useKeyboardArtifact in the parent. */
@@ -35,7 +29,9 @@ export interface SurveyPreviewPaneProps {
   /** Phase B build-list only: swap the OSK preview for the character map. */
   showCharacterMap: boolean;
   activeStepId: string | null;
-  /** Layout-provided flex styles (desktop split vs. narrow stacked). */
+  /** Narrow-viewport sheet layout: edge-to-edge keyboard, inset text only. */
+  compact?: boolean;
+  /** Layout-provided flex styles (desktop split). */
   style?: CSSProperties;
 }
 
@@ -43,14 +39,15 @@ export function SurveyPreviewPane({
   localBase,
   oskMode,
   onOskModeChange,
-  oskVisible,
-  onOskVisibleChange,
   stage,
   retry,
   showCharacterMap,
   activeStepId,
+  compact = false,
   style,
 }: SurveyPreviewPaneProps) {
+  // Compact: text rows keep a 12px inset; the keyboard itself does not.
+  const inset = compact ? "0 12px" : 0;
   return (
     <section
       aria-label={showCharacterMap ? "Character map" : "Keyboard preview"}
@@ -60,7 +57,7 @@ export function SurveyPreviewPane({
         gap: 12,
         minHeight: 0,
         overflow: "auto",
-        padding: 24,
+        padding: compact ? 0 : 24,
         boxSizing: "border-box",
         color: TEXT_MAIN,
         fontFamily: FONT,
@@ -68,9 +65,11 @@ export function SurveyPreviewPane({
       }}
     >
       {showCharacterMap ? (
-        <CharacterMapPane
-          scope={activeStepId === "punctuation" ? "punctuation" : "alphabet"}
-        />
+        <div style={{ padding: inset }}>
+          <CharacterMapPane
+            scope={activeStepId === "punctuation" ? "punctuation" : "alphabet"}
+          />
+        </div>
       ) : localBase === null ? (
         <div
           style={{
@@ -113,6 +112,7 @@ export function SurveyPreviewPane({
               alignItems: "center",
               gap: 12,
               flexWrap: "wrap",
+              padding: inset,
             }}
           >
             <h2
@@ -133,33 +133,14 @@ export function SurveyPreviewPane({
               }}
             >
               <OskModeToggle value={oskMode} onChange={onOskModeChange} />
-              <OskVisibilitySwitch
-                checked={oskVisible}
-                onCheckedChange={onOskVisibleChange}
-              />
             </div>
           </div>
-          {oskVisible ? (
-            <OSKFrame
-              baseKeyboard={localBase}
-              oskMode={oskMode}
-              stage={stage}
-              retry={retry}
-            />
-          ) : (
-            <p
-              style={{
-                margin: 0,
-                fontSize: 13,
-                color: "var(--app-text-muted)",
-              }}
-            >
-              <Trans id="preview.hidden.hint">
-                Keyboard preview hidden — toggle the switch above to bring it
-                back.
-              </Trans>
-            </p>
-          )}
+          <OSKFrame
+            baseKeyboard={localBase}
+            oskMode={oskMode}
+            stage={stage}
+            retry={retry}
+          />
         </>
       )}
     </section>

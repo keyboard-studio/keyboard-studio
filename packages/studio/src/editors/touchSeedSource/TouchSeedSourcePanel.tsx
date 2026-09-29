@@ -60,6 +60,7 @@ import { useKeyboardArtifact } from "../../hooks/useKeyboardArtifact.ts";
 import type { ScaffoldSpec, VfsTransform } from "../../hooks/useKeyboardArtifact.ts";
 import { OSKFrame } from "../../components/OSKFrame.tsx";
 import { PreviewSheet } from "../../components/PreviewSheet.tsx";
+import { PreviewButton } from "../../components/PreviewButton.tsx";
 import { ASSIGN_LOOP_LEFT_PANE_PCT } from "../assignLoop/AssignLoopShell.tsx";
 import { useIsNarrow } from "../../hooks/useViewport.ts";
 import { BREAKPOINTS } from "../../ui/breakpoints.ts";
@@ -392,6 +393,10 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
     id: "editor.touchSeed.showPreview",
     message: "Show touch preview",
   });
+  const previewButtonLabel = t({
+    id: "previewButton.label",
+    message: "Preview",
+  });
   const touchPreviewSheetLabel = t({
     id: "editor.touchSeed.previewSheetLabel",
     message: "Touch preview",
@@ -552,33 +557,13 @@ export function TouchSeedSourcePanel({ onComplete, onBack }: EditorStepProps) {
         {narrow ? (
           <>
             {choicesContent}
-            <div
-              style={{
-                borderTop: `1px solid ${BORDER}`,
-                padding: "8px 0",
-                paddingBottom: "max(8px, env(safe-area-inset-bottom))",
-              }}
-            >
-              <button
-                type="button"
-                onClick={() => setPreviewSheetOpen(true)}
-                data-testid="seed-source-show-preview"
-                style={{
-                  width: "100%",
-                  minHeight: "var(--app-touch-target)",
-                  borderRadius: 8,
-                  border: `1px solid ${BORDER}`,
-                  background: "var(--app-accent-subtle)",
-                  color: ACCENT,
-                  fontFamily: FONT,
-                  fontSize: 14,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
-              >
-                {showTouchPreviewLabel}
-              </button>
-            </div>
+            <PreviewButton
+              label={previewButtonLabel}
+              ariaLabel={showTouchPreviewLabel}
+              onClick={() => setPreviewSheetOpen(true)}
+              testId="seed-source-show-preview"
+              placement="sticky"
+            />
             <PreviewSheet
               open={previewSheetOpen}
               onOpenChange={setPreviewSheetOpen}

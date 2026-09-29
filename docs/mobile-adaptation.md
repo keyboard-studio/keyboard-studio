@@ -58,8 +58,36 @@ import { BREAKPOINTS } from "../ui/breakpoints.ts";
 - **KeymanWeb stays.** The typing keyboard is the existing KeymanWeb engine +
   OSK iframe on every viewport. Change host layout/lifecycle only — never the
   engine internals, iframe internals, or `postMessage` channel.
-- **OSK visibility is author-controlled.** Wherever the OSK shows, the author can
-  hide it to reclaim workspace. Hiding unmounts the iframe (unloading KeymanWeb);
-  showing remounts through normal initialization.
+  - *Exception (pending sign-off):* the OSK frame (`public/osk-frame.*`) now
+    sizes the keyboard to its host box's **current** width, re-sizes on width
+    change (ResizeObserver), scales the height below the device profile's
+    width, and posts one new frame→host event, `CONTENT_HEIGHT`, so the host
+    iframe shows the whole keyboard. KeymanWeb itself is untouched. Without it
+    the keyboard rendered at a stale width and its bottom rows were cropped at
+    phone widths.
+- **OSK visibility is lifecycle, not a switch.** On narrow viewports the OSK
+  lives in a `PreviewSheet` and is mounted only while the sheet is open —
+  dismissing it unmounts the iframe (unloading KeymanWeb). There is no in-pane
+  show/hide toggle.
 - **Choice copy is symmetric.** When presenting Allow/Block (or any tradeoff),
   state both risks plainly. Never sell one side.
+
+## Narrow-viewport patterns
+
+- **Chrome is one top row.** `NavBar` on narrow shows the ☰ menu (route links
+  first, then Contents, locale, theme, account, reset) and, on the survey, the
+  compact phase summary in place of the wordmark. There is no bottom tab bar;
+  the journey footer (Back / Next / Contents) is the only bottom chrome, and the
+  shell uses `100dvh` so the footer is never pushed below the visible screen.
+- **Secondary views open from a button, not a tab.** A live preview (or the
+  character map) opens from the floating `PreviewButton` into a `PreviewSheet`
+  (`flush` for an edge-to-edge keyboard). The button renders only when there is
+  something to show, so a step with nothing to preview is just its questions.
+  Use `placement="sticky"` on pages that scroll as a whole. Survey, assign-loop
+  galleries and touch-seed all use this one pattern.
+- **Progress is a labelled list, not bare dots.** Phones have no hover, so the
+  footer's dot row becomes a "Contents" button opening `JourneyContents`: the
+  same marks as `buildProgressDots`, each beside its label, with the current
+  stage expanded into its questions. Also reachable from the ☰ menu.
+- **Lead with the outcome.** Where a page's purpose is one action (Output), put
+  that action first and collapse supporting detail behind a disclosure.

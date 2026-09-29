@@ -1,11 +1,10 @@
 // Shared nav-item table for the studio's top-level navigation.
 //
-// Moved out of StudioShell.tsx (mobile adaptation, Phase 1): the new
-// MobileTabBar renders the same items at the bottom of narrow viewports, and
-// importing them from StudioShell would create a StudioShell ↔
-// MobileTabBar module cycle (forbidden by depcruise). Both NavBar (in
-// StudioShell.tsx) and MobileTabBar import from here, so the two bars can
-// never drift apart.
+// Moved out of StudioShell.tsx (mobile adaptation, Phase 1) so NavBar can
+// import it without a StudioShell <-> NavBar module cycle (forbidden by
+// depcruise). NavBar renders these items twice from this one table — as the
+// desktop tab row and as the narrow-viewport menu — so the two can never
+// drift apart.
 
 import type { MessageDescriptor } from "@lingui/core";
 import { msg } from "@lingui/core/macro";

@@ -81,7 +81,11 @@ import {
   type OnInstantiateCallback,
 } from "./hooks/useKeyboardArtifact.ts";
 import { useWorkingCopyTransform } from "./hooks/useWorkingCopyTransform.ts";
-import { PaneViewSwitch } from "./components/PaneViewSwitch.tsx";
+import { PreviewSheet } from "./components/PreviewSheet.tsx";
+import {
+  PreviewButton,
+  PREVIEW_BUTTON_CLEARANCE_PX,
+} from "./components/PreviewButton.tsx";
 import type { OskMode } from "./components/OskModeToggle.tsx";
 import { SurveyPreviewPane } from "./components/SurveyPreviewPane.tsx";
 import { useValidator } from "./hooks/useValidator.ts";
@@ -105,7 +109,6 @@ import "./lib/i18n.ts"; // side-effect: load + activate the default (en) catalog
 import { WelcomeScreen } from "./components/WelcomeScreen.tsx";
 import { NavBar } from "./components/NavBar.tsx";
 import { PhaseStepper } from "./components/PhaseStepper.tsx";
-import { MobileTabBar } from "./components/MobileTabBar.tsx";
 import { ProfileScreen } from "./components/ProfileScreen.tsx";
 import { hasVisited } from "./lib/firstVisit.ts";
 import { manifest, validateManifestShape } from "./steps/manifest.ts";
@@ -511,18 +514,12 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     [setSurveyOskMode],
   );
   const setPaneSplitPct = useViewStateStore((s) => s.setPaneSplitPct);
-  // Mobile adaptation (Phase 2): narrow-viewport pane selection and
-  // author-controlled OSK visibility (principle 9). Both are session-scoped
-  // view state — they survive a route unmount and die on reload (Q9), and
-  // neither can reach a compile or validator run (FR-053).
-  const surveyPaneView = useViewStateStore((s) => s.surveyPaneView);
-  const setSurveyPaneView = useViewStateStore((s) => s.setSurveyPaneView);
-  const surveyOskVisible = useViewStateStore((s) => s.oskVisible.survey);
-  const setOskVisible = useViewStateStore((s) => s.setOskVisible);
-  const setSurveyOskVisible = useCallback(
-    (visible: boolean) => setOskVisible("survey", visible),
-    [setOskVisible],
-  );
+  // Narrow viewports: the preview lives in a PreviewSheet opened from a
+  // floating PreviewButton (the same pattern the assign-loop galleries use),
+  // so the questions and the journey footer are always on screen. The OSK
+  // is mounted only while the sheet is open (principle 9).
+  const [previewSheetOpen, setPreviewSheetOpen] = useState(false);
+  const { t } = useLingui();
   const isNarrow = useIsNarrow();
   const { containerRef, leftPct, onPointerDown } = useResizablePanes({
     minPct: SURVEY_LEFT_MIN_PCT,
@@ -1438,15 +1435,45 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
     return stepHost;
   }
 
-  // Narrow-viewport pane visibility: the switch above picks one pane; desktop
-  // shows both side-by-side.
-  const showQuestionsPane = !isNarrow || surveyPaneView === "questions";
-  const showPreviewPane = !isNarrow || surveyPaneView === "preview";
+  // Narrow viewports: one column of questions. The right pane's content
+  // (OSK or character map) opens in a sheet, and only when there is
+  // something to show — no base keyboard yet and no character map means no
+  // trigger at all.
+  const hasPreviewContent = showCharacterMap || localBase !== null;
+  // The sheet never reopens by itself: when its content goes away (a step
+  // without a preview), forget that it was open.
+  if (previewSheetOpen && (!isNarrow || !hasPreviewContent)) {
+    setPreviewSheetOpen(false);
+  }
+  const previewPane = (
+    <SurveyPreviewPane
+      localBase={localBase}
+      oskMode={oskMode}
+      onOskModeChange={setOskMode}
+      stage={artifactStage}
+      retry={retry}
+      showCharacterMap={showCharacterMap}
+      activeStepId={activeStepId}
+      compact={isNarrow}
+      {...(isNarrow ? {} : { style: previewPaneStyle })}
+    />
+  );
+  const previewButtonLabel = showCharacterMap
+    ? t({ id: "previewButton.characterMap.label", message: "Character map" })
+    : t({ id: "previewButton.label", message: "Preview" });
+  const previewButtonAriaLabel = showCharacterMap
+    ? t({ id: "previewButton.characterMap.ariaLabel", message: "Show character map" })
+    : t({ id: "assignLoopShell.showPreview", message: "Show keyboard preview" });
+  const previewSheetLabel = showCharacterMap
+    ? t({ id: "previewButton.characterMap.sheetLabel", message: "Character map" })
+    : t({ id: "assignLoopShell.previewSheetLabel", message: "Keyboard preview" });
 
   return (
     <div
       ref={containerRef}
       style={{
+        // Anchors the narrow-viewport floating PreviewButton.
+        position: "relative",
         display: "flex",
         flexDirection: isNarrow ? "column" : "row",
         height: "100%",
@@ -1455,16 +1482,21 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
         overflow: "hidden",
       }}
     >
-      {isNarrow && (
-        <PaneViewSwitch value={surveyPaneView} onChange={setSurveyPaneView} />
-      )}
       {/* Left pane: survey questions (StepHost renders pane content) */}
-      {showQuestionsPane && (
+      {
         <SurveyQuestionsPane
           label="Survey questions"
           style={
             isNarrow
-              ? { ...questionsPaneStyle, ...narrowStackedPaneStyle }
+              ? {
+                  ...questionsPaneStyle,
+                  ...narrowStackedPaneStyle,
+                  // Tighter gutters on a phone; extra bottom room so the last
+                  // line scrolls clear of the floating preview button.
+                  padding: hasPreviewContent
+                    ? `16px 16px ${PREVIEW_BUTTON_CLEARANCE_PX}px`
+                    : 16,
+                }
               : questionsPaneStyle
           }
         >
@@ -1546,7 +1578,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           )}
           {stepHost}
         </SurveyQuestionsPane>
-      )}
+      }
 
       {/* Drag handle — desktop only; on narrow viewports there is no split
           to drag (one pane fills the column behind the Questions | Preview
@@ -1558,19 +1590,26 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
           above. The mechanism gallery and every other full-screen step render
           their own preview and are unaffected (they never reach this branch:
           activeStepIsFullScreen returns early above). */}
-      {showPreviewPane && (
-        <SurveyPreviewPane
-          localBase={localBase}
-          oskMode={oskMode}
-          onOskModeChange={setOskMode}
-          oskVisible={surveyOskVisible}
-          onOskVisibleChange={setSurveyOskVisible}
-          stage={artifactStage}
-          retry={retry}
-          showCharacterMap={showCharacterMap}
-          activeStepId={activeStepId}
-          style={isNarrow ? narrowStackedPaneStyle : previewPaneStyle}
-        />
+      {!isNarrow && previewPane}
+      {isNarrow && hasPreviewContent && (
+        <>
+          <PreviewButton
+            label={previewButtonLabel}
+            ariaLabel={previewButtonAriaLabel}
+            icon={showCharacterMap ? "grid" : "keyboard"}
+            onClick={() => setPreviewSheetOpen(true)}
+            testId="survey-show-preview"
+          />
+          <PreviewSheet
+            open={previewSheetOpen}
+            onOpenChange={setPreviewSheetOpen}
+            label={previewSheetLabel}
+            testId="survey-preview-sheet"
+            flush
+          >
+            {previewPane}
+          </PreviewSheet>
+        </>
       )}
     </div>
   );
@@ -1582,6 +1621,7 @@ export function SurveyView({ baseKeyboard }: SurveyViewProps) {
 
 export function StudioShell() {
   const route = useRoute();
+  const isNarrow = useIsNarrow();
   const { t } = useLingui();
 
   const selectedBaseKeyboard = useWorkingCopyStore((s) => s.baseKeyboard);
@@ -1892,9 +1932,8 @@ export function StudioShell() {
   // returned a null context and blanked the app in production builds, where
   // Lingui's dev-only invariant is stripped. See AppRoot.tsx.
   //
-  // The blocked-Output explanation is shared by the top NavBar and the
-  // narrow-viewport MobileTabBar so the two bars can never disagree about
-  // the gate (mobile adaptation, Phase 1).
+  // The blocked-Output explanation is shared by the desktop tab row and the
+  // narrow-viewport menu (both inside NavBar), so they can never disagree.
   const outputBlockedTitle = t({
     id: "studio.nav.outputBlocked.title",
     message: "Finish every inventory character before you can access Output",
@@ -1904,7 +1943,12 @@ export function StudioShell() {
       style={{
         display: "flex",
         flexDirection: "column",
+        // dvh, not vh: on mobile browsers 100vh includes the area behind the
+        // URL bar, which pushed the journey footer (Back / Next + progress
+        // dots) below the visible screen. `height: 100vh` stays as the
+        // fallback for engines without dvh.
         height: "100vh",
+        maxHeight: "100dvh",
         width: "100vw",
         overflow: "hidden",
         background: "var(--bg)",
@@ -1917,6 +1961,13 @@ export function StudioShell() {
         unfinishedDesktopCount={unfinishedDesktopCount}
         unfinishedTouchCount={unfinishedTouchCount}
         onNavigateToUnfinishedGallery={handleNavigateToUnfinishedGallery}
+        {...(isNarrow && route === "survey"
+          ? {
+              narrowCenter: (
+                <PhaseStepper activeStepId={surveyActiveStepId} inline />
+              ),
+            }
+          : {})}
       />
       {/* Phase stepper — survey route only. Phases (A-F) map to
           the manifest steps the survey walks (steps/phases.ts); they are
@@ -1924,7 +1975,11 @@ export function StudioShell() {
           a route gate, not an always-mounted component that happens to
           render nothing elsewhere (unlike StudioFooter below, which decides
           for itself). */}
-      {route === "survey" && <PhaseStepper activeStepId={surveyActiveStepId} />}
+      {/* Narrow viewports fold the compact stepper into the NavBar row
+          (narrowCenter above) rather than spending a second row on it. */}
+      {route === "survey" && !isNarrow && (
+        <PhaseStepper activeStepId={surveyActiveStepId} />
+      )}
       <div style={{ flex: 1, minHeight: 0, overflow: "hidden" }}>{content}</div>
       {/* Spec 057 US4/US6 (T052, FR-040): the narrow journey footer. Mounted
           unconditionally rather than per-route because `StudioFooter` returns
@@ -1933,15 +1988,6 @@ export function StudioShell() {
           project yet (Q6). A route-by-route conditional here would be a second
           place to keep that rule, and the two would drift. */}
       <StudioFooter />
-      {/* Mobile adaptation (Phase 1): bottom tab bar on narrow
-          viewports. It self-gates on `useIsNarrow()` and returns null on
-          desktop, so desktop layout is untouched. Rendered below the footer
-          so it sits at the very bottom edge, in the thumb zone. */}
-      <MobileTabBar
-        active={route}
-        outputBlocked={outputNavBlocked}
-        outputBlockedTitle={outputBlockedTitle}
-      />
     </div>
   );
 }

@@ -3,7 +3,7 @@
 // Mobile adaptation (Phase 6). Runs on the `mobile` project only
 // (Pixel 7: 412×915 CSS px, touch, mobile). Asserts the mobile/touch premises
 // first, then checks:
-// - route/tab geometry (MobileTabBar visible at bottom, desktop tab row hidden)
+// - route navigation (one top row; the route links live in the Menu)
 // - no horizontal overflow (no element exceeds the viewport width)
 // - reachable controls (key controls are within the viewport and tappable)
 // - axe serious/critical violations
@@ -27,16 +27,13 @@ test.beforeEach(async ({ page }) => {
   await seedReturningVisitor(page);
 });
 
-test("MobileTabBar is visible and the desktop tab row is hidden", async ({ page }) => {
-  await page.goto("/");
+test("route links live in the top Menu; no bottom tab bar", async ({ page }) => {
+  await page.goto("/#survey");
 
-  // The bottom tab bar carries the route navigation on narrow viewports.
-  const tabBar = page.getByRole("navigation", { name: /mobile|tab bar/i }).or(
-    page.locator("[data-testid='mobile-tab-bar']")
-  );
-  // Fall back to a structural check: MobileTabBar renders at the bottom.
-  const tabBarVisible = await page.locator("nav").last().isVisible().catch(() => false);
-  expect(tabBarVisible).toBe(true);
+  // Desktop tab row hidden until the menu opens.
+  await expect(page.getByRole("link", { name: "Compare" })).toHaveCount(0);
+  await page.getByRole("button", { name: /^menu$/i }).tap();
+  await expect(page.getByRole("link", { name: "Compare" })).toBeVisible();
 
   await expectNoSeriousAxeViolations(page, "mobile nav layout");
 });
@@ -71,8 +68,8 @@ test("no horizontal overflow on the main routes", async ({ page }) => {
 test("key controls are reachable within the viewport", async ({ page }) => {
   await page.goto("/");
 
-  // The overflow disclosure ("More options") must be tappable.
-  const overflow = page.getByRole("button", { name: /more options/i });
+  // The menu disclosure must be tappable.
+  const overflow = page.getByRole("button", { name: /^menu$/i });
   await expect(overflow).toBeVisible();
   const box = await overflow.boundingBox();
   expect(box, "overflow button must have a bounding box").not.toBeNull();

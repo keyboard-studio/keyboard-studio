@@ -49,6 +49,12 @@ export interface PhaseStepperProps {
    * unrecognized string would.
    */
   activeStepId: string | null;
+  /**
+   * Narrow viewports only: render the compact summary as a borderless,
+   * left-aligned button that sits inside the top NavBar row (see NavBar's
+   * `narrowCenter`) instead of as a row of its own.
+   */
+  inline?: boolean;
 }
 
 /** Visually-hidden but screen-reader-visible — standard clip-based technique. */
@@ -186,6 +192,24 @@ const COMPACT_BUTTON_STYLE: CSSProperties = {
   boxSizing: "border-box",
 };
 
+/** The compact trigger restyled to live inside the NavBar row. */
+const INLINE_BUTTON_STYLE: CSSProperties = {
+  ...COMPACT_BUTTON_STYLE,
+  justifyContent: "flex-start",
+  minWidth: 0,
+  padding: "0 4px",
+  background: "transparent",
+  borderBottom: "none",
+  borderRadius: 6,
+};
+
+const INLINE_TEXT_STYLE: CSSProperties = {
+  minWidth: 0,
+  overflow: "hidden",
+  textOverflow: "ellipsis",
+  whiteSpace: "nowrap",
+};
+
 /** Find the phase (if any) `activeStepId` belongs to, without requiring the
  * caller's loosely-typed id to satisfy `StepId` — `phaseOfStep` in
  * `steps/phases.ts` takes a real `StepId`; this is the same membership check
@@ -282,7 +306,7 @@ function PhasePillList({ activeStepId, direction }: PhasePillListProps) {
   );
 }
 
-export function PhaseStepper({ activeStepId }: PhaseStepperProps) {
+export function PhaseStepper({ activeStepId, inline = false }: PhaseStepperProps) {
   const { i18n, t } = useLingui();
   const isNarrow = useIsNarrow();
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -313,24 +337,30 @@ export function PhaseStepper({ activeStepId }: PhaseStepperProps) {
 
   return (
     <>
-      <nav aria-label={ariaLabel} data-testid="phase-stepper-compact">
+      <nav
+        aria-label={ariaLabel}
+        data-testid="phase-stepper-compact"
+        style={inline ? { minWidth: 0, flex: "1 1 auto" } : undefined}
+      >
         <button
           type="button"
-          style={COMPACT_BUTTON_STYLE}
+          style={inline ? INLINE_BUTTON_STYLE : COMPACT_BUTTON_STYLE}
           className="ks-focus-ring"
           aria-expanded={dialogOpen}
           aria-haspopup="dialog"
           onClick={() => setDialogOpen(true)}
         >
-          {hasPosition && activePhase !== null ? (
-            <Trans id="phaseStepper.compact.summary">
-              Phase {activePhase.letter} ·{" "}
-              {resolveMessage(i18n, activePhase.label)} · step {stepNumber} of{" "}
-              {totalSteps}
-            </Trans>
-          ) : (
-            <Trans id="phaseStepper.compact.unknown">Survey progress</Trans>
-          )}
+          <span style={inline ? INLINE_TEXT_STYLE : undefined}>
+            {hasPosition && activePhase !== null ? (
+              <Trans id="phaseStepper.compact.summary">
+                Phase {activePhase.letter} ·{" "}
+                {resolveMessage(i18n, activePhase.label)} · step {stepNumber} of{" "}
+                {totalSteps}
+              </Trans>
+            ) : (
+              <Trans id="phaseStepper.compact.unknown">Survey progress</Trans>
+            )}
+          </span>
           <span aria-hidden="true">▾</span>
         </button>
       </nav>

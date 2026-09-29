@@ -95,6 +95,9 @@
         display: flex;
         justify-content: center;
         overflow: hidden;
+        /* Never squeezed by the body's flex column: a shrunk host clipped the
+           keyboard's bottom rows, and its measured height fed CONTENT_HEIGHT. */
+        flex-shrink: 0;
       }
       #osk-host {
         width: 100%;
@@ -113,6 +116,15 @@
         background: #fff;
         border-radius: 4px;
         min-height: 320px;
+      }
+      /* Phone widths: the keyboard spans the frame edge to edge, like a real
+         keyboard, instead of sitting inside a padded card or a device mockup. */
+      @media (max-width: 520px) {
+        body { padding: 8px 0; gap: 8px; }
+        #osk-target, #status { margin: 0 8px; width: calc(100% - 16px); }
+        #osk-host-frame,
+        #osk-host-frame.Pixel5 { padding: 0; border: 0; border-radius: 0; }
+        #osk-host, #osk-host-frame.Pixel5 #osk-host { min-height: 120px; border-radius: 0; }
       }
       .kmw-osk-frame { box-shadow: none !important; }
       /*

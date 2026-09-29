@@ -10,6 +10,14 @@
 //   frame -> host: { type: "ENGINE_ERROR", message }
 //   frame -> host: { type: "TEXT_UPDATED", value }
 //   frame -> host: { type: "KEY_TAPPED", keyId }
+//   frame -> host: { type: "CONTENT_HEIGHT", height }
+//
+// Sizing: the keyboard is sized to the host box's CURRENT width, and re-sized
+// whenever that width changes (ResizeObserver), so it never renders at a stale
+// width and clips. When the box is narrower than the device profile, the
+// height scales down with it, keeping the whole keyboard in view at a phone
+// width. CONTENT_HEIGHT reports the document's natural height so the host can
+// size the iframe to show everything rather than cropping the bottom rows.
 //
 // Font injection: when fontFaceUrl and fontFaceFamily are provided, a plain
 // CSS @font-face rule is injected into the frame document head BEFORE
@@ -185,6 +193,53 @@
 
   // Build / rebuild the inline OSK for the current device.
   // Mirror of Keyman Developer test.js setOSK().
+  // Width the current OSK was last sized at; 0 when there is none.
+  var sizedWidth = 0;
+
+  // The keyboard fills the host's width. Below the profile's own width the
+  // height scales in proportion, so every row stays visible; wider hosts keep
+  // the profile height (keys widen, they do not grow taller).
+  function oskSizeFor(profile) {
+    var w = oskHost.clientWidth || profile.dimensions[0];
+    var h = profile.dimensions[1];
+    if (w < profile.dimensions[0]) {
+      h = Math.max(120, Math.round((h * w) / profile.dimensions[0]));
+    }
+    return { width: w, height: h };
+  }
+
+  function resizeOsk() {
+    if (!currentOsk) return;
+    var profile = devices[currentMode] || devices.desktop;
+    var size = oskSizeFor(profile);
+    if (Math.abs(size.width - sizedWidth) < 1) return;
+    sizedWidth = size.width;
+    try {
+      currentOsk.setSize(size.width + "px", size.height + "px");
+    } catch (_) {}
+  }
+
+  var lastReportedHeight = 0;
+  function reportContentHeight() {
+    // Measured from the last scaffold node's bottom edge, not
+    // body.scrollHeight: the body is height:100% of the iframe, so its scroll
+    // height can never report LESS than the current frame height.
+    var bottom = oskHostFrame.offsetTop + oskHostFrame.offsetHeight;
+    var padBottom = parseFloat(getComputedStyle(document.body).paddingBottom) || 0;
+    var height = Math.ceil(bottom + padBottom);
+    if (height === lastReportedHeight) return;
+    lastReportedHeight = height;
+    post({ type: "CONTENT_HEIGHT", height: height });
+  }
+
+  if (typeof ResizeObserver === "function") {
+    new ResizeObserver(function () {
+      resizeOsk();
+      reportContentHeight();
+    }).observe(oskHostFrame);
+    new ResizeObserver(reportContentHeight).observe(oskTarget);
+  }
+
   function setOsk() {
     if (!window.keyman || !window.keyman.views || !window.keyman.views.InlinedOSKView) {
       return;
@@ -201,6 +256,7 @@
       } catch (_) {}
       window.keyman.osk = null;
       currentOsk = null;
+      sizedWidth = 0;
     }
     while (oskHost.firstChild) oskHost.removeChild(oskHost.firstChild);
 
@@ -269,8 +325,9 @@
         window.keyman.core.contextDevice = profile;
       }
       window.keyman.osk = currentOsk;
-      var hostW = oskHost.clientWidth || profile.dimensions[0];
-      currentOsk.setSize(hostW + "px", profile.dimensions[1] + "px");
+      var size = oskSizeFor(profile);
+      currentOsk.setSize(size.width + "px", size.height + "px");
+      sizedWidth = size.width;
       oskHost.appendChild(currentOsk.element);
       try {
         var active = window.keyman.contextManager && window.keyman.contextManager.activeKeyboard;
