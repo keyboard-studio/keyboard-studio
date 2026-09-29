@@ -351,36 +351,17 @@ describe("checkContextOrdering", () => {
   // text-bearing-context rule (`> nul` deletes the matched context).
   // -----------------------------------------------------------------------
 
-  // Failing cases — KM_ERROR_NUL_ON_TEXT_CONTEXT
-  it("rejects nul output on a quoted-text context rule", () => {
-    const findings = checkContextOrdering('"x" + [K_A] > nul');
-    const hit = findings.find((f) => f.code === "KM_ERROR_NUL_ON_TEXT_CONTEXT");
-    expect(hit).toBeDefined();
-    expect(hit?.severity).toBe("error");
-    expect(hit?.layer).toBe("A");
-  });
-
-  it("rejects nul beep output on a text-context rule", () => {
-    const findings = checkContextOrdering('"x" + [K_A] > nul beep');
-    expect(findings.some((f) => f.code === "KM_ERROR_NUL_ON_TEXT_CONTEXT")).toBe(true);
-  });
-
-  it("rejects nul output on an any() context rule", () => {
-    const findings = checkContextOrdering("any(s) + [K_A] > nul");
-    expect(findings.some((f) => f.code === "KM_ERROR_NUL_ON_TEXT_CONTEXT")).toBe(true);
-  });
-
-  it("rejects nul output on a mixed text-plus-deadkey context rule", () => {
-    const findings = checkContextOrdering('"x" dk(acute) + [K_A] > nul');
-    expect(findings.some((f) => f.code === "KM_ERROR_NUL_ON_TEXT_CONTEXT")).toBe(true);
-  });
-
-  it("reports the finding at the nul token with an accurate column", () => {
-    // `"x" + [K_A] > nul`: the `>` is at index 12, output starts at 13, and
-    // `nul` starts at output offset 1 → column 13 + 1 + 1 = 15.
-    const findings = checkContextOrdering('"x" + [K_A] > nul');
-    const hit = findings.find((f) => f.code === "KM_ERROR_NUL_ON_TEXT_CONTEXT");
-    expect(hit?.location).toMatchObject({ line: 1, column: 15 });
+  // Hand-written `> nul` on a text context deletes that context on purpose
+  // and is valid KMN, so this source scan never flags it. The error applies
+  // only to behaviour-owned rules; see checkBehaviourNulOnTextContext.
+  it.each([
+    ["the backspace-deletes-the-cluster idiom (sil_yoruba8)", "'gb' + [K_BKSP] > nul"],
+    ["a quoted-text context", '"x" + [K_A] > nul'],
+    ["nul beep on a text context", '"x" + [K_A] > nul beep'],
+    ["an any() context", "any(s) + [K_A] > nul"],
+    ["a mixed text-plus-deadkey context", '"x" dk(acute) + [K_A] > nul'],
+  ])("accepts hand-written nul on %s", (_label, source) => {
+    expect(checkContextOrdering(source).filter((f) => f.code === "KM_ERROR_NUL_ON_TEXT_CONTEXT")).toEqual([]);
   });
 
   // Passing cases — the valid suppression shapes (must never trip this check)
