@@ -139,6 +139,8 @@
   "dashboard.library.reserve.ok": "Every registered question belongs to a live or proposed flow.",
   "dashboard.scriptRouting.azerty.note": "<0>Where AZERTY comes from.</0> AZERTY is the third §9 routing group but is <1>not</1> derivable from the script — every Latin script above starts as <2>qwerty-qwertz</2>. AZERTY is a base-layout refinement resolved <3>after</3> the author picks a base, from that base’s structural shape (see <4>lib/scriptAxes.ts</4> — <5>RoutingGroup</5> vs <6>ScriptRoutingGroup</6>). That is why it has no row here.",
   "dashboard.scriptRouting.badge.gated": "not supported yet",
+  "dashboard.scriptRouting.card.a2class": "A2 class",
+  "dashboard.scriptRouting.card.normalized": "Normalized",
   "dashboard.scriptRouting.description": "The target script the author picks — not the language — decides the layout family (§9). Latin-family alphabetic scripts route to <0>qwerty-qwertz</0>; everything else routes to <1>non-roman</1>, which then fans out inside Phase B (see the Survey flow tab: <2>pb_non_roman_branch</2> → Indic / SE-Asian / RTL / syllabic / alpha-nonlatin).",
   "dashboard.scriptRouting.header.normalized": "Normalized",
   "dashboard.scriptRouting.header.routingGroup": "Routing group",

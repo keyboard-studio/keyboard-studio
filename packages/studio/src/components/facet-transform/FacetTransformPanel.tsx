@@ -14,6 +14,7 @@
 import { useId, useState, type ReactNode } from "react";
 import { Trans, useLingui } from "@lingui/react/macro";
 import type { TransformProposal, UserDisposition } from "@keyboard-studio/engine";
+import { useIsNarrow } from "../../hooks/useViewport.ts";
 
 export interface FacetTransformPanelProps {
   proposal: TransformProposal;
@@ -63,6 +64,11 @@ export function FacetTransformPanel({
   const { transitionId, preview } = proposal;
   const { facetId, fromValue, toValue } = transitionId;
   const impactClass = proposal.transformImpactClass;
+  // Mobile adaptation (issue 1853, Phase 5): the diff tables can exceed 390px
+  // with long before/after values — narrow viewports get a horizontal scroll
+  // wrapper rather than a clipped table. Desktop renders the bare table.
+  const narrow = useIsNarrow();
+  const tableWrapStyle = narrow ? { overflowX: "auto" as const, maxWidth: "100%" } : undefined;
 
   return (
     <section
@@ -108,6 +114,7 @@ export function FacetTransformPanel({
               Behaviour is unchanged and this transform is reversible.
             </Trans>
           </p>
+          <div style={tableWrapStyle}>
           <table>
             <thead>
               <tr>
@@ -126,6 +133,7 @@ export function FacetTransformPanel({
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 
@@ -142,6 +150,7 @@ export function FacetTransformPanel({
           {proposal.derivedParameterReview && (
             <div className="derived-review">
               <p>{proposal.derivedParameterReview.note}</p>
+              <div style={tableWrapStyle}>
               <table>
                 <thead>
                   <tr>
@@ -158,6 +167,7 @@ export function FacetTransformPanel({
                   ))}
                 </tbody>
               </table>
+              </div>
             </div>
           )}
         </div>
@@ -170,6 +180,7 @@ export function FacetTransformPanel({
               Emitted output will change — review the diff before confirming.
             </Trans>
           </p>
+          <div style={tableWrapStyle}>
           <table>
             <thead>
               <tr>
@@ -186,6 +197,7 @@ export function FacetTransformPanel({
               ))}
             </tbody>
           </table>
+          </div>
         </div>
       )}
 

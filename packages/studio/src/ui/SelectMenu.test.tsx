@@ -679,3 +679,50 @@ describe("SelectMenu", () => {
     });
   });
 });
+
+describe("SelectMenu — 390px viewport (mobile adaptation issue 1853, Phase 5)", () => {
+  function setViewport(width: number, height: number): void {
+    Object.defineProperty(window, "innerWidth", { value: width, configurable: true });
+    Object.defineProperty(window, "innerHeight", { value: height, configurable: true });
+    window.dispatchEvent(new Event("resize"));
+  }
+
+  afterEach(() => {
+    setViewport(1280, 800);
+  });
+
+  it("the open list stays within the 390px viewport when the trigger is at the right edge", () => {
+    setViewport(390, 844);
+    render(<SelectMenu id="sm1" options={OPTIONS} value="a" onChange={() => {}} />);
+
+    const trigger = screen.getByRole("button");
+    // Trigger near the right edge: left 290 + width 80 = 370 < 390.
+    vi.spyOn(trigger, "getBoundingClientRect").mockReturnValue({
+      top: 100,
+      bottom: 140,
+      left: 290,
+      right: 370,
+      width: 80,
+      height: 40,
+      x: 290,
+      y: 100,
+      toJSON: () => ({}),
+    } as DOMRect);
+
+    fireEvent.click(trigger);
+    const listbox = screen.getByRole("listbox");
+    const left = parseFloat(listbox.style.left);
+    const width = parseFloat(listbox.style.width);
+    expect(left + width).toBeLessThanOrEqual(390);
+  });
+
+  it("option rows keep the 44px coarse-pointer hit target at 390px", () => {
+    setViewport(390, 844);
+    render(<SelectMenu id="sm2" options={OPTIONS} value="a" onChange={() => {}} />);
+    fireEvent.click(screen.getByRole("button"));
+
+    for (const option of screen.getAllByRole("option")) {
+      expect(option.className).toContain("ks-hit-target");
+    }
+  });
+});
