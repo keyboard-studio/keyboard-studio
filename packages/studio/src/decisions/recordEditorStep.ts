@@ -38,11 +38,11 @@ import {
 } from "@keyboard-studio/contracts";
 import { applyCarveMutate } from "../steps/editorMutate.ts";
 import { occupiedHostKeys } from "../lib/occupiedHostKeys.ts";
+import { extractMechanismHostKey } from "../lib/extractMechanismHostKey.ts";
+import type { DecisionEntryInput } from "./decisionLogStore.ts";
 
 /** Shared empty carved-character set for the optional `getCarveChars` dep. */
 const EMPTY_RECORD_CARVE_CHARS: ReadonlySet<string> = new Set();
-import { extractMechanismHostKey } from "../lib/extractMechanismHostKey.ts";
-import type { DecisionEntryInput } from "./decisionLogStore.ts";
 
 /** Step ids that record an editor action, and the editor each one is. */
 export const EDITOR_ACTION_STEPS: Readonly<Record<string, EditorActionType>> = {

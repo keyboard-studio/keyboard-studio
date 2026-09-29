@@ -70,10 +70,10 @@ function partitionItemIds(
  * nominated by the aggregated pass). Every IR-projection consumer must run
  * this union so all of them consume the same pruned result.
  *
- * Returns a new set: `deletedItemIds` ∪ the aggregated pass's slot and
+ * Returns a new set: `deletedItemIds` ∪ the aggregated pass's slot ids and
  * whole-rule ids. The aggregated pass's slot ids are always a subset of the
- * incremental union's (slot taint is per-slot), so this only ever ADDS
- * whole-rule nominations.
+ * incremental union's (slot taint is per-slot); the whole-rule ids are the
+ * net-new nominations the aggregated pass contributes.
  */
 export function unionAggregatedCarveIds(
   baseIr: KeyboardIR,
