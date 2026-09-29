@@ -56,7 +56,10 @@
  * REFERENCE_DATA_VERSION versions the layout tables; bump it whenever a
  * regeneration changes a cell. REGION_LAYOUT_MAPPING_VERSION versions the
  * bcp47 region→layout mapping below; bump it whenever a region mapping is
- * added or changed. Update policy: corrections are welcome any time (cite the
+ * added or changed. v2: the region *extraction* became a positional BCP 47
+ * parse (script/extlang skipped, private-use never a region) — no
+ * region→host row changed, but edge-case tags now resolve differently
+ * (`en-x-us` no longer reads as US). Update policy: corrections are welcome any time (cite the
  * source); new regions/hosts are additive and never renumber existing ids,
  * because persisted carve-decision metadata may reference host ids.
  */
@@ -64,7 +67,7 @@
 import generatedHostLayouts from "./generated/hostLayouts.generated.json";
 
 export const REFERENCE_DATA_VERSION = 2;
-export const REGION_LAYOUT_MAPPING_VERSION = 1;
+export const REGION_LAYOUT_MAPPING_VERSION = 2;
 
 export type HostLayoutId = "us" | "us-intl" | "azerty" | "qwertz" | "uk";
 
@@ -89,7 +92,8 @@ export const HOST_LAYOUTS: Record<HostLayoutId, HostLayoutMeta> = {
   us: {
     id: "us",
     label: "US English",
-    description: "Standard US QWERTY; no AltGr layer — RightAlt acts as Ctrl+Alt with no printable output.",
+    description:
+      "Standard US QWERTY; no AltGr layer — RightAlt acts as Ctrl+Alt with no printable output.",
   },
   "us-intl": {
     id: "us-intl",
@@ -100,17 +104,20 @@ export const HOST_LAYOUTS: Record<HostLayoutId, HostLayoutMeta> = {
   azerty: {
     id: "azerty",
     label: "AZERTY (French)",
-    description: "French AZERTY; digits on shift, accented vowels on the number row, € behind AltGr+E.",
+    description:
+      "French AZERTY; digits on shift, accented vowels on the number row, € behind AltGr+E.",
   },
   qwertz: {
     id: "qwertz",
     label: "QWERTZ (German)",
-    description: "German QWERTZ; ß and dead ´/̂ on the number row, € behind AltGr+E, @ behind AltGr+Q.",
+    description:
+      "German QWERTZ; ß and dead ´/̂ on the number row, € behind AltGr+E, @ behind AltGr+Q.",
   },
   uk: {
     id: "uk",
     label: "UK English",
-    description: "UK QWERTY; £ on Shift+3, € behind AltGr+4 — the motivating A3 leak.",
+    description:
+      "UK QWERTY; £ on Shift+3, € behind AltGr+4 — the motivating A3 leak.",
   },
 };
 
@@ -136,7 +143,8 @@ export interface HostLayoutData {
 // upper-cased Keyman virtual-key ids.
 // ---------------------------------------------------------------------------
 
-export const REFERENCE_HOSTS: Record<HostLayoutId, HostLayoutData> = generatedHostLayouts.hosts;
+export const REFERENCE_HOSTS: Record<HostLayoutId, HostLayoutData> =
+  generatedHostLayouts.hosts;
 
 // ---------------------------------------------------------------------------
 // Lookup — key+modifiers, generally (reused by carve demo now, swallowUndefined
@@ -206,7 +214,13 @@ export type LayoutFamilyAnswer = "qwerty" | "qwertz" | "azerty" | "non-roman";
 /**
  * Versioned region→layout mapping (REGION_LAYOUT_MAPPING_VERSION).
  * Keyed by bcp47 region subtag (uppercased). Approximations are marked:
- * - CH (Swiss German QWERTZ differs slightly from German QWERTZ)
+ * - CH (Swiss German QWERTZ differs slightly from German QWERTZ). This
+ *   covers fr-CH too: Swiss French typists use the Swiss QWERTZ layout
+ *   (same physical layout as Swiss German, French legends) — so fr-CH
+ *   resolves to qwertz via the region, with the same approximation caveat.
+ *   There is deliberately no French-language carve-out for CH the way
+ *   there is for fr-CA: CSA is a distinct physical layout, Swiss French
+ *   is not.
  * - CA → US: Canadian ENGLISH typists overwhelmingly use the US layout.
  *   French-Canadian typists use the distinct CSA layout, which is NOT in the
  *   reference set — so fr-CA gets no region answer (falls back to all five
@@ -225,12 +239,39 @@ const REGION_TO_HOST: Record<string, HostLayoutId> = {
   BE: "azerty",
 };
 
-/** First 2-letter bcp47 subtag after the language = the region. */
+/**
+ * The region subtag of a bcp47 tag, uppercased — parsed positionally per
+ * BCP 47 (`language ["-" extlang] ["-" script] ["-" region] ...`), NOT by
+ * scanning for any 2-letter subtag. Scanning misreads extension and
+ * private-use content as regions: `en-x-us` is not the US (the `x-us`
+ * tail is private use), and `x-en-US` has no region at all (a leading
+ * `x-` makes the whole tag private-use). Script subtags (4 letters, e.g.
+ * `Latn`) and extlangs (3 letters, e.g. `cmn`) are skipped over; they
+ * carry no region signal among the five Latin reference hosts, so they
+ * neither select nor veto a host. 3-digit UN M.49 regions (e.g. `es-419`)
+ * parse but miss the 2-letter REGION_TO_HOST table and fall back to all
+ * five — additive later, never a silent redesign.
+ */
 function regionOf(tag: string): string | undefined {
   const parts = tag.split("-");
-  for (let i = 1; i < parts.length; i++) {
+  // A leading `x-` makes the whole tag private-use: no language, no region.
+  if ((parts[0] ?? "").toLowerCase() === "x") return undefined;
+  let i = 1;
+  // Extlang subtags: 3 letters, up to 3, between language and script.
+  while (i <= 3) {
     const part = parts[i];
-    if (part && /^[A-Za-z]{2}$/.test(part)) return part.toUpperCase();
+    if (part === undefined || !/^[A-Za-z]{3}$/.test(part)) break;
+    i++;
+  }
+  // Script subtag: exactly 4 letters.
+  const maybeScript = parts[i];
+  if (maybeScript !== undefined && /^[A-Za-z]{4}$/.test(maybeScript)) i++;
+  const region = parts[i];
+  if (
+    region !== undefined &&
+    (/^[A-Za-z]{2}$/.test(region) || /^[0-9]{3}$/.test(region))
+  ) {
+    return region.toUpperCase();
   }
   return undefined;
 }

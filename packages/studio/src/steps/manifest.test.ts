@@ -101,6 +101,7 @@ const EXPECTED_SPINE_ORDER = [
   "invisibles",
   "convenience",
   "carve",
+  "deadkeys",
   "mechanisms",
   "touch",
   "help",
@@ -321,10 +322,10 @@ describe("Off-spine step inventory", () => {
 // (implicit "pane").
 // ---------------------------------------------------------------------------
 
-const FULL_LAYOUT_IDS = ["carve", "mechanisms", "touch", "touch_seed_source"] as const;
+const FULL_LAYOUT_IDS = ["carve", "deadkeys", "mechanisms", "touch", "touch_seed_source"] as const;
 
 describe("layout declarations (spec 024 Stage 0)", () => {
-  it("exactly four steps declare layout:'full'", () => {
+  it("exactly five steps declare layout:'full'", () => {
     const fullSteps = manifest.filter((s) => s.layout === "full");
     const fullIds = fullSteps.map((s) => s.id).sort();
     expect(fullIds).toEqual([...FULL_LAYOUT_IDS].sort());
@@ -333,6 +334,11 @@ describe("layout declarations (spec 024 Stage 0)", () => {
   it("carve declares layout:'full'", () => {
     const carve = manifest.find((s) => s.id === "carve");
     expect(carve?.layout).toBe("full");
+  });
+
+  it("deadkeys declares layout:'full' (spec 083: three-tab editor needs the full working area, like carve)", () => {
+    const deadkeys = manifest.find((s) => s.id === "deadkeys");
+    expect(deadkeys?.layout).toBe("full");
   });
 
   it("mechanisms declares layout:'full'", () => {

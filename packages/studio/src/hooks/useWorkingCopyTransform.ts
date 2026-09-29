@@ -219,24 +219,33 @@ export function useWorkingCopyTransform(
   // The base id the store's carve/identity layers actually belong to. Compared
   // against previewedBaseId below (F4 fix) so a candidate-base preview never
   // receives another base's carve overlay.
-  const storeBaseKeyboardId = useWorkingCopyStore((s) => s.baseKeyboard?.id ?? null);
+  const storeBaseKeyboardId = useWorkingCopyStore(
+    (s) => s.baseKeyboard?.id ?? null,
+  );
   // The base keyboard's own display name — the anchor for projectWorkingCopyVfs
   // step 3's "is the display name an EDIT?" test, so the OSK preview and the zip
   // agree about when `store(&NAME)` is rewritten.
-  const storeBaseDisplayName = useWorkingCopyStore((s) => s.baseKeyboard?.displayName ?? null);
+  const storeBaseDisplayName = useWorkingCopyStore(
+    (s) => s.baseKeyboard?.displayName ?? null,
+  );
   const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
+  const carveChars = useWorkingCopyStore((s) => s.carveChars);
   const deletedTouchKeyIds = useWorkingCopyStore((s) => s.deletedTouchKeyIds);
   // T015: carve dispositions for the suppression stage (FR-019), read from
   // the working-copy store. Scoped to the live carve set so stale
   // dispositions never rewrite uncarved rules; projectWorkingCopyVfs scopes
   // them again as a backstop. A6 loud/soft (FR-009) has no UI yet — the
   // suppression stage defaults to soft (loud: false).
-  const getCarveDispositions = useWorkingCopyStore((s) => s.getCarveDispositions);
+  const getCarveDispositions = useWorkingCopyStore(
+    (s) => s.getCarveDispositions,
+  );
   // 076 FR-023 (T020): keep-inert chars for carved touch keys ("kept, does
   // nothing" instead of removed). The set is built inside the main useMemo;
   // this array feeds a primitive-stable memo key below.
-  const carveTouchKeepInertChars = useWorkingCopyStore((s) => s.carveTouchKeepInert);
+  const carveTouchKeepInertChars = useWorkingCopyStore(
+    (s) => s.carveTouchKeepInert,
+  );
   const identity = useWorkingCopyStore((s) => s.identity);
   // Assignments: physical only (touch is projected via touchLayoutJson below).
   const phaseResults = useWorkingCopyStore((s) => s.phaseResults);
@@ -250,7 +259,9 @@ export function useWorkingCopyTransform(
   // spec 078: the applied context-tolerance fix, replayed by the projection.
   // Replaced wholesale on every apply (never mutated), so its reference is a
   // correct memo key.
-  const contextToleranceOverlay = useWorkingCopyStore((s) => s.contextToleranceOverlay?.overlay ?? null);
+  const contextToleranceOverlay = useWorkingCopyStore(
+    (s) => s.contextToleranceOverlay?.overlay ?? null,
+  );
 
   // Effective touch layout JSON: the live-layout override's own in-progress
   // value takes precedence over the store's field WHEN the override is
@@ -270,6 +281,12 @@ export function useWorkingCopyTransform(
   // array" contract for keyEditOps.
   const keyEditOps = liveLayoutOverride?.keyEditOps ?? EMPTY_KEY_EDIT_OPS;
 
+  // Deadkey lifecycle overlay (spec 083) — the committed op log, read
+  // straight from the store (deadkey edits are immediate F-10 commits, not
+  // in-progress gallery state, so there is no live-layout distinction to
+  // draw here — unlike keyEditOps above).
+  const deadkeyOps = useWorkingCopyStore((s) => s.deadkeyOverlay.ops);
+
   // Derive the current physical assignments from phaseResults.
   const sessionAssignments = useMemo(
     () => physicalAssignmentsOf(phaseResults),
@@ -279,14 +296,19 @@ export function useWorkingCopyTransform(
   // Memoization keys — primitive-stable so useMemo doesn't fire on reference churn.
 
   // Deleted node IDs: sorted, joined string. O(n) but the carve set is small.
+  // carveChars is included: the §1 aggregated-R pass can nominate whole-rule
+  // deletions beyond the incremental id union, so the memo key must change
+  // when the carved set changes even if the id union does not.
   const deletedKey = useMemo(
     () =>
       [...deletedNodeIds].sort().join("|") +
       ";" +
       [...deletedItemIds].sort().join("|") +
       ";" +
+      [...carveChars].sort().join("|") +
+      ";" +
       [...deletedTouchKeyIds].sort().join("|"),
-    [deletedNodeIds, deletedItemIds, deletedTouchKeyIds],
+    [deletedNodeIds, deletedItemIds, carveChars, deletedTouchKeyIds],
   );
 
   // Assignments key — compact string (scope:target:patternId/slotValues per assignment).
@@ -296,7 +318,9 @@ export function useWorkingCopyTransform(
         .map(
           (a) =>
             `${a.scope}:${a.target}:${a.mechanisms
-              .map((m) => `${m.patternId}/${JSON.stringify(m.slotValues ?? {})}`)
+              .map(
+                (m) => `${m.patternId}/${JSON.stringify(m.slotValues ?? {})}`,
+              )
               .join(",")}`,
         )
         .join("|"),
@@ -331,6 +355,12 @@ export function useWorkingCopyTransform(
     () => JSON.stringify([...carveTouchKeepInertChars].sort()),
     [carveTouchKeepInertChars],
   );
+
+  // Deadkey overlay key (spec 083) — same primitive-stable discipline as
+  // keyEditOpsKey above: the JSON string goes into the dep array, never the
+  // raw array. Committed ops are append-only and never mutated in place, so
+  // JSON.stringify is a correct equality check, and the log is small.
+  const deadkeyOpsKey = useMemo(() => JSON.stringify(deadkeyOps), [deadkeyOps]);
 
   // Identity display name + Track-1 rename id + bcp47.
   // identityKeyboardId triggers projectWorkingCopyVfs step 4 (rewrites
@@ -370,11 +400,17 @@ export function useWorkingCopyTransform(
     // (previewedBaseId) and that differs from the base the layers belong to,
     // the overlay does not apply — return null rather than project one base's
     // node ids onto a different base's freshly-fetched VFS.
-    if (previewedBaseId !== undefined && previewedBaseId !== storeBaseKeyboardId) {
+    if (
+      previewedBaseId !== undefined &&
+      previewedBaseId !== storeBaseKeyboardId
+    ) {
       return null;
     }
 
-    return (vfs: VirtualFS, keyboardId: string): { warnings: string[]; effectiveKeyboardId?: string } => {
+    return (
+      vfs: VirtualFS,
+      keyboardId: string,
+    ): { warnings: string[]; effectiveKeyboardId?: string } => {
       // Assignment-warning: when assignments exist but no patternMap was supplied,
       // emit a diagnostic and skip assignments (pass empty array to projectWorkingCopyVfs).
       const preWarnings: string[] = [];
@@ -392,13 +428,16 @@ export function useWorkingCopyTransform(
       // in-place mutation of `vfs`; projectWorkingCopyVfs also mutates in-place.
       const hasDisplayName = identityDisplayName !== null;
       const hasBcp47 = identityBcp47 !== null && identityBcp47 !== "";
-      const hasLanguageName = identityLanguageName !== null && identityLanguageName !== "";
+      const hasLanguageName =
+        identityLanguageName !== null && identityLanguageName !== "";
       const identityArg =
         hasDisplayName || hasBcp47 || hasLanguageName
           ? ({
               ...(hasDisplayName ? { displayName: identityDisplayName } : {}),
               ...(hasBcp47 ? { bcp47: identityBcp47 } : {}),
-              ...(hasLanguageName ? { languageName: identityLanguageName } : {}),
+              ...(hasLanguageName
+                ? { languageName: identityLanguageName }
+                : {}),
             } as import("../lib/projectWorkingCopyVfs").IdentityOverlay)
           : null;
 
@@ -415,28 +454,33 @@ export function useWorkingCopyTransform(
         ...deletedItemIds,
       ]);
 
-      const { warnings: projectionWarnings, effectiveKeyboardId } = projectWorkingCopyVfs({
-        vfs,
-        keyboardId,
-        ...(targetKeyboardId ? { targetKeyboardId } : {}),
-        baseIr,
-        deletedNodeIds,
-        deletedItemIds,
-        deletedTouchKeyIds,
-        ...(carveDispositions.length > 0 ? { carveDispositions } : {}),
-        // T020 (FR-023): keep-inert chars for carved touch keys. The store
-        // array is NFC-normalized at write time; the Set is the engine seam.
-        ...(carveTouchKeepInertChars.length > 0
-          ? { carveTouchKeepInert: new Set(carveTouchKeepInertChars) }
-          : {}),
-        keyEditOps,
-        assignments: effectiveAssignments,
-        getPattern: (id) => patternMap?.get(id),
-        identity: identityArg,
-        ...(touchLayoutJson !== null ? { touchLayoutJson } : {}),
-        ...(storeBaseDisplayName !== null ? { baseDisplayName: storeBaseDisplayName } : {}),
-        contextToleranceOverlay,
-      });
+      const { warnings: projectionWarnings, effectiveKeyboardId } =
+        projectWorkingCopyVfs({
+          vfs,
+          keyboardId,
+          ...(targetKeyboardId ? { targetKeyboardId } : {}),
+          baseIr,
+          deletedNodeIds,
+          deletedItemIds,
+          carveChars,
+          deletedTouchKeyIds,
+          ...(carveDispositions.length > 0 ? { carveDispositions } : {}),
+          // T020 (FR-023): keep-inert chars for carved touch keys. The store
+          // array is NFC-normalized at write time; the Set is the engine seam.
+          ...(carveTouchKeepInertChars.length > 0
+            ? { carveTouchKeepInert: new Set(carveTouchKeepInertChars) }
+            : {}),
+          keyEditOps,
+          deadkeyOps,
+          assignments: effectiveAssignments,
+          getPattern: (id) => patternMap?.get(id),
+          identity: identityArg,
+          ...(touchLayoutJson !== null ? { touchLayoutJson } : {}),
+          ...(storeBaseDisplayName !== null
+            ? { baseDisplayName: storeBaseDisplayName }
+            : {}),
+          contextToleranceOverlay,
+        });
 
       return {
         warnings: [...preWarnings, ...projectionWarnings],
@@ -460,6 +504,7 @@ export function useWorkingCopyTransform(
     patternMap,
     touchLayoutJson,
     keyEditOpsKey,
+    deadkeyOpsKey,
     contextToleranceOverlay,
   ]);
 }

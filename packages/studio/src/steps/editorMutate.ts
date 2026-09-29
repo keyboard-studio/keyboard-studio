@@ -19,8 +19,16 @@
 import type { IRPath, KeyboardIR } from "@keyboard-studio/contracts";
 import type { CarveDisposition } from "@keyboard-studio/contracts";
 import { irPath, ARRAY_INDEX } from "@keyboard-studio/contracts";
-import { parseSlotId, deriveCarvedIr } from "@keyboard-studio/engine";
+import {
+  parseSlotId,
+  deriveCarvedIr,
+  collectTaintedContributors,
+} from "@keyboard-studio/engine";
+
 import { applyMutatePatch } from "./mutateApply.ts";
+
+/** Shared empty carved-character set for the `carveChars` default parameter. */
+const EMPTY_CARVE_CHARS: ReadonlySet<string> = new Set();
 
 /**
  * The carve write surface — the IR arrays carve deletions may rewrite.
@@ -52,11 +60,15 @@ function partitionItemIds(
   const wholeNodeItemIds = new Set<string>();
   for (const id of deletedItemIds) {
     const parsed = parseSlotId(id);
-    (parsed !== null && storeNodeIdSet.has(parsed.storeNodeId) ? slotIds : wholeNodeItemIds).add(id);
+    (parsed !== null && storeNodeIdSet.has(parsed.storeNodeId)
+      ? slotIds
+      : wholeNodeItemIds
+    ).add(id);
   }
   return { slotIds, wholeNodeItemIds };
 }
 
+/**
 /**
  * Options for the carve mutate path (T015): the suppression stage inputs.
  * When `dispositions` is non-empty, the shared engine pipeline
@@ -68,6 +80,36 @@ export interface CarveMutateOptions {
   dispositions?: CarveDisposition[];
   /** A6 loud/soft for the suppression stage. Default false (soft). */
   loud?: boolean;
+}
+
+/**
+ * Issue #1809, ruling §1: ONE aggregated carved set R, one nomination pass.
+ *
+ * The carve gallery discards characters one toggle at a time and unions the
+ * per-character contributor records into the incremental `deletedItemIds`
+ * set — but that union is NOT equivalent to a single aggregated-R pass for
+ * whole-rule "no rows left" deletion and fully-tainted literal outputs (a
+ * rule whose rows are tainted by two different carved characters is only
+ * nominated by the aggregated pass). Every IR-projection consumer must run
+ * this union so all of them consume the same pruned result.
+ *
+ * Returns a new set: `deletedItemIds` ∪ the aggregated pass's slot ids and
+ * whole-rule ids. The aggregated pass's slot ids are always a subset of the
+ * incremental union's (slot taint is per-slot); the whole-rule ids are the
+ * net-new nominations the aggregated pass contributes.
+ */
+export function unionAggregatedCarveIds(
+  baseIr: KeyboardIR,
+  deletedItemIds: ReadonlySet<string>,
+  carveChars: ReadonlySet<string>,
+): Set<string> {
+  if (carveChars.size === 0) return new Set(deletedItemIds);
+  const aggregated = collectTaintedContributors(baseIr, carveChars);
+  return new Set([
+    ...deletedItemIds,
+    ...aggregated.storeSlotIds,
+    ...aggregated.ruleNodeIds,
+  ]);
 }
 
 /**
@@ -83,14 +125,27 @@ export interface CarveMutateOptions {
  * Always derived from `baseIr` so the patch is a pure function of the overlay
  * (idempotent + reversible). Returns `{}` (the empty, no-op patch) when there
  * are no deletions of any kind — keepAll/restoreAll collapse to this.
+ *
+ * `carveChars` (issue #1809, ruling §1): the aggregated carved character set;
+ * the single aggregated-R pass is unioned over the incremental
+ * `deletedItemIds` union (see {@link unionAggregatedCarveIds}).
  */
 export function buildCarvePatch(
   baseIr: KeyboardIR,
   deletedNodeIds: ReadonlySet<string>,
   deletedItemIds: ReadonlySet<string>,
+  carveChars: ReadonlySet<string> = EMPTY_CARVE_CHARS,
   opts?: CarveMutateOptions,
 ): Partial<KeyboardIR> {
-  const { slotIds, wholeNodeItemIds } = partitionItemIds(baseIr, deletedItemIds);
+  const effectiveItemIds = unionAggregatedCarveIds(
+    baseIr,
+    deletedItemIds,
+    carveChars,
+  );
+  const { slotIds, wholeNodeItemIds } = partitionItemIds(
+    baseIr,
+    effectiveItemIds,
+  );
   const dispositions = opts?.dispositions ?? [];
 
   if (
@@ -104,10 +159,12 @@ export function buildCarvePatch(
 
   // T015: the shared pipeline. With empty dispositions the suppression stage
   // is a structural no-op and the result is content-identical to the legacy
-  // derivation below.
+  // derivation below. deletedItemIds carries the #1809 §1 aggregated union
+  // (effectiveItemIds) so the pipeline and the legacy derivation consume the
+  // same pruned result.
   const { ir: carved } = deriveCarvedIr(baseIr, {
     deletedNodeIds,
-    deletedItemIds,
+    deletedItemIds: effectiveItemIds,
     dispositions,
     ...(opts?.loud === true ? { loud: true as const } : {}),
   });
@@ -131,15 +188,26 @@ export function buildCarvePatch(
  * @param deletedNodeIds  Whole-node carve deletions (group/rule/store/raw nodeIds).
  * @param deletedItemIds  Glyph-level carve item ids (store slots + bare node ids).
  * @param opts            Optional suppression inputs (T015: dispositions + loud).
+ * @param carveChars      Issue #1809, ruling §1: the aggregated carved character
+ *                        set; unioned over `deletedItemIds` (see buildCarvePatch).
+
  * @returns A fresh KeyboardIR with carve deletions applied.
  */
 export function applyCarveMutate(
   baseIr: KeyboardIR,
   deletedNodeIds: ReadonlySet<string>,
   deletedItemIds: ReadonlySet<string>,
+  carveChars: ReadonlySet<string> = EMPTY_CARVE_CHARS,
   opts?: CarveMutateOptions,
 ): KeyboardIR {
-  const patch = buildCarvePatch(baseIr, deletedNodeIds, deletedItemIds, opts);
+  const patch = buildCarvePatch(
+    baseIr,
+    deletedNodeIds,
+    deletedItemIds,
+    carveChars,
+    opts,
+  );
+
   return applyMutatePatch(baseIr, patch, CARVE_WRITES);
 }
 
@@ -201,7 +269,9 @@ export const ADD_GALLERY_WRITES: readonly IRPath[] = [
  * Build the add-gallery patch: the physical-assignment IR arrays (`groups`,
  * `stores`) from the assignment-injected IR.
  */
-export function buildAddGalleryPatch(assignedIr: KeyboardIR): Partial<KeyboardIR> {
+export function buildAddGalleryPatch(
+  assignedIr: KeyboardIR,
+): Partial<KeyboardIR> {
   return {
     groups: assignedIr.groups,
     stores: assignedIr.stores,
@@ -226,3 +296,28 @@ export function applyAddGalleryMutate(
   const patch = buildAddGalleryPatch(assignedIr);
   return applyMutatePatch(baseIr, patch, ADD_GALLERY_WRITES);
 }
+
+// ---------------------------------------------------------------------------
+// Deadkey lifecycle editors (spec 083) — T-phase 3
+// ---------------------------------------------------------------------------
+
+/**
+ * The deadkey-lifecycle write surface — the IR arrays a deadkey define /
+ * rename / retarget / delete / pair-edit may rewrite.
+ *
+ * The engine's deadkey-lifecycle mutations (packages/engine) touch only
+ * rules (trigger, fan-out, escape) and the two fan-out stores; the author
+ * name rides the trigger rule's `trailingComment`, which lives inside
+ * `groups[]` as well. Named deadkeys (id null, pre-FR-004) live as opaque
+ * `raw[]` fragments — their delete/retarget rewrites those fragments, so
+ * `raw[]` is in scope too. `header`, `comments`, and `touchLayout` are
+ * never touched, so a patch reaching them fails the M3 containment check.
+ *
+ * Mirrors ADD_GALLERY_WRITES (same arrays — deadkeys are IR entities,
+ * not session answers).
+ */
+export const DEADKEY_WRITES: readonly IRPath[] = [
+  irPath("groups", ARRAY_INDEX),
+  irPath("stores", ARRAY_INDEX),
+  irPath("raw", ARRAY_INDEX),
+];

@@ -6,6 +6,9 @@ export type { SubstituteResult } from "./substitute.js";
 
 export { applyAssignments, resolveRenderableMechanisms } from "./applyAssignments.js";
 export type { ApplyAssignmentsResult } from "./applyAssignments.js";
+// DeadkeyConflict is defined in ../deadkey-lifecycle (spec 083 Phase 2) and
+// re-exported here for proximity: ApplyAssignmentsResult.conflicts uses it.
+export type { DeadkeyConflict } from "../deadkey-lifecycle/index.js";
 
 export { buildSessionProducedSet } from "./sessionProducedSet.js";
 
@@ -73,7 +76,7 @@ export type { ApplyDesktopModificationsToRawJsonResult } from "./applyDesktopMod
 export { propagateDesktopLayersToTouch } from "./propagateDesktopLayersToTouch.js";
 export type { PropagateDesktopLayersToTouchResult } from "./propagateDesktopLayersToTouch.js";
 
-export { collectCharContributors, sliceContributorDescriptors } from "./collectCharContributors.js";
+export { collectCharContributors, collectTaintedContributors, sliceContributorDescriptors } from "./collectCharContributors.js";
 export type { CharContributors, ContributorDescriptor, SlicedContributorDescriptors } from "./collectCharContributors.js";
 
 export { collectCompositionMethod } from "./collectCompositionMethod.js";

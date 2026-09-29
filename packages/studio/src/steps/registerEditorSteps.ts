@@ -22,8 +22,9 @@
 
 import { irPath } from "@keyboard-studio/contracts";
 import type { EditorStep } from "./types.ts";
-import { CARVE_WRITES, ADD_GALLERY_WRITES, TOUCH_WRITES } from "./editorMutate.ts";
+import { CARVE_WRITES, ADD_GALLERY_WRITES, TOUCH_WRITES, DEADKEY_WRITES } from "./editorMutate.ts";
 import { CarveAdapter } from "../editors/adapters/carveAdapter.tsx";
+import { DeadkeyAdapter } from "../editors/adapters/deadkeyAdapter.tsx";
 import { AddPhysicalAdapter } from "../editors/adapters/addPhysicalAdapter.tsx";
 import { AddTouchAdapter } from "../editors/adapters/addTouchAdapter.tsx";
 import { TouchSeedSourcePanel } from "../editors/touchSeedSource/TouchSeedSourcePanel.tsx";
@@ -142,6 +143,27 @@ export const carveStep: EditorStep = step({
   component: CarveAdapter,
   writes: [...CARVE_WRITES],
   specRef: ["§8", "specs/051-carve-orthography-trim"],
+  persistence: "working-copy",
+});
+
+/**
+ * Deadkeys step: DeadkeySurface via DeadkeyAdapter (spec 083 — define,
+ * inventory, rename/retarget/delete for deadkey lifecycle, placed beside
+ * carve as the trim track's deadkey companion).
+ * Self-read: reads and rewrites groups[]/stores[] without upstream producer.
+ * inputs stays [] to avoid C2 data cycle with mechanisms/touch (FR-002).
+ * DEADKEY_WRITES: groups[] / stores[] (editorMutate.ts).
+ * Layout "full": like the carve gallery, the surface is a three-tab editor
+ * (inventory / define / detail) that needs the full working area, and it
+ * renders its own Back/Continue navigation.
+ */
+export const deadkeysStep: EditorStep = step({
+  id: "deadkeys",
+  title: "Deadkeys",
+  layout: "full",
+  component: DeadkeyAdapter,
+  writes: [...DEADKEY_WRITES],
+  specRef: ["§8", "specs/083-deadkey-lifecycle"],
   persistence: "working-copy",
 });
 
@@ -275,6 +297,7 @@ export const registeredEditorSteps: readonly EditorStep[] = [
   trackStep,
   projectNameStep,
   carveStep,
+  deadkeysStep,
   mechanismsStep,
   touchSeedSourceStep,
   touchStep,

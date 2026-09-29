@@ -44,6 +44,7 @@ vi.mock("./survey/FlowStepHost.tsx", () => import("./test/studioShellMocks/FlowS
 vi.mock("./survey/index.ts", () => import("./test/studioShellMocks/surveyIndex.tsx"));
 vi.mock("./editors/panels/BaseResolution.tsx", () => import("./test/studioShellMocks/BaseResolution.tsx"));
 vi.mock("./editors/carve/CarveGalleryV2.tsx", () => import("./test/studioShellMocks/CarveGalleryV2.tsx"));
+vi.mock("./editors/adapters/deadkeyAdapter.tsx", () => import("./test/studioShellMocks/deadkeyAdapter.tsx"));
 vi.mock("./editors/assignLoop/MechanismGallery.tsx", () => import("./test/studioShellMocks/MechanismGallery.tsx"));
 vi.mock("./editors/assignLoop/TouchGallery.tsx", () => import("./test/studioShellMocks/TouchGallery.tsx"));
 vi.mock("./editors/touchSeedSource/TouchSeedSourcePanel.tsx", () =>
@@ -171,10 +172,16 @@ function completeInvisibles() {
   fireEvent.click(screen.getByTestId("invisibles-continue"));
 }
 
-/** Drive from "identity" to "mechanisms". */
-async function advanceToMechanisms() {
+/** Drive from "identity" to "deadkeys" (spec 083: between carve and mechanisms). */
+async function advanceToDeadkeys() {
   await advanceToCarve();
   fireEvent.click(screen.getByTestId("carve-continue"));
+}
+
+/** Drive from "identity" to "mechanisms". */
+async function advanceToMechanisms() {
+  await advanceToDeadkeys();
+  fireEvent.click(screen.getByTestId("deadkeys-continue"));
 }
 
 /** Drive from "identity" to "touch_seed_source" (the seed-source fork chooser). */
@@ -264,11 +271,12 @@ describe("SurveyView — B → punctuation → carve transition", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Forward transition 3: carve → mechanisms  (issue #508: was B → mechanisms)
+// Forward transition 3: carve → deadkeys → mechanisms
+// (spec 083 inserts the Deadkeys step between carve and mechanisms)
 // ---------------------------------------------------------------------------
 
-describe("SurveyView — carve → mechanisms transition", () => {
-  it("renders the mechanisms stage after CarveGallery onComplete is called", async () => {
+describe("SurveyView — carve → deadkeys → mechanisms transition", () => {
+  it("renders the deadkeys stage after CarveGallery onComplete is called", async () => {
     await act(async () => {
       render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
     });
@@ -278,8 +286,22 @@ describe("SurveyView — carve → mechanisms transition", () => {
 
     fireEvent.click(screen.getByTestId("carve-continue"));
 
-    expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
+    expect(screen.getByTestId("stage-deadkeys")).toBeTruthy();
     expect(screen.queryByTestId("stage-carve")).toBeNull();
+  });
+
+  it("renders the mechanisms stage after Deadkeys onComplete is called", async () => {
+    await act(async () => {
+      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+    });
+
+    await advanceToDeadkeys();
+    expect(screen.getByTestId("stage-deadkeys")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("deadkeys-continue"));
+
+    expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
+    expect(screen.queryByTestId("stage-deadkeys")).toBeNull();
   });
 });
 
@@ -449,11 +471,12 @@ describe("SurveyView — F → E back-navigation", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Back-navigation 8: mechanisms → carve  (issue #508: was mechanisms → B)
+// Back-navigation 8: mechanisms → deadkeys → carve
+// (spec 083: Deadkeys sits between carve and mechanisms)
 // ---------------------------------------------------------------------------
 
-describe("SurveyView — mechanisms → carve back-navigation", () => {
-  it("returns to carve stage (not B) when MechanismGallery onBack is called", async () => {
+describe("SurveyView — mechanisms → deadkeys → carve back-navigation", () => {
+  it("returns to deadkeys stage (not carve) when MechanismGallery onBack is called", async () => {
     await act(async () => {
       render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
     });
@@ -463,10 +486,24 @@ describe("SurveyView — mechanisms → carve back-navigation", () => {
 
     fireEvent.click(screen.getByTestId("mechanisms-back"));
 
-    expect(screen.getByTestId("stage-carve")).toBeTruthy();
+    expect(screen.getByTestId("stage-deadkeys")).toBeTruthy();
     expect(screen.queryByTestId("stage-mechanisms")).toBeNull();
     // Confirm it did NOT go to B (the old pre-#508 behavior).
     expect(screen.queryByTestId("stage-B")).toBeNull();
+  });
+
+  it("returns to carve stage when Deadkeys onBack is called", async () => {
+    await act(async () => {
+      render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
+    });
+
+    await advanceToDeadkeys();
+    expect(screen.getByTestId("stage-deadkeys")).toBeTruthy();
+
+    fireEvent.click(screen.getByTestId("deadkeys-back"));
+
+    expect(screen.getByTestId("stage-carve")).toBeTruthy();
+    expect(screen.queryByTestId("stage-deadkeys")).toBeNull();
   });
 });
 
@@ -1469,7 +1506,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
     expect(exports).not.toContain("SurveyStage");
   });
 
-  it("manifest spine order is: identity → choose_base → track → characters → marks → punctuation → invisibles → convenience → carve → mechanisms → touch → help → package (M2, spec 071/075)", () => {
+  it("manifest spine order is: identity → choose_base → track → characters → marks → punctuation → invisibles → convenience → carve → deadkeys → mechanisms → touch → help → package (M2, spec 071/075, spec 083)", () => {
     // track is now a real manifest step (P0 fix); project_name is spine:false.
     const spineIds = manifest
       .filter((s) => s.spine !== false)
@@ -1484,6 +1521,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
       "invisibles",
       "convenience",
       "carve",
+      "deadkeys",
       "mechanisms",
       "touch",
       "help",
@@ -1522,7 +1560,7 @@ describe("T029 — no SurveyStage union in SurveyView module (M1, FR-009)", () =
 });
 
 describe("T029 — runtime step order matches manifest spine order", () => {
-  it("survey advances: identity → choose_base → track (manifest step) → project_name (copy, spine:false) → characters (prefill) → B → marks (S0 auto-skip) → carve → mechanisms → touch → help", async () => {
+  it("survey advances: identity → choose_base → track (manifest step) → project_name (copy, spine:false) → characters (prefill) → B → marks (S0 auto-skip) → carve → deadkeys → mechanisms → touch → help", async () => {
     await act(async () => {
       render(<><SurveyView baseKeyboard={null} /><ActiveStepNav /></>);
     });
@@ -1571,8 +1609,12 @@ describe("T029 — runtime step order matches manifest spine order", () => {
     completeInvisibles();
     expect(await screen.findByTestId("stage-carve")).toBeTruthy();
 
-    // → mechanisms
+    // → deadkeys (spec 083: between carve and mechanisms)
     fireEvent.click(screen.getByTestId("carve-continue"));
+    expect(screen.getByTestId("stage-deadkeys")).toBeTruthy();
+
+    // → mechanisms
+    fireEvent.click(screen.getByTestId("deadkeys-continue"));
     expect(screen.getByTestId("stage-mechanisms")).toBeTruthy();
 
     // → touch_seed_source fork (stage-seed-source; spec 035 R4/R12, no choice recorded yet)

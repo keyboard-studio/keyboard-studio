@@ -68,10 +68,15 @@
 // The function mutates `vfs` in-place. Callers that need the original VFS
 // preserved must clone it before calling (e.g. createVirtualFS(baseVfs.entries())).
 
-import type { KeyboardIR, Pattern, VirtualFS } from "@keyboard-studio/contracts";
+import type {
+  KeyboardIR,
+  Pattern,
+  VirtualFS,
+} from "@keyboard-studio/contracts";
 import type { MechanismAssignment } from "@keyboard-studio/contracts";
 import type { CarveDisposition } from "@keyboard-studio/contracts";
 import type { KeyEditOperation, RenameKeyOp } from "@keyboard-studio/engine";
+import type { DeadkeyOperation } from "./deadkeyOps.ts";
 import {
   applyCarveToVfs,
   applyCarveKeycapRemovalsToVfs,
@@ -95,10 +100,16 @@ import {
 import type { ContextToleranceOverlay } from "@keyboard-studio/engine";
 import type { PackageDescriptorIdentity } from "@keyboard-studio/engine";
 import type { ApplyCarveToVfsResult } from "@keyboard-studio/engine";
-import { applyCarveMutate, applyAddGalleryMutate } from "../steps/editorMutate.ts";
+import {
+  applyCarveMutate,
+  applyAddGalleryMutate,
+  unionAggregatedCarveIds,
+} from "../steps/editorMutate.ts";
+
 import { isMutateSeamEnabled } from "../flags/mutateFlag.ts";
 import { findTouchLayoutPath } from "./findTouchLayoutPath.ts";
 import { readVfsText } from "./vfsText.ts";
+import { applyDeadkeyOpsToVfs } from "./deadkeyOps.ts";
 
 /** Shared empty deletion set for the seam-path emit (the seam already filtered). */
 const EMPTY_DELETION_SET: ReadonlySet<string> = new Set<string>();
@@ -153,6 +164,7 @@ export interface ProjectWorkingCopyVfsInput {
   /** Individual rule nodeIds (and store-slot ids) removed via character-level carving. */
   deletedItemIds?: ReadonlySet<string>;
   /**
+  /**
    * Carve dispositions (T015, FR-019) for the suppression stage. The caller
    * (useWorkingCopyTransform) reads them from the working-copy store's
    * `getCarveDispositions`. They are scoped to the live carve set here, so a
@@ -174,6 +186,16 @@ export interface ProjectWorkingCopyVfsInput {
    */
   carveTouchKeepInert?: ReadonlySet<string>;
   /**
+   * Issue #1809, ruling §1: the aggregated carved character set (NFC-normalized).
+   * The projection runs ONE aggregated-R pass (`collectTaintedContributors`) and
+   * unions it over `deletedItemIds`, because the per-character union is not
+   * equivalent to the aggregated pass for whole-rule "no rows left" deletion
+   * and fully-tainted literal outputs. Omit or pass an empty set when nothing
+   * was carved via the gallery.
+   */
+  carveChars?: ReadonlySet<string>;
+
+  /**
    * Individually-deleted pre-existing touch methods (main key / longpress /
    * multitap / flick), addressed by the `touchKeyAddress.ts` scheme. Applied
    * at step 1.6, after the carve keycap cascade. Omit or pass an empty set
@@ -191,6 +213,15 @@ export interface ProjectWorkingCopyVfsInput {
    * there is no key-edit overlay yet.
    */
   keyEditOps?: readonly KeyEditOperation[];
+  /**
+   * The committed deadkey lifecycle overlay (spec 083): every define /
+   * rename / delete / retarget / pair / name-token mutation the Deadkeys
+   * step committed to the working IR, in commit order. Replayed at step
+   * 1.8 (via `applyDeadkeyOpsToVfs`) so working-IR deadkey edits reach the
+   * projected VFS — the working IR itself is never emitted into artifacts.
+   * Omit or pass an empty array when no deadkey edits were committed.
+   */
+  deadkeyOps?: readonly DeadkeyOperation[];
   assignments: ReadonlyArray<MechanismAssignment>;
   /** Synchronous resolver. Pass `() => undefined` when no pattern library is available. */
   getPattern: (id: string) => Pattern | undefined;
@@ -311,11 +342,13 @@ export function projectWorkingCopyVfs(
     baseIr,
     deletedNodeIds,
     deletedItemIds = new Set<string>(),
+    carveChars = new Set<string>(),
     deletedTouchKeyIds = new Set<string>(),
     carveDispositions = [],
     carveLoud = false,
     carveTouchKeepInert,
     keyEditOps = [],
+    deadkeyOps = [],
     assignments,
     getPattern,
     identity,
@@ -352,10 +385,20 @@ export function projectWorkingCopyVfs(
   // and becomes a no-op whole-node deletion (applyStoreSlotRemovals never sees it).
   const storeNodeIdSet = new Set(baseIr.stores.map((s) => s.nodeId));
 
+  // Issue #1809, ruling §1: ONE aggregated carved set R, one nomination pass.
+  // Union the aggregated pass over the incremental per-character union before
+  // partitioning, so the .kmn slot pruning, the whole-node filter, and the
+  // keycap projection below all consume the same pruned result (§11).
+  const effectiveItemIds = unionAggregatedCarveIds(
+    baseIr,
+    deletedItemIds,
+    carveChars,
+  );
+
   const slotIds = new Set<string>();
   const wholeNodeItemIds = new Set<string>();
 
-  for (const id of deletedItemIds) {
+  for (const id of effectiveItemIds) {
     const parsed = parseSlotId(id);
     if (parsed !== null && storeNodeIdSet.has(parsed.storeNodeId)) {
       slotIds.add(id);
@@ -367,8 +410,9 @@ export function projectWorkingCopyVfs(
   // T015 — scope dispositions to the live carve set. The store persists
   // dispositions per combination; prune-on-uncarve (T010) keeps them fresh,
   // but this scope is the backstop: a stale disposition must never rewrite
-  // an uncarved rule.
-  const carveIdSet = new Set([...deletedNodeIds, ...deletedItemIds]);
+  // an uncarved rule. Scoped to the #1809 §1 union (effectiveItemIds), the
+  // same id set the slot partition above consumed.
+  const carveIdSet = new Set([...deletedNodeIds, ...effectiveItemIds]);
   const activeDispositions = carveDispositions.filter((d) =>
     carveIdSet.has(d.comboId),
   );
@@ -423,11 +467,21 @@ export function projectWorkingCopyVfs(
   if (isMutateSeamEnabled() && !entryGroupDeleted && hasCarveEdit) {
     // Seam path (T015): applyCarveMutate runs the shared pipeline
     // (suppression → slot removals → filter) from the pre-carve baseIr.
-    const seamIr = applyCarveMutate(baseIr, deletedNodeIds, deletedItemIds, {
-      dispositions: activeDispositions,
-      loud: carveLoud,
-    });
+    // effectiveItemIds already carries the #1809 §1 aggregated union, so
+    // carveChars takes the plain default (buildCarvePatch would union it
+    // again idempotently).
+    const seamIr = applyCarveMutate(
+      baseIr,
+      deletedNodeIds,
+      effectiveItemIds,
+      undefined,
+      {
+        dispositions: activeDispositions,
+        loud: carveLoud,
+      },
+    );
     carveIr = seamIr;
+
     // The seam already filtered every node; hand it to emit with an empty
     // deletion set. irRewritten:true because there IS an edit (matching the
     // legacy emit-when-edited behavior) and the seam IR is already filtered,
@@ -442,7 +496,9 @@ export function projectWorkingCopyVfs(
     // pre-removal stores).
     carveResult = applyCarveToVfs(vfs, keyboardId, baseIr, deletedNodeIds, {
       carvePipeline: {
-        deletedItemIds,
+        // #1809 §1: the pipeline must see the aggregated union, not the raw
+        // incremental set.
+        deletedItemIds: effectiveItemIds,
         dispositions: activeDispositions,
         loud: carveLoud,
       },
@@ -457,7 +513,10 @@ export function projectWorkingCopyVfs(
     //     its node positions no longer match the .kmn text, so text-splice is off.
     //     When all slot ids are rejected by the transform's guards, irRewritten
     //     still triggers a (harmless, idempotent) re-emit of the unmodified IR.
-    const removalResult = applyStoreSlotRemovals(baseIr, slotIds);
+    // Carve-scoped `notany()` hygiene (issue #1809, ruling §3).
+    const removalResult = applyStoreSlotRemovals(baseIr, slotIds, {
+      carveNotAnyHygiene: true,
+    });
     warnings.push(...removalResult.warnings);
     carveIr = removalResult.ir; // equals baseIr when slotIds was empty
     carveResult = applyCarveToVfs(vfs, keyboardId, carveIr, allWholeNodeIds, {
@@ -476,15 +535,20 @@ export function projectWorkingCopyVfs(
   // Step 4 so paths resolve against the pre-rename source/<keyboardId>.* filenames.
   if (hasCarveEdit) {
     try {
-      const keycapRemovalResult = applyCarveKeycapRemovalsToVfs(vfs, keyboardId, baseIr, {
-        slotIds,
-        wholeNodeIds: allWholeNodeIds,
-        // exactOptionalPropertyTypes: only pass the seam when non-empty —
-        // an explicit undefined is not assignable to the optional field.
-        ...(carveTouchKeepInert !== undefined && carveTouchKeepInert.size > 0
-          ? { keepInertTouchChars: carveTouchKeepInert }
-          : {}),
-      });
+      const keycapRemovalResult = applyCarveKeycapRemovalsToVfs(
+        vfs,
+        keyboardId,
+        baseIr,
+        {
+          slotIds,
+          wholeNodeIds: allWholeNodeIds,
+          // exactOptionalPropertyTypes: only pass the seam when non-empty —
+          // an explicit undefined is not assignable to the optional field.
+          ...(carveTouchKeepInert !== undefined && carveTouchKeepInert.size > 0
+            ? { keepInertTouchChars: carveTouchKeepInert }
+            : {}),
+        },
+      );
       warnings.push(...keycapRemovalResult.warnings);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -586,10 +650,41 @@ export function projectWorkingCopyVfs(
     }
   }
 
+  // Step 1.8: Deadkey lifecycle overlay projection (spec 083). Replays the
+  // committed DeadkeyOperation[] log (define/rename/delete/retarget, pair
+  // edits, name tokens, merge/repoint/repair, named-deadkey ops) onto the
+  // projected .kmn via applyDeadkeyOpsToVfs. The working IR (`store.ir`,
+  // written by `setWorkingIR`) is NEVER emitted into the artifact — this
+  // replay is the only path a Deadkeys-step edit reaches the preview or
+  // the zip through.
+  //
+  // ORDER IS LOAD-BEARING: this runs BEFORE step 2 (assignments), not
+  // after. The ops were authored and validated against the working IR,
+  // which never contains assignment overlays — replaying here keeps the
+  // replay base closest to the editor's validation context. S-02
+  // assignment ids are allocated to avoid working-IR ids
+  // (MechanismGallery's allocateS02DeadkeyId seam note), so the assignment
+  // layer then composes on top without id collision. An op whose
+  // preconditions no longer hold is skipped with a warning inside
+  // applyDeadkeyOpsToVfs — never a silent no-op, never a corrupt .kmn.
+  if (deadkeyOps.length > 0) {
+    try {
+      const deadkeyResult = applyDeadkeyOpsToVfs(vfs, keyboardId, deadkeyOps);
+      warnings.push(...deadkeyResult.warnings);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      warnings.push(
+        `[project-working-copy] deadkey overlay projection skipped: ${msg}`,
+      );
+    }
+  }
+
   // Step 2: Assignments projection — inject mechanism pattern fragments.
   // Physical-only: touch assignments are handled by a separate gallery.
   // Skipped when there are no physical assignments.
-  const physicalAssignments = assignments.filter((a) => a.modality === "physical");
+  const physicalAssignments = assignments.filter(
+    (a) => a.modality === "physical",
+  );
   if (physicalAssignments.length > 0) {
     const assignResult = applyAssignmentsToVfs(
       vfs,
@@ -665,7 +760,10 @@ export function projectWorkingCopyVfs(
         typeof kmnEntryForPropagation.content === "string"
       ) {
         try {
-          const freshIr = parseKmn(kmnEntryForPropagation.content, keyboardId).ir;
+          const freshIr = parseKmn(
+            kmnEntryForPropagation.content,
+            keyboardId,
+          ).ir;
           const propagateResult = propagateDesktopLayersToTouch(
             touchEntry.content,
             freshIr,
@@ -691,18 +789,28 @@ export function projectWorkingCopyVfs(
   // anchors reflect the keyboard as the author left it), before identity and
   // the id rename (so the path still resolves under the pre-rename id).
   // A batch whose anchor is gone is skipped with a warning, never misplaced.
-  if (contextToleranceOverlay !== null && contextToleranceOverlay.batches.length > 0) {
+  if (
+    contextToleranceOverlay !== null &&
+    contextToleranceOverlay.batches.length > 0
+  ) {
     const kmnPathForTolerance = `source/${keyboardId}.kmn`;
     const kmnTextForTolerance = readVfsText(vfs, kmnPathForTolerance);
     if (kmnTextForTolerance !== undefined) {
       try {
         const parsedForTolerance = parseKmn(kmnTextForTolerance, keyboardId).ir;
-        const replay = applyContextToleranceOverlay(parsedForTolerance, contextToleranceOverlay);
+        const replay = applyContextToleranceOverlay(
+          parsedForTolerance,
+          contextToleranceOverlay,
+        );
         vfs.set(kmnPathForTolerance, emitKmn(replay.ir), false);
-        warnings.push(...replay.warnings.map((w) => `[project-working-copy] ${w}`));
+        warnings.push(
+          ...replay.warnings.map((w) => `[project-working-copy] ${w}`),
+        );
       } catch (err: unknown) {
         const msg = err instanceof Error ? err.message : String(err);
-        warnings.push(`[project-working-copy] context-tolerance projection skipped: ${msg}`);
+        warnings.push(
+          `[project-working-copy] context-tolerance projection skipped: ${msg}`,
+        );
       }
     }
   }
@@ -726,11 +834,16 @@ export function projectWorkingCopyVfs(
   // through, so they cannot disagree about whether the name changed.
   if (identity !== null) {
     const baseName = baseDisplayName ?? baseIr.header.name;
-    const identityArg: { name?: string; copyright?: string; version?: string } = {};
-    if (identity.displayName !== undefined && identity.displayName !== baseName) {
+    const identityArg: { name?: string; copyright?: string; version?: string } =
+      {};
+    if (
+      identity.displayName !== undefined &&
+      identity.displayName !== baseName
+    ) {
       identityArg.name = identity.displayName;
     }
-    if (identity.copyright !== undefined) identityArg.copyright = identity.copyright;
+    if (identity.copyright !== undefined)
+      identityArg.copyright = identity.copyright;
     if (identity.version !== undefined) identityArg.version = identity.version;
 
     if (Object.keys(identityArg).length > 0) {
@@ -753,11 +866,17 @@ export function projectWorkingCopyVfs(
   // renames source/<keyboardId>.* siblings — patched assets are carried along).
   if (physicalAssignments.length > 0) {
     try {
-      const keycapResult = applyKeycapLabelsToVfs(vfs, keyboardId, physicalAssignments);
+      const keycapResult = applyKeycapLabelsToVfs(
+        vfs,
+        keyboardId,
+        physicalAssignments,
+      );
       warnings.push(...keycapResult.warnings);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      warnings.push(`[project-working-copy] keycap label projection skipped: ${msg}`);
+      warnings.push(
+        `[project-working-copy] keycap label projection skipped: ${msg}`,
+      );
     }
   }
 
@@ -827,10 +946,7 @@ export function projectWorkingCopyVfs(
   // id via the result so callers that compile/re-read from the VFS after this
   // function returns know to use `targetKeyboardId`, not `keyboardId`.
   let effectiveKeyboardId: string | undefined;
-  if (
-    targetKeyboardId !== undefined &&
-    targetKeyboardId !== keyboardId
-  ) {
+  if (targetKeyboardId !== undefined && targetKeyboardId !== keyboardId) {
     effectiveKeyboardId = targetKeyboardId;
     const kmnPath = `source/${keyboardId}.kmn`;
     const kmnText = readVfsText(vfs, kmnPath);
@@ -848,12 +964,15 @@ export function projectWorkingCopyVfs(
           identity?.version ?? (parsed.ir.header.version?.trim() || undefined);
         resetIdentity(parsed.ir, {
           keyboardId: targetKeyboardId,
-          displayName: identity?.displayName ?? parsed.ir.header.name ?? targetKeyboardId,
+          displayName:
+            identity?.displayName ?? parsed.ir.header.name ?? targetKeyboardId,
           ...(identity?.bcp47 !== undefined && identity.bcp47 !== ""
             ? { bcp47: [identity.bcp47] }
             : {}),
           ...(copyVersion !== undefined ? { version: copyVersion } : {}),
-          ...(identity?.copyright !== undefined ? { copyright: identity.copyright } : {}),
+          ...(identity?.copyright !== undefined
+            ? { copyright: identity.copyright }
+            : {}),
         });
         vfs.set(kmnPath, emitKmn(parsed.ir), false);
       } catch (err: unknown) {

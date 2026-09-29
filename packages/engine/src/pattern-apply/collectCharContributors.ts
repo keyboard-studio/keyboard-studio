@@ -1,17 +1,35 @@
 /**
  * collectCharContributors — capability-agnostic contributor discovery for carve cascade-delete.
  *
- * Finds every place in the IR that contributes to producing a given target character:
- *   - ruleNodeIds:  whole-rule delete candidates (entire NFC output === targetChar)
- *   - storeSlotIds: output-store slot ids to remove ("<storeNodeId>#<i>")
+ * Finds every place in the IR that must be pruned when a set of carved graphemes
+ * R is removed (issue #1809, km-lead ruling 2026-09-28):
+ *   - ruleNodeIds:  whole-rule delete candidates (a literal context/output element
+ *                   tainted by R, or no rows left)
+ *   - storeSlotIds: store slot ids to remove ("<storeNodeId>#<i>") — any tainted
+ *                   `char` item, input or output side
  *   - locations:    human-readable origin labels for the confirmation dialog
- *   - blocked:      multi-char / opaque producers that cannot be surgically removed
+ *   - blocked:      producers that cannot be surgically removed without stranding
+ *                   a kept character (multi-char/partial literal runs whose kept
+ *                   output chars lack another producer; opaque fragments)
  *   - descriptors:  structured, author-friendly view of the above (spec follow-up —
  *                   engine returns STRUCTURED fields, never a pre-rendered English
  *                   string or a raw internal identifier; the studio composes the
  *                   localized display label). See `ContributorDescriptor` below for
  *                   exactly what's cheaply derivable vs. left absent for a template
  *                   fallback.
+ *
+ * Two entry points share one core:
+ *   - `collectTaintedContributors(ir, carved)` — the set-based core. `carved`
+ *     is the carved set R (one aggregated pass over all rules/stores; no
+ *     iterated fixpoint — ruling §1, §8).
+ *   - `collectCharContributors(ir, targetChar)` — the historical single-character
+ *     wrapper (R = { targetChar }), preserving the gallery's per-character
+ *     contract.
+ *
+ * The taint test (ruling §2) replaces exact-NFC matching everywhere: item `s`
+ * is tainted by R iff ∃ g ∈ R with NFD(g) a contiguous code-point subsequence
+ * of NFD(s). Canonical NFD only — never NFKD. Only `char`-kind items are ever
+ * text-tested; `raw`, `deadkey`, `any`, `vkey` items are never text-tested.
  *
  * Design constraints (from km-strategy, treated as requirements):
  *   - CAPABILITY-AGNOSTIC: does not gate on RemovalCapability; a misclassified
@@ -20,17 +38,20 @@
  *     NEVER enter the contributor set; only the fan-out rule's single matching
  *     SLOT is a contributor. A trigger rule is detected as: output is exactly one
  *     `{kind:"deadkey"}` element.
- *   - OUTPUT + INPUT STORE SLOTS ("remove everywhere", #525 v2): every matching
- *     slot index in an output store (`index()`/`outs()`) AND every matching
+ *   - OUTPUT + INPUT STORE SLOTS ("remove everywhere", #525 v2): every tainted
+ *     slot index in an output store (`index()`/`outs()`) AND every tainted
  *     slot index in an `any()`-consumed INPUT store is added to `storeSlotIds`
  *     — a character removal must reach every store it appears in, not just the
- *     one it's emitted through. `notany()` stores are deliberately NOT scanned:
- *     dropping a char from a `notany()` store WIDENS what that rule matches,
- *     the opposite of removal. This function only ever names the DIRECTLY
- *     matching slot on each store; applyStoreSlotRemovals is still the one that
- *     resolves the pairing graph and coordinates the drop across any OTHER
- *     paired store at the same position, so the caller doesn't need to (and
- *     shouldn't) duplicate that resolution here.
+ *     one it's emitted through. `notany()` stores get a carve-scoped hygiene
+ *     nomination (ruling §3): dropping a tainted char from a `notany()` store
+ *     is behavior-neutral under carve's closed model (the char can't occur in
+ *     context anymore), so tainted `notany()` items are pruned for hygiene.
+ *     The general `notany-widens` block in applyStoreSlotRemovals is preserved;
+ *     the carve apply path opts in via `carveNotAnyHygiene`. This function only
+ *     ever names the DIRECTLY tainted slot on each store; applyStoreSlotRemovals
+ *     is still the one that resolves the pairing graph and coordinates the drop
+ *     across any OTHER paired store at the same position, so the caller doesn't
+ *     need to (and shouldn't) duplicate that resolution here.
  *   - "IS IT A METHOD?" IS NOT "DOES IT DEPEND ON THE CHAR?": these two
  *     questions have separate answers, and conflating them was a shipped
  *     defect. A backspace-reached slot (`any(composed) + [K_BKSP] >
@@ -51,21 +72,29 @@
  *     the emitted `.kmn` (sil_cameroon_qwerty declares `letter`, `lc` and `uc`
  *     this way — each appears exactly once in the file, its own declaration).
  *     A final sweep nominates those slots. Scoped to ZERO-reference stores
- *     precisely because that makes the drop provably behaviour-neutral, and in
- *     particular can never reach a `notany()`-consumed store and widen it.
+ *     precisely because that makes the drop provably behaviour-neutral (a
+ *     `notany()`-consumed store is referenced, so it never lands here — it is
+ *     covered by the carve-scoped `notany()` hygiene nomination instead).
+ *     System stores (`store.isSystem`) are never nominated — the codec strips
+ *     the `&` prefix and flags `isSystem` separately, so a name-prefix check
+ *     would be dead code.
  *   - PRODUCED vs. USED (the §0 "used" gate): a rule's `any()`-consumed INPUT
- *     store occurrence of `target` is only tagged `producedRole: "used"`
- *     (blue, non-deletable) when that SAME rule does NOT also produce
- *     `target` on its output side. A rule that outputs `target` is green/
- *     "produced" for it even when `target` also happens to sit in that
+ *     store occurrence of a tainted char is only tagged `producedRole: "used"`
+ *     (blue, non-deletable) when that SAME rule does NOT also produce a tainted
+ *     char on its output side. A rule that outputs a tainted char is green/
+ *     "produced" for it even when a tainted char also happens to sit in that
  *     rule's own input store (e.g. an identity-mapped deadkey combination, or
  *     a fan-out whose input and output stores share an item) — see
- *     `ruleProducesChar` below, the single predicate both this gate and the
- *     canonical deadkey example (`A + ◌̂ → Â`: green on Â's card, blue on A's)
- *     are decided from.
- *   - SINGLE-CHAR WHOLE-DELETE: whole-rule-delete only when the rule's ENTIRE
- *     NFC output === targetChar (single-char producer). Multi-char producers go
- *     to `blocked`.
+ *     `ruleProducesTainted` below, the single predicate both this gate and
+ *     the canonical deadkey example (`A + ◌̂ → Â`: green on Â's card, blue on
+ *     A's) are decided from.
+ *   - WHOLE-RULE DELETE: a rule is a whole-rule-delete candidate when a literal
+ *     context/output element is tainted (one unmatchable literal kills the
+ *     rule; literals aren't partially rewritable), when its entire NFC output
+ *     is tainted, or when it has no rows left. A partially-tainted literal
+ *     output goes to `blocked` unless every KEPT output char remains producible
+ *     elsewhere (producer guard — a kept, still-typeable character must never
+ *     lose a production method).
  *   - OPAQUE FRAGMENTS: RawKmnFragment producers can only be whole-fragment-
  *     deleted; listed in `blocked`.
  */
@@ -74,15 +103,28 @@ import type { ContextElement, IRRule, KeyboardIR, StoreItem } from "@keyboard-st
 import { collectFromElements, contextHasDirectBackspace, isBackspaceVkeyName } from "@keyboard-studio/contracts";
 import { isDeadkeyOnlyOutput, isPlusSeparator } from "../shared/rule-shape.js";
 import { makeSlotId } from "./slotId.js";
+import { buildProducerIndex } from "./producerIndex.js";
+import type { ProducerIndex } from "./producerIndex.js";
 
 // ---------------------------------------------------------------------------
 // Public contract (shared with km-frontend — do not deviate)
 // ---------------------------------------------------------------------------
 
 export interface CharContributors {
-  /** The target character that was queried. */
+  /**
+   * The NFC-normalized carved grapheme(s) this record was computed for —
+   * the single target for `collectCharContributors`, the joined R for
+   * `collectTaintedContributors`. Prefer `carvedDiagnostics` for per-grapheme
+   * detail on the set-based path.
+   */
   targetChar: string;
-  /** nodeIds of rules whose ENTIRE NFC output equals targetChar — whole-rule delete. */
+  /**
+   * Per-carved-grapheme classification (ruling §5). Mn/Mc/Me → `diacritic`;
+   * everything else (incl. Lm/Sk spacing marks) → `base`. Diagnostics ONLY —
+   * pruning never branches on it; the taint test is uniform.
+   */
+  carvedDiagnostics?: { grapheme: string; kind: 'diacritic' | 'base' }[];
+  /** nodeIds of whole-rule-delete candidates (tainted literal context/output, or no rows left). */
   ruleNodeIds: string[];
   /** "<storeNodeId>#<index>" output-store slots to remove (one slot per matching position). */
   storeSlotIds: string[];
@@ -625,82 +667,219 @@ function storeDisplayNameField(storeName: string): { storeDisplayName: string } 
   return displayName !== undefined ? { storeDisplayName: displayName } : {};
 }
 
+// ---------------------------------------------------------------------------
+// Taint test (ruling §2) + carved-grapheme classification (ruling §5)
+// ---------------------------------------------------------------------------
+
 /**
- * True when RULE's OUTPUT side produces `target` — i.e. the SAME production
- * test the "(a) Store-produced target" and "(b) Literal target" loops below
- * perform when they build their own descriptors, computed once, ahead of
- * §0, so §0's input-side loop can ask "does this rule ALSO produce the char
- * I'm about to tag 'used' for?" without a second, potentially-divergent
- * definition of "produces".
+ * True when every code point of `needle` appears in `haystack` as one
+ * contiguous run, in order. Both arrays are NFD code-point arrays
+ * (canonical decomposition only — never NFKD).
+ */
+function isContiguousSubsequence(needle: readonly string[], haystack: readonly string[]): boolean {
+  if (needle.length === 0 || needle.length > haystack.length) return false;
+  const first = needle[0];
+  if (first === undefined) return false;
+  for (let i = 0; i <= haystack.length - needle.length; i++) {
+    if (haystack[i] !== first) continue;
+    let ok = true;
+    for (let j = 1; j < needle.length; j++) {
+      if (haystack[i + j] !== needle[j]) { ok = false; break; }
+    }
+    if (ok) return true;
+  }
+  return false;
+}
+
+/**
+ * Build the taint predicate for a carved set R (ruling §2).
  *
- * Two ways a rule's output can produce `target` (either is sufficient):
+ * Item `s` is tainted iff ∃ g ∈ R with NFD(g) a contiguous code-point
+ * subsequence of NFD(s). Canonical NFD only — never NFKD, so carving `f`
+ * does not taint `ﬁ` (U+FB01). Only `char`-kind items may be passed in;
+ * callers never text-test `raw`/`deadkey`/`any`/`vkey` items.
+ */
+function buildTaintTest(carved: ReadonlySet<string>): (value: string) => boolean {
+  const needles = [...carved]
+    .map((g) => Array.from(g.normalize('NFD')))
+    .filter((n) => n.length > 0);
+  return (value: string): boolean => {
+    const haystack = Array.from(value.normalize('NFD'));
+    return needles.some((needle) => isContiguousSubsequence(needle, haystack));
+  };
+}
+
+/**
+ * Classify a carved grapheme for diagnostics (ruling §5): Mn/Mc/Me →
+ * `diacritic`; everything else (incl. Lm/Sk spacing marks) → `base`.
+ * Recorded only — pruning never branches on it.
+ */
+function classifyCarvedGrapheme(grapheme: string): 'diacritic' | 'base' {
+  const first = Array.from(grapheme.normalize('NFC'))[0];
+  return first !== undefined && /\p{M}/u.test(first) ? 'diacritic' : 'base';
+}
+
+/**
+ * The `any()` context elements that are pairing-resolved selectors of an
+ * `index()`/`outs()` output element — the deadkey fan-out input side
+ * (ruling §3), which is NEVER taint-tested. Resolved via the same
+ * {@link resolveAlignedAnyElement} pairing the "(a)" loop uses.
+ */
+function pairedSelectorElements(rule: IRRule): Set<ContextElement> {
+  const selectors = new Set<ContextElement>();
+  for (const el of rule.output) {
+    if ((el.kind !== 'index' && el.kind !== 'outs') || el.storeRef === undefined) continue;
+    const aligned = resolveAlignedAnyElement(rule.context, {
+      kind: el.kind,
+      offset: el.kind === 'index' ? el.offset : 0,
+    });
+    if (aligned !== undefined) selectors.add(aligned);
+  }
+  return selectors;
+}
+
+/**
+ * Cased-pair input-side guard (ruling §3): a row whose INPUT item is tainted
+ * but whose paired OUTPUT item is kept is pruned only if the producer index
+ * confirms the kept output char remains producible elsewhere.
+ * `producerIndex` counts output-store char slots on the base IR; this row's
+ * own output slot contributes 1, so "producible elsewhere" is
+ * `count - 1 >= 1`. A count below 1 (shouldn't happen for an index-target
+ * char slot) fails closed — the row is kept.
+ *
+ * Approximation (documented, ruling §8): other nominations in this same pass
+ * are not subtracted — each consumer is tested against R directly on the base
+ * IR, with no iterated fixpoint.
+ *
+ * @returns true when the row must be KEPT (skip nomination).
+ */
+function inputSlotKeptByProducerGuard(
+  rule: IRRule,
+  anyEl: ContextElement,
+  storeMap: ReadonlyMap<string, KeyboardIR['stores'][number]>,
+  index: number,
+  isTainted: (value: string) => boolean,
+  producerIndex: ProducerIndex,
+): boolean {
+  for (const outEl of rule.output) {
+    if ((outEl.kind !== 'index' && outEl.kind !== 'outs') || outEl.storeRef === undefined) continue;
+    const aligned = resolveAlignedAnyElement(rule.context, {
+      kind: outEl.kind,
+      offset: outEl.kind === 'index' ? outEl.offset : 0,
+    });
+    if (aligned !== anyEl) continue;
+    const outItem = storeMap.get(outEl.storeRef)?.items[index];
+    if (outItem === undefined || outItem.kind !== 'char') continue;
+    if (isTainted(outItem.value)) continue; // output-side taint → prune; not this guard's case
+    const producers = producerIndex.get(outItem.value.normalize('NFC')) ?? 0;
+    if (producers - 1 < 1) return true; // keep: sole production of a kept char
+  }
+  return false;
+}
+
+/**
+ * True when RULE's OUTPUT side produces a tainted char — i.e. the SAME production
+ * test the "(a) Store-produced" and "(b) Literal" loops below perform when they
+ * build their own descriptors, computed once, ahead of §0, so §0's input-side
+ * loop can ask "does this rule ALSO produce a tainted char I'm about to tag
+ * 'used' for?" without a second, potentially-divergent definition of "produces".
+ *
+ * Two ways a rule's output can produce a tainted char (either is sufficient):
  *   - STORE OUTPUT: an `index()`/`outs()` element over a store that contains
- *     `target` at a slot the "(a)" loop would ITSELF attribute a production
- *     to — i.e. every index is scanned (not just the offset-paired one), but
- *     an index whose ALIGNED any()-consumed input item resolves to backspace
- *     (`K_BKSP`) is skipped, via the SAME `resolveAlignedAnyElement` +
+ *     a tainted char at a slot the "(a)" loop would ITSELF attribute a
+ *     production to — i.e. every index is scanned (not just the offset-paired
+ *     one), but an index whose ALIGNED any()-consumed input item resolves to
+ *     backspace (`K_BKSP`) is skipped, via the SAME `resolveAlignedAnyElement` +
  *     `contributorInputHasBackspace` pairing the "(a)" loop uses at its own
  *     per-slot backspace check below. Without this exclusion, a store whose
- *     ONLY occurrence of `target` sits at such a backspace-aligned index
- *     would report a production here that "(a)" itself would never
- *     attribute — a divergent, false-positive definition of "produces" that
- *     would wrongly suppress a legitimate blue "used" row for `target`'s
- *     other, non-backspace input occurrence.
- *   - LITERAL OUTPUT: `target` appears in the NFC-joined literal `char`
- *     output (the same `charVals`/`wholeOutput` computation the "(b)" loop
- *     uses, whether as a single-char whole-rule match or as part of a
- *     longer, unsplittable literal run).
+ *     ONLY tainted occurrence sits at such a backspace-aligned index would
+ *     report a production here that "(a)" itself would never attribute — a
+ *     divergent, false-positive definition of "produces" that would wrongly
+ *     suppress a legitimate blue "used" row for the rule's other, non-backspace
+ *     input occurrence.
+ *   - LITERAL OUTPUT: the NFC-joined literal `char` output is tainted (the same
+ *     `charVals`/`wholeOutput` computation the "(b)" loop uses, whether as a
+ *     fully-tainted whole-rule match or as part of a longer literal run).
  *
- * A rule producing `target` is GREEN ("produced") for it regardless of
- * whether `target` ALSO appears on that same rule's input side — the
+ * A rule producing a tainted char is GREEN ("produced") for it regardless of
+ * whether a tainted char ALSO appears on that same rule's input side — the
  * canonical case being a deadkey combination rule whose base char happens to
  * equal its own output (an identity mapping), or a fan-out rule where the
  * any()-consumed store and the index()-targeted store happen to share an
  * item. Per the produced/used contract, such a rule must never ALSO surface
- * a spurious blue "used" row for `target` — it is attributed via the
- * output-side branch alone.
+ * a spurious blue "used" row — it is attributed via the output-side branch
+ * alone.
  */
-function ruleProducesChar(
+function ruleProducesTainted(
   outEls: { kind: string; value?: string; storeRef?: string; offset?: number }[],
-  target: string,
+  isTainted: (value: string) => boolean,
   storeMap: ReadonlyMap<string, KeyboardIR['stores'][number]>,
   context: readonly ContextElement[],
-): boolean {
+): Set<string> {
+  const produced = new Set<string>();
   for (const el of outEls) {
     if ((el.kind === 'index' || el.kind === 'outs') && el.storeRef !== undefined) {
       const store = storeMap.get(el.storeRef);
       if (store === undefined) continue;
-      const alignedAnyEl = resolveAlignedAnyElement(context, { kind: el.kind, offset: el.offset });
+      const alignedAnyEl = resolveAlignedAnyElement(context, {
+        kind: el.kind,
+        offset: el.kind === 'index' ? el.offset : 0,
+      });
       const anyStore = alignedAnyEl !== undefined ? storeMap.get(alignedAnyEl.storeRef) : undefined;
       for (let i = 0; i < store.items.length; i++) {
         const item = store.items[i];
-        if (item === undefined || item.kind !== 'char' || item.value.normalize('NFC') !== target) continue;
+        if (item === undefined || item.kind !== 'char' || !isTainted(item.value)) continue;
         const baseItem = anyStore?.items[i];
         if (contributorInputHasBackspace(context, baseItem)) continue;
-        return true;
+        produced.add(item.value.normalize('NFC'));
       }
     }
   }
   const charVals = outEls.filter((el) => el.kind === 'char').map((el) => el.value ?? '');
-  if (charVals.length === 0) return false;
-  const wholeOutput = charVals.join('').normalize('NFC');
-  return wholeOutput.includes(target);
+  if (charVals.length > 0) {
+    const wholeOutput = charVals.join('').normalize('NFC');
+    // Only add if the whole output is a single tainted char (or fully tainted).
+    // A partially-tainted multi-char output doesn't "produce" the tainted part
+    // as a separate char for suppression purposes.
+    if ([...wholeOutput].every((cp) => isTainted(cp))) {
+      for (const cp of wholeOutput) {
+        produced.add(cp);
+      }
+    } else if (isTainted(wholeOutput)) {
+      // Partially tainted: add the tainted code points.
+      for (const cp of wholeOutput) {
+        if (isTainted(cp)) produced.add(cp);
+      }
+    }
+  }
+  return produced;
 }
 
 // ---------------------------------------------------------------------------
-// Main export
+// Main exports
 // ---------------------------------------------------------------------------
 
 /**
- * Collect every contributor to `targetChar` in the IR.
+ * Collect every contributor to a carved set R in the IR — one aggregated
+ * nomination pass over all rules/stores (ruling §1, §8: no iterated fixpoint).
  *
- * @param ir         The KeyboardIR (after recognizePatterns() has run, if applicable).
- * @param targetChar The NFC character to find producers for.
- * @returns          A CharContributors record (see interface above).
+ * @param ir     The KeyboardIR (after recognizePatterns() has run, if applicable).
+ * @param carved The carved set R: NFC-normalized graphemes being removed.
+ * @returns      A CharContributors record (see interface above).
  */
-export function collectCharContributors(ir: KeyboardIR, targetChar: string): CharContributors {
-  // Normalize the target to NFC so comparisons are canonical.
-  const target = targetChar.normalize("NFC");
+export function collectTaintedContributors(
+  ir: KeyboardIR,
+  carved: ReadonlySet<string>,
+): CharContributors {
+  // Normalize the carved set to NFC so comparisons are canonical.
+  const R = new Set([...carved].map((g) => g.normalize('NFC')));
+  const isTainted = buildTaintTest(R);
+  const carvedDiagnostics = [...R].map((grapheme) => ({
+    grapheme,
+    kind: classifyCarvedGrapheme(grapheme) as 'diacritic' | 'base',
+  }));
+  // Human-readable label for blocked reasons (the carved set, joined).
+  const targetLabel = [...R].join(', ');
 
   const ruleNodeIds: string[] = [];
   const storeSlotIds: string[] = [];
@@ -713,6 +892,11 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
 
   // Pre-build store map (name → store) for store-output expansion.
   const storeMap = new Map(ir.stores.map((s) => [s.name, s]));
+
+  // Producer index (base IR) for the §8 contributor guards: "does a kept,
+  // still-typeable character remain producible if this nomination is applied?"
+  // Computed once — nominations never iterate (ruling §8: no fixpoint).
+  const producerIndex = buildProducerIndex(ir);
 
   // Pre-pass: map deadkey id -> triggering keystroke display, from every S-02
   // trigger rule (output is exactly one `{kind:"deadkey"}` element) whose
@@ -811,14 +995,18 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
     if (frag.producedOutput === undefined) continue;
     const fragProduced = new Set<string>();
     collectFromElements(frag.producedOutput, storeMap, fragProduced, false);
-    if (fragProduced.has(target)) {
+    let taintedProduced: string | undefined;
+    for (const p of fragProduced) {
+      if (isTainted(p)) { taintedProduced = p; break; }
+    }
+    if (taintedProduced !== undefined) {
       blocked.push({
         reason: `Opaque fragment (${frag.reason}): cannot surgically remove individual characters`,
         label: frag.reason,
       });
       blockedDescriptors.push({
         kind: 'blocked',
-        producedChar: target,
+        producedChar: taintedProduced,
         producedRole: 'produced',
         blockedReasonCode: 'opaque-fragment',
       });
@@ -881,80 +1069,145 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
 
       const outEls = rule.output as { kind: string; value?: string; storeRef?: string; offset?: number }[];
 
-      // Does THIS rule produce `target` on its own output side (store or
-      // literal)? Computed once, ahead of §0, so §0 can gate its "used"
-      // emission on it — see `ruleProducesChar`'s doc comment. A rule that
-      // produces `target` is GREEN for it regardless of whether `target`
-      // also appears on that rule's input side; only a rule that does NOT
-      // produce `target` gets to tag an input-side occurrence "used".
-      const ruleProducesTarget = ruleProducesChar(outEls, target, storeMap, rule.context);
-
-      // (0) Input-store occurrences — any() context elements ("remove everywhere",
-      //     #525 v2). Independent of the output-store/literal classification below
-      //     (no early `continue` here): a rule's INPUT store slot for this char is a
-      //     contributor regardless of what that same rule's OUTPUT does — UNLESS
-      //     that same rule's output ALSO produces `target` (`ruleProducesTarget`),
-      //     in which case the char is attributed via the output-side branch alone
-      //     (green/"produced"), never a second, spurious blue "used" row. `notany()`
-      //     is deliberately excluded (see the module doc comment) — only `any()`.
-      if (!ruleProducesTarget) {
+      // Literal context taint (ruling §3): KMN contexts are flat conjunctions —
+      // one unmatchable literal kills the rule. A tainted `char` context element
+      // can't occur once R is carved, so the whole rule is nominated. No
+      // producer guard: a dead rule's "production" was never real. Falls
+      // through to slot nomination below ("remove everywhere" — the rule's own
+      // tainted slots are still pruned; `seenRuleNodeIds` dedups the rule).
+      // Backspace-correction rules are excluded: their surgical unit is the
+      // slot, never the rule (see `isBackspaceCorrectionRule` above) — a
+      // literal deconstruction rule like `é + BKSP -> e` is not a production
+      // method, and its context literal is the deconstruction target, not a
+      // match condition that kills the rule.
+      if (!isBackspaceCorrectionRule) {
         for (const el of rule.context) {
-          if (el.kind !== 'any') continue;
-          const inputStore = storeMap.get(el.storeRef);
-          if (inputStore === undefined) continue;
-          let inputMatched = false;
-          for (let i = 0; i < inputStore.items.length; i++) {
-            const item = inputStore.items[i];
-            if (item !== undefined && item.kind === 'char' && item.value.normalize('NFC') === target) {
-              // The input side alone doesn't cheaply resolve a deadkey's
-              // mark/base (that requires the OUTPUT-side alignment below), so
-              // this descriptor deliberately leaves mark/base/storeDisplayName
-              // absent when it's a deadkey-context rule — the studio's
-              // fallback template covers it. A non-deadkey input match still
-              // gets a `storeDisplayName`, same as an output-side match.
-              addStoreSlot(
-                makeSlotId(inputStore.nodeId, i),
-                'input',
-                isDeadkeyRule
-                  ? { kind: 'deadkey', producedChar: target, producedRole: 'used' }
-                  : {
-                      kind: 'store-slot',
-                      producedChar: target,
-                      producedRole: 'used',
-                      ...storeDisplayNameField(inputStore.name),
-                    },
-              );
-              addLocation('store', inputStore.name, inputStore.nodeId);
-              inputMatched = true;
+          if (el.kind === 'char' && isTainted(el.value)) {
+            if (!seenRuleNodeIds.has(rule.nodeId)) {
+              seenRuleNodeIds.add(rule.nodeId);
+              ruleNodeIds.push(rule.nodeId);
+              ruleDescriptors.push({
+                kind: 'keystroke',
+                producedChar: el.value.normalize('NFC'),
+                producedRole: 'used',
+              });
             }
+            addRuleLocation(rule, group);
+            break;
           }
-          if (inputMatched) addRuleLocation(rule, group);
         }
       }
 
-      // (a) Store-produced target — the character is emitted through an
+      // Does THIS rule produce tainted chars on its own output side (store or
+      // literal)? Computed once, ahead of §0, so §0 can gate its "used"
+      // emission per-character — see `ruleProducesTainted`'s doc comment. A
+      // rule that produces a tainted char is GREEN for that char regardless of
+      // whether the same char also appears on that rule's input side; only a
+      // char NOT produced on the output side gets to tag an input-side
+      // occurrence "used".
+      const ruleProducedTaintedChars = ruleProducesTainted(outEls, isTainted, storeMap, rule.context);
+
+      // Deadkey fan-out selector set (ruling §3): pairing-resolved any()
+      // elements feeding an index()/outs() output — the selector side is NEVER
+      // taint-tested. Only for deadkey fan-out rules (deadkey context, not a
+      // backspace-correction rule); other rules' selectors are still tested.
+      const skipSelectorElements =
+        isDeadkeyRule && !isBackspaceCorrectionRule ? pairedSelectorElements(rule) : undefined;
+
+      // (0) Input-store occurrences — any() context elements ("remove everywhere",
+      //     #525 v2). Independent of the output-store/literal classification below
+      //     (no early `continue` here): a rule's INPUT store slot for a tainted
+      //     char is a contributor regardless of what that same rule's OUTPUT
+      //     does — UNLESS the output ALSO produces that SPECIFIC char
+      //     (`ruleProducedTaintedChars`), in which case the char is attributed
+      //     via the output-side branch alone (green/"produced"), never a second,
+      //     spurious blue "used" row. `notany()` is excluded here — only `any()`
+      //     (the carve-scoped `notany()` hygiene nomination runs as its own
+      //     section below).
+      for (const el of rule.context) {
+        if (el.kind !== 'any') continue;
+        if (skipSelectorElements?.has(el)) continue;
+        const inputStore = storeMap.get(el.storeRef);
+        if (inputStore === undefined || inputStore.isSystem) continue;
+        let inputMatched = false;
+        for (let i = 0; i < inputStore.items.length; i++) {
+          const item = inputStore.items[i];
+          if (item === undefined || item.kind !== 'char' || !isTainted(item.value)) continue;
+          const itemChar = item.value.normalize('NFC');
+          // Per-char suppression: if the output side produces this specific
+          // char, the input occurrence is not a separate "used" contributor.
+          if (ruleProducedTaintedChars.has(itemChar)) continue;
+          // Cased-pair input-side guard (ruling §3): backspace-correction
+          // rules drop deconstruction rows unconditionally; otherwise prune
+          // an input-tainted row only when a paired kept output remains
+          // producible elsewhere.
+          if (
+            !isBackspaceCorrectionRule &&
+            inputSlotKeptByProducerGuard(rule, el, storeMap, i, isTainted, producerIndex)
+          ) {
+            continue;
+          }
+          // The input side alone doesn't cheaply resolve a deadkey's
+          // mark/base (that requires the OUTPUT-side alignment below), so
+          // this descriptor deliberately leaves mark/base/storeDisplayName
+          // absent when it's a deadkey-context rule — the studio's
+          // fallback template covers it. A non-deadkey input match still
+          // gets a `storeDisplayName`, same as an output-side match.
+          addStoreSlot(
+            makeSlotId(inputStore.nodeId, i),
+            'input',
+            isDeadkeyRule
+              ? { kind: 'deadkey', producedChar: itemChar, producedRole: 'used' }
+              : {
+                  kind: 'store-slot',
+                  producedChar: itemChar,
+                  producedRole: 'used',
+                  ...storeDisplayNameField(inputStore.name),
+                },
+          );
+          addLocation('store', inputStore.name, inputStore.nodeId);
+          inputMatched = true;
+        }
+        if (inputMatched) addRuleLocation(rule, group);
+      }
+
+      // (a) Store-produced tainted char — the character is emitted through an
       //     index()/outs() over a store (base-layer alphabet fan-out OR a
-      //     deadkey fan-out). The surgical unit is the matching store SLOT
+      //     deadkey fan-out). The surgical unit is the tainted store SLOT
       //     (a drop, coordinated by applyStoreSlotRemovals with any paired
       //     store), NEVER the whole rule — the rule produces the entire
       //     store's worth of characters, so deleting it would remove them all.
+      //     Deconstruction pairs nominate on EITHER side's taint (ruling §3).
       let storeMatched = false;
       for (const el of outEls) {
         if ((el.kind === 'index' || el.kind === 'outs') && el.storeRef !== undefined) {
           const store = storeMap.get(el.storeRef);
-          if (store === undefined) continue;
+          if (store === undefined || store.isSystem) continue;
           for (let i = 0; i < store.items.length; i++) {
             const item = store.items[i];
-            if (item !== undefined && item.kind === 'char' && item.value.normalize('NFC') === target) {
-              // Resolve the SAME aligned any()-consumed item buildOutputSlotDescriptor
-              // would derive `base`/`inputKeystroke` from, ONCE, so the backspace
-              // check and the descriptor build can never disagree about which
-              // item is "the input" for this slot (per-slot: a DIFFERENT slot
-              // index on the same store/rule can align to a different, non-
-              // backspace item, so this can't be decided once for the whole rule).
-              const alignedAnyEl = resolveAlignedAnyElement(rule.context, { kind: el.kind, offset: el.offset });
-              const anyStore = alignedAnyEl !== undefined ? storeMap.get(alignedAnyEl.storeRef) : undefined;
-              const baseItem = anyStore?.items[i];
+            if (item === undefined || item.kind !== 'char') continue;
+            // Resolve the SAME aligned any()-consumed item buildOutputSlotDescriptor
+            // would derive `base`/`inputKeystroke` from, ONCE, so the backspace
+            // check and the descriptor build can never disagree about which
+            // item is "the input" for this slot (per-slot: a DIFFERENT slot
+            // index on the same store/rule can align to a different, non-
+            // backspace item, so this can't be decided once for the whole rule).
+            const alignedAnyEl = resolveAlignedAnyElement(rule.context, { kind: el.kind, offset: el.offset });
+            const anyStore = alignedAnyEl !== undefined ? storeMap.get(alignedAnyEl.storeRef) : undefined;
+            const baseItem = anyStore?.items[i];
+            const baseTainted = baseItem !== undefined && baseItem.kind === 'char' && isTainted(baseItem.value);
+            const itemTainted = isTainted(item.value);
+            // For backspace-correction (deconstruction) rules, nominate the
+            // output slot if EITHER side is tainted (ruling §3: prune both
+            // aligned stores if either text side is tainted). The (0) loop
+            // nominates the input side; the pairing graph in
+            // applyStoreSlotRemovals coordinates the lockstep drop. For
+            // NON-deconstruction rules, only the output item's own taint
+            // nominates the output slot — an input-tainted aligned item must
+            // not pull an untainted output slot along (the "surgical unit is
+            // the slot" contract the tests assert).
+            if (!itemTainted && !(baseTainted && isBackspaceCorrectionRule)) continue;
+            const itemChar = item.value.normalize('NFC');
 
               // Reached only by pressing backspace — either the rule's context
               // carries K_BKSP directly, or this slot's ALIGNED input item
@@ -967,7 +1220,7 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
               if (contributorInputHasBackspace(rule.context, baseItem)) {
                 addStoreSlot(makeSlotId(store.nodeId, i), 'input', {
                   kind: 'store-slot',
-                  producedChar: target,
+                  producedChar: itemChar,
                   producedRole: 'used',
                   ...storeDisplayNameField(store.name),
                 });
@@ -985,7 +1238,7 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
                 buildOutputSlotDescriptor(
                   rule,
                   isDeadkeyRule,
-                  target,
+                  itemChar,
                   store.name,
                   i,
                   storeMap,
@@ -999,7 +1252,6 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
             }
           }
         }
-      }
       if (storeMatched) {
         addRuleLocation(rule, group);
         continue;
@@ -1014,15 +1266,52 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
       // this character can be "blocked" on.
       if (isBackspaceCorrectionRule) continue;
 
-      // (b) Literal target — the character is written out directly as one or
-      //     more `char` elements (base+combining runs NFC-compose to one glyph).
+      // (b) Literal output — tainted literal chars written out directly as one
+      //     or more `char` elements (base+combining runs NFC-compose to one
+      //     glyph). A fully-tainted literal output → whole-rule delete. A
+      //     PARTIALLY-tainted literal output → whole-rule delete iff every KEPT
+      //     output char remains producible elsewhere (producer guard, ruling
+      //     §8 — a kept, still-typeable character must never lose a production
+      //     method); otherwise the existing `blocked` classification.
       const charVals = outEls.filter((el) => el.kind === 'char').map((el) => el.value ?? '');
       if (charVals.length === 0) continue;
       const onlyCharOutput = charVals.length === outEls.length;
       const wholeOutput = charVals.join('').normalize('NFC');
+      // Fully-tainted: every code point in the output is tainted (per-cp), OR
+      // the output string is fully covered by carved-grapheme occurrences
+      // (string-level taint for multi-char carved graphemes, ruling §2 — e.g.
+      // carving the string 'GHG' taints the whole output 'GHG' even though
+      // the individual cps 'G'/'H' are not tainted by 'GHG' alone).
+      const nfdOutputCps = [...wholeOutput.normalize('NFD')];
+      const coveredNfd = new Array<boolean>(nfdOutputCps.length).fill(false);
+      for (const g of R) {
+        const gNfdCps = [...g.normalize('NFD')];
+        if (gNfdCps.length === 0) continue;
+        for (let i = 0; i + gNfdCps.length <= nfdOutputCps.length; i++) {
+          let ok = true;
+          for (let j = 0; j < gNfdCps.length; j++) {
+            if (nfdOutputCps[i + j] !== gNfdCps[j]) { ok = false; break; }
+          }
+          if (ok) for (let j = 0; j < gNfdCps.length; j++) coveredNfd[i + j] = true;
+        }
+      }
+      // Align NFC cps to NFD spans (NFD of an NFC string is the concatenation
+      // of each cp's NFD, in order). An NFC cp is covered iff all its NFD
+      // constituents lie within carved-grapheme occurrences.
+      let nfdIdx = 0;
+      const isStringLevelFullyTainted = [...wholeOutput].every((cp) => {
+        const cpNfdLen = [...cp.normalize('NFD')].length;
+        const spanCovered =
+          cpNfdLen > 0 && coveredNfd.slice(nfdIdx, nfdIdx + cpNfdLen).every(Boolean);
+        nfdIdx += cpNfdLen;
+        return spanCovered;
+      });
+      const isFullyTaintedOutput =
+        onlyCharOutput &&
+        ([...wholeOutput].every((cp) => isTainted(cp)) || isStringLevelFullyTainted);
 
-      if (onlyCharOutput && wholeOutput === target) {
-        // The rule's entire output is exactly this character → whole-rule delete.
+      if (isFullyTaintedOutput) {
+        // The rule's entire output is tainted → whole-rule delete.
         if (!seenRuleNodeIds.has(rule.nodeId)) {
           seenRuleNodeIds.add(rule.nodeId);
           ruleNodeIds.push(rule.nodeId);
@@ -1039,26 +1328,141 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
           );
           ruleDescriptors.push({
             kind: 'keystroke',
-            producedChar: target,
+            producedChar: wholeOutput,
             producedRole: 'produced',
             ...(keystrokeDisplay !== undefined ? { keystrokeDisplay } : {}),
             ...(inputSequence !== undefined ? { inputSequence, output: wholeOutput } : {}),
           });
         }
         addRuleLocation(rule, group);
-      } else if (wholeOutput.includes(target)) {
-        // The character is only part of a longer literal output that can't be
-        // split surgically (rare) → genuinely blocked.
-        blocked.push({
-          reason: `produces "${wholeOutput}" — "${target}" can't be removed without affecting the rest of that output`,
-          label: `${group.name} / ${rule.nodeId}`,
+      } else if (isTainted(wholeOutput)) {
+        // Partially-tainted literal output: the tainted part can't be split
+        // out surgically (literals aren't partially rewritable). Delete the
+        // whole rule iff no kept output char is stranded; else blocked.
+        // The producerIndex counts this rule itself, so >= 2 means another
+        // producer exists besides this rule.
+        const keptCodePoints = [...new Set(Array.from(wholeOutput))].filter((cp) => !isTainted(cp));
+        const strandFree = keptCodePoints.every((cp) => (producerIndex.get(cp) ?? 0) >= 2);
+        if (strandFree) {
+          if (!seenRuleNodeIds.has(rule.nodeId)) {
+            seenRuleNodeIds.add(rule.nodeId);
+            ruleNodeIds.push(rule.nodeId);
+            const keystrokeDisplay = keystrokeDisplayForContext(rule.context);
+            const inputSequence = buildContextInputSequence(
+              rule.context,
+              storeMap,
+              triggerKeystrokeByDeadkeyId,
+              undefined,
+              undefined,
+            );
+            ruleDescriptors.push({
+              kind: 'keystroke',
+              producedChar: wholeOutput,
+              producedRole: 'produced',
+              ...(keystrokeDisplay !== undefined ? { keystrokeDisplay } : {}),
+              ...(inputSequence !== undefined ? { inputSequence, output: wholeOutput } : {}),
+            });
+          }
+          addRuleLocation(rule, group);
+        } else {
+          // A kept char in this output has no other producer → genuinely blocked.
+          blocked.push({
+            reason: `produces "${wholeOutput}" — "${targetLabel}" can't be removed without affecting the rest of that output`,
+            label: `${group.name} / ${rule.nodeId}`,
+          });
+          blockedDescriptors.push({
+            kind: 'blocked',
+            producedChar: wholeOutput,
+            producedRole: 'produced',
+            blockedReasonCode: 'multi-char-output',
+          });
+        }
+      }
+    }
+  }
+
+  // --- 2b. notany() hygiene nomination (carve-scoped exception, ruling §3) ---  //
+  // Removing a tainted char from a `notany()` store is behavior-neutral under
+  // carve's closed model — the char can't occur in context anymore, so the
+  // exclusion set doesn't effectively widen. Pruned for hygiene only. This is
+  // carve-scoped: the general `notany-widens` block in applyStoreSlotRemovals
+  // is untouched; the carve apply path opts in via `carveNotAnyHygiene`.
+  for (const group of ir.groups) {
+    for (const rule of group.rules) {
+      if (isTriggerRule(rule)) continue;
+      for (const el of rule.context) {
+        if (el.kind !== 'notany') continue;
+        const store = storeMap.get(el.storeRef);
+        if (store === undefined || store.isSystem) continue;
+        let matched = false;
+        store.items.forEach((item, i) => {
+          if (item.kind !== 'char' || !isTainted(item.value)) return;
+          addStoreSlot(makeSlotId(store.nodeId, i), 'input', {
+            kind: 'store-slot',
+            producedChar: item.value.normalize('NFC'),
+            producedRole: 'used',
+            ...storeDisplayNameField(store.name),
+          });
+          matched = true;
         });
-        blockedDescriptors.push({
-          kind: 'blocked',
-          producedChar: target,
-          producedRole: 'produced',
-          blockedReasonCode: 'multi-char-output',
-        });
+        if (matched) addLocation('store', store.name, store.nodeId);
+      }
+    }
+  }
+
+  // --- 2c. "No rows left" whole-rule deletion (ruling §3) ---
+  //
+  // A rule whose every output store has no un-nominated char rows left is
+  // dead: every character it could emit is being pruned. Nominate the whole
+  // rule. Only fires when EVERY item of every index()/outs() output store is
+  // a nominated char slot (a store with surviving non-char rows still has
+  // rows, and a rule with literal char output was handled by the (b) loop).
+  // Single pass on the base IR — no fixpoint (ruling §8).
+  {
+    const nominatedSlotByStore = new Map<string, Set<number>>();
+    for (const slotId of storeSlotIds) {
+      const hashIdx = slotId.lastIndexOf('#');
+      if (hashIdx < 0) continue;
+      const storeNodeId = slotId.slice(0, hashIdx);
+      const index = Number(slotId.slice(hashIdx + 1));
+      if (!Number.isInteger(index) || index < 0) continue;
+      let set = nominatedSlotByStore.get(storeNodeId);
+      if (set === undefined) {
+        set = new Set<number>();
+        nominatedSlotByStore.set(storeNodeId, set);
+      }
+      set.add(index);
+    }
+    for (const group of ir.groups) {
+      for (const rule of group.rules) {
+        if (isTriggerRule(rule)) continue;
+        if (seenRuleNodeIds.has(rule.nodeId)) continue;
+        if (rule.output.some((el) => el.kind === 'char')) continue;
+        const outStores: KeyboardIR['stores'][number][] = [];
+        for (const el of rule.output) {
+          if ((el.kind !== 'index' && el.kind !== 'outs') || el.storeRef === undefined) continue;
+          const store = storeMap.get(el.storeRef);
+          if (store !== undefined) outStores.push(store);
+        }
+        if (outStores.length === 0) continue;
+        const noRowsLeft = outStores.every(
+          (store) =>
+            store.items.length > 0 &&
+            store.items.every((item, i) => {
+              if (item.kind !== 'char') return false;
+              return nominatedSlotByStore.get(store.nodeId)?.has(i) === true;
+            }),
+        );
+        if (noRowsLeft) {
+          seenRuleNodeIds.add(rule.nodeId);
+          ruleNodeIds.push(rule.nodeId);
+          ruleDescriptors.push({
+            kind: 'keystroke',
+            producedChar: targetLabel,
+            producedRole: 'produced',
+          });
+          addRuleLocation(rule, group);
+        }
       }
     }
   }
@@ -1103,14 +1507,17 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
   }
 
   for (const store of ir.stores) {
-    if (store.name.startsWith('&')) continue;
+    // Ruling §4: skip system stores via `store.isSystem` — the codec strips
+    // the `&` prefix and flags `isSystem` separately, so a name-prefix check
+    // here would be dead code.
+    if (store.isSystem) continue;
     if (referencedStoreNames.has(store.name)) continue;
     let matched = false;
     store.items.forEach((item, i) => {
-      if (item.kind !== 'char' || item.value.normalize('NFC') !== target) return;
+      if (item.kind !== 'char' || !isTainted(item.value)) return;
       addStoreSlot(makeSlotId(store.nodeId, i), 'input', {
         kind: 'store-slot',
-        producedChar: target,
+        producedChar: item.value.normalize('NFC'),
         producedRole: 'used',
         ...storeDisplayNameField(store.name),
       });
@@ -1120,7 +1527,8 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
   }
 
   return {
-    targetChar: target,
+    targetChar: targetLabel,
+    carvedDiagnostics,
     ruleNodeIds,
     storeSlotIds,
     storeSlots,
@@ -1128,6 +1536,20 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
     blocked,
     descriptors: [...ruleDescriptors, ...storeSlotDescriptors, ...blockedDescriptors],
   };
+}
+
+/**
+ * Single-character wrapper preserving the historical per-character contract:
+ * R = { targetChar }. The gallery's per-character cells and descriptors are
+ * built on this; multi-character removals should aggregate into one carved
+ * set and call {@link collectTaintedContributors} directly (ruling §1).
+ *
+ * @param ir         The KeyboardIR (after recognizePatterns() has run, if applicable).
+ * @param targetChar The NFC character to find contributors for.
+ * @returns          A CharContributors record (see interface above).
+ */
+export function collectCharContributors(ir: KeyboardIR, targetChar: string): CharContributors {
+  return collectTaintedContributors(ir, new Set([targetChar]));
 }
 
 // ---------------------------------------------------------------------------
@@ -1157,7 +1579,7 @@ export function collectCharContributors(ir: KeyboardIR, targetChar: string): Cha
 function buildOutputSlotDescriptor(
   rule: IRRule,
   isDeadkeyRule: boolean,
-  target: string,
+  producedChar: string,
   storeName: string,
   slotIndex: number,
   storeMap: ReadonlyMap<string, KeyboardIR['stores'][number]>,
@@ -1172,12 +1594,12 @@ function buildOutputSlotDescriptor(
     slotIndex,
     alignedAnyEl,
   );
-  const sequenceFields = inputSequence !== undefined ? { inputSequence, output: target } : {};
+  const sequenceFields = inputSequence !== undefined ? { inputSequence, output: producedChar } : {};
 
   if (!isDeadkeyRule) {
     return {
       kind: 'store-slot',
-      producedChar: target,
+      producedChar,
       producedRole: 'produced',
       ...storeDisplayNameField(storeName),
       ...typedInputField(baseItem),
@@ -1194,7 +1616,7 @@ function buildOutputSlotDescriptor(
 
   return {
     kind: 'deadkey',
-    producedChar: target,
+    producedChar,
     producedRole: 'produced',
     ...(mark !== undefined ? { mark } : {}),
     ...(base !== undefined ? { base } : {}),

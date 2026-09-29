@@ -43,6 +43,8 @@ import type { SourceSnapshotter } from "./snapshotSource.ts";
 export interface WorkingCopyStateForRecording {
   deletedNodeIds: ReadonlySet<string>;
   deletedItemIds: ReadonlySet<string>;
+  /** Issue #1809, ruling §1: the aggregated carved character set. */
+  carveChars: ReadonlySet<string>;
   deletedTouchKeyIds: ReadonlySet<string>;
   phaseResults: readonly SurveyPhaseResult[];
   baseIr: KeyboardIR | null;
@@ -111,6 +113,9 @@ export function createStudioDecisionRecorder(
     getBaseIr: () => getWorkingCopyState().baseIr,
     getDeletedNodeIds: () => getWorkingCopyState().deletedNodeIds,
     getDeletedItemIds: () => getWorkingCopyState().deletedItemIds,
+    // Issue #1809, ruling §1: the aggregated carved character set for the
+    // single aggregated-R projection pass.
+    getCarveChars: () => getWorkingCopyState().carveChars,
     // The keyboard's own id once the author has set one, else the base's. This
     // CALLS the project-key derivation rather than restating it: the comment
     // here used to claim it was "matching how deriveProjectKeyFromWorkingCopy

@@ -244,6 +244,11 @@ async function finishGalleryWork(page: Page, fx: WalkFixture = FIXTURE): Promise
   await expect(page.getByTestId("carve-gallery")).toBeVisible({ timeout: 30_000 });
   if (fx.charToCarve !== undefined) await carveCharacter(page, fx.charToCarve);
   await page.getByTestId("carve-continue").click();
+  // Spec 083 inserts the Deadkeys step between carve and mechanisms (Phase D):
+  // walk through it. The walk defines no deadkeys, so Continue advances
+  // straight to the mechanisms gallery driveMechanismsGallery expects.
+  await expect(page.getByTestId("deadkeys-continue")).toBeVisible({ timeout: 30_000 });
+  await page.getByTestId("deadkeys-continue").click();
   await driveMechanismsGallery(
     page,
     fx.placement !== undefined ? { placements: { [fx.charToAdd]: fx.placement } } : {},

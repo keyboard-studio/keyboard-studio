@@ -68,6 +68,11 @@ export interface DecisionRecorderDeps {
   /** Ids of the carved-away store-slot items, for the carve projection. */
   getDeletedItemIds: () => ReadonlySet<string>;
   /**
+   * Issue #1809, ruling §1: the aggregated carved character set, for the
+   * single aggregated-R pass. Optional — absent behaves like an empty set.
+   */
+  getCarveChars?: () => ReadonlySet<string>;
+  /**
    * The keyboard identity, once known. Read on every completion so pre-identity
    * entries get stamped the moment an identity exists (FR-004) without any step
    * having to announce it.
@@ -253,6 +258,7 @@ export function createDecisionRecorder(deps: DecisionRecorderDeps): DecisionReco
       getBaseIr: deps.getBaseIr,
       getDeletedNodeIds: deps.getDeletedNodeIds,
       getDeletedItemIds: deps.getDeletedItemIds,
+      ...(deps.getCarveChars !== undefined ? { getCarveChars: deps.getCarveChars } : {}),
     });
 
     // Every entry recorded at this boundary — a question step's answers, or an

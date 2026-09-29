@@ -797,7 +797,7 @@ describe('characterCellIds / characterCellIsToggleable', () => {
     expect(characterCellIds(cells[0]!)).toEqual(['r1']);
   });
 
-  it('is toggleable when the character is produced through an index()-output store slot (removal resolves to storeSlotIds)', () => {
+  it('is toggleable when the character is produced through an index()-output store slot — and a single-row store also nominates the now-empty rule (ruling §3 no-rows-left)', () => {
     const store: IRStore = { nodeId: 'store#s', name: 'S', items: [{ kind: 'char', value: 'y' }], isSystem: false };
     const rule: IRRule = {
       nodeId: 'r-idx',
@@ -810,7 +810,7 @@ describe('characterCellIds / characterCellIsToggleable', () => {
     const cell = cells.find((c) => c.ch === 'y')!;
 
     expect(characterCellIsToggleable(cell)).toBe(true);
-    expect(characterCellIds(cell)).toEqual(['store#s#0']);
+    expect(characterCellIds(cell)).toEqual(['r-idx', 'store#s#0']);
   });
 
   it('is toggleable when the character lives only in an unreferenced store slot', () => {

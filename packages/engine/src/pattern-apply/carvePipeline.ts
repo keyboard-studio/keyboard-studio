@@ -20,10 +20,7 @@
 //      filter must not undo the compiler's in-place block rewrite, and
 //      allow-host removals are already gone (no double-removal).
 
-import type {
-  CarveDisposition,
-  KeyboardIR,
-} from "@keyboard-studio/contracts";
+import type { CarveDisposition, KeyboardIR } from "@keyboard-studio/contracts";
 import { compileCarveSuppression } from "./carveSuppression.js";
 import { applyStoreSlotRemovals } from "./applyStoreSlotRemovals.js";
 import { carveFilterIr } from "./carveFilterIr.js";
@@ -69,7 +66,10 @@ export function partitionCarveItemIds(
   const wholeNodeItemIds = new Set<string>();
   for (const id of deletedItemIds) {
     const parsed = parseSlotId(id);
-    (parsed !== null && storeNodeIdSet.has(parsed.storeNodeId) ? slotIds : wholeNodeItemIds).add(id);
+    (parsed !== null && storeNodeIdSet.has(parsed.storeNodeId)
+      ? slotIds
+      : wholeNodeItemIds
+    ).add(id);
   }
   return { slotIds, wholeNodeItemIds };
 }
@@ -97,17 +97,25 @@ export function deriveCarvedIr(
 
   // Stage 2 — slot removals on the suppressed IR. The suppression compiler
   // never touches stores, so partitioning against the suppressed IR is
-  // equivalent to partitioning against baseIr.
+  // equivalent to partitioning against baseIr. Carve-scoped `notany()`
+  // hygiene (issue #1809, ruling §3): tainted chars are pruned from
+  // `notany()` stores instead of blocking — this pipeline is the carve
+  // apply path, so it opts in like every other carve slot-removal call.
   const { slotIds, wholeNodeItemIds } = partitionCarveItemIds(
     suppressed.ir,
     input.deletedItemIds,
   );
-  const removalResult = applyStoreSlotRemovals(suppressed.ir, slotIds);
+  const removalResult = applyStoreSlotRemovals(suppressed.ir, slotIds, {
+    carveNotAnyHygiene: true,
+  });
 
   // Stage 3 — whole-node filter. carveFilterIr skips suppression-owned rules
   // (FR-021): a block disposition rewrote the rule in place and the deletion
   // set still names its nodeId, but the filter must not undo the rewrite.
-  const allWholeNodeIds = new Set([...input.deletedNodeIds, ...wholeNodeItemIds]);
+  const allWholeNodeIds = new Set([
+    ...input.deletedNodeIds,
+    ...wholeNodeItemIds,
+  ]);
   const filtered = carveFilterIr(removalResult.ir, allWholeNodeIds);
 
   return { ir: filtered, warnings: removalResult.warnings };

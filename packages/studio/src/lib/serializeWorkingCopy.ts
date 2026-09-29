@@ -175,7 +175,7 @@ export async function projectWorkingCopyForOutput(
 ): Promise<ProjectWorkingCopyForOutputResult | null> {
   // 1. Read current working-copy store state.
   const state = useWorkingCopyStore.getState();
-  const { baseVfs, baseIr, baseKeyboard, deletedNodeIds, deletedItemIds, deletedTouchKeyIds, phaseResults, identity, touchLayoutJson, instantiationMode, attribution, baseLicenseText, baseHolderOverride, helpDocs, baseWelcomeHtmText, baseHelpPhpText, baseWelcomeImages, baseWelcomeImagesDropped, baseReadmeMdText, baseHistoryMdText, historyEntryState, chartPreference, ir: workingIr, contextToleranceOverlay } = state;
+  const { baseVfs, baseIr, baseKeyboard, deletedNodeIds, deletedItemIds, carveChars, deletedTouchKeyIds, phaseResults, identity, touchLayoutJson, instantiationMode, attribution, baseLicenseText, baseHolderOverride, helpDocs, baseWelcomeHtmText, baseHelpPhpText, baseWelcomeImages, baseWelcomeImagesDropped, baseReadmeMdText, baseHistoryMdText, historyEntryState, chartPreference, ir: workingIr, contextToleranceOverlay } = state;
 
   // Not-instantiated guard.
   if (baseVfs === null || baseIr === null || baseKeyboard === null) {
@@ -426,12 +426,16 @@ export async function projectWorkingCopyForOutput(
     baseIr,
     deletedNodeIds,
     deletedItemIds,
+    carveChars,
     deletedTouchKeyIds,
     assignments: sessionAssignments,
     getPattern: (id) => patternCache.get(id),
     identity: identityForProjection,
     touchLayoutJson,
     welcomeFolderFiles,
+    // spec 083: the committed deadkey lifecycle overlay, replayed at step
+    // 1.8 so the download carries the same deadkey edits the preview does.
+    deadkeyOps: state.deadkeyOverlay.ops,
     // Anchor for step 3's "is the display name an EDIT?" test. The no-identity
     // fallback above sets identityForProjection.displayName to this same value,
     // so they compare equal and the base's &NAME store is left byte-identical.

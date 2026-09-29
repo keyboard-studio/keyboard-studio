@@ -24,14 +24,8 @@ import {
   makeTestIR,
   vkeyRule,
 } from "@keyboard-studio/contracts/fixtures";
-import type {
-  CarveDisposition,
-  KeyboardIR,
-} from "@keyboard-studio/contracts";
-import {
-  applyCarveToVfs,
-  emitKmn,
-} from "@keyboard-studio/engine";
+import type { CarveDisposition, KeyboardIR } from "@keyboard-studio/contracts";
+import { applyCarveToVfs, emitKmn } from "@keyboard-studio/engine";
 import { applyCarveMutate } from "../steps/editorMutate.js";
 import { stubKmnVfs } from "../test/workingCopy.ts";
 
@@ -62,8 +56,16 @@ function allowDisposition(comboId: string): CarveDisposition {
 function carvePipelineFixture(): KeyboardIR {
   return makeTestIR({
     stores: [
-      charStore({ nodeId: "store#dkf003b", name: "dkf003b", chars: ["e", "E"] }),
-      charStore({ nodeId: "store#dkt003b", name: "dkt003b", chars: ["é", "É"] }),
+      charStore({
+        nodeId: "store#dkf003b",
+        name: "dkf003b",
+        chars: ["e", "E"],
+      }),
+      charStore({
+        nodeId: "store#dkt003b",
+        name: "dkt003b",
+        chars: ["é", "É"],
+      }),
     ],
     groups: [
       irGroup({
@@ -113,10 +115,16 @@ function enginePath(baseIr: KeyboardIR): string {
 
 /** Studio path: the mutate seam, then emit. */
 function seamPath(baseIr: KeyboardIR): string {
-  const seamIr = applyCarveMutate(baseIr, DELETED_NODE_IDS, DELETED_ITEM_IDS, {
-    dispositions: DISPOSITIONS,
-    loud: false,
-  });
+  const seamIr = applyCarveMutate(
+    baseIr,
+    DELETED_NODE_IDS,
+    DELETED_ITEM_IDS,
+    undefined,
+    {
+      dispositions: DISPOSITIONS,
+      loud: false,
+    },
+  );
   return emitKmn(seamIr);
 }
 
@@ -141,6 +149,7 @@ describe("T015 carve pipeline parity: engine path vs mutate seam", () => {
       carvePipelineFixture(),
       DELETED_NODE_IDS,
       DELETED_ITEM_IDS,
+      undefined,
       { dispositions: DISPOSITIONS, loud: false },
     );
     const suppressed = seamIr.groups[0]!.rules.find(
@@ -156,6 +165,7 @@ describe("T015 carve pipeline parity: engine path vs mutate seam", () => {
       carvePipelineFixture(),
       DELETED_NODE_IDS,
       DELETED_ITEM_IDS,
+      undefined,
       { dispositions: DISPOSITIONS, loud: false },
     );
     const nodeIds = seamIr.groups[0]!.rules.map((r) => r.nodeId);
@@ -165,11 +175,15 @@ describe("T015 carve pipeline parity: engine path vs mutate seam", () => {
     // No suppression rule was synthesized for it.
     expect(
       seamIr.groups[0]!.rules.filter(
-        (r) => r.ownedByBehaviour === "carve-suppression" && r.nodeId === "rule#allowMe",
+        (r) =>
+          r.ownedByBehaviour === "carve-suppression" &&
+          r.nodeId === "rule#allowMe",
       ),
     ).toHaveLength(0);
     // Byte-identical on both paths (the engine path must agree the rule is gone).
-    expect(enginePath(carvePipelineFixture())).toBe(seamPath(carvePipelineFixture()));
+    expect(enginePath(carvePipelineFixture())).toBe(
+      seamPath(carvePipelineFixture()),
+    );
   });
 
   it("block store-slot carve → guard present and slot removal composed", () => {
@@ -177,6 +191,7 @@ describe("T015 carve pipeline parity: engine path vs mutate seam", () => {
       carvePipelineFixture(),
       DELETED_NODE_IDS,
       DELETED_ITEM_IDS,
+      undefined,
       { dispositions: DISPOSITIONS, loud: false },
     );
     const rules = seamIr.groups[0]!.rules;
@@ -197,21 +212,25 @@ describe("T015 carve pipeline parity: engine path vs mutate seam", () => {
     // `dkf003b`/`dkt003b` pair-set, carving slot 1 drops index 1 from BOTH
     // stores (coordinated drop, never nul-fill — the T013 interior-padding
     // ban holds because the compiler never pads stores itself).
-    const outputStore = seamIr.stores.find((s) => s.nodeId === "store#dkt003b")!;
+    const outputStore = seamIr.stores.find(
+      (s) => s.nodeId === "store#dkt003b",
+    )!;
     expect(outputStore.items).toHaveLength(1);
     expect(outputStore.items[0]).toEqual({ kind: "char", value: "é" });
     const inputStore = seamIr.stores.find((s) => s.nodeId === "store#dkf003b")!;
     expect(inputStore.items).toHaveLength(1);
     expect(inputStore.items[0]).toEqual({ kind: "char", value: "e" });
     // Byte-identical on both paths.
-    expect(enginePath(carvePipelineFixture())).toBe(seamPath(carvePipelineFixture()));
+    expect(enginePath(carvePipelineFixture())).toBe(
+      seamPath(carvePipelineFixture()),
+    );
   });
 
   it("does not mutate the base IR on either path", () => {
     const baseIr = carvePipelineFixture();
     const before = JSON.stringify(baseIr);
     enginePath(baseIr);
-    applyCarveMutate(baseIr, DELETED_NODE_IDS, DELETED_ITEM_IDS, {
+    applyCarveMutate(baseIr, DELETED_NODE_IDS, DELETED_ITEM_IDS, undefined, {
       dispositions: DISPOSITIONS,
       loud: false,
     });

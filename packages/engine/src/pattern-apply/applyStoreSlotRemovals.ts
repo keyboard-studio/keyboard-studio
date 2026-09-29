@@ -507,13 +507,22 @@ export function analyzeStores(ir: KeyboardIR): StoreAnalysis {
  * its pair-set) — it is a "does this store's own content ever get emitted?"
  * question, orthogonal to the positional-safety question steps 4-5 answer.
  */
-function classifyStoreWithAnalysis(store: IRStore, analysis: StoreAnalysis): StoreSlotEditMode {
+function classifyStoreWithAnalysis(
+  store: IRStore,
+  analysis: StoreAnalysis,
+  carveNotAnyHygiene = false,
+): StoreSlotEditMode {
   if (store.isSystem) {
     return { mode: "blocked", reason: "system-store" };
   }
 
   const usage = analysis.usageByName.get(store.name);
-  if (usage?.asNotAny === true) {
+  // Carve-scoped exception (issue #1809, ruling §3): removing a carved char
+  // from a `notany()` store is behavior-neutral under carve's closed model —
+  // the char can't occur in context anymore, so the exclusion set doesn't
+  // effectively widen. The general `notany-widens` block is preserved by
+  // default; only the carve apply path opts in via `carveNotAnyHygiene`.
+  if (usage?.asNotAny === true && !carveNotAnyHygiene) {
     return { mode: "blocked", reason: "notany-widens" };
   }
   if (usage?.asContextIndex === true) {
@@ -540,7 +549,7 @@ function classifyStoreWithAnalysis(store: IRStore, analysis: StoreAnalysis): Sto
       return { mode: "blocked", reason: "system-store" };
     }
     const memberUsage = analysis.usageByName.get(memberName);
-    if (memberUsage?.asNotAny === true) {
+    if (memberUsage?.asNotAny === true && !carveNotAnyHygiene) {
       return { mode: "blocked", reason: "notany-widens" };
     }
     if (memberUsage?.asContextIndex === true) {
@@ -705,11 +714,18 @@ function blockedWarning(store: IRStore, storeNodeId: string, reason: StoreSlotBl
  *
  * @param baseIr  Source-of-truth IR. Never mutated.
  * @param slotIds Set of slot ids encoding which store items to edit.
+ * @param options Optional behavior flags. `carveNotAnyHygiene` opts in to the
+ *                carve-scoped `notany()` hygiene exception (issue #1809,
+ *                ruling §3): tainted chars are pruned from `notany()` stores
+ *                instead of blocking with "notany-widens". Only the carve
+ *                apply path sets this; the default preserves the general
+ *                `notany-widens` block.
  * @returns       New IR, diagnostic warnings, and count of applied edits.
  */
 export function applyStoreSlotRemovals(
   baseIr: KeyboardIR,
   slotIds: ReadonlySet<string>,
+  options: { carveNotAnyHygiene?: boolean } = {},
 ): StoreSlotRemovalResult {
   const warnings: string[] = [];
   const notices: string[] = [];
@@ -758,7 +774,7 @@ export function applyStoreSlotRemovals(
       continue;
     }
 
-    const editMode = classifyStoreWithAnalysis(store, analysis);
+    const editMode = classifyStoreWithAnalysis(store, analysis, options.carveNotAnyHygiene ?? false);
     if (editMode.mode === "blocked") {
       warnings.push(blockedWarning(store, storeNodeId, editMode.reason));
       continue;
