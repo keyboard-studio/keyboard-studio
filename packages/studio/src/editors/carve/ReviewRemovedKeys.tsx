@@ -76,6 +76,7 @@ export const PROVENANCE_LABELS: Record<CarveDispositionProvenance, string> = {
   "closed-keyboard-card-declined": "From the closed-keyboard card (declined)",
   "bulk-default": "Suggested default",
   "author-override": "Your choice",
+  "deadkey-requirement": "Required — deadkeys never allow host fallback",
 };
 
 /** "K_4" -> "4", "K_BKQUOTE" -> "BKQUOTE" — the K_ prefix is positional noise. */
