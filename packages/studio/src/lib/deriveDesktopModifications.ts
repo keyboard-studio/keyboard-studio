@@ -32,6 +32,9 @@ import type { DesktopModifications } from "@keyboard-studio/engine";
 import { applyCarveMutate } from "../steps/editorMutate.js";
 import { extractMechanismHostKey } from "./extractMechanismHostKey.js";
 
+/** Shared empty carved-character set for the `carveChars` default parameter. */
+const EMPTY_DERIVE_CARVE_CHARS: ReadonlySet<string> = new Set();
+
 // ---------------------------------------------------------------------------
 // hostKey extraction — shared with TouchGallery's per-character suggestion
 // logic via extractMechanismHostKey (packages/studio/src/lib/extractMechanismHostKey.ts).
@@ -61,15 +64,20 @@ function extractHostKey(m: MechanismRef): string | undefined {
  * @param deletedItemIds  Glyph-level carve item ids (store slots + bare node ids).
  * @param phaseResults    The working copy's survey phase results (Phase C holds
  *                        the physical desktop assignments).
+ * @param carveChars      Issue #1809, ruling §1: the aggregated carved character
+ *                        set; the single aggregated-R pass is unioned over the
+ *                        incremental `deletedItemIds` union so this view consumes
+ *                        the same pruned result as the .kmn projection (§11).
  */
 export function deriveDesktopModifications(
   baseIr: KeyboardIR,
   deletedNodeIds: ReadonlySet<string>,
   deletedItemIds: ReadonlySet<string>,
   phaseResults: readonly SurveyPhaseResult[],
+  carveChars: ReadonlySet<string> = EMPTY_DERIVE_CARVE_CHARS,
 ): DesktopModifications {
   // --- removals: produced-set diff over the carve-projected IR -------------
-  const projectedIr = applyCarveMutate(baseIr, deletedNodeIds, deletedItemIds);
+  const projectedIr = applyCarveMutate(baseIr, deletedNodeIds, deletedItemIds, carveChars);
   const baseProduced = buildProducedSet(baseIr);
   const projectedProduced = buildProducedSet(projectedIr);
   const removals = [...baseProduced]

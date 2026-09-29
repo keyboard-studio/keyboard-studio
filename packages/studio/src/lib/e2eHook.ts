@@ -57,6 +57,11 @@ export interface KsE2EHook {
    */
   getDeletedItemIds: () => string[];
   /**
+   * Issue #1809, ruling §1: the aggregated carved character set (NFC-normalized)
+   * the projection's single aggregated-R pass runs over.
+   */
+  getCarveChars: () => string[];
+  /**
    * The instantiated working copy's base keyboard id, or null before
    * instantiation. Added for the F1 (switch-base rebase) regression spec —
    * lets a test assert which base the WORKING COPY is on, independent of
@@ -125,6 +130,7 @@ export function installE2eHook(): void {
     getWorkingIr: () => useWorkingCopyStore.getState().ir,
     getDeletedNodeIds: () => [...useWorkingCopyStore.getState().deletedNodeIds],
     getDeletedItemIds: () => [...useWorkingCopyStore.getState().deletedItemIds],
+    getCarveChars: () => [...useWorkingCopyStore.getState().carveChars],
     getBaseKeyboardId: () => useWorkingCopyStore.getState().baseKeyboard?.id ?? null,
     getPhaseResultsCount: () => useWorkingCopyStore.getState().phaseResults.length,
     snapshotBaseFiles: () => {

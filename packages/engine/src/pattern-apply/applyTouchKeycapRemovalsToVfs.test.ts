@@ -30,9 +30,10 @@ import {
   applyTouchKeycapRemovalsToRawJson,
   applyTouchKeycapRemovalsToVfs,
 } from "./applyTouchKeycapRemovalsToVfs.js";
+import { applyCarveKeycapRemovalsToVfs } from "./applyCarveKeycapRemovalsToVfs.js";
 import { createVirtualFS } from "@keyboard-studio/contracts";
 import type { TouchLayoutIR, TouchKeyIR } from "@keyboard-studio/contracts";
-import { touchKey, touchLayout } from "@keyboard-studio/contracts/fixtures";
+import { irGroup, makeTestIR, touchKey, touchLayout, vkeyRule } from "@keyboard-studio/contracts/fixtures";
 
 // ---------------------------------------------------------------------------
 // Fixture helpers (mirrors applyDesktopModifications.test.ts's conventions)
@@ -377,5 +378,62 @@ describe("applyTouchKeycapRemovalsToVfs", () => {
     // (simulating a stale id that no longer resolves, e.g. after a desktop
     // carve neutralized the same key) must not throw or double-mutate.
     expect(() => applyTouchKeycapRemovalsToVfs(vfsA, "test", ids)).not.toThrow();
+  });
+
+  it("consumes the shared carve-pruned result idempotently — a key the 1.5 cascade already neutralized resolves to nothing (issue #1809, ruling §7)", () => {
+    // Ruling §7 reconciliation: projectWorkingCopyVfs runs the carve keycap
+    // cascade (step 1.5, driven by the shared pruned slot set) BEFORE the
+    // per-touch-key overlay (step 1.6, driven by deletedTouchKeyIds). A key
+    // the cascade already neutralized must resolve to nothing here — never a
+    // double-blank or an error.
+    const cascadeTouchJson = JSON.stringify({
+      phone: {
+        layer: [
+          {
+            id: "default",
+            row: [
+              {
+                id: 1,
+                key: [{ id: "U_00E4", text: "ä" }, { id: "U_0062", text: "b" }],
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const vfs = createVirtualFS([
+      { path: "source/test.kmn", content: "c test\n", isBinary: false },
+      { path: "source/test.keyman-touch-layout", content: cascadeTouchJson, isBinary: false },
+    ]);
+    const ir = makeTestIR(
+      [irGroup({ nodeId: "g1", rules: [vkeyRule({ nodeId: "r-ae", vkey: "K_E", output: "ä" })] })],
+      [],
+    );
+
+    // Step 1.5: the shared pruned result blanks the carved keycap.
+    const cascade = applyCarveKeycapRemovalsToVfs(vfs, "test", ir, {
+      slotIds: new Set<string>(),
+      wholeNodeIds: new Set(["r-ae"]),
+    });
+    expect(cascade.warnings).toEqual([]);
+    const afterCascade = vfs.get("source/test.keyman-touch-layout")!.content as string;
+    expect(afterCascade).not.toBe(cascadeTouchJson);
+    const carvedKey = (
+      JSON.parse(afterCascade) as {
+        phone: { layer: Array<{ row: Array<{ key: Array<{ id: string; text?: string }> }> }> };
+      }
+    ).phone.layer[0]!.row[0]!.key[0]!;
+    expect(carvedKey.id).toBe("T_carved_00E4");
+    expect(carvedKey.text).toBe("");
+
+    // Step 1.6: the per-touch-key overlay addressing the PRE-cascade id
+    // resolves to nothing — byte-identical no-op, no warnings, no throw.
+    const { warnings } = applyTouchKeycapRemovalsToVfs(
+      vfs,
+      "test",
+      new Set(["phone:default:U_00E4"]),
+    );
+    expect(warnings).toEqual([]);
+    expect(vfs.get("source/test.keyman-touch-layout")!.content).toBe(afterCascade);
   });
 });

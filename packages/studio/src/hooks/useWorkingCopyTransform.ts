@@ -226,6 +226,7 @@ export function useWorkingCopyTransform(
   const storeBaseDisplayName = useWorkingCopyStore((s) => s.baseKeyboard?.displayName ?? null);
   const deletedNodeIds = useWorkingCopyStore((s) => s.deletedNodeIds);
   const deletedItemIds = useWorkingCopyStore((s) => s.deletedItemIds);
+  const carveChars = useWorkingCopyStore((s) => s.carveChars);
   const deletedTouchKeyIds = useWorkingCopyStore((s) => s.deletedTouchKeyIds);
   const identity = useWorkingCopyStore((s) => s.identity);
   // Assignments: physical only (touch is projected via touchLayoutJson below).
@@ -269,14 +270,19 @@ export function useWorkingCopyTransform(
   // Memoization keys — primitive-stable so useMemo doesn't fire on reference churn.
 
   // Deleted node IDs: sorted, joined string. O(n) but the carve set is small.
+  // carveChars is included: the §1 aggregated-R pass can nominate whole-rule
+  // deletions beyond the incremental id union, so the memo key must change
+  // when the carved set changes even if the id union does not.
   const deletedKey = useMemo(
     () =>
       [...deletedNodeIds].sort().join("|") +
       ";" +
       [...deletedItemIds].sort().join("|") +
       ";" +
+      [...carveChars].sort().join("|") +
+      ";" +
       [...deletedTouchKeyIds].sort().join("|"),
-    [deletedNodeIds, deletedItemIds, deletedTouchKeyIds],
+    [deletedNodeIds, deletedItemIds, carveChars, deletedTouchKeyIds],
   );
 
   // Assignments key — compact string (scope:target:patternId/slotValues per assignment).
@@ -385,6 +391,7 @@ export function useWorkingCopyTransform(
         baseIr,
         deletedNodeIds,
         deletedItemIds,
+        carveChars,
         deletedTouchKeyIds,
         keyEditOps,
         assignments: effectiveAssignments,

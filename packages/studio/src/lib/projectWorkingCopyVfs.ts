@@ -93,7 +93,7 @@ import {
 } from "@keyboard-studio/engine";
 import type { ContextToleranceOverlay } from "@keyboard-studio/engine";
 import type { PackageDescriptorIdentity } from "@keyboard-studio/engine";
-import { applyCarveMutate, applyAddGalleryMutate } from "../steps/editorMutate.ts";
+import { applyCarveMutate, applyAddGalleryMutate, unionAggregatedCarveIds } from "../steps/editorMutate.ts";
 import { isMutateSeamEnabled } from "../flags/mutateFlag.ts";
 import { findTouchLayoutPath } from "./findTouchLayoutPath.ts";
 import { readVfsText } from "./vfsText.ts";
@@ -150,6 +150,15 @@ export interface ProjectWorkingCopyVfsInput {
   deletedNodeIds: ReadonlySet<string>;
   /** Individual rule nodeIds (and store-slot ids) removed via character-level carving. */
   deletedItemIds?: ReadonlySet<string>;
+  /**
+   * Issue #1809, ruling §1: the aggregated carved character set (NFC-normalized).
+   * The projection runs ONE aggregated-R pass (`collectTaintedContributors`) and
+   * unions it over `deletedItemIds`, because the per-character union is not
+   * equivalent to the aggregated pass for whole-rule "no rows left" deletion
+   * and fully-tainted literal outputs. Omit or pass an empty set when nothing
+   * was carved via the gallery.
+   */
+  carveChars?: ReadonlySet<string>;
   /**
    * Individually-deleted pre-existing touch methods (main key / longpress /
    * multitap / flick), addressed by the `touchKeyAddress.ts` scheme. Applied
@@ -288,6 +297,7 @@ export function projectWorkingCopyVfs(
     baseIr,
     deletedNodeIds,
     deletedItemIds = new Set<string>(),
+    carveChars = new Set<string>(),
     deletedTouchKeyIds = new Set<string>(),
     keyEditOps = [],
     assignments,
@@ -326,10 +336,16 @@ export function projectWorkingCopyVfs(
   // and becomes a no-op whole-node deletion (applyStoreSlotRemovals never sees it).
   const storeNodeIdSet = new Set(baseIr.stores.map((s) => s.nodeId));
 
+  // Issue #1809, ruling §1: ONE aggregated carved set R, one nomination pass.
+  // Union the aggregated pass over the incremental per-character union before
+  // partitioning, so the .kmn slot pruning, the whole-node filter, and the
+  // keycap projection below all consume the same pruned result (§11).
+  const effectiveItemIds = unionAggregatedCarveIds(baseIr, deletedItemIds, carveChars);
+
   const slotIds = new Set<string>();
   const wholeNodeItemIds = new Set<string>();
 
-  for (const id of deletedItemIds) {
+  for (const id of effectiveItemIds) {
     const parsed = parseSlotId(id);
     if (parsed !== null && storeNodeIdSet.has(parsed.storeNodeId)) {
       slotIds.add(id);
@@ -339,7 +355,9 @@ export function projectWorkingCopyVfs(
   }
 
   // 1a: Replace output-store slots with nul fillers (store-slot deletion path).
-  const removalResult = applyStoreSlotRemovals(baseIr, slotIds);
+  //     Carve-scoped `notany()` hygiene (issue #1809, ruling §3): tainted chars
+  //     are pruned from `notany()` stores instead of blocking.
+  const removalResult = applyStoreSlotRemovals(baseIr, slotIds, { carveNotAnyHygiene: true });
   warnings.push(...removalResult.warnings);
 
   // 1b: Whole-node deletions + VFS re-emit.
@@ -377,7 +395,9 @@ export function projectWorkingCopyVfs(
 
   let carveResult: { warnings: string[] };
   if (isMutateSeamEnabled() && !entryGroupDeleted && hasCarveEdit) {
-    const seamIr = applyCarveMutate(baseIr, deletedNodeIds, deletedItemIds);
+    // effectiveItemIds already carries the §1 aggregated union; buildCarvePatch
+    // would union it again idempotently, so pass the plain default here.
+    const seamIr = applyCarveMutate(baseIr, deletedNodeIds, effectiveItemIds);
     // The seam already filtered every node; hand it to emit with an empty
     // deletion set. irRewritten:true because there IS an edit (matching the
     // legacy emit-when-edited behavior) and the seam IR is already filtered,

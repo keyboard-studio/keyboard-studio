@@ -132,7 +132,7 @@ export type UndoEntry =
   | { k: 'n'; id: string }
   | { k: 'i'; id: string }
   | { k: 't'; id: string }
-  | { k: 'batch'; nodeIds: string[]; itemIds: string[] }
+  | { k: 'batch'; nodeIds: string[]; itemIds: string[]; chars: string[] }
   | { k: 'k'; seq: number };
 
 // ---------------------------------------------------------------------------
@@ -501,6 +501,19 @@ export interface WorkingCopyState {
    * deletion step (`applyTouchKeycapRemovalsToVfs`).
    */
   deletedTouchKeyIds: Set<string>;
+  /**
+   * NFC-normalized characters carved via the carve gallery (issue #1809,
+   * ruling §1: ONE aggregated carved set R, one nomination pass). The
+   * projection (`projectWorkingCopyVfs` / `buildCarvePatch`) runs
+   * `collectTaintedContributors(baseIr, carveChars)` once and unions the
+   * result with the incremental `deletedItemIds` union, because the
+   * per-character union is not equivalent to the aggregated pass for
+   * whole-rule "no rows left" deletion and fully-tainted literal outputs.
+   * Not an undo structure — each batch undo entry carries its own `chars`;
+   * this set is the live union. Cleared by keepAll/restoreAll/clearIR/setIR
+   * and the base-instantiation reset.
+   */
+  carveChars: Set<string>;
   /** Ordered list of undo entries (latest last). Each entry is either a whole-node
    * deletion, a single-item removal, a single touch-method deletion, a grouped
    * cascade-delete batch, or (spec 063 FR-032) a single committed key-level
@@ -741,10 +754,20 @@ export interface WorkingCopyState {
    *
    * Either array may be empty; at least one must be non-empty for the action to push
    * an undo entry. If both are empty this is a no-op.
+   *
+   * `carvedChars` (issue #1809, ruling §1): the NFC-normalized characters this
+   * cascade carves. Recorded on the batch undo entry and unioned into
+   * `carveChars` so the projection can run ONE aggregated-R pass
+   * (`collectTaintedContributors`) — the per-character union in
+   * `deletedItemIds` is not equivalent to it. Omit (or pass []) for non-carve
+   * deletions (e.g. MechanismGallery's remove-existing-method path).
    */
-  cascadeDelete: (ruleNodeIds: string[], storeSlotIds: string[]) => void;
-  /** Restore a set of item-channel ids (whole-rule + slot) that cascadeDelete removed. */
-  cascadeRestore: (ids: string[]) => void;
+  cascadeDelete: (ruleNodeIds: string[], storeSlotIds: string[], carvedChars?: string[]) => void;
+  /**
+   * Restore a set of item-channel ids (whole-rule + slot) that cascadeDelete removed.
+   * `restoredChars`: the carved characters being un-carved; removed from `carveChars`.
+   */
+  cascadeRestore: (ids: string[], restoredChars?: string[]) => void;
 
   // -- Actions (surveyResultsStore) --------------------------------------------
   /**
@@ -1285,6 +1308,7 @@ const INITIAL_STATE: WorkingCopyData = {
   deletedNodeIds: new Set(),
   deletedItemIds: new Set(),
   deletedTouchKeyIds: new Set(),
+  carveChars: new Set(),
   undoStack: [],
   // survey slots
   ...INITIAL_SURVEY,
@@ -1319,7 +1343,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
   // -- irStore actions -------------------------------------------------------
 
   setIR: (ir) =>
-    set({ ir, deletedNodeIds: new Set(), deletedItemIds: new Set(), undoStack: [] }),
+    set({ ir, deletedNodeIds: new Set(), deletedItemIds: new Set(), carveChars: new Set(), undoStack: [] }),
 
   // Overlay-preserving write for spec-014 mutate-seam incremental patches.
   // Deliberately writes ONLY `ir`, leaving deletedNodeIds/deletedItemIds/undoStack
@@ -1341,7 +1365,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
     }),
 
   clearIR: () =>
-    set({ ir: null, deletedNodeIds: new Set(), deletedItemIds: new Set(), undoStack: [] }),
+    set({ ir: null, deletedNodeIds: new Set(), deletedItemIds: new Set(), carveChars: new Set(), undoStack: [] }),
 
   deleteNode: (nodeId) =>
     set((s) => ({
@@ -1383,10 +1407,24 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
         for (const id of last.nodeIds) nextNodes.delete(id);
         const nextItems = new Set(s.deletedItemIds);
         for (const id of last.itemIds) nextItems.delete(id);
+        const nextUndoStack = s.undoStack.slice(0, -1);
+        // Issue #1809 ruling §1: unwind this batch's carved characters — but
+        // keep any char a REMAINING batch still claims (a char can be carved by
+        // two batches when a group toggle re-carves an already-discarded cell).
+        // `?? []` tolerates drafts persisted before batch entries had `chars`.
+        const undoneChars = new Set(last.chars ?? []);
+        const stillClaimed = new Set<string>();
+        for (const e of nextUndoStack) {
+          if (e.k === 'batch') for (const c of e.chars ?? []) stillClaimed.add(c);
+        }
+        const nextCarveChars = new Set(
+          [...s.carveChars].filter((c) => !undoneChars.has(c) || stillClaimed.has(c)),
+        );
         return {
           deletedNodeIds: nextNodes,
           deletedItemIds: nextItems,
-          undoStack: s.undoStack.slice(0, -1),
+          carveChars: nextCarveChars,
+          undoStack: nextUndoStack,
         };
       }
     }),
@@ -1466,13 +1504,14 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(),
       deletedTouchKeyIds: new Set(),
+      carveChars: new Set(),
       undoStack: [],
       keyEditOverlay: { ops: [] },
     }),
 
   restoreAll: () => get().keepAll(),
 
-  cascadeDelete: (ruleNodeIds, storeSlotIds) => {
+  cascadeDelete: (ruleNodeIds, storeSlotIds, carvedChars = []) => {
     if (ruleNodeIds.length === 0 && storeSlotIds.length === 0) return;
     set((s) => {
       // Route BOTH whole-rule deletes and store-slot drops through the ITEM
@@ -1488,16 +1527,27 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       // only — no caller currently passes overlapping ids.
       const allItems = [...new Set([...ruleNodeIds, ...storeSlotIds])];
       const nextItems = new Set([...s.deletedItemIds, ...allItems]);
-      const batchEntry: UndoEntry = { k: 'batch', nodeIds: [], itemIds: allItems };
+      // Issue #1809 ruling §1: record the carved characters for the single
+      // aggregated-R projection pass (see `carveChars`). Normalized to NFC
+      // for canonical comparison in `collectTaintedContributors`.
+      const nextCarveChars = new Set(s.carveChars);
+      for (const c of carvedChars) nextCarveChars.add(c.normalize('NFC'));
+      const batchEntry: UndoEntry = {
+        k: 'batch',
+        nodeIds: [],
+        itemIds: allItems,
+        chars: [...new Set(carvedChars.map((c) => c.normalize('NFC')))],
+      };
       return {
         deletedItemIds: nextItems,
+        carveChars: nextCarveChars,
         undoStack: [...s.undoStack, batchEntry],
       };
     });
   },
 
-  cascadeRestore: (ids) => {
-    if (ids.length === 0) return;
+  cascadeRestore: (ids, restoredChars = []) => {
+    if (ids.length === 0 && restoredChars.length === 0) return;
     set((s) => {
       const nextItems = new Set(s.deletedItemIds);
       for (const id of ids) nextItems.delete(id);
@@ -1507,7 +1557,25 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       const nextUndoStack = s.undoStack.filter(
         (e) => !(e.k === 'batch' && e.itemIds.every((id) => !nextItems.has(id))),
       );
-      return { deletedItemIds: nextItems, undoStack: nextUndoStack };
+      // Issue #1809 ruling §1: drop the un-carved characters from the
+      // aggregated-R set — but keep any char a REMAINING batch still claims
+      // (mirrors undoDelete's still-claimed filter; a char can be carved by
+      // two batches when a group toggle re-carves an already-discarded cell).
+      // `?? []` tolerates drafts persisted before batch entries had `chars`.
+      const stillClaimed = new Set<string>();
+      for (const e of nextUndoStack) {
+        if (e.k === 'batch') for (const c of e.chars ?? []) stillClaimed.add(c);
+      }
+      const nextCarveChars = new Set(s.carveChars);
+      for (const c of restoredChars) {
+        const nc = c.normalize('NFC');
+        if (!stillClaimed.has(nc)) nextCarveChars.delete(nc);
+      }
+      return {
+        deletedItemIds: nextItems,
+        carveChars: nextCarveChars,
+        undoStack: nextUndoStack,
+      };
     });
   },
 
@@ -1703,6 +1771,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(),
       deletedTouchKeyIds: new Set(),
+      carveChars: new Set(),
       removalCapabilities: new Map(),
       galleryIntrosSeen: { mechanism: false, touch: false },
       // Fresh instance (not a spread of INITIAL_STATE's) so no later mutation
@@ -1770,6 +1839,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(),
       deletedTouchKeyIds: new Set(),
+      carveChars: new Set(),
       undoStack: [],
       // Clear survey results only on a genuine base switch; otherwise carry
       // forward any phaseResults/irAxes recorded while this instantiate was
@@ -1845,6 +1915,7 @@ export const useWorkingCopyStore = create<WorkingCopyState>((set, get) => ({
       deletedNodeIds: new Set(),
       deletedItemIds: new Set(),
       deletedTouchKeyIds: new Set(),
+      carveChars: new Set(),
       undoStack: [],
       // Edit layers start clean only on a genuine base switch; otherwise carry
       // forward any phaseResults/irAxes recorded while this instantiate was

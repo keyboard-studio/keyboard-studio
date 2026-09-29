@@ -162,7 +162,7 @@ export interface CharacterCell {
   strategy?: string | undefined;
   /** True when `ch` is in the current removal-recommendation set (recommendedRemovalChars). */
   reco: boolean;
-  /** Contributor ids for removal — pass straight to cascadeDelete(contributors.ruleNodeIds, contributors.storeSlotIds) / cascadeRestore([...ruleNodeIds, ...storeSlotIds]). */
+  /** Contributor ids for removal — pass straight to cascadeDelete(contributors.ruleNodeIds, contributors.storeSlotIds, chars) / cascadeRestore([...ruleNodeIds, ...storeSlotIds], chars). */
   contributors: CharContributors;
 }
 

@@ -175,7 +175,7 @@ export async function projectWorkingCopyForOutput(
 ): Promise<ProjectWorkingCopyForOutputResult | null> {
   // 1. Read current working-copy store state.
   const state = useWorkingCopyStore.getState();
-  const { baseVfs, baseIr, baseKeyboard, deletedNodeIds, deletedItemIds, deletedTouchKeyIds, phaseResults, identity, touchLayoutJson, instantiationMode, attribution, baseLicenseText, baseHolderOverride, helpDocs, baseWelcomeHtmText, baseHelpPhpText, baseWelcomeImages, baseWelcomeImagesDropped, baseReadmeMdText, baseHistoryMdText, historyEntryState, chartPreference, ir: workingIr, contextToleranceOverlay } = state;
+  const { baseVfs, baseIr, baseKeyboard, deletedNodeIds, deletedItemIds, carveChars, deletedTouchKeyIds, phaseResults, identity, touchLayoutJson, instantiationMode, attribution, baseLicenseText, baseHolderOverride, helpDocs, baseWelcomeHtmText, baseHelpPhpText, baseWelcomeImages, baseWelcomeImagesDropped, baseReadmeMdText, baseHistoryMdText, historyEntryState, chartPreference, ir: workingIr, contextToleranceOverlay } = state;
 
   // Not-instantiated guard.
   if (baseVfs === null || baseIr === null || baseKeyboard === null) {
@@ -426,6 +426,7 @@ export async function projectWorkingCopyForOutput(
     baseIr,
     deletedNodeIds,
     deletedItemIds,
+    carveChars,
     deletedTouchKeyIds,
     assignments: sessionAssignments,
     getPattern: (id) => patternCache.get(id),

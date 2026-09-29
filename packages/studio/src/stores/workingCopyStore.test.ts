@@ -1844,7 +1844,7 @@ describe("workingCopyStore — cascadeRestore", () => {
   it("clears the batch undo entry once every one of its items is restored", () => {
     useWorkingCopyStore.getState().cascadeDelete(["r-eps"], ["sid-dkt#2"]);
     expect(useWorkingCopyStore.getState().undoStack).toEqual([
-      { k: "batch", nodeIds: [], itemIds: ["r-eps", "sid-dkt#2"] },
+      { k: "batch", nodeIds: [], itemIds: ["r-eps", "sid-dkt#2"], chars: [] },
     ]);
 
     useWorkingCopyStore.getState().cascadeRestore(["r-eps", "sid-dkt#2"]);
@@ -2415,5 +2415,103 @@ group(main) using keys
     const after = useWorkingCopyStore.getState();
     expect(after.ir).not.toBeNull();
     expect(after.irAxes.markInputOrder).toBe("postfix");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// carveChars — issue #1809 ruling §1: the aggregated carved character set.
+// The projection runs ONE aggregated-R pass over this set and unions it with
+// the incremental deletedItemIds union, because the per-character union is
+// not equivalent to the aggregated pass for whole-rule "no rows left"
+// deletion and fully-tainted literal outputs.
+// ---------------------------------------------------------------------------
+
+describe("workingCopyStore — carveChars (issue #1809, ruling §1)", () => {
+  beforeEach(() => {
+    useWorkingCopyStore.getState().reset();
+  });
+
+  it("starts empty", () => {
+    expect(useWorkingCopyStore.getState().carveChars.size).toBe(0);
+  });
+
+  it("cascadeDelete records carvedChars; cascadeRestore removes them", () => {
+    const s = () => useWorkingCopyStore.getState();
+    s().cascadeDelete(["rule#1"], ["store#s#0"], ["ä"]);
+    expect(s().carveChars).toEqual(new Set(["ä"]));
+    expect(s().isItemDeleted("rule#1")).toBe(true);
+
+    s().cascadeDelete(["rule#2"], [], ["ö"]);
+    expect(s().carveChars).toEqual(new Set(["ä", "ö"]));
+
+    s().cascadeRestore(["rule#1", "store#s#0"], ["ä"]);
+    expect(s().carveChars).toEqual(new Set(["ö"]));
+    expect(s().isItemDeleted("rule#1")).toBe(false);
+    // ö's deletion survives the partial restore.
+    expect(s().isItemDeleted("rule#2")).toBe(true);
+  });
+
+  it("cascadeDelete without carvedChars leaves carveChars untouched (non-carve path)", () => {
+    const s = () => useWorkingCopyStore.getState();
+    // MechanismGallery's remove-existing-method path passes no chars.
+    s().cascadeDelete(["rule#1"], []);
+    expect(s().carveChars.size).toBe(0);
+    expect(s().isItemDeleted("rule#1")).toBe(true);
+    expect(s().undoStack).toEqual([
+      { k: "batch", nodeIds: [], itemIds: ["rule#1"], chars: [] },
+    ]);
+  });
+
+  it("undoDelete unwinds the batch's chars but keeps chars claimed by remaining batches", () => {
+    const s = () => useWorkingCopyStore.getState();
+    s().cascadeDelete(["rule#a"], [], ["a"]);
+    // A group toggle that re-carves an already-discarded cell: the same char
+    // ends up claimed by two batches.
+    s().cascadeDelete(["rule#a", "rule#b"], [], ["a", "b"]);
+    expect(s().carveChars).toEqual(new Set(["a", "b"]));
+
+    s().undoDelete(); // undo the group batch
+    // 'a' survives: the first batch still claims it.
+    expect(s().carveChars).toEqual(new Set(["a"]));
+
+    s().undoDelete();
+    expect(s().carveChars.size).toBe(0);
+  });
+
+  it("keepAll clears carveChars along with the id union and undo stack", () => {
+    const s = () => useWorkingCopyStore.getState();
+    s().cascadeDelete(["rule#1"], [], ["ä"]);
+    expect(s().carveChars.size).toBe(1);
+    s().keepAll();
+    expect(s().carveChars.size).toBe(0);
+    expect(s().deletedItemIds.size).toBe(0);
+    expect(s().undoStack).toHaveLength(0);
+  });
+
+  it("carveChars survives the persist snapshot round-trip", async () => {
+    const { snapshotWorkingCopyData, prepareWorkingCopySnapshot } = await import(
+      "../lib/persistWorkingCopy.ts"
+    );
+    const s = () => useWorkingCopyStore.getState();
+    s().cascadeDelete(["rule#1"], [], ["ä", "ö"]);
+
+    const snapshot = snapshotWorkingCopyData();
+    expect(snapshot.carveChars).toEqual(["ä", "ö"]);
+
+    s().reset();
+    expect(s().carveChars.size).toBe(0);
+
+    useWorkingCopyStore.setState(prepareWorkingCopySnapshot(snapshot));
+    expect(useWorkingCopyStore.getState().carveChars).toEqual(new Set(["ä", "ö"]));
+  });
+
+  it("prepareWorkingCopySnapshot tolerates snapshots saved before carveChars existed", async () => {
+    const { prepareWorkingCopySnapshot, snapshotWorkingCopyData } = await import(
+      "../lib/persistWorkingCopy.ts"
+    );
+    const snapshot = snapshotWorkingCopyData();
+    delete (snapshot as { carveChars?: string[] }).carveChars;
+    const partial = prepareWorkingCopySnapshot(snapshot);
+    expect(partial.carveChars).toEqual(new Set());
   });
 });

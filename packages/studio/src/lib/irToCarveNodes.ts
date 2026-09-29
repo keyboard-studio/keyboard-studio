@@ -12,7 +12,7 @@ import type {
   StoreItem,
 } from '@keyboard-studio/contracts';
 import { buildProducedSet, resolveEffectiveScript } from '@keyboard-studio/contracts';
-import { isParallelIndexFanOut, classifyStoreSlotEdit, describeStorePairing, analyzeStores, buildProducerIndex, isCharCoveredForLocale, collectCharContributors, sliceContributorDescriptors, isPlusSeparator, parseSlotId, isCombiningMarkChar } from '@keyboard-studio/engine';
+import { isParallelIndexFanOut, classifyStoreSlotEdit, describeStorePairing, analyzeStores, buildProducerIndex, isCharCoveredForLocale, collectCharContributors, sliceContributorDescriptors, isPlusSeparator, parseSlotId, isCombiningMarkChar, makeSlotId } from '@keyboard-studio/engine';
 import type { ProducerIndex } from '@keyboard-studio/engine';
 import type { StoreSlotBlockReason, StoreSlotEditMode, StoreAnalysis, CharContributors, ContributorDescriptor, CharNormalizationForm } from '@keyboard-studio/engine';
 import { caseGroupFor, caseTrimSet } from './carveCasePairs.ts';
@@ -2135,12 +2135,45 @@ export function isSimpleRemovableRule(rule: IRRule): boolean {
 }
 
 /**
+ * Ruling §3 (1809) "no rows left": true when `rule`'s whole-rule deletion is a
+ * forced mechanical consequence of the nominated slot drops rather than an
+ * independent complex removal. A dead rule has only index()/outs() outputs
+ * and every char row in its output stores is nominated — deleting it is not a
+ * "complex" decision, so it must not trip the allSimple gate in
+ * recommendedRemovalChars, even when the rule itself is not "simple" (e.g. a
+ * deadkey fan-out whose store emptied). Mirrors the "No rows left" whole-rule
+ * deletion in the engine's collectTaintedContributors.
+ */
+function isDeadBySlotDrops(
+  rule: IRRule,
+  nominatedSlotIds: ReadonlySet<string>,
+  storeByName: ReadonlyMap<string, IRStore>,
+): boolean {
+  if (rule.output.some((el) => el.kind === 'char')) return false;
+  const outStores: IRStore[] = [];
+  for (const el of rule.output) {
+    if ((el.kind !== 'index' && el.kind !== 'outs') || el.storeRef === undefined) continue;
+    const store = storeByName.get(el.storeRef);
+    if (store !== undefined) outStores.push(store);
+  }
+  if (outStores.length === 0) return false;
+  return outStores.every(
+    (store) =>
+      store.items.length > 0 &&
+      store.items.every((item, i) => {
+        if (item.kind !== 'char') return false;
+        return nominatedSlotIds.has(makeSlotId(store.nodeId, i));
+      }),
+  );
+}
+
+/**
  * Merge multiple already-computed `CharContributors` records (each from an
  * independent `collectCharContributors(ir, ch)` call) into one — used by the
  * case-pair fold below (FR-014) so a folded survivor row's `contributors`
  * cascade EVERY case-group member's producers, not just the survivor's own.
  *
- * Without this, `cascadeDelete(contributors.ruleNodeIds, contributors.storeSlotIds)`
+ * Without this, `cascadeDelete(contributors.ruleNodeIds, contributors.storeSlotIds, chars)`
  * on a folded row (e.g. the `a`+`A` pair, survivor `a`) only removed the
  * lowercase's rules/slots, silently leaving the uppercase producer intact
  * (#526 diagnosed bug — `handleRemoveSelectedRecommended` in CarveGalleryV2.tsx
@@ -2236,7 +2269,7 @@ function mergeCharContributors(records: readonly CharContributors[]): CharContri
 /** A single recommended-removal character for the carve gallery's suggestion groups. */
 export interface RecommendedRemovalChar {
   ch: string;
-  /** Contributor info for removal — pass straight to cascadeDelete(contributors.ruleNodeIds, contributors.storeSlotIds). */
+  /** Contributor info for removal — pass straight to cascadeDelete(contributors.ruleNodeIds, contributors.storeSlotIds, chars). */
   contributors: CharContributors;
   /**
    * All members of this row's case group, sorted by code point, present ONLY when this
@@ -2423,7 +2456,14 @@ export function recommendedRemovalChars(args: {
     let allSimple = true;
     for (const ruleId of contributors.ruleNodeIds) {
       const rule = rulesById.get(ruleId);
-      if (rule === undefined || !isSimpleRemovableRule(rule)) { allSimple = false; break; }
+      if (rule === undefined) { allSimple = false; break; }
+      if (isSimpleRemovableRule(rule)) continue;
+      // Ruling §3 (1809): a "no rows left" whole-rule deletion is forced by
+      // the slot drops — not an independent complex removal — so it must not
+      // block the recommendation even when the rule isn't "simple".
+      if (isDeadBySlotDrops(rule, new Set(contributors.storeSlotIds), analysis.storeByName)) continue;
+      allSimple = false;
+      break;
     }
 
     let dependsOnNeeded = false;

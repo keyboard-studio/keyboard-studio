@@ -548,10 +548,12 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   const toggleRecommendedRow = useCallback((row: RecommendedRemovalChar) => {
     const ids = recommendedRowIds(row);
     if (ids.length === 0) return;
+    // Issue #1809 ruling §1: a paired row carves every case-group member.
+    const chars = row.caseGroup ?? [row.ch];
     if (isRowDiscarded(row, isItemDeleted)) {
-      cascadeRestore(ids);
+      cascadeRestore(ids, chars);
     } else {
-      cascadeDelete(row.contributors.ruleNodeIds, row.contributors.storeSlotIds);
+      cascadeDelete(row.contributors.ruleNodeIds, row.contributors.storeSlotIds, chars);
     }
   }, [isItemDeleted, cascadeDelete, cascadeRestore]);
 
@@ -559,16 +561,18 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     if (discard) {
       const ruleNodeIds: string[] = [];
       const storeSlotIds: string[] = [];
+      const chars: string[] = [];
       for (const row of rows) {
         ruleNodeIds.push(...row.contributors.ruleNodeIds);
         storeSlotIds.push(...row.contributors.storeSlotIds);
+        chars.push(...(row.caseGroup ?? [row.ch]));
       }
       if (ruleNodeIds.length === 0 && storeSlotIds.length === 0) return;
-      cascadeDelete(ruleNodeIds, storeSlotIds);
+      cascadeDelete(ruleNodeIds, storeSlotIds, chars);
     } else {
       const ids = rows.flatMap(recommendedRowIds);
       if (ids.length === 0) return;
-      cascadeRestore(ids);
+      cascadeRestore(ids, rows.flatMap((row) => row.caseGroup ?? [row.ch]));
     }
   }, [cascadeDelete, cascadeRestore]);
 
@@ -581,9 +585,9 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
   const toggleCell = useCallback((cell: CharacterCell) => {
     if (!characterCellIsToggleable(cell)) return;
     if (isCellDiscarded(cell, isItemDeleted)) {
-      cascadeRestore(characterCellIds(cell));
+      cascadeRestore(characterCellIds(cell), [cell.ch]);
     } else {
-      cascadeDelete(cell.contributors.ruleNodeIds, cell.contributors.storeSlotIds);
+      cascadeDelete(cell.contributors.ruleNodeIds, cell.contributors.storeSlotIds, [cell.ch]);
     }
   }, [isItemDeleted, cascadeDelete, cascadeRestore]);
 
@@ -591,8 +595,10 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     const ruleNodeIds: string[] = [];
     const storeSlotIds: string[] = [];
     const restoreIds: string[] = [];
+    const chars: string[] = [];
     for (const cell of groupCells) {
       if (!characterCellIsToggleable(cell)) continue;
+      chars.push(cell.ch);
       if (discard) {
         ruleNodeIds.push(...cell.contributors.ruleNodeIds);
         storeSlotIds.push(...cell.contributors.storeSlotIds);
@@ -600,8 +606,8 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
         restoreIds.push(...characterCellIds(cell));
       }
     }
-    if (discard) cascadeDelete(ruleNodeIds, storeSlotIds);
-    else cascadeRestore(restoreIds);
+    if (discard) cascadeDelete(ruleNodeIds, storeSlotIds, chars);
+    else cascadeRestore(restoreIds, chars);
   }, [cascadeDelete, cascadeRestore]);
 
   // Kept / total / removed counts over EVERY cell.
@@ -638,7 +644,8 @@ export function CarveGalleryV2({ onComplete, onBack }: CarveGalleryV2Props) {
     if (item.type !== 'item') return;
     const cell = cellsByCh.get(item.ch);
     if (cell === undefined) return;
-    cascadeRestore(characterCellIds(cell));
+    // Issue #1809 ruling §1: keep the aggregated-R carve set in sync.
+    cascadeRestore(characterCellIds(cell), [cell.ch]);
   }, [cellsByCh, cascadeRestore]);
 
   // cellsByCh (not cells) is the lookup here: selectedCh may be a
