@@ -15,7 +15,7 @@
 // FR-004: a compile error shows the blocking diagnostic and NEVER stale
 // output — while the artifact is not "ready" the trace table is hidden.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Trans } from "@lingui/react/macro";
 import type {
   CompileResult,
