@@ -103,7 +103,7 @@ const btnStyle: CSSProperties = {
 const dangerBtnStyle: CSSProperties = {
   ...btnStyle,
   border: `1px solid var(--sil-orange-dark, ${BORDER})`,
-  color: "var(--sil-orange-dark, #b3541e)",
+  color: "var(--app-warning-text)",
 };
 
 const rowStyle: CSSProperties = {
@@ -124,7 +124,7 @@ const pairCharStyle: CSSProperties = {
 
 const errorStyle: CSSProperties = {
   fontSize: 12.5,
-  color: "var(--sil-orange-dark, #b3541e)",
+  color: "var(--app-warning-text)",
   marginTop: 6,
 };
 

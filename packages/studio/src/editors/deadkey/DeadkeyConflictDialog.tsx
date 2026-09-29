@@ -20,7 +20,7 @@ import {
 const overlayStyle: CSSProperties = {
   position: "fixed",
   inset: 0,
-  background: "rgba(0, 0, 0, 0.45)",
+  background: "color-mix(in srgb, var(--sil-black) 45%, transparent)",
   display: "flex",
   alignItems: "center",
   justifyContent: "center",
@@ -35,7 +35,7 @@ const dialogStyle: CSSProperties = {
   padding: "18px 20px",
   maxWidth: 520,
   width: "calc(100% - 48px)",
-  boxShadow: "0 8px 32px rgba(0,0,0,0.25)",
+  boxShadow: "0 8px 32px color-mix(in srgb, var(--sil-black) 25%, transparent)",
 };
 
 const headingStyle: CSSProperties = {
