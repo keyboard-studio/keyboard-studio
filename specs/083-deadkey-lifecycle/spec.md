@@ -117,7 +117,7 @@ No lifecycle action silently overwrites another deadkey's identity. Minting, ren
 
 1. **Given** a define action whose proposed id collides, **When** the author has not chosen, **Then** the action does not proceed — it offers rename-mine, merge, replace, or cancel.
 2. **Given** a replace choice, **When** confirmed, **Then** the replaced deadkey's rules and stores are removed first (the delete preconditions apply), so no orphaned references survive.
-3. **Given** any lifecycle action, **When** it completes, **Then** the §10 validator layer confirms no dangling deadkey references and no duplicate ids.
+3. **Given** any lifecycle action, **When** it completes, **Then** the §10 validator layer confirms no dangling deadkey references, no orphaned stores, and no duplicate ids above warning level (several triggers arming one state is legal KMN — the duplicate-id finding is a `KM_WARN_*` intent-ambiguity notice, not an error).
 
 ---
 

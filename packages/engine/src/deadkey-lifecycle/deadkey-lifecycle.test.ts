@@ -175,9 +175,11 @@ describe("defineDeadkey", () => {
       accentChar: "́",
       id: 0x003b,
     });
-    expect(conflictKinds(result)).toEqual(["id-in-use"]);
+    expect(conflictKinds(result)).toEqual(["id-in-use", "store-in-use"]);
     if (!result.ok) {
       expect(result.conflicts[0]?.ids).toEqual([0x003b]);
+      // The id's own stores exist too — a second define would clobber them.
+      expect(result.conflicts[1]?.kind).toBe("store-in-use");
     }
     expect(JSON.stringify(ir)).toBe(before);
   });
@@ -195,6 +197,32 @@ describe("defineDeadkey", () => {
       expect(result.conflicts[0]?.ids).toEqual([0x003b]);
       expect(result.conflicts[0]?.keys).toEqual(["K_COLON"]);
     }
+  });
+
+  it("conflict: conventional store names already exist → store-in-use, no duplicate store() emitted", () => {
+    // Orphaned dk_<hex>_* stores (e.g. left by a hand-edited IR) are
+    // invisible to allocateDeadkeyId and pass id-in-use — define must refuse
+    // rather than emit a second store() with the same name.
+    const ir = parseKmn(
+      BASE_KMN +
+        `store(dk_3001_bases) 'ae'\n` +
+        `store(dk_3001_output) 'áé'\n`,
+    );
+    const before = JSON.stringify(ir);
+    const result = defineDeadkey(ir, {
+      triggerKey: "K_QUOTE",
+      accentChar: "́",
+      id: 0x3001,
+    });
+    expect(conflictKinds(result)).toEqual(["store-in-use"]);
+    if (!result.ok) {
+      expect(result.conflicts[0]?.message).toContain("dk_3001_bases");
+      expect(result.conflicts[0]?.ids).toEqual([0x3001]);
+    }
+    expect(JSON.stringify(ir)).toBe(before);
+    expect(
+      ir.stores.filter((s) => s.name === "dk_3001_bases"),
+    ).toHaveLength(1);
   });
 
   it("the cluster survives parse → emit → parse with marker and name intact", () => {

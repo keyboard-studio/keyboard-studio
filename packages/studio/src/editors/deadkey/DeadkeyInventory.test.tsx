@@ -94,11 +94,13 @@ describe("DeadkeyInventory", () => {
     ).toBeGreaterThan(0);
   });
 
-  it("shows the duplicate-id repair notice and repairs on click", () => {
+  it("shows the shared-id repair notice and repairs on click", () => {
     const ir = parseIr(`+ [K_COLON] > dk(dead0)\n+ [K_LBRKT] > dk(dead0)\n`);
     const { onCommitRepair } = renderInventory(ir);
 
-    expect(screen.getByText(/duplicate deadkey id/i)).toBeTruthy();
+    expect(screen.getByText(/shared deadkey id/i)).toBeTruthy();
+    // The notice states the do-nothing option symmetrically, not just the repair.
+    expect(screen.getByText(/works as-is/i)).toBeTruthy();
     const repairBtn = screen.getByRole("button", { name: /repair: re-assign fresh ids/i });
     fireEvent.click(repairBtn);
 

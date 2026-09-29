@@ -10,7 +10,7 @@
 //   "rule shape not recognized — pair editing unavailable"; retarget and
 //   delete stay enabled.
 // - id:null (named/opaque dk(name), pre-FR-004): delete/retarget only.
-// - Duplicate-id findings (KM_ERROR_DUPLICATE_DEADKEY_ID) surface as a
+// - Duplicate-id findings (KM_WARN_DUPLICATE_DEADKEY_ID) surface as a
 //   visible repair notice with a real minimal repair (re-mint the extra
 //   trigger rules via allocateDeadkeyId); the notice says what the repair
 //   does and what it can't do (pair attribution).
@@ -189,7 +189,7 @@ export interface DeadkeyInventoryProps {
 export function DeadkeyInventory({ ir, onDefine, onEdit, onCommitRepair }: DeadkeyInventoryProps) {
   const deadkeys = useMemo(() => listDeadkeys(ir), [ir]);
   const duplicateFindings = useMemo(
-    () => validateDeadkeyLifecycle(ir).filter((f) => f.code === "KM_ERROR_DUPLICATE_DEADKEY_ID"),
+    () => validateDeadkeyLifecycle(ir).filter((f) => f.code === "KM_WARN_DUPLICATE_DEADKEY_ID"),
     [ir],
   );
 
@@ -216,17 +216,18 @@ export function DeadkeyInventory({ ir, onDefine, onEdit, onCommitRepair }: Deadk
 
       {duplicateFindings.length > 0 && (
         <div style={repairStyle} role="alert">
-          <b>Duplicate deadkey id{duplicateFindings.length > 1 ? "s" : ""}.</b>{" "}
-          {duplicateFindings.map((f) => f.message).join(" ")} This usually
-          comes from the old assign flow minting every unknown trigger as the
-          same id.
+          <b>Shared deadkey id{duplicateFindings.length > 1 ? "s" : ""}.</b>{" "}
+          {duplicateFindings.map((f) => f.message).join(" ")}
           <br />
-          Repair keeps the first trigger rule on the id and gives every other
-          trigger rule a fresh id. Only true trigger rules (one key in, the
-          deadkey out) are re-minted — any other rule outputting the same id
-          is left for you to inspect. Pairs can&apos;t be attributed to one
-          trigger or the other — they stay with the first; add pairs to the
-          repaired deadkeys from their editors.
+          Both triggers arm the same deadkey state today, and the keyboard
+          works as-is — repair only if these were meant to be different
+          deadkeys. Repair keeps the first trigger rule on the id and gives
+          every other trigger rule a fresh id with its own empty fan-out
+          stores. Only true trigger rules (one key in, the deadkey out) are
+          re-minted — any other rule outputting the same id is left for you
+          to inspect. Pairs can&apos;t be attributed to one trigger or the
+          other — they stay with the first; add pairs to the repaired
+          deadkeys from their editors.
           <br />
           <button type="button" style={repairBtnStyle} onClick={repairDuplicates}>
             Repair: re-assign fresh ids

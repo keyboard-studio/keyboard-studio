@@ -1,5 +1,5 @@
 // deadkeyWrite tests — the studio mutate seam for spec 083, especially the
-// minimal real KM_ERROR_DUPLICATE_DEADKEY_ID repair ("dead0" corruption).
+// minimal real KM_WARN_DUPLICATE_DEADKEY_ID repair ("dead0" corruption).
 
 import { describe, it, expect } from "vitest";
 import type { KeyboardIR } from "@keyboard-studio/contracts";
@@ -27,16 +27,16 @@ function parseIr(kmn: string): KeyboardIR {
 }
 
 describe("withRepairedDuplicateTriggerIds", () => {
-  it("the fixture really is corrupt: validator flags KM_ERROR_DUPLICATE_DEADKEY_ID", () => {
+  it("the fixture really is corrupt: validator flags KM_WARN_DUPLICATE_DEADKEY_ID", () => {
     const ir = parseIr(CORRUPT_KMN);
     const codes = validateDeadkeyLifecycle(ir).map((f) => f.code);
-    expect(codes).toContain("KM_ERROR_DUPLICATE_DEADKEY_ID");
+    expect(codes).toContain("KM_WARN_DUPLICATE_DEADKEY_ID");
   });
 
   it("repair clears the duplicate finding and both deadkeys stay listed", () => {
     const repaired = withRepairedDuplicateTriggerIds(parseIr(CORRUPT_KMN));
     const codes = validateDeadkeyLifecycle(repaired).map((f) => f.code);
-    expect(codes).not.toContain("KM_ERROR_DUPLICATE_DEADKEY_ID");
+    expect(codes).not.toContain("KM_WARN_DUPLICATE_DEADKEY_ID");
 
     const ids = listDeadkeys(repaired)
       .map((d) => d.id)

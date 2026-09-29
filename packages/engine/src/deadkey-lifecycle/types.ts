@@ -32,10 +32,11 @@ import type { DeadkeyInfo, KeyboardIR } from "@keyboard-studio/contracts";
  *   rather than written as something the compiler cannot read back.
  * - `"referenced"` — delete was refused because rules or store items outside
  *   the deadkey's entity still reference its id (or its private stores).
- * - `"store-in-use"` — rename was refused because renaming this deadkey's
- *   fan-out stores to the new id's conventional names would clobber an
- *   unrelated existing store. (Pathological: reachable only when the IR
- *   already carries orphaned `dk_<hex>_*` stores.)
+ * - `"store-in-use"` — a lifecycle action was refused because writing this
+ *   deadkey's conventional fan-out store names would clobber an unrelated
+ *   existing store (define onto orphaned `dk_<hex>_*` stores; rename onto a
+ *   target whose conventional names already exist). Pathological: reachable
+ *   only when the IR already carries orphaned `dk_<hex>_*` stores.
  */
 export type DeadkeyConflictKind =
   | "id-in-use"

@@ -405,7 +405,7 @@ export function withRepointedDeadkeyRefs(
 // ---------------------------------------------------------------------------
 
 /**
- * Repair a KM_ERROR_DUPLICATE_DEADKEY_ID finding: more than one trigger
+ * Repair a KM_WARN_DUPLICATE_DEADKEY_ID finding: more than one trigger
  * rule mints the same numeric id (the "dead0" corruption — every S-02
  * mint on an unknown key used to share one id).
  *

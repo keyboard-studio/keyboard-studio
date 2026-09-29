@@ -285,6 +285,30 @@ function scanNamedRawEntries(ir: KeyboardIR): NamedRawEntry[] {
   return [...byName.values()];
 }
 
+/**
+ * Store names claimed by opaque named-deadkey rules. The codec opaques any
+ * rule mentioning `dk(name)` with a non-hex name, so a named deadkey's
+ * fan-out rules never reach the typed rule list — but its stores are still
+ * typed IR stores. A store shaped `dk_<allhex>_bases|output` (e.g.
+ * `dk_cafe_bases` for an all-hex name slug) would otherwise look orphaned
+ * to the numeric-only liveness scan in {@link validateDeadkeyLifecycle},
+ * so that check treats every store named in a named-deadkey-attributed
+ * fan-out fragment as live.
+ */
+export function namedDeadkeyRawStoreNames(ir: KeyboardIR): Set<string> {
+  const names = new Set<string>();
+  for (const frag of ir.raw) {
+    if (frag.reason !== NAMED_DEADKEY_REASON) continue;
+    const f = RAW_NAMED_FANOUT_RE.exec(frag.sourceText);
+    if (f === null) continue;
+    const base = (f[2] ?? "").trim();
+    const output = (f[3] ?? "").trim();
+    if (base !== "") names.add(base);
+    if (output !== "") names.add(output);
+  }
+  return names;
+}
+
 // ---------------------------------------------------------------------------
 // s02-legacy detection
 // ---------------------------------------------------------------------------

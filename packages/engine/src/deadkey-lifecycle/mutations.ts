@@ -143,9 +143,13 @@ function ensureEntryGroup(ir: KeyboardIR): IRGroup {
  *
  * Conflicts (checked before any work): requested `id` already minted →
  * `"id-in-use"`; `triggerKey` already triggers a different deadkey →
- * `"trigger-in-use"`. The id is never derived from the trigger key
- * (id/trigger decoupling — the old codepoint-coupled scheme is grandfathered,
- * never re-minted: `allocateDeadkeyId` starts studio ids above 0x2FFF).
+ * `"trigger-in-use"`; the new deadkey's conventional store names already
+ * exist (orphaned `dk_<hex>_*` stores from a hand-edited or imported IR) →
+ * `"store-in-use"` (emitting duplicate `store()` definitions would break
+ * compilation, so the author must clear them first). The id is never derived
+ * from the trigger key (id/trigger decoupling — the old codepoint-coupled
+ * scheme is grandfathered, never re-minted: `allocateDeadkeyId` starts
+ * studio ids above 0x2FFF).
  */
 export function defineDeadkey(
   ir: KeyboardIR,
@@ -171,14 +175,34 @@ export function defineDeadkey(
   if (occupant !== undefined) {
     conflicts.push(triggerInUseConflict(triggerKey, occupant, "define"));
   }
+  // Guard the class renameDeadkey already guards: a pre-existing orphaned
+  // store with the same conventional name is invisible to allocateDeadkeyId
+  // and passes the id-in-use check, but pushing a second store() definition
+  // with that name breaks compilation. Explicit conflict, never a silent
+  // duplicate write.
+  const hex = hex4(id);
+  const baseStoreName = `dk_${hex}_bases`;
+  const outputStoreName = `dk_${hex}_output`;
+  const liveStoreNames = new Set(ir.stores.map((s) => s.name));
+  const clobbered = [baseStoreName, outputStoreName].filter((n) =>
+    liveStoreNames.has(n),
+  );
+  if (clobbered.length > 0) {
+    const plural = clobbered.length > 1;
+    conflicts.push({
+      kind: "store-in-use",
+      message:
+        `Cannot define dk(${hex}): store${plural ? "s" : ""} ` +
+        `${clobbered.map((n) => `"${n}"`).join(" and ")} already exist${plural ? "" : "s"}. ` +
+        `Remove or rename the unrelated store${plural ? "s" : ""} first.`,
+      ids: [id],
+    });
+  }
   if (conflicts.length > 0) {
     return { ok: false, conflicts };
   }
 
   const next = structuredClone(ir);
-  const hex = hex4(id);
-  const baseStoreName = `dk_${hex}_bases`;
-  const outputStoreName = `dk_${hex}_output`;
 
   const baseStore: IRStore = {
     nodeId: `store:${baseStoreName}`,

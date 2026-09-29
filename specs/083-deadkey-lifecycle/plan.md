@@ -16,7 +16,7 @@ The IR already types deadkeys (`{ kind: "deadkey", id: number }` in `keyboard-ir
 
 - **`listDeadkeys(ir)`** — scans rules for the three-rule cluster (trigger `+ [K] > dk(id)`, fan-out `dk(id) + any(store) > index(store, 2)`, escape `dk(id) + [K] > accent`) plus the `dk_<id>_bases` / `dk_<id>_output` store pair. Returns `{ id, triggerKey, baseStore, outputStore, pairCount, origin }` where `origin` is `studio` | `imported` | `s02-legacy`. Imported/base deadkeys that don't match the cluster shape are listed with `origin: imported` and whatever fields are recoverable — they are manageable for delete/retarget but not for pair editing until recognised.
 - **`allocateDeadkeyId(ir)`** — numeric, auto-unique. Must scan existing ids *including* codepoint-derived legacy ids (`003b`, `005e`, …) and never re-mint them. Grandfathering is load-bearing: existing keyboards keep their ids.
-- **Validator extensions** (`validator.ts`, which already tracks `existingDeadkeys` and "deadkey resolution"): after any lifecycle mutation, assert no dangling `dk(id)` references, no duplicate ids, no orphaned `dk_<id>_*` stores. These are the regression guards for US6.
+- **Validator extensions** (`validator.ts`, which already tracks `existingDeadkeys` and "deadkey resolution"): after any lifecycle mutation, assert no dangling `dk(id)` references, no orphaned `dk_<id>_*` stores, and no duplicate ids above warning level (`KM_WARN_DUPLICATE_DEADKEY_ID`: several triggers arming one state is legal KMN, so duplication is an intent-ambiguity warning with an author-initiated repair, not an error). These are the regression guards for US6.
 
 ### 2. Decouple id from trigger (studio + engine)
 
@@ -62,9 +62,9 @@ The pattern's `touchLayoutFragment` places the accent char as a touch key. `defi
 ## Test strategy
 
 - Unit: every new function gets colocated tests (contracts, engine, studio), mirroring existing file conventions.
-- Validator regression: delete/rename/retarget tests assert the §10 checks (no dangling refs, no duplicate ids, no orphaned stores).
+- Validator regression: delete/rename/retarget tests assert the §10 checks (no dangling refs, no duplicate ids above warning level, no orphaned stores).
 - Simulator independent tests per user story, as the spec requires — the studio already runs the real KeymanWeb processor, so lifecycle actions are proven on typed sequences, not just emitted.
-- Conflict matrix test: define/rename/retarget × (id collision, trigger collision, referrer block) — every cell must surface a choice or a refusal, never a silent write.
+- Conflict matrix test: define/rename/retarget × (id collision, trigger collision, store-name collision, referrer block) — every cell must surface a choice or a refusal, never a silent write.
 
 ## Risks & open questions
 

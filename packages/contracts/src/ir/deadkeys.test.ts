@@ -359,15 +359,19 @@ describe("validateDeadkeyLifecycle", () => {
     expect(findings[0]?.message).toContain("dk(000b)");
   });
 
-  it("detects duplicate numeric ids across trigger rules", () => {
+  it("warns on duplicate numeric ids across trigger rules (legal KMN, ambiguous intent)", () => {
     const ir = makeTestIR([
       groupWith([trigger("K_A", 0xbeef), trigger("K_B", 0xbeef)]),
     ]);
     const findings = validateDeadkeyLifecycle(ir);
     expect(findings).toHaveLength(1);
-    expect(findings[0]?.code).toBe("KM_ERROR_DUPLICATE_DEADKEY_ID");
-    expect(findings[0]?.severity).toBe("error");
+    expect(findings[0]?.code).toBe("KM_WARN_DUPLICATE_DEADKEY_ID");
+    expect(findings[0]?.severity).toBe("warning");
     expect(findings[0]?.message).toContain("dk(beef)");
+    // Honest semantics: both triggers arm the same state — nothing is
+    // "unreachable".
+    expect(findings[0]?.message).toContain("same deadkey state");
+    expect(findings[0]?.message).not.toContain("unreachable");
   });
 
   it("detects orphaned dk_* stores", () => {
@@ -385,6 +389,30 @@ describe("validateDeadkeyLifecycle", () => {
       "KM_ERROR_ORPHANED_DEADKEY_STORE",
     ]);
     expect(findings[0]?.message).toContain("dk_00ff_bases");
+  });
+
+  it("does not flag dk_* stores claimed by opaque named-deadkey rules", () => {
+    // A named deadkey with an all-hex name slug (e.g. "cafe") produces
+    // stores shaped dk_cafe_{bases,output}, but its fan-out rules never
+    // reach the typed rule list — the codec opaques them as named-deadkey
+    // fragments. The numeric-only liveness scan must not flag these stores
+    // as orphaned.
+    const ir = makeTestIR(
+      [groupWith([])],
+      [
+        charStore({ name: "dk_cafe_bases", chars: "a" }),
+        charStore({ name: "dk_cafe_output", chars: "á" }),
+      ],
+      [
+        {
+          nodeId: "raw:1",
+          origin: "imported",
+          reason: "named-deadkey",
+          sourceText: "dk(café) + any(dk_cafe_bases) > index(dk_cafe_output, 2)",
+        },
+      ],
+    );
+    expect(validateDeadkeyLifecycle(ir)).toEqual([]);
   });
 
   it("does not flag dk_* stores attached to a live deadkey", () => {
