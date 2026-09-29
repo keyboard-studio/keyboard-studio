@@ -4,11 +4,11 @@
     "repo": "keyboard-studio/keyboards",
     "commit": "435f82d69bfc926eb03c2d8632571b41b6da3266",
     "files": {
-      "basic_kbdus": "9164a8b9c1ad1ada58f048bc6dbf8eccc8f90888f1e34104e2f7e9b8afca768d",
-      "basic_kbdusx": "051d78fead49d5324bd80e98d0e9d43f31059178e19af2e2a7f9387419badebb",
-      "basic_kbdfr": "e5c747729b7f072ce0501f8d9379fb3783d3a9a54f454a259d3b51dff27c93d2",
-      "basic_kbdgr": "5f031d31ca89a248e6c75875cd6be992772b0be291d1e81bf372f415b7c850d7",
-      "basic_kbduk": "5d067b9f5a54ec5bc0a51156bf89ad81fd53269b2e8b5ba14d38b74e95d36263"
+      "basic_kbdus": "6196ffd65d121e16b8d62f806fd654d0d94a58c6774401c33762e4674418a3bf",
+      "basic_kbdusx": "d22d13419587748fea1bb55d64ea97463cc00ca3c14a34c6e71438917cd8f4c7",
+      "basic_kbdfr": "c6b5a05257f3e282a4b69d6e8a8d2bce3d3b65084abd858079c23beed22f5c34",
+      "basic_kbdgr": "9797790bde833a08ab6a3844ac928c4834aba1c5b44f150393f83274da1558d1",
+      "basic_kbduk": "7a7767058c396559ab3af2971ffada38a9cda17440637c535b86308db4af172b"
     }
   },
   "hosts": {
