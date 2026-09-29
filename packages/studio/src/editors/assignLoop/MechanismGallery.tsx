@@ -424,8 +424,8 @@ function excludeSequenceMechanisms(
 
 /**
  * Numeric ids already minted as S-02 deadkeyName slots in this session's
- * assignments. Only 1–4 hex chars count — legacy "dead0"-style names are
- * longer and stay out of the reservation set.
+ * assignments. 1–8 hex chars count — the pipeline imposes no 0xffff cap,
+ * so a 5-digit session-minted id must still be reserved.
  */
 function sessionMintedDeadkeyIds(
   sessionAssignments: readonly MechanismAssignment[],
@@ -435,7 +435,10 @@ function sessionMintedDeadkeyIds(
     for (const m of a.mechanisms) {
       if (m.patternId !== PATTERN_DEADKEY) continue;
       const name = m.slotValues?.["deadkeyName"];
-      if (typeof name !== "string" || !/^[0-9a-fA-F]{1,4}$/.test(name)) continue;
+      // 1–8 hex digits — matches the deadkey editors' parseIdText: the
+      // pipeline imposes no 0xffff cap, so a 5-digit session-minted id
+      // must still be reserved.
+      if (typeof name !== "string" || !/^[0-9a-fA-F]{1,8}$/.test(name)) continue;
       const id = parseInt(name, 16);
       if (!Number.isNaN(id)) ids.add(id);
     }

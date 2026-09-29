@@ -42,7 +42,9 @@ export type DeadkeyCommit =
   | { ok: true; ir: KeyboardIR }
   | { ok: false; conflicts: readonly DeadkeyConflict[] };
 
-/** Lowercase 4-digit hex, e.g. 0x3000 → "3000". */
+/** Lowercase hex, zero-padded to at least 4 digits, e.g. 0x3000 → "3000".
+ *  Ids above 0xffff are not truncated ("dead1" stays "dead1") — the
+ *  pipeline imposes no 4-digit cap. */
 export function hex4(id: number): string {
   return id.toString(16).padStart(4, "0");
 }

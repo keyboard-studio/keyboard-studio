@@ -94,6 +94,22 @@ describe("DeadkeyDefineForm", () => {
     expect(onDefined).toHaveBeenCalledWith(0x3002);
   });
 
+  it("accepts a 5-digit proposed id — the pipeline has no 0xffff cap", async () => {
+    // dk(dead0) parses as numeric 0xdead0; the UI must accept the ids the
+    // pipeline itself produces (e.g. 0xdead1 after duplicate repair).
+    const { onCommitIr, onDefined } = renderForm(parseIr());
+    await changeSelectMenu(
+      screen.getByLabelText(/trigger key for the new deadkey/i),
+      "K_COLON",
+    );
+    fireEvent.change(screen.getByLabelText(/deadkey id/i), {
+      target: { value: "dead1" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /define deadkey/i }));
+    expect(onCommitIr).toHaveBeenCalledTimes(1);
+    expect(onDefined).toHaveBeenCalledWith(0xdead1);
+  });
+
   it("accepts an astral double-tap accent (one scalar, two UTF-16 units)", async () => {
     const { onCommitIr } = renderForm(parseIr());
     await changeSelectMenu(

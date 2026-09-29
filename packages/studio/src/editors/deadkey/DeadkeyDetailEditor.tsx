@@ -144,7 +144,10 @@ const NAME_RE = /^[A-Za-z0-9_]{1,64}$/;
 
 function parseIdText(text: string): number | null {
   const t = text.trim().toLowerCase();
-  const m = /^(?:dk\()?(?:0x)?([0-9a-f]{1,4})\)?$/.exec(t);
+  // 1–8 hex digits: the codec/contracts pipeline imposes no 0xffff cap
+  // (e.g. an imported dk(dead0) is numeric 0xdead0, and repair mints
+  // 0xdead1), so the UI must not reject ids the pipeline itself produces.
+  const m = /^(?:dk\()?(?:0x)?([0-9a-f]{1,8})\)?$/.exec(t);
   if (!m) return null;
   const id = parseInt(m[1]!, 16);
   return Number.isNaN(id) || id <= 0 ? null : id;

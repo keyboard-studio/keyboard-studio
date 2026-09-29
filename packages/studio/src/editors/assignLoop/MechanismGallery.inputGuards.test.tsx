@@ -11,6 +11,7 @@ import { describe, it, expect, vi } from "vitest";
 import { screen, fireEvent, act } from "@testing-library/react";
 import { render } from "../../test/renderWithI18n.tsx";
 import { MechanismGallery, resolveS02DeadkeyIdentity, PATTERN_DEADKEY } from "./MechanismGallery.tsx";
+import { parseKmn } from "@keyboard-studio/engine";
 import { useWorkingCopyStore } from "../../stores/workingCopyStore.ts";
 import { basicKbdus } from "@keyboard-studio/contracts/fixtures";
 import { CUSTOM_KEY_OPTION_VALUE } from "../../lib/keyOptions.ts";
@@ -241,6 +242,43 @@ describe("MechanismGallery — custom key option (S-02 deadkey trigger)", () => 
     expect(second.deadkeyName).toBe("3001");
     expect(second.deadkeyName).not.toBe(first.deadkeyName);
     expect(second.accentChar).toBe("[");
+  });
+
+  it("a 5-digit session-minted id is reserved (no 0xffff cap)", () => {
+    // dk(dead0) parses as numeric 0xdead0, so allocateDeadkeyId(workingIr)
+    // proposes 0xdead1 — but the session already minted "dead1". The
+    // 5-digit reservation must be honored and the mint must bump to 0xdead2.
+    const workingIr = parseKmn(
+      `store(&version) '10.0'\nbegin Unicode > use(main)\n\ngroup(main) using keys\n+ [K_BKQUOTE] > dk(dead0)\n`,
+      "deadkey-5digit-reservation",
+    ).ir;
+    const second = resolveS02DeadkeyIdentity({
+      triggerKey: "K_LBRKT",
+      triggerResolution: { kind: "key", vkey: "K_LBRKT" },
+      workingIr,
+      sessionAssignments: [
+        {
+          scope: "individual",
+          target: "ā",
+          modality: "physical",
+          mechanisms: [
+            {
+              patternId: PATTERN_DEADKEY,
+              strategyId: "S-02",
+              slotValues: {
+                triggerKey: "K_COLON",
+                deadkeyName: "dead1",
+                baseLetters: "a",
+                accentedForms: "ā",
+                accentChar: ";",
+              },
+            },
+          ],
+          source: "user",
+        },
+      ],
+    });
+    expect(second.deadkeyName).toBe("dead2");
   });
 });
 

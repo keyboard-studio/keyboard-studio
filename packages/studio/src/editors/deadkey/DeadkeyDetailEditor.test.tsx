@@ -111,6 +111,16 @@ describe("DeadkeyDetailEditor", () => {
     expect(onRenamed).toHaveBeenCalledWith(0x3001);
   });
 
+  it("renames to a 5-digit id — the pipeline has no 0xffff cap", () => {
+    const { onCommitIr, onRenamed } = renderEditor(definedIr());
+    fireEvent.change(screen.getByLabelText(/New numeric id/), { target: { value: "dead1" } });
+    fireEvent.click(screen.getByRole("button", { name: "Rename id" }));
+    expect(onCommitIr).toHaveBeenCalledTimes(1);
+    const renamed = onCommitIr.mock.calls[0]![0] as KeyboardIR;
+    expect(listDeadkeys(renamed).some((d) => d.id === 0xdead1)).toBe(true);
+    expect(onRenamed).toHaveBeenCalledWith(0xdead1);
+  });
+
   it("saves the always-available author name", () => {
     const { onCommitIr } = renderEditor(definedIr());
     fireEvent.change(screen.getByLabelText(/Author name \(optional\)/), { target: { value: "acute" } });
