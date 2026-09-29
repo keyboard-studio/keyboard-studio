@@ -4,7 +4,7 @@
 // shared `renderWithI18n` wrapper every Lingui-ified component test uses
 // (see that module's header).
 import { describe, it, expect, afterEach } from "vitest";
-import { screen, cleanup } from "@testing-library/react";
+import { screen, cleanup, fireEvent, within } from "@testing-library/react";
 import { render } from "../test/renderWithI18n.tsx";
 import { PhaseStepper } from "./PhaseStepper.tsx";
 
@@ -22,15 +22,17 @@ describe("PhaseStepper", () => {
       screen.getByTestId(`phase-pill-${letter}`),
     );
     const nav = screen.getByTestId("phase-stepper");
-    const order = pills.map((pill) => Array.from(nav.querySelectorAll("li")).indexOf(pill));
+    const order = pills.map((pill) =>
+      Array.from(nav.querySelectorAll("li")).indexOf(pill),
+    );
     expect(order).toEqual([0, 1, 2, 3, 4, 5]);
   });
 
   it("marks aria-current='step' on exactly one pill", () => {
     render(<PhaseStepper activeStepId="carve" />);
-    const current = screen.getAllByRole("listitem").filter(
-      (li) => li.getAttribute("aria-current") === "step",
-    );
+    const current = screen
+      .getAllByRole("listitem")
+      .filter((li) => li.getAttribute("aria-current") === "step");
     expect(current).toHaveLength(1);
     expect(current[0]).toBe(screen.getByTestId("phase-pill-d"));
   });
@@ -86,5 +88,84 @@ describe("PhaseStepper", () => {
     const donePill = screen.getByTestId("phase-pill-a");
     expect(activePill.textContent).toContain("current step");
     expect(donePill.textContent).toContain("completed");
+  });
+});
+
+describe("PhaseStepper compact (narrow viewport)", () => {
+  const NARROW_WIDTH = 390;
+  const DESKTOP_WIDTH = 1024;
+
+  function setViewportWidth(width: number): void {
+    Object.defineProperty(window, "innerWidth", {
+      value: width,
+      configurable: true,
+    });
+  }
+
+  afterEach(() => {
+    cleanup();
+    setViewportWidth(DESKTOP_WIDTH);
+  });
+
+  it("renders the compact summary instead of the pill row on narrow viewports", () => {
+    setViewportWidth(NARROW_WIDTH);
+    render(<PhaseStepper activeStepId="characters" />);
+    expect(screen.queryByTestId("phase-stepper")).toBeNull();
+    const trigger = screen.getByTestId("phase-stepper-compact");
+    expect(trigger.textContent).toContain("Phase C");
+    expect(trigger.textContent).toContain("Characters");
+    expect(trigger.textContent).toContain("step 5 of 15");
+  });
+
+  it("keeps the desktop pill row at desktop widths", () => {
+    setViewportWidth(DESKTOP_WIDTH);
+    render(<PhaseStepper activeStepId="characters" />);
+    expect(screen.queryByTestId("phase-stepper-compact")).toBeNull();
+    expect(screen.getByTestId("phase-stepper")).not.toBeNull();
+  });
+
+  it("opens the full pill list in a dialog on tap, preserving aria-current", () => {
+    setViewportWidth(NARROW_WIDTH);
+    render(<PhaseStepper activeStepId="carve" />);
+    const trigger = screen.getByRole("button", { name: /Phase D/ });
+    expect(trigger.getAttribute("aria-expanded")).toBe("false");
+    fireEvent.click(trigger);
+    expect(trigger.getAttribute("aria-expanded")).toBe("true");
+
+    const dialog = screen.getByTestId("phase-stepper-dialog");
+    const pills = ["a", "b", "c", "d", "e", "f"].map((letter) =>
+      within(dialog).getByTestId(`phase-pill-${letter}`),
+    );
+    expect(pills).toHaveLength(6);
+    const current = pills.filter(
+      (pill) => pill.getAttribute("aria-current") === "step",
+    );
+    expect(current).toHaveLength(1);
+    expect(current[0]).toBe(within(dialog).getByTestId("phase-pill-d"));
+  });
+
+  it("closes the dialog via its close button", () => {
+    setViewportWidth(NARROW_WIDTH);
+    render(<PhaseStepper activeStepId="carve" />);
+    fireEvent.click(screen.getByRole("button", { name: /Phase D/ }));
+    expect(screen.getByTestId("phase-stepper-dialog")).not.toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Close phase list" }));
+    expect(screen.queryByTestId("phase-stepper-dialog")).toBeNull();
+  });
+
+  it("falls back to a generic label for unphased or unknown step ids", () => {
+    setViewportWidth(NARROW_WIDTH);
+    render(<PhaseStepper activeStepId="package" />);
+    expect(screen.getByTestId("phase-stepper-compact").textContent).toContain(
+      "Survey progress",
+    );
+  });
+
+  it("falls back to a generic label when no step is resolved yet", () => {
+    setViewportWidth(NARROW_WIDTH);
+    render(<PhaseStepper activeStepId={null} />);
+    expect(screen.getByTestId("phase-stepper-compact").textContent).toContain(
+      "Survey progress",
+    );
   });
 });
