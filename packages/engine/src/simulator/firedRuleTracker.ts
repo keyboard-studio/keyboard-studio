@@ -215,12 +215,18 @@ export function instrumentFiredRuleTracking(scriptSrc: string): InstrumentedScri
 
   if (insertions.length === 0) return null;
 
-  // Splice from the end so earlier offsets stay valid.
-  insertions.sort((a, b) => b.offset - a.offset);
-  let script = scriptSrc;
+  // Build the instrumented script in a single pass. The old code spliced each
+  // insertion with slice/concat (O(insertions × script length)); corpus
+  // keyboards with tens of thousands of rules turned that quadratic.
+  insertions.sort((a, b) => a.offset - b.offset);
+  const parts: string[] = [];
+  let cursor = 0;
   for (const ins of insertions) {
-    script = script.slice(0, ins.offset) + ins.text + script.slice(ins.offset);
+    parts.push(scriptSrc.slice(cursor, ins.offset), ins.text);
+    cursor = ins.offset;
   }
+  parts.push(scriptSrc.slice(cursor));
+  const script = parts.join('');
 
   return { script, hookName: FIRED_RULE_HOOK_NAME, groups: groupInfo };
 }
