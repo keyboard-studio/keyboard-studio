@@ -300,8 +300,8 @@ describe("T022 sil_cameroon_qwerty carve regression (real keyboard, FR-019/FR-02
     // What the typist's computer would produce if the carved keystroke fell
     // through to the host layout (A3: the leak the suppression closes).
     expect(lookupHostOutput("uk", "K_4", ["RALT"])).toBe("€");
-    // Shift+AltGr resolves to the AltGr layer (documented coverage limit).
-    expect(lookupHostOutput("uk", "K_4", ["SHIFT", "RALT"])).toBe("€");
+    // Shift+AltGr is its own layer; Windows UK defines nothing on Shift+AltGr+4.
+    expect(lookupHostOutput("uk", "K_4", ["SHIFT", "RALT"])).toBeUndefined();
     // The keyboard's own ɛ on RALT+A vs the host's á — a second leak shape.
     expect(lookupHostOutput("uk", "K_A", ["RALT"])).toBe("á");
   });

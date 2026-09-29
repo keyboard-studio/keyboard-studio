@@ -49,8 +49,30 @@ describe('reference host data', () => {
   it('returns undefined for uncovered cells — never a guess', () => {
     // Plain US has no AltGr layer.
     expect(lookupHostOutput('us', 'K_A', ['RALT'])).toBeUndefined();
-    // Shift+AltGr positions are not separately mapped.
-    expect(lookupHostOutput('uk', 'K_4', ['SHIFT', 'RALT'])).toBe('€');
+    // Shift+AltGr is its own layer; Windows UK defines nothing on Shift+AltGr+4.
+    expect(lookupHostOutput('uk', 'K_4', ['SHIFT', 'RALT'])).toBeUndefined();
+  });
+
+  it('maps the Shift+AltGr layer separately from AltGr', () => {
+    expect(lookupHostOutput('uk', 'K_A', ['SHIFT', 'RALT'])).toBe('Á');
+    expect(lookupHostOutput('uk', 'K_A', ['RALT'])).toBe('á');
+  });
+
+  it('matches Windows on the cells hand curation got wrong (basic keyboards are the source)', () => {
+    // Windows UK has no AltGr bracket series, backslash on AltGr+hyphen, or ß/µ/ç.
+    for (const key of ['K_7', 'K_8', 'K_9', 'K_0', 'K_HYPHEN', 'K_S', 'K_M', 'K_C']) {
+      expect(lookupHostOutput('uk', key, ['RALT'])).toBeUndefined();
+    }
+    expect(lookupHostOutput('uk', 'K_BKQUOTE', ['RALT'])).toBe('¦');
+    expect(lookupHostOutput('us-intl', 'K_Y', ['RALT'])).toBe('ü');
+    // French AZERTY AltGr+2 (~) and AltGr+7 (`) are deadkeys, not literals.
+    expect(lookupHostOutput('azerty', 'K_2', ['RALT'])).toBe(DEADKEY);
+    expect(lookupHostOutput('azerty', 'K_7', ['RALT'])).toBe(DEADKEY);
+  });
+
+  it("normalizes Keyman's K_oE2 spelling to the tables' upper-cased ids", () => {
+    expect(lookupHostOutput('qwertz', 'K_oE2', [])).toBe(lookupHostOutput('qwertz', 'K_OE2', []));
+    expect(lookupHostOutput('qwertz', 'K_oE2', [])).toBe('<');
   });
 });
 
